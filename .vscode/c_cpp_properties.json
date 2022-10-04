@@ -1,0 +1,31 @@
+{
+    "configurations": [
+        {
+            "name": "macOS arm64 Debug",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "macFrameworkPath": [],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "gnu11",
+            "cppStandard": "gnu++11",
+            "intelliSenseMode": "macos-clang-arm64",
+            "compileCommands": "${workspaceFolder}/_build/macOS-Universal/Debug/compile_commands_arm64.json"
+        },       
+         {
+            "name": "macOS arm64 Release",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "macFrameworkPath": [],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "gnu11",
+            "cppStandard": "gnu++11",
+            "intelliSenseMode": "macos-clang-arm64",
+            "compileCommands": "${workspaceFolder}/_build/macOS-Universal/Release/compile_commands_arm64.json"
+        }
+    ],
+    "version": 4
+}

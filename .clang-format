@@ -1,0 +1,17 @@
+---
+BasedOnStyle: Microsoft
+BreakBeforeBraces: Custom
+BraceWrapping:
+    AfterUnion: true
+    SplitEmptyFunction: false
+PointerAlignment: Left
+ReferenceAlignment: Left
+AlwaysBreakTemplateDeclarations: Yes
+AllowShortFunctionsOnASingleLine: All
+AllowShortBlocksOnASingleLine: Always
+AllowShortCaseLabelsOnASingleLine: Yes
+AllowShortEnumsOnASingleLine: Yes
+AlignConsecutiveBitFields: Consecutive
+AlignConsecutiveMacros: Consecutive
+AlignConsecutiveDeclarations: Consecutive
+AlignConsecutiveAssignments: Consecutive
