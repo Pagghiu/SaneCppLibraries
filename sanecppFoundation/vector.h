@@ -1,91 +1,78 @@
 #pragma once
 #include "assert.h"
-#include "language.h"
 #include "limits.h"
 #include "memory.h"
+#include "segment.h"
 #include "types.h"
 
 namespace sanecpp
 {
-template <typename T, int N = 0>
+template <typename T>
 struct vector;
-template <typename T, int N>
-struct segmentBase;
-template <typename T, int N>
-struct segment;
+struct vectorAllocator;
 } // namespace sanecpp
-template <typename T, int N>
-struct alignas(sanecpp::uint64_t) sanecpp::segmentBase
-{
-    typedef uint32_t HeaderBytesType;
 
-    uint32_t sizeBytes;
-    uint32_t capacityBytes;
-    union
+struct sanecpp::vectorAllocator
+{
+    static segmentHeader* reallocate(segmentHeader* oldHeader, size_t newSize)
     {
-        T items[N];
-    };
-};
+        if (newSize > static_cast<segmentHeader::HeaderBytesType>(MaxValue()))
+        {
+            return nullptr;
+        }
+        segmentHeader* newHeader =
+            reinterpret_cast<segmentHeader*>(memoryReallocate(oldHeader, sizeof(segmentHeader) + newSize));
+        if (newHeader)
+        {
+            newHeader->capacityBytes = static_cast<segmentHeader::HeaderBytesType>(newSize);
+        }
+        return newHeader;
+    }
 
-template <typename T, int N>
-struct sanecpp::segment : public sanecpp::segmentBase<T, N>
-{
-    static segment* reallocate(segment* oldHeader, size_t newSize) { return nullptr; }
-    static segment* allocate(size_t numNewBytes) { return nullptr; }
-    static void     release(segment* oldHeader) {}
+    static segmentHeader* allocate(segmentHeader* oldHeader, size_t numNewBytes)
+    {
+        if (numNewBytes > static_cast<segmentHeader::HeaderBytesType>(MaxValue()))
+        {
+            return nullptr;
+        }
+        segmentHeader* newHeader =
+            reinterpret_cast<segmentHeader*>(memoryAllocate(sizeof(segmentHeader) + numNewBytes));
+        if (newHeader)
+        {
+            newHeader->capacityBytes = static_cast<segmentHeader::HeaderBytesType>(numNewBytes);
+        }
+        return newHeader;
+    }
+
+    static void release(segmentHeader* oldHeader) { memoryRelease(oldHeader); }
 };
 
 template <typename T>
-struct sanecpp::segment<T, 0> : public sanecpp::segmentBase<T, 0>
-{
-    static segment* reallocate(segment* oldHeader, size_t newSize)
-    {
-        if (newSize > static_cast<typename segmentBase<T, 0>::HeaderBytesType>(MaxValue()))
-        {
-            return nullptr;
-        }
-        segment* newHeader = reinterpret_cast<segment*>(memoryReallocate(oldHeader, sizeof(segment) + newSize));
-        if (newHeader)
-        {
-            newHeader->capacityBytes = static_cast<uint32_t>(newSize);
-        }
-        return newHeader;
-    }
-
-    static segment* allocate(size_t numNewBytes)
-    {
-        if (numNewBytes > static_cast<typename segmentBase<T, 0>::HeaderBytesType>(MaxValue()))
-        {
-            return nullptr;
-        }
-        segment* newHeader = reinterpret_cast<segment*>(memoryAllocate(sizeof(segment) + numNewBytes));
-        if (newHeader)
-        {
-            newHeader->capacityBytes = static_cast<uint32_t>(numNewBytes);
-        }
-        return newHeader;
-    }
-
-    static void release(segment* oldHeader) { memoryRelease(oldHeader); }
-};
-
-template <typename T, int N>
 struct sanecpp::vector
 {
-    typedef segment<T, N> segment;
+    typedef segmentOperations<vectorAllocator, T> segmentOperations;
 
     T* items;
 
-    vector() : items(nullptr) { static_assert(sizeof(segment) == 8, "header changed"); }
+    vector() : items(nullptr) {}
     vector(vector&& other) : items(other.items) { other.items = nullptr; }
-    vector(const vector& other) : items(nullptr) { *this = other; }
-    ~vector() { destruct(); }
+    vector(const vector& other) : items(nullptr)
+    {
+        const size_t otherSize = other.size();
+        if (otherSize > 0)
+        {
+            const bool res = appendCopy(other);
+            (void)res;
+            SANECPP_DEBUG_ASSERT(res);
+        }
+    }
+    ~vector() { destroy(); }
 
     vector& operator=(vector&& other)
     {
         if (&other != this)
         {
-            destruct();
+            destroy();
             items       = other.items;
             other.items = nullptr;
         }
@@ -96,15 +83,9 @@ struct sanecpp::vector
     {
         if (&other != this)
         {
-            destruct();
-            // We could assign items min(size, other.size) if capacity()>=other.size()...
-            if (other.size() > 0)
-            {
-                segment* newHeader   = segment::allocate(other.getSegment()->sizeBytes);
-                newHeader->sizeBytes = newHeader->capacityBytes;
-                items                = newHeader->items;
-                copyConstruct(items, 0, other.size(), other.items);
-            }
+            const bool res = segmentOperations::copy(items, other.data(), other.size());
+            (void)res;
+            SANECPP_DEBUG_ASSERT(res);
         }
         return *this;
     }
@@ -121,118 +102,84 @@ struct sanecpp::vector
         return items[index];
     }
 
-    [[nodiscard]] bool push_back(const T& element)
+    [[nodiscard]] bool push_back(const T& element) { return segmentOperations::push_back(items, element); }
+    [[nodiscard]] bool push_back(T&& element) { return segmentOperations::push_back(items, forward<T>(element)); }
+    [[nodiscard]] bool pop_back()
     {
-        const size_t numElements = size();
-        if (numElements == capacity())
-        {
-            if (!ensureCapacity(numElements + 1, numElements)) [[unlikely]]
-            {
-                return false;
-            }
-        }
-        copyConstruct(items, numElements, 1, &element);
-        getSegment()->sizeBytes += sizeof(T);
-        return true;
+        if (items != nullptr)
+            return segmentItems<T>::getSegment(items)->pop_back();
+        else
+            return false;
     }
-
-    [[nodiscard]] bool push_back(T&& element)
+    [[nodiscard]] bool pop_front()
     {
-        const size_t numElements = size();
-        if (numElements == capacity())
-        {
-            if (!ensureCapacity(numElements + 1, numElements)) [[unlikely]]
-            {
-                return false;
-            }
-        }
-        moveConstruct(items, numElements, 1, &element);
-        getSegment()->sizeBytes += sizeof(T);
-        return true;
-    }
-
-    void pop_back()
-    {
-        const size_t sz = size();
-        SANECPP_RELEASE_ASSERT(sz > 0);
-        destroyElements(items, sz - 1, 1);
-        setSize(sz - 1);
-    }
-
-    void pop_front()
-    {
-        const size_t sz = size();
-        SANECPP_RELEASE_ASSERT(sz > 0);
-        moveAssignElements(items, 0, sz - 1, items + 1);
-        setSize(sz - 1);
+        if (items != nullptr)
+            return segmentItems<T>::getSegment(items)->pop_front();
+        else
+            return false;
     }
 
     [[nodiscard]] T& front()
     {
-        SANECPP_RELEASE_ASSERT(size() > 0);
+        const size_t numElements = size();
+        SANECPP_RELEASE_ASSERT(numElements > 0);
         return items[0];
     }
 
     [[nodiscard]] const T& front() const
     {
-        SANECPP_RELEASE_ASSERT(size() > 0);
+        const size_t numElements = size();
+        SANECPP_RELEASE_ASSERT(numElements > 0);
         return items[0];
     }
 
     [[nodiscard]] T& back()
     {
-        const size_t sz = size();
-        SANECPP_RELEASE_ASSERT(sz > 0);
-        return items[sz - 1];
+        const size_t numElements = size();
+        SANECPP_RELEASE_ASSERT(numElements > 0);
+        return items[numElements - 1];
     }
 
     [[nodiscard]] const T& back() const
     {
-        const size_t sz = size();
-        SANECPP_RELEASE_ASSERT(sz > 0);
-        return items[sz - 1];
+        const size_t numElements = size();
+        SANECPP_RELEASE_ASSERT(numElements > 0);
+        return items[numElements - 1];
     }
 
-    [[nodiscard]] bool reserve(size_t newCap) { return newCap > capacity() ? ensureCapacity(newCap, size()) : true; }
-    [[nodiscard]] bool resize(size_t newSize, const T& value = T()) { return resizeInternal<true>(newSize, value); }
-    [[nodiscard]] bool resizeWithoutInitializing(size_t newSize) { return resizeInternal<false>(newSize, T()); }
+    [[nodiscard]] bool reserve(size_t newCapacity)
+    {
+        if (newCapacity > capacity())
+        {
+            return segmentOperations::ensureCapacity(items, newCapacity, size());
+        }
+        else
+        {
+            return true;
+        }
+    }
+
+    [[nodiscard]] bool resize(size_t newSize, const T& value = T())
+    {
+        return segmentOperations::template resizeInternal<true>(items, newSize, &value);
+    }
+
+    [[nodiscard]] bool resizeWithoutInitializing(size_t newSize)
+    {
+        return segmentOperations::template resizeInternal<false>(items, newSize, nullptr);
+    }
 
     void clear()
     {
         if (items != nullptr)
         {
-            destroyElements(items, 0, size());
-            getSegment()->sizeBytes = 0;
+            segmentItems<T>::getSegment(items)->clear();
         }
     }
 
-    [[nodiscard]] bool shrink_to_fit()
-    {
-        const size_t sz = size();
-        if (sz > 0)
-        {
-            if (sz != capacity())
-            {
-                segment* oldHeader = getSegment();
-                segment* newHeader = segment::allocate(oldHeader->sizeBytes);
-                if (newHeader == nullptr) [[unlikely]]
-                {
-                    return false;
-                }
-                newHeader->sizeBytes = oldHeader->sizeBytes;
-                moveConstruct(newHeader->items, 0, sz, oldHeader->items);
-                segment::release(oldHeader);
-                items = newHeader->items;
-            }
-        }
-        else
-        {
-            destruct();
-        }
-        return true;
-    }
+    [[nodiscard]] bool shrink_to_fit() { return segmentOperations::shrink_to_fit(items); }
 
-    [[nodiscard]] bool isEmpty() const { return (items == nullptr) || (getSegment()->memoryUsed == 0); }
+    [[nodiscard]] bool isEmpty() const { return (items == nullptr) || segmentItems<T>::getSegment(items)->isEmpty(); }
 
     [[nodiscard]] size_t size() const
     {
@@ -242,7 +189,7 @@ struct sanecpp::vector
         }
         else
         {
-            return (getSegment()->sizeBytes / sizeof(T));
+            return segmentItems<T>::getSegment(items)->sizeBytes / sizeof(T);
         }
     }
 
@@ -254,7 +201,7 @@ struct sanecpp::vector
         }
         else
         {
-            return (getSegment()->capacityBytes / sizeof(T));
+            return segmentItems<T>::getSegment(items)->capacityBytes / sizeof(T);
         }
     }
 
@@ -265,228 +212,45 @@ struct sanecpp::vector
     [[nodiscard]] T*       data() { return items; }
     [[nodiscard]] const T* data() const { return items; }
 
-    [[nodiscard]] bool insertMove(size_t idx, T* src, size_t srcSize) { return insert<false>(idx, src, srcSize); }
-    [[nodiscard]] bool insertCopy(size_t idx, const T* src, size_t srcSize) { return insert<true>(idx, src, srcSize); }
-    [[nodiscard]] bool appendMove(T* src, size_t srcNumItems) { return insert<false>(size(), src, srcNumItems); }
-    [[nodiscard]] bool appendCopy(const T* src, size_t srcNumItems) { return insert<true>(size(), src, srcNumItems); }
-    [[nodiscard]] bool appendMove(vector<T>& src) { return appendMove(src.items, src.size()); }
-    [[nodiscard]] bool appendCopy(const vector<T>& src) { return appendCopy(src.items, src.size()); }
-
-  private:
-    void destruct()
+    [[nodiscard]] bool insertMove(size_t idx, T* src, size_t srcNumItems)
     {
-        clear();
-        if (items != nullptr)
+        return segmentOperations::template insert<false>(items, idx, src, srcNumItems);
+    }
+    [[nodiscard]] bool insertCopy(size_t idx, const T* src, size_t srcNumItems)
+    {
+        return segmentOperations::template insert<true>(items, idx, src, srcNumItems);
+    }
+    [[nodiscard]] bool appendMove(T* src, size_t srcNumItems)
+    {
+        return segmentOperations::template insert<false>(items, size(), src, srcNumItems);
+    }
+    [[nodiscard]] bool appendCopy(const T* src, size_t srcNumItems)
+    {
+        return segmentOperations::template insert<true>(items, size(), src, srcNumItems);
+    }
+    template <typename U>
+    [[nodiscard]] bool appendMove(U&& src)
+    {
+        if (appendMove(src.data(), src.size()))
         {
-            segment::release(getSegment());
-            items = nullptr;
-        }
-    }
-
-    [[nodiscard]] bool ensureCapacity(size_t newCapacity, const size_t keepFirstN)
-    {
-        const auto numNewBytes = newCapacity * sizeof(T);
-        const auto oldSize     = size();
-        SANECPP_DEBUG_ASSERT(oldSize >= keepFirstN);
-        segment* allocatedHeader = segment::allocate(numNewBytes);
-        if (allocatedHeader == nullptr)
-        {
-            return false;
-        }
-        segment* newHeader   = allocatedHeader;
-        newHeader->sizeBytes = static_cast<HeaderBytesType>(oldSize * sizeof(T));
-        if (oldSize > 0)
-        {
-            segment* oldHeader = getSegment();
-            moveConstruct(newHeader->items, 0, keepFirstN, items);
-            destroyElements(items, keepFirstN, oldSize - keepFirstN);
-            segment::release(oldHeader);
-        }
-        items = newHeader->items;
-        return true;
-    }
-
-    static void moveAssignElements(T* destination, size_t indexStart, size_t numElements, T* source)
-    {
-        // TODO: Should we also call destructor on moved elements?
-        for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
-            destination[idx] = move(source[idx - indexStart]);
-    }
-
-    static void destroyElements(T* destination, size_t indexStart, size_t numElements)
-    {
-        for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
-            destination[idx].~T();
-    }
-
-    static void defaultConstruct(T* destination, size_t indexStart, size_t numElements)
-    {
-        for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
-            new (&destination[idx], PlacementNew()) T;
-    }
-
-    static void copyConstructSingle(T* destination, size_t indexStart, size_t numElements, const T& sourceValue)
-    {
-        for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
-            new (&destination[idx], PlacementNew()) T(sourceValue);
-    }
-
-    static void copyConstruct(T* destination, size_t indexStart, size_t numElements, const T* sourceValues)
-    {
-        for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
-            new (&destination[idx], PlacementNew()) T(sourceValues[idx - indexStart]);
-    }
-
-    static void moveConstruct(T* destination, size_t indexStart, size_t numElements, T* source)
-    {
-        // TODO: Should we also call destructor on moved elements?
-        for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
-            new (&destination[idx], PlacementNew()) T(move(source[idx - indexStart]));
-    }
-
-    typedef decltype(segment::sizeBytes) HeaderBytesType;
-
-    void setSize(size_t newSize) { getSegment()->sizeBytes = static_cast<HeaderBytesType>(newSize * sizeof(T)); }
-
-    [[nodiscard]] segment* getSegment() const
-    {
-        return reinterpret_cast<segment*>(reinterpret_cast<uint8_t*>(items) - sizeof(segment));
-    }
-
-    bool reserveInternalTrivialAllocate(size_t newSize)
-    {
-        segment* newHeader;
-        if (items == nullptr)
-        {
-            newHeader = segment::allocate(newSize * sizeof(T));
-        }
-        else if (newSize > capacity())
-        {
-            newHeader = segment::reallocate(getSegment(), newSize * sizeof(T));
-        }
-        else
-        {
-            newHeader = getSegment();
-        }
-
-        if (newHeader == nullptr)
-        {
-            return false;
-        }
-        items = newHeader->items;
-        return true;
-    }
-
-    void reserveInternalTrivialInitialize(const size_t oldSize, const size_t newSize, const T& defaultValue)
-    {
-        if (newSize > oldSize)
-        {
-            int32_t val;
-            memcpy(&val, &defaultValue, sizeof(int));
-            if (val == 0)
-            {
-                memset(items + oldSize, 0, sizeof(T) * (newSize - oldSize));
-            }
-            else
-            {
-                for (size_t idx = oldSize; idx < newSize; ++idx)
-                {
-                    items[idx] = defaultValue;
-                }
-            }
-        }
-    }
-
-    template <bool initialize, typename Q = T>
-    [[nodiscard]] typename enable_if<is_trivially_copyable<Q>::value, bool>::type resizeInternal(size_t   newSize,
-                                                                                                 const T& defaultValue)
-    {
-        const auto oldSize = size();
-
-        if (!reserveInternalTrivialAllocate(newSize))
-        {
-            return false;
-        }
-
-        setSize(newSize);
-        if (initialize)
-        {
-            reserveInternalTrivialInitialize(oldSize, newSize, defaultValue);
-        }
-        return true;
-    }
-
-    template <bool initialize, typename Q = T>
-    [[nodiscard]] typename enable_if<not is_trivially_copyable<Q>::value, bool>::type resizeInternal(
-        size_t newSize, const T& defaultValue)
-    {
-        static_assert(initialize, "There is no logical reason to skip initializing non trivially copyable class");
-        if (newSize == 0)
-        {
-            clear();
-            return false;
-        }
-        const auto oldSize = size();
-        if (newSize > capacity())
-        {
-            const auto keepFirstN = min(oldSize, newSize);
-            if (!ensureCapacity(newSize, keepFirstN)) [[unlikely]]
-            {
-                return false;
-            }
-            copyConstructSingle(items, keepFirstN, newSize - keepFirstN, defaultValue);
-        }
-        else
-        {
-            if (oldSize > newSize)
-            {
-                destroyElements(items, newSize, oldSize - newSize);
-            }
-            else if (oldSize < newSize)
-            {
-                copyConstructSingle(items, oldSize, newSize - oldSize, defaultValue);
-            }
-        }
-        const auto numNewBytes  = newSize * sizeof(T);
-        getSegment()->sizeBytes = static_cast<HeaderBytesType>(numNewBytes);
-        return true;
-    }
-
-    template <typename U, bool copy>
-    typename enable_if<copy, void>::type copyOrMoveConstruct(T* destination, size_t indexStart, size_t numElements,
-                                                             U* sourceValue)
-    {
-        copyConstruct(destination, indexStart, numElements, sourceValue);
-    }
-
-    template <typename U, bool copy>
-    typename enable_if<not copy, void>::type copyOrMoveConstruct(U* destination, size_t indexStart, size_t numElements,
-                                                                 U* sourceValue)
-    {
-        moveConstruct(destination, indexStart, numElements, sourceValue);
-    }
-
-    template <bool copy, typename U>
-    [[nodiscard]] bool insert(size_t position, U* other, size_t otherSize)
-    {
-        const size_t sz = size();
-        SANECPP_RELEASE_ASSERT(position <= sz);
-        if (otherSize == 0)
-        {
+            src.clear();
             return true;
         }
-        const size_t newSize = sz + otherSize;
-        if (newSize > capacity())
+        return false;
+    }
+    template <typename U>
+    [[nodiscard]] bool appendCopy(const U& src)
+    {
+        return appendCopy(src.data(), src.size());
+    }
+
+  private:
+    void destroy()
+    {
+        if (items != nullptr)
         {
-            if (!ensureCapacity(newSize, sz))
-            {
-                return false;
-            }
+            segmentOperations::destroy(segmentItems<T>::getSegment(items));
         }
-        const size_t numElementsToMove = sz - position;
-        moveConstruct(items, newSize - numElementsToMove, numElementsToMove, items + position);
-        copyOrMoveConstruct<U, copy>(items, position, otherSize, other);
-        setSize(newSize);
-        return true;
+        items = nullptr;
     }
 };

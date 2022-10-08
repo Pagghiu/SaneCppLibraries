@@ -88,6 +88,9 @@
 		7B7A158A28ECDBDC0090685E /* stringUtility.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = stringUtility.cpp; sourceTree = "<group>"; };
 		7B7A159B28ECDF9C0090685E /* assert.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = assert.cpp; sourceTree = "<group>"; };
 		7B7A159E28ECE8070090685E /* span.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = span.h; sourceTree = "<group>"; };
+		7B99BB4528F1EB91003EB054 /* segment.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = segment.h; sourceTree = "<group>"; };
+		7B9EE1B928EF7BF900F1EE82 /* array.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = array.h; sourceTree = "<group>"; };
+		7BB0540F28F204AE00FDDB4A /* arrayTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = arrayTest.h; sourceTree = "<group>"; };
 		7BF4DF6928DE7A5E008CBB53 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -112,6 +115,8 @@
 		7B52501E28E85CD400827290 /* sanecppFoundation */ = {
 			isa = PBXGroup;
 			children = (
+				7B9EE1B928EF7BF900F1EE82 /* array.h */,
+				7BB0540F28F204AE00FDDB4A /* arrayTest.h */,
 				7B7A159B28ECDF9C0090685E /* assert.cpp */,
 				7B7A158228ECDBDC0090685E /* assert.h */,
 				7B7A157228ECDBDB0090685E /* compiler.h */,
@@ -131,6 +136,7 @@
 				7B7A157D28ECDBDB0090685E /* platform.h */,
 				7B7A157828ECDBDB0090685E /* result.h */,
 				7B7A156E28ECDBDB0090685E /* resultTest.h */,
+				7B99BB4528F1EB91003EB054 /* segment.h */,
 				7B7A159E28ECE8070090685E /* span.h */,
 				7B7A158328ECDBDC0090685E /* staticAsserts.cpp */,
 				7B7A158A28ECDBDC0090685E /* stringUtility.cpp */,

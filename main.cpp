@@ -1,3 +1,4 @@
+#include "sanecppFoundation/arrayTest.h"
 #include "sanecppFoundation/consoleTest.h"
 #include "sanecppFoundation/memoryTest.h"
 #include "sanecppFoundation/osTest.h"
@@ -8,6 +9,9 @@
 int main(int argc, const char* argv[])
 {
     sanecpp::TestReport report(argc, argv);
+    {
+        sanecpp::ArrayTest test(report);
+    }
     {
         sanecpp::VectorTest test(report);
     }
