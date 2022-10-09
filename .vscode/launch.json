@@ -8,14 +8,14 @@
             "name": "(lldb) Launch Debug",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/_build/macOS-Universal/Debug/sanecppTest",
+            "program": "${workspaceFolder}/_build/macOS-Universal/Debug/SCTest",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
             "externalConsole": false,
             "MIMode": "lldb",
-            "preLaunchTask": "Build sanecppTest Debug"
+            "preLaunchTask": "Build SCTest Debug"
         }
     ]
 }

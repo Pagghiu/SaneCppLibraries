@@ -1,34 +1,34 @@
-#include "sanecppFoundation/arrayTest.h"
-#include "sanecppFoundation/consoleTest.h"
-#include "sanecppFoundation/memoryTest.h"
-#include "sanecppFoundation/osTest.h"
-#include "sanecppFoundation/resultTest.h"
-#include "sanecppFoundation/stringViewTest.h"
-#include "sanecppFoundation/vectorTest.h"
+#include "libraries/foundation/ArrayTest.h"
+#include "libraries/foundation/ConsoleTest.h"
+#include "libraries/foundation/MemoryTest.h"
+#include "libraries/foundation/OSTest.h"
+#include "libraries/foundation/ResultTest.h"
+#include "libraries/foundation/StringViewTest.h"
+#include "libraries/foundation/VectorTest.h"
 
 int main(int argc, const char* argv[])
 {
-    sanecpp::TestReport report(argc, argv);
+    SC::TestReport report(argc, argv);
     {
-        sanecpp::ArrayTest test(report);
+        SC::ArrayTest test(report);
     }
     {
-        sanecpp::VectorTest test(report);
+        SC::VectorTest test(report);
     }
     {
-        sanecpp::ResultTest test(report);
+        SC::ResultTest test(report);
     }
     {
-        sanecpp::StringViewTest test(report);
+        SC::StringViewTest test(report);
     }
     {
-        sanecpp::OsTest test(report);
+        SC::OSTest test(report);
     }
     {
-        sanecpp::ConsoleTest test(report);
+        SC::ConsoleTest test(report);
     }
     {
-        sanecpp::MemoryTest test(report);
+        SC::MemoryTest test(report);
     }
     return report.getTestReturnCode();
 }
