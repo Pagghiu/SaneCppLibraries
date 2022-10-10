@@ -5,19 +5,20 @@
 
 namespace SC
 {
-struct [[nodiscard]] error
+struct [[nodiscard]] Error
 {
     const StringView message;
-    constexpr error() {}
-    constexpr error(const StringView message) : message(message) {}
+    constexpr Error() {}
+    constexpr Error(const StringView message) : message(message) {}
 };
-template <typename Value, typename Error = error>
-class Result;
+template <typename Value, typename Error = Error>
+struct Result;
 } // namespace SC
 
 template <typename Value, typename Error>
-class [[nodiscard]] SC::Result
+struct [[nodiscard]] SC::Result
 {
+  private:
     union
     {
         Value value;
@@ -109,7 +110,7 @@ class [[nodiscard]] SC::Result
 #define SC_TRY_WRAP(expression, failedMessage)                                                                         \
     if (!(expression))                                                                                                 \
     {                                                                                                                  \
-        return error{failedMessage};                                                                                   \
+        return Error{failedMessage};                                                                                   \
     }
 #define SC_TRY(expression)                                                                                             \
     ({                                                                                                                 \

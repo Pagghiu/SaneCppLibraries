@@ -123,10 +123,10 @@ struct SC::SegmentItems : public SegmentHeader
         setSize(0);
     }
 
-    template <typename Comparison = smaller_than<T>>
+    template <typename Comparison = SmallerThan<T>>
     void sort(Comparison comparison = Comparison())
     {
-        bubble_sort(begin(), end(), comparison);
+        bubbleSort(begin(), end(), comparison);
     }
 
     static void moveAssignElements(T* destination, size_t indexStart, size_t numElements, T* source)
@@ -174,21 +174,21 @@ struct SC::SegmentItems : public SegmentHeader
             new (&destination[idx], PlacementNew()) T(move(source[idx - indexStart]));
     }
     template <typename U, bool copy>
-    static typename enable_if<copy, void>::type copyOrMoveConstruct(T* destination, size_t indexStart,
-                                                                    size_t numElements, U* sourceValue)
+    static typename EnableIf<copy, void>::type copyOrMoveConstruct(T* destination, size_t indexStart,
+                                                                   size_t numElements, U* sourceValue)
     {
         copyConstruct(destination, indexStart, numElements, sourceValue);
     }
 
     template <typename U, bool copy>
-    static typename enable_if<not copy, void>::type copyOrMoveConstruct(U* destination, size_t indexStart,
-                                                                        size_t numElements, U* sourceValue)
+    static typename EnableIf<not copy, void>::type copyOrMoveConstruct(U* destination, size_t indexStart,
+                                                                       size_t numElements, U* sourceValue)
     {
         moveConstruct(destination, indexStart, numElements, sourceValue);
     }
 
     template <typename Q = T>
-    static typename enable_if<not is_trivially_copyable<Q>::value, void>::type //
+    static typename EnableIf<not IsTriviallyCopyable<Q>::value, void>::type //
     moveAndDestroy(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN)
     {
         moveConstruct(newItems, 0, keepFirstN, oldItems);
@@ -196,7 +196,7 @@ struct SC::SegmentItems : public SegmentHeader
     }
 
     template <typename Q = T>
-    static typename enable_if<is_trivially_copyable<Q>::value, void>::type //
+    static typename EnableIf<IsTriviallyCopyable<Q>::value, void>::type //
     moveAndDestroy(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN)
     {
         // TODO: add code to handle memcpy destination overlapping source
@@ -204,7 +204,7 @@ struct SC::SegmentItems : public SegmentHeader
     }
 
     template <typename U, typename Q = T>
-    static typename enable_if<not is_trivially_copyable<Q>::value, void>::type //
+    static typename EnableIf<not IsTriviallyCopyable<Q>::value, void>::type //
     copyReplaceTrivialOrNot(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
                             const size_t numToDestroy, U* other, size_t otherSize)
     {
@@ -214,7 +214,7 @@ struct SC::SegmentItems : public SegmentHeader
     }
 
     template <typename U, typename Q = T>
-    static typename enable_if<is_trivially_copyable<Q>::value, void>::type //
+    static typename EnableIf<IsTriviallyCopyable<Q>::value, void>::type //
     copyReplaceTrivialOrNot(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
                             const size_t numToDestroy, U* other, size_t otherSize)
     {
@@ -223,7 +223,7 @@ struct SC::SegmentItems : public SegmentHeader
     }
 
     template <bool copy, typename U, typename Q = T>
-    static typename enable_if<not is_trivially_copyable<Q>::value, void>::type //
+    static typename EnableIf<not IsTriviallyCopyable<Q>::value, void>::type //
     insertItemsTrivialOrNot(T*& oldItems, size_t position, const size_t numElements, const size_t newSize, U* other,
                             size_t otherSize)
     {
@@ -234,7 +234,7 @@ struct SC::SegmentItems : public SegmentHeader
     }
 
     template <bool copy, typename U, typename Q = T>
-    static typename enable_if<is_trivially_copyable<U>::value, void>::type //
+    static typename EnableIf<IsTriviallyCopyable<U>::value, void>::type //
     insertItemsTrivialOrNot(T*& oldItems, size_t position, const size_t numElements, const size_t newSize, U* other,
                             size_t otherSize)
     {
@@ -420,7 +420,7 @@ struct SC::SegmentOperations
     }
 
     template <bool initialize, typename Q = T>
-    [[nodiscard]] static typename enable_if<is_trivially_copyable<Q>::value, bool>::type //
+    [[nodiscard]] static typename EnableIf<IsTriviallyCopyable<Q>::value, bool>::type //
     resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue)
     {
         const auto oldSize = oldItems == nullptr ? 0 : SegmentItems<T>::getSegment(oldItems)->size();
@@ -440,7 +440,7 @@ struct SC::SegmentOperations
     }
 
     template <bool initialize, typename Q = T>
-    [[nodiscard]] static typename enable_if<not is_trivially_copyable<Q>::value, bool>::type //
+    [[nodiscard]] static typename EnableIf<not IsTriviallyCopyable<Q>::value, bool>::type //
     resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue)
     {
         static_assert(initialize,

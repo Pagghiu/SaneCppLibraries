@@ -9,10 +9,10 @@ namespace SC
 {
 template <typename T>
 struct Vector;
-struct vectorAllocator;
+struct VectorAllocator;
 } // namespace SC
 
-struct SC::vectorAllocator
+struct SC::VectorAllocator
 {
     static SegmentHeader* reallocate(SegmentHeader* oldHeader, size_t newSize)
     {
@@ -50,7 +50,7 @@ struct SC::vectorAllocator
 template <typename T>
 struct SC::Vector
 {
-    typedef SegmentOperations<vectorAllocator, T> SegmentOperations;
+    typedef SegmentOperations<VectorAllocator, T> SegmentOperations;
 
     T* items;
 

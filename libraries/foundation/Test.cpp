@@ -46,7 +46,7 @@ SC::TestCase::TestCase(TestReport& report, StringView testName)
     if (report.isTestEnabled(testName))
     {
         SC_DEBUG_ASSERT(testName.isNullTerminated());
-        Console::c_printf("[[%s]]\n", testName.getText());
+        Console::c_printf("[[%s]]\n", testName.bytesWithoutTerminator());
         report.firstFailedTest = StringView();
     }
 }
@@ -70,14 +70,14 @@ void SC::TestCase::recordExpectation(StringView expression, bool status)
     if (status)
     {
         numTestsSucceeded++;
-        // Console::c_printf("  \033[32m[SUCCESS]\033[0m %s\n", expression.getText());
-        // Console::c_printf("\t\t[SUCC] %s\n", expression.getText());
+        // Console::c_printf("  \033[32m[SUCCESS]\033[0m %s\n", expression.bytesWithoutTerminator());
+        // Console::c_printf("\t\t[SUCC] %s\n", expression.bytesWithoutTerminator());
     }
     else
     {
         numTestsFailed++;
-        // Console::c_printf("  \033[31m[FAILED]\033[0m %s\n", expression.getText());
-        Console::c_printf("\t\t[FAIL] %s\n", expression.getText());
+        // Console::c_printf("  \033[31m[FAILED]\033[0m %s\n", expression.bytesWithoutTerminator());
+        Console::c_printf("\t\t[FAIL] %s\n", expression.bytesWithoutTerminator());
         if (report.firstFailedTest.isEmpty())
         {
             report.firstFailedTest = expression;
@@ -90,7 +90,7 @@ bool SC::TestCase::test_section(StringView sectionName)
     if (report.isTestEnabled(testName) && report.isSectionEnabled(sectionName))
     {
         SC_DEBUG_ASSERT(sectionName.isNullTerminated());
-        Console::c_printf("\t- %s::%s\n", testName.getText(), sectionName.getText());
+        Console::c_printf("\t- %s::%s\n", testName.bytesWithoutTerminator(), sectionName.bytesWithoutTerminator());
         return true;
     }
     return false;
@@ -104,7 +104,7 @@ void SC::TestReport::testCaseFinished(TestCase& testCase)
                           "FAILED TEST\n"
                           "%s\n"
                           "---------------------------------------------------\n",
-                          firstFailedTest.getText());
+                          firstFailedTest.bytesWithoutTerminator());
 #if SC_RELEASE
         ::exit(-1);
 #endif

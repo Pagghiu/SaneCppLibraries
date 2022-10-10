@@ -51,10 +51,10 @@ struct SC::ResultTest : public SC::TestCase
         error_code_2 = 2
     };
 
-    struct customError : public error
+    struct customError : public Error
     {
         MyEnum errorCode;
-        customError(StringView message, MyEnum errorCode = error_code_1) : error(message), errorCode(errorCode) {}
+        customError(StringView message, MyEnum errorCode = error_code_1) : Error(message), errorCode(errorCode) {}
     };
 
     Result<int, customError> failMultipleReasons(int reason)
@@ -74,7 +74,7 @@ struct SC::ResultTest : public SC::TestCase
             StringView sv = "-12";
             int32_t    value;
             SC_TRY_WRAP(sv.parseInt32(&value), "Parse Int failed");
-            return error("Error: cannot do stuff");
+            return Error("Error: cannot do stuff");
         }
         else
         {

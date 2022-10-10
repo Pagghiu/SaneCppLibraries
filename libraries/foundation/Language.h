@@ -4,12 +4,12 @@
 namespace SC
 {
 template <bool B, class T = void>
-struct enable_if
+struct EnableIf
 {
 };
 
 template <class T>
-struct enable_if<true, T>
+struct EnableIf<true, T>
 {
     typedef T type;
 };
@@ -27,35 +27,35 @@ struct is_same<T, T>
 };
 
 template <class T>
-struct remove_reference
+struct RemoveReference
 {
     typedef T type;
 };
 template <class T>
-struct remove_reference<T&>
+struct RemoveReference<T&>
 {
     typedef T type;
 };
 template <class T>
-struct remove_reference<T&&>
+struct RemoveReference<T&&>
 {
     typedef T type;
 };
 
 template <class T, T v>
-struct integral_constant
+struct IntegralConstant
 {
     static constexpr T value = v;
 
     using value_type = T;
-    using type       = integral_constant;
+    using type       = IntegralConstant;
 
     constexpr            operator value_type() const noexcept { return value; }
     constexpr value_type operator()() const noexcept { return value; }
 };
 
 template <typename _Tp>
-struct is_trivially_copyable : public integral_constant<bool, __is_trivially_copyable(_Tp)>
+struct IsTriviallyCopyable : public IntegralConstant<bool, __is_trivially_copyable(_Tp)>
 {
 };
 
@@ -68,7 +68,7 @@ constexpr T&& move(T& value)
 template <typename T>
 constexpr T&& forward(T& value)
 {
-    return static_cast<typename remove_reference<T>::type&&>(value);
+    return static_cast<typename RemoveReference<T>::type&&>(value);
 }
 struct PlacementNew
 {
@@ -87,20 +87,20 @@ constexpr T max(T t1, T t2)
 }
 
 template <typename T>
-constexpr void swap(T& t1, T& t2)
+void swap(T& t1, T& t2)
 {
     T temp = move(t1);
     t1     = move(t2);
     t2     = move(temp);
 }
 template <typename T>
-struct smaller_than
+struct SmallerThan
 {
     bool operator()(const T& a, const T& b) { return a < b; }
 };
 
 template <typename Iterator, typename Comparison>
-void bubble_sort(Iterator first, Iterator last, Comparison comparison)
+void bubbleSort(Iterator first, Iterator last, Comparison comparison)
 {
     if (first >= last)
     {
@@ -123,6 +123,12 @@ void bubble_sort(Iterator first, Iterator last, Comparison comparison)
             ++p1;
         }
     }
+}
+
+template <size_t N>
+constexpr size_t ConstantStringLength(const char (&text)[N])
+{
+    return N;
 }
 
 } // namespace SC

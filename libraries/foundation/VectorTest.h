@@ -156,7 +156,7 @@ void SC::VectorTest::testClassType()
     if (test_section("class_resize"))
     {
         StringView      myString("MyData");
-        VectorTestClass testClass(myString.getText());
+        VectorTestClass testClass(myString.bytesWithoutTerminator());
         SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::CONSTRUCTOR);
         SC_TEST_EXPECT(myString == testClass.toString());
         SC::Vector<VectorTestClass> myVector;

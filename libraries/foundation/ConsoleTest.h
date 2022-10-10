@@ -22,7 +22,7 @@ struct SC::ConsoleTest : public SC::TestCase
         {
             String str = StringView("Test Test\n");
             Console::printUTF8(str);
-            Console::printUTF8(str.toView());
+            Console::printUTF8(str.view());
         }
     }
 };

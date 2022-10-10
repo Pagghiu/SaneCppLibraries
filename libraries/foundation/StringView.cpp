@@ -3,7 +3,7 @@
 
 bool SC::StringView::parseInt32(int32_t* value) const
 {
-    if (isIntegerNumber(text))
+    if (text::isIntegerNumber(text))
     {
         if (hasNullTerm)
         {

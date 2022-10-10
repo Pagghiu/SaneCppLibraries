@@ -9,7 +9,7 @@ namespace SC
 struct String;
 struct Console
 {
-    static int  c_printf(const char_t* format, ...) SC_PRINTF_LIKE_FREE;
+    static int  c_printf(const char_t* format, ...) SC_ATTRIBUTE_PRINTF(1, 2);
     static void printUTF8(const StringView str);
     static void printUTF8(const String& str);
 };

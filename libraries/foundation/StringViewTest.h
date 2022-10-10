@@ -16,7 +16,7 @@ struct SC::StringViewTest : public SC::TestCase
         if (test_section("construction"))
         {
             StringView s("asd");
-            SC_TEST_EXPECT(s.getLengthInBytes() == 3);
+            SC_TEST_EXPECT(s.sizeInBytesWithoutTerminator() == 3);
             SC_TEST_EXPECT(s.isNullTerminated());
         }
 

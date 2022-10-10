@@ -33,5 +33,14 @@ struct Span
         else
             return Comparison::Bigger;
     }
+    [[nodiscard]] bool insertCopy(size_t idx, const Type* source, Size sourceSize)
+    {
+        if (sourceSize + idx <= size)
+        {
+            memcpy(data + idx, source, sourceSize * sizeof(Type));
+            return true;
+        }
+        return false;
+    }
 };
 } // namespace SC

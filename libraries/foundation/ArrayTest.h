@@ -48,7 +48,8 @@ struct SC::ArrayTest : public SC::TestCase
             Array<Vector<char>, 10> arr;
             {
                 Vector<char> str;
-                SC_TEST_EXPECT(str.appendCopy(testString.getText(), testString.getLengthInBytes() + 1));
+                SC_TEST_EXPECT(
+                    str.appendCopy(testString.bytesIncludingTerminator(), testString.sizeInBytesIncludingTerminator()));
                 SC_TEST_EXPECT(arr.push_back(str));
                 SC_TEST_EXPECT(arr.push_back(str));
             }
@@ -61,7 +62,8 @@ struct SC::ArrayTest : public SC::TestCase
         {
             Array<Vector<char>, 10> arr;
             Vector<char>            str;
-            SC_TEST_EXPECT(str.appendCopy(testString.getText(), testString.getLengthInBytes() + 1));
+            SC_TEST_EXPECT(
+                str.appendCopy(testString.bytesIncludingTerminator(), testString.sizeInBytesIncludingTerminator()));
 
             SC_TEST_EXPECT(arr.resize(2, str));
             Array<Vector<char>, 11> arr2 = arr;

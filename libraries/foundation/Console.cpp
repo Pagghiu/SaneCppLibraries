@@ -6,9 +6,6 @@
 #include <stdarg.h> // va_list
 #include <stdio.h>  // printf
 
-//#define XSTR(x) STR(x)
-//#define STR(x) #x
-//#pragma message "The value of DOUBLE_MAX: " XSTR(DBL_MAX)
 int SC::Console::c_printf(const char_t* format, ...)
 {
     va_list args;
@@ -20,17 +17,17 @@ int SC::Console::c_printf(const char_t* format, ...)
 
 void SC::Console::printUTF8(const StringView str)
 {
-    SC_DEBUG_ASSERT(str.getLengthInBytes() < static_cast<int>(MaxValue()));
-    printf("%.*s", static_cast<int>(str.getLengthInBytes()), str.getText());
+    SC_DEBUG_ASSERT(str.sizeInBytesWithoutTerminator() < static_cast<int>(MaxValue()));
+    printf("%.*s", static_cast<int>(str.sizeInBytesWithoutTerminator()), str.bytesWithoutTerminator());
 }
 
 void SC::Console::printUTF8(const String& str)
 {
-    const size_t length = str.length_bytes_with_nullterm();
+    const size_t length = str.sizeInBytesIncludingTerminator();
     SC_DEBUG_ASSERT(length < static_cast<int>(MaxValue()));
     if (length > 1)
     {
         // TODO: On windows this is not UTF8 for sure
-        printf("%.*s", static_cast<int>(length), str.rawBytes());
+        printf("%.*s", static_cast<int>(length), str.bytesIncludingTerminator());
     }
 }
