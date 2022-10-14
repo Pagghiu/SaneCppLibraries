@@ -7,6 +7,7 @@ extern "C"
     void* memcpy(void* dst, const void* src, SC::size_t n);
     int   memcmp(const void* s1, const void* s2, SC::size_t n);
     void* memset(void* dst, SC::int32_t c, SC::size_t len);
+    void* memchr(const void* ptr, SC::int32_t c, SC::size_t count);
 
     // system
     void exit(SC::int32_t val) __attribute__((__noreturn__));

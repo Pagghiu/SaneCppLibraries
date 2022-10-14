@@ -12,6 +12,14 @@ struct StringIteratorASCII
 
     [[nodiscard]] bool advanceUntilMatches(char_t c)
     {
+#if 1
+        auto res = memchr(it, c, end - it); // may be faster with longer strings...
+        if (res != nullptr)
+            it = static_cast<const SC::char_t*>(res);
+        else
+            it = end;
+        return it != end;
+#else
         while (it != end)
         {
             if (*it == c)
@@ -19,6 +27,7 @@ struct StringIteratorASCII
             ++it;
         }
         return false;
+#endif
     }
 
     [[nodiscard]] bool advanceUntilMatches(char_t c1, char_t c2, char_t* matched)

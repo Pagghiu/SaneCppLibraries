@@ -9,8 +9,10 @@ struct TestCase;
 struct TestReport
 {
     bool       abortOnFirstFailedTest = true;
+    bool       debugBreakOnFailedTest = true;
     uint32_t   numTestsSucceeded      = 0;
     uint32_t   numTestsFailed         = 0;
+    StringView currentSection;
     StringView firstFailedTest;
     StringView testToRun;
     StringView sectionToRun;
@@ -18,7 +20,9 @@ struct TestReport
     TestReport(int argc, const char** argv);
     ~TestReport();
 
-    void               testCaseFinished(TestCase& testCase);
+    void testCaseFinished(TestCase& testCase);
+    void printSectionResult(TestCase& testCase);
+
     [[nodiscard]] bool isTestEnabled(StringView testName) const;
     [[nodiscard]] bool isSectionEnabled(StringView sectionName) const;
     [[nodiscard]] int  getTestReturnCode() const;
@@ -35,8 +39,11 @@ struct TestCase
     uint32_t         numTestsSucceeded;
     uint32_t         numTestsFailed;
     TestReport&      report;
+    bool             printedSection;
 };
 } // namespace SC
 
 #define SC_TEST_EXPECT(e)                                                                                              \
-    (__builtin_expect((e), 0) ? recordExpectation(#e, true) : (recordExpectation(#e, false), SC_BREAK_DEBUGGER))
+    (__builtin_expect((e), 0)                                                                                          \
+         ? recordExpectation(#e, true)                                                                                 \
+         : (recordExpectation(#e, false), TestCase::report.debugBreakOnFailedTest ? SC_BREAK_DEBUGGER : (void)0))

@@ -39,8 +39,8 @@ struct StringBuilder
             SC_TRY_IF(data.pop_back());
         return data.appendCopy(str.bytesIncludingTerminator(), str.sizeInBytesIncludingTerminator());
     }
-    String         toString() { return move(data); }
-    Vector<char_t> toVectorOfChars() { return move(data); }
+    [[nodiscard]] String         toString() { return move(data); }
+    [[nodiscard]] Vector<char_t> toVectorOfChars() { return move(data); }
 
   private:
     Vector<char_t> data;

@@ -13,7 +13,11 @@ int main(int argc, const char* argv[])
 {
     using namespace SC;
     TestReport report(argc, argv);
+    report.debugBreakOnFailedTest = false;
     // clang-format off
+    { OSTest                test(report); }
+    { ConsoleTest           test(report); }
+    { MemoryTest            test(report); }
     { ArrayTest             test(report); }
     { VectorTest            test(report); }
     { ResultTest            test(report); }
@@ -21,9 +25,6 @@ int main(int argc, const char* argv[])
     { StringFunctionsTest   test(report); }
     { StringTest            test(report); }
     { StringBuilderTest     test(report); }
-    { OSTest                test(report); }
-    { ConsoleTest           test(report); }
-    { MemoryTest            test(report); }
     // clang-format on
 
     return report.getTestReturnCode();
