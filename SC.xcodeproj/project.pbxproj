@@ -102,6 +102,8 @@
 		7B73F00628F37F040081C601 /* Assert.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Assert.h; sourceTree = "<group>"; };
 		7B73F00728F37F040081C601 /* Platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Platform.h; sourceTree = "<group>"; };
 		7B73F00828F37F040081C601 /* StaticAsserts.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StaticAsserts.cpp; sourceTree = "<group>"; };
+		7B7499A228FA99C200FFF406 /* MapTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MapTest.h; sourceTree = "<group>"; };
+		7B7499A328FA99C200FFF406 /* Map.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Map.h; sourceTree = "<group>"; };
 		7BB1D44028F5F1E300FAEA68 /* StringBuilder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringBuilder.h; sourceTree = "<group>"; };
 		7BB1D44128F5F1F000FAEA68 /* StringBuilder.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StringBuilder.cpp; sourceTree = "<group>"; };
 		7BB1D44428F5F38800FAEA68 /* StringBuilderTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringBuilderTest.h; sourceTree = "<group>"; };
@@ -159,6 +161,8 @@
 				7B73EFF428F37F040081C601 /* Language.h */,
 				7B73F00428F37F040081C601 /* LibC.h */,
 				7B73EFEF28F37F040081C601 /* Limits.h */,
+				7B7499A328FA99C200FFF406 /* Map.h */,
+				7B7499A228FA99C200FFF406 /* MapTest.h */,
 				7B73EFE828F37F040081C601 /* Memory.cpp */,
 				7B73F00128F37F040081C601 /* Memory.h */,
 				7B73F00028F37F040081C601 /* MemoryTest.h */,
@@ -178,10 +182,10 @@
 				7BB1D44028F5F1E300FAEA68 /* StringBuilder.h */,
 				7BB1D44428F5F38800FAEA68 /* StringBuilderTest.h */,
 				7BB1D44628F5FED300FAEA68 /* StringFormat.cpp */,
-				7B15637628F9FF0700B3D229 /* StringFunctionsTest.h */,
 				7BB1D44528F5FED300FAEA68 /* StringFormat.h */,
-				7BB1D44928F5FF8000FAEA68 /* StringIterator.h */,
 				7B15637528F9FED200B3D229 /* StringFunctions.h */,
+				7B15637628F9FF0700B3D229 /* StringFunctionsTest.h */,
+				7BB1D44928F5FF8000FAEA68 /* StringIterator.h */,
 				7B520FE228F4A21B002B8DB4 /* StringTest.h */,
 				7B73EFEA28F37F040081C601 /* StringUtility.cpp */,
 				7B73EFFC28F37F040081C601 /* StringUtility.h */,
@@ -357,7 +361,7 @@
 		7B52501928E85B9100827290 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
 				CODE_SIGN_STYLE = Automatic;
 				GCC_ENABLE_CPP_EXCEPTIONS = NO;
 				GCC_ENABLE_CPP_RTTI = NO;
@@ -374,7 +378,7 @@
 		7B52501A28E85B9100827290 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
 				DEPLOYMENT_POSTPROCESSING = YES;
