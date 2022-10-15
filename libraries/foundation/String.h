@@ -7,11 +7,6 @@ namespace SC
 {
 struct String
 {
-    template <size_t N>
-    explicit String(const char (&text)[N])
-    {
-        SC_RELEASE_ASSERT(data.appendCopy(text, N));
-    }
     String() = default;
     String(Vector<char_t>&& otherData) : data(forward<Vector<char_t>>(otherData)) {}
     String(StringView sv) { SC_RELEASE_ASSERT(assignStringView(sv)); }

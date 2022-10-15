@@ -56,3 +56,5 @@ struct SC::StringView
     [[nodiscard]] constexpr size_t sizeInBytesIncludingTerminator() const { return text.size > 0 ? text.size + 1 : 0; }
     [[nodiscard]] bool             parseInt32(int32_t* value) const;
 };
+
+inline SC::StringView operator"" _sv(const SC::char_t* txt, SC::size_t sz) { return SC::StringView(txt, sz, true); }
