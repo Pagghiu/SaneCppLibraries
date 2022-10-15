@@ -4,6 +4,7 @@
 #include "libraries/foundation/MemoryTest.h"
 #include "libraries/foundation/OSTest.h"
 #include "libraries/foundation/ResultTest.h"
+#include "libraries/foundation/SmallVectorTest.h"
 #include "libraries/foundation/StringBuilderTest.h"
 #include "libraries/foundation/StringFunctionsTest.h"
 #include "libraries/foundation/StringTest.h"
@@ -14,7 +15,7 @@ int main(int argc, const char* argv[])
 {
     using namespace SC;
     TestReport report(argc, argv);
-    report.debugBreakOnFailedTest = false;
+    report.debugBreakOnFailedTest = true;
     // clang-format off
     { OSTest                test(report); }
     { ConsoleTest           test(report); }
@@ -27,6 +28,7 @@ int main(int argc, const char* argv[])
     { StringTest            test(report); }
     { StringBuilderTest     test(report); }
     { MapTest               test(report); }
+    { SmallVectorTest       test(report); }
     // clang-format on
 
     return report.getTestReturnCode();

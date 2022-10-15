@@ -54,7 +54,8 @@ SC::TestReport::~TestReport()
 
 //-------------------------------------------------------------------------------------------
 SC::TestCase::TestCase(TestReport& report, StringView testName)
-    : report(report), testName(testName), numTestsSucceeded(0), numTestsFailed(0), printedSection(false)
+    : report(report), testName(testName), numTestsSucceeded(0), numTestsFailed(0), numSectionTestsFailed(0),
+      printedSection(false)
 {
     if (report.isTestEnabled(testName))
     {
@@ -107,6 +108,7 @@ void SC::TestCase::recordExpectation(StringView expression, bool status)
     }
     else
     {
+        numSectionTestsFailed++;
         numTestsFailed++;
         report.printSectionResult(*this);
         printedSection = true;
@@ -122,6 +124,7 @@ void SC::TestCase::recordExpectation(StringView expression, bool status)
 
 bool SC::TestCase::test_section(StringView sectionName)
 {
+    numSectionTestsFailed = 0;
     if (report.isTestEnabled(testName) && report.isSectionEnabled(sectionName))
     {
         SC_DEBUG_ASSERT(sectionName.isNullTerminated());
@@ -142,7 +145,7 @@ bool SC::TestCase::test_section(StringView sectionName)
 void SC::TestReport::printSectionResult(TestCase& testCase)
 {
     Console::printUTF8("\t- ");
-    if (testCase.numTestsFailed > 0)
+    if (testCase.numSectionTestsFailed > 0)
     {
         Console::printUTF8(redEMOJI);
     }

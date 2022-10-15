@@ -446,6 +446,7 @@ void SC::VectorTest::testClassType()
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("1")));
 
         vector2 = move(vector1);
+        SC_TEST_EXPECT(vector1.items == nullptr);
         SC_TEST_EXPECT(vector1.size() == 0);
         SC_TEST_EXPECT(vector2.size() == 2);
         int32_t value;

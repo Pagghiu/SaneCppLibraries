@@ -37,6 +37,7 @@ struct TestCase
 
     const StringView testName;
     uint32_t         numTestsSucceeded;
+    uint32_t         numSectionTestsFailed;
     uint32_t         numTestsFailed;
     TestReport&      report;
     bool             printedSection;

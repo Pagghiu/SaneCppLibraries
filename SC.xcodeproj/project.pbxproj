@@ -59,6 +59,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		7B12434C28FB16A3002C5634 /* SmallVector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SmallVector.h; sourceTree = "<group>"; };
+		7B12434D28FB16A3002C5634 /* SmallVectorTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SmallVectorTest.h; sourceTree = "<group>"; };
 		7B15637528F9FED200B3D229 /* StringFunctions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringFunctions.h; sourceTree = "<group>"; };
 		7B15637628F9FF0700B3D229 /* StringFunctionsTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StringFunctionsTest.h; sourceTree = "<group>"; };
 		7B520FDE28F4A10F002B8DB4 /* String.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = String.h; sourceTree = "<group>"; };
@@ -174,6 +176,8 @@
 				7B73EFF828F37F040081C601 /* Result.h */,
 				7B73EFF928F37F040081C601 /* ResultTest.h */,
 				7B73EFEB28F37F040081C601 /* Segment.h */,
+				7B12434C28FB16A3002C5634 /* SmallVector.h */,
+				7B12434D28FB16A3002C5634 /* SmallVectorTest.h */,
 				7B73F00328F37F040081C601 /* Span.h */,
 				7B73F00828F37F040081C601 /* StaticAsserts.cpp */,
 				7B520FDF28F4A10F002B8DB4 /* String.cpp */,

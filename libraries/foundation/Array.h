@@ -16,7 +16,11 @@ struct SC::ArrayAllocator
         }
         return nullptr;
     }
-    [[nodiscard]] static SegmentHeader* allocate(SegmentHeader* oldHeader, size_t numNewBytes) { return oldHeader; }
+    [[nodiscard]] static SegmentHeader* allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* pself)
+    {
+        oldHeader->initDefaults();
+        return oldHeader;
+    }
 
     static void release(SegmentHeader* oldHeader) {}
 };

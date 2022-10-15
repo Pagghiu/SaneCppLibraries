@@ -17,9 +17,26 @@ struct Segment;
 struct SC::SegmentHeader
 {
     typedef uint32_t HeaderBytesType;
+    struct Options
+    {
+        bool isSmallVector;
+        bool isFollowedBySmallVector;
+    };
 
+    alignas(uint64_t) Options options;
     uint32_t sizeBytes;
     uint32_t capacityBytes;
+
+    void initDefaults()
+    {
+        options.isSmallVector           = false;
+        options.isFollowedBySmallVector = false;
+    }
+
+    [[nodiscard]] static SegmentHeader* getSegmentHeader(void* oldItems)
+    {
+        return reinterpret_cast<SegmentHeader*>(reinterpret_cast<uint8_t*>(oldItems) - sizeof(SegmentHeader));
+    }
 };
 
 template <typename T>
@@ -311,7 +328,7 @@ struct SC::SegmentOperations
         SegmentItems<T>* newSegment;
         if (oldItems == nullptr)
         {
-            newSegment = static_cast<SegmentItems<T>*>(Allocator::allocate(nullptr, newSize * sizeof(T)));
+            newSegment = static_cast<SegmentItems<T>*>(Allocator::allocate(nullptr, newSize * sizeof(T), &oldItems));
         }
         else if (newSize > SegmentItems<T>::getSegment(oldItems)->capacity())
         {
@@ -399,7 +416,7 @@ struct SC::SegmentOperations
         const auto       oldSize     = isNull ? 0 : oldSegment->size();
         const auto       numNewBytes = newCapacity * sizeof(T);
         SC_DEBUG_ASSERT(oldSize >= keepFirstN);
-        auto newSegment = static_cast<SegmentItems<T>*>(Allocator::allocate(oldSegment, numNewBytes));
+        auto newSegment = static_cast<SegmentItems<T>*>(Allocator::allocate(oldSegment, numNewBytes, &oldItems));
         if (newSegment == oldSegment)
         {
             return false; // Array returning the same as old
@@ -500,7 +517,7 @@ struct SC::SegmentOperations
             if (numElements != selfCapacity)
             {
                 SegmentItems<T>* newSegment =
-                    static_cast<SegmentItems<T>*>(Allocator::allocate(oldSegment, oldSegment->sizeBytes));
+                    static_cast<SegmentItems<T>*>(Allocator::allocate(oldSegment, oldSegment->sizeBytes, &oldItems));
                 if (newSegment == oldSegment)
                 {
                     return true; // Array allocator returning the same memory
