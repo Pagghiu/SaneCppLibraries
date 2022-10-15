@@ -21,16 +21,16 @@ static_assert(static_cast<int16_t>(MaxValue()) == INT16_MAX, "static_cast<int16_
 static_assert(static_cast<int32_t>(MaxValue()) == INT32_MAX, "static_cast<int32_t>(MaxValue)");
 static_assert(static_cast<int64_t>(MaxValue()) == INT64_MAX, "static_cast<int64_t>(MaxValue)");
 
-static_assert(is_same<uint8_t, ::uint8_t>::value, "uint8_t");
-static_assert(is_same<uint16_t, ::uint16_t>::value, "uint16_t");
-static_assert(is_same<uint32_t, ::uint32_t>::value, "uint32_t");
-static_assert(is_same<uint64_t, ::uint64_t>::value, "uint64_t");
+static_assert(IsSame<uint8_t, ::uint8_t>::value, "uint8_t");
+static_assert(IsSame<uint16_t, ::uint16_t>::value, "uint16_t");
+static_assert(IsSame<uint32_t, ::uint32_t>::value, "uint32_t");
+static_assert(IsSame<uint64_t, ::uint64_t>::value, "uint64_t");
 
-static_assert(is_same<int8_t, ::int8_t>::value, "int8_t");
-static_assert(is_same<int16_t, ::int16_t>::value, "int16_t");
-static_assert(is_same<int32_t, ::int32_t>::value, "int32_t");
-static_assert(is_same<int64_t, ::int64_t>::value, "int64_t");
+static_assert(IsSame<int8_t, ::int8_t>::value, "int8_t");
+static_assert(IsSame<int16_t, ::int16_t>::value, "int16_t");
+static_assert(IsSame<int32_t, ::int32_t>::value, "int32_t");
+static_assert(IsSame<int64_t, ::int64_t>::value, "int64_t");
 
-static_assert(is_same<size_t, ::size_t>::value, "size_t");
-static_assert(is_same<ssize_t, ::ssize_t>::value, "size_t");
+static_assert(IsSame<size_t, ::size_t>::value, "size_t");
+static_assert(IsSame<ssize_t, ::ssize_t>::value, "size_t");
 } // namespace SC

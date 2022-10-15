@@ -15,13 +15,13 @@ struct EnableIf<true, T>
 };
 
 template <typename T, typename U>
-struct is_same
+struct IsSame
 {
     static constexpr bool value = false;
 };
 
 template <typename T>
-struct is_same<T, T>
+struct IsSame<T, T>
 {
     static constexpr bool value = true;
 };
@@ -53,12 +53,55 @@ struct IntegralConstant
     constexpr            operator value_type() const noexcept { return value; }
     constexpr value_type operator()() const noexcept { return value; }
 };
-
+using true_type  = IntegralConstant<bool, true>;
+using false_type = IntegralConstant<bool, false>;
 template <typename _Tp>
 struct IsTriviallyCopyable : public IntegralConstant<bool, __is_trivially_copyable(_Tp)>
 {
 };
+template <class T>
+struct is_lvalue_reference : false_type
+{
+};
+template <class T>
+struct is_lvalue_reference<T&> : true_type
+{
+};
+template <class T>
+struct is_rvalue_reference : false_type
+{
+};
+template <class T>
+struct is_rvalue_reference<T&&> : true_type
+{
+};
+template <class T>
+struct IsReference : IntegralConstant<bool, is_lvalue_reference<T>::value || is_rvalue_reference<T>::value>
+{
+};
 
+template <bool B, class T, class F>
+struct Conditional
+{
+    using type = T;
+};
+
+template <class T, class F>
+struct Conditional<false, T, F>
+{
+    using type = F;
+};
+
+template <typename T>
+struct ReferenceWrapper
+{
+    const typename RemoveReference<T>::type* ptr;
+
+    ReferenceWrapper(typename RemoveReference<T>::type& other) : ptr(&other) {}
+    ~ReferenceWrapper() {}
+    operator const T&() const { return *ptr; }
+    operator T&() { return *ptr; }
+};
 template <typename T>
 constexpr T&& move(T& value)
 {

@@ -18,18 +18,21 @@ struct Result;
 template <typename Value, typename Error>
 struct [[nodiscard]] SC::Result
 {
+    // We cannot have a reference in union, so we use ReferenceWrapper
+    typedef typename Conditional<IsReference<Value>::value, ReferenceWrapper<Value>, Value>::type ValueType;
+
   private:
     union
     {
-        Value value;
-        Error error;
+        ValueType value;
+        Error     error;
     };
     bool holdsError;
 
   public:
     SC_CONSTEXPR_CONSTRUCTOR_NEW Result(Value&& v)
     {
-        new (&value, PlacementNew()) Value(forward<Value>(v));
+        new (&value, PlacementNew()) ValueType(forward<Value>(v));
         holdsError = false;
     }
 
@@ -43,7 +46,7 @@ struct [[nodiscard]] SC::Result
     {
         if (not holdsError)
         {
-            value.~Value();
+            value.~ValueType();
         }
         else
         {
@@ -65,7 +68,7 @@ struct [[nodiscard]] SC::Result
         }
         else
         {
-            new (&value, PlacementNew()) Value(move(other.value));
+            new (&value, PlacementNew()) ValueType(move(other.value));
         }
     }
     SC_CONSTEXPR_CONSTRUCTOR_NEW Result(const Result& other)
@@ -77,7 +80,7 @@ struct [[nodiscard]] SC::Result
         }
         else
         {
-            new (&value, PlacementNew()) Value(other.value);
+            new (&value, PlacementNew()) ValueType(other.value);
         }
     }
 #endif
@@ -88,7 +91,7 @@ struct [[nodiscard]] SC::Result
 
     constexpr Error releaseError() const { return move(error); }
 
-    constexpr Value releaseValue() const { return move(value); }
+    Value releaseValue() const { return move(value); }
 
     const Error& getError() const
     {
