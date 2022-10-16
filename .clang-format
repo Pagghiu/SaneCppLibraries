@@ -4,6 +4,7 @@ BreakBeforeBraces: Custom
 BraceWrapping:
     AfterUnion: true
     SplitEmptyFunction: false
+    BeforeLambdaBody: True
 PointerAlignment: Left
 ReferenceAlignment: Left
 AlwaysBreakTemplateDeclarations: Yes

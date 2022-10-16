@@ -1,5 +1,6 @@
 #include "libraries/foundation/ArrayTest.h"
 #include "libraries/foundation/ConsoleTest.h"
+#include "libraries/foundation/FunctionTest.h"
 #include "libraries/foundation/MapTest.h"
 #include "libraries/foundation/MemoryTest.h"
 #include "libraries/foundation/OSTest.h"
@@ -29,6 +30,7 @@ int main(int argc, const char* argv[])
     { StringBuilderTest     test(report); }
     { MapTest               test(report); }
     { SmallVectorTest       test(report); }
+    { FunctionTest          test(report); }
     // clang-format on
 
     return report.getTestReturnCode();
