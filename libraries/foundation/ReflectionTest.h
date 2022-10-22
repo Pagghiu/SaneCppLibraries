@@ -64,11 +64,6 @@ struct Member
         : type(type), order(order), offset(offset), size(size), numFields(numFields)
     {}
     constexpr Member& operator=(const Member& other) = default;
-    constexpr bool    operator==(const Member& other) const
-    {
-        return type == other.type && order == other.order && offset == other.offset && size == other.size &&
-               numFields == other.numFields;
-    }
 };
 static_assert(sizeof(Member) == 8, "YO watch your step");
 template <typename T, int N>
@@ -91,17 +86,6 @@ struct CompileArray
             values[size++] = i;
         }
     }
-    constexpr bool operator==(const CompileArray& other) const
-    {
-        if (size != other.size)
-            return false;
-        for (int i = 0; i < size; ++i)
-        {
-            if (not(values[i] == other.values[i]))
-                return false;
-        }
-        return true;
-    }
 };
 constexpr int MAX_NUMBER_OF_MEMBERS = 10;
 struct MemberAndName
@@ -116,15 +100,6 @@ struct MemberAndName
         : member(member), name(name), getLinkMembers(getLinkMembers)
     {}
     constexpr MemberAndName& operator=(const MemberAndName& other) = default;
-
-    constexpr bool operator==(const MemberAndName& other) const
-    {
-        const bool sameMember = member == member;
-        // TODO: I think that address of getLinkMembers should be the same as we're generating everything during
-        // template at call site
-        const bool sameLink = getLinkMembers == other.getLinkMembers;
-        return sameMember && sameLink;
-    }
 };
 template <typename T>
 struct GetDescriptorFor;
@@ -165,8 +140,9 @@ constexpr CompileArray<MemberAndName, sizeof...(Types) + 1> BuildMemberNameArray
 struct LinkAndIndex
 {
     CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> linkMembers;
-    int                                                flatternedIndex;
-    constexpr LinkAndIndex() : flatternedIndex(0) {}
+    CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> (*getLinkMembers)();
+    int flatternedIndex;
+    constexpr LinkAndIndex() : getLinkMembers(nullptr), flatternedIndex(0) {}
 };
 
 constexpr int count_maximum_links(const MemberAndName* structMember)
@@ -191,14 +167,15 @@ constexpr void flattern_links_recursive(const MemberAndName* structMember, Compi
 {
     for (int i = 0; i < structMember->member.numFields; ++i)
     {
-        const MemberAndName*                               member      = structMember + 1 + i;
-        CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> linkMembers = member->getLinkMembers();
+        const MemberAndName*                               member         = structMember + 1 + i;
+        CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> linkMembers    = member->getLinkMembers();
+        auto                                               getLinkMembers = member->getLinkMembers;
         if (linkMembers.size > 0)
         {
             bool found = false;
             for (int searchIDx = 0; searchIDx < collected.size; ++searchIDx)
             {
-                if (collected.values[searchIDx].linkMembers == linkMembers)
+                if (collected.values[searchIDx].getLinkMembers == getLinkMembers)
                 {
                     found = true;
                     break;
@@ -217,6 +194,7 @@ constexpr void flattern_links_recursive(const MemberAndName* structMember, Compi
                     }
 
                     collected.values[collected.size].linkMembers     = linkMembers;
+                    collected.values[collected.size].getLinkMembers  = getLinkMembers;
                     collected.values[collected.size].flatternedIndex = prevMembers;
                     collected.size++;
                 }
@@ -238,6 +216,7 @@ constexpr auto flattern_links(const CompileArray<MemberAndName, ArraySize>& inpu
         prevMembers              = prev.linkMembers.values[0].member.numFields;
     }
     collected.values[collected.size].linkMembers     = inputMembers;
+    collected.values[collected.size].getLinkMembers  = rootMember->getLinkMembers;
     collected.values[collected.size].flatternedIndex = prevMembers;
     collected.size++;
     return collected;
@@ -267,7 +246,7 @@ constexpr auto merge_links_recurse(CompileArray<Member, totalMembers>& members, 
         {
             for (int findIdx = 0; findIdx < collected.size; ++findIdx)
             {
-                if (collected.values[findIdx].linkMembers == linkMembers)
+                if (collected.values[findIdx].getLinkMembers == field->getLinkMembers)
                 {
                     members.values[members.size].numFields = collected.values[findIdx].flatternedIndex;
                     break;
