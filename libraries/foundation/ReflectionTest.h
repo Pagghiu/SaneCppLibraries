@@ -87,16 +87,18 @@ struct CompileArray
         }
     }
 };
-constexpr int MAX_NUMBER_OF_MEMBERS = 10;
+// constexpr int MAX_NUMBER_OF_MEMBERS = 10;
+
+template <int MAX_MEMBERS>
 struct MemberAndName
 {
     Member      member;
     const char* name;
-    CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> (*getLinkMembers)();
+    CompileArray<MemberAndName, MAX_MEMBERS> (*getLinkMembers)();
 
     constexpr MemberAndName() : name(nullptr), getLinkMembers(nullptr) {}
     constexpr MemberAndName(const Member member, const char* name,
-                            CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> (*getLinkMembers)())
+                            decltype(MemberAndName::getLinkMembers) getLinkMembers)
         : member(member), name(name), getLinkMembers(getLinkMembers)
     {}
     constexpr MemberAndName& operator=(const MemberAndName& other) = default;
@@ -107,10 +109,10 @@ struct GetDescriptorFor;
 template <typename T>
 struct GetMembersListFor
 {
-    static constexpr const MemberAndName*                               get() { return nullptr; }
-    static constexpr CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> getLinkMembers()
+    template <int MAX_MEMBERS>
+    static constexpr auto getLinkMembers()
     {
-        return CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS>();
+        return CompileArray<MemberAndName<MAX_MEMBERS>, MAX_MEMBERS>();
     }
 };
 // clang-format off
@@ -122,54 +124,57 @@ template<> constexpr Type get_type<uint16_t>() { return Type::TypeUINT16; }
 
 // clang-format on
 
-template <typename R, typename T>
-constexpr MemberAndName ReflectField(int order, const char* name, R T::*func, size_t offset)
+template <int MAX_MEMBERS, typename R, typename T>
+constexpr MemberAndName<MAX_MEMBERS> ReflectField(int order, const char* name, R T::*func, size_t offset)
 {
-    return {Member(get_type<R>(), order, offset, sizeof(R), -1), name, &GetMembersListFor<R>::getLinkMembers};
+    return {Member(get_type<R>(), order, offset, sizeof(R), -1), name,
+            &GetMembersListFor<R>::template getLinkMembers<MAX_MEMBERS>};
 }
-template <typename... Types>
-constexpr CompileArray<MemberAndName, sizeof...(Types) + 1> BuildMemberNameArray(MemberAndName structType,
-                                                                                 Types... args)
+template <int MAX_MEMBERS, typename... Types>
+constexpr CompileArray<MemberAndName<MAX_MEMBERS>, sizeof...(Types) + 1> BuildMemberNameArray(
+    MemberAndName<MAX_MEMBERS> structType, Types... args)
 {
-    return {MemberAndName(Member(structType.member.type, structType.member.order, structType.member.offset,
-                                 structType.member.size, sizeof...(Types)),
-                          structType.name, nullptr),
+    return {MemberAndName<MAX_MEMBERS>(Member(structType.member.type, structType.member.order, structType.member.offset,
+                                              structType.member.size, sizeof...(Types)),
+                                       structType.name, nullptr),
             args...};
 }
 
+template <int MAX_MEMBERS>
 struct LinkAndIndex
 {
-    CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> linkMembers;
-    CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> (*getLinkMembers)();
+    CompileArray<MemberAndName<MAX_MEMBERS>, MAX_MEMBERS> linkMembers;
+    decltype(linkMembers) (*getLinkMembers)();
     int flatternedIndex;
     constexpr LinkAndIndex() : getLinkMembers(nullptr), flatternedIndex(0) {}
 };
 
-constexpr int count_maximum_links(const MemberAndName* structMember)
+template <int MAX_MEMBERS>
+constexpr int count_maximum_links(const MemberAndName<MAX_MEMBERS>* structMember)
 {
     int numLinks = 0;
     for (int i = 0; i < structMember->member.numFields; ++i)
     {
-        const MemberAndName*                               member      = structMember + 1 + i;
-        CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> linkMembers = member->getLinkMembers();
+        const auto* member      = structMember + 1 + i;
+        const auto  linkMembers = member->getLinkMembers();
 
         if (linkMembers.size > 0)
         {
-            numLinks += 1 + linkMembers.size;
-            numLinks += count_maximum_links(&linkMembers.values[0]);
+            numLinks += 1 + count_maximum_links(&linkMembers.values[0]);
         }
     }
     return numLinks;
 }
 
-template <int N>
-constexpr void flattern_links_recursive(const MemberAndName* structMember, CompileArray<LinkAndIndex, N>& collected)
+template <int MAX_MEMBERS, int N>
+constexpr void flattern_links_recursive(const MemberAndName<MAX_MEMBERS>*           structMember,
+                                        CompileArray<LinkAndIndex<MAX_MEMBERS>, N>& collected)
 {
     for (int i = 0; i < structMember->member.numFields; ++i)
     {
-        const MemberAndName*                               member         = structMember + 1 + i;
-        CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> linkMembers    = member->getLinkMembers();
-        auto                                               getLinkMembers = member->getLinkMembers;
+        const auto* member         = structMember + 1 + i;
+        auto        linkMembers    = member->getLinkMembers();
+        auto        getLinkMembers = member->getLinkMembers;
         if (linkMembers.size > 0)
         {
             bool found = false;
@@ -189,8 +194,8 @@ constexpr void flattern_links_recursive(const MemberAndName* structMember, Compi
                     int prevMembers = 0;
                     if (collected.size > 0)
                     {
-                        const LinkAndIndex& prev = collected.values[collected.size - 1];
-                        prevMembers              = prev.linkMembers.values[0].member.numFields;
+                        const auto& prev = collected.values[collected.size - 1];
+                        prevMembers      = prev.linkMembers.values[0].member.numFields;
                     }
 
                     collected.values[collected.size].linkMembers     = linkMembers;
@@ -203,17 +208,17 @@ constexpr void flattern_links_recursive(const MemberAndName* structMember, Compi
     }
 }
 
-template <int MaxNumParams, int ArraySize>
-constexpr auto flattern_links(const CompileArray<MemberAndName, ArraySize>& inputMembers)
+template <int MAX_MEMBERS, int MaxNumParams, int ArraySize>
+constexpr auto flattern_links(const CompileArray<MemberAndName<MAX_MEMBERS>, ArraySize>& inputMembers)
 {
-    const MemberAndName*                     rootMember = &inputMembers.values[0];
-    CompileArray<LinkAndIndex, MaxNumParams> collected;
+    const auto*                                           rootMember = &inputMembers.values[0];
+    CompileArray<LinkAndIndex<MAX_MEMBERS>, MaxNumParams> collected;
     flattern_links_recursive(rootMember, collected);
     int prevMembers = 0;
     if (collected.size > 0)
     {
-        const LinkAndIndex& prev = collected.values[collected.size - 1];
-        prevMembers              = prev.linkMembers.values[0].member.numFields;
+        const auto& prev = collected.values[collected.size - 1];
+        prevMembers      = prev.linkMembers.values[0].member.numFields;
     }
     collected.values[collected.size].linkMembers     = inputMembers;
     collected.values[collected.size].getLinkMembers  = rootMember->getLinkMembers;
@@ -222,26 +227,27 @@ constexpr auto flattern_links(const CompileArray<MemberAndName, ArraySize>& inpu
     return collected;
 }
 
-template <int MaxNumParams>
-constexpr auto count_members(const CompileArray<LinkAndIndex, MaxNumParams>& links)
+template <int MAX_MEMBERS, int MaxNumParams>
+constexpr auto count_members(const CompileArray<LinkAndIndex<MAX_MEMBERS>, MaxNumParams>& links)
 {
-    const LinkAndIndex& lastLink   = links.values[links.size - 1];
-    const auto numCollectedMembers = lastLink.flatternedIndex + lastLink.linkMembers.values[0].member.numFields;
+    const auto& lastLink            = links.values[links.size - 1];
+    const auto  numCollectedMembers = lastLink.flatternedIndex + lastLink.linkMembers.values[0].member.numFields;
     return numCollectedMembers + links.size;
 }
 
-template <int totalMembers, int MaxNumParams>
-constexpr auto merge_links_recurse(CompileArray<Member, totalMembers>& members, const LinkAndIndex* currentLink,
-                                   const CompileArray<LinkAndIndex, MaxNumParams>& collected)
+template <int MAX_MEMBERS, int totalMembers, int MaxNumParams>
+constexpr auto merge_links_recurse(CompileArray<Member, totalMembers>&                          members,
+                                   const LinkAndIndex<MAX_MEMBERS>*                             currentLink,
+                                   const CompileArray<LinkAndIndex<MAX_MEMBERS>, MaxNumParams>& collected)
 {
     auto memberAndName             = &currentLink->linkMembers.values[0];
     members.values[members.size++] = memberAndName->member;
     for (int idx = 0; idx < memberAndName->member.numFields; ++idx)
     {
-        const MemberAndName* field = memberAndName + 1 + idx;
+        const auto* field = memberAndName + 1 + idx;
 
-        members.values[members.size]                                   = field->member;
-        CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> linkMembers = field->getLinkMembers();
+        members.values[members.size] = field->member;
+        auto linkMembers             = field->getLinkMembers();
         if (linkMembers.size > 0)
         {
             for (int findIdx = 0; findIdx < collected.size; ++findIdx)
@@ -257,8 +263,8 @@ constexpr auto merge_links_recurse(CompileArray<Member, totalMembers>& members, 
     }
 }
 
-template <int totalMembers, int MaxNumParams>
-constexpr auto merge_links(const CompileArray<LinkAndIndex, MaxNumParams>& links)
+template <int MAX_MEMBERS, int totalMembers, int MaxNumParams>
+constexpr auto merge_links(const CompileArray<LinkAndIndex<MAX_MEMBERS>, MaxNumParams>& links)
 {
     CompileArray<Member, totalMembers> members;
     for (int i = 0; i < links.size; ++i)
@@ -268,92 +274,87 @@ constexpr auto merge_links(const CompileArray<LinkAndIndex, MaxNumParams>& links
     return members;
 }
 
-template <typename T>
+// You can customize MAX_MEMBERS to match the max number of members (+1) of any descriptor that will be linked
+// This is just consuming compile time memory, so it doesn't matter putting any value as long as your compiler
+// is able to handle it without running out of heap space :)
+template <typename T, int MAX_MEMBERS = 10>
 constexpr auto CompileFlatternedDescriptorFor()
 {
-    constexpr auto linkMembers  = GetMembersListFor<T>::getLinkMembers();
+    constexpr auto linkMembers  = GetMembersListFor<T>::template getLinkMembers<MAX_MEMBERS>();
     constexpr auto maxNumParams = count_maximum_links(linkMembers.values);
-    constexpr auto links        = flattern_links<maxNumParams>(linkMembers);
+    constexpr auto links        = flattern_links<MAX_MEMBERS, maxNumParams>(linkMembers);
     constexpr auto totalMembers = count_members(links);
-    return merge_links<totalMembers>(links);
+    return merge_links<MAX_MEMBERS, totalMembers>(links);
 }
 
-template <typename T>
-auto GetLinksFor()
-{
-    auto linkMembers  = GetMembersListFor<T>::getLinkMembers();
-    auto maxNumParams = count_maximum_links(linkMembers.values);
-    (void)maxNumParams;
-    return flattern_links<8>(linkMembers);
-}
+// template <typename T>
+// auto GetLinksFor()
+//{
+//     auto linkMembers  = GetMembersListFor<T>::getLinkMembers();
+//     auto maxNumParams = count_maximum_links(linkMembers.values);
+//     (void)maxNumParams;
+//     return flattern_links<8>(linkMembers);
+// }
 
 #define SC_REFLECT_STRUCT_START(StructName)                                                                            \
     template <>                                                                                                        \
-    struct SC::Reflection::GetDescriptorFor<StructName>                                                                \
-    {                                                                                                                  \
-        typedef StructName    T;                                                                                       \
-        static constexpr auto get()                                                                                    \
-        {                                                                                                              \
-return SC::Reflection::BuildMemberNameArray({SC::Reflection::Member(Type::TypeStruct, 0, 0, sizeof(T), 0), #StructName, nullptr}
-
-#define SC__REFLECT_STRUCT_END_IMPL2(StructName, Counter)                                                              \
-);                                                                                                                     \
-    }                                                                                                                  \
-    }                                                                                                                  \
-    ;                                                                                                                  \
-    namespace SC                                                                                                       \
-    {                                                                                                                  \
-    namespace Reflection                                                                                               \
-    {                                                                                                                  \
-    constexpr auto Members##Counter = SC::Reflection::GetDescriptorFor<StructName>::get();                             \
-    }                                                                                                                  \
-    }                                                                                                                  \
-    template <>                                                                                                        \
     struct SC::Reflection::GetMembersListFor<StructName>                                                               \
     {                                                                                                                  \
-        static constexpr const auto* get() { return Members##Counter.values; }                                         \
-        static constexpr auto&       getDescriptor() { return Members##Counter; }                                      \
-    };
-#define SC__REFLECT_STRUCT_END_IMPL1(StructName, Counter) SC__REFLECT_STRUCT_END_IMPL2(StructName, Counter)
+        typedef StructName T;                                                                                          \
+        template <int MAX_MEMBERS>                                                                                     \
+        static constexpr auto getLinkMembers()                                                                         \
+        {                                                                                                              \
+            CompileArray<MemberAndName<MAX_MEMBERS>, MAX_MEMBERS> fields;                                              \
+            fields.values[fields.size++] = {Member(Type::TypeStruct, 0, 0, sizeof(T), 0), #StructName, nullptr};
 
-#define SC_REFLECT_STRUCT_END(StructName) SC__REFLECT_STRUCT_END_IMPL1(StructName, __COUNTER__)
+#define SC_REFLECT_STRUCT_END()                                                                                        \
+    fields.values[0].member.numFields = fields.size - 1;                                                               \
+    return fields;                                                                                                     \
+    }                                                                                                                  \
+    }                                                                                                                  \
+    ;
 
-#define SC_REFLECT_FIELD(Order, Field) , ReflectField(Order, #Field, &T::Field, SC_OFFSET_OF(T, Field))
+#define SC_REFLECT_FIELD(Order, Field)                                                                                 \
+    fields.values[fields.size++] = ReflectField<MAX_MEMBERS>(Order, #Field, &T::Field, SC_OFFSET_OF(T, Field));
 
 } // namespace Reflection
 } // namespace SC
 
-#if 1
+#if 0
 
 template <>
 struct SC::Reflection::GetMembersListFor<TestNamespace::SimpleStructure>
 {
-    static constexpr CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> getLinkMembers()
+    template <int MAX_MEMBERS>
+    static constexpr auto getLinkMembers()
     {
-        typedef TestNamespace::SimpleStructure             T;
-        CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> asd;
-        asd.values[0] = {Member(get_type<T>(), 0, 0, sizeof(T), 2), "SimpleStructure", nullptr};
-        asd.values[1] = ReflectField(0, "f1", &T::f1, SC_OFFSET_OF(T, f1));
-        asd.values[2] = ReflectField(1, "f2", &T::f2, SC_OFFSET_OF(T, f2));
-        asd.size      = 3;
-        return asd;
+        typedef TestNamespace::SimpleStructure                T;
+        CompileArray<MemberAndName<MAX_MEMBERS>, MAX_MEMBERS> fields;
+        fields.values[fields.size++]      = {Member(get_type<T>(), 0, 0, sizeof(T), 2), "SimpleStructure", nullptr};
+        fields.values[fields.size++]      = ReflectField<MAX_MEMBERS>(0, "f1", &T::f1, SC_OFFSET_OF(T, f1));
+        fields.values[fields.size++]      = ReflectField<MAX_MEMBERS>(1, "f2", &T::f2, SC_OFFSET_OF(T, f2));
+        fields.values[0].member.numFields = fields.size - 1;
+        return fields;
     }
 };
 
 template <>
 struct SC::Reflection::GetMembersListFor<TestNamespace::ComplexStructure>
 {
-    typedef TestNamespace::ComplexStructure                             T;
-    static constexpr CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> getLinkMembers()
+    typedef TestNamespace::ComplexStructure T;
+    template <int MAX_MEMBERS>
+    static constexpr auto getLinkMembers()
     {
-        CompileArray<MemberAndName, MAX_NUMBER_OF_MEMBERS> asd;
-        asd.values[0] = {Member(Type::TypeStruct, 0, 0, sizeof(T), 4), "ComplexStructure", nullptr};
-        asd.values[1] = ReflectField(0, "f1", &T::f1, SC_OFFSET_OF(T, f1));
-        asd.values[2] = ReflectField(1, "simpleStructure", &T::simpleStructure, SC_OFFSET_OF(T, simpleStructure));
-        asd.values[3] = ReflectField(2, "simpleStructure2", &T::simpleStructure2, SC_OFFSET_OF(T, simpleStructure2));
-        asd.values[4] = ReflectField(3, "f4", &T::f1, SC_OFFSET_OF(T, f4));
-        asd.size      = 5;
-        return asd;
+        CompileArray<MemberAndName<MAX_MEMBERS>, MAX_MEMBERS> fields;
+        fields.values[fields.size++] = {Member(Type::TypeStruct, 0, 0, sizeof(T), 4), "ComplexStructure", nullptr};
+        fields.values[fields.size++] = ReflectField<MAX_MEMBERS>(0, "f1", &T::f1, SC_OFFSET_OF(T, f1));
+        fields.values[fields.size++] =
+            ReflectField<MAX_MEMBERS>(1, "simpleStructure", &T::simpleStructure, SC_OFFSET_OF(T, simpleStructure));
+        fields.values[fields.size++] =
+            ReflectField<MAX_MEMBERS>(2, "simpleStructure2", &T::simpleStructure2, SC_OFFSET_OF(T, simpleStructure2));
+        fields.values[fields.size++]      = ReflectField<MAX_MEMBERS>(3, "f4", &T::f1, SC_OFFSET_OF(T, f4));
+        fields.values[0].member.numFields = fields.size - 1;
+        return fields;
     }
 };
 #else
@@ -361,14 +362,14 @@ struct SC::Reflection::GetMembersListFor<TestNamespace::ComplexStructure>
 SC_REFLECT_STRUCT_START(TestNamespace::SimpleStructure)
 SC_REFLECT_FIELD(0, f1)
 SC_REFLECT_FIELD(1, f2)
-SC_REFLECT_STRUCT_END(TestNamespace::SimpleStructure)
+SC_REFLECT_STRUCT_END()
 
 SC_REFLECT_STRUCT_START(TestNamespace::ComplexStructure)
 SC_REFLECT_FIELD(0, f1)
 SC_REFLECT_FIELD(1, simpleStructure)
 SC_REFLECT_FIELD(2, simpleStructure2)
 SC_REFLECT_FIELD(3, f4)
-SC_REFLECT_STRUCT_END(TestNamespace::ComplexStructure)
+SC_REFLECT_STRUCT_END()
 
 #endif
 
