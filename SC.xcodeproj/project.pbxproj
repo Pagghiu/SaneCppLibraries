@@ -114,6 +114,10 @@
 		7BB1D44528F5FED300FAEA68 /* StringFormat.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringFormat.h; sourceTree = "<group>"; };
 		7BB1D44628F5FED300FAEA68 /* StringFormat.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StringFormat.cpp; sourceTree = "<group>"; };
 		7BB1D44928F5FF8000FAEA68 /* StringIterator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StringIterator.h; sourceTree = "<group>"; };
+		7BD2350328FC9DA60004C69E /* Reflection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Reflection.h; sourceTree = "<group>"; };
+		7BD2350428FC9DA60004C69E /* ReflectionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ReflectionTest.h; sourceTree = "<group>"; };
+		7BE4E1C72902F15C0091CED7 /* ReflectionTestEmbedding.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ReflectionTestEmbedding.h; sourceTree = "<group>"; };
+		7BE4E1CB29033C3D0091CED7 /* InitializerList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InitializerList.h; sourceTree = "<group>"; };
 		7BF4DF6928DE7A5E008CBB53 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -160,6 +164,7 @@
 				7B73F00628F37F040081C601 /* Assert.h */,
 				7B73EFEC28F37F040081C601 /* Compiler.h */,
 				7B73EFF028F37F040081C601 /* Console.cpp */,
+				7BE4E1CB29033C3D0091CED7 /* InitializerList.h */,
 				7B73EFE728F37F040081C601 /* Console.h */,
 				7B73EFF228F37F040081C601 /* ConsoleTest.h */,
 				7B26715028FC1A6000112DCE /* Function.h */,
@@ -177,6 +182,9 @@
 				7B73EFFA28F37F040081C601 /* OSPosix.cpp */,
 				7B73EFFB28F37F040081C601 /* OSTest.h */,
 				7B73F00728F37F040081C601 /* Platform.h */,
+				7BD2350328FC9DA60004C69E /* Reflection.h */,
+				7BD2350428FC9DA60004C69E /* ReflectionTest.h */,
+				7BE4E1C72902F15C0091CED7 /* ReflectionTestEmbedding.h */,
 				7B73EFF828F37F040081C601 /* Result.h */,
 				7B73EFF928F37F040081C601 /* ResultTest.h */,
 				7B73EFEB28F37F040081C601 /* Segment.h */,
@@ -369,7 +377,7 @@
 		7B52501928E85B9100827290 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
 				CODE_SIGN_STYLE = Automatic;
 				GCC_ENABLE_CPP_EXCEPTIONS = NO;
 				GCC_ENABLE_CPP_RTTI = NO;
@@ -386,7 +394,7 @@
 		7B52501A28E85B9100827290 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
 				DEPLOYMENT_POSTPROCESSING = YES;

@@ -4,6 +4,8 @@
 #include "libraries/foundation/MapTest.h"
 #include "libraries/foundation/MemoryTest.h"
 #include "libraries/foundation/OSTest.h"
+#include "libraries/foundation/ReflectionTest.h"
+#include "libraries/foundation/ReflectionTestEmbedding.h"
 #include "libraries/foundation/ResultTest.h"
 #include "libraries/foundation/SmallVectorTest.h"
 #include "libraries/foundation/StringBuilderTest.h"
@@ -31,6 +33,8 @@ int main(int argc, const char* argv[])
     { MapTest               test(report); }
     { SmallVectorTest       test(report); }
     { FunctionTest          test(report); }
+    { ReflectionTest        test(report); }
+    { ReflectionTestEmbedding        test(report); }
     // clang-format on
 
     return report.getTestReturnCode();
