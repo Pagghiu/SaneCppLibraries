@@ -44,8 +44,14 @@ struct SC::SegmentItems : public SegmentHeader
 {
 #if SC_MSVC
     // MSVC doesn't like 0 sized arrays...
-    SC_ALWAYS_INLINE T*       getItems() { return reinterpret_cast<T*>(this); }
-    SC_ALWAYS_INLINE const T* getItems() const { return reinterpret_cast<T*>(this); }
+    SC_ALWAYS_INLINE T* getItems()
+    {
+        return reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(this) + sizeof(SegmentHeader));
+    }
+    SC_ALWAYS_INLINE const T* getItems() const
+    {
+        return reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(this) + sizeof(SegmentHeader));
+    }
 #else
     union
     {
@@ -280,10 +286,8 @@ struct SC::SegmentOperations
         const size_t     numCapacity = isNull ? 0 : selfSegment->capacity();
         if (numElements == numCapacity)
         {
-            if (!ensureCapacity(oldItems, numElements + 1, numElements)) [[unlikely]]
-            {
-                return false;
-            }
+            if (!ensureCapacity(oldItems, numElements + 1, numElements))
+                SC_UNLIKELY { return false; }
         }
         SegmentItems<T>::copyConstruct(oldItems, numElements, 1, &element);
         SegmentItems<T>::getSegment(oldItems)->sizeBytes += sizeof(T);
@@ -298,10 +302,8 @@ struct SC::SegmentOperations
         const size_t     numCapacity = isNull ? 0 : selfSegment->capacity();
         if (numElements == numCapacity)
         {
-            if (!ensureCapacity(oldItems, numElements + 1, numElements)) [[unlikely]]
-            {
-                return false;
-            }
+            if (!ensureCapacity(oldItems, numElements + 1, numElements))
+                SC_UNLIKELY { return false; }
         }
         SegmentItems<T>::moveConstruct(oldItems, numElements, 1, &element);
         SegmentItems<T>::getSegment(oldItems)->sizeBytes += sizeof(T);
@@ -485,10 +487,8 @@ struct SC::SegmentOperations
         if (newSize > oldCapacity)
         {
             const auto keepFirstN = min(oldSize, newSize);
-            if (!ensureCapacity(oldItems, newSize, keepFirstN)) [[unlikely]]
-            {
-                return false;
-            }
+            if (!ensureCapacity(oldItems, newSize, keepFirstN))
+                SC_UNLIKELY { return false; }
             if (initialize)
             {
                 SegmentItems<T>::copyConstructSingle(oldItems, keepFirstN, newSize - keepFirstN, *defaultValue);
@@ -530,10 +530,8 @@ struct SC::SegmentOperations
                 {
                     return true; // Array allocator returning the same memory
                 }
-                else if (newSegment == nullptr) [[unlikely]]
-                {
-                    return false;
-                }
+                else if (newSegment == nullptr)
+                    SC_UNLIKELY { return false; }
                 newSegment->sizeBytes = oldSegment->sizeBytes;
                 SegmentItems<T>::moveConstruct(newSegment->getItems(), 0, numElements, oldSegment->getItems());
                 Allocator::release(oldSegment);

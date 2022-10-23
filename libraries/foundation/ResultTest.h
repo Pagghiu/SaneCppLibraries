@@ -23,7 +23,7 @@ struct SC::ResultTest : public SC::TestCase
         }
         if (test_section("nested_succeed"))
         {
-            int res = SC_MUST(nestedFail2(false));
+            SC_MUST(int res, nestedFail2(false));
             SC_TEST_EXPECT(res = 7);
         }
         if (test_section("nested_fail"))
@@ -86,13 +86,13 @@ struct SC::ResultTest : public SC::TestCase
 
     Result<int> nestedFail1(bool fail)
     {
-        int value = SC_TRY(nestedFail2(fail));
+        SC_TRY(int value, nestedFail2(fail));
         return value + 1;
     }
 
     Result<int> nestedFail2(bool fail)
     {
-        auto value = SC_TRY(getString(fail));
+        SC_TRY(auto value, getString(fail));
         return static_cast<int>(value.size());
     }
 };

@@ -34,7 +34,7 @@ int main(int argc, const char* argv[])
     { SmallVectorTest       test(report); }
     { FunctionTest          test(report); }
     { ReflectionTest        test(report); }
-    { ReflectionTestEmbedding        test(report); }
+    { ReflectionTestEmbedding test(report); }
     // clang-format on
 
     return report.getTestReturnCode();

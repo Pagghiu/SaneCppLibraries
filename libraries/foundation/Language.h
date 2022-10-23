@@ -184,12 +184,18 @@ inline void  operator delete(void* p, SC::PlacementNew) noexcept {}
 inline void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { return p; }
 #endif
 
-#if __cplusplus >= 202002L
+#if SC_MSVC
+#define SC_CPLUSPLUS _MSVC_LANG
+#else
+#define SC_CPLUSPLUS __cplusplus
+#endif
+
+#if SC_CPLUSPLUS >= 202002L
 
 #define SC_CPP_AT_LEAST_20 1
 #define SC_CPP_AT_LEAST_14 1
 
-#elif __cplusplus >= 201402L
+#elif SC_CPLUSPLUS >= 201402L
 
 #define SC_CPP_AT_LEAST_20 0
 #define SC_CPP_AT_LEAST_14 1
@@ -213,4 +219,12 @@ inline void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { retu
 #define SC_CONSTEXPR_DESTRUCTOR constexpr
 #else
 #define SC_CONSTEXPR_DESTRUCTOR
+#endif
+
+#if (!SC_MSVC) || SC_CPP_AT_LEAST_20
+#define SC_LIKELY   [[likely]]
+#define SC_UNLIKELY [[unlikely]]
+#else
+#define SC_LIKELY
+#define SC_UNLIKELY
 #endif

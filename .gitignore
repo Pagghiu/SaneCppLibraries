@@ -3,3 +3,4 @@
 _*/
 .vs
 x64
+*.vcxproj.user

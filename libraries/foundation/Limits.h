@@ -8,7 +8,8 @@ struct MaxValue
     template <typename T>
     constexpr T SignedMaxValue() const
     {
-        return (1ull << (sizeof(T) * 8 - 1)) - 1;
+        // (1ull << (sizeof(T) * 8 - 1)) - 1; produces warning on MSVC
+        return (~0) & ~static_cast<T>((1ull << (sizeof(T) * 8 - 1)));
     }
     template <typename T>
     constexpr T UnsignedMaxValue() const

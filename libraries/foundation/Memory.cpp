@@ -1,5 +1,6 @@
 #include "Memory.h"
 #include "Assert.h"
+#include "Language.h"
 #include "Limits.h"
 
 // system includes
@@ -20,13 +21,13 @@ void*           operator new[](SC::size_t len) { return malloc(len); }
 #endif
 void operator delete(void* p) noexcept
 {
-    if (p != 0) [[likely]]
-        free(p);
+    if (p != 0)
+        SC_LIKELY { free(p); }
 }
 void operator delete[](void* p) noexcept
 {
-    if (p != 0) [[likely]]
-        free(p);
+    if (p != 0)
+        SC_LIKELY { free(p); }
 }
 #if SC_MSVC
 #else

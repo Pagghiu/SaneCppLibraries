@@ -62,7 +62,8 @@ struct SC::Function<R(Args...)>
 
     Function(Function&& other)
     {
-        functionStub = other.functionStub;
+        functionStub  = other.functionStub;
+        classInstance = other.classInstance;
         other.sendLambdaSignal(FunctionErasedOperation::LambdaMoveConstruct, &classInstance);
         other.sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
         other.functionStub = nullptr;
@@ -105,8 +106,8 @@ struct SC::Function<R(Args...)>
         functionStub = [](FunctionErasedOperation operation, void* other, const void* const* p, Args... args) -> R
         {
             Lambda& lambda = *reinterpret_cast<Lambda*>(const_cast<void**>(p));
-            if (operation == FunctionErasedOperation::Execute) [[likely]]
-                return lambda(forward<Args>(args)...);
+            if (operation == FunctionErasedOperation::Execute)
+                SC_LIKELY { return lambda(forward<Args>(args)...); }
             else if (operation == FunctionErasedOperation::LambdaDestruct)
                 lambda.~Lambda();
             else if (operation == FunctionErasedOperation::LambdaCopyConstruct)
@@ -154,31 +155,31 @@ struct SC::Function<R(Args...)>
     template <typename Class, R (Class::*MemberFunction)(Args...)>
     static R MemberWrapper(FunctionErasedOperation operation, void* other, const void* const* p, Args... args)
     {
-        if (operation == FunctionErasedOperation::Execute) [[likely]]
-        {
-            Class* cls = const_cast<Class*>(static_cast<const Class*>(*p));
-            return (cls->*MemberFunction)(forward<Args>(args)...);
-        }
+        if (operation == FunctionErasedOperation::Execute)
+            SC_LIKELY
+            {
+                Class* cls = const_cast<Class*>(static_cast<const Class*>(*p));
+                return (cls->*MemberFunction)(forward<Args>(args)...);
+            }
         return R();
     }
     template <typename Class, R (Class::*MemberFunction)(Args...) const>
     static R MemberWrapper(FunctionErasedOperation operation, void* other, const void* const* p, Args... args)
     {
-        if (operation == FunctionErasedOperation::Execute) [[likely]]
-        {
-            const Class* cls = static_cast<const Class*>(*p);
-            return (cls->*MemberFunction)(forward<Args>(args)...);
-        }
+        if (operation == FunctionErasedOperation::Execute)
+            SC_LIKELY
+            {
+                const Class* cls = static_cast<const Class*>(*p);
+                return (cls->*MemberFunction)(forward<Args>(args)...);
+            }
         return R();
     }
 
     template <R (*FreeFunction)(Args...)>
     static R FunctionWrapper(FunctionErasedOperation operation, void* other, const void* const* p, Args... args)
     {
-        if (operation == FunctionErasedOperation::Execute) [[likely]]
-        {
-            return FreeFunction(forward<Args>(args)...);
-        }
+        if (operation == FunctionErasedOperation::Execute)
+            SC_LIKELY { return FreeFunction(forward<Args>(args)...); }
         return R();
     }
 };

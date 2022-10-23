@@ -103,7 +103,7 @@ struct SC::Vector
         }
     }
 
-    Vector(Vector&& other)
+    Vector(Vector&& other) noexcept
     {
         items = nullptr;
         moveAssign(forward<Vector>(other));
@@ -232,10 +232,8 @@ struct SC::Vector
 
     [[nodiscard]] size_t size() const
     {
-        if (items == nullptr) [[unlikely]]
-        {
-            return 0;
-        }
+        if (items == nullptr)
+            SC_UNLIKELY { return 0; }
         else
         {
             return SegmentItems<T>::getSegment(items)->sizeBytes / sizeof(T);
@@ -244,10 +242,8 @@ struct SC::Vector
 
     [[nodiscard]] size_t capacity() const
     {
-        if (items == nullptr) [[unlikely]]
-        {
-            return 0;
-        }
+        if (items == nullptr)
+            SC_UNLIKELY { return 0; }
         else
         {
             return SegmentItems<T>::getSegment(items)->capacityBytes / sizeof(T);

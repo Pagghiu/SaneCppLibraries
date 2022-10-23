@@ -59,7 +59,7 @@ struct [[nodiscard]] SC::Result
     constexpr Result(Result&& other)      = delete;
     constexpr Result(const Result& other) = delete;
 #else
-    SC_CONSTEXPR_CONSTRUCTOR_NEW Result(Result&& other)
+    SC_CONSTEXPR_CONSTRUCTOR_NEW Result(Result&& other) noexcept
     {
         holdsError = other.holdsError;
         if (holdsError)
@@ -115,16 +115,22 @@ struct [[nodiscard]] SC::Result
     {                                                                                                                  \
         return Error{failedMessage};                                                                                   \
     }
-#define SC_TRY(expression)                                                                                             \
-    ({                                                                                                                 \
-        auto _temporary_result = (expression);                                                                         \
-        if (_temporary_result.isError()) [[unlikely]]                                                                  \
-            return _temporary_result.releaseError();                                                                   \
-        _temporary_result.releaseValue();                                                                              \
-    })
-#define SC_MUST(expression)                                                                                            \
-    ({                                                                                                                 \
-        auto _temporary_result = (expression);                                                                         \
-        SC_DEBUG_ASSERT(!_temporary_result.isError());                                                                 \
-        _temporary_result.releaseValue();                                                                              \
-    })
+
+#define SC__TRY_IMPL2(assignment, expression, Counter)                                                                 \
+    auto _temporary_result##Counter = (expression);                                                                    \
+    if (_temporary_result##Counter.isError())                                                                          \
+    {                                                                                                                  \
+        return _temporary_result##Counter.releaseError();                                                              \
+    }                                                                                                                  \
+    assignment = _temporary_result##Counter.releaseValue()
+#define SC__TRY_IMPL1(assignment, expression, Counter) SC__TRY_IMPL2(assignment, expression, Counter)
+#define SC_TRY(assignment, expression)                 SC__TRY_IMPL1(assignment, expression, __COUNTER__)
+
+#define SC__MUST_IMPL2(assignment, expression, Counter)                                                                \
+    auto _temporary_result##Counter = (expression);                                                                    \
+    SC_DEBUG_ASSERT(not _temporary_result##Counter.isError());                                                         \
+    assignment = _temporary_result##Counter.releaseValue()
+
+#define SC__MUST_IMPL1(assignment, expression, Counter) SC__MUST_IMPL2(assignment, expression, Counter)
+
+#define SC_MUST(assignment, expression) SC__MUST_IMPL1(assignment, expression, __COUNTER__)

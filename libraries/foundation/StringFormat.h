@@ -39,13 +39,14 @@ struct StringFormat
     [[nodiscard]] static bool format(Vector<char_t>& data, StringView fmt, Types... args)
     {
         const size_t prevSize = data.size();
-        if (recursiveFormat(data, fmt.getIterator<RangeIterator>(), args...)) [[likely]]
-        {
-            if (data.size() > prevSize)
-                return data.push_back(0);
-            else
-                return true; // passed "" as fmt probably
-        }
+        if (recursiveFormat(data, fmt.getIterator<RangeIterator>(), args...))
+            SC_LIKELY
+            {
+                if (data.size() > prevSize)
+                    return data.push_back(0);
+                else
+                    return true; // passed "" as fmt probably
+            }
         else
         {
             (void)data.resize(prevSize);
@@ -81,15 +82,16 @@ struct StringFormat
         {
             if (it.advanceUntilMatches('{', '}', &matchedChar)) // match start or end of specifier
             {
-                if (it.isFollowedBy(matchedChar)) [[unlikely]] // if it's the same matched, let's escape it
-                {
-                    (void)it.skipNext(); // we want to make sure we insert the escaped '{' or '}'
-                    SC_TRY_IF(startingPoint.writeBytesUntil(it, data));
-                    (void)it.skipNext(); // we don't want to insert the additional '{' or '}' needed for escaping
-                    startingPoint = it;
-                    continue; // or return recursiveFormat(data, it, args...); // recurse as alternative to
-                              // while(true)
-                }
+                if (it.isFollowedBy(matchedChar))
+                    SC_UNLIKELY // if it's the same matched, let's escape it
+                    {
+                        (void)it.skipNext(); // we want to make sure we insert the escaped '{' or '}'
+                        SC_TRY_IF(startingPoint.writeBytesUntil(it, data));
+                        (void)it.skipNext(); // we don't want to insert the additional '{' or '}' needed for escaping
+                        startingPoint = it;
+                        continue; // or return recursiveFormat(data, it, args...); // recurse as alternative to
+                                  // while(true)
+                    }
                 else if (matchedChar == '{') // it's a '{' not followed by itself, so let's parse specifier
                 {
                     SC_TRY_IF(startingPoint.writeBytesUntil(it, data)); // write everything before '{'

@@ -49,7 +49,7 @@ struct SC::MapTest : public SC::TestCase
     template <typename T>
     static Result<const String&> getTestString(const T& map, StringView key)
     {
-        auto& result = *SC_TRY(map.get(key));
-        return result;
+        SC_TRY(auto result, map.get(key));
+        return *result;
     }
 };

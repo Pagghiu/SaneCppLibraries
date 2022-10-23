@@ -15,13 +15,14 @@ void printAssertion(const char_t* expression, const char_t* filename, const char
 } // namespace SC
 
 #define SC_RELEASE_ASSERT(e)                                                                                           \
-    if (!(e)) [[unlikely]]                                                                                             \
-    {                                                                                                                  \
-        SC::printAssertion(#e, __FILE__, __func__, __LINE__);                                                          \
-        (void)SC::OS::printBacktrace();                                                                                \
-        SC_BREAK_DEBUGGER;                                                                                             \
-        exit(-1);                                                                                                      \
-    }
+    if (!(e))                                                                                                          \
+        SC_UNLIKELY                                                                                                    \
+        {                                                                                                              \
+            SC::printAssertion(#e, __FILE__, __func__, __LINE__);                                                      \
+            (void)SC::OS::printBacktrace();                                                                            \
+            SC_BREAK_DEBUGGER;                                                                                         \
+            exit(-1);                                                                                                  \
+        }
 #if SC_DEBUG
 #define SC_DEBUG_ASSERT(e) SC_RELEASE_ASSERT(e)
 #else
