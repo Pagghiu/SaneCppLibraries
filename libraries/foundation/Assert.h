@@ -6,9 +6,14 @@
 
 namespace SC
 {
-[[noreturn]] inline __attribute__((always_inline)) void SC_UNREACHABLE() { __builtin_unreachable(); }
+#if SC_MSVC
+[[noreturn]] __forceinline void unreachable() { __assume(false); }
+#else
+[[noreturn]] SC_ALWAYS_INLINE void SC_UNREACHABLE() { __builtin_unreachable(); }
+#endif
 void printAssertion(const char_t* expression, const char_t* filename, const char_t* functionName, int lineNumber);
 } // namespace SC
+
 #define SC_RELEASE_ASSERT(e)                                                                                           \
     if (!(e)) [[unlikely]]                                                                                             \
     {                                                                                                                  \

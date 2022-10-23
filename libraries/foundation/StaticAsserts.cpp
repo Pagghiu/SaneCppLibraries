@@ -4,8 +4,13 @@
 // system includes
 #include <float.h>  // FLT_MAX / DBL_MAX
 #include <stdlib.h> // *_MAX (integer)
+#if SC_MSVC
+#include <BaseTsd.h>
+#include <stdint.h>
+typedef SSIZE_T ssize_t;
+#else
 #include <unistd.h> // ssize_t
-
+#endif
 namespace SC
 {
 static_assert(static_cast<float>(MaxValue()) == FLT_MAX, "static_cast<float>(MaxValue)");

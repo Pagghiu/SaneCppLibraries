@@ -13,19 +13,22 @@ template <typename T>
 struct StringFormatterFor;
 
 // clang-format off
-template <> struct SC::text::StringFormatterFor<float>        {static bool format(Vector<char_t>&, StringIteratorASCII, const float);};
-template <> struct SC::text::StringFormatterFor<double>       {static bool format(Vector<char_t>&, StringIteratorASCII, const double);};
-template <> struct SC::text::StringFormatterFor<SC::size_t>   {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::size_t);};
-template <> struct SC::text::StringFormatterFor<SC::ssize_t>  {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::ssize_t);};
-template <> struct SC::text::StringFormatterFor<SC::int64_t>  {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::int64_t);};
-template <> struct SC::text::StringFormatterFor<SC::uint64_t> {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::uint64_t);};
-template <> struct SC::text::StringFormatterFor<SC::int32_t>  {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::int32_t);};
-template <> struct SC::text::StringFormatterFor<SC::uint32_t> {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::uint32_t);};
-template <> struct SC::text::StringFormatterFor<SC::int16_t>  {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::int16_t);};
-template <> struct SC::text::StringFormatterFor<SC::uint16_t> {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::uint16_t);};
-template <> struct SC::text::StringFormatterFor<SC::char_t>   {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::char_t);};
-template <> struct SC::text::StringFormatterFor<StringView>   {static bool format(Vector<char_t>&, StringIteratorASCII, const StringView);};
-template <> struct SC::text::StringFormatterFor<const SC::char_t*> {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::char_t*);};
+template <> struct StringFormatterFor<float>        {static bool format(Vector<char_t>&, StringIteratorASCII, const float);};
+template <> struct StringFormatterFor<double>       {static bool format(Vector<char_t>&, StringIteratorASCII, const double);};
+#if SC_MSVC
+#else
+template <> struct StringFormatterFor<SC::size_t>   {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::size_t);};
+template <> struct StringFormatterFor<SC::ssize_t>  {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::ssize_t);};
+#endif
+template <> struct StringFormatterFor<SC::int64_t>  {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::int64_t);};
+template <> struct StringFormatterFor<SC::uint64_t> {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::uint64_t);};
+template <> struct StringFormatterFor<SC::int32_t>  {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::int32_t);};
+template <> struct StringFormatterFor<SC::uint32_t> {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::uint32_t);};
+template <> struct StringFormatterFor<SC::int16_t>  {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::int16_t);};
+template <> struct StringFormatterFor<SC::uint16_t> {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::uint16_t);};
+template <> struct StringFormatterFor<SC::char_t>   {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::char_t);};
+template <> struct StringFormatterFor<StringView>   {static bool format(Vector<char_t>&, StringIteratorASCII, const StringView);};
+template <> struct StringFormatterFor<const SC::char_t*> {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::char_t*);};
 // clang-format on
 } // namespace text
 
@@ -84,7 +87,8 @@ struct StringFormat
                     SC_TRY_IF(startingPoint.writeBytesUntil(it, data));
                     (void)it.skipNext(); // we don't want to insert the additional '{' or '}' needed for escaping
                     startingPoint = it;
-                    continue; // or return recursiveFormat(data, it, args...); // recurse as alternative to while(true)
+                    continue; // or return recursiveFormat(data, it, args...); // recurse as alternative to
+                              // while(true)
                 }
                 else if (matchedChar == '{') // it's a '{' not followed by itself, so let's parse specifier
                 {

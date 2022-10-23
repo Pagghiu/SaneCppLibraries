@@ -44,7 +44,14 @@ struct TestCase
 };
 } // namespace SC
 
+#if SC_MSVC
+#define SC_TEST_EXPECT(e)                                                                                              \
+    ((e) ? recordExpectation(#e, true)                                                                                 \
+         : (recordExpectation(#e, false), TestCase::report.debugBreakOnFailedTest ? SC_BREAK_DEBUGGER : (void)0))
+
+#else
 #define SC_TEST_EXPECT(e)                                                                                              \
     (__builtin_expect((e), 0)                                                                                          \
          ? recordExpectation(#e, true)                                                                                 \
          : (recordExpectation(#e, false), TestCase::report.debugBreakOnFailedTest ? SC_BREAK_DEBUGGER : (void)0))
+#endif

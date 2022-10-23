@@ -1,4 +1,5 @@
 #pragma once
+#include "Compiler.h"
 #include "Types.h"
 
 namespace SC
@@ -176,7 +177,12 @@ constexpr size_t ConstantStringLength(const char (&text)[N])
 
 } // namespace SC
 
-inline constexpr void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { return p; }
+#if SC_MSVC
+inline void* operator new(size_t, void* p, SC::PlacementNew) noexcept { return p; }
+inline void  operator delete(void* p, SC::PlacementNew) noexcept {}
+#else
+inline void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { return p; }
+#endif
 
 #if __cplusplus >= 202002L
 

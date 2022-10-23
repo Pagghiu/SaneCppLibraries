@@ -27,6 +27,8 @@ bool formatSprintf(Vector<char_t>& data, char (&formatSpecifier)[N], StringItera
     const bool validResult = numCharsExcludingTerminator >= 0 && numCharsExcludingTerminator + 1 < BUFFER_SIZE;
     return validResult && data.appendCopy(buffer, numCharsExcludingTerminator);
 }
+#if SC_MSVC
+#else
 
 bool StringFormatterFor<SC::size_t>::format(Vector<char_t>& data, const StringIteratorASCII specifier,
                                             const SC::size_t value)
@@ -41,6 +43,7 @@ bool StringFormatterFor<SC::ssize_t>::format(Vector<char_t>& data, const StringI
     char_t formatSpecifier[SPECIFIER_SIZE] = "%zd";
     return formatSprintf<ConstantStringLength("zd") - 1>(data, formatSpecifier, specifier, value);
 }
+#endif
 
 bool StringFormatterFor<SC::int64_t>::format(Vector<char_t>& data, const StringIteratorASCII specifier,
                                              const SC::int64_t value)

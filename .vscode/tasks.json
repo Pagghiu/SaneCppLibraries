@@ -33,7 +33,10 @@
             "command": "xcodebuild -target SCTest -configuration Release -project ${workspaceFolder}/SC.xcodeproj",
             "problemMatcher": [
                 "$gcc"
-            ]
+            ],
+            "group": {
+                "kind": "build",
+            }
         },
         {
             "label": "Build SCTest Release ARM64",
@@ -41,13 +44,27 @@
             "command": "xcodebuild -target SCTest -configuration Release -project ${workspaceFolder}/SC.xcodeproj ONLY_ACTIVE_ARCH=NO ARCHS=arm64",
             "problemMatcher": [
                 "$gcc"
-            ]
+            ],
+            "group": {
+                "kind": "build",
+            }
         },
         {
             "label": "Clang-Format Everything",
             "type": "shell",
             "command": "${workspaceFolder}/clang_format.sh",
             "problemMatcher": []
+        },
+        {
+            "label": "GCC Compile",
+            "type": "shell",
+            "command": "${workspaceFolder}/gcc_compile.sh",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+            }
         },
         {
             "label": "Refresh compile_commands_arm64.json macOS-Universal Debug",

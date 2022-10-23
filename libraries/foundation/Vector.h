@@ -87,7 +87,7 @@ struct SC::VectorAllocator
 template <typename T>
 struct SC::Vector
 {
-    typedef SegmentOperations<VectorAllocator, T> SegmentOperations;
+    typedef SegmentOperations<VectorAllocator, T> SegmentOperationsT;
 
     T* items;
 
@@ -122,7 +122,7 @@ struct SC::Vector
     {
         if (&other != this)
         {
-            const bool res = SegmentOperations::copy(items, other.data(), other.size());
+            const bool res = SegmentOperationsT::copy(items, other.data(), other.size());
             (void)res;
             SC_DEBUG_ASSERT(res);
         }
@@ -143,8 +143,8 @@ struct SC::Vector
         return items[index];
     }
 
-    [[nodiscard]] bool push_back(const T& element) { return SegmentOperations::push_back(items, element); }
-    [[nodiscard]] bool push_back(T&& element) { return SegmentOperations::push_back(items, forward<T>(element)); }
+    [[nodiscard]] bool push_back(const T& element) { return SegmentOperationsT::push_back(items, element); }
+    [[nodiscard]] bool push_back(T&& element) { return SegmentOperationsT::push_back(items, forward<T>(element)); }
     [[nodiscard]] bool pop_back()
     {
         if (items != nullptr)
@@ -192,7 +192,7 @@ struct SC::Vector
     {
         if (newCapacity > capacity())
         {
-            return SegmentOperations::ensureCapacity(items, newCapacity, size());
+            return SegmentOperationsT::ensureCapacity(items, newCapacity, size());
         }
         else
         {
@@ -202,12 +202,12 @@ struct SC::Vector
 
     [[nodiscard]] bool resize(size_t newSize, const T& value = T())
     {
-        return SegmentOperations::template resizeInternal<true>(items, newSize, &value);
+        return SegmentOperationsT::template resizeInternal<true>(items, newSize, &value);
     }
 
     [[nodiscard]] bool resizeWithoutInitializing(size_t newSize)
     {
-        return SegmentOperations::template resizeInternal<false>(items, newSize, nullptr);
+        return SegmentOperationsT::template resizeInternal<false>(items, newSize, nullptr);
     }
 
     void clear()
@@ -226,7 +226,7 @@ struct SC::Vector
         }
     }
 
-    [[nodiscard]] bool shrink_to_fit() { return SegmentOperations::shrink_to_fit(items); }
+    [[nodiscard]] bool shrink_to_fit() { return SegmentOperationsT::shrink_to_fit(items); }
 
     [[nodiscard]] bool isEmpty() const { return (items == nullptr) || SegmentItems<T>::getSegment(items)->isEmpty(); }
 
@@ -263,19 +263,19 @@ struct SC::Vector
 
     [[nodiscard]] bool insertMove(size_t idx, T* src, size_t srcNumItems)
     {
-        return SegmentOperations::template insert<false>(items, idx, src, srcNumItems);
+        return SegmentOperationsT::template insert<false>(items, idx, src, srcNumItems);
     }
     [[nodiscard]] bool insertCopy(size_t idx, const T* src, size_t srcNumItems)
     {
-        return SegmentOperations::template insert<true>(items, idx, src, srcNumItems);
+        return SegmentOperationsT::template insert<true>(items, idx, src, srcNumItems);
     }
     [[nodiscard]] bool appendMove(T* src, size_t srcNumItems)
     {
-        return SegmentOperations::template insert<false>(items, size(), src, srcNumItems);
+        return SegmentOperationsT::template insert<false>(items, size(), src, srcNumItems);
     }
     [[nodiscard]] bool appendCopy(const T* src, size_t srcNumItems)
     {
-        return SegmentOperations::template insert<true>(items, size(), src, srcNumItems);
+        return SegmentOperationsT::template insert<true>(items, size(), src, srcNumItems);
     }
     template <typename U>
     [[nodiscard]] bool appendMove(U&& src)
@@ -298,7 +298,7 @@ struct SC::Vector
     {
         if (items != nullptr)
         {
-            SegmentOperations::destroy(SegmentItems<T>::getSegment(items));
+            SegmentOperationsT::destroy(SegmentItems<T>::getSegment(items));
         }
         items = nullptr;
     }

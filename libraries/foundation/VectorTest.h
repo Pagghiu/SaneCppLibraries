@@ -1,5 +1,6 @@
 #pragma once
 #include "Test.h"
+#include "Vector.h"
 namespace SC
 {
 struct VectorTest;

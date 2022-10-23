@@ -1,0 +1,182 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Foundation">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="libraries\foundation\Assert.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="libraries\foundation\Console.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="libraries\foundation\Memory.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="libraries\foundation\StaticAsserts.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="libraries\foundation\String.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="libraries\foundation\StringBuilder.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="libraries\foundation\StringFormat.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="libraries\foundation\StringUtility.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="libraries\foundation\StringView.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="libraries\foundation\Test.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="libraries\foundation\OSWindows.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="libraries\foundation\Array.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\ArrayTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Assert.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Compiler.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Console.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\ConsoleTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Function.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\FunctionTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\InitializerList.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Language.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\LibC.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Limits.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Map.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\MapTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Memory.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\MemoryTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\OS.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\OSTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Platform.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Reflection.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\ReflectionTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\ReflectionTestEmbedding.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Result.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\ResultTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Segment.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\SmallVector.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\SmallVectorTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Span.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\String.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\StringBuilder.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\StringBuilderTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\StringFormat.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\StringFunctions.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\StringFunctionsTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\StringIterator.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\StringTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\StringUtility.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\StringView.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\StringViewTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Test.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Types.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Vector.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\VectorTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

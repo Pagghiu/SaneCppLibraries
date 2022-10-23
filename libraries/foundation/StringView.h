@@ -29,12 +29,9 @@ struct SC::StringView
     [[nodiscard]] constexpr const char_t* bytesWithoutTerminator() const { return text.data; }
     [[nodiscard]] constexpr const char_t* bytesIncludingTerminator() const { return text.data; }
 
-    [[nodiscard]] constexpr Comparison compareASCII(StringView other) const { return text.compare(other.text); }
+    [[nodiscard]] Comparison compareASCII(StringView other) const { return text.compare(other.text); }
 
-    [[nodiscard]] constexpr bool operator<(StringView other) const
-    {
-        return text.compare(other.text) == Comparison::Smaller;
-    }
+    [[nodiscard]] bool operator<(StringView other) const { return text.compare(other.text) == Comparison::Smaller; }
 
     template <typename StringIterator>
     StringIterator getIterator() const
@@ -48,8 +45,8 @@ struct SC::StringView
         return *this;
     }
 
-    [[nodiscard]] constexpr bool   operator==(StringView other) const { return text.equalsContent(other.text); }
-    [[nodiscard]] constexpr bool   operator!=(StringView other) const { return not operator==(other); }
+    [[nodiscard]] bool             operator==(StringView other) const { return text.equalsContent(other.text); }
+    [[nodiscard]] bool             operator!=(StringView other) const { return not operator==(other); }
     [[nodiscard]] constexpr bool   isEmpty() const { return text.data == nullptr; }
     [[nodiscard]] constexpr bool   isNullTerminated() const { return hasNullTerm; }
     [[nodiscard]] constexpr size_t sizeInBytesWithoutTerminator() const { return text.size; }
@@ -57,4 +54,8 @@ struct SC::StringView
     [[nodiscard]] bool             parseInt32(int32_t* value) const;
 };
 
+#if SC_MSVC
+inline SC::StringView operator"" _sv(const char* txt, size_t sz) { return SC::StringView(txt, sz, true); }
+#else
 inline SC::StringView operator"" _sv(const SC::char_t* txt, SC::size_t sz) { return SC::StringView(txt, sz, true); }
+#endif

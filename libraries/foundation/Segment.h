@@ -42,10 +42,18 @@ struct SC::SegmentHeader
 template <typename T>
 struct SC::SegmentItems : public SegmentHeader
 {
+#if SC_MSVC
+    // MSVC doesn't like 0 sized arrays...
+    SC_ALWAYS_INLINE T*       getItems() { return reinterpret_cast<T*>(this); }
+    SC_ALWAYS_INLINE const T* getItems() const { return reinterpret_cast<T*>(this); }
+#else
     union
     {
         T items[0];
     };
+    SC_ALWAYS_INLINE T*       getItems() { return items; }
+    SC_ALWAYS_INLINE const T* getItems() const { return items; }
+#endif
     SegmentItems() {}
     ~SegmentItems() {}
 
@@ -58,39 +66,39 @@ struct SC::SegmentItems : public SegmentHeader
     [[nodiscard]] bool   isEmpty() const { return sizeBytes == 0; }
     [[nodiscard]] size_t capacity() const { return capacityBytes / sizeof(T); }
 
-    [[nodiscard]] T*       begin() { return items; }
-    [[nodiscard]] const T* begin() const { return items; }
-    [[nodiscard]] T*       end() { return items + size(); }
-    [[nodiscard]] const T* end() const { return items + size(); }
-    [[nodiscard]] T*       data() { return items; }
-    [[nodiscard]] const T* data() const { return items; }
+    [[nodiscard]] T*       begin() { return getItems(); }
+    [[nodiscard]] const T* begin() const { return getItems(); }
+    [[nodiscard]] T*       end() { return getItems() + size(); }
+    [[nodiscard]] const T* end() const { return getItems() + size(); }
+    [[nodiscard]] T*       data() { return getItems(); }
+    [[nodiscard]] const T* data() const { return getItems(); }
 
     [[nodiscard]] T& front()
     {
         const size_t numElements = size();
         SC_RELEASE_ASSERT(numElements > 0);
-        return items[0];
+        return getItems()[0];
     }
 
     [[nodiscard]] const T& front() const
     {
         const size_t numElements = size();
         SC_RELEASE_ASSERT(numElements > 0);
-        return items[0];
+        return getItems()[0];
     }
 
     [[nodiscard]] T& back()
     {
         const size_t numElements = size();
         SC_RELEASE_ASSERT(numElements > 0);
-        return items[numElements - 1];
+        return getItems()[numElements - 1];
     }
 
     [[nodiscard]] const T& back() const
     {
         const size_t numElements = size();
         SC_RELEASE_ASSERT(numElements > 0);
-        return items[numElements - 1];
+        return getItems()[numElements - 1];
     }
     [[nodiscard]] static SegmentItems<T>* getSegment(T* oldItems)
     {
@@ -109,7 +117,7 @@ struct SC::SegmentItems : public SegmentHeader
         const size_t numElements = size();
         if (numElements > 0)
         {
-            SegmentItems<T>::destroyElements(items, numElements - 1, 1);
+            SegmentItems<T>::destroyElements(getItems(), numElements - 1, 1);
             setSize(numElements - 1);
             return true;
         }
@@ -124,7 +132,7 @@ struct SC::SegmentItems : public SegmentHeader
         const size_t numElements = size();
         if (numElements > 0)
         {
-            SegmentItems<T>::moveAssignElements(items, 0, numElements - 1, items + 1);
+            SegmentItems<T>::moveAssignElements(getItems(), 0, numElements - 1, getItems() + 1);
             setSize(numElements - 1);
             return true;
         }
@@ -136,7 +144,7 @@ struct SC::SegmentItems : public SegmentHeader
 
     void clear()
     {
-        SegmentItems<T>::destroyElements(items, 0, size());
+        SegmentItems<T>::destroyElements(getItems(), 0, size());
         setSize(0);
     }
 
@@ -344,7 +352,7 @@ struct SC::SegmentOperations
         {
             return false;
         }
-        oldItems = newSegment->items;
+        oldItems = newSegment->getItems();
         return true;
     }
 
@@ -429,10 +437,10 @@ struct SC::SegmentOperations
         if (oldSize > 0)
         {
             auto oldSegment = SegmentItems<T>::getSegment(oldItems);
-            SegmentItems<T>::moveAndDestroy(oldSegment->items, newSegment->items, oldSize, keepFirstN);
+            SegmentItems<T>::moveAndDestroy(oldSegment->getItems(), newSegment->getItems(), oldSize, keepFirstN);
             Allocator::release(oldSegment);
         }
-        oldItems = newSegment->items;
+        oldItems = newSegment->getItems();
         return true;
     }
 
@@ -451,7 +459,7 @@ struct SC::SegmentOperations
         selfSegment->setSize(newSize);
         if (initialize)
         {
-            reserveInternalTrivialInitialize(selfSegment->items, oldSize, newSize, *defaultValue);
+            reserveInternalTrivialInitialize(selfSegment->getItems(), oldSize, newSize, *defaultValue);
         }
         return true;
     }
@@ -527,9 +535,9 @@ struct SC::SegmentOperations
                     return false;
                 }
                 newSegment->sizeBytes = oldSegment->sizeBytes;
-                SegmentItems<T>::moveConstruct(newSegment->items, 0, numElements, oldSegment->items);
+                SegmentItems<T>::moveConstruct(newSegment->getItems(), 0, numElements, oldSegment->getItems());
                 Allocator::release(oldSegment);
-                oldItems = newSegment->items;
+                oldItems = newSegment->getItems();
             }
         }
         else
@@ -553,6 +561,7 @@ struct SC::SegmentOperations
 template <typename Allocator, typename T, int N>
 struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
 {
+    typedef SegmentItems<T>                 Parent;
     typedef SegmentOperations<Allocator, T> operations;
     union
     {
@@ -649,6 +658,24 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
         }
         return *this;
     }
+#if SC_MSVC
+    [[nodiscard]] size_t size() const { return Parent::size(); }
+    [[nodiscard]] bool   isEmpty() const { return Parent::isEmpty(); }
+    [[nodiscard]] size_t capacity() const { return Parent::capacity(); }
+
+    [[nodiscard]] T& front() { return Parent::front(); }
+
+    [[nodiscard]] const T& front() const { return Parent::front(); }
+
+    [[nodiscard]] T& back() { return Parent::back(); }
+
+    [[nodiscard]] const T& back() const { return Parent::back(); }
+    template <typename Comparison = SmallerThan<T>>
+    void sort(Comparison comparison = Comparison())
+    {
+        Parent::sort(comparison);
+    }
+#endif
 
     [[nodiscard]] bool push_back(const T& element)
     {

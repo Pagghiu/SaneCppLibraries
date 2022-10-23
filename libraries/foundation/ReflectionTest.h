@@ -72,11 +72,10 @@ struct CompileArray
     typedef T type;
     T         values[N];
     int       size;
-    constexpr CompileArray()
+    constexpr CompileArray() : size(0)
     {
         for (int i = 0; i < N; ++i)
             values[i] = T();
-        size = 0;
     }
     constexpr CompileArray(std::initializer_list<T> ilist)
     {
@@ -127,7 +126,7 @@ template<> constexpr Type get_type<uint16_t>() { return Type::TypeUINT16; }
 template <int MAX_MEMBERS, typename R, typename T>
 constexpr MemberAndName<MAX_MEMBERS> ReflectField(int order, const char* name, R T::*func, size_t offset)
 {
-    return {Member(get_type<R>(), order, offset, sizeof(R), -1), name,
+    return {Member(get_type<R>(), order, static_cast<SC::uint16_t>(offset), sizeof(R), -1), name,
             &GetMembersListFor<R>::template getLinkMembers<MAX_MEMBERS>};
 }
 template <int MAX_MEMBERS, typename... Types>
