@@ -71,14 +71,14 @@ struct CompileArray
     T   values[N] = {};
     int size      = 0;
 };
-// constexpr int MAX_NUMBER_OF_MEMBERS = 10;
 
 template <int MAX_MEMBERS>
 struct MemberAndName
 {
     Member      member;
     const char* name;
-    CompileArray<MemberAndName, MAX_MEMBERS> (*getLinkMembers)();
+    typedef CompileArray<MemberAndName, MAX_MEMBERS> (*GetLinkMemberFunction)();
+    GetLinkMemberFunction getLinkMembers;
 
     constexpr MemberAndName() : name(nullptr), getLinkMembers(nullptr) {}
     constexpr MemberAndName(const Member member, const char* name,
@@ -147,9 +147,8 @@ constexpr CompileArray<MemberAndName<MAX_MEMBERS>, sizeof...(Types) + 1> BuildMe
 template <int MAX_MEMBERS>
 struct LinkAndIndex
 {
-    CompileArray<MemberAndName<MAX_MEMBERS>, MAX_MEMBERS> linkMembers;
-    decltype(linkMembers) (*getLinkMembers)();
-    int flatternedIndex;
+    typename MemberAndName<MAX_MEMBERS>::GetLinkMemberFunction getLinkMembers;
+    int                                                        flatternedIndex;
     constexpr LinkAndIndex() : getLinkMembers(nullptr), flatternedIndex(0) {}
 };
 
@@ -208,10 +207,9 @@ constexpr void flattern_links_iterative(const MemberAndName<MAX_MEMBERS>*       
                 if (collected.size > 0)
                 {
                     const auto& prev = collected.values[collected.size - 1];
-                    prevMembers      = prev.linkMembers.values[0].member.numFields;
+                    prevMembers      = prev.getLinkMembers().values[0].member.numFields;
                 }
 
-                collected.values[collected.size].linkMembers     = linkMembers;
                 collected.values[collected.size].getLinkMembers  = getLinkMembers;
                 collected.values[collected.size].flatternedIndex = prevMembers;
                 collected.size++;
@@ -221,7 +219,8 @@ constexpr void flattern_links_iterative(const MemberAndName<MAX_MEMBERS>*       
 }
 
 template <int MAX_MEMBERS, int MaxNumParams, int ArraySize>
-inline constexpr auto flattern_links(const CompileArray<MemberAndName<MAX_MEMBERS>, ArraySize>& inputMembers)
+inline constexpr auto flattern_links(const CompileArray<MemberAndName<MAX_MEMBERS>, ArraySize>& inputMembers,
+                                     typename MemberAndName<MAX_MEMBERS>::GetLinkMemberFunction lastMember)
 {
     CompileArray<LinkAndIndex<MAX_MEMBERS>, MaxNumParams>        collected;
     CompileArray<const MemberAndName<MAX_MEMBERS>*, MAX_MEMBERS> toRecurse;
@@ -235,10 +234,9 @@ inline constexpr auto flattern_links(const CompileArray<MemberAndName<MAX_MEMBER
     if (collected.size > 0)
     {
         const auto& prev = collected.values[collected.size - 1];
-        prevMembers      = prev.linkMembers.values[0].member.numFields;
+        prevMembers      = prev.getLinkMembers().values[0].member.numFields;
     }
-    collected.values[collected.size].linkMembers     = inputMembers;
-    collected.values[collected.size].getLinkMembers  = inputMembers.values[0].getLinkMembers;
+    collected.values[collected.size].getLinkMembers  = lastMember;
     collected.values[collected.size].flatternedIndex = prevMembers;
     collected.size++;
     return collected;
@@ -248,7 +246,7 @@ template <int MAX_MEMBERS, int MaxNumParams>
 constexpr auto count_members(const CompileArray<LinkAndIndex<MAX_MEMBERS>, MaxNumParams>& links)
 {
     const auto& lastLink            = links.values[links.size - 1];
-    const auto  numCollectedMembers = lastLink.flatternedIndex + lastLink.linkMembers.values[0].member.numFields;
+    const auto  numCollectedMembers = lastLink.flatternedIndex + lastLink.getLinkMembers().values[0].member.numFields;
     return numCollectedMembers + links.size;
 }
 
@@ -257,7 +255,8 @@ constexpr auto merge_links_recurse(CompileArray<Member, totalMembers>&          
                                    const LinkAndIndex<MAX_MEMBERS>*                             currentLink,
                                    const CompileArray<LinkAndIndex<MAX_MEMBERS>, MaxNumParams>& collected)
 {
-    auto memberAndName             = &currentLink->linkMembers.values[0];
+    auto linkMembers               = currentLink->getLinkMembers();
+    auto memberAndName             = &linkMembers.values[0];
     members.values[members.size++] = memberAndName->member;
     for (int idx = 0; idx < memberAndName->member.numFields; ++idx)
     {
@@ -299,7 +298,8 @@ constexpr auto CompileFlatternedDescriptorFor()
 {
     constexpr auto linkMembers  = GetMembersListFor<T>::template getLinkMembers<MAX_MEMBERS>();
     constexpr auto maxNumParams = count_maximum_links<MAX_MEMBERS>(linkMembers.values);
-    constexpr auto links        = flattern_links<MAX_MEMBERS, maxNumParams, MAX_MEMBERS>(linkMembers);
+    constexpr auto links        = flattern_links<MAX_MEMBERS, maxNumParams, MAX_MEMBERS>(
+        linkMembers, &GetMembersListFor<T>::template getLinkMembers<MAX_MEMBERS>);
     constexpr auto totalMembers = count_members(links);
     return merge_links<MAX_MEMBERS, totalMembers>(links);
 }
@@ -387,7 +387,7 @@ struct SC::ReflectionTest : public SC::TestCase
     {
         using namespace SC;
         using namespace SC::Reflection;
-        if (test_section("ASDF"))
+        if (test_section("Print Complex structure"))
         {
             //#if 0
             //            auto ComplexStructureLinks = GetLinksFor<TestNamespace::ComplexStructure>();
@@ -399,6 +399,7 @@ struct SC::ReflectionTest : public SC::TestCase
             //                                  val.flatternedIndex, val.linkMembers.values[0].member.numFields);
             //            }
             //#endif
+
             constexpr auto MyCompileTimeDescriptor = CompileFlatternedDescriptorFor<TestNamespace::ComplexStructure>();
             printMembersFlat(MyCompileTimeDescriptor.values);
         }
