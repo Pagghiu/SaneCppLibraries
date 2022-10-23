@@ -1,5 +1,4 @@
 #pragma once
-#include "InitializerList.h"
 #include "Reflection.h"
 #include "Test.h"
 
@@ -69,22 +68,8 @@ static_assert(sizeof(Member) == 8, "YO watch your step");
 template <typename T, int N>
 struct CompileArray
 {
-    typedef T type;
-    T         values[N];
-    int       size;
-    constexpr CompileArray() : size(0)
-    {
-        for (int i = 0; i < N; ++i)
-            values[i] = T();
-    }
-    constexpr CompileArray(std::initializer_list<T> ilist)
-    {
-        size = 0;
-        for (auto i : ilist)
-        {
-            values[size++] = i;
-        }
-    }
+    T   values[N] = {};
+    int size      = 0;
 };
 // constexpr int MAX_NUMBER_OF_MEMBERS = 10;
 
@@ -129,6 +114,25 @@ constexpr MemberAndName<MAX_MEMBERS> ReflectField(int order, const char* name, R
     return {Member(get_type<R>(), order, static_cast<SC::uint16_t>(offset), sizeof(R), -1), name,
             &GetMembersListFor<R>::template getLinkMembers<MAX_MEMBERS>};
 }
+#if 1
+template <int MAX_MEMBERS, typename... Types>
+constexpr CompileArray<MemberAndName<MAX_MEMBERS>, sizeof...(Types) + 1> BuildMemberNameArray(
+    MemberAndName<MAX_MEMBERS> structType, Types... args)
+{
+    CompileArray<MemberAndName<MAX_MEMBERS>, sizeof...(Types) + 1> res;
+    res.values[res.size++] =
+        MemberAndName<MAX_MEMBERS>(Member(structType.member.type, structType.member.order, structType.member.offset,
+                                          structType.member.size, sizeof...(Types)),
+                                   structType.name, nullptr);
+    auto argsArr = {args...};
+    for (auto a : argsArr)
+    {
+        res.values[res.size++] = a;
+    }
+    return res;
+}
+
+#else
 template <int MAX_MEMBERS, typename... Types>
 constexpr CompileArray<MemberAndName<MAX_MEMBERS>, sizeof...(Types) + 1> BuildMemberNameArray(
     MemberAndName<MAX_MEMBERS> structType, Types... args)
@@ -138,6 +142,7 @@ constexpr CompileArray<MemberAndName<MAX_MEMBERS>, sizeof...(Types) + 1> BuildMe
                                        structType.name, nullptr),
             args...};
 }
+#endif
 
 template <int MAX_MEMBERS>
 struct LinkAndIndex
@@ -151,29 +156,38 @@ struct LinkAndIndex
 template <int MAX_MEMBERS>
 constexpr int count_maximum_links(const MemberAndName<MAX_MEMBERS>* structMember)
 {
-    int numLinks = 0;
-    for (int i = 0; i < structMember->member.numFields; ++i)
+    int                                                          numLinks = 0;
+    CompileArray<const MemberAndName<MAX_MEMBERS>*, MAX_MEMBERS> toRecurse;
+    toRecurse.values[toRecurse.size++] = structMember;
+    while (toRecurse.size > 0)
     {
-        const auto* member      = structMember + 1 + i;
-        const auto  linkMembers = member->getLinkMembers();
-
-        if (linkMembers.size > 0)
+        toRecurse.size--;
+        const auto toAnalize = toRecurse.values[toRecurse.size];
+        for (int i = 0; i < toAnalize->member.numFields; ++i)
         {
-            numLinks += 1 + count_maximum_links(&linkMembers.values[0]);
+            const auto* member      = toAnalize + 1 + i;
+            const auto  linkMembers = member->getLinkMembers();
+
+            if (linkMembers.size > 0)
+            {
+                numLinks++;
+                toRecurse.values[toRecurse.size++] = member;
+            }
         }
     }
     return numLinks;
 }
 
-template <int MAX_MEMBERS, int N>
-constexpr void flattern_links_recursive(const MemberAndName<MAX_MEMBERS>*           structMember,
-                                        CompileArray<LinkAndIndex<MAX_MEMBERS>, N>& collected)
+template <int MAX_MEMBERS, int MaxNumParams, int N>
+constexpr void flattern_links_iterative(const MemberAndName<MAX_MEMBERS>*                      rootMember,
+                                        CompileArray<LinkAndIndex<MAX_MEMBERS>, MaxNumParams>& collected,
+                                        CompileArray<const MemberAndName<MAX_MEMBERS>*, N>&    toRecurse)
 {
-    for (int i = 0; i < structMember->member.numFields; ++i)
+    for (int i = 0; i < rootMember->member.numFields; ++i)
     {
-        const auto* member         = structMember + 1 + i;
-        auto        linkMembers    = member->getLinkMembers();
-        auto        getLinkMembers = member->getLinkMembers;
+        const auto& member         = *(rootMember + i + 1);
+        auto        getLinkMembers = member.getLinkMembers;
+        auto        linkMembers    = member.getLinkMembers();
         if (linkMembers.size > 0)
         {
             bool found = false;
@@ -187,32 +201,36 @@ constexpr void flattern_links_recursive(const MemberAndName<MAX_MEMBERS>*       
             }
             if (not found)
             {
-                if (linkMembers.size > 0)
+                toRecurse.values[toRecurse.size++] = &member;
+                // Note: This was easy to do recursive but MSVC complained it was not anymore a constexpr
+                // flattern_links_recursive(linkMembers, collected);
+                int prevMembers = 0;
+                if (collected.size > 0)
                 {
-                    flattern_links_recursive(linkMembers.values, collected);
-                    int prevMembers = 0;
-                    if (collected.size > 0)
-                    {
-                        const auto& prev = collected.values[collected.size - 1];
-                        prevMembers      = prev.linkMembers.values[0].member.numFields;
-                    }
-
-                    collected.values[collected.size].linkMembers     = linkMembers;
-                    collected.values[collected.size].getLinkMembers  = getLinkMembers;
-                    collected.values[collected.size].flatternedIndex = prevMembers;
-                    collected.size++;
+                    const auto& prev = collected.values[collected.size - 1];
+                    prevMembers      = prev.linkMembers.values[0].member.numFields;
                 }
+
+                collected.values[collected.size].linkMembers     = linkMembers;
+                collected.values[collected.size].getLinkMembers  = getLinkMembers;
+                collected.values[collected.size].flatternedIndex = prevMembers;
+                collected.size++;
             }
         }
     }
 }
 
 template <int MAX_MEMBERS, int MaxNumParams, int ArraySize>
-constexpr auto flattern_links(const CompileArray<MemberAndName<MAX_MEMBERS>, ArraySize>& inputMembers)
+inline constexpr auto flattern_links(const CompileArray<MemberAndName<MAX_MEMBERS>, ArraySize>& inputMembers)
 {
-    const auto*                                           rootMember = &inputMembers.values[0];
-    CompileArray<LinkAndIndex<MAX_MEMBERS>, MaxNumParams> collected;
-    flattern_links_recursive(rootMember, collected);
+    CompileArray<LinkAndIndex<MAX_MEMBERS>, MaxNumParams>        collected;
+    CompileArray<const MemberAndName<MAX_MEMBERS>*, MAX_MEMBERS> toRecurse;
+    toRecurse.values[toRecurse.size++] = &inputMembers.values[0];
+    while (toRecurse.size > 0)
+    {
+        toRecurse.size--;
+        flattern_links_iterative(toRecurse.values[toRecurse.size], collected, toRecurse);
+    }
     int prevMembers = 0;
     if (collected.size > 0)
     {
@@ -220,7 +238,7 @@ constexpr auto flattern_links(const CompileArray<MemberAndName<MAX_MEMBERS>, Arr
         prevMembers      = prev.linkMembers.values[0].member.numFields;
     }
     collected.values[collected.size].linkMembers     = inputMembers;
-    collected.values[collected.size].getLinkMembers  = rootMember->getLinkMembers;
+    collected.values[collected.size].getLinkMembers  = inputMembers.values[0].getLinkMembers;
     collected.values[collected.size].flatternedIndex = prevMembers;
     collected.size++;
     return collected;
@@ -280,20 +298,11 @@ template <typename T, int MAX_MEMBERS = 10>
 constexpr auto CompileFlatternedDescriptorFor()
 {
     constexpr auto linkMembers  = GetMembersListFor<T>::template getLinkMembers<MAX_MEMBERS>();
-    constexpr auto maxNumParams = count_maximum_links(linkMembers.values);
-    constexpr auto links        = flattern_links<MAX_MEMBERS, maxNumParams>(linkMembers);
+    constexpr auto maxNumParams = count_maximum_links<MAX_MEMBERS>(linkMembers.values);
+    constexpr auto links        = flattern_links<MAX_MEMBERS, maxNumParams, MAX_MEMBERS>(linkMembers);
     constexpr auto totalMembers = count_members(links);
     return merge_links<MAX_MEMBERS, totalMembers>(links);
 }
-
-// template <typename T>
-// auto GetLinksFor()
-//{
-//     auto linkMembers  = GetMembersListFor<T>::getLinkMembers();
-//     auto maxNumParams = count_maximum_links(linkMembers.values);
-//     (void)maxNumParams;
-//     return flattern_links<8>(linkMembers);
-// }
 
 #define SC_REFLECT_STRUCT_START(StructName)                                                                            \
     template <>                                                                                                        \
@@ -380,15 +389,16 @@ struct SC::ReflectionTest : public SC::TestCase
         using namespace SC::Reflection;
         if (test_section("ASDF"))
         {
-#if 0
-            auto ComplexStructureLinks = GetLinksFor<TestNamespace::ComplexStructure>();
-            for (int i = 0; i < ComplexStructureLinks.size; ++i)
-            {
-                auto val = ComplexStructureLinks.values[i];
-                Console::c_printf("Link name=%s flatternedIndex=%d numMembers=%d\n", val.linkMembers.values[0].name,
-                                  val.flatternedIndex, val.linkMembers.values[0].member.numFields);
-            }
-#endif
+            //#if 0
+            //            auto ComplexStructureLinks = GetLinksFor<TestNamespace::ComplexStructure>();
+            //            for (int i = 0; i < ComplexStructureLinks.size; ++i)
+            //            {
+            //                auto val = ComplexStructureLinks.values[i];
+            //                Console::c_printf("Link name=%s flatternedIndex=%d numMembers=%d\n",
+            //                val.linkMembers.values[0].name,
+            //                                  val.flatternedIndex, val.linkMembers.values[0].member.numFields);
+            //            }
+            //#endif
             constexpr auto MyCompileTimeDescriptor = CompileFlatternedDescriptorFor<TestNamespace::ComplexStructure>();
             printMembersFlat(MyCompileTimeDescriptor.values);
         }
@@ -403,7 +413,7 @@ struct SC::ReflectionTest : public SC::TestCase
         }
     }
 
-    size_t printMembers(const Reflection::Member* member, int indentation)
+    int printMembers(const Reflection::Member* member, int indentation)
     {
         using namespace SC;
         using namespace SC::Reflection;
@@ -414,13 +424,13 @@ struct SC::ReflectionTest : public SC::TestCase
         for (int i = 0; i < indentation; ++i)
             Console::c_printf("\t");
         Console::c_printf("{\n");
-        size_t fieldsToSkip = 0;
-        for (size_t idx = 0; idx < member->numFields; ++idx)
+        int fieldsToSkip = 0;
+        for (int idx = 0; idx < member->numFields; ++idx)
         {
             auto& mem = member[idx + 1 + fieldsToSkip];
             for (int i = 0; i < indentation + 1; ++i)
                 Console::c_printf("\t");
-            Console::c_printf("[%lu] Type=%d Offset=%d Size=%d", idx, (int)mem.type, mem.offset, mem.size);
+            Console::c_printf("[%d] Type=%d Offset=%d Size=%d", idx, (int)mem.type, mem.offset, mem.size);
             if (mem.numFields >= 0)
             {
                 Console::c_printf(" linkID=%d", mem.numFields);
