@@ -39,3 +39,5 @@
 #error "No builtin_trap"
 #endif
 #endif
+
+#define SC_OFFSET_OF(Class, Field) __builtin_offsetof(Class, Field)
