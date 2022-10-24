@@ -7,36 +7,24 @@
 template <typename T, SC::size_t N>
 struct SC::Reflection::AtomsFor<SC::Array<T, N>>
 {
-    static constexpr Atom::Type getAtomType() { return Atom::TypeSCArray; }
-    template <int MAX_ATOMS>
-    static constexpr auto getAtoms()
+    static constexpr AtomType getAtomType() { return AtomType::TypeSCArray; }
+    static constexpr void     pushAtomsTo(AtomContainer& atoms)
     {
-        AtomsArray<AtomWithName<MAX_ATOMS>, MAX_ATOMS> atoms;
-
-        const uint16_t lowN              = N & 0xffff;
-        const uint16_t highN             = (N >> 16) & 0xffff;
-        atoms.values[atoms.size++]       = {Atom(getAtomType(), lowN, highN, sizeof(SC::Array<T, N>), 0), "SC::Array",
-                                            nullptr};
-        atoms.values[atoms.size++]       = {Atom(AtomsFor<T>::getAtomType(), 0, 0, sizeof(T), -1), "T",
-                                            &AtomsFor<T>::template getAtoms<MAX_ATOMS>};
-        atoms.values[0].atom.numChildren = atoms.size - 1;
-        return atoms;
+        const uint16_t lowN  = N & 0xffff;
+        const uint16_t highN = (N >> 16) & 0xffff;
+        atoms.push({AtomProperties(getAtomType(), lowN, highN, sizeof(SC::Array<T, N>), 0), "SC::Array", nullptr});
+        atoms.push({AtomProperties(AtomsFor<T>::getAtomType(), 0, 0, sizeof(T), -1), "T", &AtomsFor<T>::pushAtomsTo});
     }
 };
 
 template <typename T>
 struct SC::Reflection::AtomsFor<SC::Vector<T>>
 {
-    static constexpr Atom::Type getAtomType() { return Atom::TypeSCVector; }
-    template <int MAX_ATOMS>
-    static constexpr auto getAtoms()
+    static constexpr AtomType getAtomType() { return AtomType::TypeSCVector; }
+    static constexpr void     pushAtomsTo(AtomContainer& atoms)
     {
-        AtomsArray<AtomWithName<MAX_ATOMS>, MAX_ATOMS> atoms;
-        atoms.values[atoms.size++]       = {Atom(getAtomType(), 0, 0, sizeof(SC::Vector<T>), 0), "SC::Vector", nullptr};
-        atoms.values[atoms.size++]       = {Atom(AtomsFor<T>::getAtomType(), 0, 0, sizeof(T), -1), "T",
-                                            &AtomsFor<T>::template getAtoms<MAX_ATOMS>};
-        atoms.values[0].atom.numChildren = atoms.size - 1;
-        return atoms;
+        atoms.push(Atom::create<SC::Vector<T>>("SC::Vector"));
+        atoms.push({AtomProperties(AtomsFor<T>::getAtomType(), 0, 0, sizeof(T), -1), "T", &AtomsFor<T>::pushAtomsTo});
     }
 };
 
@@ -69,70 +57,47 @@ struct ComplexStructure
     SimpleStructure             simpleStructure2;
     SC::uint16_t                f4 = 0;
     IntermediateStructure       intermediateStructure;
-    SC::Vector<SimpleStructure> vectorOfSimpleStruct;
+    SC::Vector<SimpleStructure> vectorOfStructs;
 };
 } // namespace TestNamespace
 
 #if 0
-
 template <>
-struct SC::Reflection::AtomsFor<TestNamespace::SimpleStructure>
+struct SC::Reflection::AtomsFor<TestNamespace::SimpleStructure> : public SC::Reflection::AtomStruct
 {
-    static constexpr Atom::Type getAtomType() { return Atom::TypeStruct; }
-    template <int MAX_ATOMS>
-    static constexpr auto getAtoms()
+    static constexpr void pushAtomsTo(AtomContainer& atoms)
     {
-        typedef TestNamespace::SimpleStructure         T;
-        AtomsArray<AtomWithName<MAX_ATOMS>, MAX_ATOMS> atoms;
-        atoms.values[atoms.size++]       = {Atom(Atom::TypeStruct, 0, 0, sizeof(T), 2), "SimpleStructure", nullptr};
-        atoms.values[atoms.size++]       = AtomWithNameCreate<MAX_ATOMS>(0, "f1", &T::f1, SC_OFFSET_OF(T, f1));
-        atoms.values[atoms.size++]       = AtomWithNameCreate<MAX_ATOMS>(1, "f2", &T::f2, SC_OFFSET_OF(T, f2));
-        atoms.values[0].atom.numChildren = atoms.size - 1;
-        return atoms;
+        typedef TestNamespace::SimpleStructure T;
+        atoms.push(Atom::create<T>("TestNamespace::SimpleStructure"));
+        atoms.push(Atom::create(0, "f1", &T::f1, SC_OFFSET_OF(T, f1)));
+        atoms.push(Atom::create(1, "f2", &T::f2, SC_OFFSET_OF(T, f2)));
+    }
+};
+template <>
+struct SC::Reflection::AtomsFor<TestNamespace::IntermediateStructure> : public SC::Reflection::AtomStruct
+{
+    static constexpr void pushAtomsTo(AtomContainer& atoms)
+    {
+        typedef TestNamespace::IntermediateStructure T;
+        atoms.push(Atom::create<T>("TestNamespace::IntermediateStructure"));
+        atoms.push(Atom::create(0, "simpleStructure", &T::simpleStructure, SC_OFFSET_OF(T, simpleStructure)));
+        atoms.push(Atom::create(1, "vectorOfInt", &T::vectorOfInt, SC_OFFSET_OF(T, vectorOfInt)));
     }
 };
 
 template <>
-struct SC::Reflection::AtomsFor<TestNamespace::IntermediateStructure>
+struct SC::Reflection::AtomsFor<TestNamespace::ComplexStructure> : public SC::Reflection::AtomStruct
 {
-    static constexpr Atom::Type getAtomType() { return Atom::TypeStruct; }
-    template <int MAX_ATOMS>
-    static constexpr auto getAtoms()
+    static constexpr void pushAtomsTo(AtomContainer& atoms)
     {
-        typedef TestNamespace::IntermediateStructure   T;
-        AtomsArray<AtomWithName<MAX_ATOMS>, MAX_ATOMS> atoms;
-        atoms.values[atoms.size++] = {Atom(Atom::TypeStruct, 0, 0, sizeof(T), 0), "IntermediateStructure", nullptr};
-        atoms.values[atoms.size++] =
-            AtomWithNameCreate<MAX_ATOMS>(0, "simpleStructure", &T::simpleStructure, SC_OFFSET_OF(T, simpleStructure));
-        atoms.values[atoms.size++] =
-            AtomWithNameCreate<MAX_ATOMS>(1, "vectorOfInt", &T::vectorOfInt, SC_OFFSET_OF(T, vectorOfInt));
-        atoms.values[0].atom.numChildren = atoms.size - 1;
-        return atoms;
-    }
-};
-
-template <>
-struct SC::Reflection::AtomsFor<TestNamespace::ComplexStructure>
-{
-    static constexpr Atom::Type getAtomType() { return Atom::TypeStruct; }
-    template <int MAX_ATOMS>
-    static constexpr auto getAtoms()
-    {
-        typedef TestNamespace::ComplexStructure        T;
-        AtomsArray<AtomWithName<MAX_ATOMS>, MAX_ATOMS> atoms;
-        atoms.values[atoms.size++] = {Atom(Atom::TypeStruct, 0, 0, sizeof(T), 4), "ComplexStructure", nullptr};
-        atoms.values[atoms.size++] = AtomWithNameCreate<MAX_ATOMS>(0, "f1", &T::f1, SC_OFFSET_OF(T, f1));
-        atoms.values[atoms.size++] =
-            AtomWithNameCreate<MAX_ATOMS>(1, "simpleStructure", &T::simpleStructure, SC_OFFSET_OF(T, simpleStructure));
-        atoms.values[atoms.size++] = AtomWithNameCreate<MAX_ATOMS>(2, "simpleStructure2", &T::simpleStructure2,
-                                                                   SC_OFFSET_OF(T, simpleStructure2));
-        atoms.values[atoms.size++] = AtomWithNameCreate<MAX_ATOMS>(3, "f4", &T::f1, SC_OFFSET_OF(T, f4));
-        atoms.values[atoms.size++] = AtomWithNameCreate<MAX_ATOMS>(4, "intermediate", &T::intermediateStructure,
-                                                                   SC_OFFSET_OF(T, intermediateStructure));
-        atoms.values[atoms.size++] = AtomWithNameCreate<MAX_ATOMS>(5, "vectorOfSimpleStruct", &T::vectorOfSimpleStruct,
-                                                                   SC_OFFSET_OF(T, vectorOfSimpleStruct));
-        atoms.values[0].atom.numChildren = atoms.size - 1;
-        return atoms;
+        typedef TestNamespace::ComplexStructure T;
+        atoms.push(Atom::create<T>("TestNamespace::ComplexStructure"));
+        atoms.push(Atom::create(0, "f1", &T::f1, SC_OFFSET_OF(T, f1)));
+        atoms.push(Atom::create(1, "simpleStructure", &T::simpleStructure, SC_OFFSET_OF(T, simpleStructure)));
+        atoms.push(Atom::create(2, "simpleStructure2", &T::simpleStructure2, SC_OFFSET_OF(T, simpleStructure2)));
+        atoms.push(Atom::create(3, "f4", &T::f1, SC_OFFSET_OF(T, f4)));
+        atoms.push(Atom::create(4, "intermediate", &T::intermediateStructure, SC_OFFSET_OF(T, intermediateStructure)));
+        atoms.push(Atom::create(5, "vectorOfStructs", &T::vectorOfStructs, SC_OFFSET_OF(T, vectorOfStructs)));
     }
 };
 #else
@@ -161,7 +126,7 @@ SC_REFLECT_FIELD(1, simpleStructure)
 SC_REFLECT_FIELD(2, simpleStructure2)
 SC_REFLECT_FIELD(3, f4)
 SC_REFLECT_FIELD(4, intermediateStructure)
-SC_REFLECT_FIELD(5, vectorOfSimpleStruct)
+SC_REFLECT_FIELD(5, vectorOfStructs)
 SC_REFLECT_STRUCT_END()
 
 #endif
@@ -186,10 +151,14 @@ struct SC::ReflectionTest : public SC::TestCase
             constexpr auto ComplexStructureFlatSchema =
                 FlatSchemaCompiler<>::compile<TestNamespace::ComplexStructure>();
             printFlatSchema(ComplexStructureFlatSchema.atoms.values, ComplexStructureFlatSchema.names.values);
+            //            constexpr auto SimpleStructureFlatSchema =
+            //            FlatSchemaCompiler<>::compile<TestNamespace::SimpleStructure>();
+            //            printFlatSchema(SimpleStructureFlatSchema.atoms.values,
+            //            SimpleStructureFlatSchema.names.values);
         }
     }
     template <int NUM_ATOMS>
-    void printFlatSchema(const Reflection::Atom (&atom)[NUM_ATOMS], const char* const (&names)[NUM_ATOMS])
+    void printFlatSchema(const Reflection::AtomProperties (&atom)[NUM_ATOMS], const char* const (&names)[NUM_ATOMS])
     {
         int atomIndex = 0;
         while (atomIndex < NUM_ATOMS)
@@ -198,18 +167,20 @@ struct SC::ReflectionTest : public SC::TestCase
         }
     }
 
-    int printAtoms(int currentAtomIdx, const Reflection::Atom* atom, const char* const* atomName, int indentation)
+    int printAtoms(int currentAtomIdx, const Reflection::AtomProperties* atom, const char* const* atomName,
+                   int indentation)
     {
         using namespace SC;
         using namespace SC::Reflection;
-        SC_RELEASE_ASSERT(atom->type == Reflection::Atom::TypeStruct || atom->type >= Reflection::Atom::TypeSCVector);
+        SC_RELEASE_ASSERT(atom->type == Reflection::AtomType::TypeStruct ||
+                          atom->type >= Reflection::AtomType::TypeSCVector);
         for (int i = 0; i < indentation; ++i)
             Console::c_printf("\t");
-        Console::c_printf("[LinkIndex=%d] %s (%d atoms)\n", currentAtomIdx, *atomName, atom->numChildren);
+        Console::c_printf("[LinkIndex=%d] %s (%d atoms)\n", currentAtomIdx, *atomName, atom->numSubAtoms);
         for (int i = 0; i < indentation; ++i)
             Console::c_printf("\t");
         Console::c_printf("{\n");
-        for (int idx = 0; idx < atom->numChildren; ++idx)
+        for (int idx = 0; idx < atom->numSubAtoms; ++idx)
         {
             auto&       field     = atom[idx + 1];
             const char* fieldName = atomName[idx + 1];
@@ -226,6 +197,6 @@ struct SC::ReflectionTest : public SC::TestCase
         for (int i = 0; i < indentation; ++i)
             Console::c_printf("\t");
         Console::c_printf("}\n");
-        return atom->numChildren;
+        return atom->numSubAtoms;
     }
 };

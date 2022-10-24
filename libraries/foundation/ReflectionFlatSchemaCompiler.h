@@ -10,29 +10,36 @@ namespace Reflection
 template <int TOTAL_ATOMS>
 struct FlatSchema
 {
-    AtomsArray<Atom, TOTAL_ATOMS>        atoms;
-    AtomsArray<const char*, TOTAL_ATOMS> names;
+    AtomsArray<AtomProperties, TOTAL_ATOMS> atoms;
+    AtomsArray<const char*, TOTAL_ATOMS>    names;
+};
+
+struct FlatAtomLink
+{
+    typedef typename Atom::AtomsPushFunc AtomsPushFunc;
+
+    AtomsPushFunc pushAtomsTo;
+    int           flatternedIndex;
+    int           numberOfAtoms;
+
+    constexpr FlatAtomLink() : pushAtomsTo(nullptr), flatternedIndex(0), numberOfAtoms(0) {}
+
+    template <int MAX_ATOMS>
+    constexpr auto getAtoms() const
+    {
+        return GetAtomsFromFunc<MAX_ATOMS>(pushAtomsTo);
+    }
 };
 
 template <int MAX_ATOMS = 20>
 struct FlatSchemaCompiler
 {
-    struct FlatAtomLink
-    {
-        typedef typename AtomWithName<MAX_ATOMS>::GetAtomsFunction GetAtomsFunction;
-
-        GetAtomsFunction getAtoms;
-        int              flatternedIndex;
-
-        constexpr FlatAtomLink() : getAtoms(nullptr), flatternedIndex(0) {}
-    };
-
     template <int MAX_POSSIBLE_LINKS>
-    static constexpr int countUniqueLinks(const AtomsArray<AtomWithName<MAX_ATOMS>, MAX_ATOMS>& rootAtom)
+    static constexpr int countUniqueLinks(const AtomsArray<Atom, MAX_ATOMS>& rootAtom)
     {
-        AtomsArray<AtomsArray<AtomWithName<MAX_ATOMS>, MAX_ATOMS>, MAX_POSSIBLE_LINKS> atomsQueue;
+        AtomsArray<AtomsArray<Atom, MAX_ATOMS>, MAX_POSSIBLE_LINKS> atomsQueue;
         atomsQueue.values[atomsQueue.size++] = rootAtom;
-        AtomsArray<typename AtomWithName<MAX_ATOMS>::GetAtomsFunction, MAX_POSSIBLE_LINKS> alreadyVisitedLinks;
+        AtomsArray<typename Atom::AtomsPushFunc, MAX_POSSIBLE_LINKS> alreadyVisitedLinks;
 
         int numLinks = 1;
 
@@ -40,14 +47,14 @@ struct FlatSchemaCompiler
         {
             atomsQueue.size--;
             const auto atomsChildren = atomsQueue.values[atomsQueue.size]; // MUST copy as we're modifying queue
-            for (int idx = 0; idx < atomsChildren.values[0].atom.numChildren; ++idx)
+            for (int idx = 0; idx < atomsChildren.values[0].properties.numSubAtoms; ++idx)
             {
                 const auto& atom = atomsChildren.values[idx + 1];
 
                 bool alreadyVisitedLink = false;
                 for (int searchIDX = 0; searchIDX < alreadyVisitedLinks.size; ++searchIDX)
                 {
-                    if (alreadyVisitedLinks.values[searchIDX] == atom.getAtoms)
+                    if (alreadyVisitedLinks.values[searchIDX] == atom.pushAtomsTo)
                     {
                         alreadyVisitedLink = true;
                         break;
@@ -55,9 +62,9 @@ struct FlatSchemaCompiler
                 }
                 if (not alreadyVisitedLink)
                 {
-                    alreadyVisitedLinks.values[alreadyVisitedLinks.size++] = atom.getAtoms;
-                    const auto linkAtoms                                   = atom.getAtoms();
-                    if (atom.atom.type == Atom::TypeInvalid)
+                    alreadyVisitedLinks.values[alreadyVisitedLinks.size++] = atom.pushAtomsTo;
+                    const auto linkAtoms                                   = atom.template getAtoms<MAX_ATOMS>();
+                    if (atom.properties.type == AtomType::TypeInvalid)
                     {
                         return -1; // Missing descriptor for type
                     }
@@ -66,7 +73,7 @@ struct FlatSchemaCompiler
                         numLinks++;
                         atomsQueue.values[atomsQueue.size++] = linkAtoms;
                     }
-                    else if (atom.atom.type == Atom::TypeStruct)
+                    else if (atom.properties.type == AtomType::TypeStruct)
                     {
                         return -2; // Somebody created a struct with empty list of atoms
                     }
@@ -77,27 +84,28 @@ struct FlatSchemaCompiler
     }
 
     template <int UNIQUE_LINKS_NUMBER, int MAX_POSSIBLE_LINKS>
-    static constexpr auto findAllLinks(const AtomsArray<AtomWithName<MAX_ATOMS>, MAX_ATOMS>& inputAtoms,
-                                       typename AtomWithName<MAX_ATOMS>::GetAtomsFunction    rootAtomFunction)
+    static constexpr auto findAllLinks(const AtomsArray<Atom, MAX_ATOMS>& inputAtoms,
+                                       typename Atom::AtomsPushFunc       rootPushAtomsTo)
     {
-        AtomsArray<FlatAtomLink, UNIQUE_LINKS_NUMBER>                                  links;
-        AtomsArray<AtomsArray<AtomWithName<MAX_ATOMS>, MAX_ATOMS>, MAX_POSSIBLE_LINKS> atomsQueue;
+        AtomsArray<FlatAtomLink, UNIQUE_LINKS_NUMBER>               links;
+        AtomsArray<AtomsArray<Atom, MAX_ATOMS>, MAX_POSSIBLE_LINKS> atomsQueue;
         atomsQueue.values[atomsQueue.size++]     = inputAtoms;
-        links.values[links.size].getAtoms        = rootAtomFunction;
+        links.values[links.size].pushAtomsTo     = rootPushAtomsTo;
         links.values[links.size].flatternedIndex = 0;
+        links.values[links.size].numberOfAtoms   = inputAtoms.size;
         links.size++;
         while (atomsQueue.size > 0)
         {
             atomsQueue.size--;
             const auto rootAtom = atomsQueue.values[atomsQueue.size]; // MUST be copy (we modify atomsQueue)
-            for (int atomIdx = 0; atomIdx < rootAtom.values[0].atom.numChildren; ++atomIdx)
+            for (int atomIdx = 0; atomIdx < rootAtom.values[0].properties.numSubAtoms; ++atomIdx)
             {
-                const auto& atom      = rootAtom.values[atomIdx + 1];
-                auto        getAtoms  = atom.getAtoms;
-                bool        foundLink = false;
+                const auto& atom        = rootAtom.values[atomIdx + 1];
+                auto        pushAtomsTo = atom.pushAtomsTo;
+                bool        foundLink   = false;
                 for (int searchIDX = 0; searchIDX < links.size; ++searchIDX)
                 {
-                    if (links.values[searchIDX].getAtoms == getAtoms)
+                    if (links.values[searchIDX].pushAtomsTo == pushAtomsTo)
                     {
                         foundLink = true;
                         break;
@@ -105,7 +113,7 @@ struct FlatSchemaCompiler
                 }
                 if (not foundLink)
                 {
-                    auto linkAtoms = atom.getAtoms();
+                    auto linkAtoms = atom.template getAtoms<MAX_ATOMS>();
                     if (linkAtoms.size > 0)
                     {
                         atomsQueue.values[atomsQueue.size++] = linkAtoms;
@@ -113,11 +121,12 @@ struct FlatSchemaCompiler
                         if (links.size > 0)
                         {
                             const auto& prev = links.values[links.size - 1];
-                            prevMembers      = prev.flatternedIndex + prev.getAtoms().size;
+                            prevMembers      = prev.flatternedIndex + prev.numberOfAtoms;
                         }
 
-                        links.values[links.size].getAtoms        = getAtoms;
+                        links.values[links.size].pushAtomsTo     = pushAtomsTo;
                         links.values[links.size].flatternedIndex = prevMembers;
+                        links.values[links.size].numberOfAtoms   = linkAtoms.size;
                         links.size++;
                     }
                 }
@@ -128,28 +137,28 @@ struct FlatSchemaCompiler
 
     template <int TOTAL_ATOMS, int MAX_LINKS_NUMBER>
     static constexpr void mergeLinksFlat(const AtomsArray<FlatAtomLink, MAX_LINKS_NUMBER>& links,
-                                         AtomsArray<Atom, TOTAL_ATOMS>&                    mergedAtoms,
+                                         AtomsArray<AtomProperties, TOTAL_ATOMS>&          mergedAtoms,
                                          AtomsArray<const char*, TOTAL_ATOMS>*             mergedNames)
     {
         for (int linkIndex = 0; linkIndex < links.size; ++linkIndex)
         {
-            auto linkAtoms                         = links.values[linkIndex].getAtoms();
-            mergedAtoms.values[mergedAtoms.size++] = linkAtoms.values[0].atom;
+            auto linkAtoms                         = links.values[linkIndex].template getAtoms<MAX_ATOMS>();
+            mergedAtoms.values[mergedAtoms.size++] = linkAtoms.values[0].properties;
             if (mergedNames)
             {
                 mergedNames->values[mergedNames->size++] = linkAtoms.values[0].name;
             }
-            for (int atomIndex = 0; atomIndex < linkAtoms.values[0].atom.numChildren; ++atomIndex)
+            for (int atomIndex = 0; atomIndex < linkAtoms.values[0].properties.numSubAtoms; ++atomIndex)
             {
                 const auto& field                    = linkAtoms.values[1 + atomIndex];
-                mergedAtoms.values[mergedAtoms.size] = field.atom;
+                mergedAtoms.values[mergedAtoms.size] = field.properties;
                 if (mergedNames)
                 {
                     mergedNames->values[mergedNames->size++] = field.name;
                 }
                 for (int findIdx = 0; findIdx < links.size; ++findIdx)
                 {
-                    if (links.values[findIdx].getAtoms == field.getAtoms)
+                    if (links.values[findIdx].pushAtomsTo == field.pushAtomsTo)
                     {
                         mergedAtoms.values[mergedAtoms.size].setLinkIndex(links.values[findIdx].flatternedIndex);
                         break;
@@ -167,14 +176,14 @@ struct FlatSchemaCompiler
     template <typename T, int MAX_POSSIBLE_LINKS = 500>
     static constexpr auto compile()
     {
-        constexpr auto linkAtoms = AtomsFor<T>::template getAtoms<MAX_ATOMS>();
+        constexpr auto linkAtoms = GetAtomsFor<T, MAX_ATOMS>();
         static_assert(linkAtoms.size > 0, "Missing Descriptor for root class");
         constexpr auto UNIQUE_LINKS_NUMBER = countUniqueLinks<MAX_POSSIBLE_LINKS>(linkAtoms);
         static_assert(UNIQUE_LINKS_NUMBER >= 0, "Missing Descriptor for a class reachable by root class");
-        constexpr auto links = findAllLinks<UNIQUE_LINKS_NUMBER, MAX_POSSIBLE_LINKS>(
-            linkAtoms, &AtomsFor<T>::template getAtoms<MAX_ATOMS>);
+        constexpr auto links =
+            findAllLinks<UNIQUE_LINKS_NUMBER, MAX_POSSIBLE_LINKS>(linkAtoms, &AtomsFor<T>::pushAtomsTo);
         constexpr auto TOTAL_ATOMS =
-            links.values[links.size - 1].flatternedIndex + links.values[links.size - 1].getAtoms().size;
+            links.values[links.size - 1].flatternedIndex + links.values[links.size - 1].numberOfAtoms;
         FlatSchema<TOTAL_ATOMS> result;
         mergeLinksFlat(links, result.atoms, &result.names);
         return result;
