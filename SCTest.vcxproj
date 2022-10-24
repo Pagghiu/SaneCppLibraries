@@ -163,8 +163,8 @@
     <ClInclude Include="libraries\foundation\OSTest.h" />
     <ClInclude Include="libraries\foundation\Platform.h" />
     <ClInclude Include="libraries\foundation\Reflection.h" />
+    <ClInclude Include="libraries\foundation\ReflectionFlatSchemaCompiler.h" />
     <ClInclude Include="libraries\foundation\ReflectionTest.h" />
-    <ClInclude Include="libraries\foundation\ReflectionTestEmbedding.h" />
     <ClInclude Include="libraries\foundation\Result.h" />
     <ClInclude Include="libraries\foundation\ResultTest.h" />
     <ClInclude Include="libraries\foundation\Segment.h" />

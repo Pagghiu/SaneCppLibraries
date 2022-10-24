@@ -106,15 +106,6 @@
     <ClInclude Include="libraries\foundation\Platform.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="libraries\foundation\Reflection.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="libraries\foundation\ReflectionTest.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="libraries\foundation\ReflectionTestEmbedding.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
     <ClInclude Include="libraries\foundation\Result.h">
       <Filter>Foundation</Filter>
     </ClInclude>
@@ -176,6 +167,15 @@
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="libraries\foundation\VectorTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\Reflection.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\ReflectionFlatSchemaCompiler.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="libraries\foundation\ReflectionTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
   </ItemGroup>
