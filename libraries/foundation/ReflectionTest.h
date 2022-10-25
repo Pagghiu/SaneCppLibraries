@@ -8,12 +8,12 @@ template <typename T, SC::size_t N>
 struct SC::Reflection::AtomsFor<SC::Array<T, N>>
 {
     static constexpr AtomType getAtomType() { return AtomType::TypeSCArray; }
-    static constexpr void     pushAtomsTo(AtomContainer& atoms)
+    static constexpr void     build(AtomsBuilder& atoms)
     {
         const uint16_t lowN  = N & 0xffff;
         const uint16_t highN = (N >> 16) & 0xffff;
         atoms.push({AtomProperties(getAtomType(), lowN, highN, sizeof(SC::Array<T, N>), 0), "SC::Array", nullptr});
-        atoms.push({AtomProperties(AtomsFor<T>::getAtomType(), 0, 0, sizeof(T), -1), "T", &AtomsFor<T>::pushAtomsTo});
+        atoms.push({AtomProperties(AtomsFor<T>::getAtomType(), 0, 0, sizeof(T), -1), "T", &AtomsFor<T>::build});
     }
 };
 
@@ -21,10 +21,10 @@ template <typename T>
 struct SC::Reflection::AtomsFor<SC::Vector<T>>
 {
     static constexpr AtomType getAtomType() { return AtomType::TypeSCVector; }
-    static constexpr void     pushAtomsTo(AtomContainer& atoms)
+    static constexpr void     build(AtomsBuilder& atoms)
     {
         atoms.push(Atom::create<SC::Vector<T>>("SC::Vector"));
-        atoms.push({AtomProperties(AtomsFor<T>::getAtomType(), 0, 0, sizeof(T), -1), "T", &AtomsFor<T>::pushAtomsTo});
+        atoms.push({AtomProperties(AtomsFor<T>::getAtomType(), 0, 0, sizeof(T), -1), "T", &AtomsFor<T>::build});
     }
 };
 
@@ -69,7 +69,7 @@ namespace Reflection
 template <>
 struct AtomsFor<TestNamespace::SimpleStructure> : AtomStruct<AtomsFor<TestNamespace::SimpleStructure>>
 {
-    static constexpr void members(AtomContainer& atoms)
+    static constexpr void members(AtomsBuilder& atoms)
     {
         atoms.member(0, SC_ATOM_MEMBER(T, f1));
         atoms.member(1, SC_ATOM_MEMBER(T, f2));
@@ -79,7 +79,7 @@ struct AtomsFor<TestNamespace::SimpleStructure> : AtomStruct<AtomsFor<TestNamesp
 template <>
 struct AtomsFor<TestNamespace::IntermediateStructure> : AtomStruct<AtomsFor<TestNamespace::IntermediateStructure>>
 {
-    static constexpr void members(AtomContainer& atoms)
+    static constexpr void members(AtomsBuilder& atoms)
     {
         atoms.member(0, SC_ATOM_MEMBER(T, simpleStructure));
         atoms.member(1, SC_ATOM_MEMBER(T, vectorOfInt));
@@ -89,7 +89,7 @@ struct AtomsFor<TestNamespace::IntermediateStructure> : AtomStruct<AtomsFor<Test
 template <>
 struct AtomsFor<TestNamespace::ComplexStructure> : AtomStruct<AtomsFor<TestNamespace::ComplexStructure>>
 {
-    static constexpr void members(AtomContainer& atoms)
+    static constexpr void members(AtomsBuilder& atoms)
     {
         atoms.member(0, SC_ATOM_MEMBER(T, f1));
         atoms.member(1, SC_ATOM_MEMBER(T, simpleStructure));
@@ -126,7 +126,8 @@ struct SC::ReflectionTest : public SC::TestCase
         {
             constexpr auto       className    = GetTypeNameAsString<TestNamespace::ComplexStructure>::get();
             constexpr StringView classNameStr = "TestNamespace::ComplexStructure";
-            static_assert(constexprEquals(StringView(className.data, className.length, false), classNameStr), "");
+            static_assert(constexprEquals(StringView(className.data, className.length, false), classNameStr),
+                          "Please update SC::ClNm for your compiler");
             // auto numlinks =
             // countUniqueLinks<10>(AtomsFor<TestNamespace::ComplexStructure>::template
             // getAtoms<10>());
@@ -134,10 +135,10 @@ struct SC::ReflectionTest : public SC::TestCase
             constexpr auto ComplexStructureFlatSchema =
                 FlatSchemaCompiler<>::compile<TestNamespace::ComplexStructure>();
             printFlatSchema(ComplexStructureFlatSchema.atoms.values, ComplexStructureFlatSchema.names.values);
-            //            constexpr auto SimpleStructureFlatSchema =
-            //            FlatSchemaCompiler<>::compile<TestNamespace::SimpleStructure>();
-            //            printFlatSchema(SimpleStructureFlatSchema.atoms.values,
-            //            SimpleStructureFlatSchema.names.values);
+            // constexpr auto SimpleStructureFlatSchema =
+            // FlatSchemaCompiler<>::compile<TestNamespace::SimpleStructure>();
+            // printFlatSchema(SimpleStructureFlatSchema.atoms.values,
+            // SimpleStructureFlatSchema.names.values);
         }
     }
     template <int NUM_ATOMS>

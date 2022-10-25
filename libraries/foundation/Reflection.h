@@ -84,9 +84,9 @@ struct AtomProperties
     constexpr int16_t getLinkIndex() const { return numSubAtoms; }
 };
 
-struct AtomContainer;
+struct AtomsBuilder;
 // clang-format off
-struct AtomPrimitive { static constexpr void pushAtomsTo( AtomContainer& atoms) { } };
+struct AtomPrimitive { static constexpr void build( AtomsBuilder& atoms) { } };
 
 template <typename T> struct AtomsFor : public AtomPrimitive {static constexpr AtomType getAtomType(){return AtomType::TypeInvalid;}};
 
@@ -107,20 +107,6 @@ struct AtomsArray
 {
     T   values[N] = {};
     int size      = 0;
-
-    bool exceedsCapacity = true;
-
-    constexpr void push_back(T value)
-    {
-        if (size + 1 < N)
-        {
-            values[size++] = value;
-        }
-        else
-        {
-            exceedsCapacity = true;
-        }
-    }
 };
 
 struct AtomString
@@ -132,17 +118,6 @@ struct AtomString
     constexpr AtomString(const char (&data)[N]) : data(data), length(N)
     {}
     constexpr AtomString(const char* data, int length) : data(data), length(length) {}
-    //    constexpr bool operator==(const AtomString& other) const
-    //    {
-    //        if (length != other.length)
-    //            return false;
-    //        for (int i = 0; i < length; ++i)
-    //        {
-    //            if (data[i] != other.data[i])
-    //                return false;
-    //        }
-    //        return true;
-    //    }
 };
 
 template <typename T>
@@ -162,7 +137,8 @@ struct GetTypeNameAsString
         trimmedName.size = className.length;
         return trimmedName;
     }
-
+    
+    // Inline static constexpr requires C++17
     static inline constexpr auto value = TrimClassName();
 
   public:
@@ -178,34 +154,34 @@ struct GetTypeNameAsString
 
 struct Atom;
 
-struct AtomContainer
+struct AtomsBuilder
 {
     int       size;
     Atom*     output;
     const int capacity;
 
-    constexpr AtomContainer(Atom* output, const int capacity) : size(0), output(output), capacity(capacity) {}
+    constexpr AtomsBuilder(Atom* output, const int capacity) : size(0), output(output), capacity(capacity) {}
 
-    inline constexpr bool push(const Atom& value);
+    inline constexpr void push(const Atom& value);
     template <typename T, int N>
-    inline constexpr bool Struct(const char (&name)[N]);
+    inline constexpr void Struct(const char (&name)[N]);
     template <typename T>
-    inline constexpr bool Struct();
+    inline constexpr void Struct();
     template <typename R, typename T, int N>
-    inline constexpr bool member(int order, const char (&name)[N], R T::*, size_t offset);
+    inline constexpr void member(int order, const char (&name)[N], R T::*, size_t offset);
 };
 
 struct Atom
 {
-    typedef void (*AtomsPushFunc)(AtomContainer& atoms);
+    typedef void (*AtomsBuildFunc)(AtomsBuilder& atoms);
 
     AtomProperties properties;
-    AtomString     nameString;
-    AtomsPushFunc  pushAtomsTo;
+    AtomString     name;
+    AtomsBuildFunc build;
 
-    constexpr Atom() : pushAtomsTo(nullptr) {}
-    constexpr Atom(const AtomProperties properties, AtomString nameString, AtomsPushFunc pushAtomsTo)
-        : properties(properties), nameString(nameString), pushAtomsTo(pushAtomsTo)
+    constexpr Atom() : build(nullptr) {}
+    constexpr Atom(const AtomProperties properties, AtomString name, AtomsBuildFunc build)
+        : properties(properties), name(name), build(build)
     {}
     template <int MAX_ATOMS>
     constexpr AtomsArray<Atom, MAX_ATOMS> getAtoms() const;
@@ -214,13 +190,13 @@ struct Atom
     static constexpr Atom create(int order, const char (&name)[N], R T::*, size_t offset)
     {
         return {AtomProperties(AtomsFor<R>::getAtomType(), order, static_cast<SC::uint16_t>(offset), sizeof(R), -1),
-                AtomString(name, N), &AtomsFor<R>::pushAtomsTo};
+                AtomString(name, N), &AtomsFor<R>::build};
     }
 
     template <typename T>
     static constexpr Atom create(AtomString name = GetTypeNameAsString<T>::get())
     {
-        return {AtomProperties(AtomsFor<T>::getAtomType(), 0, 0, sizeof(T), -1), name, &AtomsFor<T>::pushAtomsTo};
+        return {AtomProperties(AtomsFor<T>::getAtomType(), 0, 0, sizeof(T), -1), name, &AtomsFor<T>::build};
     }
 
     template <typename T, int N>
@@ -238,14 +214,14 @@ struct AtomStruct<AtomsFor<Type>>
 {
     typedef Type              T;
     static constexpr AtomType getAtomType() { return AtomType::TypeStruct; }
-    static constexpr void     pushAtomsTo(AtomContainer& atoms)
+    static constexpr void     build(AtomsBuilder& atoms)
     {
         atoms.Struct<T>();
         AtomsFor<Type>::members(atoms);
     }
 };
 
-inline constexpr bool AtomContainer::push(const Atom& value)
+inline constexpr void AtomsBuilder::push(const Atom& value)
 {
     if (size < capacity)
     {
@@ -254,35 +230,30 @@ inline constexpr bool AtomContainer::push(const Atom& value)
             output[size] = value;
         }
         size++;
-        return true;
-    }
-    else
-    {
-        return false;
     }
 }
 template <typename T, int N>
-inline constexpr bool AtomContainer::Struct(const char (&name)[N])
+inline constexpr void AtomsBuilder::Struct(const char (&name)[N])
 {
-    return push(Atom::create<T>(name));
+    push(Atom::create<T>(name));
 }
 template <typename T>
-inline constexpr bool AtomContainer::Struct()
+inline constexpr void AtomsBuilder::Struct()
 {
-    return push(Atom::create<T>());
+    push(Atom::create<T>());
 }
 template <typename R, typename T, int N>
-inline constexpr bool AtomContainer::member(int order, const char (&name)[N], R T::*field, size_t offset)
+inline constexpr void AtomsBuilder::member(int order, const char (&name)[N], R T::*field, size_t offset)
 {
-    return push(Atom::create(order, name, field, offset));
+    push(Atom::create(order, name, field, offset));
 }
 
 template <int MAX_ATOMS>
-inline constexpr auto GetAtomsFromFunc(Atom::AtomsPushFunc pushAtomsTo)
+inline constexpr auto AtomsBuild(Atom::AtomsBuildFunc build)
 {
     AtomsArray<Atom, MAX_ATOMS> atoms;
-    AtomContainer              container(atoms.values, MAX_ATOMS);
-    pushAtomsTo(container);
+    AtomsBuilder                container(atoms.values, MAX_ATOMS);
+    build(container);
     if (container.size <= MAX_ATOMS)
     {
         atoms.values[0].properties.numSubAtoms = container.size - 1;
@@ -294,13 +265,13 @@ inline constexpr auto GetAtomsFromFunc(Atom::AtomsPushFunc pushAtomsTo)
 template <int MAX_ATOMS>
 constexpr AtomsArray<Atom, MAX_ATOMS> Atom::getAtoms() const
 {
-    return GetAtomsFromFunc<MAX_ATOMS>(pushAtomsTo);
+    return AtomsBuild<MAX_ATOMS>(build);
 }
 
 template <typename T, int MAX_ATOMS>
-constexpr AtomsArray<Atom, MAX_ATOMS> GetAtomsFor()
+constexpr AtomsArray<Atom, MAX_ATOMS> AtomsGet()
 {
-    return GetAtomsFromFunc<MAX_ATOMS>(&AtomsFor<T>::pushAtomsTo);
+    return AtomsBuild<MAX_ATOMS>(&AtomsFor<T>::build);
 }
 } // namespace Reflection
 } // namespace SC

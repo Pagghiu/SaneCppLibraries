@@ -16,18 +16,18 @@ struct FlatSchema
 
 struct FlatAtomLink
 {
-    typedef typename Atom::AtomsPushFunc AtomsPushFunc;
+    typedef typename Atom::AtomsBuildFunc AtomsBuildFunc;
 
-    AtomsPushFunc pushAtomsTo;
-    int           flatternedIndex;
-    int           numberOfAtoms;
+    AtomsBuildFunc build;
+    int            flatternedIndex;
+    int            numberOfAtoms;
 
-    constexpr FlatAtomLink() : pushAtomsTo(nullptr), flatternedIndex(0), numberOfAtoms(0) {}
+    constexpr FlatAtomLink() : build(nullptr), flatternedIndex(0), numberOfAtoms(0) {}
 
     template <int MAX_ATOMS>
     constexpr auto getAtoms() const
     {
-        return GetAtomsFromFunc<MAX_ATOMS>(pushAtomsTo);
+        return AtomsBuild<MAX_ATOMS>(build);
     }
 };
 
@@ -39,7 +39,7 @@ struct FlatSchemaCompiler
     {
         AtomsArray<AtomsArray<Atom, MAX_ATOMS>, MAX_POSSIBLE_LINKS> atomsQueue;
         atomsQueue.values[atomsQueue.size++] = rootAtom;
-        AtomsArray<typename Atom::AtomsPushFunc, MAX_POSSIBLE_LINKS> alreadyVisitedLinks;
+        AtomsArray<typename Atom::AtomsBuildFunc, MAX_POSSIBLE_LINKS> alreadyVisitedLinks;
 
         int numLinks = 1;
 
@@ -54,7 +54,7 @@ struct FlatSchemaCompiler
                 bool alreadyVisitedLink = false;
                 for (int searchIDX = 0; searchIDX < alreadyVisitedLinks.size; ++searchIDX)
                 {
-                    if (alreadyVisitedLinks.values[searchIDX] == atom.pushAtomsTo)
+                    if (alreadyVisitedLinks.values[searchIDX] == atom.build)
                     {
                         alreadyVisitedLink = true;
                         break;
@@ -62,7 +62,7 @@ struct FlatSchemaCompiler
                 }
                 if (not alreadyVisitedLink)
                 {
-                    alreadyVisitedLinks.values[alreadyVisitedLinks.size++] = atom.pushAtomsTo;
+                    alreadyVisitedLinks.values[alreadyVisitedLinks.size++] = atom.build;
                     const auto linkAtoms                                   = atom.template getAtoms<MAX_ATOMS>();
                     if (atom.properties.type == AtomType::TypeInvalid)
                     {
@@ -85,12 +85,12 @@ struct FlatSchemaCompiler
 
     template <int UNIQUE_LINKS_NUMBER, int MAX_POSSIBLE_LINKS>
     static constexpr auto findAllLinks(const AtomsArray<Atom, MAX_ATOMS>& inputAtoms,
-                                       typename Atom::AtomsPushFunc       rootPushAtomsTo)
+                                       typename Atom::AtomsBuildFunc      rootBuilder)
     {
         AtomsArray<FlatAtomLink, UNIQUE_LINKS_NUMBER>               links;
         AtomsArray<AtomsArray<Atom, MAX_ATOMS>, MAX_POSSIBLE_LINKS> atomsQueue;
         atomsQueue.values[atomsQueue.size++]     = inputAtoms;
-        links.values[links.size].pushAtomsTo     = rootPushAtomsTo;
+        links.values[links.size].build           = rootBuilder;
         links.values[links.size].flatternedIndex = 0;
         links.values[links.size].numberOfAtoms   = inputAtoms.size;
         links.size++;
@@ -100,12 +100,12 @@ struct FlatSchemaCompiler
             const auto rootAtom = atomsQueue.values[atomsQueue.size]; // MUST be copy (we modify atomsQueue)
             for (int atomIdx = 0; atomIdx < rootAtom.values[0].properties.numSubAtoms; ++atomIdx)
             {
-                const auto& atom        = rootAtom.values[atomIdx + 1];
-                auto        pushAtomsTo = atom.pushAtomsTo;
-                bool        foundLink   = false;
+                const auto& atom      = rootAtom.values[atomIdx + 1];
+                auto        build     = atom.build;
+                bool        foundLink = false;
                 for (int searchIDX = 0; searchIDX < links.size; ++searchIDX)
                 {
-                    if (links.values[searchIDX].pushAtomsTo == pushAtomsTo)
+                    if (links.values[searchIDX].build == build)
                     {
                         foundLink = true;
                         break;
@@ -124,7 +124,7 @@ struct FlatSchemaCompiler
                             prevMembers      = prev.flatternedIndex + prev.numberOfAtoms;
                         }
 
-                        links.values[links.size].pushAtomsTo     = pushAtomsTo;
+                        links.values[links.size].build           = build;
                         links.values[links.size].flatternedIndex = prevMembers;
                         links.values[links.size].numberOfAtoms   = linkAtoms.size;
                         links.size++;
@@ -146,7 +146,7 @@ struct FlatSchemaCompiler
             mergedAtoms.values[mergedAtoms.size++] = linkAtoms.values[0].properties;
             if (mergedNames)
             {
-                mergedNames->values[mergedNames->size++] = linkAtoms.values[0].nameString;
+                mergedNames->values[mergedNames->size++] = linkAtoms.values[0].name;
             }
             for (int atomIndex = 0; atomIndex < linkAtoms.values[0].properties.numSubAtoms; ++atomIndex)
             {
@@ -154,11 +154,11 @@ struct FlatSchemaCompiler
                 mergedAtoms.values[mergedAtoms.size] = field.properties;
                 if (mergedNames)
                 {
-                    mergedNames->values[mergedNames->size++] = field.nameString;
+                    mergedNames->values[mergedNames->size++] = field.name;
                 }
                 for (int findIdx = 0; findIdx < links.size; ++findIdx)
                 {
-                    if (links.values[findIdx].pushAtomsTo == field.pushAtomsTo)
+                    if (links.values[findIdx].build == field.build)
                     {
                         mergedAtoms.values[mergedAtoms.size].setLinkIndex(links.values[findIdx].flatternedIndex);
                         break;
@@ -176,12 +176,11 @@ struct FlatSchemaCompiler
     template <typename T, int MAX_POSSIBLE_LINKS = 500>
     static constexpr auto compile()
     {
-        constexpr auto linkAtoms = GetAtomsFor<T, MAX_ATOMS>();
+        constexpr auto linkAtoms = AtomsGet<T, MAX_ATOMS>();
         static_assert(linkAtoms.size > 0, "Missing Descriptor for root class");
         constexpr auto UNIQUE_LINKS_NUMBER = countUniqueLinks<MAX_POSSIBLE_LINKS>(linkAtoms);
         static_assert(UNIQUE_LINKS_NUMBER >= 0, "Missing Descriptor for a class reachable by root class");
-        constexpr auto links =
-            findAllLinks<UNIQUE_LINKS_NUMBER, MAX_POSSIBLE_LINKS>(linkAtoms, &AtomsFor<T>::pushAtomsTo);
+        constexpr auto links = findAllLinks<UNIQUE_LINKS_NUMBER, MAX_POSSIBLE_LINKS>(linkAtoms, &AtomsFor<T>::build);
         constexpr auto TOTAL_ATOMS =
             links.values[links.size - 1].flatternedIndex + links.values[links.size - 1].numberOfAtoms;
         FlatSchema<TOTAL_ATOMS> result;
