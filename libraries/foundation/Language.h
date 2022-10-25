@@ -193,16 +193,25 @@ inline void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { retu
 #if SC_CPLUSPLUS >= 202002L
 
 #define SC_CPP_AT_LEAST_20 1
+#define SC_CPP_AT_LEAST_17 1
+#define SC_CPP_AT_LEAST_14 1
+
+#elif SC_CPLUSPLUS >= 201703L
+
+#define SC_CPP_AT_LEAST_20 0
+#define SC_CPP_AT_LEAST_17 1
 #define SC_CPP_AT_LEAST_14 1
 
 #elif SC_CPLUSPLUS >= 201402L
 
 #define SC_CPP_AT_LEAST_20 0
+#define SC_CPP_AT_LEAST_17 0
 #define SC_CPP_AT_LEAST_14 1
 
 #else
 
 #define SC_CPP_AT_LEAST_20 0
+#define SC_CPP_AT_LEAST_17 0
 #define SC_CPP_AT_LEAST_14 0
 
 #endif

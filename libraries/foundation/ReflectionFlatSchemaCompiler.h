@@ -11,7 +11,7 @@ template <int TOTAL_ATOMS>
 struct FlatSchema
 {
     AtomsArray<AtomProperties, TOTAL_ATOMS> atoms;
-    AtomsArray<const char*, TOTAL_ATOMS>    names;
+    AtomsArray<AtomString, TOTAL_ATOMS>     names;
 };
 
 struct FlatAtomLink
@@ -138,7 +138,7 @@ struct FlatSchemaCompiler
     template <int TOTAL_ATOMS, int MAX_LINKS_NUMBER>
     static constexpr void mergeLinksFlat(const AtomsArray<FlatAtomLink, MAX_LINKS_NUMBER>& links,
                                          AtomsArray<AtomProperties, TOTAL_ATOMS>&          mergedAtoms,
-                                         AtomsArray<const char*, TOTAL_ATOMS>*             mergedNames)
+                                         AtomsArray<AtomString, TOTAL_ATOMS>*              mergedNames)
     {
         for (int linkIndex = 0; linkIndex < links.size; ++linkIndex)
         {
@@ -146,7 +146,7 @@ struct FlatSchemaCompiler
             mergedAtoms.values[mergedAtoms.size++] = linkAtoms.values[0].properties;
             if (mergedNames)
             {
-                mergedNames->values[mergedNames->size++] = linkAtoms.values[0].name;
+                mergedNames->values[mergedNames->size++] = linkAtoms.values[0].nameString;
             }
             for (int atomIndex = 0; atomIndex < linkAtoms.values[0].properties.numSubAtoms; ++atomIndex)
             {
@@ -154,7 +154,7 @@ struct FlatSchemaCompiler
                 mergedAtoms.values[mergedAtoms.size] = field.properties;
                 if (mergedNames)
                 {
-                    mergedNames->values[mergedNames->size++] = field.name;
+                    mergedNames->values[mergedNames->size++] = field.nameString;
                 }
                 for (int findIdx = 0; findIdx < links.size; ++findIdx)
                 {
