@@ -7,7 +7,7 @@
 namespace SC
 {
 #if SC_MSVC
-[[noreturn]] __forceinline void unreachable() { __assume(false); }
+[[noreturn]] __forceinline void SC_UNREACHABLE() { __assume(false); }
 #else
 [[noreturn]] SC_ALWAYS_INLINE void SC_UNREACHABLE() { __builtin_unreachable(); }
 #endif

@@ -5,7 +5,9 @@
 
 namespace SC
 {
-struct String
+struct String;
+}
+struct SC::String
 {
     String() = default;
     String(Vector<char_t>&& otherData) : data(forward<Vector<char_t>>(otherData)) {}
@@ -42,7 +44,6 @@ struct String
     //  - if string is not empty    --> data.size() > 2
     Vector<char_t> data;
 };
-} // namespace SC
 
 template <>
 struct SC::text::StringFormatterFor<SC::String>

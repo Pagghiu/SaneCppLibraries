@@ -20,10 +20,10 @@ static constexpr Nm ClNm()
     constexpr int  skip_chars      = 8;
     constexpr int  trim_chars      = 7;
 #else
-    const char*                 name            = __PRETTY_FUNCTION__;
-    constexpr char              separating_char = '=';
-    constexpr int               skip_chars      = 2;
-    constexpr int               trim_chars      = 1;
+    const char*                     name            = __PRETTY_FUNCTION__;
+    constexpr char                  separating_char = '=';
+    constexpr int                   skip_chars      = 2;
+    constexpr int                   trim_chars      = 1;
 #endif
     int         length = 0;
     const char* it     = name;
@@ -38,7 +38,7 @@ static constexpr Nm ClNm()
 namespace Reflection
 {
 
-enum class AtomType : uint8_t
+enum class MetaType : uint8_t
 {
     // Invalid sentinel
     TypeInvalid = 0,
@@ -65,71 +65,71 @@ enum class AtomType : uint8_t
     TypeSCMap    = 15,
 };
 
-struct AtomProperties
+struct MetaProperties
 {
-    AtomType type;        // 1
+    MetaType type;        // 1
     uint8_t  order;       // 1
     uint16_t offset;      // 2
     uint16_t size;        // 2
     int16_t  numSubAtoms; // 2
 
-    constexpr AtomProperties() : type(AtomType::TypeInvalid), order(0), offset(0), size(0), numSubAtoms(0)
+    constexpr MetaProperties() : type(MetaType::TypeInvalid), order(0), offset(0), size(0), numSubAtoms(0)
     {
-        static_assert(sizeof(AtomProperties) == 8, "Size must be 8 bytes");
+        static_assert(sizeof(MetaProperties) == 8, "Size must be 8 bytes");
     }
-    constexpr AtomProperties(AtomType type, uint8_t order, uint16_t offset, uint16_t size, int16_t numSubAtoms)
+    constexpr MetaProperties(MetaType type, uint8_t order, uint16_t offset, uint16_t size, int16_t numSubAtoms)
         : type(type), order(order), offset(offset), size(size), numSubAtoms(numSubAtoms)
     {}
     constexpr void    setLinkIndex(int16_t linkIndex) { numSubAtoms = linkIndex; }
     constexpr int16_t getLinkIndex() const { return numSubAtoms; }
 };
 
-struct AtomsBuilder;
+struct MetaClassBuilder;
 // clang-format off
-struct AtomPrimitive { static constexpr void build( AtomsBuilder& atoms) { } };
+struct MetaPrimitive { static constexpr void build( MetaClassBuilder& builder) { } };
 
-template <typename T> struct AtomsFor : public AtomPrimitive {static constexpr AtomType getAtomType(){return AtomType::TypeInvalid;}};
+template <typename T> struct MetaClass : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeInvalid;}};
 
-template <> struct AtomsFor<uint8_t>  : public AtomPrimitive {static constexpr AtomType getAtomType(){return AtomType::TypeUINT8;}};
-template <> struct AtomsFor<uint16_t> : public AtomPrimitive {static constexpr AtomType getAtomType(){return AtomType::TypeUINT16;}};
-template <> struct AtomsFor<uint32_t> : public AtomPrimitive {static constexpr AtomType getAtomType(){return AtomType::TypeUINT32;}};
-template <> struct AtomsFor<uint64_t> : public AtomPrimitive {static constexpr AtomType getAtomType(){return AtomType::TypeUINT64;}};
-template <> struct AtomsFor<int8_t>   : public AtomPrimitive {static constexpr AtomType getAtomType(){return AtomType::TypeINT8;}};
-template <> struct AtomsFor<int16_t>  : public AtomPrimitive {static constexpr AtomType getAtomType(){return AtomType::TypeINT16;}};
-template <> struct AtomsFor<int32_t>  : public AtomPrimitive {static constexpr AtomType getAtomType(){return AtomType::TypeINT32;}};
-template <> struct AtomsFor<int64_t>  : public AtomPrimitive {static constexpr AtomType getAtomType(){return AtomType::TypeINT64;}};
-template <> struct AtomsFor<float>    : public AtomPrimitive {static constexpr AtomType getAtomType(){return AtomType::TypeFLOAT32;}};
-template <> struct AtomsFor<double>   : public AtomPrimitive {static constexpr AtomType getAtomType(){return AtomType::TypeDOUBLE64;}};
+template <> struct MetaClass<uint8_t>  : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT8;}};
+template <> struct MetaClass<uint16_t> : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT16;}};
+template <> struct MetaClass<uint32_t> : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT32;}};
+template <> struct MetaClass<uint64_t> : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT64;}};
+template <> struct MetaClass<int8_t>   : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeINT8;}};
+template <> struct MetaClass<int16_t>  : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeINT16;}};
+template <> struct MetaClass<int32_t>  : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeINT32;}};
+template <> struct MetaClass<int64_t>  : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeINT64;}};
+template <> struct MetaClass<float>    : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeFLOAT32;}};
+template <> struct MetaClass<double>   : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeDOUBLE64;}};
 // clang-format on
 
 template <typename T, int N>
-struct AtomsArray
+struct MetaArray
 {
     T   values[N] = {};
     int size      = 0;
 };
 
-struct AtomString
+struct MetaStringView
 {
     const char* data;
     int         length;
-    constexpr AtomString() : data(nullptr), length(0) {}
+    constexpr MetaStringView() : data(nullptr), length(0) {}
     template <int N>
-    constexpr AtomString(const char (&data)[N]) : data(data), length(N)
+    constexpr MetaStringView(const char (&data)[N]) : data(data), length(N)
     {}
-    constexpr AtomString(const char* data, int length) : data(data), length(length) {}
+    constexpr MetaStringView(const char* data, int length) : data(data), length(length) {}
 };
 
 template <typename T>
-struct GetTypeNameAsString
+struct MetaTypeToString
 {
 #if SC_CPP_AT_LEAST_17
   private:
     // In C++ 17 we try to trim the long string producted by ClassName<T> to reduce executable size
     static constexpr auto TrimClassName()
     {
-        constexpr auto                     className = ClNm<T>();
-        AtomsArray<char, className.length> trimmedName;
+        constexpr auto                    className = ClNm<T>();
+        MetaArray<char, className.length> trimmedName;
         for (int i = 0; i < className.length; ++i)
         {
             trimmedName.values[i] = className.data[i];
@@ -137,30 +137,30 @@ struct GetTypeNameAsString
         trimmedName.size = className.length;
         return trimmedName;
     }
-    
+
     // Inline static constexpr requires C++17
     static inline constexpr auto value = TrimClassName();
 
   public:
-    static constexpr AtomString get() { return AtomString(value.values, value.size); }
+    static constexpr MetaStringView get() { return MetaStringView(value.values, value.size); }
 #else
-    static constexpr AtomString get()
+    static constexpr MetaStringView get()
     {
         auto className = ClNm<T>();
-        return AtomString(className.data, className.length);
+        return MetaStringView(className.data, className.length);
     }
 #endif
 };
 
 struct Atom;
 
-struct AtomsBuilder
+struct MetaClassBuilder
 {
     int       size;
     Atom*     output;
     const int capacity;
 
-    constexpr AtomsBuilder(Atom* output, const int capacity) : size(0), output(output), capacity(capacity) {}
+    constexpr MetaClassBuilder(Atom* output, const int capacity) : size(0), output(output), capacity(capacity) {}
 
     inline constexpr void push(const Atom& value);
     template <typename T, int N>
@@ -173,55 +173,55 @@ struct AtomsBuilder
 
 struct Atom
 {
-    typedef void (*AtomsBuildFunc)(AtomsBuilder& atoms);
+    typedef void (*MetaClassBuildFunc)(MetaClassBuilder& builder);
 
-    AtomProperties properties;
-    AtomString     name;
-    AtomsBuildFunc build;
+    MetaProperties     properties;
+    MetaStringView     name;
+    MetaClassBuildFunc build;
 
     constexpr Atom() : build(nullptr) {}
-    constexpr Atom(const AtomProperties properties, AtomString name, AtomsBuildFunc build)
+    constexpr Atom(const MetaProperties properties, MetaStringView name, MetaClassBuildFunc build)
         : properties(properties), name(name), build(build)
     {}
     template <int MAX_ATOMS>
-    constexpr AtomsArray<Atom, MAX_ATOMS> getAtoms() const;
+    constexpr MetaArray<Atom, MAX_ATOMS> getAtoms() const;
 
     template <typename R, typename T, int N>
     static constexpr Atom create(int order, const char (&name)[N], R T::*, size_t offset)
     {
-        return {AtomProperties(AtomsFor<R>::getAtomType(), order, static_cast<SC::uint16_t>(offset), sizeof(R), -1),
-                AtomString(name, N), &AtomsFor<R>::build};
+        return {MetaProperties(MetaClass<R>::getMetaType(), order, static_cast<SC::uint16_t>(offset), sizeof(R), -1),
+                MetaStringView(name, N), &MetaClass<R>::build};
     }
 
     template <typename T>
-    static constexpr Atom create(AtomString name = GetTypeNameAsString<T>::get())
+    static constexpr Atom create(MetaStringView name = MetaTypeToString<T>::get())
     {
-        return {AtomProperties(AtomsFor<T>::getAtomType(), 0, 0, sizeof(T), -1), name, &AtomsFor<T>::build};
+        return {MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), name, &MetaClass<T>::build};
     }
 
     template <typename T, int N>
     static constexpr Atom create(const char (&name)[N])
     {
-        return create<T>(AtomString(name, N));
+        return create<T>(MetaStringView(name, N));
     }
 };
 
 template <typename Type>
-struct AtomStruct;
+struct MetaStruct;
 
 template <typename Type>
-struct AtomStruct<AtomsFor<Type>>
+struct MetaStruct<MetaClass<Type>>
 {
     typedef Type              T;
-    static constexpr AtomType getAtomType() { return AtomType::TypeStruct; }
-    static constexpr void     build(AtomsBuilder& atoms)
+    static constexpr MetaType getMetaType() { return MetaType::TypeStruct; }
+    static constexpr void     build(MetaClassBuilder& builder)
     {
-        atoms.Struct<T>();
-        AtomsFor<Type>::members(atoms);
+        builder.Struct<T>();
+        MetaClass<Type>::members(builder);
     }
 };
 
-inline constexpr void AtomsBuilder::push(const Atom& value)
+inline constexpr void MetaClassBuilder::push(const Atom& value)
 {
     if (size < capacity)
     {
@@ -233,26 +233,26 @@ inline constexpr void AtomsBuilder::push(const Atom& value)
     }
 }
 template <typename T, int N>
-inline constexpr void AtomsBuilder::Struct(const char (&name)[N])
+inline constexpr void MetaClassBuilder::Struct(const char (&name)[N])
 {
     push(Atom::create<T>(name));
 }
 template <typename T>
-inline constexpr void AtomsBuilder::Struct()
+inline constexpr void MetaClassBuilder::Struct()
 {
     push(Atom::create<T>());
 }
 template <typename R, typename T, int N>
-inline constexpr void AtomsBuilder::member(int order, const char (&name)[N], R T::*field, size_t offset)
+inline constexpr void MetaClassBuilder::member(int order, const char (&name)[N], R T::*field, size_t offset)
 {
     push(Atom::create(order, name, field, offset));
 }
 
 template <int MAX_ATOMS>
-inline constexpr auto AtomsBuild(Atom::AtomsBuildFunc build)
+inline constexpr auto MetaBuild(Atom::MetaClassBuildFunc build)
 {
-    AtomsArray<Atom, MAX_ATOMS> atoms;
-    AtomsBuilder                container(atoms.values, MAX_ATOMS);
+    MetaArray<Atom, MAX_ATOMS> atoms;
+    MetaClassBuilder           container(atoms.values, MAX_ATOMS);
     build(container);
     if (container.size <= MAX_ATOMS)
     {
@@ -263,17 +263,17 @@ inline constexpr auto AtomsBuild(Atom::AtomsBuildFunc build)
 }
 
 template <int MAX_ATOMS>
-constexpr AtomsArray<Atom, MAX_ATOMS> Atom::getAtoms() const
+constexpr MetaArray<Atom, MAX_ATOMS> Atom::getAtoms() const
 {
-    return AtomsBuild<MAX_ATOMS>(build);
+    return MetaBuild<MAX_ATOMS>(build);
 }
 
 template <typename T, int MAX_ATOMS>
-constexpr AtomsArray<Atom, MAX_ATOMS> AtomsGet()
+constexpr MetaArray<Atom, MAX_ATOMS> MetaClassGetAtoms()
 {
-    return AtomsBuild<MAX_ATOMS>(&AtomsFor<T>::build);
+    return MetaBuild<MAX_ATOMS>(&MetaClass<T>::build);
 }
 } // namespace Reflection
 } // namespace SC
 
-#define SC_ATOM_MEMBER(TYPE, MEMBER) #MEMBER, &TYPE::MEMBER, SC_OFFSET_OF(TYPE, MEMBER)
+#define SC_META_MEMBER(TYPE, MEMBER) #MEMBER, &TYPE::MEMBER, SC_OFFSET_OF(TYPE, MEMBER)

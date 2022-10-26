@@ -10,36 +10,37 @@ namespace Reflection
 template <int TOTAL_ATOMS>
 struct FlatSchema
 {
-    AtomsArray<AtomProperties, TOTAL_ATOMS> atoms;
-    AtomsArray<AtomString, TOTAL_ATOMS>     names;
+    MetaArray<MetaProperties, TOTAL_ATOMS> properties;
+    MetaArray<MetaStringView, TOTAL_ATOMS> names;
 };
 
 struct FlatAtomLink
 {
-    typedef typename Atom::AtomsBuildFunc AtomsBuildFunc;
+    typedef typename Atom::MetaClassBuildFunc MetaClassBuildFunc;
 
-    AtomsBuildFunc build;
-    int            flatternedIndex;
-    int            numberOfAtoms;
+    MetaClassBuildFunc build;
+    int                flatternedIndex;
+    int                numberOfAtoms;
 
     constexpr FlatAtomLink() : build(nullptr), flatternedIndex(0), numberOfAtoms(0) {}
 
     template <int MAX_ATOMS>
     constexpr auto getAtoms() const
     {
-        return AtomsBuild<MAX_ATOMS>(build);
+        return MetaBuild<MAX_ATOMS>(build);
     }
 };
 
+// You can customize MAX_ATOMS to match the max number of atoms (+1) of any single MetaClass that will be linked
 template <int MAX_ATOMS = 20>
 struct FlatSchemaCompiler
 {
     template <int MAX_POSSIBLE_LINKS>
-    static constexpr int countUniqueLinks(const AtomsArray<Atom, MAX_ATOMS>& rootAtom)
+    static constexpr int countUniqueLinks(const MetaArray<Atom, MAX_ATOMS>& rootAtom)
     {
-        AtomsArray<AtomsArray<Atom, MAX_ATOMS>, MAX_POSSIBLE_LINKS> atomsQueue;
+        MetaArray<MetaArray<Atom, MAX_ATOMS>, MAX_POSSIBLE_LINKS> atomsQueue;
         atomsQueue.values[atomsQueue.size++] = rootAtom;
-        AtomsArray<typename Atom::AtomsBuildFunc, MAX_POSSIBLE_LINKS> alreadyVisitedLinks;
+        MetaArray<typename Atom::MetaClassBuildFunc, MAX_POSSIBLE_LINKS> alreadyVisitedLinks;
 
         int numLinks = 1;
 
@@ -64,18 +65,18 @@ struct FlatSchemaCompiler
                 {
                     alreadyVisitedLinks.values[alreadyVisitedLinks.size++] = atom.build;
                     const auto linkAtoms                                   = atom.template getAtoms<MAX_ATOMS>();
-                    if (atom.properties.type == AtomType::TypeInvalid)
+                    if (atom.properties.type == MetaType::TypeInvalid)
                     {
-                        return -1; // Missing descriptor for type
+                        return -1; // Missing metaclass for type
                     }
                     else if (linkAtoms.size > 0)
                     {
                         numLinks++;
                         atomsQueue.values[atomsQueue.size++] = linkAtoms;
                     }
-                    else if (atom.properties.type == AtomType::TypeStruct)
+                    else if (atom.properties.type == MetaType::TypeStruct)
                     {
-                        return -2; // Somebody created a struct with empty list of atoms
+                        return -2; // Created a struct with empty list of atoms
                     }
                 }
             }
@@ -84,11 +85,11 @@ struct FlatSchemaCompiler
     }
 
     template <int UNIQUE_LINKS_NUMBER, int MAX_POSSIBLE_LINKS>
-    static constexpr auto findAllLinks(const AtomsArray<Atom, MAX_ATOMS>& inputAtoms,
-                                       typename Atom::AtomsBuildFunc      rootBuilder)
+    static constexpr auto findAllLinks(const MetaArray<Atom, MAX_ATOMS>& inputAtoms,
+                                       typename Atom::MetaClassBuildFunc rootBuilder)
     {
-        AtomsArray<FlatAtomLink, UNIQUE_LINKS_NUMBER>               links;
-        AtomsArray<AtomsArray<Atom, MAX_ATOMS>, MAX_POSSIBLE_LINKS> atomsQueue;
+        MetaArray<FlatAtomLink, UNIQUE_LINKS_NUMBER>              links;
+        MetaArray<MetaArray<Atom, MAX_ATOMS>, MAX_POSSIBLE_LINKS> atomsQueue;
         atomsQueue.values[atomsQueue.size++]     = inputAtoms;
         links.values[links.size].build           = rootBuilder;
         links.values[links.size].flatternedIndex = 0;
@@ -136,14 +137,14 @@ struct FlatSchemaCompiler
     }
 
     template <int TOTAL_ATOMS, int MAX_LINKS_NUMBER>
-    static constexpr void mergeLinksFlat(const AtomsArray<FlatAtomLink, MAX_LINKS_NUMBER>& links,
-                                         AtomsArray<AtomProperties, TOTAL_ATOMS>&          mergedAtoms,
-                                         AtomsArray<AtomString, TOTAL_ATOMS>*              mergedNames)
+    static constexpr void mergeLinksFlat(const MetaArray<FlatAtomLink, MAX_LINKS_NUMBER>& links,
+                                         MetaArray<MetaProperties, TOTAL_ATOMS>&          mergedProps,
+                                         MetaArray<MetaStringView, TOTAL_ATOMS>*          mergedNames)
     {
         for (int linkIndex = 0; linkIndex < links.size; ++linkIndex)
         {
             auto linkAtoms                         = links.values[linkIndex].template getAtoms<MAX_ATOMS>();
-            mergedAtoms.values[mergedAtoms.size++] = linkAtoms.values[0].properties;
+            mergedProps.values[mergedProps.size++] = linkAtoms.values[0].properties;
             if (mergedNames)
             {
                 mergedNames->values[mergedNames->size++] = linkAtoms.values[0].name;
@@ -151,7 +152,7 @@ struct FlatSchemaCompiler
             for (int atomIndex = 0; atomIndex < linkAtoms.values[0].properties.numSubAtoms; ++atomIndex)
             {
                 const auto& field                    = linkAtoms.values[1 + atomIndex];
-                mergedAtoms.values[mergedAtoms.size] = field.properties;
+                mergedProps.values[mergedProps.size] = field.properties;
                 if (mergedNames)
                 {
                     mergedNames->values[mergedNames->size++] = field.name;
@@ -160,31 +161,30 @@ struct FlatSchemaCompiler
                 {
                     if (links.values[findIdx].build == field.build)
                     {
-                        mergedAtoms.values[mergedAtoms.size].setLinkIndex(links.values[findIdx].flatternedIndex);
+                        mergedProps.values[mergedProps.size].setLinkIndex(links.values[findIdx].flatternedIndex);
                         break;
                     }
                 }
-                mergedAtoms.size++;
+                mergedProps.size++;
             }
         }
     }
 
-    // You can customize MAX_ATOMS to match the max number of atoms (+1) of any descriptor that will be linked
     // You can customize MAX_POSSIBLE_LINKS for the max numer of unique types in the system
     // This is just consuming compile time memory, so it doesn't matter putting any value as long as your compiler
     // is able to handle it without running out of heap space :)
     template <typename T, int MAX_POSSIBLE_LINKS = 500>
     static constexpr auto compile()
     {
-        constexpr auto linkAtoms = AtomsGet<T, MAX_ATOMS>();
-        static_assert(linkAtoms.size > 0, "Missing Descriptor for root class");
+        constexpr auto linkAtoms = MetaClassGetAtoms<T, MAX_ATOMS>();
+        static_assert(linkAtoms.size > 0, "Missing metaclass for root class");
         constexpr auto UNIQUE_LINKS_NUMBER = countUniqueLinks<MAX_POSSIBLE_LINKS>(linkAtoms);
-        static_assert(UNIQUE_LINKS_NUMBER >= 0, "Missing Descriptor for a class reachable by root class");
-        constexpr auto links = findAllLinks<UNIQUE_LINKS_NUMBER, MAX_POSSIBLE_LINKS>(linkAtoms, &AtomsFor<T>::build);
+        static_assert(UNIQUE_LINKS_NUMBER >= 0, "Missing metaclass for a class reachable by root class");
+        constexpr auto links = findAllLinks<UNIQUE_LINKS_NUMBER, MAX_POSSIBLE_LINKS>(linkAtoms, &MetaClass<T>::build);
         constexpr auto TOTAL_ATOMS =
             links.values[links.size - 1].flatternedIndex + links.values[links.size - 1].numberOfAtoms;
         FlatSchema<TOTAL_ATOMS> result;
-        mergeLinksFlat(links, result.atoms, &result.names);
+        mergeLinksFlat(links, result.properties, &result.names);
         return result;
     }
 };

@@ -5,26 +5,28 @@
 #include "Vector.h"
 
 template <typename T, SC::size_t N>
-struct SC::Reflection::AtomsFor<SC::Array<T, N>>
+struct SC::Reflection::MetaClass<SC::Array<T, N>>
 {
-    static constexpr AtomType getAtomType() { return AtomType::TypeSCArray; }
-    static constexpr void     build(AtomsBuilder& atoms)
+    static constexpr MetaType getMetaType() { return MetaType::TypeSCArray; }
+    static constexpr void     build(MetaClassBuilder& builder)
     {
         const uint16_t lowN  = N & 0xffff;
         const uint16_t highN = (N >> 16) & 0xffff;
-        atoms.push({AtomProperties(getAtomType(), lowN, highN, sizeof(SC::Array<T, N>), 0), "SC::Array", nullptr});
-        atoms.push({AtomProperties(AtomsFor<T>::getAtomType(), 0, 0, sizeof(T), -1), "T", &AtomsFor<T>::build});
+        builder.push({MetaProperties(getMetaType(), lowN, highN, sizeof(SC::Array<T, N>), 0), "SC::Array", nullptr});
+        builder.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), MetaTypeToString<T>::get(),
+                      &MetaClass<T>::build});
     }
 };
 
 template <typename T>
-struct SC::Reflection::AtomsFor<SC::Vector<T>>
+struct SC::Reflection::MetaClass<SC::Vector<T>>
 {
-    static constexpr AtomType getAtomType() { return AtomType::TypeSCVector; }
-    static constexpr void     build(AtomsBuilder& atoms)
+    static constexpr MetaType getMetaType() { return MetaType::TypeSCVector; }
+    static constexpr void     build(MetaClassBuilder& builder)
     {
-        atoms.push(Atom::create<SC::Vector<T>>("SC::Vector"));
-        atoms.push({AtomProperties(AtomsFor<T>::getAtomType(), 0, 0, sizeof(T), -1), "T", &AtomsFor<T>::build});
+        builder.push(Atom::create<SC::Vector<T>>("SC::Vector"));
+        builder.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), MetaTypeToString<T>::get(),
+                      &MetaClass<T>::build});
     }
 };
 
@@ -67,36 +69,36 @@ namespace Reflection
 {
 
 template <>
-struct AtomsFor<TestNamespace::SimpleStructure> : AtomStruct<AtomsFor<TestNamespace::SimpleStructure>>
+struct MetaClass<TestNamespace::SimpleStructure> : MetaStruct<MetaClass<TestNamespace::SimpleStructure>>
 {
-    static constexpr void members(AtomsBuilder& atoms)
+    static constexpr void members(MetaClassBuilder& builder)
     {
-        atoms.member(0, SC_ATOM_MEMBER(T, f1));
-        atoms.member(1, SC_ATOM_MEMBER(T, f2));
+        builder.member(0, SC_META_MEMBER(T, f1));
+        builder.member(1, SC_META_MEMBER(T, f2));
     }
 };
 
 template <>
-struct AtomsFor<TestNamespace::IntermediateStructure> : AtomStruct<AtomsFor<TestNamespace::IntermediateStructure>>
+struct MetaClass<TestNamespace::IntermediateStructure> : MetaStruct<MetaClass<TestNamespace::IntermediateStructure>>
 {
-    static constexpr void members(AtomsBuilder& atoms)
+    static constexpr void members(MetaClassBuilder& builder)
     {
-        atoms.member(0, SC_ATOM_MEMBER(T, simpleStructure));
-        atoms.member(1, SC_ATOM_MEMBER(T, vectorOfInt));
+        builder.member(0, SC_META_MEMBER(T, simpleStructure));
+        builder.member(1, SC_META_MEMBER(T, vectorOfInt));
     }
 };
 
 template <>
-struct AtomsFor<TestNamespace::ComplexStructure> : AtomStruct<AtomsFor<TestNamespace::ComplexStructure>>
+struct MetaClass<TestNamespace::ComplexStructure> : MetaStruct<MetaClass<TestNamespace::ComplexStructure>>
 {
-    static constexpr void members(AtomsBuilder& atoms)
+    static constexpr void members(MetaClassBuilder& builder)
     {
-        atoms.member(0, SC_ATOM_MEMBER(T, f1));
-        atoms.member(1, SC_ATOM_MEMBER(T, simpleStructure));
-        atoms.member(2, SC_ATOM_MEMBER(T, simpleStructure2));
-        atoms.member(3, SC_ATOM_MEMBER(T, f4));
-        atoms.member(4, SC_ATOM_MEMBER(T, intermediateStructure));
-        atoms.member(5, SC_ATOM_MEMBER(T, vectorOfStructs));
+        builder.member(0, SC_META_MEMBER(T, f1));
+        builder.member(1, SC_META_MEMBER(T, simpleStructure));
+        builder.member(2, SC_META_MEMBER(T, simpleStructure2));
+        builder.member(3, SC_META_MEMBER(T, f4));
+        builder.member(4, SC_META_MEMBER(T, intermediateStructure));
+        builder.member(5, SC_META_MEMBER(T, vectorOfStructs));
     }
 };
 } // namespace Reflection
@@ -124,17 +126,17 @@ struct SC::ReflectionTest : public SC::TestCase
         using namespace SC::Reflection;
         if (test_section("Print Complex structure"))
         {
-            constexpr auto       className    = GetTypeNameAsString<TestNamespace::ComplexStructure>::get();
+            constexpr auto       className    = MetaTypeToString<TestNamespace::ComplexStructure>::get();
             constexpr StringView classNameStr = "TestNamespace::ComplexStructure";
             static_assert(constexprEquals(StringView(className.data, className.length, false), classNameStr),
                           "Please update SC::ClNm for your compiler");
             // auto numlinks =
-            // countUniqueLinks<10>(AtomsFor<TestNamespace::ComplexStructure>::template
+            // countUniqueLinks<10>(MetaClass<TestNamespace::ComplexStructure>::template
             // getAtoms<10>());
             // SC_RELEASE_ASSERT(numlinks == 3);
             constexpr auto ComplexStructureFlatSchema =
                 FlatSchemaCompiler<>::compile<TestNamespace::ComplexStructure>();
-            printFlatSchema(ComplexStructureFlatSchema.atoms.values, ComplexStructureFlatSchema.names.values);
+            printFlatSchema(ComplexStructureFlatSchema.properties.values, ComplexStructureFlatSchema.names.values);
             // constexpr auto SimpleStructureFlatSchema =
             // FlatSchemaCompiler<>::compile<TestNamespace::SimpleStructure>();
             // printFlatSchema(SimpleStructureFlatSchema.atoms.values,
@@ -142,8 +144,8 @@ struct SC::ReflectionTest : public SC::TestCase
         }
     }
     template <int NUM_ATOMS>
-    void printFlatSchema(const Reflection::AtomProperties (&atom)[NUM_ATOMS],
-                         const Reflection::AtomString (&names)[NUM_ATOMS])
+    void printFlatSchema(const Reflection::MetaProperties (&atom)[NUM_ATOMS],
+                         const Reflection::MetaStringView (&names)[NUM_ATOMS])
     {
         int atomIndex = 0;
         while (atomIndex < NUM_ATOMS)
@@ -152,13 +154,13 @@ struct SC::ReflectionTest : public SC::TestCase
         }
     }
 
-    int printAtoms(int currentAtomIdx, const Reflection::AtomProperties* atom, const Reflection::AtomString* atomName,
-                   int indentation)
+    int printAtoms(int currentAtomIdx, const Reflection::MetaProperties* atom,
+                   const Reflection::MetaStringView* atomName, int indentation)
     {
         using namespace SC;
         using namespace SC::Reflection;
-        SC_RELEASE_ASSERT(atom->type == Reflection::AtomType::TypeStruct ||
-                          atom->type >= Reflection::AtomType::TypeSCVector);
+        SC_RELEASE_ASSERT(atom->type == Reflection::MetaType::TypeStruct ||
+                          atom->type >= Reflection::MetaType::TypeSCVector);
         for (int i = 0; i < indentation; ++i)
             Console::c_printf("\t");
         Console::c_printf("[LinkIndex=%d] %.*s (%d atoms)\n", currentAtomIdx, atomName->length, atomName->data,
