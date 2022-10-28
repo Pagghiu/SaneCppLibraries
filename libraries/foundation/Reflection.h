@@ -125,7 +125,7 @@ struct MetaTypeToString
 {
 #if SC_CPP_AT_LEAST_17
   private:
-    // In C++ 17 we try to trim the long string producted by ClassName<T> to reduce executable size
+    // In C++ 17 we trim the long string producted by ClassName<T> to reduce executable size
     static constexpr auto TrimClassName()
     {
         constexpr auto                    className = ClNm<T>();
@@ -205,7 +205,19 @@ struct Atom
         return create<T>(MetaStringView(name, N));
     }
 };
-
+template <typename T, SC::size_t N>
+struct SC::Reflection::MetaClass<T[N]>
+{
+    static constexpr MetaType getMetaType() { return MetaType::TypeArray; }
+    static constexpr void     build(MetaClassBuilder& builder)
+    {
+        const uint16_t lowN  = N & 0xffff;
+        const uint16_t highN = (N >> 16) & 0xffff;
+        builder.push({MetaProperties(getMetaType(), lowN, highN, sizeof(SC::Array<T, N>), 0), "Array", nullptr});
+        builder.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), MetaTypeToString<T>::get(),
+                      &MetaClass<T>::build});
+    }
+};
 template <typename Type>
 struct MetaStruct;
 
@@ -276,4 +288,4 @@ constexpr MetaArray<Atom, MAX_ATOMS> MetaClassGetAtoms()
 } // namespace Reflection
 } // namespace SC
 
-#define SC_META_MEMBER(TYPE, MEMBER) #MEMBER, &TYPE::MEMBER, SC_OFFSET_OF(TYPE, MEMBER)
+#define SC_META_MEMBER(MEMBER) #MEMBER, &T::MEMBER, SC_OFFSET_OF(T, MEMBER)

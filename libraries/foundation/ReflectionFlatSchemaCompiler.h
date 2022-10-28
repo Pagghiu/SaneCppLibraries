@@ -12,6 +12,9 @@ struct FlatSchema
 {
     MetaArray<MetaProperties, TOTAL_ATOMS> properties;
     MetaArray<MetaStringView, TOTAL_ATOMS> names;
+
+    constexpr auto propertiesAsSpan() const { return Span<const MetaProperties>(properties.values, properties.size); }
+    constexpr auto namesAsSpan() const { return Span<const MetaStringView>(names.values, names.size); }
 };
 
 struct FlatAtomLink
@@ -48,10 +51,17 @@ struct FlatSchemaCompiler
         {
             atomsQueue.size--;
             const auto atomsChildren = atomsQueue.values[atomsQueue.size]; // MUST copy as we're modifying queue
+            if (atomsChildren.values[0].properties.type == MetaType::TypeInvalid)
+            {
+                return -1;
+            }
             for (int idx = 0; idx < atomsChildren.values[0].properties.numSubAtoms; ++idx)
             {
                 const auto& atom = atomsChildren.values[idx + 1];
-
+                if (atom.properties.type == MetaType::TypeInvalid)
+                {
+                    return -1; // Missing metaclass for type
+                }
                 bool alreadyVisitedLink = false;
                 for (int searchIDX = 0; searchIDX < alreadyVisitedLinks.size; ++searchIDX)
                 {
@@ -65,11 +75,7 @@ struct FlatSchemaCompiler
                 {
                     alreadyVisitedLinks.values[alreadyVisitedLinks.size++] = atom.build;
                     const auto linkAtoms                                   = atom.template getAtoms<MAX_ATOMS>();
-                    if (atom.properties.type == MetaType::TypeInvalid)
-                    {
-                        return -1; // Missing metaclass for type
-                    }
-                    else if (linkAtoms.size > 0)
+                    if (linkAtoms.size > 0)
                     {
                         numLinks++;
                         atomsQueue.values[atomsQueue.size++] = linkAtoms;
@@ -178,8 +184,9 @@ struct FlatSchemaCompiler
     {
         constexpr auto linkAtoms = MetaClassGetAtoms<T, MAX_ATOMS>();
         static_assert(linkAtoms.size > 0, "Missing metaclass for root class");
-        constexpr auto UNIQUE_LINKS_NUMBER = countUniqueLinks<MAX_POSSIBLE_LINKS>(linkAtoms);
-        static_assert(UNIQUE_LINKS_NUMBER >= 0, "Missing metaclass for a class reachable by root class");
+        constexpr auto MISSING_METACLASS = countUniqueLinks<MAX_POSSIBLE_LINKS>(linkAtoms);
+        static_assert(MISSING_METACLASS >= 0, "Missing metaclass for a class reachable by root class");
+        constexpr auto UNIQUE_LINKS_NUMBER = MISSING_METACLASS < 0 ? 1 : MISSING_METACLASS;
         constexpr auto links = findAllLinks<UNIQUE_LINKS_NUMBER, MAX_POSSIBLE_LINKS>(linkAtoms, &MetaClass<T>::build);
         constexpr auto TOTAL_ATOMS =
             links.values[links.size - 1].flatternedIndex + links.values[links.size - 1].numberOfAtoms;

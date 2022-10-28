@@ -45,7 +45,10 @@ struct SimpleStructure
     SC::int64_t  f8  = 7;
     float        f9  = 8;
     double       f10 = 9;
+
+    int arrayOfInt[3] = {1, 2, 3};
 };
+
 struct IntermediateStructure
 {
     SC::Vector<int> vectorOfInt;
@@ -73,8 +76,9 @@ struct MetaClass<TestNamespace::SimpleStructure> : MetaStruct<MetaClass<TestName
 {
     static constexpr void members(MetaClassBuilder& builder)
     {
-        builder.member(0, SC_META_MEMBER(T, f1));
-        builder.member(1, SC_META_MEMBER(T, f2));
+        builder.member(0, SC_META_MEMBER(f1));
+        builder.member(1, SC_META_MEMBER(f2));
+        builder.member(2, SC_META_MEMBER(arrayOfInt));
     }
 };
 
@@ -83,8 +87,8 @@ struct MetaClass<TestNamespace::IntermediateStructure> : MetaStruct<MetaClass<Te
 {
     static constexpr void members(MetaClassBuilder& builder)
     {
-        builder.member(0, SC_META_MEMBER(T, simpleStructure));
-        builder.member(1, SC_META_MEMBER(T, vectorOfInt));
+        builder.member(0, SC_META_MEMBER(simpleStructure));
+        builder.member(1, SC_META_MEMBER(vectorOfInt));
     }
 };
 
@@ -93,12 +97,12 @@ struct MetaClass<TestNamespace::ComplexStructure> : MetaStruct<MetaClass<TestNam
 {
     static constexpr void members(MetaClassBuilder& builder)
     {
-        builder.member(0, SC_META_MEMBER(T, f1));
-        builder.member(1, SC_META_MEMBER(T, simpleStructure));
-        builder.member(2, SC_META_MEMBER(T, simpleStructure2));
-        builder.member(3, SC_META_MEMBER(T, f4));
-        builder.member(4, SC_META_MEMBER(T, intermediateStructure));
-        builder.member(5, SC_META_MEMBER(T, vectorOfStructs));
+        builder.member(0, SC_META_MEMBER(f1));
+        builder.member(1, SC_META_MEMBER(simpleStructure));
+        builder.member(2, SC_META_MEMBER(simpleStructure2));
+        builder.member(3, SC_META_MEMBER(f4));
+        builder.member(4, SC_META_MEMBER(intermediateStructure));
+        builder.member(5, SC_META_MEMBER(vectorOfStructs));
     }
 };
 } // namespace Reflection
@@ -160,6 +164,7 @@ struct SC::ReflectionTest : public SC::TestCase
         using namespace SC;
         using namespace SC::Reflection;
         SC_RELEASE_ASSERT(atom->type == Reflection::MetaType::TypeStruct ||
+                          atom->type == Reflection::MetaType::TypeArray ||
                           atom->type >= Reflection::MetaType::TypeSCVector);
         for (int i = 0; i < indentation; ++i)
             Console::c_printf("\t");
