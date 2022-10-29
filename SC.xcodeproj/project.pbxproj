@@ -72,6 +72,7 @@
 		7B52501428E85B9100827290 /* SCTest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SCTest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B5A353328E8640B00B2F589 /* SCXCTest.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SCXCTest.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B5A353528E8640B00B2F589 /* SCXCTest.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = SCXCTest.mm; sourceTree = "<group>"; };
+		7B711C9B290DCAF200387525 /* ReflectionSC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ReflectionSC.h; sourceTree = "<group>"; };
 		7B73EFE728F37F040081C601 /* Console.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Console.h; sourceTree = "<group>"; };
 		7B73EFE828F37F040081C601 /* Memory.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Memory.cpp; sourceTree = "<group>"; };
 		7B73EFE928F37F040081C601 /* ArrayTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ArrayTest.h; sourceTree = "<group>"; };
@@ -118,6 +119,7 @@
 		7BD08BD629071D1B00970C9A /* Reflection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Reflection.h; sourceTree = "<group>"; };
 		7BD2350428FC9DA60004C69E /* ReflectionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ReflectionTest.h; sourceTree = "<group>"; };
 		7BE4E1CB29033C3D0091CED7 /* InitializerList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InitializerList.h; sourceTree = "<group>"; };
+		7BF0D328290C44E600FC93B4 /* SerializationTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SerializationTest.h; sourceTree = "<group>"; };
 		7BF4DF6928DE7A5E008CBB53 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -183,6 +185,7 @@
 				7B73EFFB28F37F040081C601 /* OSTest.h */,
 				7B73F00728F37F040081C601 /* Platform.h */,
 				7BD08BD629071D1B00970C9A /* Reflection.h */,
+				7B711C9B290DCAF200387525 /* ReflectionSC.h */,
 				7BD08BD529071D1B00970C9A /* ReflectionFlatSchemaCompiler.h */,
 				7BD2350428FC9DA60004C69E /* ReflectionTest.h */,
 				7B73EFF828F37F040081C601 /* Result.h */,
@@ -194,6 +197,7 @@
 				7B73F00828F37F040081C601 /* StaticAsserts.cpp */,
 				7B520FDF28F4A10F002B8DB4 /* String.cpp */,
 				7B520FDE28F4A10F002B8DB4 /* String.h */,
+				7BF0D328290C44E600FC93B4 /* SerializationTest.h */,
 				7BB1D44128F5F1F000FAEA68 /* StringBuilder.cpp */,
 				7BB1D44028F5F1E300FAEA68 /* StringBuilder.h */,
 				7BB1D44428F5F38800FAEA68 /* StringBuilderTest.h */,

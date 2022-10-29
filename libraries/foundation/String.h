@@ -37,12 +37,13 @@ struct SC::String
     [[nodiscard]] bool operator!=(const StringView other) const { return not operator==(other); }
     [[nodiscard]] bool operator<(const StringView other) const { return view() < other; }
 
+    Vector<char_t> data;
+
   private:
     [[nodiscard]] bool assignStringView(StringView sv);
     // Invariants:
     //  - if string is empty        --> data.size() == 0
     //  - if string is not empty    --> data.size() > 2
-    Vector<char_t> data;
 };
 
 template <>

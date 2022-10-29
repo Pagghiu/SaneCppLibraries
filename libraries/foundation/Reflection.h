@@ -62,7 +62,6 @@ enum class MetaType : uint8_t
     // SC containers types
     TypeSCArray  = 13,
     TypeSCVector = 14,
-    TypeSCMap    = 15,
 };
 
 struct MetaProperties
@@ -98,6 +97,7 @@ struct MetaPrimitive { static constexpr void build( MetaClassBuilder& builder) {
 
 template <typename T> struct MetaClass : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeInvalid;}};
 
+template <> struct MetaClass<char_t>   : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT8;}};
 template <> struct MetaClass<uint8_t>  : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT8;}};
 template <> struct MetaClass<uint16_t> : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT16;}};
 template <> struct MetaClass<uint32_t> : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT32;}};
@@ -213,8 +213,8 @@ struct Atom
         return create<T>(MetaStringView(name, N));
     }
 };
-template <typename T, SC::size_t N>
-struct SC::Reflection::MetaClass<T[N]>
+template <typename T, size_t N>
+struct MetaClass<T[N]>
 {
     static constexpr MetaType getMetaType() { return MetaType::TypeArray; }
     static constexpr void     build(MetaClassBuilder& builder)
@@ -302,6 +302,12 @@ constexpr MetaArray<Atom, MAX_ATOMS> MetaClassGetAtoms()
     _Pragma("clang diagnostic push");                                                                                  \
     _Pragma("clang diagnostic ignored \"-Winvalid-offsetof\"");
 #define SC_ENABLE_OFFSETOF_WARNING _Pragma("clang diagnostic pop");
+
+#elif SC_GCC
+#define SC_DISABLE_OFFSETOF_WARNING                                                                                    \
+    _Pragma("GCC diagnostic push");                                                                                    \
+    _Pragma("GCC diagnostic ignored \"-Winvalid-offsetof\"");
+#define SC_ENABLE_OFFSETOF_WARNING _Pragma("GCC diagnostic pop");
 
 #else
 

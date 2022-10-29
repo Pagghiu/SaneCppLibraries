@@ -1,34 +1,9 @@
 #pragma once
 #include "Array.h"
 #include "ReflectionFlatSchemaCompiler.h"
+#include "ReflectionSC.h"
 #include "Test.h"
 #include "Vector.h"
-
-template <typename T, SC::size_t N>
-struct SC::Reflection::MetaClass<SC::Array<T, N>>
-{
-    static constexpr MetaType getMetaType() { return MetaType::TypeSCArray; }
-    static constexpr void     build(MetaClassBuilder& builder)
-    {
-        Atom arrayHeader = {MetaProperties(getMetaType(), 0, 0, sizeof(SC::Array<T, N>), 1), "Array", nullptr};
-        arrayHeader.properties.setCustomUint32(N);
-        builder.push(arrayHeader);
-        builder.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), MetaTypeToString<T>::get(),
-                      &MetaClass<T>::build});
-    }
-};
-
-template <typename T>
-struct SC::Reflection::MetaClass<SC::Vector<T>>
-{
-    static constexpr MetaType getMetaType() { return MetaType::TypeSCVector; }
-    static constexpr void     build(MetaClassBuilder& builder)
-    {
-        builder.push(Atom::create<SC::Vector<T>>("SC::Vector"));
-        builder.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), MetaTypeToString<T>::get(),
-                      &MetaClass<T>::build});
-    }
-};
 
 namespace TestNamespace
 {
@@ -126,6 +101,11 @@ struct SC::ReflectionTest : public SC::TestCase
     }
     ReflectionTest(SC::TestReport& report) : TestCase(report, "ReflectionTest")
     {
+        // clang++ -Xclang -ast-dump -Xclang -ast-dump-filter=SimpleStructure -std=c++14
+        // libraries/foundation/ReflectionTest.h clang -cc1 -xc++ -fsyntax-only -code-completion-at
+        // libraries/Foundation/ReflectionTest.h:94:12 libraries/Foundation/ReflectionTest.h -std=c++14 echo '#include
+        // "libraries/Foundation/ReflectionTest.h"\nTestNamespace::SimpleStructure\n::\n"' | clang -cc1 -xc++
+        // -fsyntax-only -code-completion-at -:3:3 - -std=c++14
         using namespace SC;
         using namespace SC::Reflection;
         if (test_section("Print Complex structure"))
