@@ -169,8 +169,8 @@ void bubbleSort(Iterator first, Iterator last, Comparison comparison)
     }
 }
 
-template <size_t N>
-constexpr size_t ConstantStringLength(const char (&text)[N])
+template <typename T, size_t N>
+constexpr size_t ConstantArraySize(const T (&text)[N])
 {
     return N;
 }

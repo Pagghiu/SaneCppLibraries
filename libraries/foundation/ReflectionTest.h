@@ -10,9 +10,9 @@ struct SC::Reflection::MetaClass<SC::Array<T, N>>
     static constexpr MetaType getMetaType() { return MetaType::TypeSCArray; }
     static constexpr void     build(MetaClassBuilder& builder)
     {
-        const uint16_t lowN  = N & 0xffff;
-        const uint16_t highN = (N >> 16) & 0xffff;
-        builder.push({MetaProperties(getMetaType(), lowN, highN, sizeof(SC::Array<T, N>), 0), "SC::Array", nullptr});
+        Atom arrayHeader = {MetaProperties(getMetaType(), 0, 0, sizeof(SC::Array<T, N>), 1), "Array", nullptr};
+        arrayHeader.properties.setCustomUint32(N);
+        builder.push(arrayHeader);
         builder.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), MetaTypeToString<T>::get(),
                       &MetaClass<T>::build});
     }
@@ -148,8 +148,8 @@ struct SC::ReflectionTest : public SC::TestCase
         }
     }
     template <int NUM_ATOMS>
-    void printFlatSchema(const Reflection::MetaProperties (&atom)[NUM_ATOMS],
-                         const Reflection::MetaStringView (&names)[NUM_ATOMS])
+    static void printFlatSchema(const Reflection::MetaProperties (&atom)[NUM_ATOMS],
+                                const Reflection::MetaStringView (&names)[NUM_ATOMS])
     {
         int atomIndex = 0;
         while (atomIndex < NUM_ATOMS)
@@ -158,8 +158,8 @@ struct SC::ReflectionTest : public SC::TestCase
         }
     }
 
-    int printAtoms(int currentAtomIdx, const Reflection::MetaProperties* atom,
-                   const Reflection::MetaStringView* atomName, int indentation)
+    static int printAtoms(int currentAtomIdx, const Reflection::MetaProperties* atom,
+                          const Reflection::MetaStringView* atomName, int indentation)
     {
         using namespace SC;
         using namespace SC::Reflection;

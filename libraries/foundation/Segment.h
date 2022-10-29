@@ -1,5 +1,6 @@
 #pragma once
 #include "Assert.h"
+#include "InitializerList.h"
 #include "Language.h"
 #include "Types.h"
 
@@ -572,6 +573,11 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
         Segment::capacityBytes = sizeof(T) * N;
     }
 
+    Segment(std::initializer_list<T> ilist)
+    {
+        Parent::copyConstruct(items, 0, ilist.size(), ilist.begin());
+        Parent::setSize(ilist.size());
+    }
     ~Segment() { operations::destroy(this); }
 
     Segment(const Segment& other)

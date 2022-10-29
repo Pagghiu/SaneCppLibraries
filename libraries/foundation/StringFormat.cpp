@@ -34,14 +34,14 @@ bool StringFormatterFor<SC::size_t>::format(Vector<char_t>& data, const StringIt
                                             const SC::size_t value)
 {
     char_t formatSpecifier[SPECIFIER_SIZE] = "%zu";
-    return formatSprintf<ConstantStringLength("zu") - 1>(data, formatSpecifier, specifier, value);
+    return formatSprintf<ConstantArraySize("zu") - 1>(data, formatSpecifier, specifier, value);
 }
 
 bool StringFormatterFor<SC::ssize_t>::format(Vector<char_t>& data, const StringIteratorASCII specifier,
                                              const SC::ssize_t value)
 {
     char_t formatSpecifier[SPECIFIER_SIZE] = "%zd";
-    return formatSprintf<ConstantStringLength("zd") - 1>(data, formatSpecifier, specifier, value);
+    return formatSprintf<ConstantArraySize("zd") - 1>(data, formatSpecifier, specifier, value);
 }
 #endif
 
@@ -49,14 +49,14 @@ bool StringFormatterFor<SC::int64_t>::format(Vector<char_t>& data, const StringI
                                              const SC::int64_t value)
 {
     char_t formatSpecifier[SPECIFIER_SIZE] = "%" PRIi64;
-    return formatSprintf<ConstantStringLength(PRIi64) - 1>(data, formatSpecifier, specifier, value);
+    return formatSprintf<ConstantArraySize(PRIi64) - 1>(data, formatSpecifier, specifier, value);
 }
 
 bool StringFormatterFor<SC::uint64_t>::format(Vector<char_t>& data, const StringIteratorASCII specifier,
                                               const SC::uint64_t value)
 {
     char_t formatSpecifier[SPECIFIER_SIZE] = "%" PRIu64;
-    return formatSprintf<ConstantStringLength(PRIu64) - 1>(data, formatSpecifier, specifier, value);
+    return formatSprintf<ConstantArraySize(PRIu64) - 1>(data, formatSpecifier, specifier, value);
 }
 
 bool StringFormatterFor<SC::int32_t>::format(Vector<char_t>& data, const StringIteratorASCII specifier,

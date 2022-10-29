@@ -34,6 +34,11 @@ class _LIBCPP_TEMPLATE_VIS initializer_list
     _LIBCPP_INLINE_VISIBILITY
     _LIBCPP_CONSTEXPR_AFTER_CXX11
     initializer_list() _NOEXCEPT : __begin_(nullptr), __size_(0) {}
+    _LIBCPP_INLINE_VISIBILITY
+    _LIBCPP_CONSTEXPR_AFTER_CXX11
+    initializer_list(const _Ep* _First_arg, const _Ep* _Last_arg) _NOEXCEPT : __begin_(_First_arg),
+                                                                              __size_(_Last_arg - _First_arg)
+    {}
 
     _LIBCPP_INLINE_VISIBILITY
     _LIBCPP_CONSTEXPR_AFTER_CXX11
