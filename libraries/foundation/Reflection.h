@@ -64,6 +64,8 @@ enum class MetaType : uint8_t
     TypeSCVector = 14,
 };
 
+constexpr bool IsPrimitiveType(MetaType type) { return type >= MetaType::TypeUINT8 && type <= MetaType::TypeDOUBLE64; }
+
 struct MetaProperties
 {
     MetaType type;        // 1

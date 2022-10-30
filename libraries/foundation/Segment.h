@@ -575,8 +575,9 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
 
     Segment(std::initializer_list<T> ilist)
     {
-        Parent::copyConstruct(items, 0, ilist.size(), ilist.begin());
-        Parent::setSize(ilist.size());
+        const auto sz = min(static_cast<int>(ilist.size()), N);
+        Parent::copyConstruct(items, 0, sz, ilist.begin());
+        Parent::setSize(sz);
     }
     ~Segment() { operations::destroy(this); }
 

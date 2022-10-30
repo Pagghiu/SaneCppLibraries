@@ -1,8 +1,8 @@
 #pragma once
 #include "Array.h"
+#include "Reflection.h"
 #include "String.h"
 #include "Vector.h"
-#include "Reflection.h"
 
 template <typename T, SC::size_t N>
 struct SC::Reflection::MetaClass<SC::Array<T, N>>
