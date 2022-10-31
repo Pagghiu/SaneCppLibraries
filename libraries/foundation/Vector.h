@@ -92,6 +92,7 @@ struct SC::Vector
     T* items;
 
     Vector() : items(nullptr) {}
+    Vector(std::initializer_list<T> ilist) : items(nullptr) { (void)appendCopy(ilist.begin(), ilist.size()); }
     Vector(const Vector& other) : items(nullptr)
     {
         const size_t otherSize = other.size();

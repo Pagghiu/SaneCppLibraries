@@ -7,7 +7,7 @@
 #include "StringBuilder.h"
 #include "Test.h"
 
-// TODO: Support reordering
+// TODO: Optional flags to allow dropping array elements (with testing of edge cases)
 // TODO: Optimize for memcpy-able types (example: Vector<Point3> should be memcopyed)
 // TODO: Support SmallVector
 // TODO: Streaming
@@ -80,9 +80,9 @@ struct CArrayAccess
     {
         return object;
     }
-    static bool resize(uint8_t* object, Reflection::MetaProperties property, uint64_t size)
+    static bool resize(uint8_t* object, Reflection::MetaProperties property, uint64_t sizeInBytes)
     {
-        return size <= property.getCustomUint32();
+        return sizeInBytes == property.size;
     }
 };
 
@@ -91,7 +91,7 @@ struct SCArrayAccess
     static constexpr Reflection::MetaType getType() { return Reflection::MetaType::TypeSCArray; }
     static constexpr bool getSizeInBytes(Reflection::MetaProperties property, const uint8_t* object, uint64_t& outSize)
     {
-        outSize = BinaryReader(object).readAt<uint32_t>(0);
+        outSize = BinaryReader(object).readAt<uint32_t>(SC_OFFSET_OF(SegmentHeader, sizeBytes));
         return true;
     }
     template <typename T>
@@ -99,9 +99,11 @@ struct SCArrayAccess
     {
         return object + sizeof(SegmentHeader);
     }
-    static bool resize(uint8_t* object, Reflection::MetaProperties property, uint64_t size)
+    static bool resize(uint8_t* object, Reflection::MetaProperties property, uint64_t sizeInBytes)
     {
-        return size <= property.getCustomUint32();
+        *reinterpret_cast<uint32_t*>(object + SC_OFFSET_OF(SegmentHeader, sizeBytes)) =
+            SC::min(static_cast<uint32_t>(sizeInBytes), static_cast<uint32_t>(property.size - sizeof(SegmentHeader)));
+        return true;
     }
 };
 
@@ -121,16 +123,16 @@ struct SCVectorAccess
     {
         return reinterpret_cast<const SC::Vector<const uint8_t>*>(object)->data();
     }
-    static bool resize(uint8_t* object, Reflection::MetaProperties property, uint64_t size, bool initialize)
+    static bool resize(uint8_t* object, Reflection::MetaProperties property, uint64_t sizeInBytes, bool initialize)
     {
         SC::Vector<uint8_t>& vector = *reinterpret_cast<SC::Vector<uint8_t>*>(object);
         if (initialize)
         {
-            return vector.resize(size);
+            return vector.resize(sizeInBytes);
         }
         else
         {
-            return vector.resizeWithoutInitializing(size);
+            return vector.resizeWithoutInitializing(sizeInBytes);
         }
     }
 };
@@ -158,15 +160,15 @@ struct ArrayAccess
             return SCVectorAccess::getItemBegin(object);
         return nullptr;
     }
-    [[nodiscard]] static bool resize(uint8_t* object, Reflection::MetaProperties property, uint64_t size,
+    [[nodiscard]] static bool resize(uint8_t* object, Reflection::MetaProperties property, uint64_t sizeInBytes,
                                      bool initialize)
     {
         if (property.type == CArrayAccess::getType())
-            return CArrayAccess::resize(object, property, size);
+            return CArrayAccess::resize(object, property, sizeInBytes);
         else if (property.type == SCArrayAccess::getType())
-            return SCArrayAccess::resize(object, property, size);
+            return SCArrayAccess::resize(object, property, sizeInBytes);
         else if (property.type == SCVectorAccess::getType())
-            return SCVectorAccess::resize(object, property, size, initialize);
+            return SCVectorAccess::resize(object, property, sizeInBytes, initialize);
         return false;
     }
 
@@ -345,13 +347,13 @@ struct SimpleBinaryReader
 
     [[nodiscard]] bool readStruct()
     {
-        const auto structProperty  = sinkProperty;
-        const auto structTypeIndex = sinkTypeIndex;
-        uint8_t*   structRoot      = static_cast<uint8_t*>(sinkObject);
-        for (int16_t idx = 0; idx < structProperty.numSubAtoms; ++idx)
+        const auto structSinkProperty  = sinkProperty;
+        const auto structSinkTypeIndex = sinkTypeIndex;
+        uint8_t*   structSinkObject    = static_cast<uint8_t*>(sinkObject);
+        for (int16_t idx = 0; idx < structSinkProperty.numSubAtoms; ++idx)
         {
-            sinkTypeIndex = structTypeIndex + idx + 1;
-            sinkObject    = structRoot + sinkProperties.data[sinkTypeIndex].offset;
+            sinkTypeIndex = structSinkTypeIndex + idx + 1;
+            sinkObject    = structSinkObject + sinkProperties.data[sinkTypeIndex].offset;
             if (sinkProperties.data[sinkTypeIndex].getLinkIndex() >= 0)
                 sinkTypeIndex = sinkProperties.data[sinkTypeIndex].getLinkIndex();
             SC_TRY_IF(read());
@@ -361,37 +363,265 @@ struct SimpleBinaryReader
 
     [[nodiscard]] bool readArray()
     {
-        const auto arrayProperty  = sinkProperty;
-        const auto arrayTypeIndex = sinkTypeIndex;
-        sinkTypeIndex             = arrayTypeIndex + 1;
-        uint64_t   numBytes       = 0;
-        uint8_t*   arrayRoot      = static_cast<uint8_t*>(sinkObject);
-        const bool isPrimitive    = Reflection::IsPrimitiveType(sinkProperties.data[sinkTypeIndex].type);
-        if (ArrayAccess::hasVariableSize(arrayProperty.type))
+        const auto arraySinkProperty  = sinkProperty;
+        const auto arraySinkTypeIndex = sinkTypeIndex;
+        sinkTypeIndex                 = arraySinkTypeIndex + 1;
+        uint64_t   sinkNumBytes       = 0;
+        uint8_t*   arraySinkObject    = static_cast<uint8_t*>(sinkObject);
+        const bool isSinkPrimitive    = Reflection::IsPrimitiveType(sinkProperties.data[sinkTypeIndex].type);
+        if (ArrayAccess::hasVariableSize(arraySinkProperty.type))
         {
-            SC_TRY_IF(source.read(&numBytes, sizeof(numBytes)));
-            SC_TRY_IF(ArrayAccess::resize(arrayRoot, arrayProperty, numBytes, not isPrimitive));
+            SC_TRY_IF(source.read(&sinkNumBytes, sizeof(sinkNumBytes)));
+            SC_TRY_IF(ArrayAccess::resize(arraySinkObject, arraySinkProperty, sinkNumBytes, not isSinkPrimitive));
         }
         else
         {
-            SC_TRY_IF(ArrayAccess::getSizeInBytes(arrayProperty, arrayRoot, numBytes));
+            SC_TRY_IF(ArrayAccess::getSizeInBytes(arraySinkProperty, arraySinkObject, sinkNumBytes));
         }
-        uint8_t* arrayStart = ArrayAccess::getItemBegin(arrayProperty, arrayRoot);
-        if (isPrimitive)
+        uint8_t* arraySinkStart = ArrayAccess::getItemBegin(arraySinkProperty, arraySinkObject);
+        if (isSinkPrimitive)
         {
-            SC_TRY_IF(source.read(arrayStart, numBytes));
+            SC_TRY_IF(source.read(arraySinkStart, sinkNumBytes));
         }
         else
         {
-            const auto itemSize = sinkProperties.data[sinkTypeIndex].size;
+            const auto sinkItemSize = sinkProperties.data[sinkTypeIndex].size;
             if (sinkProperties.data[sinkTypeIndex].getLinkIndex() >= 0)
                 sinkTypeIndex = sinkProperties.data[sinkTypeIndex].getLinkIndex();
-            const auto numElements   = numBytes / itemSize;
-            const auto itemTypeIndex = sinkTypeIndex;
-            for (uint64_t idx = 0; idx < numElements; ++idx)
+            const auto sinkNumElements   = sinkNumBytes / sinkItemSize;
+            const auto itemSinkTypeIndex = sinkTypeIndex;
+            for (uint64_t idx = 0; idx < sinkNumElements; ++idx)
             {
-                sinkTypeIndex = itemTypeIndex;
-                sinkObject    = arrayStart + idx * itemSize;
+                sinkTypeIndex = itemSinkTypeIndex;
+                sinkObject    = arraySinkStart + idx * sinkItemSize;
+                SC_TRY_IF(read());
+            }
+        }
+        return true;
+    }
+};
+
+struct SimpleBinaryReaderVersioned
+{
+    Span<const Reflection::MetaStringView> sinkNames;
+
+    Span<const Reflection::MetaProperties> sinkProperties;
+    void*                                  sinkObject = nullptr;
+    Reflection::MetaProperties             sinkProperty;
+    int                                    sinkTypeIndex = 0;
+
+    Span<const Reflection::MetaProperties> sourceProperties;
+    const void*                            sourceObject = nullptr;
+    Reflection::MetaProperties             sourceProperty;
+    int                                    sourceTypeIndex = 0;
+
+    template <typename T>
+    [[nodiscard]] bool read(T& object, const void* source, Span<const Reflection::MetaProperties> properties)
+    {
+        auto flatSchema = Reflection::FlatSchemaCompiler<>::compile<T>();
+        // ReflectionTest::printFlatSchema(flatSchema.properties.values, flatSchema.names.values);
+        sourceProperties = properties;
+        sinkProperties   = flatSchema.propertiesAsSpan();
+        sinkNames        = flatSchema.namesAsSpan();
+        sinkObject       = &object;
+        sourceObject     = source;
+        sinkTypeIndex    = 0;
+        sourceTypeIndex  = 0;
+
+        if (sourceProperties.size == 0 || sourceProperties.data[0].type != Reflection::MetaType::TypeStruct ||
+            sinkProperties.size == 0 || sinkProperties.data[0].type != Reflection::MetaType::TypeStruct)
+        {
+            return false;
+        }
+        return read();
+    }
+
+    [[nodiscard]] bool read()
+    {
+        sinkProperty   = sinkProperties.data[sinkTypeIndex];
+        sourceProperty = sourceProperties.data[sourceTypeIndex];
+        switch (sourceProperty.type)
+        {
+        // clang-format off
+        case Reflection::MetaType::TypeInvalid:
+            return false;
+        case Reflection::MetaType::TypeUINT8:
+        case Reflection::MetaType::TypeUINT16:
+        case Reflection::MetaType::TypeUINT32:
+        case Reflection::MetaType::TypeUINT64:
+        case Reflection::MetaType::TypeINT8:
+        case Reflection::MetaType::TypeINT16:
+        case Reflection::MetaType::TypeINT32:
+        case Reflection::MetaType::TypeINT64:
+        case Reflection::MetaType::TypeFLOAT32:
+        case Reflection::MetaType::TypeDOUBLE64:
+        {
+            if(sinkObject == nullptr)
+            {
+                sourceObject = static_cast<const uint8_t*>(sourceObject) + sourceProperty.size;
+            }
+            else if(sinkProperty.type == sourceProperty.type)
+            {
+                memcpy(sinkObject, sourceObject, sourceProperty.size);
+                sourceObject = static_cast<const uint8_t*>(sourceObject) + sourceProperty.size;
+            }
+            else
+            {
+                // Incompatible types
+                return false;
+            }
+            break;
+        }
+        case Reflection::MetaType::TypeStruct:
+            return readStruct();
+        case Reflection::MetaType::TypeArray:
+        case Reflection::MetaType::TypeSCArray:
+        case Reflection::MetaType::TypeSCVector:
+            return readArray();
+            // clang-format on
+        }
+        return true;
+    }
+
+    [[nodiscard]] bool readStruct()
+    {
+        if (sinkObject != nullptr && sourceProperty.type != sinkProperty.type)
+        {
+            // sinkProperty is not struct
+            return false;
+        }
+        const auto structSourceProperty  = sourceProperty;
+        const auto structSourceTypeIndex = sourceTypeIndex;
+        const auto structSinkProperty    = sinkProperty;
+        const auto structSinkTypeIndex   = sinkTypeIndex;
+        auto       structSinkObject      = static_cast<uint8_t*>(sinkObject);
+        for (int16_t idx = 0; idx < structSourceProperty.numSubAtoms; ++idx)
+        {
+            sourceTypeIndex        = structSourceTypeIndex + idx + 1;
+            const auto sourceOrder = sourceProperties.data[sourceTypeIndex].order;
+            int16_t    findIdx;
+            for (findIdx = 0; findIdx < structSinkProperty.numSubAtoms; ++findIdx)
+            {
+                const auto typeIndex = structSinkTypeIndex + findIdx + 1;
+                if (sinkProperties.data[typeIndex].order == sourceOrder)
+                {
+                    break;
+                }
+            }
+            if (findIdx != structSinkProperty.numSubAtoms && structSinkObject != nullptr)
+            {
+                // Found corresponding member
+                sinkTypeIndex = structSinkTypeIndex + findIdx + 1;
+                sinkObject    = structSinkObject + sinkProperties.data[sinkTypeIndex].offset;
+                if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
+                    sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
+                if (sinkProperties.data[sinkTypeIndex].getLinkIndex() >= 0)
+                    sinkTypeIndex = sinkProperties.data[sinkTypeIndex].getLinkIndex();
+                SC_TRY_IF(read());
+            }
+            else
+            {
+                sinkObject = nullptr;
+                if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
+                    sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
+                SC_TRY_IF(read());
+            }
+        }
+        return true;
+    }
+    static bool IsArrayType(Reflection::MetaType type)
+    {
+        switch (type)
+        {
+        case Reflection::MetaType::TypeArray:
+        case Reflection::MetaType::TypeSCArray:
+        case Reflection::MetaType::TypeSCVector: return true;
+        default: return false;
+        }
+    }
+    [[nodiscard]] bool readArray()
+    {
+        if ((sinkObject != nullptr) and (not IsArrayType(sinkProperty.type)))
+        {
+            // sinkProperty is not array
+            return false;
+        }
+        const auto arraySourceProperty  = sourceProperty;
+        const auto arraySourceTypeIndex = sourceTypeIndex;
+        const auto arraySinkTypeIndex   = sinkTypeIndex;
+        auto       arraySinkObject      = static_cast<uint8_t*>(sinkObject);
+        const auto arraySinkProperty    = sinkProperty;
+
+        sinkTypeIndex           = arraySinkTypeIndex + 1;
+        sourceTypeIndex         = arraySourceTypeIndex + 1;
+        uint64_t sinkNumBytes   = 0;
+        uint64_t sourceNumBytes = 0;
+        if (ArrayAccess::hasVariableSize(arraySourceProperty.type))
+        {
+            memcpy(&sourceNumBytes, sourceObject, sizeof(sourceNumBytes));
+            sourceObject = static_cast<const uint8_t*>(sourceObject) + sizeof(sourceNumBytes);
+        }
+        else
+        {
+            SC_TRY_IF(ArrayAccess::getSizeInBytes(arraySourceProperty, static_cast<const uint8_t*>(sourceObject),
+                                                  sourceNumBytes));
+        }
+        const bool isPrimitive = Reflection::IsPrimitiveType(sourceProperties.data[sourceTypeIndex].type);
+
+        if (sinkObject == nullptr)
+        {
+            if (isPrimitive)
+            {
+                sourceObject = static_cast<const uint8_t*>(sourceObject) + sourceNumBytes;
+            }
+            else
+            {
+                const auto sourceItemSize      = sourceProperties.data[sourceTypeIndex].size;
+                const auto sourceNumElements   = sourceNumBytes / sourceItemSize;
+                const auto itemSourceTypeIndex = sourceTypeIndex;
+                for (uint64_t idx = 0; idx < sourceNumElements; ++idx)
+                {
+                    sourceTypeIndex = itemSourceTypeIndex;
+                    if (sinkProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
+                        sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
+                    SC_TRY_IF(read());
+                }
+            }
+            return true;
+        }
+        const bool isSameType = sinkProperties.data[sinkTypeIndex].type == sourceProperties.data[sourceTypeIndex].type;
+        const bool isMemcpyable   = isPrimitive && isSameType;
+        const auto sourceItemSize = sourceProperties.data[sourceTypeIndex].size;
+        const auto sinkItemSize   = sinkProperties.data[sinkTypeIndex].size;
+        if (ArrayAccess::hasVariableSize(arraySinkProperty.type))
+        {
+            SC_TRY_IF(ArrayAccess::resize(arraySinkObject, arraySinkProperty,
+                                          sourceNumBytes / sourceItemSize * sinkItemSize, not isMemcpyable));
+        }
+        SC_TRY_IF(ArrayAccess::getSizeInBytes(arraySinkProperty, arraySinkObject, sinkNumBytes));
+        uint8_t* arraySinkStart = ArrayAccess::getItemBegin(arraySinkProperty, arraySinkObject);
+        if (isMemcpyable)
+        {
+            const auto minBytes = min(sinkNumBytes, sourceNumBytes);
+            memcpy(arraySinkStart, static_cast<const uint8_t*>(sourceObject), minBytes);
+            sourceObject = static_cast<const uint8_t*>(sourceObject) + sizeof(sourceNumBytes);
+        }
+        else
+        {
+            if (sinkProperties.data[sinkTypeIndex].getLinkIndex() >= 0)
+                sinkTypeIndex = sinkProperties.data[sinkTypeIndex].getLinkIndex();
+            if (sinkProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
+                sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
+            const auto sinkNumElements     = sinkNumBytes / sinkItemSize;
+            const auto sourceNumElements   = sourceNumBytes / sourceItemSize;
+            const auto itemSinkTypeIndex   = sinkTypeIndex;
+            const auto itemSourceTypeIndex = sourceTypeIndex;
+            const auto minElements         = min(sinkNumElements, sourceNumElements);
+            for (uint64_t idx = 0; idx < minElements; ++idx)
+            {
+                sinkTypeIndex   = itemSinkTypeIndex;
+                sourceTypeIndex = itemSourceTypeIndex;
+                sinkObject      = arraySinkStart + idx * sinkItemSize;
                 SC_TRY_IF(read());
             }
         }
@@ -410,6 +640,8 @@ struct NestedStruct;
 struct TopLevelStruct;
 struct VectorStructSimple;
 struct VectorStructComplex;
+struct VersionedStruct1;
+struct VersionedStruct2;
 } // namespace SC
 
 struct SC::PrimitiveStruct
@@ -488,6 +720,98 @@ struct SC::VectorStructComplex
 
 SC_META_STRUCT_BEGIN(SC::VectorStructComplex)
 SC_META_STRUCT_MEMBER(0, vectorOfStrings)
+SC_META_STRUCT_END()
+
+struct SC::VersionedStruct1
+{
+    float          floatValue     = 1.5f;
+    int64_t        fieldToRemove  = 12;
+    Vector<String> field2ToRemove = {"ASD1"_sv, "ASD2"_sv, "ASD3"_sv};
+    int64_t        int64Value     = -13;
+};
+
+SC_META_STRUCT_BEGIN(SC::VersionedStruct1)
+SC_META_STRUCT_MEMBER(0, floatValue)
+SC_META_STRUCT_MEMBER(1, fieldToRemove)
+SC_META_STRUCT_MEMBER(2, field2ToRemove)
+SC_META_STRUCT_MEMBER(3, int64Value)
+SC_META_STRUCT_END()
+
+struct SC::VersionedStruct2
+{
+    int64_t int64Value = 55;
+    float   floatValue = -2.9f;
+
+    bool operator!=(const VersionedStruct1& other) const
+    {
+        if (floatValue != other.floatValue)
+            return true;
+        if (int64Value != other.int64Value)
+            return true;
+        return false;
+    }
+};
+SC_META_STRUCT_BEGIN(SC::VersionedStruct2)
+SC_META_STRUCT_MEMBER(3, int64Value)
+SC_META_STRUCT_MEMBER(0, floatValue)
+SC_META_STRUCT_END()
+
+namespace SC
+{
+struct VersionedPoint3D;
+struct VersionedPoint2D;
+struct VersionedArray1;
+struct VersionedArray2;
+} // namespace SC
+struct SC::VersionedPoint3D
+{
+    float x;
+    float y;
+    float z;
+};
+SC_META_STRUCT_BEGIN(SC::VersionedPoint3D)
+SC_META_STRUCT_MEMBER(0, x)
+SC_META_STRUCT_MEMBER(1, y)
+SC_META_STRUCT_MEMBER(2, z)
+SC_META_STRUCT_END()
+struct SC::VersionedPoint2D
+{
+    float x;
+    float y;
+};
+SC_META_STRUCT_BEGIN(SC::VersionedPoint2D)
+SC_META_STRUCT_MEMBER(0, x)
+SC_META_STRUCT_MEMBER(1, y)
+SC_META_STRUCT_END()
+
+struct SC::VersionedArray1
+{
+    Vector<VersionedPoint2D> points;
+};
+SC_META_STRUCT_BEGIN(SC::VersionedArray1)
+SC_META_STRUCT_MEMBER(0, points)
+SC_META_STRUCT_END()
+
+struct SC::VersionedArray2
+{
+    Array<VersionedPoint3D, 5> points;
+
+    bool operator!=(const VersionedArray1& other) const
+    {
+        if (other.points.size() < points.size())
+            return true;
+        for (size_t i = 0; i < points.size(); ++i)
+        {
+            if (points[i].x != other.points[i].x)
+                return true;
+            if (points[i].y != other.points[i].y)
+                return true;
+        }
+        return false;
+    }
+};
+SC_META_STRUCT_BEGIN(SC::VersionedArray2)
+SC_META_STRUCT_MEMBER(0, points)
 SC_META_STRUCT_END()
 
 struct SC::SerializationTest : public SC::TestCase
@@ -572,11 +896,37 @@ struct SC::SerializationTest : public SC::TestCase
             reader.source.buffer = writer.destination.buffer;
             VectorStructComplex topLevelRead;
             SC_TEST_EXPECT(reader.read(topLevelRead));
-            SC_TEST_EXPECT(topLevelRead.vectorOfStrings.size() == 3);
             SC_TEST_EXPECT(reader.source.numReads == 7);
+            SC_TEST_EXPECT(topLevelRead.vectorOfStrings.size() == 3);
             SC_TEST_EXPECT(topLevelRead.vectorOfStrings[0] == "asdasdasd1"_sv);
             SC_TEST_EXPECT(topLevelRead.vectorOfStrings[1] == "asdasdasd2"_sv);
             SC_TEST_EXPECT(topLevelRead.vectorOfStrings[2] == "asdasdasd3"_sv);
+        }
+        if (test_section("VersionedStruct1/2"))
+        {
+            VersionedStruct1                  struct1;
+            Serialization::SimpleBinaryWriter writer;
+            SC_TEST_EXPECT(writer.write(struct1));
+            Serialization::SimpleBinaryReaderVersioned reader;
+            VersionedStruct2                           struct2;
+            auto flatSchema = Reflection::FlatSchemaCompiler<>::compile<VersionedStruct1>();
+            SC_TEST_EXPECT(reader.read(struct2, writer.destination.buffer.data(), flatSchema.propertiesAsSpan()));
+            SC_TEST_EXPECT(not(struct2 != struct1));
+        }
+        if (test_section("VersionedArray1/2"))
+        {
+            VersionedArray1 array1;
+            (void)array1.points.push_back({1.0f, 2.0f});
+            (void)array1.points.push_back({3.0f, 4.0f});
+            Serialization::SimpleBinaryWriter writer;
+            SC_TEST_EXPECT(writer.write(array1));
+            SC_TEST_EXPECT(writer.destination.numWrites == 5);
+            Serialization::SimpleBinaryReaderVersioned reader;
+            VersionedArray2                            array2;
+            auto flatSchema = Reflection::FlatSchemaCompiler<>::compile<VersionedArray1>();
+            SC_TEST_EXPECT(reader.read(array2, writer.destination.buffer.data(), flatSchema.propertiesAsSpan()));
+            SC_TEST_EXPECT(array2.points.size() == 2);
+            SC_TEST_EXPECT(not(array2 != array1));
         }
     }
 };

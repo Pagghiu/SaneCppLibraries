@@ -97,7 +97,7 @@ struct MetaClassBuilder;
 // clang-format off
 struct MetaPrimitive { static constexpr void build( MetaClassBuilder& builder) { } };
 
-template <typename T> struct MetaClass : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeInvalid;}};
+template <typename T> struct MetaClass;
 
 template <> struct MetaClass<char_t>   : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT8;}};
 template <> struct MetaClass<uint8_t>  : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT8;}};

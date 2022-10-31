@@ -143,9 +143,6 @@ struct SC::ReflectionTest : public SC::TestCase
     {
         using namespace SC;
         using namespace SC::Reflection;
-        SC_RELEASE_ASSERT(atom->type == Reflection::MetaType::TypeStruct ||
-                          atom->type == Reflection::MetaType::TypeArray ||
-                          atom->type >= Reflection::MetaType::TypeSCVector);
         for (int i = 0; i < indentation; ++i)
             Console::c_printf("\t");
         Console::c_printf("[LinkIndex=%d] %.*s (%d atoms)\n", currentAtomIdx, atomName->length, atomName->data,

@@ -56,7 +56,7 @@
             "problemMatcher": []
         },
         {
-            "label": "GCC Compile",
+            "label": "Build SCTest GCC Debug",
             "type": "shell",
             "command": "${workspaceFolder}/gcc_compile.sh",
             "problemMatcher": [
