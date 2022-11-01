@@ -10,7 +10,7 @@
 // TODO: Optimize for memcpy-able types (example: Vector<Point3> should be memcopyed)
 // TODO: Primitive conversions
 // TODO: Support SmallVector
-// TODO: Streaming
+// TODO: Streaming interface
 
 namespace SC
 {
@@ -87,6 +87,7 @@ struct SCArrayAccess
     [[nodiscard]] static constexpr bool resize(Span<void> object, Reflection::MetaProperties property,
                                                uint64_t sizeInBytes)
     {
+        // TODO: This "dropping values" must be at caller site (under an option). Here we should validate only capacity
         const SizeType minValue =
             SC::min(static_cast<SizeType>(sizeInBytes), static_cast<SizeType>(property.size - sizeof(SegmentHeader)));
         Span<void> sizeSpan;
@@ -107,7 +108,7 @@ struct SCVectorAccess
         if (object.size >= sizeof(void*))
         {
             typedef typename SameConstnessAs<T, SC::Vector<uint8_t>>::type VectorType;
-            auto& vectorByte = *reinterpret_cast<VectorType*>(object.data);
+            auto& vectorByte = *static_cast<VectorType*>(object.data);
             itemBegin        = Span<T>(vectorByte.data(), vectorByte.size());
             return true;
         }
@@ -122,7 +123,7 @@ struct SCVectorAccess
     {
         if (object.size >= sizeof(void*))
         {
-            auto& vectorByte = *reinterpret_cast<SC::Vector<uint8_t>*>(object.data);
+            auto& vectorByte = *static_cast<SC::Vector<uint8_t>*>(object.data);
             if (initialize)
             {
                 return vectorByte.resize(sizeInBytes);
@@ -138,6 +139,7 @@ struct SCVectorAccess
         }
     }
 };
+
 struct ArrayAccess
 {
     template <typename T>
@@ -152,6 +154,7 @@ struct ArrayAccess
             return SCVectorAccess::getSegmentSpan(property, object, itemBegin);
         return false;
     }
+
     [[nodiscard]] static bool resize(Span<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
                                      bool initialize)
     {
@@ -178,11 +181,10 @@ struct SimpleBinaryWriter
     [[nodiscard]] bool write(const T& object)
     {
         auto flatSchema = Reflection::FlatSchemaCompiler<>::compile<T>();
-        // ReflectionTest::printFlatSchema(flatSchema.properties.values, flatSchema.names.values);
-        properties = flatSchema.propertiesAsSpan();
-        names      = flatSchema.namesAsSpan();
-        sinkObject = Span<const void>(&object, sizeof(T));
-        typeIndex  = 0;
+        properties      = flatSchema.propertiesAsSpan();
+        names           = flatSchema.namesAsSpan();
+        sinkObject      = Span<const void>(&object, sizeof(T));
+        typeIndex       = 0;
         if (properties.size == 0 || properties.data[0].type != Reflection::MetaType::TypeStruct)
         {
             return false;
@@ -195,9 +197,7 @@ struct SimpleBinaryWriter
         property = properties.data[typeIndex];
         switch (property.type)
         {
-        // clang-format off
-        case Reflection::MetaType::TypeInvalid:
-            return false;
+        case Reflection::MetaType::TypeInvalid: return false;
         case Reflection::MetaType::TypeUINT8:
         case Reflection::MetaType::TypeUINT16:
         case Reflection::MetaType::TypeUINT32:
@@ -207,20 +207,23 @@ struct SimpleBinaryWriter
         case Reflection::MetaType::TypeINT32:
         case Reflection::MetaType::TypeINT64:
         case Reflection::MetaType::TypeFLOAT32:
-        case Reflection::MetaType::TypeDOUBLE64:
-            {
-                Span<const void> primitiveSpan;
-                SC_TRY_IF(sinkObject.viewAt(0, property.size, primitiveSpan));
-                SC_TRY_IF(destination.write(primitiveSpan));
-                return true;
-            }
-        case Reflection::MetaType::TypeStruct:
+        case Reflection::MetaType::TypeDOUBLE64: //
+        {
+            Span<const void> primitiveSpan;
+            SC_TRY_IF(sinkObject.viewAt(0, property.size, primitiveSpan));
+            SC_TRY_IF(destination.write(primitiveSpan));
+            return true;
+        }
+        case Reflection::MetaType::TypeStruct: //
+        {
             return writeStruct();
+        }
         case Reflection::MetaType::TypeArray:
         case Reflection::MetaType::TypeSCArray:
-        case Reflection::MetaType::TypeSCVector:
+        case Reflection::MetaType::TypeSCVector: //
+        {
             return writeArray();
-            // clang-format on
+        }
         }
         return true;
     }
@@ -291,11 +294,10 @@ struct SimpleBinaryReader
     [[nodiscard]] bool read(T& object)
     {
         auto flatSchema = Reflection::FlatSchemaCompiler<>::compile<T>();
-        // ReflectionTest::printFlatSchema(flatSchema.properties.values, flatSchema.names.values);
-        sinkProperties = flatSchema.propertiesAsSpan();
-        sinkNames      = flatSchema.namesAsSpan();
-        sinkObject     = Span<void>(&object, sizeof(T));
-        sinkTypeIndex  = 0;
+        sinkProperties  = flatSchema.propertiesAsSpan();
+        sinkNames       = flatSchema.namesAsSpan();
+        sinkObject      = Span<void>(&object, sizeof(T));
+        sinkTypeIndex   = 0;
         if (sinkProperties.size == 0 || sinkProperties.data[0].type != Reflection::MetaType::TypeStruct)
         {
             return false;
@@ -308,9 +310,10 @@ struct SimpleBinaryReader
         sinkProperty = sinkProperties.data[sinkTypeIndex];
         switch (sinkProperty.type)
         {
-        // clang-format off
-        case Reflection::MetaType::TypeInvalid:
+        case Reflection::MetaType::TypeInvalid: //
+        {
             return false;
+        }
         case Reflection::MetaType::TypeUINT8:
         case Reflection::MetaType::TypeUINT16:
         case Reflection::MetaType::TypeUINT32:
@@ -320,20 +323,23 @@ struct SimpleBinaryReader
         case Reflection::MetaType::TypeINT32:
         case Reflection::MetaType::TypeINT64:
         case Reflection::MetaType::TypeFLOAT32:
-        case Reflection::MetaType::TypeDOUBLE64:
-            {
-                Span<void> primitiveSpan;
-                SC_TRY_IF(sinkObject.viewAt(0, sinkProperty.size, primitiveSpan));
-                SC_TRY_IF(source.read(primitiveSpan));
-                return true;
-            }
-        case Reflection::MetaType::TypeStruct:
+        case Reflection::MetaType::TypeDOUBLE64: //
+        {
+            Span<void> primitiveSpan;
+            SC_TRY_IF(sinkObject.viewAt(0, sinkProperty.size, primitiveSpan));
+            SC_TRY_IF(source.read(primitiveSpan));
+            return true;
+        }
+        case Reflection::MetaType::TypeStruct: //
+        {
             return readStruct();
+        }
         case Reflection::MetaType::TypeArray:
         case Reflection::MetaType::TypeSCArray:
-        case Reflection::MetaType::TypeSCVector:
+        case Reflection::MetaType::TypeSCVector: //
+        {
             return readArray();
-            // clang-format on
+        }
         }
         return true;
     }
@@ -411,8 +417,7 @@ struct SimpleBinaryReaderVersioned
     [[nodiscard]] bool read(T& object, Span<const void> source, Span<const Reflection::MetaProperties> properties,
                             Span<const Reflection::MetaStringView> names)
     {
-        auto flatSchema = Reflection::FlatSchemaCompiler<>::compile<T>();
-        // ReflectionTest::printFlatSchema(flatSchema.properties.values, flatSchema.names.values);
+        auto flatSchema  = Reflection::FlatSchemaCompiler<>::compile<T>();
         sourceProperties = properties;
         sinkProperties   = flatSchema.propertiesAsSpan();
         sinkNames        = flatSchema.namesAsSpan();
@@ -536,9 +541,13 @@ struct SimpleBinaryReaderVersioned
         {
         case Reflection::MetaType::TypeArray:
         case Reflection::MetaType::TypeSCArray:
-        case Reflection::MetaType::TypeSCVector: return true;
-        default: return false;
+        case Reflection::MetaType::TypeSCVector: //
+        {
+            return true;
         }
+        default: break;
+        }
+        return false;
     }
 
     [[nodiscard]] bool readArray()
@@ -915,7 +924,7 @@ struct SC::SerializationTest : public SC::TestCase
             Serialization::SimpleBinaryReaderVersioned reader;
             VersionedStruct2                           struct2;
             auto flatSchema = Reflection::FlatSchemaCompiler<>::compile<VersionedStruct1>();
-            // ReflectionTest::printFlatSchema(flatSchema.properties.values, flatSchema.names.values);
+
             Span<const void> readSpan(writer.destination.buffer.data(), writer.destination.buffer.size());
             SC_TEST_EXPECT(reader.read(struct2, readSpan, flatSchema.propertiesAsSpan(), flatSchema.namesAsSpan()));
             SC_TEST_EXPECT(not(struct2 != struct1));
