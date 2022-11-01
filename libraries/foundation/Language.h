@@ -43,6 +43,17 @@ struct RemoveReference<T&&>
     typedef T type;
 };
 
+template <class T>
+struct RemoveConst
+{
+    typedef T type;
+};
+template <class T>
+struct RemoveConst<const T>
+{
+    typedef T type;
+};
+
 template <class T, T v>
 struct IntegralConstant
 {
@@ -56,6 +67,17 @@ struct IntegralConstant
 };
 using true_type  = IntegralConstant<bool, true>;
 using false_type = IntegralConstant<bool, false>;
+
+template <typename T>
+struct IsConst : public false_type
+{
+    typedef T type;
+};
+template <typename T>
+struct IsConst<const T> : public true_type
+{
+};
+
 template <typename _Tp>
 struct IsTriviallyCopyable : public IntegralConstant<bool, __is_trivially_copyable(_Tp)>
 {
@@ -91,6 +113,12 @@ template <class T, class F>
 struct Conditional<false, T, F>
 {
     using type = F;
+};
+
+template <typename SourceType, typename T>
+struct SameConstnessAs
+{
+    using type = typename Conditional<IsConst<SourceType>::value, const T, T>::type;
 };
 
 template <typename T>
