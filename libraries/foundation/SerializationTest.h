@@ -6,9 +6,7 @@
 #include "StringBuilder.h"
 #include "Test.h"
 
-// TODO: Optional flags to allow dropping array elements (with testing of edge cases)
 // TODO: Optimize for memcpy-able types (example: Vector<Point3> should be memcopyed)
-// TODO: Primitive conversions
 // TODO: Support SmallVector
 // TODO: Streaming interface
 
@@ -85,15 +83,22 @@ struct SCArrayAccess
     }
 
     [[nodiscard]] static constexpr bool resize(Span<void> object, Reflection::MetaProperties property,
-                                               uint64_t sizeInBytes)
+                                               uint64_t sizeInBytes, bool dropEccessItems)
     {
-        // TODO: This "dropping values" must be at caller site (under an option). Here we should validate only capacity
-        const SizeType minValue =
-            SC::min(static_cast<SizeType>(sizeInBytes), static_cast<SizeType>(property.size - sizeof(SegmentHeader)));
-        Span<void> sizeSpan;
-        SC_TRY_IF(object.viewAt(SC_OFFSET_OF(SegmentHeader, sizeBytes), sizeof(SizeType), sizeSpan));
-        SC_TRY_IF(Span<const void>(&minValue, sizeof(SizeType)).copyTo(sizeSpan));
-        return true;
+        const SizeType availableSpace = static_cast<SizeType>(property.size - sizeof(SegmentHeader));
+        const SizeType convertedSize  = dropEccessItems ? min(static_cast<SizeType>(sizeInBytes), availableSpace)
+                                                        : static_cast<SizeType>(sizeInBytes);
+        if (availableSpace >= convertedSize)
+        {
+            Span<void> sizeSpan;
+            SC_TRY_IF(object.viewAt(SC_OFFSET_OF(SegmentHeader, sizeBytes), sizeof(SizeType), sizeSpan));
+            SC_TRY_IF(Span<const void>(&convertedSize, sizeof(SizeType)).copyTo(sizeSpan));
+            return true;
+        }
+        else
+        {
+            return false;
+        }
     }
 };
 
@@ -155,15 +160,27 @@ struct ArrayAccess
         return false;
     }
 
+    enum class Initialize
+    {
+        No,
+        Yes
+    };
+    enum class DropEccessItems
+    {
+        No,
+        Yes
+    };
     [[nodiscard]] static bool resize(Span<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
-                                     bool initialize)
+                                     Initialize initialize, DropEccessItems dropEccessItems)
     {
         if (property.type == CArrayAccess::getType())
             return CArrayAccess::resize(object, property, sizeInBytes);
         else if (property.type == SCArrayAccess::getType())
-            return SCArrayAccess::resize(object, property, sizeInBytes);
+            return SCArrayAccess::resize(object, property, sizeInBytes, dropEccessItems == DropEccessItems::Yes);
         else if (property.type == SCVectorAccess::getType())
-            return SCVectorAccess::resize(object, property, sizeInBytes, initialize);
+        {
+            return SCVectorAccess::resize(object, property, sizeInBytes, initialize == Initialize::Yes);
+        }
         return false;
     }
 };
@@ -372,7 +389,9 @@ struct SimpleBinaryReader
         {
             uint64_t sinkNumBytes = 0;
             SC_TRY_IF(source.read(Span<void>(&sinkNumBytes, sizeof(sinkNumBytes))));
-            SC_TRY_IF(ArrayAccess::resize(arraySinkObject, arraySinkProperty, sinkNumBytes, not isSinkPrimitive));
+            SC_TRY_IF(ArrayAccess::resize(arraySinkObject, arraySinkProperty, sinkNumBytes,
+                                          isSinkPrimitive ? ArrayAccess::Initialize::No : ArrayAccess::Initialize::Yes,
+                                          ArrayAccess::DropEccessItems::No));
         }
         Span<void> arraySinkStart;
         SC_TRY_IF(ArrayAccess::getSegmentSpan(arraySinkProperty, arraySinkObject, arraySinkStart));
@@ -400,6 +419,14 @@ struct SimpleBinaryReader
 
 struct SimpleBinaryReaderVersioned
 {
+    struct Options
+    {
+        bool allowFloatToIntTruncation    = true;
+        bool allowDropEccessArrayItems    = true;
+        bool allowDropEccessStructMembers = true;
+    };
+    Options options;
+
     Span<const Reflection::MetaStringView> sinkNames;
     Span<const Reflection::MetaStringView> sourceNames;
 
@@ -434,6 +461,76 @@ struct SimpleBinaryReaderVersioned
         return read();
     }
 
+    template <typename SourceValue, typename SinkValue>
+    [[nodiscard]] bool tryWritingPrimitiveValueToSink(SourceValue sourceValue)
+    {
+        SinkValue sinkValue = static_cast<SinkValue>(sourceValue);
+        SC_TRY_IF(Span<const void>(&sinkValue, sizeof(sinkValue)).copyTo(sinkObject));
+        return true;
+    }
+
+    template <typename T>
+    [[nodiscard]] bool tryWritingPrimitiveValue(T sourceValue)
+    {
+        Span<const void> span(&sourceValue, sizeof(T));
+        switch (sinkProperty.type)
+        {
+        case Reflection::MetaType::TypeUINT8: return tryWritingPrimitiveValueToSink<T, uint8_t>(sourceValue);
+        case Reflection::MetaType::TypeUINT16: return tryWritingPrimitiveValueToSink<T, uint16_t>(sourceValue);
+        case Reflection::MetaType::TypeUINT32: return tryWritingPrimitiveValueToSink<T, uint32_t>(sourceValue);
+        case Reflection::MetaType::TypeUINT64: return tryWritingPrimitiveValueToSink<T, uint64_t>(sourceValue);
+        case Reflection::MetaType::TypeINT8: return tryWritingPrimitiveValueToSink<T, int8_t>(sourceValue);
+        case Reflection::MetaType::TypeINT16: return tryWritingPrimitiveValueToSink<T, int16_t>(sourceValue);
+        case Reflection::MetaType::TypeINT32: return tryWritingPrimitiveValueToSink<T, int32_t>(sourceValue);
+        case Reflection::MetaType::TypeINT64: return tryWritingPrimitiveValueToSink<T, int64_t>(sourceValue);
+        case Reflection::MetaType::TypeFLOAT32: return tryWritingPrimitiveValueToSink<T, float>(sourceValue);
+        case Reflection::MetaType::TypeDOUBLE64: return tryWritingPrimitiveValueToSink<T, double>(sourceValue);
+        default: break;
+        }
+        return false;
+    }
+
+    template <typename T>
+    [[nodiscard]] bool tryReadPrimitiveValue()
+    {
+        T value;
+        SC_TRY_IF(sourceObject.readAndAdvance(value));
+        return tryWritingPrimitiveValue(value);
+    }
+
+    [[nodiscard]] bool tryPrimitiveConversion()
+    {
+        switch (sourceProperty.type)
+        {
+        case Reflection::MetaType::TypeUINT8: return tryReadPrimitiveValue<uint8_t>();
+        case Reflection::MetaType::TypeUINT16: return tryReadPrimitiveValue<uint16_t>();
+        case Reflection::MetaType::TypeUINT32: return tryReadPrimitiveValue<uint32_t>();
+        case Reflection::MetaType::TypeUINT64: return tryReadPrimitiveValue<uint64_t>();
+        case Reflection::MetaType::TypeINT8: return tryReadPrimitiveValue<int8_t>();
+        case Reflection::MetaType::TypeINT16: return tryReadPrimitiveValue<int16_t>();
+        case Reflection::MetaType::TypeINT32: return tryReadPrimitiveValue<int32_t>();
+        case Reflection::MetaType::TypeINT64: return tryReadPrimitiveValue<int64_t>();
+        case Reflection::MetaType::TypeFLOAT32: //
+        {
+            if (sinkProperty.type == Reflection::MetaType::TypeDOUBLE64 or options.allowFloatToIntTruncation)
+            {
+                return tryReadPrimitiveValue<float>();
+            }
+            break;
+        }
+        case Reflection::MetaType::TypeDOUBLE64: //
+        {
+            if (sinkProperty.type == Reflection::MetaType::TypeFLOAT32 or options.allowFloatToIntTruncation)
+            {
+                return tryReadPrimitiveValue<double>();
+            }
+            break;
+        }
+        default: break;
+        }
+        return false;
+    }
+
     [[nodiscard]] bool read()
     {
         sinkProperty   = sinkProperties.data[sinkTypeIndex];
@@ -465,7 +562,7 @@ struct SimpleBinaryReaderVersioned
             }
             else
             {
-                return false; // Incompatible types, we could do some conversions
+                return tryPrimitiveConversion();
             }
             break;
         }
@@ -524,12 +621,16 @@ struct SimpleBinaryReaderVersioned
                     sinkTypeIndex = sinkProperties.data[sinkTypeIndex].getLinkIndex();
                 SC_TRY_IF(read());
             }
-            else
+            else if (options.allowDropEccessStructMembers)
             {
                 sinkObject = Span<void>();
                 if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
                     sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
                 SC_TRY_IF(read());
+            }
+            else
+            {
+                return false;
             }
         }
         return true;
@@ -600,8 +701,11 @@ struct SimpleBinaryReaderVersioned
         const auto sinkItemSize   = sinkProperties.data[sinkTypeIndex].size;
         if (arraySinkProperty.type != Reflection::MetaType::TypeArray)
         {
-            SC_TRY_IF(ArrayAccess::resize(arraySinkObject, arraySinkProperty,
-                                          sourceNumBytes / sourceItemSize * sinkItemSize, not isMemcpyable));
+            const auto numWantedBytes = sourceNumBytes / sourceItemSize * sinkItemSize;
+            SC_TRY_IF(ArrayAccess::resize(arraySinkObject, arraySinkProperty, numWantedBytes,
+                                          isMemcpyable ? ArrayAccess::Initialize::No : ArrayAccess::Initialize::Yes,
+                                          options.allowDropEccessArrayItems ? ArrayAccess::DropEccessItems::Yes
+                                                                            : ArrayAccess::DropEccessItems::No));
         }
         Span<void> arraySinkStart;
         SC_TRY_IF(ArrayAccess::getSegmentSpan(arraySinkProperty, arraySinkObject, arraySinkStart));
@@ -828,6 +932,40 @@ SC_META_STRUCT_MEMBER(0, points)
 SC_META_STRUCT_MEMBER(1, simpleInts)
 SC_META_STRUCT_END()
 
+namespace SC
+{
+struct ConversionStruct1;
+struct ConversionStruct2;
+} // namespace SC
+
+struct SC::ConversionStruct1
+{
+    uint32_t intToFloat         = 1;
+    float    floatToInt         = 1;
+    uint16_t uint16To32         = 1;
+    int16_t  signed16ToUnsigned = 1;
+};
+SC_META_STRUCT_BEGIN(SC::ConversionStruct1)
+SC_META_STRUCT_MEMBER(0, intToFloat)
+SC_META_STRUCT_MEMBER(1, floatToInt)
+SC_META_STRUCT_MEMBER(2, uint16To32)
+SC_META_STRUCT_MEMBER(3, signed16ToUnsigned)
+SC_META_STRUCT_END()
+
+struct SC::ConversionStruct2
+{
+    float    intToFloat         = 0;
+    uint32_t floatToInt         = 0;
+    uint32_t uint16To32         = 0;
+    uint16_t signed16ToUnsigned = 0;
+};
+SC_META_STRUCT_BEGIN(SC::ConversionStruct2)
+SC_META_STRUCT_MEMBER(0, intToFloat)
+SC_META_STRUCT_MEMBER(1, floatToInt)
+SC_META_STRUCT_MEMBER(2, uint16To32)
+SC_META_STRUCT_MEMBER(3, signed16ToUnsigned)
+SC_META_STRUCT_END()
+
 struct SC::SerializationTest : public SC::TestCase
 {
     SerializationTest(SC::TestReport& report) : TestCase(report, "SerializationTest")
@@ -946,6 +1084,21 @@ struct SC::SerializationTest : public SC::TestCase
             SC_TEST_EXPECT(array1.simpleInts.size() == 3); // It's dopping one element
             SC_TEST_EXPECT(array2.simpleInts.size() == 2); // It's dopping one element
             SC_TEST_EXPECT(not(array2 != array1));
+        }
+        if (test_section("ConversionStruct1/2"))
+        {
+            ConversionStruct1                 struct1;
+            ConversionStruct2                 struct2;
+            Serialization::SimpleBinaryWriter writer;
+            SC_TEST_EXPECT(writer.write(struct1));
+            Serialization::SimpleBinaryReaderVersioned reader;
+            auto             flatSchema = Reflection::FlatSchemaCompiler<>::compile<ConversionStruct1>();
+            Span<const void> readSpan(writer.destination.buffer.data(), writer.destination.buffer.size());
+            SC_TEST_EXPECT(reader.read(struct2, readSpan, flatSchema.propertiesAsSpan(), flatSchema.namesAsSpan()));
+            SC_TEST_EXPECT(struct2.intToFloat == struct1.intToFloat);
+            SC_TEST_EXPECT(struct2.floatToInt == struct1.floatToInt);
+            SC_TEST_EXPECT(struct2.uint16To32 == struct1.uint16To32);
+            SC_TEST_EXPECT(struct2.signed16ToUnsigned == struct1.signed16ToUnsigned);
         }
     }
 };
