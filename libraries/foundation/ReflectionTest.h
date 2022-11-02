@@ -88,8 +88,86 @@ namespace SC
 struct ReflectionTest;
 }
 
+namespace TestNamespace
+{
+struct PackedStructWithArray;
+struct PackedStruct;
+struct UnpackedStruct;
+struct NestedUnpackedStruct;
+struct StructWithArrayPacked;
+struct StructWithArrayUnpacked;
+} // namespace TestNamespace
+
+struct TestNamespace::PackedStructWithArray
+{
+    SC::uint8_t arrayValue[4] = {0, 1, 2, 3};
+    float       floatValue    = 1.5f;
+    SC::int64_t int64Value    = -13;
+};
+SC_META_STRUCT_BEGIN(TestNamespace::PackedStructWithArray)
+SC_META_STRUCT_MEMBER(0, arrayValue)
+SC_META_STRUCT_MEMBER(1, floatValue)
+SC_META_STRUCT_MEMBER(2, int64Value)
+SC_META_STRUCT_END()
+
+struct TestNamespace::PackedStruct
+{
+    float x, y, z;
+    PackedStruct() : x(0), y(0), z(0) {}
+};
+
+SC_META_STRUCT_BEGIN(TestNamespace::PackedStruct)
+SC_META_STRUCT_MEMBER(0, x);
+SC_META_STRUCT_MEMBER(1, y);
+SC_META_STRUCT_MEMBER(2, z);
+SC_META_STRUCT_END()
+
+struct TestNamespace::UnpackedStruct
+{
+    SC::int16_t x;
+    float       y, z;
+
+    UnpackedStruct()
+    {
+        x = 10;
+        y = 2;
+        z = 3;
+    }
+};
+
+SC_META_STRUCT_BEGIN(TestNamespace::UnpackedStruct)
+SC_META_STRUCT_MEMBER(0, x);
+SC_META_STRUCT_MEMBER(1, y);
+SC_META_STRUCT_MEMBER(2, z);
+SC_META_STRUCT_END()
+
+struct TestNamespace::NestedUnpackedStruct
+{
+    UnpackedStruct unpackedMember;
+};
+SC_META_STRUCT_BEGIN(TestNamespace::NestedUnpackedStruct)
+SC_META_STRUCT_MEMBER(0, unpackedMember);
+SC_META_STRUCT_END()
+
+struct TestNamespace::StructWithArrayPacked
+{
+    PackedStruct packedMember[3];
+};
+SC_META_STRUCT_BEGIN(TestNamespace::StructWithArrayPacked)
+SC_META_STRUCT_MEMBER(0, packedMember);
+SC_META_STRUCT_END()
+
+struct TestNamespace::StructWithArrayUnpacked
+{
+    NestedUnpackedStruct unpackedMember[3];
+};
+SC_META_STRUCT_BEGIN(TestNamespace::StructWithArrayUnpacked)
+SC_META_STRUCT_MEMBER(0, unpackedMember);
+SC_META_STRUCT_END()
+
 struct SC::ReflectionTest : public SC::TestCase
 {
+
     [[nodiscard]] static constexpr bool constexprEquals(const StringView str1, const StringView other)
     {
         if (str1.sizeInBytesWithoutTerminator() != other.sizeInBytesWithoutTerminator())
@@ -108,6 +186,74 @@ struct SC::ReflectionTest : public SC::TestCase
         // -fsyntax-only -code-completion-at -:3:3 - -std=c++14
         using namespace SC;
         using namespace SC::Reflection;
+        if (test_section("Packing"))
+        {
+
+            constexpr auto packedStructWithArray =
+                FlatSchemaCompiler<>::compile<TestNamespace::PackedStructWithArray>();
+            constexpr auto packedStructWithArrayFlags = packedStructWithArray.properties.values[0].getCustomUint32();
+            static_assert(packedStructWithArrayFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked),
+                          "Packed struct should be packed");
+            //            auto packedStructWithArrayRuntime = packedStructWithArray;
+            //            FlatSchemaCompiler<>::markRecursiveProperties(packedStructWithArrayRuntime, 0);
+            //            auto packedStructWithArrayRuntimeFlags =
+            //            packedStructWithArrayRuntime.properties.values[0].getCustomUint32();
+            //            SC_TEST_EXPECT(packedStructWithArrayRuntimeFlags &
+            //            static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked));
+            static_assert(packedStructWithArrayFlags & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked),
+                          "nestedPacked struct should be recursively packed");
+            static_assert(packedStructWithArrayFlags & static_cast<uint32_t>(MetaStructFlags::IsTriviallyCopyable),
+                          "Packed struct should be trivially copyable");
+
+            constexpr auto packedStruct      = FlatSchemaCompiler<>::compile<TestNamespace::PackedStruct>();
+            constexpr auto packedStructFlags = packedStruct.properties.values[0].getCustomUint32();
+            static_assert(packedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked),
+                          "Packed struct should be packed");
+            static_assert(packedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked),
+                          "nestedPacked struct should be recursively packed");
+            static_assert(packedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsTriviallyCopyable),
+                          "Packed struct should be trivially copyable");
+
+            constexpr auto unpackedStruct      = FlatSchemaCompiler<>::compile<TestNamespace::UnpackedStruct>();
+            constexpr auto unpackedStructFlags = unpackedStruct.properties.values[0].getCustomUint32();
+            static_assert(not(unpackedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked)),
+                          "Unpacked struct should not be packed");
+            static_assert(not(unpackedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked)),
+                          "Unpacked struct should be recursively packed");
+            static_assert(unpackedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsTriviallyCopyable),
+                          "Unpacked struct should be trivially copyable");
+
+            constexpr auto nestedUnpackedStruct = FlatSchemaCompiler<>::compile<TestNamespace::NestedUnpackedStruct>();
+            constexpr auto nestedUnpackedStructFlags = nestedUnpackedStruct.properties.values[0].getCustomUint32();
+            static_assert((nestedUnpackedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked)),
+                          "nestedPacked struct should be packed");
+            static_assert(not(nestedUnpackedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked)),
+                          "nestedPacked struct should not be recursiely packed");
+            static_assert(nestedUnpackedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsTriviallyCopyable),
+                          "nestedPacked struct should be trivially copyable");
+
+            constexpr auto structWithArrayPacked =
+                FlatSchemaCompiler<>::compile<TestNamespace::StructWithArrayPacked>();
+            constexpr auto structWithArrayPackedFlags = structWithArrayPacked.properties.values[0].getCustomUint32();
+            static_assert((structWithArrayPackedFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked)),
+                          "structWithArrayPacked struct should be packed");
+            static_assert(structWithArrayPackedFlags & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked),
+                          "structWithArrayPacked struct should not be recursiely packed");
+            static_assert(structWithArrayPackedFlags & static_cast<uint32_t>(MetaStructFlags::IsTriviallyCopyable),
+                          "structWithArrayPacked struct should be trivially copyable");
+
+            constexpr auto structWithArrayUnpacked =
+                FlatSchemaCompiler<>::compile<TestNamespace::StructWithArrayUnpacked>();
+            constexpr auto structWithArrayUnpackedFlags =
+                structWithArrayUnpacked.properties.values[0].getCustomUint32();
+            static_assert((structWithArrayUnpackedFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked)),
+                          "structWithArrayUnpacked struct should be packed");
+            static_assert(
+                not(structWithArrayUnpackedFlags & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked)),
+                "structWithArrayUnpacked struct should not be recursiely packed");
+            static_assert(structWithArrayUnpackedFlags & static_cast<uint32_t>(MetaStructFlags::IsTriviallyCopyable),
+                          "structWithArrayUnpacked struct should be trivially copyable");
+        }
         if (test_section("Print Complex structure"))
         {
             constexpr auto       className    = MetaTypeToString<TestNamespace::ComplexStructure>::get();

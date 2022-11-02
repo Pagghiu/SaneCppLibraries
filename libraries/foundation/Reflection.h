@@ -231,15 +231,58 @@ struct MetaClass<T[N]>
 template <typename Type>
 struct MetaStruct;
 
+enum class MetaStructFlags : uint32_t
+{
+    IsTriviallyCopyable = 1 << 0, // Type can be memcpy-ied
+    IsPacked            = 1 << 1, // There is no spacing between fields of a type
+    IsRecursivelyPacked = 1 << 2, // There is no spacing even between sub-types of all members
+};
+
+constexpr bool IsPrimitiveOrRecursivelyPacked(MetaProperties properties)
+{
+    if (IsPrimitiveType(properties.type))
+        return true;
+    if (properties.type == MetaType::TypeStruct)
+    {
+        if (properties.getCustomUint32() & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+constexpr bool AreAllMembersPacked(const Atom* structAtom, int numAtoms)
+{
+    uint32_t nextOffset = 0;
+    for (int idx = 0; idx < numAtoms; ++idx)
+    {
+        const Atom* member = structAtom + idx + 1;
+        if (member->properties.offset != nextOffset)
+        {
+            return false;
+        }
+        nextOffset += member->properties.size;
+    }
+    return nextOffset == structAtom->properties.size;
+}
+
 template <typename Type>
 struct MetaStruct<MetaClass<Type>>
 {
     typedef Type              T;
     static constexpr MetaType getMetaType() { return MetaType::TypeStruct; }
-    static constexpr void     build(MetaClassBuilder& builder)
+
+    static constexpr void build(MetaClassBuilder& builder)
     {
         builder.Struct<T>();
         MetaClass<Type>::members(builder);
+        uint32_t flags = 0;
+        if (IsTriviallyCopyable<T>::value)
+            flags |= static_cast<uint32_t>(MetaStructFlags::IsTriviallyCopyable);
+        if (AreAllMembersPacked(builder.output, builder.size - 1))
+            flags |= static_cast<uint32_t>(MetaStructFlags::IsPacked);
+        builder.output[0].properties.setCustomUint32(flags);
     }
 };
 

@@ -176,6 +176,56 @@ struct FlatSchemaCompiler
         }
     }
 
+    template <int TOTAL_ATOMS>
+    static constexpr bool markPackedStructs(FlatSchema<TOTAL_ATOMS>& result, int startIdx)
+    {
+        MetaProperties& atom = result.properties.values[startIdx];
+        if (IsPrimitiveType(atom.type))
+        {
+            return true; // packed by definition
+        }
+        else if (atom.type == MetaType::TypeStruct)
+        {
+            // packed if is itself packed and all of its non primitive members are packed
+            const auto structFlags         = atom.getCustomUint32();
+            bool       isRecursivelyPacked = true;
+            if (not(structFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked)))
+            {
+                isRecursivelyPacked = false;
+            }
+            for (int idx = 0; idx < atom.numSubAtoms; ++idx)
+            {
+                const MetaProperties& member = result.properties.values[startIdx + 1 + idx];
+                if (not IsPrimitiveType(member.type))
+                {
+                    if (not markPackedStructs(result, member.getLinkIndex()))
+                    {
+                        isRecursivelyPacked = false;
+                    }
+                }
+            }
+            if (isRecursivelyPacked)
+            {
+                atom.setCustomUint32(structFlags | static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked));
+            }
+            return isRecursivelyPacked;
+        }
+        int             newIndex = startIdx + 1;
+        MetaProperties& itemAtom = result.properties.values[startIdx + 1];
+        if (itemAtom.getLinkIndex() > 0)
+            newIndex = itemAtom.getLinkIndex();
+        // We want to visit the inner type anyway
+        const bool innerResult = markPackedStructs(result, newIndex);
+        if (atom.type == MetaType::TypeArray)
+        {
+            return innerResult; // C-arrays are packed if their inner type is packed
+        }
+        else
+        {
+            return false; // Vector & co will break packed state
+        }
+    }
+
     // You can customize MAX_POSSIBLE_LINKS for the max numer of unique types in the system
     // This is just consuming compile time memory, so it doesn't matter putting any value as long as your compiler
     // is able to handle it without running out of heap space :)
@@ -192,6 +242,7 @@ struct FlatSchemaCompiler
             links.values[links.size - 1].flatternedIndex + links.values[links.size - 1].numberOfAtoms;
         FlatSchema<TOTAL_ATOMS> result;
         mergeLinksFlat(links, result.properties, &result.names);
+        markPackedStructs(result, 0);
         return result;
     }
 };
