@@ -50,16 +50,24 @@ struct SCArrayAccess
     }
 
     [[nodiscard]] static constexpr bool resize(Span<void> object, Reflection::MetaProperties property,
-                                               uint64_t sizeInBytes, bool dropEccessItems)
+                                               uint64_t sizeInBytes, bool initialize, bool dropEccessItems)
     {
         const SizeType availableSpace = static_cast<SizeType>(property.size - sizeof(SegmentHeader));
-        const SizeType convertedSize  = dropEccessItems ? min(static_cast<SizeType>(sizeInBytes), availableSpace)
+        const SizeType wantedSize     = dropEccessItems ? min(static_cast<SizeType>(sizeInBytes), availableSpace)
                                                         : static_cast<SizeType>(sizeInBytes);
-        if (availableSpace >= convertedSize)
+        if ((object.size >= availableSpace) and (availableSpace >= wantedSize))
         {
-            Span<void> sizeSpan;
-            SC_TRY_IF(object.viewAt(SC_OFFSET_OF(SegmentHeader, sizeBytes), sizeof(SizeType), sizeSpan));
-            SC_TRY_IF(Span<const void>(&convertedSize, sizeof(SizeType)).copyTo(sizeSpan));
+            if (initialize)
+            {
+                auto& arrayByte = *static_cast<SC::Array<uint8_t, 1>*>(object.data);
+                SC_TRY_IF(arrayByte.resize(wantedSize));
+            }
+            else
+            {
+                Span<void> sizeSpan;
+                SC_TRY_IF(object.viewAt(SC_OFFSET_OF(SegmentHeader, sizeBytes), sizeof(SizeType), sizeSpan));
+                SC_TRY_IF(Span<const void>(&wantedSize, sizeof(SizeType)).copyTo(sizeSpan));
+            }
             return true;
         }
         else
@@ -139,7 +147,8 @@ struct ArrayAccess
                                      Initialize initialize, DropEccessItems dropEccessItems)
     {
         if (property.type == SCArrayAccess::getType())
-            return SCArrayAccess::resize(object, property, sizeInBytes, dropEccessItems == DropEccessItems::Yes);
+            return SCArrayAccess::resize(object, property, sizeInBytes, initialize == Initialize::Yes,
+                                         dropEccessItems == DropEccessItems::Yes);
         else if (property.type == SCVectorAccess::getType())
         {
             return SCVectorAccess::resize(object, property, sizeInBytes, initialize == Initialize::Yes);
