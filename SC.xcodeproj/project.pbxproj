@@ -119,7 +119,7 @@
 		7BD08BD629071D1B00970C9A /* Reflection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Reflection.h; sourceTree = "<group>"; };
 		7BD2350428FC9DA60004C69E /* ReflectionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ReflectionTest.h; sourceTree = "<group>"; };
 		7BE4E1CB29033C3D0091CED7 /* InitializerList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InitializerList.h; sourceTree = "<group>"; };
-		7BF0D328290C44E600FC93B4 /* SerializationTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SerializationTest.h; sourceTree = "<group>"; };
+		7BF0D328290C44E600FC93B4 /* Serialization.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Serialization.h; sourceTree = "<group>"; };
 		7BF4DF6928DE7A5E008CBB53 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -197,7 +197,7 @@
 				7B73F00828F37F040081C601 /* StaticAsserts.cpp */,
 				7B520FDF28F4A10F002B8DB4 /* String.cpp */,
 				7B520FDE28F4A10F002B8DB4 /* String.h */,
-				7BF0D328290C44E600FC93B4 /* SerializationTest.h */,
+				7BF0D328290C44E600FC93B4 /* Serialization.h */,
 				7BB1D44128F5F1F000FAEA68 /* StringBuilder.cpp */,
 				7BB1D44028F5F1E300FAEA68 /* StringBuilder.h */,
 				7BB1D44428F5F38800FAEA68 /* StringBuilderTest.h */,
