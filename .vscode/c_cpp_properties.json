@@ -11,7 +11,7 @@
             "cStandard": "gnu11",
             "cppStandard": "gnu++11",
             "intelliSenseMode": "macos-clang-arm64",
-            "compileCommands": "${workspaceFolder}/_build/macOS-Universal/Debug/compile_commands_arm64.json"
+            "compileCommands": "${workspaceFolder}/_intermediate/macOS-Universal/Debug/compile_commands_arm64.json"
         },       
          {
             "name": "macOS arm64 Release",
@@ -24,7 +24,7 @@
             "cStandard": "gnu11",
             "cppStandard": "gnu++11",
             "intelliSenseMode": "macos-clang-arm64",
-            "compileCommands": "${workspaceFolder}/_build/macOS-Universal/Release/compile_commands_arm64.json"
+            "compileCommands": "${workspaceFolder}/_intermediate/macOS-Universal/Release/compile_commands_arm64.json"
         }
     ],
     "version": 4

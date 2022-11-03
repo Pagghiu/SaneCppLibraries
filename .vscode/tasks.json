@@ -8,7 +8,7 @@
             "type": "shell",
             // Building scheme for DEBUG (will use settings set in the scheme, ASAN for example)
             // Building only a single arch because, USE_ACTIVE_ARCS is ignored when invoked from xcodebuild
-            "command": "xcodebuild -scheme SCTest -configuration Debug -project ${workspaceFolder}/SC.xcodeproj",
+            "command": "xcodebuild -scheme SCTest -configuration Debug -project \"${workspaceFolder}/SC.xcodeproj\"",
             "problemMatcher": [
                 "$gcc"
             ],
@@ -30,7 +30,7 @@
             "type": "shell",
             // We cannot use "archive" action as produces a broken symlink instead of proper executable (BUG)
             // If you want to build only 1 arch add ONLY_ACTIVE_ARCH=NO AND (ARCHS=arm64 or ARCHS=x86_64)
-            "command": "xcodebuild -target SCTest -configuration Release -project ${workspaceFolder}/SC.xcodeproj",
+            "command": "xcodebuild -target SCTest -configuration Release -project \"${workspaceFolder}/SC.xcodeproj\"",
             "problemMatcher": [
                 "$gcc"
             ],
@@ -41,7 +41,7 @@
         {
             "label": "Build SCTest Release ARM64",
             "type": "shell",
-            "command": "xcodebuild -target SCTest -configuration Release -project ${workspaceFolder}/SC.xcodeproj ONLY_ACTIVE_ARCH=NO ARCHS=arm64",
+            "command": "xcodebuild -target SCTest -configuration Release -project \"${workspaceFolder}/SC.xcodeproj\" ONLY_ACTIVE_ARCH=NO ARCHS=arm64",
             "problemMatcher": [
                 "$gcc"
             ],
@@ -52,13 +52,32 @@
         {
             "label": "Clang-Format Everything",
             "type": "shell",
-            "command": "${workspaceFolder}/clang_format.sh",
+            "command": "${workspaceFolder}/format_clang.sh",
             "problemMatcher": []
         },
         {
             "label": "Build SCTest GCC Debug",
             "type": "shell",
-            "command": "${workspaceFolder}/gcc_compile.sh",
+            "command": "${workspaceFolder}/SCTest_gcc.sh",
+            "args": [
+                "--debug",
+                "macOS-Universal-GCC12"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+            }
+        },
+        {
+            "label": "Build SCTest GCC Release",
+            "type": "shell",
+            "command": "${workspaceFolder}/SCTest_gcc.sh",
+            "args": [
+                "--release",
+                "macOS-Universal-GCC12"
+            ],
             "problemMatcher": [
                 "$gcc"
             ],
@@ -69,13 +88,13 @@
         {
             "label": "Refresh compile_commands_arm64.json macOS-Universal Debug",
             "type": "shell",
-            "command": "xcrun xcodebuild -scheme SCTest -configuration Debug -project ${workspaceFolder}/SC.xcodeproj ARCHS=arm64 USE_ACTIVE_ARCS=NO OTHER_CFLAGS=\"\\$(inherited) -gen-cdb-fragment-path \\$(PROJECT_DIR)/_build/macOS-Universal/Debug/CompilationDatabase\" && sed -e '1s/^/[\\'$'\n''/' -e '$s/,$/\\'$'\n'']/' ${workspaceFolder}/_build/macOS-Universal/Debug/CompilationDatabase/*.json > ${workspaceFolder}/_build/macOS-Universal/Debug/compile_commands_arm64.json && rm ${workspaceFolder}/_build/macOS-Universal/Debug/CompilationDatabase/*.json && rmdir ${workspaceFolder}/_build/macOS-Universal/Debug/CompilationDatabase",
+            "command": "xcrun xcodebuild -scheme SCTest -configuration Debug -project \"${workspaceFolder}/SC.xcodeproj\" ARCHS=arm64 USE_ACTIVE_ARCS=NO OTHER_CFLAGS=\"\\$(inherited) -gen-cdb-fragment-path \"\"\\$(PROJECT_DIR)/_intermediate/macOS-Universal/Debug/CompilationDatabase\"\"\" && sed -e '1s/^/[\\'$'\n''/' -e '$s/,$/\\'$'\n'']/' \"${workspaceFolder}/_intermediate/macOS-Universal/Debug/CompilationDatabase/\"*.json > \"${workspaceFolder}/_intermediate/macOS-Universal/Debug/compile_commands_arm64.json\" && rm \"${workspaceFolder}/_intermediate/macOS-Universal/Debug/CompilationDatabase/\"*.json && rmdir \"${workspaceFolder}/_intermediate/macOS-Universal/Debug/CompilationDatabase\"",
             "problemMatcher": []
         },
         {
             "label": "Refresh compile_commands_arm64.json macOS-Universal Release",
             "type": "shell",
-            "command": "xcrun xcodebuild -scheme SCTest -configuration Release -project ${workspaceFolder}/SC.xcodeproj ARCHS=arm64 USE_ACTIVE_ARCS=NO OTHER_CFLAGS=\"\\$(inherited) -gen-cdb-fragment-path \\$(PROJECT_DIR)/_build/macOS-Universal/Release/CompilationDatabase\" && sed -e '1s/^/[\\'$'\n''/' -e '$s/,$/\\'$'\n'']/' ${workspaceFolder}/_build/macOS-Universal/Release/CompilationDatabase/*.json > ${workspaceFolder}/_build/macOS-Universal/Release/compile_commands_arm64.json && rm ${workspaceFolder}/_build/macOS-Universal/Release/CompilationDatabase/*.json && rmdir ${workspaceFolder}/_build/macOS-Universal/Release/CompilationDatabase",
+            "command": "xcrun xcodebuild -scheme SCTest -configuration Release -project \"${workspaceFolder}/SC.xcodeproj\" ARCHS=arm64 USE_ACTIVE_ARCS=NO OTHER_CFLAGS=\"\\$(inherited) -gen-cdb-fragment-path \"\"\\$(PROJECT_DIR)/_intermediate/macOS-Universal/Release/CompilationDatabase\"\"\" && sed -e '1s/^/[\\'$'\n''/' -e '$s/,$/\\'$'\n'']/' \"${workspaceFolder}/_intermediate/macOS-Universal/Release/CompilationDatabase/\"*.json > \"${workspaceFolder}/_intermediate/macOS-Universal/Release/compile_commands_arm64.json\" && rm \"${workspaceFolder}/_intermediate/macOS-Universal/Release/CompilationDatabase/\"*.json && rmdir \"${workspaceFolder}/_intermediate/macOS-Universal/Release/CompilationDatabase\"",
             "problemMatcher": []
         }
     ]

@@ -21,7 +21,7 @@
             "name": "(lldb) Debug SCTest GCC",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/_build/gcc/SCTest",
+            "program": "${workspaceFolder}/_build/macOS-Universal-GCC12/Debug/SCTest",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
