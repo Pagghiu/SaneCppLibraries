@@ -2,69 +2,38 @@
 #include "ReflectionFlatSchemaCompiler.h"
 #include "ReflectionSC.h"
 
+// TODO: Cleanup serialization interface
 // TODO: Support SmallVector
 // TODO: Streaming interface
-// TODO: Figure out if BulkWrites optimizations could make sense into the versioned serializer, if it's not too
-// complicated
-// TODO: Compiling all the constexpr stuff on MSVC is very slow
+// TODO: Figure out if BulkWrites optimizations makes sense in the versioned serializer (or it's too complex)
+// TODO: Compiling all the constexpr stuff on MSVC is very slow...profile somehow
 
 namespace SC
 {
-struct BufferDestination
+struct BinaryBuffer
 {
+    size_t              index = 0;
     SC::Vector<uint8_t> buffer;
 
-    [[nodiscard]] bool write(Span<const void> object)
+    [[nodiscard]] bool readFrom(Span<const void> object)
     {
-        numWrites++;
         Span<const uint8_t> bytes = object.castTo<const uint8_t>();
         return buffer.appendCopy(bytes.data, bytes.size);
     }
 
-    size_t index = 0;
-
-    [[nodiscard]] bool read(Span<void> object)
+    [[nodiscard]] bool writeTo(Span<void> object)
     {
         if (object.size > buffer.size())
             return false;
-        numReads++;
         Span<uint8_t> bytes = object.castTo<uint8_t>();
         memcpy(bytes.data, &buffer[index], bytes.size);
         index += bytes.size;
         return true;
     }
-
-    // Used only for the test
-    int numReads  = 0;
-    int numWrites = 0;
-    template <typename T>
-    [[nodiscard]] constexpr const T read()
-    {
-        T alignedRead;
-        memcpy(&alignedRead, &buffer[index], sizeof(T));
-        index += sizeof(T);
-        return alignedRead;
-    }
 };
 
 namespace Serialization
 {
-struct CArrayAccess
-{
-    static constexpr Reflection::MetaType getType() { return Reflection::MetaType::TypeArray; }
-
-    template <typename T>
-    static constexpr bool getSegmentSpan(Reflection::MetaProperties property, Span<T>(object), Span<T>& itemBegin)
-    {
-        return object.viewAt(0, property.size, itemBegin);
-    }
-
-    static bool resize(Span<void>(object), Reflection::MetaProperties property, uint64_t sizeInBytes)
-    {
-        return sizeInBytes == property.size;
-    }
-};
-
 struct SCArrayAccess
 {
     typedef decltype(SegmentHeader::sizeBytes)          SizeType;
@@ -149,9 +118,7 @@ struct ArrayAccess
     [[nodiscard]] static constexpr bool getSegmentSpan(Reflection::MetaProperties property, Span<T> object,
                                                        Span<T>& itemBegin)
     {
-        if (property.type == CArrayAccess::getType())
-            return CArrayAccess::getSegmentSpan(property, object, itemBegin);
-        else if (property.type == SCArrayAccess::getType())
+        if (property.type == SCArrayAccess::getType())
             return SCArrayAccess::getSegmentSpan(property, object, itemBegin);
         else if (property.type == SCVectorAccess::getType())
             return SCVectorAccess::getSegmentSpan(property, object, itemBegin);
@@ -171,9 +138,7 @@ struct ArrayAccess
     [[nodiscard]] static bool resize(Span<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
                                      Initialize initialize, DropEccessItems dropEccessItems)
     {
-        if (property.type == CArrayAccess::getType())
-            return CArrayAccess::resize(object, property, sizeInBytes);
-        else if (property.type == SCArrayAccess::getType())
+        if (property.type == SCArrayAccess::getType())
             return SCArrayAccess::resize(object, property, sizeInBytes, dropEccessItems == DropEccessItems::Yes);
         else if (property.type == SCVectorAccess::getType())
         {
@@ -185,9 +150,11 @@ struct ArrayAccess
 
 struct SimpleBinaryWriter
 {
+    int numberOfOperations = 0;
+
     Span<const Reflection::MetaProperties> sourceProperties;
     Span<const Reflection::MetaStringView> sourceNames;
-    BufferDestination                      destination;
+    BinaryBuffer                           destination;
     Span<const void>                       sourceObject;
     int                                    sourceTypeIndex;
     Reflection::MetaProperties             sourceProperty;
@@ -200,6 +167,7 @@ struct SimpleBinaryWriter
         sourceNames               = flatSchema.namesAsSpan();
         sourceObject              = Span<const void>(&object, sizeof(T));
         sourceTypeIndex           = 0;
+        numberOfOperations        = 0;
         if (sourceProperties.size == 0 || sourceProperties.data[0].type != Reflection::MetaType::TypeStruct)
         {
             return false;
@@ -226,7 +194,8 @@ struct SimpleBinaryWriter
         {
             Span<const void> primitiveSpan;
             SC_TRY_IF(sourceObject.viewAt(0, sourceProperty.size, primitiveSpan));
-            SC_TRY_IF(destination.write(primitiveSpan));
+            SC_TRY_IF(destination.readFrom(primitiveSpan));
+            numberOfOperations++;
             return true;
         }
         case Reflection::MetaType::TypeStruct: //
@@ -256,7 +225,8 @@ struct SimpleBinaryWriter
             // Bulk Write the entire struct
             Span<const void> structSpan;
             SC_TRY_IF(sourceObject.viewAt(0, structSourceProperty.size, structSpan));
-            SC_TRY_IF(destination.write(structSpan));
+            SC_TRY_IF(destination.readFrom(structSpan));
+            numberOfOperations++;
         }
         else
         {
@@ -279,11 +249,17 @@ struct SimpleBinaryWriter
         const auto       arrayTypeIndex = sourceTypeIndex;
         Span<const void> arraySpan;
         uint64_t         numBytes = 0;
-        SC_TRY_IF(ArrayAccess::getSegmentSpan(arrayProperty, sourceObject, arraySpan));
-        numBytes = arraySpan.size;
-        if (arrayProperty.type != Reflection::MetaType::TypeArray)
+        if (arrayProperty.type == Reflection::MetaType::TypeArray)
         {
-            SC_TRY_IF(destination.write(Span<const void>(&numBytes, sizeof(numBytes))));
+            SC_TRY_IF(sourceObject.viewAt(0, arrayProperty.size, arraySpan));
+            numBytes = arrayProperty.size;
+        }
+        else
+        {
+            SC_TRY_IF(ArrayAccess::getSegmentSpan(arrayProperty, sourceObject, arraySpan));
+            numBytes = arraySpan.size;
+            SC_TRY_IF(destination.readFrom(Span<const void>(&numBytes, sizeof(numBytes))));
+            numberOfOperations++;
         }
         sourceTypeIndex     = arrayTypeIndex + 1;
         const auto itemSize = sourceProperties.data[sourceTypeIndex].size;
@@ -293,7 +269,8 @@ struct SimpleBinaryWriter
         const bool isBulkWriteable = Reflection::IsPrimitiveOrRecursivelyPacked(sourceProperties.data[sourceTypeIndex]);
         if (isBulkWriteable)
         {
-            SC_TRY_IF(destination.write(arraySpan));
+            SC_TRY_IF(destination.readFrom(arraySpan));
+            numberOfOperations++;
         }
         else
         {
@@ -312,12 +289,14 @@ struct SimpleBinaryWriter
 
 struct SimpleBinaryReader
 {
+    int numberOfOperations = 0;
+
     Span<const Reflection::MetaProperties> sinkProperties;
     Span<const Reflection::MetaStringView> sinkNames;
     Reflection::MetaProperties             sinkProperty;
     int                                    sinkTypeIndex = 0;
     Span<void>                             sinkObject;
-    BufferDestination                      source;
+    BinaryBuffer                           source;
 
     template <typename T>
     [[nodiscard]] bool read(T& object)
@@ -327,6 +306,7 @@ struct SimpleBinaryReader
         sinkNames                 = flatSchema.namesAsSpan();
         sinkObject                = Span<void>(&object, sizeof(T));
         sinkTypeIndex             = 0;
+        numberOfOperations        = 0;
         if (sinkProperties.size == 0 || sinkProperties.data[0].type != Reflection::MetaType::TypeStruct)
         {
             return false;
@@ -356,7 +336,8 @@ struct SimpleBinaryReader
         {
             Span<void> primitiveSpan;
             SC_TRY_IF(sinkObject.viewAt(0, sinkProperty.size, primitiveSpan));
-            SC_TRY_IF(source.read(primitiveSpan));
+            SC_TRY_IF(source.writeTo(primitiveSpan));
+            numberOfOperations++;
             return true;
         }
         case Reflection::MetaType::TypeStruct: //
@@ -386,7 +367,8 @@ struct SimpleBinaryReader
             // Bulk read the entire struct
             Span<void> structSpan;
             SC_TRY_IF(sinkObject.viewAt(0, structSinkProperty.size, structSpan));
-            SC_TRY_IF(source.read(structSpan));
+            SC_TRY_IF(source.writeTo(structSpan));
+            numberOfOperations++;
         }
         else
         {
@@ -413,19 +395,25 @@ struct SimpleBinaryReader
         if (sinkProperties.data[sinkTypeIndex].getLinkIndex() >= 0)
             sinkTypeIndex = sinkProperties.data[sinkTypeIndex].getLinkIndex();
         const bool isBulkReadable = Reflection::IsPrimitiveOrRecursivelyPacked(sinkProperties.data[sinkTypeIndex]);
-        if (arraySinkProperty.type != Reflection::MetaType::TypeArray)
+        Span<void> arraySinkStart;
+        if (arraySinkProperty.type == Reflection::MetaType::TypeArray)
+        {
+            SC_TRY_IF(arraySinkObject.viewAt(0, arraySinkProperty.size, arraySinkStart));
+        }
+        else
         {
             uint64_t sinkNumBytes = 0;
-            SC_TRY_IF(source.read(Span<void>(&sinkNumBytes, sizeof(sinkNumBytes))));
+            SC_TRY_IF(source.writeTo(Span<void>(&sinkNumBytes, sizeof(sinkNumBytes))));
+            numberOfOperations++;
             SC_TRY_IF(ArrayAccess::resize(arraySinkObject, arraySinkProperty, sinkNumBytes,
                                           isBulkReadable ? ArrayAccess::Initialize::No : ArrayAccess::Initialize::Yes,
                                           ArrayAccess::DropEccessItems::No));
+            SC_TRY_IF(ArrayAccess::getSegmentSpan(arraySinkProperty, arraySinkObject, arraySinkStart));
         }
-        Span<void> arraySinkStart;
-        SC_TRY_IF(ArrayAccess::getSegmentSpan(arraySinkProperty, arraySinkObject, arraySinkStart));
         if (isBulkReadable)
         {
-            SC_TRY_IF(source.read(arraySinkStart));
+            SC_TRY_IF(source.writeTo(arraySinkStart));
+            numberOfOperations++;
         }
         else
         {
@@ -451,6 +439,7 @@ struct SimpleBinaryReaderVersioned
         bool allowDropEccessStructMembers = true;
     };
     Options options;
+    int     numberOfOperations = 0;
 
     Span<const Reflection::MetaStringView> sinkNames;
     Span<const Reflection::MetaStringView> sourceNames;
@@ -478,6 +467,7 @@ struct SimpleBinaryReaderVersioned
         sourceObject              = source;
         sinkTypeIndex             = 0;
         sourceTypeIndex           = 0;
+        numberOfOperations        = 0;
         if (sourceProperties.size == 0 || sourceProperties.data[0].type != Reflection::MetaType::TypeStruct ||
             sinkProperties.size == 0 || sinkProperties.data[0].type != Reflection::MetaType::TypeStruct)
         {
@@ -491,6 +481,7 @@ struct SimpleBinaryReaderVersioned
     {
         SinkValue sinkValue = static_cast<SinkValue>(sourceValue);
         SC_TRY_IF(Span<const void>(&sinkValue, sizeof(sinkValue)).copyTo(sinkObject));
+        numberOfOperations++;
         return true;
     }
 
@@ -520,6 +511,7 @@ struct SimpleBinaryReaderVersioned
     {
         T value;
         SC_TRY_IF(sourceObject.readAndAdvance(value));
+        numberOfOperations++;
         return tryWritingPrimitiveValue(value);
     }
 
@@ -584,6 +576,7 @@ struct SimpleBinaryReaderVersioned
             else if (sinkProperty.type == sourceProperty.type)
             {
                 SC_TRY_IF(sourceObject.writeAndAdvance(sinkObject, sourceProperty.size));
+                numberOfOperations++;
             }
             else
             {
@@ -693,6 +686,7 @@ struct SimpleBinaryReaderVersioned
         if (arraySourceProperty.type != Reflection::MetaType::TypeArray)
         {
             SC_TRY_IF(sourceObject.readAndAdvance(sourceNumBytes));
+            numberOfOperations++;
         }
 
         const bool isPrimitive = Reflection::IsPrimitiveType(sourceProperties.data[sourceTypeIndex].type);
@@ -724,20 +718,26 @@ struct SimpleBinaryReaderVersioned
         const bool isMemcpyable   = isPrimitive && isSameType;
         const auto sourceItemSize = sourceProperties.data[sourceTypeIndex].size;
         const auto sinkItemSize   = sinkProperties.data[sinkTypeIndex].size;
-        if (arraySinkProperty.type != Reflection::MetaType::TypeArray)
+
+        Span<void> arraySinkStart;
+        if (arraySinkProperty.type == Reflection::MetaType::TypeArray)
+        {
+            SC_TRY_IF(arraySinkObject.viewAt(0, arraySinkProperty.size, arraySinkStart));
+        }
+        else
         {
             const auto numWantedBytes = sourceNumBytes / sourceItemSize * sinkItemSize;
             SC_TRY_IF(ArrayAccess::resize(arraySinkObject, arraySinkProperty, numWantedBytes,
                                           isMemcpyable ? ArrayAccess::Initialize::No : ArrayAccess::Initialize::Yes,
                                           options.allowDropEccessArrayItems ? ArrayAccess::DropEccessItems::Yes
                                                                             : ArrayAccess::DropEccessItems::No));
+            SC_TRY_IF(ArrayAccess::getSegmentSpan(arraySinkProperty, arraySinkObject, arraySinkStart));
         }
-        Span<void> arraySinkStart;
-        SC_TRY_IF(ArrayAccess::getSegmentSpan(arraySinkProperty, arraySinkObject, arraySinkStart));
         if (isMemcpyable)
         {
             const auto minBytes = min(static_cast<uint64_t>(arraySinkStart.size), sourceNumBytes);
             SC_TRY_IF(sourceObject.writeAndAdvance(arraySinkStart, minBytes));
+            numberOfOperations++;
         }
         else
         {

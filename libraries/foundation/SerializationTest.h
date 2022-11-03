@@ -231,6 +231,16 @@ SC_META_STRUCT_END()
 
 struct SC::SerializationTest : public SC::TestCase
 {
+    // Used only for the test
+    template <typename T>
+    [[nodiscard]] constexpr const T readPrimitive(const Vector<uint8_t>& buffer, int& index)
+    {
+        T alignedRead;
+        memcpy(&alignedRead, &buffer[index], sizeof(T));
+        index += sizeof(T);
+        return alignedRead;
+    }
+
     SerializationTest(SC::TestReport& report) : TestCase(report, "SerializationTest")
     {
         using namespace SC;
@@ -240,26 +250,27 @@ struct SC::SerializationTest : public SC::TestCase
             Serialization::SimpleBinaryWriter writer;
             auto&                             destination = writer.destination;
             SC_TEST_EXPECT(writer.write(primitive));
-            SC_TEST_EXPECT(destination.numWrites == 1);
+            SC_TEST_EXPECT(writer.numberOfOperations == 1);
+            int index = 0;
             for (int i = 0; i < 4; ++i)
             {
-                SC_TEST_EXPECT(destination.read<uint8_t>() == primitive.arrayValue[i]);
+                SC_TEST_EXPECT(readPrimitive<uint8_t>(destination.buffer, index) == primitive.arrayValue[i]);
             }
-            SC_TEST_EXPECT(destination.read<float>() == primitive.floatValue);
-            SC_TEST_EXPECT(destination.read<int64_t>() == primitive.int64Value);
+            SC_TEST_EXPECT(readPrimitive<float>(destination.buffer, index) == primitive.floatValue);
+            SC_TEST_EXPECT(readPrimitive<int64_t>(destination.buffer, index) == primitive.int64Value);
         }
         if (test_section("Primitive Structure Read"))
         {
             PrimitiveStruct                   primitive;
             Serialization::SimpleBinaryWriter writer;
             SC_TEST_EXPECT(writer.write(primitive));
-            SC_TEST_EXPECT(writer.destination.numWrites == 1);
+            SC_TEST_EXPECT(writer.numberOfOperations == 1);
             Serialization::SimpleBinaryReader reader;
             reader.source.buffer = writer.destination.buffer;
             PrimitiveStruct primitiveRead;
             memset(&primitiveRead, 0, sizeof(primitiveRead));
             SC_TEST_EXPECT(reader.read(primitiveRead));
-            SC_TEST_EXPECT(reader.source.numReads == 1);
+            SC_TEST_EXPECT(reader.numberOfOperations == 1);
             SC_TEST_EXPECT(not(primitive != primitiveRead));
         }
         if (test_section("TopLevel Structure Read"))
@@ -274,13 +285,13 @@ struct SC::SerializationTest : public SC::TestCase
             TopLevelStruct                    topLevel;
             Serialization::SimpleBinaryWriter writer;
             SC_TEST_EXPECT(writer.write(topLevel));
-            SC_TEST_EXPECT(writer.destination.numWrites == 3);
+            SC_TEST_EXPECT(writer.numberOfOperations == 3);
             Serialization::SimpleBinaryReader reader;
             reader.source.buffer = writer.destination.buffer;
             TopLevelStruct topLevelRead;
             memset(&topLevelRead, 0, sizeof(topLevelRead));
             SC_TEST_EXPECT(reader.read(topLevelRead));
-            SC_TEST_EXPECT(reader.source.numReads == 3);
+            SC_TEST_EXPECT(reader.numberOfOperations == 3);
             SC_TEST_EXPECT(not(topLevel != topLevelRead));
         }
         if (test_section("VectorStructSimple"))
@@ -292,12 +303,12 @@ struct SC::SerializationTest : public SC::TestCase
             (void)topLevel.vectorOfInts.push_back(4);
             Serialization::SimpleBinaryWriter writer;
             SC_TEST_EXPECT(writer.write(topLevel));
-            SC_TEST_EXPECT(writer.destination.numWrites == 4);
+            SC_TEST_EXPECT(writer.numberOfOperations == 4);
             Serialization::SimpleBinaryReader reader;
             reader.source.buffer = writer.destination.buffer;
             VectorStructSimple topLevelRead;
             SC_TEST_EXPECT(reader.read(topLevelRead));
-            SC_TEST_EXPECT(reader.source.numReads == 4);
+            SC_TEST_EXPECT(reader.numberOfOperations == 4);
             SC_TEST_EXPECT(topLevelRead.emptyVector.size() == 0);
             SC_TEST_EXPECT(topLevelRead.vectorOfInts.size() == 4);
             for (size_t idx = 0; idx < topLevel.vectorOfInts.size(); ++idx)
@@ -313,12 +324,12 @@ struct SC::SerializationTest : public SC::TestCase
             (void)topLevel.vectorOfStrings.push_back("asdasdasd3"_sv);
             Serialization::SimpleBinaryWriter writer;
             SC_TEST_EXPECT(writer.write(topLevel));
-            SC_TEST_EXPECT(writer.destination.numWrites == 7);
+            SC_TEST_EXPECT(writer.numberOfOperations == 7);
             Serialization::SimpleBinaryReader reader;
             reader.source.buffer = writer.destination.buffer;
             VectorStructComplex topLevelRead;
             SC_TEST_EXPECT(reader.read(topLevelRead));
-            SC_TEST_EXPECT(reader.source.numReads == 7);
+            SC_TEST_EXPECT(reader.numberOfOperations == 7);
             SC_TEST_EXPECT(topLevelRead.vectorOfStrings.size() == 3);
             SC_TEST_EXPECT(topLevelRead.vectorOfStrings[0] == "asdasdasd1"_sv);
             SC_TEST_EXPECT(topLevelRead.vectorOfStrings[1] == "asdasdasd2"_sv);
@@ -344,7 +355,7 @@ struct SC::SerializationTest : public SC::TestCase
             (void)array1.points.push_back({3.0f, 4.0f});
             Serialization::SimpleBinaryWriter writer;
             SC_TEST_EXPECT(writer.write(array1));
-            SC_TEST_EXPECT(writer.destination.numWrites == 4);
+            SC_TEST_EXPECT(writer.numberOfOperations == 4);
             Serialization::SimpleBinaryReaderVersioned reader;
             VersionedArray2                            array2;
             auto             flatSchema = Reflection::FlatSchemaCompiler<>::compile<VersionedArray1>();
