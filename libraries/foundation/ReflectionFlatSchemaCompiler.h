@@ -1,5 +1,6 @@
 #pragma once
 #include "Reflection.h"
+#include "Span.h" // TODO: Remove Span.h dependency
 
 namespace SC
 {

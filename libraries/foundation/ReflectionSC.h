@@ -1,5 +1,6 @@
 #pragma once
 #include "Array.h"
+#include "Map.h"
 #include "Reflection.h"
 #include "String.h"
 #include "Vector.h"

@@ -6,7 +6,7 @@
 #include "libraries/foundation/OSTest.h"
 #include "libraries/foundation/ReflectionTest.h"
 #include "libraries/foundation/ResultTest.h"
-#include "libraries/foundation/Serialization.h"
+#include "libraries/foundation/SerializationTest.h"
 #include "libraries/foundation/SmallVectorTest.h"
 #include "libraries/foundation/StringBuilderTest.h"
 #include "libraries/foundation/StringFunctionsTest.h"

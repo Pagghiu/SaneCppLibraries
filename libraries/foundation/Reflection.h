@@ -1,4 +1,5 @@
 #pragma once
+#include "Language.h" // IsTriviallyCopyable<T>
 #include "Types.h"
 
 namespace SC

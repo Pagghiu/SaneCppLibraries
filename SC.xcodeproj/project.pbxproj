@@ -118,6 +118,7 @@
 		7BD08BD529071D1B00970C9A /* ReflectionFlatSchemaCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ReflectionFlatSchemaCompiler.h; sourceTree = "<group>"; };
 		7BD08BD629071D1B00970C9A /* Reflection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Reflection.h; sourceTree = "<group>"; };
 		7BD2350428FC9DA60004C69E /* ReflectionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ReflectionTest.h; sourceTree = "<group>"; };
+		7BD87ABF291438E2005E7980 /* SerializationTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SerializationTest.h; sourceTree = "<group>"; };
 		7BE4E1CB29033C3D0091CED7 /* InitializerList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InitializerList.h; sourceTree = "<group>"; };
 		7BF0D328290C44E600FC93B4 /* Serialization.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Serialization.h; sourceTree = "<group>"; };
 		7BF4DF6928DE7A5E008CBB53 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
@@ -166,11 +167,11 @@
 				7B73F00628F37F040081C601 /* Assert.h */,
 				7B73EFEC28F37F040081C601 /* Compiler.h */,
 				7B73EFF028F37F040081C601 /* Console.cpp */,
-				7BE4E1CB29033C3D0091CED7 /* InitializerList.h */,
 				7B73EFE728F37F040081C601 /* Console.h */,
 				7B73EFF228F37F040081C601 /* ConsoleTest.h */,
 				7B26715028FC1A6000112DCE /* Function.h */,
 				7B26715128FC1A6000112DCE /* FunctionTest.h */,
+				7BE4E1CB29033C3D0091CED7 /* InitializerList.h */,
 				7B73EFF428F37F040081C601 /* Language.h */,
 				7B73F00428F37F040081C601 /* LibC.h */,
 				7B73EFEF28F37F040081C601 /* Limits.h */,
@@ -185,19 +186,20 @@
 				7B73EFFB28F37F040081C601 /* OSTest.h */,
 				7B73F00728F37F040081C601 /* Platform.h */,
 				7BD08BD629071D1B00970C9A /* Reflection.h */,
-				7B711C9B290DCAF200387525 /* ReflectionSC.h */,
 				7BD08BD529071D1B00970C9A /* ReflectionFlatSchemaCompiler.h */,
+				7B711C9B290DCAF200387525 /* ReflectionSC.h */,
 				7BD2350428FC9DA60004C69E /* ReflectionTest.h */,
 				7B73EFF828F37F040081C601 /* Result.h */,
 				7B73EFF928F37F040081C601 /* ResultTest.h */,
 				7B73EFEB28F37F040081C601 /* Segment.h */,
+				7BF0D328290C44E600FC93B4 /* Serialization.h */,
+				7BD87ABF291438E2005E7980 /* SerializationTest.h */,
 				7B12434C28FB16A3002C5634 /* SmallVector.h */,
 				7B12434D28FB16A3002C5634 /* SmallVectorTest.h */,
 				7B73F00328F37F040081C601 /* Span.h */,
 				7B73F00828F37F040081C601 /* StaticAsserts.cpp */,
 				7B520FDF28F4A10F002B8DB4 /* String.cpp */,
 				7B520FDE28F4A10F002B8DB4 /* String.h */,
-				7BF0D328290C44E600FC93B4 /* Serialization.h */,
 				7BB1D44128F5F1F000FAEA68 /* StringBuilder.cpp */,
 				7BB1D44028F5F1E300FAEA68 /* StringBuilder.h */,
 				7BB1D44428F5F38800FAEA68 /* StringBuilderTest.h */,
