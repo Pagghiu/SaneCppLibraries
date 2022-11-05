@@ -59,7 +59,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		7B0892B22915A9B200210F74 /* SerializationBinary.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SerializationBinary.h; sourceTree = "<group>"; };
+		7B0892B22915A9B200210F74 /* Serialization2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Serialization2.h; sourceTree = "<group>"; };
 		7B12434C28FB16A3002C5634 /* SmallVector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SmallVector.h; sourceTree = "<group>"; };
 		7B12434D28FB16A3002C5634 /* SmallVectorTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SmallVectorTest.h; sourceTree = "<group>"; };
 		7B15637528F9FED200B3D229 /* StringFunctions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringFunctions.h; sourceTree = "<group>"; };
@@ -116,6 +116,7 @@
 		7BB1D44528F5FED300FAEA68 /* StringFormat.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringFormat.h; sourceTree = "<group>"; };
 		7BB1D44628F5FED300FAEA68 /* StringFormat.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StringFormat.cpp; sourceTree = "<group>"; };
 		7BB1D44928F5FF8000FAEA68 /* StringIterator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StringIterator.h; sourceTree = "<group>"; };
+		7BCBC36F2916BE80008CF1A9 /* Reflection2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Reflection2.h; sourceTree = "<group>"; };
 		7BD08BD529071D1B00970C9A /* ReflectionFlatSchemaCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ReflectionFlatSchemaCompiler.h; sourceTree = "<group>"; };
 		7BD08BD629071D1B00970C9A /* Reflection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Reflection.h; sourceTree = "<group>"; };
 		7BD2350428FC9DA60004C69E /* ReflectionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ReflectionTest.h; sourceTree = "<group>"; };
@@ -187,6 +188,7 @@
 				7B73EFFB28F37F040081C601 /* OSTest.h */,
 				7B73F00728F37F040081C601 /* Platform.h */,
 				7BD08BD629071D1B00970C9A /* Reflection.h */,
+				7BCBC36F2916BE80008CF1A9 /* Reflection2.h */,
 				7BD08BD529071D1B00970C9A /* ReflectionFlatSchemaCompiler.h */,
 				7B711C9B290DCAF200387525 /* ReflectionSC.h */,
 				7BD2350428FC9DA60004C69E /* ReflectionTest.h */,
@@ -194,7 +196,7 @@
 				7B73EFF928F37F040081C601 /* ResultTest.h */,
 				7B73EFEB28F37F040081C601 /* Segment.h */,
 				7BF0D328290C44E600FC93B4 /* Serialization.h */,
-				7B0892B22915A9B200210F74 /* SerializationBinary.h */,
+				7B0892B22915A9B200210F74 /* Serialization2.h */,
 				7BD87ABF291438E2005E7980 /* SerializationTest.h */,
 				7B12434C28FB16A3002C5634 /* SmallVector.h */,
 				7B12434D28FB16A3002C5634 /* SmallVectorTest.h */,
@@ -290,7 +292,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastUpgradeCheck = 1400;
+				LastUpgradeCheck = 1410;
 				TargetAttributes = {
 					7B52501328E85B9100827290 = {
 						CreatedOnToolsVersion = 14.0.1;
@@ -386,7 +388,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_ENABLE_CPP_EXCEPTIONS = NO;
 				GCC_ENABLE_CPP_RTTI = NO;
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
@@ -403,6 +407,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
 				DEPLOYMENT_POSTPROCESSING = YES;
@@ -423,6 +428,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = sc.SCXCTest;
@@ -436,6 +442,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = sc.SCXCTest;
@@ -478,6 +485,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/_build/macOS-Universal/$(CONFIGURATION)";
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -538,6 +546,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/_build/macOS-Universal/$(CONFIGURATION)";
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

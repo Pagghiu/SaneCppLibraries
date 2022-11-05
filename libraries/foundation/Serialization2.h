@@ -1,27 +1,13 @@
 #pragma once
 #include "Array.h"
-#include "Reflection.h"
+#include "Reflection2.h"
 #include "String.h"
 #include "Test.h"
 #include "Vector.h"
 
 namespace SC
 {
-// clang-format off
-template <typename T> struct IsPrimitive : false_type {};
-template <> struct IsPrimitive<uint8_t>  : true_type  {};
-template <> struct IsPrimitive<uint16_t> : true_type  {};
-template <> struct IsPrimitive<uint32_t> : true_type  {};
-template <> struct IsPrimitive<uint64_t> : true_type  {};
-template <> struct IsPrimitive<int8_t>   : true_type  {};
-template <> struct IsPrimitive<int16_t>  : true_type  {};
-template <> struct IsPrimitive<int32_t>  : true_type  {};
-template <> struct IsPrimitive<int64_t>  : true_type  {};
-template <> struct IsPrimitive<float>    : true_type  {};
-template <> struct IsPrimitive<double>   : true_type  {};
-// clang-format on
-
-namespace Serialization
+namespace Serialization2
 {
 template <typename Writer, typename T, typename T2 = void>
 struct Serializer;
@@ -40,6 +26,17 @@ struct SerializerVector;
 template <typename T>
 struct HashFor;
 // clang-format off
+template <typename T> struct IsPrimitive : false_type {};
+template <> struct IsPrimitive<uint8_t>  : true_type  {};
+template <> struct IsPrimitive<uint16_t> : true_type  {};
+template <> struct IsPrimitive<uint32_t> : true_type  {};
+template <> struct IsPrimitive<uint64_t> : true_type  {};
+template <> struct IsPrimitive<int8_t>   : true_type  {};
+template <> struct IsPrimitive<int16_t>  : true_type  {};
+template <> struct IsPrimitive<int32_t>  : true_type  {};
+template <> struct IsPrimitive<int64_t>  : true_type  {};
+template <> struct IsPrimitive<float>    : true_type  {};
+template <> struct IsPrimitive<double>   : true_type  {};
 // TODO: We could probably hardcode these for faster compile time
 template <> struct HashFor<uint8_t>  { static constexpr auto Hash = StringHash("uint8");  };
 template <> struct HashFor<uint16_t> { static constexpr auto Hash = StringHash("uint16"); };
@@ -84,18 +81,18 @@ struct BinaryReader
         return true;
     }
 };
-} // namespace Serialization
+} // namespace Serialization2
 } // namespace SC
 
 template <typename T>
-struct SC::Serialization::ClassInfoMembers
+struct SC::Serialization2::ClassInfoMembers
 {
     size_t memberSizeSum = 0;
     bool   IsPacked      = false;
 
     constexpr ClassInfoMembers()
     {
-        if (Reflection::MetaClass<T>::members(*this))
+        if (Reflection2::MetaClass<T>::visit(*this))
         {
             IsPacked = memberSizeSum == sizeof(T);
         }
@@ -114,28 +111,28 @@ struct SC::Serialization::ClassInfoMembers
 };
 
 template <typename T, typename T2>
-struct SC::Serialization::ClassInfo
+struct SC::Serialization2::ClassInfo
 {
     static constexpr bool IsPacked = ClassInfoMembers<T>().IsPacked;
-    static constexpr auto Hash     = Reflection::MetaClass<T>::Hash;
+    static constexpr auto Hash     = Reflection2::MetaClass<T>::Hash;
 };
 
 template <typename T, int N>
-struct SC::Serialization::ClassInfo<T[N]>
+struct SC::Serialization2::ClassInfo<T[N]>
 {
     static constexpr bool IsPacked = ClassInfo<T>::IsPacked;
     static constexpr auto Hash     = SC::CombineHash(SC::StringHash("[]"), HashFor<T>::Hash, N);
 };
 
 template <typename T>
-struct SC::Serialization::ClassInfo<T, typename SC::EnableIf<SC::IsPrimitive<T>::value>::type>
+struct SC::Serialization2::ClassInfo<T, typename SC::EnableIf<SC::Serialization2::IsPrimitive<T>::value>::type>
 {
     static constexpr bool IsPacked = true;
     static constexpr auto Hash     = HashFor<T>::Hash;
 };
 
 template <typename Writer, typename T>
-struct SC::Serialization::SerializerMemberIterator
+struct SC::Serialization2::SerializerMemberIterator
 {
     Writer& writer;
     T&      object;
@@ -148,7 +145,7 @@ struct SC::Serialization::SerializerMemberIterator
 };
 
 template <typename Writer, typename T, typename T2>
-struct SC::Serialization::Serializer
+struct SC::Serialization2::Serializer
 {
     static constexpr bool IsItemPacked = ClassInfo<T>::IsPacked;
 
@@ -158,12 +155,12 @@ struct SC::Serialization::Serializer
         {
             return writer.serialize({&object, sizeof(T)});
         }
-        return Reflection::MetaClass<T>::members(SerializerMemberIterator<Writer, T>{writer, object});
+        return Reflection2::MetaClass<T>::visit(SerializerMemberIterator<Writer, T>{writer, object});
     }
 };
 
 template <typename Writer, typename T, int N>
-struct SC::Serialization::Serializer<Writer, T[N]>
+struct SC::Serialization2::Serializer<Writer, T[N]>
 {
     static constexpr bool IsItemPacked = ClassInfo<T>::IsPacked;
 
@@ -186,7 +183,7 @@ struct SC::Serialization::Serializer<Writer, T[N]>
 };
 
 template <typename Writer, typename Container, typename T>
-struct SC::Serialization::SerializerVector
+struct SC::Serialization2::SerializerVector
 {
     static constexpr bool IsItemPacked = ClassInfo<T>::IsPacked;
 
@@ -215,30 +212,30 @@ struct SC::Serialization::SerializerVector
 };
 
 template <typename Writer, typename T>
-struct SC::Serialization::Serializer<Writer, SC::Vector<T>> : public SerializerVector<Writer, SC::Vector<T>, T>
+struct SC::Serialization2::Serializer<Writer, SC::Vector<T>> : public SerializerVector<Writer, SC::Vector<T>, T>
 {
 };
 template <typename T>
-struct SC::Serialization::ClassInfo<SC::Vector<T>>
+struct SC::Serialization2::ClassInfo<SC::Vector<T>>
 {
     static constexpr bool IsPacked = false;
     static constexpr auto Hash     = SC::CombineHash(SC::StringHash("SC::Vector"), HashFor<T>::Hash);
 };
 
 template <typename Writer, typename T, int N>
-struct SC::Serialization::Serializer<Writer, SC::Array<T, N>> : public SerializerVector<Writer, SC::Array<T, N>, T>
+struct SC::Serialization2::Serializer<Writer, SC::Array<T, N>> : public SerializerVector<Writer, SC::Array<T, N>, T>
 {
 };
 
 template <typename T, int N>
-struct SC::Serialization::ClassInfo<SC::Array<T, N>>
+struct SC::Serialization2::ClassInfo<SC::Array<T, N>>
 {
     static constexpr bool IsPacked = false;
     static constexpr auto Hash     = SC::CombineHash(SC::StringHash("SC::Array"), HashFor<T>::Hash, N);
 };
 
 template <typename Writer, typename T>
-struct SC::Serialization::Serializer<Writer, T, typename SC::EnableIf<SC::IsPrimitive<T>::value>::type>
+struct SC::Serialization2::Serializer<Writer, T, typename SC::EnableIf<SC::Serialization2::IsPrimitive<T>::value>::type>
 {
     [[nodiscard]] static constexpr bool serialize(T& object, Writer& writer)
     {
@@ -278,20 +275,20 @@ struct SC::PrimitiveBStruct
         return false;
     }
 };
-SC_META_STRUCT_BEGIN(SC::PrimitiveBStruct)
-SC_META_STRUCT_MEMBER(0, arrayValue)
-SC_META_STRUCT_MEMBER(1, floatValue)
-SC_META_STRUCT_MEMBER(2, int64Value)
-SC_META_STRUCT_MEMBER(3, vector)
-SC_META_STRUCT_END()
-// static_assert(SC::Serialization::ClassInfo<SC::PrimitiveBStruct>().IsPacked, "THIS MUST BE PACKED");
+SC_META2_STRUCT_BEGIN(SC::PrimitiveBStruct)
+SC_META2_STRUCT_MEMBER(0, arrayValue)
+SC_META2_STRUCT_MEMBER(1, floatValue)
+SC_META2_STRUCT_MEMBER(2, int64Value)
+SC_META2_STRUCT_MEMBER(3, vector)
+SC_META2_STRUCT_END()
+// static_assert(SC::Serialization2::ClassInfo<SC::PrimitiveBStruct>().IsPacked, "THIS MUST BE PACKED");
 
 struct SC::SerializationBTest : public SC::TestCase
 {
     SerializationBTest(SC::TestReport& report) : TestCase(report, "SerializationBTest")
     {
         using namespace SC;
-        using namespace SC::Serialization;
+        using namespace SC::Serialization2;
         if (test_section("Primitive Structure Write"))
         {
             PrimitiveBStruct struct1;
