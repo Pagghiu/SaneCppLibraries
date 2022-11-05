@@ -47,7 +47,11 @@ template <typename Key, typename Value, typename Container>
 struct MetaClass<Map<Key, Value, Container>> : MetaStruct<MetaClass<Map<Key, Value, Container>>>
 {
     typedef typename MetaStruct<MetaClass<SC::Map<Key, Value, Container>>>::T T;
-    static constexpr void members(MetaClassBuilder& builder) { builder.member(0, SC_META_MEMBER(items)); }
+    template <typename MemberVisitor>
+    static constexpr void members(MemberVisitor&& builder)
+    {
+        builder(0, SC_META_MEMBER(items));
+    }
 };
 
 } // namespace Reflection

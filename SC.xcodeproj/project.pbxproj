@@ -59,6 +59,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		7B0892B22915A9B200210F74 /* SerializationBinary.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SerializationBinary.h; sourceTree = "<group>"; };
 		7B12434C28FB16A3002C5634 /* SmallVector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SmallVector.h; sourceTree = "<group>"; };
 		7B12434D28FB16A3002C5634 /* SmallVectorTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SmallVectorTest.h; sourceTree = "<group>"; };
 		7B15637528F9FED200B3D229 /* StringFunctions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringFunctions.h; sourceTree = "<group>"; };
@@ -193,6 +194,7 @@
 				7B73EFF928F37F040081C601 /* ResultTest.h */,
 				7B73EFEB28F37F040081C601 /* Segment.h */,
 				7BF0D328290C44E600FC93B4 /* Serialization.h */,
+				7B0892B22915A9B200210F74 /* SerializationBinary.h */,
 				7BD87ABF291438E2005E7980 /* SerializationTest.h */,
 				7B12434C28FB16A3002C5634 /* SmallVector.h */,
 				7B12434D28FB16A3002C5634 /* SmallVectorTest.h */,

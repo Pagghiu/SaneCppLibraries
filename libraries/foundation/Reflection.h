@@ -268,6 +268,17 @@ constexpr bool AreAllMembersPacked(const Atom* structAtom, int numAtoms)
     return nextOffset == structAtom->properties.size;
 }
 
+struct MetaClassBuilderVisitor
+{
+    MetaClassBuilder& builder;
+
+    template <typename R, typename T, int N>
+    inline constexpr bool operator()(int order, const char (&name)[N], R T::*memberPointer, size_t offset)
+    {
+        builder.member(order, name, memberPointer, offset);
+        return true;
+    }
+};
 template <typename Type>
 struct MetaStruct<MetaClass<Type>>
 {
@@ -277,7 +288,8 @@ struct MetaStruct<MetaClass<Type>>
     static constexpr void build(MetaClassBuilder& builder)
     {
         builder.Struct<T>();
-        MetaClass<Type>::members(builder);
+        MetaClassBuilderVisitor builderVisitor = {builder};
+        MetaClass<Type>::members(builderVisitor);
         uint32_t flags = 0;
         if (IsTriviallyCopyable<T>::value)
             flags |= static_cast<uint32_t>(MetaStructFlags::IsTriviallyCopyable);
@@ -366,15 +378,21 @@ constexpr MetaArray<Atom, MAX_ATOMS> MetaClassGetAtoms()
     template <>                                                                                                        \
     struct SC::Reflection::MetaClass<StructName> : SC::Reflection::MetaStruct<MetaClass<StructName>>                   \
     {                                                                                                                  \
-        static constexpr void members(MetaClassBuilder& builder)                                                       \
+        template <typename MemberVisitor>                                                                              \
+        static constexpr bool members(MemberVisitor&& builder)                                                         \
         {                                                                                                              \
             SC_DISABLE_OFFSETOF_WARNING
 
-#define SC_META_MEMBER(MEMBER)               #MEMBER, &T::MEMBER, SC_OFFSET_OF(T, MEMBER)
-#define SC_META_STRUCT_MEMBER(ORDER, MEMBER) builder.member(ORDER, #MEMBER, &T::MEMBER, SC_OFFSET_OF(T, MEMBER));
+#define SC_META_MEMBER(MEMBER) #MEMBER, &T::MEMBER, SC_OFFSET_OF(T, MEMBER)
+#define SC_META_STRUCT_MEMBER(ORDER, MEMBER)                                                                           \
+    if (not builder(ORDER, #MEMBER, &T::MEMBER, SC_OFFSET_OF(T, MEMBER)))                                              \
+    {                                                                                                                  \
+        return false;                                                                                                  \
+    }
 
 #define SC_META_STRUCT_END()                                                                                           \
     SC_ENABLE_OFFSETOF_WARNING                                                                                         \
+    return true;                                                                                                       \
     }                                                                                                                  \
     }                                                                                                                  \
     ;

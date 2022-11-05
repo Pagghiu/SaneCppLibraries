@@ -49,35 +49,41 @@ namespace Reflection
 template <>
 struct MetaClass<TestNamespace::SimpleStructure> : MetaStruct<MetaClass<TestNamespace::SimpleStructure>>
 {
-    static constexpr void members(MetaClassBuilder& builder)
+    template <typename MemberVisitor>
+    static constexpr bool members(MemberVisitor&& builder)
     {
-        builder.member(0, SC_META_MEMBER(f1));
-        builder.member(1, SC_META_MEMBER(f2));
-        builder.member(2, SC_META_MEMBER(arrayOfInt));
+        SC_TRY_IF(builder(0, SC_META_MEMBER(f1)));
+        SC_TRY_IF(builder(1, SC_META_MEMBER(f2)));
+        SC_TRY_IF(builder(2, SC_META_MEMBER(arrayOfInt)));
+        return true;
     }
 };
 
 template <>
 struct MetaClass<TestNamespace::IntermediateStructure> : MetaStruct<MetaClass<TestNamespace::IntermediateStructure>>
 {
-    static constexpr void members(MetaClassBuilder& builder)
+    template <typename MemberVisitor>
+    static constexpr bool members(MemberVisitor&& builder)
     {
-        builder.member(0, SC_META_MEMBER(simpleStructure));
-        builder.member(1, SC_META_MEMBER(vectorOfInt));
+        SC_TRY_IF(builder(0, SC_META_MEMBER(simpleStructure)));
+        SC_TRY_IF(builder(1, SC_META_MEMBER(vectorOfInt)));
+        return true;
     }
 };
 
 template <>
 struct MetaClass<TestNamespace::ComplexStructure> : MetaStruct<MetaClass<TestNamespace::ComplexStructure>>
 {
-    static constexpr void members(MetaClassBuilder& builder)
+    template <typename MemberVisitor>
+    static constexpr bool members(MemberVisitor&& builder)
     {
-        builder.member(0, SC_META_MEMBER(f1));
-        builder.member(1, SC_META_MEMBER(simpleStructure));
-        builder.member(2, SC_META_MEMBER(simpleStructure2));
-        builder.member(3, SC_META_MEMBER(f4));
-        builder.member(4, SC_META_MEMBER(intermediateStructure));
-        builder.member(5, SC_META_MEMBER(vectorOfStructs));
+        SC_TRY_IF(builder(0, SC_META_MEMBER(f1)));
+        SC_TRY_IF(builder(1, SC_META_MEMBER(simpleStructure)));
+        SC_TRY_IF(builder(2, SC_META_MEMBER(simpleStructure2)));
+        SC_TRY_IF(builder(3, SC_META_MEMBER(f4)));
+        SC_TRY_IF(builder(4, SC_META_MEMBER(intermediateStructure)));
+        SC_TRY_IF(builder(5, SC_META_MEMBER(vectorOfStructs)));
+        return true;
     }
 };
 } // namespace Reflection

@@ -2,6 +2,7 @@
 #include "ReflectionFlatSchemaCompiler.h"
 #include "ReflectionSC.h"
 
+// TODO: Proper construction of C++ types with a TypeErased Vtable holding Constructor call
 // TODO: Cleanup serialization interface
 // TODO: Support SmallVector
 // TODO: Streaming interface
@@ -169,7 +170,7 @@ struct SimpleBinaryWriter
     Reflection::MetaProperties             sourceProperty;
 
     template <typename T>
-    [[nodiscard]] bool write(const T& object)
+    [[nodiscard]] constexpr bool write(const T& object)
     {
         constexpr auto flatSchema = Reflection::FlatSchemaCompiler<>::compile<T>();
         sourceProperties          = flatSchema.propertiesAsSpan();
@@ -184,7 +185,7 @@ struct SimpleBinaryWriter
         return write();
     }
 
-    [[nodiscard]] bool write()
+    [[nodiscard]] constexpr bool write()
     {
         sourceProperty = sourceProperties.data[sourceTypeIndex];
         switch (sourceProperty.type)
@@ -221,7 +222,7 @@ struct SimpleBinaryWriter
         return true;
     }
 
-    [[nodiscard]] bool writeStruct()
+    [[nodiscard]] constexpr bool writeStruct()
     {
         const auto       structSourceProperty  = sourceProperty;
         const auto       structSourceTypeIndex = sourceTypeIndex;
@@ -252,7 +253,7 @@ struct SimpleBinaryWriter
         return true;
     }
 
-    [[nodiscard]] bool writeArray()
+    [[nodiscard]] constexpr bool writeArray()
     {
         const auto       arrayProperty  = sourceProperty;
         const auto       arrayTypeIndex = sourceTypeIndex;
