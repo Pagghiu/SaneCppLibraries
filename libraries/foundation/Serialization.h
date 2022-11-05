@@ -172,7 +172,7 @@ struct SimpleBinaryWriter
     template <typename T>
     [[nodiscard]] constexpr bool write(const T& object)
     {
-        constexpr auto flatSchema = Reflection::FlatSchemaCompiler<>::compile<T>();
+        constexpr auto flatSchema = Reflection::FlatSchemaCompiler::compile<T>();
         sourceProperties          = flatSchema.propertiesAsSpan();
         sourceNames               = flatSchema.namesAsSpan();
         sourceObject              = Span<const void>(&object, sizeof(T));
@@ -276,7 +276,7 @@ struct SimpleBinaryWriter
         if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
             sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
 
-        const bool isBulkWriteable = Reflection::IsPrimitiveOrRecursivelyPacked(sourceProperties.data[sourceTypeIndex]);
+        const bool isBulkWriteable = sourceProperties.data[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
         if (isBulkWriteable)
         {
             SC_TRY_IF(destination.readFrom(arraySpan));
@@ -311,7 +311,7 @@ struct SimpleBinaryReader
     template <typename T>
     [[nodiscard]] bool read(T& object)
     {
-        constexpr auto flatSchema = Reflection::FlatSchemaCompiler<>::compile<T>();
+        constexpr auto flatSchema = Reflection::FlatSchemaCompiler::compile<T>();
         sinkProperties            = flatSchema.propertiesAsSpan();
         sinkNames                 = flatSchema.namesAsSpan();
         sinkObject                = Span<void>(&object, sizeof(T));
@@ -404,7 +404,7 @@ struct SimpleBinaryReader
         const auto sinkItemSize       = sinkProperties.data[sinkTypeIndex].size;
         if (sinkProperties.data[sinkTypeIndex].getLinkIndex() >= 0)
             sinkTypeIndex = sinkProperties.data[sinkTypeIndex].getLinkIndex();
-        const bool isBulkReadable = Reflection::IsPrimitiveOrRecursivelyPacked(sinkProperties.data[sinkTypeIndex]);
+        const bool isBulkReadable = sinkProperties.data[sinkTypeIndex].isPrimitiveOrRecursivelyPacked();
         Span<void> arraySinkStart;
         if (arraySinkProperty.type == Reflection::MetaType::TypeArray)
         {
@@ -468,7 +468,7 @@ struct SimpleBinaryReaderVersioned
     [[nodiscard]] bool read(T& object, Span<const void> source, Span<const Reflection::MetaProperties> properties,
                             Span<const Reflection::MetaStringView> names)
     {
-        constexpr auto flatSchema = Reflection::FlatSchemaCompiler<>::compile<T>();
+        constexpr auto flatSchema = Reflection::FlatSchemaCompiler::compile<T>();
         sourceProperties          = properties;
         sinkProperties            = flatSchema.propertiesAsSpan();
         sinkNames                 = flatSchema.namesAsSpan();
@@ -699,7 +699,7 @@ struct SimpleBinaryReaderVersioned
             numberOfOperations++;
         }
 
-        const bool isPrimitive = Reflection::IsPrimitiveType(sourceProperties.data[sourceTypeIndex].type);
+        const bool isPrimitive = sourceProperties.data[sourceTypeIndex].isPrimitiveType();
 
         if (sinkObject.isNull())
         {

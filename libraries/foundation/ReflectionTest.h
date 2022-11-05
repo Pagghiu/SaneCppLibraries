@@ -195,13 +195,12 @@ struct SC::ReflectionTest : public SC::TestCase
         if (test_section("Packing"))
         {
 
-            constexpr auto packedStructWithArray =
-                FlatSchemaCompiler<>::compile<TestNamespace::PackedStructWithArray>();
+            constexpr auto packedStructWithArray = FlatSchemaCompiler::compile<TestNamespace::PackedStructWithArray>();
             constexpr auto packedStructWithArrayFlags = packedStructWithArray.properties.values[0].getCustomUint32();
             static_assert(packedStructWithArrayFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked),
                           "Packed struct should be packed");
             //            auto packedStructWithArrayRuntime = packedStructWithArray;
-            //            FlatSchemaCompiler<>::markRecursiveProperties(packedStructWithArrayRuntime, 0);
+            //            FlatSchemaCompiler::markRecursiveProperties(packedStructWithArrayRuntime, 0);
             //            auto packedStructWithArrayRuntimeFlags =
             //            packedStructWithArrayRuntime.properties.values[0].getCustomUint32();
             //            SC_TEST_EXPECT(packedStructWithArrayRuntimeFlags &
@@ -211,7 +210,7 @@ struct SC::ReflectionTest : public SC::TestCase
             static_assert(packedStructWithArrayFlags & static_cast<uint32_t>(MetaStructFlags::IsTriviallyCopyable),
                           "Packed struct should be trivially copyable");
 
-            constexpr auto packedStruct      = FlatSchemaCompiler<>::compile<TestNamespace::PackedStruct>();
+            constexpr auto packedStruct      = FlatSchemaCompiler::compile<TestNamespace::PackedStruct>();
             constexpr auto packedStructFlags = packedStruct.properties.values[0].getCustomUint32();
             static_assert(packedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked),
                           "Packed struct should be packed");
@@ -220,7 +219,7 @@ struct SC::ReflectionTest : public SC::TestCase
             static_assert(packedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsTriviallyCopyable),
                           "Packed struct should be trivially copyable");
 
-            constexpr auto unpackedStruct      = FlatSchemaCompiler<>::compile<TestNamespace::UnpackedStruct>();
+            constexpr auto unpackedStruct      = FlatSchemaCompiler::compile<TestNamespace::UnpackedStruct>();
             constexpr auto unpackedStructFlags = unpackedStruct.properties.values[0].getCustomUint32();
             static_assert(not(unpackedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked)),
                           "Unpacked struct should not be packed");
@@ -229,7 +228,7 @@ struct SC::ReflectionTest : public SC::TestCase
             static_assert(unpackedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsTriviallyCopyable),
                           "Unpacked struct should be trivially copyable");
 
-            constexpr auto nestedUnpackedStruct = FlatSchemaCompiler<>::compile<TestNamespace::NestedUnpackedStruct>();
+            constexpr auto nestedUnpackedStruct = FlatSchemaCompiler::compile<TestNamespace::NestedUnpackedStruct>();
             constexpr auto nestedUnpackedStructFlags = nestedUnpackedStruct.properties.values[0].getCustomUint32();
             static_assert((nestedUnpackedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked)),
                           "nestedPacked struct should be packed");
@@ -238,8 +237,7 @@ struct SC::ReflectionTest : public SC::TestCase
             static_assert(nestedUnpackedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsTriviallyCopyable),
                           "nestedPacked struct should be trivially copyable");
 
-            constexpr auto structWithArrayPacked =
-                FlatSchemaCompiler<>::compile<TestNamespace::StructWithArrayPacked>();
+            constexpr auto structWithArrayPacked = FlatSchemaCompiler::compile<TestNamespace::StructWithArrayPacked>();
             constexpr auto structWithArrayPackedFlags = structWithArrayPacked.properties.values[0].getCustomUint32();
             static_assert((structWithArrayPackedFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked)),
                           "structWithArrayPacked struct should be packed");
@@ -249,7 +247,7 @@ struct SC::ReflectionTest : public SC::TestCase
                           "structWithArrayPacked struct should be trivially copyable");
 
             constexpr auto structWithArrayUnpacked =
-                FlatSchemaCompiler<>::compile<TestNamespace::StructWithArrayUnpacked>();
+                FlatSchemaCompiler::compile<TestNamespace::StructWithArrayUnpacked>();
             constexpr auto structWithArrayUnpackedFlags =
                 structWithArrayUnpacked.properties.values[0].getCustomUint32();
             static_assert((structWithArrayUnpackedFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked)),
@@ -270,11 +268,10 @@ struct SC::ReflectionTest : public SC::TestCase
             // countUniqueLinks<10>(MetaClass<TestNamespace::ComplexStructure>::template
             // getAtoms<10>());
             // SC_RELEASE_ASSERT(numlinks == 3);
-            constexpr auto ComplexStructureFlatSchema =
-                FlatSchemaCompiler<>::compile<TestNamespace::ComplexStructure>();
+            constexpr auto ComplexStructureFlatSchema = FlatSchemaCompiler::compile<TestNamespace::ComplexStructure>();
             printFlatSchema(ComplexStructureFlatSchema.properties.values, ComplexStructureFlatSchema.names.values);
             // constexpr auto SimpleStructureFlatSchema =
-            // FlatSchemaCompiler<>::compile<TestNamespace::SimpleStructure>();
+            // FlatSchemaCompiler::compile<TestNamespace::SimpleStructure>();
             // printFlatSchema(SimpleStructureFlatSchema.atoms.values,
             // SimpleStructureFlatSchema.names.values);
         }

@@ -276,9 +276,9 @@ struct SC::SerializationTest : public SC::TestCase
         if (test_section("TopLevel Structure Read"))
         {
             using namespace Reflection;
-            //            auto testStruct = FlatSchemaCompiler<>::compile<TopLevelStruct>();
+            //            auto testStruct = FlatSchemaCompiler::compile<TopLevelStruct>();
             //            ReflectionTest::printFlatSchema(testStruct.properties.values, testStruct.names.values);
-            //            FlatSchemaCompiler<>::markRecursiveProperties(testStruct, 0);
+            //            FlatSchemaCompiler::markRecursiveProperties(testStruct, 0);
             //            auto testStructFlags = testStruct.properties.values[0].getCustomUint32();
             //            SC_TEST_EXPECT(testStructFlags & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked));
 
@@ -342,7 +342,7 @@ struct SC::SerializationTest : public SC::TestCase
             SC_TEST_EXPECT(writer.write(struct1));
             Serialization::SimpleBinaryReaderVersioned reader;
             VersionedStruct2                           struct2;
-            auto flatSchema = Reflection::FlatSchemaCompiler<>::compile<VersionedStruct1>();
+            auto flatSchema = Reflection::FlatSchemaCompiler::compile<VersionedStruct1>();
 
             Span<const void> readSpan(writer.destination.buffer.data(), writer.destination.buffer.size());
             SC_TEST_EXPECT(reader.read(struct2, readSpan, flatSchema.propertiesAsSpan(), flatSchema.namesAsSpan()));
@@ -358,7 +358,7 @@ struct SC::SerializationTest : public SC::TestCase
             SC_TEST_EXPECT(writer.numberOfOperations == 4);
             Serialization::SimpleBinaryReaderVersioned reader;
             VersionedArray2                            array2;
-            auto             flatSchema = Reflection::FlatSchemaCompiler<>::compile<VersionedArray1>();
+            auto             flatSchema = Reflection::FlatSchemaCompiler::compile<VersionedArray1>();
             Span<const void> readSpan(writer.destination.buffer.data(), writer.destination.buffer.size());
             SC_TEST_EXPECT(reader.read(array2, readSpan, flatSchema.propertiesAsSpan(), flatSchema.namesAsSpan()));
             SC_TEST_EXPECT(array2.points.size() == 2);
@@ -373,7 +373,7 @@ struct SC::SerializationTest : public SC::TestCase
             Serialization::SimpleBinaryWriter writer;
             SC_TEST_EXPECT(writer.write(struct1));
             Serialization::SimpleBinaryReaderVersioned reader;
-            auto             flatSchema = Reflection::FlatSchemaCompiler<>::compile<ConversionStruct1>();
+            auto             flatSchema = Reflection::FlatSchemaCompiler::compile<ConversionStruct1>();
             Span<const void> readSpan(writer.destination.buffer.data(), writer.destination.buffer.size());
             SC_TEST_EXPECT(reader.read(struct2, readSpan, flatSchema.propertiesAsSpan(), flatSchema.namesAsSpan()));
             SC_TEST_EXPECT(struct2.intToFloat == struct1.intToFloat);

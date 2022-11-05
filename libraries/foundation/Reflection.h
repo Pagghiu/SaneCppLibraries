@@ -12,20 +12,23 @@ struct Nm
     int         length;
     constexpr Nm(const char* data, int length) : data(data), length(length) {}
 };
+
 template <typename T>
 static constexpr Nm ClNm()
 {
+    // clang-format off
 #if SC_MSVC
     const char*    name            = __FUNCSIG__;
     constexpr char separating_char = '<';
     constexpr int  skip_chars      = 8;
     constexpr int  trim_chars      = 7;
 #else
-    const char*                     name            = __PRETTY_FUNCTION__;
-    constexpr char                  separating_char = '=';
-    constexpr int                   skip_chars      = 2;
-    constexpr int                   trim_chars      = 1;
+    const char*    name            = __PRETTY_FUNCTION__;
+    constexpr char separating_char = '=';
+    constexpr int  skip_chars      = 2;
+    constexpr int  trim_chars      = 1;
 #endif
+    // clang-format on
     int         length = 0;
     const char* it     = name;
     while (*it != separating_char)
@@ -64,9 +67,12 @@ enum class MetaType : uint8_t
     TypeSCArray  = 13,
     TypeSCVector = 14,
 };
-
-constexpr bool IsPrimitiveType(MetaType type) { return type >= MetaType::TypeUINT8 && type <= MetaType::TypeDOUBLE64; }
-
+enum class MetaStructFlags : uint32_t
+{
+    IsTriviallyCopyable = 1 << 0, // Type can be memcpy-ied
+    IsPacked            = 1 << 1, // There is no spacing between fields of a type
+    IsRecursivelyPacked = 1 << 2, // There is no spacing even between sub-types of all members
+};
 struct MetaProperties
 {
     MetaType type;        // 1
@@ -82,16 +88,35 @@ struct MetaProperties
     constexpr MetaProperties(MetaType type, uint8_t order, uint16_t offset, uint16_t size, int8_t numSubAtoms)
         : type(type), order(order), offset(offset), size(size), numSubAtoms(numSubAtoms)
     {}
-    constexpr void setCustomUint32(uint32_t N)
+    constexpr void                   setLinkIndex(int8_t linkIndex) { numSubAtoms = linkIndex; }
+    [[nodiscard]] constexpr int8_t   getLinkIndex() const { return numSubAtoms; }
+    [[nodiscard]] constexpr uint32_t getCustomUint32() const { return (offset << 16) | order; }
+    constexpr void                   setCustomUint32(uint32_t N)
     {
         const uint16_t lowN  = N & 0xffff;
         const uint16_t highN = (N >> 16) & 0xffff;
         order                = static_cast<uint8_t>(lowN);
         offset               = static_cast<uint8_t>(highN);
     }
-    constexpr uint32_t getCustomUint32() const { return (offset << 16) | order; }
-    constexpr void     setLinkIndex(int8_t linkIndex) { numSubAtoms = linkIndex; }
-    constexpr int8_t   getLinkIndex() const { return numSubAtoms; }
+
+    [[nodiscard]] constexpr bool isPrimitiveType() const
+    {
+        return type >= MetaType::TypeUINT8 && type <= MetaType::TypeDOUBLE64;
+    }
+
+    [[nodiscard]] constexpr bool isPrimitiveOrRecursivelyPacked() const
+    {
+        if (isPrimitiveType())
+            return true;
+        if (type == MetaType::TypeStruct)
+        {
+            if (getCustomUint32() & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 };
 
 struct MetaClassBuilder;
@@ -118,6 +143,42 @@ struct MetaArray
 {
     T   values[N] = {};
     int size      = 0;
+
+    [[nodiscard]] constexpr bool contains(T value, int* outIndex = nullptr) const
+    {
+        for (int i = 0; i < size; ++i)
+        {
+            if (values[i] == value)
+            {
+                if (outIndex)
+                    *outIndex = i;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    template <int N2>
+    [[nodiscard]] constexpr bool append(const MetaArray<T, N2>& other)
+    {
+        if (size + other.size >= N)
+            return false;
+        for (int i = 0; i < other.size; ++i)
+        {
+            values[size++] = other.values[i];
+        }
+        return true;
+    }
+
+    [[nodiscard]] constexpr bool push_back(const T& value)
+    {
+        if (size < N)
+        {
+            values[size++] = value;
+            return true;
+        }
+        return false;
+    }
 };
 
 struct MetaStringView
@@ -137,7 +198,7 @@ struct MetaTypeToString
 #if SC_CPP_AT_LEAST_17
   private:
     // In C++ 17 we trim the long string producted by ClassName<T> to reduce executable size
-    static constexpr auto TrimClassName()
+    [[nodiscard]] static constexpr auto TrimClassName()
     {
         constexpr auto                    className = ClNm<T>();
         MetaArray<char, className.length> trimmedName;
@@ -153,9 +214,9 @@ struct MetaTypeToString
     static inline constexpr auto value = TrimClassName();
 
   public:
-    static constexpr MetaStringView get() { return MetaStringView(value.values, value.size); }
+    [[nodiscard]] static constexpr MetaStringView get() { return MetaStringView(value.values, value.size); }
 #else
-    static constexpr MetaStringView get()
+    [[nodiscard]] static constexpr MetaStringView get()
     {
         auto className = ClNm<T>();
         return MetaStringView(className.data, className.length);
@@ -168,10 +229,13 @@ struct Atom;
 struct MetaClassBuilder
 {
     int       size;
+    int       wantedCapacity;
     Atom*     output;
     const int capacity;
 
-    constexpr MetaClassBuilder(Atom* output, const int capacity) : size(0), output(output), capacity(capacity) {}
+    constexpr MetaClassBuilder(Atom* output, const int capacity)
+        : size(0), wantedCapacity(0), output(output), capacity(capacity)
+    {}
 
     inline constexpr void push(const Atom& value);
     template <typename T, int N>
@@ -180,6 +244,12 @@ struct MetaClassBuilder
     inline constexpr void Struct();
     template <typename R, typename T, int N>
     inline constexpr void member(int order, const char (&name)[N], R T::*, size_t offset);
+    template <typename R, typename T, int N>
+    [[nodiscard]] constexpr bool operator()(int order, const char (&name)[N], R T::*f, size_t offset)
+    {
+        member(order, name, f, offset);
+        return true;
+    }
 };
 
 struct Atom
@@ -195,25 +265,53 @@ struct Atom
         : properties(properties), name(name), build(build)
     {}
     template <int MAX_ATOMS>
-    constexpr MetaArray<Atom, MAX_ATOMS> getAtoms() const;
+    [[nodiscard]] constexpr MetaArray<Atom, MAX_ATOMS> getAtoms() const;
+
+    [[nodiscard]] constexpr int countAtoms() const
+    {
+        MetaClassBuilder builder(nullptr, 0);
+        if (build != nullptr)
+        {
+            build(builder);
+            return builder.wantedCapacity;
+        }
+        return 0;
+    }
 
     template <typename R, typename T, int N>
-    static constexpr Atom create(int order, const char (&name)[N], R T::*, size_t offset)
+    [[nodiscard]] static constexpr Atom create(int order, const char (&name)[N], R T::*, size_t offset)
     {
         return {MetaProperties(MetaClass<R>::getMetaType(), order, static_cast<SC::uint16_t>(offset), sizeof(R), -1),
                 MetaStringView(name, N), &MetaClass<R>::build};
     }
 
     template <typename T>
-    static constexpr Atom create(MetaStringView name = MetaTypeToString<T>::get())
+    [[nodiscard]] static constexpr Atom create(MetaStringView name = MetaTypeToString<T>::get())
     {
         return {MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), name, &MetaClass<T>::build};
     }
 
     template <typename T, int N>
-    static constexpr Atom create(const char (&name)[N])
+    [[nodiscard]] static constexpr Atom create(const char (&name)[N])
     {
         return create<T>(MetaStringView(name, N));
+    }
+
+    [[nodiscard]] constexpr bool operator==(const Atom& other) const { return build == other.build; }
+
+    [[nodiscard]] constexpr bool areAllMembersPacked(int numAtoms) const
+    {
+        uint32_t nextOffset = 0;
+        for (int idx = 0; idx < numAtoms; ++idx)
+        {
+            const Atom* member = this + idx + 1;
+            if (member->properties.offset != nextOffset)
+            {
+                return false;
+            }
+            nextOffset += member->properties.size;
+        }
+        return nextOffset == properties.size;
     }
 };
 template <typename T, size_t N>
@@ -232,70 +330,25 @@ struct MetaClass<T[N]>
 template <typename Type>
 struct MetaStruct;
 
-enum class MetaStructFlags : uint32_t
-{
-    IsTriviallyCopyable = 1 << 0, // Type can be memcpy-ied
-    IsPacked            = 1 << 1, // There is no spacing between fields of a type
-    IsRecursivelyPacked = 1 << 2, // There is no spacing even between sub-types of all members
-};
-
-constexpr bool IsPrimitiveOrRecursivelyPacked(MetaProperties properties)
-{
-    if (IsPrimitiveType(properties.type))
-        return true;
-    if (properties.type == MetaType::TypeStruct)
-    {
-        if (properties.getCustomUint32() & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked))
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-constexpr bool AreAllMembersPacked(const Atom* structAtom, int numAtoms)
-{
-    uint32_t nextOffset = 0;
-    for (int idx = 0; idx < numAtoms; ++idx)
-    {
-        const Atom* member = structAtom + idx + 1;
-        if (member->properties.offset != nextOffset)
-        {
-            return false;
-        }
-        nextOffset += member->properties.size;
-    }
-    return nextOffset == structAtom->properties.size;
-}
-
-struct MetaClassBuilderVisitor
-{
-    MetaClassBuilder& builder;
-
-    template <typename R, typename T, int N>
-    inline constexpr bool operator()(int order, const char (&name)[N], R T::*memberPointer, size_t offset)
-    {
-        builder.member(order, name, memberPointer, offset);
-        return true;
-    }
-};
 template <typename Type>
 struct MetaStruct<MetaClass<Type>>
 {
-    typedef Type              T;
-    static constexpr MetaType getMetaType() { return MetaType::TypeStruct; }
+    typedef Type                            T;
+    [[nodiscard]] static constexpr MetaType getMetaType() { return MetaType::TypeStruct; }
 
     static constexpr void build(MetaClassBuilder& builder)
     {
         builder.Struct<T>();
-        MetaClassBuilderVisitor builderVisitor = {builder};
-        MetaClass<Type>::members(builderVisitor);
-        uint32_t flags = 0;
-        if (IsTriviallyCopyable<T>::value)
-            flags |= static_cast<uint32_t>(MetaStructFlags::IsTriviallyCopyable);
-        if (AreAllMembersPacked(builder.output, builder.size - 1))
-            flags |= static_cast<uint32_t>(MetaStructFlags::IsPacked);
-        builder.output[0].properties.setCustomUint32(flags);
+        MetaClass<Type>::members(builder);
+        if (builder.capacity > 0)
+        {
+            uint32_t flags = 0;
+            if (IsTriviallyCopyable<T>::value)
+                flags |= static_cast<uint32_t>(MetaStructFlags::IsTriviallyCopyable);
+            if (builder.output->areAllMembersPacked(builder.size - 1))
+                flags |= static_cast<uint32_t>(MetaStructFlags::IsPacked);
+            builder.output[0].properties.setCustomUint32(flags);
+        }
     }
 };
 
@@ -303,12 +356,10 @@ inline constexpr void MetaClassBuilder::push(const Atom& value)
 {
     if (size < capacity)
     {
-        if (output != nullptr)
-        {
-            output[size] = value;
-        }
+        output[size] = value;
         size++;
     }
+    wantedCapacity++;
 }
 template <typename T, int N>
 inline constexpr void MetaClassBuilder::Struct(const char (&name)[N])
@@ -327,30 +378,20 @@ inline constexpr void MetaClassBuilder::member(int order, const char (&name)[N],
 }
 
 template <int MAX_ATOMS>
-inline constexpr auto MetaBuild(Atom::MetaClassBuildFunc build)
+[[nodiscard]] constexpr bool MetaBuildAppend(MetaArray<Atom, MAX_ATOMS>& atoms, Atom::MetaClassBuildFunc build)
 {
-    MetaArray<Atom, MAX_ATOMS> atoms;
-    MetaClassBuilder           container(atoms.values, MAX_ATOMS);
+    const int        initialSize = atoms.size;
+    MetaClassBuilder container(atoms.values + initialSize, MAX_ATOMS - initialSize);
     build(container);
-    if (container.size <= MAX_ATOMS)
+    if (container.wantedCapacity == container.size)
     {
-        atoms.values[0].properties.numSubAtoms = container.size - 1;
-        atoms.size                             = container.size;
+        atoms.values[initialSize].properties.numSubAtoms = container.size - 1;
+        atoms.size += container.size;
+        return true;
     }
-    return atoms;
+    return false;
 }
 
-template <int MAX_ATOMS>
-constexpr MetaArray<Atom, MAX_ATOMS> Atom::getAtoms() const
-{
-    return MetaBuild<MAX_ATOMS>(build);
-}
-
-template <typename T, int MAX_ATOMS>
-constexpr MetaArray<Atom, MAX_ATOMS> MetaClassGetAtoms()
-{
-    return MetaBuild<MAX_ATOMS>(&MetaClass<T>::build);
-}
 } // namespace Reflection
 } // namespace SC
 
