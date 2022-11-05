@@ -78,6 +78,29 @@ struct IsConst<const T> : public true_type
 {
 };
 
+template <typename T>
+struct IsUnion : false_type
+{
+}; // TODO: This needs compiler instrinsics
+template <class T>
+IntegralConstant<bool, !IsUnion<T>::value> isClassTest(char T::*);
+template <class>
+false_type isClassTest(...);
+
+template <class T>
+struct IsClass : decltype(isClassTest<T>(nullptr))
+{
+};
+
+template <typename T>
+struct IsArray : false_type
+{
+};
+template <typename T, int N>
+struct IsArray<T[N]> : true_type
+{
+    typedef T type;
+};
 template <typename _Tp>
 struct IsTriviallyCopyable : public IntegralConstant<bool, __is_trivially_copyable(_Tp)>
 {
@@ -201,6 +224,43 @@ template <typename T, size_t N>
 constexpr size_t ConstantArraySize(const T (&text)[N])
 {
     return N;
+}
+template <unsigned int N, unsigned int I>
+struct FnvHash
+{
+    static constexpr uint32_t Hash(const char (&str)[N])
+    {
+        return (FnvHash<N, I - 1>::Hash(str) ^ str[I - 1]) * 16777619u;
+    }
+};
+
+template <uint32_t N>
+struct FnvHash<N, 1>
+{
+    static constexpr uint32_t Hash(const char (&str)[N]) { return (2166136261u ^ str[0]) * 16777619u; }
+};
+
+template <unsigned int N>
+constexpr uint32_t StringHash(const char (&str)[N])
+{
+    return FnvHash<N, N>::Hash(str);
+}
+
+template <typename... uint32_t>
+constexpr auto CombineHash(uint32_t... hash1)
+{
+    char parts2[sizeof...(uint32_t)][4] = {
+        {static_cast<char>((hash1 & 0xff) >> 0), static_cast<char>((hash1 & 0xff00) >> 8),
+         static_cast<char>((hash1 & 0xff0000) >> 16), static_cast<char>((hash1 & 0xff0000) >> 24)}...};
+    char combinedChars[sizeof(parts2)] = {0};
+    for (int i = 0; i < sizeof...(uint32_t); ++i)
+    {
+        combinedChars[i * 4 + 0] = parts2[i][0];
+        combinedChars[i * 4 + 1] = parts2[i][1];
+        combinedChars[i * 4 + 2] = parts2[i][2];
+        combinedChars[i * 4 + 3] = parts2[i][3];
+    }
+    return StringHash(combinedChars);
 }
 
 } // namespace SC

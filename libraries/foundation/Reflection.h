@@ -378,6 +378,8 @@ constexpr MetaArray<Atom, MAX_ATOMS> MetaClassGetAtoms()
     template <>                                                                                                        \
     struct SC::Reflection::MetaClass<StructName> : SC::Reflection::MetaStruct<MetaClass<StructName>>                   \
     {                                                                                                                  \
+        static constexpr auto Hash = SC::StringHash(#StructName);                                                      \
+                                                                                                                       \
         template <typename MemberVisitor>                                                                              \
         static constexpr bool members(MemberVisitor&& builder)                                                         \
         {                                                                                                              \
