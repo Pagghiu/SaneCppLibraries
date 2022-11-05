@@ -36,7 +36,7 @@ struct SC::SegmentHeader
 
     [[nodiscard]] static SegmentHeader* getSegmentHeader(void* oldItems)
     {
-        return reinterpret_cast<SegmentHeader*>(reinterpret_cast<uint8_t*>(oldItems) - sizeof(SegmentHeader));
+        return static_cast<SegmentHeader*>(static_cast<void*>(static_cast<uint8_t*>(oldItems) - sizeof(SegmentHeader)));
     }
 };
 
@@ -47,11 +47,13 @@ struct SC::SegmentItems : public SegmentHeader
     // MSVC doesn't like 0 sized arrays...
     SC_ALWAYS_INLINE T* getItems()
     {
-        return reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(this) + sizeof(SegmentHeader));
+        return static_cast<T*>(
+            static_cast<void*>(static_cast<uint8_t*>(static_cast<void*>(this)) + sizeof(SegmentHeader)));
     }
     SC_ALWAYS_INLINE const T* getItems() const
     {
-        return reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(this) + sizeof(SegmentHeader));
+        return static_cast<T*>(
+            static_cast<void*>(static_cast<uint8_t*>(static_cast<void*>(this)) + sizeof(SegmentHeader)));
     }
 #else
     union
@@ -109,12 +111,14 @@ struct SC::SegmentItems : public SegmentHeader
     }
     [[nodiscard]] static SegmentItems<T>* getSegment(T* oldItems)
     {
-        return reinterpret_cast<SegmentItems<T>*>(reinterpret_cast<uint8_t*>(oldItems) - sizeof(SegmentHeader));
+        return static_cast<SegmentItems<T>*>(
+            static_cast<void*>(static_cast<uint8_t*>(static_cast<void*>(oldItems)) - sizeof(SegmentHeader)));
     }
 
     [[nodiscard]] static const SegmentItems<T>* getSegment(const T* oldItems)
     {
-        return reinterpret_cast<SegmentItems<T>*>(reinterpret_cast<uint8_t*>(oldItems) - sizeof(SegmentHeader));
+        return static_cast<const SegmentItems<T>*>(static_cast<const void*>(
+            static_cast<const uint8_t*>(static_cast<const void*>(oldItems)) - sizeof(SegmentHeader)));
     }
 
     void setSize(size_t newSize) { sizeBytes = static_cast<HeaderBytesType>(newSize * sizeof(T)); }
