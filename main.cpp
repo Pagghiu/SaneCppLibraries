@@ -36,7 +36,7 @@ int main(int argc, const char* argv[])
     { FunctionTest          test(report); }
     { ReflectionTest        test(report); }
     { SerializationTest     test(report); }
-    { SerializationBTest    test(report); }
+    { Serialization2Test    test(report); }
     // clang-format on
 
     return report.getTestReturnCode();

@@ -1,7 +1,7 @@
 #pragma once
 #include "ConstexprTypes.h"
+#include "FlatSchemaCompiler.h"
 #include "Language.h" // IsTriviallyCopyable<T>
-#include "ReflectionFlatSchemaCompiler.h"
 #include "Types.h"
 
 namespace SC
@@ -327,9 +327,7 @@ inline constexpr void MetaClassBuilder::member(int order, const char (&name)[N],
 
 struct FlatSchemaCompiler
 {
-    typedef FlatSchemaCompilerBase::FlatSchemaCompilerBase<Reflection::MetaProperties, Reflection::Atom,
-                                                           Reflection::MetaClassBuilder>
-        FlatSchemaBase;
+    typedef FlatSchemaCompilerBase::FlatSchemaCompilerBase<MetaProperties, Atom, MetaClassBuilder> FlatSchemaBase;
 
     // You can customize:
     // - MAX_LINK_BUFFER_SIZE: maximum number of "complex types" (anything that is not a primitive) that can be built

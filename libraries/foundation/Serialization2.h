@@ -1,6 +1,7 @@
 #pragma once
 #include "Array.h"
 #include "Reflection2.h"
+#include "SerializationTestSuite.h"
 #include "String.h"
 #include "Test.h"
 #include "Vector.h"
@@ -30,6 +31,7 @@ template <typename T>
 struct HashFor;
 // clang-format off
 template <typename T> struct IsPrimitive : false_type {};
+
 template <> struct IsPrimitive<uint8_t>  : true_type  {};
 template <> struct IsPrimitive<uint16_t> : true_type  {};
 template <> struct IsPrimitive<uint32_t> : true_type  {};
@@ -40,6 +42,7 @@ template <> struct IsPrimitive<int32_t>  : true_type  {};
 template <> struct IsPrimitive<int64_t>  : true_type  {};
 template <> struct IsPrimitive<float>    : true_type  {};
 template <> struct IsPrimitive<double>   : true_type  {};
+
 // TODO: We could probably hardcode these for faster compile time
 template <> struct HashFor<uint8_t>  { static constexpr auto Hash = StringHash("uint8");  };
 template <> struct HashFor<uint16_t> { static constexpr auto Hash = StringHash("uint16"); };
@@ -51,17 +54,20 @@ template <> struct HashFor<int32_t>  { static constexpr auto Hash = StringHash("
 template <> struct HashFor<int64_t>  { static constexpr auto Hash = StringHash("int64");  };
 template <> struct HashFor<float>    { static constexpr auto Hash = StringHash("float");  };
 template <> struct HashFor<double>   { static constexpr auto Hash = StringHash("double"); };
+
+template <> struct HashFor<char_t>      : HashFor<uint8_t>{};
+template <> struct IsPrimitive<char_t>  : IsPrimitive<uint8_t>  {};
 // clang-format on
 
 struct BinaryWriterStream
 {
     size_t              index = 0;
     SC::Vector<uint8_t> buffer;
-    int                 numOperations = 0;
+    int                 numberOfOperations = 0;
 
     [[nodiscard]] bool serialize(Span<const void> object)
     {
-        numOperations++;
+        numberOfOperations++;
         Span<const uint8_t> bytes = object.castTo<const uint8_t>();
         return buffer.appendCopy(bytes.data, bytes.size);
     }
@@ -71,13 +77,13 @@ struct BinaryReaderStream
 {
     size_t              index = 0;
     SC::Vector<uint8_t> buffer;
-    int                 numOperations = 0;
+    int                 numberOfOperations = 0;
 
     [[nodiscard]] bool serialize(Span<void> object)
     {
         if (object.size > buffer.size())
             return false;
-        numOperations++;
+        numberOfOperations++;
         Span<uint8_t> bytes = object.castTo<uint8_t>();
         memcpy(bytes.data, &buffer[index], bytes.size);
         index += bytes.size;
@@ -89,8 +95,9 @@ struct BinaryReaderStream
 struct SC::Serialization2::VersionSchema
 {
     const Span<const Reflection2::MetaProperties> sourceProperties;
-    int                                           sourceTypeIndex = 0;
-    Reflection2::MetaProperties                   current() const { return sourceProperties.data[sourceTypeIndex]; }
+
+    int                         sourceTypeIndex = 0;
+    Reflection2::MetaProperties current() const { return sourceProperties.data[sourceTypeIndex]; }
 };
 
 template <typename T>
@@ -123,7 +130,7 @@ template <typename T, typename T2>
 struct SC::Serialization2::ClassInfo
 {
     static constexpr bool IsPacked = ClassInfoMembers<T>().IsPacked;
-    static constexpr auto Hash     = Reflection2::MetaClass<T>::Hash;
+    static constexpr auto Hash     = HashFor<T>::Hash;
 };
 
 template <typename T, int N>
@@ -260,70 +267,131 @@ struct SC::Serialization2::Serializer<BinaryStream, T,
         return stream.serialize({&object, sizeof(T)});
     }
 };
-
+SC_META2_STRUCT_BEGIN(SC::String)
+SC_META2_STRUCT_MEMBER(0, data)
+SC_META2_STRUCT_END()
 namespace SC
 {
-struct SerializationBTest;
-struct PrimitiveBStruct;
-} // namespace SC
-
-struct SC::PrimitiveBStruct
+namespace Serialization2
 {
-    uint8_t     arrayValue[4] = {0, 1, 2, 3};
-    float       floatValue    = 1.5f;
-    int64_t     int64Value    = -13;
-    Vector<int> vector        = {1, 2, 3};
+struct SimpleBinaryReaderVersioned
+{
+    template <typename T>
+    [[nodiscard]] bool serialize(T& object, Span<const void> source, Span<const Reflection::MetaProperties> properties,
+                                 Span<const SC::ConstexprStringView> names)
 
-    bool operator!=(const PrimitiveBStruct& other) const
     {
-        for (int i = 0; i < ConstantArraySize(arrayValue); ++i)
-            if (arrayValue[i] != other.arrayValue[i])
-                return true;
-        if (floatValue != other.floatValue)
-            return true;
-        if (int64Value != other.int64Value)
-            return true;
-        if (vector.size() != other.vector.size())
-            return false;
-        for (int i = 0; i < vector.size(); ++i)
-        {
-            if (vector[i] != other.vector[i])
-                return true;
-        }
         return false;
     }
 };
-SC_META2_STRUCT_BEGIN(SC::PrimitiveBStruct)
+} // namespace Serialization2
+} // namespace SC
+
+namespace SC
+{
+struct Serialization2Test;
+} // namespace SC
+
+SC_META2_STRUCT_BEGIN(SC::SerializationTestSuite::PrimitiveStruct)
 SC_META2_STRUCT_MEMBER(0, arrayValue)
 SC_META2_STRUCT_MEMBER(1, floatValue)
 SC_META2_STRUCT_MEMBER(2, int64Value)
-SC_META2_STRUCT_MEMBER(3, vector)
 SC_META2_STRUCT_END()
+
+SC_META2_STRUCT_BEGIN(SC::SerializationTestSuite::NestedStruct)
+SC_META2_STRUCT_MEMBER(0, int16Value)
+SC_META2_STRUCT_MEMBER(1, structsArray)
+SC_META2_STRUCT_MEMBER(2, doubleVal)
+SC_META2_STRUCT_END()
+
+SC_META2_STRUCT_BEGIN(SC::SerializationTestSuite::TopLevelStruct)
+SC_META2_STRUCT_MEMBER(0, nestedStruct)
+SC_META2_STRUCT_END()
+
+SC_META2_STRUCT_BEGIN(SC::SerializationTestSuite::VectorStructSimple)
+SC_META2_STRUCT_MEMBER(0, emptyVector)
+SC_META2_STRUCT_MEMBER(1, vectorOfInts)
+SC_META2_STRUCT_END()
+
+SC_META2_STRUCT_BEGIN(SC::SerializationTestSuite::VectorStructComplex)
+SC_META2_STRUCT_MEMBER(0, vectorOfStrings)
+SC_META2_STRUCT_END()
+
+SC_META2_STRUCT_BEGIN(SC::SerializationTestSuite::VersionedStruct1)
+SC_META2_STRUCT_MEMBER(0, floatValue)
+SC_META2_STRUCT_MEMBER(1, fieldToRemove)
+SC_META2_STRUCT_MEMBER(2, field2ToRemove)
+SC_META2_STRUCT_MEMBER(3, int64Value)
+SC_META2_STRUCT_END()
+
+SC_META2_STRUCT_BEGIN(SC::SerializationTestSuite::VersionedStruct2)
+SC_META2_STRUCT_MEMBER(3, int64Value)
+SC_META2_STRUCT_MEMBER(0, floatValue)
+SC_META2_STRUCT_END()
+
+SC_META2_STRUCT_BEGIN(SC::SerializationTestSuite::VersionedPoint3D)
+SC_META2_STRUCT_MEMBER(0, x)
+SC_META2_STRUCT_MEMBER(1, y)
+SC_META2_STRUCT_MEMBER(2, z)
+SC_META2_STRUCT_END()
+
+SC_META2_STRUCT_BEGIN(SC::SerializationTestSuite::VersionedPoint2D)
+SC_META2_STRUCT_MEMBER(0, x)
+SC_META2_STRUCT_MEMBER(1, y)
+SC_META2_STRUCT_END()
+
+SC_META2_STRUCT_BEGIN(SC::SerializationTestSuite::VersionedArray1)
+SC_META2_STRUCT_MEMBER(0, points)
+SC_META2_STRUCT_MEMBER(1, simpleInts)
+SC_META2_STRUCT_END()
+
+SC_META2_STRUCT_BEGIN(SC::SerializationTestSuite::VersionedArray2)
+SC_META2_STRUCT_MEMBER(0, points)
+SC_META2_STRUCT_MEMBER(1, simpleInts)
+SC_META2_STRUCT_END()
+
+SC_META2_STRUCT_BEGIN(SC::SerializationTestSuite::ConversionStruct1)
+SC_META2_STRUCT_MEMBER(0, intToFloat)
+SC_META2_STRUCT_MEMBER(1, floatToInt)
+SC_META2_STRUCT_MEMBER(2, uint16To32)
+SC_META2_STRUCT_MEMBER(3, signed16ToUnsigned)
+SC_META2_STRUCT_END()
+
+SC_META2_STRUCT_BEGIN(SC::SerializationTestSuite::ConversionStruct2)
+SC_META2_STRUCT_MEMBER(0, intToFloat)
+SC_META2_STRUCT_MEMBER(1, floatToInt)
+SC_META2_STRUCT_MEMBER(2, uint16To32)
+SC_META2_STRUCT_MEMBER(3, signed16ToUnsigned)
+SC_META2_STRUCT_END()
+
 // static_assert(SC::Serialization2::ClassInfo<SC::PrimitiveBStruct>().IsPacked, "THIS MUST BE PACKED");
-
-struct SC::SerializationBTest : public SC::TestCase
+template <typename StreamType>
+struct SerializerAdapter
 {
-    SerializationBTest(SC::TestReport& report) : TestCase(report, "SerializationBTest")
+    StreamType& stream;
+    SerializerAdapter(StreamType& stream) : stream(stream) {}
+    template <typename T>
+    bool serialize(T& value)
     {
-        using namespace SC;
-        using namespace SC::Serialization2;
-        if (test_section("Primitive Structure Write"))
-        {
-            PrimitiveBStruct   struct1;
-            BinaryWriterStream stream;
-            bool               res;
+        bool res = SC::Serialization2::Serializer<StreamType, T>::serialize(value, stream);
+        return res;
+    }
+};
 
-            res = Serializer<BinaryWriterStream, PrimitiveBStruct>::serialize(struct1, stream);
-            SC_TEST_EXPECT(res);
-            SC_TEST_EXPECT(stream.numOperations == 5);
-            BinaryReaderStream reader;
-            reader.buffer = move(stream.buffer);
-            PrimitiveBStruct struct2;
-            memset(&struct2, 0, sizeof(struct2));
-            res = Serializer<BinaryReaderStream, PrimitiveBStruct>::serialize(struct2, reader);
-            SC_TEST_EXPECT(res);
-            SC_TEST_EXPECT(reader.numOperations == stream.numOperations);
-            SC_TEST_EXPECT(not(struct1 != struct2));
-        }
+namespace SC
+{
+struct Serialization2Test;
+}
+struct SC::Serialization2Test : public SC::SerializationTestSuite::SerializationTestBase<
+                                    SC::Serialization2::BinaryWriterStream,                    //
+                                    SC::Serialization2::BinaryReaderStream,                    //
+                                    SerializerAdapter<SC::Serialization2::BinaryWriterStream>, //
+                                    SerializerAdapter<SC::Serialization2::BinaryReaderStream>, //
+                                    SC::Serialization2::SimpleBinaryReaderVersioned,           //
+                                    SC::Reflection::FlatSchemaCompiler>
+{
+    Serialization2Test(SC::TestReport& report) : SerializationTestBase(report, "Serialization2Test")
+    {
+        runSameVersionTests();
     }
 };
