@@ -1,5 +1,7 @@
 #pragma once
+#include "ConstexprTypes.h"
 #include "Language.h" // IsTriviallyCopyable<T>
+#include "ReflectionFlatSchemaCompiler.h"
 #include "Types.h"
 
 namespace SC
@@ -138,60 +140,6 @@ template <> struct MetaClass<float>    : public MetaPrimitive {static constexpr 
 template <> struct MetaClass<double>   : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeDOUBLE64;}};
 // clang-format on
 
-template <typename T, int N>
-struct MetaArray
-{
-    T   values[N] = {};
-    int size      = 0;
-
-    [[nodiscard]] constexpr bool contains(T value, int* outIndex = nullptr) const
-    {
-        for (int i = 0; i < size; ++i)
-        {
-            if (values[i] == value)
-            {
-                if (outIndex)
-                    *outIndex = i;
-                return true;
-            }
-        }
-        return false;
-    }
-
-    template <int N2>
-    [[nodiscard]] constexpr bool append(const MetaArray<T, N2>& other)
-    {
-        if (size + other.size >= N)
-            return false;
-        for (int i = 0; i < other.size; ++i)
-        {
-            values[size++] = other.values[i];
-        }
-        return true;
-    }
-
-    [[nodiscard]] constexpr bool push_back(const T& value)
-    {
-        if (size < N)
-        {
-            values[size++] = value;
-            return true;
-        }
-        return false;
-    }
-};
-
-struct MetaStringView
-{
-    const char* data;
-    int         length;
-    constexpr MetaStringView() : data(nullptr), length(0) {}
-    template <int N>
-    constexpr MetaStringView(const char (&data)[N]) : data(data), length(N)
-    {}
-    constexpr MetaStringView(const char* data, int length) : data(data), length(length) {}
-};
-
 template <typename T>
 struct MetaTypeToString
 {
@@ -200,8 +148,8 @@ struct MetaTypeToString
     // In C++ 17 we trim the long string producted by ClassName<T> to reduce executable size
     [[nodiscard]] static constexpr auto TrimClassName()
     {
-        constexpr auto                    className = ClNm<T>();
-        MetaArray<char, className.length> trimmedName;
+        constexpr auto                         className = ClNm<T>();
+        ConstexprArray<char, className.length> trimmedName;
         for (int i = 0; i < className.length; ++i)
         {
             trimmedName.values[i] = className.data[i];
@@ -214,12 +162,12 @@ struct MetaTypeToString
     static inline constexpr auto value = TrimClassName();
 
   public:
-    [[nodiscard]] static constexpr MetaStringView get() { return MetaStringView(value.values, value.size); }
+    [[nodiscard]] static constexpr ConstexprStringView get() { return ConstexprStringView(value.values, value.size); }
 #else
-    [[nodiscard]] static constexpr MetaStringView get()
+    [[nodiscard]] static constexpr ConstexprStringView get()
     {
         auto className = ClNm<T>();
-        return MetaStringView(className.data, className.length);
+        return ConstexprStringView(className.data, className.length);
     }
 #endif
 };
@@ -256,16 +204,16 @@ struct Atom
 {
     typedef void (*MetaClassBuildFunc)(MetaClassBuilder& builder);
 
-    MetaProperties     properties;
-    MetaStringView     name;
-    MetaClassBuildFunc build;
+    MetaProperties      properties;
+    ConstexprStringView name;
+    MetaClassBuildFunc  build;
 
     constexpr Atom() : build(nullptr) {}
-    constexpr Atom(const MetaProperties properties, MetaStringView name, MetaClassBuildFunc build)
+    constexpr Atom(const MetaProperties properties, ConstexprStringView name, MetaClassBuildFunc build)
         : properties(properties), name(name), build(build)
     {}
     template <int MAX_ATOMS>
-    [[nodiscard]] constexpr MetaArray<Atom, MAX_ATOMS> getAtoms() const;
+    [[nodiscard]] constexpr ConstexprArray<Atom, MAX_ATOMS> getAtoms() const;
 
     [[nodiscard]] constexpr int countAtoms() const
     {
@@ -282,11 +230,11 @@ struct Atom
     [[nodiscard]] static constexpr Atom create(int order, const char (&name)[N], R T::*, size_t offset)
     {
         return {MetaProperties(MetaClass<R>::getMetaType(), order, static_cast<SC::uint16_t>(offset), sizeof(R), -1),
-                MetaStringView(name, N), &MetaClass<R>::build};
+                ConstexprStringView(name, N), &MetaClass<R>::build};
     }
 
     template <typename T>
-    [[nodiscard]] static constexpr Atom create(MetaStringView name = MetaTypeToString<T>::get())
+    [[nodiscard]] static constexpr Atom create(ConstexprStringView name = MetaTypeToString<T>::get())
     {
         return {MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), name, &MetaClass<T>::build};
     }
@@ -294,7 +242,7 @@ struct Atom
     template <typename T, int N>
     [[nodiscard]] static constexpr Atom create(const char (&name)[N])
     {
-        return create<T>(MetaStringView(name, N));
+        return create<T>(ConstexprStringView(name, N));
     }
 
     [[nodiscard]] constexpr bool operator==(const Atom& other) const { return build == other.build; }
@@ -377,21 +325,84 @@ inline constexpr void MetaClassBuilder::member(int order, const char (&name)[N],
     push(Atom::create(order, name, field, offset));
 }
 
-template <int MAX_ATOMS>
-[[nodiscard]] constexpr bool MetaBuildAppend(MetaArray<Atom, MAX_ATOMS>& atoms, Atom::MetaClassBuildFunc build)
+struct FlatSchemaCompiler
 {
-    const int        initialSize = atoms.size;
-    MetaClassBuilder container(atoms.values + initialSize, MAX_ATOMS - initialSize);
-    build(container);
-    if (container.wantedCapacity == container.size)
-    {
-        atoms.values[initialSize].properties.numSubAtoms = container.size - 1;
-        atoms.size += container.size;
-        return true;
-    }
-    return false;
-}
+    typedef FlatSchemaCompilerBase::FlatSchemaCompilerBase<Reflection::MetaProperties, Reflection::Atom,
+                                                           Reflection::MetaClassBuilder>
+        FlatSchemaBase;
 
+    // You can customize:
+    // - MAX_LINK_BUFFER_SIZE: maximum number of "complex types" (anything that is not a primitive) that can be built
+    // - MAX_TOTAL_ATOMS: maximum number of atoms (struct members). When using constexpr it will trim it to actual size.
+    template <typename T, int MAX_LINK_BUFFER_SIZE = 20, int MAX_TOTAL_ATOMS = 100>
+    static constexpr auto compile()
+    {
+        constexpr ConstexprArray<Atom, MAX_TOTAL_ATOMS> allAtoms =
+            FlatSchemaBase::compileAllAtomsFor<MAX_LINK_BUFFER_SIZE, MAX_TOTAL_ATOMS>(&MetaClass<T>::build);
+        static_assert(allAtoms.size > 0, "Something failed in compileAllAtomsFor");
+        FlatSchemaBase::FlatSchema<allAtoms.size> result;
+        for (int i = 0; i < allAtoms.size; ++i)
+        {
+            result.properties.values[i] = allAtoms.values[i].properties;
+            result.names.values[i]      = allAtoms.values[i].name;
+        }
+        result.properties.size = allAtoms.size;
+        result.names.size      = allAtoms.size;
+        markPackedStructs(result, 0);
+        return result;
+    }
+
+  private:
+    template <int MAX_TOTAL_ATOMS>
+    static constexpr bool markPackedStructs(FlatSchemaBase::FlatSchema<MAX_TOTAL_ATOMS>& result, int startIdx)
+    {
+        MetaProperties& atom = result.properties.values[startIdx];
+        if (atom.isPrimitiveType())
+        {
+            return true; // packed by definition
+        }
+        else if (atom.type == MetaType::TypeStruct)
+        {
+            // packed if is itself packed and all of its non primitive members are packed
+            const auto structFlags         = atom.getCustomUint32();
+            bool       isRecursivelyPacked = true;
+            if (not(structFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked)))
+            {
+                isRecursivelyPacked = false;
+            }
+            for (int idx = 0; idx < atom.numSubAtoms; ++idx)
+            {
+                const MetaProperties& member = result.properties.values[startIdx + 1 + idx];
+                if (not member.isPrimitiveType())
+                {
+                    if (not markPackedStructs(result, member.getLinkIndex()))
+                    {
+                        isRecursivelyPacked = false;
+                    }
+                }
+            }
+            if (isRecursivelyPacked)
+            {
+                atom.setCustomUint32(structFlags | static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked));
+            }
+            return isRecursivelyPacked;
+        }
+        int             newIndex = startIdx + 1;
+        MetaProperties& itemAtom = result.properties.values[startIdx + 1];
+        if (itemAtom.getLinkIndex() > 0)
+            newIndex = itemAtom.getLinkIndex();
+        // We want to visit the inner type anyway
+        const bool innerResult = markPackedStructs(result, newIndex);
+        if (atom.type == MetaType::TypeArray)
+        {
+            return innerResult; // C-arrays are packed if their inner type is packed
+        }
+        else
+        {
+            return false; // Vector & co will break packed state
+        }
+    }
+};
 } // namespace Reflection
 } // namespace SC
 

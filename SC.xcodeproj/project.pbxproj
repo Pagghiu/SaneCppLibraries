@@ -119,6 +119,7 @@
 		7BCBC36F2916BE80008CF1A9 /* Reflection2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Reflection2.h; sourceTree = "<group>"; };
 		7BD08BD529071D1B00970C9A /* ReflectionFlatSchemaCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ReflectionFlatSchemaCompiler.h; sourceTree = "<group>"; };
 		7BD08BD629071D1B00970C9A /* Reflection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Reflection.h; sourceTree = "<group>"; };
+		7BD19C0A2917B3F700CDC3C8 /* ConstexprTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ConstexprTypes.h; sourceTree = "<group>"; };
 		7BD2350428FC9DA60004C69E /* ReflectionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ReflectionTest.h; sourceTree = "<group>"; };
 		7BD87ABF291438E2005E7980 /* SerializationTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SerializationTest.h; sourceTree = "<group>"; };
 		7BE4E1CB29033C3D0091CED7 /* InitializerList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InitializerList.h; sourceTree = "<group>"; };
@@ -171,6 +172,7 @@
 				7B73EFF028F37F040081C601 /* Console.cpp */,
 				7B73EFE728F37F040081C601 /* Console.h */,
 				7B73EFF228F37F040081C601 /* ConsoleTest.h */,
+				7BD19C0A2917B3F700CDC3C8 /* ConstexprTypes.h */,
 				7B26715028FC1A6000112DCE /* Function.h */,
 				7B26715128FC1A6000112DCE /* FunctionTest.h */,
 				7BE4E1CB29033C3D0091CED7 /* InitializerList.h */,

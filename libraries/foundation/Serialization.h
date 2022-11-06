@@ -163,7 +163,7 @@ struct SimpleBinaryWriter
     int numberOfOperations = 0;
 
     Span<const Reflection::MetaProperties> sourceProperties;
-    Span<const Reflection::MetaStringView> sourceNames;
+    Span<const SC::ConstexprStringView>    sourceNames;
     BinaryBuffer                           destination;
     Span<const void>                       sourceObject;
     int                                    sourceTypeIndex;
@@ -302,7 +302,7 @@ struct SimpleBinaryReader
     int numberOfOperations = 0;
 
     Span<const Reflection::MetaProperties> sinkProperties;
-    Span<const Reflection::MetaStringView> sinkNames;
+    Span<const SC::ConstexprStringView>    sinkNames;
     Reflection::MetaProperties             sinkProperty;
     int                                    sinkTypeIndex = 0;
     Span<void>                             sinkObject;
@@ -451,8 +451,8 @@ struct SimpleBinaryReaderVersioned
     Options options;
     int     numberOfOperations = 0;
 
-    Span<const Reflection::MetaStringView> sinkNames;
-    Span<const Reflection::MetaStringView> sourceNames;
+    Span<const SC::ConstexprStringView> sinkNames;
+    Span<const SC::ConstexprStringView> sourceNames;
 
     Span<const Reflection::MetaProperties> sinkProperties;
     Span<void>                             sinkObject;
@@ -466,7 +466,7 @@ struct SimpleBinaryReaderVersioned
 
     template <typename T>
     [[nodiscard]] bool read(T& object, Span<const void> source, Span<const Reflection::MetaProperties> properties,
-                            Span<const Reflection::MetaStringView> names)
+                            Span<const SC::ConstexprStringView> names)
     {
         constexpr auto flatSchema = Reflection::FlatSchemaCompiler::compile<T>();
         sourceProperties          = properties;

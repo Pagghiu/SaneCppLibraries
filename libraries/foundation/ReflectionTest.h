@@ -1,6 +1,5 @@
 #pragma once
 #include "Array.h"
-#include "ReflectionFlatSchemaCompiler.h"
 #include "ReflectionSC.h"
 #include "Test.h"
 #include "Vector.h"
@@ -278,7 +277,7 @@ struct SC::ReflectionTest : public SC::TestCase
     }
     template <int NUM_ATOMS>
     static void printFlatSchema(const Reflection::MetaProperties (&atom)[NUM_ATOMS],
-                                const Reflection::MetaStringView (&names)[NUM_ATOMS])
+                                const SC::ConstexprStringView (&names)[NUM_ATOMS])
     {
         int atomIndex = 0;
         while (atomIndex < NUM_ATOMS)
@@ -288,7 +287,7 @@ struct SC::ReflectionTest : public SC::TestCase
     }
 
     static int printAtoms(int currentAtomIdx, const Reflection::MetaProperties* atom,
-                          const Reflection::MetaStringView* atomName, int indentation)
+                          const SC::ConstexprStringView* atomName, int indentation)
     {
         using namespace SC;
         using namespace SC::Reflection;

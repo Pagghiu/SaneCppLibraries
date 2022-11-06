@@ -1,11 +1,10 @@
 #pragma once
-#include "Reflection.h"
+#include "ConstexprTypes.h"
+
 namespace SC
 {
 namespace Reflection2
 {
-using SC::Reflection::MetaArray;
-using SC::Reflection::MetaStringView;
 enum class MetaType : uint8_t
 {
     // Invalid sentinel
@@ -46,9 +45,9 @@ struct MetaProperties
 };
 struct MetaAtom
 {
-    MetaProperties     properties;
-    MetaStringView     name;
-    MetaClassBuildFunc build;
+    MetaProperties      properties;
+    ConstexprStringView name;
+    MetaClassBuildFunc  build;
 };
 struct MetaClassBuilder
 {
