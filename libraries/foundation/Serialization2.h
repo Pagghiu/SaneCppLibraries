@@ -90,18 +90,9 @@ struct BinaryReaderStream
         return true;
     }
 };
-} // namespace Serialization2
-} // namespace SC
-struct SC::Serialization2::VersionSchema
-{
-    const Span<const Reflection2::MetaProperties> sourceProperties;
-
-    int                         sourceTypeIndex = 0;
-    Reflection2::MetaProperties current() const { return sourceProperties.data[sourceTypeIndex]; }
-};
 
 template <typename T>
-struct SC::Serialization2::ClassInfoMembers
+struct ClassInfoMembers
 {
     size_t memberSizeSum = 0;
     bool   IsPacked      = false;
@@ -127,28 +118,28 @@ struct SC::Serialization2::ClassInfoMembers
 };
 
 template <typename T, typename T2>
-struct SC::Serialization2::ClassInfo
+struct ClassInfo
 {
     static constexpr bool IsPacked = ClassInfoMembers<T>().IsPacked;
     static constexpr auto Hash     = HashFor<T>::Hash;
 };
 
 template <typename T, int N>
-struct SC::Serialization2::ClassInfo<T[N]>
+struct ClassInfo<T[N]>
 {
     static constexpr bool IsPacked = ClassInfo<T>::IsPacked;
     static constexpr auto Hash     = SC::CombineHash(SC::StringHash("[]"), HashFor<T>::Hash, N);
 };
 
 template <typename T>
-struct SC::Serialization2::ClassInfo<T, typename SC::EnableIf<SC::Serialization2::IsPrimitive<T>::value>::type>
+struct ClassInfo<T, typename SC::EnableIf<IsPrimitive<T>::value>::type>
 {
     static constexpr bool IsPacked = true;
     static constexpr auto Hash     = HashFor<T>::Hash;
 };
 
 template <typename BinaryStream, typename T>
-struct SC::Serialization2::SerializerMemberIterator
+struct SerializerMemberIterator
 {
     BinaryStream& stream;
     T&            object;
@@ -160,15 +151,27 @@ struct SC::Serialization2::SerializerMemberIterator
     }
 };
 
+struct VersionSchema
+{
+    const Span<const Reflection2::MetaProperties> sourceProperties;
+
+    int sourceTypeIndex = 0;
+
+    Reflection2::MetaProperties current() const { return sourceProperties.data[sourceTypeIndex]; }
+};
+
 template <typename BinaryStream, typename T, typename T2>
-struct SC::Serialization2::Serializer
+struct Serializer
 {
     static constexpr bool IsItemPacked = ClassInfo<T>::IsPacked;
 
-    static constexpr bool serializeVersioned(T& object, BinaryStream& stream, VersionSchema& version)
+    [[nodiscard]] static constexpr bool serializeVersioned(T& object, BinaryStream& stream, VersionSchema& schema)
     {
-        SC_TRY_IF(version.current().type == Reflection2::MetaType::TypeStruct);
-        return true;
+        if (IsItemPacked)
+        {
+            return stream.serialize({&object, sizeof(T)});
+        }
+        return Reflection2::MetaClass<T>::visit(SerializerMemberIterator<BinaryStream, T>{stream, object});
     }
 
     [[nodiscard]] static constexpr bool serialize(T& object, BinaryStream& stream)
@@ -182,7 +185,7 @@ struct SC::Serialization2::Serializer
 };
 
 template <typename BinaryStream, typename T, int N>
-struct SC::Serialization2::Serializer<BinaryStream, T[N]>
+struct Serializer<BinaryStream, T[N]>
 {
     static constexpr bool IsItemPacked = ClassInfo<T>::IsPacked;
 
@@ -205,7 +208,7 @@ struct SC::Serialization2::Serializer<BinaryStream, T[N]>
 };
 
 template <typename BinaryStream, typename Container, typename T>
-struct SC::Serialization2::SerializerVector
+struct SerializerVector
 {
     static constexpr bool IsItemPacked = ClassInfo<T>::IsPacked;
 
@@ -234,39 +237,39 @@ struct SC::Serialization2::SerializerVector
 };
 
 template <typename BinaryStream, typename T>
-struct SC::Serialization2::Serializer<BinaryStream, SC::Vector<T>>
-    : public SerializerVector<BinaryStream, SC::Vector<T>, T>
+struct Serializer<BinaryStream, SC::Vector<T>> : public SerializerVector<BinaryStream, SC::Vector<T>, T>
 {
 };
 template <typename T>
-struct SC::Serialization2::ClassInfo<SC::Vector<T>>
+struct ClassInfo<SC::Vector<T>>
 {
     static constexpr bool IsPacked = false;
     static constexpr auto Hash     = SC::CombineHash(SC::StringHash("SC::Vector"), HashFor<T>::Hash);
 };
 
 template <typename BinaryStream, typename T, int N>
-struct SC::Serialization2::Serializer<BinaryStream, SC::Array<T, N>>
-    : public SerializerVector<BinaryStream, SC::Array<T, N>, T>
+struct Serializer<BinaryStream, SC::Array<T, N>> : public SerializerVector<BinaryStream, SC::Array<T, N>, T>
 {
 };
 
 template <typename T, int N>
-struct SC::Serialization2::ClassInfo<SC::Array<T, N>>
+struct ClassInfo<SC::Array<T, N>>
 {
     static constexpr bool IsPacked = false;
     static constexpr auto Hash     = SC::CombineHash(SC::StringHash("SC::Array"), HashFor<T>::Hash, N);
 };
 
 template <typename BinaryStream, typename T>
-struct SC::Serialization2::Serializer<BinaryStream, T,
-                                      typename SC::EnableIf<SC::Serialization2::IsPrimitive<T>::value>::type>
+struct Serializer<BinaryStream, T, typename SC::EnableIf<IsPrimitive<T>::value>::type>
 {
     [[nodiscard]] static constexpr bool serialize(T& object, BinaryStream& stream)
     {
         return stream.serialize({&object, sizeof(T)});
     }
 };
+} // namespace Serialization2
+} // namespace SC
+
 SC_META2_STRUCT_BEGIN(SC::String)
 SC_META2_STRUCT_MEMBER(0, data)
 SC_META2_STRUCT_END()
@@ -378,6 +381,16 @@ struct SerializerAdapter
     }
 };
 
+template <typename StreamType>
+struct SerializerVersionedAdapter
+{
+    template <typename T>
+    bool serialize(T& value)
+    {
+        return true;
+    }
+};
+
 namespace SC
 {
 struct Serialization2Test;
@@ -388,7 +401,7 @@ struct SC::Serialization2Test : public SC::SerializationTestSuite::Serialization
                                     SerializerAdapter<SC::Serialization2::BinaryWriterStream>, //
                                     SerializerAdapter<SC::Serialization2::BinaryReaderStream>, //
                                     SC::Serialization2::SimpleBinaryReaderVersioned,           //
-                                    SC::Reflection::FlatSchemaCompiler>
+                                    SC::Reflection2::FlatSchemaCompiler>
 {
     Serialization2Test(SC::TestReport& report) : SerializationTestBase(report, "Serialization2Test")
     {

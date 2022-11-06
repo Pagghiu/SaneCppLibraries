@@ -15,7 +15,7 @@ struct SC::Reflection::MetaClass<SC::Array<T, N>>
         arrayHeader.properties.numSubAtoms = 1;
         arrayHeader.properties.setCustomUint32(N);
         builder.push(arrayHeader);
-        builder.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), MetaTypeToString<T>::get(),
+        builder.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), TypeToString<T>::get(),
                       &MetaClass<T>::build});
     }
 };
@@ -30,7 +30,7 @@ struct SC::Reflection::MetaClass<SC::Vector<T>>
         vectorHeader.properties.numSubAtoms = 1;
         vectorHeader.properties.setCustomUint32(sizeof(T));
         builder.push(vectorHeader);
-        builder.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), MetaTypeToString<T>::get(),
+        builder.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), TypeToString<T>::get(),
                       &MetaClass<T>::build});
     }
 };

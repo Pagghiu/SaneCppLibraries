@@ -153,6 +153,21 @@ struct ArrayAccess
     }
 };
 
+[[nodiscard]] inline constexpr bool IsPrimitiveOrRecursivelyPacked(Reflection::MetaProperties properties)
+{
+    if (properties.isPrimitiveType())
+        return true;
+    if (properties.type == Reflection::MetaType::TypeStruct)
+    {
+        if (properties.getCustomUint32() &
+            static_cast<uint32_t>(Reflection::FlatSchemaCompiler::MetaStructFlags::IsRecursivelyPacked))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 struct SimpleBinaryWriter
 {
     Span<const Reflection::MetaProperties> sourceProperties;
@@ -223,8 +238,9 @@ struct SimpleBinaryWriter
         const auto       structSourceTypeIndex = sourceTypeIndex;
         Span<const void> structSourceRoot      = sourceObject;
 
-        const bool isBulkWriteable = structSourceProperty.getCustomUint32() &
-                                     static_cast<uint32_t>(Reflection::MetaStructFlags::IsRecursivelyPacked);
+        const bool isBulkWriteable =
+            structSourceProperty.getCustomUint32() &
+            static_cast<uint32_t>(Reflection::FlatSchemaCompiler::MetaStructFlags::IsRecursivelyPacked);
         if (isBulkWriteable)
         {
             // Bulk Write the entire struct
@@ -269,7 +285,7 @@ struct SimpleBinaryWriter
         if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
             sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
 
-        const bool isBulkWriteable = sourceProperties.data[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
+        const bool isBulkWriteable = IsPrimitiveOrRecursivelyPacked(sourceProperties.data[sourceTypeIndex]);
         if (isBulkWriteable)
         {
             SC_TRY_IF(destination.readFrom(arraySpan));
@@ -362,8 +378,9 @@ struct SimpleBinaryReader
         const auto structSinkProperty  = sinkProperty;
         const auto structSinkTypeIndex = sinkTypeIndex;
         Span<void> structSinkObject    = sinkObject;
-        const bool isRecursivelyPacked = structSinkProperty.getCustomUint32() &
-                                         static_cast<uint32_t>(Reflection::MetaStructFlags::IsRecursivelyPacked);
+        const bool isRecursivelyPacked =
+            structSinkProperty.getCustomUint32() &
+            static_cast<uint32_t>(Reflection::FlatSchemaCompiler::MetaStructFlags::IsRecursivelyPacked);
 
         if (isRecursivelyPacked)
         {
@@ -396,7 +413,7 @@ struct SimpleBinaryReader
         const auto sinkItemSize       = sinkProperties.data[sinkTypeIndex].size;
         if (sinkProperties.data[sinkTypeIndex].getLinkIndex() >= 0)
             sinkTypeIndex = sinkProperties.data[sinkTypeIndex].getLinkIndex();
-        const bool isBulkReadable = sinkProperties.data[sinkTypeIndex].isPrimitiveOrRecursivelyPacked();
+        const bool isBulkReadable = IsPrimitiveOrRecursivelyPacked(sinkProperties.data[sinkTypeIndex]);
         Span<void> arraySinkStart;
         if (arraySinkProperty.type == Reflection::MetaType::TypeArray)
         {

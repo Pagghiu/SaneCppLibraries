@@ -184,7 +184,6 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
 
     void runSameVersionTests()
     {
-        using namespace SC::SerializationTestSuite;
         if (test_section("Primitive Structure Write"))
         {
             PrimitiveStruct    primitive;

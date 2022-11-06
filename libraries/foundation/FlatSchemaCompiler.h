@@ -54,7 +54,7 @@ struct FlatSchemaCompilerBase
             Atom&      atom        = allAtoms.values[atomIndex];
             const bool isEmptyLink = atom.properties.getLinkIndex() < 0;
             int        numSubAtoms = 0;
-            if (isEmptyLink && (numSubAtoms = atom.countAtoms()) > 0)
+            if (isEmptyLink && (numSubAtoms = MetaClassBuilder::countAtoms(atom)) > 0)
             {
                 int outIndex = -1;
                 if (alreadyVisitedTypes.contains(atom.build, &outIndex))

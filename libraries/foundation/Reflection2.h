@@ -29,8 +29,6 @@ enum class MetaType : uint8_t
     TypeCustom = 13,
 };
 
-constexpr bool IsPrimitiveType(MetaType type) { return type >= MetaType::TypeUINT8 && type <= MetaType::TypeDOUBLE64; }
-
 template <typename T>
 struct MetaClass;
 
