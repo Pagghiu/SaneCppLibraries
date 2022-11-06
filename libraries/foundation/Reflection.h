@@ -186,7 +186,7 @@ struct MetaStruct<MetaClass<Type>>
     static constexpr void build(MetaClassBuilder& builder)
     {
         builder.Struct<T>();
-        MetaClass<Type>::members(builder);
+        MetaClass<Type>::visit(builder);
     }
 };
 
@@ -291,26 +291,6 @@ struct FlatSchemaCompiler
 } // namespace Reflection
 } // namespace SC
 
-#if SC_CLANG
-
-#define SC_DISABLE_OFFSETOF_WARNING                                                                                    \
-    _Pragma("clang diagnostic push");                                                                                  \
-    _Pragma("clang diagnostic ignored \"-Winvalid-offsetof\"");
-#define SC_ENABLE_OFFSETOF_WARNING _Pragma("clang diagnostic pop");
-
-#elif SC_GCC
-#define SC_DISABLE_OFFSETOF_WARNING                                                                                    \
-    _Pragma("GCC diagnostic push");                                                                                    \
-    _Pragma("GCC diagnostic ignored \"-Winvalid-offsetof\"");
-#define SC_ENABLE_OFFSETOF_WARNING _Pragma("GCC diagnostic pop");
-
-#else
-
-#define SC_DISABLE_OFFSETOF_WARNING
-#define SC_ENABLE_OFFSETOF_WARNING
-
-#endif
-
 #define SC_META_STRUCT_BEGIN(StructName)                                                                               \
     template <>                                                                                                        \
     struct SC::Reflection::MetaClass<StructName> : SC::Reflection::MetaStruct<MetaClass<StructName>>                   \
@@ -318,7 +298,7 @@ struct FlatSchemaCompiler
         static constexpr auto Hash = SC::StringHash(#StructName);                                                      \
                                                                                                                        \
         template <typename MemberVisitor>                                                                              \
-        static constexpr bool members(MemberVisitor&& builder)                                                         \
+        static constexpr bool visit(MemberVisitor&& builder)                                                           \
         {                                                                                                              \
             SC_DISABLE_OFFSETOF_WARNING
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "Array.h"
 #include "ReflectionSC.h"
+#include "SerializationTestSuite.h"
 #include "Test.h"
 #include "Vector.h"
 
@@ -49,7 +50,7 @@ template <>
 struct MetaClass<TestNamespace::SimpleStructure> : MetaStruct<MetaClass<TestNamespace::SimpleStructure>>
 {
     template <typename MemberVisitor>
-    static constexpr bool members(MemberVisitor&& builder)
+    static constexpr bool visit(MemberVisitor&& builder)
     {
         SC_TRY_IF(builder(0, SC_META_MEMBER(f1)));
         SC_TRY_IF(builder(1, SC_META_MEMBER(f2)));
@@ -62,7 +63,7 @@ template <>
 struct MetaClass<TestNamespace::IntermediateStructure> : MetaStruct<MetaClass<TestNamespace::IntermediateStructure>>
 {
     template <typename MemberVisitor>
-    static constexpr bool members(MemberVisitor&& builder)
+    static constexpr bool visit(MemberVisitor&& builder)
     {
         SC_TRY_IF(builder(0, SC_META_MEMBER(simpleStructure)));
         SC_TRY_IF(builder(1, SC_META_MEMBER(vectorOfInt)));
@@ -74,7 +75,7 @@ template <>
 struct MetaClass<TestNamespace::ComplexStructure> : MetaStruct<MetaClass<TestNamespace::ComplexStructure>>
 {
     template <typename MemberVisitor>
-    static constexpr bool members(MemberVisitor&& builder)
+    static constexpr bool visit(MemberVisitor&& builder)
     {
         SC_TRY_IF(builder(0, SC_META_MEMBER(f1)));
         SC_TRY_IF(builder(1, SC_META_MEMBER(simpleStructure)));
@@ -256,47 +257,5 @@ struct SC::ReflectionTest : public SC::TestCase
             // printFlatSchema(SimpleStructureFlatSchema.atoms.values,
             // SimpleStructureFlatSchema.names.values);
         }
-    }
-    template <int NUM_ATOMS>
-    static void printFlatSchema(const Reflection::MetaProperties (&atom)[NUM_ATOMS],
-                                const SC::ConstexprStringView (&names)[NUM_ATOMS])
-    {
-        int atomIndex = 0;
-        while (atomIndex < NUM_ATOMS)
-        {
-            atomIndex += printAtoms(atomIndex, atom + atomIndex, names + atomIndex, 0) + 1;
-        }
-    }
-
-    static int printAtoms(int currentAtomIdx, const Reflection::MetaProperties* atom,
-                          const SC::ConstexprStringView* atomName, int indentation)
-    {
-        using namespace SC;
-        using namespace SC::Reflection;
-        for (int i = 0; i < indentation; ++i)
-            Console::c_printf("\t");
-        Console::c_printf("[LinkIndex=%d] %.*s (%d atoms)\n", currentAtomIdx, atomName->length, atomName->data,
-                          atom->numSubAtoms);
-        for (int i = 0; i < indentation; ++i)
-            Console::c_printf("\t");
-        Console::c_printf("{\n");
-        for (int idx = 0; idx < atom->numSubAtoms; ++idx)
-        {
-            auto& field     = atom[idx + 1];
-            auto  fieldName = atomName[idx + 1];
-            for (int i = 0; i < indentation + 1; ++i)
-                Console::c_printf("\t");
-            Console::c_printf("Type=%d\tOffset=%d\tSize=%d\tName=%.*s", (int)field.type, field.offset, field.size,
-                              fieldName.length, fieldName.data);
-            if (field.getLinkIndex() >= 0)
-            {
-                Console::c_printf("\t[LinkIndex=%d]", field.getLinkIndex());
-            }
-            Console::c_printf("\n");
-        }
-        for (int i = 0; i < indentation; ++i)
-            Console::c_printf("\t");
-        Console::c_printf("}\n");
-        return atom->numSubAtoms;
     }
 };

@@ -29,9 +29,9 @@ SC_META_STRUCT_MEMBER(0, vectorOfStrings)
 SC_META_STRUCT_END()
 
 SC_META_STRUCT_BEGIN(SC::SerializationTestSuite::VersionedStruct1)
+SC_META_STRUCT_MEMBER(2, field2ToRemove)
 SC_META_STRUCT_MEMBER(0, floatValue)
 SC_META_STRUCT_MEMBER(1, fieldToRemove)
-SC_META_STRUCT_MEMBER(2, field2ToRemove)
 SC_META_STRUCT_MEMBER(3, int64Value)
 SC_META_STRUCT_END()
 
@@ -80,16 +80,16 @@ namespace SC
 struct SerializationTest;
 }
 struct SC::SerializationTest
-    : public SC::SerializationTestSuite::SerializationTestBase<SC::Serialization::BinaryBuffer,                //
-                                                               SC::Serialization::BinaryBuffer,                //
-                                                               SC::Serialization::SimpleBinaryWriter,          //
-                                                               SC::Serialization::SimpleBinaryReader,          //
-                                                               SC::Serialization::SimpleBinaryReaderVersioned, //
-                                                               SC::Reflection::FlatSchemaCompiler>
+    : public SC::SerializationTestSuite::SerializationTestBase<SC::Serialization::BinaryBuffer,       //
+                                                               SC::Serialization::BinaryBuffer,       //
+                                                               SC::Serialization::SimpleBinaryWriter, //
+                                                               SC::Serialization::SimpleBinaryReader>
 {
     SerializationTest(SC::TestReport& report) : SerializationTestBase(report, "SerializationTest")
     {
         runSameVersionTests();
-        runVersionedTests();
+        runVersionedTests<SC::Reflection::FlatSchemaCompiler,
+                          SC::Serialization::SimpleBinaryReaderVersioned<SC::Serialization::BinaryBuffer>,
+                          SC::Serialization::VersionSchema>();
     }
 };

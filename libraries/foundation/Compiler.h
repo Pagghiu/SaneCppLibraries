@@ -41,3 +41,22 @@
 #endif
 
 #define SC_OFFSET_OF(Class, Field) __builtin_offsetof(Class, Field)
+#if SC_CLANG
+
+#define SC_DISABLE_OFFSETOF_WARNING                                                                                    \
+    _Pragma("clang diagnostic push");                                                                                  \
+    _Pragma("clang diagnostic ignored \"-Winvalid-offsetof\"");
+#define SC_ENABLE_OFFSETOF_WARNING _Pragma("clang diagnostic pop");
+
+#elif SC_GCC
+#define SC_DISABLE_OFFSETOF_WARNING                                                                                    \
+    _Pragma("GCC diagnostic push");                                                                                    \
+    _Pragma("GCC diagnostic ignored \"-Winvalid-offsetof\"");
+#define SC_ENABLE_OFFSETOF_WARNING _Pragma("GCC diagnostic pop");
+
+#else
+
+#define SC_DISABLE_OFFSETOF_WARNING
+#define SC_ENABLE_OFFSETOF_WARNING
+
+#endif

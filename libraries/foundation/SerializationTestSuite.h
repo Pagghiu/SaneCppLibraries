@@ -1,5 +1,8 @@
 #pragma once
+#include "String.h"
+#include "StringView.h"
 #include "Test.h"
+#include "Vector.h"
 namespace SC
 {
 namespace SerializationTestSuite
@@ -18,7 +21,7 @@ struct VersionedArray2;
 struct ConversionStruct1;
 struct ConversionStruct2;
 template <typename BinaryWriterStream, typename BinaryReaderStream, typename SerializerWriter,
-          typename SerializerReader, typename SerializerVersioned, typename FlatSchemaCompiler>
+          typename SerializerReader>
 struct SerializationTestBase;
 
 } // namespace SerializationTestSuite
@@ -125,7 +128,7 @@ struct SC::SerializationTestSuite::VersionedArray1
 
 struct SC::SerializationTestSuite::VersionedArray2
 {
-    Array<VersionedPoint3D, 5> points;
+    Array<VersionedPoint3D, 2> points;
     Array<int, 2>              simpleInts;
 
     bool operator!=(const VersionedArray1& other) const
@@ -134,9 +137,13 @@ struct SC::SerializationTestSuite::VersionedArray2
             return true;
         for (size_t i = 0; i < points.size(); ++i)
         {
-            if (points[i].x != other.points[i].x)
+            auto p1x = points[i].x;
+            auto p1y = points[i].y;
+            auto p2x = other.points[i].x;
+            auto p2y = other.points[i].y;
+            if (p1x != p2x)
                 return true;
-            if (points[i].y != other.points[i].y)
+            if (p1y != p2y)
                 return true;
         }
         if (simpleInts.size() > other.points.size())
@@ -166,8 +173,56 @@ struct SC::SerializationTestSuite::ConversionStruct2
     uint16_t signed16ToUnsigned = 0;
 };
 
+namespace SC
+{
+// TODO: Move printFlatSchema somewhere else
+template <int NUM_ATOMS, typename MetaProperties>
+inline void printFlatSchema(const MetaProperties (&atom)[NUM_ATOMS], const SC::ConstexprStringView (&names)[NUM_ATOMS])
+{
+    int atomIndex = 0;
+    while (atomIndex < NUM_ATOMS)
+    {
+        atomIndex += printAtoms(atomIndex, atom + atomIndex, names + atomIndex, 0) + 1;
+    }
+}
+
+template <typename MetaProperties>
+inline int printAtoms(int currentAtomIdx, const MetaProperties* atom, const SC::ConstexprStringView* atomName,
+                      int indentation)
+{
+    Console::c_printf("[%02d]", currentAtomIdx);
+    for (int i = 0; i < indentation; ++i)
+        Console::c_printf("\t");
+    Console::c_printf("[LinkIndex=%2d] %.*s (%d atoms)\n", currentAtomIdx, atomName->length, atomName->data,
+                      atom->numSubAtoms);
+    for (int i = 0; i < indentation; ++i)
+        Console::c_printf("\t");
+    Console::c_printf("{\n");
+    for (int idx = 0; idx < atom->numSubAtoms; ++idx)
+    {
+        auto& field     = atom[idx + 1];
+        auto  fieldName = atomName[idx + 1];
+        Console::c_printf("[%02d]", currentAtomIdx + idx + 1);
+
+        for (int i = 0; i < indentation + 1; ++i)
+            Console::c_printf("\t");
+        Console::c_printf("Type=%d\tOffset=%d\tSize=%d\tName=%.*s", (int)field.type, field.offset, field.size,
+                          fieldName.length, fieldName.data);
+        if (field.getLinkIndex() >= 0)
+        {
+            Console::c_printf("\t[LinkIndex=%d]", field.getLinkIndex());
+        }
+        Console::c_printf("\n");
+    }
+    for (int i = 0; i < indentation; ++i)
+        Console::c_printf("\t");
+    Console::c_printf("}\n");
+    return atom->numSubAtoms;
+}
+} // namespace SC
+
 template <typename BinaryWriterStream, typename BinaryReaderStream, typename SerializerWriter,
-          typename SerializerReader, typename SerializerVersioned, typename FlatSchemaCompiler>
+          typename SerializerReader>
 struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
 {
     // Used only for the test
@@ -217,7 +272,6 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
         }
         if (test_section("TopLevel Structure Read"))
         {
-            using namespace Reflection;
             TopLevelStruct     topLevel;
             BinaryWriterStream streamWriter;
             SerializerWriter   writer(streamWriter);
@@ -279,6 +333,7 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
         }
     }
 
+    template <typename FlatSchemaCompiler, typename SerializerVersioned, typename VersionSchema>
     void runVersionedTests()
     {
         if (test_section("VersionedStruct1/2"))
@@ -290,8 +345,11 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
             SerializerVersioned reader;
             VersionedStruct2    struct2;
             auto                schema = FlatSchemaCompiler::template compile<VersionedStruct1>();
-            Span<const void>    readSpan(streamWriter.buffer.data(), streamWriter.buffer.size());
-            SC_TEST_EXPECT(reader.serialize(struct2, readSpan, schema.propertiesAsSpan(), schema.namesAsSpan()));
+            BinaryReaderStream  streamReader;
+            streamReader.buffer = move(streamWriter.buffer);
+            VersionSchema versionSchema;
+            versionSchema.sourceProperties = schema.propertiesAsSpan();
+            SC_TEST_EXPECT(reader.serializeVersioned(struct2, streamReader, versionSchema));
             SC_TEST_EXPECT(not(struct2 != struct1));
         }
         if (test_section("VersionedArray1/2"))
@@ -299,6 +357,7 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
             VersionedArray1 array1;
             (void)array1.points.push_back({1.0f, 2.0f});
             (void)array1.points.push_back({3.0f, 4.0f});
+            (void)array1.points.push_back({5.0f, 6.0f});
             BinaryWriterStream streamWriter;
             SerializerWriter   writer(streamWriter);
             SC_TEST_EXPECT(writer.serialize(array1));
@@ -306,11 +365,14 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
             SerializerVersioned reader;
             VersionedArray2     array2;
             auto                schema = FlatSchemaCompiler::template compile<VersionedArray1>();
-            Span<const void>    readSpan(streamWriter.buffer.data(), streamWriter.buffer.size());
-            SC_TEST_EXPECT(reader.serialize(array2, readSpan, schema.propertiesAsSpan(), schema.namesAsSpan()));
+            BinaryReaderStream  streamReader;
+            streamReader.buffer = move(streamWriter.buffer);
+            VersionSchema versionSchema;
+            versionSchema.sourceProperties = schema.propertiesAsSpan();
+            SC_TEST_EXPECT(reader.serializeVersioned(array2, streamReader, versionSchema));
             SC_TEST_EXPECT(array2.points.size() == 2);
-            SC_TEST_EXPECT(array1.simpleInts.size() == 3); // It's dopping one element
-            SC_TEST_EXPECT(array2.simpleInts.size() == 2); // It's dopping one element
+            SC_TEST_EXPECT(array1.simpleInts.size() == 3); // It's dropping one element
+            SC_TEST_EXPECT(array2.simpleInts.size() == 2); // It's dropping one element
             SC_TEST_EXPECT(not(array2 != array1));
         }
         if (test_section("ConversionStruct1/2"))
@@ -322,8 +384,11 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
             SC_TEST_EXPECT(writer.serialize(struct1));
             SerializerVersioned reader;
             auto                schema = FlatSchemaCompiler::template compile<ConversionStruct1>();
-            Span<const void>    readSpan(streamWriter.buffer.data(), streamWriter.buffer.size());
-            SC_TEST_EXPECT(reader.serialize(struct2, readSpan, schema.propertiesAsSpan(), schema.namesAsSpan()));
+            BinaryReaderStream  streamReader;
+            streamReader.buffer = move(streamWriter.buffer);
+            VersionSchema versionSchema;
+            versionSchema.sourceProperties = schema.propertiesAsSpan();
+            SC_TEST_EXPECT(reader.serializeVersioned(struct2, streamReader, versionSchema));
             SC_TEST_EXPECT(struct2.intToFloat == struct1.intToFloat);
             SC_TEST_EXPECT(struct2.floatToInt == struct1.floatToInt);
             SC_TEST_EXPECT(struct2.uint16To32 == struct1.uint16To32);

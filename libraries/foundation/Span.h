@@ -35,6 +35,8 @@ struct Span
             return false;
         }
     }
+
+    // TODO: Remove Span<void>::advance
     [[nodiscard]] constexpr bool advance(Size length)
     {
         if (length <= size)
@@ -48,6 +50,8 @@ struct Span
             return false;
         }
     }
+
+    // TODO: Remove Span<void>::readAndAdvance
     template <typename T>
     [[nodiscard]] constexpr bool readAndAdvance(T& value)
     {
@@ -63,17 +67,6 @@ struct Span
         {
             return false;
         }
-    }
-    [[nodiscard]] bool writeAndAdvance(Span<void> other, Size length)
-    {
-        if (other.size >= length && length <= size)
-        {
-            memcpy(other.data, data, length);
-            data = static_cast<ByteType*>(data) + length;
-            size -= length;
-            return true;
-        }
-        return false;
     }
 
     template <typename DestinationType>

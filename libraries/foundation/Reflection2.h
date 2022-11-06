@@ -1,5 +1,7 @@
 #pragma once
 #include "ConstexprTypes.h"
+#include "FlatSchemaCompiler.h"
+#include "Map.h"
 
 namespace SC
 {
@@ -29,11 +31,6 @@ enum class MetaType : uint8_t
     TypeCustom = 13,
 };
 
-template <typename T>
-struct MetaClass;
-
-struct MetaClassBuilder;
-typedef bool (*MetaClassBuildFunc)(MetaClassBuilder& builder);
 struct MetaProperties
 {
     MetaType type;        // 1
@@ -41,7 +38,52 @@ struct MetaProperties
     uint16_t order;       // 2
     uint16_t offset;      // 2
     uint16_t size;        // 2
+
+    constexpr MetaProperties() : type(MetaType::TypeInvalid), order(0), offset(0), size(0), numSubAtoms(0)
+    {
+        static_assert(sizeof(MetaProperties) == 8, "Size must be 8 bytes");
+    }
+    constexpr MetaProperties(MetaType type, uint8_t order, uint16_t offset, uint16_t size, int8_t numSubAtoms)
+        : type(type), order(order), offset(offset), size(size), numSubAtoms(numSubAtoms)
+    {}
+    constexpr void                   setLinkIndex(int8_t linkIndex) { numSubAtoms = linkIndex; }
+    [[nodiscard]] constexpr int8_t   getLinkIndex() const { return numSubAtoms; }
+    [[nodiscard]] constexpr uint32_t getCustomUint32() const { return (offset << 16) | order; }
+    constexpr void                   setCustomUint32(uint32_t N)
+    {
+        const uint16_t lowN  = N & 0xffff;
+        const uint16_t highN = (N >> 16) & 0xffff;
+        order                = static_cast<uint8_t>(lowN);
+        offset               = static_cast<uint8_t>(highN);
+    }
+
+    [[nodiscard]] constexpr bool isPrimitiveType() const
+    {
+        return type >= MetaType::TypeUINT8 && type <= MetaType::TypeDOUBLE64;
+    }
 };
+
+struct MetaClassBuilder;
+// clang-format off
+struct MetaPrimitive { static constexpr void build( MetaClassBuilder& builder) { } };
+
+template <typename T> struct MetaClass;
+
+template <> struct MetaClass<char_t>   : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT8;}};
+template <> struct MetaClass<uint8_t>  : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT8;}};
+template <> struct MetaClass<uint16_t> : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT16;}};
+template <> struct MetaClass<uint32_t> : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT32;}};
+template <> struct MetaClass<uint64_t> : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT64;}};
+template <> struct MetaClass<int8_t>   : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeINT8;}};
+template <> struct MetaClass<int16_t>  : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeINT16;}};
+template <> struct MetaClass<int32_t>  : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeINT32;}};
+template <> struct MetaClass<int64_t>  : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeINT64;}};
+template <> struct MetaClass<float>    : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeFLOAT32;}};
+template <> struct MetaClass<double>   : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeDOUBLE64;}};
+// clang-format on
+
+struct Atom;
+
 struct Atom
 {
     typedef void (*MetaClassBuildFunc)(MetaClassBuilder& builder);
@@ -49,22 +91,100 @@ struct Atom
     MetaProperties      properties;
     ConstexprStringView name;
     MetaClassBuildFunc  build;
+
+    constexpr Atom() : build(nullptr) {}
+    constexpr Atom(const MetaProperties properties, ConstexprStringView name, MetaClassBuildFunc build)
+        : properties(properties), name(name), build(build)
+    {}
+
+    template <typename R, typename T, int N>
+    [[nodiscard]] static constexpr Atom create(int order, const char (&name)[N], R T::*, size_t offset)
+    {
+        return {MetaProperties(MetaClass<R>::getMetaType(), order, static_cast<SC::uint16_t>(offset), sizeof(R), -1),
+                ConstexprStringView(name, N), &MetaClass<R>::build};
+    }
+
+    template <typename T>
+    [[nodiscard]] static constexpr Atom create(ConstexprStringView name = TypeToString<T>::get())
+    {
+        return {MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), name, &MetaClass<T>::build};
+    }
 };
 
 struct MetaClassBuilder
 {
-    Atom* data     = nullptr;
-    int   numAtoms = 0;
+    int       size;
+    int       wantedCapacity;
+    Atom*     output;
+    const int capacity;
+
+    constexpr MetaClassBuilder(Atom* output = nullptr, const int capacity = 0)
+        : size(0), wantedCapacity(0), output(output), capacity(capacity)
+    {}
+
+    [[nodiscard]] static constexpr int countAtoms(const Atom& atom)
+    {
+        if (atom.build != nullptr)
+        {
+            MetaClassBuilder builder;
+            atom.build(builder);
+            return builder.wantedCapacity;
+        }
+        return 0;
+    }
+
+    constexpr void push(const Atom& value)
+    {
+        if (size < capacity)
+        {
+            output[size] = value;
+            size++;
+        }
+        wantedCapacity++;
+    }
+
+    template <typename T>
+    constexpr void Struct()
+    {
+        push(Atom::create<T>());
+    }
+
+    template <typename R, typename T, int N>
+    [[nodiscard]] constexpr bool operator()(int order, const char (&name)[N], R T::*field, size_t offset)
+    {
+        push(Atom::create(order, name, field, offset));
+        return true;
+    }
 };
 
+template <typename T, size_t N>
+struct MetaClass<T[N]>
+{
+    static constexpr MetaType getMetaType() { return MetaType::TypeArray; }
+    static constexpr void     build(MetaClassBuilder& builder)
+    {
+        Atom arrayHeader = {MetaProperties(getMetaType(), 0, 0, sizeof(T[N]), 1), "Array", nullptr};
+        arrayHeader.properties.setCustomUint32(N);
+        builder.push(arrayHeader);
+        builder.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), TypeToString<T>::get(),
+                      &MetaClass<T>::build});
+    }
+};
 template <typename Type>
 struct MetaStruct;
 
 template <typename Type>
 struct MetaStruct<MetaClass<Type>>
 {
-    typedef Type              T;
-    static constexpr MetaType getMetaType() { return MetaType::TypeStruct; }
+    typedef Type T;
+
+    [[nodiscard]] static constexpr MetaType getMetaType() { return MetaType::TypeStruct; }
+
+    static constexpr void build(MetaClassBuilder& builder)
+    {
+        builder.Struct<T>();
+        MetaClass<Type>::visit(builder);
+    }
 };
 
 struct FlatSchemaCompiler

@@ -48,7 +48,7 @@ struct MetaClass<Map<Key, Value, Container>> : MetaStruct<MetaClass<Map<Key, Val
 {
     typedef typename MetaStruct<MetaClass<SC::Map<Key, Value, Container>>>::T T;
     template <typename MemberVisitor>
-    static constexpr void members(MemberVisitor&& builder)
+    static constexpr void visit(MemberVisitor&& builder)
     {
         builder(0, SC_META_MEMBER(items));
     }
