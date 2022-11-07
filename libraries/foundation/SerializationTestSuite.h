@@ -350,6 +350,7 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
             VersionSchema versionSchema;
             versionSchema.sourceProperties = schema.propertiesAsSpan();
             SC_TEST_EXPECT(reader.serializeVersioned(struct2, streamReader, versionSchema));
+            SC_TEST_EXPECT(streamReader.index == streamReader.buffer.size());
             SC_TEST_EXPECT(not(struct2 != struct1));
         }
         if (test_section("VersionedArray1/2"))
@@ -370,6 +371,7 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
             VersionSchema versionSchema;
             versionSchema.sourceProperties = schema.propertiesAsSpan();
             SC_TEST_EXPECT(reader.serializeVersioned(array2, streamReader, versionSchema));
+            SC_TEST_EXPECT(streamReader.index == streamReader.buffer.size());
             SC_TEST_EXPECT(array2.points.size() == 2);
             SC_TEST_EXPECT(array1.simpleInts.size() == 3); // It's dropping one element
             SC_TEST_EXPECT(array2.simpleInts.size() == 2); // It's dropping one element
@@ -389,6 +391,7 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
             VersionSchema versionSchema;
             versionSchema.sourceProperties = schema.propertiesAsSpan();
             SC_TEST_EXPECT(reader.serializeVersioned(struct2, streamReader, versionSchema));
+            SC_TEST_EXPECT(streamReader.index == streamReader.buffer.size());
             SC_TEST_EXPECT(struct2.intToFloat == struct1.intToFloat);
             SC_TEST_EXPECT(struct2.floatToInt == struct1.floatToInt);
             SC_TEST_EXPECT(struct2.uint16To32 == struct1.uint16To32);

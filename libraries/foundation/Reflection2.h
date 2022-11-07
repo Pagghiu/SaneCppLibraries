@@ -30,7 +30,7 @@ enum class MetaType : uint8_t
 
     TypeCustom = 13,
 };
-
+constexpr bool IsPrimitiveType(MetaType type) { return type >= MetaType::TypeUINT8 && type <= MetaType::TypeDOUBLE64; }
 struct MetaProperties
 {
     MetaType type;        // 1
@@ -57,10 +57,7 @@ struct MetaProperties
         offset               = static_cast<uint8_t>(highN);
     }
 
-    [[nodiscard]] constexpr bool isPrimitiveType() const
-    {
-        return type >= MetaType::TypeUINT8 && type <= MetaType::TypeDOUBLE64;
-    }
+    [[nodiscard]] constexpr bool isPrimitiveType() const { return IsPrimitiveType(type); }
 };
 
 struct MetaClassBuilder;

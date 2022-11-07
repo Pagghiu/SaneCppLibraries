@@ -758,6 +758,14 @@ struct SimpleBinaryReaderVersioned
         {
             const auto minBytes = min(static_cast<uint64_t>(arraySinkStart.size), sourceNumBytes);
             SC_TRY_IF(sourceObject->writeAndAdvance(arraySinkStart, minBytes));
+            if (sourceNumBytes > static_cast<uint64_t>(arraySinkStart.size))
+            {
+                if (not options.allowDropEccessArrayItems)
+                {
+                    return false;
+                }
+                return sourceObject->advance(sourceNumBytes - minBytes);
+            }
         }
         else
         {
