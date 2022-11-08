@@ -56,7 +56,7 @@ struct BinaryBuffer
 struct SCArrayAccess
 {
     typedef decltype(SegmentHeader::sizeBytes)          SizeType;
-    [[nodiscard]] static constexpr Reflection::MetaType getType() { return Reflection::MetaType::TypeSCArray; }
+    [[nodiscard]] static constexpr Reflection::MetaType getType() { return Reflection::MetaType::TypeVector; }
     template <typename T>
     [[nodiscard]] static constexpr bool getSegmentSpan(Reflection::MetaProperties property, Span<T> object,
                                                        Span<T>& itemBegin)
@@ -98,7 +98,7 @@ struct SCArrayAccess
 
 struct SCVectorAccess
 {
-    [[nodiscard]] static constexpr Reflection::MetaType getType() { return Reflection::MetaType::TypeSCVector; }
+    [[nodiscard]] static constexpr Reflection::MetaType getType() { return Reflection::MetaType::TypeVector; }
 
     template <typename T>
     [[nodiscard]] static constexpr bool getSegmentSpan(Reflection::MetaProperties property, Span<T> object,
@@ -141,36 +141,57 @@ struct SCVectorAccess
 
 struct ArrayAccess
 {
-    template <typename T>
-    [[nodiscard]] static constexpr bool getSegmentSpan(Reflection::MetaProperties property, Span<T> object,
-                                                       Span<T>& itemBegin)
+    Span<const Reflection::VectorVTable> vectorVtable;
+
+    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::MetaProperties property, Span<void> object,
+                                      Span<void>& itemBegin)
     {
-        if (property.type == SCArrayAccess::getType())
-            return SCArrayAccess::getSegmentSpan(property, object, itemBegin);
-        else if (property.type == SCVectorAccess::getType())
-            return SCVectorAccess::getSegmentSpan(property, object, itemBegin);
+        for (uint32_t index = 0; index < vectorVtable.size; ++index)
+        {
+            if (vectorVtable.data[index].linkID == linkID)
+            {
+                return vectorVtable.data[index].getSegmentSpan(property, object, itemBegin);
+            }
+        }
+        return false;
+    }
+    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::MetaProperties property, Span<const void> object,
+                                      Span<const void>& itemBegin)
+    {
+        for (uint32_t index = 0; index < vectorVtable.size; ++index)
+        {
+            if (vectorVtable.data[index].linkID == linkID)
+            {
+                return vectorVtable.data[index].getSegmentSpanConst(property, object, itemBegin);
+            }
+        }
         return false;
     }
 
+    typedef Reflection::VectorVTable::DropEccessItems DropEccessItems;
     enum class Initialize
     {
         No,
         Yes
     };
-    enum class DropEccessItems
+
+    bool resize(uint32_t linkID, Span<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
+                Initialize initialize, DropEccessItems dropEccessItems)
     {
-        No,
-        Yes
-    };
-    [[nodiscard]] static bool resize(Span<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
-                                     Initialize initialize, DropEccessItems dropEccessItems)
-    {
-        if (property.type == SCArrayAccess::getType())
-            return SCArrayAccess::resize(object, property, sizeInBytes, initialize == Initialize::Yes,
-                                         dropEccessItems == DropEccessItems::Yes);
-        else if (property.type == SCVectorAccess::getType())
+        for (uint32_t index = 0; index < vectorVtable.size; ++index)
         {
-            return SCVectorAccess::resize(object, property, sizeInBytes, initialize == Initialize::Yes);
+            if (vectorVtable.data[index].linkID == linkID)
+            {
+                if (initialize == Initialize::Yes)
+                {
+                    return vectorVtable.data[index].resize(object, property, sizeInBytes, dropEccessItems);
+                }
+                else
+                {
+                    return vectorVtable.data[index].resizeWithoutInitialize(object, property, sizeInBytes,
+                                                                            dropEccessItems);
+                }
+            }
         }
         return false;
     }
@@ -199,6 +220,7 @@ struct SimpleBinaryWriter
     Span<const void>                       sourceObject;
     int                                    sourceTypeIndex;
     Reflection::MetaProperties             sourceProperty;
+    ArrayAccess                            arrayAccess;
 
     SimpleBinaryWriter(BinaryBuffer& destination) : destination(destination) {}
 
@@ -208,6 +230,8 @@ struct SimpleBinaryWriter
         constexpr auto flatSchema      = Reflection::FlatSchemaCompiler::compile<T>();
         sourceProperties               = flatSchema.propertiesAsSpan();
         sourceNames                    = flatSchema.namesAsSpan();
+        arrayAccess.vectorVtable       = {flatSchema.payload.vector.values,
+                                          static_cast<size_t>(flatSchema.payload.vector.size)};
         sourceObject                   = Span<const void>(&object, sizeof(T));
         sourceTypeIndex                = 0;
         destination.numberOfOperations = 0;
@@ -246,8 +270,7 @@ struct SimpleBinaryWriter
             return writeStruct();
         }
         case Reflection::MetaType::TypeArray:
-        case Reflection::MetaType::TypeSCArray:
-        case Reflection::MetaType::TypeSCVector: //
+        case Reflection::MetaType::TypeVector: //
         {
             return writeArray();
         }
@@ -299,7 +322,7 @@ struct SimpleBinaryWriter
         }
         else
         {
-            SC_TRY_IF(ArrayAccess::getSegmentSpan(arrayProperty, sourceObject, arraySpan));
+            SC_TRY_IF(arrayAccess.getSegmentSpan(arrayTypeIndex, arrayProperty, sourceObject, arraySpan));
             numBytes = arraySpan.size;
             SC_TRY_IF(destination.readFrom(Span<const void>(&numBytes, sizeof(numBytes))));
         }
@@ -336,6 +359,7 @@ struct SimpleBinaryReader
     int                                    sinkTypeIndex = 0;
     Span<void>                             sinkObject;
     BinaryBuffer&                          source;
+    ArrayAccess                            arrayAccess;
 
     SimpleBinaryReader(BinaryBuffer& source) : source(source) {}
 
@@ -348,6 +372,9 @@ struct SimpleBinaryReader
         sinkNames      = flatSchema.namesAsSpan();
         sinkObject     = Span<void>(&object, sizeof(T));
         sinkTypeIndex  = 0;
+
+        arrayAccess.vectorVtable = {flatSchema.payload.vector.values,
+                                    static_cast<size_t>(flatSchema.payload.vector.size)};
 
         if (sinkProperties.size == 0 || sinkProperties.data[0].type != Reflection::MetaType::TypeStruct)
         {
@@ -387,8 +414,7 @@ struct SimpleBinaryReader
             return readStruct();
         }
         case Reflection::MetaType::TypeArray:
-        case Reflection::MetaType::TypeSCArray:
-        case Reflection::MetaType::TypeSCVector: //
+        case Reflection::MetaType::TypeVector: //
         {
             return readArray();
         }
@@ -447,10 +473,11 @@ struct SimpleBinaryReader
             uint64_t sinkNumBytes = 0;
             SC_TRY_IF(source.writeTo(Span<void>(&sinkNumBytes, sizeof(sinkNumBytes))));
 
-            SC_TRY_IF(ArrayAccess::resize(arraySinkObject, arraySinkProperty, sinkNumBytes,
-                                          isBulkReadable ? ArrayAccess::Initialize::No : ArrayAccess::Initialize::Yes,
-                                          ArrayAccess::DropEccessItems::No));
-            SC_TRY_IF(ArrayAccess::getSegmentSpan(arraySinkProperty, arraySinkObject, arraySinkStart));
+            SC_TRY_IF(arrayAccess.resize(arraySinkTypeIndex, arraySinkObject, arraySinkProperty, sinkNumBytes,
+                                         isBulkReadable ? ArrayAccess::Initialize::No : ArrayAccess::Initialize::Yes,
+                                         ArrayAccess::DropEccessItems::No));
+            SC_TRY_IF(
+                arrayAccess.getSegmentSpan(arraySinkTypeIndex, arraySinkProperty, arraySinkObject, arraySinkStart));
         }
         if (isBulkReadable)
         {
@@ -489,6 +516,8 @@ struct SimpleBinaryReaderVersioned
 
     Span<const SC::ConstexprStringView> sinkNames;
 
+    ArrayAccess arrayAccess;
+
     Span<const Reflection::MetaProperties> sinkProperties;
     Span<void>                             sinkObject;
     Reflection::MetaProperties             sinkProperty;
@@ -510,6 +539,9 @@ struct SimpleBinaryReaderVersioned
         sourceObject              = &source;
         sinkTypeIndex             = 0;
         sourceTypeIndex           = 0;
+        arrayAccess.vectorVtable  = {flatSchema.payload.vector.values,
+                                     static_cast<size_t>(flatSchema.payload.vector.size)};
+
         if (sourceProperties.size == 0 || sourceProperties.data[0].type != Reflection::MetaType::TypeStruct ||
             sinkProperties.size == 0 || sinkProperties.data[0].type != Reflection::MetaType::TypeStruct)
         {
@@ -630,8 +662,7 @@ struct SimpleBinaryReaderVersioned
             return readStruct();
         }
         case Reflection::MetaType::TypeArray:
-        case Reflection::MetaType::TypeSCArray:
-        case Reflection::MetaType::TypeSCVector: //
+        case Reflection::MetaType::TypeVector: //
         {
             return readArray();
         }
@@ -698,8 +729,7 @@ struct SimpleBinaryReaderVersioned
         switch (type)
         {
         case Reflection::MetaType::TypeArray:
-        case Reflection::MetaType::TypeSCArray:
-        case Reflection::MetaType::TypeSCVector: //
+        case Reflection::MetaType::TypeVector: //
         {
             return true;
         }
@@ -748,11 +778,12 @@ struct SimpleBinaryReaderVersioned
         else
         {
             const auto numWantedBytes = sourceNumBytes / sourceItemSize * sinkItemSize;
-            SC_TRY_IF(ArrayAccess::resize(arraySinkObject, arraySinkProperty, numWantedBytes,
-                                          isMemcpyable ? ArrayAccess::Initialize::No : ArrayAccess::Initialize::Yes,
-                                          options.allowDropEccessArrayItems ? ArrayAccess::DropEccessItems::Yes
-                                                                            : ArrayAccess::DropEccessItems::No));
-            SC_TRY_IF(ArrayAccess::getSegmentSpan(arraySinkProperty, arraySinkObject, arraySinkStart));
+            SC_TRY_IF(arrayAccess.resize(arraySinkTypeIndex, arraySinkObject, arraySinkProperty, numWantedBytes,
+                                         isMemcpyable ? ArrayAccess::Initialize::No : ArrayAccess::Initialize::Yes,
+                                         options.allowDropEccessArrayItems ? ArrayAccess::DropEccessItems::Yes
+                                                                           : ArrayAccess::DropEccessItems::No));
+            SC_TRY_IF(
+                arrayAccess.getSegmentSpan(arraySinkTypeIndex, arraySinkProperty, arraySinkObject, arraySinkStart));
         }
         if (isMemcpyable)
         {

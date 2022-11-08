@@ -12,23 +12,21 @@ enum class MetaType : uint8_t
     // Invalid sentinel
     TypeInvalid = 0,
 
-    // Struct and Array types
-    TypeStruct = 1,
-    TypeArray  = 2,
-
     // Primitive types
-    TypeUINT8    = 3,
-    TypeUINT16   = 4,
-    TypeUINT32   = 5,
-    TypeUINT64   = 6,
-    TypeINT8     = 7,
-    TypeINT16    = 8,
-    TypeINT32    = 9,
-    TypeINT64    = 10,
-    TypeFLOAT32  = 11,
-    TypeDOUBLE64 = 12,
+    TypeUINT8    = 1,
+    TypeUINT16   = 2,
+    TypeUINT32   = 3,
+    TypeUINT64   = 4,
+    TypeINT8     = 5,
+    TypeINT16    = 6,
+    TypeINT32    = 7,
+    TypeINT64    = 8,
+    TypeFLOAT32  = 9,
+    TypeDOUBLE64 = 10,
 
-    TypeCustom = 13,
+    TypeStruct = 11,
+    TypeArray  = 12,
+    TypeVector = 13,
 };
 constexpr bool IsPrimitiveType(MetaType type) { return type >= MetaType::TypeUINT8 && type <= MetaType::TypeDOUBLE64; }
 struct MetaProperties
@@ -108,29 +106,29 @@ struct Atom
     }
 };
 
-struct MetaClassBuilder
+template <typename Type>
+struct MetaArrayView
 {
-    int       size;
-    int       wantedCapacity;
-    Atom*     output;
-    const int capacity;
+    int   size;
+    int   wantedCapacity;
+    Type* output;
+    int   capacity;
 
-    constexpr MetaClassBuilder(Atom* output = nullptr, const int capacity = 0)
-        : size(0), wantedCapacity(0), output(output), capacity(capacity)
-    {}
-
-    [[nodiscard]] static constexpr int countAtoms(const Atom& atom)
+    constexpr MetaArrayView(Type* output = nullptr, const int capacity = 0)
+        : size(0), wantedCapacity(0), output(nullptr), capacity(0)
     {
-        if (atom.build != nullptr)
-        {
-            MetaClassBuilder builder;
-            atom.build(builder);
-            return builder.wantedCapacity;
-        }
-        return 0;
+        init(output, capacity);
     }
 
-    constexpr void push(const Atom& value)
+    constexpr void init(Type* initOutput, int initCapacity)
+    {
+        size           = 0;
+        wantedCapacity = 0;
+        output         = initOutput;
+        capacity       = initCapacity;
+    }
+
+    constexpr void push(const Type& value)
     {
         if (size < capacity)
         {
@@ -146,10 +144,21 @@ struct MetaClassBuilder
         push(Atom::create<T>());
     }
 
+    constexpr bool capacityWasEnough() const { return wantedCapacity == size; }
+};
+
+struct MetaClassBuilder
+{
+    MetaArrayView<Atom> atoms;
+    uint32_t            initialSize;
+
+    constexpr MetaClassBuilder(Atom* output = nullptr, const int capacity = 0) : atoms(output, capacity), initialSize(0)
+    {}
+
     template <typename R, typename T, int N>
     [[nodiscard]] constexpr bool operator()(int order, const char (&name)[N], R T::*field, size_t offset)
     {
-        push(Atom::create(order, name, field, offset));
+        atoms.push(Atom::create(order, name, field, offset));
         return true;
     }
 };
@@ -162,9 +171,9 @@ struct MetaClass<T[N]>
     {
         Atom arrayHeader = {MetaProperties(getMetaType(), 0, 0, sizeof(T[N]), 1), "Array", nullptr};
         arrayHeader.properties.setCustomUint32(N);
-        builder.push(arrayHeader);
-        builder.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), TypeToString<T>::get(),
-                      &MetaClass<T>::build});
+        builder.atoms.push(arrayHeader);
+        builder.atoms.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), TypeToString<T>::get(),
+                            &MetaClass<T>::build});
     }
 };
 template <typename Type>
@@ -179,14 +188,23 @@ struct MetaStruct<MetaClass<Type>>
 
     static constexpr void build(MetaClassBuilder& builder)
     {
-        builder.Struct<T>();
+        builder.atoms.Struct<T>();
         MetaClass<Type>::visit(builder);
     }
 };
 
 struct FlatSchemaCompiler
 {
-    typedef FlatSchemaCompilerBase::FlatSchemaCompilerBase<MetaProperties, Atom, MetaClassBuilder> FlatSchemaBase;
+    struct EmptyPayload
+    {
+    };
+    struct MetaClassBuilder2 : public MetaClassBuilder
+    {
+        EmptyPayload payload;
+        constexpr MetaClassBuilder2(Atom* output = nullptr, const int capacity = 0) : MetaClassBuilder(output, capacity)
+        {}
+    };
+    typedef FlatSchemaCompilerBase::FlatSchemaCompilerBase<MetaProperties, Atom, MetaClassBuilder2> FlatSchemaBase;
 
     // You can customize:
     // - MAX_LINK_BUFFER_SIZE: maximum number of "complex types" (anything that is not a primitive) that can be built
@@ -194,17 +212,17 @@ struct FlatSchemaCompiler
     template <typename T, int MAX_LINK_BUFFER_SIZE = 20, int MAX_TOTAL_ATOMS = 100>
     static constexpr auto compile()
     {
-        constexpr ConstexprArray<Atom, MAX_TOTAL_ATOMS> allAtoms =
+        constexpr auto schema =
             FlatSchemaBase::compileAllAtomsFor<MAX_LINK_BUFFER_SIZE, MAX_TOTAL_ATOMS>(&MetaClass<T>::build);
-        static_assert(allAtoms.size > 0, "Something failed in compileAllAtomsFor");
-        FlatSchemaBase::FlatSchema<allAtoms.size> result;
-        for (int i = 0; i < allAtoms.size; ++i)
+        static_assert(schema.atoms.size > 0, "Something failed in compileAllAtomsFor");
+        FlatSchemaBase::FlatSchema<schema.atoms.size> result;
+        for (int i = 0; i < schema.atoms.size; ++i)
         {
-            result.properties.values[i] = allAtoms.values[i].properties;
-            result.names.values[i]      = allAtoms.values[i].name;
+            result.properties.values[i] = schema.atoms.values[i].properties;
+            result.names.values[i]      = schema.atoms.values[i].name;
         }
-        result.properties.size = allAtoms.size;
-        result.names.size      = allAtoms.size;
+        result.properties.size = schema.atoms.size;
+        result.names.size      = schema.atoms.size;
         return result;
     }
 };

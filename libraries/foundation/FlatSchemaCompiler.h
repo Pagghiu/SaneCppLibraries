@@ -6,6 +6,13 @@ namespace SC
 {
 namespace FlatSchemaCompilerBase
 {
+template <typename Atom, typename Payload, int MAX_TOTAL_ATOMS>
+struct FlatSchemaCompilerResult
+{
+    ConstexprArray<Atom, MAX_TOTAL_ATOMS> atoms;
+    Payload                               payload;
+};
+
 template <typename MetaProperties, typename Atom, typename MetaClassBuilder>
 struct FlatSchemaCompilerBase
 {
@@ -14,6 +21,7 @@ struct FlatSchemaCompilerBase
     {
         ConstexprArray<MetaProperties, MAX_TOTAL_ATOMS>      properties;
         ConstexprArray<ConstexprStringView, MAX_TOTAL_ATOMS> names;
+        decltype(MetaClassBuilder::payload)                  payload;
 
         constexpr auto propertiesAsSpan() const
         {
@@ -24,37 +32,53 @@ struct FlatSchemaCompilerBase
 
     template <int MAX_ATOMS>
     [[nodiscard]] static constexpr bool appendAtomsTo(ConstexprArray<Atom, MAX_ATOMS>&  atoms,
-                                                      typename Atom::MetaClassBuildFunc build)
+                                                      typename Atom::MetaClassBuildFunc build,
+                                                      MetaClassBuilder&                 container)
     {
-        const int        initialSize = atoms.size;
-        MetaClassBuilder container(atoms.values + initialSize, MAX_ATOMS - initialSize);
+        container.initialSize = atoms.size;
+        container.atoms.init(atoms.values + container.initialSize, MAX_ATOMS - container.initialSize);
         build(container);
-        if (container.wantedCapacity == container.size)
+        if (container.atoms.capacityWasEnough())
         {
-            atoms.values[initialSize].properties.numSubAtoms = container.size - 1;
-            atoms.size += container.size;
+            atoms.values[container.initialSize].properties.numSubAtoms = container.atoms.size - 1;
+            atoms.size += container.atoms.size;
             return true;
         }
         return false;
     }
 
-    template <int MAX_LINK_BUFFER_SIZE, int MAX_TOTAL_ATOMS, typename Func>
-    constexpr static ConstexprArray<Atom, MAX_TOTAL_ATOMS> compileAllAtomsFor(Func f)
+    [[nodiscard]] static constexpr int countAtoms(const Atom& atom)
     {
-        ConstexprArray<Atom, MAX_TOTAL_ATOMS>                                   allAtoms;
+        if (atom.build != nullptr)
+        {
+            MetaClassBuilder builder;
+            atom.build(builder);
+            return builder.atoms.wantedCapacity;
+        }
+        return 0;
+    }
+
+    template <int MAX_LINK_BUFFER_SIZE, int MAX_TOTAL_ATOMS, typename Func>
+    constexpr static FlatSchemaCompilerResult<Atom, decltype(MetaClassBuilder::payload), MAX_TOTAL_ATOMS>
+    compileAllAtomsFor(Func f)
+    {
+        FlatSchemaCompilerResult<Atom, decltype(MetaClassBuilder::payload), MAX_TOTAL_ATOMS> result;
+
+        MetaClassBuilder container(result.atoms.values, MAX_TOTAL_ATOMS);
+
         ConstexprArray<typename Atom::MetaClassBuildFunc, MAX_LINK_BUFFER_SIZE> alreadyVisitedTypes;
         ConstexprArray<int, MAX_LINK_BUFFER_SIZE>                               alreadyVisitedLinkID;
-        if (not appendAtomsTo(allAtoms, f))
+        if (not appendAtomsTo(result.atoms, f, container))
         {
             return {};
         }
         int atomIndex = 1;
-        while (atomIndex < allAtoms.size)
+        while (atomIndex < result.atoms.size)
         {
-            Atom&      atom        = allAtoms.values[atomIndex];
+            Atom&      atom        = result.atoms.values[atomIndex];
             const bool isEmptyLink = atom.properties.getLinkIndex() < 0;
             int        numSubAtoms = 0;
-            if (isEmptyLink && (numSubAtoms = MetaClassBuilder::countAtoms(atom)) > 0)
+            if (isEmptyLink && (numSubAtoms = countAtoms(atom)) > 0)
             {
                 int outIndex = -1;
                 if (alreadyVisitedTypes.contains(atom.build, &outIndex))
@@ -63,18 +87,19 @@ struct FlatSchemaCompilerBase
                 }
                 else
                 {
-                    atom.properties.setLinkIndex(allAtoms.size);
-                    if (not alreadyVisitedLinkID.push_back(allAtoms.size))
+                    atom.properties.setLinkIndex(result.atoms.size);
+                    if (not alreadyVisitedLinkID.push_back(result.atoms.size))
                         return {};
                     if (not alreadyVisitedTypes.push_back(atom.build))
                         return {};
-                    if (not appendAtomsTo(allAtoms, atom.build))
+                    if (not appendAtomsTo(result.atoms, atom.build, container))
                         return {};
                 }
             }
             atomIndex++;
         }
-        return allAtoms;
+        result.payload = container.payload;
+        return result;
     }
 };
 

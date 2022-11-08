@@ -207,7 +207,7 @@ struct SimpleBinaryReaderSkipper
             return readStruct();
         }
         case Reflection2::MetaType::TypeArray:
-        case Reflection2::MetaType::TypeCustom: {
+        case Reflection2::MetaType::TypeVector: {
             return readArray();
         }
         }
@@ -236,7 +236,7 @@ struct SimpleBinaryReaderSkipper
 
         sourceTypeIndex         = arraySourceTypeIndex + 1;
         uint64_t sourceNumBytes = arraySourceProperty.size;
-        if (arraySourceProperty.type != Reflection2::MetaType::TypeArray)
+        if (arraySourceProperty.type == Reflection2::MetaType::TypeVector)
         {
             SC_TRY_IF(sourceObject.readAndAdvance(sourceNumBytes));
         }
@@ -572,9 +572,9 @@ struct Serializer<BinaryStream, T, typename SC::EnableIf<IsPrimitive<T>::value>:
     [[nodiscard]] static constexpr bool serializeVersioned(T& object, BinaryStream& stream, VersionSchema& schema)
     {
 
+        // clang-format off
         switch (schema.current().type)
         {
-        // clang-format off
             case Reflection2::MetaType::TypeUINT8:      return readCastValue<uint8_t>(object, stream);
             case Reflection2::MetaType::TypeUINT16:     return readCastValue<uint16_t>(object, stream);
             case Reflection2::MetaType::TypeUINT32:     return readCastValue<uint32_t>(object, stream);
@@ -599,9 +599,9 @@ struct Serializer<BinaryStream, T, typename SC::EnableIf<IsPrimitive<T>::value>:
                 }
                 return false;
             }
-            default:                                    return false;
-            // clang-format on
+            default: return false;
         }
+        // clang-format on
         return stream.serialize({&object, sizeof(T)});
     }
     [[nodiscard]] static constexpr bool serialize(T& object, BinaryStream& stream)
@@ -619,30 +619,30 @@ SC_META2_STRUCT_END()
 template <typename T, int N>
 struct SC::Reflection2::MetaClass<SC::Array<T, N>>
 {
-    static constexpr MetaType getMetaType() { return MetaType::TypeCustom; }
+    static constexpr MetaType getMetaType() { return MetaType::TypeVector; }
     static constexpr void     build(MetaClassBuilder& builder)
     {
         Atom arrayHeader                   = Atom::create<SC::Array<T, N>>("SC::Array<T, N>");
         arrayHeader.properties.numSubAtoms = 1;
         arrayHeader.properties.setCustomUint32(N);
-        builder.push(arrayHeader);
-        builder.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), TypeToString<T>::get(),
-                      &MetaClass<T>::build});
+        builder.atoms.push(arrayHeader);
+        builder.atoms.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), TypeToString<T>::get(),
+                            &MetaClass<T>::build});
     }
 };
 
 template <typename T>
 struct SC::Reflection2::MetaClass<SC::Vector<T>>
 {
-    static constexpr MetaType getMetaType() { return MetaType::TypeCustom; }
+    static constexpr MetaType getMetaType() { return MetaType::TypeVector; }
     static constexpr void     build(MetaClassBuilder& builder)
     {
         Atom vectorHeader                   = Atom::create<SC::Vector<T>>("SC::Vector");
         vectorHeader.properties.numSubAtoms = 1;
         vectorHeader.properties.setCustomUint32(sizeof(T));
-        builder.push(vectorHeader);
-        builder.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), TypeToString<T>::get(),
-                      &MetaClass<T>::build});
+        builder.atoms.push(vectorHeader);
+        builder.atoms.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), TypeToString<T>::get(),
+                            &MetaClass<T>::build});
     }
 };
 
