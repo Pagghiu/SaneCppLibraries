@@ -1,10 +1,10 @@
 #pragma once
-#include "FlatSchemaCompiler.h"
 #include "ReflectionSC.h"
+#include "SerializationTypeErasedCompiler.h"
 
 namespace SC
 {
-namespace Serialization
+namespace SerializationTypeErased
 {
 struct BinaryBuffer
 {
@@ -51,91 +51,6 @@ struct BinaryBuffer
             return writeTo(Span<void>{other.data, length});
         }
         return false;
-    }
-};
-struct SCArrayAccess
-{
-    typedef decltype(SegmentHeader::sizeBytes)          SizeType;
-    [[nodiscard]] static constexpr Reflection::MetaType getType() { return Reflection::MetaType::TypeVector; }
-    template <typename T>
-    [[nodiscard]] static constexpr bool getSegmentSpan(Reflection::MetaProperties property, Span<T> object,
-                                                       Span<T>& itemBegin)
-    {
-        SizeType size       = 0;
-        auto     sizeReader = object;
-        SC_TRY_IF(sizeReader.advance(SC_OFFSET_OF(SegmentHeader, sizeBytes)));
-        SC_TRY_IF(sizeReader.readAndAdvance(size));
-        return object.viewAt(sizeof(SegmentHeader), size, itemBegin);
-    }
-
-    [[nodiscard]] static constexpr bool resize(Span<void> object, Reflection::MetaProperties property,
-                                               uint64_t sizeInBytes, bool initialize, bool dropEccessItems)
-    {
-        const SizeType availableSpace = static_cast<SizeType>(property.size - sizeof(SegmentHeader));
-        const SizeType wantedSize     = dropEccessItems ? min(static_cast<SizeType>(sizeInBytes), availableSpace)
-                                                        : static_cast<SizeType>(sizeInBytes);
-        if ((object.size >= availableSpace) and (availableSpace >= wantedSize))
-        {
-            if (initialize)
-            {
-                auto& arrayByte = *static_cast<SC::Array<uint8_t, 1>*>(object.data);
-                SC_TRY_IF(arrayByte.resize(wantedSize));
-            }
-            else
-            {
-                Span<void> sizeSpan;
-                SC_TRY_IF(object.viewAt(SC_OFFSET_OF(SegmentHeader, sizeBytes), sizeof(SizeType), sizeSpan));
-                SC_TRY_IF(Span<const void>(&wantedSize, sizeof(SizeType)).copyTo(sizeSpan));
-            }
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-};
-
-struct SCVectorAccess
-{
-    [[nodiscard]] static constexpr Reflection::MetaType getType() { return Reflection::MetaType::TypeVector; }
-
-    template <typename T>
-    [[nodiscard]] static constexpr bool getSegmentSpan(Reflection::MetaProperties property, Span<T> object,
-                                                       Span<T>& itemBegin)
-    {
-        if (object.size >= sizeof(void*))
-        {
-            typedef typename SameConstnessAs<T, SC::Vector<uint8_t>>::type VectorType;
-            auto& vectorByte = *static_cast<VectorType*>(object.data);
-            itemBegin        = Span<T>(vectorByte.data(), vectorByte.size());
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-
-    [[nodiscard]] static constexpr bool resize(Span<void> object, Reflection::MetaProperties property,
-                                               uint64_t sizeInBytes, bool initialize)
-    {
-        if (object.size >= sizeof(void*))
-        {
-            auto& vectorByte = *static_cast<SC::Vector<uint8_t>*>(object.data);
-            if (initialize)
-            {
-                return vectorByte.resize(sizeInBytes);
-            }
-            else
-            {
-                return vectorByte.resizeWithoutInitializing(sizeInBytes);
-            }
-        }
-        else
-        {
-            return false;
-        }
     }
 };
 
@@ -204,7 +119,7 @@ struct ArrayAccess
     if (properties.type == Reflection::MetaType::TypeStruct)
     {
         if (properties.getCustomUint32() &
-            static_cast<uint32_t>(Reflection::FlatSchemaCompiler::MetaStructFlags::IsRecursivelyPacked))
+            static_cast<uint32_t>(Reflection::FlatSchemaTypeErased::MetaStructFlags::IsRecursivelyPacked))
         {
             return true;
         }
@@ -227,7 +142,7 @@ struct SimpleBinaryWriter
     template <typename T>
     [[nodiscard]] constexpr bool serialize(const T& object)
     {
-        constexpr auto flatSchema      = Reflection::FlatSchemaCompiler::compile<T>();
+        constexpr auto flatSchema      = Reflection::FlatSchemaTypeErased::compile<T>();
         sourceProperties               = flatSchema.propertiesAsSpan();
         sourceNames                    = flatSchema.namesAsSpan();
         arrayAccess.vectorVtable       = {flatSchema.payload.vector.values,
@@ -286,7 +201,7 @@ struct SimpleBinaryWriter
 
         const bool isBulkWriteable =
             structSourceProperty.getCustomUint32() &
-            static_cast<uint32_t>(Reflection::FlatSchemaCompiler::MetaStructFlags::IsRecursivelyPacked);
+            static_cast<uint32_t>(Reflection::FlatSchemaTypeErased::MetaStructFlags::IsRecursivelyPacked);
         if (isBulkWriteable)
         {
             // Bulk Write the entire struct
@@ -366,7 +281,7 @@ struct SimpleBinaryReader
     template <typename T>
     [[nodiscard]] bool serialize(T& object)
     {
-        constexpr auto flatSchema = Reflection::FlatSchemaCompiler::compile<T>();
+        constexpr auto flatSchema = Reflection::FlatSchemaTypeErased::compile<T>();
 
         sinkProperties = flatSchema.propertiesAsSpan();
         sinkNames      = flatSchema.namesAsSpan();
@@ -429,7 +344,7 @@ struct SimpleBinaryReader
         Span<void> structSinkObject    = sinkObject;
         const bool isRecursivelyPacked =
             structSinkProperty.getCustomUint32() &
-            static_cast<uint32_t>(Reflection::FlatSchemaCompiler::MetaStructFlags::IsRecursivelyPacked);
+            static_cast<uint32_t>(Reflection::FlatSchemaTypeErased::MetaStructFlags::IsRecursivelyPacked);
 
         if (isRecursivelyPacked)
         {
@@ -531,7 +446,7 @@ struct SimpleBinaryReaderVersioned
     template <typename T>
     [[nodiscard]] bool serializeVersioned(T& object, BinaryWriter& source, VersionSchema& schema)
     {
-        constexpr auto flatSchema = Reflection::FlatSchemaCompiler::compile<T>();
+        constexpr auto flatSchema = Reflection::FlatSchemaTypeErased::compile<T>();
         sourceProperties          = schema.sourceProperties;
         sinkProperties            = flatSchema.propertiesAsSpan();
         sinkNames                 = flatSchema.namesAsSpan();
@@ -847,5 +762,5 @@ struct SimpleBinaryReaderVersioned
         return true;
     }
 };
-} // namespace Serialization
+} // namespace SerializationTypeErased
 } // namespace SC

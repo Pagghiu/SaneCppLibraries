@@ -6,8 +6,8 @@
 #include "libraries/foundation/OSTest.h"
 #include "libraries/foundation/ReflectionTest.h"
 #include "libraries/foundation/ResultTest.h"
-#include "libraries/foundation/Serialization2.h"
-#include "libraries/foundation/SerializationTest.h"
+#include "libraries/foundation/SerializationTemplateTest.h"
+#include "libraries/foundation/SerializationTypeErasedTest.h"
 #include "libraries/foundation/SmallVectorTest.h"
 #include "libraries/foundation/StringBuilderTest.h"
 #include "libraries/foundation/StringFunctionsTest.h"
@@ -35,8 +35,8 @@ int main(int argc, const char* argv[])
     { SmallVectorTest       test(report); }
     { FunctionTest          test(report); }
     { ReflectionTest        test(report); }
-    { SerializationTest     test(report); }
-    { Serialization2Test    test(report); }
+    { SerializationTypeErasedTest     test(report); }
+    { SerializationTemplateTest    test(report); }
     // clang-format on
 
     return report.getTestReturnCode();

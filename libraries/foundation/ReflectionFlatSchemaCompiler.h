@@ -4,7 +4,7 @@
 
 namespace SC
 {
-namespace FlatSchemaCompilerBase
+namespace FlatSchemaCompiler
 {
 template <typename Atom, typename Payload, int MAX_TOTAL_ATOMS>
 struct FlatSchemaCompilerResult
@@ -14,7 +14,7 @@ struct FlatSchemaCompilerResult
 };
 
 template <typename MetaProperties, typename Atom, typename MetaClassBuilder>
-struct FlatSchemaCompilerBase
+struct FlatSchemaCompiler
 {
     template <int MAX_TOTAL_ATOMS>
     struct FlatSchema
@@ -103,6 +103,6 @@ struct FlatSchemaCompilerBase
     }
 };
 
-} // namespace FlatSchemaCompilerBase
+} // namespace FlatSchemaCompiler
 
 } // namespace SC

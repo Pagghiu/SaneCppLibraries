@@ -59,7 +59,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		7B0892B22915A9B200210F74 /* Serialization2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Serialization2.h; sourceTree = "<group>"; };
+		7B0892B22915A9B200210F74 /* SerializationTemplate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SerializationTemplate.h; sourceTree = "<group>"; };
 		7B12434C28FB16A3002C5634 /* SmallVector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SmallVector.h; sourceTree = "<group>"; };
 		7B12434D28FB16A3002C5634 /* SmallVectorTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SmallVectorTest.h; sourceTree = "<group>"; };
 		7B15637528F9FED200B3D229 /* StringFunctions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringFunctions.h; sourceTree = "<group>"; };
@@ -117,14 +117,16 @@
 		7BB1D44528F5FED300FAEA68 /* StringFormat.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringFormat.h; sourceTree = "<group>"; };
 		7BB1D44628F5FED300FAEA68 /* StringFormat.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StringFormat.cpp; sourceTree = "<group>"; };
 		7BB1D44928F5FF8000FAEA68 /* StringIterator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StringIterator.h; sourceTree = "<group>"; };
-		7BCBC36F2916BE80008CF1A9 /* Reflection2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Reflection2.h; sourceTree = "<group>"; };
-		7BD08BD529071D1B00970C9A /* FlatSchemaCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FlatSchemaCompiler.h; sourceTree = "<group>"; };
+		7BD080BE291C7217007B543B /* SerializationTypeErasedCompiler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SerializationTypeErasedCompiler.h; sourceTree = "<group>"; };
+		7BD080BF291C72CB007B543B /* SerializationTemplateCompiler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SerializationTemplateCompiler.h; sourceTree = "<group>"; };
+		7BD080C0291C7936007B543B /* SerializationTemplateTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SerializationTemplateTest.h; sourceTree = "<group>"; };
+		7BD08BD529071D1B00970C9A /* ReflectionFlatSchemaCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ReflectionFlatSchemaCompiler.h; sourceTree = "<group>"; };
 		7BD08BD629071D1B00970C9A /* Reflection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Reflection.h; sourceTree = "<group>"; };
 		7BD19C0A2917B3F700CDC3C8 /* ConstexprTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ConstexprTypes.h; sourceTree = "<group>"; };
 		7BD2350428FC9DA60004C69E /* ReflectionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ReflectionTest.h; sourceTree = "<group>"; };
-		7BD87ABF291438E2005E7980 /* SerializationTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SerializationTest.h; sourceTree = "<group>"; };
+		7BD87ABF291438E2005E7980 /* SerializationTypeErasedTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SerializationTypeErasedTest.h; sourceTree = "<group>"; };
 		7BE4E1CB29033C3D0091CED7 /* InitializerList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InitializerList.h; sourceTree = "<group>"; };
-		7BF0D328290C44E600FC93B4 /* Serialization.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Serialization.h; sourceTree = "<group>"; };
+		7BF0D328290C44E600FC93B4 /* SerializationTypeErased.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SerializationTypeErased.h; sourceTree = "<group>"; };
 		7BF4DF6928DE7A5E008CBB53 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -174,7 +176,6 @@
 				7B73EFE728F37F040081C601 /* Console.h */,
 				7B73EFF228F37F040081C601 /* ConsoleTest.h */,
 				7BD19C0A2917B3F700CDC3C8 /* ConstexprTypes.h */,
-				7BD08BD529071D1B00970C9A /* FlatSchemaCompiler.h */,
 				7B26715028FC1A6000112DCE /* Function.h */,
 				7B26715128FC1A6000112DCE /* FunctionTest.h */,
 				7BE4E1CB29033C3D0091CED7 /* InitializerList.h */,
@@ -192,16 +193,19 @@
 				7B73EFFB28F37F040081C601 /* OSTest.h */,
 				7B73F00728F37F040081C601 /* Platform.h */,
 				7BD08BD629071D1B00970C9A /* Reflection.h */,
-				7BCBC36F2916BE80008CF1A9 /* Reflection2.h */,
+				7BD08BD529071D1B00970C9A /* ReflectionFlatSchemaCompiler.h */,
 				7B711C9B290DCAF200387525 /* ReflectionSC.h */,
 				7BD2350428FC9DA60004C69E /* ReflectionTest.h */,
 				7B73EFF828F37F040081C601 /* Result.h */,
 				7B73EFF928F37F040081C601 /* ResultTest.h */,
 				7B73EFEB28F37F040081C601 /* Segment.h */,
-				7BF0D328290C44E600FC93B4 /* Serialization.h */,
-				7B0892B22915A9B200210F74 /* Serialization2.h */,
-				7BD87ABF291438E2005E7980 /* SerializationTest.h */,
+				7B0892B22915A9B200210F74 /* SerializationTemplate.h */,
+				7BD080BF291C72CB007B543B /* SerializationTemplateCompiler.h */,
+				7BD080C0291C7936007B543B /* SerializationTemplateTest.h */,
 				7B2A92212917F2C000A187A6 /* SerializationTestSuite.h */,
+				7BF0D328290C44E600FC93B4 /* SerializationTypeErased.h */,
+				7BD080BE291C7217007B543B /* SerializationTypeErasedCompiler.h */,
+				7BD87ABF291438E2005E7980 /* SerializationTypeErasedTest.h */,
 				7B12434C28FB16A3002C5634 /* SmallVector.h */,
 				7B12434D28FB16A3002C5634 /* SmallVectorTest.h */,
 				7B73F00328F37F040081C601 /* Span.h */,

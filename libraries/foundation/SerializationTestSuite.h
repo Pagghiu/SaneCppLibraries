@@ -1,7 +1,6 @@
 #pragma once
 #include "String.h"
 #include "StringView.h"
-#include "Test.h"
 #include "Vector.h"
 namespace SC
 {
@@ -46,6 +45,12 @@ struct SC::SerializationTestSuite::PrimitiveStruct
     }
 };
 
+SC_META_STRUCT_BEGIN(SC::SerializationTestSuite::PrimitiveStruct)
+SC_META_STRUCT_MEMBER(0, arrayValue)
+SC_META_STRUCT_MEMBER(1, floatValue)
+SC_META_STRUCT_MEMBER(2, int64Value)
+SC_META_STRUCT_END()
+
 struct SC::SerializationTestSuite::NestedStruct
 {
     int16_t         int16Value = 244;
@@ -66,6 +71,12 @@ struct SC::SerializationTestSuite::NestedStruct
     }
 };
 
+SC_META_STRUCT_BEGIN(SC::SerializationTestSuite::NestedStruct)
+SC_META_STRUCT_MEMBER(0, int16Value)
+SC_META_STRUCT_MEMBER(1, structsArray)
+SC_META_STRUCT_MEMBER(2, doubleVal)
+SC_META_STRUCT_END()
+
 struct SC::SerializationTestSuite::TopLevelStruct
 {
     NestedStruct nestedStruct;
@@ -73,16 +84,29 @@ struct SC::SerializationTestSuite::TopLevelStruct
     bool operator!=(const TopLevelStruct& other) const { return nestedStruct != other.nestedStruct; }
 };
 
+SC_META_STRUCT_BEGIN(SC::SerializationTestSuite::TopLevelStruct)
+SC_META_STRUCT_MEMBER(0, nestedStruct)
+SC_META_STRUCT_END()
+
 struct SC::SerializationTestSuite::VectorStructSimple
 {
     SC::Vector<int> emptyVector;
     SC::Vector<int> vectorOfInts;
 };
 
+SC_META_STRUCT_BEGIN(SC::SerializationTestSuite::VectorStructSimple)
+SC_META_STRUCT_MEMBER(0, emptyVector)
+SC_META_STRUCT_MEMBER(1, vectorOfInts)
+SC_META_STRUCT_END()
+
 struct SC::SerializationTestSuite::VectorStructComplex
 {
     SC::Vector<SC::String> vectorOfStrings;
 };
+
+SC_META_STRUCT_BEGIN(SC::SerializationTestSuite::VectorStructComplex)
+SC_META_STRUCT_MEMBER(0, vectorOfStrings)
+SC_META_STRUCT_END()
 
 struct SC::SerializationTestSuite::VersionedStruct1
 {
@@ -91,6 +115,13 @@ struct SC::SerializationTestSuite::VersionedStruct1
     Vector<String> field2ToRemove = {"ASD1"_sv, "ASD2"_sv, "ASD3"_sv};
     int64_t        int64Value     = -13;
 };
+
+SC_META_STRUCT_BEGIN(SC::SerializationTestSuite::VersionedStruct1)
+SC_META_STRUCT_MEMBER(2, field2ToRemove)
+SC_META_STRUCT_MEMBER(0, floatValue)
+SC_META_STRUCT_MEMBER(1, fieldToRemove)
+SC_META_STRUCT_MEMBER(3, int64Value)
+SC_META_STRUCT_END()
 
 struct SC::SerializationTestSuite::VersionedStruct2
 {
@@ -107,6 +138,11 @@ struct SC::SerializationTestSuite::VersionedStruct2
     }
 };
 
+SC_META_STRUCT_BEGIN(SC::SerializationTestSuite::VersionedStruct2)
+SC_META_STRUCT_MEMBER(3, int64Value)
+SC_META_STRUCT_MEMBER(0, floatValue)
+SC_META_STRUCT_END()
+
 struct SC::SerializationTestSuite::VersionedPoint3D
 {
     float x;
@@ -114,17 +150,33 @@ struct SC::SerializationTestSuite::VersionedPoint3D
     float z;
 };
 
+SC_META_STRUCT_BEGIN(SC::SerializationTestSuite::VersionedPoint3D)
+SC_META_STRUCT_MEMBER(0, x)
+SC_META_STRUCT_MEMBER(1, y)
+SC_META_STRUCT_MEMBER(2, z)
+SC_META_STRUCT_END()
+
 struct SC::SerializationTestSuite::VersionedPoint2D
 {
     float x;
     float y;
 };
 
+SC_META_STRUCT_BEGIN(SC::SerializationTestSuite::VersionedPoint2D)
+SC_META_STRUCT_MEMBER(0, x)
+SC_META_STRUCT_MEMBER(1, y)
+SC_META_STRUCT_END()
+
 struct SC::SerializationTestSuite::VersionedArray1
 {
     Vector<VersionedPoint2D> points;
     Vector<int>              simpleInts = {1, 2, 3};
 };
+
+SC_META_STRUCT_BEGIN(SC::SerializationTestSuite::VersionedArray1)
+SC_META_STRUCT_MEMBER(0, points)
+SC_META_STRUCT_MEMBER(1, simpleInts)
+SC_META_STRUCT_END()
 
 struct SC::SerializationTestSuite::VersionedArray2
 {
@@ -157,6 +209,11 @@ struct SC::SerializationTestSuite::VersionedArray2
     }
 };
 
+SC_META_STRUCT_BEGIN(SC::SerializationTestSuite::VersionedArray2)
+SC_META_STRUCT_MEMBER(0, points)
+SC_META_STRUCT_MEMBER(1, simpleInts)
+SC_META_STRUCT_END()
+
 struct SC::SerializationTestSuite::ConversionStruct1
 {
     uint32_t intToFloat         = 1;
@@ -164,6 +221,13 @@ struct SC::SerializationTestSuite::ConversionStruct1
     uint16_t uint16To32         = 1;
     int16_t  signed16ToUnsigned = 1;
 };
+
+SC_META_STRUCT_BEGIN(SC::SerializationTestSuite::ConversionStruct1)
+SC_META_STRUCT_MEMBER(0, intToFloat)
+SC_META_STRUCT_MEMBER(1, floatToInt)
+SC_META_STRUCT_MEMBER(2, uint16To32)
+SC_META_STRUCT_MEMBER(3, signed16ToUnsigned)
+SC_META_STRUCT_END()
 
 struct SC::SerializationTestSuite::ConversionStruct2
 {
@@ -173,6 +237,12 @@ struct SC::SerializationTestSuite::ConversionStruct2
     uint16_t signed16ToUnsigned = 0;
 };
 
+SC_META_STRUCT_BEGIN(SC::SerializationTestSuite::ConversionStruct2)
+SC_META_STRUCT_MEMBER(0, intToFloat)
+SC_META_STRUCT_MEMBER(1, floatToInt)
+SC_META_STRUCT_MEMBER(2, uint16To32)
+SC_META_STRUCT_MEMBER(3, signed16ToUnsigned)
+SC_META_STRUCT_END()
 namespace SC
 {
 // TODO: Move printFlatSchema somewhere else
