@@ -1,27 +1,19 @@
 #pragma once
+#include "Array.h"
+#include "ReflectionSC.h"
+#include "Result.h"
 #include "SerializationTemplateCompiler.h"
-#include "SerializationTestSuite.h"
+#include "Vector.h"
 
 namespace SC
 {
 namespace SerializationTemplate
 {
-template <typename BinaryStream, typename T, typename T2 = void>
+template <typename BinaryStream, typename T, typename SFINAESelector = void>
 struct Serializer;
 
-template <typename BinaryStream, typename T>
-struct SerializerMemberIterator;
-
-template <typename T>
-struct ClassInfoMembers;
-
-template <typename T, typename T2 = void>
+template <typename T, typename SFINAESelector = void>
 struct ClassInfo;
-
-template <typename BinaryStream, typename Container, typename T>
-struct SerializerVector;
-
-struct VersionSchema;
 
 // clang-format off
 template <typename T> struct IsPrimitive : false_type {};
@@ -40,12 +32,12 @@ template <> struct IsPrimitive<char_t>   : true_type  {};
 // clang-format on
 
 template <typename T>
-struct ClassInfoMembers
+struct ClassInfoStruct
 {
     size_t memberSizeSum = 0;
     bool   IsPacked      = false;
 
-    constexpr ClassInfoMembers()
+    constexpr ClassInfoStruct()
     {
         if (Reflection::MetaClass<T>::visit(*this))
         {
@@ -65,10 +57,10 @@ struct ClassInfoMembers
     }
 };
 
-template <typename T, typename T2>
+template <typename T, typename SFINAESelector>
 struct ClassInfo
 {
-    static constexpr bool IsPacked = ClassInfoMembers<T>().IsPacked;
+    static constexpr bool IsPacked = ClassInfoStruct<T>().IsPacked;
 };
 
 template <typename T, int N>
@@ -102,49 +94,34 @@ struct SimpleBinaryReaderSkipper
     Span<const Reflection::MetaProperties> sourceProperties;
     Reflection::MetaProperties             sourceProperty;
 
-    BinaryStream& sourceObject;
-    int&          sourceTypeIndex;
-
     SimpleBinaryReaderSkipper(BinaryStream& stream, int& sourceTypeIndex)
         : sourceObject(stream), sourceTypeIndex(sourceTypeIndex)
     {}
 
-    [[nodiscard]] bool read()
+    [[nodiscard]] bool skip()
     {
         sourceProperty = sourceProperties.data[sourceTypeIndex];
-        switch (sourceProperty.type)
+        if (sourceProperty.type == Reflection::MetaType::TypeStruct)
         {
-        case Reflection::MetaType::TypeInvalid: //
+            return skipStruct();
+        }
+        else if (sourceProperty.type == Reflection::MetaType::TypeArray ||
+                 sourceProperty.type == Reflection::MetaType::TypeVector)
         {
-            return false;
+            return skipVectorOrArray();
         }
-        case Reflection::MetaType::TypeUINT8:
-        case Reflection::MetaType::TypeUINT16:
-        case Reflection::MetaType::TypeUINT32:
-        case Reflection::MetaType::TypeUINT64:
-        case Reflection::MetaType::TypeINT8:
-        case Reflection::MetaType::TypeINT16:
-        case Reflection::MetaType::TypeINT32:
-        case Reflection::MetaType::TypeINT64:
-        case Reflection::MetaType::TypeFLOAT32:
-        case Reflection::MetaType::TypeDOUBLE64: //
+        else if (sourceProperty.isPrimitiveType())
         {
-            SC_TRY_IF(sourceObject.advance(sourceProperty.size))
-            break;
+            return sourceObject.advance(sourceProperty.size);
         }
-        case Reflection::MetaType::TypeStruct: //
-        {
-            return readStruct();
-        }
-        case Reflection::MetaType::TypeArray:
-        case Reflection::MetaType::TypeVector: {
-            return readArray();
-        }
-        }
-        return true;
+        return false;
     }
 
-    [[nodiscard]] bool readStruct()
+  private:
+    BinaryStream& sourceObject;
+    int&          sourceTypeIndex;
+
+    [[nodiscard]] bool skipStruct()
     {
         const auto structSourceProperty  = sourceProperty;
         const auto structSourceTypeIndex = sourceTypeIndex;
@@ -154,12 +131,12 @@ struct SimpleBinaryReaderSkipper
             sourceTypeIndex = structSourceTypeIndex + idx + 1;
             if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
                 sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
-            SC_TRY_IF(read());
+            SC_TRY_IF(skip());
         }
         return true;
     }
 
-    [[nodiscard]] bool readArray()
+    [[nodiscard]] bool skipVectorOrArray()
     {
         const auto arraySourceProperty  = sourceProperty;
         const auto arraySourceTypeIndex = sourceTypeIndex;
@@ -175,7 +152,7 @@ struct SimpleBinaryReaderSkipper
 
         if (isPrimitive)
         {
-            SC_TRY_IF(sourceObject.advance(sourceNumBytes));
+            return sourceObject.advance(sourceNumBytes);
         }
         else
         {
@@ -187,10 +164,10 @@ struct SimpleBinaryReaderSkipper
                 sourceTypeIndex = itemSourceTypeIndex;
                 if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
                     sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
-                SC_TRY_IF(read());
+                SC_TRY_IF(skip());
             }
+            return true;
         }
-        return true;
     }
 };
 
@@ -217,12 +194,13 @@ struct VersionSchema
         if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
             sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
     }
+
     template <typename BinaryStream>
     [[nodiscard]] bool skipCurrent(BinaryStream& stream)
     {
         SimpleBinaryReaderSkipper<BinaryStream> skipper(stream, sourceTypeIndex);
         skipper.sourceProperties = sourceProperties;
-        return skipper.read();
+        return skipper.skip();
     }
 };
 
@@ -250,13 +228,14 @@ struct SerializerVersionedMemberIterator
     }
 };
 
-template <typename BinaryStream, typename T, typename T2>
+template <typename BinaryStream, typename T, typename SFINAESelector>
 struct Serializer
 {
     static constexpr bool IsItemPacked = ClassInfo<T>::IsPacked;
 
     [[nodiscard]] static constexpr bool serializeVersioned(T& object, BinaryStream& stream, VersionSchema& schema)
     {
+        typedef SerializerVersionedMemberIterator<BinaryStream, T> VersionedMemberIterator;
         if (schema.current().type != Reflection::MetaType::TypeStruct)
         {
             return false;
@@ -265,22 +244,17 @@ struct Serializer
         const int structTypeIndex = schema.sourceTypeIndex;
         for (int i = 0; i < numMembers; ++i)
         {
-            schema.sourceTypeIndex                                     = structTypeIndex + i + 1;
-            SerializerVersionedMemberIterator<BinaryStream, T> visitor = {schema, stream, object,
-                                                                          schema.current().order};
+            schema.sourceTypeIndex          = structTypeIndex + i + 1;
+            VersionedMemberIterator visitor = {schema, stream, object, schema.current().order};
             schema.resolveLink();
             Reflection::MetaClass<T>::visit(visitor);
             if (visitor.consumed)
             {
-                if (not visitor.consumedWithSuccess)
-                {
-                    return false;
-                }
+                SC_TRY_IF(visitor.consumedWithSuccess);
             }
             else
             {
-                if (not schema.options.allowDropEccessStructMembers)
-                    return false;
+                SC_TRY_IF(schema.options.allowDropEccessStructMembers)
                 // We must consume it anyway, discarding its content
                 SC_TRY_IF(schema.skipCurrent(stream));
             }
@@ -315,14 +289,10 @@ struct SerializerItems
             const auto sourceNumBytes = schema.current().size * numSourceItems;
             const auto destNumBytes   = numDestinationItems * sizeof(T);
             const auto minBytes       = min(static_cast<uint32_t>(destNumBytes), sourceNumBytes);
-            if (not stream.serialize({object, minBytes}))
-                return false;
+            SC_TRY_IF(stream.serialize({object, minBytes}));
             if (sourceNumBytes > static_cast<uint32_t>(destNumBytes))
             {
-                if (not schema.options.allowDropEccessArrayItems)
-                {
-                    return false;
-                }
+                SC_TRY_IF(schema.options.allowDropEccessArrayItems);
                 return stream.advance(sourceNumBytes - minBytes);
             }
         }
@@ -337,18 +307,14 @@ struct SerializerItems
         if (numSourceItems > numDestinationItems)
         {
             // We must consume these excess items anyway, discarding their content
-            if (not schema.options.allowDropEccessArrayItems)
-            {
-                return false;
-            }
+            SC_TRY_IF(schema.options.allowDropEccessArrayItems);
+
             for (uint32_t idx = 0; idx < numSourceItems - numDestinationItems; ++idx)
             {
                 schema.sourceTypeIndex = arrayItemTypeIndex;
-                if (not schema.skipCurrent(stream))
-                    return false;
+                SC_TRY_IF(schema.skipCurrent(stream));
             }
         }
-
         return true;
     }
 };
@@ -375,7 +341,7 @@ struct Serializer<BinaryStream, T[N]>
         {
             for (auto& item : object)
             {
-                if (!Serializer<BinaryStream, T>::serialize(item, stream))
+                if (not Serializer<BinaryStream, T>::serialize(item, stream))
                     return false;
             }
             return true;
@@ -394,8 +360,7 @@ struct SerializerVector
         uint64_t     sizeInBytes = static_cast<uint64_t>(object.size() * itemSize);
         if (not Serializer<BinaryStream, uint64_t>::serialize(sizeInBytes, stream))
             return false;
-        if (not object.resize(sizeInBytes / itemSize))
-            return false;
+        SC_TRY_IF(object.resize(sizeInBytes / itemSize));
 
         if (IsItemPacked)
         {
@@ -429,18 +394,17 @@ struct Serializer<BinaryStream, SC::Vector<T>> : public SerializerVector<BinaryS
         const uint32_t numSourceItems = static_cast<uint32_t>(sizeInBytes / sourceItemSize);
         if (isMemcpyable)
         {
-            if (not object.resizeWithoutInitializing(numSourceItems))
-                return false;
+            SC_TRY_IF(object.resizeWithoutInitializing(numSourceItems));
         }
         else
         {
-            if (not object.resize(numSourceItems))
-                return false;
+            SC_TRY_IF(object.resize(numSourceItems));
         }
         return SerializerItems<BinaryStream, T>::serializeVersioned(object.data(), stream, schema, numSourceItems,
                                                                     numSourceItems);
     }
 };
+
 template <typename T>
 struct ClassInfo<SC::Vector<T>>
 {
@@ -465,13 +429,11 @@ struct Serializer<BinaryStream, SC::Array<T, N>> : public SerializerVector<Binar
         const uint32_t numDestinationItems = static_cast<uint32_t>(N);
         if (isMemcpyable)
         {
-            if (not object.resizeWithoutInitializing(min(numSourceItems, numDestinationItems)))
-                return false;
+            SC_TRY_IF(object.resizeWithoutInitializing(min(numSourceItems, numDestinationItems)));
         }
         else
         {
-            if (not object.resize(min(numSourceItems, numDestinationItems)))
-                return false;
+            SC_TRY_IF(object.resize(min(numSourceItems, numDestinationItems)));
         }
         return SerializerItems<BinaryStream, T>::serializeItems(object.data(), stream, schema, numSourceItems,
                                                                 numDestinationItems);
@@ -491,15 +453,13 @@ struct Serializer<BinaryStream, T, typename SC::EnableIf<IsPrimitive<T>::value>:
     [[nodiscard]] static bool readCastValue(T& destination, BinaryStream& stream)
     {
         ValueType value;
-        if (not stream.template readAndAdvance<ValueType>(value))
-            return false;
+        SC_TRY_IF(stream.template readAndAdvance<ValueType>(value));
         destination = static_cast<T>(value);
         return true;
     }
 
     [[nodiscard]] static constexpr bool serializeVersioned(T& object, BinaryStream& stream, VersionSchema& schema)
     {
-
         // clang-format off
         switch (schema.current().type)
         {
@@ -532,6 +492,7 @@ struct Serializer<BinaryStream, T, typename SC::EnableIf<IsPrimitive<T>::value>:
         // clang-format on
         return stream.serialize({&object, sizeof(T)});
     }
+
     [[nodiscard]] static constexpr bool serialize(T& object, BinaryStream& stream)
     {
         return stream.serialize({&object, sizeof(T)});

@@ -21,22 +21,22 @@ int main(int argc, const char* argv[])
     TestReport report(argc, argv);
     report.debugBreakOnFailedTest = true;
     // clang-format off
-    { OSTest                test(report); }
-    { ConsoleTest           test(report); }
-    { MemoryTest            test(report); }
-    { ArrayTest             test(report); }
-    { VectorTest            test(report); }
-    { ResultTest            test(report); }
-    { StringViewTest        test(report); }
-    { StringFunctionsTest   test(report); }
-    { StringTest            test(report); }
-    { StringBuilderTest     test(report); }
-    { MapTest               test(report); }
-    { SmallVectorTest       test(report); }
-    { FunctionTest          test(report); }
-    { ReflectionTest        test(report); }
-    { SerializationTypeErasedTest     test(report); }
-    { SerializationTemplateTest    test(report); }
+    { OSTest                        test(report); }
+    { ConsoleTest                   test(report); }
+    { MemoryTest                    test(report); }
+    { ArrayTest                     test(report); }
+    { VectorTest                    test(report); }
+    { ResultTest                    test(report); }
+    { StringViewTest                test(report); }
+    { StringFunctionsTest           test(report); }
+    { StringTest                    test(report); }
+    { StringBuilderTest             test(report); }
+    { MapTest                       test(report); }
+    { SmallVectorTest               test(report); }
+    { FunctionTest                  test(report); }
+    { ReflectionTest                test(report); }
+    { SerializationTypeErasedTest   test(report); }
+    { SerializationTemplateTest     test(report); }
     // clang-format on
 
     return report.getTestReturnCode();

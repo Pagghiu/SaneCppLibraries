@@ -1,6 +1,10 @@
 #pragma once
+#include "Array.h"
+#include "Console.h"
+#include "Reflection.h"
 #include "String.h"
 #include "StringView.h"
+#include "Test.h"
 #include "Vector.h"
 namespace SC
 {

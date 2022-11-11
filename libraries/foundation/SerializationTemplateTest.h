@@ -1,5 +1,6 @@
 #pragma once
 #include "SerializationTemplate.h"
+#include "SerializationTestSuite.h"
 
 namespace SC
 {

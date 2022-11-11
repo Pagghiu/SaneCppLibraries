@@ -62,9 +62,8 @@ struct MetaProperties
     }
 };
 
-struct MetaClassBuilder;
 // clang-format off
-struct MetaPrimitive { static constexpr void build( MetaClassBuilder& builder) { } };
+struct MetaPrimitive { template<typename MemberVisitor>  static constexpr void build( MemberVisitor& builder) { } };
 
 template <typename T> struct MetaClass;
 
@@ -80,33 +79,6 @@ template <> struct MetaClass<int64_t>  : public MetaPrimitive {static constexpr 
 template <> struct MetaClass<float>    : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeFLOAT32;}};
 template <> struct MetaClass<double>   : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeDOUBLE64;}};
 // clang-format on
-
-struct Atom
-{
-    typedef void (*MetaClassBuildFunc)(MetaClassBuilder& builder);
-
-    MetaProperties      properties;
-    ConstexprStringView name;
-    MetaClassBuildFunc  build;
-
-    constexpr Atom() : build(nullptr) {}
-    constexpr Atom(const MetaProperties properties, ConstexprStringView name, MetaClassBuildFunc build)
-        : properties(properties), name(name), build(build)
-    {}
-
-    template <typename R, typename T, int N>
-    [[nodiscard]] static constexpr Atom create(int order, const char (&name)[N], R T::*, size_t offset)
-    {
-        return {MetaProperties(MetaClass<R>::getMetaType(), order, static_cast<SC::uint16_t>(offset), sizeof(R), -1),
-                ConstexprStringView(name, N), &MetaClass<R>::build};
-    }
-
-    template <typename T>
-    [[nodiscard]] static constexpr Atom create(ConstexprStringView name = TypeToString<T>::get())
-    {
-        return {MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), name, &MetaClass<T>::build};
-    }
-};
 
 template <typename Type>
 struct MetaArrayView
@@ -156,38 +128,41 @@ struct MetaArrayView
     constexpr bool capacityWasEnough() const { return wantedCapacity == size; }
 };
 
-struct VectorVTable
+template <typename MemberVisitor>
+struct AtomBase
 {
-    enum class DropEccessItems
-    {
-        No,
-        Yes
-    };
+    typedef void (*MetaClassBuildFunc)(MemberVisitor& builder);
 
-    typedef bool (*FunctionGetSegmentSpan)(MetaProperties property, Span<void> object, Span<void>& itemBegin);
-    typedef bool (*FunctionGetSegmentSpanConst)(MetaProperties property, Span<const void> object,
-                                                Span<const void>& itemBegin);
+    MetaProperties      properties;
+    ConstexprStringView name;
+    MetaClassBuildFunc  build;
 
-    typedef bool (*FunctionResize)(Span<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
-                                   DropEccessItems dropEccessItems);
-    typedef bool (*FunctionResizeWithoutInitialize)(Span<void> object, Reflection::MetaProperties property,
-                                                    uint64_t sizeInBytes, DropEccessItems dropEccessItems);
-    FunctionGetSegmentSpan          getSegmentSpan;
-    FunctionGetSegmentSpanConst     getSegmentSpanConst;
-    FunctionResize                  resize;
-    FunctionResizeWithoutInitialize resizeWithoutInitialize;
-    uint32_t                        linkID;
-
-    constexpr VectorVTable()
-        : getSegmentSpan(nullptr), getSegmentSpanConst(nullptr), resize(nullptr), resizeWithoutInitialize(nullptr),
-          linkID(0)
+    constexpr AtomBase() : build(nullptr) {}
+    constexpr AtomBase(const MetaProperties properties, ConstexprStringView name, MetaClassBuildFunc build)
+        : properties(properties), name(name), build(build)
     {}
+
+    template <typename R, typename T, int N>
+    [[nodiscard]] static constexpr AtomBase create(int order, const char (&name)[N], R T::*, size_t offset)
+    {
+        return {MetaProperties(MetaClass<R>::getMetaType(), order, static_cast<SC::uint16_t>(offset), sizeof(R), -1),
+                ConstexprStringView(name, N), &MetaClass<R>::build};
+    }
+
+    template <typename T>
+    [[nodiscard]] static constexpr AtomBase create(ConstexprStringView name = TypeToString<T>::get())
+    {
+        return {MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), name, &MetaClass<T>::build};
+    }
 };
+
+template <typename MemberVisitor>
 struct MetaClassBuilder
 {
-    MetaArrayView<Atom>         atoms;
-    MetaArrayView<VectorVTable> vectorVtable;
-    uint32_t                    initialSize;
+    typedef AtomBase<MemberVisitor> Atom;
+
+    MetaArrayView<Atom> atoms;
+    uint32_t            initialSize;
     constexpr MetaClassBuilder(Atom* output = nullptr, const int capacity = 0) : atoms(output, capacity), initialSize(0)
     {}
 
@@ -202,9 +177,12 @@ template <typename T, size_t N>
 struct MetaClass<T[N]>
 {
     static constexpr MetaType getMetaType() { return MetaType::TypeArray; }
-    static constexpr void     build(MetaClassBuilder& builder)
+
+    template <typename MemberVisitor>
+    static constexpr void build(MemberVisitor& builder)
     {
-        Atom arrayHeader = {MetaProperties(getMetaType(), 0, 0, sizeof(T[N]), 1), "Array", nullptr};
+        typename MemberVisitor::Atom arrayHeader = {MetaProperties(getMetaType(), 0, 0, sizeof(T[N]), 1), "Array",
+                                                    nullptr};
         arrayHeader.properties.setCustomUint32(N);
         builder.atoms.push(arrayHeader);
         builder.atoms.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), TypeToString<T>::get(),
@@ -221,9 +199,10 @@ struct MetaStruct<MetaClass<Type>>
 
     [[nodiscard]] static constexpr MetaType getMetaType() { return MetaType::TypeStruct; }
 
-    static constexpr void build(MetaClassBuilder& builder)
+    template <typename MemberVisitor>
+    static constexpr void build(MemberVisitor& builder)
     {
-        builder.atoms.Struct<T>();
+        builder.atoms.template Struct<T>();
         MetaClass<Type>::visit(builder);
     }
 };
@@ -235,8 +214,6 @@ struct MetaStruct<MetaClass<Type>>
     template <>                                                                                                        \
     struct SC::Reflection::MetaClass<StructName> : SC::Reflection::MetaStruct<MetaClass<StructName>>                   \
     {                                                                                                                  \
-        static constexpr auto Hash = SC::StringHash(#StructName);                                                      \
-                                                                                                                       \
         template <typename MemberVisitor>                                                                              \
         static constexpr bool visit(MemberVisitor&& builder)                                                           \
         {                                                                                                              \

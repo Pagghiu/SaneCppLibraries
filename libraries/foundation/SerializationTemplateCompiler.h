@@ -9,13 +9,17 @@ struct FlatSchemaTemplated
     struct EmptyPayload
     {
     };
-    struct MetaClassBuilder2 : public MetaClassBuilder
+    struct MetaClassBuilderTemplate : public MetaClassBuilder<MetaClassBuilderTemplate>
     {
-        EmptyPayload payload;
-        constexpr MetaClassBuilder2(Atom* output = nullptr, const int capacity = 0) : MetaClassBuilder(output, capacity)
+        typedef AtomBase<MetaClassBuilderTemplate> Atom;
+        EmptyPayload                               payload;
+        constexpr MetaClassBuilderTemplate(Atom* output = nullptr, const int capacity = 0)
+            : MetaClassBuilder(output, capacity)
         {}
     };
-    typedef FlatSchemaCompiler::FlatSchemaCompiler<MetaProperties, Atom, MetaClassBuilder2> FlatSchemaBase;
+    typedef FlatSchemaCompiler::FlatSchemaCompiler<MetaProperties, MetaClassBuilderTemplate::Atom,
+                                                   MetaClassBuilderTemplate>
+        FlatSchemaBase;
 
     // You can customize:
     // - MAX_LINK_BUFFER_SIZE: maximum number of "complex types" (anything that is not a primitive) that can be built
@@ -23,8 +27,8 @@ struct FlatSchemaTemplated
     template <typename T, int MAX_LINK_BUFFER_SIZE = 20, int MAX_TOTAL_ATOMS = 100>
     static constexpr auto compile()
     {
-        constexpr auto schema =
-            FlatSchemaBase::compileAllAtomsFor<MAX_LINK_BUFFER_SIZE, MAX_TOTAL_ATOMS>(&MetaClass<T>::build);
+        constexpr auto schema = FlatSchemaBase::compileAllAtomsFor<MAX_LINK_BUFFER_SIZE, MAX_TOTAL_ATOMS>(
+            &MetaClass<T>::template build<MetaClassBuilderTemplate>);
         static_assert(schema.atoms.size > 0, "Something failed in compileAllAtomsFor");
         FlatSchemaBase::FlatSchema<schema.atoms.size> result;
         for (int i = 0; i < schema.atoms.size; ++i)
