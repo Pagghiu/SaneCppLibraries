@@ -2,6 +2,7 @@
 #include "Array.h"
 #include "Map.h"
 #include "Reflection.h"
+#include "ReflectionClassInfo.h"
 #include "String.h"
 #include "Vector.h"
 
@@ -15,7 +16,16 @@ struct VectorArrayVTable
 {
     static constexpr void build(MemberVisitor&) {}
 };
-
+template <typename T>
+struct ClassInfo<SC::Vector<T>>
+{
+    static constexpr bool IsPacked = false;
+};
+template <typename T, int N>
+struct ClassInfo<SC::Array<T, N>>
+{
+    static constexpr bool IsPacked = false;
+};
 } // namespace Reflection
 } // namespace SC
 

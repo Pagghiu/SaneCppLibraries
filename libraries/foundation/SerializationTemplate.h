@@ -21,69 +21,6 @@ namespace SerializationTemplate
 template <typename BinaryStream, typename T, typename SFINAESelector = void>
 struct Serializer;
 
-template <typename T, typename SFINAESelector = void>
-struct ClassInfo;
-
-// clang-format off
-template <typename T> struct IsPrimitive : false_type {};
-
-template <> struct IsPrimitive<uint8_t>  : true_type  {};
-template <> struct IsPrimitive<uint16_t> : true_type  {};
-template <> struct IsPrimitive<uint32_t> : true_type  {};
-template <> struct IsPrimitive<uint64_t> : true_type  {};
-template <> struct IsPrimitive<int8_t>   : true_type  {};
-template <> struct IsPrimitive<int16_t>  : true_type  {};
-template <> struct IsPrimitive<int32_t>  : true_type  {};
-template <> struct IsPrimitive<int64_t>  : true_type  {};
-template <> struct IsPrimitive<float>    : true_type  {};
-template <> struct IsPrimitive<double>   : true_type  {};
-template <> struct IsPrimitive<char_t>   : true_type  {};
-// clang-format on
-
-template <typename T>
-struct ClassInfoStruct
-{
-    size_t memberSizeSum = 0;
-    bool   IsPacked      = false;
-
-    constexpr ClassInfoStruct()
-    {
-        if (Reflection::MetaClass<T>::visit(*this))
-        {
-            IsPacked = memberSizeSum == sizeof(T);
-        }
-    }
-
-    template <typename R, int N>
-    constexpr bool operator()(int order, const char (&name)[N], R T::*member, size_t offset)
-    {
-        if (not ClassInfo<R>().IsPacked)
-        {
-            return false;
-        }
-        memberSizeSum += sizeof(R);
-        return true;
-    }
-};
-
-template <typename T, typename SFINAESelector>
-struct ClassInfo
-{
-    static constexpr bool IsPacked = ClassInfoStruct<T>().IsPacked;
-};
-
-template <typename T, int N>
-struct ClassInfo<T[N]>
-{
-    static constexpr bool IsPacked = ClassInfo<T>::IsPacked;
-};
-
-template <typename T>
-struct ClassInfo<T, typename SC::EnableIf<IsPrimitive<T>::value>::type>
-{
-    static constexpr bool IsPacked = true;
-};
-
 template <typename BinaryStream, typename T>
 struct SerializerMemberIterator
 {
@@ -157,7 +94,7 @@ struct SerializerVersionedMemberIterator
 template <typename BinaryStream, typename T, typename SFINAESelector>
 struct Serializer
 {
-    static constexpr bool IsItemPacked = ClassInfo<T>::IsPacked;
+    static constexpr bool IsItemPacked = Reflection::ClassInfo<T>::IsPacked;
 
     [[nodiscard]] static constexpr bool serializeVersioned(T& object, BinaryStream& stream, VersionSchema& schema)
     {
@@ -209,7 +146,7 @@ struct SerializerItems
         const auto arrayItemTypeIndex = schema.sourceTypeIndex;
 
         const bool isMemcpyable =
-            IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
+            Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
         if (isMemcpyable)
         {
             const size_t sourceNumBytes = schema.current().size * numSourceItems;
@@ -248,7 +185,7 @@ struct SerializerItems
 template <typename BinaryStream, typename T, int N>
 struct Serializer<BinaryStream, T[N]>
 {
-    static constexpr bool IsItemPacked = ClassInfo<T>::IsPacked;
+    static constexpr bool IsItemPacked = Reflection::ClassInfo<T>::IsPacked;
 
     [[nodiscard]] static constexpr bool serializeVersioned(T (&object)[N], BinaryStream& stream, VersionSchema& schema)
     {
@@ -278,7 +215,7 @@ struct Serializer<BinaryStream, T[N]>
 template <typename BinaryStream, typename Container, typename T>
 struct SerializerVector
 {
-    static constexpr bool IsItemPacked = ClassInfo<T>::IsPacked;
+    static constexpr bool IsItemPacked = Reflection::ClassInfo<T>::IsPacked;
 
     [[nodiscard]] static constexpr bool serialize(Container& object, BinaryStream& stream)
     {
@@ -315,7 +252,7 @@ struct Serializer<BinaryStream, SC::Vector<T>> : public SerializerVector<BinaryS
             return false;
         schema.advance();
         const bool isMemcpyable =
-            IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
+            Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
         const size_t   sourceItemSize = schema.current().size;
         const uint32_t numSourceItems = static_cast<uint32_t>(sizeInBytes / sourceItemSize);
         if (isMemcpyable)
@@ -331,12 +268,6 @@ struct Serializer<BinaryStream, SC::Vector<T>> : public SerializerVector<BinaryS
     }
 };
 
-template <typename T>
-struct ClassInfo<SC::Vector<T>>
-{
-    static constexpr bool IsPacked = false;
-};
-
 template <typename BinaryStream, typename T, int N>
 struct Serializer<BinaryStream, SC::Array<T, N>> : public SerializerVector<BinaryStream, SC::Array<T, N>, T>
 {
@@ -348,7 +279,7 @@ struct Serializer<BinaryStream, SC::Array<T, N>> : public SerializerVector<Binar
             return false;
         schema.advance();
         const bool isMemcpyable =
-            IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
+            Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
 
         const size_t   sourceItemSize      = schema.current().size;
         const uint32_t numSourceItems      = static_cast<uint32_t>(sizeInBytes / sourceItemSize);
@@ -366,14 +297,8 @@ struct Serializer<BinaryStream, SC::Array<T, N>> : public SerializerVector<Binar
     }
 };
 
-template <typename T, int N>
-struct ClassInfo<SC::Array<T, N>>
-{
-    static constexpr bool IsPacked = false;
-};
-
 template <typename BinaryStream, typename T>
-struct Serializer<BinaryStream, T, typename SC::EnableIf<IsPrimitive<T>::value>::type>
+struct Serializer<BinaryStream, T, typename SC::EnableIf<Reflection::IsPrimitive<T>::value>::type>
 {
     template <typename ValueType>
     [[nodiscard]] static bool readCastValue(T& destination, BinaryStream& stream)
