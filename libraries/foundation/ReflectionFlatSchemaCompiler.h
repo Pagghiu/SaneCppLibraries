@@ -1,5 +1,6 @@
 #pragma once
 #include "ConstexprTypes.h"
+#include "Reflection.h"
 #include "Span.h" // TODO: Remove Span.h dependency
 
 namespace SC
@@ -13,15 +14,18 @@ struct FlatSchemaCompilerResult
     Payload                               payload;
 };
 
-template <typename MetaProperties, typename Atom, typename MetaClassBuilder>
+template <typename MetaClassBuilder>
 struct FlatSchemaCompiler
 {
+    typedef typename MetaClassBuilder::Atom     Atom;
+    typedef typename Atom::MetaClassBuildFunc   MetaClassBuildFunc;
+    typedef decltype(MetaClassBuilder::payload) PayloadType;
     template <int MAX_TOTAL_ATOMS>
     struct FlatSchema
     {
         ConstexprArray<MetaProperties, MAX_TOTAL_ATOMS>      properties;
         ConstexprArray<ConstexprStringView, MAX_TOTAL_ATOMS> names;
-        decltype(MetaClassBuilder::payload)                  payload;
+        PayloadType                                          payload;
 
         constexpr auto propertiesAsSpan() const
         {
@@ -31,9 +35,8 @@ struct FlatSchemaCompiler
     };
 
     template <int MAX_ATOMS>
-    [[nodiscard]] static constexpr bool appendAtomsTo(ConstexprArray<Atom, MAX_ATOMS>&  atoms,
-                                                      typename Atom::MetaClassBuildFunc build,
-                                                      MetaClassBuilder&                 container)
+    [[nodiscard]] static constexpr bool appendAtomsTo(ConstexprArray<Atom, MAX_ATOMS>& atoms, MetaClassBuildFunc build,
+                                                      MetaClassBuilder& container)
     {
         container.initialSize = atoms.size;
         container.atoms.init(atoms.values + container.initialSize, MAX_ATOMS - container.initialSize);
@@ -59,15 +62,14 @@ struct FlatSchemaCompiler
     }
 
     template <int MAX_LINK_BUFFER_SIZE, int MAX_TOTAL_ATOMS, typename Func>
-    constexpr static FlatSchemaCompilerResult<Atom, decltype(MetaClassBuilder::payload), MAX_TOTAL_ATOMS>
-    compileAllAtomsFor(Func f)
+    constexpr static FlatSchemaCompilerResult<Atom, PayloadType, MAX_TOTAL_ATOMS> compileAllAtomsFor(Func f)
     {
-        FlatSchemaCompilerResult<Atom, decltype(MetaClassBuilder::payload), MAX_TOTAL_ATOMS> result;
+        FlatSchemaCompilerResult<Atom, PayloadType, MAX_TOTAL_ATOMS> result;
 
         MetaClassBuilder container(result.atoms.values, MAX_TOTAL_ATOMS);
 
-        ConstexprArray<typename Atom::MetaClassBuildFunc, MAX_LINK_BUFFER_SIZE> alreadyVisitedTypes;
-        ConstexprArray<int, MAX_LINK_BUFFER_SIZE>                               alreadyVisitedLinkID;
+        ConstexprArray<MetaClassBuildFunc, MAX_LINK_BUFFER_SIZE> alreadyVisitedTypes;
+        ConstexprArray<int, MAX_LINK_BUFFER_SIZE>                alreadyVisitedLinkID;
         if (not appendAtomsTo(result.atoms, f, container))
         {
             return {};

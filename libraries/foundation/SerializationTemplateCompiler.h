@@ -1,5 +1,6 @@
 #pragma once
 #include "Reflection.h"
+#include "ReflectionFlatSchemaCompiler.h"
 namespace SC
 {
 namespace Reflection
@@ -17,8 +18,7 @@ struct FlatSchemaTemplated
             : MetaClassBuilder(output, capacity)
         {}
     };
-    typedef Reflection::FlatSchemaCompiler<MetaProperties, MetaClassBuilderTemplate::Atom, MetaClassBuilderTemplate>
-        FlatSchemaBase;
+    typedef Reflection::FlatSchemaCompiler<MetaClassBuilderTemplate> FlatSchemaBase;
 
     // You can customize:
     // - MAX_LINK_BUFFER_SIZE: maximum number of "complex types" (anything that is not a primitive) that can be built

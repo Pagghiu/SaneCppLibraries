@@ -1,5 +1,6 @@
 #pragma once
 #include "Reflection.h"
+#include "ReflectionFlatSchemaCompiler.h"
 namespace SC
 {
 namespace Reflection
@@ -136,8 +137,7 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
 
 struct FlatSchemaTypeErased
 {
-    typedef Reflection::FlatSchemaCompiler<MetaProperties, MetaClassBuilderTypeErased::Atom, MetaClassBuilderTypeErased>
-        FlatSchemaBase;
+    typedef Reflection::FlatSchemaCompiler<MetaClassBuilderTypeErased> FlatSchemaBase;
 
     // You can customize:
     // - MAX_LINK_BUFFER_SIZE: maximum number of "complex types" (anything that is not a primitive) that can be built
@@ -157,7 +157,7 @@ struct FlatSchemaTypeErased
         result.properties.size = schema.atoms.size;
         result.names.size      = schema.atoms.size;
         result.payload         = schema.payload;
-        // TODO: This is really ugly
+        // TODO: This is ugly, and by removing it we could move this compile() inside FlatSchemaCompiler
         while (schema.payload.vector.values[result.payload.vector.size++].resize != nullptr)
             ;
         return result;

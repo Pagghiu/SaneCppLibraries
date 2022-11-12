@@ -1,7 +1,6 @@
 #pragma once
 #include "ConstexprTypes.h"
 #include "ReflectionClassInfo.h"
-#include "ReflectionFlatSchemaCompiler.h"
 #include "Types.h"
 
 namespace SC
