@@ -1,5 +1,7 @@
 #pragma once
 #include "Reflection.h"
+#include "Result.h"
+#include "Span.h"
 
 namespace SC
 {

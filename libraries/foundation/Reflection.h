@@ -100,13 +100,13 @@ template <> struct MetaClass<double>   : public MetaPrimitive {static constexpr 
 template <typename Type>
 struct MetaArrayView
 {
-    int   size;
+    int&  size;
     int   wantedCapacity;
     Type* output;
     int   capacity;
 
-    constexpr MetaArrayView(Type* output = nullptr, const int capacity = 0)
-        : size(0), wantedCapacity(0), output(nullptr), capacity(0)
+    constexpr MetaArrayView(int& size, Type* output = nullptr, const int capacity = 0)
+        : size(size), wantedCapacity(0), output(nullptr), capacity(0)
     {
         init(output, capacity);
     }
@@ -183,9 +183,11 @@ struct MetaClassBuilder
 {
     typedef AtomBase<MemberVisitor> Atom;
 
+    int                 atomsSize;
     MetaArrayView<Atom> atoms;
     uint32_t            initialSize;
-    constexpr MetaClassBuilder(Atom* output = nullptr, const int capacity = 0) : atoms(output, capacity), initialSize(0)
+    constexpr MetaClassBuilder(Atom* output = nullptr, const int capacity = 0)
+        : atomsSize(0), atoms(atomsSize, output, capacity), initialSize(0)
     {}
 
     template <typename R, typename T, int N>
