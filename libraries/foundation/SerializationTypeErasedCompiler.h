@@ -136,12 +136,6 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
 
 struct FlatSchemaTypeErased
 {
-    enum class MetaStructFlags : uint32_t
-    {
-        IsPacked            = 1 << 1, // No padding between members of a Struct
-        IsRecursivelyPacked = 1 << 2, // IsPacked AND No padding in every contained field (recursively)
-    };
-
     typedef Reflection::FlatSchemaCompiler<MetaProperties, MetaClassBuilderTypeErased::Atom, MetaClassBuilderTypeErased>
         FlatSchemaBase;
 
@@ -166,75 +160,7 @@ struct FlatSchemaTypeErased
         // TODO: This is really ugly
         while (schema.payload.vector.values[result.payload.vector.size++].resize != nullptr)
             ;
-        markPackedStructs(result, 0);
         return result;
-    }
-    [[nodiscard]] static constexpr bool areAllMembersPacked(const MetaProperties* properties, int numAtoms)
-    {
-        uint32_t totalSize = 0;
-        for (int idx = 0; idx < numAtoms; ++idx)
-        {
-            totalSize += properties[idx + 1].size;
-        }
-        return totalSize == properties->size;
-    }
-
-  private:
-    template <int MAX_TOTAL_ATOMS>
-    static constexpr bool markPackedStructs(FlatSchemaBase::FlatSchema<MAX_TOTAL_ATOMS>& result, int startIdx)
-    {
-        MetaProperties& atom = result.properties.values[startIdx];
-        if (atom.isPrimitiveType())
-        {
-            return true; // packed by definition
-        }
-        else if (atom.type == MetaType::TypeStruct)
-        {
-            // packed if is itself packed and all of its non primitive members are packed
-            if (not(atom.getCustomUint32() & static_cast<uint32_t>(MetaStructFlags::IsPacked)))
-            {
-                if (areAllMembersPacked(&atom, atom.numSubAtoms))
-                {
-                    atom.setCustomUint32(atom.getCustomUint32() | static_cast<uint32_t>(MetaStructFlags::IsPacked));
-                }
-            }
-            const auto structFlags         = atom.getCustomUint32();
-            bool       isRecursivelyPacked = true;
-            if (not(structFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked)))
-            {
-                isRecursivelyPacked = false;
-            }
-            for (int idx = 0; idx < atom.numSubAtoms; ++idx)
-            {
-                const MetaProperties& member = result.properties.values[startIdx + 1 + idx];
-                if (not member.isPrimitiveType())
-                {
-                    if (not markPackedStructs(result, member.getLinkIndex()))
-                    {
-                        isRecursivelyPacked = false;
-                    }
-                }
-            }
-            if (isRecursivelyPacked)
-            {
-                atom.setCustomUint32(structFlags | static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked));
-            }
-            return isRecursivelyPacked;
-        }
-        int             newIndex = startIdx + 1;
-        MetaProperties& itemAtom = result.properties.values[startIdx + 1];
-        if (itemAtom.getLinkIndex() > 0)
-            newIndex = itemAtom.getLinkIndex();
-        // We want to visit the inner type anyway
-        const bool innerResult = markPackedStructs(result, newIndex);
-        if (atom.type == MetaType::TypeArray)
-        {
-            return innerResult; // C-arrays are packed if their inner type is packed
-        }
-        else
-        {
-            return false; // Vector & co will break packed state
-        }
     }
 };
 

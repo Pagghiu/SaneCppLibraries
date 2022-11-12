@@ -195,53 +195,39 @@ struct SC::ReflectionTest : public SC::TestCase
         using namespace SC::Reflection;
         if (test_section("Packing"))
         {
-            typedef FlatSchemaTypeErased::MetaStructFlags MetaStructFlags;
-            constexpr auto                                packedStructWithArray =
+            constexpr auto packedStructWithArray =
                 FlatSchemaTypeErased::compile<TestNamespace::PackedStructWithArray>();
             constexpr auto packedStructWithArrayFlags = packedStructWithArray.properties.values[0].getCustomUint32();
-            static_assert(packedStructWithArrayFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked),
-                          "Packed struct should be packed");
-            static_assert(packedStructWithArrayFlags & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked),
+            static_assert(packedStructWithArrayFlags & MetaStructFlags::IsPacked,
                           "nestedPacked struct should be recursively packed");
 
             constexpr auto packedStruct      = FlatSchemaTypeErased::compile<TestNamespace::PackedStruct>();
             constexpr auto packedStructFlags = packedStruct.properties.values[0].getCustomUint32();
-            static_assert(packedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked),
-                          "Packed struct should be packed");
-            static_assert(packedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked),
+            static_assert(packedStructFlags & MetaStructFlags::IsPacked,
                           "nestedPacked struct should be recursively packed");
 
             constexpr auto unpackedStruct      = FlatSchemaTypeErased::compile<TestNamespace::UnpackedStruct>();
             constexpr auto unpackedStructFlags = unpackedStruct.properties.values[0].getCustomUint32();
-            static_assert(not(unpackedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked)),
-                          "Unpacked struct should not be packed");
-            static_assert(not(unpackedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked)),
+            static_assert(not(unpackedStructFlags & MetaStructFlags::IsPacked),
                           "Unpacked struct should be recursively packed");
 
             constexpr auto nestedUnpackedStruct = FlatSchemaTypeErased::compile<TestNamespace::NestedUnpackedStruct>();
             constexpr auto nestedUnpackedStructFlags = nestedUnpackedStruct.properties.values[0].getCustomUint32();
-            static_assert((nestedUnpackedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked)),
-                          "nestedPacked struct should be packed");
-            static_assert(not(nestedUnpackedStructFlags & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked)),
+            static_assert(not(nestedUnpackedStructFlags & MetaStructFlags::IsPacked),
                           "nestedPacked struct should not be recursiely packed");
 
             constexpr auto structWithArrayPacked =
                 FlatSchemaTypeErased::compile<TestNamespace::StructWithArrayPacked>();
             constexpr auto structWithArrayPackedFlags = structWithArrayPacked.properties.values[0].getCustomUint32();
-            static_assert((structWithArrayPackedFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked)),
-                          "structWithArrayPacked struct should be packed");
-            static_assert(structWithArrayPackedFlags & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked),
+            static_assert(structWithArrayPackedFlags & MetaStructFlags::IsPacked,
                           "structWithArrayPacked struct should not be recursiely packed");
 
             constexpr auto structWithArrayUnpacked =
                 FlatSchemaTypeErased::compile<TestNamespace::StructWithArrayUnpacked>();
             constexpr auto structWithArrayUnpackedFlags =
                 structWithArrayUnpacked.properties.values[0].getCustomUint32();
-            static_assert((structWithArrayUnpackedFlags & static_cast<uint32_t>(MetaStructFlags::IsPacked)),
-                          "structWithArrayUnpacked struct should be packed");
-            static_assert(
-                not(structWithArrayUnpackedFlags & static_cast<uint32_t>(MetaStructFlags::IsRecursivelyPacked)),
-                "structWithArrayUnpacked struct should not be recursiely packed");
+            static_assert(not(structWithArrayUnpackedFlags & MetaStructFlags::IsPacked),
+                          "structWithArrayUnpacked struct should not be recursiely packed");
         }
         if (test_section("Print Complex structure"))
         {

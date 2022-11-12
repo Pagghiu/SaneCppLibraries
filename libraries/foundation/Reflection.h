@@ -1,5 +1,6 @@
 #pragma once
 #include "ConstexprTypes.h"
+#include "ReflectionClassInfo.h"
 #include "ReflectionFlatSchemaCompiler.h"
 #include "Types.h"
 
@@ -7,6 +8,10 @@ namespace SC
 {
 namespace Reflection
 {
+struct MetaStructFlags
+{
+    static const uint32_t IsPacked = 1 << 1; // IsPacked AND No padding in every contained field (recursively)
+};
 
 enum class MetaType : uint8_t
 {
@@ -59,6 +64,19 @@ struct MetaProperties
     [[nodiscard]] constexpr bool isPrimitiveType() const
     {
         return type >= MetaType::TypeUINT8 && type <= MetaType::TypeDOUBLE64;
+    }
+    [[nodiscard]] constexpr bool isPrimitiveOrRecursivelyPacked() const
+    {
+        if (isPrimitiveType())
+            return true;
+        if (type == Reflection::MetaType::TypeStruct)
+        {
+            if (getCustomUint32() & Reflection::MetaStructFlags::IsPacked)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 };
 
@@ -152,7 +170,12 @@ struct AtomBase
     template <typename T>
     [[nodiscard]] static constexpr AtomBase create(ConstexprStringView name = TypeToString<T>::get())
     {
-        return {MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), name, &MetaClass<T>::build};
+        AtomBase atom = {MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), name, &MetaClass<T>::build};
+        if (ClassInfo<T>::IsPacked)
+        {
+            atom.properties.setCustomUint32(MetaStructFlags::IsPacked);
+        }
+        return atom;
     }
 };
 

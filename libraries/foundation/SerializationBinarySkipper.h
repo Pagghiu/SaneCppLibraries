@@ -41,13 +41,21 @@ struct BinarySkipper
     {
         const auto structSourceProperty  = sourceProperty;
         const auto structSourceTypeIndex = sourceTypeIndex;
-        // TODO: If we save the "isPacked" into some atom flags we coud skip entire struct
-        for (int16_t idx = 0; idx < structSourceProperty.numSubAtoms; ++idx)
+        const bool isBulkWriteable       = sourceProperties.data[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
+
+        if (isBulkWriteable)
         {
-            sourceTypeIndex = structSourceTypeIndex + idx + 1;
-            if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
-                sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
-            SC_TRY_IF(skip());
+            SC_TRY_IF(sourceObject.advance(structSourceProperty.size));
+        }
+        else
+        {
+            for (int16_t idx = 0; idx < structSourceProperty.numSubAtoms; ++idx)
+            {
+                sourceTypeIndex = structSourceTypeIndex + idx + 1;
+                if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
+                    sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
+                SC_TRY_IF(skip());
+            }
         }
         return true;
     }
@@ -64,10 +72,8 @@ struct BinarySkipper
             SC_TRY_IF(sourceObject.readAndAdvance(sourceNumBytes));
         }
 
-        // TODO: If we save the "isRecursivelyPacked" into some atom flags we coud skip entire array
-        const bool isPrimitive = sourceProperties.data[sourceTypeIndex].isPrimitiveType();
-
-        if (isPrimitive)
+        const bool isBulkWriteable = sourceProperties.data[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
+        if (isBulkWriteable)
         {
             return sourceObject.advance(sourceNumBytes);
         }
