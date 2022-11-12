@@ -17,8 +17,7 @@ struct FlatSchemaTemplated
             : MetaClassBuilder(output, capacity)
         {}
     };
-    typedef FlatSchemaCompiler::FlatSchemaCompiler<MetaProperties, MetaClassBuilderTemplate::Atom,
-                                                   MetaClassBuilderTemplate>
+    typedef Reflection::FlatSchemaCompiler<MetaProperties, MetaClassBuilderTemplate::Atom, MetaClassBuilderTemplate>
         FlatSchemaBase;
 
     // You can customize:

@@ -142,8 +142,7 @@ struct FlatSchemaTypeErased
         IsRecursivelyPacked = 1 << 2, // IsPacked AND No padding in every contained field (recursively)
     };
 
-    typedef FlatSchemaCompiler::FlatSchemaCompiler<MetaProperties, MetaClassBuilderTypeErased::Atom,
-                                                   MetaClassBuilderTypeErased>
+    typedef Reflection::FlatSchemaCompiler<MetaProperties, MetaClassBuilderTypeErased::Atom, MetaClassBuilderTypeErased>
         FlatSchemaBase;
 
     // You can customize:

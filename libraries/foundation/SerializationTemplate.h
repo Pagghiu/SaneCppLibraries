@@ -7,6 +7,15 @@
 
 namespace SC
 {
+namespace Serialization
+{
+template <typename BinaryStream>
+struct BinarySkipper;
+}
+} // namespace SC
+
+namespace SC
+{
 namespace SerializationTemplate
 {
 template <typename BinaryStream, typename T, typename SFINAESelector = void>
@@ -88,89 +97,6 @@ struct SerializerMemberIterator
     }
 };
 
-template <typename BinaryStream>
-struct SimpleBinaryReaderSkipper
-{
-    Span<const Reflection::MetaProperties> sourceProperties;
-    Reflection::MetaProperties             sourceProperty;
-
-    SimpleBinaryReaderSkipper(BinaryStream& stream, int& sourceTypeIndex)
-        : sourceObject(stream), sourceTypeIndex(sourceTypeIndex)
-    {}
-
-    [[nodiscard]] bool skip()
-    {
-        sourceProperty = sourceProperties.data[sourceTypeIndex];
-        if (sourceProperty.type == Reflection::MetaType::TypeStruct)
-        {
-            return skipStruct();
-        }
-        else if (sourceProperty.type == Reflection::MetaType::TypeArray ||
-                 sourceProperty.type == Reflection::MetaType::TypeVector)
-        {
-            return skipVectorOrArray();
-        }
-        else if (sourceProperty.isPrimitiveType())
-        {
-            return sourceObject.advance(sourceProperty.size);
-        }
-        return false;
-    }
-
-  private:
-    BinaryStream& sourceObject;
-    int&          sourceTypeIndex;
-
-    [[nodiscard]] bool skipStruct()
-    {
-        const auto structSourceProperty  = sourceProperty;
-        const auto structSourceTypeIndex = sourceTypeIndex;
-
-        for (int16_t idx = 0; idx < structSourceProperty.numSubAtoms; ++idx)
-        {
-            sourceTypeIndex = structSourceTypeIndex + idx + 1;
-            if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
-                sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
-            SC_TRY_IF(skip());
-        }
-        return true;
-    }
-
-    [[nodiscard]] bool skipVectorOrArray()
-    {
-        const auto arraySourceProperty  = sourceProperty;
-        const auto arraySourceTypeIndex = sourceTypeIndex;
-
-        sourceTypeIndex         = arraySourceTypeIndex + 1;
-        uint64_t sourceNumBytes = arraySourceProperty.size;
-        if (arraySourceProperty.type == Reflection::MetaType::TypeVector)
-        {
-            SC_TRY_IF(sourceObject.readAndAdvance(sourceNumBytes));
-        }
-
-        const bool isPrimitive = sourceProperties.data[sourceTypeIndex].isPrimitiveType();
-
-        if (isPrimitive)
-        {
-            return sourceObject.advance(sourceNumBytes);
-        }
-        else
-        {
-            const auto sourceItemSize      = sourceProperties.data[sourceTypeIndex].size;
-            const auto sourceNumElements   = sourceNumBytes / sourceItemSize;
-            const auto itemSourceTypeIndex = sourceTypeIndex;
-            for (uint64_t idx = 0; idx < sourceNumElements; ++idx)
-            {
-                sourceTypeIndex = itemSourceTypeIndex;
-                if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
-                    sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
-                SC_TRY_IF(skip());
-            }
-            return true;
-        }
-    }
-};
-
 struct VersionSchema
 {
     struct Options
@@ -185,20 +111,20 @@ struct VersionSchema
 
     int sourceTypeIndex = 0;
 
-    Reflection::MetaProperties current() const { return sourceProperties.data[sourceTypeIndex]; }
+    constexpr Reflection::MetaProperties current() const { return sourceProperties.data[sourceTypeIndex]; }
 
-    void advance() { sourceTypeIndex++; }
+    constexpr void advance() { sourceTypeIndex++; }
 
-    void resolveLink()
+    constexpr void resolveLink()
     {
         if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
             sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
     }
 
     template <typename BinaryStream>
-    [[nodiscard]] bool skipCurrent(BinaryStream& stream)
+    [[nodiscard]] constexpr bool skipCurrent(BinaryStream& stream)
     {
-        SimpleBinaryReaderSkipper<BinaryStream> skipper(stream, sourceTypeIndex);
+        Serialization::BinarySkipper<BinaryStream> skipper(stream, sourceTypeIndex);
         skipper.sourceProperties = sourceProperties;
         return skipper.skip();
     }
@@ -286,11 +212,11 @@ struct SerializerItems
             IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
         if (isMemcpyable)
         {
-            const auto sourceNumBytes = schema.current().size * numSourceItems;
-            const auto destNumBytes   = numDestinationItems * sizeof(T);
-            const auto minBytes       = min(static_cast<uint32_t>(destNumBytes), sourceNumBytes);
+            const size_t sourceNumBytes = schema.current().size * numSourceItems;
+            const size_t destNumBytes   = numDestinationItems * sizeof(T);
+            const size_t minBytes       = min(destNumBytes, sourceNumBytes);
             SC_TRY_IF(stream.serialize({object, minBytes}));
-            if (sourceNumBytes > static_cast<uint32_t>(destNumBytes))
+            if (sourceNumBytes > destNumBytes)
             {
                 SC_TRY_IF(schema.options.allowDropEccessArrayItems);
                 return stream.advance(sourceNumBytes - minBytes);

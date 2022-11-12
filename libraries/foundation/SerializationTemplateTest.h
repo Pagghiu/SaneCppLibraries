@@ -1,4 +1,5 @@
 #pragma once
+#include "SerializationBinarySkipper.h" // This can be included in cpp explicitly templatized only with the BinaryReader
 #include "SerializationTemplate.h"
 #include "SerializationTestSuite.h"
 

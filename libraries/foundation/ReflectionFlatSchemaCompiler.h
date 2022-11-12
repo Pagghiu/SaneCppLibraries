@@ -4,7 +4,7 @@
 
 namespace SC
 {
-namespace FlatSchemaCompiler
+namespace Reflection
 {
 template <typename Atom, typename Payload, int MAX_TOTAL_ATOMS>
 struct FlatSchemaCompilerResult
@@ -103,6 +103,6 @@ struct FlatSchemaCompiler
     }
 };
 
-} // namespace FlatSchemaCompiler
+} // namespace Reflection
 
 } // namespace SC
