@@ -81,6 +81,19 @@ struct SC::VectorAllocator
             oldHeader->sizeBytes = 0;
         }
     }
+
+    template <typename T>
+    static T* getItems(SegmentHeader* header)
+    {
+        return static_cast<T*>(
+            static_cast<void*>(static_cast<char_t*>(static_cast<void*>(header)) + sizeof(SegmentHeader)));
+    }
+    template <typename T>
+    static const T* getItems(const SegmentHeader* header)
+    {
+        return static_cast<T*>(static_cast<const void*>(static_cast<const char_t*>(static_cast<const void*>(header)) +
+                                                        sizeof(SegmentHeader)));
+    }
 };
 
 template <typename T>
@@ -148,14 +161,14 @@ struct SC::Vector
     [[nodiscard]] bool pop_back()
     {
         if (items != nullptr)
-            return SegmentItems<T>::getSegment(items)->pop_back();
+            return SegmentOperationsT::pop_back(SegmentItems<T>::getSegment(items));
         else
             return false;
     }
     [[nodiscard]] bool pop_front()
     {
         if (items != nullptr)
-            return SegmentItems<T>::getSegment(items)->pop_front();
+            return SegmentOperationsT::pop_front(SegmentItems<T>::getSegment(items));
         else
             return false;
     }
@@ -214,15 +227,16 @@ struct SC::Vector
     {
         if (items != nullptr)
         {
-            SegmentItems<T>::getSegment(items)->clear();
+            SegmentOperationsT::clear(SegmentItems<T>::getSegment(items));
         }
     }
 
-    void sort()
+    template <typename Comparison = SmallerThan<T>>
+    void sort(Comparison comparison = Comparison())
     {
         if (items != nullptr)
         {
-            SegmentItems<T>::getSegment(items)->sort();
+            bubbleSort(begin(), end(), comparison);
         }
     }
 

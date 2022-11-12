@@ -23,6 +23,19 @@ struct SC::ArrayAllocator
     }
 
     static void release(SegmentHeader* oldHeader) {}
+
+    template <typename T>
+    static T* getItems(SegmentHeader* header)
+    {
+        return static_cast<T*>(
+            static_cast<void*>(static_cast<char_t*>(static_cast<void*>(header)) + sizeof(SegmentHeader)));
+    }
+    template <typename T>
+    static const T* getItems(const SegmentHeader* header)
+    {
+        return static_cast<T*>(static_cast<const void*>(static_cast<const char_t*>(static_cast<const void*>(header)) +
+                                                        sizeof(SegmentHeader)));
+    }
 };
 
 namespace SC
