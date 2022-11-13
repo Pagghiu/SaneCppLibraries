@@ -1,7 +1,7 @@
 #pragma once
 #include "ReflectionSC.h"
+#include "SerializationBinarySkipper.h"
 #include "SerializationTypeErasedCompiler.h"
-
 namespace SC
 {
 namespace SerializationTypeErased
@@ -451,13 +451,14 @@ struct SimpleBinaryReaderVersioned
     {
         SinkValue sinkValue = static_cast<SinkValue>(sourceValue);
         SC_TRY_IF(Span<const void>(&sinkValue, sizeof(sinkValue)).copyTo(sinkObject));
-
         return true;
     }
 
     template <typename T>
-    [[nodiscard]] bool tryWritingPrimitiveValue(T sourceValue)
+    [[nodiscard]] bool tryReadPrimitiveValue()
     {
+        T sourceValue;
+        SC_TRY_IF(sourceObject->readAndAdvance(sourceValue));
         Span<const void> span(&sourceValue, sizeof(T));
         switch (sinkProperty.type)
         {
@@ -471,18 +472,8 @@ struct SimpleBinaryReaderVersioned
         case Reflection::MetaType::TypeINT64: return tryWritingPrimitiveValueToSink<T, int64_t>(sourceValue);
         case Reflection::MetaType::TypeFLOAT32: return tryWritingPrimitiveValueToSink<T, float>(sourceValue);
         case Reflection::MetaType::TypeDOUBLE64: return tryWritingPrimitiveValueToSink<T, double>(sourceValue);
-        default: break;
+        default: return false;
         }
-        return false;
-    }
-
-    template <typename T>
-    [[nodiscard]] bool tryReadPrimitiveValue()
-    {
-        T value;
-        SC_TRY_IF(sourceObject->readAndAdvance(value));
-
-        return tryWritingPrimitiveValue(value);
     }
 
     [[nodiscard]] bool tryPrimitiveConversion()
@@ -522,53 +513,33 @@ struct SimpleBinaryReaderVersioned
     {
         sinkProperty   = sinkProperties.data[sinkTypeIndex];
         sourceProperty = sourceProperties.data[sourceTypeIndex];
-        switch (sourceProperty.type)
+        if (sourceProperty.isPrimitiveType())
         {
-        case Reflection::MetaType::TypeInvalid: //
-        {
-            return false;
-        }
-        case Reflection::MetaType::TypeUINT8:
-        case Reflection::MetaType::TypeUINT16:
-        case Reflection::MetaType::TypeUINT32:
-        case Reflection::MetaType::TypeUINT64:
-        case Reflection::MetaType::TypeINT8:
-        case Reflection::MetaType::TypeINT16:
-        case Reflection::MetaType::TypeINT32:
-        case Reflection::MetaType::TypeINT64:
-        case Reflection::MetaType::TypeFLOAT32:
-        case Reflection::MetaType::TypeDOUBLE64: //
-        {
-            if (sinkObject.isNull())
-            {
-                SC_TRY_IF(sourceObject->advance(sourceProperty.size))
-            }
-            else if (sinkProperty.type == sourceProperty.type)
+            if (sinkProperty.type == sourceProperty.type)
             {
                 SC_TRY_IF(sourceObject->writeAndAdvance(sinkObject, sourceProperty.size));
+                return true;
             }
             else
             {
                 return tryPrimitiveConversion();
             }
-            break;
         }
-        case Reflection::MetaType::TypeStruct: //
+        else if (sourceProperty.type == Reflection::MetaType::TypeStruct)
         {
             return readStruct();
         }
-        case Reflection::MetaType::TypeArray:
-        case Reflection::MetaType::TypeVector: //
+        else if (sourceProperty.type == Reflection::MetaType::TypeArray ||
+                 sourceProperty.type == Reflection::MetaType::TypeVector)
         {
-            return readArray();
+            return readArrayVector();
         }
-        }
-        return true;
+        return false;
     }
 
     [[nodiscard]] bool readStruct()
     {
-        if ((not sinkObject.isNull()) && sourceProperty.type != sinkProperty.type)
+        if (sinkProperty.type != Reflection::MetaType::TypeStruct)
         {
             return false;
         }
@@ -584,20 +555,17 @@ struct SimpleBinaryReaderVersioned
             sourceTypeIndex        = structSourceTypeIndex + idx + 1;
             const auto sourceOrder = sourceProperties.data[sourceTypeIndex].order;
             int16_t    findIdx     = structSinkProperty.numSubAtoms;
-            if (not structSinkObject.isNull())
+            for (findIdx = 0; findIdx < structSinkProperty.numSubAtoms; ++findIdx)
             {
-                for (findIdx = 0; findIdx < structSinkProperty.numSubAtoms; ++findIdx)
+                const auto typeIndex = structSinkTypeIndex + findIdx + 1;
+                if (sinkProperties.data[typeIndex].order == sourceOrder)
                 {
-                    const auto typeIndex = structSinkTypeIndex + findIdx + 1;
-                    if (sinkProperties.data[typeIndex].order == sourceOrder)
-                    {
-                        break;
-                    }
+                    break;
                 }
             }
             if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
                 sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
-            if (findIdx != structSinkProperty.numSubAtoms && (not structSinkObject.isNull()))
+            if (findIdx != structSinkProperty.numSubAtoms)
             {
                 // Member with same order ordinal has been found
                 sinkTypeIndex = structSinkTypeIndex + findIdx + 1;
@@ -607,36 +575,20 @@ struct SimpleBinaryReaderVersioned
                     sinkTypeIndex = sinkProperties.data[sinkTypeIndex].getLinkIndex();
                 SC_TRY_IF(read());
             }
-            else if (options.allowDropEccessStructMembers)
-            {
-                sinkObject = Span<void>();
-                SC_TRY_IF(read());
-            }
             else
             {
-                return false;
+                SC_TRY_IF(options.allowDropEccessStructMembers)
+                // We must consume it anyway, discarding its content
+                SC_TRY_IF(skipCurrent());
             }
         }
         return true;
     }
 
-    static constexpr bool IsArrayType(Reflection::MetaType type)
+    [[nodiscard]] bool readArrayVector()
     {
-        switch (type)
-        {
-        case Reflection::MetaType::TypeArray:
-        case Reflection::MetaType::TypeVector: //
-        {
-            return true;
-        }
-        default: break;
-        }
-        return false;
-    }
-
-    [[nodiscard]] bool readArray()
-    {
-        if ((not sinkObject.isNull()) and (not IsArrayType(sinkProperty.type)))
+        if (sinkProperty.type != Reflection::MetaType::TypeArray &&
+            sinkProperty.type != Reflection::MetaType::TypeVector)
         {
             return false;
         }
@@ -648,17 +600,13 @@ struct SimpleBinaryReaderVersioned
 
         sourceTypeIndex         = arraySourceTypeIndex + 1;
         uint64_t sourceNumBytes = arraySourceProperty.size;
-        if (arraySourceProperty.type != Reflection::MetaType::TypeArray)
+        if (arraySourceProperty.type == Reflection::MetaType::TypeVector)
         {
             SC_TRY_IF(sourceObject->readAndAdvance(sourceNumBytes));
         }
 
         const bool isPrimitive = sourceProperties.data[sourceTypeIndex].isPrimitiveType();
 
-        if (sinkObject.isNull())
-        {
-            return skipElements(isPrimitive, sourceNumBytes);
-        }
         sinkTypeIndex = arraySinkTypeIndex + 1;
 
         const bool isSameType = sinkProperties.data[sinkTypeIndex].type == sourceProperties.data[sourceTypeIndex].type;
@@ -687,10 +635,8 @@ struct SimpleBinaryReaderVersioned
             SC_TRY_IF(sourceObject->writeAndAdvance(arraySinkStart, minBytes));
             if (sourceNumBytes > static_cast<uint64_t>(arraySinkStart.size))
             {
-                if (not options.allowDropEccessArrayItems)
-                {
-                    return false;
-                }
+                // We must consume these excess bytes anyway, discarding their content
+                SC_TRY_IF(options.allowDropEccessArrayItems);
                 return sourceObject->advance(sourceNumBytes - minBytes);
             }
         }
@@ -714,33 +660,23 @@ struct SimpleBinaryReaderVersioned
             }
             if (sourceNumElements > sinkNumElements)
             {
-                sinkObject = Span<void>();
-                return skipElements(isPrimitive, (sourceNumElements - sinkNumElements) * sourceItemSize);
+                // We must consume these excess items anyway, discarding their content
+                SC_TRY_IF(options.allowDropEccessArrayItems);
+                for (uint32_t idx = 0; idx < sourceNumElements - sinkNumElements; ++idx)
+                {
+                    sourceTypeIndex = itemSourceTypeIndex;
+                    SC_TRY_IF(skipCurrent());
+                }
             }
         }
         return true;
     }
 
-    bool skipElements(bool isPrimitive, SC::uint64_t sourceNumBytes)
+    [[nodiscard]] bool skipCurrent()
     {
-        if (isPrimitive)
-        {
-            SC_TRY_IF(sourceObject->advance(sourceNumBytes));
-        }
-        else
-        {
-            const auto sourceItemSize      = sourceProperties.data[sourceTypeIndex].size;
-            const auto sourceNumElements   = sourceNumBytes / sourceItemSize;
-            const auto itemSourceTypeIndex = sourceTypeIndex;
-            for (uint64_t idx = 0; idx < sourceNumElements; ++idx)
-            {
-                sourceTypeIndex = itemSourceTypeIndex;
-                if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
-                    sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
-                SC_TRY_IF(read());
-            }
-        }
-        return true;
+        Serialization::BinarySkipper<BinaryWriter> skipper(*sourceObject, sourceTypeIndex);
+        skipper.sourceProperties = sourceProperties;
+        return skipper.skip();
     }
 };
 } // namespace SerializationTypeErased

@@ -155,9 +155,11 @@ struct SerializerItems
             SC_TRY_IF(stream.serialize({object, minBytes}));
             if (sourceNumBytes > destNumBytes)
             {
+                // We must consume these excess bytes anyway, discarding their content
                 SC_TRY_IF(schema.options.allowDropEccessArrayItems);
                 return stream.advance(sourceNumBytes - minBytes);
             }
+            return true;
         }
 
         for (uint32_t idx = 0; idx < commonSubsetItems; ++idx)

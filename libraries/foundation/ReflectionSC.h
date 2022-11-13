@@ -67,9 +67,9 @@ struct SC::Reflection::MetaClass<SC::Vector<T>>
     }
 };
 
-SC_META_STRUCT_BEGIN(SC::String)
-SC_META_STRUCT_MEMBER(0, data)
-SC_META_STRUCT_END()
+SC_META_STRUCT_VISIT(SC::String)
+SC_META_STRUCT_FIELD(0, data)
+SC_META_STRUCT_LEAVE()
 
 namespace SC
 {

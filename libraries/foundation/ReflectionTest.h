@@ -51,12 +51,12 @@ template <>
 struct MetaClass<TestNamespace::SimpleStructure> : MetaStruct<MetaClass<TestNamespace::SimpleStructure>>
 {
     template <typename MemberVisitor>
-    static constexpr bool visit(MemberVisitor&& builder)
+    static constexpr bool visit(MemberVisitor&& visitor)
     {
-        SC_TRY_IF(builder(0, SC_META_MEMBER(f1)));
-        SC_TRY_IF(builder(1, SC_META_MEMBER(f2)));
-        SC_TRY_IF(builder(2, SC_META_MEMBER(arrayOfInt)));
-        return true;
+        return                                            //
+            visitor(0, "f1", &T::f1, offsetof(T, f1)) and //
+            visitor(1, "f2", &T::f2, offsetof(T, f2)) and //
+            visitor(2, "arrayOfInt", &T::arrayOfInt, offsetof(T, arrayOfInt));
     }
 };
 
@@ -64,11 +64,11 @@ template <>
 struct MetaClass<TestNamespace::IntermediateStructure> : MetaStruct<MetaClass<TestNamespace::IntermediateStructure>>
 {
     template <typename MemberVisitor>
-    static constexpr bool visit(MemberVisitor&& builder)
+    static constexpr bool visit(MemberVisitor&& visitor)
     {
-        SC_TRY_IF(builder(0, SC_META_MEMBER(simpleStructure)));
-        SC_TRY_IF(builder(1, SC_META_MEMBER(vectorOfInt)));
-        return true;
+        return //
+            visitor(0, "simpleStructure", &T::simpleStructure, offsetof(T, simpleStructure)) and
+            visitor(1, "vectorOfInt", &T::vectorOfInt, offsetof(T, vectorOfInt));
     }
 };
 
@@ -76,15 +76,15 @@ template <>
 struct MetaClass<TestNamespace::ComplexStructure> : MetaStruct<MetaClass<TestNamespace::ComplexStructure>>
 {
     template <typename MemberVisitor>
-    static constexpr bool visit(MemberVisitor&& builder)
+    static constexpr bool visit(MemberVisitor&& visitor)
     {
-        SC_TRY_IF(builder(0, SC_META_MEMBER(f1)));
-        SC_TRY_IF(builder(1, SC_META_MEMBER(simpleStructure)));
-        SC_TRY_IF(builder(2, SC_META_MEMBER(simpleStructure2)));
-        SC_TRY_IF(builder(3, SC_META_MEMBER(f4)));
-        SC_TRY_IF(builder(4, SC_META_MEMBER(intermediateStructure)));
-        SC_TRY_IF(builder(5, SC_META_MEMBER(vectorOfStructs)));
-        return true;
+        return                                                                                                     //
+            visitor(0, "f1", &T::f1, offsetof(T, f1)) and                                                          //
+            visitor(1, "simpleStructure", &T::simpleStructure, offsetof(T, simpleStructure)) and                   //
+            visitor(2, "simpleStructure2", &T::simpleStructure2, offsetof(T, simpleStructure2)) and                //
+            visitor(3, "f4", &T::f4, offsetof(T, f4)) and                                                          //
+            visitor(4, "intermediateStructure", &T::intermediateStructure, offsetof(T, intermediateStructure)) and //
+            visitor(5, "vectorOfStructs", &T::vectorOfStructs, offsetof(T, vectorOfStructs));
     }
 };
 } // namespace Reflection
@@ -111,11 +111,11 @@ struct TestNamespace::PackedStructWithArray
     float       floatValue    = 1.5f;
     SC::int64_t int64Value    = -13;
 };
-SC_META_STRUCT_BEGIN(TestNamespace::PackedStructWithArray)
-SC_META_STRUCT_MEMBER(0, arrayValue)
-SC_META_STRUCT_MEMBER(1, floatValue)
-SC_META_STRUCT_MEMBER(2, int64Value)
-SC_META_STRUCT_END()
+SC_META_STRUCT_VISIT(TestNamespace::PackedStructWithArray)
+SC_META_STRUCT_FIELD(0, arrayValue)
+SC_META_STRUCT_FIELD(1, floatValue)
+SC_META_STRUCT_FIELD(2, int64Value)
+SC_META_STRUCT_LEAVE()
 
 struct TestNamespace::PackedStruct
 {
@@ -123,11 +123,11 @@ struct TestNamespace::PackedStruct
     PackedStruct() : x(0), y(0), z(0) {}
 };
 
-SC_META_STRUCT_BEGIN(TestNamespace::PackedStruct)
-SC_META_STRUCT_MEMBER(0, x);
-SC_META_STRUCT_MEMBER(1, y);
-SC_META_STRUCT_MEMBER(2, z);
-SC_META_STRUCT_END()
+SC_META_STRUCT_VISIT(TestNamespace::PackedStruct)
+SC_META_STRUCT_FIELD(0, x);
+SC_META_STRUCT_FIELD(1, y);
+SC_META_STRUCT_FIELD(2, z);
+SC_META_STRUCT_LEAVE()
 
 struct TestNamespace::UnpackedStruct
 {
@@ -142,35 +142,35 @@ struct TestNamespace::UnpackedStruct
     }
 };
 
-SC_META_STRUCT_BEGIN(TestNamespace::UnpackedStruct)
-SC_META_STRUCT_MEMBER(0, x);
-SC_META_STRUCT_MEMBER(1, y);
-SC_META_STRUCT_MEMBER(2, z);
-SC_META_STRUCT_END()
+SC_META_STRUCT_VISIT(TestNamespace::UnpackedStruct)
+SC_META_STRUCT_FIELD(0, x);
+SC_META_STRUCT_FIELD(1, y);
+SC_META_STRUCT_FIELD(2, z);
+SC_META_STRUCT_LEAVE()
 
 struct TestNamespace::NestedUnpackedStruct
 {
     UnpackedStruct unpackedMember;
 };
-SC_META_STRUCT_BEGIN(TestNamespace::NestedUnpackedStruct)
-SC_META_STRUCT_MEMBER(0, unpackedMember);
-SC_META_STRUCT_END()
+SC_META_STRUCT_VISIT(TestNamespace::NestedUnpackedStruct)
+SC_META_STRUCT_FIELD(0, unpackedMember);
+SC_META_STRUCT_LEAVE()
 
 struct TestNamespace::StructWithArrayPacked
 {
     PackedStruct packedMember[3];
 };
-SC_META_STRUCT_BEGIN(TestNamespace::StructWithArrayPacked)
-SC_META_STRUCT_MEMBER(0, packedMember);
-SC_META_STRUCT_END()
+SC_META_STRUCT_VISIT(TestNamespace::StructWithArrayPacked)
+SC_META_STRUCT_FIELD(0, packedMember);
+SC_META_STRUCT_LEAVE()
 
 struct TestNamespace::StructWithArrayUnpacked
 {
     NestedUnpackedStruct unpackedMember[3];
 };
-SC_META_STRUCT_BEGIN(TestNamespace::StructWithArrayUnpacked)
-SC_META_STRUCT_MEMBER(0, unpackedMember);
-SC_META_STRUCT_END()
+SC_META_STRUCT_VISIT(TestNamespace::StructWithArrayUnpacked)
+SC_META_STRUCT_FIELD(0, unpackedMember);
+SC_META_STRUCT_LEAVE()
 
 struct SC::ReflectionTest : public SC::TestCase
 {

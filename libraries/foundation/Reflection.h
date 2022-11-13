@@ -234,7 +234,7 @@ struct MetaStruct<MetaClass<Type>>
 } // namespace Reflection
 } // namespace SC
 
-#define SC_META_STRUCT_BEGIN(StructName)                                                                               \
+#define SC_META_STRUCT_VISIT(StructName)                                                                               \
     template <>                                                                                                        \
     struct SC::Reflection::MetaClass<StructName> : SC::Reflection::MetaStruct<MetaClass<StructName>>                   \
     {                                                                                                                  \
@@ -244,13 +244,13 @@ struct MetaStruct<MetaClass<Type>>
             SC_DISABLE_OFFSETOF_WARNING
 
 #define SC_META_MEMBER(MEMBER) #MEMBER, &T::MEMBER, SC_OFFSET_OF(T, MEMBER)
-#define SC_META_STRUCT_MEMBER(ORDER, MEMBER)                                                                           \
+#define SC_META_STRUCT_FIELD(ORDER, MEMBER)                                                                            \
     if (not builder(ORDER, #MEMBER, &T::MEMBER, SC_OFFSET_OF(T, MEMBER)))                                              \
     {                                                                                                                  \
         return false;                                                                                                  \
     }
 
-#define SC_META_STRUCT_END()                                                                                           \
+#define SC_META_STRUCT_LEAVE()                                                                                         \
     SC_ENABLE_OFFSETOF_WARNING                                                                                         \
     return true;                                                                                                       \
     }                                                                                                                  \

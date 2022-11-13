@@ -124,7 +124,6 @@
 		7BD08BD629071D1B00970C9A /* Reflection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Reflection.h; sourceTree = "<group>"; };
 		7BD19C0A2917B3F700CDC3C8 /* ConstexprTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ConstexprTypes.h; sourceTree = "<group>"; };
 		7BD2350428FC9DA60004C69E /* ReflectionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ReflectionTest.h; sourceTree = "<group>"; };
-		7BD86F2D291FD48E0001161E /* SerializationBinarySkipper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SerializationBinarySkipper.h; sourceTree = "<group>"; };
 		7BD86F2E291FD4A20001161E /* SerializationBinarySkipper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SerializationBinarySkipper.h; sourceTree = "<group>"; };
 		7BD86F2F291FDDBE0001161E /* ReflectionClassInfo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ReflectionClassInfo.h; sourceTree = "<group>"; };
 		7BD87ABF291438E2005E7980 /* SerializationTypeErasedTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SerializationTypeErasedTest.h; sourceTree = "<group>"; };
@@ -203,10 +202,9 @@
 				7B73EFF828F37F040081C601 /* Result.h */,
 				7B73EFF928F37F040081C601 /* ResultTest.h */,
 				7B73EFEB28F37F040081C601 /* Segment.h */,
-				7BD86F2D291FD48E0001161E /* SerializationBinarySkipper.h */,
+				7BD86F2E291FD4A20001161E /* SerializationBinarySkipper.h */,
 				7B0892B22915A9B200210F74 /* SerializationTemplate.h */,
 				7BD080BF291C72CB007B543B /* SerializationTemplateCompiler.h */,
-				7BD86F2E291FD4A20001161E /* SerializationBinarySkipper.h */,
 				7BD080C0291C7936007B543B /* SerializationTemplateTest.h */,
 				7B2A92212917F2C000A187A6 /* SerializationTestSuite.h */,
 				7BF0D328290C44E600FC93B4 /* SerializationTypeErased.h */,
