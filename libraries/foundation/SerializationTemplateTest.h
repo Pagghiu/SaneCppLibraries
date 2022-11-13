@@ -33,7 +33,6 @@ struct SerializerVersionedAdapter
 
 struct BinaryWriterStream
 {
-    size_t              index = 0;
     SC::Vector<uint8_t> buffer;
     int                 numberOfOperations = 0;
 
@@ -68,12 +67,6 @@ struct BinaryReaderStream
             return false;
         index += numBytes;
         return true;
-    }
-
-    template <typename T>
-    [[nodiscard]] constexpr bool readAndAdvance(T& value)
-    {
-        return serialize(Span<void>{&value, sizeof(T)});
     }
 };
 } // namespace SC

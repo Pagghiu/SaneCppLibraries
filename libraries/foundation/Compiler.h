@@ -40,10 +40,7 @@
 #endif
 #endif
 
-#define SC_OFFSET_OF(Class, Field) __builtin_offsetof(Class, Field)
-#ifndef offsetof
-#define offsetof(Class, Field) __builtin_offsetof(Class, Field)
-#endif
+#define SC_OFFSETOF(Class, Field) __builtin_offsetof(Class, Field)
 #if SC_CLANG
 
 #define SC_DISABLE_OFFSETOF_WARNING                                                                                    \

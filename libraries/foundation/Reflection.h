@@ -243,9 +243,9 @@ struct MetaStruct<MetaClass<Type>>
         {                                                                                                              \
             SC_DISABLE_OFFSETOF_WARNING
 
-#define SC_META_MEMBER(MEMBER) #MEMBER, &T::MEMBER, SC_OFFSET_OF(T, MEMBER)
+#define SC_META_MEMBER(MEMBER) #MEMBER, &T::MEMBER, SC_OFFSETOF(T, MEMBER)
 #define SC_META_STRUCT_FIELD(ORDER, MEMBER)                                                                            \
-    if (not builder(ORDER, #MEMBER, &T::MEMBER, SC_OFFSET_OF(T, MEMBER)))                                              \
+    if (not builder(ORDER, #MEMBER, &T::MEMBER, SC_OFFSETOF(T, MEMBER)))                                               \
     {                                                                                                                  \
         return false;                                                                                                  \
     }

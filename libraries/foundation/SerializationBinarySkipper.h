@@ -71,7 +71,7 @@ struct BinarySkipper
         uint64_t sourceNumBytes = arraySourceProperty.size;
         if (arraySourceProperty.type == Reflection::MetaType::TypeVector)
         {
-            SC_TRY_IF(sourceObject.readAndAdvance(sourceNumBytes));
+            SC_TRY_IF(sourceObject.serialize(Span<void>(&sourceNumBytes, sizeof(uint64_t))));
         }
 
         const bool isBulkWriteable = sourceProperties.data[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();

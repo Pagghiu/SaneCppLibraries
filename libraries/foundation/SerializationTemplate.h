@@ -80,7 +80,6 @@ struct SerializerVersionedMemberIterator
     template <typename R, int N>
     constexpr bool operator()(int order, const char (&name)[N], R T::*member, size_t offset)
     {
-        // TODO: If we code order inside visit, this can be made faster
         if (matchOrder == order)
         {
             consumed            = true;
@@ -306,7 +305,7 @@ struct Serializer<BinaryStream, T, typename SC::EnableIf<Reflection::IsPrimitive
     [[nodiscard]] static bool readCastValue(T& destination, BinaryStream& stream)
     {
         ValueType value;
-        SC_TRY_IF(stream.template readAndAdvance<ValueType>(value));
+        SC_TRY_IF(stream.serialize({&value, sizeof(ValueType)}));
         destination = static_cast<T>(value);
         return true;
     }
@@ -343,7 +342,6 @@ struct Serializer<BinaryStream, T, typename SC::EnableIf<Reflection::IsPrimitive
             default: return false;
         }
         // clang-format on
-        return stream.serialize({&object, sizeof(T)});
     }
 
     [[nodiscard]] static constexpr bool serialize(T& object, BinaryStream& stream)

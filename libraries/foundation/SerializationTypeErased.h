@@ -12,14 +12,14 @@ struct BinaryBuffer
     SC::Vector<uint8_t> buffer;
     int                 numberOfOperations = 0;
 
-    [[nodiscard]] bool readFrom(Span<const void> object)
+    [[nodiscard]] bool serialize(Span<const void> object)
     {
         Span<const uint8_t> bytes = object.castTo<const uint8_t>();
         numberOfOperations++;
         return buffer.appendCopy(bytes.data, bytes.size);
     }
 
-    [[nodiscard]] bool writeTo(Span<void> object)
+    [[nodiscard]] bool serialize(Span<void> object)
     {
         if (index + object.size > buffer.size())
             return false;
@@ -36,21 +36,6 @@ struct BinaryBuffer
             return false;
         index += numBytes;
         return true;
-    }
-
-    template <typename T>
-    [[nodiscard]] constexpr bool readAndAdvance(T& value)
-    {
-        return writeTo(Span<void>{&value, sizeof(T)});
-    }
-
-    [[nodiscard]] constexpr bool writeAndAdvance(Span<void> other, size_t length)
-    {
-        if (other.size >= length)
-        {
-            return writeTo(Span<void>{other.data, length});
-        }
-        return false;
     }
 };
 
@@ -145,37 +130,23 @@ struct SimpleBinaryWriter
     [[nodiscard]] constexpr bool write()
     {
         sourceProperty = sourceProperties.data[sourceTypeIndex];
-        switch (sourceProperty.type)
-        {
-        case Reflection::MetaType::TypeInvalid: return false;
-        case Reflection::MetaType::TypeUINT8:
-        case Reflection::MetaType::TypeUINT16:
-        case Reflection::MetaType::TypeUINT32:
-        case Reflection::MetaType::TypeUINT64:
-        case Reflection::MetaType::TypeINT8:
-        case Reflection::MetaType::TypeINT16:
-        case Reflection::MetaType::TypeINT32:
-        case Reflection::MetaType::TypeINT64:
-        case Reflection::MetaType::TypeFLOAT32:
-        case Reflection::MetaType::TypeDOUBLE64: //
+        if (sourceProperty.isPrimitiveType())
         {
             Span<const void> primitiveSpan;
             SC_TRY_IF(sourceObject.viewAt(0, sourceProperty.size, primitiveSpan));
-            SC_TRY_IF(destination.readFrom(primitiveSpan));
-
+            SC_TRY_IF(destination.serialize(primitiveSpan));
             return true;
         }
-        case Reflection::MetaType::TypeStruct: //
+        else if (sourceProperty.type == Reflection::MetaType::TypeStruct)
         {
             return writeStruct();
         }
-        case Reflection::MetaType::TypeArray:
-        case Reflection::MetaType::TypeVector: //
+        else if (sourceProperty.type == Reflection::MetaType::TypeArray ||
+                 sourceProperty.type == Reflection::MetaType::TypeVector)
         {
-            return writeArray();
+            return writeArrayVector();
         }
-        }
-        return true;
+        return false;
     }
 
     [[nodiscard]] constexpr bool writeStruct()
@@ -190,7 +161,7 @@ struct SimpleBinaryWriter
             // Bulk Write the entire struct
             Span<const void> structSpan;
             SC_TRY_IF(sourceObject.viewAt(0, structSourceProperty.size, structSpan));
-            SC_TRY_IF(destination.readFrom(structSpan));
+            SC_TRY_IF(destination.serialize(structSpan));
         }
         else
         {
@@ -207,7 +178,7 @@ struct SimpleBinaryWriter
         return true;
     }
 
-    [[nodiscard]] constexpr bool writeArray()
+    [[nodiscard]] constexpr bool writeArrayVector()
     {
         const auto       arrayProperty  = sourceProperty;
         const auto       arrayTypeIndex = sourceTypeIndex;
@@ -222,7 +193,7 @@ struct SimpleBinaryWriter
         {
             SC_TRY_IF(arrayAccess.getSegmentSpan(arrayTypeIndex, arrayProperty, sourceObject, arraySpan));
             numBytes = arraySpan.size;
-            SC_TRY_IF(destination.readFrom(Span<const void>(&numBytes, sizeof(numBytes))));
+            SC_TRY_IF(destination.serialize(Span<const void>(&numBytes, sizeof(numBytes))));
         }
         sourceTypeIndex     = arrayTypeIndex + 1;
         const auto itemSize = sourceProperties.data[sourceTypeIndex].size;
@@ -232,7 +203,7 @@ struct SimpleBinaryWriter
         const bool isBulkWriteable = sourceProperties.data[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
         if (isBulkWriteable)
         {
-            SC_TRY_IF(destination.readFrom(arraySpan));
+            SC_TRY_IF(destination.serialize(arraySpan));
         }
         else
         {
@@ -284,40 +255,23 @@ struct SimpleBinaryReader
     [[nodiscard]] bool read()
     {
         sinkProperty = sinkProperties.data[sinkTypeIndex];
-        switch (sinkProperty.type)
-        {
-        case Reflection::MetaType::TypeInvalid: //
-        {
-            return false;
-        }
-        case Reflection::MetaType::TypeUINT8:
-        case Reflection::MetaType::TypeUINT16:
-        case Reflection::MetaType::TypeUINT32:
-        case Reflection::MetaType::TypeUINT64:
-        case Reflection::MetaType::TypeINT8:
-        case Reflection::MetaType::TypeINT16:
-        case Reflection::MetaType::TypeINT32:
-        case Reflection::MetaType::TypeINT64:
-        case Reflection::MetaType::TypeFLOAT32:
-        case Reflection::MetaType::TypeDOUBLE64: //
+        if (sinkProperty.isPrimitiveType())
         {
             Span<void> primitiveSpan;
             SC_TRY_IF(sinkObject.viewAt(0, sinkProperty.size, primitiveSpan));
-            SC_TRY_IF(source.writeTo(primitiveSpan));
-
+            SC_TRY_IF(source.serialize(primitiveSpan));
             return true;
         }
-        case Reflection::MetaType::TypeStruct: //
+        else if (sinkProperty.type == Reflection::MetaType::TypeStruct)
         {
             return readStruct();
         }
-        case Reflection::MetaType::TypeArray:
-        case Reflection::MetaType::TypeVector: //
+        else if (sinkProperty.type == Reflection::MetaType::TypeArray ||
+                 sinkProperty.type == Reflection::MetaType::TypeVector)
         {
-            return readArray();
+            return readArrayVector();
         }
-        }
-        return true;
+        return false;
     }
 
     [[nodiscard]] bool readStruct()
@@ -332,7 +286,7 @@ struct SimpleBinaryReader
             // Bulk read the entire struct
             Span<void> structSpan;
             SC_TRY_IF(sinkObject.viewAt(0, structSinkProperty.size, structSpan));
-            SC_TRY_IF(source.writeTo(structSpan));
+            SC_TRY_IF(source.serialize(structSpan));
         }
         else
         {
@@ -349,7 +303,7 @@ struct SimpleBinaryReader
         return true;
     }
 
-    [[nodiscard]] bool readArray()
+    [[nodiscard]] bool readArrayVector()
     {
         const auto arraySinkProperty  = sinkProperty;
         const auto arraySinkTypeIndex = sinkTypeIndex;
@@ -367,7 +321,7 @@ struct SimpleBinaryReader
         else
         {
             uint64_t sinkNumBytes = 0;
-            SC_TRY_IF(source.writeTo(Span<void>(&sinkNumBytes, sizeof(sinkNumBytes))));
+            SC_TRY_IF(source.serialize(Span<void>(&sinkNumBytes, sizeof(sinkNumBytes))));
 
             SC_TRY_IF(arrayAccess.resize(arraySinkTypeIndex, arraySinkObject, arraySinkProperty, sinkNumBytes,
                                          isBulkReadable ? ArrayAccess::Initialize::No : ArrayAccess::Initialize::Yes,
@@ -377,7 +331,7 @@ struct SimpleBinaryReader
         }
         if (isBulkReadable)
         {
-            SC_TRY_IF(source.writeTo(arraySinkStart));
+            SC_TRY_IF(source.serialize(arraySinkStart));
         }
         else
         {
@@ -458,7 +412,7 @@ struct SimpleBinaryReaderVersioned
     [[nodiscard]] bool tryReadPrimitiveValue()
     {
         T sourceValue;
-        SC_TRY_IF(sourceObject->readAndAdvance(sourceValue));
+        SC_TRY_IF(sourceObject->serialize(Span<void>{&sourceValue, sizeof(T)}));
         Span<const void> span(&sourceValue, sizeof(T));
         switch (sinkProperty.type)
         {
@@ -517,8 +471,11 @@ struct SimpleBinaryReaderVersioned
         {
             if (sinkProperty.type == sourceProperty.type)
             {
-                SC_TRY_IF(sourceObject->writeAndAdvance(sinkObject, sourceProperty.size));
-                return true;
+                if (sinkObject.size >= sourceProperty.size)
+                {
+                    SC_TRY_IF(sourceObject->serialize(Span<void>{sinkObject.data, sourceProperty.size}));
+                    return true;
+                }
             }
             else
             {
@@ -602,7 +559,7 @@ struct SimpleBinaryReaderVersioned
         uint64_t sourceNumBytes = arraySourceProperty.size;
         if (arraySourceProperty.type == Reflection::MetaType::TypeVector)
         {
-            SC_TRY_IF(sourceObject->readAndAdvance(sourceNumBytes));
+            SC_TRY_IF(sourceObject->serialize(Span<void>{&sourceNumBytes, sizeof(uint64_t)}));
         }
 
         const bool isPrimitive = sourceProperties.data[sourceTypeIndex].isPrimitiveType();
@@ -632,7 +589,7 @@ struct SimpleBinaryReaderVersioned
         if (isMemcpyable)
         {
             const auto minBytes = min(static_cast<uint64_t>(arraySinkStart.size), sourceNumBytes);
-            SC_TRY_IF(sourceObject->writeAndAdvance(arraySinkStart, minBytes));
+            SC_TRY_IF(sourceObject->serialize(Span<void>{arraySinkStart.data, minBytes}));
             if (sourceNumBytes > static_cast<uint64_t>(arraySinkStart.size))
             {
                 // We must consume these excess bytes anyway, discarding their content
