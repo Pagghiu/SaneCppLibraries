@@ -17,7 +17,7 @@
                BlueprintIdentifier = "7B52501328E85B9100827290"
                BuildableName = "SCTest"
                BlueprintName = "SCTest"
-               ReferencedContainer = "container:SC.xcodeproj">
+               ReferencedContainer = "container:SCTest.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -51,7 +51,7 @@
             BlueprintIdentifier = "7B52501328E85B9100827290"
             BuildableName = "SCTest"
             BlueprintName = "SCTest"
-            ReferencedContainer = "container:SC.xcodeproj">
+            ReferencedContainer = "container:SCTest.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -68,7 +68,7 @@
             BlueprintIdentifier = "7B52501328E85B9100827290"
             BuildableName = "SCTest"
             BlueprintName = "SCTest"
-            ReferencedContainer = "container:SC.xcodeproj">
+            ReferencedContainer = "container:SCTest.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

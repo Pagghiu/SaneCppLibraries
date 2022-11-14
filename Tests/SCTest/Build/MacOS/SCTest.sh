@@ -2,7 +2,8 @@
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 PATH=$PATH:/opt/homebrew/bin/
-cd "${SCRIPT_DIR}"
+cd "${SCRIPT_DIR}/../../../.."
+
 
 POSITIONAL_ARGS=()
 
@@ -33,12 +34,12 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-rm -rf "_build/${GCC_DIRECTORY}/${GCC_CONFIGURATION}"
-mkdir -p "_build/${GCC_DIRECTORY}/${GCC_CONFIGURATION}"
+rm -rf "_BuildOutput/${GCC_DIRECTORY}/${GCC_CONFIGURATION}"
+mkdir -p "_BuildOutput/${GCC_DIRECTORY}/${GCC_CONFIGURATION}"
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 time g++-12 -std=c++14 -nostdinc++ ${GCC_DEBUG_FLAG} \
--o _build/${GCC_DIRECTORY}/${GCC_CONFIGURATION}/SCTest \
+-o _BuildOutput/${GCC_DIRECTORY}/${GCC_CONFIGURATION}/SCTest \
 Libraries/Foundation/Assert.cpp         \
 Libraries/Foundation/Console.cpp        \
 Libraries/Foundation/Memory.cpp         \
@@ -51,4 +52,4 @@ Libraries/Foundation/StringFormat.cpp   \
 Libraries/Foundation/StringUtility.cpp  \
 Libraries/Foundation/StringView.cpp     \
 Libraries/Foundation/Test.cpp           \
-main.cpp
+${SCRIPT_DIR}/../../SCTest.cpp

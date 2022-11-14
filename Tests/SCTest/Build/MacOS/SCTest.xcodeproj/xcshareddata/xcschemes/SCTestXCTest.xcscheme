@@ -19,9 +19,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "7B5A353228E8640B00B2F589"
-               BuildableName = "SCXCTest.xctest"
-               BlueprintName = "SCXCTest"
-               ReferencedContainer = "container:SC.xcodeproj">
+               BuildableName = "SCTestXCTest.xctest"
+               BlueprintName = "SCTestXCTest"
+               ReferencedContainer = "container:SCTest.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>

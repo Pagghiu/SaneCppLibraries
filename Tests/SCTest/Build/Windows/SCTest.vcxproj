@@ -98,20 +98,20 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)\_build\windows\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\_intermediate\windows\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)\..\..\..\..\_BuildOutput\Windows\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\..\..\_BuildIntermediate\Windows\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
-    <OutDir>$(SolutionDir)\_build\windows\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\_intermediate\windows\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)\..\..\..\..\_BuildOutput\Windows\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\..\..\_BuildIntermediate\Windows\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)\_build\windows\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\_intermediate\windows\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)\..\..\..\..\_BuildOutput\Windows\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\..\..\_BuildIntermediate\Windows\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
-    <OutDir>$(SolutionDir)\_build\windows\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\_intermediate\windows\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)\..\..\..\..\_BuildOutput\Windows\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\..\..\_BuildIntermediate\Windows\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -202,63 +202,74 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Libraries\Foundation\Assert.cpp" />
-    <ClCompile Include="Libraries\Foundation\Console.cpp" />
-    <ClCompile Include="Libraries\Foundation\Memory.cpp" />
-    <ClCompile Include="Libraries\Foundation\OSWindows.cpp" />
-    <ClCompile Include="Libraries\Foundation\StaticAsserts.cpp" />
-    <ClCompile Include="Libraries\Foundation\String.cpp" />
-    <ClCompile Include="Libraries\Foundation\StringBuilder.cpp" />
-    <ClCompile Include="Libraries\Foundation\StringFormat.cpp" />
-    <ClCompile Include="Libraries\Foundation\StringUtility.cpp" />
-    <ClCompile Include="Libraries\Foundation\StringView.cpp" />
-    <ClCompile Include="Libraries\Foundation\Test.cpp" />
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\Assert.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\Console.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\OSWindows.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\StaticAsserts.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\String.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\StringBuilder.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\StringFormat.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\StringUtility.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\StringView.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\Test.cpp" />
+    <ClCompile Include="..\..\SCTest.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Libraries\Foundation\Array.h" />
-    <ClInclude Include="Libraries\Foundation\ArrayTest.h" />
-    <ClInclude Include="Libraries\Foundation\Assert.h" />
-    <ClInclude Include="Libraries\Foundation\Compiler.h" />
-    <ClInclude Include="Libraries\Foundation\Console.h" />
-    <ClInclude Include="Libraries\Foundation\ConsoleTest.h" />
-    <ClInclude Include="Libraries\Foundation\Function.h" />
-    <ClInclude Include="Libraries\Foundation\FunctionTest.h" />
-    <ClInclude Include="Libraries\Foundation\InitializerList.h" />
-    <ClInclude Include="Libraries\Foundation\Language.h" />
-    <ClInclude Include="Libraries\Foundation\LibC.h" />
-    <ClInclude Include="Libraries\Foundation\Limits.h" />
-    <ClInclude Include="Libraries\Foundation\Map.h" />
-    <ClInclude Include="Libraries\Foundation\MapTest.h" />
-    <ClInclude Include="Libraries\Foundation\Memory.h" />
-    <ClInclude Include="Libraries\Foundation\MemoryTest.h" />
-    <ClInclude Include="Libraries\Foundation\OS.h" />
-    <ClInclude Include="Libraries\Foundation\OSTest.h" />
-    <ClInclude Include="Libraries\Foundation\Platform.h" />
-    <ClInclude Include="Libraries\Foundation\Reflection.h" />
-    <ClInclude Include="Libraries\Foundation\ReflectionFlatSchemaCompiler.h" />
-    <ClInclude Include="Libraries\Foundation\ReflectionTest.h" />
-    <ClInclude Include="Libraries\Foundation\Result.h" />
-    <ClInclude Include="Libraries\Foundation\ResultTest.h" />
-    <ClInclude Include="Libraries\Foundation\Segment.h" />
-    <ClInclude Include="Libraries\Foundation\SmallVector.h" />
-    <ClInclude Include="Libraries\Foundation\SmallVectorTest.h" />
-    <ClInclude Include="Libraries\Foundation\Span.h" />
-    <ClInclude Include="Libraries\Foundation\String.h" />
-    <ClInclude Include="Libraries\Foundation\StringBuilder.h" />
-    <ClInclude Include="Libraries\Foundation\StringBuilderTest.h" />
-    <ClInclude Include="Libraries\Foundation\StringFormat.h" />
-    <ClInclude Include="Libraries\Foundation\StringFunctions.h" />
-    <ClInclude Include="Libraries\Foundation\StringFunctionsTest.h" />
-    <ClInclude Include="Libraries\Foundation\StringIterator.h" />
-    <ClInclude Include="Libraries\Foundation\StringTest.h" />
-    <ClInclude Include="Libraries\Foundation\StringUtility.h" />
-    <ClInclude Include="Libraries\Foundation\StringView.h" />
-    <ClInclude Include="Libraries\Foundation\StringViewTest.h" />
-    <ClInclude Include="Libraries\Foundation\Test.h" />
-    <ClInclude Include="Libraries\Foundation\Types.h" />
-    <ClInclude Include="Libraries\Foundation\Vector.h" />
-    <ClInclude Include="Libraries\Foundation\VectorTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\ArrayTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Compiler.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Console.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\ConsoleTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\ConstexprTypes.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Function.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\FunctionTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\InitializerList.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\LibC.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Limits.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Map.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\MapTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Memory.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\MemoryTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\OS.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\OSTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Platform.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Reflection.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionClassInfo.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionFlatSchemaCompiler.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionSC.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Result.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\ResultTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Segment.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationBinarySkipper.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTemplate.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTemplateCompiler.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTemplateTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTestSuite.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTypeErased.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTypeErasedCompiler.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTypeErasedTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\SmallVector.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\SmallVectorTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Span.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\String.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringBuilder.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringBuilderTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringFormat.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringFunctions.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringFunctionsTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringIterator.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringUtility.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringView.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringViewTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Test.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Types.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Vector.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\VectorTest.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
