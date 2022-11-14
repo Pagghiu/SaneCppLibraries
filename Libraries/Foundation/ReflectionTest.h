@@ -187,7 +187,7 @@ struct SC::ReflectionTest : public SC::TestCase
     ReflectionTest(SC::TestReport& report) : TestCase(report, "ReflectionTest")
     {
         // clang++ -Xclang -ast-dump -Xclang -ast-dump-filter=SimpleStructure -std=c++14
-        // libraries/foundation/ReflectionTest.h clang -cc1 -xc++ -fsyntax-only -code-completion-at
+        // Libraries/Foundation/ReflectionTest.h clang -cc1 -xc++ -fsyntax-only -code-completion-at
         // libraries/Foundation/ReflectionTest.h:94:12 libraries/Foundation/ReflectionTest.h -std=c++14 echo '#include
         // "libraries/Foundation/ReflectionTest.h"\nTestNamespace::SimpleStructure\n::\n"' | clang -cc1 -xc++
         // -fsyntax-only -code-completion-at -:3:3 - -std=c++14

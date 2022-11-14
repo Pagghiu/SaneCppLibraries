@@ -39,16 +39,16 @@ mkdir -p "_build/${GCC_DIRECTORY}/${GCC_CONFIGURATION}"
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 time g++-12 -std=c++14 -nostdinc++ ${GCC_DEBUG_FLAG} \
 -o _build/${GCC_DIRECTORY}/${GCC_CONFIGURATION}/SCTest \
-libraries/foundation/Assert.cpp         \
-libraries/foundation/Console.cpp        \
-libraries/foundation/Memory.cpp         \
-libraries/foundation/OSDarwin.cpp       \
-libraries/foundation/OSPosix.cpp        \
-libraries/foundation/StaticAsserts.cpp  \
-libraries/foundation/String.cpp         \
-libraries/foundation/StringBuilder.cpp  \
-libraries/foundation/StringFormat.cpp   \
-libraries/foundation/StringUtility.cpp  \
-libraries/foundation/StringView.cpp     \
-libraries/foundation/Test.cpp           \
+Libraries/Foundation/Assert.cpp         \
+Libraries/Foundation/Console.cpp        \
+Libraries/Foundation/Memory.cpp         \
+Libraries/Foundation/OSDarwin.cpp       \
+Libraries/Foundation/OSPosix.cpp        \
+Libraries/Foundation/StaticAsserts.cpp  \
+Libraries/Foundation/String.cpp         \
+Libraries/Foundation/StringBuilder.cpp  \
+Libraries/Foundation/StringFormat.cpp   \
+Libraries/Foundation/StringUtility.cpp  \
+Libraries/Foundation/StringView.cpp     \
+Libraries/Foundation/Test.cpp           \
 main.cpp

@@ -5,7 +5,7 @@
 //  Created by Stefano Cristiano on 01/10/22.
 //
 
-#include "../libraries/foundation/Test.h"
+#include "../Libraries/Foundation/Test.h"
 #import <XCTest/XCTest.h>
 int        main(int argc, const char* argv[]);
 @interface sanecppXCTest : XCTestCase

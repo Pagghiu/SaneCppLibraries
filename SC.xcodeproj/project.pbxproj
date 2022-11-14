@@ -158,15 +158,15 @@
 			path = SCXCTest;
 			sourceTree = "<group>";
 		};
-		7B73EFE528F37F040081C601 /* libraries */ = {
+		7B73EFE528F37F040081C601 /* Libraries */ = {
 			isa = PBXGroup;
 			children = (
-				7B73EFE628F37F040081C601 /* foundation */,
+				7B73EFE628F37F040081C601 /* Foundation */,
 			);
-			path = libraries;
+			path = Libraries;
 			sourceTree = "<group>";
 		};
-		7B73EFE628F37F040081C601 /* foundation */ = {
+		7B73EFE628F37F040081C601 /* Foundation */ = {
 			isa = PBXGroup;
 			children = (
 				7B73EFFE28F37F040081C601 /* Array.h */,
@@ -236,14 +236,14 @@
 				7B73F00528F37F040081C601 /* Vector.h */,
 				7B73F00228F37F040081C601 /* VectorTest.h */,
 			);
-			path = foundation;
+			path = Foundation;
 			sourceTree = "<group>";
 		};
 		7BF4DF5D28DE7A5E008CBB53 = {
 			isa = PBXGroup;
 			children = (
 				7BF4DF6928DE7A5E008CBB53 /* main.cpp */,
-				7B73EFE528F37F040081C601 /* libraries */,
+				7B73EFE528F37F040081C601 /* Libraries */,
 				7B52500F28E85AF100827290 /* .clang-format */,
 				7B5A353428E8640B00B2F589 /* SCXCTest */,
 				7BF4DF6728DE7A5E008CBB53 /* Products */,
