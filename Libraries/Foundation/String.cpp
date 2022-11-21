@@ -1,3 +1,6 @@
+// Copyright (c) 2022, Stefano Cristiano
+//
+// All Rights Reserved. Reproduction is not allowed.
 #include "String.h"
 #include <stdarg.h> // va_list
 #include <stdio.h>  // vsnprintf

@@ -1,3 +1,6 @@
+// Copyright (c) 2022, Stefano Cristiano
+//
+// All Rights Reserved. Reproduction is not allowed.
 #include "../../Libraries/Foundation/ArrayTest.h"
 #include "../../Libraries/Foundation/ConsoleTest.h"
 #include "../../Libraries/Foundation/FunctionTest.h"

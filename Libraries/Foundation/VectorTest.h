@@ -1,3 +1,6 @@
+// Copyright (c) 2022, Stefano Cristiano
+//
+// All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "Test.h"
 #include "Vector.h"

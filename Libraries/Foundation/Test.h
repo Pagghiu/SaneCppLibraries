@@ -1,3 +1,6 @@
+// Copyright (c) 2022, Stefano Cristiano
+//
+// All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "Console.h" // SC_BREAK_DEBUGGER
 #include "StringView.h"

@@ -1,3 +1,6 @@
+// Copyright (c) 2022, Stefano Cristiano
+//
+// All Rights Reserved. Reproduction is not allowed.
 #include "../../Libraries/Foundation/Test.h"
 #import <XCTest/XCTest.h>
 int        main(int argc, const char* argv[]);

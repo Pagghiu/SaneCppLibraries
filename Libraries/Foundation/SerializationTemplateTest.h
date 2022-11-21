@@ -1,3 +1,6 @@
+// Copyright (c) 2022, Stefano Cristiano
+//
+// All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "SerializationBinarySkipper.h" // This can be included in cpp explicitly templatized only with the BinaryReader
 #include "SerializationTemplate.h"

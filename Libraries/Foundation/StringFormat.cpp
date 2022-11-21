@@ -1,3 +1,6 @@
+// Copyright (c) 2022, Stefano Cristiano
+//
+// All Rights Reserved. Reproduction is not allowed.
 #include "StringFormat.h"
 
 #include <inttypes.h> // PRIu64 / PRIi64
