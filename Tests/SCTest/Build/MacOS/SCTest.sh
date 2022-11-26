@@ -39,6 +39,7 @@ mkdir -p "_BuildOutput/${GCC_DIRECTORY}/${GCC_CONFIGURATION}"
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 time g++-12 -std=c++14 -nostdinc++ ${GCC_DEBUG_FLAG} \
+-I${SCRIPT_DIR}/../../ \
 -o _BuildOutput/${GCC_DIRECTORY}/${GCC_CONFIGURATION}/SCTest \
 Libraries/Foundation/Assert.cpp         \
 Libraries/Foundation/Console.cpp        \

@@ -38,12 +38,11 @@ struct ClassInfoStruct
 
     constexpr ClassInfoStruct()
     {
-        if (Reflection::MetaClass<T>::visit(*this))
+        if (MetaClass<T>::visit(*this))
         {
             IsPacked = memberSizeSum == sizeof(T);
         }
     }
-
     template <typename R, int N>
     constexpr bool operator()(int order, const char (&name)[N], R T::*member, size_t offset)
     {

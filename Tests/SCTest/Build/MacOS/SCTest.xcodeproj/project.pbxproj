@@ -47,6 +47,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		7B4B99EF2937EBAC003D17A6 /* ReflectionAutoAggregates.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ReflectionAutoAggregates.h; path = ../../../../Libraries/Foundation/ReflectionAutoAggregates.h; sourceTree = "<group>"; };
+		7B4B99F02937EBAC003D17A6 /* ReflectionAutoStructured.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ReflectionAutoStructured.h; path = ../../../../Libraries/Foundation/ReflectionAutoStructured.h; sourceTree = "<group>"; };
+		7B5119C5293C0DF60061646E /* SCConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SCConfig.h; path = ../../SCConfig.h; sourceTree = "<group>"; };
 		7B515FC729243086006996AA /* ResultTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ResultTest.h; path = ../../../../Libraries/Foundation/ResultTest.h; sourceTree = "<group>"; };
 		7B515FC829243086006996AA /* OSTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OSTest.h; path = ../../../../Libraries/Foundation/OSTest.h; sourceTree = "<group>"; };
 		7B515FC929243086006996AA /* MapTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MapTest.h; path = ../../../../Libraries/Foundation/MapTest.h; sourceTree = "<group>"; };
@@ -166,6 +169,8 @@
 				7B515FC829243086006996AA /* OSTest.h */,
 				7B515FE029243087006996AA /* Platform.h */,
 				7B515FCC29243086006996AA /* Reflection.h */,
+				7B4B99EF2937EBAC003D17A6 /* ReflectionAutoAggregates.h */,
+				7B4B99F02937EBAC003D17A6 /* ReflectionAutoStructured.h */,
 				7B515FD829243086006996AA /* ReflectionClassInfo.h */,
 				7B515FE729243087006996AA /* ReflectionFlatSchemaCompiler.h */,
 				7B515FCE29243086006996AA /* ReflectionSC.h */,
@@ -221,6 +226,7 @@
 		7BF4DF5D28DE7A5E008CBB53 = {
 			isa = PBXGroup;
 			children = (
+				7B5119C5293C0DF60061646E /* SCConfig.h */,
 				7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */,
 				7B583F692922ECF900FBE019 /* SCTest.cpp */,
 				7B583F2E2922EC9F00FBE019 /* Libraries */,

@@ -214,6 +214,12 @@ struct SC::SegmentOperations
         return true;
     }
 
+    template <int size>
+    static void memcpyWithoutWarning(int32_t& val, const void* defaultValue)
+    {
+        memcpy(&val, defaultValue, size);
+    }
+
     static void reserveInternalTrivialInitialize(T* items, const size_t oldSize, const size_t newSize,
                                                  const T& defaultValue)
     {
@@ -223,7 +229,10 @@ struct SC::SegmentOperations
             constexpr bool smallerThanInt = sizeof(T) <= sizeof(int32_t);
             if (smallerThanInt)
             {
-                memcpy(&val, &defaultValue, sizeof(T));
+                // We are separating in a different function because CLANG complains
+                // with this memcpy when sizeof(T) > sizeof(int32_t) even if this branch
+                // will never be taken...
+                memcpyWithoutWarning<sizeof(T)>(val, &defaultValue);
             }
             if (smallerThanInt && val == 0)
             {

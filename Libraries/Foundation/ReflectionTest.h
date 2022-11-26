@@ -70,8 +70,8 @@ struct MetaClass<TestNamespace::IntermediateStructure> : MetaStruct<MetaClass<Te
     static constexpr bool visit(MemberVisitor&& visitor)
     {
         return //
-            visitor(0, "simpleStructure", &T::simpleStructure, SC_OFFSETOF(T, simpleStructure)) and
-            visitor(1, "vectorOfInt", &T::vectorOfInt, SC_OFFSETOF(T, vectorOfInt));
+            visitor(1, "vectorOfInt", &T::vectorOfInt, SC_OFFSETOF(T, vectorOfInt)) and
+            visitor(0, "simpleStructure", &T::simpleStructure, SC_OFFSETOF(T, simpleStructure));
     }
 };
 
@@ -114,6 +114,7 @@ struct TestNamespace::PackedStructWithArray
     float       floatValue    = 1.5f;
     SC::int64_t int64Value    = -13;
 };
+
 SC_META_STRUCT_VISIT(TestNamespace::PackedStructWithArray)
 SC_META_STRUCT_FIELD(0, arrayValue)
 SC_META_STRUCT_FIELD(1, floatValue)
@@ -122,33 +123,26 @@ SC_META_STRUCT_LEAVE()
 
 struct TestNamespace::PackedStruct
 {
-    float x, y, z;
-    PackedStruct() : x(0), y(0), z(0) {}
+    float x, y, z = 0.0f;
 };
 
 SC_META_STRUCT_VISIT(TestNamespace::PackedStruct)
-SC_META_STRUCT_FIELD(0, x);
-SC_META_STRUCT_FIELD(1, y);
-SC_META_STRUCT_FIELD(2, z);
+SC_META_STRUCT_FIELD(0, x)
+SC_META_STRUCT_FIELD(1, y)
+SC_META_STRUCT_FIELD(2, z)
 SC_META_STRUCT_LEAVE()
 
 struct TestNamespace::UnpackedStruct
 {
-    SC::int16_t x;
-    float       y, z;
-
-    UnpackedStruct()
-    {
-        x = 10;
-        y = 2;
-        z = 3;
-    }
+    SC::int16_t x = 10;
+    float       y = 2;
+    float       z = 3;
 };
 
 SC_META_STRUCT_VISIT(TestNamespace::UnpackedStruct)
-SC_META_STRUCT_FIELD(0, x);
-SC_META_STRUCT_FIELD(1, y);
-SC_META_STRUCT_FIELD(2, z);
+SC_META_STRUCT_FIELD(0, x)
+SC_META_STRUCT_FIELD(1, y)
+SC_META_STRUCT_FIELD(2, z)
 SC_META_STRUCT_LEAVE()
 
 struct TestNamespace::NestedUnpackedStruct
@@ -217,20 +211,25 @@ struct SC::ReflectionTest : public SC::TestCase
             constexpr auto nestedUnpackedStruct = FlatSchemaTypeErased::compile<TestNamespace::NestedUnpackedStruct>();
             constexpr auto nestedUnpackedStructFlags = nestedUnpackedStruct.properties.values[0].getCustomUint32();
             static_assert(not(nestedUnpackedStructFlags & MetaStructFlags::IsPacked),
-                          "nestedPacked struct should not be recursiely packed");
+                          "nestedPacked struct should not be recursively packed");
 
             constexpr auto structWithArrayPacked =
                 FlatSchemaTypeErased::compile<TestNamespace::StructWithArrayPacked>();
             constexpr auto structWithArrayPackedFlags = structWithArrayPacked.properties.values[0].getCustomUint32();
             static_assert(structWithArrayPackedFlags & MetaStructFlags::IsPacked,
-                          "structWithArrayPacked struct should not be recursiely packed");
+                          "structWithArrayPacked struct should not be recursively packed");
 
             constexpr auto structWithArrayUnpacked =
                 FlatSchemaTypeErased::compile<TestNamespace::StructWithArrayUnpacked>();
             constexpr auto structWithArrayUnpackedFlags =
                 structWithArrayUnpacked.properties.values[0].getCustomUint32();
             static_assert(not(structWithArrayUnpackedFlags & MetaStructFlags::IsPacked),
-                          "structWithArrayUnpacked struct should not be recursiely packed");
+                          "structWithArrayUnpacked struct should not be recursively packed");
+        }
+        if (test_section("Print Simple structure"))
+        {
+            constexpr auto SimpleStructureFlatSchema = FlatSchemaTypeErased::compile<TestNamespace::SimpleStructure>();
+            printFlatSchema(SimpleStructureFlatSchema.properties.values, SimpleStructureFlatSchema.names.values);
         }
         if (test_section("Print Complex structure"))
         {
@@ -238,17 +237,13 @@ struct SC::ReflectionTest : public SC::TestCase
             constexpr StringView classNameStr = "TestNamespace::ComplexStructure";
             static_assert(constexprEquals(StringView(className.data, className.length, false), classNameStr),
                           "Please update SC::ClNm for your compiler");
-            // auto numlinks =
-            // countUniqueLinks<10>(MetaClass<TestNamespace::ComplexStructure>::template
-            // getAtoms<10>());
-            // SC_RELEASE_ASSERT(numlinks == 3);
+            constexpr auto       intName    = TypeToString<int>::get();
+            constexpr StringView intNameStr = "int";
+            static_assert(constexprEquals(StringView(intName.data, intName.length, false), intNameStr),
+                          "Please update SC::ClNm for your compiler");
             constexpr auto ComplexStructureFlatSchema =
                 FlatSchemaTypeErased::compile<TestNamespace::ComplexStructure>();
             printFlatSchema(ComplexStructureFlatSchema.properties.values, ComplexStructureFlatSchema.names.values);
-            // constexpr auto SimpleStructureFlatSchema =
-            // FlatSchemaTypeErased::compile<TestNamespace::SimpleStructure>();
-            // printFlatSchema(SimpleStructureFlatSchema.atoms.values,
-            // SimpleStructureFlatSchema.names.values);
         }
     }
 };

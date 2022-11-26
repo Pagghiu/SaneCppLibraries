@@ -28,12 +28,11 @@ template <typename BinaryStream, typename T>
 struct SerializerMemberIterator
 {
     BinaryStream& stream;
-    T&            object;
 
     template <typename R, int N>
-    constexpr bool operator()(int order, const char (&name)[N], R T::*member, size_t offset) const
+    constexpr bool operator()(int order, const char (&name)[N], R& field) const
     {
-        return Serializer<BinaryStream, R>::serialize(object.*member, stream);
+        return Serializer<BinaryStream, R>::serialize(field, stream);
     }
 };
 
@@ -75,18 +74,17 @@ struct SerializerVersionedMemberIterator
 {
     VersionSchema& schema;
     BinaryStream&  stream;
-    T&             object;
     int            matchOrder          = 0;
     bool           consumed            = false;
     bool           consumedWithSuccess = false;
 
     template <typename R, int N>
-    constexpr bool operator()(int order, const char (&name)[N], R T::*member, size_t offset)
+    constexpr bool operator()(int order, const char (&name)[N], R& field)
     {
         if (matchOrder == order)
         {
             consumed            = true;
-            consumedWithSuccess = Serializer<BinaryStream, R>::serializeVersioned(object.*member, stream, schema);
+            consumedWithSuccess = Serializer<BinaryStream, R>::serializeVersioned(field, stream, schema);
             return false; // stop iterations
         }
         return true;
@@ -110,9 +108,9 @@ struct Serializer
         for (int i = 0; i < numMembers; ++i)
         {
             schema.sourceTypeIndex          = structTypeIndex + i + 1;
-            VersionedMemberIterator visitor = {schema, stream, object, schema.current().order};
+            VersionedMemberIterator visitor = {schema, stream, schema.current().order};
             schema.resolveLink();
-            Reflection::MetaClass<T>::visit(visitor);
+            Reflection::MetaClass<T>::visitObject(visitor, object);
             if (visitor.consumed)
             {
                 SC_TRY_IF(visitor.consumedWithSuccess);
@@ -133,7 +131,7 @@ struct Serializer
         {
             return stream.serialize({&object, sizeof(T)});
         }
-        return Reflection::MetaClass<T>::visit(SerializerMemberIterator<BinaryStream, T>{stream, object});
+        return Reflection::MetaClass<T>::visitObject(SerializerMemberIterator<BinaryStream, T>{stream}, object);
     }
 };
 

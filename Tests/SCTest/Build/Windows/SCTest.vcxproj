@@ -100,6 +100,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)\..\..\..\..\_BuildOutput\Windows\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)\..\..\..\..\_BuildIntermediate\Windows\$(Platform)\$(Configuration)\</IntDir>
+    <IncludePath>..\..\;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <OutDir>$(SolutionDir)\..\..\..\..\_BuildOutput\Windows\$(Platform)\$(Configuration)\</OutDir>
@@ -108,6 +109,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)\..\..\..\..\_BuildOutput\Windows\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)\..\..\..\..\_BuildIntermediate\Windows\$(Platform)\$(Configuration)\</IntDir>
+    <IncludePath>..\..\;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <OutDir>$(SolutionDir)\..\..\..\..\_BuildOutput\Windows\$(Platform)\$(Configuration)\</OutDir>

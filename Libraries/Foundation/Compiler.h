@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-
+#include "SCConfig.h"
 // Compiler name
 #if _MSC_VER
 #define SC_CLANG 0
