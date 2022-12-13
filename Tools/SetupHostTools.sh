@@ -97,4 +97,39 @@ if [ "$(echo "int    asd=0;" | "${HOST_TOOLS}/${SC_PACKAGE_NAME}/bin/clang-forma
     echo -e "${COLOR_RED}FATAL ERROR: clang-format doesn't work inside ${HOST_TOOLS}/${SC_PACKAGE_NAME} ${COLOR_NONE}" ; exit 1;
 fi
 
+# -------------------------------------------------------------------------------------------------------------------
+# EMSDK 
+# -------------------------------------------------------------------------------------------------------------------
+
+SC_PACKAGE_NAME="emsdk"
+SC_PACKAGE_VERSION="3.1.28"
+SC_PACKAGE_FILE_NAME="${SC_PACKAGE_NAME}_${SC_PACKAGE_VERSION}"
+SC_PACKAGE_URL="https://github.com/emscripten-core/emsdk.git"
+SC_PACKAGE_LOCAL_TXT="${SC_BINARIES_DIR}/${SC_PACKAGE_NAME}/${SC_PACKAGE_FILE_NAME}.txt"
+SC_PACKAGE_LOCAL_DIR="${SC_BINARIES_DIR}/${SC_PACKAGE_NAME}/${SC_PACKAGE_FILE_NAME}"
+
+if [ -f ${SC_PACKAGE_LOCAL_TXT} ]; then
+    SC_PACKAGE_INSTALLED=true
+else
+    SC_PACKAGE_INSTALLED=false
+fi
+
+if [ "$SC_PACKAGE_INSTALLED" = true ]; then
+    echo -e "Package ${COLOR_GREEN}'${SC_PACKAGE_NAME}'${COLOR_NONE} is installed in version '${SC_PACKAGE_FILE_NAME}'"
+else
+    echo -e "Package  ${COLOR_GREEN}'${SC_PACKAGE_NAME}'${COLOR_NONE} is missing, installing it in version '${SC_PACKAGE_FILE_NAME}'"
+    rm -rf "${SC_PACKAGE_LOCAL_DIR}"
+    mkdir -p "${SC_PACKAGE_LOCAL_DIR}"
+    git clone --branch ${SC_PACKAGE_VERSION} "${SC_PACKAGE_URL}" "${SC_PACKAGE_LOCAL_DIR}"
+    ${SC_PACKAGE_LOCAL_DIR}/emsdk install ${SC_PACKAGE_VERSION}
+    ${SC_PACKAGE_LOCAL_DIR}/emsdk activate ${SC_PACKAGE_VERSION}
+    printf "SC_PACKAGE_URL=${SC_PACKAGE_URL}\n" > "${SC_PACKAGE_LOCAL_TXT}"
+fi
+
+# Remove link
+if [ -d "${HOST_TOOLS}/${SC_PACKAGE_NAME}" ]; then
+    rm "${HOST_TOOLS}/${SC_PACKAGE_NAME}"
+fi
+# Create Link
+ln -s "${SC_PACKAGE_LOCAL_DIR}" "${HOST_TOOLS}/${SC_PACKAGE_NAME}" 
 
