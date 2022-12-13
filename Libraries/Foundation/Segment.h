@@ -5,6 +5,7 @@
 #include "Assert.h"
 #include "InitializerList.h"
 #include "Language.h"
+#include "Limits.h"
 #include "Types.h"
 
 namespace SC
@@ -248,15 +249,23 @@ struct SC::SegmentOperations
 
     [[nodiscard]] static bool reserveInternalTrivialAllocate(T*& oldItems, size_t newSize)
     {
-        SegmentItems<T>* newSegment;
+        SegmentItems<T>* newSegment = nullptr;
+        constexpr size_t maxSizeT   = SC::MaxValue();
         if (oldItems == nullptr)
         {
-            newSegment = static_cast<SegmentItems<T>*>(Allocator::allocate(nullptr, newSize * sizeof(T), &oldItems));
+            if (newSize <= maxSizeT / sizeof(T))
+            {
+                newSegment =
+                    static_cast<SegmentItems<T>*>(Allocator::allocate(nullptr, newSize * sizeof(T), &oldItems));
+            }
         }
         else if (newSize > SegmentItems<T>::getSegment(oldItems)->capacity())
         {
-            newSegment = static_cast<SegmentItems<T>*>(
-                Allocator::reallocate(SegmentItems<T>::getSegment(oldItems), newSize * sizeof(T)));
+            if (newSize <= maxSizeT / sizeof(T))
+            {
+                newSegment = static_cast<SegmentItems<T>*>(
+                    Allocator::reallocate(SegmentItems<T>::getSegment(oldItems), newSize * sizeof(T)));
+            }
         }
         else
         {
@@ -315,6 +324,11 @@ struct SC::SegmentOperations
         {
             return true;
         }
+        constexpr size_t maxSizeT = SC::MaxValue();
+        if ((numElements > maxSizeT - otherSize) or ((numElements + otherSize) > maxSizeT / sizeof(T)))
+        {
+            return false;
+        }
         const size_t newSize     = numElements + otherSize;
         const size_t oldCapacity = isNull ? 0 : selfSegment->capacity();
         if (newSize > oldCapacity)
@@ -334,12 +348,17 @@ struct SC::SegmentOperations
 
     [[nodiscard]] static bool ensureCapacity(T*& oldItems, size_t newCapacity, const size_t keepFirstN)
     {
-        const bool       isNull      = oldItems == nullptr;
-        SegmentItems<T>* oldSegment  = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
-        const auto       oldSize     = isNull ? 0 : oldSegment->size();
-        const auto       numNewBytes = newCapacity * sizeof(T);
+        const bool       isNull     = oldItems == nullptr;
+        SegmentItems<T>* oldSegment = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
+        const auto       oldSize    = isNull ? 0 : oldSegment->size();
         SC_DEBUG_ASSERT(oldSize >= keepFirstN);
-        auto newSegment = static_cast<SegmentItems<T>*>(Allocator::allocate(oldSegment, numNewBytes, &oldItems));
+        SegmentItems<T>* newSegment = nullptr;
+        constexpr size_t maxSizeT   = SC::MaxValue();
+        if (newCapacity <= maxSizeT / sizeof(T))
+        {
+            newSegment =
+                static_cast<SegmentItems<T>*>(Allocator::allocate(oldSegment, newCapacity * sizeof(T), &oldItems));
+        }
         if (newSegment == oldSegment)
         {
             return false; // Array returning the same as old
@@ -439,7 +458,7 @@ struct SC::SegmentOperations
             const size_t selfCapacity = oldSegment->capacity();
             if (numElements != selfCapacity)
             {
-                SegmentItems<T>* newSegment =
+                auto newSegment =
                     static_cast<SegmentItems<T>*>(Allocator::allocate(oldSegment, oldSegment->sizeBytes, &oldItems));
                 if (newSegment == oldSegment)
                 {

@@ -150,7 +150,7 @@ SC::VectorTest::VectorTest(SC::TestReport& report) : TestCase(report, "VectorTes
     testBasicType();
     testClassType();
 }
-const SC::size_t INSANE_NUMBER = static_cast<SC::size_t>(static_cast<SC::uint32_t>(SC::MaxValue())) + 1;
+constexpr SC::size_t INSANE_NUMBER = SC::MaxValue();
 
 void SC::VectorTest::testClassType()
 {

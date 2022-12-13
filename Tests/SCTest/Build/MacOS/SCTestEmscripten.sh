@@ -2,8 +2,10 @@
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 PATH=$PATH:/opt/homebrew/bin/
-cd "${SCRIPT_DIR}/../../../.."
+ROOT_DIR="${SCRIPT_DIR}/../../../.."
+cd "${ROOT_DIR}"
 
+source _Build/HostTools/emsdk/emsdk_env.sh
 
 POSITIONAL_ARGS=()
 
@@ -38,14 +40,23 @@ rm -rf "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}"
 mkdir -p "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}"
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
-time g++-12 -std=c++14 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
+time em++ -std=c++20 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -I${SCRIPT_DIR}/../../ \
--o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest \
+-o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest.html \
+-sSTRICT=1 \
+-sENVIRONMENT=web \
+-sLLD_REPORT_UNDEFINED \
+-sALLOW_MEMORY_GROWTH=1 \
+-sALLOW_TABLE_GROWTH \
+-sMALLOC=emmalloc \
+-sEXPORT_ALL=1 \
+-sEXPORTED_FUNCTIONS=["_malloc","_free","_main"] \
+-sASYNCIFY \
+--no-entry \
 Libraries/Foundation/Assert.cpp         \
 Libraries/Foundation/Console.cpp        \
 Libraries/Foundation/Memory.cpp         \
-Libraries/Foundation/OSDarwin.cpp       \
-Libraries/Foundation/OSPosix.cpp        \
+Libraries/Foundation/OSHTML5.cpp        \
 Libraries/Foundation/StaticAsserts.cpp  \
 Libraries/Foundation/String.cpp         \
 Libraries/Foundation/StringBuilder.cpp  \

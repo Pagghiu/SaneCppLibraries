@@ -592,7 +592,7 @@ struct SimpleBinaryReaderVersioned
         if (isMemcpyable)
         {
             const auto minBytes = min(static_cast<uint64_t>(arraySinkStart.size), sourceNumBytes);
-            SC_TRY_IF(sourceObject->serialize(Span<void>{arraySinkStart.data, minBytes}));
+            SC_TRY_IF(sourceObject->serialize(Span<void>{arraySinkStart.data, static_cast<size_t>(minBytes)}));
             if (sourceNumBytes > static_cast<uint64_t>(arraySinkStart.size))
             {
                 // We must consume these excess bytes anyway, discarding their content

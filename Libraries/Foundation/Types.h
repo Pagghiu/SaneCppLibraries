@@ -33,8 +33,12 @@ using int8_t  = signed char;
 using int16_t = short;
 using int32_t = int;
 using int64_t = long long;
-
+#if SC_PLATFORM_HTML5
+using size_t  = unsigned __PTRDIFF_TYPE__;
+using ssize_t = signed  __PTRDIFF_TYPE__;
+#else
 using size_t  = unsigned long;
 using ssize_t = signed long;
+#endif
 #endif
 } // namespace SC

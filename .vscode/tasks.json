@@ -56,6 +56,36 @@
             "problemMatcher": []
         },
         {
+            "label": "Build SCTest GCC HTML5 Debug",
+            "type": "shell",
+            "command": "${workspaceFolder}/Tests/SCTest/Build/MacOS/SCTestEmscripten.sh",
+            "args": [
+                "--debug",
+                "html5-any-any-emcc"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+            }
+        },
+        {
+            "label": "Build SCTest GCC HTML5 Release",
+            "type": "shell",
+            "command": "${workspaceFolder}/Tests/SCTest/Build/MacOS/SCTestEmscripten.sh",
+            "args": [
+                "--release",
+                "html5-any-any-emcc"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+            }
+        },
+        {
             "label": "Build SCTest GCC Debug",
             "type": "shell",
             "command": "${workspaceFolder}/Tests/SCTest/Build/MacOS/SCTest.sh",

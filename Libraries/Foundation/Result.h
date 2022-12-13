@@ -14,11 +14,11 @@ struct [[nodiscard]] Error
     constexpr Error() {}
     constexpr Error(const StringView message) : message(message) {}
 };
-template <typename Value, typename Error = Error>
+template <typename Value, typename ErrorType = Error>
 struct Result;
 } // namespace SC
 
-template <typename Value, typename Error>
+template <typename Value, typename ErrorType>
 struct [[nodiscard]] SC::Result
 {
     // We cannot have a reference in union, so we use ReferenceWrapper
@@ -28,7 +28,7 @@ struct [[nodiscard]] SC::Result
     union
     {
         ValueType value;
-        Error     error;
+        ErrorType error;
     };
     bool holdsError;
 
@@ -39,9 +39,9 @@ struct [[nodiscard]] SC::Result
         holdsError = false;
     }
 
-    SC_CONSTEXPR_CONSTRUCTOR_NEW Result(Error&& e)
+    SC_CONSTEXPR_CONSTRUCTOR_NEW Result(ErrorType&& e)
     {
-        new (&error, PlacementNew()) Error(e);
+        new (&error, PlacementNew()) ErrorType(e);
         holdsError = true;
     }
 
@@ -53,7 +53,7 @@ struct [[nodiscard]] SC::Result
         }
         else
         {
-            error.~Error();
+            error.~ErrorType();
         }
     }
     constexpr Result() = delete;
@@ -67,7 +67,7 @@ struct [[nodiscard]] SC::Result
         holdsError = other.holdsError;
         if (holdsError)
         {
-            new (&error, PlacementNew()) Error(move(other.error));
+            new (&error, PlacementNew()) ErrorType(move(other.error));
         }
         else
         {
@@ -79,7 +79,7 @@ struct [[nodiscard]] SC::Result
         holdsError = other.holdsError;
         if (holdsError)
         {
-            new (&error, PlacementNew()) Error(other.error);
+            new (&error, PlacementNew()) ErrorType(other.error);
         }
         else
         {
@@ -92,11 +92,11 @@ struct [[nodiscard]] SC::Result
 
     constexpr bool isError() const { return holdsError == true; }
 
-    constexpr Error releaseError() const { return move(error); }
+    constexpr ErrorType releaseError() const { return move(error); }
 
     Value releaseValue() const { return move(value); }
 
-    const Error& getError() const
+    const ErrorType& getError() const
     {
         SC_DEBUG_ASSERT(holdsError);
         return error;

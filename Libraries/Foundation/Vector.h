@@ -347,7 +347,7 @@ struct SC::Vector
             {
                 // Other.items should become nullptr, but if it was followed by small vector, restore its link
                 other.items = static_cast<T*>(static_cast<void*>(static_cast<char_t*>(static_cast<void*>(&other)) +
-                                                                 sizeof(other) + sizeof(SegmentHeader)));
+                                                                 alignof(SegmentHeader) + sizeof(SegmentHeader)));
             }
             else
             {
