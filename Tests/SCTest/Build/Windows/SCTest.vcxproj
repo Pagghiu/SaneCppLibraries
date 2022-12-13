@@ -98,22 +98,24 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)\..\..\..\..\_BuildOutput\Windows\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\..\..\..\..\_BuildIntermediate\Windows\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)\..\..\..\..\_Build\Output\windows-10-x86_64-msvc2022-$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\..\..\_Build\Intermediate\windows-10-x86_64-msvc2022-$(Configuration)\</IntDir>
     <IncludePath>..\..\;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
-    <OutDir>$(SolutionDir)\..\..\..\..\_BuildOutput\Windows\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\..\..\..\..\_BuildIntermediate\Windows\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)\..\..\..\..\_Build\Output\windows-10-arm64-msvc2022-$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\..\..\_Build\Intermediate\windows-10-arm64-msvc2022-$(Configuration)\</IntDir>
+    <IncludePath>..\..\;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)\..\..\..\..\_BuildOutput\Windows\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\..\..\..\..\_BuildIntermediate\Windows\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)\..\..\..\..\_Build\Output\windows-10-x86_64-msvc2022-$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\..\..\_Build\Intermediate\windows-10-x86_64-msvc2022-$(Configuration)\</IntDir>
     <IncludePath>..\..\;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
-    <OutDir>$(SolutionDir)\..\..\..\..\_BuildOutput\Windows\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\..\..\..\..\_BuildIntermediate\Windows\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)\..\..\..\..\_Build\Output\windows-10-arm64-msvc2022-$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\..\..\_Build\Intermediate\windows-10-arm64-msvc2022-$(Configuration)\</IntDir>
+    <IncludePath>..\..\;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

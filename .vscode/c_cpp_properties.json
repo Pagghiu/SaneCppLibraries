@@ -8,10 +8,10 @@
             "defines": [],
             "macFrameworkPath": [],
             "compilerPath": "/usr/bin/clang",
-            "cStandard": "gnu11",
-            "cppStandard": "gnu++11",
+            "cStandard": "c11",
+            "cppStandard": "c++14",
             "intelliSenseMode": "macos-clang-arm64",
-            "compileCommands": "${workspaceFolder}/_BuildIntermediate/MacOS-Universal/Debug/compile_commands_arm64.json"
+            "compileCommands": "${workspaceFolder}/_Build/Intermediate/macOS-13-arm64_x86_64-Xcode-Debug/compile_commands_arm64.json"
         },       
          {
             "name": "macOS arm64 Release",
@@ -21,10 +21,10 @@
             "defines": [],
             "macFrameworkPath": [],
             "compilerPath": "/usr/bin/clang",
-            "cStandard": "gnu11",
-            "cppStandard": "gnu++11",
+            "cStandard": "c11",
+            "cppStandard": "c++14",
             "intelliSenseMode": "macos-clang-arm64",
-            "compileCommands": "${workspaceFolder}/_BuildIntermediate/MacOS-Universal/Release/compile_commands_arm64.json"
+            "compileCommands": "${workspaceFolder}/_Build/Intermediate/macOS-13-arm64_x86_64-Xcode-Release/compile_commands_arm64.json"
         }
     ],
     "version": 4

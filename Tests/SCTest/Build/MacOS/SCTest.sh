@@ -34,13 +34,13 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-rm -rf "_BuildOutput/${GCC_DIRECTORY}/${GCC_CONFIGURATION}"
-mkdir -p "_BuildOutput/${GCC_DIRECTORY}/${GCC_CONFIGURATION}"
+rm -rf "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}"
+mkdir -p "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}"
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 time g++-12 -std=c++14 -nostdinc++ ${GCC_DEBUG_FLAG} \
 -I${SCRIPT_DIR}/../../ \
--o _BuildOutput/${GCC_DIRECTORY}/${GCC_CONFIGURATION}/SCTest \
+-o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest \
 Libraries/Foundation/Assert.cpp         \
 Libraries/Foundation/Console.cpp        \
 Libraries/Foundation/Memory.cpp         \
