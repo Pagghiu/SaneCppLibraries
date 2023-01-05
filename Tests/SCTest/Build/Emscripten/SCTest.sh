@@ -36,13 +36,13 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-rm -rf "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}"
-mkdir -p "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}"
+rm -rf "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest"
+mkdir -p "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest"
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 time em++ -std=c++20 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -I${SCRIPT_DIR}/../../ \
--o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest.html \
+-o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest/SCTest.html \
 -sSTRICT=1 \
 -sENVIRONMENT=web \
 -sLLD_REPORT_UNDEFINED \

@@ -36,14 +36,14 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-rm -rf "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}"
-mkdir -p "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}"
+rm -rf "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCExample"
+mkdir -p "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCExample"
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 time em++ -std=c++20 -nostdinc++  -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -I${SCRIPT_DIR}/../../ \
--o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCExample.html \
+-o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCExample/SCExample.html \
 -s DISABLE_EXCEPTION_CATCHING=1 -s STACK_SIZE=512KB --memory-init-file 0 \
 -s ERROR_ON_UNDEFINED_SYMBOLS=1 -s NO_EXIT_RUNTIME=1 \
 -s ALLOW_MEMORY_GROWTH=1 -s USE_WEBGL2=1 -s "MALLOC='emmalloc'" -s NO_FILESYSTEM=1 -s WASM=1  \
