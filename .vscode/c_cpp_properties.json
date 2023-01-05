@@ -1,7 +1,7 @@
 {
     "configurations": [
         {
-            "name": "macOS arm64 Debug",
+            "name": "SCTest macOS arm64 Debug",
             "includePath": [
                 "${workspaceFolder}/**"
             ],
@@ -11,10 +11,10 @@
             "cStandard": "c11",
             "cppStandard": "c++14",
             "intelliSenseMode": "macos-clang-arm64",
-            "compileCommands": "${workspaceFolder}/_Build/Intermediate/macOS-13-arm64_x86_64-Xcode-Debug/compile_commands_arm64.json"
+            "compileCommands": "${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13-arm64_x86_64-Xcode-Debug/compile_commands_arm64.json"
         },       
          {
-            "name": "macOS arm64 Release",
+            "name": "SCTest macOS arm64 Release",
             "includePath": [
                 "${workspaceFolder}/**"
             ],
@@ -24,7 +24,7 @@
             "cStandard": "c11",
             "cppStandard": "c++14",
             "intelliSenseMode": "macos-clang-arm64",
-            "compileCommands": "${workspaceFolder}/_Build/Intermediate/macOS-13-arm64_x86_64-Xcode-Release/compile_commands_arm64.json"
+            "compileCommands": "${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13-arm64_x86_64-Xcode-Release/compile_commands_arm64.json"
         }
     ],
     "version": 4
