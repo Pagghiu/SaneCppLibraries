@@ -67,10 +67,16 @@ void frame(void)
     sg_commit();
     if (stm_sec(stm_since(lastResetTime)) > 0.5)
     {
-#if defined(SOKOL_METAL) && TARGET_OS_OSX
+#if defined(SOKOL_METAL)
+#if TARGET_OS_OSX
         NSWindow* window  = (__bridge NSWindow*)sapp_macos_get_window();
         MTKView*  mtkView = window.contentView;
         mtkView.paused    = true;
+#else
+        UIWindow* window  = (__bridge UIWindow*)sapp_ios_get_window();
+        MTKView*  mtkView = (MTKView*)window.rootViewController.view;
+        mtkView.paused    = true;
+#endif
 #elif defined(_WIN32)
         HWND hwnd = (HWND)sapp_win32_get_hwnd();
         MSG  msg;
@@ -102,10 +108,16 @@ _SOKOL_PRIVATE EM_BOOL sapp_emsc_custom_frame(double time, void* userData);
 void input(const sapp_event* ev)
 {
     simgui_handle_event(ev);
-#if defined(SOKOL_METAL) && TARGET_OS_OSX
+#if defined(SOKOL_METAL)
+#if TARGET_OS_OSX
     NSWindow* window  = (__bridge NSWindow*)sapp_macos_get_window();
     MTKView*  mtkView = window.contentView;
     mtkView.paused    = false;
+#else
+    UIWindow* window = (__bridge UIWindow*)sapp_ios_get_window();
+    MTKView* mtkView = (MTKView*)window.rootViewController.view;
+    mtkView.paused = false;
+#endif
 #elif defined(__EMSCRIPTEN__) && defined(SOKOL_NO_ENTRY)
     if (shouldBePaused)
     {
@@ -130,6 +142,7 @@ sapp_desc sokol_get_desc(int argc, char* argv[])
     desc.gl_force_gles2              = true;
     desc.window_title                = "SC Platform Example";
     desc.ios_keyboard_resizes_canvas = false;
+    desc.high_dpi                    = true;
     // desc.icon.sokol_default = true;
     desc.enable_clipboard = true;
     return desc;
