@@ -86,6 +86,36 @@
             }
         },
         {
+            "label": "Build SCExample GCC HTML5 Debug",
+            "type": "shell",
+            "command": "${workspaceFolder}/Examples/SCExample/Build/Emscripten/SCExample.sh",
+            "args": [
+                "--debug",
+                "html5-any-any-emcc"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+            }
+        },
+        {
+            "label": "Build SCExample GCC HTML5 Release",
+            "type": "shell",
+            "command": "${workspaceFolder}/Examples/SCExample/Build/Emscripten/SCExample.sh",
+            "args": [
+                "--release",
+                "html5-any-any-emcc"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+            }
+        },
+        {
             "label": "Build SCTest GCC Debug",
             "type": "shell",
             "command": "${workspaceFolder}/Tests/SCTest/Build/MacOS/SCTest.sh",
@@ -125,6 +155,18 @@
             "label": "Refresh SCTest compile_commands_arm64.json macos-arm64 Release",
             "type": "shell",
             "command": "xcrun xcodebuild -scheme SCTest -configuration Release -project \"${workspaceFolder}/Tests/SCTest/Build/MacOS/SCTest.xcodeproj\" ARCHS=arm64 USE_ACTIVE_ARCS=NO OTHER_CFLAGS=\"\\$(inherited) -gen-cdb-fragment-path \"\"\\$(PROJECT_DIR)/../../../../_Build/Intermediate/\\$(PROJECT_NAME)/macOS-13-arm64_x86_64-Xcode-Release/CompilationDatabase\"\"\" && sed -e '1s/^/[\\'$'\n''/' -e '$s/,$/\\'$'\n'']/' \"${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13-arm64_x86_64-Xcode-Release/CompilationDatabase/\"*.json > \"${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13-arm64_x86_64-Xcode-Release/compile_commands_arm64.json\" && rm \"${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13-arm64_x86_64-Xcode-Release/CompilationDatabase/\"*.json && rmdir \"${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13-arm64_x86_64-Xcode-Release/CompilationDatabase\"",
+            "problemMatcher": []
+        },
+        {
+            "label": "Refresh SCExample compile_commands_arm64.json macos-arm64 Debug",
+            "type": "shell",
+            "command": "xcrun xcodebuild -scheme SCExample -configuration Debug -project \"${workspaceFolder}/Examples/SCExample/Build/MacOS/SCExample.xcodeproj\" ARCHS=arm64 USE_ACTIVE_ARCS=NO OTHER_CFLAGS=\"\\$(inherited) -gen-cdb-fragment-path \"\"\\$(PROJECT_DIR)/../../../../_Build/Intermediate/\\$(PROJECT_NAME)/macOS-13-arm64_x86_64-Xcode-Debug/CompilationDatabase\"\"\" && sed -e '1s/^/[\\'$'\n''/' -e '$s/,$/\\'$'\n'']/' \"${workspaceFolder}/_Build/Intermediate/SCExample/macOS-13-arm64_x86_64-Xcode-Debug/CompilationDatabase/\"*.json > \"${workspaceFolder}/_Build/Intermediate/SCExample/macOS-13-arm64_x86_64-Xcode-Debug/compile_commands_arm64.json\" && rm \"${workspaceFolder}/_Build/Intermediate/SCExample/macOS-13-arm64_x86_64-Xcode-Debug/CompilationDatabase/\"*.json && rmdir \"${workspaceFolder}/_Build/Intermediate/SCExample/macOS-13-arm64_x86_64-Xcode-Debug/CompilationDatabase\"",
+            "problemMatcher": []
+        },
+        {
+            "label": "Refresh SCExample compile_commands_arm64.json macos-arm64 Release",
+            "type": "shell",
+            "command": "xcrun xcodebuild -scheme SCExample -configuration Release -project \"${workspaceFolder}/Examples/SCExample/Build/MacOS/SCExample.xcodeproj\" ARCHS=arm64 USE_ACTIVE_ARCS=NO OTHER_CFLAGS=\"\\$(inherited) -gen-cdb-fragment-path \"\"\\$(PROJECT_DIR)/../../../../_Build/Intermediate/\\$(PROJECT_NAME)/macOS-13-arm64_x86_64-Xcode-Release/CompilationDatabase\"\"\" && sed -e '1s/^/[\\'$'\n''/' -e '$s/,$/\\'$'\n'']/' \"${workspaceFolder}/_Build/Intermediate/SCExample/macOS-13-arm64_x86_64-Xcode-Release/CompilationDatabase/\"*.json > \"${workspaceFolder}/_Build/Intermediate/SCExample/macOS-13-arm64_x86_64-Xcode-Release/compile_commands_arm64.json\" && rm \"${workspaceFolder}/_Build/Intermediate/SCExample/macOS-13-arm64_x86_64-Xcode-Release/CompilationDatabase/\"*.json && rmdir \"${workspaceFolder}/_Build/Intermediate/SCExample/macOS-13-arm64_x86_64-Xcode-Release/CompilationDatabase\"",
             "problemMatcher": []
         }
     ]

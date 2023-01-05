@@ -25,6 +25,32 @@
             "cppStandard": "c++14",
             "intelliSenseMode": "macos-clang-arm64",
             "compileCommands": "${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13-arm64_x86_64-Xcode-Release/compile_commands_arm64.json"
+        },
+        {
+            "name": "SCExample macOS arm64 Debug",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "macFrameworkPath": [],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c11",
+            "cppStandard": "c++14",
+            "intelliSenseMode": "macos-clang-arm64",
+            "compileCommands": "${workspaceFolder}/_Build/Intermediate/SCExample/macOS-13-arm64_x86_64-Xcode-Debug/compile_commands_arm64.json"
+        },       
+         {
+            "name": "SCExample macOS arm64 Release",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "macFrameworkPath": [],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c11",
+            "cppStandard": "c++14",
+            "intelliSenseMode": "macos-clang-arm64",
+            "compileCommands": "${workspaceFolder}/_Build/Intermediate/SCExample/macOS-13-arm64_x86_64-Xcode-Release/compile_commands_arm64.json"
         }
     ],
     "version": 4
