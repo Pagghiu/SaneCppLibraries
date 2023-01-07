@@ -1,3 +1,5 @@
+#include "SCConfig.h"
+
 #include "../../Dependencies/imgui/_imgui/imgui.h"
 #include "../../Libraries/UserInterface/Platform.h"
 
@@ -20,6 +22,13 @@ void platform_draw()
     // Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
     static float f = 0.0f;
     ImGui::Text("Hello, world!");
+#if SC_ENABLE_FREETYPE
+    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
+    // ImGui::Text("\xf0\x9f\x8d\x89\xf0\x9f\x8d\x8a\xf0\x9f\x8d\x8b\xf0\x9f\x8d\x8c\xf0\x9f\x8d\x8d");
+    ImGui::Text("\xf0\x9f\x8d\x94\xf0\x9f\x8d\x95\xf0\x9f\x8d\x96\xf0\x9f\x8d\x97\xf0\x9f\x8d\x98");
+    ImGui::PopFont();
+
+#endif
     ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
     ImGui::ColorEdit3("clear color", &gBackgroundValue.r);
     if (ImGui::Button("Test Window"))

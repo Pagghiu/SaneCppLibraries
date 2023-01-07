@@ -14,7 +14,26 @@
 		7B681C14296631E100634EAA /* DependencyImgui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B681C13296631E100634EAA /* DependencyImgui.cpp */; };
 		7B681C172966321D00634EAA /* SCExample.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B681C152966321D00634EAA /* SCExample.cpp */; };
 		7B681C1E2966323100634EAA /* Platform.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B681C1A2966323100634EAA /* Platform.mm */; };
+		7BF04D82296B40C4006C1E93 /* DependencyFreetype.c in Sources */ = {isa = PBXBuildFile; fileRef = 7BF04D81296B40C4006C1E93 /* DependencyFreetype.c */; };
+		7BF04D84296B40CF006C1E93 /* DependencyNanosvg.c in Sources */ = {isa = PBXBuildFile; fileRef = 7BF04D83296B40CF006C1E93 /* DependencyNanosvg.c */; };
+		7BF04D86296B4145006C1E93 /* DependencyFcft.c in Sources */ = {isa = PBXBuildFile; fileRef = 7BF04D85296B4145006C1E93 /* DependencyFcft.c */; };
+		7BF04D94296B59D3006C1E93 /* DroidSans.ttf in CopyFiles */ = {isa = PBXBuildFile; fileRef = 7BF04D92296B59CA006C1E93 /* DroidSans.ttf */; };
+		7BF04D95296B59D3006C1E93 /* NotoColorEmoji-Regular.ttf in CopyFiles */ = {isa = PBXBuildFile; fileRef = 7BF04D90296B59A5006C1E93 /* NotoColorEmoji-Regular.ttf */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		7BF04D8B296B41A6006C1E93 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Fonts;
+			dstSubfolderSpec = 7;
+			files = (
+				7BF04D94296B59D3006C1E93 /* DroidSans.ttf in CopyFiles */,
+				7BF04D95296B59D3006C1E93 /* NotoColorEmoji-Regular.ttf in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		7B4F78D029662D24000D7EEA /* SCExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SCExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -29,6 +48,11 @@
 		7B681C192966323100634EAA /* Platform.html */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.html; name = Platform.html; path = ../../../../Libraries/UserInterface/Platform.html; sourceTree = "<group>"; };
 		7B681C1A2966323100634EAA /* Platform.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = Platform.mm; path = ../../../../Libraries/UserInterface/Platform.mm; sourceTree = "<group>"; };
 		7B681C1B2966323100634EAA /* Platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Platform.h; path = ../../../../Libraries/UserInterface/Platform.h; sourceTree = "<group>"; };
+		7BF04D81296B40C4006C1E93 /* DependencyFreetype.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencyFreetype.c; path = ../../../../Dependencies/freetype/DependencyFreetype.c; sourceTree = "<group>"; };
+		7BF04D83296B40CF006C1E93 /* DependencyNanosvg.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencyNanosvg.c; path = ../../../../Dependencies/nanosvg/DependencyNanosvg.c; sourceTree = "<group>"; };
+		7BF04D85296B4145006C1E93 /* DependencyFcft.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencyFcft.c; path = ../../../../Dependencies/fcft/DependencyFcft.c; sourceTree = "<group>"; };
+		7BF04D90296B59A5006C1E93 /* NotoColorEmoji-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "NotoColorEmoji-Regular.ttf"; path = "../../../../Dependencies/notoemoji/_notocoloremojiregular/notocoloremojiregular_497a6598/NotoColorEmoji-Regular.ttf"; sourceTree = "<group>"; };
+		7BF04D92296B59CA006C1E93 /* DroidSans.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = DroidSans.ttf; path = ../../../../Dependencies/imgui/_imgui/misc/fonts/DroidSans.ttf; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -48,8 +72,12 @@
 		7B4F78C729662D24000D7EEA = {
 			isa = PBXGroup;
 			children = (
+				7BF04D8E296B58E8006C1E93 /* Resources */,
 				7B681C152966321D00634EAA /* SCExample.cpp */,
+				7BF04D85296B4145006C1E93 /* DependencyFcft.c */,
 				7B681C13296631E100634EAA /* DependencyImgui.cpp */,
+				7BF04D83296B40CF006C1E93 /* DependencyNanosvg.c */,
+				7BF04D81296B40C4006C1E93 /* DependencyFreetype.c */,
 				7B681C162966321D00634EAA /* SCConfig.h */,
 				7B681C182966323100634EAA /* Platform.cpp */,
 				7B681C1B2966323100634EAA /* Platform.h */,
@@ -79,6 +107,23 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		7BF04D8E296B58E8006C1E93 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				7BF04D8F296B58F5006C1E93 /* Fonts */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		7BF04D8F296B58F5006C1E93 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				7BF04D92296B59CA006C1E93 /* DroidSans.ttf */,
+				7BF04D90296B59A5006C1E93 /* NotoColorEmoji-Regular.ttf */,
+			);
+			name = Fonts;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -89,6 +134,7 @@
 				7B4F78CC29662D24000D7EEA /* Sources */,
 				7B4F78CD29662D24000D7EEA /* Frameworks */,
 				7B4F78CE29662D24000D7EEA /* Resources */,
+				7BF04D8B296B41A6006C1E93 /* CopyFiles */,
 			);
 			buildRules = (
 			);
@@ -148,8 +194,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				7B681C14296631E100634EAA /* DependencyImgui.cpp in Sources */,
+				7BF04D82296B40C4006C1E93 /* DependencyFreetype.c in Sources */,
 				7B681C172966321D00634EAA /* SCExample.cpp in Sources */,
 				7B681C1E2966323100634EAA /* Platform.mm in Sources */,
+				7BF04D84296B40CF006C1E93 /* DependencyNanosvg.c in Sources */,
+				7BF04D86296B4145006C1E93 /* DependencyFcft.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -207,6 +256,10 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					../../../../Dependencies/freetype/_freetype/include,
+					../../../../Dependencies/imgui/_imgui,
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -261,6 +314,10 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					../../../../Dependencies/freetype/_freetype/include,
+					../../../../Dependencies/imgui/_imgui,
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;

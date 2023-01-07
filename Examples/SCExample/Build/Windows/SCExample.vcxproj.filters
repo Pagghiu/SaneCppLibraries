@@ -1,41 +1,70 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Source Files">
+    <Filter Include="Resources">
+      <UniqueIdentifier>{fb5d71e7-4508-481c-b3f2-88eb4e88f92e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\Fonts">
+      <UniqueIdentifier>{c3b1a3b1-f7c7-4e43-9cae-64034725230f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Foundation">
+    <Filter Include="Dependencies">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Icon">
+      <UniqueIdentifier>{30ebdc64-fa08-4d75-bfd4-ade8fd64f422}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\SCExample.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Dependencies\imgui\DependencyImgui.cpp">
-      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Libraries</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\UserInterface\Platform.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Dependencies\freetype\DependencyFreetype.c">
+      <Filter>Dependencies</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Dependencies\imgui\DependencyImgui.cpp">
+      <Filter>Dependencies</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Dependencies\fcft\DependencyFcft.c">
+      <Filter>Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Dependencies\nanosvg\DependencyNanosvg.c">
+      <Filter>Libraries</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Dependencies\sokol\_sokol\sokol_app.h">
-      <Filter>Foundation</Filter>
+      <Filter>Dependencies</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">
-      <Filter>Foundation</Filter>
+      <Filter>Icon</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="Resource.rc" />
+    <None Include="..\..\..\..\Dependencies\imgui\_imgui\misc\fonts\DroidSans.ttf">
+      <Filter>Resources\Fonts</Filter>
+    </None>
+    <None Include="..\..\..\..\Dependencies\notoemoji\_notocoloremojiregular\notocoloremojiregular_497a6598\NotoColorEmoji-Regular.ttf">
+      <Filter>Resources\Fonts</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="AppIcon.ico" />
+    <Image Include="AppIcon.ico">
+      <Filter>Icon</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Resource.rc">
+      <Filter>Icon</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

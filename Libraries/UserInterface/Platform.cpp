@@ -1,5 +1,10 @@
 #include "SCConfig.h"
 
+#if defined(_WIN32)
+#include <Shlwapi.h>
+#pragma comment(lib, "shlwapi.lib")
+#endif
+
 #include "Platform.h"
 #define SOKOL_APP_IMPL
 #define SOKOL_IMPL
@@ -19,19 +24,143 @@
 #include "../../Dependencies/sokol/_sokol/sokol_gfx.h"
 #include "../../Dependencies/sokol/_sokol/sokol_glue.h"
 #include "../../Dependencies/sokol/_sokol/sokol_time.h"
+#include "../../Dependencies/sokol/_sokol/sokol_fetch.h"
 #include "../../Dependencies/imgui/_imgui/imgui.h"
+#if SC_ENABLE_FREETYPE
+#include "../../Dependencies/imgui/_imgui/misc/freetype/imgui_freetype.h"
+#endif
 #define SOKOL_IMGUI_IMPL
 #include "../../Dependencies/sokol/_sokol/util/sokol_imgui.h"
 // clang-format on
 
-static sg_pass_action pass_action;
-static uint64_t       lastResetTime  = 0;
-static bool           shouldBePaused = false;
+static sg_pass_action gGlobalPassAction;
+static uint64_t       gLastResetTime       = 0;
+static bool           gShouldBePaused      = false;
+static bool           gImguiInited         = false;
+static bool           gInitError           = false;
+static char           gInitErrorMsg[1024]  = "Error: Cannot load resources";
+static const float    gDpiScaling          = 2.0f;
+static bool           gFontLoaded[2]       = {false, false};
+static int            numResourcesFinished = 0;
+static int            numTotalResources    = 0;
 
 sg_color gBackgroundValue = {0.0f, 0.5f, 0.7f, 1.0f};
 
+template <int bufferLength>
+const char* GetResourceFile(char (&buffer)[bufferLength], const char* directory, const char* file)
+{
+    char executablePath[2048] = {0};
+    if (executablePath[0] == 0)
+    {
+#if defined(_WIN32)
+        // TODO: This will fail on non ASCII paths
+        GetModuleFileNameA(NULL, executablePath, 2048);
+        PathRemoveFileSpecA(executablePath);
+#elif defined(__APPLE__)
+        const char* resourcePath = [NSBundle.mainBundle.resourcePath cStringUsingEncoding:kCFStringEncodingUTF8];
+        strncpy(executablePath, resourcePath, 2048);
+#elif defined(__EMSCRIPTEN__)
+        snprintf(buffer, bufferLength, "%s/%s", directory, file);
+#else
+#error "TODO: Implement GetResourceFile"
+#endif
+    }
+#if defined(_WIN32)
+    snprintf(buffer, bufferLength, "%s\\Resources\\%s\\%s", executablePath, directory, file);
+#elif defined(__EMSCRIPTEN__)
+    snprintf(buffer, bufferLength, "%s/%s", directory, file);
+#elif defined(__APPLE__)
+    snprintf(buffer, bufferLength, "%s/%s/%s", executablePath, directory, file);
+#else
+#error "TODO: Implement GetResourceFile"
+#endif
+    return buffer;
+}
+
+void init_imgui(void)
+{
+    ImGuiIO* io = &ImGui::GetIO();
+    if (gInitError)
+    {
+        io->Fonts->AddFontDefault();
+    }
+
+    unsigned char* font_pixels;
+    int            font_width, font_height;
+    io->Fonts->GetTexDataAsRGBA32(&font_pixels, &font_width, &font_height);
+    sg_image_desc img_desc;
+    _simgui_clear(&img_desc, sizeof(img_desc));
+    img_desc.width                    = font_width;
+    img_desc.height                   = font_height;
+    img_desc.pixel_format             = SG_PIXELFORMAT_RGBA8;
+    img_desc.wrap_u                   = SG_WRAP_CLAMP_TO_EDGE;
+    img_desc.wrap_v                   = SG_WRAP_CLAMP_TO_EDGE;
+    img_desc.min_filter               = SG_FILTER_LINEAR;
+    img_desc.mag_filter               = SG_FILTER_LINEAR;
+    img_desc.data.subimage[0][0].ptr  = font_pixels;
+    img_desc.data.subimage[0][0].size = (size_t)(font_width * font_height) * sizeof(uint32_t);
+    img_desc.label                    = "sokol-imgui-font";
+    _simgui.img                       = sg_make_image(&img_desc);
+    io->Fonts->TexID                  = (ImTextureID)(uintptr_t)_simgui.img.id;
+    gImguiInited                      = true;
+}
+
+static void PlatformFontLoaded(const sfetch_response_t* response)
+{
+    if (response->fetched)
+    {
+        ImGuiIO* io = &ImGui::GetIO();
+        // Data is owned and will be freed after build
+        const uint32_t fontIndex = *((uint32_t*)response->user_data);
+        if (fontIndex == 0)
+        {
+            ImFont* f0 = io->Fonts->AddFontFromMemoryTTF((void*)response->data.ptr, (int)response->data.size,
+                                                         16.0f * gDpiScaling);
+            f0->Scale /= gDpiScaling;
+        }
+        else if (fontIndex == 1)
+        {
+            // static ImWchar ranges[] = { 0x1, 0x1FFFF, 0 };
+            static ImWchar      ranges[] = {0x1F354, 0x1F354 + 5, 0};
+            static ImFontConfig cfg;
+            cfg.OversampleH = cfg.OversampleV = 1;
+            // cfg.MergeMode = true;
+            cfg.FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor | ImGuiFreeTypeBuilderFlags_Bitmap;
+            ImFont* f0 = io->Fonts->AddFontFromMemoryTTF((void*)response->data.ptr, (int)response->data.size,
+                                                         50 * gDpiScaling, &cfg, ranges);
+            f0->Scale /= gDpiScaling;
+        }
+        gFontLoaded[*((uint32_t*)response->user_data)] = true;
+    }
+
+    if (response->finished)
+    {
+        numResourcesFinished++;
+        if (numResourcesFinished == numTotalResources)
+        {
+            gInitError = false;
+            for (int i = 0; i < numTotalResources; ++i)
+            {
+                if (!gFontLoaded[i])
+                {
+                    snprintf(gInitErrorMsg, sizeof(gInitErrorMsg), "Error: Cannot load all font resources");
+                    gInitError = true;
+                }
+            }
+            init_imgui();
+        }
+    }
+}
+
 void init(void)
 {
+    // FOR SVG SUPPORT CHECKOUT https://codeberg.org/dnkl/fcft/src/branch/master
+    // COLR/CPAL https://github.com/mozilla/twemoji-colr
+    // GetResourceFile(buffer, "Fonts", "Noto-COLRv1-emojicompat.ttf");
+    // GetResourceFile(buffer, "Fonts", "OpenMoji-Color.ttf");
+    // GetResourceFile(buffer, "Fonts", "Twemoji.Mozilla.ttf");
+    // GetResourceFile(buffer, "Fonts", "seguiemj.ttf");
+
 #if defined(_WIN32)
     HWND  hwnd  = (HWND)sapp_win32_get_hwnd();
     HICON hIcon = LoadIcon(GetModuleHandleW(NULL), MAKEINTRESOURCE(100));
@@ -42,30 +171,69 @@ void init(void)
     sg_desc desc = {};
     desc.context = sapp_sgcontext();
     sg_setup(&desc);
-
-    // use sokol-imgui with all default-options (we're not doing
-    // multi-sampled rendering or using non-default pixel formats)
-    simgui_desc_t simgui_desc = {};
+    simgui_desc_t simgui_desc   = {};
+    simgui_desc.no_default_font = true;
     simgui_setup(&simgui_desc);
 
+    sfetch_desc_t fetchSetup = {};
+    fetchSetup.num_channels  = 1;
+    fetchSetup.num_lanes     = 4;
+    sfetch_setup(&fetchSetup);
+    uint32_t         first = 0, second = 1;
+    char             buffer[2048] = {0};
+    sfetch_request_t req          = {};
+
+    req.path           = GetResourceFile(buffer, "Fonts", "DroidSans.ttf");
+    req.callback       = PlatformFontLoaded;
+    req.user_data.ptr  = &first;
+    req.user_data.size = sizeof(first);
+    req.buffer.size    = 190044;
+    req.buffer.ptr     = malloc(req.buffer.size);
+    sfetch_send(&req);
+    numTotalResources++;
+
+#if SC_ENABLE_FREETYPE
+    req.path           = GetResourceFile(buffer, "Fonts", "NotoColorEmoji-Regular.ttf");
+    req.callback       = PlatformFontLoaded;
+    req.user_data.ptr  = &second;
+    req.user_data.size = sizeof(second);
+    req.buffer.size    = 23746536;
+    req.buffer.ptr     = malloc(req.buffer.size);
+    sfetch_send(&req);
+    numTotalResources++;
+#endif
     // initial clear color
-    pass_action.colors[0].action = SG_ACTION_CLEAR;
-    pass_action.colors[0].value  = gBackgroundValue;
-    lastResetTime                = stm_now();
+    gGlobalPassAction.colors[0].action = SG_ACTION_CLEAR;
+    gGlobalPassAction.colors[0].value  = gBackgroundValue;
+    gLastResetTime                     = stm_now();
 }
 
 void frame(void)
 {
-    const int width             = sapp_width();
-    const int height            = sapp_height();
-    pass_action.colors[0].value = gBackgroundValue;
-    simgui_new_frame({width, height, sapp_frame_duration(), sapp_dpi_scale()});
-    platform_draw();
-    sg_begin_default_pass(&pass_action, width, height);
-    simgui_render();
+    sfetch_dowork();
+    const int width                   = sapp_width();
+    const int height                  = sapp_height();
+    gGlobalPassAction.colors[0].value = gBackgroundValue;
+    if (gImguiInited)
+    {
+        simgui_new_frame({width, height, sapp_frame_duration(), sapp_dpi_scale()});
+        if (gInitError)
+        {
+            ImGui::Text("%s", gInitErrorMsg);
+        }
+        else
+        {
+            platform_draw();
+        }
+    }
+    sg_begin_default_pass(&gGlobalPassAction, width, height);
+    if (gImguiInited)
+    {
+        simgui_render();
+    }
     sg_end_pass();
     sg_commit();
-    if (stm_sec(stm_since(lastResetTime)) > 0.5)
+    if (stm_sec(stm_since(gLastResetTime)) > 0.5)
     {
 #if defined(SOKOL_METAL)
 #if TARGET_OS_OSX
@@ -79,7 +247,7 @@ void frame(void)
 #endif
 #elif defined(_WIN32)
         HWND hwnd = (HWND)sapp_win32_get_hwnd();
-        MSG  msg;
+        MSG msg;
         GetMessageW(&msg, NULL, 0, 0);
         if (msg.message == WM_QUIT)
         {
@@ -91,15 +259,19 @@ void frame(void)
             DispatchMessageW(&msg);
         }
 #else
-        shouldBePaused = true;
+        gShouldBePaused = true;
 #endif
-        lastResetTime = stm_now();
+        gLastResetTime = stm_now();
     }
 }
 
 void cleanup(void)
 {
-    simgui_shutdown();
+    sfetch_shutdown();
+    if (gImguiInited)
+    {
+        simgui_shutdown();
+    }
     sg_shutdown();
 }
 #if defined(__EMSCRIPTEN__) && defined(SOKOL_NO_ENTRY)
@@ -107,7 +279,10 @@ _SOKOL_PRIVATE EM_BOOL sapp_emsc_custom_frame(double time, void* userData);
 #endif
 void input(const sapp_event* ev)
 {
-    simgui_handle_event(ev);
+    if (gImguiInited)
+    {
+        simgui_handle_event(ev);
+    }
 #if defined(SOKOL_METAL)
 #if TARGET_OS_OSX
     NSWindow* window  = (__bridge NSWindow*)sapp_macos_get_window();
@@ -119,14 +294,14 @@ void input(const sapp_event* ev)
     mtkView.paused = false;
 #endif
 #elif defined(__EMSCRIPTEN__) && defined(SOKOL_NO_ENTRY)
-    if (shouldBePaused)
+    if (gShouldBePaused)
     {
-        shouldBePaused = false;
+        gShouldBePaused = false;
         emscripten_request_animation_frame_loop(sapp_emsc_custom_frame, 0);
     }
 #endif
     // sapp_set_frame_cb_paused(false);
-    lastResetTime = stm_now();
+    gLastResetTime = stm_now();
 }
 
 sapp_desc sokol_get_desc(int argc, char* argv[])
@@ -198,7 +373,7 @@ _SOKOL_PRIVATE EM_BOOL sapp_emsc_custom_frame(double time, void* userData)
         _sapp_discard_state();
         return EM_FALSE;
     }
-    if (shouldBePaused)
+    if (gShouldBePaused)
     {
         return EM_FALSE;
     }

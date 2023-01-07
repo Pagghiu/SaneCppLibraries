@@ -5,10 +5,10 @@ COLOR_RED="\033[31m"
 COLOR_GREEN="\033[32m"
 COLOR_NONE="\033[00m"
 
-SC_PACKAGE_NAME="imgui"
-SC_PACKAGE_VERSION="d7c8516"
+SC_PACKAGE_NAME="freetype"
+SC_PACKAGE_VERSION="VER-2-12-1"
 SC_PACKAGE_FILE_NAME="${SC_PACKAGE_NAME}_${SC_PACKAGE_VERSION}"
-SC_PACKAGE_URL="https://github.com/ocornut/imgui"
+SC_PACKAGE_URL="https://gitlab.freedesktop.org/freetype/freetype.git"
 SC_PACKAGE_LOCAL_TXT=${SC_PACKAGE_NAME}.txt
 SC_PACKAGE_LOCAL_DIR="${SCRIPT_DIR}/_${SC_PACKAGE_NAME}"
 
@@ -27,10 +27,12 @@ else
     git clone "${SC_PACKAGE_URL}" "${SC_PACKAGE_LOCAL_DIR}" || { echo -e "${COLOR_RED}FATAL ERROR: Cannot clone package ${SC_PACKAGE_URL} to ${SC_PACKAGE_LOCAL_DIR} at ${SC_PACKAGE_VERSION}" ; exit 1; }
     pushd "${SC_PACKAGE_LOCAL_DIR}"
     git checkout -b sc ${SC_PACKAGE_VERSION} || { echo -e "${COLOR_RED}FATAL ERROR: Cannot switch git repo ${SC_PACKAGE_URL} at ${SC_PACKAGE_LOCAL_DIR} to ${SC_PACKAGE_VERSION}" ; exit 1; }
-    git apply ../${SC_PACKAGE_NAME}.patch
     popd
 
     printf "SC_PACKAGE_NAME=${SC_PACKAGE_NAME}\nSC_PACKAGE_VERSION=${SC_PACKAGE_VERSION}\nSC_PACKAGE_URL=${SC_PACKAGE_URL}" > "${SC_PACKAGE_LOCAL_TXT}"
 fi
+
+# configs have been created with the following command
+# cmake -G Xcode -B _freetype_cmake_macos -D FT_DISABLE_ZLIB=TRUE -D FT_DISABLE_BZIP2=TRUE -D FT_DISABLE_PNG=TRUE  -D FT_DISABLE_HARFBUZZ=TRUE -D FT_DISABLE_BROTLI=TRUE _freetype
 
 popd

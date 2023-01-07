@@ -12,10 +12,29 @@
 		7B23DC2A295B9C3A00002529 /* DependencyImgui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B23DC29295B9C3A00002529 /* DependencyImgui.cpp */; };
 		7B23DC2E295B9CC100002529 /* Platform.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B23DC2D295B9CC100002529 /* Platform.mm */; };
 		7B681C222966385F00634EAA /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B681C212966385F00634EAA /* QuartzCore.framework */; };
+		7B80694A296AB65900473478 /* DependencyNanosvg.c in Sources */ = {isa = PBXBuildFile; fileRef = 7B806949296AB65900473478 /* DependencyNanosvg.c */; };
+		7B806956296AC7FC00473478 /* NotoColorEmoji-Regular.ttf in CopyFiles */ = {isa = PBXBuildFile; fileRef = 7B806954296AC7ED00473478 /* NotoColorEmoji-Regular.ttf */; };
 		7B895A89295B9F0B001E2406 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B23DC34295B9D8900002529 /* Metal.framework */; };
 		7B895A8B295B9F0E001E2406 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B895A8A295B9F0E001E2406 /* Cocoa.framework */; platformFilters = (macos, ); };
 		7B895A8E295B9F1F001E2406 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B23DC30295B9D7400002529 /* MetalKit.framework */; };
+		7BDDBF11296990B3004F4755 /* DependencyFreetype.c in Sources */ = {isa = PBXBuildFile; fileRef = 7BDDBF10296990B3004F4755 /* DependencyFreetype.c */; };
+		7BF04D79296AE50F006C1E93 /* DependencyFcft.c in Sources */ = {isa = PBXBuildFile; fileRef = 7BF04D78296AE50F006C1E93 /* DependencyFcft.c */; };
+		7BF04D7C296AEE35006C1E93 /* DroidSans.ttf in CopyFiles */ = {isa = PBXBuildFile; fileRef = 7BF04D7A296AEE2C006C1E93 /* DroidSans.ttf */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		7B806953296AC7C700473478 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Fonts;
+			dstSubfolderSpec = 7;
+			files = (
+				7BF04D7C296AEE35006C1E93 /* DroidSans.ttf in CopyFiles */,
+				7B806956296AC7FC00473478 /* NotoColorEmoji-Regular.ttf in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		7B23DC14295B9B0F00002529 /* SCExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SCExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -29,10 +48,15 @@
 		7B23DC34295B9D8900002529 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS16.2.sdk/System/Library/Frameworks/Metal.framework; sourceTree = DEVELOPER_DIR; };
 		7B23DC36295B9D9300002529 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		7B681C212966385F00634EAA /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS16.2.sdk/System/Library/Frameworks/QuartzCore.framework; sourceTree = DEVELOPER_DIR; };
+		7B806949296AB65900473478 /* DependencyNanosvg.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencyNanosvg.c; path = ../../../../Dependencies/nanosvg/DependencyNanosvg.c; sourceTree = "<group>"; };
+		7B806954296AC7ED00473478 /* NotoColorEmoji-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "NotoColorEmoji-Regular.ttf"; path = "../../../../Dependencies/notoemoji/_notocoloremojiregular/notocoloremojiregular_497a6598/NotoColorEmoji-Regular.ttf"; sourceTree = "<group>"; };
 		7B82F875295BAEB100B7287B /* Platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Platform.h; path = ../../../../Libraries/UserInterface/Platform.h; sourceTree = "<group>"; };
 		7B895A8A295B9F0E001E2406 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		7BDDBF10296990B3004F4755 /* DependencyFreetype.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencyFreetype.c; path = ../../../../Dependencies/freetype/DependencyFreetype.c; sourceTree = "<group>"; };
 		7BE649A02964D3CE003A7EAB /* Platform.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Platform.cpp; path = ../../../../Libraries/UserInterface/Platform.cpp; sourceTree = "<group>"; };
 		7BE649A12964D60B003A7EAB /* Platform.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = Platform.html; path = ../../../../Libraries/UserInterface/Platform.html; sourceTree = "<group>"; };
+		7BF04D78296AE50F006C1E93 /* DependencyFcft.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencyFcft.c; path = ../../../../Dependencies/fcft/DependencyFcft.c; sourceTree = "<group>"; };
+		7BF04D7A296AEE2C006C1E93 /* DroidSans.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = DroidSans.ttf; path = ../../../../Dependencies/imgui/_imgui/misc/fonts/DroidSans.ttf; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -53,7 +77,11 @@
 		7B23DC0B295B9B0F00002529 = {
 			isa = PBXGroup;
 			children = (
+				7B46F943296A1C38003B70B6 /* Resources */,
 				7B23DC27295B9C1800002529 /* SCExample.cpp */,
+				7BF04D78296AE50F006C1E93 /* DependencyFcft.c */,
+				7BDDBF10296990B3004F4755 /* DependencyFreetype.c */,
+				7B806949296AB65900473478 /* DependencyNanosvg.c */,
 				7B23DC29295B9C3A00002529 /* DependencyImgui.cpp */,
 				7B23DC26295B9C1800002529 /* SCConfig.h */,
 				7BE649A02964D3CE003A7EAB /* Platform.cpp */,
@@ -87,6 +115,23 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		7B46F943296A1C38003B70B6 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				7B80694B296AC1D100473478 /* Fonts */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		7B80694B296AC1D100473478 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				7BF04D7A296AEE2C006C1E93 /* DroidSans.ttf */,
+				7B806954296AC7ED00473478 /* NotoColorEmoji-Regular.ttf */,
+			);
+			name = Fonts;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -97,6 +142,7 @@
 				7B23DC10295B9B0F00002529 /* Sources */,
 				7B23DC11295B9B0F00002529 /* Frameworks */,
 				7B23DC12295B9B0F00002529 /* Resources */,
+				7B806953296AC7C700473478 /* CopyFiles */,
 			);
 			buildRules = (
 			);
@@ -156,9 +202,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7BDDBF11296990B3004F4755 /* DependencyFreetype.c in Sources */,
 				7B23DC28295B9C1800002529 /* SCExample.cpp in Sources */,
 				7B23DC2E295B9CC100002529 /* Platform.mm in Sources */,
 				7B23DC2A295B9C3A00002529 /* DependencyImgui.cpp in Sources */,
+				7B80694A296AB65900473478 /* DependencyNanosvg.c in Sources */,
+				7BF04D79296AE50F006C1E93 /* DependencyFcft.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -216,6 +265,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = ../../../../Dependencies/freetype/_freetype/include;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -270,6 +320,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = ../../../../Dependencies/freetype/_freetype/include;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -288,6 +339,10 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					../../../../Dependencies/freetype/_freetype/include,
+					../../../../Dependencies/imgui/_imgui,
+				);
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -323,6 +378,10 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					../../../../Dependencies/freetype/_freetype/include,
+					../../../../Dependencies/imgui/_imgui,
+				);
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

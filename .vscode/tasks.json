@@ -56,7 +56,7 @@
             "problemMatcher": []
         },
         {
-            "label": "Build SCTest GCC HTML5 Debug",
+            "label": "Build SCTest Emscripten Debug",
             "type": "shell",
             "command": "${workspaceFolder}/Tests/SCTest/Build/Emscripten/SCTest.sh",
             "args": [
@@ -71,7 +71,7 @@
             }
         },
         {
-            "label": "Build SCTest GCC HTML5 Release",
+            "label": "Build SCTest Emscripten Release",
             "type": "shell",
             "command": "${workspaceFolder}/Tests/SCTest/Build/Emscripten/SCTest.sh",
             "args": [
@@ -86,10 +86,11 @@
             }
         },
         {
-            "label": "Build SCExample GCC HTML5 Debug",
+            "label": "Build SCExample Emscripten Debug",
             "type": "shell",
-            "command": "${workspaceFolder}/Examples/SCExample/Build/Emscripten/SCExample.sh",
+            "command": "time",
             "args": [
+                "${workspaceFolder}/Examples/SCExample/Build/Emscripten/SCExample.sh",
                 "--debug",
                 "html5-any-any-emcc"
             ],
@@ -101,10 +102,11 @@
             }
         },
         {
-            "label": "Build SCExample GCC HTML5 Release",
+            "label": "Build SCExample Emscripten Release",
             "type": "shell",
-            "command": "${workspaceFolder}/Examples/SCExample/Build/Emscripten/SCExample.sh",
+            "command": "time",
             "args": [
+                "${workspaceFolder}/Examples/SCExample/Build/Emscripten/SCExample.sh",
                 "--release",
                 "html5-any-any-emcc"
             ],
