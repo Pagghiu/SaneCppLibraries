@@ -1,0 +1,6 @@
+#include "SCConfig.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STBI_WRITE_NO_STDIO
+#include "DependencyStb.h"
