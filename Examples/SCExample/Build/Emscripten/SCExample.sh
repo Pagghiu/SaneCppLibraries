@@ -62,22 +62,34 @@ mkdir -p "${INTERMEDIATE_PATH}"
 # Compile files
 emcc -c ${EMSC_C_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Dependencies/freetype/DependencyFreetype.c" -o "${INTERMEDIATE_PATH}/DependencyFreetype.o" &
 emcc -c ${EMSC_C_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Dependencies/nanosvg/DependencyNanosvg.c" -o "${INTERMEDIATE_PATH}/DependencyNanosvg.o" &
+emcc -c ${EMSC_C_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Dependencies/stb/DependencyStb.c" -o "${INTERMEDIATE_PATH}/DependencyStb.o" &
 emcc -c ${EMSC_C_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Dependencies/fcft/DependencyFcft.c" -o "${INTERMEDIATE_PATH}/DependencyFcft.o" &
 em++ -c ${EMSC_CPP_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Dependencies/imgui/DependencyImgui.cpp" -o "${INTERMEDIATE_PATH}/DependencyImgui.o" &
-em++ -c ${EMSC_CPP_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Libraries/UserInterface/Platform.cpp" -o "${INTERMEDIATE_PATH}/Platform.o" &
+em++ -c ${EMSC_CPP_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Dependencies/sokol/DependencySokol.cpp" -o "${INTERMEDIATE_PATH}/DependencySokol.o" &
+em++ -c ${EMSC_CPP_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Libraries/UserInterface/PlatformApplication.cpp" -o "${INTERMEDIATE_PATH}/Platform.o" &
+em++ -c ${EMSC_CPP_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Libraries/UserInterface/PlatformEmscripten.cpp" -o "${INTERMEDIATE_PATH}/PlatformEmscripten.o" &
+em++ -c ${EMSC_CPP_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Libraries/UserInterface/PlatformResource.cpp" -o "${INTERMEDIATE_PATH}/PlatformResource.o" &
 em++ -c ${EMSC_CPP_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${SCRIPT_DIR}/../../${PROJECT_NAME}.cpp" -o "${INTERMEDIATE_PATH}/${PROJECT_NAME}.o" &
 wait
 
 # Link into final product
 em++ ${EMSC_COMPILE_OPTIONS} ${EMSC_LINKER_OPTIONS} -o "${OUTPUT_FILE}" \
---shell-file "${ROOT_DIR}/Libraries/UserInterface/Platform.html" \
+--shell-file "${ROOT_DIR}/Libraries/UserInterface/PlatformApplication.html" \
 "${INTERMEDIATE_PATH}/DependencyImgui.o" \
 "${INTERMEDIATE_PATH}/Platform.o" \
+"${INTERMEDIATE_PATH}/PlatformEmscripten.o" \
+"${INTERMEDIATE_PATH}/PlatformResource.o" \
 "${INTERMEDIATE_PATH}/DependencyFreetype.o" \
 "${INTERMEDIATE_PATH}/DependencyNanosvg.o" \
 "${INTERMEDIATE_PATH}/DependencyFcft.o" \
+"${INTERMEDIATE_PATH}/DependencyStb.o" \
+"${INTERMEDIATE_PATH}/DependencySokol.o" \
 "${INTERMEDIATE_PATH}/${PROJECT_NAME}.o"
 
 mkdir -p "${OUTPUT_PATH}/Fonts"
+mkdir -p "${OUTPUT_PATH}/Images"
+cp "${SCRIPT_DIR}/../../Build/Windows/AppIcon.ico" "${OUTPUT_PATH}/favicon.ico"
+
 cp "${ROOT_DIR}/Dependencies/imgui/_imgui/misc/fonts/DroidSans.ttf" "${OUTPUT_PATH}/Fonts"
 cp "${ROOT_DIR}/Dependencies/notoemoji/_notocoloremojiregular/notocoloremojiregular_497a6598/NotoColorEmoji-Regular.ttf" "${OUTPUT_PATH}/Fonts"
+cp "${ROOT_DIR}/Dependencies/nanosvg/_nanosvg/example/screenshot-2.png" "${OUTPUT_PATH}/Images"

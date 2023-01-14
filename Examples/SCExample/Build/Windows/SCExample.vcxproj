@@ -227,8 +227,11 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Dependencies\imgui\DependencyImgui.cpp" />
     <ClCompile Include="..\..\..\..\Dependencies\nanosvg\DependencyNanosvg.c" />
-    <ClCompile Include="..\..\..\..\Libraries\UserInterface\Platform.cpp" />
+    <ClCompile Include="..\..\..\..\Dependencies\sokol\DependencySokol.cpp" />
+    <ClCompile Include="..\..\..\..\Dependencies\stb\DependencyStb.c" />
+    <ClCompile Include="..\..\..\..\Libraries\UserInterface\PlatformApplication.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\UserInterface\PlatformWindows.cpp" />
     <ClCompile Include="..\..\SCExample.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -240,6 +243,13 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="AppIcon.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ContentWithTargetPath Include="..\..\..\..\Dependencies\nanosvg\_nanosvg\example\screenshot-2.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Resources\Images\screenshot-2.png</TargetPath>
+    </ContentWithTargetPath>
+    <None Include="..\..\..\..\Dependencies\nanosvg\_nanosvg\example\screenshot-2.png" />
   </ItemGroup>
   <ItemGroup>
     <ContentWithTargetPath Include="..\..\..\..\Dependencies\imgui\_imgui\misc\fonts\DroidSans.ttf">

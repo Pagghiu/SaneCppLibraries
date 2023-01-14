@@ -25,7 +25,7 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp">
       <Filter>Libraries</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\UserInterface\Platform.cpp">
+    <ClCompile Include="..\..\..\..\Libraries\UserInterface\PlatformApplication.cpp">
       <Filter>Libraries</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Dependencies\freetype\DependencyFreetype.c">
@@ -35,9 +35,18 @@
       <Filter>Dependencies</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Dependencies\fcft\DependencyFcft.c">
-      <Filter>Libraries</Filter>
+      <Filter>Dependencies</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Dependencies\nanosvg\DependencyNanosvg.c">
+      <Filter>Dependencies</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Dependencies\stb\DependencyStb.c">
+      <Filter>Dependencies</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Dependencies\sokol\DependencySokol.cpp">
+      <Filter>Dependencies</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\UserInterface\PlatformWindows.cpp">
       <Filter>Libraries</Filter>
     </ClCompile>
   </ItemGroup>
@@ -54,6 +63,9 @@
       <Filter>Resources\Fonts</Filter>
     </None>
     <None Include="..\..\..\..\Dependencies\notoemoji\_notocoloremojiregular\notocoloremojiregular_497a6598\NotoColorEmoji-Regular.ttf">
+      <Filter>Resources\Fonts</Filter>
+    </None>
+    <None Include="..\..\..\..\Dependencies\nanosvg\_nanosvg\example\screenshot-2.png">
       <Filter>Resources\Fonts</Filter>
     </None>
   </ItemGroup>

@@ -9,4 +9,7 @@ pushd ${ROOT_DIR}
 ./Dependencies/nanosvg/DownloadNanosvg.sh
 ./Dependencies/notoemoji/DownloadNotoColorEmojiRegular.sh.sh
 ./Dependencies/fcft/DownloadFcft.sh
+./Dependencies/stb/DownloadStb.sh
+./Dependencies/notoemoji/DownloadNotoColorEmojiRegular.sh
+./Dependencies/emscripten-browser-file/DownloadEmscriptenBrowserFile.sh
 popd

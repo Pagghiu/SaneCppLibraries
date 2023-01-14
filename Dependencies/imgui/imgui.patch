@@ -1,8 +1,13 @@
 diff --git forkSrcPrefix/misc/freetype/imgui_freetype.cpp forkDstPrefix/misc/freetype/imgui_freetype.cpp
-index 03255326b2b63a8cbeb7c76bbf9ef28c69c0b633..f48e1a8e197594afecbad096b0c24812d4f88a40 100644
+index 78ef293979adf0166b1371bacf1d65a0a7509839..a250c0522e5755e75f81a8c664d49b3615964c43 100644
 --- forkSrcPrefix/misc/freetype/imgui_freetype.cpp
 +++ forkDstPrefix/misc/freetype/imgui_freetype.cpp
-@@ -40,6 +40,7 @@
+@@ -37,10 +37,12 @@
+ #include "imgui_internal.h"     // ImMin,ImMax,ImFontAtlasBuild*,
+ #include <stdint.h>
+ #include <ft2build.h>
++#include FT_CONFIG_CONFIG_H
+ #include FT_FREETYPE_H          // <freetype/freetype.h>
  #include FT_MODULE_H            // <freetype/ftmodapi.h>
  #include FT_GLYPH_H             // <freetype/ftglyph.h>
  #include FT_SYNTHESIS_H         // <freetype/ftsynth.h>
@@ -10,7 +15,7 @@ index 03255326b2b63a8cbeb7c76bbf9ef28c69c0b633..f48e1a8e197594afecbad096b0c24812
  
  #ifdef _MSC_VER
  #pragma warning (disable: 4505)     // unreferenced local function has been removed (stb stuff)
-@@ -238,7 +239,7 @@ namespace
+@@ -239,7 +241,7 @@ namespace
  
          // Need an outline for this to work
          FT_GlyphSlot slot = Face->glyph;
@@ -19,7 +24,7 @@ index 03255326b2b63a8cbeb7c76bbf9ef28c69c0b633..f48e1a8e197594afecbad096b0c24812
  
          // Apply convenience transform (this is not picking from real "Bold"/"Italic" fonts! Merely applying FreeType helper transform. Oblique == Slanting)
          if (UserFlags & ImGuiFreeTypeBuilderFlags_Bold)
-@@ -326,7 +327,14 @@ namespace
+@@ -327,7 +329,14 @@ namespace
                          for (uint32_t x = 0; x < w; x++)
                          {
                              uint8_t r = src[x * 4 + 2], g = src[x * 4 + 1], b = src[x * 4], a = src[x * 4 + 3];
@@ -35,7 +40,23 @@ index 03255326b2b63a8cbeb7c76bbf9ef28c69c0b633..f48e1a8e197594afecbad096b0c24812
                          }
                  }
                  else
-@@ -741,6 +749,7 @@ static void* FreeType_Realloc(FT_Memory /*memory*/, long cur_size, long new_size
+@@ -337,7 +346,14 @@ namespace
+                         for (uint32_t x = 0; x < w; x++)
+                         {
+                             uint8_t r = src[x * 4 + 2], g = src[x * 4 + 1], b = src[x * 4], a = src[x * 4 + 3];
+-                            dst[x] = IM_COL32(multiply_table[DE_MULTIPLY(r, a)], multiply_table[DE_MULTIPLY(g, a)], multiply_table[DE_MULTIPLY(b, a)], multiply_table[a]);
++                            if(a > 0)
++                            {
++                                dst[x] = IM_COL32(multiply_table[DE_MULTIPLY(r, a)], multiply_table[DE_MULTIPLY(g, a)], multiply_table[DE_MULTIPLY(b, a)], multiply_table[a]);
++                            }
++                            else
++                            {
++                                dst[x] = 0;
++                            }
+                         }
+                     }
+                 }
+@@ -742,6 +758,7 @@ static void* FreeType_Realloc(FT_Memory /*memory*/, long cur_size, long new_size
      return block;
  }
  
@@ -43,11 +64,16 @@ index 03255326b2b63a8cbeb7c76bbf9ef28c69c0b633..f48e1a8e197594afecbad096b0c24812
  static bool ImFontAtlasBuildWithFreeType(ImFontAtlas* atlas)
  {
      // FreeType memory management: https://www.freetype.org/freetype2/docs/design/design-4.html
-@@ -758,6 +767,7 @@ static bool ImFontAtlasBuildWithFreeType(ImFontAtlas* atlas)
+@@ -759,7 +776,11 @@ static bool ImFontAtlasBuildWithFreeType(ImFontAtlas* atlas)
  
      // If you don't call FT_Add_Default_Modules() the rest of code may work, but FreeType won't use our custom allocator.
      FT_Add_Default_Modules(ft_library);
+-
 +    FT_Property_Set(ft_library, "ot-svg", "svg-hooks", &nanosvg_hooks);
- 
++    FT_Bool     variable_colrv1 = 1;
++    
++    FT_Property_Set( ft_library, "truetype", "TEMPORARY-enable-variable-colrv1", &variable_colrv1 );
++    
      bool ret = ImFontAtlasBuildWithFreeTypeEx(ft_library, atlas, atlas->FontBuilderFlags);
      FT_Done_Library(ft_library);
+ 

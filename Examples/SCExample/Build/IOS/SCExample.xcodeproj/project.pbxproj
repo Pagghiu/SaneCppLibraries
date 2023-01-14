@@ -7,13 +7,18 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7B0C90602972D60B001D97A2 /* PlatformApplication.html in Resources */ = {isa = PBXBuildFile; fileRef = 7B0C90582972D60B001D97A2 /* PlatformApplication.html */; };
+		7B0C90622972D60B001D97A2 /* PlatformApplication.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C905A2972D60B001D97A2 /* PlatformApplication.cpp */; };
+		7B0C90682972D64D001D97A2 /* DependencySokol.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C90672972D64D001D97A2 /* DependencySokol.mm */; };
+		7B0C906A2972D654001D97A2 /* DependencyStb.c in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C90692972D654001D97A2 /* DependencyStb.c */; };
+		7B0C906F2972D77A001D97A2 /* screenshot-2.png in CopyFiles */ = {isa = PBXBuildFile; fileRef = 7B0C906C2972D769001D97A2 /* screenshot-2.png */; };
+		7B0C90742972D97F001D97A2 /* PlatformApple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C90732972D976001D97A2 /* PlatformApple.mm */; };
 		7B4F78E329662D25000D7EEA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7B4F78E229662D25000D7EEA /* Assets.xcassets */; };
 		7B4F78F329662E60000D7EEA /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B4F78F129662E60000D7EEA /* MetalKit.framework */; };
 		7B4F78F429662E60000D7EEA /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B4F78F229662E60000D7EEA /* Metal.framework */; };
 		7B4F78F629662E69000D7EEA /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B4F78F529662E69000D7EEA /* UIKit.framework */; platformFilter = ios; };
 		7B681C14296631E100634EAA /* DependencyImgui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B681C13296631E100634EAA /* DependencyImgui.cpp */; };
 		7B681C172966321D00634EAA /* SCExample.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B681C152966321D00634EAA /* SCExample.cpp */; };
-		7B681C1E2966323100634EAA /* Platform.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B681C1A2966323100634EAA /* Platform.mm */; };
 		7BF04D82296B40C4006C1E93 /* DependencyFreetype.c in Sources */ = {isa = PBXBuildFile; fileRef = 7BF04D81296B40C4006C1E93 /* DependencyFreetype.c */; };
 		7BF04D84296B40CF006C1E93 /* DependencyNanosvg.c in Sources */ = {isa = PBXBuildFile; fileRef = 7BF04D83296B40CF006C1E93 /* DependencyNanosvg.c */; };
 		7BF04D86296B4145006C1E93 /* DependencyFcft.c in Sources */ = {isa = PBXBuildFile; fileRef = 7BF04D85296B4145006C1E93 /* DependencyFcft.c */; };
@@ -22,6 +27,16 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		7B0C906E2972D76F001D97A2 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Images;
+			dstSubfolderSpec = 7;
+			files = (
+				7B0C906F2972D77A001D97A2 /* screenshot-2.png in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		7BF04D8B296B41A6006C1E93 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -36,6 +51,19 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		7B0C90572972D60B001D97A2 /* PlatformResource.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = PlatformResource.cpp; path = ../../../../Libraries/UserInterface/PlatformResource.cpp; sourceTree = "<group>"; };
+		7B0C90582972D60B001D97A2 /* PlatformApplication.html */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.html; name = PlatformApplication.html; path = ../../../../Libraries/UserInterface/PlatformApplication.html; sourceTree = "<group>"; };
+		7B0C90592972D60B001D97A2 /* PlatformEmscripten.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = PlatformEmscripten.cpp; path = ../../../../Libraries/UserInterface/PlatformEmscripten.cpp; sourceTree = "<group>"; };
+		7B0C905A2972D60B001D97A2 /* PlatformApplication.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = PlatformApplication.cpp; path = ../../../../Libraries/UserInterface/PlatformApplication.cpp; sourceTree = "<group>"; };
+		7B0C905B2972D60B001D97A2 /* PlatformResource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = PlatformResource.h; path = ../../../../Libraries/UserInterface/PlatformResource.h; sourceTree = "<group>"; };
+		7B0C905D2972D60B001D97A2 /* PlatformWindows.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = PlatformWindows.cpp; path = ../../../../Libraries/UserInterface/PlatformWindows.cpp; sourceTree = "<group>"; };
+		7B0C905E2972D60B001D97A2 /* PlatformApplication.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = PlatformApplication.h; path = ../../../../Libraries/UserInterface/PlatformApplication.h; sourceTree = "<group>"; };
+		7B0C90672972D64D001D97A2 /* DependencySokol.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = DependencySokol.mm; path = ../../../../Dependencies/sokol/DependencySokol.mm; sourceTree = "<group>"; };
+		7B0C90692972D654001D97A2 /* DependencyStb.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencyStb.c; path = ../../../../Dependencies/stb/DependencyStb.c; sourceTree = "<group>"; };
+		7B0C906C2972D769001D97A2 /* screenshot-2.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "screenshot-2.png"; path = "../../../../../Dependencies/nanosvg/_nanosvg/example/screenshot-2.png"; sourceTree = "<group>"; };
+		7B0C90702972D7F1001D97A2 /* DependencySokol.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DependencySokol.cpp; path = ../../../../Dependencies/sokol/DependencySokol.cpp; sourceTree = "<group>"; };
+		7B0C90722972D7FB001D97A2 /* DependencySokol.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = DependencySokol.h; path = ../../../../Dependencies/sokol/DependencySokol.h; sourceTree = "<group>"; };
+		7B0C90732972D976001D97A2 /* PlatformApple.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = PlatformApple.mm; path = ../../../../Libraries/UserInterface/PlatformApple.mm; sourceTree = "<group>"; };
 		7B4F78D029662D24000D7EEA /* SCExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SCExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B4F78E229662D25000D7EEA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7B4F78F129662E60000D7EEA /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
@@ -44,10 +72,6 @@
 		7B681C13296631E100634EAA /* DependencyImgui.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DependencyImgui.cpp; path = ../../../../Dependencies/imgui/DependencyImgui.cpp; sourceTree = "<group>"; };
 		7B681C152966321D00634EAA /* SCExample.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SCExample.cpp; path = ../../SCExample.cpp; sourceTree = "<group>"; };
 		7B681C162966321D00634EAA /* SCConfig.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SCConfig.h; path = ../../SCConfig.h; sourceTree = "<group>"; };
-		7B681C182966323100634EAA /* Platform.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Platform.cpp; path = ../../../../Libraries/UserInterface/Platform.cpp; sourceTree = "<group>"; };
-		7B681C192966323100634EAA /* Platform.html */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.html; name = Platform.html; path = ../../../../Libraries/UserInterface/Platform.html; sourceTree = "<group>"; };
-		7B681C1A2966323100634EAA /* Platform.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = Platform.mm; path = ../../../../Libraries/UserInterface/Platform.mm; sourceTree = "<group>"; };
-		7B681C1B2966323100634EAA /* Platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Platform.h; path = ../../../../Libraries/UserInterface/Platform.h; sourceTree = "<group>"; };
 		7BF04D81296B40C4006C1E93 /* DependencyFreetype.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencyFreetype.c; path = ../../../../Dependencies/freetype/DependencyFreetype.c; sourceTree = "<group>"; };
 		7BF04D83296B40CF006C1E93 /* DependencyNanosvg.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencyNanosvg.c; path = ../../../../Dependencies/nanosvg/DependencyNanosvg.c; sourceTree = "<group>"; };
 		7BF04D85296B4145006C1E93 /* DependencyFcft.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencyFcft.c; path = ../../../../Dependencies/fcft/DependencyFcft.c; sourceTree = "<group>"; };
@@ -69,21 +93,53 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		7B4F78C729662D24000D7EEA = {
+		7B0C90552972D493001D97A2 /* UserInterface */ = {
 			isa = PBXGroup;
 			children = (
-				7BF04D8E296B58E8006C1E93 /* Resources */,
-				7B681C152966321D00634EAA /* SCExample.cpp */,
+				7B0C905A2972D60B001D97A2 /* PlatformApplication.cpp */,
+				7B0C905E2972D60B001D97A2 /* PlatformApplication.h */,
+				7B0C90582972D60B001D97A2 /* PlatformApplication.html */,
+				7B0C90732972D976001D97A2 /* PlatformApple.mm */,
+				7B0C90592972D60B001D97A2 /* PlatformEmscripten.cpp */,
+				7B0C905D2972D60B001D97A2 /* PlatformWindows.cpp */,
+				7B0C90572972D60B001D97A2 /* PlatformResource.cpp */,
+				7B0C905B2972D60B001D97A2 /* PlatformResource.h */,
+			);
+			name = UserInterface;
+			sourceTree = "<group>";
+		};
+		7B0C90562972D49A001D97A2 /* Dependencies */ = {
+			isa = PBXGroup;
+			children = (
 				7BF04D85296B4145006C1E93 /* DependencyFcft.c */,
+				7B0C90702972D7F1001D97A2 /* DependencySokol.cpp */,
+				7B0C90722972D7FB001D97A2 /* DependencySokol.h */,
+				7B0C90672972D64D001D97A2 /* DependencySokol.mm */,
+				7B0C90692972D654001D97A2 /* DependencyStb.c */,
 				7B681C13296631E100634EAA /* DependencyImgui.cpp */,
 				7BF04D83296B40CF006C1E93 /* DependencyNanosvg.c */,
 				7BF04D81296B40C4006C1E93 /* DependencyFreetype.c */,
+			);
+			name = Dependencies;
+			sourceTree = "<group>";
+		};
+		7B0C906B2972D6F6001D97A2 /* Images */ = {
+			isa = PBXGroup;
+			children = (
+				7B0C906C2972D769001D97A2 /* screenshot-2.png */,
+			);
+			path = Images;
+			sourceTree = "<group>";
+		};
+		7B4F78C729662D24000D7EEA = {
+			isa = PBXGroup;
+			children = (
+				7B681C152966321D00634EAA /* SCExample.cpp */,
 				7B681C162966321D00634EAA /* SCConfig.h */,
-				7B681C182966323100634EAA /* Platform.cpp */,
-				7B681C1B2966323100634EAA /* Platform.h */,
-				7B681C192966323100634EAA /* Platform.html */,
-				7B681C1A2966323100634EAA /* Platform.mm */,
+				7B0C90562972D49A001D97A2 /* Dependencies */,
+				7B0C90552972D493001D97A2 /* UserInterface */,
 				7B4F78E229662D25000D7EEA /* Assets.xcassets */,
+				7BF04D8E296B58E8006C1E93 /* Resources */,
 				7B4F78D129662D24000D7EEA /* Products */,
 				7B4F78F029662E60000D7EEA /* Frameworks */,
 			);
@@ -110,6 +166,7 @@
 		7BF04D8E296B58E8006C1E93 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				7B0C906B2972D6F6001D97A2 /* Images */,
 				7BF04D8F296B58F5006C1E93 /* Fonts */,
 			);
 			name = Resources;
@@ -135,6 +192,7 @@
 				7B4F78CD29662D24000D7EEA /* Frameworks */,
 				7B4F78CE29662D24000D7EEA /* Resources */,
 				7BF04D8B296B41A6006C1E93 /* CopyFiles */,
+				7B0C906E2972D76F001D97A2 /* CopyFiles */,
 			);
 			buildRules = (
 			);
@@ -183,6 +241,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7B4F78E329662D25000D7EEA /* Assets.xcassets in Resources */,
+				7B0C90602972D60B001D97A2 /* PlatformApplication.html in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -194,10 +253,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				7B681C14296631E100634EAA /* DependencyImgui.cpp in Sources */,
+				7B0C90742972D97F001D97A2 /* PlatformApple.mm in Sources */,
+				7B0C90682972D64D001D97A2 /* DependencySokol.mm in Sources */,
+				7B0C90622972D60B001D97A2 /* PlatformApplication.cpp in Sources */,
 				7BF04D82296B40C4006C1E93 /* DependencyFreetype.c in Sources */,
 				7B681C172966321D00634EAA /* SCExample.cpp in Sources */,
-				7B681C1E2966323100634EAA /* Platform.mm in Sources */,
 				7BF04D84296B40CF006C1E93 /* DependencyNanosvg.c in Sources */,
+				7B0C906A2972D654001D97A2 /* DependencyStb.c in Sources */,
 				7BF04D86296B4145006C1E93 /* DependencyFcft.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

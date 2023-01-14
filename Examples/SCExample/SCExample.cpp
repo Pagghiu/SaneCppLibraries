@@ -1,7 +1,7 @@
 #include "SCConfig.h"
 
-#include "../../Dependencies/imgui/_imgui/imgui.h"
-#include "../../Libraries/UserInterface/Platform.h"
+#include "../../Dependencies/imgui/DependencyImgui.h"
+#include "../../Libraries/UserInterface/PlatformApplication.h"
 
 static bool      show_test_window    = true;
 static bool      show_another_window = false;
@@ -16,7 +16,7 @@ struct sg_color
 };
 extern sg_color gBackgroundValue;
 
-void platform_draw()
+void SC::PlatformApplication::draw()
 {
     // 1. Show a simple window
     // Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
