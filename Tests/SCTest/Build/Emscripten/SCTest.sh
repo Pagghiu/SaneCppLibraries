@@ -56,7 +56,7 @@ time em++ -std=c++20 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 Libraries/Foundation/Assert.cpp         \
 Libraries/Foundation/Console.cpp        \
 Libraries/Foundation/Memory.cpp         \
-Libraries/Foundation/OSHTML5.cpp        \
+Libraries/Foundation/OSEmscripten.cpp   \
 Libraries/Foundation/StaticAsserts.cpp  \
 Libraries/Foundation/String.cpp         \
 Libraries/Foundation/StringBuilder.cpp  \

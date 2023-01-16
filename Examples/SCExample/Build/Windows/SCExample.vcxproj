@@ -227,7 +227,7 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Dependencies\imgui\DependencyImgui.cpp" />
     <ClCompile Include="..\..\..\..\Dependencies\nanosvg\DependencyNanosvg.c" />
-    <ClCompile Include="..\..\..\..\Dependencies\sokol\DependencySokol.cpp" />
+    <ClCompile Include="..\..\..\..\Dependencies\sokol\DependencySokol.c" />
     <ClCompile Include="..\..\..\..\Dependencies\stb\DependencyStb.c" />
     <ClCompile Include="..\..\..\..\Libraries\UserInterface\PlatformApplication.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp" />

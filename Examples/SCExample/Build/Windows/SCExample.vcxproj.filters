@@ -43,7 +43,7 @@
     <ClCompile Include="..\..\..\..\Dependencies\stb\DependencyStb.c">
       <Filter>Dependencies</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Dependencies\sokol\DependencySokol.cpp">
+    <ClCompile Include="..\..\..\..\Dependencies\sokol\DependencySokol.c">
       <Filter>Dependencies</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\UserInterface\PlatformWindows.cpp">

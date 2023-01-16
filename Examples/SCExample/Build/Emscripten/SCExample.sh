@@ -63,9 +63,9 @@ mkdir -p "${INTERMEDIATE_PATH}"
 emcc -c ${EMSC_C_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Dependencies/freetype/DependencyFreetype.c" -o "${INTERMEDIATE_PATH}/DependencyFreetype.o" &
 emcc -c ${EMSC_C_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Dependencies/nanosvg/DependencyNanosvg.c" -o "${INTERMEDIATE_PATH}/DependencyNanosvg.o" &
 emcc -c ${EMSC_C_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Dependencies/stb/DependencyStb.c" -o "${INTERMEDIATE_PATH}/DependencyStb.o" &
+emcc -c ${EMSC_C_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Dependencies/sokol/DependencySokol.c" -o "${INTERMEDIATE_PATH}/DependencySokol.o" &
 emcc -c ${EMSC_C_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Dependencies/fcft/DependencyFcft.c" -o "${INTERMEDIATE_PATH}/DependencyFcft.o" &
 em++ -c ${EMSC_CPP_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Dependencies/imgui/DependencyImgui.cpp" -o "${INTERMEDIATE_PATH}/DependencyImgui.o" &
-em++ -c ${EMSC_CPP_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Dependencies/sokol/DependencySokol.cpp" -o "${INTERMEDIATE_PATH}/DependencySokol.o" &
 em++ -c ${EMSC_CPP_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Libraries/UserInterface/PlatformApplication.cpp" -o "${INTERMEDIATE_PATH}/Platform.o" &
 em++ -c ${EMSC_CPP_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Libraries/UserInterface/PlatformEmscripten.cpp" -o "${INTERMEDIATE_PATH}/PlatformEmscripten.o" &
 em++ -c ${EMSC_CPP_OPTIONS} ${INCLUDE_DIRS} ${EMSC_COMPILE_OPTIONS} "${ROOT_DIR}/Libraries/UserInterface/PlatformResource.cpp" -o "${INTERMEDIATE_PATH}/PlatformResource.o" &

@@ -29,9 +29,9 @@ void* __cxa_pure_virtual   = 0;
 void* __gxx_personality_v0 = 0;
 
 // helper functions for getting/setting flags in guard_object
-static bool initializerHasRun(uint64_t* guard_object) { return (*((uint8_t*)guard_object) != 0); }
+static bool initializerHasRun(SC::uint64_t* guard_object) { return (*((SC::uint8_t*)guard_object) != 0); }
 
-static void setInitializerHasRun(uint64_t* guard_object) { *((uint8_t*)guard_object) = 1; }
+static void setInitializerHasRun(SC::uint64_t* guard_object) { *((SC::uint8_t*)guard_object) = 1; }
 
 // We're stripping away all locking from static initialization because if one relies on multithreaded order of
 // static initialization for your program to function properly, it's a good idea to encourage it to fail/crash

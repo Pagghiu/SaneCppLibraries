@@ -7,30 +7,23 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		7B0C7FA72972C9FD001D97A2 /* PlatformApple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C7FA32972C9FD001D97A2 /* PlatformApple.mm */; };
 		7B0C7FA82972C9FD001D97A2 /* PlatformApplication.html in Resources */ = {isa = PBXBuildFile; fileRef = 7B0C7FA42972C9FD001D97A2 /* PlatformApplication.html */; };
 		7B0C7FB42972CBE9001D97A2 /* PlatformApplication.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C7FA52972C9FD001D97A2 /* PlatformApplication.cpp */; };
 		7B0C7FB92972CED7001D97A2 /* PlatformResource.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C7FB82972CED7001D97A2 /* PlatformResource.cpp */; };
-		7B0C90B12972F28C001D97A2 /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C90782972F28C001D97A2 /* Console.cpp */; };
-		7B0C90B22972F28C001D97A2 /* StaticAsserts.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C90822972F28C001D97A2 /* StaticAsserts.cpp */; };
-		7B0C90B32972F28C001D97A2 /* StringFormat.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C90842972F28C001D97A2 /* StringFormat.cpp */; };
-		7B0C90B52972F28C001D97A2 /* Assert.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C908C2972F28C001D97A2 /* Assert.cpp */; };
-		7B0C90B62972F28C001D97A2 /* String.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C90962972F28C001D97A2 /* String.cpp */; };
-		7B0C90B72972F28C001D97A2 /* OSPosix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C90982972F28C001D97A2 /* OSPosix.cpp */; };
-		7B0C90BA2972F28C001D97A2 /* Memory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C90A62972F28C001D97A2 /* Memory.cpp */; };
-		7B0C90BB2972F28C001D97A2 /* StringBuilder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C90AC2972F28C001D97A2 /* StringBuilder.cpp */; };
 		7B23DC1C295B9B1000002529 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7B23DC1B295B9B1000002529 /* Assets.xcassets */; };
 		7B23DC28295B9C1800002529 /* SCExample.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B23DC27295B9C1800002529 /* SCExample.cpp */; };
 		7B23DC2A295B9C3A00002529 /* DependencyImgui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B23DC29295B9C3A00002529 /* DependencyImgui.cpp */; };
 		7B38DF702971F15B009C5826 /* screenshot-2.png in CopyFiles */ = {isa = PBXBuildFile; fileRef = 7B38DF6D2971F118009C5826 /* screenshot-2.png */; };
 		7B681C222966385F00634EAA /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B681C212966385F00634EAA /* QuartzCore.framework */; };
+		7B6D5E6D297601D600B9AEB1 /* PlatformApple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C7FA32972C9FD001D97A2 /* PlatformApple.mm */; };
 		7B80694A296AB65900473478 /* DependencyNanosvg.c in Sources */ = {isa = PBXBuildFile; fileRef = 7B806949296AB65900473478 /* DependencyNanosvg.c */; };
 		7B806956296AC7FC00473478 /* NotoColorEmoji-Regular.ttf in CopyFiles */ = {isa = PBXBuildFile; fileRef = 7B806954296AC7ED00473478 /* NotoColorEmoji-Regular.ttf */; };
 		7B895A89295B9F0B001E2406 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B23DC34295B9D8900002529 /* Metal.framework */; };
 		7B895A8B295B9F0E001E2406 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B895A8A295B9F0E001E2406 /* Cocoa.framework */; platformFilters = (macos, ); };
 		7B895A8E295B9F1F001E2406 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B23DC30295B9D7400002529 /* MetalKit.framework */; };
 		7BA622D62972B83B002BEDD9 /* DependencyStb.c in Sources */ = {isa = PBXBuildFile; fileRef = 7BA622D52972B83B002BEDD9 /* DependencyStb.c */; };
-		7BA622DA2972BB2F002BEDD9 /* DependencySokol.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7BA622D92972BB2F002BEDD9 /* DependencySokol.mm */; };
+		7BA622DA2972BB2F002BEDD9 /* DependencySokol.m in Sources */ = {isa = PBXBuildFile; fileRef = 7BA622D92972BB2F002BEDD9 /* DependencySokol.m */; };
+		7BAF898C29760C6F007D9534 /* Memory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C90A62972F28C001D97A2 /* Memory.cpp */; };
 		7BDDBF11296990B3004F4755 /* DependencyFreetype.c in Sources */ = {isa = PBXBuildFile; fileRef = 7BDDBF10296990B3004F4755 /* DependencyFreetype.c */; };
 		7BF04D79296AE50F006C1E93 /* DependencyFcft.c in Sources */ = {isa = PBXBuildFile; fileRef = 7BF04D78296AE50F006C1E93 /* DependencyFcft.c */; };
 		7BF04D7C296AEE35006C1E93 /* DroidSans.ttf in CopyFiles */ = {isa = PBXBuildFile; fileRef = 7BF04D7A296AEE2C006C1E93 /* DroidSans.ttf */; };
@@ -90,7 +83,7 @@
 		7B0C90882972F28C001D97A2 /* ArrayTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ArrayTest.h; path = ../../../../Libraries/Foundation/ArrayTest.h; sourceTree = "<group>"; };
 		7B0C90892972F28C001D97A2 /* ConsoleTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ConsoleTest.h; path = ../../../../Libraries/Foundation/ConsoleTest.h; sourceTree = "<group>"; };
 		7B0C908A2972F28C001D97A2 /* StringFormat.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringFormat.h; path = ../../../../Libraries/Foundation/StringFormat.h; sourceTree = "<group>"; };
-		7B0C908B2972F28C001D97A2 /* OSApple.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OSApple.cpp; path = ../../../../Libraries/Foundation/OSApple.cpp; sourceTree = "<group>"; };
+		7B0C908B2972F28C001D97A2 /* OSApple.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = OSApple.mm; path = ../../../../Libraries/Foundation/OSApple.mm; sourceTree = "<group>"; };
 		7B0C908C2972F28C001D97A2 /* Assert.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Assert.cpp; path = ../../../../Libraries/Foundation/Assert.cpp; sourceTree = "<group>"; };
 		7B0C908D2972F28C001D97A2 /* InitializerList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = InitializerList.h; path = ../../../../Libraries/Foundation/InitializerList.h; sourceTree = "<group>"; };
 		7B0C908E2972F28C001D97A2 /* Array.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Array.h; path = ../../../../Libraries/Foundation/Array.h; sourceTree = "<group>"; };
@@ -109,7 +102,7 @@
 		7B0C909B2972F28C001D97A2 /* Language.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Language.h; path = ../../../../Libraries/Foundation/Language.h; sourceTree = "<group>"; };
 		7B0C909C2972F28C001D97A2 /* StringIterator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringIterator.h; path = ../../../../Libraries/Foundation/StringIterator.h; sourceTree = "<group>"; };
 		7B0C909D2972F28C001D97A2 /* ReflectionClassInfo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionClassInfo.h; path = ../../../../Libraries/Foundation/ReflectionClassInfo.h; sourceTree = "<group>"; };
-		7B0C909E2972F28C001D97A2 /* OSHTML5.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OSHTML5.cpp; path = ../../../../Libraries/Foundation/OSHTML5.cpp; sourceTree = "<group>"; };
+		7B0C909E2972F28C001D97A2 /* OSEmscripten.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OSEmscripten.cpp; path = ../../../../Libraries/Foundation/OSEmscripten.cpp; sourceTree = "<group>"; };
 		7B0C909F2972F28C001D97A2 /* StringFunctionsTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringFunctionsTest.h; path = ../../../../Libraries/Foundation/StringFunctionsTest.h; sourceTree = "<group>"; };
 		7B0C90A02972F28C001D97A2 /* ResultTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ResultTest.h; path = ../../../../Libraries/Foundation/ResultTest.h; sourceTree = "<group>"; };
 		7B0C90A12972F28C001D97A2 /* OSWindows.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OSWindows.cpp; path = ../../../../Libraries/Foundation/OSWindows.cpp; sourceTree = "<group>"; };
@@ -142,11 +135,11 @@
 		7B806949296AB65900473478 /* DependencyNanosvg.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencyNanosvg.c; path = ../../../../Dependencies/nanosvg/DependencyNanosvg.c; sourceTree = "<group>"; };
 		7B806954296AC7ED00473478 /* NotoColorEmoji-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "NotoColorEmoji-Regular.ttf"; path = "../../../../Dependencies/notoemoji/_notocoloremojiregular/notocoloremojiregular_497a6598/NotoColorEmoji-Regular.ttf"; sourceTree = "<group>"; };
 		7B895A8A295B9F0E001E2406 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
-		7BA622D32972B7C0002BEDD9 /* DependencySokol.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DependencySokol.cpp; path = ../../../../Dependencies/sokol/DependencySokol.cpp; sourceTree = "<group>"; };
+		7BA622D32972B7C0002BEDD9 /* DependencySokol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencySokol.c; path = ../../../../Dependencies/sokol/DependencySokol.c; sourceTree = "<group>"; };
 		7BA622D52972B83B002BEDD9 /* DependencyStb.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencyStb.c; path = ../../../../Dependencies/stb/DependencyStb.c; sourceTree = "<group>"; };
 		7BA622D72972B862002BEDD9 /* DependencySokol.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = DependencySokol.h; path = ../../../../Dependencies/sokol/DependencySokol.h; sourceTree = "<group>"; };
 		7BA622D82972B8B1002BEDD9 /* DependencyStb.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = DependencyStb.h; path = ../../../../Dependencies/stb/DependencyStb.h; sourceTree = "<group>"; };
-		7BA622D92972BB2F002BEDD9 /* DependencySokol.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = DependencySokol.mm; path = ../../../../Dependencies/sokol/DependencySokol.mm; sourceTree = "<group>"; };
+		7BA622D92972BB2F002BEDD9 /* DependencySokol.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = DependencySokol.m; path = ../../../../Dependencies/sokol/DependencySokol.m; sourceTree = "<group>"; };
 		7BA622DB2972BB76002BEDD9 /* DependencyImgui.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = DependencyImgui.h; path = ../../../../Dependencies/imgui/DependencyImgui.h; sourceTree = "<group>"; };
 		7BDDBF10296990B3004F4755 /* DependencyFreetype.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencyFreetype.c; path = ../../../../Dependencies/freetype/DependencyFreetype.c; sourceTree = "<group>"; };
 		7BF04D78296AE50F006C1E93 /* DependencyFcft.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencyFcft.c; path = ../../../../Dependencies/fcft/DependencyFcft.c; sourceTree = "<group>"; };
@@ -193,8 +186,8 @@
 				7B23DC29295B9C3A00002529 /* DependencyImgui.cpp */,
 				7B806949296AB65900473478 /* DependencyNanosvg.c */,
 				7BA622D72972B862002BEDD9 /* DependencySokol.h */,
-				7BA622D32972B7C0002BEDD9 /* DependencySokol.cpp */,
-				7BA622D92972BB2F002BEDD9 /* DependencySokol.mm */,
+				7BA622D32972B7C0002BEDD9 /* DependencySokol.c */,
+				7BA622D92972BB2F002BEDD9 /* DependencySokol.m */,
 				7BA622D82972B8B1002BEDD9 /* DependencyStb.h */,
 				7BA622D52972B83B002BEDD9 /* DependencyStb.c */,
 			);
@@ -225,12 +218,12 @@
 				7B0C90AB2972F28C001D97A2 /* Memory.h */,
 				7B0C90A32972F28C001D97A2 /* MemoryTest.h */,
 				7B0C908F2972F28C001D97A2 /* OS.h */,
-				7B0C908B2972F28C001D97A2 /* OSApple.cpp */,
-				7B0C909E2972F28C001D97A2 /* OSHTML5.cpp */,
+				7B0C908B2972F28C001D97A2 /* OSApple.mm */,
+				7B0C909E2972F28C001D97A2 /* OSEmscripten.cpp */,
 				7B0C90982972F28C001D97A2 /* OSPosix.cpp */,
 				7B0C907D2972F28C001D97A2 /* OSTest.h */,
 				7B0C90A12972F28C001D97A2 /* OSWindows.cpp */,
-				7B0C90862972F28C001D97A2 /* PlatformApplication.h */,
+				7B0C90862972F28C001D97A2 /* Platform.h */,
 				7B0C90852972F28C001D97A2 /* Reflection.h */,
 				7B0C90932972F28C001D97A2 /* ReflectionAutoAggregates.h */,
 				7B0C90942972F28C001D97A2 /* ReflectionAutoStructured.h */,
@@ -402,23 +395,16 @@
 			buildActionMask = 2147483647;
 			files = (
 				7BA622D62972B83B002BEDD9 /* DependencyStb.c in Sources */,
-				7B0C90B32972F28C001D97A2 /* StringFormat.cpp in Sources */,
-				7B0C90B62972F28C001D97A2 /* String.cpp in Sources */,
 				7BDDBF11296990B3004F4755 /* DependencyFreetype.c in Sources */,
-				7B0C90BA2972F28C001D97A2 /* Memory.cpp in Sources */,
-				7B0C90BB2972F28C001D97A2 /* StringBuilder.cpp in Sources */,
 				7B23DC28295B9C1800002529 /* SCExample.cpp in Sources */,
-				7B0C7FA72972C9FD001D97A2 /* PlatformApple.mm in Sources */,
 				7B23DC2A295B9C3A00002529 /* DependencyImgui.cpp in Sources */,
 				7B80694A296AB65900473478 /* DependencyNanosvg.c in Sources */,
 				7BF04D79296AE50F006C1E93 /* DependencyFcft.c in Sources */,
-				7BA622DA2972BB2F002BEDD9 /* DependencySokol.mm in Sources */,
+				7B6D5E6D297601D600B9AEB1 /* PlatformApple.mm in Sources */,
+				7BA622DA2972BB2F002BEDD9 /* DependencySokol.m in Sources */,
 				7B0C7FB92972CED7001D97A2 /* PlatformResource.cpp in Sources */,
-				7B0C90B12972F28C001D97A2 /* Console.cpp in Sources */,
+				7BAF898C29760C6F007D9534 /* Memory.cpp in Sources */,
 				7B0C7FB42972CBE9001D97A2 /* PlatformApplication.cpp in Sources */,
-				7B0C90B52972F28C001D97A2 /* Assert.cpp in Sources */,
-				7B0C90B22972F28C001D97A2 /* StaticAsserts.cpp in Sources */,
-				7B0C90B72972F28C001D97A2 /* OSPosix.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -464,6 +450,8 @@
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_CPP_EXCEPTIONS = NO;
+				GCC_ENABLE_CPP_RTTI = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -480,6 +468,11 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(OTHER_CFLAGS)",
+					"-nostdinc++",
+				);
+				OTHER_LDFLAGS = "-nostdlib++";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SYMROOT = "$(PROJECT_DIR)/../../../../_Build/Intermediate/$(PROJECT_NAME)/macOS-13-arm64_x86_64-Xcode-$(CONFIGURATION)";
@@ -524,6 +517,8 @@
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_ENABLE_CPP_EXCEPTIONS = NO;
+				GCC_ENABLE_CPP_RTTI = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
@@ -534,6 +529,11 @@
 				HEADER_SEARCH_PATHS = ../../../../Dependencies/freetype/_freetype/include;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(OTHER_CFLAGS)",
+					"-nostdinc++",
+				);
+				OTHER_LDFLAGS = "-nostdlib++";
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SYMROOT = "$(PROJECT_DIR)/../../../../_Build/Intermediate/$(PROJECT_NAME)/macOS-13-arm64_x86_64-Xcode-$(CONFIGURATION)";

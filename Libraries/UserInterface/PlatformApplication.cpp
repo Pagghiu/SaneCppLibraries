@@ -8,6 +8,8 @@
 #include "../../Dependencies/imgui/DependencyImgui.h"
 #include "../../Dependencies/sokol/DependencySokol.h"
 #include "../../Dependencies/stb/DependencyStb.h"
+// This is included outside of DependencySokol to keep DependencySokol a regular C / ObjC file
+#include "../../Dependencies/sokol/_sokol/util/sokol_imgui.h"
 
 sg_color gBackgroundValue = {0.0f, 0.5f, 0.7f, 1.0f};
 

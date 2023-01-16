@@ -1,8 +1,10 @@
+// Copyright (c) 2023, Stefano Cristiano
+//
+// All Rights Reserved. Reproduction is not allowed.
 #include "SCConfig.h"
 
 #define SOKOL_APP_IMPL
 #define SOKOL_IMPL
-#define SOKOL_IMGUI_IMPL
 #include "DependencySokol.h"
 
 static uint64_t gLastResetTime = 0;
@@ -11,26 +13,6 @@ static uint64_t gLastResetTime = 0;
 static bool gShouldPauseEmscripten = false;
 #endif
 
-void sokol_delay_init_imgui(void)
-{
-    ImGuiIO*       io = &ImGui::GetIO();
-    unsigned char* font_pixels;
-    int            font_width, font_height;
-    io->Fonts->GetTexDataAsRGBA32(&font_pixels, &font_width, &font_height);
-    sg_image_desc img_desc            = {};
-    img_desc.width                    = font_width;
-    img_desc.height                   = font_height;
-    img_desc.pixel_format             = SG_PIXELFORMAT_RGBA8;
-    img_desc.wrap_u                   = SG_WRAP_CLAMP_TO_EDGE;
-    img_desc.wrap_v                   = SG_WRAP_CLAMP_TO_EDGE;
-    img_desc.min_filter               = SG_FILTER_LINEAR;
-    img_desc.mag_filter               = SG_FILTER_LINEAR;
-    img_desc.data.subimage[0][0].ptr  = font_pixels;
-    img_desc.data.subimage[0][0].size = (size_t)(font_width * font_height) * sizeof(uint32_t);
-    img_desc.label                    = "sokol-imgui-font";
-    _simgui.img                       = sg_make_image(&img_desc);
-    io->Fonts->TexID                  = (ImTextureID)(uintptr_t)_simgui.img.id;
-}
 
 #if defined(__EMSCRIPTEN__) && defined(SOKOL_NO_ENTRY)
 
@@ -139,7 +121,7 @@ int main(int argc, char* argv[])
 sapp_desc sokol_main(int argc, char* argv[]) { return sokol_get_desc(argc, argv); }
 #endif
 
-void sokol_pause_rendering()
+void sokol_pause_rendering(void)
 {
     if (gLastResetTime == 0)
     {
@@ -181,7 +163,7 @@ void sokol_pause_rendering()
 #if defined(__EMSCRIPTEN__) && defined(SOKOL_NO_ENTRY)
 _SOKOL_PRIVATE EM_BOOL sapp_emsc_custom_frame(double time, void* userData);
 #endif
-void sokol_unpause_rendering()
+void sokol_unpause_rendering(void)
 {
 #if defined(SOKOL_METAL)
 #if TARGET_OS_OSX

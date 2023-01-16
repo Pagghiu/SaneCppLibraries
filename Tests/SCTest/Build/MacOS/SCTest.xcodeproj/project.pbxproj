@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		7B515FF429243087006996AA /* OSDarwin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FCF29243086006996AA /* OSDarwin.cpp */; };
+		7B515FF429243087006996AA /* OSApple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FCF29243086006996AA /* OSApple.mm */; };
 		7B515FF529243087006996AA /* Memory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FD429243086006996AA /* Memory.cpp */; };
 		7B515FF729243087006996AA /* OSPosix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FE429243087006996AA /* OSPosix.cpp */; };
 		7B515FF829243087006996AA /* Assert.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FE929243087006996AA /* Assert.cpp */; };
@@ -58,7 +58,7 @@
 		7B515FCC29243086006996AA /* Reflection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Reflection.h; path = ../../../../Libraries/Foundation/Reflection.h; sourceTree = "<group>"; };
 		7B515FCD29243086006996AA /* Function.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Function.h; path = ../../../../Libraries/Foundation/Function.h; sourceTree = "<group>"; };
 		7B515FCE29243086006996AA /* ReflectionSC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionSC.h; path = ../../../../Libraries/Foundation/ReflectionSC.h; sourceTree = "<group>"; };
-		7B515FCF29243086006996AA /* OSDarwin.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OSDarwin.cpp; path = ../../../../Libraries/Foundation/OSDarwin.cpp; sourceTree = "<group>"; };
+		7B515FCF29243086006996AA /* OSApple.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = OSApple.mm; path = ../../../../Libraries/Foundation/OSApple.mm; sourceTree = "<group>"; };
 		7B515FD029243086006996AA /* FunctionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FunctionTest.h; path = ../../../../Libraries/Foundation/FunctionTest.h; sourceTree = "<group>"; };
 		7B515FD129243086006996AA /* SerializationTypeErased.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTypeErased.h; path = ../../../../Libraries/Foundation/SerializationTypeErased.h; sourceTree = "<group>"; };
 		7B515FD229243086006996AA /* Assert.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Assert.h; path = ../../../../Libraries/Foundation/Assert.h; sourceTree = "<group>"; };
@@ -164,7 +164,7 @@
 				7B515FEA29243087006996AA /* Memory.h */,
 				7B515FF229243087006996AA /* MemoryTest.h */,
 				7B515FDC29243086006996AA /* OS.h */,
-				7B515FCF29243086006996AA /* OSDarwin.cpp */,
+				7B515FCF29243086006996AA /* OSApple.mm */,
 				7B515FE429243087006996AA /* OSPosix.cpp */,
 				7B515FC829243086006996AA /* OSTest.h */,
 				7B515FE029243087006996AA /* Platform.h */,
@@ -288,7 +288,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastUpgradeCheck = 1410;
+				LastUpgradeCheck = 1420;
 				TargetAttributes = {
 					7B52501328E85B9100827290 = {
 						CreatedOnToolsVersion = 14.0.1;
@@ -339,7 +339,7 @@
 				7B51601029243097006996AA /* Test.cpp in Sources */,
 				7B515FF829243087006996AA /* Assert.cpp in Sources */,
 				7B515FF929243087006996AA /* Console.cpp in Sources */,
-				7B515FF429243087006996AA /* OSDarwin.cpp in Sources */,
+				7B515FF429243087006996AA /* OSApple.mm in Sources */,
 				7B583F6A2922ECF900FBE019 /* SCTest.cpp in Sources */,
 				7B51601429243097006996AA /* StringUtility.cpp in Sources */,
 				7B51601329243097006996AA /* String.cpp in Sources */,
@@ -378,6 +378,7 @@
 				GCC_ENABLE_CPP_EXCEPTIONS = NO;
 				GCC_ENABLE_CPP_RTTI = NO;
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-nostdinc++",
@@ -398,6 +399,7 @@
 				GCC_ENABLE_CPP_EXCEPTIONS = NO;
 				GCC_ENABLE_CPP_RTTI = NO;
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-nostdinc++",
@@ -414,6 +416,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = sc.SCXCTest;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -428,6 +431,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = sc.SCXCTest;
 				PRODUCT_NAME = "$(TARGET_NAME)";
