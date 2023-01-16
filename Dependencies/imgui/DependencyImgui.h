@@ -1,3 +1,6 @@
+// Copyright (c) 2022-2023, Stefano Cristiano
+//
+// All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #if SC_ENABLE_FREETYPE
 #define IMGUI_USE_WCHAR32 1
