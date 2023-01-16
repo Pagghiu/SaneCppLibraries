@@ -80,8 +80,8 @@ struct SC::PlatformApplication::Internal
             else if (fontIndex == 1)
             {
                 // static ImWchar ranges[] = { 0x1, 0x1FFFF, 0 };
-                static ImWchar      ranges[] = {0x1F354, 0x1F354 + 5, 0};
-                static ImFontConfig cfg;
+                static const ImWchar ranges[] = {0x1F354, 0x1F354 + 5, 0};
+                ImFontConfig         cfg;
                 cfg.OversampleH = cfg.OversampleV = 1;
                 // cfg.MergeMode = true;
                 cfg.FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor | ImGuiFreeTypeBuilderFlags_Bitmap;
@@ -211,6 +211,7 @@ struct SC::PlatformApplication::Internal
         }
         sg_end_pass();
         sg_commit();
+        sokol_pause_rendering();
     }
 
     static void cleanup()
