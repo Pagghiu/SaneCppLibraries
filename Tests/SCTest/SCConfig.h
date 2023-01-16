@@ -9,3 +9,4 @@
 // #define SC_META_ENABLE_CPP14_AUTO_REFLECTION 1
 
 // #define SC_CPP_STANDARD_FORCE                14
+#define SC_ENABLE_STD_CPP_LIBRARY 0
