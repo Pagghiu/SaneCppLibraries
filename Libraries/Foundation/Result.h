@@ -13,6 +13,7 @@ struct [[nodiscard]] Error
     const StringView message;
     constexpr Error() {}
     constexpr Error(const StringView message) : message(message) {}
+    operator bool() const { return message.isEmpty(); }
 };
 template <typename Value, typename ErrorType = Error>
 struct Result;
@@ -91,6 +92,8 @@ struct [[nodiscard]] SC::Result
     constexpr Result& operator=(Result&& other) const      = delete;
 
     constexpr bool isError() const { return holdsError == true; }
+
+    constexpr bool isValid() const { return holdsError == false; }
 
     constexpr ErrorType releaseError() const { return move(error); }
 

@@ -218,6 +218,7 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Console.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\OSWindows.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\Path.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StaticAsserts.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\String.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringBuilder.cpp" />
@@ -247,6 +248,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\MemoryTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\OS.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\OSTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Path.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\PathTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Platform.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Reflection.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionClassInfo.h" />

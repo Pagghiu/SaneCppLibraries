@@ -56,6 +56,24 @@ struct SC::StringView
     [[nodiscard]] bool             parseInt32(int32_t* value) const;
     [[nodiscard]] bool endsWith(char_t c) const { return isEmpty() ? false : text.data[text.size - 1] == c; }
     [[nodiscard]] bool startsWith(char_t c) const { return isEmpty() ? false : text.data[0] == c; }
+    [[nodiscard]] bool startsWith(const StringView str) const
+    {
+        if (str.text.size <= text.size)
+        {
+            const StringView ours(text.data, str.text.size, false);
+            return str == ours;
+        }
+        return false;
+    }
+    [[nodiscard]] bool endsWith(const StringView str) const
+    {
+        if (str.sizeInBytesWithoutTerminator() <= sizeInBytesWithoutTerminator())
+        {
+            const StringView ours(text.data + text.size - str.text.size, str.text.size, false);
+            return str == ours;
+        }
+        return false;
+    }
     [[nodiscard]] bool setSizeInBytesWithoutTerminator(size_t newSize)
     {
         if (newSize <= text.size)

@@ -53,5 +53,26 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(other.parseInt32(&value));
             SC_TEST_EXPECT(value == -456);
         }
+
+        if (test_section("startsWith/endsWith"))
+        {
+            StringView test("Ciao_123");
+            SC_TEST_EXPECT(test.startsWith('C'));
+            SC_TEST_EXPECT(test.endsWith('3'));
+            SC_TEST_EXPECT(test.startsWith("Ciao"_sv));
+            SC_TEST_EXPECT(test.endsWith("123"_sv));
+            SC_TEST_EXPECT(not test.startsWith('D'));
+            SC_TEST_EXPECT(not test.endsWith('4'));
+            SC_TEST_EXPECT(not test.startsWith("Cia_"_sv));
+            SC_TEST_EXPECT(not test.endsWith("1_3"_sv));
+
+            StringView test2;
+            SC_TEST_EXPECT(not test2.startsWith('a'));
+            SC_TEST_EXPECT(not test2.endsWith('a'));
+            SC_TEST_EXPECT(test2.startsWith(""_sv));
+            SC_TEST_EXPECT(not test2.startsWith("A"_sv));
+            SC_TEST_EXPECT(test2.endsWith(""_sv));
+            SC_TEST_EXPECT(not test2.endsWith("A"_sv));
+        }
     }
 };

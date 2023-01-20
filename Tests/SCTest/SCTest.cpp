@@ -7,6 +7,7 @@
 #include "../../Libraries/Foundation/MapTest.h"
 #include "../../Libraries/Foundation/MemoryTest.h"
 #include "../../Libraries/Foundation/OSTest.h"
+#include "../../Libraries/Foundation/PathTest.h"
 #include "../../Libraries/Foundation/ReflectionTest.h"
 #include "../../Libraries/Foundation/ResultTest.h"
 #include "../../Libraries/Foundation/SerializationTemplateTest.h"
@@ -40,6 +41,7 @@ int main(int argc, const char* argv[])
     { ReflectionTest                test(report); }
     { SerializationTypeErasedTest   test(report); }
     { SerializationTemplateTest     test(report); }
+    { PathTest                      test(report); }
     // clang-format on
 
     return report.getTestReturnCode();

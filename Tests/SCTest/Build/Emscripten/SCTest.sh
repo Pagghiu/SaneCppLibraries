@@ -57,6 +57,7 @@ Libraries/Foundation/Assert.cpp         \
 Libraries/Foundation/Console.cpp        \
 Libraries/Foundation/Memory.cpp         \
 Libraries/Foundation/OSEmscripten.cpp   \
+Libraries/Foundation/Path.cpp           \
 Libraries/Foundation/StaticAsserts.cpp  \
 Libraries/Foundation/String.cpp         \
 Libraries/Foundation/StringBuilder.cpp  \

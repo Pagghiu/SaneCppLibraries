@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7B19C9AC297AF99F001C0627 /* Path.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B19C9A9297AF95B001C0627 /* Path.cpp */; };
+		7B19C9AD297AF9A2001C0627 /* Path.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B19C9A9297AF95B001C0627 /* Path.cpp */; };
 		7B515FF429243087006996AA /* OSApple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FCF29243086006996AA /* OSApple.mm */; };
 		7B515FF529243087006996AA /* Memory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FD429243086006996AA /* Memory.cpp */; };
 		7B515FF729243087006996AA /* OSPosix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FE429243087006996AA /* OSPosix.cpp */; };
@@ -47,6 +49,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		7B19C9A9297AF95B001C0627 /* Path.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Path.cpp; path = ../../../../Libraries/Foundation/Path.cpp; sourceTree = "<group>"; };
+		7B19C9AA297AF95B001C0627 /* PathTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PathTest.h; path = ../../../../Libraries/Foundation/PathTest.h; sourceTree = "<group>"; };
+		7B19C9AB297AF95B001C0627 /* Path.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Path.h; path = ../../../../Libraries/Foundation/Path.h; sourceTree = "<group>"; };
 		7B4B99EF2937EBAC003D17A6 /* ReflectionAutoAggregates.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ReflectionAutoAggregates.h; path = ../../../../Libraries/Foundation/ReflectionAutoAggregates.h; sourceTree = "<group>"; };
 		7B4B99F02937EBAC003D17A6 /* ReflectionAutoStructured.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ReflectionAutoStructured.h; path = ../../../../Libraries/Foundation/ReflectionAutoStructured.h; sourceTree = "<group>"; };
 		7B5119C5293C0DF60061646E /* SCConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SCConfig.h; path = ../../SCConfig.h; sourceTree = "<group>"; };
@@ -167,6 +172,9 @@
 				7B515FCF29243086006996AA /* OSApple.mm */,
 				7B515FE429243087006996AA /* OSPosix.cpp */,
 				7B515FC829243086006996AA /* OSTest.h */,
+				7B19C9A9297AF95B001C0627 /* Path.cpp */,
+				7B19C9AB297AF95B001C0627 /* Path.h */,
+				7B19C9AA297AF95B001C0627 /* PathTest.h */,
 				7B515FE029243087006996AA /* Platform.h */,
 				7B515FCC29243086006996AA /* Reflection.h */,
 				7B4B99EF2937EBAC003D17A6 /* ReflectionAutoAggregates.h */,
@@ -341,6 +349,7 @@
 				7B515FF929243087006996AA /* Console.cpp in Sources */,
 				7B515FF429243087006996AA /* OSApple.mm in Sources */,
 				7B583F6A2922ECF900FBE019 /* SCTest.cpp in Sources */,
+				7B19C9AC297AF99F001C0627 /* Path.cpp in Sources */,
 				7B51601429243097006996AA /* StringUtility.cpp in Sources */,
 				7B51601329243097006996AA /* String.cpp in Sources */,
 				7B51601629243097006996AA /* StringBuilder.cpp in Sources */,
@@ -352,6 +361,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B19C9AD297AF9A2001C0627 /* Path.cpp in Sources */,
 				7B583FCB2922EE7300FBE019 /* SCTest.cpp in Sources */,
 				7B583F6D2922ED2700FBE019 /* SCTestXCTest.mm in Sources */,
 			);
