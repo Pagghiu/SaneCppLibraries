@@ -18,7 +18,7 @@ struct StringBuilder
     {
         if (not data.isEmpty())
             SC_TRY_IF(data.pop_back());
-        return StringFormat<text::StringIteratorASCII>::format(data, fmt, args...);
+        return StringFormat<StringIteratorASCII>::format(data, fmt, args...);
     }
 
     [[nodiscard]] bool append(StringView str)
@@ -49,6 +49,5 @@ struct StringBuilder
     Vector<char_t> data;
 
     [[nodiscard]] bool assignStringView(StringView sv);
-    [[nodiscard]] bool snprintf(bool append, const char_t* fmt, ...) SC_ATTRIBUTE_PRINTF(3, 4);
 };
 } // namespace SC

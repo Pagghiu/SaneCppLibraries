@@ -8,8 +8,7 @@
 
 namespace SC
 {
-namespace text
-{
+
 const int SPECIFIER_SIZE = 10;
 
 template <size_t SPECIFIER_OFFSET, size_t N>
@@ -117,5 +116,4 @@ bool StringFormatterFor<SC::StringView>::format(Vector<char_t>& data, const Stri
 {
     return data.appendCopy(value.bytesIncludingTerminator(), value.sizeInBytesWithoutTerminator());
 }
-} // namespace text
 } // namespace SC

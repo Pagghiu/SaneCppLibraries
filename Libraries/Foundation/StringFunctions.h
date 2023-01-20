@@ -8,6 +8,27 @@ namespace SC
 {
 template <typename StringIterator>
 struct StringFunctions;
+
+struct SplitOptions
+{
+
+    enum Value
+    {
+        None          = 0,
+        SkipEmpty     = 1,
+        SkipSeparator = 2
+    };
+    Value value;
+    SplitOptions(std::initializer_list<Value> ilist)
+    {
+        value = None;
+        for (auto v : ilist)
+        {
+            value = static_cast<Value>(static_cast<uint32_t>(value) | static_cast<uint32_t>(v));
+        }
+    }
+    bool has(Value v) const { return (value & v) != None; }
+};
 } // namespace SC
 
 template <typename StringIterator>
@@ -29,5 +50,35 @@ struct SC::StringFunctions
     [[nodiscard]] StringView offsetLength(size_t offset, size_t length) const
     {
         return fromTo(offset, offset + length);
+    }
+
+    template <typename Lambda, typename CharacterType>
+    [[nodiscard]] uint32_t split(CharacterType separator, Lambda lambda,
+                                 SplitOptions options = {SplitOptions::SkipEmpty, SplitOptions::SkipSeparator})
+    {
+        if (sv.isEmpty())
+            return 0;
+        StringIterator it            = sv.getIterator<StringIterator>();
+        StringIterator itBackup      = it;
+        uint32_t       numSplits     = 0;
+        bool           continueSplit = true;
+        while (continueSplit)
+        {
+            continueSplit        = it.advanceUntilMatches(separator);
+            StringView component = itBackup.viewUntil(it);
+            if (options.has(SplitOptions::SkipSeparator))
+            {
+                (void)it.skipNext(); // No need to check return result, we already checked in advanceUntilMatches
+                continueSplit = !it.isEmpty();
+            }
+            // directory
+            if (!component.isEmpty() || !options.has(SplitOptions::SkipEmpty))
+            {
+                numSplits++;
+                lambda(component);
+            }
+            itBackup = it;
+        }
+        return numSplits;
     }
 };

@@ -22,8 +22,8 @@ bool SC::String::assignStringView(StringView sv)
     return res;
 }
 
-bool SC::text::StringFormatterFor<SC::String>::format(Vector<char_t>& data, const StringIteratorASCII specifier,
-                                                      const SC::String value)
+bool SC::StringFormatterFor<SC::String>::format(Vector<char_t>& data, const StringIteratorASCII specifier,
+                                                const SC::String& value)
 {
     return StringFormatterFor<SC::StringView>::format(data, specifier, value.view());
 }

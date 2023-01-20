@@ -50,7 +50,7 @@ struct SC::String
 };
 
 template <>
-struct SC::text::StringFormatterFor<SC::String>
+struct SC::StringFormatterFor<SC::String>
 {
-    static bool format(Vector<char_t>& data, const StringIteratorASCII specifier, const String value);
+    static bool format(Vector<char_t>& data, const StringIteratorASCII specifier, const String& value);
 };

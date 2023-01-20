@@ -6,8 +6,6 @@
 
 namespace SC
 {
-namespace text
-{
 
 struct StringIteratorASCII
 {
@@ -31,6 +29,18 @@ struct StringIteratorASCII
         }
         return false;
 #endif
+    }
+    [[nodiscard]] bool reverseUntilMatches(char_t c)
+    {
+        auto startBackup = it;
+        it               = end;
+        while (it != startBackup)
+        {
+            --it;
+            if (*it == c)
+                return true;
+        }
+        return false;
     }
 
     [[nodiscard]] bool advanceUntilMatches(char_t c1, char_t c2, char_t* matched)
@@ -124,10 +134,20 @@ struct StringIteratorASCII
 
     const char_t* getStart() const { return it; }
 
+    StringView viewUntil(StringIteratorASCII other) const
+    {
+        if (other.it <= end)
+        {
+            return StringView(it, other.it - it, false);
+        }
+        return StringView();
+    }
+
+    StringView viewUntilEnd() const { return StringView(it, end - it, false); }
+
   private:
     const char_t* it;
     const char_t* end;
 };
 
-} // namespace text
 } // namespace SC

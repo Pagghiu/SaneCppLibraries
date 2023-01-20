@@ -6,7 +6,7 @@
 #include <stdarg.h> // va_list
 #include <stdio.h>  // vsnprintf
 
-bool SC::text::isIntegerNumber(Span<const char_t> text)
+bool SC::isIntegerNumber(Span<const char_t> text)
 {
     if (text.size == 0)
         return false;

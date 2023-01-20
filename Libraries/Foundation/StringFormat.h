@@ -9,8 +9,6 @@
 
 namespace SC
 {
-namespace text
-{
 
 template <typename T>
 struct StringFormatterFor;
@@ -33,7 +31,6 @@ template <> struct StringFormatterFor<SC::char_t>   {static bool format(Vector<c
 template <> struct StringFormatterFor<StringView>   {static bool format(Vector<char_t>&, StringIteratorASCII, const StringView);};
 template <> struct StringFormatterFor<const SC::char_t*> {static bool format(Vector<char_t>&, StringIteratorASCII, const SC::char_t*);};
 // clang-format on
-} // namespace text
 
 template <typename RangeIterator>
 struct StringFormat
@@ -68,7 +65,7 @@ struct StringFormat
         {
             auto specifier = startOfSpecifier.untilBefore(it);
             (void)specifier.advanceUntilMatchesAfter(':'); // optional
-            const bool formattedSuccessfully = text::StringFormatterFor<First>::format(data, specifier, first);
+            const bool formattedSuccessfully = StringFormatterFor<First>::format(data, specifier, first);
             return formattedSuccessfully && recursiveFormat(data, it, args...);
         }
         return false;

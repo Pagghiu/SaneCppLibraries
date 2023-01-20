@@ -7,7 +7,6 @@
 #include "Limits.h"
 #include "Memory.h"
 #include "Span.h"
-#include "StringIterator.h"
 
 namespace SC
 {
@@ -50,11 +49,22 @@ struct SC::StringView
 
     [[nodiscard]] bool             operator==(StringView other) const { return text.equalsContent(other.text); }
     [[nodiscard]] bool             operator!=(StringView other) const { return not operator==(other); }
-    [[nodiscard]] constexpr bool   isEmpty() const { return text.data == nullptr; }
+    [[nodiscard]] constexpr bool   isEmpty() const { return text.data == nullptr || text.size == 0; }
     [[nodiscard]] constexpr bool   isNullTerminated() const { return hasNullTerm; }
     [[nodiscard]] constexpr size_t sizeInBytesWithoutTerminator() const { return text.size; }
     [[nodiscard]] constexpr size_t sizeInBytesIncludingTerminator() const { return text.size > 0 ? text.size + 1 : 0; }
     [[nodiscard]] bool             parseInt32(int32_t* value) const;
+    [[nodiscard]] bool endsWith(char_t c) const { return isEmpty() ? false : text.data[text.size - 1] == c; }
+    [[nodiscard]] bool startsWith(char_t c) const { return isEmpty() ? false : text.data[0] == c; }
+    [[nodiscard]] bool setSizeInBytesWithoutTerminator(size_t newSize)
+    {
+        if (newSize <= text.size)
+        {
+            text.size = newSize;
+            return true;
+        }
+        return false;
+    }
 };
 
 #if SC_MSVC
