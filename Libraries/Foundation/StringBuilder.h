@@ -31,7 +31,7 @@ struct StringBuilder
         }
         else
         {
-            SC_TRY_IF(data.appendCopy(str.bytesWithoutTerminator(), str.sizeInBytesWithoutTerminator()));
+            SC_TRY_IF(data.appendCopy(str.bytesWithoutTerminator(), str.sizeInBytes()));
             SC_TRY_IF(data.push_back(0));
             return true;
         }

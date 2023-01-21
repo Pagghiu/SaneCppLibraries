@@ -19,7 +19,7 @@ struct SC::Path::Internal
                 if (it.skipNext() && it.matches(':') && it.skipNext() && it.matches('\\'))
                 {
                     (void)it.skipNext();
-                    return itBackup.viewUntil(it);
+                    return StringView::fromIterators(itBackup, it);
                 }
             }
         }
@@ -46,62 +46,40 @@ struct SC::Path::Internal
         auto it = input.getIterator<StringIteratorASCII>();
         (void)it.reverseUntilMatches(separator);
         (void)it.skipNext();
-        return it.viewUntilEnd();
+        return StringView::fromIterator(it);
     }
 
     template <char separator>
-    static bool rootIsFollowedByOnlySeparators(const StringView input,const StringView root)
+    static bool rootIsFollowedByOnlySeparators(const StringView input, const StringView root)
     {
-        StringView remaining = input.functions<StringIteratorASCII>().fromTo(root.sizeInBytesWithoutTerminator(), input.sizeInBytesWithoutTerminator());
-        auto it = remaining.getIterator<StringIteratorASCII>();
-        bool endsWithAllSeparators = true;
-        while(!it.isEmpty())
+        StringView remaining = input.sliceStartEnd<StringIteratorASCII>(root.sizeCodePoints<StringIteratorASCII>(),
+                                                                        input.sizeCodePoints<StringIteratorASCII>());
+        auto       it        = remaining.getIterator<StringIteratorASCII>();
+        bool       endsWithAllSeparators = true;
+        while (!it.isEmpty())
         {
             endsWithAllSeparators &= it.matches(separator);
             (void)it.skipNext();
         }
         return endsWithAllSeparators;
     }
-    
+
     template <char separator>
-    static StringView parseDirectoryPosix(const StringView input, const StringView root)
+    static StringView parseDirectory(const StringView input, const StringView root)
     {
         auto       it       = input.getIterator<StringIteratorASCII>();
         const auto itBackup = it;
         if (it.reverseUntilMatches(separator))
         {
-            const StringView directory = itBackup.viewUntil(it);
-            if(directory.isEmpty())
+            const StringView directory = StringView::fromIterators(itBackup, it);
+            if (directory.isEmpty())
             {
                 return root;
             }
-            if(rootIsFollowedByOnlySeparators<separator>(input, root))
+            if (rootIsFollowedByOnlySeparators<separator>(input, root))
             {
                 return input;
             }
-            
-            return directory;
-        }
-        return StringView();
-    }
-    
-    template <char separator>
-    static StringView parseDirectoryWindows(const StringView input, const StringView root)
-    {
-        auto       it       = input.getIterator<StringIteratorASCII>();
-        const auto itBackup = it;
-        if (it.reverseUntilMatches(separator))
-        {
-            const StringView directory = itBackup.viewUntil(it);
-            if(directory.isEmpty())
-            {
-                return root;
-            }
-            if(rootIsFollowedByOnlySeparators<separator>(input, root))
-            {
-                return input;
-            }
-                        
             return directory;
         }
         return StringView();
@@ -118,9 +96,9 @@ struct SC::Path::Internal
     {
         // Parse the drive, then look for rightmost backslash separator to get directory
         // Everything after it will be the base.
-        root              = Internal::parseWindowsRoot(input);
-        directory         = Internal::parseDirectoryWindows<'\\'>(input, root);
-        if(root.startsWith(directory) && root.endsWith('\\'))
+        root      = Internal::parseWindowsRoot(input);
+        directory = Internal::parseDirectory<'\\'>(input, root);
+        if (root.startsWith(directory) && root.endsWith('\\'))
         {
             directory = root;
         }
@@ -128,7 +106,6 @@ struct SC::Path::Internal
         endsWithSeparator = input.endsWith('\\');
         return !(root.isEmpty() && directory.isEmpty());
     }
-
 
     /// Splits a Posix path of type "/usr/dir/base" into root=/ - directory=/usr/dir - base=base
     /// @param input            Posix path of the form "/usr/dir/base"
@@ -140,7 +117,7 @@ struct SC::Path::Internal
                                          bool& endsWithSeparator)
     {
         root              = Internal::parsePosixRoot(input);
-        directory         = Internal::parseDirectoryPosix<'/'>(input, root);
+        directory         = Internal::parseDirectory<'/'>(input, root);
         base              = Internal::parseBase<'/'>(input);
         endsWithSeparator = input.endsWith('/');
         return !(root.isEmpty() && directory.isEmpty());
@@ -155,9 +132,9 @@ bool SC::Path::parseNameExtension(const StringView input, StringView& name, Stri
     // to be the name.
     if (it.reverseUntilMatches('.'))
     {
-        name = itBackup.viewUntil(it); // from 'name.ext' keep 'name'
-        (void)it.skipNext();           // skip the .
-        extension = it.viewUntilEnd(); // from 'name.ext' keep 'ext'
+        name = StringView::fromIterators(itBackup, it); // from 'name.ext' keep 'name'
+        (void)it.skipNext();                            // skip the .
+        extension = StringView::fromIterator(it);       // from 'name.ext' keep 'ext'
     }
     else
     {

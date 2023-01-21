@@ -6,7 +6,6 @@
 #pragma once
 #include "../Foundation/Result.h"
 #include "../Foundation/SmallVector.h"
-#include "../Foundation/StringFunctions.h"
 #include "../Foundation/StringIterator.h"
 #include "../Foundation/StringView.h"
 #include "StringIterator.h"

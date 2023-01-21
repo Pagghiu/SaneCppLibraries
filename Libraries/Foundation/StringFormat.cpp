@@ -114,6 +114,6 @@ bool StringFormatterFor<const SC::char_t*>::format(Vector<char_t>& data, const S
 bool StringFormatterFor<SC::StringView>::format(Vector<char_t>& data, const StringIteratorASCII specifier,
                                                 const SC::StringView value)
 {
-    return data.appendCopy(value.bytesIncludingTerminator(), value.sizeInBytesWithoutTerminator());
+    return data.appendCopy(value.bytesIncludingTerminator(), value.sizeInBytes());
 }
 } // namespace SC

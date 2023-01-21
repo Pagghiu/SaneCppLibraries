@@ -274,8 +274,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringBuilder.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringBuilderTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringFormat.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringFunctions.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringFunctionsTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringIterator.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringUtility.h" />

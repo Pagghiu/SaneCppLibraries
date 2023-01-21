@@ -8,7 +8,7 @@
 bool SC::StringBuilder::assignStringView(StringView sv)
 {
     bool         res;
-    const size_t length = sv.sizeInBytesWithoutTerminator();
+    const size_t length = sv.sizeInBytes();
     res                 = data.resizeWithoutInitializing(length + 1);
     if (sv.isNullTerminated())
     {

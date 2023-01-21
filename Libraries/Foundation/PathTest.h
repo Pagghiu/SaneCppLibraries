@@ -13,6 +13,7 @@ struct SC::PathTest : public SC::TestCase
 {
     PathTest(SC::TestReport& report) : TestCase(report, "PathTest")
     {
+        // TODO: PathView::directory and base are not defined consistently
         if (test_section("PathView::parsePosix"))
         {
             PathView path;
@@ -34,11 +35,11 @@ struct SC::PathTest : public SC::TestCase
             SC_TEST_EXPECT(path.base.isEmpty());
             SC_TEST_EXPECT(path.endsWithSeparator == true);
 
-//            SC_TEST_EXPECT(path.parsePosix("//"));
-//            SC_TEST_EXPECT(path.root == "/");
-//            SC_TEST_EXPECT(path.directory == "/");
-//            SC_TEST_EXPECT(path.base.isEmpty());
-//            SC_TEST_EXPECT(path.endsWithSeparator == true);
+            SC_TEST_EXPECT(path.parsePosix("//"));
+            SC_TEST_EXPECT(path.root == "/");
+            SC_TEST_EXPECT(path.directory == "//");
+            SC_TEST_EXPECT(path.base.isEmpty());
+            SC_TEST_EXPECT(path.endsWithSeparator == true);
         }
 
         if (test_section("PathView::parseWindows"))

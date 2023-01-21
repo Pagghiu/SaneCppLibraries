@@ -19,7 +19,7 @@ struct SC::StringViewTest : public SC::TestCase
         if (test_section("construction"))
         {
             StringView s("asd");
-            SC_TEST_EXPECT(s.sizeInBytesWithoutTerminator() == 3);
+            SC_TEST_EXPECT(s.sizeInBytes() == 3);
             SC_TEST_EXPECT(s.isNullTerminated());
         }
 
@@ -73,6 +73,46 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(not test2.startsWith("A"_sv));
             SC_TEST_EXPECT(test2.endsWith(""_sv));
             SC_TEST_EXPECT(not test2.endsWith("A"_sv));
+        }
+
+        if (test_section("view"))
+        {
+            StringView str = "123_567";
+            SC_TEST_EXPECT(str.sliceStartLength(7, 0) == "");
+            SC_TEST_EXPECT(str.sliceStartLength(0, 3) == "123");
+            SC_TEST_EXPECT(str.sliceStartEnd(0, 3) == "123");
+            SC_TEST_EXPECT(str.sliceStartLength(4, 3) == "567");
+            SC_TEST_EXPECT(str.sliceStartEnd(4, 7) == "567");
+        }
+        if (test_section("split"))
+        {
+            {
+                StringView str   = "_123_567___";
+                int        index = 0;
+
+                auto numSplits = str.splitASCII('_',
+                                                [&](StringView v)
+                                                {
+                                                    switch (index)
+                                                    {
+                                                    case 0: SC_TEST_EXPECT(v == "123"); break;
+                                                    case 1: SC_TEST_EXPECT(v == "567"); break;
+                                                    }
+                                                    index++;
+                                                });
+                SC_TEST_EXPECT(index == 2);
+                SC_TEST_EXPECT(numSplits == 2);
+            }
+            {
+                StringView str       = "___";
+                auto       numSplits = str.splitASCII('_', [&](StringView v) {}, {SplitOptions::SkipSeparator});
+                SC_TEST_EXPECT(numSplits == 3);
+            }
+            {
+                StringView str       = "";
+                auto       numSplits = str.splitASCII('_', [&](StringView v) {}, {SplitOptions::SkipSeparator});
+                SC_TEST_EXPECT(numSplits == 0);
+            }
         }
     }
 };

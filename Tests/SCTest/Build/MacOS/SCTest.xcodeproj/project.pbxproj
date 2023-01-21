@@ -103,7 +103,6 @@
 		7B515FFB29243097006996AA /* Test.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Test.cpp; path = ../../../../Libraries/Foundation/Test.cpp; sourceTree = "<group>"; };
 		7B515FFC29243097006996AA /* StringFormat.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringFormat.cpp; path = ../../../../Libraries/Foundation/StringFormat.cpp; sourceTree = "<group>"; };
 		7B515FFD29243097006996AA /* StringUtility.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringUtility.h; path = ../../../../Libraries/Foundation/StringUtility.h; sourceTree = "<group>"; };
-		7B515FFE29243097006996AA /* StringFunctions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringFunctions.h; path = ../../../../Libraries/Foundation/StringFunctions.h; sourceTree = "<group>"; };
 		7B515FFF29243097006996AA /* StringView.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringView.cpp; path = ../../../../Libraries/Foundation/StringView.cpp; sourceTree = "<group>"; };
 		7B51600029243097006996AA /* VectorTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VectorTest.h; path = ../../../../Libraries/Foundation/VectorTest.h; sourceTree = "<group>"; };
 		7B51600129243097006996AA /* String.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = String.cpp; path = ../../../../Libraries/Foundation/String.cpp; sourceTree = "<group>"; };
@@ -118,7 +117,6 @@
 		7B51600A29243097006996AA /* StringBuilderTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringBuilderTest.h; path = ../../../../Libraries/Foundation/StringBuilderTest.h; sourceTree = "<group>"; };
 		7B51600B29243097006996AA /* StaticAsserts.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StaticAsserts.cpp; path = ../../../../Libraries/Foundation/StaticAsserts.cpp; sourceTree = "<group>"; };
 		7B51600C29243097006996AA /* StringBuilder.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringBuilder.cpp; path = ../../../../Libraries/Foundation/StringBuilder.cpp; sourceTree = "<group>"; };
-		7B51600D29243097006996AA /* StringFunctionsTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringFunctionsTest.h; path = ../../../../Libraries/Foundation/StringFunctionsTest.h; sourceTree = "<group>"; };
 		7B51600E29243097006996AA /* StringBuilder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringBuilder.h; path = ../../../../Libraries/Foundation/StringBuilder.h; sourceTree = "<group>"; };
 		7B51600F29243097006996AA /* StringTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringTest.h; path = ../../../../Libraries/Foundation/StringTest.h; sourceTree = "<group>"; };
 		7B52501428E85B9100827290 /* SCTest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SCTest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -205,8 +203,6 @@
 				7B51600A29243097006996AA /* StringBuilderTest.h */,
 				7B515FFC29243097006996AA /* StringFormat.cpp */,
 				7B515FFA29243097006996AA /* StringFormat.h */,
-				7B515FFE29243097006996AA /* StringFunctions.h */,
-				7B51600D29243097006996AA /* StringFunctionsTest.h */,
 				7B51600829243097006996AA /* StringIterator.h */,
 				7B51600F29243097006996AA /* StringTest.h */,
 				7B51600929243097006996AA /* StringUtility.cpp */,

@@ -174,9 +174,9 @@ struct SC::ReflectionTest : public SC::TestCase
 
     [[nodiscard]] static constexpr bool constexprEquals(const StringView str1, const StringView other)
     {
-        if (str1.sizeInBytesWithoutTerminator() != other.sizeInBytesWithoutTerminator())
+        if (str1.sizeInBytes() != other.sizeInBytes())
             return false;
-        for (size_t i = 0; i < str1.sizeInBytesWithoutTerminator(); ++i)
+        for (size_t i = 0; i < str1.sizeInBytes(); ++i)
             if (str1.bytesWithoutTerminator()[i] != other.bytesWithoutTerminator()[i])
                 return false;
         return true;

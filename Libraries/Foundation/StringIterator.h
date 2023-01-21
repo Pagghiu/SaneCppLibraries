@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "StringView.h"
+#include "Types.h"
 
 namespace SC
 {
@@ -133,17 +133,7 @@ struct StringIteratorASCII
     [[nodiscard]] size_t bytesDistanceFrom(StringIteratorASCII other) const { return it - other.it; }
 
     const char_t* getStart() const { return it; }
-
-    StringView viewUntil(StringIteratorASCII other) const
-    {
-        if (other.it <= end)
-        {
-            return StringView(it, other.it - it, false);
-        }
-        return StringView();
-    }
-
-    StringView viewUntilEnd() const { return StringView(it, end - it, false); }
+    const char_t* getEnd() const { return end; }
 
   private:
     const char_t* it;

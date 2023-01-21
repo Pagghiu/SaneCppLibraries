@@ -20,8 +20,8 @@ int SC::Console::c_printf(const char_t* format, ...)
 
 void SC::Console::printUTF8(const StringView str)
 {
-    SC_DEBUG_ASSERT(str.sizeInBytesWithoutTerminator() < static_cast<int>(MaxValue()));
-    printf("%.*s", static_cast<int>(str.sizeInBytesWithoutTerminator()), str.bytesWithoutTerminator());
+    SC_DEBUG_ASSERT(str.sizeInBytes() < static_cast<int>(MaxValue()));
+    printf("%.*s", static_cast<int>(str.sizeInBytes()), str.bytesWithoutTerminator());
 }
 
 void SC::Console::printUTF8(const String& str)

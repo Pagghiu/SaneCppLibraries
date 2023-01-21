@@ -14,7 +14,6 @@
 #include "../../Libraries/Foundation/SerializationTypeErasedTest.h"
 #include "../../Libraries/Foundation/SmallVectorTest.h"
 #include "../../Libraries/Foundation/StringBuilderTest.h"
-#include "../../Libraries/Foundation/StringFunctionsTest.h"
 #include "../../Libraries/Foundation/StringTest.h"
 #include "../../Libraries/Foundation/StringViewTest.h"
 #include "../../Libraries/Foundation/VectorTest.h"
@@ -32,7 +31,6 @@ int main(int argc, const char* argv[])
     { VectorTest                    test(report); }
     { ResultTest                    test(report); }
     { StringViewTest                test(report); }
-    { StringFunctionsTest           test(report); }
     { StringTest                    test(report); }
     { StringBuilderTest             test(report); }
     { MapTest                       test(report); }

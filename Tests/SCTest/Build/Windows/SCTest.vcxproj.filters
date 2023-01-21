@@ -181,12 +181,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringFormat.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringFunctions.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringFunctionsTest.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringIterator.h">
       <Filter>Foundation</Filter>
     </ClInclude>
