@@ -13,9 +13,9 @@
 namespace SC
 {
 struct StringView;
+struct StringViewWithEncoding;
 struct SplitOptions
 {
-
     enum Value
     {
         None          = 0,
@@ -41,21 +41,34 @@ struct SC::StringView
 {
   private:
     Span<const char_t> text;
+    StringEncoding     encoding;
     bool               hasNullTerm;
 
   public:
-    constexpr StringView() : text(nullptr, 0), hasNullTerm(false) {}
-    constexpr StringView(const char_t* text, size_t bytes, bool nullTerm) : text{text, bytes}, hasNullTerm(nullTerm) {}
+    constexpr StringView() : text(nullptr, 0), encoding(StringEncoding::Utf8), hasNullTerm(false) {}
+    constexpr StringView(const char_t* text, size_t bytes, bool nullTerm, StringEncoding encoding)
+        : text{text, bytes}, encoding(encoding), hasNullTerm(nullTerm)
+    {}
     template <size_t N>
-    constexpr StringView(const char (&text)[N]) : text{text, N - 1}, hasNullTerm(true)
+    constexpr StringView(const char (&text)[N]) : text{text, N - 1}, encoding(StringEncoding::Utf8), hasNullTerm(true)
     {}
 
-    [[nodiscard]] constexpr const char_t* bytesWithoutTerminator() const { return text.data; }
-    [[nodiscard]] constexpr const char_t* bytesIncludingTerminator() const { return text.data; }
+    [[nodiscard]] constexpr StringEncoding getEncoding() const { return encoding; }
+    [[nodiscard]] constexpr const char_t*  bytesWithoutTerminator() const { return text.data; }
+    [[nodiscard]] constexpr const char_t*  bytesIncludingTerminator() const { return text.data; }
 
-    [[nodiscard]] Comparison compareASCII(StringView other) const { return text.compare(other.text); }
+    [[nodiscard]] Comparison compareASCII(StringView other) const
+    {
+        const int res = memcmp(text.data, other.text.data, min(text.size, other.text.size));
+        if (res < 0)
+            return Comparison::Smaller;
+        else if (res == 0)
+            return Comparison::Equals;
+        else
+            return Comparison::Bigger;
+    }
 
-    [[nodiscard]] bool operator<(StringView other) const { return text.compare(other.text) == Comparison::Smaller; }
+    [[nodiscard]] bool operator<(StringView other) const { return compareASCII(other) == Comparison::Smaller; }
 
     template <typename StringIterator>
     StringIterator getIterator() const
@@ -63,7 +76,10 @@ struct SC::StringView
         return StringIterator(bytesWithoutTerminator(), bytesWithoutTerminator() + sizeInBytes());
     }
 
-    [[nodiscard]] bool             operator==(StringView other) const { return text.equalsContent(other.text); }
+    [[nodiscard]] bool operator==(StringView other) const
+    {
+        return text.size == other.text.size ? memcmp(text.data, other.text.data, text.size) == 0 : false;
+    }
     [[nodiscard]] bool             operator!=(StringView other) const { return not operator==(other); }
     [[nodiscard]] constexpr bool   isEmpty() const { return text.data == nullptr || text.size == 0; }
     [[nodiscard]] constexpr bool   isNullTerminated() const { return hasNullTerm; }
@@ -76,7 +92,7 @@ struct SC::StringView
     {
         if (str.text.size <= text.size)
         {
-            const StringView ours(text.data, str.text.size, false);
+            const StringView ours(text.data, str.text.size, false, encoding);
             return str == ours;
         }
         return false;
@@ -85,7 +101,7 @@ struct SC::StringView
     {
         if (str.sizeInBytes() <= sizeInBytes())
         {
-            const StringView ours(text.data + text.size - str.text.size, str.text.size, false);
+            const StringView ours(text.data + text.size - str.text.size, str.text.size, false, encoding);
             return str == ours;
         }
         return false;
@@ -105,34 +121,37 @@ struct SC::StringView
     template <typename StringIterator>
     static StringView fromIterators(StringIterator from, StringIterator to)
     {
-        if (to.getStart() <= from.getEnd() && to.getStart() >= from.getStart())
+        if (to.getIt() <= from.getEnd() && to.getIt() >= from.getIt())
         {
-            return StringView(from.getStart(), to.getStart() - from.getStart(), false);
+            return StringView(from.getIt(), to.getIt() - from.getIt(), false, StringIterator::getEncoding());
         }
         return StringView();
     }
 
     /// Returns a section of a string.
-    /// @param from The index to the beginning of the specified portion of StringView. The substring includes the
-    /// characters up to the end.
+    /// @param it The index to the beginning of the specified portion of StringView. The substring includes the
+    /// characters up to iterator end.
     template <typename StringIterator>
-    static StringView fromIterator(StringIterator from)
+    static StringView fromIteratorUntilEnd(StringIterator it)
     {
-        return StringView(from.getStart(), from.getEnd() - from.getStart(), false);
+        return StringView(it.getIt(), it.getEnd() - it.getIt(), false, StringIterator::getEncoding());
     }
-    template <typename StringIterator = StringIteratorASCII>
-    size_t sizeCodePoints() const;
 
-    template <>
-    size_t sizeCodePoints<StringIteratorASCII>() const
+    /// Returns a section of a string.
+    /// @param it The index to the beginning of the specified portion of StringView. The substring includes the
+    /// characters from iterator start up to its current position
+    template <typename StringIterator>
+    static StringView fromIteratorFromStart(StringIterator it)
     {
-        return sizeInBytes();
+        return StringView(it.getStart(), it.getIt() - it.getStart(), false, StringIterator::getEncoding());
     }
+
+    size_t sizeASCII() const { return sizeInBytes(); }
     /// Returns a section of a string.
     /// @param start The index to the beginning of the specified portion of StringView.
     /// @param end The index to the end of the specified portion of StringView. The substring includes the characters up
     /// to, but not including, the character indicated by end.
-    template <typename StringIterator = StringIteratorASCII>
+    template <typename StringIterator>
     [[nodiscard]] StringView sliceStartEnd(size_t start, size_t end) const
     {
         StringIterator it = getIterator<StringIterator>();
@@ -140,7 +159,7 @@ struct SC::StringView
         StringIterator startIt = it;
         SC_RELEASE_ASSERT(start <= end && it.advanceCodePoints(end - start));
         const auto distance = it.bytesDistanceFrom(startIt);
-        return StringView(startIt.getStart(), distance, start + distance == sizeInBytesIncludingTerminator());
+        return StringView(startIt.getIt(), distance, start + distance == sizeInBytesIncludingTerminator(), encoding);
     }
 
     /// Returns a section of a string.
@@ -198,7 +217,13 @@ struct SC::StringView
 };
 
 #if SC_MSVC
-inline SC::StringView operator"" _sv(const char* txt, size_t sz) { return SC::StringView(txt, sz, true); }
+inline SC::StringView operator"" _sv(const char* txt, size_t sz)
+{
+    return SC::StringView(txt, sz, true, SC::StringEncoding::Utf8);
+}
 #else
-inline SC::StringView operator"" _sv(const SC::char_t* txt, SC::size_t sz) { return SC::StringView(txt, sz, true); }
+inline SC::StringView operator"" _sv(const SC::char_t* txt, SC::size_t sz)
+{
+    return SC::StringView(txt, sz, true, SC::StringEncoding::Utf8);
+}
 #endif

@@ -14,10 +14,13 @@ namespace SC
 {
 struct Path;
 struct PathView;
+struct PathParsedView;
+struct Extension;
+struct FileName;
 } // namespace SC
 
 // Holds parsing windows and posix path and name/extension pairs
-struct SC::PathView
+struct SC::PathParsedView
 {
     enum Type
     {
@@ -26,6 +29,8 @@ struct SC::PathView
         TypePosix        // Path is a posix type
     };
     bool endsWithSeparator = false;
+
+    // TODO: PathParsedView::directory and base are not defined consistently
 
     Type       type = TypeInvalid; // Indicates if this is a windows or posix path
     StringView root;               // Ex. "C:\\" on windows - "/" on posix
@@ -45,6 +50,16 @@ struct SC::PathView
     [[nodiscard]] bool parsePosix(StringView input);
 };
 
+// Wraps a string view that is meant to be used as path
+struct SC::PathView
+{
+    PathView() : valid(false) {}
+    PathView(const StringView path) : path(path), valid(true) {}
+
+    const StringView path;
+    const bool       valid;
+};
+
 // Allow parsing windows and posix path and name/extension pairs
 struct SC::Path
 {
@@ -57,9 +72,41 @@ struct SC::Path
 
     /// Splits a Posix or Windows path of type "/usr/dir/base" into root=/ - directory=/usr/dir - base=base
     /// (or "C:\\directory\\base" into root=C:\\ - directory=C:\\directory\\ - base=base)
-    [[nodiscard]] static Error parse(StringView input, PathView& pathView);
+    [[nodiscard]] static bool parse(StringView input, PathParsedView& pathView);
 
+    /// Return the directory name of a path. Trailing spearators are ignored.
+    [[nodiscard]] static StringView dirname(StringView input);
+    /// Return the base name of a path. Trailing spearators are ignored.
+    [[nodiscard]] static StringView basename(StringView input);
+    /// Return the base name of a path. Suffix is stripped if existing. Trailing spearators are ignored.
+    [[nodiscard]] static StringView basename(StringView input, StringView suffix);
+
+    struct Windows
+    {
+        static const char Separator = '\\';
+        /// Return the directory name of a path. Trailing spearators are ignored.
+        [[nodiscard]] static StringView dirname(StringView input);
+        /// Return the base name of a path. Trailing spearators are ignored.
+        [[nodiscard]] static StringView basename(StringView input);
+        /// Return the base name of a path. Suffix is stripped if existing. Trailing spearators are ignored.
+        [[nodiscard]] static StringView basename(StringView input, StringView suffix);
+    };
+    struct Posix
+    {
+        static const char Separator = '/';
+        /// Return the directory name of a path. Trailing spearators are ignored.
+        [[nodiscard]] static StringView dirname(StringView input);
+        /// Return the base name of a path. Trailing spearators are ignored.
+        [[nodiscard]] static StringView basename(StringView input);
+        /// Return the base name of a path. Suffix is stripped if existing. Trailing spearators are ignored.
+        [[nodiscard]] static StringView basename(StringView input, StringView suffix);
+    };
+#if SC_PLATFORM_WINDOWS
+    static const char Separator = '\\';
+#else
+    static const char Separator = '/';
+#endif
   private:
-    friend struct PathView;
+    friend struct PathParsedView;
     struct Internal;
 };

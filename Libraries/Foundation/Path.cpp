@@ -13,7 +13,7 @@ struct SC::Path::Internal
         auto itBackup = it;
         if (!it.isEmpty())
         {
-            const char_t letter = *it.getStart();
+            const char_t letter = *it.getIt();
             if ((letter >= 'a' && letter <= 'z') || (letter >= 'A' && letter <= 'Z'))
             {
                 if (it.skipNext() && it.matches(':') && it.skipNext() && it.matches('\\'))
@@ -21,6 +21,20 @@ struct SC::Path::Internal
                     (void)it.skipNext();
                     return StringView::fromIterators(itBackup, it);
                 }
+            }
+            // Try parasing network form
+            it = itBackup;
+            if (it.matches('\\') && it.skipNext() && it.matches('\\'))
+            {
+                (void)it.skipNext();
+                auto itCheckpoint = it;
+                // Try parsing long path form that includes ? and another backslash
+                if (it.matches('?') && it.skipNext() && it.matches('\\'))
+                {
+                    (void)it.skipNext();
+                    return StringView::fromIterators(itBackup, it);
+                }
+                return StringView::fromIterators(itBackup, itCheckpoint);
             }
         }
         return StringView();
@@ -44,16 +58,16 @@ struct SC::Path::Internal
     {
         // Parse the base
         auto it = input.getIterator<StringIteratorASCII>();
+        it.rewindToEnd();
         (void)it.reverseUntilMatches(separator);
         (void)it.skipNext();
-        return StringView::fromIterator(it);
+        return StringView::fromIteratorUntilEnd(it);
     }
 
     template <char separator>
     static bool rootIsFollowedByOnlySeparators(const StringView input, const StringView root)
     {
-        StringView remaining = input.sliceStartEnd<StringIteratorASCII>(root.sizeCodePoints<StringIteratorASCII>(),
-                                                                        input.sizeCodePoints<StringIteratorASCII>());
+        StringView remaining = input.sliceStartEnd<StringIteratorASCII>(root.sizeASCII(), input.sizeASCII());
         auto       it        = remaining.getIterator<StringIteratorASCII>();
         bool       endsWithAllSeparators = true;
         while (!it.isEmpty())
@@ -69,6 +83,7 @@ struct SC::Path::Internal
     {
         auto       it       = input.getIterator<StringIteratorASCII>();
         const auto itBackup = it;
+        it.rewindToEnd();
         if (it.reverseUntilMatches(separator))
         {
             const StringView directory = StringView::fromIterators(itBackup, it);
@@ -83,6 +98,50 @@ struct SC::Path::Internal
             return directory;
         }
         return StringView();
+    }
+
+    template <char separator>
+    static SC::StringView dirname(StringView input)
+    {
+        StringView dirn;
+        StringView base = basename<separator>(input, &dirn);
+        if (dirn.isEmpty())
+        {
+            return StringView(".");
+        }
+        return dirn;
+    }
+
+    template <char separator>
+    static SC::StringView basename(StringView input, StringView* dir = nullptr)
+    {
+        auto it = input.getIterator<StringIteratorASCII>();
+        it.rewindToEnd();
+        while (it.skipPrev() and it.matches(separator)) {}
+        auto itEnd = it;
+        (void)itEnd.skipNext();
+        if (it.reverseUntilMatches(separator))
+        {
+            (void)it.skipNext();
+            if (dir)
+            {
+                (void)it.skipPrev();
+                *dir = StringView::fromIteratorFromStart(it);
+            }
+            return StringView::fromIterators(it, itEnd);
+        }
+        return input;
+    }
+
+    template <char separator>
+    static SC::StringView basename(StringView input, StringView suffix)
+    {
+        StringView name = basename<separator>(input);
+        if (name.endsWith(suffix))
+        {
+            return name.sliceStartEnd<StringIteratorASCII>(0, name.sizeInBytes() - suffix.sizeInBytes());
+        }
+        return name;
     }
 
     /// Splits a Windows path of type "C:\\directory\\base" into root=C:\\ - directory=C:\\directory\\ - base=base
@@ -130,11 +189,12 @@ bool SC::Path::parseNameExtension(const StringView input, StringView& name, Stri
     StringIteratorASCII itBackup = it;
     // Try searching for a '.' but if it's not found then just set the entire content
     // to be the name.
+    it.rewindToEnd();
     if (it.reverseUntilMatches('.'))
     {
-        name = StringView::fromIterators(itBackup, it); // from 'name.ext' keep 'name'
-        (void)it.skipNext();                            // skip the .
-        extension = StringView::fromIterator(it);       // from 'name.ext' keep 'ext'
+        name = StringView::fromIterators(itBackup, it);   // from 'name.ext' keep 'name'
+        (void)it.skipNext();                              // skip the .
+        extension = StringView::fromIteratorUntilEnd(it); // from 'name.ext' keep 'ext'
     }
     else
     {
@@ -144,23 +204,16 @@ bool SC::Path::parseNameExtension(const StringView input, StringView& name, Stri
     return !(name.isEmpty() && extension.isEmpty());
 }
 
-SC::Error SC::Path::parse(StringView input, PathView& pathView)
+bool SC::Path::parse(StringView input, PathParsedView& pathView)
 {
 #if SC_PLATFORM_WINDOWS
-    if (pathView.parseWindows(input))
-    {
-        return {};
-    }
+    return pathView.parseWindows(input);
 #else
-    if (pathView.parsePosix(input))
-    {
-        return {};
-    }
+    return pathView.parsePosix(input);
 #endif
-    return "Cannot Parse path"_sv;
 }
 
-bool SC::PathView::parseWindows(StringView input)
+bool SC::PathParsedView::parseWindows(StringView input)
 {
     type = TypeInvalid;
     if (!Path::Internal::parseWindows(input, root, directory, base, endsWithSeparator))
@@ -176,7 +229,7 @@ bool SC::PathView::parseWindows(StringView input)
     return true;
 }
 
-bool SC::PathView::parsePosix(StringView input)
+bool SC::PathParsedView::parsePosix(StringView input)
 {
     type = TypeInvalid;
     if (!Path::Internal::parsePosix(input, root, directory, base, endsWithSeparator))
@@ -190,4 +243,31 @@ bool SC::PathView::parsePosix(StringView input)
     }
     type = TypePosix;
     return true;
+}
+
+SC::StringView SC::Path::dirname(StringView input) { return Internal::dirname<Separator>(input); }
+
+SC::StringView SC::Path::basename(StringView input) { return Internal::basename<Separator>(input); }
+
+SC::StringView SC::Path::basename(StringView input, StringView suffix)
+{
+    return Internal::basename<Separator>(input, suffix);
+}
+
+SC::StringView SC::Path::Windows::dirname(StringView input) { return Internal::dirname<Separator>(input); }
+
+SC::StringView SC::Path::Windows::basename(StringView input) { return Internal::basename<Separator>(input); }
+
+SC::StringView SC::Path::Windows::basename(StringView input, StringView suffix)
+{
+    return Internal::basename<Separator>(input, suffix);
+}
+
+SC::StringView SC::Path::Posix::dirname(StringView input) { return Internal::dirname<Separator>(input); }
+
+SC::StringView SC::Path::Posix::basename(StringView input) { return Internal::basename<Separator>(input); }
+
+SC::StringView SC::Path::Posix::basename(StringView input, StringView suffix)
+{
+    return Internal::basename<Separator>(input, suffix);
 }

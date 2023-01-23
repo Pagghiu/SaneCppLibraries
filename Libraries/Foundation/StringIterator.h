@@ -2,14 +2,27 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "Assert.h"
 #include "Types.h"
 
 namespace SC
 {
+enum class StringEncoding : uint8_t
+{
+    Ascii = 0,
+    Utf8  = 1,
+    Utf16 = 2,
+    Utf32 = 3,
+};
 
 struct StringIteratorASCII
 {
-    StringIteratorASCII(const char_t* it, const char_t* end) : it(it), end(end) {}
+    StringIteratorASCII(const char_t* it, const char_t* end) : it(it), start(it), end(end) {}
+
+    static StringEncoding getEncoding() { return StringEncoding::Ascii; }
+
+    void rewindToStart() { it = start; }
+    void rewindToEnd() { it = end; }
 
     [[nodiscard]] bool advanceUntilMatches(char_t c)
     {
@@ -32,9 +45,7 @@ struct StringIteratorASCII
     }
     [[nodiscard]] bool reverseUntilMatches(char_t c)
     {
-        auto startBackup = it;
-        it               = end;
-        while (it != startBackup)
+        while (it != start)
         {
             --it;
             if (*it == c)
@@ -86,6 +97,16 @@ struct StringIteratorASCII
         return false;
     }
 
+    [[nodiscard]] bool skipPrev()
+    {
+        if (it != start)
+        {
+            --it;
+            return true;
+        }
+        return false;
+    }
+
     [[nodiscard]] bool advanceCodePoints(size_t numCodePoints)
     {
         while (numCodePoints-- > 0)
@@ -132,11 +153,13 @@ struct StringIteratorASCII
 
     [[nodiscard]] size_t bytesDistanceFrom(StringIteratorASCII other) const { return it - other.it; }
 
-    const char_t* getStart() const { return it; }
+    const char_t* getStart() const { return start; }
+    const char_t* getIt() const { return it; }
     const char_t* getEnd() const { return end; }
 
   private:
     const char_t* it;
+    const char_t* start;
     const char_t* end;
 };
 

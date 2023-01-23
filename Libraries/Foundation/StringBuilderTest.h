@@ -18,7 +18,7 @@ struct SC::StringBuilderTest : public SC::TestCase
         if (test_section("edge_cases"))
         {
             StringBuilder builder;
-            SC_TEST_EXPECT(builder.appendFormatASCII(StringView(nullptr, 0, true)));
+            SC_TEST_EXPECT(builder.appendFormatASCII(StringView(nullptr, 0, true, StringEncoding::Ascii)));
             SC_TEST_EXPECT(builder.toString().isEmpty());
             SC_TEST_EXPECT(builder.appendFormatASCII(""));
             SC_TEST_EXPECT(builder.toString().isEmpty());
@@ -54,7 +54,7 @@ struct SC::StringBuilderTest : public SC::TestCase
         if (test_section("append"))
         {
             StringBuilder builder;
-            SC_TEST_EXPECT(builder.append(StringView("asdf", 3, false)));
+            SC_TEST_EXPECT(builder.append(StringView("asdf", 3, false, StringEncoding::Ascii)));
             SC_TEST_EXPECT(builder.append("asd"));
             SC_TEST_EXPECT(builder.append(String("asd")));
             SC_TEST_EXPECT(builder.toString() == "asdasdasd");
@@ -108,7 +108,7 @@ struct SC::StringBuilderTest : public SC::TestCase
             SC_TEST_EXPECT(builder.toString() == "__asd__");
             SC_TEST_EXPECT(builder.appendFormatASCII("__{}__", StringView("")));
             SC_TEST_EXPECT(builder.toString() == "____");
-            SC_TEST_EXPECT(builder.appendFormatASCII("__{}__", StringView(nullptr, 0, true)));
+            SC_TEST_EXPECT(builder.appendFormatASCII("__{}__", StringView(nullptr, 0, true, StringEncoding::Ascii)));
             SC_TEST_EXPECT(builder.toString() == "____");
             SC_TEST_EXPECT(builder.appendFormatASCII("__{}__", String("asd")));
             SC_TEST_EXPECT(builder.toString() == "__asd__");

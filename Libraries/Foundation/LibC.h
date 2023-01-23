@@ -14,7 +14,7 @@ extern "C"
     void* __cdecl memset(void* dst, SC::int32_t c, size_t len);
     [[nodiscard]] void const* __cdecl memchr(const void* ptr, SC::int32_t c, size_t count);
     __declspec(dllimport) SC::int32_t __cdecl atoi(const SC::char_t* str);
-    __declspec(dllimport) SC::size_t __cdecl strlen(const SC::char_t* str);
+    SC::size_t __cdecl strlen(const SC::char_t* str);
 #else
     void        exit(SC::int32_t val) __attribute__((__noreturn__));
     void*       memcpy(void* dst, const void* src, SC::size_t n);

@@ -126,7 +126,7 @@ struct SC::VectorTestClass
         }
         else
         {
-            return StringView(data, strlen(data), true);
+            return StringView(data, strlen(data), true, StringEncoding::Ascii);
         }
     }
 

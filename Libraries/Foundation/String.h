@@ -31,7 +31,7 @@ struct SC::String
         if (data.isEmpty())
             return StringView();
         else
-            return StringView(data.items, data.size() - 1, true);
+            return StringView(data.items, data.size() - 1, true, StringEncoding::Utf8);
     }
 
     [[nodiscard]] bool operator==(const String& other) const { return view() == (other.view()); }

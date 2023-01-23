@@ -76,6 +76,9 @@ using false_type = IntegralConstant<bool, false>;
 template <typename T> struct IsConst            : public false_type { typedef T type; };
 template <typename T> struct IsConst<const T>   : public true_type  { typedef T type; };
 
+template <typename T> struct IsVoid : public false_type { typedef T type; };
+template <> struct IsVoid<void>     : public true_type  { typedef void type; };
+
 template <class T> struct IsEmpty : public IntegralConstant<bool, __is_empty(T)> {};
 
 template <typename T>

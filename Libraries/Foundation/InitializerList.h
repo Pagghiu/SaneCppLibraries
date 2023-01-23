@@ -26,10 +26,8 @@ class _LIBCPP_TEMPLATE_VIS initializer_list
     initializer_list(const _Ep* __b, size_t __s) _NOEXCEPT : __begin_(__b), __size_(__s) {}
 
   public:
-    typedef _Ep        value_type;
-    typedef const _Ep& reference;
-    typedef const _Ep& const_reference;
-    typedef size_t     size_type;
+    typedef _Ep value_type;
+    typedef size_t size_type;
 
     typedef const _Ep* iterator;
     typedef const _Ep* const_iterator;

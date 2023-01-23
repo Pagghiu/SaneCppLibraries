@@ -235,12 +235,14 @@ struct SC::ReflectionTest : public SC::TestCase
         {
             constexpr auto       className    = TypeToString<TestNamespace::ComplexStructure>::get();
             constexpr StringView classNameStr = "TestNamespace::ComplexStructure";
-            static_assert(constexprEquals(StringView(className.data, className.length, false), classNameStr),
+            static_assert(constexprEquals(StringView(className.data, className.length, false, StringEncoding::Ascii),
+                                          classNameStr),
                           "Please update SC::ClNm for your compiler");
             constexpr auto       intName    = TypeToString<int>::get();
             constexpr StringView intNameStr = "int";
-            static_assert(constexprEquals(StringView(intName.data, intName.length, false), intNameStr),
-                          "Please update SC::ClNm for your compiler");
+            static_assert(
+                constexprEquals(StringView(intName.data, intName.length, false, StringEncoding::Ascii), intNameStr),
+                "Please update SC::ClNm for your compiler");
             constexpr auto ComplexStructureFlatSchema =
                 FlatSchemaTypeErased::compile<TestNamespace::ComplexStructure>();
             printFlatSchema(ComplexStructureFlatSchema.properties.values, ComplexStructureFlatSchema.names.values);

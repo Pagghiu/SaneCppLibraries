@@ -21,7 +21,7 @@ struct SC::ResultTest : public SC::TestCase
             auto res   = getString(false);
             auto value = res.releaseValue();
             SC_TEST_EXPECT(!res.isError());
-            StringView sv(value.data(), static_cast<uint32_t>(value.size() - 1), true);
+            StringView sv(value.data(), static_cast<uint32_t>(value.size() - 1), true, StringEncoding::Ascii);
             SC_TEST_EXPECT(sv == "CIAO!");
         }
         if (test_section("nested_succeed"))

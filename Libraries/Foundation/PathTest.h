@@ -13,10 +13,22 @@ struct SC::PathTest : public SC::TestCase
 {
     PathTest(SC::TestReport& report) : TestCase(report, "PathTest")
     {
-        // TODO: PathView::directory and base are not defined consistently
-        if (test_section("PathView::parsePosix"))
+        if (test_section("Path::dirname"))
         {
-            PathView path;
+            SC_TEST_EXPECT(Path::Posix::dirname("/dirname/basename") == "/dirname");
+            SC_TEST_EXPECT(Path::Posix::dirname("/dirname/basename//") == "/dirname");
+            SC_TEST_EXPECT(Path::Windows::dirname("C:\\dirname\\basename") == "C:\\dirname");
+            SC_TEST_EXPECT(Path::Windows::dirname("\\dirname\\basename\\\\") == "\\dirname");
+        }
+        if (test_section("Path::basename"))
+        {
+            SC_TEST_EXPECT(Path::Posix::basename("/a/basename") == "basename");
+            SC_TEST_EXPECT(Path::Posix::basename("/a/basename//") == "basename");
+            SC_TEST_EXPECT(Path::Posix::basename("/a/basename.html", ".html") == "basename");
+        }
+        if (test_section("PathParsedView::parsePosix"))
+        {
+            PathParsedView path;
             SC_TEST_EXPECT(path.parsePosix("/123/456"));
             SC_TEST_EXPECT(path.root == "/");
             SC_TEST_EXPECT(path.directory == "/123");
@@ -42,9 +54,9 @@ struct SC::PathTest : public SC::TestCase
             SC_TEST_EXPECT(path.endsWithSeparator == true);
         }
 
-        if (test_section("PathView::parseWindows"))
+        if (test_section("PathParsedView::parseWindows"))
         {
-            PathView path;
+            PathParsedView path;
             SC_TEST_EXPECT(!path.parseWindows("\\"));
             SC_TEST_EXPECT(!path.parseWindows(""));
             SC_TEST_EXPECT(!path.parseWindows(":"));
@@ -98,6 +110,22 @@ struct SC::PathTest : public SC::TestCase
             SC_TEST_EXPECT(path.name == "name"_sv);
             SC_TEST_EXPECT(path.ext == "ext"_sv);
             SC_TEST_EXPECT(path.endsWithSeparator == false);
+
+            SC_TEST_EXPECT(path.parseWindows("\\\\ASD\\bbb\\name.ext"));
+            SC_TEST_EXPECT(path.root == "\\\\"_sv);
+            SC_TEST_EXPECT(path.directory == "\\\\ASD\\bbb"_sv);
+            SC_TEST_EXPECT(path.base == "name.ext"_sv);
+            SC_TEST_EXPECT(path.name == "name"_sv);
+            SC_TEST_EXPECT(path.ext == "ext"_sv);
+            SC_TEST_EXPECT(path.endsWithSeparator == false);
+
+            SC_TEST_EXPECT(path.parseWindows("\\\\?\\ASD\\bbb\\name.ext"));
+            SC_TEST_EXPECT(path.root == "\\\\?\\"_sv);
+            SC_TEST_EXPECT(path.directory == "\\\\?\\ASD\\bbb"_sv);
+            SC_TEST_EXPECT(path.base == "name.ext"_sv);
+            SC_TEST_EXPECT(path.name == "name"_sv);
+            SC_TEST_EXPECT(path.ext == "ext"_sv);
+            SC_TEST_EXPECT(path.endsWithSeparator == false);
         }
 
         if (test_section("Path::parseNameExtension"))
@@ -131,11 +159,11 @@ struct SC::PathTest : public SC::TestCase
         if (test_section("Path::parse"))
         {
 #if SC_PLATFORM_WINDOWS
-            PathView view;
+            PathParsedView view;
             SC_TEST_EXPECT(Path::parse("C:\\dir\\base.ext", view));
             SC_TEST_EXPECT(view.directory == "C:\\dir");
 #else
-            PathView view;
+            PathParsedView view;
             SC_TEST_EXPECT(Path::parse("/usr/dir/base.ext", view));
             SC_TEST_EXPECT(view.directory == "/usr/dir");
 #endif

@@ -49,7 +49,7 @@ struct SC::StringViewTest : public SC::TestCase
             other = "-123";
             SC_TEST_EXPECT(other.parseInt32(&value));
             SC_TEST_EXPECT(value == -123);
-            other = StringView("-456___", 4, false);
+            other = StringView("-456___", 4, false, StringEncoding::Ascii);
             SC_TEST_EXPECT(other.parseInt32(&value));
             SC_TEST_EXPECT(value == -456);
         }
@@ -80,9 +80,9 @@ struct SC::StringViewTest : public SC::TestCase
             StringView str = "123_567";
             SC_TEST_EXPECT(str.sliceStartLength(7, 0) == "");
             SC_TEST_EXPECT(str.sliceStartLength(0, 3) == "123");
-            SC_TEST_EXPECT(str.sliceStartEnd(0, 3) == "123");
+            SC_TEST_EXPECT(str.sliceStartEnd<StringIteratorASCII>(0, 3) == "123");
             SC_TEST_EXPECT(str.sliceStartLength(4, 3) == "567");
-            SC_TEST_EXPECT(str.sliceStartEnd(4, 7) == "567");
+            SC_TEST_EXPECT(str.sliceStartEnd<StringIteratorASCII>(4, 7) == "567");
         }
         if (test_section("split"))
         {

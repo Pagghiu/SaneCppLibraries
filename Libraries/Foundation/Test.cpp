@@ -14,12 +14,12 @@ SC::TestReport::TestReport(int argc, const char** argv)
 {
     for (int idx = 1; idx < argc; ++idx)
     {
-        const auto param = StringView(argv[idx], strlen(argv[idx]), true);
+        const auto param = StringView(argv[idx], strlen(argv[idx]), true, StringEncoding::Utf8);
         if (param == "--test" && testToRun.isEmpty())
         {
             if (idx + 1 < argc)
             {
-                testToRun = StringView(argv[idx + 1], strlen(argv[idx + 1]), true);
+                testToRun = StringView(argv[idx + 1], strlen(argv[idx + 1]), true, StringEncoding::Utf8);
 
                 Console::c_printf("TestReport::Running single test \"%s\"\n", argv[idx + 1]);
             }
@@ -28,7 +28,7 @@ SC::TestReport::TestReport(int argc, const char** argv)
         {
             if (idx + 1 < argc)
             {
-                sectionToRun = StringView(argv[idx + 1], strlen(argv[idx + 1]), true);
+                sectionToRun = StringView(argv[idx + 1], strlen(argv[idx + 1]), true, StringEncoding::Utf8);
 
                 Console::c_printf("TestReport::Running single section \"%s\"\n", argv[idx + 1]);
             }

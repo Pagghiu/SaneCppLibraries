@@ -1,9 +1,10 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "StringBuilder.h"
 #include <stdarg.h> // va_list
 #include <stdio.h>  // vsnprintf
+
+#include "StringBuilder.h"
 
 bool SC::StringBuilder::assignStringView(StringView sv)
 {
