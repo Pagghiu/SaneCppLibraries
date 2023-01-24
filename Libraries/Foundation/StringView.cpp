@@ -2,12 +2,11 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "StringView.h"
-#include "StringUtility.h"
 
-// TODO: Use StringIterator
-bool SC::StringView::parseInt32(int32_t* value) const
+template <>
+bool SC::StringView::parseInt32<SC::StringIteratorASCII>(int32_t* value) const
 {
-    if (isIntegerNumber(text))
+    if (isIntegerNumber<StringIteratorASCII>())
     {
         if (hasNullTerm)
         {
@@ -27,4 +26,29 @@ bool SC::StringView::parseInt32(int32_t* value) const
     {
         return false;
     }
+}
+
+template <typename StringIterator>
+bool SC::StringView::isIntegerNumber() const
+{
+    if (text.sizeInBytes() == 0)
+        return false;
+    StringIteratorASCII it = getIterator<StringIterator>();
+    if (it.matchesAny({'-', '+'}))
+    {
+        (void)it.skipNext();
+    }
+
+    // From here, first is either a sign (and size > 1) or a digit
+    // We just look for non-digits
+    bool matchedAtLeastOneDigit = false;
+    do
+    {
+        if (not it.matchesAny({'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}))
+        {
+            return false;
+        }
+        matchedAtLeastOneDigit = true;
+    } while (it.skipNext());
+    return matchedAtLeastOneDigit;
 }

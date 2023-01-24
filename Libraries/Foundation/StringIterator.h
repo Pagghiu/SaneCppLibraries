@@ -87,12 +87,22 @@ struct StringIteratorASCII
 
     [[nodiscard]] bool matches(char_t c) const { return *it == c; }
 
+    [[nodiscard]] bool matchesAny(std::initializer_list<char> items) const
+    {
+        for (auto i : items)
+        {
+            if (*it == i)
+                return true;
+        }
+        return false;
+    }
+
     [[nodiscard]] bool skipNext()
     {
         if (it != end)
         {
             ++it;
-            return true;
+            return it != end;
         }
         return false;
     }
@@ -102,7 +112,7 @@ struct StringIteratorASCII
         if (it != start)
         {
             --it;
-            return true;
+            return it != start;
         }
         return false;
     }

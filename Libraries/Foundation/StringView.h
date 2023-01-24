@@ -97,7 +97,6 @@ struct SC::StringView
     {
         return text.sizeInBytes() > 0 ? text.sizeInBytes() + 1 : 0;
     }
-    [[nodiscard]] bool parseInt32(int32_t* value) const;
     [[nodiscard]] bool endsWith(char_t c) const { return isEmpty() ? false : text.data()[text.sizeInBytes() - 1] == c; }
     [[nodiscard]] bool startsWith(char_t c) const { return isEmpty() ? false : text.data()[0] == c; }
     [[nodiscard]] bool startsWith(const StringView str) const
@@ -134,6 +133,7 @@ struct SC::StringView
     template <typename StringIterator>
     static StringView fromIterators(StringIterator from, StringIterator to)
     {
+        // TODO: Make StringView::fromIterators return bool to make it fallible
         if (to.getIt() <= from.getEnd() && to.getIt() >= from.getIt())
         {
             return StringView(from.getIt(), to.getIt() - from.getIt(), false, StringIterator::getEncoding());
@@ -227,6 +227,18 @@ struct SC::StringView
         }
         return numSplits;
     }
+
+    /// If the current view is an integer number, returns true
+    template <typename StringIterator>
+    [[nodiscard]] bool isIntegerNumber() const;
+
+    /// Parses int32_t, returning false if it fails
+    template <typename StringIterator>
+    [[nodiscard]] bool parseInt32(int32_t* value) const;
+
+    /// Parses int32_t, returning false if it fails
+    template <>
+    [[nodiscard]] bool parseInt32<StringIteratorASCII>(int32_t* value) const;
 };
 
 #if SC_MSVC

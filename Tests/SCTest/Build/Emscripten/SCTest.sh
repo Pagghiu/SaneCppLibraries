@@ -64,7 +64,6 @@ Libraries/Foundation/String.cpp           \
 Libraries/Foundation/StringBuilder.cpp    \
 Libraries/Foundation/StringConverter.cpp  \
 Libraries/Foundation/StringFormat.cpp     \
-Libraries/Foundation/StringUtility.cpp    \
 Libraries/Foundation/StringView.cpp       \
 Libraries/Foundation/Test.cpp             \
 ${SCRIPT_DIR}/../../SCTest.cpp
