@@ -283,8 +283,8 @@ inline int printAtoms(int currentAtomIdx, const MetaProperties* atom, const SC::
 
         for (int i = 0; i < indentation + 1; ++i)
             Console::c_printf("\t");
-        Console::c_printf("Type=%d\tOffset=%d\tSize=%d\tName=%.*s", (int)field.type, field.offset, field.size,
-                          fieldName.length, fieldName.data);
+        Console::c_printf("Type=%d\tOffset=%d\tSize=%d\tName=%.*s", (int)field.type, field.offsetInBytes,
+                          field.sizeInBytes, fieldName.length, fieldName.data);
         if (field.getLinkIndex() >= 0)
         {
             Console::c_printf("\t[LinkIndex=%d]", field.getLinkIndex());

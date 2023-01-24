@@ -50,14 +50,14 @@ struct VersionSchema
 
     int sourceTypeIndex = 0;
 
-    constexpr Reflection::MetaProperties current() const { return sourceProperties.data[sourceTypeIndex]; }
+    constexpr Reflection::MetaProperties current() const { return sourceProperties.data()[sourceTypeIndex]; }
 
     constexpr void advance() { sourceTypeIndex++; }
 
     constexpr void resolveLink()
     {
-        if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
-            sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
+        if (sourceProperties.data()[sourceTypeIndex].getLinkIndex() >= 0)
+            sourceTypeIndex = sourceProperties.data()[sourceTypeIndex].getLinkIndex();
     }
 
     template <typename BinaryStream>
@@ -149,7 +149,7 @@ struct SerializerItems
             Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
         if (isMemcpyable)
         {
-            const size_t sourceNumBytes = schema.current().size * numSourceItems;
+            const size_t sourceNumBytes = schema.current().sizeInBytes * numSourceItems;
             const size_t destNumBytes   = numDestinationItems * sizeof(T);
             const size_t minBytes       = min(destNumBytes, sourceNumBytes);
             SC_TRY_IF(stream.serialize({object, minBytes}));
@@ -255,7 +255,7 @@ struct Serializer<BinaryStream, SC::Vector<T>> : public SerializerVector<BinaryS
         schema.advance();
         const bool isMemcpyable =
             Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
-        const size_t   sourceItemSize = schema.current().size;
+        const size_t   sourceItemSize = schema.current().sizeInBytes;
         const uint32_t numSourceItems = static_cast<uint32_t>(sizeInBytes / sourceItemSize);
         if (isMemcpyable)
         {
@@ -283,7 +283,7 @@ struct Serializer<BinaryStream, SC::Array<T, N>> : public SerializerVector<Binar
         const bool isMemcpyable =
             Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
 
-        const size_t   sourceItemSize      = schema.current().size;
+        const size_t   sourceItemSize      = schema.current().sizeInBytes;
         const uint32_t numSourceItems      = static_cast<uint32_t>(sizeInBytes / sourceItemSize);
         const uint32_t numDestinationItems = static_cast<uint32_t>(N);
         if (isMemcpyable)

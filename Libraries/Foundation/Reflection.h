@@ -44,28 +44,29 @@ enum class MetaType : uint8_t
 
 struct MetaProperties
 {
-    MetaType type;        // 1
-    int8_t   numSubAtoms; // 1
-    uint16_t order;       // 2
-    uint16_t offset;      // 2
-    uint16_t size;        // 2
+    MetaType type;          // 1
+    int8_t   numSubAtoms;   // 1
+    uint16_t order;         // 2
+    uint16_t offsetInBytes; // 2
+    uint16_t sizeInBytes;   // 2
 
-    constexpr MetaProperties() : type(MetaType::TypeInvalid), order(0), offset(0), size(0), numSubAtoms(0)
+    constexpr MetaProperties() : type(MetaType::TypeInvalid), order(0), offsetInBytes(0), sizeInBytes(0), numSubAtoms(0)
     {
         static_assert(sizeof(MetaProperties) == 8, "Size must be 8 bytes");
     }
-    constexpr MetaProperties(MetaType type, uint8_t order, uint16_t offset, uint16_t size, int8_t numSubAtoms)
-        : type(type), order(order), offset(offset), size(size), numSubAtoms(numSubAtoms)
+    constexpr MetaProperties(MetaType type, uint8_t order, uint16_t offsetInBytes, uint16_t sizeInBytes,
+                             int8_t numSubAtoms)
+        : type(type), order(order), offsetInBytes(offsetInBytes), sizeInBytes(sizeInBytes), numSubAtoms(numSubAtoms)
     {}
     constexpr void                   setLinkIndex(int8_t linkIndex) { numSubAtoms = linkIndex; }
     [[nodiscard]] constexpr int8_t   getLinkIndex() const { return numSubAtoms; }
-    [[nodiscard]] constexpr uint32_t getCustomUint32() const { return (offset << 16) | order; }
+    [[nodiscard]] constexpr uint32_t getCustomUint32() const { return (offsetInBytes << 16) | order; }
     constexpr void                   setCustomUint32(uint32_t N)
     {
         const uint16_t lowN  = N & 0xffff;
         const uint16_t highN = (N >> 16) & 0xffff;
         order                = static_cast<uint8_t>(lowN);
-        offset               = static_cast<uint8_t>(highN);
+        offsetInBytes        = static_cast<uint8_t>(highN);
     }
 
     [[nodiscard]] constexpr bool isPrimitiveType() const

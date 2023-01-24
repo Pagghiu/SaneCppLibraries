@@ -39,11 +39,11 @@ struct BinaryWriterStream
     SC::Vector<uint8_t> buffer;
     int                 numberOfOperations = 0;
 
-    [[nodiscard]] bool serialize(Span<const void> object)
+    [[nodiscard]] bool serialize(SpanVoid<const void> object)
     {
         numberOfOperations++;
         Span<const uint8_t> bytes = object.castTo<const uint8_t>();
-        return buffer.appendCopy(bytes.data, bytes.size);
+        return buffer.appendCopy(bytes.data(), bytes.sizeInBytes());
     }
 };
 
@@ -53,14 +53,14 @@ struct BinaryReaderStream
     SC::Vector<uint8_t> buffer;
     int                 numberOfOperations = 0;
 
-    [[nodiscard]] bool serialize(Span<void> object)
+    [[nodiscard]] bool serialize(SpanVoid<void> object)
     {
-        if (index + object.size > buffer.size())
+        if (index + object.sizeInBytes() > buffer.size())
             return false;
         numberOfOperations++;
         Span<uint8_t> bytes = object.castTo<uint8_t>();
-        memcpy(bytes.data, &buffer[index], bytes.size);
-        index += bytes.size;
+        memcpy(bytes.data(), &buffer[index], bytes.sizeInBytes());
+        index += bytes.sizeInBytes();
         return true;
     }
 

@@ -33,6 +33,13 @@ struct SplitOptions
     }
     bool has(Value v) const { return (value & v) != None; }
 };
+enum class Comparison
+{
+    Smaller = -1,
+    Equals  = 0,
+    Bigger  = 1
+};
+
 template <typename StringIterator>
 struct StringFunctions;
 } // namespace SC
@@ -54,12 +61,12 @@ struct SC::StringView
     {}
 
     [[nodiscard]] constexpr StringEncoding getEncoding() const { return encoding; }
-    [[nodiscard]] constexpr const char_t*  bytesWithoutTerminator() const { return text.data; }
-    [[nodiscard]] constexpr const char_t*  bytesIncludingTerminator() const { return text.data; }
+    [[nodiscard]] constexpr const char_t*  bytesWithoutTerminator() const { return text.data(); }
+    [[nodiscard]] constexpr const char_t*  bytesIncludingTerminator() const { return text.data(); }
 
     [[nodiscard]] Comparison compareASCII(StringView other) const
     {
-        const int res = memcmp(text.data, other.text.data, min(text.size, other.text.size));
+        const int res = memcmp(text.data(), other.text.data(), min(text.sizeInBytes(), other.text.sizeInBytes()));
         if (res < 0)
             return Comparison::Smaller;
         else if (res == 0)
@@ -78,21 +85,26 @@ struct SC::StringView
 
     [[nodiscard]] bool operator==(StringView other) const
     {
-        return text.size == other.text.size ? memcmp(text.data, other.text.data, text.size) == 0 : false;
+        return text.sizeInBytes() == other.text.sizeInBytes()
+                   ? memcmp(text.data(), other.text.data(), text.sizeInBytes()) == 0
+                   : false;
     }
     [[nodiscard]] bool             operator!=(StringView other) const { return not operator==(other); }
-    [[nodiscard]] constexpr bool   isEmpty() const { return text.data == nullptr || text.size == 0; }
+    [[nodiscard]] constexpr bool   isEmpty() const { return text.data() == nullptr || text.sizeInBytes() == 0; }
     [[nodiscard]] constexpr bool   isNullTerminated() const { return hasNullTerm; }
-    [[nodiscard]] constexpr size_t sizeInBytes() const { return text.size; }
-    [[nodiscard]] constexpr size_t sizeInBytesIncludingTerminator() const { return text.size > 0 ? text.size + 1 : 0; }
-    [[nodiscard]] bool             parseInt32(int32_t* value) const;
-    [[nodiscard]] bool endsWith(char_t c) const { return isEmpty() ? false : text.data[text.size - 1] == c; }
-    [[nodiscard]] bool startsWith(char_t c) const { return isEmpty() ? false : text.data[0] == c; }
+    [[nodiscard]] constexpr size_t sizeInBytes() const { return text.sizeInBytes(); }
+    [[nodiscard]] constexpr size_t sizeInBytesIncludingTerminator() const
+    {
+        return text.sizeInBytes() > 0 ? text.sizeInBytes() + 1 : 0;
+    }
+    [[nodiscard]] bool parseInt32(int32_t* value) const;
+    [[nodiscard]] bool endsWith(char_t c) const { return isEmpty() ? false : text.data()[text.sizeInBytes() - 1] == c; }
+    [[nodiscard]] bool startsWith(char_t c) const { return isEmpty() ? false : text.data()[0] == c; }
     [[nodiscard]] bool startsWith(const StringView str) const
     {
-        if (str.text.size <= text.size)
+        if (str.text.sizeInBytes() <= text.sizeInBytes())
         {
-            const StringView ours(text.data, str.text.size, false, encoding);
+            const StringView ours(text.data(), str.text.sizeInBytes(), false, encoding);
             return str == ours;
         }
         return false;
@@ -101,7 +113,8 @@ struct SC::StringView
     {
         if (str.sizeInBytes() <= sizeInBytes())
         {
-            const StringView ours(text.data + text.size - str.text.size, str.text.size, false, encoding);
+            const StringView ours(text.data() + text.sizeInBytes() - str.text.sizeInBytes(), str.text.sizeInBytes(),
+                                  false, encoding);
             return str == ours;
         }
         return false;
@@ -109,9 +122,9 @@ struct SC::StringView
 
     [[nodiscard]] bool setSizeInBytesWithoutTerminator(size_t newSize)
     {
-        if (newSize <= text.size)
+        if (newSize <= text.sizeInBytes())
         {
-            text.size = newSize;
+            text.setSizeInBytes(newSize);
             return true;
         }
         return false;

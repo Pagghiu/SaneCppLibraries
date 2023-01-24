@@ -17,13 +17,13 @@ struct VectorVTable
         Yes
     };
 
-    typedef bool (*FunctionGetSegmentSpan)(MetaProperties property, Span<void> object, Span<void>& itemBegin);
-    typedef bool (*FunctionGetSegmentSpanConst)(MetaProperties property, Span<const void> object,
-                                                Span<const void>& itemBegin);
+    typedef bool (*FunctionGetSegmentSpan)(MetaProperties property, SpanVoid<void> object, SpanVoid<void>& itemBegin);
+    typedef bool (*FunctionGetSegmentSpanConst)(MetaProperties property, SpanVoid<const void> object,
+                                                SpanVoid<const void>& itemBegin);
 
-    typedef bool (*FunctionResize)(Span<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
+    typedef bool (*FunctionResize)(SpanVoid<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
                                    DropEccessItems dropEccessItems);
-    typedef bool (*FunctionResizeWithoutInitialize)(Span<void> object, Reflection::MetaProperties property,
+    typedef bool (*FunctionResizeWithoutInitialize)(SpanVoid<void> object, Reflection::MetaProperties property,
                                                     uint64_t sizeInBytes, DropEccessItems dropEccessItems);
     FunctionGetSegmentSpan          getSegmentSpan;
     FunctionGetSegmentSpanConst     getSegmentSpanConst;
@@ -76,12 +76,12 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
         }
     }
 
-    static bool resize(Span<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
+    static bool resize(SpanVoid<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
                        VectorVTable::DropEccessItems dropEccessItems)
     {
-        if (object.size >= sizeof(void*))
+        if (object.sizeInBytes() >= sizeof(void*))
         {
-            auto& vectorByte = *static_cast<Container*>(object.data);
+            auto& vectorByte = *static_cast<Container*>(object.data());
             auto  numItems   = sizeInBytes / sizeof(ItemType);
             if (N >= 0)
                 numItems = min(numItems, static_cast<decltype(numItems)>(N));
@@ -92,12 +92,12 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
             return false;
         }
     }
-    static bool resizeWithoutInitialize(Span<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
-                                        VectorVTable::DropEccessItems dropEccessItems)
+    static bool resizeWithoutInitialize(SpanVoid<void> object, Reflection::MetaProperties property,
+                                        uint64_t sizeInBytes, VectorVTable::DropEccessItems dropEccessItems)
     {
-        if (object.size >= sizeof(void*))
+        if (object.sizeInBytes() >= sizeof(void*))
         {
-            auto& vectorByte = *static_cast<Container*>(object.data);
+            auto& vectorByte = *static_cast<Container*>(object.data());
             auto  numItems   = sizeInBytes / sizeof(ItemType);
             if (N >= 0)
                 numItems = min(numItems, static_cast<decltype(numItems)>(N));
@@ -110,14 +110,14 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
     }
 
     template <typename VoidType>
-    [[nodiscard]] static constexpr bool getSegmentSpan(Reflection::MetaProperties property, Span<VoidType> object,
-                                                       Span<VoidType>& itemBegin)
+    [[nodiscard]] static constexpr bool getSegmentSpan(Reflection::MetaProperties property, SpanVoid<VoidType> object,
+                                                       SpanVoid<VoidType>& itemBegin)
     {
-        if (object.size >= sizeof(void*))
+        if (object.sizeInBytes() >= sizeof(void*))
         {
             typedef typename SameConstnessAs<VoidType, Container>::type VectorType;
-            auto& vectorByte = *static_cast<VectorType*>(object.data);
-            itemBegin        = Span<VoidType>(vectorByte.data(), vectorByte.size() * sizeof(ItemType));
+            auto& vectorByte = *static_cast<VectorType*>(object.data());
+            itemBegin        = SpanVoid<VoidType>(vectorByte.data(), vectorByte.size() * sizeof(ItemType));
             return true;
         }
         else

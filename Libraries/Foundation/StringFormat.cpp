@@ -8,14 +8,29 @@
 
 namespace SC
 {
+struct SpanContainerAdapter
+{
+    Span<char_t>       span;
+    [[nodiscard]] bool insertCopy(size_t offsetInBytes, const char* source, size_t sourceSizeInBytes)
+    {
+        if (sourceSizeInBytes + offsetInBytes <= span.sizeInBytes())
+        {
+            memcpy(span.data() + offsetInBytes, source, sourceSizeInBytes * sizeof(char));
+            return true;
+        }
+        return false;
+    }
+};
 
 const int SPECIFIER_SIZE = 10;
 
 template <size_t SPECIFIER_OFFSET, size_t N>
 static bool transformToPrintfSpecifier(StringIteratorASCII specifier, char (&formatSpecifier)[N])
 {
-    Span<char_t> span(formatSpecifier, N - SPECIFIER_OFFSET);
-    SC_TRY_IF(specifier.insertBytesTo(span, SPECIFIER_OFFSET));
+    Span<char_t>         span(formatSpecifier, N - SPECIFIER_OFFSET);
+    SpanContainerAdapter adapter;
+    adapter.span = span;
+    SC_TRY_IF(specifier.insertBytesTo(adapter, SPECIFIER_OFFSET));
     return true;
 }
 

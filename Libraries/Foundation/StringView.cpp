@@ -4,19 +4,20 @@
 #include "StringView.h"
 #include "StringUtility.h"
 
+// TODO: Use StringIterator
 bool SC::StringView::parseInt32(int32_t* value) const
 {
     if (isIntegerNumber(text))
     {
         if (hasNullTerm)
         {
-            *value = atoi(text.data);
+            *value = atoi(text.data());
         }
         else
         {
             char_t buffer[12]; // 10 digits + sign + nullterm
-            memcpy(buffer, text.data, text.size);
-            buffer[text.size] = 0;
+            memcpy(buffer, text.data(), text.sizeInBytes());
+            buffer[text.sizeInBytes()] = 0;
 
             *value = atoi(buffer);
         }

@@ -21,7 +21,7 @@ struct BinarySkipper
 
     [[nodiscard]] bool skip()
     {
-        sourceProperty = sourceProperties.data[sourceTypeIndex];
+        sourceProperty = sourceProperties.data()[sourceTypeIndex];
         if (sourceProperty.type == Reflection::MetaType::TypeStruct)
         {
             return skipStruct();
@@ -33,7 +33,7 @@ struct BinarySkipper
         }
         else if (sourceProperty.isPrimitiveType())
         {
-            return sourceObject.advance(sourceProperty.size);
+            return sourceObject.advance(sourceProperty.sizeInBytes);
         }
         return false;
     }
@@ -46,19 +46,19 @@ struct BinarySkipper
     {
         const auto structSourceProperty  = sourceProperty;
         const auto structSourceTypeIndex = sourceTypeIndex;
-        const bool isBulkWriteable       = sourceProperties.data[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
+        const bool isBulkWriteable       = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
 
         if (isBulkWriteable)
         {
-            SC_TRY_IF(sourceObject.advance(structSourceProperty.size));
+            SC_TRY_IF(sourceObject.advance(structSourceProperty.sizeInBytes));
         }
         else
         {
             for (int16_t idx = 0; idx < structSourceProperty.numSubAtoms; ++idx)
             {
                 sourceTypeIndex = structSourceTypeIndex + idx + 1;
-                if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
-                    sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
+                if (sourceProperties.data()[sourceTypeIndex].getLinkIndex() >= 0)
+                    sourceTypeIndex = sourceProperties.data()[sourceTypeIndex].getLinkIndex();
                 SC_TRY_IF(skip());
             }
         }
@@ -71,27 +71,27 @@ struct BinarySkipper
         const auto arraySourceTypeIndex = sourceTypeIndex;
 
         sourceTypeIndex         = arraySourceTypeIndex + 1;
-        uint64_t sourceNumBytes = arraySourceProperty.size;
+        uint64_t sourceNumBytes = arraySourceProperty.sizeInBytes;
         if (arraySourceProperty.type == Reflection::MetaType::TypeVector)
         {
-            SC_TRY_IF(sourceObject.serialize(Span<void>(&sourceNumBytes, sizeof(uint64_t))));
+            SC_TRY_IF(sourceObject.serialize(SpanVoid<void>(&sourceNumBytes, sizeof(uint64_t))));
         }
 
-        const bool isBulkWriteable = sourceProperties.data[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
+        const bool isBulkWriteable = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
         if (isBulkWriteable)
         {
             return sourceObject.advance(sourceNumBytes);
         }
         else
         {
-            const auto sourceItemSize      = sourceProperties.data[sourceTypeIndex].size;
+            const auto sourceItemSize      = sourceProperties.data()[sourceTypeIndex].sizeInBytes;
             const auto sourceNumElements   = sourceNumBytes / sourceItemSize;
             const auto itemSourceTypeIndex = sourceTypeIndex;
             for (uint64_t idx = 0; idx < sourceNumElements; ++idx)
             {
                 sourceTypeIndex = itemSourceTypeIndex;
-                if (sourceProperties.data[sourceTypeIndex].getLinkIndex() >= 0)
-                    sourceTypeIndex = sourceProperties.data[sourceTypeIndex].getLinkIndex();
+                if (sourceProperties.data()[sourceTypeIndex].getLinkIndex() >= 0)
+                    sourceTypeIndex = sourceProperties.data()[sourceTypeIndex].getLinkIndex();
                 SC_TRY_IF(skip());
             }
             return true;
