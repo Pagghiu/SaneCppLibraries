@@ -50,6 +50,12 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Path.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\OS.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\StringConverter.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h">
@@ -212,6 +218,9 @@
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\PathTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringConverter.h">
       <Filter>Foundation</Filter>
     </ClInclude>
   </ItemGroup>

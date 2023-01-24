@@ -24,6 +24,11 @@
 		7B583F6A2922ECF900FBE019 /* SCTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F692922ECF900FBE019 /* SCTest.cpp */; };
 		7B583F6D2922ED2700FBE019 /* SCTestXCTest.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */; };
 		7B583FCB2922EE7300FBE019 /* SCTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F692922ECF900FBE019 /* SCTest.cpp */; };
+		7BA892A6297DF9F40093152B /* OSApple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FCF29243086006996AA /* OSApple.mm */; };
+		7BA892AA297E03B50093152B /* OS.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892A9297E03540093152B /* OS.cpp */; };
+		7BA892AB297E03B50093152B /* OS.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892A9297E03540093152B /* OS.cpp */; };
+		7BA892AE297E06040093152B /* StringConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892AD297E06040093152B /* StringConverter.cpp */; };
+		7BA892AF297E06040093152B /* StringConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892AD297E06040093152B /* StringConverter.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -123,6 +128,11 @@
 		7B583F692922ECF900FBE019 /* SCTest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SCTest.cpp; path = ../../SCTest.cpp; sourceTree = "<group>"; };
 		7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SCTestXCTest.mm; path = ../../SCTestXCTest.mm; sourceTree = "<group>"; };
 		7B5A353328E8640B00B2F589 /* SCTestXCTest.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SCTestXCTest.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7BA892A7297E032F0093152B /* OSWindows.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = OSWindows.cpp; path = ../../../../Libraries/Foundation/OSWindows.cpp; sourceTree = "<group>"; };
+		7BA892A8297E03340093152B /* OSEmscripten.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = OSEmscripten.cpp; path = ../../../../Libraries/Foundation/OSEmscripten.cpp; sourceTree = "<group>"; };
+		7BA892A9297E03540093152B /* OS.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = OS.cpp; path = ../../../../Libraries/Foundation/OS.cpp; sourceTree = "<group>"; };
+		7BA892AC297E06040093152B /* StringConverter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringConverter.h; path = ../../../../Libraries/Foundation/StringConverter.h; sourceTree = "<group>"; };
+		7BA892AD297E06040093152B /* StringConverter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringConverter.cpp; path = ../../../../Libraries/Foundation/StringConverter.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -166,10 +176,13 @@
 				7B515FD429243086006996AA /* Memory.cpp */,
 				7B515FEA29243087006996AA /* Memory.h */,
 				7B515FF229243087006996AA /* MemoryTest.h */,
+				7BA892A9297E03540093152B /* OS.cpp */,
 				7B515FDC29243086006996AA /* OS.h */,
 				7B515FCF29243086006996AA /* OSApple.mm */,
+				7BA892A8297E03340093152B /* OSEmscripten.cpp */,
 				7B515FE429243087006996AA /* OSPosix.cpp */,
 				7B515FC829243086006996AA /* OSTest.h */,
+				7BA892A7297E032F0093152B /* OSWindows.cpp */,
 				7B19C9A9297AF95B001C0627 /* Path.cpp */,
 				7B19C9AB297AF95B001C0627 /* Path.h */,
 				7B19C9AA297AF95B001C0627 /* PathTest.h */,
@@ -201,6 +214,8 @@
 				7B51600C29243097006996AA /* StringBuilder.cpp */,
 				7B51600E29243097006996AA /* StringBuilder.h */,
 				7B51600A29243097006996AA /* StringBuilderTest.h */,
+				7BA892AD297E06040093152B /* StringConverter.cpp */,
+				7BA892AC297E06040093152B /* StringConverter.h */,
 				7B515FFC29243097006996AA /* StringFormat.cpp */,
 				7B515FFA29243097006996AA /* StringFormat.h */,
 				7B51600829243097006996AA /* StringIterator.h */,
@@ -344,11 +359,13 @@
 				7B515FF829243087006996AA /* Assert.cpp in Sources */,
 				7B515FF929243087006996AA /* Console.cpp in Sources */,
 				7B515FF429243087006996AA /* OSApple.mm in Sources */,
+				7BA892AA297E03B50093152B /* OS.cpp in Sources */,
 				7B583F6A2922ECF900FBE019 /* SCTest.cpp in Sources */,
 				7B19C9AC297AF99F001C0627 /* Path.cpp in Sources */,
 				7B51601429243097006996AA /* StringUtility.cpp in Sources */,
 				7B51601329243097006996AA /* String.cpp in Sources */,
 				7B51601629243097006996AA /* StringBuilder.cpp in Sources */,
+				7BA892AE297E06040093152B /* StringConverter.cpp in Sources */,
 				7B515FF729243087006996AA /* OSPosix.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -357,8 +374,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7BA892AB297E03B50093152B /* OS.cpp in Sources */,
 				7B19C9AD297AF9A2001C0627 /* Path.cpp in Sources */,
+				7BA892AF297E06040093152B /* StringConverter.cpp in Sources */,
 				7B583FCB2922EE7300FBE019 /* SCTest.cpp in Sources */,
+				7BA892A6297DF9F40093152B /* OSApple.mm in Sources */,
 				7B583F6D2922ED2700FBE019 /* SCTestXCTest.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

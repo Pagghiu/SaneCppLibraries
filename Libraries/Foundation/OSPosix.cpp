@@ -4,8 +4,8 @@
 #include "Console.h"
 #include "Limits.h"
 
-#include <Memory.h>   // memcpy
 #include <execinfo.h> // backtrace
+#include <memory.h>   // memcpy
 #include <stdlib.h>   // free
 
 bool SC::OS::printBacktrace()

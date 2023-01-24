@@ -2,6 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "OS.h"
+
+bool SC::OSPaths::init() { return true; }
+
 bool SC::OS::printBacktrace() { return true; }
 
 bool SC::OS::printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeInBytes)

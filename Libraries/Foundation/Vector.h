@@ -147,6 +147,21 @@ struct SC::Vector
 
     ~Vector() { destroy(); }
 
+    // Reinterpret Vector to hold a different type (example Vector<int32_t> to Vector<int8_t>.
+    // This works because the SegmentHeader stores item size and capacity in bytes
+    template <typename Q>
+    Vector<const Q>& unsafeReinterpretAsConst() const
+    {
+        return *reinterpret_cast<Vector<const Q>*>(this);
+    }
+    // Reinterpret Vector to hold a different type (example Vector<int32_t> to Vector<int8_t>.
+    // This works because the SegmentHeader stores item size and capacity in bytes
+    template <typename Q>
+    Vector<Q>& unsafeReinterpretAs()
+    {
+        return *reinterpret_cast<Vector<Q>*>(this);
+    }
+
     [[nodiscard]] T& operator[](size_t index)
     {
         SC_DEBUG_ASSERT(index < size());

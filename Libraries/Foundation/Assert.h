@@ -4,7 +4,6 @@
 #pragma once
 #include "Compiler.h" // SC_BREAK_DEBUGGER
 #include "LibC.h"     // exit
-#include "OS.h"       // printBacktrace
 #include "Platform.h" // SC_DEBUG
 
 namespace SC
@@ -15,6 +14,8 @@ namespace SC
 [[noreturn]] SC_ALWAYS_INLINE void SC_UNREACHABLE() { __builtin_unreachable(); }
 #endif
 void printAssertion(const char_t* expression, const char_t* filename, const char_t* functionName, int lineNumber);
+[[nodiscard]] bool printBacktrace();
+
 } // namespace SC
 
 #define SC_RELEASE_ASSERT(e)                                                                                           \
@@ -22,7 +23,7 @@ void printAssertion(const char_t* expression, const char_t* filename, const char
         SC_UNLIKELY                                                                                                    \
         {                                                                                                              \
             SC::printAssertion(#e, __FILE__, __func__, __LINE__);                                                      \
-            (void)SC::OS::printBacktrace();                                                                            \
+            (void)SC::printBacktrace();                                                                                \
             SC_BREAK_DEBUGGER;                                                                                         \
             exit(-1);                                                                                                  \
         }

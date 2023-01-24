@@ -41,16 +41,19 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 time g++-12 -std=c++14 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -I${SCRIPT_DIR}/../../ \
 -o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest \
-Libraries/Foundation/Assert.cpp         \
-Libraries/Foundation/Console.cpp        \
-Libraries/Foundation/Memory.cpp         \
-Libraries/Foundation/OSDarwin.cpp       \
-Libraries/Foundation/OSPosix.cpp        \
-Libraries/Foundation/StaticAsserts.cpp  \
-Libraries/Foundation/String.cpp         \
-Libraries/Foundation/StringBuilder.cpp  \
-Libraries/Foundation/StringFormat.cpp   \
-Libraries/Foundation/StringUtility.cpp  \
-Libraries/Foundation/StringView.cpp     \
-Libraries/Foundation/Test.cpp           \
+Libraries/Foundation/Assert.cpp           \
+Libraries/Foundation/Console.cpp          \
+Libraries/Foundation/Memory.cpp           \
+Libraries/Foundation/OSApple.mm           \
+Libraries/Foundation/OS.cpp               \
+Libraries/Foundation/OSPosix.cpp          \
+Libraries/Foundation/Path.cpp             \
+Libraries/Foundation/StaticAsserts.cpp    \
+Libraries/Foundation/String.cpp           \
+Libraries/Foundation/StringBuilder.cpp    \
+Libraries/Foundation/StringConverter.cpp  \
+Libraries/Foundation/StringFormat.cpp     \
+Libraries/Foundation/StringUtility.cpp    \
+Libraries/Foundation/StringView.cpp       \
+Libraries/Foundation/Test.cpp             \
 ${SCRIPT_DIR}/../../SCTest.cpp

@@ -34,5 +34,13 @@ struct SC::OSTest : public SC::TestCase
             frames                = OS::captureBacktrace(2, nullptr, maxVal * sizeof(void*), &hash);
             SC_TEST_EXPECT(frames == 0);
         }
+        if (test_section("OS"))
+        {
+            SC_TEST_EXPECT(OSPaths::init());
+            Console::printUTF8(OSPaths::get().executableFile.view());
+            Console::printUTF8("\n");
+            Console::printUTF8(OSPaths::get().applicationRootDirectory.view());
+            SC_TEST_EXPECT(OSPaths::close());
+        }
     }
 };
