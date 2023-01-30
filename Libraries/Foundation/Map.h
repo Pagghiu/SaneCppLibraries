@@ -71,7 +71,7 @@ struct SC::Map
             {
                 return &item.value;
             }
-        return Error("Missing key");
+        return ReturnCode("Missing key"_sv);
     }
     template <typename ComparableToKey>
     [[nodiscard]] Result<Value*> get(const ComparableToKey& key)
@@ -81,6 +81,6 @@ struct SC::Map
             {
                 return &item.value;
             }
-        return Error("Missing key");
+        return ReturnCode("Missing key"_sv);
     }
 };

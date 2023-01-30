@@ -8,14 +8,16 @@
 
 namespace SC
 {
-struct [[nodiscard]] Error
+struct [[nodiscard]] ReturnCode
 {
-    const StringView message;
-    constexpr Error() {}
-    constexpr Error(const StringView message) : message(message) {}
+    StringView message;
+    constexpr ReturnCode(bool result) : message(result ? ""_sv : "Unspecified Error"_sv) {}
+    constexpr ReturnCode(const char* message) = delete;
+    constexpr ReturnCode(const StringView message) : message(message) {}
+    constexpr ReturnCode(const ReturnCode& other) : message(other.message) {}
     operator bool() const { return message.isEmpty(); }
 };
-template <typename Value, typename ErrorType = Error>
+template <typename Value, typename ErrorType = ReturnCode>
 struct Result;
 } // namespace SC
 
@@ -112,14 +114,20 @@ struct [[nodiscard]] SC::Result
     }
 };
 #define SC_TRY_IF(expression)                                                                                          \
-    if (!(expression))                                                                                                 \
     {                                                                                                                  \
-        return false;                                                                                                  \
+        if (auto res = (expression))                                                                                   \
+        {                                                                                                              \
+            (void)0;                                                                                                   \
+        }                                                                                                              \
+        else                                                                                                           \
+        {                                                                                                              \
+            return res;                                                                                                \
+        }                                                                                                              \
     }
 #define SC_TRY_WRAP(expression, failedMessage)                                                                         \
     if (!(expression))                                                                                                 \
     {                                                                                                                  \
-        return Error{failedMessage};                                                                                   \
+        return ReturnCode(failedMessage);                                                                              \
     }
 
 #define SC__TRY_IMPL2(assignment, expression, Counter)                                                                 \
