@@ -68,63 +68,63 @@ struct SC::PathTest : public SC::TestCase
             SC_TEST_EXPECT(path.endsWithSeparator == false);
 
             SC_TEST_EXPECT(path.parseWindows("C:\\"));
-            SC_TEST_EXPECT(path.root == "C:\\"_sv);
-            SC_TEST_EXPECT(path.directory == "C:\\"_sv);
+            SC_TEST_EXPECT(path.root == "C:\\");
+            SC_TEST_EXPECT(path.directory == "C:\\");
             SC_TEST_EXPECT(path.base.isEmpty());
             SC_TEST_EXPECT(path.endsWithSeparator == true);
 
             SC_TEST_EXPECT(path.parseWindows("C:\\\\"));
-            SC_TEST_EXPECT(path.root == "C:\\"_sv);
-            SC_TEST_EXPECT(path.directory == "C:\\\\"_sv);
+            SC_TEST_EXPECT(path.root == "C:\\");
+            SC_TEST_EXPECT(path.directory == "C:\\\\");
             SC_TEST_EXPECT(path.base.isEmpty());
             SC_TEST_EXPECT(path.endsWithSeparator == true);
 
             SC_TEST_EXPECT(path.parseWindows("C:\\ASD"));
-            SC_TEST_EXPECT(path.root == "C:\\"_sv);
-            SC_TEST_EXPECT(path.directory == "C:\\"_sv);
-            SC_TEST_EXPECT(path.base == "ASD"_sv);
+            SC_TEST_EXPECT(path.root == "C:\\");
+            SC_TEST_EXPECT(path.directory == "C:\\");
+            SC_TEST_EXPECT(path.base == "ASD");
             SC_TEST_EXPECT(path.endsWithSeparator == false);
 
             SC_TEST_EXPECT(path.parseWindows("C:\\ASD\\"));
-            SC_TEST_EXPECT(path.root == "C:\\"_sv);
-            SC_TEST_EXPECT(path.directory == "C:\\ASD"_sv);
+            SC_TEST_EXPECT(path.root == "C:\\");
+            SC_TEST_EXPECT(path.directory == "C:\\ASD");
             SC_TEST_EXPECT(path.base.isEmpty());
             SC_TEST_EXPECT(path.endsWithSeparator == true);
 
             SC_TEST_EXPECT(path.parseWindows("C:\\ASD\\\\"));
-            SC_TEST_EXPECT(path.root == "C:\\"_sv);
-            SC_TEST_EXPECT(path.directory == "C:\\ASD\\"_sv);
+            SC_TEST_EXPECT(path.root == "C:\\");
+            SC_TEST_EXPECT(path.directory == "C:\\ASD\\");
             SC_TEST_EXPECT(path.base.isEmpty());
             SC_TEST_EXPECT(path.endsWithSeparator == true);
 
             SC_TEST_EXPECT(path.parseWindows("C:\\ASD\\bbb"));
-            SC_TEST_EXPECT(path.root == "C:\\"_sv);
-            SC_TEST_EXPECT(path.directory == "C:\\ASD"_sv);
-            SC_TEST_EXPECT(path.base == "bbb"_sv);
+            SC_TEST_EXPECT(path.root == "C:\\");
+            SC_TEST_EXPECT(path.directory == "C:\\ASD");
+            SC_TEST_EXPECT(path.base == "bbb");
             SC_TEST_EXPECT(path.endsWithSeparator == false);
 
             SC_TEST_EXPECT(path.parseWindows("C:\\ASD\\bbb\\name.ext"));
-            SC_TEST_EXPECT(path.root == "C:\\"_sv);
-            SC_TEST_EXPECT(path.directory == "C:\\ASD\\bbb"_sv);
-            SC_TEST_EXPECT(path.base == "name.ext"_sv);
-            SC_TEST_EXPECT(path.name == "name"_sv);
-            SC_TEST_EXPECT(path.ext == "ext"_sv);
+            SC_TEST_EXPECT(path.root == "C:\\");
+            SC_TEST_EXPECT(path.directory == "C:\\ASD\\bbb");
+            SC_TEST_EXPECT(path.base == "name.ext");
+            SC_TEST_EXPECT(path.name == "name");
+            SC_TEST_EXPECT(path.ext == "ext");
             SC_TEST_EXPECT(path.endsWithSeparator == false);
 
             SC_TEST_EXPECT(path.parseWindows("\\\\ASD\\bbb\\name.ext"));
-            SC_TEST_EXPECT(path.root == "\\\\"_sv);
-            SC_TEST_EXPECT(path.directory == "\\\\ASD\\bbb"_sv);
-            SC_TEST_EXPECT(path.base == "name.ext"_sv);
-            SC_TEST_EXPECT(path.name == "name"_sv);
-            SC_TEST_EXPECT(path.ext == "ext"_sv);
+            SC_TEST_EXPECT(path.root == "\\\\");
+            SC_TEST_EXPECT(path.directory == "\\\\ASD\\bbb");
+            SC_TEST_EXPECT(path.base == "name.ext");
+            SC_TEST_EXPECT(path.name == "name");
+            SC_TEST_EXPECT(path.ext == "ext");
             SC_TEST_EXPECT(path.endsWithSeparator == false);
 
             SC_TEST_EXPECT(path.parseWindows("\\\\?\\ASD\\bbb\\name.ext"));
-            SC_TEST_EXPECT(path.root == "\\\\?\\"_sv);
-            SC_TEST_EXPECT(path.directory == "\\\\?\\ASD\\bbb"_sv);
-            SC_TEST_EXPECT(path.base == "name.ext"_sv);
-            SC_TEST_EXPECT(path.name == "name"_sv);
-            SC_TEST_EXPECT(path.ext == "ext"_sv);
+            SC_TEST_EXPECT(path.root == "\\\\?\\");
+            SC_TEST_EXPECT(path.directory == "\\\\?\\ASD\\bbb");
+            SC_TEST_EXPECT(path.base == "name.ext");
+            SC_TEST_EXPECT(path.name == "name");
+            SC_TEST_EXPECT(path.ext == "ext");
             SC_TEST_EXPECT(path.endsWithSeparator == false);
         }
 

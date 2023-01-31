@@ -13,7 +13,9 @@ struct String;
 struct SC::String
 {
     String() = default;
-    String(Vector<char_t>&& otherData) : data(forward<Vector<char_t>>(otherData)) {}
+    String(Vector<char_t>&& otherData, StringEncoding encoding)
+        : data(forward<Vector<char_t>>(otherData)), encoding(encoding)
+    {}
     String(StringView sv) { SC_RELEASE_ASSERT(assignStringView(sv)); }
 
     String& operator=(StringView sv)
@@ -29,9 +31,18 @@ struct SC::String
     [[nodiscard]] StringView view() const
     {
         if (data.isEmpty())
-            return StringView();
+        {
+            return StringView(nullptr, 0, false, encoding);
+        }
         else
-            return StringView(data.items, data.size() - 1, true, StringEncoding::Utf8);
+        {
+            int sizeOfZero = 1;
+            if (encoding == StringEncoding::Utf16)
+                sizeOfZero = 2;
+            else if (encoding == StringEncoding::Utf32)
+                sizeOfZero = 4;
+            return StringView(data.items, data.size() - sizeOfZero, true, encoding);
+        }
     }
 
     [[nodiscard]] bool operator==(const String& other) const { return view() == (other.view()); }
@@ -43,6 +54,7 @@ struct SC::String
     Vector<char_t> data;
 
   private:
+    StringEncoding     encoding = StringEncoding::Utf8;
     [[nodiscard]] bool assignStringView(StringView sv);
     // Invariants:
     //  - if string is empty        --> data.size() == 0

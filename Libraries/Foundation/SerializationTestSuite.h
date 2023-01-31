@@ -121,7 +121,7 @@ struct SC::SerializationTestSuite::VersionedStruct1
 {
     float          floatValue     = 1.5f;
     int64_t        fieldToRemove  = 12;
-    Vector<String> field2ToRemove = {"ASD1"_sv, "ASD2"_sv, "ASD3"_sv};
+    Vector<String> field2ToRemove = {"ASD1"_a8, "ASD2"_a8, "ASD3"_a8};
     int64_t        int64Value     = -13;
 };
 
@@ -269,12 +269,12 @@ template <typename MetaProperties>
 inline int printAtoms(int currentAtomIdx, const MetaProperties* atom, const SC::ConstexprStringView* atomName,
                       int indentation)
 {
-    StringBuilder sb;
+    StringBuilder sb(StringEncoding::Ascii);
     (void)sb.append("[{:02}]", currentAtomIdx);
     for (int i = 0; i < indentation; ++i)
         (void)sb.append("\t");
     (void)sb.append("[LinkIndex={:2}] {} ({} atoms)\n", currentAtomIdx,
-                    StringView(atomName->data, atomName->length, false, StringEncoding::Utf8), atom->numSubAtoms);
+                    StringView(atomName->data, atomName->length, false, StringEncoding::Ascii), atom->numSubAtoms);
     for (int i = 0; i < indentation; ++i)
         (void)sb.append("\t");
     (void)sb.append("{\n");
@@ -288,7 +288,7 @@ inline int printAtoms(int currentAtomIdx, const MetaProperties* atom, const SC::
             (void)sb.append("\t");
 
         (void)sb.append("Type={}\tOffset={}\tSize={}\tName={}", (int)field.type, field.offsetInBytes, field.sizeInBytes,
-                        StringView(fieldName.data, fieldName.length, false, StringEncoding::Utf8));
+                        StringView(fieldName.data, fieldName.length, false, StringEncoding::Ascii));
         if (field.getLinkIndex() >= 0)
         {
             (void)sb.append("\t[LinkIndex={}]", field.getLinkIndex());
@@ -396,9 +396,9 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
         if (test_section("VectorStructComplex"))
         {
             VectorStructComplex topLevel;
-            (void)topLevel.vectorOfStrings.push_back("asdasdasd1"_sv);
-            (void)topLevel.vectorOfStrings.push_back("asdasdasd2"_sv);
-            (void)topLevel.vectorOfStrings.push_back("asdasdasd3"_sv);
+            (void)topLevel.vectorOfStrings.push_back("asdasdasd1"_a8);
+            (void)topLevel.vectorOfStrings.push_back("asdasdasd2"_a8);
+            (void)topLevel.vectorOfStrings.push_back("asdasdasd3"_a8);
             BinaryWriterStream streamWriter;
             SerializerWriter   writer(streamWriter);
             SC_TEST_EXPECT(writer.serialize(topLevel));
@@ -410,9 +410,9 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
             SC_TEST_EXPECT(reader.serialize(topLevelRead));
             SC_TEST_EXPECT(streamReader.numberOfOperations == streamWriter.numberOfOperations);
             SC_TEST_EXPECT(topLevelRead.vectorOfStrings.size() == 3);
-            SC_TEST_EXPECT(topLevelRead.vectorOfStrings[0] == "asdasdasd1"_sv);
-            SC_TEST_EXPECT(topLevelRead.vectorOfStrings[1] == "asdasdasd2"_sv);
-            SC_TEST_EXPECT(topLevelRead.vectorOfStrings[2] == "asdasdasd3"_sv);
+            SC_TEST_EXPECT(topLevelRead.vectorOfStrings[0] == "asdasdasd1"_a8);
+            SC_TEST_EXPECT(topLevelRead.vectorOfStrings[1] == "asdasdasd2"_a8);
+            SC_TEST_EXPECT(topLevelRead.vectorOfStrings[2] == "asdasdasd3"_a8);
         }
     }
 

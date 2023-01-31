@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "Result.h"
+#include "SmallVector.h"
 #include "StringIterator.h"
 #include "StringView.h"
 #include "Vector.h"
@@ -15,11 +16,13 @@ struct StringFormatterFor;
 
 struct StringFormatOutput
 {
-    Vector<char> buffer;
-    Vector<char> data;
-    bool         writeToStdout = false;
+    SmallVector<char, 512> buffer;
+    SmallVector<char, 512> data;
 
-    bool write(Span<const char> text);
+    bool           writeToStdout = false;
+    StringEncoding encoding      = StringEncoding::Ascii;
+
+    bool write(StringView text);
     void onFormatBegin();
     bool onFormatSucceded();
     void onFormatFailed();
@@ -56,7 +59,7 @@ struct StringFormat
     [[nodiscard]] static bool format(StringFormatOutput& data, StringView fmt, Types... args)
     {
         data.onFormatBegin();
-        if (recursiveFormat(data, fmt.getIterator<RangeIterator>(), args...))
+        if (recursiveFormat(data, fmt.getEncoding(), fmt.getIterator<RangeIterator>(), args...))
             SC_LIKELY { return data.onFormatSucceded(); }
         else
         {
@@ -67,8 +70,8 @@ struct StringFormat
 
   private:
     template <typename First, typename... Types>
-    [[nodiscard]] static bool formatArgumentAndRecurse(StringFormatOutput& data, RangeIterator it, First first,
-                                                       Types... args)
+    [[nodiscard]] static bool formatArgumentAndRecurse(StringFormatOutput& data, StringEncoding encoding,
+                                                       RangeIterator it, First first, Types... args)
     {
         // We have an already matched '{' here
         const auto startOfSpecifier = it;
@@ -77,15 +80,20 @@ struct StringFormat
             auto specifier = startOfSpecifier.untilBefore(it);
             (void)specifier.advanceUntilMatchesAfter(':'); // optional
             const bool formattedSuccessfully = StringFormatterFor<First>::format(data, specifier, first);
-            return formattedSuccessfully && recursiveFormat(data, it, args...);
+            return formattedSuccessfully && recursiveFormat(data, encoding, it, args...);
         }
         return false;
     }
 
-    [[nodiscard]] static bool formatArgumentAndRecurse(StringFormatOutput& data, RangeIterator it) { return false; }
+    [[nodiscard]] static bool formatArgumentAndRecurse(StringFormatOutput& data, StringEncoding encoding,
+                                                       RangeIterator it)
+    {
+        return false;
+    }
 
     template <typename... Types>
-    [[nodiscard]] static bool recursiveFormat(StringFormatOutput& data, RangeIterator it, Types... args)
+    [[nodiscard]] static bool recursiveFormat(StringFormatOutput& data, StringEncoding encoding, RangeIterator it,
+                                              Types... args)
     {
         auto   startingPoint = it;
         char_t matchedChar;
@@ -97,7 +105,7 @@ struct StringFormat
                     SC_UNLIKELY // if it's the same matched, let's escape it
                     {
                         (void)it.skipNext(); // we want to make sure we insert the escaped '{' or '}'
-                        SC_TRY_IF(data.write(startingPoint.sliceUntil(it)));
+                        SC_TRY_IF(data.write(StringView(startingPoint.sliceUntil(it), false, encoding)));
                         (void)it.skipNext(); // we don't want to insert the additional '{' or '}' needed for escaping
                         startingPoint = it;
                         continue; // or return recursiveFormat(data, it, args...); // recurse as alternative to
@@ -105,8 +113,9 @@ struct StringFormat
                     }
                 else if (matchedChar == '{') // it's a '{' not followed by itself, so let's parse specifier
                 {
-                    SC_TRY_IF(data.write(startingPoint.sliceUntil(it))); // write everything before '{'
-                    return formatArgumentAndRecurse(data, it, args...);  // try parse '}' and eventually format
+                    SC_TRY_IF(data.write(
+                        StringView(startingPoint.sliceUntil(it), false, encoding))); // write everything before '{'
+                    return formatArgumentAndRecurse(data, encoding, it, args...); // try parse '}' and eventually format
                 }
                 // arriving here means end of string with as single, unescaped '}'
                 return false;
@@ -114,7 +123,7 @@ struct StringFormat
             if (sizeof...(Types) == 0)
             {
                 // All arguments have been eaten, so let's append all remaining chars
-                return data.write(startingPoint.sliceUntilEnd());
+                return data.write(StringView(startingPoint.sliceUntilEnd(), false, encoding));
             }
             return false; // we have more arguments than specifiers
         }

@@ -107,7 +107,7 @@ struct SC::Path::Internal
         StringView base = basename<separator>(input, &dirn);
         if (dirn.isEmpty())
         {
-            return "."_sv;
+            return "."_a8;
         }
         return dirn;
     }

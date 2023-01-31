@@ -29,23 +29,23 @@ struct SC::MapTest : public SC::TestCase
         if (test_section("array"))
         {
             Map<String, String, Array<MapItem<String, String>, 2>> map;
-            SC_TEST_EXPECT(map.insert({"Ciao"_sv, "Fra"_sv}));
-            SC_TEST_EXPECT(map.insert({"Bella"_sv, "Bro"_sv}));
-            SC_TEST_EXPECT(not map.insert({"Fail"_sv, "Fail"_sv}));
+            SC_TEST_EXPECT(map.insert({"Ciao"_a8, "Fra"_a8}));
+            SC_TEST_EXPECT(map.insert({"Bella"_a8, "Bro"_a8}));
+            SC_TEST_EXPECT(not map.insert({"Fail"_a8, "Fail"_a8}));
             const String* value;
-            SC_TEST_EXPECT(map.contains("Ciao"_sv, &value) && *value == "Fra");
-            SC_TEST_EXPECT(map.contains("Bella"_sv, &value) && *value == "Bro");
+            SC_TEST_EXPECT(map.contains("Ciao"_a8, &value) && *value == "Fra");
+            SC_TEST_EXPECT(map.contains("Bella"_a8, &value) && *value == "Bro");
         }
         if (test_section("get"))
         {
             Map<String, String, Array<MapItem<String, String>, 2>> map;
-            SC_TEST_EXPECT(map.insert({"Ciao"_sv, "Fra"_sv}));
-            SC_TEST_EXPECT(map.insert({"Bella"_sv, "Bro"_sv}));
-            auto result1 = map.get("Ciao"_sv);
+            SC_TEST_EXPECT(map.insert({"Ciao"_a8, "Fra"_a8}));
+            SC_TEST_EXPECT(map.insert({"Bella"_a8, "Bro"_a8}));
+            auto result1 = map.get("Ciao"_a8);
             SC_TEST_EXPECT(*result1.releaseValue() == "Fra");
-            auto result2 = map.get("Fail"_sv);
+            auto result2 = map.get("Fail"_a8);
             SC_TEST_EXPECT(result2.isError());
-            SC_TEST_EXPECT(getTestString(map, "Bella").releaseValue() == "Bro"_sv);
+            SC_TEST_EXPECT(getTestString(map, "Bella").releaseValue() == "Bro"_a8);
         }
     }
 

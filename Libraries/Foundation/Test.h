@@ -50,5 +50,6 @@ struct TestCase
 } // namespace SC
 
 #define SC_TEST_EXPECT(e)                                                                                              \
-    recordExpectation(StringView(#e), (e)) ? (void)0                                                                   \
-                                           : (TestCase::report.debugBreakOnFailedTest ? SC_BREAK_DEBUGGER : (void)0);
+    recordExpectation(StringView(#e##_a8), (e))                                                                        \
+        ? (void)0                                                                                                      \
+        : (TestCase::report.debugBreakOnFailedTest ? SC_BREAK_DEBUGGER : (void)0);

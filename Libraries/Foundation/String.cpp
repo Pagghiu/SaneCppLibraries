@@ -5,9 +5,8 @@
 
 bool SC::String::assignStringView(StringView sv)
 {
-    bool         res;
     const size_t length = sv.sizeInBytes();
-    res                 = data.resizeWithoutInitializing(length + 1);
+    bool         res    = data.resizeWithoutInitializing(length + 1);
     if (sv.isNullTerminated())
     {
         memcpy(data.items, sv.bytesWithoutTerminator(), length + 1);
@@ -17,6 +16,7 @@ bool SC::String::assignStringView(StringView sv)
         memcpy(data.items, sv.bytesWithoutTerminator(), length);
         data.items[length] = 0;
     }
+    encoding = sv.getEncoding();
     return res;
 }
 

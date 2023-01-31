@@ -17,7 +17,7 @@ struct SC::StringBuilderTest : public SC::TestCase
         using namespace SC;
         if (test_section("edge_cases"))
         {
-            StringBuilder builder;
+            StringBuilder builder(StringEncoding::Ascii);
             SC_TEST_EXPECT(builder.append(StringView(nullptr, 0, true, StringEncoding::Ascii)));
             SC_TEST_EXPECT(builder.releaseString().isEmpty());
             SC_TEST_EXPECT(builder.append(""));
@@ -53,7 +53,7 @@ struct SC::StringBuilderTest : public SC::TestCase
         }
         if (test_section("append"))
         {
-            StringBuilder builder;
+            StringBuilder builder(StringEncoding::Ascii);
             SC_TEST_EXPECT(builder.append(StringView("asdf", 3, false, StringEncoding::Ascii)));
             SC_TEST_EXPECT(builder.append("asd"));
             SC_TEST_EXPECT(builder.append(String("asd")));
@@ -61,7 +61,7 @@ struct SC::StringBuilderTest : public SC::TestCase
         }
         if (test_section("append"))
         {
-            StringBuilder builder;
+            StringBuilder builder(StringEncoding::Ascii);
             SC_TEST_EXPECT(not builder.append("{", 1));
             SC_TEST_EXPECT(not builder.append("", 123));
             SC_TEST_EXPECT(builder.append("{}", 123));
@@ -79,7 +79,7 @@ struct SC::StringBuilderTest : public SC::TestCase
         }
         if (test_section("append_formats"))
         {
-            StringBuilder builder;
+            StringBuilder builder(StringEncoding::Ascii);
             SC_TEST_EXPECT(builder.append("__{}__", static_cast<uint64_t>(MaxValue())));
             SC_TEST_EXPECT(builder.releaseString() == "__18446744073709551615__");
             SC_TEST_EXPECT(builder.append("__{}__", static_cast<int64_t>(MaxValue())));

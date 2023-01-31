@@ -25,7 +25,7 @@ bool formatSprintf(StringFormatOutput& data, char (&formatSpecifier)[SPECIFIER_L
     char_t     buffer[BUFFER_SIZE];
     const int  numCharsExcludingTerminator = snprintf(buffer, sizeof(buffer), compoundSpecifier, value);
     const bool validResult = numCharsExcludingTerminator >= 0 && numCharsExcludingTerminator + 1 < BUFFER_SIZE;
-    return validResult && data.write(Span<const char>(buffer, numCharsExcludingTerminator));
+    return validResult && data.write(StringView(buffer, numCharsExcludingTerminator, true, StringEncoding::Ascii));
 }
 #if SC_MSVC
 #else
@@ -112,13 +112,13 @@ bool StringFormatterFor<double>::format(StringFormatOutput& data, const StringIt
 bool StringFormatterFor<SC::char_t>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
                                             const SC::char_t value)
 {
-    return data.write(Span<const char>(&value, 1));
+    return data.write(StringView(&value, 1, false, StringEncoding::Ascii));
 }
 
 bool StringFormatterFor<const SC::char_t*>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
                                                    const SC::char_t* value)
 {
-    return data.write(Span<const char>(value, strlen(value)));
+    return data.write(StringView(value, strlen(value), true, StringEncoding::Ascii));
 }
 
 bool StringFormatterFor<SC::StringView>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
@@ -129,24 +129,35 @@ bool StringFormatterFor<SC::StringView>::format(StringFormatOutput& data, const 
         const char* nullTerminated = nullptr;
         const bool  res            = StringConverter::toNullTerminatedUTF8(value, data.buffer, &nullTerminated, true);
         return res && data.buffer.pop_back() &&
-               data.write(Span<const char>(data.buffer.data(), data.buffer.size())); // remove the trailing zero
+               data.write(StringView(data.buffer.data(), data.buffer.size(), true, StringEncoding::Utf16));
     }
     else
     {
-        return data.write(Span<const char>(value.bytesWithoutTerminator(), value.sizeInBytes()));
+        return data.write(value);
     }
 }
 
-bool StringFormatOutput::write(Span<const char> text)
+bool StringFormatOutput::write(StringView text)
 {
     if (writeToStdout)
     {
-        Console::print(StringView(text.data(), text.sizeInBytes(), false, StringEncoding::Utf8));
+        Console::print(text);
         return true;
     }
     else
     {
-        return data.appendCopy(text.data(), text.sizeInBytes());
+        if ((encoding == text.getEncoding()) or
+            (encoding == StringEncoding::Utf8 and text.getEncoding() == StringEncoding::Ascii) or
+            (encoding == StringEncoding::Ascii and text.getEncoding() == StringEncoding::Utf8))
+        {
+            return data.appendCopy(text.getIterator<StringIteratorASCII>().getIt(), text.sizeInBytes());
+        }
+        else
+        {
+            // TODO: Implement mixing different encodings when writing to buffer
+            SC_DEBUG_ASSERT("Not Implemented" && 0);
+            return false;
+        }
     }
 }
 

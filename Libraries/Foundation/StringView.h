@@ -46,17 +46,20 @@ struct StringFunctions;
 struct SC::StringView
 {
   private:
-    Span<const char_t> text;
-    StringEncoding     encoding;
-    bool               hasNullTerm;
+    Span<const char> text;
+    StringEncoding   encoding;
+    bool             hasNullTerm;
 
   public:
-    constexpr StringView() : text(nullptr, 0), encoding(StringEncoding::Utf8), hasNullTerm(false) {}
+    constexpr StringView() : text(nullptr, 0), encoding(StringEncoding::Ascii), hasNullTerm(false) {}
+    constexpr StringView(Span<const char> text, bool nullTerm, StringEncoding encoding)
+        : text(text), encoding(encoding), hasNullTerm(nullTerm)
+    {}
     constexpr StringView(const char_t* text, size_t bytes, bool nullTerm, StringEncoding encoding)
         : text{text, bytes}, encoding(encoding), hasNullTerm(nullTerm)
     {}
     template <size_t N>
-    constexpr StringView(const char (&text)[N]) : text{text, N - 1}, encoding(StringEncoding::Utf8), hasNullTerm(true)
+    constexpr StringView(const char (&text)[N]) : text{text, N - 1}, encoding(StringEncoding::Ascii), hasNullTerm(true)
     {}
 #if SC_PLATFORM_WINDOWS
     template <size_t N>
@@ -250,12 +253,20 @@ struct SC::StringView
 };
 
 #if SC_MSVC
-constexpr inline SC::StringView operator"" _sv(const char* txt, size_t sz)
+constexpr inline SC::StringView operator"" _a8(const char* txt, size_t sz)
+{
+    return SC::StringView(txt, sz, true, SC::StringEncoding::Ascii);
+}
+constexpr inline SC::StringView operator"" _u8(const char* txt, size_t sz)
 {
     return SC::StringView(txt, sz, true, SC::StringEncoding::Utf8);
 }
 #else
-constexpr inline SC::StringView operator"" _sv(const SC::char_t* txt, SC::size_t sz)
+constexpr inline SC::StringView operator"" _a8(const SC::char_t* txt, SC::size_t sz)
+{
+    return SC::StringView(txt, sz, true, SC::StringEncoding::Ascii);
+}
+constexpr inline SC::StringView operator"" _u8(const SC::char_t* txt, SC::size_t sz)
 {
     return SC::StringView(txt, sz, true, SC::StringEncoding::Utf8);
 }

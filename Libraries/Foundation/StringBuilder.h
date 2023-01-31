@@ -9,12 +9,14 @@ namespace SC
 {
 struct StringBuilder
 {
+    StringBuilder(StringEncoding encoding) : encoding(encoding) {}
     template <typename... Types>
     [[nodiscard]] bool append(StringView fmt, Types... args)
     {
         if (not data.isEmpty())
             SC_TRY_IF(data.pop_back());
         StringFormatOutput sos;
+        sos.encoding   = encoding;
         sos.data       = move(data);
         const bool res = StringFormat<StringIteratorASCII>::format(sos, fmt, args...);
         data           = move(sos.data);
@@ -46,7 +48,7 @@ struct StringBuilder
 
     [[nodiscard]] StringView view()
     {
-        String     s(move(data));
+        String     s(move(data), encoding);
         StringView sv = s.view();
         data          = move(s.data);
         return sv;
@@ -54,9 +56,10 @@ struct StringBuilder
 
     void clear() { (void)data.resizeWithoutInitializing(0); }
 
-    [[nodiscard]] String releaseString() { return move(data); }
+    [[nodiscard]] String releaseString() { return String(move(data), encoding); }
 
   private:
+    StringEncoding encoding;
     Vector<char_t> data;
 };
 } // namespace SC

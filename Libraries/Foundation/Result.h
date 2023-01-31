@@ -11,7 +11,7 @@ namespace SC
 struct [[nodiscard]] ReturnCode
 {
     StringView message;
-    constexpr ReturnCode(bool result) : message(result ? ""_sv : "Unspecified Error"_sv) {}
+    constexpr ReturnCode(bool result) : message(result ? ""_a8 : "Unspecified Error"_a8) {}
     constexpr ReturnCode(const char* message) = delete;
     constexpr ReturnCode(const StringView message) : message(message) {}
     constexpr ReturnCode(const ReturnCode& other) : message(other.message) {}

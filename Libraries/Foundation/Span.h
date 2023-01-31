@@ -17,34 +17,31 @@ struct Span
 
     typedef SC::size_t Size;
 
-    constexpr Span() : items(nullptr), size(0) {}
-    constexpr Span(Type* items, Size sizeInBytes) : items(items), size(sizeInBytes) {}
-    constexpr Span(Type& type) : items(&type), size(sizeof(Type)) {}
-    constexpr Span(Type&& type) : items(&type), size(sizeof(Type)) {}
+    constexpr Span() : items(nullptr), sizeBytes(0) {}
+    constexpr Span(Type* items, Size sizeInBytes) : items(items), sizeBytes(sizeInBytes) {}
+    constexpr Span(Type& type) : items(&type), sizeBytes(sizeof(Type)) {}
+    constexpr Span(Type&& type) : items(&type), sizeBytes(sizeof(Type)) {}
 
     // Specialization for converting const char* to StringView
-    template <int N>
-    constexpr Span(const char (&type)[N]) : Span(Type(type))
-    {}
     constexpr Span(std::initializer_list<Type> ilist)
     {
-        items = ilist.begin();
-        size  = ilist.size() * sizeof(Type);
+        items     = ilist.begin();
+        sizeBytes = ilist.size() * sizeof(Type);
     }
 
     constexpr const Type* begin() const { return items; }
-    constexpr const Type* end() const { return items + size; }
+    constexpr const Type* end() const { return items + sizeBytes / sizeof(Type); }
     constexpr const Type* data() const { return items; }
     constexpr Type*       begin() { return items; }
-    constexpr Type*       end() { return items + size; }
+    constexpr Type*       end() { return items + sizeBytes / sizeof(Type); }
     constexpr Type*       data() { return items; }
-    constexpr Size        sizeInElements() const { return size / sizeof(Type); }
-    constexpr Size        sizeInBytes() const { return size; }
-    constexpr void        setSizeInBytes(Size newSize) { size = newSize; }
+    constexpr Size        sizeInElements() const { return sizeBytes / sizeof(Type); }
+    constexpr Size        sizeInBytes() const { return sizeBytes; }
+    constexpr void        setSizeInBytes(Size newSize) { sizeBytes = newSize; }
 
   private:
     Type* items;
-    Size  size;
+    Size  sizeBytes;
 };
 
 template <typename Type>

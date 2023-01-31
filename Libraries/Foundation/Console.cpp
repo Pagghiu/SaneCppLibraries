@@ -6,17 +6,17 @@
 #include "Platform.h"
 #include "String.h"
 #include "StringConverter.h"
+#include "StringNative.h"
 
-#include <stdarg.h> // va_list
-#include <stdio.h>  // printf
+#include <stdio.h> // stdout
 
 #if SC_PLATFORM_WINDOWS
 #include <Windows.h>
 struct SC::Console::Internal
 {
-    static Vector<wchar_t> mainThreadBuffer;
+    static StringNative<512> mainThreadBuffer;
 };
-SC::Vector<wchar_t> SC::Console::Internal::mainThreadBuffer;
+SC::StringNative<512> SC::Console::Internal::mainThreadBuffer;
 #endif
 
 void SC::Console::print(const StringView str)
@@ -24,16 +24,28 @@ void SC::Console::print(const StringView str)
     if (str.isEmpty())
         return;
     SC_DEBUG_ASSERT(str.sizeInBytes() < static_cast<int>(MaxValue()));
-
 #if SC_PLATFORM_WINDOWS
-    const wchar_t* nullTerminated = nullptr;
-    (void)Internal::mainThreadBuffer.resizeWithoutInitializing(0);
-    if (StringConverter::toNullTerminatedUTF16(str, Internal::mainThreadBuffer, &nullTerminated, true))
+    if (str.getEncoding() == StringEncoding::Ascii)
     {
-        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), Internal::mainThreadBuffer.data(),
-                      static_cast<DWORD>(Internal::mainThreadBuffer.size()), nullptr, nullptr);
+        WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), str.getIterator<StringIteratorASCII>().getIt(),
+                      static_cast<DWORD>(str.sizeInBytes()), nullptr, nullptr);
 #if SC_DEBUG
-        OutputDebugStringW(Internal::mainThreadBuffer.data());
+        if (str.isNullTerminated())
+        {
+            OutputDebugStringA(str.getIterator<StringIteratorASCII>().getIt());
+        }
+        else if (Internal::mainThreadBuffer.convertToNullTerminated(str))
+        {
+            OutputDebugStringW(Internal::mainThreadBuffer.getText());
+        }
+#endif
+    }
+    else if (Internal::mainThreadBuffer.convertToNullTerminated(str))
+    {
+        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), Internal::mainThreadBuffer.getText(),
+                      static_cast<DWORD>(Internal::mainThreadBuffer.getTextLengthInPoints()), nullptr, nullptr);
+#if SC_DEBUG
+        OutputDebugStringW(Internal::mainThreadBuffer.getText());
 #endif
     }
     else
