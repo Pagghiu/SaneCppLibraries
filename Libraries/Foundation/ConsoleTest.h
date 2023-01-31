@@ -21,11 +21,11 @@ struct SC::ConsoleTest : public SC::TestCase
         {
             printAssertion("a!=b", "FileName.cpp", "Function", 12);
         }
-        if (test_section("printUTF8"))
+        if (test_section("print"))
         {
             String str = StringView("Test Test\n");
-            Console::printUTF8(str);
-            Console::printUTF8(str.view());
+            Console::print(str);
+            Console::print(str.view());
         }
     }
 };

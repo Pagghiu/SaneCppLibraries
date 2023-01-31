@@ -35,7 +35,7 @@ bool SC::OSPaths::init()
 
     SmallVector<char_t, MAX_PATH> utf8Buffer;
     const char_t*                 nullTerminatedUTF8;
-    SC_TRY_IF(StringConverter::toNullTerminatedUTF8(utf16executable, utf8Buffer, &nullTerminatedUTF8));
+    SC_TRY_IF(StringConverter::toNullTerminatedUTF8(utf16executable, utf8Buffer, &nullTerminatedUTF8, false));
     globalPaths.executableFile = StringView(nullTerminatedUTF8, utf8Buffer.size() - 1, true, StringEncoding::Utf8);
     globalPaths.applicationRootDirectory = Path::Windows::dirname(globalPaths.executableFile.view());
     return true;

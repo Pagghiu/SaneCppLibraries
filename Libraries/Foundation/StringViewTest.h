@@ -34,23 +34,23 @@ struct SC::StringViewTest : public SC::TestCase
         {
             StringView other;
             int32_t    value;
-            SC_TEST_EXPECT(not other.parseInt32<StringIteratorASCII>(&value));
+            SC_TEST_EXPECT(not other.parseInt32(&value));
             other = "\0";
-            SC_TEST_EXPECT(not other.parseInt32<StringIteratorASCII>(&value));
+            SC_TEST_EXPECT(not other.parseInt32(&value));
             other = "+";
-            SC_TEST_EXPECT(not other.parseInt32<StringIteratorASCII>(&value));
+            SC_TEST_EXPECT(not other.parseInt32(&value));
             other = "-";
-            SC_TEST_EXPECT(not other.parseInt32<StringIteratorASCII>(&value));
+            SC_TEST_EXPECT(not other.parseInt32(&value));
             other = "+ ";
-            SC_TEST_EXPECT(not other.parseInt32<StringIteratorASCII>(&value));
+            SC_TEST_EXPECT(not other.parseInt32(&value));
             other = "+1";
-            SC_TEST_EXPECT(other.parseInt32<StringIteratorASCII>(&value));
+            SC_TEST_EXPECT(other.parseInt32(&value));
             SC_TEST_EXPECT(value == 1);
             other = "-123";
-            SC_TEST_EXPECT(other.parseInt32<StringIteratorASCII>(&value));
+            SC_TEST_EXPECT(other.parseInt32(&value));
             SC_TEST_EXPECT(value == -123);
             other = StringView("-456___", 4, false, StringEncoding::Ascii);
-            SC_TEST_EXPECT(other.parseInt32<StringIteratorASCII>(&value));
+            SC_TEST_EXPECT(other.parseInt32(&value));
             SC_TEST_EXPECT(value == -456);
         }
 

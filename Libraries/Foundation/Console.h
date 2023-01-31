@@ -12,8 +12,16 @@ namespace SC
 struct String;
 struct Console
 {
-    static int  c_printf(const char_t* format, ...) SC_ATTRIBUTE_PRINTF(1, 2);
-    static void printUTF8(const StringView str);
-    static void printUTF8(const String& str);
+    template <typename... Types>
+    static bool print(StringView fmt, Types... args)
+    {
+        StringFormatOutput output;
+        output.writeToStdout = true;
+        return StringFormat<StringIteratorASCII>::format(output, fmt, args...);
+    }
+
+    static void print(const StringView str);
+    static void print(const String& str);
+    struct Internal;
 };
 } // namespace SC

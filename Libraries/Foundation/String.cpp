@@ -2,8 +2,6 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "String.h"
-#include <stdarg.h> // va_list
-#include <stdio.h>  // vsnprintf
 
 bool SC::String::assignStringView(StringView sv)
 {
@@ -22,7 +20,7 @@ bool SC::String::assignStringView(StringView sv)
     return res;
 }
 
-bool SC::StringFormatterFor<SC::String>::format(Vector<char_t>& data, const StringIteratorASCII specifier,
+bool SC::StringFormatterFor<SC::String>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
                                                 const SC::String& value)
 {
     return StringFormatterFor<SC::StringView>::format(data, specifier, value.view());

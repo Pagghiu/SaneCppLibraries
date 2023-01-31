@@ -37,9 +37,8 @@ struct SC::OSTest : public SC::TestCase
         if (test_section("OS"))
         {
             SC_TEST_EXPECT(OSPaths::init());
-            Console::printUTF8(OSPaths::get().executableFile.view());
-            Console::printUTF8("\n");
-            Console::printUTF8(OSPaths::get().applicationRootDirectory.view());
+            Console::print("executableFile=\"{}\"\n", OSPaths::get().executableFile.view());
+            Console::print("applicationRootDirectory=\"{}\"\n", OSPaths::get().applicationRootDirectory.view());
             SC_TEST_EXPECT(OSPaths::close());
         }
     }

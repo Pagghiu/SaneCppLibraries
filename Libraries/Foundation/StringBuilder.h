@@ -4,21 +4,21 @@
 #pragma once
 #include "String.h"
 #include "StringFormat.h"
-#include "Vector.h"
 
 namespace SC
 {
 struct StringBuilder
 {
-    [[nodiscard]] size_t        sizeInBytesIncludingTerminator() const { return data.size(); }
-    [[nodiscard]] const char_t* bytesIncludingTerminator() const { return data.data(); }
-
     template <typename... Types>
-    [[nodiscard]] bool appendFormatASCII(StringView fmt, Types... args)
+    [[nodiscard]] bool append(StringView fmt, Types... args)
     {
         if (not data.isEmpty())
             SC_TRY_IF(data.pop_back());
-        return StringFormat<StringIteratorASCII>::format(data, fmt, args...);
+        StringFormatOutput sos;
+        sos.data       = move(data);
+        const bool res = StringFormat<StringIteratorASCII>::format(sos, fmt, args...);
+        data           = move(sos.data);
+        return res;
     }
 
     [[nodiscard]] bool append(StringView str)
@@ -36,18 +36,27 @@ struct StringBuilder
             return true;
         }
     }
+
     [[nodiscard]] bool append(const String& str)
     {
         if (not data.isEmpty())
             SC_TRY_IF(data.pop_back());
         return data.appendCopy(str.bytesIncludingTerminator(), str.sizeInBytesIncludingTerminator());
     }
-    [[nodiscard]] String         toString() { return move(data); }
-    [[nodiscard]] Vector<char_t> toVectorOfChars() { return move(data); }
+
+    [[nodiscard]] StringView view()
+    {
+        String     s(move(data));
+        StringView sv = s.view();
+        data          = move(s.data);
+        return sv;
+    }
+
+    void clear() { (void)data.resizeWithoutInitializing(0); }
+
+    [[nodiscard]] String releaseString() { return move(data); }
 
   private:
     Vector<char_t> data;
-
-    [[nodiscard]] bool assignStringView(StringView sv);
 };
 } // namespace SC

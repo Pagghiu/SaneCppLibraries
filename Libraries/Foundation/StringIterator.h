@@ -145,23 +145,18 @@ struct StringIteratorASCII
         return StringIteratorASCII(it, otherPoint.it - 1);
     }
 
-    template <typename Container>
-    [[nodiscard]] bool writeBytesUntil(StringIteratorASCII other, Container& container) const
-    {
-        if (other.it < it)
-        {
-            return false;
-        }
-        return container.appendCopy(it, other.it - it);
-    }
-
-    template <typename Container>
-    [[nodiscard]] bool insertBytesTo(Container& container, size_t idx) const
-    {
-        return container.insertCopy(idx, it, end - it);
-    }
-
     [[nodiscard]] size_t bytesDistanceFrom(StringIteratorASCII other) const { return it - other.it; }
+
+    Span<const char> sliceUntil(StringIteratorASCII other) const
+    {
+        if (other.it >= start && other.it <= end)
+        {
+            return Span<const char>(it, other.it - it);
+        }
+        return {};
+    }
+    Span<const char> sliceUntilEnd() const { return Span<const char>(it, end - it); }
+    Span<const char> sliceFromStart() const { return Span<const char>(start, it - start); }
 
     const char_t* getStart() const { return start; }
     const char_t* getIt() const { return it; }

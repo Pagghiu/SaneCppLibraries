@@ -5,32 +5,45 @@
 #include "Limits.h"
 #include "Platform.h"
 #include "String.h"
+#include "StringConverter.h"
 
 #include <stdarg.h> // va_list
 #include <stdio.h>  // printf
 
-int SC::Console::c_printf(const char_t* format, ...)
+#if SC_PLATFORM_WINDOWS
+#include <Windows.h>
+struct SC::Console::Internal
 {
-    va_list args;
-    va_start(args, format);
-    int res = ::vprintf(format, args);
-    va_end(args);
-    return res;
-}
+    static Vector<wchar_t> mainThreadBuffer;
+};
+SC::Vector<wchar_t> SC::Console::Internal::mainThreadBuffer;
+#endif
 
-void SC::Console::printUTF8(const StringView str)
+void SC::Console::print(const StringView str)
 {
+    if (str.isEmpty())
+        return;
     SC_DEBUG_ASSERT(str.sizeInBytes() < static_cast<int>(MaxValue()));
-    printf("%.*s", static_cast<int>(str.sizeInBytes()), str.bytesWithoutTerminator());
+
+#if SC_PLATFORM_WINDOWS
+    const wchar_t* nullTerminated = nullptr;
+    (void)Internal::mainThreadBuffer.resizeWithoutInitializing(0);
+    if (StringConverter::toNullTerminatedUTF16(str, Internal::mainThreadBuffer, &nullTerminated, true))
+    {
+        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), Internal::mainThreadBuffer.data(),
+                      static_cast<DWORD>(Internal::mainThreadBuffer.size()), nullptr, nullptr);
+#if SC_DEBUG
+        OutputDebugStringW(Internal::mainThreadBuffer.data());
+#endif
+    }
+    else
+    {
+        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), L"ERROR: cannot format string",
+                      static_cast<DWORD>(wcslen(L"ERROR: cannot format string")), nullptr, nullptr);
+    }
+#else
+    fwrite(str.bytesWithoutTerminator(), sizeof(char), static_cast<int>(str.sizeInBytes()), stdout);
+#endif
 }
 
-void SC::Console::printUTF8(const String& str)
-{
-    const size_t length = str.sizeInBytesIncludingTerminator();
-    SC_DEBUG_ASSERT(length < static_cast<int>(MaxValue()));
-    if (length > 1)
-    {
-        // TODO: On windows this is not UTF8 for sure
-        printf("%.*s", static_cast<int>(length), str.bytesIncludingTerminator());
-    }
-}
+void SC::Console::print(const String& str) { print(str.view()); }

@@ -3,8 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "StringView.h"
 
-template <>
-bool SC::StringView::parseInt32<SC::StringIteratorASCII>(int32_t* value) const
+bool SC::StringView::parseInt32(int32_t* value) const
 {
     if (isIntegerNumber<StringIteratorASCII>())
     {

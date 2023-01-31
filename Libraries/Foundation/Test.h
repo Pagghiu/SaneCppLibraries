@@ -35,7 +35,9 @@ struct TestCase
 {
     TestCase(TestReport& report, StringView testName);
     ~TestCase();
-    void               recordExpectation(StringView expression, bool status);
+    bool recordExpectation(StringView expression, bool status, StringView detailedError = StringView());
+    bool recordExpectation(StringView expression, ReturnCode status);
+
     [[nodiscard]] bool test_section(StringView sectionName);
 
     const StringView testName;
@@ -47,14 +49,6 @@ struct TestCase
 };
 } // namespace SC
 
-#if SC_MSVC
 #define SC_TEST_EXPECT(e)                                                                                              \
-    ((e) ? recordExpectation(#e, true)                                                                                 \
-         : (recordExpectation(#e, false), TestCase::report.debugBreakOnFailedTest ? SC_BREAK_DEBUGGER : (void)0))
-
-#else
-#define SC_TEST_EXPECT(e)                                                                                              \
-    (__builtin_expect((e), 0)                                                                                          \
-         ? recordExpectation(#e, true)                                                                                 \
-         : (recordExpectation(#e, false), TestCase::report.debugBreakOnFailedTest ? SC_BREAK_DEBUGGER : (void)0))
-#endif
+    recordExpectation(StringView(#e), (e)) ? (void)0                                                                   \
+                                           : (TestCase::report.debugBreakOnFailedTest ? SC_BREAK_DEBUGGER : (void)0);

@@ -13,7 +13,6 @@
 namespace SC
 {
 struct StringView;
-struct StringViewWithEncoding;
 struct SplitOptions
 {
     enum Value
@@ -59,10 +58,21 @@ struct SC::StringView
     template <size_t N>
     constexpr StringView(const char (&text)[N]) : text{text, N - 1}, encoding(StringEncoding::Utf8), hasNullTerm(true)
     {}
+#if SC_PLATFORM_WINDOWS
+    template <size_t N>
+    StringView(const wchar_t (&text)[N])
+        : text{reinterpret_cast<const char*>(text), (N - 1) * sizeof(wchar_t)}, encoding(StringEncoding::Utf16),
+          hasNullTerm(true)
+    {}
+#endif
 
     [[nodiscard]] constexpr StringEncoding getEncoding() const { return encoding; }
     [[nodiscard]] constexpr const char_t*  bytesWithoutTerminator() const { return text.data(); }
-    [[nodiscard]] constexpr const char_t*  bytesIncludingTerminator() const { return text.data(); }
+    [[nodiscard]] constexpr const char_t*  bytesIncludingTerminator() const
+    {
+        SC_RELEASE_ASSERT(hasNullTerm);
+        return text.data();
+    }
 
     [[nodiscard]] Comparison compareASCII(StringView other) const
     {
@@ -101,7 +111,7 @@ struct SC::StringView
     [[nodiscard]] bool startsWith(char_t c) const { return isEmpty() ? false : text.data()[0] == c; }
     [[nodiscard]] bool startsWith(const StringView str) const
     {
-        if (str.text.sizeInBytes() <= text.sizeInBytes())
+        if (encoding == str.encoding && str.text.sizeInBytes() <= text.sizeInBytes())
         {
             const StringView ours(text.data(), str.text.sizeInBytes(), false, encoding);
             return str == ours;
@@ -110,7 +120,10 @@ struct SC::StringView
     }
     [[nodiscard]] bool endsWith(const StringView str) const
     {
-        if (str.sizeInBytes() <= sizeInBytes())
+        const bool compatibleEncoding = (encoding == str.encoding) or
+                                        (str.encoding == StringEncoding::Ascii && encoding == StringEncoding::Utf8) or
+                                        (str.encoding == StringEncoding::Utf8 && encoding == StringEncoding::Ascii);
+        if (compatibleEncoding && str.sizeInBytes() <= sizeInBytes())
         {
             const StringView ours(text.data() + text.sizeInBytes() - str.text.sizeInBytes(), str.text.sizeInBytes(),
                                   false, encoding);
@@ -232,22 +245,17 @@ struct SC::StringView
     template <typename StringIterator>
     [[nodiscard]] bool isIntegerNumber() const;
 
-    /// Parses int32_t, returning false if it fails
-    template <typename StringIterator>
+    /// Parses int32, returning false if it fails
     [[nodiscard]] bool parseInt32(int32_t* value) const;
-
-    /// Parses int32_t, returning false if it fails
-    template <>
-    [[nodiscard]] bool parseInt32<StringIteratorASCII>(int32_t* value) const;
 };
 
 #if SC_MSVC
-inline SC::StringView operator"" _sv(const char* txt, size_t sz)
+constexpr inline SC::StringView operator"" _sv(const char* txt, size_t sz)
 {
     return SC::StringView(txt, sz, true, SC::StringEncoding::Utf8);
 }
 #else
-inline SC::StringView operator"" _sv(const SC::char_t* txt, SC::size_t sz)
+constexpr inline SC::StringView operator"" _sv(const SC::char_t* txt, SC::size_t sz)
 {
     return SC::StringView(txt, sz, true, SC::StringEncoding::Utf8);
 }

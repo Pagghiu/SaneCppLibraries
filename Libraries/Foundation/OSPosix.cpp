@@ -24,7 +24,8 @@ bool SC::OS::printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeIn
     char** strs = backtrace_symbols(backtraceBuffer, static_cast<int>(numFrames));
     for (size_t i = 0; i < numFrames; ++i)
     {
-        Console::c_printf("%s\n", strs[i]);
+        Console::print(StringView(strs[i], strlen(strs[i]), true, StringEncoding::Utf8));
+        Console::print("\n");
     }
     // TODO: Fix Backtrace line numbers
     // https://stackoverflow.com/questions/8278691/how-to-fix-backtrace-line-number-error-in-c

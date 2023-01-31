@@ -21,7 +21,7 @@ SC::TestReport::TestReport(int argc, const char** argv)
             {
                 testToRun = StringView(argv[idx + 1], strlen(argv[idx + 1]), true, StringEncoding::Utf8);
 
-                Console::c_printf("TestReport::Running single test \"%s\"\n", argv[idx + 1]);
+                Console::print("TestReport::Running single test \"{}\"\n", argv[idx + 1]);
             }
         }
         if (param == "--test-section" && sectionToRun.isEmpty())
@@ -30,13 +30,13 @@ SC::TestReport::TestReport(int argc, const char** argv)
             {
                 sectionToRun = StringView(argv[idx + 1], strlen(argv[idx + 1]), true, StringEncoding::Utf8);
 
-                Console::c_printf("TestReport::Running single section \"%s\"\n", argv[idx + 1]);
+                Console::print("TestReport::Running single section \"{}\"\n", argv[idx + 1]);
             }
         }
     }
     if (not testToRun.isEmpty() || not sectionToRun.isEmpty())
     {
-        Console::c_printf("\n");
+        Console::print("\n");
     }
 }
 
@@ -44,15 +44,15 @@ SC::TestReport::~TestReport()
 {
     if (numTestsFailed > 0)
     {
-        Console::printUTF8(redEMOJI);
-        Console::c_printf(" TOTAL Failed = %d (Succeeded = %d)", numTestsFailed, numTestsSucceeded);
+        Console::print(redEMOJI);
+        Console::print(" TOTAL Failed = {} (Succeeded = {})", numTestsFailed, numTestsSucceeded);
     }
     else
     {
-        Console::printUTF8(greenEMOJI);
-        Console::c_printf(" TOTAL Succeeded = %d", numTestsSucceeded);
+        Console::print(greenEMOJI);
+        Console::print(" TOTAL Succeeded = {}", numTestsSucceeded);
     }
-    Console::c_printf("\n---------------------------------------------------\n");
+    Console::print("\n---------------------------------------------------\n");
 }
 
 //-------------------------------------------------------------------------------------------
@@ -62,8 +62,7 @@ SC::TestCase::TestCase(TestReport& report, StringView testName)
 {
     if (report.isTestEnabled(testName))
     {
-        SC_DEBUG_ASSERT(testName.isNullTerminated());
-        Console::c_printf("[[ %s ]]\n\n", testName.bytesWithoutTerminator());
+        Console::print("[[ {} ]]\n\n", testName);
         report.firstFailedTest = StringView();
         report.currentSection  = StringView();
     }
@@ -78,31 +77,31 @@ SC::TestCase::~TestCase()
             report.printSectionResult(*this);
         }
 
-        Console::printUTF8("\n");
+        Console::print("\n");
         if (numTestsFailed > 0)
         {
-            Console::printUTF8(redEMOJI);
-            Console::printUTF8(" [[ ");
-            Console::printUTF8(testName);
-            Console::printUTF8(" ]]");
-            Console::c_printf(" FAILED = %d (Succeeded = %d)\n", numTestsFailed, numTestsSucceeded);
+            Console::print(redEMOJI);
+            Console::print(" [[ ");
+            Console::print(testName);
+            Console::print(" ]]");
+            Console::print(" FAILED = {} (Succeeded = {})\n", numTestsFailed, numTestsSucceeded);
         }
         else
         {
-            Console::printUTF8(greenEMOJI);
-            Console::printUTF8(" [[ ");
-            Console::printUTF8(testName);
-            Console::printUTF8(" ]]");
-            Console::c_printf(" SUCCEEDED = %d\n", numTestsSucceeded);
+            Console::print(greenEMOJI);
+            Console::print(" [[ ");
+            Console::print(testName);
+            Console::print(" ]]");
+            Console::print(" SUCCEEDED = {}\n", numTestsSucceeded);
         }
-        Console::c_printf("---------------------------------------------------\n");
+        Console::print("---------------------------------------------------\n");
         report.numTestsFailed += numTestsFailed;
         report.numTestsSucceeded += numTestsSucceeded;
         report.testCaseFinished(*this);
     }
 }
 
-void SC::TestCase::recordExpectation(StringView expression, bool status)
+bool SC::TestCase::recordExpectation(StringView expression, bool status, StringView detailedError)
 {
     SC_DEBUG_ASSERT(expression.isNullTerminated());
     if (status)
@@ -115,14 +114,27 @@ void SC::TestCase::recordExpectation(StringView expression, bool status)
         numTestsFailed++;
         report.printSectionResult(*this);
         printedSection = true;
-        Console::printUTF8("\t\t");
-        Console::printUTF8(redEMOJI);
-        Console::c_printf(" [FAIL] %s\n", expression.bytesWithoutTerminator());
+        Console::print("\t\t");
+        Console::print(redEMOJI);
+        if (detailedError.isEmpty())
+        {
+            Console::print(" [FAIL] {}\n", expression);
+        }
+        else
+        {
+            Console::print(" [FAIL] {} - Error: {}\n", expression, detailedError);
+        }
         if (report.firstFailedTest.isEmpty())
         {
             report.firstFailedTest = expression;
         }
     }
+    return status;
+}
+
+bool SC::TestCase::recordExpectation(StringView expression, ReturnCode status)
+{
+    return recordExpectation(expression, status, status.message);
 }
 
 bool SC::TestCase::test_section(StringView sectionName)
@@ -147,16 +159,16 @@ bool SC::TestCase::test_section(StringView sectionName)
 
 void SC::TestReport::printSectionResult(TestCase& testCase)
 {
-    Console::printUTF8("\t- ");
+    Console::print("\t- ");
     if (testCase.numSectionTestsFailed > 0)
     {
-        Console::printUTF8(redEMOJI);
+        Console::print(redEMOJI);
     }
     else
     {
-        Console::printUTF8(greenEMOJI);
+        Console::print(greenEMOJI);
     }
-    Console::c_printf(" %s::%s\n", testCase.testName.bytesWithoutTerminator(), currentSection.bytesWithoutTerminator());
+    Console::print(" {}::{}\n", testCase.testName, currentSection);
 }
 
 void SC::TestReport::testCaseFinished(TestCase& testCase)

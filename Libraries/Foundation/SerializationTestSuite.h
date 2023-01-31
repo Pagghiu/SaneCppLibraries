@@ -6,9 +6,11 @@
 #include "Console.h"
 #include "Reflection.h"
 #include "String.h"
+#include "StringBuilder.h"
 #include "StringView.h"
 #include "Test.h"
 #include "Vector.h"
+
 namespace SC
 {
 namespace SerializationTestSuite
@@ -267,33 +269,37 @@ template <typename MetaProperties>
 inline int printAtoms(int currentAtomIdx, const MetaProperties* atom, const SC::ConstexprStringView* atomName,
                       int indentation)
 {
-    Console::c_printf("[%02d]", currentAtomIdx);
+    StringBuilder sb;
+    (void)sb.append("[{:02}]", currentAtomIdx);
     for (int i = 0; i < indentation; ++i)
-        Console::c_printf("\t");
-    Console::c_printf("[LinkIndex=%2d] %.*s (%d atoms)\n", currentAtomIdx, atomName->length, atomName->data,
-                      atom->numSubAtoms);
+        (void)sb.append("\t");
+    (void)sb.append("[LinkIndex={:2}] {} ({} atoms)\n", currentAtomIdx,
+                    StringView(atomName->data, atomName->length, false, StringEncoding::Utf8), atom->numSubAtoms);
     for (int i = 0; i < indentation; ++i)
-        Console::c_printf("\t");
-    Console::c_printf("{\n");
+        (void)sb.append("\t");
+    (void)sb.append("{\n");
     for (int idx = 0; idx < atom->numSubAtoms; ++idx)
     {
         auto& field     = atom[idx + 1];
         auto  fieldName = atomName[idx + 1];
-        Console::c_printf("[%02d]", currentAtomIdx + idx + 1);
+        (void)sb.append("[{:02}]", currentAtomIdx + idx + 1);
 
         for (int i = 0; i < indentation + 1; ++i)
-            Console::c_printf("\t");
-        Console::c_printf("Type=%d\tOffset=%d\tSize=%d\tName=%.*s", (int)field.type, field.offsetInBytes,
-                          field.sizeInBytes, fieldName.length, fieldName.data);
+            (void)sb.append("\t");
+
+        (void)sb.append("Type={}\tOffset={}\tSize={}\tName={}", (int)field.type, field.offsetInBytes, field.sizeInBytes,
+                        StringView(fieldName.data, fieldName.length, false, StringEncoding::Utf8));
         if (field.getLinkIndex() >= 0)
         {
-            Console::c_printf("\t[LinkIndex=%d]", field.getLinkIndex());
+            (void)sb.append("\t[LinkIndex={}]", field.getLinkIndex());
         }
-        Console::c_printf("\n");
+        (void)sb.append("\n");
     }
     for (int i = 0; i < indentation; ++i)
-        Console::c_printf("\t");
-    Console::c_printf("}\n");
+        (void)sb.append("\t");
+
+    (void)sb.append("}\n");
+    Console::print(sb.view());
     return atom->numSubAtoms;
 }
 } // namespace SC

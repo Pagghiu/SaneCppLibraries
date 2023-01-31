@@ -356,7 +356,7 @@ void SC::VectorTest::testClassType()
         for (int32_t idx = 0; idx < 5; ++idx)
         {
             int32_t value = 0;
-            SC_TEST_EXPECT(vector1[idx].toString().parseInt32<StringIteratorASCII>(&value));
+            SC_TEST_EXPECT(vector1[idx].toString().parseInt32(&value));
             SC_TEST_EXPECT(value == idx);
         }
     }
@@ -375,7 +375,7 @@ void SC::VectorTest::testClassType()
         for (int32_t idx = 0; idx < 5; ++idx)
         {
             int32_t value = 0;
-            SC_TEST_EXPECT(vector1[idx].toString().parseInt32<StringIteratorASCII>(&value));
+            SC_TEST_EXPECT(vector1[idx].toString().parseInt32(&value));
             SC_TEST_EXPECT(value == idx);
         }
     }
@@ -392,7 +392,7 @@ void SC::VectorTest::testClassType()
         for (const auto& it : vector1)
         {
             int32_t value = 0;
-            SC_TEST_EXPECT(it.toString().parseInt32<StringIteratorASCII>(&value));
+            SC_TEST_EXPECT(it.toString().parseInt32(&value));
             SC_TEST_EXPECT(value == idx++);
         }
     }
@@ -403,22 +403,22 @@ void SC::VectorTest::testClassType()
         report.reset();
         SC_TEST_EXPECT(test.push_back(VectorTestClass("1")));
         int32_t value = -1;
-        SC_TEST_EXPECT(test[0].toString().parseInt32<StringIteratorASCII>(&value));
+        SC_TEST_EXPECT(test[0].toString().parseInt32(&value));
         SC_TEST_EXPECT(value == 1);
         SC_TEST_EXPECT(test.push_back(VectorTestClass("2")));
-        SC_TEST_EXPECT(test[0].toString().parseInt32<StringIteratorASCII>(&value));
+        SC_TEST_EXPECT(test[0].toString().parseInt32(&value));
         SC_TEST_EXPECT(value == 1);
-        SC_TEST_EXPECT(test[1].toString().parseInt32<StringIteratorASCII>(&value));
+        SC_TEST_EXPECT(test[1].toString().parseInt32(&value));
         SC_TEST_EXPECT(value == 2);
         SC_TEST_EXPECT(test.size() == 2);
         SC_TEST_EXPECT(test.push_back(VectorTestClass("3")));
         SC_TEST_EXPECT(test.pop_front());
         SC_TEST_EXPECT(test.size() == 2);
-        SC_TEST_EXPECT(test[0].toString().parseInt32<StringIteratorASCII>(&value));
+        SC_TEST_EXPECT(test[0].toString().parseInt32(&value));
         SC_TEST_EXPECT(value == 2);
         SC_TEST_EXPECT(test.pop_back());
         SC_TEST_EXPECT(test.size() == 1);
-        SC_TEST_EXPECT(test[0].toString().parseInt32<StringIteratorASCII>(&value));
+        SC_TEST_EXPECT(test[0].toString().parseInt32(&value));
         SC_TEST_EXPECT(value == 2);
         SC_TEST_EXPECT(test.pop_back());
         SC_TEST_EXPECT(not test.pop_back());
@@ -438,8 +438,8 @@ void SC::VectorTest::testClassType()
         SC_TEST_EXPECT(vector1[0].data != vector2[0].data);
         SC_TEST_EXPECT(vector1[1].data != vector2[1].data);
         int32_t value;
-        SC_TEST_EXPECT(vector2[0].toString().parseInt32<StringIteratorASCII>(&value) && value == 0);
-        SC_TEST_EXPECT(vector2[1].toString().parseInt32<StringIteratorASCII>(&value) && value == 1);
+        SC_TEST_EXPECT(vector2[0].toString().parseInt32(&value) && value == 0);
+        SC_TEST_EXPECT(vector2[1].toString().parseInt32(&value) && value == 1);
     }
 
     if (test_section("class_move_assignment"))
@@ -454,8 +454,8 @@ void SC::VectorTest::testClassType()
         SC_TEST_EXPECT(vector1.size() == 0);
         SC_TEST_EXPECT(vector2.size() == 2);
         int32_t value;
-        SC_TEST_EXPECT(vector2[0].toString().parseInt32<StringIteratorASCII>(&value) && value == 0);
-        SC_TEST_EXPECT(vector2[1].toString().parseInt32<StringIteratorASCII>(&value) && value == 1);
+        SC_TEST_EXPECT(vector2[0].toString().parseInt32(&value) && value == 0);
+        SC_TEST_EXPECT(vector2[1].toString().parseInt32(&value) && value == 1);
     }
 }
 

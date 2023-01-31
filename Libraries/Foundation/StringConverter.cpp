@@ -9,7 +9,7 @@
 #endif
 
 bool SC::StringConverter::toNullTerminatedUTF8(StringView file, Vector<char_t>& buffer,
-                                               const char_t** nullTerminatedUTF8)
+                                               const char_t** nullTerminatedUTF8, bool forceCopy)
 {
     if (file.isEmpty())
     {
@@ -19,12 +19,21 @@ bool SC::StringConverter::toNullTerminatedUTF8(StringView file, Vector<char_t>& 
     {
         if (file.isNullTerminated())
         {
-            *nullTerminatedUTF8 = file.getIterator<StringIteratorASCII>().getIt();
+            if (forceCopy)
+            {
+                SC_TRY_IF(buffer.appendCopy(file.getIterator<StringIteratorASCII>().getIt(),
+                                            file.sizeInBytesIncludingTerminator()));
+                *nullTerminatedUTF8 = reinterpret_cast<const char_t*>(buffer.data());
+            }
+            else
+            {
+                *nullTerminatedUTF8 = file.getIterator<StringIteratorASCII>().getIt();
+            }
             return true;
         }
         else
         {
-            SC_TRY_IF(buffer.reserve(file.sizeInBytes() + 1));
+            SC_TRY_IF(buffer.reserve(buffer.size() + file.sizeInBytes() + 1));
             SC_TRY_IF(buffer.appendCopy(file.getIterator<StringIteratorASCII>().getIt(), file.sizeInBytes() + 1));
             *nullTerminatedUTF8 = buffer.data();
             return true;
@@ -41,9 +50,10 @@ bool SC::StringConverter::toNullTerminatedUTF8(StringView file, Vector<char_t>& 
         {
             return false;
         }
-        SC_TRY_IF(buffer.resizeWithoutInitializing((static_cast<size_t>(numChars) + 1)));
+        const auto oldSize = buffer.size();
+        SC_TRY_IF(buffer.resizeWithoutInitializing(oldSize + (static_cast<size_t>(numChars) + 1)));
         WideCharToMultiByte(CP_UTF8, 0, source, sourceSizeInBytes / sizeof(wchar_t),
-                            reinterpret_cast<char_t*>(buffer.data()), numChars, nullptr, 0);
+                            reinterpret_cast<char_t*>(buffer.data() + oldSize), numChars, nullptr, 0);
         buffer[buffer.size() - 1] = 0;
         *nullTerminatedUTF8       = reinterpret_cast<const char_t*>(buffer.data());
         return true;
@@ -54,7 +64,7 @@ bool SC::StringConverter::toNullTerminatedUTF8(StringView file, Vector<char_t>& 
 }
 
 bool SC::StringConverter::toNullTerminatedUTF16(StringView file, Vector<char_t>& buffer,
-                                                const wchar_t** nullTerminatedUTF16)
+                                                const wchar_t** nullTerminatedUTF16, bool forceCopy)
 {
     if (file.isEmpty())
     {
@@ -64,12 +74,22 @@ bool SC::StringConverter::toNullTerminatedUTF16(StringView file, Vector<char_t>&
     {
         if (file.isNullTerminated())
         {
-            *nullTerminatedUTF16 = reinterpret_cast<const wchar_t*>(file.getIterator<StringIteratorASCII>().getIt());
+            if (forceCopy)
+            {
+                SC_TRY_IF(buffer.appendCopy(file.getIterator<StringIteratorASCII>().getIt(),
+                                            file.sizeInBytes() + sizeof(wchar_t)));
+                *nullTerminatedUTF16 = reinterpret_cast<const wchar_t*>(buffer.data());
+            }
+            else
+            {
+                *nullTerminatedUTF16 =
+                    reinterpret_cast<const wchar_t*>(file.getIterator<StringIteratorASCII>().getIt());
+            }
             return true;
         }
         else
         {
-            SC_TRY_IF(buffer.reserve(file.sizeInBytes() + 1));
+            SC_TRY_IF(buffer.reserve(buffer.size() + file.sizeInBytes() + 1));
             SC_TRY_IF(
                 buffer.appendCopy(reinterpret_cast<const char_t*>(file.getIterator<StringIteratorASCII>().getIt()),
                                   file.sizeInBytes() + 1));
@@ -86,9 +106,12 @@ bool SC::StringConverter::toNullTerminatedUTF16(StringView file, Vector<char_t>&
         {
             return false;
         }
-        SC_TRY_IF(buffer.resizeWithoutInitializing((static_cast<size_t>(numWChars) + 1) * sizeof(wchar_t)));
+        const auto oldSize = buffer.size();
+        SC_TRY_IF(buffer.resizeWithoutInitializing(oldSize + (static_cast<size_t>(numWChars) + 1) * sizeof(wchar_t)));
         MultiByteToWideChar(CP_UTF8, 0, file.getIterator<StringIteratorASCII>().getIt(),
-                            static_cast<int>(file.sizeInBytes()), reinterpret_cast<wchar_t*>(buffer.data()), numWChars);
+                            static_cast<int>(file.sizeInBytes()), reinterpret_cast<wchar_t*>(buffer.data() + oldSize),
+                            numWChars);
+        buffer[buffer.size() - 2] = 0;
         buffer[buffer.size() - 1] = 0;
         *nullTerminatedUTF16      = reinterpret_cast<const wchar_t*>(buffer.data());
         return true;
