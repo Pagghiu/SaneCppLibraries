@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "SmallVector.h"
+#include "String.h"
 #include "StringConverter.h"
 
 namespace SC
@@ -15,77 +15,51 @@ struct StringNative;
 template <int N>
 struct SC::StringNative
 {
-#if SC_PLATFORM_WINDOWS
-    typedef wchar_t CharType;
-#else
-    typedef char CharType;
-#endif
+    void clear() { (void)buffer.data.resizeWithoutInitializing(0); }
 
-    /// Returns a null terminated converted string
-    const CharType* getText() const
+    [[nodiscard]] bool convertNullTerminateFastPath(StringView input, StringView& encodedText)
     {
-        // Probably forgot to call convertToNullTerminated
-        SC_RELEASE_ASSERT(data != nullptr);
-        return data;
+        SC_TRY_IF(buffer.data.resizeWithoutInitializing(0));
+        SC_TRY_IF(internalAppend(input, false, encodedText));
+        return true;
     }
 
-    /// Size of string obtained with getText() in bytes
-    size_t getTextLengthInBytes() const { return dataSizeInBytes; }
-
-    /// Size of string obtained with getText() in code points
-    size_t getTextLengthInPoints() const { return dataSizeInBytes / sizeof(CharType); }
-
-    void clear() { (void)buffer.resizeWithoutInitializing(0); }
-
-    [[nodiscard]] bool convertToNullTerminated(StringView input)
-    {
-        SC_TRY_IF(buffer.resizeWithoutInitializing(0));
-        dataSizeInBytes = 0;
-        return appendNullTerminated(input, false); // forceCopy = true
-    }
     /// Appends the input string null terminated
-    [[nodiscard]] bool appendNullTerminated(StringView input, bool forceCopy)
+    [[nodiscard]] bool appendNullTerminated(StringView input)
     {
-        if (!buffer.isEmpty())
+        SC_TRY_IF(buffer.popNulltermIfExists());
+        StringView encodedText;
+        return internalAppend(input, true, encodedText);
+    }
+
+    [[nodiscard]] bool setTextLengthInBytesIncludingTerminator(size_t newDataSize)
+    {
+        const auto zeroSize = StringEncodingGetSize(buffer.getEncoding());
+        if (newDataSize >= zeroSize)
         {
-            SC_TRY_IF(buffer.pop_back());
-        }
-#if SC_PLATFORM_WINDOWS
-        SC_TRY_IF(StringConverter::toNullTerminatedUTF16(input, buffer, &data, forceCopy));
-#else
-        SC_TRY_IF(StringConverter::toNullTerminatedUTF8(input, buffer, &data, forceCopy));
-#endif
-        if (buffer.size() == 0)
-        {
-            dataSizeInBytes = input.sizeInBytes();
-        }
-        else
-        {
-            dataSizeInBytes = buffer.size() * sizeof(CharType);
+            const bool res = buffer.data.resizeWithoutInitializing(newDataSize - zeroSize);
+            return res && buffer.data.resize(newDataSize, 0); // Adds the null terminator
         }
         return true;
     }
 
-    [[nodiscard]] bool setTextLengthInBytes(size_t newDataSize)
-    {
-        dataSizeInBytes = newDataSize;
-        const bool res  = buffer.resize(newDataSize / sizeof(CharType) - 1);
-        return res && buffer.push_back(0);
-    }
+    StringView view() const { return buffer.view(); }
 #if SC_PLATFORM_WINDOWS
-    StringView view() const
-    {
-        return StringView(reinterpret_cast<const char*>(buffer.data()), buffer.size() * sizeof(CharType), true,
-                          StringEncoding::Utf16);
-    }
+    typedef wchar_t CharType;
+    SmallString<N>  buffer = StringEncoding::Utf16;
 #else
-    StringView view() const
-    {
-        return StringView(buffer.data(), buffer.size() * sizeof(CharType), true, StringEncoding::Utf8);
-    }
+    typedef char   CharType;
+    SmallString<N> buffer = StringEncoding::Utf8;
 #endif
   private:
-    SmallVector<CharType, N> buffer;
-    const CharType*          data            = nullptr;
-    size_t                   dataSizeInBytes = 0;
+    /// Appends the input string null terminated
+    [[nodiscard]] bool internalAppend(StringView input, bool forceCopy, StringView& encodedText)
+    {
+#if SC_PLATFORM_WINDOWS
+        SC_TRY_IF(StringConverter::toNullTerminatedUTF16(input, buffer.data, encodedText, forceCopy));
+#else
+        SC_TRY_IF(StringConverter::toNullTerminatedUTF8(input, buffer.data, encodedText, forceCopy));
+#endif
+        return true;
+    }
 };

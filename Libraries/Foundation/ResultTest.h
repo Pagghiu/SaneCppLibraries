@@ -70,7 +70,7 @@ struct SC::ResultTest : public SC::TestCase
         return 12345;
     }
 
-    Result<Vector<char_t>> getString(bool fail)
+    Result<Vector<char>> getString(bool fail)
     {
         if (fail)
         {
@@ -81,7 +81,7 @@ struct SC::ResultTest : public SC::TestCase
         }
         else
         {
-            Vector<char_t> valueTest;
+            Vector<char> valueTest;
             SC_TRY_WRAP(valueTest.appendCopy("CIAO!", strlen("CIAO!") + 1), "Failed Append"_a8);
             return valueTest;
         }

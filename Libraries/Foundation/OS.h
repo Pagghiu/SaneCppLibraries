@@ -4,6 +4,7 @@
 #pragma once
 #include "String.h"
 #include "Types.h"
+
 namespace SC
 {
 struct OS;
@@ -20,9 +21,9 @@ struct SC::OS
 
 struct SC::OSPaths
 {
-    String executableFile;           // Full path to executable file including extension
-    String applicationRootDirectory; // Full path to Application directory (on Mac Apps is different from executable
-                                     // directory )
+    static const int            StaticPathSize = 1024;
+    SmallString<StaticPathSize> executableFile; // Full path (native encoding) to executable file including extension
+    SmallString<StaticPathSize> applicationRootDirectory; // Full path to (native encoding) Application directory
 
     [[nodiscard]] static bool init();
     [[nodiscard]] static bool close();

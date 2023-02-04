@@ -4,6 +4,7 @@
 #include "OS.h"
 #include "Path.h"
 #include "SmallVector.h"
+#include "StringBuilder.h"
 #include "StringConverter.h"
 
 #include <Windows.h>
@@ -12,6 +13,9 @@ extern SC::OSPaths globalPaths;
 
 bool SC::OSPaths::init()
 {
+    // TODO: OsPaths::init() for Windows is messy. Tune the API to improve writing software like this.
+    // Reason is because it's handy counting in wchars but we can't do it with StringNative.
+    // Additionally we must convert to utf8 at the end otherwise path::dirname will not work
     SmallVector<wchar_t, MAX_PATH> buffer;
 
     int numChars;
@@ -30,14 +34,15 @@ bool SC::OSPaths::init()
     SC_TRY_IF(buffer.resizeWithoutInitializing(numChars + 1));
     SC_TRY_IF(buffer[numChars] == 0);
 
-    StringView utf16executable = StringView(reinterpret_cast<const char*>(buffer.data()),
-                                            (buffer.size() - 1) * sizeof(wchar_t), true, StringEncoding::Utf16);
+    StringView utf16executable = StringView(Span<const wchar_t>(buffer.data(), (buffer.size() - 1) * sizeof(wchar_t)),
+                                            true, StringEncoding::Utf16);
 
-    SmallVector<char_t, MAX_PATH> utf8Buffer;
-    const char_t*                 nullTerminatedUTF8;
-    SC_TRY_IF(StringConverter::toNullTerminatedUTF8(utf16executable, utf8Buffer, &nullTerminatedUTF8, false));
-    globalPaths.executableFile = StringView(nullTerminatedUTF8, utf8Buffer.size() - 1, true, StringEncoding::Utf8);
-    globalPaths.applicationRootDirectory = Path::Windows::dirname(globalPaths.executableFile.view());
+    // TODO: OSPaths::init - We must also convert to utf8 because dirname will not work on non utf8 or ascii text
+    // assigning directly the SmallString inside StringNative will copy as is instad of converting utf16 to utf8
+    globalPaths.executableFile = ""_u8;
+    StringBuilder builder(globalPaths.executableFile);
+    SC_TRY_IF(builder.append(utf16executable));
+    globalPaths.applicationRootDirectory = Path::Windows::dirname(builder.getResultString().view());
     return true;
 }
 

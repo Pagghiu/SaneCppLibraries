@@ -126,10 +126,20 @@ bool StringFormatterFor<SC::StringView>::format(StringFormatOutput& data, const 
 {
     if (value.getEncoding() == StringEncoding::Utf16)
     {
-        const char* nullTerminated = nullptr;
-        const bool  res            = StringConverter::toNullTerminatedUTF8(value, data.buffer, &nullTerminated, true);
-        return res && data.buffer.pop_back() &&
-               data.write(StringView(data.buffer.data(), data.buffer.size(), true, StringEncoding::Utf16));
+        StringView encodedText;
+        bool       res = false;
+        if (data.encoding == StringEncoding::Utf8)
+        {
+            res = StringConverter::toNullTerminatedUTF8(value, data.buffer, encodedText, true);
+            res &= data.buffer.pop_back();
+        }
+        else if (data.encoding == StringEncoding::Utf16)
+        {
+            res = StringConverter::toNullTerminatedUTF16(value, data.buffer, encodedText, true);
+            res &= data.buffer.pop_back();
+            res &= data.buffer.pop_back();
+        }
+        return res && data.write(encodedText);
     }
     else
     {
@@ -150,7 +160,7 @@ bool StringFormatOutput::write(StringView text)
             (encoding == StringEncoding::Utf8 and text.getEncoding() == StringEncoding::Ascii) or
             (encoding == StringEncoding::Ascii and text.getEncoding() == StringEncoding::Utf8))
         {
-            return data.appendCopy(text.getIterator<StringIteratorASCII>().getIt(), text.sizeInBytes());
+            return data.appendCopy(text.bytesWithoutTerminator(), text.sizeInBytes());
         }
         else
         {

@@ -269,37 +269,39 @@ template <typename MetaProperties>
 inline int printAtoms(int currentAtomIdx, const MetaProperties* atom, const SC::ConstexprStringView* atomName,
                       int indentation)
 {
-    StringBuilder sb(StringEncoding::Ascii);
-    (void)sb.append("[{:02}]", currentAtomIdx);
+    String        buffer(StringEncoding::Ascii);
+    StringBuilder builder(buffer);
+    (void)builder.append("[{:02}]", currentAtomIdx);
     for (int i = 0; i < indentation; ++i)
-        (void)sb.append("\t");
-    (void)sb.append("[LinkIndex={:2}] {} ({} atoms)\n", currentAtomIdx,
-                    StringView(atomName->data, atomName->length, false, StringEncoding::Ascii), atom->numSubAtoms);
+        (void)builder.append("\t");
+    (void)builder.append("[LinkIndex={:2}] {} ({} atoms)\n", currentAtomIdx,
+                         StringView(atomName->data, atomName->length, false, StringEncoding::Ascii), atom->numSubAtoms);
     for (int i = 0; i < indentation; ++i)
-        (void)sb.append("\t");
-    (void)sb.append("{\n");
+        (void)builder.append("\t");
+    (void)builder.append("{\n");
     for (int idx = 0; idx < atom->numSubAtoms; ++idx)
     {
         auto& field     = atom[idx + 1];
         auto  fieldName = atomName[idx + 1];
-        (void)sb.append("[{:02}]", currentAtomIdx + idx + 1);
+        (void)builder.append("[{:02}]", currentAtomIdx + idx + 1);
 
         for (int i = 0; i < indentation + 1; ++i)
-            (void)sb.append("\t");
+            (void)builder.append("\t");
 
-        (void)sb.append("Type={}\tOffset={}\tSize={}\tName={}", (int)field.type, field.offsetInBytes, field.sizeInBytes,
-                        StringView(fieldName.data, fieldName.length, false, StringEncoding::Ascii));
+        (void)builder.append("Type={}\tOffset={}\tSize={}\tName={}", (int)field.type, field.offsetInBytes,
+                             field.sizeInBytes,
+                             StringView(fieldName.data, fieldName.length, false, StringEncoding::Ascii));
         if (field.getLinkIndex() >= 0)
         {
-            (void)sb.append("\t[LinkIndex={}]", field.getLinkIndex());
+            (void)builder.append("\t[LinkIndex={}]", field.getLinkIndex());
         }
-        (void)sb.append("\n");
+        (void)builder.append("\n");
     }
     for (int i = 0; i < indentation; ++i)
-        (void)sb.append("\t");
+        (void)builder.append("\t");
 
-    (void)sb.append("}\n");
-    Console::print(sb.view());
+    (void)builder.append("}\n");
+    Console::print(builder.view());
     return atom->numSubAtoms;
 }
 } // namespace SC

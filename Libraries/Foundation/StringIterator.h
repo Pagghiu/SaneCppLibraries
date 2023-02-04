@@ -12,8 +12,18 @@ enum class StringEncoding : uint8_t
     Ascii = 0,
     Utf8  = 1,
     Utf16 = 2,
-    Utf32 = 3,
+    Utf32 = 3
 };
+
+constexpr uint32_t StringEncodingGetSize(StringEncoding encoding)
+{
+    switch (encoding)
+    {
+    case StringEncoding::Utf32: return 4;
+    case StringEncoding::Utf16: return 2;
+    default: return 1;
+    }
+}
 
 struct StringIteratorASCII
 {

@@ -25,27 +25,28 @@ void SC::Console::print(const StringView str)
         return;
     SC_DEBUG_ASSERT(str.sizeInBytes() < static_cast<int>(MaxValue()));
 #if SC_PLATFORM_WINDOWS
+    StringView encodedPath;
     if (str.getEncoding() == StringEncoding::Ascii)
     {
-        WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), str.getIterator<StringIteratorASCII>().getIt(),
+        WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), str.bytesWithoutTerminator(),
                       static_cast<DWORD>(str.sizeInBytes()), nullptr, nullptr);
 #if SC_DEBUG
         if (str.isNullTerminated())
         {
-            OutputDebugStringA(str.getIterator<StringIteratorASCII>().getIt());
+            OutputDebugStringA(str.bytesIncludingTerminator());
         }
-        else if (Internal::mainThreadBuffer.convertToNullTerminated(str))
+        else if (Internal::mainThreadBuffer.convertNullTerminateFastPath(str, encodedPath))
         {
-            OutputDebugStringW(Internal::mainThreadBuffer.getText());
+            OutputDebugStringW(encodedPath.getNullTerminatedNative());
         }
 #endif
     }
-    else if (Internal::mainThreadBuffer.convertToNullTerminated(str))
+    else if (Internal::mainThreadBuffer.convertNullTerminateFastPath(str, encodedPath))
     {
-        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), Internal::mainThreadBuffer.getText(),
-                      static_cast<DWORD>(Internal::mainThreadBuffer.getTextLengthInPoints()), nullptr, nullptr);
+        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), encodedPath.getNullTerminatedNative(),
+                      static_cast<DWORD>(encodedPath.sizeInBytes() / sizeof(wchar_t)), nullptr, nullptr);
 #if SC_DEBUG
-        OutputDebugStringW(Internal::mainThreadBuffer.getText());
+        OutputDebugStringW(encodedPath.getNullTerminatedNative());
 #endif
     }
     else

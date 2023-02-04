@@ -14,7 +14,7 @@ bool SC::OSPaths::close()
 const SC::OSPaths& SC::OSPaths::get()
 {
     // Probably forgot to call init
-    SC_RELEASE_ASSERT(!globalPaths.executableFile.isEmpty());
+    SC_RELEASE_ASSERT(!globalPaths.executableFile.view().isEmpty());
     return globalPaths;
 }
 

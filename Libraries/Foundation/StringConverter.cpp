@@ -8,8 +8,8 @@
 #include <Windows.h>
 #endif
 
-bool SC::StringConverter::toNullTerminatedUTF8(StringView file, Vector<char_t>& buffer,
-                                               const char_t** nullTerminatedUTF8, bool forceCopy)
+bool SC::StringConverter::toNullTerminatedUTF8(StringView file, Vector<char>& buffer, StringView& encodedText,
+                                               bool forceCopy)
 {
     if (file.isEmpty())
     {
@@ -21,28 +21,28 @@ bool SC::StringConverter::toNullTerminatedUTF8(StringView file, Vector<char_t>& 
         {
             if (forceCopy)
             {
-                SC_TRY_IF(buffer.appendCopy(file.getIterator<StringIteratorASCII>().getIt(),
-                                            file.sizeInBytesIncludingTerminator()));
-                *nullTerminatedUTF8 = reinterpret_cast<const char_t*>(buffer.data());
+                SC_TRY_IF(buffer.appendCopy(file.bytesIncludingTerminator(), file.sizeInBytesIncludingTerminator()));
+                encodedText = StringView(buffer.data(), buffer.size() - 1, true, StringEncoding::Utf8);
             }
             else
             {
-                *nullTerminatedUTF8 = file.getIterator<StringIteratorASCII>().getIt();
+                encodedText = file;
             }
             return true;
         }
         else
         {
             SC_TRY_IF(buffer.reserve(buffer.size() + file.sizeInBytes() + 1));
-            SC_TRY_IF(buffer.appendCopy(file.getIterator<StringIteratorASCII>().getIt(), file.sizeInBytes() + 1));
-            *nullTerminatedUTF8 = buffer.data();
+            SC_TRY_IF(buffer.appendCopy(file.bytesWithoutTerminator(), file.sizeInBytes()));
+            encodedText = StringView(buffer.data(), buffer.size(), true, StringEncoding::Utf8);
+            SC_TRY_IF(buffer.push_back(0)); // null terminator
             return true;
         }
     }
     else if (file.getEncoding() == StringEncoding::Utf16)
     {
 #if SC_PLATFORM_WINDOWS
-        const wchar_t* source = reinterpret_cast<const wchar_t*>(file.getIterator<StringIteratorASCII>().getIt());
+        const wchar_t* source            = reinterpret_cast<const wchar_t*>(file.bytesWithoutTerminator());
         const int      sourceSizeInBytes = static_cast<int>(file.sizeInBytes());
         const int      numChars =
             WideCharToMultiByte(CP_UTF8, 0, source, sourceSizeInBytes / sizeof(wchar_t), nullptr, 0, nullptr, 0);
@@ -55,7 +55,7 @@ bool SC::StringConverter::toNullTerminatedUTF8(StringView file, Vector<char_t>& 
         WideCharToMultiByte(CP_UTF8, 0, source, sourceSizeInBytes / sizeof(wchar_t),
                             reinterpret_cast<char_t*>(buffer.data() + oldSize), numChars, nullptr, 0);
         buffer[buffer.size() - 1] = 0;
-        *nullTerminatedUTF8       = reinterpret_cast<const char_t*>(buffer.data());
+        encodedText               = StringView(buffer.data(), buffer.size() - 1, true, StringEncoding::Utf8);
         return true;
 #else
 #endif
@@ -63,8 +63,8 @@ bool SC::StringConverter::toNullTerminatedUTF8(StringView file, Vector<char_t>& 
     return false;
 }
 
-bool SC::StringConverter::toNullTerminatedUTF16(StringView file, Vector<char_t>& buffer,
-                                                const wchar_t** nullTerminatedUTF16, bool forceCopy)
+bool SC::StringConverter::toNullTerminatedUTF16(StringView file, Vector<char>& buffer, StringView& encodedText,
+                                                bool forceCopy)
 {
     if (file.isEmpty())
     {
@@ -76,31 +76,28 @@ bool SC::StringConverter::toNullTerminatedUTF16(StringView file, Vector<char_t>&
         {
             if (forceCopy)
             {
-                SC_TRY_IF(buffer.appendCopy(file.getIterator<StringIteratorASCII>().getIt(),
-                                            file.sizeInBytes() + sizeof(wchar_t)));
-                *nullTerminatedUTF16 = reinterpret_cast<const wchar_t*>(buffer.data());
+                SC_TRY_IF(buffer.appendCopy(file.bytesIncludingTerminator(), file.sizeInBytesIncludingTerminator()));
+                encodedText = StringView(buffer.data(), buffer.size() - sizeof(wchar_t), true, StringEncoding::Utf16);
             }
             else
             {
-                *nullTerminatedUTF16 =
-                    reinterpret_cast<const wchar_t*>(file.getIterator<StringIteratorASCII>().getIt());
+                encodedText = file;
             }
             return true;
         }
         else
         {
-            SC_TRY_IF(buffer.reserve(buffer.size() + file.sizeInBytes() + 1));
-            SC_TRY_IF(
-                buffer.appendCopy(reinterpret_cast<const char_t*>(file.getIterator<StringIteratorASCII>().getIt()),
-                                  file.sizeInBytes() + 1));
-            *nullTerminatedUTF16 = reinterpret_cast<const wchar_t*>(buffer.data());
+            SC_TRY_IF(buffer.reserve(buffer.size() + file.sizeInBytes() + sizeof(wchar_t)));
+            SC_TRY_IF(buffer.appendCopy(file.bytesWithoutTerminator(), file.sizeInBytes()));
+            encodedText = StringView(buffer.data(), buffer.size(), true, StringEncoding::Utf16);
+            SC_TRY_IF(buffer.resize(buffer.size() + sizeof(wchar_t), 0)); // null terminator
             return true;
         }
     }
     else if (file.getEncoding() == StringEncoding::Utf8 || file.getEncoding() == StringEncoding::Ascii)
     {
 #if SC_PLATFORM_WINDOWS
-        const int numWChars = MultiByteToWideChar(CP_UTF8, 0, file.getIterator<StringIteratorASCII>().getIt(),
+        const int numWChars = MultiByteToWideChar(CP_UTF8, 0, file.bytesWithoutTerminator(),
                                                   static_cast<int>(file.sizeInBytes()), nullptr, 0);
         if (numWChars <= 0)
         {
@@ -108,12 +105,11 @@ bool SC::StringConverter::toNullTerminatedUTF16(StringView file, Vector<char_t>&
         }
         const auto oldSize = buffer.size();
         SC_TRY_IF(buffer.resizeWithoutInitializing(oldSize + (static_cast<size_t>(numWChars) + 1) * sizeof(wchar_t)));
-        MultiByteToWideChar(CP_UTF8, 0, file.getIterator<StringIteratorASCII>().getIt(),
-                            static_cast<int>(file.sizeInBytes()), reinterpret_cast<wchar_t*>(buffer.data() + oldSize),
-                            numWChars);
-        buffer[buffer.size() - 2] = 0;
-        buffer[buffer.size() - 1] = 0;
-        *nullTerminatedUTF16      = reinterpret_cast<const wchar_t*>(buffer.data());
+        MultiByteToWideChar(CP_UTF8, 0, file.bytesWithoutTerminator(), static_cast<int>(file.sizeInBytes()),
+                            reinterpret_cast<wchar_t*>(buffer.data() + oldSize), numWChars);
+        buffer[buffer.size() - 2] = 0; // null terminator
+        buffer[buffer.size() - 1] = 0; // null terminator
+        encodedText = StringView(buffer.data(), buffer.size() - sizeof(wchar_t), true, StringEncoding::Utf16);
         return true;
 #else
 #endif

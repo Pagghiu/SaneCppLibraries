@@ -58,6 +58,10 @@ struct SC::StringView
     constexpr StringView(const char_t* text, size_t bytes, bool nullTerm, StringEncoding encoding)
         : text{text, bytes}, encoding(encoding), hasNullTerm(nullTerm)
     {}
+    StringView(Span<const wchar_t> text, bool nullTerm, StringEncoding encoding)
+        : text{reinterpret_cast<const char_t*>(text.data()), text.sizeInBytes()}, encoding(encoding),
+          hasNullTerm(nullTerm)
+    {}
     template <size_t N>
     constexpr StringView(const char (&text)[N]) : text{text, N - 1}, encoding(StringEncoding::Ascii), hasNullTerm(true)
     {}
@@ -76,6 +80,19 @@ struct SC::StringView
         SC_RELEASE_ASSERT(hasNullTerm);
         return text.data();
     }
+#if SC_PLATFORM_WINDOWS
+    [[nodiscard]] const wchar_t* getNullTerminatedNative() const
+    {
+        SC_RELEASE_ASSERT(hasNullTerm && (encoding == StringEncoding::Utf16));
+        return reinterpret_cast<const wchar_t*>(text.data());
+    }
+#else
+    [[nodiscard]] const char_t* getNullTerminatedNative() const
+    {
+        SC_RELEASE_ASSERT(hasNullTerm && (encoding == StringEncoding::Utf8 || encoding == StringEncoding::Ascii));
+        return text.data();
+    }
+#endif
 
     [[nodiscard]] Comparison compareASCII(StringView other) const
     {
@@ -106,9 +123,10 @@ struct SC::StringView
     [[nodiscard]] constexpr bool   isEmpty() const { return text.data() == nullptr || text.sizeInBytes() == 0; }
     [[nodiscard]] constexpr bool   isNullTerminated() const { return hasNullTerm; }
     [[nodiscard]] constexpr size_t sizeInBytes() const { return text.sizeInBytes(); }
+
     [[nodiscard]] constexpr size_t sizeInBytesIncludingTerminator() const
     {
-        return text.sizeInBytes() > 0 ? text.sizeInBytes() + 1 : 0;
+        return text.sizeInBytes() > 0 ? text.sizeInBytes() + StringEncodingGetSize(encoding) : 0;
     }
     [[nodiscard]] bool endsWith(char_t c) const { return isEmpty() ? false : text.data()[text.sizeInBytes() - 1] == c; }
     [[nodiscard]] bool startsWith(char_t c) const { return isEmpty() ? false : text.data()[0] == c; }
