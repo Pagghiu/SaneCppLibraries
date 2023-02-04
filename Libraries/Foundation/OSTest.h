@@ -36,10 +36,11 @@ struct SC::OSTest : public SC::TestCase
         }
         if (test_section("OS"))
         {
-            SC_TEST_EXPECT(OSPaths::init());
-            Console::print("executableFile=\"{}\"\n", OSPaths::get().executableFile.view());
-            Console::print("applicationRootDirectory=\"{}\"\n", OSPaths::get().applicationRootDirectory.view());
-            SC_TEST_EXPECT(OSPaths::close());
+            OSPaths paths;
+            SC_TEST_EXPECT(paths.init());
+            report.console.print("executableFile=\"{}\"\n", paths.executableFile.view());
+            report.console.print("applicationRootDirectory=\"{}\"\n", paths.applicationRootDirectory.view());
+            SC_TEST_EXPECT(paths.close());
         }
     }
 };

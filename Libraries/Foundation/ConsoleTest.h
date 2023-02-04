@@ -17,6 +17,10 @@ struct SC::ConsoleTest : public SC::TestCase
     {
         using namespace SC;
 
+        SmallVector<char, 512 * sizeof(utf_char_t)> consoleBuffer;
+
+        Console console(consoleBuffer);
+
         if (test_section("printAssertion"))
         {
             printAssertion("a!=b", "FileName.cpp", "Function", 12);
@@ -24,8 +28,7 @@ struct SC::ConsoleTest : public SC::TestCase
         if (test_section("print"))
         {
             String str = StringView("Test Test\n");
-            Console::print(str);
-            Console::print(str.view());
+            console.print(str.view());
         }
     }
 };

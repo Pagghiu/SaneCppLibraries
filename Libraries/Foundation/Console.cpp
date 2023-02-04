@@ -12,11 +12,6 @@
 
 #if SC_PLATFORM_WINDOWS
 #include <Windows.h>
-struct SC::Console::Internal
-{
-    static StringNative<512> mainThreadBuffer;
-};
-SC::StringNative<512> SC::Console::Internal::mainThreadBuffer;
 #endif
 
 void SC::Console::print(const StringView str)
@@ -35,28 +30,54 @@ void SC::Console::print(const StringView str)
         {
             OutputDebugStringA(str.bytesIncludingTerminator());
         }
-        else if (Internal::mainThreadBuffer.convertNullTerminateFastPath(str, encodedPath))
+        else
         {
-            OutputDebugStringW(encodedPath.getNullTerminatedNative());
+            temporaryBuffer.clearWithoutInitializing();
+            if (StringConverter::toNullTerminatedUTF16(str, temporaryBuffer, encodedPath, false))
+            {
+                OutputDebugStringW(encodedPath.getNullTerminatedNative());
+            }
+            else
+            {
+                WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), L"ERROR: cannot format string",
+                              static_cast<DWORD>(wcslen(L"ERROR: cannot format string")), nullptr, nullptr);
+            }
         }
-#endif
-    }
-    else if (Internal::mainThreadBuffer.convertNullTerminateFastPath(str, encodedPath))
-    {
-        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), encodedPath.getNullTerminatedNative(),
-                      static_cast<DWORD>(encodedPath.sizeInBytes() / sizeof(wchar_t)), nullptr, nullptr);
-#if SC_DEBUG
-        OutputDebugStringW(encodedPath.getNullTerminatedNative());
 #endif
     }
     else
     {
-        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), L"ERROR: cannot format string",
-                      static_cast<DWORD>(wcslen(L"ERROR: cannot format string")), nullptr, nullptr);
+        temporaryBuffer.clearWithoutInitializing();
+        if (StringConverter::toNullTerminatedUTF16(str, temporaryBuffer, encodedPath, false))
+        {
+            WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), encodedPath.getNullTerminatedNative(),
+                          static_cast<DWORD>(encodedPath.sizeInBytes() / sizeof(wchar_t)), nullptr, nullptr);
+#if SC_DEBUG
+            OutputDebugStringW(encodedPath.getNullTerminatedNative());
+#endif
+        }
+        else
+        {
+            WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), L"ERROR: cannot format string",
+                          static_cast<DWORD>(wcslen(L"ERROR: cannot format string")), nullptr, nullptr);
+        }
     }
 #else
     fwrite(str.bytesWithoutTerminator(), sizeof(char), static_cast<int>(str.sizeInBytes()), stdout);
 #endif
 }
 
-void SC::Console::print(const String& str) { print(str.view()); }
+void SC::Console::printNullTerminatedASCII(const StringView str)
+{
+    if (str.isEmpty() || str.getEncoding() != StringEncoding::Ascii)
+        return;
+
+        // SC_DEBUG_ASSERT(str.sizeInBytes() < static_cast<int>(MaxValue()));
+#if SC_PLATFORM_WINDOWS
+    WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), str.bytesWithoutTerminator(), static_cast<DWORD>(str.sizeInBytes()),
+                  nullptr, nullptr);
+    OutputDebugStringA(str.bytesIncludingTerminator());
+#else
+    fwrite(str.bytesWithoutTerminator(), sizeof(char), static_cast<int>(str.sizeInBytes()), stdout);
+#endif
+}

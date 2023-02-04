@@ -249,6 +249,8 @@ struct SC::Vector
         }
     }
 
+    void clearWithoutInitializing() { (void)resizeWithoutInitializing(0); }
+
     template <typename Comparison = SmallerThan<T>>
     void sort(Comparison comparison = Comparison())
     {

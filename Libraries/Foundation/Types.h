@@ -6,8 +6,9 @@
 #include "Platform.h"
 namespace SC
 {
-#if SC_MSVC
-using char_t = char;
+#if SC_PLATFORM_WINDOWS
+using utf_char_t = wchar_t;
+using char_t     = char;
 
 using uint8_t  = unsigned char;
 using uint16_t = unsigned short;
@@ -22,7 +23,8 @@ using int64_t = long long;
 using size_t  = unsigned __int64;
 using ssize_t = signed __int64;
 #else
-using char_t = char;
+using utf_char_t = char;
+using char_t     = char;
 
 using uint8_t  = unsigned char;
 using uint16_t = unsigned short;

@@ -229,7 +229,8 @@ struct SC::ReflectionTest : public SC::TestCase
         if (test_section("Print Simple structure"))
         {
             constexpr auto SimpleStructureFlatSchema = FlatSchemaTypeErased::compile<TestNamespace::SimpleStructure>();
-            printFlatSchema(SimpleStructureFlatSchema.properties.values, SimpleStructureFlatSchema.names.values);
+            printFlatSchema(report.console, SimpleStructureFlatSchema.properties.values,
+                            SimpleStructureFlatSchema.names.values);
         }
         if (test_section("Print Complex structure"))
         {
@@ -245,7 +246,8 @@ struct SC::ReflectionTest : public SC::TestCase
                 "Please update SC::ClNm for your compiler");
             constexpr auto ComplexStructureFlatSchema =
                 FlatSchemaTypeErased::compile<TestNamespace::ComplexStructure>();
-            printFlatSchema(ComplexStructureFlatSchema.properties.values, ComplexStructureFlatSchema.names.values);
+            printFlatSchema(report.console, ComplexStructureFlatSchema.properties.values,
+                            ComplexStructureFlatSchema.names.values);
         }
     }
 };

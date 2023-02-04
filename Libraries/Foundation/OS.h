@@ -21,12 +21,11 @@ struct SC::OS
 
 struct SC::OSPaths
 {
-    static const int            StaticPathSize = 1024;
+    static const int StaticPathSize = 1024 * sizeof(utf_char_t);
+
     SmallString<StaticPathSize> executableFile; // Full path (native encoding) to executable file including extension
     SmallString<StaticPathSize> applicationRootDirectory; // Full path to (native encoding) Application directory
 
-    [[nodiscard]] static bool init();
-    [[nodiscard]] static bool close();
-
-    [[nodiscard]] static const OSPaths& get();
+    [[nodiscard]] bool init();
+    [[nodiscard]] bool close();
 };

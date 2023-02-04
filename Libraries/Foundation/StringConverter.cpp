@@ -57,7 +57,6 @@ bool SC::StringConverter::toNullTerminatedUTF8(StringView file, Vector<char>& bu
         buffer[buffer.size() - 1] = 0;
         encodedText               = StringView(buffer.data(), buffer.size() - 1, true, StringEncoding::Utf8);
         return true;
-#else
 #endif
     }
     return false;
@@ -111,8 +110,20 @@ bool SC::StringConverter::toNullTerminatedUTF16(StringView file, Vector<char>& b
         buffer[buffer.size() - 1] = 0; // null terminator
         encodedText = StringView(buffer.data(), buffer.size() - sizeof(wchar_t), true, StringEncoding::Utf16);
         return true;
-#else
 #endif
+    }
+    return false;
+}
+
+bool SC::StringConverter::toNullTerminated(StringEncoding encoding, StringView text, Vector<char>& buffer,
+                                           StringView& encodedText, bool forceCopy)
+{
+    switch (encoding)
+    {
+    case StringEncoding::Ascii: return toNullTerminatedUTF8(text, buffer, encodedText, forceCopy);
+    case StringEncoding::Utf8: return toNullTerminatedUTF8(text, buffer, encodedText, forceCopy);
+    case StringEncoding::Utf16: return toNullTerminatedUTF16(text, buffer, encodedText, forceCopy);
+    case StringEncoding::Utf32: break;
     }
     return false;
 }

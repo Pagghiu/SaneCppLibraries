@@ -11,6 +11,7 @@ struct VectorTest;
 
 struct SC::VectorTest : public SC::TestCase
 {
+    static constexpr SC::size_t INSANE_NUMBER = SC::MaxValue();
     VectorTest(SC::TestReport& report);
     void testClassType();
     void testBasicType();
@@ -150,7 +151,6 @@ SC::VectorTest::VectorTest(SC::TestReport& report) : TestCase(report, "VectorTes
     testBasicType();
     testClassType();
 }
-constexpr SC::size_t INSANE_NUMBER = SC::MaxValue();
 
 void SC::VectorTest::testClassType()
 {

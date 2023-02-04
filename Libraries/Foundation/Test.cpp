@@ -10,7 +10,7 @@ namespace SC
 static const StringView redEMOJI   = "\xf0\x9f\x9f\xa5"_u8;
 static const StringView greenEMOJI = "\xf0\x9f\x9f\xa9"_u8;
 } // namespace SC
-SC::TestReport::TestReport(int argc, const char** argv)
+SC::TestReport::TestReport(Console& console, int argc, const char** argv) : console(console)
 {
     for (int idx = 1; idx < argc; ++idx)
     {
@@ -21,7 +21,7 @@ SC::TestReport::TestReport(int argc, const char** argv)
             {
                 testToRun = StringView(argv[idx + 1], strlen(argv[idx + 1]), true, StringEncoding::Ascii);
 
-                Console::print("TestReport::Running single test \"{}\"\n"_a8, testToRun);
+                console.print("TestReport::Running single test \"{}\"\n"_a8, testToRun);
             }
         }
         if (param == "--test-section"_a8 && sectionToRun.isEmpty())
@@ -30,13 +30,13 @@ SC::TestReport::TestReport(int argc, const char** argv)
             {
                 sectionToRun = StringView(argv[idx + 1], strlen(argv[idx + 1]), true, StringEncoding::Ascii);
 
-                Console::print("TestReport::Running single section \"{}\"\n"_a8, sectionToRun);
+                console.print("TestReport::Running single section \"{}\"\n"_a8, sectionToRun);
             }
         }
     }
     if (not testToRun.isEmpty() || not sectionToRun.isEmpty())
     {
-        Console::print("\n"_a8);
+        console.print("\n"_a8);
     }
 }
 
@@ -44,15 +44,15 @@ SC::TestReport::~TestReport()
 {
     if (numTestsFailed > 0)
     {
-        Console::print(redEMOJI);
-        Console::print(" TOTAL Failed = {} (Succeeded = {})"_a8, numTestsFailed, numTestsSucceeded);
+        console.print(redEMOJI);
+        console.print(" TOTAL Failed = {} (Succeeded = {})"_a8, numTestsFailed, numTestsSucceeded);
     }
     else
     {
-        Console::print(greenEMOJI);
-        Console::print(" TOTAL Succeeded = {}"_a8, numTestsSucceeded);
+        console.print(greenEMOJI);
+        console.print(" TOTAL Succeeded = {}"_a8, numTestsSucceeded);
     }
-    Console::print("\n---------------------------------------------------\n"_a8);
+    console.print("\n---------------------------------------------------\n"_a8);
 }
 
 //-------------------------------------------------------------------------------------------
@@ -62,7 +62,7 @@ SC::TestCase::TestCase(TestReport& report, StringView testName)
 {
     if (report.isTestEnabled(testName))
     {
-        Console::print("[[ {} ]]\n\n"_a8, testName);
+        report.console.print("[[ {} ]]\n\n"_a8, testName);
         report.firstFailedTest = StringView();
         report.currentSection  = StringView();
     }
@@ -77,24 +77,24 @@ SC::TestCase::~TestCase()
             report.printSectionResult(*this);
         }
 
-        Console::print("\n"_a8);
+        report.console.print("\n"_a8);
         if (numTestsFailed > 0)
         {
-            Console::print(redEMOJI);
-            Console::print(" [[ "_a8);
-            Console::print(testName);
-            Console::print(" ]]"_a8);
-            Console::print(" FAILED = {} (Succeeded = {})\n"_a8, numTestsFailed, numTestsSucceeded);
+            report.console.print(redEMOJI);
+            report.console.print(" [[ "_a8);
+            report.console.print(testName);
+            report.console.print(" ]]"_a8);
+            report.console.print(" FAILED = {} (Succeeded = {})\n"_a8, numTestsFailed, numTestsSucceeded);
         }
         else
         {
-            Console::print(greenEMOJI);
-            Console::print(" [[ "_a8);
-            Console::print(testName);
-            Console::print(" ]]"_a8);
-            Console::print(" SUCCEEDED = {}\n"_a8, numTestsSucceeded);
+            report.console.print(greenEMOJI);
+            report.console.print(" [[ "_a8);
+            report.console.print(testName);
+            report.console.print(" ]]"_a8);
+            report.console.print(" SUCCEEDED = {}\n"_a8, numTestsSucceeded);
         }
-        Console::print("---------------------------------------------------\n"_a8);
+        report.console.print("---------------------------------------------------\n"_a8);
         report.numTestsFailed += numTestsFailed;
         report.numTestsSucceeded += numTestsSucceeded;
         report.testCaseFinished(*this);
@@ -114,15 +114,15 @@ bool SC::TestCase::recordExpectation(StringView expression, bool status, StringV
         numTestsFailed++;
         report.printSectionResult(*this);
         printedSection = true;
-        Console::print("\t\t"_a8);
-        Console::print(redEMOJI);
+        report.console.print("\t\t"_a8);
+        report.console.print(redEMOJI);
         if (detailedError.isEmpty())
         {
-            Console::print(" [FAIL] {}\n"_a8, expression);
+            report.console.print(" [FAIL] {}\n"_a8, expression);
         }
         else
         {
-            Console::print(" [FAIL] {} - Error: {}\n"_a8, expression, detailedError);
+            report.console.print(" [FAIL] {} - Error: {}\n"_a8, expression, detailedError);
         }
         if (report.firstFailedTest.isEmpty())
         {
@@ -159,16 +159,16 @@ bool SC::TestCase::test_section(StringView sectionName)
 
 void SC::TestReport::printSectionResult(TestCase& testCase)
 {
-    Console::print("\t- "_a8);
+    console.print("\t- "_a8);
     if (testCase.numSectionTestsFailed > 0)
     {
-        Console::print(redEMOJI);
+        console.print(redEMOJI);
     }
     else
     {
-        Console::print(greenEMOJI);
+        console.print(greenEMOJI);
     }
-    Console::print(" {}::{}\n"_a8, testCase.testName, currentSection);
+    console.print(" {}::{}\n"_a8, testCase.testName, currentSection);
 }
 
 void SC::TestReport::testCaseFinished(TestCase& testCase)

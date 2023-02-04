@@ -15,11 +15,11 @@ struct StringNative;
 template <int N>
 struct SC::StringNative
 {
-    void clear() { (void)buffer.data.resizeWithoutInitializing(0); }
+    void clear() { text.data.clearWithoutInitializing(); }
 
     [[nodiscard]] bool convertNullTerminateFastPath(StringView input, StringView& encodedText)
     {
-        SC_TRY_IF(buffer.data.resizeWithoutInitializing(0));
+        text.data.clearWithoutInitializing();
         SC_TRY_IF(internalAppend(input, false, encodedText));
         return true;
     }
@@ -27,39 +27,30 @@ struct SC::StringNative
     /// Appends the input string null terminated
     [[nodiscard]] bool appendNullTerminated(StringView input)
     {
-        SC_TRY_IF(buffer.popNulltermIfExists());
+        SC_TRY_IF(text.popNulltermIfExists());
         StringView encodedText;
         return internalAppend(input, true, encodedText);
     }
 
     [[nodiscard]] bool setTextLengthInBytesIncludingTerminator(size_t newDataSize)
     {
-        const auto zeroSize = StringEncodingGetSize(buffer.getEncoding());
+        const auto zeroSize = StringEncodingGetSize(text.getEncoding());
         if (newDataSize >= zeroSize)
         {
-            const bool res = buffer.data.resizeWithoutInitializing(newDataSize - zeroSize);
-            return res && buffer.data.resize(newDataSize, 0); // Adds the null terminator
+            const bool res = text.data.resizeWithoutInitializing(newDataSize - zeroSize);
+            return res && text.data.resize(newDataSize, 0); // Adds the null terminator
         }
         return true;
     }
 
-    StringView view() const { return buffer.view(); }
-#if SC_PLATFORM_WINDOWS
-    typedef wchar_t CharType;
-    SmallString<N>  buffer = StringEncoding::Utf16;
-#else
-    typedef char   CharType;
-    SmallString<N> buffer = StringEncoding::Utf8;
-#endif
+    StringView view() const { return text.view(); }
+
+    SmallString<N * sizeof(utf_char_t)> text = StringEncoding::Native;
+
   private:
     /// Appends the input string null terminated
     [[nodiscard]] bool internalAppend(StringView input, bool forceCopy, StringView& encodedText)
     {
-#if SC_PLATFORM_WINDOWS
-        SC_TRY_IF(StringConverter::toNullTerminatedUTF16(input, buffer.data, encodedText, forceCopy));
-#else
-        SC_TRY_IF(StringConverter::toNullTerminatedUTF8(input, buffer.data, encodedText, forceCopy));
-#endif
-        return true;
+        return StringConverter::toNullTerminated(StringEncoding::Native, input, text.data, encodedText, forceCopy);
     }
 };

@@ -130,14 +130,14 @@ bool StringFormatterFor<SC::StringView>::format(StringFormatOutput& data, const 
         bool       res = false;
         if (data.encoding == StringEncoding::Utf8)
         {
-            res = StringConverter::toNullTerminatedUTF8(value, data.buffer, encodedText, true);
-            res &= data.buffer.pop_back();
+            res = StringConverter::toNullTerminatedUTF8(value, data.temporaryBuffer, encodedText, true);
+            res &= data.temporaryBuffer.pop_back();
         }
         else if (data.encoding == StringEncoding::Utf16)
         {
-            res = StringConverter::toNullTerminatedUTF16(value, data.buffer, encodedText, true);
-            res &= data.buffer.pop_back();
-            res &= data.buffer.pop_back();
+            res = StringConverter::toNullTerminatedUTF16(value, data.temporaryBuffer, encodedText, true);
+            res &= data.temporaryBuffer.pop_back();
+            res &= data.temporaryBuffer.pop_back();
         }
         return res && data.write(encodedText);
     }
@@ -149,18 +149,18 @@ bool StringFormatterFor<SC::StringView>::format(StringFormatOutput& data, const 
 
 bool StringFormatOutput::write(StringView text)
 {
-    if (writeToStdout)
+    if (console != nullptr)
     {
-        Console::print(text);
+        console->print(text);
         return true;
     }
-    else
+    else if (data != nullptr)
     {
         if ((encoding == text.getEncoding()) or
             (encoding == StringEncoding::Utf8 and text.getEncoding() == StringEncoding::Ascii) or
             (encoding == StringEncoding::Ascii and text.getEncoding() == StringEncoding::Utf8))
         {
-            return data.appendCopy(text.bytesWithoutTerminator(), text.sizeInBytes());
+            return data->appendCopy(text.bytesWithoutTerminator(), text.sizeInBytes());
         }
         else
         {
@@ -169,23 +169,35 @@ bool StringFormatOutput::write(StringView text)
             return false;
         }
     }
+    else
+    {
+        SC_DEBUG_ASSERT("StringFormatOutput::write - Forgot to set buffer or console" && 0);
+        return false;
+    }
 }
 
 void StringFormatOutput::onFormatBegin()
 {
-    if (not writeToStdout)
+    if (data != nullptr)
     {
-        backupSize = data.size();
+        backupSize = data->size();
     }
 }
 
 bool StringFormatOutput::onFormatSucceded()
 {
-    if (not writeToStdout)
+    if (data != nullptr)
     {
-        if (backupSize < data.size())
+        if (backupSize < data->size())
         {
-            return data.push_back(0);
+            // TODO: we should push depending on encoding
+            int  numZeroes = StringEncodingGetSize(encoding);
+            bool res       = true;
+            while (numZeroes-- > 0)
+            {
+                res &= data->push_back(0);
+            }
+            return res;
         }
     }
     return true;
@@ -193,9 +205,9 @@ bool StringFormatOutput::onFormatSucceded()
 
 void StringFormatOutput::onFormatFailed()
 {
-    if (not writeToStdout)
+    if (data != nullptr)
     {
-        (void)data.resize(backupSize);
+        (void)data->resize(backupSize);
     }
 }
 } // namespace SC

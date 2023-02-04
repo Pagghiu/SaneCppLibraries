@@ -19,8 +19,9 @@ struct TestReport
     StringView firstFailedTest;
     StringView testToRun;
     StringView sectionToRun;
+    Console&   console;
 
-    TestReport(int argc, const char** argv);
+    TestReport(Console& console, int argc, const char** argv);
     ~TestReport();
 
     void testCaseFinished(TestCase& testCase);

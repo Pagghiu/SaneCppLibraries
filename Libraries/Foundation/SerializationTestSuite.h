@@ -256,18 +256,19 @@ namespace SC
 {
 // TODO: Move printFlatSchema somewhere else
 template <int NUM_ATOMS, typename MetaProperties>
-inline void printFlatSchema(const MetaProperties (&atom)[NUM_ATOMS], const SC::ConstexprStringView (&names)[NUM_ATOMS])
+inline void printFlatSchema(Console& console, const MetaProperties (&atom)[NUM_ATOMS],
+                            const SC::ConstexprStringView (&names)[NUM_ATOMS])
 {
     int atomIndex = 0;
     while (atomIndex < NUM_ATOMS)
     {
-        atomIndex += printAtoms(atomIndex, atom + atomIndex, names + atomIndex, 0) + 1;
+        atomIndex += printAtoms(console, atomIndex, atom + atomIndex, names + atomIndex, 0) + 1;
     }
 }
 
 template <typename MetaProperties>
-inline int printAtoms(int currentAtomIdx, const MetaProperties* atom, const SC::ConstexprStringView* atomName,
-                      int indentation)
+inline int printAtoms(Console& console, int currentAtomIdx, const MetaProperties* atom,
+                      const SC::ConstexprStringView* atomName, int indentation)
 {
     String        buffer(StringEncoding::Ascii);
     StringBuilder builder(buffer);
@@ -301,7 +302,7 @@ inline int printAtoms(int currentAtomIdx, const MetaProperties* atom, const SC::
         (void)builder.append("\t");
 
     (void)builder.append("}\n");
-    Console::print(builder.view());
+    console.print(builder.view());
     return atom->numSubAtoms;
 }
 } // namespace SC

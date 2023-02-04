@@ -39,10 +39,10 @@ bool SC::OSPaths::init()
 
     // TODO: OSPaths::init - We must also convert to utf8 because dirname will not work on non utf8 or ascii text
     // assigning directly the SmallString inside StringNative will copy as is instad of converting utf16 to utf8
-    globalPaths.executableFile = ""_u8;
-    StringBuilder builder(globalPaths.executableFile);
+    executableFile = ""_u8;
+    StringBuilder builder(executableFile);
     SC_TRY_IF(builder.append(utf16executable));
-    globalPaths.applicationRootDirectory = Path::Windows::dirname(builder.getResultString().view());
+    applicationRootDirectory = Path::Windows::dirname(builder.getResultString().view());
     return true;
 }
 

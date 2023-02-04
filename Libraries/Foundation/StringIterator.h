@@ -12,7 +12,12 @@ enum class StringEncoding : uint8_t
     Ascii = 0,
     Utf8  = 1,
     Utf16 = 2,
-    Utf32 = 3
+    Utf32 = 3,
+#if SC_PLATFORM_WINDOWS
+    Native = Utf16
+#else
+    Native = Utf8
+#endif
 };
 
 constexpr uint32_t StringEncodingGetSize(StringEncoding encoding)

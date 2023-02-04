@@ -10,19 +10,30 @@
 
 namespace SC
 {
-
+struct Console;
 template <typename T>
 struct StringFormatterFor;
 
 struct StringFormatOutput
 {
-    SmallVector<char, 512> buffer;
-    SmallVector<char, 512> data;
+    Vector<char>& temporaryBuffer;
+    Vector<char>* data    = nullptr;
+    Console*      console = nullptr;
 
-    bool           writeToStdout = false;
-    StringEncoding encoding      = StringEncoding::Ascii;
+    StringFormatOutput(Vector<char>& tempBuffer) : temporaryBuffer(tempBuffer) {}
+    StringEncoding encoding = StringEncoding::Ascii;
 
     bool write(StringView text);
+    void redirectToBuffer(Vector<char>& destination)
+    {
+        data    = &destination;
+        console = nullptr;
+    }
+    void redirectToConsole(Console& newConsole)
+    {
+        data    = nullptr;
+        console = &newConsole;
+    }
     void onFormatBegin();
     bool onFormatSucceded();
     void onFormatFailed();
