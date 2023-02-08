@@ -74,8 +74,7 @@ struct StringBuilder
     template <typename... Types>
     [[nodiscard]] bool printWithTemporaryBuffer(Vector<char>& buffer, StringView fmt, Types&&... args)
     {
-        StringFormatOutput sfo(buffer);
-        sfo.encoding = backingString.getEncoding();
+        StringFormatOutput sfo(buffer, backingString.getEncoding());
         sfo.redirectToBuffer(backingString.data);
         if (fmt.getEncoding() == StringEncoding::Ascii || fmt.getEncoding() == StringEncoding::Utf8)
         {

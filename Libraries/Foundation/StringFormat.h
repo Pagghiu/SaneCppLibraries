@@ -17,11 +17,10 @@ struct StringFormatterFor;
 struct StringFormatOutput
 {
     Vector<char>& temporaryBuffer;
-    Vector<char>* data    = nullptr;
-    Console*      console = nullptr;
 
-    StringFormatOutput(Vector<char>& tempBuffer) : temporaryBuffer(tempBuffer) {}
-    StringEncoding encoding = StringEncoding::Ascii;
+    StringFormatOutput(Vector<char>& tempBuffer, StringEncoding encoding)
+        : temporaryBuffer(tempBuffer), encoding(encoding)
+    {}
 
     bool write(StringView text);
     void redirectToBuffer(Vector<char>& destination)
@@ -38,8 +37,13 @@ struct StringFormatOutput
     bool onFormatSucceded();
     void onFormatFailed();
 
+    StringEncoding getEncoding() const { return encoding; }
+
   private:
-    size_t backupSize = 0;
+    Vector<char>*  data    = nullptr;
+    Console*       console = nullptr;
+    StringEncoding encoding;
+    size_t         backupSize = 0;
 };
 
 // clang-format off

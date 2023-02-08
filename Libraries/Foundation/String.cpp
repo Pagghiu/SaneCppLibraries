@@ -3,20 +3,24 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "String.h"
 
-bool SC::String::assignStringView(StringView sv)
+bool SC::String::assign(StringView sv)
 {
-    const size_t length = sv.sizeInBytes();
-    bool         res    = data.resizeWithoutInitializing(length + 1);
+    const size_t length    = sv.sizeInBytes();
+    encoding               = sv.getEncoding();
+    const uint32_t numZero = StringEncodingGetSize(encoding);
+    bool           res     = data.resizeWithoutInitializing(length + numZero);
     if (sv.isNullTerminated())
     {
-        memcpy(data.items, sv.bytesWithoutTerminator(), length + 1);
+        memcpy(data.items, sv.bytesWithoutTerminator(), length + numZero);
     }
     else
     {
         memcpy(data.items, sv.bytesWithoutTerminator(), length);
-        data.items[length] = 0;
+        for (uint32_t idx = 0; idx < numZero; ++idx)
+        {
+            data.items[length + idx] = 0;
+        }
     }
-    encoding = sv.getEncoding();
     return res;
 }
 

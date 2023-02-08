@@ -16,16 +16,15 @@ struct SmallString;
 struct SC::String
 {
   private:
-    [[nodiscard]] bool assignStringView(StringView sv);
-
   public:
     String(StringEncoding encoding = StringEncoding::Utf8) : encoding(encoding) {}
-    String(StringView sv) { SC_RELEASE_ASSERT(assignStringView(sv)); }
+    String(StringView sv) { SC_RELEASE_ASSERT(assign(sv)); }
 
-    String& operator=(StringView sv)
+    [[nodiscard]] bool assign(StringView sv);
+    String&            operator=(StringView sv)
     {
         data.clear();
-        SC_RELEASE_ASSERT(assignStringView(sv));
+        SC_RELEASE_ASSERT(assign(sv));
         return *this;
     }
 
@@ -35,7 +34,12 @@ struct SC::String
     //  - if string is empty        --> data.size() == 0
     //  - if string is not empty    --> data.size() > 2
     [[nodiscard]] const char_t* bytesIncludingTerminator() const { return data.data(); }
-    [[nodiscard]] bool          isEmpty() const { return data.isEmpty(); }
+#if SC_PLATFORM_WINDOWS
+    [[nodiscard]] wchar_t* nativeWritableBytesIncludingTerminator() { return reinterpret_cast<wchar_t*>(data.data()); }
+#else
+    [[nodiscard]] char_t* nativeWritableBytesIncludingTerminator() { return data.data(); }
+#endif
+    [[nodiscard]] bool isEmpty() const { return data.isEmpty(); }
 
     [[nodiscard]] StringView view() const
     {
@@ -56,6 +60,16 @@ struct SC::String
         if (dataSize >= sizeOfZero)
         {
             return data.resizeWithoutInitializing(dataSize - sizeOfZero);
+        }
+        return true;
+    }
+
+    bool pushNullTerm()
+    {
+        auto numZeros = StringEncodingGetSize(encoding);
+        while (numZeros--)
+        {
+            SC_TRY_IF(data.push_back(0));
         }
         return true;
     }

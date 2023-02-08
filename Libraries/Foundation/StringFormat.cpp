@@ -126,18 +126,16 @@ bool StringFormatterFor<SC::StringView>::format(StringFormatOutput& data, const 
 {
     if (value.getEncoding() == StringEncoding::Utf16)
     {
+        // TODO: This logic for conversion doesn't make sense for console, as on windows will convert to utf16 again...
         StringView encodedText;
         bool       res = false;
-        if (data.encoding == StringEncoding::Utf8)
+        if (data.getEncoding() == StringEncoding::Utf8)
         {
             res = StringConverter::toNullTerminatedUTF8(value, data.temporaryBuffer, encodedText, true);
-            res &= data.temporaryBuffer.pop_back();
         }
-        else if (data.encoding == StringEncoding::Utf16)
+        else if (data.getEncoding() == StringEncoding::Utf16)
         {
             res = StringConverter::toNullTerminatedUTF16(value, data.temporaryBuffer, encodedText, true);
-            res &= data.temporaryBuffer.pop_back();
-            res &= data.temporaryBuffer.pop_back();
         }
         return res && data.write(encodedText);
     }

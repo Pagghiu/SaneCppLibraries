@@ -45,6 +45,7 @@ struct SC::StringNative
 
     StringView view() const { return text.view(); }
 
+    [[nodiscard]] bool growToFullCapacity() { return text.data.resizeWithoutInitializing(text.data.capacity()); }
     SmallString<N * sizeof(utf_char_t)> text = StringEncoding::Native;
 
   private:

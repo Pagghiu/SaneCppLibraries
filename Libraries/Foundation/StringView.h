@@ -62,6 +62,9 @@ struct SC::StringView
         : text{reinterpret_cast<const char_t*>(text.data()), text.sizeInBytes()}, encoding(encoding),
           hasNullTerm(nullTerm)
     {}
+
+    SpanVoid<const void> toVoidSpan() const { return text; }
+
     template <size_t N>
     constexpr StringView(const char (&text)[N]) : text{text, N - 1}, encoding(StringEncoding::Ascii), hasNullTerm(true)
     {}
@@ -115,7 +118,7 @@ struct SC::StringView
 
     [[nodiscard]] bool operator==(StringView other) const
     {
-        return text.sizeInBytes() == other.text.sizeInBytes()
+        return hasCompatibleEncoding(other) && text.sizeInBytes() == other.text.sizeInBytes()
                    ? memcmp(text.data(), other.text.data(), text.sizeInBytes()) == 0
                    : false;
     }
@@ -141,16 +144,20 @@ struct SC::StringView
     }
     [[nodiscard]] bool endsWith(const StringView str) const
     {
-        const bool compatibleEncoding = (encoding == str.encoding) or
-                                        (str.encoding == StringEncoding::Ascii && encoding == StringEncoding::Utf8) or
-                                        (str.encoding == StringEncoding::Utf8 && encoding == StringEncoding::Ascii);
-        if (compatibleEncoding && str.sizeInBytes() <= sizeInBytes())
+        if (hasCompatibleEncoding(str) && str.sizeInBytes() <= sizeInBytes())
         {
             const StringView ours(text.data() + text.sizeInBytes() - str.text.sizeInBytes(), str.text.sizeInBytes(),
                                   false, encoding);
             return str == ours;
         }
         return false;
+    }
+
+    [[nodiscard]] bool hasCompatibleEncoding(StringView str) const
+    {
+        return (encoding == str.encoding) or
+               (str.encoding == StringEncoding::Ascii && encoding == StringEncoding::Utf8) or
+               (str.encoding == StringEncoding::Utf8 && encoding == StringEncoding::Ascii);
     }
 
     [[nodiscard]] bool setSizeInBytesWithoutTerminator(size_t newSize)
