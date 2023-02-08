@@ -18,8 +18,9 @@ struct SC::ConsoleTest : public SC::TestCase
         using namespace SC;
 
         SmallVector<char, 512 * sizeof(utf_char_t)> consoleBuffer;
+        SmallVector<char, 512 * sizeof(utf_char_t)> formatBuffer;
 
-        Console console(consoleBuffer);
+        Console console(consoleBuffer, formatBuffer);
 
         if (test_section("printAssertion"))
         {

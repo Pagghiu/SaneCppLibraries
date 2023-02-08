@@ -18,10 +18,17 @@
 #include "../../Libraries/Foundation/StringViewTest.h"
 #include "../../Libraries/Foundation/VectorTest.h"
 
+SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> globalConsoleBuffer;
+SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> formatConsoleBuffer;
+
 int main(int argc, const char* argv[])
 {
     using namespace SC;
-    TestReport report(argc, argv);
+    OSPaths paths;
+    if (not paths.init())
+        return -2;
+    Console    console(globalConsoleBuffer, formatConsoleBuffer);
+    TestReport report(console, paths, argc, argv);
     report.debugBreakOnFailedTest = true;
     // clang-format off
     { OSTest                        test(report); }

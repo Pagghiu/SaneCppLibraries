@@ -12,20 +12,21 @@ namespace SC
 struct String;
 struct Console
 {
-    Vector<char>& temporaryBuffer;
 
-    Console(Vector<char>& temporaryBuffer) : temporaryBuffer(temporaryBuffer) {}
+    Console(Vector<char>& printConversionBuffer, Vector<char>& formatBuffer)
+        : printConversionBuffer(printConversionBuffer), formatBuffer(formatBuffer)
+    {}
 
     template <typename... Types>
     bool print(StringView fmt, Types&&... args)
     {
-        return printWithCustomTemporaryBuffer(temporaryBuffer, fmt, forward(args)...);
+        return printWithCustomTemporaryBuffer(formatBuffer, fmt, forward(args)...);
     }
 
     template <typename... Types>
     bool printWithCustomTemporaryBuffer(Vector<char>& buffer, StringView fmt, Types&&... args)
     {
-        StringFormatOutput output(buffer);
+        StringFormatOutput output(buffer, fmt.getEncoding());
         output.redirectToConsole(*this);
         if (fmt.getEncoding() == StringEncoding::Ascii || fmt.getEncoding() == StringEncoding::Utf8)
         {
@@ -36,7 +37,13 @@ struct Console
         return false; // UTF16/32 format strings are not supported
     }
 
-    void        print(const StringView str);
+    void print(const StringView str);
+    void printLine(const StringView str);
+
     static void printNullTerminatedASCII(const StringView str);
+
+  private:
+    Vector<char>& printConversionBuffer;
+    Vector<char>& formatBuffer;
 };
 } // namespace SC

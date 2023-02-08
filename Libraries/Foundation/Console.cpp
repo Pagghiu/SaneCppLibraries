@@ -14,6 +14,11 @@
 #include <Windows.h>
 #endif
 
+void SC::Console::printLine(const StringView str)
+{
+    print(str);
+    print("\n"_a8);
+}
 void SC::Console::print(const StringView str)
 {
     if (str.isEmpty())
@@ -32,8 +37,8 @@ void SC::Console::print(const StringView str)
         }
         else
         {
-            temporaryBuffer.clearWithoutInitializing();
-            if (StringConverter::toNullTerminatedUTF16(str, temporaryBuffer, encodedPath, false))
+            printConversionBuffer.clearWithoutInitializing();
+            if (StringConverter::toNullTerminatedUTF16(str, printConversionBuffer, encodedPath, false))
             {
                 OutputDebugStringW(encodedPath.getNullTerminatedNative());
             }
@@ -47,8 +52,8 @@ void SC::Console::print(const StringView str)
     }
     else
     {
-        temporaryBuffer.clearWithoutInitializing();
-        if (StringConverter::toNullTerminatedUTF16(str, temporaryBuffer, encodedPath, false))
+        printConversionBuffer.clearWithoutInitializing();
+        if (StringConverter::toNullTerminatedUTF16(str, printConversionBuffer, encodedPath, false))
         {
             WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), encodedPath.getNullTerminatedNative(),
                           static_cast<DWORD>(encodedPath.sizeInBytes() / sizeof(wchar_t)), nullptr, nullptr);

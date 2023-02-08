@@ -8,6 +8,7 @@
 namespace SC
 {
 struct TestCase;
+struct OSPaths;
 
 struct TestReport
 {
@@ -20,8 +21,9 @@ struct TestReport
     StringView testToRun;
     StringView sectionToRun;
     Console&   console;
+    OSPaths&   paths;
 
-    TestReport(Console& console, int argc, const char** argv);
+    TestReport(Console& console, OSPaths& paths, int argc, const char** argv);
     ~TestReport();
 
     void testCaseFinished(TestCase& testCase);

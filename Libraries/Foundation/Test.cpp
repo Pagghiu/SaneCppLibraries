@@ -10,7 +10,8 @@ namespace SC
 static const StringView redEMOJI   = "\xf0\x9f\x9f\xa5"_u8;
 static const StringView greenEMOJI = "\xf0\x9f\x9f\xa9"_u8;
 } // namespace SC
-SC::TestReport::TestReport(Console& console, int argc, const char** argv) : console(console)
+SC::TestReport::TestReport(Console& console, OSPaths& paths, int argc, const char** argv)
+    : console(console), paths(paths)
 {
     for (int idx = 1; idx < argc; ++idx)
     {
@@ -122,7 +123,7 @@ bool SC::TestCase::recordExpectation(StringView expression, bool status, StringV
         }
         else
         {
-            report.console.print(" [FAIL] {} - Error: {}\n"_a8, expression, detailedError);
+            report.console.print(" [FAIL] {} - Error: {}\n"_u8, expression, detailedError);
         }
         if (report.firstFailedTest.isEmpty())
         {
