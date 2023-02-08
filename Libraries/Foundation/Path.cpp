@@ -254,6 +254,15 @@ SC::StringView SC::Path::basename(StringView input, StringView suffix)
     return Internal::basename<Separator>(input, suffix);
 }
 
+bool SC::Path::isAbsolute(StringView input)
+{
+#if SC_PLATFORM_WINDOWS
+    return Windows::isAbsolute(input);
+#else
+    return Posix::isAbsolute(input);
+#endif
+}
+
 SC::StringView SC::Path::Windows::dirname(StringView input) { return Internal::dirname<Separator>(input); }
 
 SC::StringView SC::Path::Windows::basename(StringView input) { return Internal::basename<Separator>(input); }
@@ -261,6 +270,12 @@ SC::StringView SC::Path::Windows::basename(StringView input) { return Internal::
 SC::StringView SC::Path::Windows::basename(StringView input, StringView suffix)
 {
     return Internal::basename<Separator>(input, suffix);
+}
+
+bool SC::Path::Windows::isAbsolute(StringView input)
+{
+    StringView root = Internal::parseWindowsRoot(input);
+    return not root.isEmpty();
 }
 
 SC::StringView SC::Path::Posix::dirname(StringView input) { return Internal::dirname<Separator>(input); }
@@ -271,3 +286,5 @@ SC::StringView SC::Path::Posix::basename(StringView input, StringView suffix)
 {
     return Internal::basename<Separator>(input, suffix);
 }
+
+bool SC::Path::Posix::isAbsolute(StringView input) { return input.startsWith('/'); }

@@ -80,6 +80,8 @@ struct SC::Path
     [[nodiscard]] static StringView basename(StringView input);
     /// Return the base name of a path. Suffix is stripped if existing. Trailing spearators are ignored.
     [[nodiscard]] static StringView basename(StringView input, StringView suffix);
+    /// Returns true if path is an absolute native path (depending on platform)
+    [[nodiscard]] static bool isAbsolute(StringView input);
 
     struct Windows
     {
@@ -90,6 +92,8 @@ struct SC::Path
         [[nodiscard]] static StringView basename(StringView input);
         /// Return the base name of a path. Suffix is stripped if existing. Trailing spearators are ignored.
         [[nodiscard]] static StringView basename(StringView input, StringView suffix);
+        /// Returns true if path is an absolute Windows path (Starts with drive letter + backslatsh or double backslash)
+        [[nodiscard]] static bool isAbsolute(StringView input);
     };
     struct Posix
     {
@@ -100,6 +104,8 @@ struct SC::Path
         [[nodiscard]] static StringView basename(StringView input);
         /// Return the base name of a path. Suffix is stripped if existing. Trailing spearators are ignored.
         [[nodiscard]] static StringView basename(StringView input, StringView suffix);
+        /// Returns true if path is an absolute Posix path (starts with /)
+        [[nodiscard]] static bool isAbsolute(StringView input);
     };
 #if SC_PLATFORM_WINDOWS
     static const char Separator = '\\';

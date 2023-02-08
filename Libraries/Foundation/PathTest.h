@@ -13,6 +13,15 @@ struct SC::PathTest : public SC::TestCase
 {
     PathTest(SC::TestReport& report) : TestCase(report, "PathTest")
     {
+        if (test_section("Path::isAbsolute"))
+        {
+            SC_TEST_EXPECT(Path::Posix::isAbsolute("/dirname/basename"));           // Posix Absolute
+            SC_TEST_EXPECT(not Path::Posix::isAbsolute("./dirname/basename"));      // Posix Relative
+            SC_TEST_EXPECT(Path::Windows::isAbsolute("C:\\dirname\\basename"));     // Windows with Drive
+            SC_TEST_EXPECT(Path::Windows::isAbsolute("\\\\server\\dir"));           // Windows with Network
+            SC_TEST_EXPECT(Path::Windows::isAbsolute("\\\\?\\C:\\server\\dir"));    // Windows with Long
+            SC_TEST_EXPECT(not Path::Windows::isAbsolute("..\\dirname\\basename")); // Widnwos relative
+        }
         if (test_section("Path::dirname"))
         {
             SC_TEST_EXPECT(Path::Posix::dirname("/dirname/basename") == "/dirname");
