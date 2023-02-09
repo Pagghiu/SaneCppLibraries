@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "Reflection.h"
-#include "ReflectionFlatSchemaCompiler.h"
+#include "../Reflection/Reflection.h"
+#include "../Reflection/ReflectionFlatSchemaCompiler.h"
 namespace SC
 {
 namespace Reflection

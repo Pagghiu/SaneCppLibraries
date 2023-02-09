@@ -2,12 +2,12 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "Array.h"
-#include "Map.h"
+#include "../Foundation/Array.h"
+#include "../Foundation/Map.h"
+#include "../Foundation/String.h"
+#include "../Foundation/Vector.h"
 #include "Reflection.h"
 #include "ReflectionClassInfo.h"
-#include "String.h"
-#include "Vector.h"
 
 namespace SC
 {

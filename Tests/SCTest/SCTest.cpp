@@ -8,10 +8,7 @@
 #include "../../Libraries/Foundation/MemoryTest.h"
 #include "../../Libraries/Foundation/OSTest.h"
 #include "../../Libraries/Foundation/PathTest.h"
-#include "../../Libraries/Foundation/ReflectionTest.h"
 #include "../../Libraries/Foundation/ResultTest.h"
-#include "../../Libraries/Foundation/SerializationTemplateTest.h"
-#include "../../Libraries/Foundation/SerializationTypeErasedTest.h"
 #include "../../Libraries/Foundation/SmallVectorTest.h"
 #include "../../Libraries/Foundation/StringBuilderTest.h"
 #include "../../Libraries/Foundation/StringTest.h"
@@ -19,6 +16,9 @@
 #include "../../Libraries/Foundation/VectorTest.h"
 #include "../../Libraries/InputOutput/FileSystemTest.h"
 #include "../../Libraries/InputOutput/FileSystemWalkerTest.h"
+#include "../../Libraries/Reflection/ReflectionTest.h"
+#include "../../Libraries/Serialization/SerializationTemplateTest.h"
+#include "../../Libraries/Serialization/SerializationTypeErasedTest.h"
 
 SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> globalConsoleBuffer;
 SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> formatConsoleBuffer;
@@ -50,7 +50,7 @@ int main(int argc, const char* argv[])
     { SerializationTemplateTest     test(report); }
     { PathTest                      test(report); }
     { FileSystemTest                test(report); }
-    { FileSystemWalkerTest                test(report); }
+    { FileSystemWalkerTest          test(report); }
     // clang-format on
 
     return report.getTestReturnCode();

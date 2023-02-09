@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "Reflection.h"
-#include "Result.h"
-#include "Span.h"
+#include "../Foundation/Result.h"
+#include "../Foundation/Span.h"
+#include "../Reflection/Reflection.h"
 
 namespace SC
 {

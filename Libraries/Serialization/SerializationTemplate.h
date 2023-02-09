@@ -2,11 +2,11 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "Array.h"
-#include "ReflectionSC.h"
-#include "Result.h"
+#include "../Foundation/Array.h"
+#include "../Foundation/Result.h"
+#include "../Foundation/Vector.h"
+#include "../Reflection/ReflectionSC.h"
 #include "SerializationTemplateCompiler.h"
-#include "Vector.h"
 
 namespace SC
 {

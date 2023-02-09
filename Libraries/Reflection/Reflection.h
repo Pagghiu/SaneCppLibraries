@@ -2,14 +2,13 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "ConstexprTypes.h"
+#include "../Foundation/ConstexprTypes.h"
 #include "ReflectionClassInfo.h"
 #if SC_CPP_LESS_THAN_20
 #include "ReflectionAutoAggregates.h"
 #else
 #include "ReflectionAutoStructured.h"
 #endif
-#include "Types.h"
 
 namespace SC
 {

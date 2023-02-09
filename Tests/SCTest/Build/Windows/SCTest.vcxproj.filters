@@ -12,6 +12,12 @@
     <Filter Include="InputOutput">
       <UniqueIdentifier>{0c8b9b79-9b52-4f3d-85e6-0586825ad41e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Reflection">
+      <UniqueIdentifier>{d0488c14-8bfd-443c-b095-ec59e957df67}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Serialization">
+      <UniqueIdentifier>{a96dd608-4270-4a30-ba77-903042163752}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\SCTest.cpp">
@@ -130,21 +136,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Platform.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Reflection.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionClassInfo.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionFlatSchemaCompiler.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionSC.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionTest.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Result.h">
       <Filter>Foundation</Filter>
     </ClInclude>
@@ -152,30 +143,6 @@
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Segment.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationBinarySkipper.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTemplate.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTemplateCompiler.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTemplateTest.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTestSuite.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTypeErased.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTypeErasedCompiler.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTypeErasedTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\SmallVector.h">
@@ -250,11 +217,50 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\FixedSizePimpl.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionAutoAggregates.h">
-      <Filter>Foundation</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinarySkipper.h">
+      <Filter>Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionAutoStructured.h">
-      <Filter>Foundation</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTemplate.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTemplateCompiler.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTemplateTest.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTestSuite.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTypeErased.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTypeErasedCompiler.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTypeErasedTest.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\Reflection.h">
+      <Filter>Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAutoAggregates.h">
+      <Filter>Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAutoStructured.h">
+      <Filter>Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionClassInfo.h">
+      <Filter>Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionFlatSchemaCompiler.h">
+      <Filter>Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionSC.h">
+      <Filter>Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionTest.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

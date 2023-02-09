@@ -9,7 +9,7 @@
 // Original Code License: Public Domain
 //------------------------------------------------------------------------
 #pragma once
-#include "Language.h"
+#include "../Foundation/Language.h"
 
 namespace luple
 {

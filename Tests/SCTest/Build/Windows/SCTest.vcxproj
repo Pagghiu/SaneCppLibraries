@@ -271,24 +271,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Path.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\PathTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Platform.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Reflection.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionAutoAggregates.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionAutoStructured.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionClassInfo.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionFlatSchemaCompiler.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionSC.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Result.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ResultTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Segment.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationBinarySkipper.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTemplate.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTemplateCompiler.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTemplateTest.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTestSuite.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTypeErased.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTypeErasedCompiler.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SerializationTypeErasedTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\SmallVector.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\SmallVectorTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Span.h" />
@@ -310,6 +295,21 @@
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.h" />
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\Reflection.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAutoAggregates.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAutoStructured.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionClassInfo.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionFlatSchemaCompiler.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionSC.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinarySkipper.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTemplate.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTemplateCompiler.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTemplateTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTestSuite.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTypeErased.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTypeErasedCompiler.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTypeErasedTest.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\Foundation\OSApple.mm">

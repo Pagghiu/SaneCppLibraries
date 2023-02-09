@@ -2,14 +2,14 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "Array.h"
-#include "Console.h"
-#include "Reflection.h"
-#include "String.h"
-#include "StringBuilder.h"
-#include "StringView.h"
-#include "Test.h"
-#include "Vector.h"
+#include "../Foundation/Array.h"
+#include "../Foundation/Console.h"
+#include "../Foundation/String.h"
+#include "../Foundation/StringBuilder.h"
+#include "../Foundation/StringView.h"
+#include "../Foundation/Test.h"
+#include "../Foundation/Vector.h"
+#include "../Reflection/Reflection.h"
 
 namespace SC
 {
@@ -252,60 +252,6 @@ SC_META_STRUCT_FIELD(1, floatToInt)
 SC_META_STRUCT_FIELD(2, uint16To32)
 SC_META_STRUCT_FIELD(3, signed16ToUnsigned)
 SC_META_STRUCT_LEAVE()
-namespace SC
-{
-// TODO: Move printFlatSchema somewhere else
-template <int NUM_ATOMS, typename MetaProperties>
-inline void printFlatSchema(Console& console, const MetaProperties (&atom)[NUM_ATOMS],
-                            const SC::ConstexprStringView (&names)[NUM_ATOMS])
-{
-    int atomIndex = 0;
-    while (atomIndex < NUM_ATOMS)
-    {
-        atomIndex += printAtoms(console, atomIndex, atom + atomIndex, names + atomIndex, 0) + 1;
-    }
-}
-
-template <typename MetaProperties>
-inline int printAtoms(Console& console, int currentAtomIdx, const MetaProperties* atom,
-                      const SC::ConstexprStringView* atomName, int indentation)
-{
-    String        buffer(StringEncoding::Ascii);
-    StringBuilder builder(buffer);
-    (void)builder.append("[{:02}]", currentAtomIdx);
-    for (int i = 0; i < indentation; ++i)
-        (void)builder.append("\t");
-    (void)builder.append("[LinkIndex={:2}] {} ({} atoms)\n", currentAtomIdx,
-                         StringView(atomName->data, atomName->length, false, StringEncoding::Ascii), atom->numSubAtoms);
-    for (int i = 0; i < indentation; ++i)
-        (void)builder.append("\t");
-    (void)builder.append("{\n");
-    for (int idx = 0; idx < atom->numSubAtoms; ++idx)
-    {
-        auto& field     = atom[idx + 1];
-        auto  fieldName = atomName[idx + 1];
-        (void)builder.append("[{:02}]", currentAtomIdx + idx + 1);
-
-        for (int i = 0; i < indentation + 1; ++i)
-            (void)builder.append("\t");
-
-        (void)builder.append("Type={}\tOffset={}\tSize={}\tName={}", (int)field.type, field.offsetInBytes,
-                             field.sizeInBytes,
-                             StringView(fieldName.data, fieldName.length, false, StringEncoding::Ascii));
-        if (field.getLinkIndex() >= 0)
-        {
-            (void)builder.append("\t[LinkIndex={}]", field.getLinkIndex());
-        }
-        (void)builder.append("\n");
-    }
-    for (int i = 0; i < indentation; ++i)
-        (void)builder.append("\t");
-
-    (void)builder.append("}\n");
-    console.print(builder.view());
-    return atom->numSubAtoms;
-}
-} // namespace SC
 
 template <typename BinaryWriterStream, typename BinaryReaderStream, typename SerializerWriter,
           typename SerializerReader>

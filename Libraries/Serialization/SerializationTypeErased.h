@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "ReflectionSC.h"
+#include "../Reflection/ReflectionSC.h"
 #include "SerializationBinarySkipper.h"
 #include "SerializationTypeErasedCompiler.h"
 namespace SC
