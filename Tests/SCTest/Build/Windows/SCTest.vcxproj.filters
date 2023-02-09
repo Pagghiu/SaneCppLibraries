@@ -9,6 +9,9 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
     </Filter>
+    <Filter Include="InputOutput">
+      <UniqueIdentifier>{0c8b9b79-9b52-4f3d-85e6-0586825ad41e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\SCTest.cpp">
@@ -47,10 +50,22 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Path.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystem.cpp">
+      <Filter>InputOutput</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\OS.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringConverter.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.cpp">
+      <Filter>InputOutput</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\OSEmscripten.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\OSPosix.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
   </ItemGroup>
@@ -214,8 +229,52 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\PathTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystem.h">
+      <Filter>InputOutput</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemTest.h">
+      <Filter>InputOutput</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringConverter.h">
       <Filter>Foundation</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringNative.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.h">
+      <Filter>InputOutput</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerTest.h">
+      <Filter>InputOutput</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\FixedSizePimpl.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionAutoAggregates.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionAutoStructured.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\..\Libraries\InputOutput\FileSystemInternalPosix.inl">
+      <Filter>InputOutput</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\InputOutput\FileSystemInternalWindows.inl">
+      <Filter>InputOutput</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalEmscripten.inl">
+      <Filter>InputOutput</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalPosix.inl">
+      <Filter>InputOutput</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalWindows.inl">
+      <Filter>InputOutput</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Foundation\OSApple.mm">
+      <Filter>Foundation</Filter>
+    </None>
   </ItemGroup>
 </Project>

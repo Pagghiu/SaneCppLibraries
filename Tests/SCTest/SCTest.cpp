@@ -17,6 +17,8 @@
 #include "../../Libraries/Foundation/StringTest.h"
 #include "../../Libraries/Foundation/StringViewTest.h"
 #include "../../Libraries/Foundation/VectorTest.h"
+#include "../../Libraries/InputOutput/FileSystemTest.h"
+#include "../../Libraries/InputOutput/FileSystemWalkerTest.h"
 
 SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> globalConsoleBuffer;
 SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> formatConsoleBuffer;
@@ -47,6 +49,8 @@ int main(int argc, const char* argv[])
     { SerializationTypeErasedTest   test(report); }
     { SerializationTemplateTest     test(report); }
     { PathTest                      test(report); }
+    { FileSystemTest                test(report); }
+    { FileSystemWalkerTest                test(report); }
     // clang-format on
 
     return report.getTestReturnCode();

@@ -4,4 +4,4 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 ROOT_DIR="${SCRIPT_DIR}/.."
 HOST_TOOLS="${ROOT_DIR}/_Build/HostTools"
 CLANG_FORMAT="$HOST_TOOLS/clang/bin/clang-format"
-cd "${SCRIPT_DIR}/.." && find . \( -iname \*.h -o -iname \*.cpp -o -iname \*.mm -o -iname \*.m \) -not \( -path "*/Dependencies/*" -o -path "*/Build/*" \) | xargs "${CLANG_FORMAT}" -i
+cd "${SCRIPT_DIR}/.." && find . \( -iname \*.h -o -iname \*.cpp -o -iname \*.mm -o -iname \*.m -o -iname \*.inl \) -not \( -path "*/Dependencies/*" -o -path "*/Build/*" \) | xargs "${CLANG_FORMAT}" -i

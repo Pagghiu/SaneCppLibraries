@@ -218,6 +218,22 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Console.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\OS.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\OSEmscripten.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\OSPosix.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\OSWindows.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Path.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StaticAsserts.cpp" />
@@ -227,6 +243,8 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringConverter.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringView.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Test.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystem.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.cpp" />
     <ClCompile Include="..\..\SCTest.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -237,6 +255,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Console.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ConsoleTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ConstexprTypes.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\FixedSizePimpl.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Function.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\FunctionTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\InitializerList.h" />
@@ -253,6 +272,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\PathTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Platform.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Reflection.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionAutoAggregates.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionAutoStructured.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionClassInfo.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionFlatSchemaCompiler.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ReflectionSC.h" />
@@ -285,6 +306,25 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Types.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Vector.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\VectorTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystem.h" />
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.h" />
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerTest.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\..\Libraries\Foundation\OSApple.mm">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="..\..\..\..\Libraries\InputOutput\FileSystemInternalPosix.inl" />
+    <None Include="..\..\..\..\Libraries\InputOutput\FileSystemInternalWindows.inl" />
+    <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalEmscripten.inl" />
+    <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalPosix.inl" />
+    <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalWindows.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
