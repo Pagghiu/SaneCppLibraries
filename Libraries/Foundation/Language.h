@@ -226,6 +226,20 @@ constexpr auto CombineHash(uint32_t... hash1)
     return StringHash(combinedChars);
 }
 
+template <typename F>
+struct Deferred
+{
+    F f;
+    Deferred(F f) : f(f) {}
+    ~Deferred() { f(); }
+};
+
+template <typename F>
+Deferred<F> MakeDeferred(F f)
+{
+    return Deferred<F>(f);
+}
+
 } // namespace SC
 
 #if SC_MSVC
