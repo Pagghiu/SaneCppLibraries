@@ -32,9 +32,6 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\OSWindows.cpp">
-      <Filter>Foundation</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StaticAsserts.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
@@ -67,12 +64,6 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.cpp">
       <Filter>InputOutput</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\OSEmscripten.cpp">
-      <Filter>Foundation</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\OSPosix.cpp">
-      <Filter>Foundation</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -279,7 +270,13 @@
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalWindows.inl">
       <Filter>InputOutput</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Foundation\OSApple.mm">
+    <None Include="..\..\..\..\Libraries\Foundation\OSInternalEmscripten.inl">
+      <Filter>Foundation</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Foundation\OSInternalPosix.inl">
+      <Filter>Foundation</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Foundation\OSInternalWindows.inl">
       <Filter>Foundation</Filter>
     </None>
   </ItemGroup>

@@ -40,13 +40,12 @@ mkdir -p "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}"
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 time g++-12 -std=c++14 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -I${SCRIPT_DIR}/../../ \
+-lobjc \
 -o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest \
 Libraries/Foundation/Assert.cpp             \
 Libraries/Foundation/Console.cpp            \
 Libraries/Foundation/Memory.cpp             \
-Libraries/Foundation/OSApple.mm             \
 Libraries/Foundation/OS.cpp                 \
-Libraries/Foundation/OSPosix.cpp            \
 Libraries/Foundation/Path.cpp               \
 Libraries/Foundation/StaticAsserts.cpp      \
 Libraries/Foundation/String.cpp             \
