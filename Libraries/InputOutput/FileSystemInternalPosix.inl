@@ -9,7 +9,7 @@
 #include <sys/stat.h> // mkdir
 #include <unistd.h> // rmdir
 #include <string.h> //strerror_r
-#if SC_PLATFORM_DARWIN
+#if __APPLE__
 #include <copyfile.h>
 #include <sys/attr.h>
 #include <sys/clonefile.h>
@@ -109,7 +109,7 @@ struct SC::FileSystem::Internal
         (void)buffer.data.resizeWithoutInitializing(0);
         return false;
     }
-#if SC_PLATFORM_DARWIN
+#if __APPLE__
     // TODO: We should add a version of copyfile/clonefile that uses the file descriptors already opened by the file
     // walker
     [[nodiscard]] static bool copyFile(const char* sourceFile, const char* destinationFile,

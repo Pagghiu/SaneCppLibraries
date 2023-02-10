@@ -12,22 +12,22 @@
 #endif
 
 #if __APPLE__
-#define SC_PLATFORM_DARWIN     1
+#define SC_PLATFORM_APPLE      1
 #define SC_PLATFORM_LINUX      0
 #define SC_PLATFORM_WINDOWS    0
 #define SC_PLATFORM_EMSCRIPTEN 0
 #elif _WIN32 || _WIN64
-#define SC_PLATFORM_DARWIN     0
+#define SC_PLATFORM_APPLE      0
 #define SC_PLATFORM_LINUX      0
 #define SC_PLATFORM_WINDOWS    1
 #define SC_PLATFORM_EMSCRIPTEN 0
 #elif __EMSCRIPTEN__
-#define SC_PLATFORM_DARWIN     0
+#define SC_PLATFORM_APPLE      0
 #define SC_PLATFORM_LINUX      0
 #define SC_PLATFORM_WINDOWS    0
 #define SC_PLATFORM_EMSCRIPTEN 1
 #elif __linux__
-#define SC_PLATFORM_DARWIN     0
+#define SC_PLATFORM_APPLE      0
 #define SC_PLATFORM_LINUX      1
 #define SC_PLATFORM_WINDOWS    0
 #define SC_PLATFORM_EMSCRIPTEN 0
