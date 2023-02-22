@@ -2,6 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "Language.h" // RemoveReference
+#include "LibC.h"     // memset
 #include "Types.h"
 
 namespace SC
@@ -21,7 +23,8 @@ template <typename R, typename... Args>
 struct SC::Function<R(Args...)>
 {
   private:
-    using StubFunction = R (*)(FunctionErasedOperation operation, void* other, const void* const*, Args...);
+    using StubFunction = R (*)(FunctionErasedOperation operation, void* other, const void* const*,
+                               typename AddPointer<Args>::type...);
 
     static const int LAMBDA_SIZE = sizeof(uint64_t) * 2;
 
@@ -35,7 +38,7 @@ struct SC::Function<R(Args...)>
     {
         if (functionStub)
         {
-            (*functionStub)(operation, other, &classInstance, Args()...);
+            (*functionStub)(operation, other, &classInstance, typename AddPointer<Args>::type(nullptr)...);
         }
     }
 
@@ -52,11 +55,13 @@ struct SC::Function<R(Args...)>
         classInstance = instance;
     }
 
-    template <typename Lambda>
+    // SFINAE used to avoid universal reference from "eating" also copy consttructor
+    template <typename Lambda, typename = typename EnableIf<
+                                   not IsSame<typename RemoveReference<Lambda>::type, Function>::value, void>::type>
     Function(Lambda&& lambda)
     {
         functionStub = nullptr;
-        bind(forward<Lambda>(lambda));
+        bind(forward<typename RemoveReference<Lambda>::type>(lambda));
     }
 
     typedef R (*FreeFunction)(Args...);
@@ -104,13 +109,14 @@ struct SC::Function<R(Args...)>
     template <typename Lambda>
     void bind(Lambda&& lambda)
     {
-        new (&classInstance, PlacementNew()) Lambda(lambda);
+        new (&classInstance, PlacementNew()) Lambda(forward<Lambda>(lambda));
         static_assert(sizeof(Lambda) <= sizeof(lambdaMemory), "Lambda is too big");
-        functionStub = [](FunctionErasedOperation operation, void* other, const void* const* p, Args... args) -> R
+        functionStub = [](FunctionErasedOperation operation, void* other, const void* const* p,
+                          typename AddPointer<Args>::type... args) -> R
         {
             Lambda& lambda = *reinterpret_cast<Lambda*>(const_cast<void**>(p));
             if (operation == FunctionErasedOperation::Execute)
-                SC_LIKELY { return lambda(forward<Args>(args)...); }
+                SC_LIKELY { return lambda(*args...); }
             else if (operation == FunctionErasedOperation::LambdaDestruct)
                 lambda.~Lambda();
             else if (operation == FunctionErasedOperation::LambdaCopyConstruct)
@@ -149,40 +155,43 @@ struct SC::Function<R(Args...)>
 
     [[nodiscard]] R operator()(Args... args) const
     {
-        return (*functionStub)(FunctionErasedOperation::Execute, nullptr, &classInstance, forward<Args>(args)...);
+        return (*functionStub)(FunctionErasedOperation::Execute, nullptr, &classInstance, &args...);
     }
 
   private:
     template <typename R2, class Class2, typename... Args2>
     friend struct FunctionDeducerCreator;
     template <typename Class, R (Class::*MemberFunction)(Args...)>
-    static R MemberWrapper(FunctionErasedOperation operation, void* other, const void* const* p, Args... args)
+    static R MemberWrapper(FunctionErasedOperation operation, void* other, const void* const* p,
+                           typename RemoveReference<Args>::type*... args)
     {
         if (operation == FunctionErasedOperation::Execute)
             SC_LIKELY
             {
                 Class* cls = const_cast<Class*>(static_cast<const Class*>(*p));
-                return (cls->*MemberFunction)(forward<Args>(args)...);
+                return (cls->*MemberFunction)(*args...);
             }
         return R();
     }
     template <typename Class, R (Class::*MemberFunction)(Args...) const>
-    static R MemberWrapper(FunctionErasedOperation operation, void* other, const void* const* p, Args... args)
+    static R MemberWrapper(FunctionErasedOperation operation, void* other, const void* const* p,
+                           typename RemoveReference<Args>::type*... args)
     {
         if (operation == FunctionErasedOperation::Execute)
             SC_LIKELY
             {
                 const Class* cls = static_cast<const Class*>(*p);
-                return (cls->*MemberFunction)(forward<Args>(args)...);
+                return (cls->*MemberFunction)(*args...);
             }
         return R();
     }
 
     template <R (*FreeFunction)(Args...)>
-    static R FunctionWrapper(FunctionErasedOperation operation, void* other, const void* const* p, Args... args)
+    static R FunctionWrapper(FunctionErasedOperation operation, void* other, const void* const* p,
+                             typename RemoveReference<Args>::type*... args)
     {
         if (operation == FunctionErasedOperation::Execute)
-            SC_LIKELY { return FreeFunction(forward<Args>(args)...); }
+            SC_LIKELY { return FreeFunction(*args...); }
         return R();
     }
 };
@@ -233,6 +242,8 @@ FunctionDeducerCreator<R, FunctionEmptyClass, Args...> FunctionDeducer(R(Args...
 {
     return FunctionDeducerCreator<R, FunctionEmptyClass, Args...>();
 }
+template <typename T>
+using Delegate = Function<void(T)>;
 #define SC_FUNCTION_FREE(FUNCTION_PARAM) SC::FunctionDeducer(FUNCTION_PARAM).Bind<FUNCTION_PARAM>()
 #define SC_FUNCTION_MEMBER(FUNCTION_PARAM, FUNCTION_OBJECT)                                                            \
     SC::FunctionDeducer(FUNCTION_PARAM).Bind<FUNCTION_PARAM>(FUNCTION_OBJECT)

@@ -31,7 +31,6 @@ struct SC::FunctionTest : public SC::TestCase
 
         if (test_section("bind"))
         {
-
             TestClass           tc;
             Function<void(int)> setValue;
             Function<int(void)> getValue;
@@ -52,7 +51,9 @@ struct SC::FunctionTest : public SC::TestCase
             auto setValue = SC::FunctionDeducer(&TestClass::setValue).Bind<&TestClass::setValue>(&tc);
             auto getValue = SC_FUNCTION_MEMBER(&TestClass::getValue, &tc);
 
-            Function<int(int)> lambdaFreeFunc = &TestClass::freeFunc;
+            Function<int(int)> lambdaFreeFunc  = &TestClass::freeFunc;
+            Function<int(int)> lambdaFreeFunc2 = lambdaFreeFunc;        // Copy Construct
+            Function<int(int)> lambdaFreeFunc3 = move(lambdaFreeFunc2); // Move Construct
             Function<int(int)> lambdaCopy;
             Function<int(int)> lambdaMove;
             {
@@ -63,7 +64,8 @@ struct SC::FunctionTest : public SC::TestCase
                 Function<int(int)> lambda = [=](int value) -> int
                 { return static_cast<int>(val1 + val2 + val3 + value); };
                 SC_TEST_EXPECT(lambda(2) == 5);
-
+                auto               func    = [](int val) -> int { return 1; };
+                Function<int(int)> lambda2 = func;
                 SC_TEST_EXPECT(freeFunc(23) == 24);
                 SC_TEST_EXPECT(getValue() == 0);
                 setValue(3);
@@ -73,6 +75,19 @@ struct SC::FunctionTest : public SC::TestCase
             }
             SC_TEST_EXPECT(lambdaCopy(2) == 5);
             SC_TEST_EXPECT(lambdaMove(2) == 5);
+        }
+        if (test_section("reference"))
+        {
+            // Try assigning a lanbda with a reference
+            Function<void(int&)> incrementWithReference = [](int& val) { val += 1; };
+
+            int val = 0;
+            incrementWithReference(val);
+            SC_TEST_EXPECT(val == 1);
+
+            // Upcast lambda with const reference to non const reference
+            Function<void(int&)> constReference = [&](const int& val) { SC_TEST_EXPECT(val == 1); };
+            constReference(val);
         }
     }
 };
