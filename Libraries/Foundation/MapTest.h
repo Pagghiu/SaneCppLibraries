@@ -24,6 +24,9 @@ struct SC::MapTest : public SC::TestCase
             const int* value;
             SC_TEST_EXPECT(map.contains(1, &value) && *value == 2);
             SC_TEST_EXPECT(map.contains(2, &value) && *value == 3);
+            SC_TEST_EXPECT(map.contains(2, &value) && *value == 3);
+            size_t index = 0;
+            SC_TEST_EXPECT(map.contains(2, &index) && index == 1);
             SC_TEST_EXPECT(not map.contains(3));
         }
         if (test_section("array"))
