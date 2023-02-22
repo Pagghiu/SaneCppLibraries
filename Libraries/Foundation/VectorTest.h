@@ -457,6 +457,27 @@ void SC::VectorTest::testClassType()
         SC_TEST_EXPECT(vector2[0].toString().parseInt32(&value) && value == 0);
         SC_TEST_EXPECT(vector2[1].toString().parseInt32(&value) && value == 1);
     }
+
+    if (test_section("class_remove_at"))
+    {
+        SC::Vector<VectorTestClass> vector1;
+        report.reset();
+        SC_TEST_EXPECT(vector1.push_back(VectorTestClass("0")));
+        SC_TEST_EXPECT(vector1.push_back(VectorTestClass("1")));
+        SC_TEST_EXPECT(vector1.push_back(VectorTestClass("2")));
+        SC_TEST_EXPECT(vector1.push_back(VectorTestClass("3")));
+
+        SC_TEST_EXPECT(not vector1.removeAt(10));
+        SC_TEST_EXPECT(vector1.removeAt(1));
+        int32_t value;
+        SC_TEST_EXPECT(vector1[0].toString().parseInt32(&value) && value == 0);
+        SC_TEST_EXPECT(vector1[1].toString().parseInt32(&value) && value == 2);
+        SC_TEST_EXPECT(vector1[2].toString().parseInt32(&value) && value == 3);
+        SC_TEST_EXPECT(vector1.removeAll([&](const VectorTestClass& val)
+                                         { return val.toString().parseInt32(&value) && value <= 2; }));
+        SC_TEST_EXPECT(vector1.size() == 1);
+        SC_TEST_EXPECT(vector1[0].toString().parseInt32(&value) && value == 3);
+    }
 }
 
 void SC::VectorTest::testBasicType()
@@ -553,5 +574,31 @@ void SC::VectorTest::testBasicType()
         SC_TEST_EXPECT(elements[0] == 0);
         SC_TEST_EXPECT(elements[1] == 1);
         SC_TEST_EXPECT(elements[2] == 2);
+    }
+    if (test_section("contains/find"))
+    {
+        Vector<int> elements;
+        (void)elements.push_back(1);
+        (void)elements.push_back(0);
+        (void)elements.push_back(2);
+        size_t index = 0;
+        SC_TEST_EXPECT(elements.contains(2, &index) && index == 2);
+        SC_TEST_EXPECT(not elements.contains(44));
+        (void)elements.push_back(2);
+        index = 0;
+        SC_TEST_EXPECT(elements.find([](auto& val) { return val >= 2; }, &index) && index == 2);
+    }
+    if (test_section("removeAll"))
+    {
+        Vector<int> elements;
+        (void)elements.push_back(1);
+        (void)elements.push_back(0);
+        (void)elements.push_back(2);
+        SC_TEST_EXPECT(elements.remove(0));
+        SC_TEST_EXPECT(elements.size() == 2);
+        SC_TEST_EXPECT(elements[0] == 1);
+        SC_TEST_EXPECT(elements[1] == 2);
+        elements.clear();
+        SC_TEST_EXPECT(not elements.removeAt(1));
     }
 }

@@ -65,6 +65,7 @@ struct SC::SegmentItems : public SegmentHeader
 
     void setSize(size_t newSize) { sizeBytes = static_cast<HeaderBytesType>(newSize * sizeof(T)); }
 
+    // TODO: needs specialized moveAssign for trivial types
     static void moveAssignElements(T* destination, size_t indexStart, size_t numElements, T* source)
     {
         // TODO: Should we also call destructor on moved elements?
@@ -177,6 +178,24 @@ struct SC::SegmentItems : public SegmentHeader
         static_assert(sizeof(T) == sizeof(U), "What?");
         // TODO: add code to handle memcpy destination overlapping source
         memcpy(oldItems + position, other, otherSize * sizeof(T));
+    }
+
+    template <typename Lambda>
+    [[nodiscard]] static bool findIf(const T* items, size_t indexStart, const size_t numElements, Lambda&& criteria,
+                                     size_t* foundIndex = nullptr)
+    {
+        for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
+        {
+            if (criteria(items[idx]))
+            {
+                if (foundIndex)
+                {
+                    *foundIndex = idx;
+                }
+                return true;
+            }
+        }
+        return false;
     }
 };
 
@@ -496,8 +515,12 @@ struct SC::SegmentOperations
         Allocator::release(segment);
     }
 
-    [[nodiscard]] static bool pop_back(SegmentItems<T>* segment)
+    [[nodiscard]] static bool pop_back(T*& items)
     {
+        const bool       isNull  = items == nullptr;
+        SegmentItems<T>* segment = isNull ? nullptr : SegmentItems<T>::getSegment(items);
+        if (segment == nullptr)
+            return false;
         const size_t numElements = segment->size();
         if (numElements > 0)
         {
@@ -511,13 +534,25 @@ struct SC::SegmentOperations
         }
     }
 
-    [[nodiscard]] static bool pop_front(SegmentItems<T>* segment)
+    [[nodiscard]] static bool pop_front(T*& items) { return removeAt(items, 0); }
+
+    [[nodiscard]] static bool removeAt(T*& items, size_t index)
     {
+        const bool       isNull  = items == nullptr;
+        SegmentItems<T>* segment = isNull ? nullptr : SegmentItems<T>::getSegment(items);
+        if (segment == nullptr)
+            return false;
         const size_t numElements = segment->size();
-        if (numElements > 0)
+        if (index < numElements)
         {
-            SegmentItems<T>::moveAssignElements(Allocator::template getItems<T>(segment), 0, numElements - 1,
-                                                Allocator::template getItems<T>(segment) + 1);
+            if (index + 1 == numElements)
+            {
+                SegmentItems<T>::destroyElements(items, index, 1);
+            }
+            else
+            {
+                SegmentItems<T>::moveAssignElements(items, index, numElements - index - 1, items + index + 1);
+            }
             segment->setSize(numElements - 1);
             return true;
         }
@@ -763,5 +798,51 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
     [[nodiscard]] bool appendCopy(const U& src)
     {
         return appendCopy(src.data(), src.size());
+    }
+
+    [[nodiscard]] bool contains(const T& value, size_t* foundIndex = nullptr) const
+    {
+        T* oldItems = items;
+        return SegmentItems<T>::findIf(
+            oldItems, 0, Segment::size(), [&](const T& element) { return element == value; }, foundIndex);
+    }
+
+    template <typename Lambda>
+    [[nodiscard]] bool find(Lambda&& lambda, size_t* foundIndex = nullptr) const
+    {
+        T* oldItems = items;
+        return SegmentItems<T>::findIf(oldItems, 0, Segment::size(), forward<Lambda>(lambda), foundIndex);
+    }
+
+    [[nodiscard]] bool removeAt(size_t index)
+    {
+        T* oldItems = items;
+        return SegmentItems<T>::removeAt(oldItems, index);
+    }
+
+    template <typename Lambda>
+    [[nodiscard]] bool removeAll(Lambda&& criteria)
+    {
+        size_t index;
+        size_t prevIndex         = 0;
+        bool   atLeastOneRemoved = false;
+        while (SegmentItems<T>::findIf(items, prevIndex, SegmentItems<T>::size() - prevIndex, forward<Lambda>(criteria),
+                                       &index))
+        {
+            SC_TRY_IF(removeAt(index));
+            prevIndex         = index;
+            atLeastOneRemoved = true;
+        }
+        return atLeastOneRemoved;
+    }
+
+    [[nodiscard]] bool remove(const T& value)
+    {
+        size_t index;
+        if (contains(value, &index))
+        {
+            return removeAt(index);
+        }
+        return false;
     }
 };

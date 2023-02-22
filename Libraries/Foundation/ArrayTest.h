@@ -44,6 +44,8 @@ struct SC::ArrayTest : public SC::TestCase
             SC_TEST_EXPECT(arr.shrink_to_fit());
             SC_TEST_EXPECT(arr.size() == 1);
             SC_TEST_EXPECT(arr.capacity() == 10);
+            SC_TEST_EXPECT(arr.pop_front());
+            SC_TEST_EXPECT(arr.size() == 0);
         }
 
         if (test_section("push_back"))

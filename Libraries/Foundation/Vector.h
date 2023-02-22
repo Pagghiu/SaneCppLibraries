@@ -176,20 +176,8 @@ struct SC::Vector
 
     [[nodiscard]] bool push_back(const T& element) { return SegmentOperationsT::push_back(items, element); }
     [[nodiscard]] bool push_back(T&& element) { return SegmentOperationsT::push_back(items, forward<T>(element)); }
-    [[nodiscard]] bool pop_back()
-    {
-        if (items != nullptr)
-            return SegmentOperationsT::pop_back(SegmentItems<T>::getSegment(items));
-        else
-            return false;
-    }
-    [[nodiscard]] bool pop_front()
-    {
-        if (items != nullptr)
-            return SegmentOperationsT::pop_front(SegmentItems<T>::getSegment(items));
-        else
-            return false;
-    }
+    [[nodiscard]] bool pop_back() { return SegmentOperationsT::pop_back(items); }
+    [[nodiscard]] bool pop_front() { return SegmentOperationsT::pop_front(items); }
 
     [[nodiscard]] T& front()
     {
@@ -321,6 +309,45 @@ struct SC::Vector
     [[nodiscard]] bool appendCopy(const U& src)
     {
         return appendCopy(src.data(), src.size());
+    }
+
+    [[nodiscard]] bool contains(const T& value, size_t* foundIndex = nullptr) const
+    {
+        return SegmentItems<T>::findIf(
+            items, 0, size(), [&](const T& element) { return element == value; }, foundIndex);
+    }
+
+    template <typename Lambda>
+    [[nodiscard]] bool find(Lambda&& lambda, size_t* foundIndex = nullptr) const
+    {
+        return SegmentItems<T>::findIf(items, 0, size(), forward<Lambda>(lambda), foundIndex);
+    }
+
+    [[nodiscard]] bool removeAt(size_t index) { return SegmentOperationsT::removeAt(items, index); }
+
+    template <typename Lambda>
+    [[nodiscard]] bool removeAll(Lambda&& criteria)
+    {
+        size_t index;
+        size_t prevIndex         = 0;
+        bool   atLeastOneRemoved = false;
+        while (SegmentItems<T>::findIf(items, prevIndex, size() - prevIndex, forward<Lambda>(criteria), &index))
+        {
+            SC_TRY_IF(removeAt(index));
+            prevIndex         = index;
+            atLeastOneRemoved = true;
+        }
+        return atLeastOneRemoved;
+    }
+
+    [[nodiscard]] bool remove(const T& value)
+    {
+        size_t index;
+        if (contains(value, &index))
+        {
+            return removeAt(index);
+        }
+        return false;
     }
 
   private:
