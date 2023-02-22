@@ -15,7 +15,8 @@ struct [[nodiscard]] ReturnCode
     constexpr ReturnCode(const char* message) = delete;
     constexpr ReturnCode(const StringView message) : message(message) {}
     constexpr ReturnCode(const ReturnCode& other) : message(other.message) {}
-    operator bool() const { return message.isEmpty(); }
+         operator bool() const { return message.isEmpty(); }
+    bool isError() const { return not message.isEmpty(); }
 };
 template <typename Value, typename ErrorType = ReturnCode>
 struct Result;
@@ -99,7 +100,7 @@ struct [[nodiscard]] SC::Result
 
     constexpr ErrorType releaseError() const { return move(error); }
 
-    Value releaseValue() const { return move(value); }
+    Value&& releaseValue() { return move(value); }
 
     const ErrorType& getError() const
     {
@@ -115,27 +116,30 @@ struct [[nodiscard]] SC::Result
 };
 #define SC_TRY_IF(expression)                                                                                          \
     {                                                                                                                  \
-        if (auto res = (expression))                                                                                   \
-        {                                                                                                              \
-            (void)0;                                                                                                   \
-        }                                                                                                              \
+        if (auto _exprResConv = (expression))                                                                          \
+            SC_LIKELY                                                                                                  \
+            {                                                                                                          \
+                (void)0;                                                                                               \
+            }                                                                                                          \
         else                                                                                                           \
         {                                                                                                              \
-            return res;                                                                                                \
+            return _exprResConv;                                                                                       \
         }                                                                                                              \
     }
-#define SC_TRY_WRAP(expression, failedMessage)                                                                         \
-    if (!(expression))                                                                                                 \
-    {                                                                                                                  \
-        return ReturnCode(failedMessage);                                                                              \
-    }
+#define SC_TRY_MSG(expression, failedMessage)                                                                          \
+    if (not(expression))                                                                                               \
+        SC_UNLIKELY                                                                                                    \
+        {                                                                                                              \
+            return ReturnCode(failedMessage);                                                                          \
+        }
 
 #define SC__TRY_IMPL2(assignment, expression, Counter)                                                                 \
     auto _temporary_result##Counter = (expression);                                                                    \
     if (_temporary_result##Counter.isError())                                                                          \
-    {                                                                                                                  \
-        return _temporary_result##Counter.releaseError();                                                              \
-    }                                                                                                                  \
+        SC_UNLIKELY                                                                                                    \
+        {                                                                                                              \
+            return _temporary_result##Counter.releaseError();                                                          \
+        }                                                                                                              \
     assignment = _temporary_result##Counter.releaseValue()
 #define SC__TRY_IMPL1(assignment, expression, Counter) SC__TRY_IMPL2(assignment, expression, Counter)
 #define SC_TRY(assignment, expression)                 SC__TRY_IMPL1(assignment, expression, __COUNTER__)
@@ -148,3 +152,4 @@ struct [[nodiscard]] SC::Result
 #define SC__MUST_IMPL1(assignment, expression, Counter) SC__MUST_IMPL2(assignment, expression, Counter)
 
 #define SC_MUST(assignment, expression) SC__MUST_IMPL1(assignment, expression, __COUNTER__)
+#define SC_TRUST_RESULT(expression)     (void)expression

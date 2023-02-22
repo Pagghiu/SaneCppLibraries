@@ -1,10 +1,11 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "FileSystemWalker.h"
 // clang-format off
-#include <errno.h>
+#include "FileSystemWalker.h"
+// clang-format on
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
@@ -20,7 +21,7 @@ struct SC::FileSystemWalker::Internal
     {
         DIR*   dirEnumerator     = nullptr;
         size_t textLengthInBytes = 0;
-        int    fileDescriptor    = -1;
+        int    fileDescriptor    = -1; // TODO: use actual filedescriptor class here
         bool   gotDot1           = false;
         bool   gotDot2           = false;
 
@@ -55,7 +56,7 @@ struct SC::FileSystemWalker::Internal
         while (not recurseStack.isEmpty())
         {
             recurseStack.back().close();
-            (void)recurseStack.pop_back();
+            SC_TRUST_RESULT(recurseStack.pop_back());
         }
     }
 
@@ -66,7 +67,7 @@ struct SC::FileSystemWalker::Internal
         StackEntry entry;
         entry.textLengthInBytes = currentPath.view().sizeInBytesIncludingTerminator();
         SC_TRY_IF(entry.init(open(currentPath.view().getNullTerminatedNative(), O_DIRECTORY)));
-        SC_TRY_IF(recurseStack.push_back(entry));
+        SC_TRY_IF(recurseStack.push_back(move(entry)));
         return true;
     }
 
@@ -84,7 +85,10 @@ struct SC::FileSystemWalker::Internal
                 recurseStack.back().close();
                 SC_TRY_IF(recurseStack.pop_back());
                 if (recurseStack.isEmpty())
+                {
+                    entry.parentFileDescriptor.resetAsInvalid();
                     return "Iteration Finished"_a8;
+                }
                 parent = recurseStack.back();
                 SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(parent.textLengthInBytes));
                 continue;
@@ -107,9 +111,10 @@ struct SC::FileSystemWalker::Internal
         SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
         SC_TRY_IF(currentPath.appendNullTerminated("/"_u8));
         SC_TRY_IF(currentPath.appendNullTerminated(entry.name));
-        entry.path                                     = currentPath.view();
-        entry.level                                    = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
-        entry.parentFileDescriptor.posixFileDescriptor = parent.fileDescriptor;
+        entry.path  = currentPath.view();
+        entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
+        entry.parentFileDescriptor.resetAsInvalid();
+        SC_TRY_IF(entry.parentFileDescriptor.assign(parent.fileDescriptor));
         if (item->d_type == DT_DIR)
         {
             entry.type = Type::Directory;
@@ -132,7 +137,7 @@ struct SC::FileSystemWalker::Internal
         SC_TRY_IF(currentPath.appendNullTerminated("/"_u8));
         SC_TRY_IF(currentPath.appendNullTerminated(entry.name));
         newParent.textLengthInBytes = currentPath.view().sizeInBytesIncludingTerminator();
-        SC_TRY_IF(newParent.init(openat(entry.parentFileDescriptor.posixFileDescriptor,
+        SC_TRY_IF(newParent.init(openat(entry.parentFileDescriptor.getRawFileDescriptor(),
                                         entry.name.bytesIncludingTerminator(), O_DIRECTORY)));
         SC_TRY_IF(recurseStack.push_back(newParent))
         return true;

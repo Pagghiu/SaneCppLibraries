@@ -45,7 +45,7 @@ struct SC::FileSystemWalker::Internal
         while (not recurseStack.isEmpty())
         {
             recurseStack.back().close();
-            (void)recurseStack.pop_back();
+            SC_TRUST_RESULT(recurseStack.pop_back());
         }
     }
 

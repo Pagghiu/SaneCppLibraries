@@ -226,6 +226,7 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringConverter.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringView.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Test.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileDescriptor.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystem.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.cpp" />
     <ClCompile Include="..\..\SCTest.cpp" />
@@ -274,6 +275,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Types.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Vector.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\VectorTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystem.h" />
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.h" />
@@ -303,6 +305,7 @@
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalEmscripten.inl" />
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalWindows.inl" />
+    <None Include="..\..\..\..\Libraries\InputOutput\UtilityWindows.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

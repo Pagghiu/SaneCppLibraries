@@ -29,6 +29,7 @@
 		7BA892AF297E06040093152B /* StringConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892AD297E06040093152B /* StringConverter.cpp */; };
 		7BC56BDB29946C9200EED472 /* FileSystemWalker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BC56BD729946AD100EED472 /* FileSystemWalker.cpp */; };
 		7BC56BDC29946C9200EED472 /* FileSystemWalker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BC56BD729946AD100EED472 /* FileSystemWalker.cpp */; };
+		7BE5C81329A2707E00CBCAD1 /* FileDescriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -145,6 +146,8 @@
 		7BC56BD929946B1800EED472 /* FileSystemWalkerInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalPosix.inl; path = ../../../../Libraries/InputOutput/FileSystemWalkerInternalPosix.inl; sourceTree = "<group>"; };
 		7BC56BDA29946B1800EED472 /* FileSystemWalkerInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalWindows.inl; path = ../../../../Libraries/InputOutput/FileSystemWalkerInternalWindows.inl; sourceTree = "<group>"; };
 		7BC56BDD2994715800EED472 /* FixedSizePimpl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FixedSizePimpl.h; path = ../../../../Libraries/Foundation/FixedSizePimpl.h; sourceTree = "<group>"; };
+		7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = FileDescriptor.cpp; path = ../../../../Libraries/InputOutput/FileDescriptor.cpp; sourceTree = "<group>"; };
+		7BE5C81229A2707E00CBCAD1 /* FileDescriptor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FileDescriptor.h; path = ../../../../Libraries/InputOutput/FileDescriptor.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -169,6 +172,8 @@
 		7B0C2999297CA7C10071C5B4 /* InputOutput */ = {
 			isa = PBXGroup;
 			children = (
+				7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */,
+				7BE5C81229A2707E00CBCAD1 /* FileDescriptor.h */,
 				7B0C299C297CA7CC0071C5B4 /* FileSystem.cpp */,
 				7B0C299A297CA7CC0071C5B4 /* FileSystem.h */,
 				7B2F86E029887CA400EFC5FB /* FileSystemInternalEmscripten.inl */,
@@ -420,6 +425,7 @@
 				7B583F6A2922ECF900FBE019 /* SCTest.cpp in Sources */,
 				7B19C9AC297AF99F001C0627 /* Path.cpp in Sources */,
 				7B51601329243097006996AA /* String.cpp in Sources */,
+				7BE5C81329A2707E00CBCAD1 /* FileDescriptor.cpp in Sources */,
 				7B51601629243097006996AA /* StringBuilder.cpp in Sources */,
 				7BA892AE297E06040093152B /* StringConverter.cpp in Sources */,
 				7BC56BDB29946C9200EED472 /* FileSystemWalker.cpp in Sources */,

@@ -65,6 +65,7 @@ Libraries/Foundation/StringConverter.cpp    \
 Libraries/Foundation/StringFormat.cpp       \
 Libraries/Foundation/StringView.cpp         \
 Libraries/Foundation/Test.cpp               \
+Libraries/InputOutput/FileDescriptor.cpp    \
 Libraries/InputOutput/FileSystem.cpp        \
 Libraries/InputOutput/FileSystemWalker.cpp  \
 ${SCRIPT_DIR}/../../SCTest.cpp

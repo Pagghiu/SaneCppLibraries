@@ -93,23 +93,8 @@ struct SC::FileSystem::Internal
             const size_t numUtf16Points = wcslen(buffer.nativeWritableBytesIncludingTerminator()) + 1;
             return buffer.data.resizeWithoutInitializing(numUtf16Points * sizeof(wchar_t));
         }
-        (void)buffer.data.resizeWithoutInitializing(0);
+        SC_TRUST_RESULT(buffer.data.resizeWithoutInitializing(0));
         return false;
-    }
-
-    [[nodiscard]] static bool formatWindowsError(int errorNumber, String& buffer)
-    {
-        LPWSTR messageBuffer = nullptr;
-        size_t size          = FormatMessageW(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-            errorNumber, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), reinterpret_cast<LPWSTR>(&messageBuffer), 0, NULL);
-        auto deferFree = MakeDeferred([&]() { LocalFree(messageBuffer); });
-
-        // TODO: We should use a fallible append here instead of the assignment
-        const StringView sv =
-            StringView(Span<const wchar_t>(messageBuffer, size * sizeof(wchar_t)), true, StringEncoding::Utf16);
-        SC_TRY_IF(buffer.assign(sv));
-        return true;
     }
 
     [[nodiscard]] static bool copyFile(const wchar_t* sourceFile, const wchar_t* destinationFile,

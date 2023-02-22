@@ -65,6 +65,9 @@
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.cpp">
       <Filter>InputOutput</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileDescriptor.cpp">
+      <Filter>InputOutput</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h">
@@ -253,6 +256,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionTest.h">
       <Filter>Reflection</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptor.h">
+      <Filter>InputOutput</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemInternalPosix.inl">
@@ -278,6 +284,9 @@
     </None>
     <None Include="..\..\..\..\Libraries\Foundation\OSInternalWindows.inl">
       <Filter>Foundation</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\InputOutput\UtilityWindows.inl">
+      <Filter>InputOutput</Filter>
     </None>
   </ItemGroup>
 </Project>

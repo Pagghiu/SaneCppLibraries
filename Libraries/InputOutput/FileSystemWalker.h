@@ -5,17 +5,12 @@
 #include "../Foundation/FixedSizePimpl.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/StringView.h"
+#include "FileDescriptor.h"
 
 namespace SC
 {
 struct FileSystemWalker;
-struct FileDescriptor;
 } // namespace SC
-
-struct SC::FileDescriptor
-{
-    int posixFileDescriptor = 0;
-};
 
 struct SC::FileSystemWalker
 {

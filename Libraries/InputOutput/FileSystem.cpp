@@ -5,6 +5,7 @@
 
 #if SC_PLATFORM_WINDOWS
 #include "FileSystemInternalWindows.inl"
+#include "UtilityWindows.inl"
 #elif SC_PLATFORM_EMSCRIPTEN
 #include "FileSystemInternalEmscripten.inl"
 #else
@@ -172,7 +173,7 @@ SC::ReturnCode SC::FileSystem::formatError(int errorNumber, StringView item, boo
         {
             return "Windows Error"_a8;
         }
-        if (not Internal::formatWindowsError(errorNumber, errorMessageBuffer.text))
+        if (not UtilityWindows::formatWindowsError(errorNumber, errorMessageBuffer.text))
         {
             return "SC::FileSystem::formatError - Cannot format error"_a8;
         }

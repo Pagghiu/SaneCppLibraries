@@ -106,7 +106,7 @@ struct SC::FileSystem::Internal
         {
             return buffer.data.resizeWithoutInitializing(strlen(buffer.nativeWritableBytesIncludingTerminator()) + 1);
         }
-        (void)buffer.data.resizeWithoutInitializing(0);
+        SC_TRUST_RESULT(buffer.data.resizeWithoutInitializing(0));
         return false;
     }
 #if __APPLE__
