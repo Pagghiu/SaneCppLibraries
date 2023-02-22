@@ -237,7 +237,7 @@ struct SC::StringView
     [[nodiscard]] size_t splitASCII(char_t separator, Lambda&& lambda,
                                     SplitOptions options = {SplitOptions::SkipEmpty, SplitOptions::SkipSeparator})
     {
-        return split<StringIteratorASCII>(separator, forward(lambda), options);
+        return split<StringIteratorASCII>(separator, forward<Lambda>(lambda), options);
     }
 
     template <typename StringIterator, typename Lambda, typename CharacterType>

@@ -20,7 +20,7 @@ struct Console
     template <typename... Types>
     bool print(StringView fmt, Types&&... args)
     {
-        return printWithCustomTemporaryBuffer(formatBuffer, fmt, forward(args)...);
+        return printWithCustomTemporaryBuffer(formatBuffer, fmt, forward<Types>(args)...);
     }
 
     template <typename... Types>
@@ -32,7 +32,7 @@ struct Console
         {
             // It's ok parsing format string '{' and '}' both for utf8 and ascii with StringIteratorASCII
             // because on a valid UTF8 string, these chars are unambiguously recognizable
-            return StringFormat<StringIteratorASCII>::format(output, fmt, forward(args)...);
+            return StringFormat<StringIteratorASCII>::format(output, fmt, forward<Types>(args)...);
         }
         return false; // UTF16/32 format strings are not supported
     }

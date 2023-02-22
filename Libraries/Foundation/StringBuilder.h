@@ -18,7 +18,7 @@ struct StringBuilder
     [[nodiscard]] bool format(StringView fmt, Types&&... args)
     {
         reset();
-        return append(fmt, forward(args)...);
+        return append(fmt, forward<Types>(args)...);
     }
 
     [[nodiscard]] bool format(StringView text)
@@ -33,12 +33,12 @@ struct StringBuilder
         SC_TRY_IF(backingString.popNulltermIfExists());
         if (temporaryBuffer)
         {
-            return printWithTemporaryBuffer(*temporaryBuffer, fmt, forward(args)...);
+            return printWithTemporaryBuffer(*temporaryBuffer, fmt, forward<Types>(args)...);
         }
         else
         {
             SmallVector<char, 512> buffer;
-            return printWithTemporaryBuffer(buffer, fmt, forward(args)...);
+            return printWithTemporaryBuffer(buffer, fmt, forward<Types>(args)...);
         }
     }
 
@@ -80,7 +80,7 @@ struct StringBuilder
         {
             // It's ok parsing format string '{' and '}' both for utf8 and ascii with StringIteratorASCII
             // because on a valid UTF8 string, these chars are unambiguously recognizable
-            return StringFormat<StringIteratorASCII>::format(sfo, fmt, forward(args)...);
+            return StringFormat<StringIteratorASCII>::format(sfo, fmt, forward<Types>(args)...);
         }
         return false; // UTF16/32 format strings are not supported
     }

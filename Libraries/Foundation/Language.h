@@ -28,6 +28,8 @@ template <class T> struct AddReference      { typedef T& type; };
 template <class T> struct AddReference<T&>  { typedef T  type; };
 template <class T> struct AddReference<T&&> { typedef T  type; };
 
+template <class T> struct AddPointer      { using type = typename RemoveReference<T>::type*; };
+
 template <class T> struct RemoveConst           { typedef T type;};
 template <class T> struct RemoveConst<const T>  { typedef T type; };
 
@@ -91,7 +93,22 @@ template <class T> struct IsClass : decltype(isClassTest<T>(nullptr)) { };
 template <typename T>        struct IsArray : false_type { };
 template <typename T, int N> struct IsArray<T[N]> : true_type { typedef T type; };
 
-template <typename _Tp> struct IsTriviallyCopyable : public IntegralConstant<bool, __is_trivially_copyable(_Tp)> { };
+template <typename T> struct IsTriviallyCopyable  : public IntegralConstant<bool, __is_trivially_copyable(T)> { };
+
+#if SC_GCC and not SC_CLANG
+// Not easy on GCC as it doesn't implement __is_convertible_to that is a Microsoft extension
+// see https://opensource.apple.com/source/lldb/lldb-69/llvm/tools/clang/docs/LanguageExtensions.html
+// gcc/x.y.z/include/c++/xy/tr1/type_traits has a super complex thing, we'll try to play it easy here
+// When trying it out inside SC_TRY_IF to convert to ReturnCode if conversion exist, this made a constexpr
+// function not be considered anymore constexpr, for absolutely no reason, needs some more debug
+template <typename From, typename To, typename ENABLE = void>
+struct IsConvertible : false_type { };
+template <typename From, typename To>
+struct IsConvertible<From, To, decltype(declval<void (*)(To)>()(declval<From>()))> : true_type { };
+#else
+template <typename T1, typename T2>
+struct IsConvertible : public IntegralConstant<bool, __is_convertible_to(T1, T2)> { };
+#endif
 
 template <class T> struct IsLValueReference     : false_type { };
 template <class T> struct IsLValueReference<T&> : true_type  { };
@@ -124,9 +141,15 @@ constexpr T&& move(T& value)
 }
 
 template <typename T>
-constexpr T&& forward(T& value)
+constexpr T&& forward(typename RemoveReference<T>::type& value)
 {
-    return static_cast<typename RemoveReference<T>::type&&>(value);
+    return static_cast<T&&>(value);
+}
+template <typename T>
+constexpr T&& forward(typename RemoveReference<T>::type&& value)
+{
+    static_assert(!IsLValueReference<T>::value, "Forward an rvalue as an lvalue is not allowed");
+    return static_cast<T&&>(value);
 }
 struct PlacementNew
 {

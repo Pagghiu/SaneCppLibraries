@@ -97,7 +97,7 @@ struct CallVisitorFor
     constexpr static bool visit(Visitor&& visitor)
     {
         typedef luple::tlist_get_t<data_tlist, N-1> R;
-        return CallVisitorFor<data_tlist, N-1>::visit(forward(visitor)) and visitor.template visit<N-1, R>();
+        return CallVisitorFor<data_tlist, N-1>::visit(forward<Visitor>(visitor)) and visitor.template visit<N-1, R>();
     }
 };
 template<typename data_tlist>
