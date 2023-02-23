@@ -7,6 +7,7 @@
 #include "../../Libraries/Foundation/MapTest.h"
 #include "../../Libraries/Foundation/MemoryTest.h"
 #include "../../Libraries/Foundation/OSTest.h"
+#include "../../Libraries/Foundation/OptionalTest.h"
 #include "../../Libraries/Foundation/PathTest.h"
 #include "../../Libraries/Foundation/ResultTest.h"
 #include "../../Libraries/Foundation/SmallVectorTest.h"
@@ -39,6 +40,7 @@ int main(int argc, const char* argv[])
     { ArrayTest                     test(report); }
     { VectorTest                    test(report); }
     { ResultTest                    test(report); }
+    { OptionalTest                  test(report); }
     { StringViewTest                test(report); }
     { StringTest                    test(report); }
     { StringBuilderTest             test(report); }

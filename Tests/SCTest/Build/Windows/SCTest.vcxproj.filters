@@ -256,6 +256,12 @@
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionTest.h">
       <Filter>Reflection</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Optional.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\OptionalTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptor.h">
       <Filter>InputOutput</Filter>
     </ClInclude>

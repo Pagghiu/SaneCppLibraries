@@ -133,6 +133,8 @@
 		7B583F692922ECF900FBE019 /* SCTest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SCTest.cpp; path = ../../SCTest.cpp; sourceTree = "<group>"; };
 		7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SCTestXCTest.mm; path = ../../SCTestXCTest.mm; sourceTree = "<group>"; };
 		7B5A353328E8640B00B2F589 /* SCTestXCTest.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SCTestXCTest.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7B75258629A16F8000779F2A /* OptionalTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OptionalTest.h; path = ../../../../Libraries/Foundation/OptionalTest.h; sourceTree = "<group>"; };
+		7B75258729A16F8000779F2A /* Optional.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Optional.h; path = ../../../../Libraries/Foundation/Optional.h; sourceTree = "<group>"; };
 		7B9F61832995BDA20011F4D4 /* libobjc.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libobjc.tbd; path = usr/lib/libobjc.tbd; sourceTree = SDKROOT; };
 		7BA892A7297E032F0093152B /* OSInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = OSInternalWindows.inl; path = ../../../../Libraries/Foundation/OSInternalWindows.inl; sourceTree = "<group>"; };
 		7BA892A8297E03340093152B /* OSInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = OSInternalEmscripten.inl; path = ../../../../Libraries/Foundation/OSInternalEmscripten.inl; sourceTree = "<group>"; };
@@ -214,6 +216,8 @@
 				7B515FD429243086006996AA /* Memory.cpp */,
 				7B515FEA29243087006996AA /* Memory.h */,
 				7B515FF229243087006996AA /* MemoryTest.h */,
+				7B75258729A16F8000779F2A /* Optional.h */,
+				7B75258629A16F8000779F2A /* OptionalTest.h */,
 				7BA892A9297E03540093152B /* OS.cpp */,
 				7B515FDC29243086006996AA /* OS.h */,
 				7BA892A8297E03340093152B /* OSInternalEmscripten.inl */,
