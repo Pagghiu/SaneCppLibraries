@@ -57,4 +57,5 @@ Libraries/Foundation/Test.cpp               \
 Libraries/InputOutput/FileDescriptor.cpp    \
 Libraries/InputOutput/FileSystem.cpp        \
 Libraries/InputOutput/FileSystemWalker.cpp  \
+Libraries/InputOutput/Process.cpp           \
 ${SCRIPT_DIR}/../../SCTest.cpp

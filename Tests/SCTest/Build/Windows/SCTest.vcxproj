@@ -229,6 +229,7 @@
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileDescriptor.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystem.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\InputOutput\Process.cpp" />
     <ClCompile Include="..\..\SCTest.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -284,6 +285,8 @@
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.h" />
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\Process.h" />
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\ProcessTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\Reflection.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAutoAggregates.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAutoStructured.h" />

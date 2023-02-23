@@ -29,6 +29,7 @@
 		7BA892AF297E06040093152B /* StringConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892AD297E06040093152B /* StringConverter.cpp */; };
 		7BC56BDB29946C9200EED472 /* FileSystemWalker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BC56BD729946AD100EED472 /* FileSystemWalker.cpp */; };
 		7BC56BDC29946C9200EED472 /* FileSystemWalker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BC56BD729946AD100EED472 /* FileSystemWalker.cpp */; };
+		7BE5C81029A26E3E00CBCAD1 /* Process.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */; };
 		7BE5C81329A2707E00CBCAD1 /* FileDescriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */; };
 /* End PBXBuildFile section */
 
@@ -148,6 +149,9 @@
 		7BC56BD929946B1800EED472 /* FileSystemWalkerInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalPosix.inl; path = ../../../../Libraries/InputOutput/FileSystemWalkerInternalPosix.inl; sourceTree = "<group>"; };
 		7BC56BDA29946B1800EED472 /* FileSystemWalkerInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalWindows.inl; path = ../../../../Libraries/InputOutput/FileSystemWalkerInternalWindows.inl; sourceTree = "<group>"; };
 		7BC56BDD2994715800EED472 /* FixedSizePimpl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FixedSizePimpl.h; path = ../../../../Libraries/Foundation/FixedSizePimpl.h; sourceTree = "<group>"; };
+		7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Process.cpp; path = ../../../../Libraries/InputOutput/Process.cpp; sourceTree = "<group>"; };
+		7BE5C80E29A26E3E00CBCAD1 /* Process.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Process.h; path = ../../../../Libraries/InputOutput/Process.h; sourceTree = "<group>"; };
+		7BE5C80F29A26E3E00CBCAD1 /* ProcessTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ProcessTest.h; path = ../../../../Libraries/InputOutput/ProcessTest.h; sourceTree = "<group>"; };
 		7BDC117C29A9654E000E1CD3 /* MovableHandle.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MovableHandle.h; path = ../../../../Libraries/Foundation/MovableHandle.h; sourceTree = "<group>"; };
 		7BDC117D29A9654E000E1CD3 /* MovableHandleTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MovableHandleTest.h; path = ../../../../Libraries/Foundation/MovableHandleTest.h; sourceTree = "<group>"; };
 		7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = FileDescriptor.cpp; path = ../../../../Libraries/InputOutput/FileDescriptor.cpp; sourceTree = "<group>"; };
@@ -190,6 +194,9 @@
 				7BC56BD929946B1800EED472 /* FileSystemWalkerInternalPosix.inl */,
 				7BC56BDA29946B1800EED472 /* FileSystemWalkerInternalWindows.inl */,
 				7BC56BD629946AD100EED472 /* FileSystemWalkerTest.h */,
+				7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */,
+				7BE5C80E29A26E3E00CBCAD1 /* Process.h */,
+				7BE5C80F29A26E3E00CBCAD1 /* ProcessTest.h */,
 			);
 			name = InputOutput;
 			sourceTree = "<group>";
@@ -432,6 +439,7 @@
 				7BA892AA297E03B50093152B /* OS.cpp in Sources */,
 				7B583F6A2922ECF900FBE019 /* SCTest.cpp in Sources */,
 				7B19C9AC297AF99F001C0627 /* Path.cpp in Sources */,
+				7BE5C81029A26E3E00CBCAD1 /* Process.cpp in Sources */,
 				7B51601329243097006996AA /* String.cpp in Sources */,
 				7BE5C81329A2707E00CBCAD1 /* FileDescriptor.cpp in Sources */,
 				7B51601629243097006996AA /* StringBuilder.cpp in Sources */,

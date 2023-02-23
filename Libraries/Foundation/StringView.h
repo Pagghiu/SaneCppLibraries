@@ -153,6 +153,10 @@ struct SC::StringView
         return false;
     }
 
+    [[nodiscard]] bool containsASCIICharacter(char c)
+    {
+        return getIterator<StringIteratorASCII>().advanceUntilMatches(c);
+    }
     [[nodiscard]] bool hasCompatibleEncoding(StringView str) const
     {
         return (encoding == str.encoding) or

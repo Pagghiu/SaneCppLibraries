@@ -18,6 +18,7 @@
 #include "../../Libraries/Foundation/VectorTest.h"
 #include "../../Libraries/InputOutput/FileSystemTest.h"
 #include "../../Libraries/InputOutput/FileSystemWalkerTest.h"
+#include "../../Libraries/InputOutput/ProcessTest.h"
 #include "../../Libraries/Reflection/ReflectionTest.h"
 #include "../../Libraries/Serialization/SerializationTemplateTest.h"
 #include "../../Libraries/Serialization/SerializationTypeErasedTest.h"
@@ -55,6 +56,7 @@ int main(int argc, const char* argv[])
     { PathTest                      test(report); }
     { FileSystemTest                test(report); }
     { FileSystemWalkerTest          test(report); }
+    { ProcessTest                   test(report); }
     // clang-format on
 
     return report.getTestReturnCode();
