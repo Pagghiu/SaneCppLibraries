@@ -6,6 +6,7 @@
 #include "../../Libraries/Foundation/FunctionTest.h"
 #include "../../Libraries/Foundation/MapTest.h"
 #include "../../Libraries/Foundation/MemoryTest.h"
+#include "../../Libraries/Foundation/MovableHandleTest.h"
 #include "../../Libraries/Foundation/OSTest.h"
 #include "../../Libraries/Foundation/OptionalTest.h"
 #include "../../Libraries/Foundation/PathTest.h"
@@ -41,6 +42,7 @@ int main(int argc, const char* argv[])
     { VectorTest                    test(report); }
     { ResultTest                    test(report); }
     { OptionalTest                  test(report); }
+    { MovableHandleTest             test(report); }
     { StringViewTest                test(report); }
     { StringTest                    test(report); }
     { StringBuilderTest             test(report); }

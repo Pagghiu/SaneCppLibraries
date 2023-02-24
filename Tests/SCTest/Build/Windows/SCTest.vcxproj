@@ -250,6 +250,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\MapTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Memory.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\MemoryTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\MovableHandle.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\MovableHandleTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Optional.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\OptionalTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\OS.h" />
