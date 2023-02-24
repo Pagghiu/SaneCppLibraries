@@ -14,35 +14,24 @@
 #include <unistd.h> // close
 
 #endif
-SC::FileDescriptor::FileDescriptor(FileDescriptor&& other)
-{
-    fileDescriptor = other.fileDescriptor;
-    other.resetAsInvalid();
-}
-SC::FileDescriptor& SC::FileDescriptor::operator=(FileDescriptor&& other)
-{
-    SC_RELEASE_ASSERT(close());
-    fileDescriptor = other.fileDescriptor;
-    other.resetAsInvalid();
-    return *this;
-}
-SC::FileDescriptor::~FileDescriptor() { (void)close(); }
-
-bool SC::FileDescriptor::assign(FileNativeDescriptor newFileDescriptor)
-{
-    SC_TRY_IF(close());
-    fileDescriptor = newFileDescriptor;
-    return true;
-}
 
 #if SC_PLATFORM_WINDOWS
-
+SC::ReturnCode SC::FileNativeDescriptorCloseWindows(const FileNativeDescriptor& fileDescriptor)
+{
+    if (::CloseHandle(fileDescriptor) == FALSE)
+    {
+        return "FileNativeDescriptorCloseWindows - CloseHandle failed"_a8;
+    }
+    return true;
+}
 SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector<char>& output,
                                                                           Span<char>    fallbackBuffer)
 {
-    DWORD      numReadBytes = 0xffffffff;
-    bool       gotError     = true;
-    const bool useVector    = output.capacity() > output.size();
+    DWORD                numReadBytes = 0xffffffff;
+    bool                 gotError     = true;
+    const bool           useVector    = output.capacity() > output.size();
+    FileNativeDescriptor fileDescriptor;
+    SC_TRY_IF(get(fileDescriptor, "FileDescriptor::readAppend - Invalid Handle"_a8));
     if (useVector)
     {
         BOOL success = ReadFile(fileDescriptor, output.data() + output.size(),
@@ -96,29 +85,17 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
     }
 }
 
-bool SC::FileDescriptor::close()
+SC::ReturnCode SC::FileDescriptorWindows::disableInherit()
 {
-    if (isValid())
+    FileNativeDescriptor nativeFd;
+    SC_TRY_IF(fileDescriptor.get(nativeFd, "FileDescriptorPipe::createPipe - Invalid Handle"_a8));
+    if (!SetHandleInformation(nativeFd, HANDLE_FLAG_INHERIT, 0))
     {
-        BOOL res = CloseHandle(fileDescriptor);
-        resetAsInvalid();
-        return res == TRUE;
+        return "FileDescriptorPipe::createPipe - ::SetHandleInformation failed"_a8;
     }
     return true;
 }
-
-SC::ReturnCode SC::FileDescriptor::disableInherit()
-{
-    if (isValid())
-    {
-        if (!SetHandleInformation(fileDescriptor, HANDLE_FLAG_INHERIT, 0))
-        {
-            return "FileDescriptorPipe::createPipe - ::SetHandleInformation failed"_a8;
-        }
-        return true;
-    }
-    return "FileDescriptorPipe::createPipe - Invalid Handle"_a8;
-}
+SC::ReturnCode SC::FileDescriptorPosix::setCloseOnExec() { return true; }
 
 SC::ReturnCode SC::FileDescriptorPipe::createPipe()
 {
@@ -142,8 +119,10 @@ SC::ReturnCode SC::FileDescriptorPipe::createPipe()
 SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector<char>& output,
                                                                           Span<char>    fallbackBuffer)
 {
-    ssize_t    numReadBytes;
-    const bool useVector = output.capacity() > output.size();
+    ssize_t              numReadBytes;
+    const bool           useVector = output.capacity() > output.size();
+    FileNativeDescriptor fileDescriptor;
+    SC_TRY_IF(get(fileDescriptor, "FileDescriptor::readAppend - Invalid Handle"_a8));
     if (useVector)
     {
         numReadBytes = read(fileDescriptor, output.data() + output.size(), output.capacity() - output.size());
@@ -181,35 +160,36 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
     }
 }
 
-int SC::FileDescriptor::getStandardInputFDS() { return fileno(stdin); };
-int SC::FileDescriptor::getStandardOutputFDS() { return fileno(stdout); };
-int SC::FileDescriptor::getStandardErrorFDS() { return fileno(stderr); };
+int SC::FileDescriptorPosix::getStandardInputFDS() { return fileno(stdin); };
+int SC::FileDescriptorPosix::getStandardOutputFDS() { return fileno(stdout); };
+int SC::FileDescriptorPosix::getStandardErrorFDS() { return fileno(stderr); };
 
-bool SC::FileDescriptor::close()
+SC::ReturnCode SC::FileNativeDescriptorClosePosix(const FileNativeDescriptor& fileDescriptor)
 {
-    if (fileDescriptor != InvalidFDS)
+    if (::close(fileDescriptor) != 0)
     {
-        int res = ::close(fileDescriptor);
-        resetAsInvalid();
-        return res == 0;
+        return "FileNativeDescriptorClosePosix - close failed"_a8;
     }
     return true;
 }
 
-bool SC::FileDescriptor::setCloseOnExec()
+SC::ReturnCode SC::FileDescriptorWindows::disableInherit() { return true; }
+SC::ReturnCode SC::FileDescriptorPosix::setCloseOnExec()
 {
-    if (fileDescriptor != InvalidFDS)
+    FileNativeDescriptor nativeFd;
+    SC_TRY_IF(fileDescriptor.get(nativeFd, "FileDescriptor::setCloseOnExec - Invalid Handle"_a8));
+    if (::fcntl(nativeFd, F_SETFD, FD_CLOEXEC) != 0)
     {
-        int res = ::fcntl(fileDescriptor, F_SETFD, FD_CLOEXEC);
-        return res == 0;
+        return "FileDescriptor::setCloseOnExec - fcntl failed"_a8;
     }
-    return false;
+    return true;
 }
 
-SC::ReturnCode SC::FileDescriptor::redirect(int fds)
+SC::ReturnCode SC::FileDescriptorPosix::redirect(int fds)
 {
-    SC_TRY_MSG(isValid(), "Not inited"_a8);
-    if (::dup2(fileDescriptor, fds) == -1)
+    FileNativeDescriptor nativeFd;
+    SC_TRY_IF(fileDescriptor.get(nativeFd, "FileDescriptor::redirect - Invalid Handle"_a8));
+    if (::dup2(nativeFd, fds) == -1)
     {
         return ReturnCode("dup2 failed"_a8);
     }
@@ -224,7 +204,7 @@ SC::ReturnCode SC::FileDescriptorPipe::createPipe()
         return ReturnCode("pipe failed"_a8);
     }
     SC_TRY_MSG(readPipe.assign(pipes[0]), "Cannot assign read pipe"_a8);
-    SC_TRY_MSG(writePipe.assign(pipes[1]), "Cannot assign read pipe"_a8);
+    SC_TRY_MSG(writePipe.assign(pipes[1]), "Cannot assign write pipe"_a8);
     return true;
 }
 

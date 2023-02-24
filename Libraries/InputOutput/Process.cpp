@@ -16,22 +16,20 @@ struct SC::ProcessEntry::Internal
     static void exit(int code) { _exit(code); }
 };
 
-SC::ReturnCode SC::ProcessHandle::close()
+SC::ReturnCode SC::ProcessNativeHandleCloseWindows(const ProcessNativeHandle& handle)
 {
-    if (isValid())
-    {
-        BOOL res = ::CloseHandle(handle);
-        makeInvalid();
-        return res == TRUE;
-    }
+    if (::CloseHandle(handle) == FALSE)
+        return "ProcessNativeHandleClosePosix - CloseHandle failed"_a8;
     return true;
 }
 
 SC::ReturnCode SC::ProcessEntry::waitProcessExit()
 {
-    WaitForSingleObject(processHandle.handle, INFINITE);
+    HANDLE handle;
+    SC_TRY_IF(processHandle.get(handle, ReturnCode("ProcesEntry::waitProcessExit - Invalid handle"_a8)));
+    WaitForSingleObject(handle, INFINITE);
     DWORD processStatus;
-    if (GetExitCodeProcess(processHandle.handle, &processStatus))
+    if (GetExitCodeProcess(handle, &processStatus))
     {
         exitStatus.value = static_cast<int32_t>(processStatus);
         return true;
@@ -55,15 +53,15 @@ SC::ReturnCode SC::ProcessEntry::run(const ProcessOptions& options)
 
     if (standardInput.isValid())
     {
-        startupInfo.hStdInput = standardInput.getRawFileDescriptor();
+        SC_TRY_IF(standardInput.get(startupInfo.hStdInput, false));
     }
     if (standardOutput.isValid())
     {
-        startupInfo.hStdOutput = standardOutput.getRawFileDescriptor();
+        SC_TRY_IF(standardOutput.get(startupInfo.hStdOutput, false));
     }
     if (standardError.isValid())
     {
-        startupInfo.hStdError = standardError.getRawFileDescriptor();
+        SC_TRY_IF(standardError.get(startupInfo.hStdError, false));
     }
     if (someRedirection)
     {
@@ -93,7 +91,7 @@ SC::ReturnCode SC::ProcessEntry::run(const ProcessOptions& options)
         return "CreateProcessW failed"_a8;
     }
     CloseHandle(processInfo.hThread);
-    processHandle.handle = processInfo.hProcess;
+    SC_TRY_IF(processHandle.assign(processInfo.hProcess));
 
     SC_TRY_IF(standardInput.close());
     SC_TRY_IF(standardOutput.close());
@@ -113,7 +111,9 @@ struct SC::ProcessEntry::Internal
     static __attribute__((__noreturn__)) void exit(int code) { _exit(code); }
 };
 
-SC::ReturnCode SC::ProcessHandle::close() { return true; }
+SC::ReturnCode SC::ProcessNativeHandleClosePosix(const ProcessNativeHandle& handle) { return true; }
+
+// SC::ReturnCode SC::ProcessHandle::close() { return true; }
 
 SC::ReturnCode SC::ProcessEntry::fork()
 {
@@ -147,15 +147,15 @@ SC::ReturnCode SC::ProcessEntry::spawn(Lambda&& lambda)
         auto exitDeferred = MakeDeferred([&] { Internal::exit(127); });
         if (standardInput.isValid())
         {
-            SC_TRY_IF(standardInput.redirect(FileDescriptor::getStandardInputFDS()));
+            SC_TRY_IF(standardInput.posix().redirect(FileDescriptorPosix::getStandardInputFDS()));
         }
         if (standardOutput.isValid())
         {
-            SC_TRY_IF(standardOutput.redirect(FileDescriptor::getStandardOutputFDS()));
+            SC_TRY_IF(standardOutput.posix().redirect(FileDescriptorPosix::getStandardOutputFDS()));
         }
         if (standardError.isValid())
         {
-            SC_TRY_IF(standardError.redirect(FileDescriptor::getStandardErrorFDS()));
+            SC_TRY_IF(standardError.posix().redirect(FileDescriptorPosix::getStandardErrorFDS()));
         }
         // TODO: Check if these close calls are still needed after we setCloseOnExec
         SC_TRY_IF(standardInput.close());
@@ -165,7 +165,7 @@ SC::ReturnCode SC::ProcessEntry::spawn(Lambda&& lambda)
     }
     else
     {
-        processHandle.handle = processID.pid;
+        SC_TRY_IF(processHandle.assign(processID.pid));
         SC_TRY_IF(standardInput.close());
         SC_TRY_IF(standardOutput.close());
         SC_TRY_IF(standardError.close());
@@ -201,32 +201,34 @@ SC::ReturnCode SC::ProcessHandle::close() { return true; }
 
 SC::ReturnCode SC::ProcessShell::launch()
 {
+    if (error.returnCode.isError())
+        return error.returnCode;
     if (processes.isEmpty())
         return false;
 
     if (options.pipeSTDIN)
     {
         SC_TRY_IF(inputPipe.createPipe());
-        SC_TRY_IF(inputPipe.setCloseOnExec());
-        SC_TRY_IF(inputPipe.writePipe.disableInherit());
-        SC_TRY_IF(processes.front().standardInput.assign(inputPipe.readPipe.getRawFileDescriptor()));
-        inputPipe.readPipe.resetAsInvalid();
+        SC_TRY_IF(inputPipe.readPipe.posix().setCloseOnExec());
+        SC_TRY_IF(inputPipe.writePipe.posix().setCloseOnExec());
+        SC_TRY_IF(inputPipe.writePipe.windows().disableInherit());
+        SC_TRY_IF(processes.front().standardInput.assignMovingFrom(inputPipe.readPipe));
     }
     if (options.pipeSTDOUT)
     {
         SC_TRY_IF(outputPipe.createPipe());
-        SC_TRY_IF(outputPipe.setCloseOnExec());
-        SC_TRY_IF(outputPipe.readPipe.disableInherit());
-        SC_TRY_IF(processes.back().standardOutput.assign(outputPipe.writePipe.getRawFileDescriptor()));
-        outputPipe.writePipe.resetAsInvalid();
+        SC_TRY_IF(outputPipe.readPipe.posix().setCloseOnExec());
+        SC_TRY_IF(outputPipe.writePipe.posix().setCloseOnExec());
+        SC_TRY_IF(outputPipe.readPipe.windows().disableInherit());
+        SC_TRY_IF(processes.back().standardOutput.assignMovingFrom(outputPipe.writePipe));
     }
     if (options.pipeSTDERR)
     {
         SC_TRY_IF(errorPipe.createPipe());
-        SC_TRY_IF(errorPipe.setCloseOnExec());
-        SC_TRY_IF(errorPipe.readPipe.disableInherit());
-        SC_TRY_IF(processes.back().standardError.assign(errorPipe.writePipe.getRawFileDescriptor()));
-        errorPipe.writePipe.resetAsInvalid();
+        SC_TRY_IF(errorPipe.readPipe.posix().setCloseOnExec());
+        SC_TRY_IF(errorPipe.writePipe.posix().setCloseOnExec());
+        SC_TRY_IF(errorPipe.readPipe.windows().disableInherit());
+        SC_TRY_IF(processes.back().standardError.assignMovingFrom(errorPipe.writePipe));
     }
 
     for (ProcessEntry& process : processes)
@@ -243,6 +245,26 @@ SC::ReturnCode SC::ProcessShell::launch()
     SC_TRY_IF(outputPipe.writePipe.close());
     SC_TRY_IF(errorPipe.writePipe.close());
     return true;
+}
+
+SC::ProcessShell& SC::ProcessShell::pipe(StringView s1, StringView s2, StringView s3, StringView s4)
+{
+    if (not error.returnCode)
+    {
+        return *this;
+    }
+    StringView* arguments[]  = {&s1, &s2, &s3, &s4};
+    size_t      numArguments = ConstantArraySize(arguments);
+    for (; numArguments > 0; --numArguments)
+    {
+        if (!arguments[numArguments - 1]->isEmpty())
+        {
+            break;
+        }
+    }
+    Span<StringView*> spanArguments = Span<StringView*>(&arguments[0], numArguments * sizeof(StringView*));
+    error.returnCode                = queueProcess(spanArguments);
+    return *this;
 }
 
 SC::ReturnCode SC::ProcessShell::readOutputSync(String* outputString, String* errorString)
@@ -316,12 +338,10 @@ SC::ReturnCode SC::ProcessShell::queueProcess(Span<StringView*> spanArguments)
     {
         FileDescriptorPipe chainPipe;
         SC_TRY_IF(chainPipe.createPipe());
-        // TODO: Create a typed assign with move semantics instead of going raw / reset as invalid
-        SC_TRY_IF(processes.back().standardOutput.assign(chainPipe.writePipe.getRawFileDescriptor()));
-        SC_TRY_IF(process.standardInput.assign(chainPipe.readPipe.getRawFileDescriptor()));
-        SC_TRY_IF(chainPipe.setCloseOnExec());
-        chainPipe.writePipe.resetAsInvalid();
-        chainPipe.readPipe.resetAsInvalid();
+        SC_TRY_IF(chainPipe.readPipe.posix().setCloseOnExec());
+        SC_TRY_IF(chainPipe.writePipe.posix().setCloseOnExec());
+        SC_TRY_IF(processes.back().standardOutput.assignMovingFrom(chainPipe.writePipe));
+        SC_TRY_IF(process.standardInput.assignMovingFrom(chainPipe.readPipe));
     }
     SC_TRY_IF(processes.push_back(move(process)));
     return true;
