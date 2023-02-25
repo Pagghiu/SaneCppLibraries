@@ -307,6 +307,8 @@
     <None Include="..\..\..\..\Libraries\Foundation\OSInternalEmscripten.inl" />
     <None Include="..\..\..\..\Libraries\Foundation\OSInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\Foundation\OSInternalWindows.inl" />
+    <None Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalPosix.inl" />
+    <None Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalEmscripten.inl" />
