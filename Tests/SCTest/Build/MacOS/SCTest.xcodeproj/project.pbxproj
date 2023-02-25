@@ -58,6 +58,9 @@
 /* Begin PBXFileReference section */
 		7B0A83BF29A989A000C16EBF /* FileDescriptorInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileDescriptorInternalPosix.inl; path = ../../../../Libraries/InputOutput/FileDescriptorInternalPosix.inl; sourceTree = "<group>"; };
 		7B0A83C029A989A000C16EBF /* FileDescriptorInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileDescriptorInternalWindows.inl; path = ../../../../Libraries/InputOutput/FileDescriptorInternalWindows.inl; sourceTree = "<group>"; };
+		7B0A83C129A98B2000C16EBF /* ProcessInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = ProcessInternalPosix.inl; path = ../../../../Libraries/InputOutput/ProcessInternalPosix.inl; sourceTree = "<group>"; };
+		7B0A83C229A98B2000C16EBF /* ProcessInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = ProcessInternalWindows.inl; path = ../../../../Libraries/InputOutput/ProcessInternalWindows.inl; sourceTree = "<group>"; };
+		7B0A83C329A98B8200C16EBF /* ProcessInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = ProcessInternalEmscripten.inl; path = ../../../../Libraries/InputOutput/ProcessInternalEmscripten.inl; sourceTree = "<group>"; };
 		7B0C299A297CA7CC0071C5B4 /* FileSystem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FileSystem.h; path = ../../../../Libraries/InputOutput/FileSystem.h; sourceTree = "<group>"; };
 		7B0C299B297CA7CC0071C5B4 /* FileSystemTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FileSystemTest.h; path = ../../../../Libraries/InputOutput/FileSystemTest.h; sourceTree = "<group>"; };
 		7B0C299C297CA7CC0071C5B4 /* FileSystem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = FileSystem.cpp; path = ../../../../Libraries/InputOutput/FileSystem.cpp; sourceTree = "<group>"; };
@@ -200,6 +203,9 @@
 				7BC56BD629946AD100EED472 /* FileSystemWalkerTest.h */,
 				7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */,
 				7BE5C80E29A26E3E00CBCAD1 /* Process.h */,
+				7B0A83C329A98B8200C16EBF /* ProcessInternalEmscripten.inl */,
+				7B0A83C129A98B2000C16EBF /* ProcessInternalPosix.inl */,
+				7B0A83C229A98B2000C16EBF /* ProcessInternalWindows.inl */,
 				7BE5C80F29A26E3E00CBCAD1 /* ProcessTest.h */,
 			);
 			name = InputOutput;

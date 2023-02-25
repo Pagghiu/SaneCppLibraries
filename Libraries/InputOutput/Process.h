@@ -14,7 +14,7 @@
 
 namespace SC
 {
-// TODO: We should really type erase the process handle and do this under th hood
+// TODO: We should really type erase the process handle and do this under the hood with a Movable Fixed Size Pimpl
 #if SC_PLATFORM_WINDOWS
 using ProcessNativeID     = unsigned long;
 using ProcessNativeHandle = void*;

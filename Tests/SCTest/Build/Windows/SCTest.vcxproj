@@ -314,6 +314,9 @@
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalEmscripten.inl" />
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalWindows.inl" />
+    <None Include="..\..\..\..\Libraries\InputOutput\ProcessInternalEmscripten.inl" />
+    <None Include="..\..\..\..\Libraries\InputOutput\ProcessInternalPosix.inl" />
+    <None Include="..\..\..\..\Libraries\InputOutput\ProcessInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\InputOutput\UtilityWindows.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
