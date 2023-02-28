@@ -13,6 +13,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "FileDescriptorInternalPosix.h"
 #include "FileSystemInternalPosix.inl"
 
 struct SC::FileSystemWalker::Internal
@@ -114,7 +115,7 @@ struct SC::FileSystemWalker::Internal
         entry.path  = currentPath.view();
         entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
         entry.parentFileDescriptor.detach();
-        SC_TRY_IF(entry.parentFileDescriptor.assign(parent.fileDescriptor));
+        SC_TRY_IF(entry.parentFileDescriptor.fileNativeHandle.get().assign(parent.fileDescriptor));
         if (item->d_type == DT_DIR)
         {
             entry.type = Type::Directory;
@@ -138,7 +139,8 @@ struct SC::FileSystemWalker::Internal
         SC_TRY_IF(currentPath.appendNullTerminated(entry.name));
         newParent.textLengthInBytes = currentPath.view().sizeInBytesIncludingTerminator();
         FileNativeDescriptor handle;
-        SC_TRY_IF(entry.parentFileDescriptor.get(handle, ReturnCode("recurseSubdirectory - InvalidHandle"_a8)));
+        SC_TRY_IF(entry.parentFileDescriptor.fileNativeHandle.get().get(
+            handle, ReturnCode("recurseSubdirectory - InvalidHandle"_a8)));
         SC_TRY_IF(newParent.init(openat(handle, entry.name.bytesIncludingTerminator(), O_DIRECTORY)));
         SC_TRY_IF(recurseStack.push_back(newParent))
         return true;

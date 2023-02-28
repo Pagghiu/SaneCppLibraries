@@ -153,3 +153,16 @@ struct [[nodiscard]] SC::Result
 
 #define SC_MUST(assignment, expression) SC__MUST_IMPL1(assignment, expression, __COUNTER__)
 #define SC_TRUST_RESULT(expression)     (void)expression
+
+#define SC_TRY_ASSIGN(destination, source, errorCode)                                                                  \
+    {                                                                                                                  \
+        constexpr auto maxValue = static_cast<decltype(destination)>(MaxValue());                                      \
+        if (processInfo.dwProcessId <= maxValue)                                                                       \
+        {                                                                                                              \
+            destination = static_cast<decltype(destination)>(source);                                                  \
+        }                                                                                                              \
+        else                                                                                                           \
+        {                                                                                                              \
+            return errorCode;                                                                                          \
+        }                                                                                                              \
+    }

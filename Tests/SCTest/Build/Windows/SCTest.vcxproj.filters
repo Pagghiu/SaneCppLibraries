@@ -211,9 +211,6 @@
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerTest.h">
       <Filter>InputOutput</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\FixedSizePimpl.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinarySkipper.h">
       <Filter>Serialization</Filter>
     </ClInclude>
@@ -274,6 +271,21 @@
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptor.h">
       <Filter>InputOutput</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\MovableHandle.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\MovableHandleTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalPosix.h">
+      <Filter>InputOutput</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalWindows.h">
+      <Filter>InputOutput</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\CompilerFirewall.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemInternalPosix.inl">
@@ -301,6 +313,21 @@
       <Filter>Foundation</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\InputOutput\UtilityWindows.inl">
+      <Filter>InputOutput</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalPosix.inl">
+      <Filter>InputOutput</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalWindows.inl">
+      <Filter>InputOutput</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\InputOutput\ProcessInternalEmscripten.inl">
+      <Filter>InputOutput</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\InputOutput\ProcessInternalPosix.inl">
+      <Filter>InputOutput</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\InputOutput\ProcessInternalWindows.inl">
       <Filter>InputOutput</Filter>
     </None>
   </ItemGroup>

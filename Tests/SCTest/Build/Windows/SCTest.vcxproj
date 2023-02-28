@@ -237,10 +237,10 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ArrayTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Compiler.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\CompilerFirewall.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Console.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ConsoleTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ConstexprTypes.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\FixedSizePimpl.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Function.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\FunctionTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\InitializerList.h" />
@@ -281,6 +281,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Vector.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\VectorTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptor.h" />
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalPosix.h" />
+    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalWindows.h" />
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystem.h" />
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.h" />

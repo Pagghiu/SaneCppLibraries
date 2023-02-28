@@ -2,33 +2,17 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Foundation/CompilerFirewall.h"
 #include "../Foundation/Function.h"
-#include "../Foundation/Language.h"
-#include "../Foundation/MovableHandle.h"
 #include "../Foundation/Optional.h"
-#include "../Foundation/Result.h"
 #include "../Foundation/StringNative.h"
-#include "../Foundation/Types.h"
-#include "../Foundation/Vector.h"
 #include "FileDescriptor.h"
 
 namespace SC
 {
-// TODO: We should really type erase the process handle and do this under the hood with a Movable Fixed Size Pimpl
-#if SC_PLATFORM_WINDOWS
-using ProcessNativeID     = unsigned long;
-using ProcessNativeHandle = void*;
-ReturnCode ProcessNativeHandleCloseWindows(const ProcessNativeHandle& handle);
-using ProcessHandle = MovableHandle<ProcessNativeHandle, nullptr, ReturnCode, &ProcessNativeHandleCloseWindows>;
-#else
-using ProcessNativeID     = int32_t;
-using ProcessNativeHandle = int32_t;
-ReturnCode ProcessNativeHandleClosePosix(const ProcessNativeHandle& handle);
-using ProcessHandle = MovableHandle<ProcessNativeHandle, 0, ReturnCode, &ProcessNativeHandleClosePosix>;
-#endif
 struct ProcessID
 {
-    ProcessNativeID pid = 0;
+    int32_t pid = 0;
 };
 
 struct ProcessEntry;
@@ -45,12 +29,12 @@ struct ProcessExitStatus
 {
     Optional<int32_t> value = 0;
 };
+
 } // namespace SC
 
 struct SC::ProcessEntry
 {
     ProcessID          processID;
-    ProcessHandle      processHandle;
     ProcessExitStatus  exitStatus;
     FileDescriptor     standardInput;
     FileDescriptor     standardOutput;
@@ -62,7 +46,11 @@ struct SC::ProcessEntry
     [[nodiscard]] ReturnCode waitProcessExit();
     [[nodiscard]] ReturnCode run(const ProcessOptions& options);
 
+    struct ProcessHandle;
+
   private:
+    CompilerFirewall<ProcessHandle> processHandlePimpl;
+
     struct Internal;
     template <typename Lambda>
     [[nodiscard]] ReturnCode spawn(Lambda&& lambda);
@@ -100,5 +88,6 @@ struct SC::ProcessShell
     FileDescriptorPipe inputPipe;
     FileDescriptorPipe outputPipe;
     FileDescriptorPipe errorPipe;
-    ReturnCode         queueProcess(Span<StringView*> spanArguments);
+
+    ReturnCode queueProcess(Span<StringView*> spanArguments);
 };

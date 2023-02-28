@@ -9,8 +9,21 @@
 #else
 #include "FileSystemWalkerInternalPosix.inl"
 #endif
+template <>
+template <>
+void SC::CompilerFirewallFuncs<SC::FileSystemWalker::Internal>::construct<SC::FileSystemWalker::InternalSize>(
+    uint8_t* buffer)
+{
+    static_assert(SC::FileSystemWalker::InternalSize >= sizeof(FileSystemWalker::Internal),
+                  "Increase size of unique static pimpl");
 
-SC::FileSystemWalker::FileSystemWalker() : errorResult(true) {}
+    new (buffer, PlacementNew()) FileSystemWalker::Internal();
+}
+template <>
+void SC::CompilerFirewallFuncs<SC::FileSystemWalker::Internal>::destruct(FileSystemWalker::Internal& obj)
+{
+    obj.~Internal();
+}
 
 SC::FileSystemWalker::~FileSystemWalker()
 {

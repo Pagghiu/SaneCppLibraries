@@ -46,7 +46,7 @@ struct SC::MovableHandle
     }
     MovableHandle& operator=(MovableHandle&& other)
     {
-        SC_TRUST_RESULT(assignMovingFrom(other));
+        (void)(assignMovingFrom(other));
         return *this;
     }
 

@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/FixedSizePimpl.h"
+#include "../Foundation/CompilerFirewall.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/StringView.h"
 #include "FileDescriptor.h"
@@ -35,12 +35,7 @@ struct SC::FileSystemWalker
 
     Options options;
 
-    FileSystemWalker();
     ~FileSystemWalker();
-    FileSystemWalker(const FileSystemWalker&)            = delete;
-    FileSystemWalker& operator=(const FileSystemWalker&) = delete;
-    FileSystemWalker(FileSystemWalker&&)                 = delete;
-    FileSystemWalker& operator=(FileSystemWalker&&)      = delete;
 
     const Entry& get() const { return entry; }
 
@@ -56,15 +51,13 @@ struct SC::FileSystemWalker
 
     [[nodiscard]] ReturnCode recurseSubdirectory();
 
-  private:
+    static constexpr int InternalSize = 256 * sizeof(void*) + (512 + 128) * sizeof(utf_char_t);
     struct Internal;
-#if SC_PLATFORM_WINDOWS
-    FixedSizePimpl<Internal, 256 * sizeof(void*) + (512 + 128) * sizeof(wchar_t)> internal;
-#else
-    FixedSizePimpl<Internal, 256 * sizeof(void*) + (512 + 128) * sizeof(char)> internal;
-#endif
+
+  private:
+    CompilerFirewall<Internal, InternalSize> internal;
 
     Entry      entry;
-    ReturnCode errorResult;
+    ReturnCode errorResult   = true;
     bool       errorsChecked = false;
 };

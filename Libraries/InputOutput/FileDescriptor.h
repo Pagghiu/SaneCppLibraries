@@ -2,44 +2,33 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/MovableHandle.h"
+#include "../Foundation/CompilerFirewall.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/Vector.h"
 namespace SC
 {
 struct FileDescriptor;
 struct FileDescriptorPipe;
-#if SC_PLATFORM_WINDOWS
-using FileNativeDescriptor = void*;
-ReturnCode FileNativeDescriptorCloseWindows(const FileNativeDescriptor&);
-using FileNativeMovableHandle = MovableHandle<FileNativeDescriptor, (FileNativeDescriptor)((long long)-1), ReturnCode,
-                                              FileNativeDescriptorCloseWindows>;
-#else
-using FileNativeDescriptor = int;
-ReturnCode FileNativeDescriptorClosePosix(const FileNativeDescriptor&);
-using FileNativeMovableHandle = MovableHandle<FileNativeDescriptor, -1, ReturnCode, FileNativeDescriptorClosePosix>;
-#endif
 struct FileDescriptorWindows;
 struct FileDescriptorPosix;
+struct FileNativeMovableHandle;
 } // namespace SC
 
+// TODO: Figure out if these operations should be abstracted or put into internal per platform implementation
 struct SC::FileDescriptorWindows
 {
     SC::FileDescriptor&      fileDescriptor;
     [[nodiscard]] ReturnCode disableInherit();
 };
+
 struct SC::FileDescriptorPosix
 {
     SC::FileDescriptor&      fileDescriptor;
     [[nodiscard]] ReturnCode setCloseOnExec();
-    [[nodiscard]] ReturnCode redirect(FileNativeDescriptor fds);
-
-    static FileNativeDescriptor getStandardInputFDS();
-    static FileNativeDescriptor getStandardOutputFDS();
-    static FileNativeDescriptor getStandardErrorFDS();
+    [[nodiscard]] ReturnCode redirect(int fds);
 };
 
-struct SC::FileDescriptor : public FileNativeMovableHandle
+struct SC::FileDescriptor
 {
     struct ReadResult
     {
@@ -50,6 +39,13 @@ struct SC::FileDescriptor : public FileNativeMovableHandle
 
     FileDescriptorPosix   posix() { return {*this}; }
     FileDescriptorWindows windows() { return {*this}; }
+
+    void                     detach();
+    [[nodiscard]] bool       isValid() const;
+    [[nodiscard]] ReturnCode close();
+    [[nodiscard]] ReturnCode assignMovingFrom(FileDescriptor& other);
+
+    CompilerFirewall<FileNativeMovableHandle> fileNativeHandle;
 };
 
 struct SC::FileDescriptorPipe

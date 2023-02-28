@@ -1,31 +1,32 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#pragma once
+#include "FileDescriptorInternalWindows.h"
 #include "Process.h"
 
 #include <Windows.h>
-static_assert(SC::IsSame<SC::ProcessNativeID, decltype(PROCESS_INFORMATION::dwProcessId)>::value,
-              "Check Definition of ProcessNativeID");
-static_assert(SC::IsSame<SC::ProcessNativeHandle, decltype(PROCESS_INFORMATION::hProcess)>::value,
-              "Check Definition of ProcessNativeID");
 
 struct SC::ProcessEntry::Internal
 {
     // TODO: this could be migrated to OS
-    static void exit(int code) { _exit(code); }
+    static void       exit(int code) { _exit(code); }
+    static ReturnCode ProcessHandleClose(const HANDLE& handle)
+    {
+        if (::CloseHandle(handle) == FALSE)
+            return "ProcessHandleClose - CloseHandle failed"_a8;
+        return true;
+    }
 };
 
-SC::ReturnCode SC::ProcessNativeHandleCloseWindows(const ProcessNativeHandle& handle)
+struct SC::ProcessEntry::ProcessHandle
+    : public MovableHandle<HANDLE, nullptr, ReturnCode, &Internal::ProcessHandleClose>
 {
-    if (::CloseHandle(handle) == FALSE)
-        return "ProcessNativeHandleClosePosix - CloseHandle failed"_a8;
-    return true;
-}
-
+};
 SC::ReturnCode SC::ProcessEntry::waitProcessExit()
 {
     HANDLE handle;
-    SC_TRY_IF(processHandle.get(handle, ReturnCode("ProcesEntry::waitProcessExit - Invalid handle"_a8)));
+    SC_TRY_IF(processHandlePimpl.get().get(handle, ReturnCode("ProcesEntry::waitProcessExit - Invalid handle"_a8)));
     WaitForSingleObject(handle, INFINITE);
     DWORD processStatus;
     if (GetExitCodeProcess(handle, &processStatus))
@@ -52,15 +53,15 @@ SC::ReturnCode SC::ProcessEntry::run(const ProcessOptions& options)
 
     if (standardInput.isValid())
     {
-        SC_TRY_IF(standardInput.get(startupInfo.hStdInput, false));
+        SC_TRY_IF(standardInput.fileNativeHandle.get().get(startupInfo.hStdInput, false));
     }
     if (standardOutput.isValid())
     {
-        SC_TRY_IF(standardOutput.get(startupInfo.hStdOutput, false));
+        SC_TRY_IF(standardOutput.fileNativeHandle.get().get(startupInfo.hStdOutput, false));
     }
     if (standardError.isValid())
     {
-        SC_TRY_IF(standardError.get(startupInfo.hStdError, false));
+        SC_TRY_IF(standardError.fileNativeHandle.get().get(startupInfo.hStdError, false));
     }
     if (someRedirection)
     {
@@ -90,8 +91,9 @@ SC::ReturnCode SC::ProcessEntry::run(const ProcessOptions& options)
         return "CreateProcessW failed"_a8;
     }
     CloseHandle(processInfo.hThread);
-    SC_TRY_IF(processHandle.assign(processInfo.hProcess));
 
+    SC_TRY_ASSIGN(processID.pid, processInfo.dwProcessId, "processInfo.dwProcessId exceeds processID.pid"_a8);
+    SC_TRY_IF(processHandlePimpl.get().assign(processInfo.hProcess));
     SC_TRY_IF(standardInput.close());
     SC_TRY_IF(standardOutput.close());
     SC_TRY_IF(standardError.close());

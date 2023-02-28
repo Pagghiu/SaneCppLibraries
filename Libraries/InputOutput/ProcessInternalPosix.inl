@@ -1,20 +1,26 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#pragma once
+#include "FileDescriptorInternalPosix.h"
 #include "Process.h"
 
 #include <errno.h>
+#include <stdio.h>    // stdout, stdin
 #include <sys/wait.h> // waitpid
 #include <unistd.h>   // pipe fork execl _exit
 
-static_assert(SC::IsSame<SC::ProcessNativeID, pid_t>::value, "Check Definition of ProcessNativeID");
 struct SC::ProcessEntry::Internal
 {
-    static __attribute__((__noreturn__)) void exit(int code) { _exit(code); }
+    static ReturnCode           ProcessHandleClose(const pid_t& handle) { return true; }
+    static FileNativeDescriptor getStandardInputFDS() { return fileno(stdin); };
+    static FileNativeDescriptor getStandardOutputFDS() { return fileno(stdout); };
+    static FileNativeDescriptor getStandardErrorFDS() { return fileno(stderr); };
 };
 
-SC::ReturnCode SC::ProcessNativeHandleClosePosix(const ProcessNativeHandle& handle) { return true; }
-
+struct SC::ProcessEntry::ProcessHandle : public MovableHandle<pid_t, 0, ReturnCode, &Internal::ProcessHandleClose>
+{
+};
 SC::ReturnCode SC::ProcessEntry::fork()
 {
     processID.pid = ::fork();
@@ -44,18 +50,18 @@ SC::ReturnCode SC::ProcessEntry::spawn(Lambda&& lambda)
     SC_TRY_IF(fork());
     if (isChild())
     {
-        auto exitDeferred = MakeDeferred([&] { Internal::exit(127); });
+        auto exitDeferred = MakeDeferred([&] { _exit(127); });
         if (standardInput.isValid())
         {
-            SC_TRY_IF(standardInput.posix().redirect(FileDescriptorPosix::getStandardInputFDS()));
+            SC_TRY_IF(standardInput.posix().redirect(Internal::getStandardInputFDS()));
         }
         if (standardOutput.isValid())
         {
-            SC_TRY_IF(standardOutput.posix().redirect(FileDescriptorPosix::getStandardOutputFDS()));
+            SC_TRY_IF(standardOutput.posix().redirect(Internal::getStandardOutputFDS()));
         }
         if (standardError.isValid())
         {
-            SC_TRY_IF(standardError.posix().redirect(FileDescriptorPosix::getStandardErrorFDS()));
+            SC_TRY_IF(standardError.posix().redirect(Internal::getStandardErrorFDS()));
         }
         // TODO: Check if these close calls are still needed after we setCloseOnExec
         SC_TRY_IF(standardInput.close());
@@ -65,7 +71,8 @@ SC::ReturnCode SC::ProcessEntry::spawn(Lambda&& lambda)
     }
     else
     {
-        SC_TRY_IF(processHandle.assign(processID.pid));
+        SC_TRY_IF(processHandlePimpl.get().assign(processID.pid));
+
         SC_TRY_IF(standardInput.close());
         SC_TRY_IF(standardOutput.close());
         SC_TRY_IF(standardError.close());
