@@ -17,7 +17,7 @@ struct SC::FileSystemWalkerTest : public SC::TestCase
         {
             FileSystemWalker walker;
             walker.options.recursive = false;
-            OSPaths paths;
+            SystemDirectories paths;
             SC_TEST_EXPECT(report.paths.init());
             SC_TEST_EXPECT(walker.init(report.paths.applicationRootDirectory.view()));
             while (walker.enumerateNext())

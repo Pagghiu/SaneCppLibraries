@@ -9,7 +9,7 @@
 
 struct SC::ProcessEntry::Internal
 {
-    // TODO: this could be migrated to OS
+    // TODO: this could be migrated to SystemDebug
     static void       exit(int code) { _exit(code); }
     static ReturnCode ProcessHandleClose(const HANDLE& handle)
     {

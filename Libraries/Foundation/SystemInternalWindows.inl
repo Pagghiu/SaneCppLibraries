@@ -1,17 +1,14 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "OS.h"
+#include "System.h"
+
 #include "Path.h"
-#include "SmallVector.h"
 #include "StringBuilder.h"
-#include "StringConverter.h"
 
 #include <Windows.h>
 
-extern SC::OSPaths globalPaths;
-
-bool SC::OSPaths::init()
+bool SC::SystemDirectories::init()
 {
     // TODO: OsPaths::init() for Windows is messy. Tune the API to improve writing software like this.
     // Reason is because it's handy counting in wchars but we can't do it with StringNative.
@@ -37,8 +34,8 @@ bool SC::OSPaths::init()
     StringView utf16executable = StringView(Span<const wchar_t>(buffer.data(), (buffer.size() - 1) * sizeof(wchar_t)),
                                             true, StringEncoding::Utf16);
 
-    // TODO: OSPaths::init - We must also convert to utf8 because dirname will not work on non utf8 or ascii text
-    // assigning directly the SmallString inside StringNative will copy as is instad of converting utf16 to utf8
+    // TODO: SystemDirectories::init - We must also convert to utf8 because dirname will not work on non utf8 or ascii
+    // text assigning directly the SmallString inside StringNative will copy as is instad of converting utf16 to utf8
     executableFile = ""_u8;
     StringBuilder builder(executableFile);
     SC_TRY_IF(builder.append(utf16executable));
@@ -46,17 +43,17 @@ bool SC::OSPaths::init()
     return true;
 }
 
-bool SC::OS::printBacktrace() { return true; }
+bool SC::SystemDebug::printBacktrace() { return true; }
 
-bool SC::OS::printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeInBytes)
+bool SC::SystemDebug::printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeInBytes)
 {
     if (!backtraceBuffer)
         return false;
     return true;
 }
 
-SC::size_t SC::OS::captureBacktrace(size_t framesToSkip, void** backtraceBuffer, size_t backtraceBufferSizeInBytes,
-                                    uint32_t* hash)
+SC::size_t SC::SystemDebug::captureBacktrace(size_t framesToSkip, void** backtraceBuffer,
+                                             size_t backtraceBufferSizeInBytes, uint32_t* hash)
 {
     if (hash)
         *hash = 1;

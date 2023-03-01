@@ -56,7 +56,7 @@
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystem.cpp">
       <Filter>InputOutput</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\OS.cpp">
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\System.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringConverter.cpp">
@@ -124,10 +124,10 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\MemoryTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\OS.h">
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\System.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\OSTest.h">
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\SystemTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Platform.h">

@@ -7,11 +7,11 @@
 
 namespace SC
 {
-struct OS;
-struct OSPaths;
+struct SystemDebug;
+struct SystemDirectories;
 } // namespace SC
 
-struct SC::OS
+struct SC::SystemDebug
 {
     [[nodiscard]] static bool   printBacktrace();
     [[nodiscard]] static bool   printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeInBytes);
@@ -19,7 +19,7 @@ struct SC::OS
                                                  size_t backtraceBufferSizeInBytes, uint32_t* hash);
 };
 
-struct SC::OSPaths
+struct SC::SystemDirectories
 {
     static const int StaticPathSize = 1024 * sizeof(utf_char_t);
 

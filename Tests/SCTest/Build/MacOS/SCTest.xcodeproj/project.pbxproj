@@ -23,8 +23,8 @@
 		7B583F6D2922ED2700FBE019 /* SCTestXCTest.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */; };
 		7B583FCB2922EE7300FBE019 /* SCTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F692922ECF900FBE019 /* SCTest.cpp */; };
 		7B9F61842995BDA20011F4D4 /* libobjc.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B9F61832995BDA20011F4D4 /* libobjc.tbd */; };
-		7BA892AA297E03B50093152B /* OS.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892A9297E03540093152B /* OS.cpp */; };
-		7BA892AB297E03B50093152B /* OS.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892A9297E03540093152B /* OS.cpp */; };
+		7BA892AA297E03B50093152B /* System.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892A9297E03540093152B /* System.cpp */; };
+		7BA892AB297E03B50093152B /* System.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892A9297E03540093152B /* System.cpp */; };
 		7BA892AE297E06040093152B /* StringConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892AD297E06040093152B /* StringConverter.cpp */; };
 		7BA892AF297E06040093152B /* StringConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892AD297E06040093152B /* StringConverter.cpp */; };
 		7BC56BDB29946C9200EED472 /* FileSystemWalker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BC56BD729946AD100EED472 /* FileSystemWalker.cpp */; };
@@ -74,7 +74,7 @@
 		7B4B99F02937EBAC003D17A6 /* ReflectionAutoStructured.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ReflectionAutoStructured.h; path = ../../../../Libraries/Reflection/ReflectionAutoStructured.h; sourceTree = "<group>"; };
 		7B5119C5293C0DF60061646E /* SCConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SCConfig.h; path = ../../SCConfig.h; sourceTree = "<group>"; };
 		7B515FC729243086006996AA /* ResultTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ResultTest.h; path = ../../../../Libraries/Foundation/ResultTest.h; sourceTree = "<group>"; };
-		7B515FC829243086006996AA /* OSTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OSTest.h; path = ../../../../Libraries/Foundation/OSTest.h; sourceTree = "<group>"; };
+		7B515FC829243086006996AA /* SystemTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SystemTest.h; path = ../../../../Libraries/Foundation/SystemTest.h; sourceTree = "<group>"; };
 		7B515FC929243086006996AA /* MapTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MapTest.h; path = ../../../../Libraries/Foundation/MapTest.h; sourceTree = "<group>"; };
 		7B515FCA29243086006996AA /* Segment.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Segment.h; path = ../../../../Libraries/Foundation/Segment.h; sourceTree = "<group>"; };
 		7B515FCB29243086006996AA /* SerializationTestSuite.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTestSuite.h; path = ../../../../Libraries/Serialization/SerializationTestSuite.h; sourceTree = "<group>"; };
@@ -93,14 +93,14 @@
 		7B515FD929243086006996AA /* SerializationTemplateTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTemplateTest.h; path = ../../../../Libraries/Serialization/SerializationTemplateTest.h; sourceTree = "<group>"; };
 		7B515FDA29243086006996AA /* SerializationTypeErasedCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTypeErasedCompiler.h; path = ../../../../Libraries/Serialization/SerializationTypeErasedCompiler.h; sourceTree = "<group>"; };
 		7B515FDB29243086006996AA /* ConstexprTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ConstexprTypes.h; path = ../../../../Libraries/Foundation/ConstexprTypes.h; sourceTree = "<group>"; };
-		7B515FDC29243086006996AA /* OS.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OS.h; path = ../../../../Libraries/Foundation/OS.h; sourceTree = "<group>"; };
+		7B515FDC29243086006996AA /* System.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = System.h; path = ../../../../Libraries/Foundation/System.h; sourceTree = "<group>"; };
 		7B515FDD29243087006996AA /* SerializationTemplate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTemplate.h; path = ../../../../Libraries/Serialization/SerializationTemplate.h; sourceTree = "<group>"; };
 		7B515FDE29243087006996AA /* ReflectionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionTest.h; path = ../../../../Libraries/Reflection/ReflectionTest.h; sourceTree = "<group>"; };
 		7B515FDF29243087006996AA /* LibC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = LibC.h; path = ../../../../Libraries/Foundation/LibC.h; sourceTree = "<group>"; };
 		7B515FE029243087006996AA /* Platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Platform.h; path = ../../../../Libraries/Foundation/Platform.h; sourceTree = "<group>"; };
 		7B515FE129243087006996AA /* SmallVector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SmallVector.h; path = ../../../../Libraries/Foundation/SmallVector.h; sourceTree = "<group>"; };
 		7B515FE329243087006996AA /* SerializationTypeErasedTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTypeErasedTest.h; path = ../../../../Libraries/Serialization/SerializationTypeErasedTest.h; sourceTree = "<group>"; };
-		7B515FE429243087006996AA /* OSInternalPosix.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = OSInternalPosix.inl; path = ../../../../Libraries/Foundation/OSInternalPosix.inl; sourceTree = "<group>"; };
+		7B515FE429243087006996AA /* SystemInternalPosix.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = SystemInternalPosix.inl; path = ../../../../Libraries/Foundation/SystemInternalPosix.inl; sourceTree = "<group>"; };
 		7B515FE529243087006996AA /* Compiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Compiler.h; path = ../../../../Libraries/Foundation/Compiler.h; sourceTree = "<group>"; };
 		7B515FE629243087006996AA /* ConsoleTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ConsoleTest.h; path = ../../../../Libraries/Foundation/ConsoleTest.h; sourceTree = "<group>"; };
 		7B515FE729243087006996AA /* ReflectionFlatSchemaCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionFlatSchemaCompiler.h; path = ../../../../Libraries/Reflection/ReflectionFlatSchemaCompiler.h; sourceTree = "<group>"; };
@@ -140,10 +140,11 @@
 		7B5A353328E8640B00B2F589 /* SCTestXCTest.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SCTestXCTest.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B75258629A16F8000779F2A /* OptionalTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OptionalTest.h; path = ../../../../Libraries/Foundation/OptionalTest.h; sourceTree = "<group>"; };
 		7B75258729A16F8000779F2A /* Optional.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Optional.h; path = ../../../../Libraries/Foundation/Optional.h; sourceTree = "<group>"; };
+		7B872C4629AFF1D900949BD2 /* SystemInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SystemInternalApple.inl; path = ../../../../Libraries/Foundation/SystemInternalApple.inl; sourceTree = "<group>"; };
 		7B9F61832995BDA20011F4D4 /* libobjc.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libobjc.tbd; path = usr/lib/libobjc.tbd; sourceTree = SDKROOT; };
-		7BA892A7297E032F0093152B /* OSInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = OSInternalWindows.inl; path = ../../../../Libraries/Foundation/OSInternalWindows.inl; sourceTree = "<group>"; };
-		7BA892A8297E03340093152B /* OSInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = OSInternalEmscripten.inl; path = ../../../../Libraries/Foundation/OSInternalEmscripten.inl; sourceTree = "<group>"; };
-		7BA892A9297E03540093152B /* OS.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = OS.cpp; path = ../../../../Libraries/Foundation/OS.cpp; sourceTree = "<group>"; };
+		7BA892A7297E032F0093152B /* SystemInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SystemInternalWindows.inl; path = ../../../../Libraries/Foundation/SystemInternalWindows.inl; sourceTree = "<group>"; };
+		7BA892A8297E03340093152B /* SystemInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SystemInternalEmscripten.inl; path = ../../../../Libraries/Foundation/SystemInternalEmscripten.inl; sourceTree = "<group>"; };
+		7BA892A9297E03540093152B /* System.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = System.cpp; path = ../../../../Libraries/Foundation/System.cpp; sourceTree = "<group>"; };
 		7BA892AC297E06040093152B /* StringConverter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringConverter.h; path = ../../../../Libraries/Foundation/StringConverter.h; sourceTree = "<group>"; };
 		7BA892AD297E06040093152B /* StringConverter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringConverter.cpp; path = ../../../../Libraries/Foundation/StringConverter.cpp; sourceTree = "<group>"; };
 		7BC56BD529946AD100EED472 /* FileSystemWalker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FileSystemWalker.h; path = ../../../../Libraries/InputOutput/FileSystemWalker.h; sourceTree = "<group>"; };
@@ -223,11 +224,11 @@
 				7B515FE929243087006996AA /* Assert.cpp */,
 				7B515FD229243086006996AA /* Assert.h */,
 				7B515FE529243087006996AA /* Compiler.h */,
+				7BC56BDD2994715800EED472 /* CompilerFirewall.h */,
 				7B515FEE29243087006996AA /* Console.cpp */,
 				7B515FD529243086006996AA /* Console.h */,
 				7B515FE629243087006996AA /* ConsoleTest.h */,
 				7B515FDB29243086006996AA /* ConstexprTypes.h */,
-				7BC56BDD2994715800EED472 /* CompilerFirewall.h */,
 				7B515FCD29243086006996AA /* Function.h */,
 				7B515FD029243086006996AA /* FunctionTest.h */,
 				7B515FEB29243087006996AA /* InitializerList.h */,
@@ -243,12 +244,6 @@
 				7BDC117D29A9654E000E1CD3 /* MovableHandleTest.h */,
 				7B75258729A16F8000779F2A /* Optional.h */,
 				7B75258629A16F8000779F2A /* OptionalTest.h */,
-				7BA892A9297E03540093152B /* OS.cpp */,
-				7B515FDC29243086006996AA /* OS.h */,
-				7BA892A8297E03340093152B /* OSInternalEmscripten.inl */,
-				7B515FE429243087006996AA /* OSInternalPosix.inl */,
-				7BA892A7297E032F0093152B /* OSInternalWindows.inl */,
-				7B515FC829243086006996AA /* OSTest.h */,
 				7B19C9A9297AF95B001C0627 /* Path.cpp */,
 				7B19C9AB297AF95B001C0627 /* Path.h */,
 				7B19C9AA297AF95B001C0627 /* PathTest.h */,
@@ -275,6 +270,13 @@
 				7B515FFF29243097006996AA /* StringView.cpp */,
 				7B51600329243097006996AA /* StringView.h */,
 				7B51600429243097006996AA /* StringViewTest.h */,
+				7BA892A9297E03540093152B /* System.cpp */,
+				7B515FDC29243086006996AA /* System.h */,
+				7BA892A8297E03340093152B /* SystemInternalEmscripten.inl */,
+				7B872C4629AFF1D900949BD2 /* SystemInternalApple.inl */,
+				7B515FE429243087006996AA /* SystemInternalPosix.inl */,
+				7BA892A7297E032F0093152B /* SystemInternalWindows.inl */,
+				7B515FC829243086006996AA /* SystemTest.h */,
 				7B515FFB29243097006996AA /* Test.cpp */,
 				7B51600629243097006996AA /* Test.h */,
 				7B51600229243097006996AA /* Types.h */,
@@ -450,7 +452,7 @@
 				7B51601029243097006996AA /* Test.cpp in Sources */,
 				7B515FF829243087006996AA /* Assert.cpp in Sources */,
 				7B515FF929243087006996AA /* Console.cpp in Sources */,
-				7BA892AA297E03B50093152B /* OS.cpp in Sources */,
+				7BA892AA297E03B50093152B /* System.cpp in Sources */,
 				7B583F6A2922ECF900FBE019 /* SCTest.cpp in Sources */,
 				7B19C9AC297AF99F001C0627 /* Path.cpp in Sources */,
 				7BE5C81029A26E3E00CBCAD1 /* Process.cpp in Sources */,
@@ -466,7 +468,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7BA892AB297E03B50093152B /* OS.cpp in Sources */,
+				7BA892AB297E03B50093152B /* System.cpp in Sources */,
 				7B19C9AD297AF9A2001C0627 /* Path.cpp in Sources */,
 				7BA892AF297E06040093152B /* StringConverter.cpp in Sources */,
 				7B583FCB2922EE7300FBE019 /* SCTest.cpp in Sources */,

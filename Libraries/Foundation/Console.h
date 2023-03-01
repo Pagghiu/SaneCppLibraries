@@ -3,8 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "Compiler.h"
-#include "OS.h"
 #include "StringView.h"
+#include "System.h"
 #include "Types.h"
 
 namespace SC

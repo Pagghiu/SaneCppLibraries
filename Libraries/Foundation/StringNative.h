@@ -11,7 +11,7 @@ template <int N>
 struct StringNative;
 } // namespace SC
 
-// Allows obtaining a null terminated char pointer to use with OS native api
+// Allows obtaining a null terminated char pointer to use with SystemDebug native api
 template <int N>
 struct SC::StringNative
 {

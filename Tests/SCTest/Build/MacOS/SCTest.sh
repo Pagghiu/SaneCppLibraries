@@ -45,7 +45,6 @@ time g++-12 -std=c++14 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 Libraries/Foundation/Assert.cpp             \
 Libraries/Foundation/Console.cpp            \
 Libraries/Foundation/Memory.cpp             \
-Libraries/Foundation/OS.cpp                 \
 Libraries/Foundation/Path.cpp               \
 Libraries/Foundation/StaticAsserts.cpp      \
 Libraries/Foundation/String.cpp             \
@@ -53,6 +52,7 @@ Libraries/Foundation/StringBuilder.cpp      \
 Libraries/Foundation/StringConverter.cpp    \
 Libraries/Foundation/StringFormat.cpp       \
 Libraries/Foundation/StringView.cpp         \
+Libraries/Foundation/System.cpp             \
 Libraries/Foundation/Test.cpp               \
 Libraries/InputOutput/FileDescriptor.cpp    \
 Libraries/InputOutput/FileSystem.cpp        \

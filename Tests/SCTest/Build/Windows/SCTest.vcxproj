@@ -217,7 +217,7 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Assert.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Console.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp" />
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\OS.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\System.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Path.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StaticAsserts.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\String.cpp" />
@@ -255,8 +255,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\MovableHandleTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Optional.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\OptionalTest.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\OS.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\OSTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\System.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\SystemTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Path.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\PathTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Platform.h" />
@@ -306,9 +306,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTypeErasedTest.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\..\Libraries\Foundation\OSInternalEmscripten.inl" />
-    <None Include="..\..\..\..\Libraries\Foundation\OSInternalPosix.inl" />
-    <None Include="..\..\..\..\Libraries\Foundation\OSInternalWindows.inl" />
+    <None Include="..\..\..\..\Libraries\Foundation\SystemInternalEmscripten.inl" />
+    <None Include="..\..\..\..\Libraries\Foundation\SystemInternalPosix.inl" />
+    <None Include="..\..\..\..\Libraries\Foundation\SystemInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemInternalPosix.inl" />
