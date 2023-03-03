@@ -6,7 +6,20 @@
 
 namespace SC
 {
+template <int N, int Alignment>
+struct OpaqueHandle
+{
+    template <typename T>
+    T& reinterpret_as()
+    {
+        static_assert(sizeof(T) <= N, "Increase size of OpaqueHandle");
+        static_assert(alignof(T) <= Alignment, "Increase Alignment of OpaqueHandle");
+        return *reinterpret_cast<T*>(bytes);
+    }
 
+  private:
+    alignas(Alignment) char bytes[N];
+};
 template <typename T>
 struct CompilerFirewallFuncs
 {
