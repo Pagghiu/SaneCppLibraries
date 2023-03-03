@@ -8,7 +8,7 @@
 
 struct SC::ProcessEntry::Internal
 {
-    static ReturnCode ProcessHandleClose(const int& handle) { return true; }
+    static ReturnCode ProcessHandleClose(int& handle) { return true; }
 };
 struct SC::ProcessEntry::ProcessHandle : public MovableHandle<int, 0, ReturnCode, &Internal::ProcessHandleClose>
 {

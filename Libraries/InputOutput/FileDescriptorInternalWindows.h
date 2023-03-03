@@ -11,7 +11,7 @@
 namespace SC
 {
 using FileNativeDescriptor = HANDLE;
-ReturnCode FileNativeDescriptorClose(const FileNativeDescriptor&);
+ReturnCode FileNativeDescriptorClose(FileNativeDescriptor&);
 struct FileNativeMovableHandle
     : public MovableHandle<FileNativeDescriptor, INVALID_HANDLE_VALUE, ReturnCode, FileNativeDescriptorClose>
 {

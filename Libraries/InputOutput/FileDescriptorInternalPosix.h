@@ -9,7 +9,7 @@
 namespace SC
 {
 using FileNativeDescriptor = int;
-ReturnCode FileNativeDescriptorClose(const FileNativeDescriptor&);
+ReturnCode FileNativeDescriptorClose(FileNativeDescriptor&);
 struct FileNativeMovableHandle : public MovableHandle<FileNativeDescriptor, -1, ReturnCode, FileNativeDescriptorClose>
 {
 };

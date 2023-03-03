@@ -12,7 +12,7 @@
 
 struct SC::ProcessEntry::Internal
 {
-    static ReturnCode           ProcessHandleClose(const pid_t& handle) { return true; }
+    static ReturnCode           ProcessHandleClose(pid_t& handle) { return true; }
     static FileNativeDescriptor getStandardInputFDS() { return fileno(stdin); };
     static FileNativeDescriptor getStandardOutputFDS() { return fileno(stdout); };
     static FileNativeDescriptor getStandardErrorFDS() { return fileno(stderr); };

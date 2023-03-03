@@ -11,7 +11,7 @@ struct SC::ProcessEntry::Internal
 {
     // TODO: this could be migrated to SystemDebug
     static void       exit(int code) { _exit(code); }
-    static ReturnCode ProcessHandleClose(const HANDLE& handle)
+    static ReturnCode ProcessHandleClose(HANDLE& handle)
     {
         if (::CloseHandle(handle) == FALSE)
             return "ProcessHandleClose - CloseHandle failed"_a8;

@@ -7,13 +7,13 @@
 namespace SC
 {
 template <typename HandleType, HandleType InvalidSentinel, typename CloseReturnType,
-          CloseReturnType (*FuncPointer)(const HandleType&)>
+          CloseReturnType (*FuncPointer)(HandleType&)>
 struct MovableHandle;
 } // namespace SC
 
 // MovableHandle is used to wrap HANDLE files on Windows or file descriptors on Posix
 template <typename HandleType, HandleType InvalidSentinel, typename CloseReturnType,
-          CloseReturnType (*DeleteFunc)(const HandleType&)>
+          CloseReturnType (*DeleteFunc)(HandleType&)>
 struct SC::MovableHandle
 {
     static constexpr HandleType   InvalidHandle() { return InvalidSentinel; }

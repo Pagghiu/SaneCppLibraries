@@ -52,7 +52,7 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
     }
 }
 
-SC::ReturnCode SC::FileNativeDescriptorClose(const FileNativeDescriptor& fileDescriptor)
+SC::ReturnCode SC::FileNativeDescriptorClose(FileNativeDescriptor& fileDescriptor)
 {
     if (::close(fileDescriptor) != 0)
     {

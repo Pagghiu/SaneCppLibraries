@@ -7,7 +7,7 @@
 
 #include <Windows.h>
 
-SC::ReturnCode SC::FileNativeDescriptorClose(const FileNativeDescriptor& fileDescriptor)
+SC::ReturnCode SC::FileNativeDescriptorClose(FileNativeDescriptor& fileDescriptor)
 {
     if (::CloseHandle(fileDescriptor) == FALSE)
     {

@@ -19,7 +19,7 @@ struct SC::MovableHandleTest : public SC::TestCase
             static bool deleteCalled = false;
             return deleteCalled;
         }
-        static bool deleteHandle(const int& sad)
+        static bool deleteHandle(int& sad)
         {
             getDeleteCalled() = true;
             return true;
