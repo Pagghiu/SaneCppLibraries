@@ -22,6 +22,7 @@
 		7B583F6A2922ECF900FBE019 /* SCTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F692922ECF900FBE019 /* SCTest.cpp */; };
 		7B583F6D2922ED2700FBE019 /* SCTestXCTest.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */; };
 		7B583FCB2922EE7300FBE019 /* SCTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F692922ECF900FBE019 /* SCTest.cpp */; };
+		7B872C4D29AFFC4900949BD2 /* Threading.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B872C4A29AFFC4900949BD2 /* Threading.cpp */; };
 		7B9F61842995BDA20011F4D4 /* libobjc.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B9F61832995BDA20011F4D4 /* libobjc.tbd */; };
 		7BA892AA297E03B50093152B /* System.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892A9297E03540093152B /* System.cpp */; };
 		7BA892AB297E03B50093152B /* System.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892A9297E03540093152B /* System.cpp */; };
@@ -137,10 +138,15 @@
 		7B52501428E85B9100827290 /* SCTest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SCTest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B583F692922ECF900FBE019 /* SCTest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SCTest.cpp; path = ../../SCTest.cpp; sourceTree = "<group>"; };
 		7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SCTestXCTest.mm; path = ../../SCTestXCTest.mm; sourceTree = "<group>"; };
+		7B59307629B128C300876ABB /* ThreadingTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ThreadingTest.h; path = ../../../../Libraries/Threading/ThreadingTest.h; sourceTree = "<group>"; };
 		7B5A353328E8640B00B2F589 /* SCTestXCTest.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SCTestXCTest.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B75258629A16F8000779F2A /* OptionalTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OptionalTest.h; path = ../../../../Libraries/Foundation/OptionalTest.h; sourceTree = "<group>"; };
 		7B75258729A16F8000779F2A /* Optional.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Optional.h; path = ../../../../Libraries/Foundation/Optional.h; sourceTree = "<group>"; };
 		7B872C4629AFF1D900949BD2 /* SystemInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SystemInternalApple.inl; path = ../../../../Libraries/Foundation/SystemInternalApple.inl; sourceTree = "<group>"; };
+		7B872C4829AFFC4900949BD2 /* ThreadingInternalPosix.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = ThreadingInternalPosix.inl; path = ../../../../Libraries/Threading/ThreadingInternalPosix.inl; sourceTree = "<group>"; };
+		7B872C4929AFFC4900949BD2 /* ThreadingInternalWindows.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = ThreadingInternalWindows.inl; path = ../../../../Libraries/Threading/ThreadingInternalWindows.inl; sourceTree = "<group>"; };
+		7B872C4A29AFFC4900949BD2 /* Threading.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Threading.cpp; path = ../../../../Libraries/Threading/Threading.cpp; sourceTree = "<group>"; };
+		7B872C4C29AFFC4900949BD2 /* Threading.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Threading.h; path = ../../../../Libraries/Threading/Threading.h; sourceTree = "<group>"; };
 		7B9F61832995BDA20011F4D4 /* libobjc.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libobjc.tbd; path = usr/lib/libobjc.tbd; sourceTree = SDKROOT; };
 		7BA892A7297E032F0093152B /* SystemInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SystemInternalWindows.inl; path = ../../../../Libraries/Foundation/SystemInternalWindows.inl; sourceTree = "<group>"; };
 		7BA892A8297E03340093152B /* SystemInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SystemInternalEmscripten.inl; path = ../../../../Libraries/Foundation/SystemInternalEmscripten.inl; sourceTree = "<group>"; };
@@ -293,6 +299,7 @@
 				7B0C2999297CA7C10071C5B4 /* InputOutput */,
 				7B7044552995A2180034458B /* Reflection */,
 				7B7044562995A2290034458B /* Serialization */,
+				7B872C4729AFFC3F00949BD2 /* Threading */,
 			);
 			name = Libraries;
 			sourceTree = "<group>";
@@ -324,6 +331,18 @@
 				7B515FE329243087006996AA /* SerializationTypeErasedTest.h */,
 			);
 			name = Serialization;
+			sourceTree = "<group>";
+		};
+		7B872C4729AFFC3F00949BD2 /* Threading */ = {
+			isa = PBXGroup;
+			children = (
+				7B872C4A29AFFC4900949BD2 /* Threading.cpp */,
+				7B872C4C29AFFC4900949BD2 /* Threading.h */,
+				7B872C4829AFFC4900949BD2 /* ThreadingInternalPosix.inl */,
+				7B872C4929AFFC4900949BD2 /* ThreadingInternalWindows.inl */,
+				7B59307629B128C300876ABB /* ThreadingTest.h */,
+			);
+			name = Threading;
 			sourceTree = "<group>";
 		};
 		7B9F61822995BDA20011F4D4 /* Frameworks */ = {
@@ -448,6 +467,7 @@
 				7B0C299D297CA7CC0071C5B4 /* FileSystem.cpp in Sources */,
 				7B51601229243097006996AA /* StringView.cpp in Sources */,
 				7B51601129243097006996AA /* StringFormat.cpp in Sources */,
+				7B872C4D29AFFC4900949BD2 /* Threading.cpp in Sources */,
 				7B51601529243097006996AA /* StaticAsserts.cpp in Sources */,
 				7B51601029243097006996AA /* Test.cpp in Sources */,
 				7B515FF829243087006996AA /* Assert.cpp in Sources */,

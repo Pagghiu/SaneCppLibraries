@@ -69,4 +69,5 @@ Libraries/InputOutput/FileDescriptor.cpp    \
 Libraries/InputOutput/FileSystem.cpp        \
 Libraries/InputOutput/FileSystemWalker.cpp  \
 Libraries/InputOutput/Process.cpp           \
+Libraries/Threading/Threading.cpp           \
 ${SCRIPT_DIR}/../../SCTest.cpp

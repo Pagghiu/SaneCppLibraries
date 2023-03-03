@@ -31,6 +31,9 @@
 #include "../../Libraries/Serialization/SerializationTemplateTest.h"
 #include "../../Libraries/Serialization/SerializationTypeErasedTest.h"
 
+// Threading
+#include "../../Libraries/Threading/ThreadingTest.h"
+
 SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> globalConsoleBuffer;
 SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> formatConsoleBuffer;
 
@@ -73,6 +76,9 @@ int main(int argc, const char* argv[])
     // Serialization tests
     { SerializationTemplateTest     test(report); }
     { SerializationTypeErasedTest   test(report); }
+
+    // Threading tests
+    { ThreadingTest                 test(report); }
 
     // clang-format on
 

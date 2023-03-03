@@ -230,6 +230,7 @@
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystem.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\Process.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Threading\Threading.cpp" />
     <ClCompile Include="..\..\SCTest.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -304,6 +305,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTypeErased.h" />
     <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTypeErasedCompiler.h" />
     <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTypeErasedTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Threading\Threading.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Threading\ThreadingTest.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\Foundation\SystemInternalEmscripten.inl" />
@@ -320,6 +323,8 @@
     <None Include="..\..\..\..\Libraries\InputOutput\ProcessInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\InputOutput\ProcessInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\InputOutput\UtilityWindows.inl" />
+    <None Include="..\..\..\..\Libraries\Threading\ThreadingInternalPosix.inl" />
+    <None Include="..\..\..\..\Libraries\Threading\ThreadingInternalWindows.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
