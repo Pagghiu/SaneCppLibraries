@@ -28,10 +28,10 @@ struct SC::OpaqueTest : public SC::TestCase
     OpaqueTest(SC::TestReport& report) : TestCase(report, "OpaqueTest")
     {
         using namespace SC;
-        if (test_section("OpaqueUniqueTaggedHandle"))
+        if (test_section("UniqueTaggedHandle"))
         {
             MyDeleter::getDeleteCalled() = false;
-            OpaqueUniqueTaggedHandle<int, -1, bool, &MyDeleter::deleteHandle> myInt;
+            UniqueTaggedHandle<int, -1, bool, &MyDeleter::deleteHandle> myInt;
             {
                 SC_TEST_EXPECT(not MyDeleter::getDeleteCalled());
                 SC_TEST_EXPECT(not myInt);

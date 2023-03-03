@@ -11,7 +11,20 @@ struct FileDescriptor;
 struct FileDescriptorPipe;
 struct FileDescriptorWindows;
 struct FileDescriptorPosix;
-struct FileNativeOpaqueUniqueTaggedHandle;
+
+#if SC_PLATFORM_WINDOWS
+using FileDescriptorNative                                        = void*;   // HANDLE
+static constexpr FileDescriptorNative FileDescriptorNativeInvalid = nullptr; // INVALID_HANDLE_VALUE
+#else
+using FileDescriptorNative                                        = int; // Posix FD
+static constexpr FileDescriptorNative FileDescriptorNativeInvalid = -1;  // Posix Invalid FD
+#endif
+ReturnCode FileDescriptorNativeClose(FileDescriptorNative&);
+struct FileDescriptorNativeHandle : public UniqueTaggedHandle<FileDescriptorNative, FileDescriptorNativeInvalid,
+                                                              ReturnCode, FileDescriptorNativeClose>
+{
+};
+
 } // namespace SC
 
 // TODO: Figure out if these operations should be abstracted or put into internal per platform implementation
@@ -40,12 +53,7 @@ struct SC::FileDescriptor
     FileDescriptorPosix   posix() { return {*this}; }
     FileDescriptorWindows windows() { return {*this}; }
 
-    void                     detach();
-    [[nodiscard]] bool       isValid() const;
-    [[nodiscard]] ReturnCode close();
-    [[nodiscard]] ReturnCode assignMovingFrom(FileDescriptor& other);
-
-    OpaqueUniqueObject<FileNativeOpaqueUniqueTaggedHandle> fileNativeHandle;
+    FileDescriptorNativeHandle handle;
 };
 
 struct SC::FileDescriptorPipe

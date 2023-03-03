@@ -2,47 +2,44 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "FileDescriptorInternalWindows.h"
 #include "Process.h"
 
 #include <Windows.h>
 
-struct SC::ProcessEntry::Internal
+struct SC::Process::Internal
 {
     // TODO: this could be migrated to SystemDebug
-    static void       exit(int code) { _exit(code); }
-    static ReturnCode ProcessHandleClose(HANDLE& handle)
-    {
-        if (::CloseHandle(handle) == FALSE)
-            return "ProcessHandleClose - CloseHandle failed"_a8;
-        return true;
-    }
+    static void exit(int code) { _exit(code); }
 };
 
-struct SC::ProcessEntry::ProcessHandle
-    : public OpaqueUniqueTaggedHandle<HANDLE, nullptr, ReturnCode, &Internal::ProcessHandleClose>
+SC::ReturnCode SC::ProcessNativeHandleClose(HANDLE& handle)
 {
-};
-SC::ReturnCode SC::ProcessEntry::waitProcessExit()
+    if (::CloseHandle(handle) == FALSE)
+        return "ProcessNativeHandleClose - CloseHandle failed"_a8;
+    return true;
+}
+
+SC::ReturnCode SC::Process::waitProcessExit()
 {
-    HANDLE handle;
-    SC_TRY_IF(processHandlePimpl.get().get(handle, ReturnCode("ProcesEntry::waitProcessExit - Invalid handle"_a8)));
-    WaitForSingleObject(handle, INFINITE);
+    HANDLE hProcess;
+    SC_TRY_IF(handle.get(hProcess, ReturnCode("ProcesEntry::waitProcessExit - Invalid handle"_a8)));
+    WaitForSingleObject(hProcess, INFINITE);
     DWORD processStatus;
-    if (GetExitCodeProcess(handle, &processStatus))
+    if (GetExitCodeProcess(hProcess, &processStatus))
     {
         exitStatus.value = static_cast<int32_t>(processStatus);
         return true;
     }
-    return "ProcessEntry::wait - GetExitCodeProcess failed"_a8;
+    return "Process::wait - GetExitCodeProcess failed"_a8;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/procthread/creating-a-child-process-with-redirected-input-and-output
-SC::ReturnCode SC::ProcessEntry::run(const ProcessOptions& options)
+SC::ReturnCode SC::Process::run(const ProcessOptions& options)
 {
     STARTUPINFO startupInfo;
-    const bool  someRedirection = standardInput.isValid() || standardOutput.isValid() || standardError.isValid();
-    const BOOL  inheritHandles  = options.inheritFileDescriptors or someRedirection ? TRUE : FALSE;
+    const bool  someRedirection =
+        standardInput.handle.isValid() || standardOutput.handle.isValid() || standardError.handle.isValid();
+    const BOOL inheritHandles = options.inheritFileDescriptors or someRedirection ? TRUE : FALSE;
 
     DWORD creationFlags = 0; // CREATE_UNICODE_ENVIRONMENT;
     ZeroMemory(&startupInfo, sizeof(STARTUPINFO));
@@ -51,17 +48,17 @@ SC::ReturnCode SC::ProcessEntry::run(const ProcessOptions& options)
     startupInfo.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
     startupInfo.hStdError  = GetStdHandle(STD_ERROR_HANDLE);
 
-    if (standardInput.isValid())
+    if (standardInput.handle.isValid())
     {
-        SC_TRY_IF(standardInput.fileNativeHandle.get().get(startupInfo.hStdInput, false));
+        SC_TRY_IF(standardInput.handle.get(startupInfo.hStdInput, false));
     }
-    if (standardOutput.isValid())
+    if (standardOutput.handle.isValid())
     {
-        SC_TRY_IF(standardOutput.fileNativeHandle.get().get(startupInfo.hStdOutput, false));
+        SC_TRY_IF(standardOutput.handle.get(startupInfo.hStdOutput, false));
     }
-    if (standardError.isValid())
+    if (standardError.handle.isValid())
     {
-        SC_TRY_IF(standardError.fileNativeHandle.get().get(startupInfo.hStdError, false));
+        SC_TRY_IF(standardError.handle.get(startupInfo.hStdError, false));
     }
     if (someRedirection)
     {
@@ -93,9 +90,9 @@ SC::ReturnCode SC::ProcessEntry::run(const ProcessOptions& options)
     CloseHandle(processInfo.hThread);
 
     SC_TRY_ASSIGN(processID.pid, processInfo.dwProcessId, "processInfo.dwProcessId exceeds processID.pid"_a8);
-    SC_TRY_IF(processHandlePimpl.get().assign(processInfo.hProcess));
-    SC_TRY_IF(standardInput.close());
-    SC_TRY_IF(standardOutput.close());
-    SC_TRY_IF(standardError.close());
+    SC_TRY_IF(handle.assign(processInfo.hProcess));
+    SC_TRY_IF(standardInput.handle.close());
+    SC_TRY_IF(standardOutput.handle.close());
+    SC_TRY_IF(standardError.handle.close());
     return true;
 }

@@ -162,8 +162,6 @@
 		7BC56BD929946B1800EED472 /* FileSystemWalkerInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalPosix.inl; path = ../../../../Libraries/InputOutput/FileSystemWalkerInternalPosix.inl; sourceTree = "<group>"; };
 		7BC56BDA29946B1800EED472 /* FileSystemWalkerInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalWindows.inl; path = ../../../../Libraries/InputOutput/FileSystemWalkerInternalWindows.inl; sourceTree = "<group>"; };
 		7BE50C9729AEB4CC00BE6C25 /* FileDescriptorInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileDescriptorInternalPosix.inl; path = ../../../../Libraries/InputOutput/FileDescriptorInternalPosix.inl; sourceTree = "<group>"; };
-		7BE50C9829AEB4CC00BE6C25 /* FileDescriptorInternalPosix.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FileDescriptorInternalPosix.h; path = ../../../../Libraries/InputOutput/FileDescriptorInternalPosix.h; sourceTree = "<group>"; };
-		7BE50C9929AEB4FB00BE6C25 /* FileDescriptorInternalWindows.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FileDescriptorInternalWindows.h; path = ../../../../Libraries/InputOutput/FileDescriptorInternalWindows.h; sourceTree = "<group>"; };
 		7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Process.cpp; path = ../../../../Libraries/InputOutput/Process.cpp; sourceTree = "<group>"; };
 		7BE5C80E29A26E3E00CBCAD1 /* Process.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Process.h; path = ../../../../Libraries/InputOutput/Process.h; sourceTree = "<group>"; };
 		7BE5C80F29A26E3E00CBCAD1 /* ProcessTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ProcessTest.h; path = ../../../../Libraries/InputOutput/ProcessTest.h; sourceTree = "<group>"; };
@@ -195,9 +193,7 @@
 			children = (
 				7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */,
 				7BE5C81229A2707E00CBCAD1 /* FileDescriptor.h */,
-				7BE50C9829AEB4CC00BE6C25 /* FileDescriptorInternalPosix.h */,
 				7BE50C9729AEB4CC00BE6C25 /* FileDescriptorInternalPosix.inl */,
-				7BE50C9929AEB4FB00BE6C25 /* FileDescriptorInternalWindows.h */,
 				7B0A83C029A989A000C16EBF /* FileDescriptorInternalWindows.inl */,
 				7B0C299C297CA7CC0071C5B4 /* FileSystem.cpp */,
 				7B0C299A297CA7CC0071C5B4 /* FileSystem.h */,

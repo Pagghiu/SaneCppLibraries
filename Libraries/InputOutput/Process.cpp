@@ -11,31 +11,6 @@
 #include "ProcessInternalPosix.inl"
 #endif
 
-template <>
-template <int BufferSizeInBytes>
-void SC::OpaqueFunctions<SC::ProcessEntry::ProcessHandle>::construct(uint8_t* buffer)
-{
-    static_assert(BufferSizeInBytes >= sizeof(ProcessEntry::ProcessHandle), "Increase size of unique static pimpl");
-    new (buffer, PlacementNew()) ProcessEntry::ProcessHandle();
-}
-template <>
-void SC::OpaqueFunctions<SC::ProcessEntry::ProcessHandle>::destruct(ProcessEntry::ProcessHandle& obj)
-{
-    obj.~ProcessHandle();
-}
-template <>
-void SC::OpaqueFunctions<SC::ProcessEntry::ProcessHandle>::moveConstruct(uint8_t*                      buffer,
-                                                                         ProcessEntry::ProcessHandle&& obj)
-{
-    new (buffer, PlacementNew()) ProcessEntry::ProcessHandle(forward<ProcessEntry::ProcessHandle>(obj));
-}
-template <>
-void SC::OpaqueFunctions<SC::ProcessEntry::ProcessHandle>::moveAssign(ProcessEntry::ProcessHandle&  pthis,
-                                                                      ProcessEntry::ProcessHandle&& obj)
-{
-    pthis = forward<ProcessEntry::ProcessHandle>(obj);
-}
-
 SC::ReturnCode SC::ProcessShell::launch()
 {
     if (error.returnCode.isError())
@@ -49,7 +24,7 @@ SC::ReturnCode SC::ProcessShell::launch()
         SC_TRY_IF(inputPipe.readPipe.posix().setCloseOnExec());
         SC_TRY_IF(inputPipe.writePipe.posix().setCloseOnExec());
         SC_TRY_IF(inputPipe.writePipe.windows().disableInherit());
-        SC_TRY_IF(processes.front().standardInput.assignMovingFrom(inputPipe.readPipe));
+        SC_TRY_IF(processes.front().standardInput.handle.assign(move(inputPipe.readPipe.handle)));
     }
     if (options.pipeSTDOUT)
     {
@@ -57,7 +32,7 @@ SC::ReturnCode SC::ProcessShell::launch()
         SC_TRY_IF(outputPipe.readPipe.posix().setCloseOnExec());
         SC_TRY_IF(outputPipe.writePipe.posix().setCloseOnExec());
         SC_TRY_IF(outputPipe.readPipe.windows().disableInherit());
-        SC_TRY_IF(processes.back().standardOutput.assignMovingFrom(outputPipe.writePipe));
+        SC_TRY_IF(processes.back().standardOutput.handle.assign(move(outputPipe.writePipe.handle)));
     }
     if (options.pipeSTDERR)
     {
@@ -65,10 +40,10 @@ SC::ReturnCode SC::ProcessShell::launch()
         SC_TRY_IF(errorPipe.readPipe.posix().setCloseOnExec());
         SC_TRY_IF(errorPipe.writePipe.posix().setCloseOnExec());
         SC_TRY_IF(errorPipe.readPipe.windows().disableInherit());
-        SC_TRY_IF(processes.back().standardError.assignMovingFrom(errorPipe.writePipe));
+        SC_TRY_IF(processes.back().standardError.handle.assign(move(errorPipe.writePipe.handle)));
     }
 
-    for (ProcessEntry& process : processes)
+    for (Process& process : processes)
     {
         error.returnCode = process.run(options);
         if (error.returnCode.isError())
@@ -78,9 +53,9 @@ SC::ReturnCode SC::ProcessShell::launch()
             return error.returnCode;
         }
     }
-    SC_TRY_IF(inputPipe.readPipe.close());
-    SC_TRY_IF(outputPipe.writePipe.close());
-    SC_TRY_IF(errorPipe.writePipe.close());
+    SC_TRY_IF(inputPipe.readPipe.handle.close());
+    SC_TRY_IF(outputPipe.writePipe.handle.close());
+    SC_TRY_IF(errorPipe.writePipe.handle.close());
     return true;
 }
 
@@ -109,7 +84,7 @@ SC::ReturnCode SC::ProcessShell::readOutputSync(String* outputString, String* er
     Array<char, 1024> buffer;
     SC_TRUST_RESULT(buffer.resizeWithoutInitializing(buffer.capacity()));
     FileDescriptor::ReadResult readResult;
-    if (outputPipe.readPipe.isValid() && outputString)
+    if (outputPipe.readPipe.handle.isValid() && outputString)
     {
         while (not readResult.isEOF)
         {
@@ -117,7 +92,7 @@ SC::ReturnCode SC::ProcessShell::readOutputSync(String* outputString, String* er
         }
         outputString->pushNullTerm();
     }
-    if (errorPipe.readPipe.isValid() && errorString)
+    if (errorPipe.readPipe.handle.isValid() && errorString)
     {
         while (not readResult.isEOF)
         {
@@ -130,20 +105,20 @@ SC::ReturnCode SC::ProcessShell::readOutputSync(String* outputString, String* er
 
 SC::ReturnCode SC::ProcessShell::waitSync()
 {
-    for (ProcessEntry& p : processes)
+    for (Process& p : processes)
     {
         SC_TRY_IF(p.waitProcessExit());
     }
     processes.clear();
-    SC_TRY_IF(inputPipe.writePipe.close());
-    SC_TRY_IF(outputPipe.readPipe.close());
-    SC_TRY_IF(errorPipe.readPipe.close());
+    SC_TRY_IF(inputPipe.writePipe.handle.close());
+    SC_TRY_IF(outputPipe.readPipe.handle.close());
+    SC_TRY_IF(errorPipe.readPipe.handle.close());
     return error.returnCode;
 }
 
 SC::ReturnCode SC::ProcessShell::queueProcess(Span<StringView*> spanArguments)
 {
-    ProcessEntry process;
+    Process process;
     if (options.useShell)
     {
         bool first = true;
@@ -177,8 +152,8 @@ SC::ReturnCode SC::ProcessShell::queueProcess(Span<StringView*> spanArguments)
         SC_TRY_IF(chainPipe.createPipe());
         SC_TRY_IF(chainPipe.readPipe.posix().setCloseOnExec());
         SC_TRY_IF(chainPipe.writePipe.posix().setCloseOnExec());
-        SC_TRY_IF(processes.back().standardOutput.assignMovingFrom(chainPipe.writePipe));
-        SC_TRY_IF(process.standardInput.assignMovingFrom(chainPipe.readPipe));
+        SC_TRY_IF(processes.back().standardOutput.handle.assign(move(chainPipe.writePipe.handle)));
+        SC_TRY_IF(process.standardInput.handle.assign(move(chainPipe.readPipe.handle)));
     }
     SC_TRY_IF(processes.push_back(move(process)));
     return true;

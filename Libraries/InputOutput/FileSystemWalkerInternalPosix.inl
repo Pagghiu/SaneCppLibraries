@@ -13,7 +13,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "FileDescriptorInternalPosix.h"
 #include "FileSystemInternalPosix.inl"
 
 struct SC::FileSystemWalker::Internal
@@ -87,7 +86,7 @@ struct SC::FileSystemWalker::Internal
                 SC_TRY_IF(recurseStack.pop_back());
                 if (recurseStack.isEmpty())
                 {
-                    entry.parentFileDescriptor.detach();
+                    entry.parentFileDescriptor.handle.detach();
                     return "Iteration Finished"_a8;
                 }
                 parent = recurseStack.back();
@@ -114,8 +113,8 @@ struct SC::FileSystemWalker::Internal
         SC_TRY_IF(currentPath.appendNullTerminated(entry.name));
         entry.path  = currentPath.view();
         entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
-        entry.parentFileDescriptor.detach();
-        SC_TRY_IF(entry.parentFileDescriptor.fileNativeHandle.get().assign(parent.fileDescriptor));
+        entry.parentFileDescriptor.handle.detach();
+        SC_TRY_IF(entry.parentFileDescriptor.handle.assign(parent.fileDescriptor));
         if (item->d_type == DT_DIR)
         {
             entry.type = Type::Directory;
@@ -138,9 +137,8 @@ struct SC::FileSystemWalker::Internal
         SC_TRY_IF(currentPath.appendNullTerminated("/"_u8));
         SC_TRY_IF(currentPath.appendNullTerminated(entry.name));
         newParent.textLengthInBytes = currentPath.view().sizeInBytesIncludingTerminator();
-        FileNativeDescriptor handle;
-        SC_TRY_IF(entry.parentFileDescriptor.fileNativeHandle.get().get(
-            handle, ReturnCode("recurseSubdirectory - InvalidHandle"_a8)));
+        FileDescriptorNative handle;
+        SC_TRY_IF(entry.parentFileDescriptor.handle.get(handle, ReturnCode("recurseSubdirectory - InvalidHandle"_a8)));
         SC_TRY_IF(newParent.init(openat(handle, entry.name.bytesIncludingTerminator(), O_DIRECTORY)));
         SC_TRY_IF(recurseStack.push_back(newParent))
         return true;

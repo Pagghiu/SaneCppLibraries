@@ -2,7 +2,6 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "FileDescriptorInternalPosix.h"
 #include "Process.h"
 
 #include <errno.h>
@@ -10,19 +9,15 @@
 #include <sys/wait.h> // waitpid
 #include <unistd.h>   // pipe fork execl _exit
 
-struct SC::ProcessEntry::Internal
+struct SC::Process::Internal
 {
-    static ReturnCode           ProcessHandleClose(pid_t& handle) { return true; }
-    static FileNativeDescriptor getStandardInputFDS() { return fileno(stdin); };
-    static FileNativeDescriptor getStandardOutputFDS() { return fileno(stdout); };
-    static FileNativeDescriptor getStandardErrorFDS() { return fileno(stderr); };
+    static FileDescriptorNative getStandardInputFDS() { return fileno(stdin); };
+    static FileDescriptorNative getStandardOutputFDS() { return fileno(stdout); };
+    static FileDescriptorNative getStandardErrorFDS() { return fileno(stderr); };
 };
 
-struct SC::ProcessEntry::ProcessHandle
-    : public OpaqueUniqueTaggedHandle<pid_t, 0, ReturnCode, &Internal::ProcessHandleClose>
-{
-};
-SC::ReturnCode SC::ProcessEntry::fork()
+SC::ReturnCode SC::ProcessNativeHandleClose(pid_t& handle) { return true; }
+SC::ReturnCode SC::Process::fork()
 {
     processID.pid = ::fork();
     if (processID.pid < 0)
@@ -32,9 +27,9 @@ SC::ReturnCode SC::ProcessEntry::fork()
     return true;
 }
 
-bool SC::ProcessEntry::isChild() const { return processID.pid == 0; }
+bool SC::Process::isChild() const { return processID.pid == 0; }
 
-SC::ReturnCode SC::ProcessEntry::waitProcessExit()
+SC::ReturnCode SC::Process::waitProcessExit()
 {
     int   status = -1;
     pid_t waitPid;
@@ -46,44 +41,44 @@ SC::ReturnCode SC::ProcessEntry::waitProcessExit()
 }
 
 template <typename Lambda>
-SC::ReturnCode SC::ProcessEntry::spawn(Lambda&& lambda)
+SC::ReturnCode SC::Process::spawn(Lambda&& lambda)
 {
     SC_TRY_IF(fork());
     if (isChild())
     {
         auto exitDeferred = MakeDeferred([&] { _exit(127); });
-        if (standardInput.isValid())
+        if (standardInput.handle.isValid())
         {
             SC_TRY_IF(standardInput.posix().redirect(Internal::getStandardInputFDS()));
         }
-        if (standardOutput.isValid())
+        if (standardOutput.handle.isValid())
         {
             SC_TRY_IF(standardOutput.posix().redirect(Internal::getStandardOutputFDS()));
         }
-        if (standardError.isValid())
+        if (standardError.handle.isValid())
         {
             SC_TRY_IF(standardError.posix().redirect(Internal::getStandardErrorFDS()));
         }
         // TODO: Check if these close calls are still needed after we setCloseOnExec
-        SC_TRY_IF(standardInput.close());
-        SC_TRY_IF(standardOutput.close());
-        SC_TRY_IF(standardError.close());
+        SC_TRY_IF(standardInput.handle.close());
+        SC_TRY_IF(standardOutput.handle.close());
+        SC_TRY_IF(standardError.handle.close());
         lambda();
     }
     else
     {
-        SC_TRY_IF(processHandlePimpl.get().assign(processID.pid));
+        SC_TRY_IF(handle.assign(processID.pid));
 
-        SC_TRY_IF(standardInput.close());
-        SC_TRY_IF(standardOutput.close());
-        SC_TRY_IF(standardError.close());
+        SC_TRY_IF(standardInput.handle.close());
+        SC_TRY_IF(standardOutput.handle.close());
+        SC_TRY_IF(standardError.handle.close());
         return true;
     }
     // The exit(127) inside isChild makes this unreachable
     SC_UNREACHABLE();
 }
 
-SC::ReturnCode SC::ProcessEntry::run(const ProcessOptions& options)
+SC::ReturnCode SC::Process::run(const ProcessOptions& options)
 {
     auto spawnLambda = [&]()
     {

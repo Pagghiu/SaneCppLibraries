@@ -54,7 +54,7 @@ int main(int argc, const char* argv[])
     { FunctionTest                  test(report); }
     { MapTest                       test(report); }
     { MemoryTest                    test(report); }
-    { OpaqueTest             test(report); }
+    { OpaqueTest                    test(report); }
     { OptionalTest                  test(report); }
     { PathTest                      test(report); }
     { ResultTest                    test(report); }

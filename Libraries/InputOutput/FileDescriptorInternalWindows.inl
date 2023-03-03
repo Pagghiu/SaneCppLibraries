@@ -3,15 +3,14 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "FileDescriptor.h"
-#include "FileDescriptorInternalWindows.h"
 
 #include <Windows.h>
 
-SC::ReturnCode SC::FileNativeDescriptorClose(FileNativeDescriptor& fileDescriptor)
+SC::ReturnCode SC::FileDescriptorNativeClose(FileDescriptorNative& fileDescriptor)
 {
     if (::CloseHandle(fileDescriptor) == FALSE)
     {
-        return "FileNativeDescriptorClose - CloseHandle failed"_a8;
+        return "FileDescriptorNativeClose - CloseHandle failed"_a8;
     }
     return true;
 }
@@ -22,8 +21,8 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
     DWORD                numReadBytes = 0xffffffff;
     bool                 gotError     = true;
     const bool           useVector    = output.capacity() > output.size();
-    FileNativeDescriptor fileDescriptor;
-    SC_TRY_IF(fileNativeHandle.get().get(fileDescriptor, "FileDescriptor::readAppend - Invalid Handle"_a8));
+    FileDescriptorNative fileDescriptor;
+    SC_TRY_IF(handle.get(fileDescriptor, "FileDescriptor::readAppend - Invalid Handle"_a8));
     if (useVector)
     {
         BOOL success = ReadFile(fileDescriptor, output.data() + output.size(),
@@ -90,16 +89,15 @@ SC::ReturnCode SC::FileDescriptorPipe::createPipe()
     {
         return "FileDescriptorPipe::createPipe - ::CreatePipe failed"_a8;
     }
-    SC_TRY_IF(readPipe.fileNativeHandle.get().assign(pipeRead));
-    SC_TRY_IF(writePipe.fileNativeHandle.get().assign(pipeWrite));
+    SC_TRY_IF(readPipe.handle.assign(pipeRead));
+    SC_TRY_IF(writePipe.handle.assign(pipeWrite));
     return true;
 }
 
 SC::ReturnCode SC::FileDescriptorWindows::disableInherit()
 {
-    FileNativeDescriptor nativeFd;
-    SC_TRY_IF(
-        fileDescriptor.fileNativeHandle.get().get(nativeFd, "FileDescriptorPipe::createPipe - Invalid Handle"_a8));
+    FileDescriptorNative nativeFd;
+    SC_TRY_IF(fileDescriptor.handle.get(nativeFd, "FileDescriptorPipe::createPipe - Invalid Handle"_a8));
     if (!SetHandleInformation(nativeFd, HANDLE_FLAG_INHERIT, 0))
     {
         return "FileDescriptorPipe::createPipe - ::SetHandleInformation failed"_a8;

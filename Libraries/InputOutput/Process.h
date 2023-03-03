@@ -15,7 +15,7 @@ struct ProcessID
     int32_t pid = 0;
 };
 
-struct ProcessEntry;
+struct Process;
 struct ProcessOptions
 {
     bool useShell               = true;
@@ -29,28 +29,36 @@ struct ProcessExitStatus
 {
     Optional<int32_t> value = 0;
 };
-
+#if SC_PLATFORM_WINDOWS
+using ProcessNative                                 = void*;   // HANDLE
+static constexpr ProcessNative ProcessNativeInvalid = nullptr; // INVALID_HANDLE_VALUE
+#else
+using ProcessNative                                 = int; // pid_t
+static constexpr ProcessNative ProcessNativeInvalid = 0;
+#endif
+ReturnCode ProcessNativeHandleClose(ProcessNative& handle);
+struct ProcessNativeHandle
+    : public UniqueTaggedHandle<ProcessNative, ProcessNativeInvalid, ReturnCode, &ProcessNativeHandleClose>
+{
+};
 } // namespace SC
 
-struct SC::ProcessEntry
+struct SC::Process
 {
-    ProcessID          processID;
-    ProcessExitStatus  exitStatus;
-    FileDescriptor     standardInput;
-    FileDescriptor     standardOutput;
-    FileDescriptor     standardError;
-    StringNative<255>  command;
-    StringNative<255>  currentDirectory;
-    StringNative<1024> environment;
+    ProcessID           processID;
+    ProcessExitStatus   exitStatus;
+    FileDescriptor      standardInput;
+    FileDescriptor      standardOutput;
+    FileDescriptor      standardError;
+    StringNative<255>   command;
+    StringNative<255>   currentDirectory;
+    StringNative<1024>  environment;
+    ProcessNativeHandle handle;
 
     [[nodiscard]] ReturnCode waitProcessExit();
     [[nodiscard]] ReturnCode run(const ProcessOptions& options);
 
-    struct ProcessHandle;
-
   private:
-    OpaqueUniqueObject<ProcessHandle> processHandlePimpl;
-
     struct Internal;
     template <typename Lambda>
     [[nodiscard]] ReturnCode spawn(Lambda&& lambda);
@@ -83,7 +91,7 @@ struct SC::ProcessShell
   private:
     Delegate<const Error&> onError;
     Error                  error;
-    Vector<ProcessEntry>   processes;
+    Vector<Process>        processes;
 
     FileDescriptorPipe inputPipe;
     FileDescriptorPipe outputPipe;

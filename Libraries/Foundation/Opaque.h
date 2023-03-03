@@ -21,30 +21,28 @@ struct OpaqueHandle
     alignas(Alignment) char bytes[N];
 };
 
-template <typename T>
+template <typename T, int N, int Alignment>
 struct OpaqueFunctions
 {
-    template <int BufferSizeInBytes>
-    static void construct(uint8_t* buffer);
+    using Handle = OpaqueHandle<N, Alignment>;
+    using Object = T;
+    static void construct(Handle& buffer);
     static void destruct(T& obj);
-    static void moveConstruct(uint8_t* buffer, T&& obj);
+    static void moveConstruct(Handle& buffer, T&& obj);
     static void moveAssign(T& pthis, T&& obj);
 };
 
-template <typename T, int N = sizeof(void*)>
+template <typename T, int N = sizeof(void*), int Alignment = alignof(void*)>
 struct OpaqueUniqueObject
 {
     static constexpr int BufferSizeInBytes = N;
 
-    OpaqueUniqueObject() { OpaqueUniqueObjectOps::template construct<N>(buffer); }
-    ~OpaqueUniqueObject() { OpaqueUniqueObjectOps::destruct(get()); }
-    OpaqueUniqueObject(OpaqueUniqueObject&& other)
-    {
-        OpaqueUniqueObjectOps::moveConstruct(buffer, forward<T>(other.get()));
-    }
+    OpaqueUniqueObject() { OpaqueOps::construct(buffer); }
+    ~OpaqueUniqueObject() { OpaqueOps::destruct(get()); }
+    OpaqueUniqueObject(OpaqueUniqueObject&& other) { OpaqueOps::moveConstruct(buffer, forward<T>(other.get())); }
     OpaqueUniqueObject& operator=(OpaqueUniqueObject&& other)
     {
-        OpaqueUniqueObjectOps::moveAssign(get(), forward<T>(other.get()));
+        OpaqueOps::moveAssign(get(), forward<T>(other.get()));
         return *this;
     }
 
@@ -56,15 +54,32 @@ struct OpaqueUniqueObject
     const T& get() const { return reinterpret_cast<const T&>(buffer); }
 
   private:
-    using OpaqueUniqueObjectOps = OpaqueFunctions<T>;
-    alignas(uint64_t) uint8_t buffer[N];
+    using OpaqueOps = OpaqueFunctions<T, N, Alignment>;
+    OpaqueHandle<N, Alignment> buffer;
 };
 
 template <typename HandleType, HandleType InvalidSentinel, typename CloseReturnType,
           CloseReturnType (*DeleteFunc)(HandleType&)>
-struct OpaqueUniqueTaggedHandle
+struct UniqueTaggedHandle
 {
-    static constexpr HandleType   InvalidHandle() { return InvalidSentinel; }
+    UniqueTaggedHandle()                                           = default;
+    UniqueTaggedHandle(const UniqueTaggedHandle& v)                = delete;
+    UniqueTaggedHandle& operator=(const UniqueTaggedHandle& other) = delete;
+    UniqueTaggedHandle(UniqueTaggedHandle&& v) : handle(v.handle) { v.detach(); }
+    UniqueTaggedHandle(const HandleType& externalHandle) : handle(externalHandle) {}
+    ~UniqueTaggedHandle() { (void)close(); }
+
+    [[nodiscard]] CloseReturnType assign(UniqueTaggedHandle&& other)
+    {
+        if (close())
+        {
+            handle = other.handle;
+            other.detach();
+            return true;
+        }
+        return false;
+    }
+
     [[nodiscard]] CloseReturnType assign(const HandleType& externalHandle)
     {
         if (close())
@@ -75,26 +90,9 @@ struct OpaqueUniqueTaggedHandle
         return false;
     }
 
-    OpaqueUniqueTaggedHandle()                                                 = default;
-    OpaqueUniqueTaggedHandle(const OpaqueUniqueTaggedHandle& v)                = delete;
-    OpaqueUniqueTaggedHandle& operator=(const OpaqueUniqueTaggedHandle& other) = delete;
-    OpaqueUniqueTaggedHandle(OpaqueUniqueTaggedHandle&& v) : handle(v.handle) { v.detach(); }
-    OpaqueUniqueTaggedHandle(const HandleType& externalHandle) : handle(externalHandle) {}
-    ~OpaqueUniqueTaggedHandle() { (void)close(); }
-
-    [[nodiscard]] CloseReturnType assignMovingFrom(OpaqueUniqueTaggedHandle& other)
+    UniqueTaggedHandle& operator=(UniqueTaggedHandle&& other)
     {
-        if (close())
-        {
-            handle = other.handle;
-            other.detach();
-            return true;
-        }
-        return false;
-    }
-    OpaqueUniqueTaggedHandle& operator=(OpaqueUniqueTaggedHandle&& other)
-    {
-        (void)(assignMovingFrom(other));
+        (void)(assign(forward<UniqueTaggedHandle>(other)));
         return *this;
     }
 

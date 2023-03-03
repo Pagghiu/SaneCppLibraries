@@ -281,8 +281,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Vector.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\VectorTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptor.h" />
-    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalPosix.h" />
-    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalWindows.h" />
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystem.h" />
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.h" />
