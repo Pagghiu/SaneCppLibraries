@@ -244,6 +244,7 @@ FunctionDeducerCreator<R, FunctionEmptyClass, Args...> FunctionDeducer(R(Args...
 }
 template <typename T>
 using Delegate = Function<void(T)>;
+using Action   = Function<void()>;
 #define SC_FUNCTION_FREE(FUNCTION_PARAM) SC::FunctionDeducer(FUNCTION_PARAM).Bind<FUNCTION_PARAM>()
 #define SC_FUNCTION_MEMBER(FUNCTION_PARAM, FUNCTION_OBJECT)                                                            \
     SC::FunctionDeducer(FUNCTION_PARAM).Bind<FUNCTION_PARAM>(FUNCTION_OBJECT)

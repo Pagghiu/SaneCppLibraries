@@ -8,6 +8,9 @@ namespace SC
 {
 template <typename Value>
 struct Optional;
+
+template <typename Value>
+struct UniqueOptional;
 } // namespace SC
 
 template <typename Value>
@@ -107,6 +110,25 @@ struct [[nodiscard]] SC::Optional
         return false;
     }
 
+    void clear()
+    {
+        if (hasValue)
+        {
+            value.~ValueType();
+        }
+        hasValue = false;
+    }
+
+    void assign(Value&& source)
+    {
+        if (hasValue)
+        {
+            value.~ValueType();
+        }
+        new (&value, PlacementNew()) ValueType(forward<Value>(source));
+        hasValue = true;
+    }
+
     [[nodiscard]] bool get(const Value*& pValue) const
     {
         if (hasValue)
@@ -117,7 +139,7 @@ struct [[nodiscard]] SC::Optional
         return false;
     }
 
-    [[nodiscard]] bool get(Value*& pValue) const
+    [[nodiscard]] bool get(Value*& pValue)
     {
         if (hasValue)
         {
@@ -126,4 +148,15 @@ struct [[nodiscard]] SC::Optional
         }
         return false;
     }
+};
+
+template <typename Value>
+struct [[nodiscard]] SC::UniqueOptional : public Optional<Value>
+{
+    UniqueOptional()                                 = default;
+    ~UniqueOptional()                                = default;
+    UniqueOptional(UniqueOptional&&)                 = default;
+    UniqueOptional& operator=(UniqueOptional&&)      = default;
+    UniqueOptional(const UniqueOptional&)            = delete;
+    UniqueOptional& operator=(const UniqueOptional&) = delete;
 };
