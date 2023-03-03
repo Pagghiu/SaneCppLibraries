@@ -2,15 +2,15 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "MovableHandle.h"
+#include "Opaque.h"
 #include "Test.h"
 
 namespace SC
 {
-struct MovableHandleTest;
+struct OpaqueTest;
 }
 
-struct SC::MovableHandleTest : public SC::TestCase
+struct SC::OpaqueTest : public SC::TestCase
 {
     struct MyDeleter
     {
@@ -25,13 +25,13 @@ struct SC::MovableHandleTest : public SC::TestCase
             return true;
         }
     };
-    MovableHandleTest(SC::TestReport& report) : TestCase(report, "MovableHandleTest")
+    OpaqueTest(SC::TestReport& report) : TestCase(report, "OpaqueTest")
     {
         using namespace SC;
-        if (test_section("MovableHandle"))
+        if (test_section("OpaqueUniqueTaggedHandle"))
         {
             MyDeleter::getDeleteCalled() = false;
-            MovableHandle<int, -1, bool, &MyDeleter::deleteHandle> myInt;
+            OpaqueUniqueTaggedHandle<int, -1, bool, &MyDeleter::deleteHandle> myInt;
             {
                 SC_TEST_EXPECT(not MyDeleter::getDeleteCalled());
                 SC_TEST_EXPECT(not myInt);

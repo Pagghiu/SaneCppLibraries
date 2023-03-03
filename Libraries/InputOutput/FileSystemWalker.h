@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/CompilerFirewall.h"
+#include "../Foundation/Opaque.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/StringView.h"
 #include "FileDescriptor.h"
@@ -55,7 +55,7 @@ struct SC::FileSystemWalker
     struct Internal;
 
   private:
-    CompilerFirewall<Internal, InternalSize> internal;
+    OpaqueUniqueObject<Internal, InternalSize> internal;
 
     Entry      entry;
     ReturnCode errorResult   = true;

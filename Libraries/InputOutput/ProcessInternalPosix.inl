@@ -18,7 +18,8 @@ struct SC::ProcessEntry::Internal
     static FileNativeDescriptor getStandardErrorFDS() { return fileno(stderr); };
 };
 
-struct SC::ProcessEntry::ProcessHandle : public MovableHandle<pid_t, 0, ReturnCode, &Internal::ProcessHandleClose>
+struct SC::ProcessEntry::ProcessHandle
+    : public OpaqueUniqueTaggedHandle<pid_t, 0, ReturnCode, &Internal::ProcessHandleClose>
 {
 };
 SC::ReturnCode SC::ProcessEntry::fork()

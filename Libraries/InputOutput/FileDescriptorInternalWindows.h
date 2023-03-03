@@ -4,7 +4,7 @@
 #pragma once
 #include "FileDescriptor.h"
 
-#include "../Foundation/MovableHandle.h"
+#include "../Foundation/Opaque.h"
 
 #include <Windows.h>
 
@@ -12,8 +12,8 @@ namespace SC
 {
 using FileNativeDescriptor = HANDLE;
 ReturnCode FileNativeDescriptorClose(FileNativeDescriptor&);
-struct FileNativeMovableHandle
-    : public MovableHandle<FileNativeDescriptor, INVALID_HANDLE_VALUE, ReturnCode, FileNativeDescriptorClose>
+struct FileNativeOpaqueUniqueTaggedHandle
+    : public OpaqueUniqueTaggedHandle<FileNativeDescriptor, INVALID_HANDLE_VALUE, ReturnCode, FileNativeDescriptorClose>
 {
 };
 } // namespace SC

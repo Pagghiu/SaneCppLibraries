@@ -8,7 +8,7 @@
 #include "../../Libraries/Foundation/FunctionTest.h"
 #include "../../Libraries/Foundation/MapTest.h"
 #include "../../Libraries/Foundation/MemoryTest.h"
-#include "../../Libraries/Foundation/MovableHandleTest.h"
+#include "../../Libraries/Foundation/OpaqueTest.h"
 #include "../../Libraries/Foundation/OptionalTest.h"
 #include "../../Libraries/Foundation/PathTest.h"
 #include "../../Libraries/Foundation/ResultTest.h"
@@ -54,7 +54,7 @@ int main(int argc, const char* argv[])
     { FunctionTest                  test(report); }
     { MapTest                       test(report); }
     { MemoryTest                    test(report); }
-    { MovableHandleTest             test(report); }
+    { OpaqueTest             test(report); }
     { OptionalTest                  test(report); }
     { PathTest                      test(report); }
     { ResultTest                    test(report); }

@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/CompilerFirewall.h"
+#include "../Foundation/Opaque.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/Vector.h"
 namespace SC
@@ -11,7 +11,7 @@ struct FileDescriptor;
 struct FileDescriptorPipe;
 struct FileDescriptorWindows;
 struct FileDescriptorPosix;
-struct FileNativeMovableHandle;
+struct FileNativeOpaqueUniqueTaggedHandle;
 } // namespace SC
 
 // TODO: Figure out if these operations should be abstracted or put into internal per platform implementation
@@ -45,7 +45,7 @@ struct SC::FileDescriptor
     [[nodiscard]] ReturnCode close();
     [[nodiscard]] ReturnCode assignMovingFrom(FileDescriptor& other);
 
-    CompilerFirewall<FileNativeMovableHandle> fileNativeHandle;
+    OpaqueUniqueObject<FileNativeOpaqueUniqueTaggedHandle> fileNativeHandle;
 };
 
 struct SC::FileDescriptorPipe

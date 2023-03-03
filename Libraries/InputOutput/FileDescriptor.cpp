@@ -11,27 +11,27 @@
 
 template <>
 template <>
-void SC::CompilerFirewallFuncs<SC::FileNativeMovableHandle>::construct<sizeof(void*)>(uint8_t* buffer)
+void SC::OpaqueFunctions<SC::FileNativeOpaqueUniqueTaggedHandle>::construct<sizeof(void*)>(uint8_t* buffer)
 {
-    static_assert(sizeof(void*) >= sizeof(FileNativeMovableHandle), "Increase size of unique static pimpl");
-    new (buffer, PlacementNew()) FileNativeMovableHandle();
+    static_assert(sizeof(void*) >= sizeof(FileNativeOpaqueUniqueTaggedHandle), "Increase size of unique static pimpl");
+    new (buffer, PlacementNew()) FileNativeOpaqueUniqueTaggedHandle();
 }
 template <>
-void SC::CompilerFirewallFuncs<SC::FileNativeMovableHandle>::destruct(FileNativeMovableHandle& obj)
+void SC::OpaqueFunctions<SC::FileNativeOpaqueUniqueTaggedHandle>::destruct(FileNativeOpaqueUniqueTaggedHandle& obj)
 {
-    obj.~FileNativeMovableHandle();
+    obj.~FileNativeOpaqueUniqueTaggedHandle();
 }
 template <>
-void SC::CompilerFirewallFuncs<SC::FileNativeMovableHandle>::moveConstruct(uint8_t*                  buffer,
-                                                                           FileNativeMovableHandle&& obj)
+void SC::OpaqueFunctions<SC::FileNativeOpaqueUniqueTaggedHandle>::moveConstruct(
+    uint8_t* buffer, FileNativeOpaqueUniqueTaggedHandle&& obj)
 {
-    new (buffer, PlacementNew()) FileNativeMovableHandle(forward<FileNativeMovableHandle>(obj));
+    new (buffer, PlacementNew()) FileNativeOpaqueUniqueTaggedHandle(forward<FileNativeOpaqueUniqueTaggedHandle>(obj));
 }
 template <>
-void SC::CompilerFirewallFuncs<SC::FileNativeMovableHandle>::moveAssign(FileNativeMovableHandle&  pthis,
-                                                                        FileNativeMovableHandle&& obj)
+void SC::OpaqueFunctions<SC::FileNativeOpaqueUniqueTaggedHandle>::moveAssign(FileNativeOpaqueUniqueTaggedHandle&  pthis,
+                                                                             FileNativeOpaqueUniqueTaggedHandle&& obj)
 {
-    pthis = forward<FileNativeMovableHandle>(obj);
+    pthis = forward<FileNativeOpaqueUniqueTaggedHandle>(obj);
 }
 
 void           SC::FileDescriptor::detach() { fileNativeHandle.get().detach(); }

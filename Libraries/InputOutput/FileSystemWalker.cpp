@@ -11,8 +11,7 @@
 #endif
 template <>
 template <>
-void SC::CompilerFirewallFuncs<SC::FileSystemWalker::Internal>::construct<SC::FileSystemWalker::InternalSize>(
-    uint8_t* buffer)
+void SC::OpaqueFunctions<SC::FileSystemWalker::Internal>::construct<SC::FileSystemWalker::InternalSize>(uint8_t* buffer)
 {
     static_assert(SC::FileSystemWalker::InternalSize >= sizeof(FileSystemWalker::Internal),
                   "Increase size of unique static pimpl");
@@ -20,7 +19,7 @@ void SC::CompilerFirewallFuncs<SC::FileSystemWalker::Internal>::construct<SC::Fi
     new (buffer, PlacementNew()) FileSystemWalker::Internal();
 }
 template <>
-void SC::CompilerFirewallFuncs<SC::FileSystemWalker::Internal>::destruct(FileSystemWalker::Internal& obj)
+void SC::OpaqueFunctions<SC::FileSystemWalker::Internal>::destruct(FileSystemWalker::Internal& obj)
 {
     obj.~Internal();
 }

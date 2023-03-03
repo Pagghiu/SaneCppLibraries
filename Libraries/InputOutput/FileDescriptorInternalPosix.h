@@ -4,13 +4,14 @@
 #pragma once
 #include "FileDescriptor.h"
 
-#include "../Foundation/MovableHandle.h"
+#include "../Foundation/Opaque.h"
 
 namespace SC
 {
 using FileNativeDescriptor = int;
 ReturnCode FileNativeDescriptorClose(FileNativeDescriptor&);
-struct FileNativeMovableHandle : public MovableHandle<FileNativeDescriptor, -1, ReturnCode, FileNativeDescriptorClose>
+struct FileNativeOpaqueUniqueTaggedHandle
+    : public OpaqueUniqueTaggedHandle<FileNativeDescriptor, -1, ReturnCode, FileNativeDescriptorClose>
 {
 };
 } // namespace SC

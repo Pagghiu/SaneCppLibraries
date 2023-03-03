@@ -20,7 +20,7 @@ struct SC::ProcessEntry::Internal
 };
 
 struct SC::ProcessEntry::ProcessHandle
-    : public MovableHandle<HANDLE, nullptr, ReturnCode, &Internal::ProcessHandleClose>
+    : public OpaqueUniqueTaggedHandle<HANDLE, nullptr, ReturnCode, &Internal::ProcessHandleClose>
 {
 };
 SC::ReturnCode SC::ProcessEntry::waitProcessExit()

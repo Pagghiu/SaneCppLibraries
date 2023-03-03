@@ -13,25 +13,25 @@
 
 template <>
 template <int BufferSizeInBytes>
-void SC::CompilerFirewallFuncs<SC::ProcessEntry::ProcessHandle>::construct(uint8_t* buffer)
+void SC::OpaqueFunctions<SC::ProcessEntry::ProcessHandle>::construct(uint8_t* buffer)
 {
     static_assert(BufferSizeInBytes >= sizeof(ProcessEntry::ProcessHandle), "Increase size of unique static pimpl");
     new (buffer, PlacementNew()) ProcessEntry::ProcessHandle();
 }
 template <>
-void SC::CompilerFirewallFuncs<SC::ProcessEntry::ProcessHandle>::destruct(ProcessEntry::ProcessHandle& obj)
+void SC::OpaqueFunctions<SC::ProcessEntry::ProcessHandle>::destruct(ProcessEntry::ProcessHandle& obj)
 {
     obj.~ProcessHandle();
 }
 template <>
-void SC::CompilerFirewallFuncs<SC::ProcessEntry::ProcessHandle>::moveConstruct(uint8_t*                      buffer,
-                                                                               ProcessEntry::ProcessHandle&& obj)
+void SC::OpaqueFunctions<SC::ProcessEntry::ProcessHandle>::moveConstruct(uint8_t*                      buffer,
+                                                                         ProcessEntry::ProcessHandle&& obj)
 {
     new (buffer, PlacementNew()) ProcessEntry::ProcessHandle(forward<ProcessEntry::ProcessHandle>(obj));
 }
 template <>
-void SC::CompilerFirewallFuncs<SC::ProcessEntry::ProcessHandle>::moveAssign(ProcessEntry::ProcessHandle&  pthis,
-                                                                            ProcessEntry::ProcessHandle&& obj)
+void SC::OpaqueFunctions<SC::ProcessEntry::ProcessHandle>::moveAssign(ProcessEntry::ProcessHandle&  pthis,
+                                                                      ProcessEntry::ProcessHandle&& obj)
 {
     pthis = forward<ProcessEntry::ProcessHandle>(obj);
 }

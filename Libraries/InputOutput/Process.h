@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/CompilerFirewall.h"
 #include "../Foundation/Function.h"
+#include "../Foundation/Opaque.h"
 #include "../Foundation/Optional.h"
 #include "../Foundation/StringNative.h"
 #include "FileDescriptor.h"
@@ -49,7 +49,7 @@ struct SC::ProcessEntry
     struct ProcessHandle;
 
   private:
-    CompilerFirewall<ProcessHandle> processHandlePimpl;
+    OpaqueUniqueObject<ProcessHandle> processHandlePimpl;
 
     struct Internal;
     template <typename Lambda>

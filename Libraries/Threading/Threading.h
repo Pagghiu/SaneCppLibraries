@@ -3,10 +3,10 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/Function.h"
+#include "../Foundation/Opaque.h"
 #include "../Foundation/Optional.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/StringView.h"
-#include "../Foundation/CompilerFirewall.h"
 
 namespace SC
 {

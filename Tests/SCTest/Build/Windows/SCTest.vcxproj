@@ -238,7 +238,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ArrayTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Compiler.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\CompilerFirewall.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Opaque.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Console.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ConsoleTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ConstexprTypes.h" />
@@ -252,8 +252,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\MapTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Memory.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\MemoryTest.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\MovableHandle.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\MovableHandleTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\OpaqueTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Optional.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\OptionalTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\System.h" />
