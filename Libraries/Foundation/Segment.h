@@ -47,6 +47,7 @@ struct SC::SegmentHeader
 template <typename T>
 struct SC::SegmentItems : public SegmentHeader
 {
+    SegmentItems() { initDefaults(); }
     [[nodiscard]] size_t size() const { return sizeBytes / sizeof(T); }
     [[nodiscard]] bool   isEmpty() const { return sizeBytes == 0; }
     [[nodiscard]] size_t capacity() const { return capacityBytes / sizeof(T); }
