@@ -226,6 +226,7 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringConverter.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringView.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Test.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\Time.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileDescriptor.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystem.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.cpp" />
@@ -277,6 +278,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringView.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringViewTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Test.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Time.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\TimeTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Types.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Vector.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\VectorTest.h" />

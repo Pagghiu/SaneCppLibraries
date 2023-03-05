@@ -17,6 +17,7 @@
 #include "../../Libraries/Foundation/StringTest.h"
 #include "../../Libraries/Foundation/StringViewTest.h"
 #include "../../Libraries/Foundation/SystemTest.h"
+#include "../../Libraries/Foundation/TimeTest.h"
 #include "../../Libraries/Foundation/VectorTest.h"
 
 // InputOutput
@@ -63,6 +64,7 @@ int main(int argc, const char* argv[])
     { StringTest                    test(report); }
     { StringViewTest                test(report); }
     { SystemTest                    test(report); }
+    { TimeTest                      test(report); }
     { VectorTest                    test(report); }
 
     // InputOutput tests

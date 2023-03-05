@@ -65,6 +65,7 @@ Libraries/Foundation/StringFormat.cpp       \
 Libraries/Foundation/StringView.cpp         \
 Libraries/Foundation/System.cpp             \
 Libraries/Foundation/Test.cpp               \
+Libraries/Foundation/Time.cpp               \
 Libraries/InputOutput/FileDescriptor.cpp    \
 Libraries/InputOutput/FileSystem.cpp        \
 Libraries/InputOutput/FileSystemWalker.cpp  \
