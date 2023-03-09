@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "FileDescriptor.h"
 
+#include <errno.h>
 #include <fcntl.h>  // fcntl
 #include <stdio.h>  // stdout, stdin
 #include <unistd.h> // close
@@ -16,13 +17,19 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
     SC_TRY_IF(handle.get(fileDescriptor, "FileDescriptor::readAppend - Invalid Handle"_a8));
     if (useVector)
     {
-        numReadBytes = read(fileDescriptor, output.data() + output.size(), output.capacity() - output.size());
+        do
+        {
+            numReadBytes = read(fileDescriptor, output.data() + output.size(), output.capacity() - output.size());
+        } while (numReadBytes == -1 && errno == EINTR); // Syscall may be interrupted and userspace must retry
     }
     else
     {
         SC_TRY_MSG(fallbackBuffer.sizeInBytes() != 0,
                    "FileDescriptor::readAppend - buffer must be bigger than zero"_a8);
-        numReadBytes = read(fileDescriptor, fallbackBuffer.data(), fallbackBuffer.sizeInBytes());
+        do
+        {
+            numReadBytes = read(fileDescriptor, fallbackBuffer.data(), fallbackBuffer.sizeInBytes());
+        } while (numReadBytes == -1 && errno == EINTR); // Syscall may be interrupted and userspace must retry
     }
     if (numReadBytes > 0)
     {
