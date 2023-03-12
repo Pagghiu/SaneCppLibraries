@@ -18,6 +18,12 @@
     <Filter Include="Serialization">
       <UniqueIdentifier>{a96dd608-4270-4a30-ba77-903042163752}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Async">
+      <UniqueIdentifier>{f8d68c02-3548-48bc-881e-4f9a019190af}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Threading">
+      <UniqueIdentifier>{d44e6dde-d6eb-4e7e-9b5f-78e958cb07d5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\SCTest.cpp">
@@ -70,6 +76,15 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileDescriptor.cpp">
       <Filter>InputOutput</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Async\Loop.cpp">
+      <Filter>Async</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Threading\Threading.cpp">
+      <Filter>Threading</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\Time.cpp">
+      <Filter>Foundation</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -271,20 +286,31 @@
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptor.h">
       <Filter>InputOutput</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\MovableHandle.h">
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Opaque.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\MovableHandleTest.h">
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\OpaqueTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalPosix.h">
-      <Filter>InputOutput</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalWindows.h">
-      <Filter>InputOutput</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\CompilerFirewall.h">
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Time.h">
       <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\TimeTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Threading\Threading.h">
+      <Filter>Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Async\Loop.h">
+      <Filter>Async</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Async\LoopTest.h">
+      <Filter>Async</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Threading\ThreadingTest.h">
+      <Filter>Threading</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -303,15 +329,6 @@
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalWindows.inl">
       <Filter>InputOutput</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Foundation\OSInternalEmscripten.inl">
-      <Filter>Foundation</Filter>
-    </None>
-    <None Include="..\..\..\..\Libraries\Foundation\OSInternalPosix.inl">
-      <Filter>Foundation</Filter>
-    </None>
-    <None Include="..\..\..\..\Libraries\Foundation\OSInternalWindows.inl">
-      <Filter>Foundation</Filter>
-    </None>
     <None Include="..\..\..\..\Libraries\InputOutput\UtilityWindows.inl">
       <Filter>InputOutput</Filter>
     </None>
@@ -329,6 +346,30 @@
     </None>
     <None Include="..\..\..\..\Libraries\InputOutput\ProcessInternalWindows.inl">
       <Filter>InputOutput</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Foundation\SystemInternalEmscripten.inl">
+      <Filter>Foundation</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Foundation\SystemInternalPosix.inl">
+      <Filter>Foundation</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Foundation\SystemInternalWindows.inl">
+      <Filter>Foundation</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Async\LoopInternalApple.inl">
+      <Filter>Async</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Async\LoopInternalEmscripten.inl">
+      <Filter>Async</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Async\LoopInternalWindows.inl">
+      <Filter>Async</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Threading\ThreadingInternalPosix.inl">
+      <Filter>Threading</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Threading\ThreadingInternalWindows.inl">
+      <Filter>Threading</Filter>
     </None>
   </ItemGroup>
 </Project>
