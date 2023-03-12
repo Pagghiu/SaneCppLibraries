@@ -26,7 +26,7 @@ struct SC::Function<R(Args...)>
     using StubFunction = R (*)(FunctionErasedOperation operation, void* other, const void* const*,
                                typename AddPointer<Args>::type...);
 
-    static const int LAMBDA_SIZE = sizeof(uint64_t) * 2;
+    static const int LAMBDA_SIZE = sizeof(uint64_t) * 4;
 
     StubFunction functionStub;
     union
