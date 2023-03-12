@@ -38,11 +38,11 @@ struct SC::Thread::CreateParams
     }
 };
 
-SC::Thread::~Thread() { SC_DEBUG_ASSERT(not thread && "Forgot to call join() or detach()"); }
+SC::Thread::~Thread() { SC_DEBUG_ASSERT(not thread.hasValue() && "Forgot to call join() or detach()"); }
 
 SC::ReturnCode SC::Thread::start(StringView name, Action&& func)
 {
-    if (thread)
+    if (thread.hasValue())
         return "Error thread already started"_a8;
     CreateParams      self(forward<Action>(func), this);
     StringNative<128> nameNative;

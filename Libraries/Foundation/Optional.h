@@ -24,28 +24,27 @@ struct [[nodiscard]] SC::Optional
     {
         ValueType value;
     };
-    bool hasValue;
+    bool valueExists;
 
   public:
-    constexpr operator bool() const { return hasValue; }
-
+    [[nodiscard]] bool           hasValue() const { return valueExists; }
     SC_CONSTEXPR_CONSTRUCTOR_NEW Optional(const Value& v)
     {
         new (&value, PlacementNew()) ValueType(v);
-        hasValue = true;
+        valueExists = true;
     }
 
     SC_CONSTEXPR_CONSTRUCTOR_NEW Optional(Value&& v)
     {
         new (&value, PlacementNew()) ValueType(forward<Value>(v));
-        hasValue = true;
+        valueExists = true;
     }
 
-    SC_CONSTEXPR_CONSTRUCTOR_NEW Optional() { hasValue = false; }
+    SC_CONSTEXPR_CONSTRUCTOR_NEW Optional() { valueExists = false; }
 
     SC_CONSTEXPR_DESTRUCTOR ~Optional()
     {
-        if (hasValue)
+        if (valueExists)
         {
             value.~ValueType();
         }
@@ -53,18 +52,18 @@ struct [[nodiscard]] SC::Optional
 
     SC_CONSTEXPR_CONSTRUCTOR_NEW Optional(Optional&& other) noexcept
     {
-        hasValue = other.hasValue;
-        if (hasValue)
+        valueExists = other.valueExists;
+        if (valueExists)
         {
             new (&value, PlacementNew()) ValueType(move(other.value));
-            other.hasValue = false;
+            other.valueExists = false;
         }
     }
 
     SC_CONSTEXPR_CONSTRUCTOR_NEW Optional(const Optional& other)
     {
-        hasValue = other.hasValue;
-        if (hasValue)
+        valueExists = other.valueExists;
+        if (valueExists)
         {
             new (&value, PlacementNew()) ValueType(other.value);
         }
@@ -72,12 +71,12 @@ struct [[nodiscard]] SC::Optional
 
     constexpr Optional& operator=(const Optional& other) const
     {
-        if (hasValue)
+        if (valueExists)
         {
             value.~ValueType();
         }
-        hasValue = other.hasValue;
-        if (hasValue)
+        valueExists = other.valueExists;
+        if (valueExists)
         {
             new (&value, PlacementNew()) ValueType(other.value);
         }
@@ -86,25 +85,25 @@ struct [[nodiscard]] SC::Optional
 
     constexpr Optional& operator=(Optional&& other)
     {
-        if (hasValue)
+        if (valueExists)
         {
             value.~ValueType();
         }
-        hasValue = other.hasValue;
-        if (hasValue)
+        valueExists = other.valueExists;
+        if (valueExists)
         {
             new (&value, PlacementNew()) ValueType(move(other.value));
-            other.hasValue = false;
+            other.valueExists = false;
         }
         return *this;
     }
 
     [[nodiscard]] bool moveTo(Value& destination)
     {
-        if (hasValue)
+        if (valueExists)
         {
             destination = move(value);
-            hasValue    = false;
+            valueExists = false;
             return true;
         }
         return false;
@@ -112,26 +111,26 @@ struct [[nodiscard]] SC::Optional
 
     void clear()
     {
-        if (hasValue)
+        if (valueExists)
         {
             value.~ValueType();
         }
-        hasValue = false;
+        valueExists = false;
     }
 
     void assign(Value&& source)
     {
-        if (hasValue)
+        if (valueExists)
         {
             value.~ValueType();
         }
         new (&value, PlacementNew()) ValueType(forward<Value>(source));
-        hasValue = true;
+        valueExists = true;
     }
 
     [[nodiscard]] bool get(const Value*& pValue) const
     {
-        if (hasValue)
+        if (valueExists)
         {
             pValue = &value;
             return true;
@@ -141,7 +140,7 @@ struct [[nodiscard]] SC::Optional
 
     [[nodiscard]] bool get(Value*& pValue)
     {
-        if (hasValue)
+        if (valueExists)
         {
             pValue = &value;
             return true;

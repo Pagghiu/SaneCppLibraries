@@ -100,6 +100,8 @@ struct SC::Thread
     [[nodiscard]] ReturnCode join();
     [[nodiscard]] ReturnCode detach();
 
+    static void Sleep(uint32_t milliseconds);
+
   private:
     struct CreateParams;
     struct Internal;

@@ -18,12 +18,12 @@ struct SC::OptionalTest : public SC::TestCase
         if (test_section("Optional"))
         {
             Optional<String> optString = String("ASD"_a8);
-            SC_TEST_EXPECT(optString);
+            SC_TEST_EXPECT(optString.hasValue());
             const String* value;
             SC_TEST_EXPECT(optString.get(value) and value->view() == "ASD"_a8);
             String extracted;
             SC_TEST_EXPECT(optString.moveTo(extracted) and extracted.view() == "ASD"_a8);
-            SC_TEST_EXPECT(not optString);
+            SC_TEST_EXPECT(not optString.hasValue());
         }
     }
 };
