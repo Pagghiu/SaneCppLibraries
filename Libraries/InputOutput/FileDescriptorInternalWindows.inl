@@ -76,33 +76,53 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
     }
 }
 
-SC::ReturnCode SC::FileDescriptorPipe::createPipe()
+SC::ReturnCode SC::FileDescriptor::setBlocking(bool blocking)
 {
+    FileDescriptorNative fileDescriptor;
+    SC_TRY_IF(handle.get(fileDescriptor, "FileDescriptor::setBlocking - Invalid Handle"_a8));
+    // TODO: IMPLEMENT
+    return false;
+}
+
+SC::ReturnCode SC::FileDescriptor::setInheritable(bool inheritable)
+{
+    FileDescriptorNative fileDescriptor;
+    SC_TRY_IF(handle.get(fileDescriptor, "FileDescriptor::setInheritable - Invalid Handle"_a8));
+    if (SetHandleInformation(fileDescriptor, HANDLE_FLAG_INHERIT, inheritable ? TRUE : FALSE) == FALSE)
+    {
+        return "FileDescriptor::setInheritable - ::SetHandleInformation failed"_a8;
+    }
+    return true;
+}
+
+SC::ReturnCode SC::FileDescriptorPipe::createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag)
+{
+    // On Windows to inherit flags they must be flagged as inheritable
+    // https://devblogs.microsoft.com/oldnewthing/20111216-00/?p=8873
     SECURITY_ATTRIBUTES security  = {0};
     security.nLength              = sizeof(security);
-    security.bInheritHandle       = TRUE;
+    security.bInheritHandle       = readFlag == ReadInheritable or writeFlag == WriteInheritable ? TRUE : FALSE;
     security.lpSecurityDescriptor = nullptr;
     HANDLE pipeRead               = INVALID_HANDLE_VALUE;
     HANDLE pipeWrite              = INVALID_HANDLE_VALUE;
 
-    if (!CreatePipe(&pipeRead, &pipeWrite, &security, 0))
+    if (CreatePipe(&pipeRead, &pipeWrite, &security, 0) == FALSE)
     {
         return "FileDescriptorPipe::createPipe - ::CreatePipe failed"_a8;
     }
     SC_TRY_IF(readPipe.handle.assign(pipeRead));
     SC_TRY_IF(writePipe.handle.assign(pipeWrite));
-    return true;
-}
 
-SC::ReturnCode SC::FileDescriptorWindows::disableInherit()
-{
-    FileDescriptorNative nativeFd;
-    SC_TRY_IF(fileDescriptor.handle.get(nativeFd, "FileDescriptorPipe::createPipe - Invalid Handle"_a8));
-    if (!SetHandleInformation(nativeFd, HANDLE_FLAG_INHERIT, 0))
+    if (security.bInheritHandle)
     {
-        return "FileDescriptorPipe::createPipe - ::SetHandleInformation failed"_a8;
+        if (readFlag == ReadNonInheritable)
+        {
+            SC_TRY_MSG(readPipe.setInheritable(false), "Cannot set read pipe inheritable"_a8);
+        }
+        if (writeFlag == WriteNonInheritable)
+        {
+            SC_TRY_MSG(writePipe.setInheritable(false), "Cannot set write pipe inheritable"_a8);
+        }
     }
     return true;
 }
-
-SC::ReturnCode SC::FileDescriptorPosix::setCloseOnExec() { return true; }

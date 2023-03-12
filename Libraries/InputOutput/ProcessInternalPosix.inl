@@ -49,17 +49,26 @@ SC::ReturnCode SC::Process::spawn(Lambda&& lambda)
         auto exitDeferred = MakeDeferred([&] { _exit(127); });
         if (standardInput.handle.isValid())
         {
-            SC_TRY_IF(standardInput.posix().redirect(Internal::getStandardInputFDS()));
+            SC_TRY_IF(standardInput.posix().duplicateAndReplace(Internal::getStandardInputFDS()));
         }
         if (standardOutput.handle.isValid())
         {
-            SC_TRY_IF(standardOutput.posix().redirect(Internal::getStandardOutputFDS()));
+            SC_TRY_IF(standardOutput.posix().duplicateAndReplace(Internal::getStandardOutputFDS()));
         }
         if (standardError.handle.isValid())
         {
-            SC_TRY_IF(standardError.posix().redirect(Internal::getStandardErrorFDS()));
+            SC_TRY_IF(standardError.posix().duplicateAndReplace(Internal::getStandardErrorFDS()));
         }
-        // TODO: Check if these close calls are still needed after we setCloseOnExec
+        // As std handles have been duplicated / redirected, we can close all of them.
+        // We explicitly close them because some may have not been marked as CLOEXEC.
+        // During creation of pipes we do setInheritable(true) for all read/write FDs
+        // passed to child process, that means not setting the CLOEXEC flag on the FD.
+        // We need the setInheritable(true) because windows backend otherwise child
+        // process will not be able to see / duplicate such file descriptors.
+        // On Posix this is easier as we could just always set CLOEXEC but the FD would
+        // still valid between the fork() and the exec() call to do anything needed
+        // (like the duplication / redirect we're doing here) without risk of leaking
+        // any FD to the newly executed child process.
         SC_TRY_IF(standardInput.handle.close());
         SC_TRY_IF(standardOutput.handle.close());
         SC_TRY_IF(standardError.handle.close());
@@ -68,7 +77,6 @@ SC::ReturnCode SC::Process::spawn(Lambda&& lambda)
     else
     {
         SC_TRY_IF(handle.assign(processID.pid));
-
         SC_TRY_IF(standardInput.handle.close());
         SC_TRY_IF(standardOutput.handle.close());
         SC_TRY_IF(standardError.handle.close());

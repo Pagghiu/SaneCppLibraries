@@ -15,31 +15,25 @@ SC::ReturnCode SC::ProcessShell::launch()
 {
     if (error.returnCode.isError())
         return error.returnCode;
+
     if (processes.isEmpty())
         return false;
 
     if (options.pipeSTDIN)
     {
-        SC_TRY_IF(inputPipe.createPipe());
-        SC_TRY_IF(inputPipe.readPipe.posix().setCloseOnExec());
-        SC_TRY_IF(inputPipe.writePipe.posix().setCloseOnExec());
-        SC_TRY_IF(inputPipe.writePipe.windows().disableInherit());
+        SC_TRY_IF(inputPipe.createPipe(FileDescriptorPipe::ReadInheritable, FileDescriptorPipe::WriteNonInheritable));
         SC_TRY_IF(processes.front().standardInput.handle.assign(move(inputPipe.readPipe.handle)));
     }
+
     if (options.pipeSTDOUT)
     {
-        SC_TRY_IF(outputPipe.createPipe());
-        SC_TRY_IF(outputPipe.readPipe.posix().setCloseOnExec());
-        SC_TRY_IF(outputPipe.writePipe.posix().setCloseOnExec());
-        SC_TRY_IF(outputPipe.readPipe.windows().disableInherit());
+        SC_TRY_IF(outputPipe.createPipe(FileDescriptorPipe::ReadNonInheritable, FileDescriptorPipe::WriteInheritable));
         SC_TRY_IF(processes.back().standardOutput.handle.assign(move(outputPipe.writePipe.handle)));
     }
+
     if (options.pipeSTDERR)
     {
-        SC_TRY_IF(errorPipe.createPipe());
-        SC_TRY_IF(errorPipe.readPipe.posix().setCloseOnExec());
-        SC_TRY_IF(errorPipe.writePipe.posix().setCloseOnExec());
-        SC_TRY_IF(errorPipe.readPipe.windows().disableInherit());
+        SC_TRY_IF(errorPipe.createPipe(FileDescriptorPipe::ReadNonInheritable, FileDescriptorPipe::WriteInheritable));
         SC_TRY_IF(processes.back().standardError.handle.assign(move(errorPipe.writePipe.handle)));
     }
 
@@ -149,9 +143,7 @@ SC::ReturnCode SC::ProcessShell::queueProcess(Span<StringView*> spanArguments)
     if (not processes.isEmpty())
     {
         FileDescriptorPipe chainPipe;
-        SC_TRY_IF(chainPipe.createPipe());
-        SC_TRY_IF(chainPipe.readPipe.posix().setCloseOnExec());
-        SC_TRY_IF(chainPipe.writePipe.posix().setCloseOnExec());
+        SC_TRY_IF(chainPipe.createPipe(FileDescriptorPipe::ReadInheritable, FileDescriptorPipe::WriteInheritable));
         SC_TRY_IF(processes.back().standardOutput.handle.assign(move(chainPipe.writePipe.handle)));
         SC_TRY_IF(process.standardInput.handle.assign(move(chainPipe.readPipe.handle)));
     }

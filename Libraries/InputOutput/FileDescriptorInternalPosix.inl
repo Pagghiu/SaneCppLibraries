@@ -4,9 +4,64 @@
 #include "FileDescriptor.h"
 
 #include <errno.h>
-#include <fcntl.h>  // fcntl
-#include <stdio.h>  // stdout, stdin
-#include <unistd.h> // close
+#include <fcntl.h>     // fcntl
+#include <stdio.h>     // stdout, stdin
+#include <sys/ioctl.h> // ioctl
+#include <unistd.h>    // close
+
+struct SC::FileDescriptor::Internal
+{
+  private:
+    enum TypeFlag
+    {
+        TypeStatusFlag,
+        TypeDescriptorFlag
+    };
+    static ReturnCode setFileFlags(int flagRead, int flagWrite, const FileDescriptorNative fileDescriptor,
+                                   const bool setFlag, const int flag)
+    {
+        int oldFlags;
+        do
+        {
+            oldFlags = ::fcntl(fileDescriptor, flagRead);
+        } while (oldFlags == -1 and errno == EINTR);
+        if (oldFlags == -1)
+        {
+            return "fcntl getFlag failed"_a8;
+        }
+        const int newFlags = setFlag ? oldFlags | flag : oldFlags & (~flag);
+        if (newFlags != oldFlags)
+        {
+            int res;
+            do
+            {
+                res = ::fcntl(fileDescriptor, flagWrite, newFlags);
+            } while (res == -1 and errno == EINTR);
+            if (res != 0)
+            {
+                return "fcntl setFlag failed"_a8;
+            }
+        }
+        return true;
+    }
+
+  public:
+    template <int flag>
+    static ReturnCode setFileDescriptorFlags(FileDescriptorNative fileDescriptor, bool setFlag)
+    {
+        // We can OR the allowed flags here to provide some safety
+        static_assert(flag == FD_CLOEXEC, "setFileStatusFlags invalid value");
+        return setFileFlags(F_GETFD, F_SETFD, fileDescriptor, setFlag, flag);
+    }
+
+    template <int flag>
+    static ReturnCode setFileStatusFlags(FileDescriptorNative fileDescriptor, bool setFlag)
+    {
+        // We can OR the allowed flags here to provide some safety
+        static_assert(flag == O_NONBLOCK, "setFileStatusFlags invalid value");
+        return setFileFlags(F_GETFL, F_SETFL, fileDescriptor, setFlag, flag);
+    }
+};
 
 SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector<char>& output,
                                                                           Span<char>    fallbackBuffer)
@@ -58,6 +113,20 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
     }
 }
 
+SC::ReturnCode SC::FileDescriptor::setBlocking(bool blocking)
+{
+    FileDescriptorNative fileDescriptor;
+    SC_TRY_IF(handle.get(fileDescriptor, "FileDescriptor::setBlocking - Invalid Handle"_a8));
+    return Internal::setFileStatusFlags<O_NONBLOCK>(fileDescriptor, not blocking);
+}
+
+SC::ReturnCode SC::FileDescriptor::setInheritable(bool inheritable)
+{
+    FileDescriptorNative fileDescriptor;
+    SC_TRY_IF(handle.get(fileDescriptor, "FileDescriptor::setInheritable - Invalid Handle"_a8));
+    return Internal::setFileDescriptorFlags<FD_CLOEXEC>(fileDescriptor, not inheritable);
+}
+
 SC::ReturnCode SC::FileDescriptorNativeClose(FileDescriptorNative& fileDescriptor)
 {
     if (::close(fileDescriptor) != 0)
@@ -67,37 +136,35 @@ SC::ReturnCode SC::FileDescriptorNativeClose(FileDescriptorNative& fileDescripto
     return true;
 }
 
-SC::ReturnCode SC::FileDescriptorPipe::createPipe()
+SC::ReturnCode SC::FileDescriptorPipe::createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag)
 {
     int pipes[2];
     if (::pipe(pipes) != 0)
     {
-        return ReturnCode("pipe failed"_a8);
+        return ReturnCode("FileDescriptorPipe::createPipe - pipe failed"_a8);
     }
     SC_TRY_MSG(readPipe.handle.assign(pipes[0]), "Cannot assign read pipe"_a8);
     SC_TRY_MSG(writePipe.handle.assign(pipes[1]), "Cannot assign write pipe"_a8);
-    return true;
-}
-
-SC::ReturnCode SC::FileDescriptorWindows::disableInherit() { return true; }
-SC::ReturnCode SC::FileDescriptorPosix::setCloseOnExec()
-{
-    FileDescriptorNative nativeFd;
-    SC_TRY_IF(fileDescriptor.handle.get(nativeFd, "FileDescriptor::setCloseOnExec - Invalid Handle"_a8));
-    if (::fcntl(nativeFd, F_SETFD, FD_CLOEXEC) != 0)
+    // On Posix by default descriptors are inheritable
+    // https://devblogs.microsoft.com/oldnewthing/20111216-00/?p=8873
+    if (readFlag == ReadNonInheritable)
     {
-        return "FileDescriptor::setCloseOnExec - fcntl failed"_a8;
+        SC_TRY_MSG(readPipe.setInheritable(false), "Cannot set close on exec on read pipe"_a8);
+    }
+    if (writeFlag == WriteNonInheritable)
+    {
+        SC_TRY_MSG(writePipe.setInheritable(false), "Cannot set close on exec on write pipe"_a8);
     }
     return true;
 }
 
-SC::ReturnCode SC::FileDescriptorPosix::redirect(int fds)
+SC::ReturnCode SC::FileDescriptorPosix::duplicateAndReplace(int fds)
 {
     FileDescriptorNative nativeFd;
-    SC_TRY_IF(fileDescriptor.handle.get(nativeFd, "FileDescriptor::redirect - Invalid Handle"_a8));
+    SC_TRY_IF(fileDescriptor.handle.get(nativeFd, "FileDescriptor::duplicateAndReplace - Invalid Handle"_a8));
     if (::dup2(nativeFd, fds) == -1)
     {
-        return ReturnCode("dup2 failed"_a8);
+        return ReturnCode("FileDescriptorPosix::duplicateAndReplace - dup2 failed"_a8);
     }
     return true;
 }

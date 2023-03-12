@@ -27,18 +27,25 @@ struct FileDescriptorNativeHandle : public UniqueTaggedHandle<FileDescriptorNati
 
 } // namespace SC
 
-// TODO: Figure out if these operations should be abstracted or put into internal per platform implementation
 struct SC::FileDescriptorWindows
 {
-    SC::FileDescriptor&      fileDescriptor;
-    [[nodiscard]] ReturnCode disableInherit();
+    SC::FileDescriptor& fileDescriptor;
 };
 
 struct SC::FileDescriptorPosix
 {
     SC::FileDescriptor&      fileDescriptor;
-    [[nodiscard]] ReturnCode setCloseOnExec();
-    [[nodiscard]] ReturnCode redirect(int fds);
+    [[nodiscard]] ReturnCode duplicateAndReplace(int fds);
+};
+
+struct FileDescriptorOptions
+{
+    bool                   inheritable = false;
+    FileDescriptorOptions& setInheritable(bool inheritable)
+    {
+        this->inheritable = inheritable;
+        return *this;
+    }
 };
 
 struct SC::FileDescriptor
@@ -50,16 +57,32 @@ struct SC::FileDescriptor
     };
     [[nodiscard]] Result<ReadResult> readAppend(Vector<char>& output, Span<char> fallbackBuffer);
 
+    [[nodiscard]] ReturnCode setBlocking(bool blocking);
+    [[nodiscard]] ReturnCode setInheritable(bool inheritable);
+
     FileDescriptorPosix   posix() { return {*this}; }
     FileDescriptorWindows windows() { return {*this}; }
 
     FileDescriptorNativeHandle handle;
+
+    struct Internal;
 };
 
 struct SC::FileDescriptorPipe
 {
+    enum InheritableReadFlag
+    {
+        ReadInheritable,
+        ReadNonInheritable
+    };
+    enum InheritableWriteFlag
+    {
+        WriteInheritable,
+        WriteNonInheritable
+    };
     FileDescriptor readPipe;
     FileDescriptor writePipe;
 
-    [[nodiscard]] ReturnCode createPipe();
+    /// Creates a Pipe. Default is non-inheritable / blocking
+    [[nodiscard]] ReturnCode createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag);
 };

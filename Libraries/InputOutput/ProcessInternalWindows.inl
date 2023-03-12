@@ -39,6 +39,11 @@ SC::ReturnCode SC::Process::run(const ProcessOptions& options)
     STARTUPINFO startupInfo;
     const bool  someRedirection =
         standardInput.handle.isValid() || standardOutput.handle.isValid() || standardError.handle.isValid();
+
+    // On Windows to inherit flags they must be flagged as inheritable AND CreateProcess bInheritHandles must be true
+    // TODO: This is not thread-safe in regard to handle inheritance, check out Microsoft Article on the topic
+    // https://devblogs.microsoft.com/oldnewthing/20111216-00/?p=8873
+
     const BOOL inheritHandles = options.inheritFileDescriptors or someRedirection ? TRUE : FALSE;
 
     DWORD creationFlags = 0; // CREATE_UNICODE_ENVIRONMENT;

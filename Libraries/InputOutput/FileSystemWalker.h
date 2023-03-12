@@ -51,11 +51,10 @@ struct SC::FileSystemWalker
 
     [[nodiscard]] ReturnCode recurseSubdirectory();
 
-    static constexpr int InternalSize      = 256 * sizeof(void*) + (512 + 128) * sizeof(utf_char_t);
-    static constexpr int InternalAlignment = alignof(void*);
-
   private:
     struct Internal;
+    static constexpr int InternalSize      = 256 * sizeof(void*) + (512 + 128) * sizeof(utf_char_t);
+    static constexpr int InternalAlignment = alignof(void*);
     template <typename T, int N, int Alignment>
     friend struct OpaqueFunctions;
     OpaqueUniqueObject<Internal, InternalSize, InternalAlignment> internal;
