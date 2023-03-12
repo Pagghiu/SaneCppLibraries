@@ -5,6 +5,7 @@
 #include "Threading.h"
 
 #include <pthread.h>
+#include <unistd.h> // usleep
 SC::Mutex::Mutex() { pthread_mutex_init(&mutex.reinterpret_as<pthread_mutex_t>(), 0); }
 SC::Mutex::~Mutex() { pthread_mutex_destroy(&mutex.reinterpret_as<pthread_mutex_t>()); }
 void SC::Mutex::lock() { pthread_mutex_lock(&mutex.reinterpret_as<pthread_mutex_t>()); }
@@ -62,3 +63,5 @@ struct SC::Thread::Internal
         return true;
     }
 };
+
+void SC::Thread::Sleep(uint32_t milliseconds) { ::usleep(milliseconds * 1e3); }

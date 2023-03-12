@@ -60,3 +60,5 @@ struct SC::Thread::Internal
         return true;
     }
 };
+
+void SC::Thread::Sleep(uint32_t milliseconds) { ::Sleep(milliseconds); }
