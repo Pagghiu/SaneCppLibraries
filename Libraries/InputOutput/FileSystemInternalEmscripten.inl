@@ -6,7 +6,10 @@
 #include <stdio.h>
 #include <sys/stat.h> // mkdir
 
+namespace SC
+{
 static constexpr SC::ReturnCode getErrorCode(int errorCode) { return "Unknown"_a8; }
+} // namespace SC
 
 struct SC::FileSystem::Internal
 {

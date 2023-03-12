@@ -281,6 +281,8 @@ struct SC::StringView
     [[nodiscard]] bool parseInt32(int32_t* value) const;
 };
 
+namespace SC
+{
 #if SC_MSVC
 constexpr inline SC::StringView operator"" _a8(const char* txt, size_t sz)
 {
@@ -300,3 +302,4 @@ constexpr inline SC::StringView operator"" _u8(const SC::char_t* txt, SC::size_t
     return SC::StringView(txt, sz, true, SC::StringEncoding::Utf8);
 }
 #endif
+} // namespace SC

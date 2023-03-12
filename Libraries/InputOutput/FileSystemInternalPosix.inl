@@ -17,6 +17,8 @@
 #endif
 // clang-format on
 
+namespace SC
+{
 static constexpr SC::ReturnCode getErrorCode(int errorCode)
 {
     switch (errorCode)
@@ -41,7 +43,7 @@ static constexpr SC::ReturnCode getErrorCode(int errorCode)
     }
     return "Unknown"_a8;
 }
-
+} // namespace SC
 struct SC::FileSystem::Internal
 {
 

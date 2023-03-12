@@ -8,6 +8,9 @@
 #include <Windows.h>
 // clang-format on
 
+namespace SC
+{
+
 static constexpr const SC::StringView getErrorCode(int errorCode)
 {
     switch (errorCode)
@@ -17,6 +20,7 @@ static constexpr const SC::StringView getErrorCode(int errorCode)
     }
     return "Unknown"_a8;
 }
+} // namespace SC
 
 struct SC::FileSystem::Internal
 {
