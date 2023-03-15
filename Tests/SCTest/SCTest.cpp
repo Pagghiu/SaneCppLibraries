@@ -17,6 +17,7 @@
 #include "../../Libraries/Foundation/StringTest.h"
 #include "../../Libraries/Foundation/StringViewTest.h"
 #include "../../Libraries/Foundation/SystemTest.h"
+#include "../../Libraries/Foundation/TaggedUnionTest.h"
 #include "../../Libraries/Foundation/TimeTest.h"
 #include "../../Libraries/Foundation/VectorTest.h"
 
@@ -67,6 +68,7 @@ int main(int argc, const char* argv[])
     { StringTest                    test(report); }
     { StringViewTest                test(report); }
     { SystemTest                    test(report); }
+    { TaggedUnionTest               test(report); }
     { TimeTest                      test(report); }
     { VectorTest                    test(report); }
 

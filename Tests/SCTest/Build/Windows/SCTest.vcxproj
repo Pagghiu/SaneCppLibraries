@@ -280,6 +280,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringView.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringViewTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\TaggedUnion.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\TaggedUnionTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Test.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Time.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\TimeTest.h" />
