@@ -153,6 +153,7 @@
 		7B872C4929AFFC4900949BD2 /* ThreadingInternalWindows.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = ThreadingInternalWindows.inl; path = ../../../../Libraries/Threading/ThreadingInternalWindows.inl; sourceTree = "<group>"; };
 		7B872C4A29AFFC4900949BD2 /* Threading.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Threading.cpp; path = ../../../../Libraries/Threading/Threading.cpp; sourceTree = "<group>"; };
 		7B872C4C29AFFC4900949BD2 /* Threading.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Threading.h; path = ../../../../Libraries/Threading/Threading.h; sourceTree = "<group>"; };
+		7B89A60429BFE1A4006EF085 /* TypeList.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TypeList.h; path = ../../../../Libraries/Foundation/TypeList.h; sourceTree = "<group>"; };
 		7B91CBEE29B17F470013E95E /* Opaque.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Opaque.h; path = ../../../../Libraries/Foundation/Opaque.h; sourceTree = "<group>"; };
 		7B91CBEF29B17F470013E95E /* OpaqueTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OpaqueTest.h; path = ../../../../Libraries/Foundation/OpaqueTest.h; sourceTree = "<group>"; };
 		7B9F61832995BDA20011F4D4 /* libobjc.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libobjc.tbd; path = usr/lib/libobjc.tbd; sourceTree = SDKROOT; };
@@ -294,6 +295,7 @@
 				7B4A291B29B3CD4A00F13DCB /* Time.cpp */,
 				7B4A291C29B3CD4A00F13DCB /* Time.h */,
 				7B6A1E9F29B2B07F00DDCF40 /* TimeTest.h */,
+				7B89A60429BFE1A4006EF085 /* TypeList.h */,
 				7B51600229243097006996AA /* Types.h */,
 				7B51600529243097006996AA /* Vector.h */,
 				7B51600029243097006996AA /* VectorTest.h */,

@@ -294,17 +294,17 @@ struct c_op
 };
 
 template <typename T, typename U>
-struct loophole_type_list;
+struct loophole_TypeList;
 
 template <typename T, int... NN>
-struct loophole_type_list<T, SC::IntegerSequence<int, NN...>>
+struct loophole_TypeList<T, SC::IntegerSequence<int, NN...>>
 {
     static constexpr int size = sizeof...(NN);
-    using type                = luple::type_list<typename decltype(loophole(tag<T, NN>{}))::type...>;
+    using type                = SC::TypeList<typename decltype(loophole(tag<T, NN>{}))::type...>;
 };
 
 template <typename T, int N, typename F>
-using as_type_list = typename loophole_type_list<T, SC::MakeIntegerSequence<int, N>>::type;
+using as_TypeList = typename loophole_TypeList<T, SC::MakeIntegerSequence<int, N>>::type;
 
 template <typename T, typename U>
 struct loophole_type_insert;
@@ -409,6 +409,6 @@ constexpr auto CountNumMembers(int) -> decltype(T{{UniversallyConvertible<NN>{}}
     return CountNumMembers<T, NN..., sizeof...(NN)>(0);
 }
 template <typename T, int N = CountNumMembers<T>(0), typename F = typename DecomposeInElements<T, N>::type>
-using TypeListFor = as_type_list<T, N, F>;
+using TypeListFor = as_TypeList<T, N, F>;
 
 } // namespace loophole_structured

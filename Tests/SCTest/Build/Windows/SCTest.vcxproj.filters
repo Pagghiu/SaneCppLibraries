@@ -298,6 +298,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\TimeTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\TypeList.h">
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Threading\Threading.h">

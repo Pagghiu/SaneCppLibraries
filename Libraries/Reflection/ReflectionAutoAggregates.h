@@ -10,43 +10,9 @@
 //------------------------------------------------------------------------
 #pragma once
 #include "../Foundation/Language.h"
+#include "../Foundation/TypeList.h"
 
-namespace luple
-{
-// type list
-template <typename... TT>
-struct type_list
-{
-    static const int size = sizeof...(TT);
-};
-
-template <typename T, int N, int M = 0>
-struct tlist_get;
-
-template <int N, int M, typename T, typename... TT>
-struct tlist_get<type_list<T, TT...>, N, M>
-{
-    static_assert(N < (int)sizeof...(TT) + 1 + M, "type index out of bounds");
-    using type = SC::ConditionalT<N == M, T, typename tlist_get<type_list<TT...>, N, M + 1>::type>;
-};
-
-template <int N, int M>
-struct tlist_get<type_list<>, N, M>
-{
-    using type = void;
-};
-
-template <int N>
-struct tlist_get<type_list<>, N, 0>
-{
-};
-
-template <typename T, int N>
-using tlist_get_t = typename tlist_get<T, N>::type;
-
-} // namespace luple
-
-namespace loophole_aggregates
+namespace SC
 {
 template <typename T>
 struct loopholeResult
@@ -92,13 +58,13 @@ struct c_op
 };
 
 template <typename T, typename U>
-struct loophole_type_list;
+struct loophole_TypeList;
 
 template <typename T, int... NN>
-struct loophole_type_list<T, SC::IntegerSequence<int, NN...>>
+struct loophole_TypeList<T, IntegerSequence<int, NN...>>
 {
     static constexpr int size = sizeof...(NN);
-    using type                = luple::type_list<typename decltype(loophole(tag<T, NN>{}))::type...>;
+    using type                = TypeList<typename decltype(loophole(tag<T, NN>{}))::type...>;
 };
 template <typename T, int... NN>
 constexpr int enumerate_fields_with_aggregates(...)
@@ -113,10 +79,10 @@ constexpr auto enumerate_fields_with_aggregates(int) -> decltype(T{{c_op<T, NN>{
 }
 
 template <typename T>
-using as_type_list =
-    typename loophole_type_list<T, SC::MakeIntegerSequence<int, enumerate_fields_with_aggregates<T>(0)>>::type;
+using as_TypeList =
+    typename loophole_TypeList<T, MakeIntegerSequence<int, enumerate_fields_with_aggregates<T>(0)>>::type;
 
 template <typename T>
-using TypeListFor = as_type_list<T>;
+using TypeListFor = as_TypeList<T>;
 
-} // namespace loophole_aggregates
+} // namespace SC
