@@ -37,14 +37,15 @@ struct SC::TaggedUnion
     {
       private:
         static constexpr auto CurrentIndex = StartIndex - 1;
+        static_assert(CurrentIndex >= 0, "Type not found!");
         using CurrentType                  = typename TypeAt<CurrentIndex>::type;
         static constexpr auto CurrentValue = TypeAt<CurrentIndex>::value;
         static constexpr bool TypeFound    = IsSame<T, CurrentType>::value;
 
       public:
-        static const EnumType enumType = TypeFound ? CurrentValue : TypeToEnum<T, CurrentIndex - 1>::enumType;
-        using type = ConditionalT<TypeFound, CurrentType, typename TypeToEnum<T, CurrentIndex - 1>::type>;
-        static constexpr int index = TypeFound ? CurrentIndex : TypeToEnum<T, CurrentIndex - 1>::index;
+        static constexpr EnumType enumType = TypeFound ? CurrentValue : TypeToEnum<T, StartIndex - 1>::enumType;
+        using type                 = ConditionalT<TypeFound, CurrentType, typename TypeToEnum<T, StartIndex - 1>::type>;
+        static constexpr int index = TypeFound ? CurrentIndex : TypeToEnum<T, StartIndex - 1>::index;
     };
 
     template <typename T>
@@ -115,7 +116,7 @@ struct SC::TaggedUnion
             }
             else
             {
-                RuntimeEnumVisit<Visitor, T1, T2, Index - 1>::visit(t1, t2, enumType);
+                RuntimeEnumVisit<Visitor, T1, T2, StartIndex - 1>::visit(t1, t2, enumType);
             }
         }
     };
