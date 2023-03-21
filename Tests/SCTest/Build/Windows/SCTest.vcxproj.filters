@@ -319,6 +319,12 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\TaggedUnionTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\IntrusiveDoubleLinkedList.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\IntrusiveDoubleLinkedListTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemInternalPosix.inl">

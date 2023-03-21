@@ -242,6 +242,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ArrayTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Compiler.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\IntrusiveDoubleLinkedList.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\IntrusiveDoubleLinkedListTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Opaque.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Console.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ConsoleTest.h" />

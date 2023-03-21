@@ -6,6 +6,7 @@
 #include "../../Libraries/Foundation/ArrayTest.h"
 #include "../../Libraries/Foundation/ConsoleTest.h"
 #include "../../Libraries/Foundation/FunctionTest.h"
+#include "../../Libraries/Foundation/IntrusiveDoubleLinkedListTest.h"
 #include "../../Libraries/Foundation/MapTest.h"
 #include "../../Libraries/Foundation/MemoryTest.h"
 #include "../../Libraries/Foundation/OpaqueTest.h"
@@ -57,6 +58,7 @@ int main(int argc, const char* argv[])
     { ArrayTest                     test(report); }
     { ConsoleTest                   test(report); }
     { FunctionTest                  test(report); }
+    { IntrusiveDoubleLinkedListTest test(report); }
     { MapTest                       test(report); }
     { MemoryTest                    test(report); }
     { OpaqueTest                    test(report); }

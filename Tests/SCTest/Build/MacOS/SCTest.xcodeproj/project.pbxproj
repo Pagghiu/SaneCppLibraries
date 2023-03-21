@@ -145,6 +145,8 @@
 		7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SCTestXCTest.mm; path = ../../SCTestXCTest.mm; sourceTree = "<group>"; };
 		7B59307629B128C300876ABB /* ThreadingTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ThreadingTest.h; path = ../../../../Libraries/Threading/ThreadingTest.h; sourceTree = "<group>"; };
 		7B5A353328E8640B00B2F589 /* SCTestXCTest.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SCTestXCTest.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7B67008C29C28DF600174AB8 /* IntrusiveDoubleLinkedList.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = IntrusiveDoubleLinkedList.h; path = ../../../../Libraries/Foundation/IntrusiveDoubleLinkedList.h; sourceTree = "<group>"; };
+		7B67008D29C28DF600174AB8 /* IntrusiveDoubleLinkedListTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = IntrusiveDoubleLinkedListTest.h; path = ../../../../Libraries/Foundation/IntrusiveDoubleLinkedListTest.h; sourceTree = "<group>"; };
 		7B6A1E9F29B2B07F00DDCF40 /* TimeTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TimeTest.h; path = ../../../../Libraries/Foundation/TimeTest.h; sourceTree = "<group>"; };
 		7B75258629A16F8000779F2A /* OptionalTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OptionalTest.h; path = ../../../../Libraries/Foundation/OptionalTest.h; sourceTree = "<group>"; };
 		7B75258729A16F8000779F2A /* Optional.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Optional.h; path = ../../../../Libraries/Foundation/Optional.h; sourceTree = "<group>"; };
@@ -247,6 +249,8 @@
 				7B515FCD29243086006996AA /* Function.h */,
 				7B515FD029243086006996AA /* FunctionTest.h */,
 				7B515FEB29243087006996AA /* InitializerList.h */,
+				7B67008C29C28DF600174AB8 /* IntrusiveDoubleLinkedList.h */,
+				7B67008D29C28DF600174AB8 /* IntrusiveDoubleLinkedListTest.h */,
 				7B515FEF29243087006996AA /* Language.h */,
 				7B515FDF29243087006996AA /* LibC.h */,
 				7B515FD629243086006996AA /* Limits.h */,
