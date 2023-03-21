@@ -3,30 +3,30 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include <Windows.h>
 
-struct SC::Loop::Internal
+struct SC::EventLoop::Internal
 {
-    bool           inited = false;
     FileDescriptor loopFd;
 
-    Vector<FileDescriptorNative> watchersQueue;
-
-    OVERLAPPED async;
     ~Internal() { SC_TRUST_RESULT(close()); }
     [[nodiscard]] ReturnCode close() { return loopFd.handle.close(); }
 
-    [[nodiscard]] ReturnCode createLoop()
+    [[nodiscard]] ReturnCode createEventLoop()
     {
         HANDLE newQueue = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
         if (newQueue == INVALID_HANDLE_VALUE)
         {
             // TODO: Better CreateIoCompletionPort error handling
-            return "Loop::Internal::createLoop() - CreateIoCompletionPort"_a8;
+            return "EventLoop::Internal::createEventLoop() - CreateIoCompletionPort"_a8;
         }
         SC_TRY_IF(loopFd.handle.assign(newQueue));
         return true;
     }
 
-    [[nodiscard]] ReturnCode createLoopAsyncWakeup() { return true; }
+    [[nodiscard]] ReturnCode createWakeup(EventLoop& loop)
+    {
+        // Not needed, we can just use PostQueuedCompletionStatus directly
+        return true;
+    }
 
     struct KernelQueue
     {
@@ -59,7 +59,7 @@ struct SC::Loop::Internal
     };
 };
 
-SC::ReturnCode SC::Loop::wakeUpFromExternalThread()
+SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
 {
     Internal&            self = internal.get();
     FileDescriptorNative loopNativeDescriptor;
@@ -67,7 +67,7 @@ SC::ReturnCode SC::Loop::wakeUpFromExternalThread()
 
     if (not PostQueuedCompletionStatus(loopNativeDescriptor, 0, 0, nullptr))
     {
-        return "Loop::wakeUpFromExternalThread() - PostQueuedCompletionStatus"_a8;
+        return "EventLoop::wakeUpFromExternalThread() - PostQueuedCompletionStatus"_a8;
     }
     return true;
 }

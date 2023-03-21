@@ -1,19 +1,16 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-struct SC::Loop::Internal
+struct SC::EventLoop::Internal
 {
-    bool           inited = false;
     FileDescriptor loopFd;
-
-    Vector<FileDescriptorNative> watchersQueue;
 
     ~Internal() { SC_TRUST_RESULT(close()); }
     [[nodiscard]] ReturnCode close() { return loopFd.handle.close(); }
 
-    [[nodiscard]] ReturnCode createLoop() { return true; }
+    [[nodiscard]] ReturnCode createEventLoop() { return true; }
 
-    [[nodiscard]] ReturnCode createLoopAsyncWakeup() { return true; }
+    [[nodiscard]] ReturnCode createWakeup(EventLoop&) { return true; }
     struct KernelQueue
     {
         int newEvents = 0;
@@ -27,4 +24,4 @@ struct SC::Loop::Internal
     };
 };
 
-SC::ReturnCode SC::Loop::wakeUpFromExternalThread() { return true; }
+SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread() { return true; }

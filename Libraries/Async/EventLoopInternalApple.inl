@@ -7,41 +7,45 @@
 #include <sys/time.h>  // timespec
 #include <unistd.h>
 
-struct SC::Loop::Internal
+struct SC::EventLoop::Internal
 {
-    bool           inited = false;
     FileDescriptor loopFd;
 
-    Vector<FileDescriptorNative> watchersQueue;
-
-    FileDescriptorPipe async;
+    Async              wakeupAsync;
+    FileDescriptorPipe wakeupPipe;
 
     ~Internal() { SC_TRUST_RESULT(close()); }
-    [[nodiscard]] ReturnCode close() { return loopFd.handle.close(); }
 
-    [[nodiscard]] ReturnCode createLoop()
+    [[nodiscard]] ReturnCode close()
+    {
+        return wakeupPipe.readPipe.handle.close() and wakeupPipe.writePipe.handle.close() and loopFd.handle.close();
+    }
+
+    [[nodiscard]] ReturnCode createEventLoop()
     {
         const int newQueue = kqueue();
         if (newQueue == -1)
         {
             // TODO: Better kqueue error handling
-            return "Loop::Internal::createLoop() - kqueue failed"_a8;
+            return "EventLoop::Internal::createEventLoop() - kqueue failed"_a8;
         }
         SC_TRY_IF(loopFd.handle.assign(newQueue));
         return true;
     }
 
-    [[nodiscard]] ReturnCode createLoopAsyncWakeup()
+    [[nodiscard]] ReturnCode createWakeup(EventLoop& loop)
     {
-        // Create Async
-        SC_TRY_IF(async.createPipe(FileDescriptorPipe::ReadNonInheritable, FileDescriptorPipe::WriteNonInheritable));
-        SC_TRY_IF(async.readPipe.setBlocking(false));
-        SC_TRY_IF(async.writePipe.setBlocking(false));
-        // Register Async
-        FileDescriptorNative asyncHandle;
-        SC_TRY_IF(async.readPipe.handle.get(asyncHandle,
-                                            "Loop::Internal::createLoopAsyncWakeup() - Async read handle invalid"_a8));
-        SC_TRY_IF(watchersQueue.push_back(asyncHandle));
+        // Create
+        SC_TRY_IF(
+            wakeupPipe.createPipe(FileDescriptorPipe::ReadNonInheritable, FileDescriptorPipe::WriteNonInheritable));
+        SC_TRY_IF(wakeupPipe.readPipe.setBlocking(false));
+        SC_TRY_IF(wakeupPipe.writePipe.setBlocking(false));
+
+        // Register
+        FileDescriptorNative pipeHandle;
+        SC_TRY_IF(wakeupPipe.readPipe.handle.get(pipeHandle,
+                                                 "EventLoop::Internal::createWakeup() - Async read handle invalid"_a8));
+        loop.addRead(pipeHandle, wakeupAsync);
         return true;
     }
 
@@ -66,7 +70,7 @@ struct SC::Loop::Internal
         [[nodiscard]] ReturnCode poll(FileDescriptor& loopFd, IntegerMilliseconds* actualTimeout)
         {
             FileDescriptorNative loopNativeDescriptor;
-            SC_TRY_IF(loopFd.handle.get(loopNativeDescriptor, "Loop::Internal::poll() - Invalid Handle"_a8));
+            SC_TRY_IF(loopFd.handle.get(loopNativeDescriptor, "EventLoop::Internal::poll() - Invalid Handle"_a8));
             struct timespec specTimeout;
             if (actualTimeout)
             {
@@ -81,7 +85,7 @@ struct SC::Loop::Internal
             } while (res == -1 && errno == EINTR);
             if (res == -1)
             {
-                return "Loop::Internal::poll() - kevent failed"_a8;
+                return "EventLoop::Internal::poll() - kevent failed"_a8;
             }
             newEvents = static_cast<int>(res);
             return true;
@@ -100,7 +104,8 @@ struct SC::Loop::Internal
         [[nodiscard]] ReturnCode commitQueue(FileDescriptor& loopFd)
         {
             FileDescriptorNative loopNativeDescriptor;
-            SC_TRY_IF(loopFd.handle.get(loopNativeDescriptor, "Loop::Internal::commitQueue() - Invalid Handle"_a8));
+            SC_TRY_IF(
+                loopFd.handle.get(loopNativeDescriptor, "EventLoop::Internal::commitQueue() - Invalid Handle"_a8));
 
             int res;
             do
@@ -109,7 +114,7 @@ struct SC::Loop::Internal
             } while (res == -1 && errno == EINTR);
             if (res != 0)
             {
-                return "Loop::Internal::commitQueue() - kevent failed"_a8;
+                return "EventLoop::Internal::commitQueue() - kevent failed"_a8;
             }
             newEvents = 0;
             return true;
@@ -117,7 +122,7 @@ struct SC::Loop::Internal
     };
 };
 
-SC::ReturnCode SC::Loop::wakeUpFromExternalThread()
+SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
 {
     Internal& self = internal.get();
     // TODO: We need an atomic bool swap to wait until next run
@@ -125,7 +130,7 @@ SC::ReturnCode SC::Loop::wakeUpFromExternalThread()
     ssize_t     numBytes;
     int         asyncFd;
     ssize_t     writtenBytes;
-    SC_TRY_IF(self.async.writePipe.handle.get(asyncFd, "writePipe handle"_a8));
+    SC_TRY_IF(self.wakeupPipe.writePipe.handle.get(asyncFd, "writePipe handle"_a8));
     fakeBuffer = "";
     numBytes   = 1;
     do
@@ -135,7 +140,7 @@ SC::ReturnCode SC::Loop::wakeUpFromExternalThread()
 
     if (writtenBytes != numBytes)
     {
-        return "Loop::wakeUpFromExternalThread - Error in write"_a8;
+        return "EventLoop::wakeUpFromExternalThread - Error in write"_a8;
     }
     return true;
 }

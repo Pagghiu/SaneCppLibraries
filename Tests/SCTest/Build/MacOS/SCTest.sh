@@ -42,7 +42,7 @@ time g++-12 -std=c++14 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -I${SCRIPT_DIR}/../../ \
 -framework CoreFoundation \
 -o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest \
-Libraries/Async/Loop.cpp                    \
+Libraries/Async/EventLoop.cpp                    \
 Libraries/Foundation/Assert.cpp             \
 Libraries/Foundation/Console.cpp            \
 Libraries/Foundation/Memory.cpp             \

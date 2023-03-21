@@ -25,7 +25,7 @@
 		7B583F6D2922ED2700FBE019 /* SCTestXCTest.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */; };
 		7B583FCB2922EE7300FBE019 /* SCTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F692922ECF900FBE019 /* SCTest.cpp */; };
 		7B872C4D29AFFC4900949BD2 /* Threading.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B872C4A29AFFC4900949BD2 /* Threading.cpp */; };
-		7BA7D47C29B5488200811076 /* Loop.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA7D47B29B5488200811076 /* Loop.cpp */; };
+		7BA7D47C29B5488200811076 /* EventLoop.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA7D47B29B5488200811076 /* EventLoop.cpp */; };
 		7BA892AA297E03B50093152B /* System.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892A9297E03540093152B /* System.cpp */; };
 		7BA892AB297E03B50093152B /* System.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892A9297E03540093152B /* System.cpp */; };
 		7BA892AE297E06040093152B /* StringConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892AD297E06040093152B /* StringConverter.cpp */; };
@@ -161,9 +161,9 @@
 		7B91CBEE29B17F470013E95E /* Opaque.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Opaque.h; path = ../../../../Libraries/Foundation/Opaque.h; sourceTree = "<group>"; };
 		7B91CBEF29B17F470013E95E /* OpaqueTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OpaqueTest.h; path = ../../../../Libraries/Foundation/OpaqueTest.h; sourceTree = "<group>"; };
 		7B9F61832995BDA20011F4D4 /* libobjc.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libobjc.tbd; path = usr/lib/libobjc.tbd; sourceTree = SDKROOT; };
-		7BA7D47929B5488200811076 /* Loop.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Loop.h; path = ../../../../Libraries/Async/Loop.h; sourceTree = "<group>"; };
-		7BA7D47A29B5488200811076 /* LoopTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = LoopTest.h; path = ../../../../Libraries/Async/LoopTest.h; sourceTree = "<group>"; };
-		7BA7D47B29B5488200811076 /* Loop.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Loop.cpp; path = ../../../../Libraries/Async/Loop.cpp; sourceTree = "<group>"; };
+		7BA7D47929B5488200811076 /* EventLoop.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = EventLoop.h; path = ../../../../Libraries/Async/EventLoop.h; sourceTree = "<group>"; };
+		7BA7D47A29B5488200811076 /* EventLoopTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = EventLoopTest.h; path = ../../../../Libraries/Async/EventLoopTest.h; sourceTree = "<group>"; };
+		7BA7D47B29B5488200811076 /* EventLoop.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = EventLoop.cpp; path = ../../../../Libraries/Async/EventLoop.cpp; sourceTree = "<group>"; };
 		7BA892A7297E032F0093152B /* SystemInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SystemInternalWindows.inl; path = ../../../../Libraries/Foundation/SystemInternalWindows.inl; sourceTree = "<group>"; };
 		7BA892A8297E03340093152B /* SystemInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SystemInternalEmscripten.inl; path = ../../../../Libraries/Foundation/SystemInternalEmscripten.inl; sourceTree = "<group>"; };
 		7BA892A9297E03540093152B /* System.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = System.cpp; path = ../../../../Libraries/Foundation/System.cpp; sourceTree = "<group>"; };
@@ -175,9 +175,9 @@
 		7BC56BD829946B1800EED472 /* FileSystemWalkerInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalEmscripten.inl; path = ../../../../Libraries/InputOutput/FileSystemWalkerInternalEmscripten.inl; sourceTree = "<group>"; };
 		7BC56BD929946B1800EED472 /* FileSystemWalkerInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalPosix.inl; path = ../../../../Libraries/InputOutput/FileSystemWalkerInternalPosix.inl; sourceTree = "<group>"; };
 		7BC56BDA29946B1800EED472 /* FileSystemWalkerInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalWindows.inl; path = ../../../../Libraries/InputOutput/FileSystemWalkerInternalWindows.inl; sourceTree = "<group>"; };
-		7BD8E37929BE8357004AB23D /* LoopInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = LoopInternalApple.inl; path = ../../../../Libraries/Async/LoopInternalApple.inl; sourceTree = "<group>"; };
-		7BD8E37A29BE8357004AB23D /* LoopInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = LoopInternalWindows.inl; path = ../../../../Libraries/Async/LoopInternalWindows.inl; sourceTree = "<group>"; };
-		7BD8E37B29BE8357004AB23D /* LoopInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = LoopInternalEmscripten.inl; path = ../../../../Libraries/Async/LoopInternalEmscripten.inl; sourceTree = "<group>"; };
+		7BD8E37929BE8357004AB23D /* EventLoopInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalApple.inl; path = ../../../../Libraries/Async/EventLoopInternalApple.inl; sourceTree = "<group>"; };
+		7BD8E37A29BE8357004AB23D /* EventLoopInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalWindows.inl; path = ../../../../Libraries/Async/EventLoopInternalWindows.inl; sourceTree = "<group>"; };
+		7BD8E37B29BE8357004AB23D /* EventLoopInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalEmscripten.inl; path = ../../../../Libraries/Async/EventLoopInternalEmscripten.inl; sourceTree = "<group>"; };
 		7BE50C9729AEB4CC00BE6C25 /* FileDescriptorInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileDescriptorInternalPosix.inl; path = ../../../../Libraries/InputOutput/FileDescriptorInternalPosix.inl; sourceTree = "<group>"; };
 		7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Process.cpp; path = ../../../../Libraries/InputOutput/Process.cpp; sourceTree = "<group>"; };
 		7BE5C80E29A26E3E00CBCAD1 /* Process.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Process.h; path = ../../../../Libraries/InputOutput/Process.h; sourceTree = "<group>"; };
@@ -377,12 +377,12 @@
 		7BA7D47829B5473100811076 /* Async */ = {
 			isa = PBXGroup;
 			children = (
-				7BA7D47B29B5488200811076 /* Loop.cpp */,
-				7BA7D47929B5488200811076 /* Loop.h */,
-				7BD8E37929BE8357004AB23D /* LoopInternalApple.inl */,
-				7BD8E37B29BE8357004AB23D /* LoopInternalEmscripten.inl */,
-				7BD8E37A29BE8357004AB23D /* LoopInternalWindows.inl */,
-				7BA7D47A29B5488200811076 /* LoopTest.h */,
+				7BA7D47B29B5488200811076 /* EventLoop.cpp */,
+				7BA7D47929B5488200811076 /* EventLoop.h */,
+				7BD8E37929BE8357004AB23D /* EventLoopInternalApple.inl */,
+				7BD8E37B29BE8357004AB23D /* EventLoopInternalEmscripten.inl */,
+				7BD8E37A29BE8357004AB23D /* EventLoopInternalWindows.inl */,
+				7BA7D47A29B5488200811076 /* EventLoopTest.h */,
 			);
 			name = Async;
 			sourceTree = "<group>";
@@ -516,7 +516,7 @@
 				7B51601629243097006996AA /* StringBuilder.cpp in Sources */,
 				7BA892AE297E06040093152B /* StringConverter.cpp in Sources */,
 				7BC56BDB29946C9200EED472 /* FileSystemWalker.cpp in Sources */,
-				7BA7D47C29B5488200811076 /* Loop.cpp in Sources */,
+				7BA7D47C29B5488200811076 /* EventLoop.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

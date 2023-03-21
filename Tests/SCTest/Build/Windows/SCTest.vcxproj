@@ -214,7 +214,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\..\Libraries\Async\Loop.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Assert.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Console.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp" />
@@ -236,8 +236,8 @@
     <ClCompile Include="..\..\SCTest.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\..\Libraries\Async\Loop.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Async\LoopTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Async\EventLoop.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ArrayTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
@@ -317,9 +317,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Threading\ThreadingTest.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\..\Libraries\Async\LoopInternalApple.inl" />
-    <None Include="..\..\..\..\Libraries\Async\LoopInternalEmscripten.inl" />
-    <None Include="..\..\..\..\Libraries\Async\LoopInternalWindows.inl" />
+    <None Include="..\..\..\..\Libraries\Async\EventLoopInternalApple.inl" />
+    <None Include="..\..\..\..\Libraries\Async\EventLoopInternalEmscripten.inl" />
+    <None Include="..\..\..\..\Libraries\Async\EventLoopInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\Foundation\SystemInternalEmscripten.inl" />
     <None Include="..\..\..\..\Libraries\Foundation\SystemInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\Foundation\SystemInternalWindows.inl" />

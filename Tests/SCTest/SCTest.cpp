@@ -38,7 +38,7 @@
 #include "../../Libraries/Threading/ThreadingTest.h"
 
 // Async
-#include "../../Libraries/Async/LoopTest.h"
+#include "../../Libraries/Async/EventLoopTest.h"
 
 SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> globalConsoleBuffer;
 SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> formatConsoleBuffer;
@@ -90,7 +90,7 @@ int main(int argc, const char* argv[])
     { ThreadingTest                 test(report); }
 
     // Async tests
-    { LoopTest                      test(report); }
+    { EventLoopTest                 test(report); }
 
     // clang-format on
 

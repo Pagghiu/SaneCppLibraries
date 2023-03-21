@@ -3,26 +3,40 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/Test.h"
-#include "Loop.h"
+#include "EventLoop.h"
 
 namespace SC
 {
-struct LoopTest;
+struct EventLoopTest;
 }
 
-struct SC::LoopTest : public SC::TestCase
+struct SC::EventLoopTest : public SC::TestCase
 {
-    LoopTest(SC::TestReport& report) : TestCase(report, "LoopTest")
+    EventLoopTest(SC::TestReport& report) : TestCase(report, "EventLoopTest")
     {
         using namespace SC;
-        if (test_section("addTimer"))
+        // TODO: Add EventLoop::resetTimeout
+        // TODO: Implement async lifecycle
+        if (test_section("addTimeout"))
         {
-            Loop loop;
+            EventLoop loop;
             SC_TEST_EXPECT(loop.create());
-            int called1 = 0;
-            int called2 = 0;
-            SC_TEST_EXPECT(loop.addTimer(10_ms, [&]() { called1++; }));
-            SC_TEST_EXPECT(loop.addTimer(100_ms, [&]() { called2++; }));
+            int   called1 = 0;
+            int   called2 = 0;
+            Async c1, c2;
+            loop.addTimeout(10_ms, c1,
+                            [&](AsyncResult& res)
+                            {
+                                // As we are in a timeout callback we know for fact that we could easily access
+                                // what we need with res.async.operation.fields.timeout, playing at the edge of UB.
+                                // unionAs<...>() however is more safe, as it will return nullptr when casted to wrong
+                                // type.
+                                Async::Timeout* timeout = res.async.operation.unionAs<Async::Timeout>();
+                                SC_TEST_EXPECT(timeout and timeout->timeout.ms == 10);
+                                called1++;
+                            });
+            loop.addTimeout(100_ms, c2,
+                            [&](AsyncResult&) { called2++; }); // TODO: investigate allowing dropping AsyncResult
             SC_TEST_EXPECT(loop.runOnce());
             SC_TEST_EXPECT(called1 == 1 and called2 == 0);
             SC_TEST_EXPECT(loop.runOnce());
@@ -30,7 +44,7 @@ struct SC::LoopTest : public SC::TestCase
         }
         if (test_section("wakeUpFromExternalThread"))
         {
-            Loop loop;
+            EventLoop loop;
             SC_TEST_EXPECT(loop.create());
             Thread newThread;
             int    threadCalled                      = 0;

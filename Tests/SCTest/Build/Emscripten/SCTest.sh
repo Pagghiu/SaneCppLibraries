@@ -53,7 +53,7 @@ time em++ -std=c++20 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -sEXPORTED_FUNCTIONS=["_malloc","_free","_main"] \
 -sASYNCIFY \
 --no-entry \
-Libraries/Async/Loop.cpp                    \
+Libraries/Async/EventLoop.cpp                    \
 Libraries/Foundation/Assert.cpp             \
 Libraries/Foundation/Console.cpp            \
 Libraries/Foundation/Memory.cpp             \

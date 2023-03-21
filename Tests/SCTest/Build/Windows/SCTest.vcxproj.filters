@@ -77,7 +77,7 @@
     <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileDescriptor.cpp">
       <Filter>InputOutput</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Async\Loop.cpp">
+    <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp">
       <Filter>Async</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Threading\Threading.cpp">
@@ -304,10 +304,10 @@
     <ClInclude Include="..\..\..\..\Libraries\Threading\Threading.h">
       <Filter>Threading</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Async\Loop.h">
+    <ClInclude Include="..\..\..\..\Libraries\Async\EventLoop.h">
       <Filter>Async</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Async\LoopTest.h">
+    <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopTest.h">
       <Filter>Async</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Threading\ThreadingTest.h">
@@ -369,13 +369,13 @@
     <None Include="..\..\..\..\Libraries\Foundation\SystemInternalWindows.inl">
       <Filter>Foundation</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Async\LoopInternalApple.inl">
+    <None Include="..\..\..\..\Libraries\Async\EventLoopInternalApple.inl">
       <Filter>Async</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Async\LoopInternalEmscripten.inl">
+    <None Include="..\..\..\..\Libraries\Async\EventLoopInternalEmscripten.inl">
       <Filter>Async</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Async\LoopInternalWindows.inl">
+    <None Include="..\..\..\..\Libraries\Async\EventLoopInternalWindows.inl">
       <Filter>Async</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\Threading\ThreadingInternalPosix.inl">
