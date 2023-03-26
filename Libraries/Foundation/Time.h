@@ -42,9 +42,9 @@ struct SC::RelativeTime
     double floatingSeconds = 0;
 
     static RelativeTime fromSeconds(double seconds) { return {seconds}; }
-    IntegerMilliseconds inMilliseconds() const
+    IntegerMilliseconds inRoundedUpperMilliseconds() const
     {
-        return IntegerMilliseconds(static_cast<int64_t>(floatingSeconds * 1000.0));
+        return IntegerMilliseconds(static_cast<int64_t>(floatingSeconds * 1000.0 + 0.5f));
     }
     IntegerSeconds inSeconds() const { return IntegerSeconds(static_cast<int64_t>(floatingSeconds)); }
 };
@@ -85,10 +85,12 @@ struct SC::TimeCounter
     TimeCounter&               snap();
     [[nodiscard]] TimeCounter  offsetBy(IntegerMilliseconds ms) const;
     [[nodiscard]] bool         isLaterThanOrEqualTo(TimeCounter other) const;
-    [[nodiscard]] RelativeTime subtract(TimeCounter other) const;
+    [[nodiscard]] RelativeTime subtractApproximate(TimeCounter other) const;
+    [[nodiscard]] TimeCounter  subtractExact(TimeCounter other) const;
 
-  private:
     int64_t part1;
     int64_t part2;
+
+  private:
     struct Internal;
 };

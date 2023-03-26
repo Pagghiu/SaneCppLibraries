@@ -37,23 +37,6 @@ struct SC::IntrusiveDoubleLinkedListTest : public SC::TestCase
                 queue.queueBack(*currentItem);
             }
             SC_TEST_EXPECT(not queue.isEmpty());
-            int numInvocations = 0;
-            queue.forEachFrontToBack(
-                [&](Item* it)
-                {
-                    SC_TEST_EXPECT(it->data == numInvocations);
-                    numInvocations++;
-                });
-            SC_TEST_EXPECT(numInvocations == 2);
-            numInvocations = 0;
-            queue.forEachBackToFront(
-                [&](Item* it)
-                {
-                    SC_TEST_EXPECT(it->data == 1 - numInvocations);
-                    numInvocations++;
-                });
-            SC_TEST_EXPECT(numInvocations == 2);
-
             Item* first = queue.dequeueFront();
             SC_TEST_EXPECT(first->data == 0);
             SC_TEST_EXPECT(not queue.isEmpty());
@@ -75,25 +58,8 @@ struct SC::IntrusiveDoubleLinkedListTest : public SC::TestCase
             queue.queueBack(items[2]);
 
             queue.remove(items[1]);
-            int numInvocations;
-            queue.forEachFrontToBack(
-                [&](Item* it)
-                {
-                    SC_TEST_EXPECT(it->data == numInvocations);
-                    numInvocations++;
-                });
-            SC_TEST_EXPECT(numInvocations == 2);
-
-            queue.remove(items[2]);
-            numInvocations = 0;
-            queue.forEachFrontToBack(
-                [&](Item* it)
-                {
-                    SC_TEST_EXPECT(it->data == numInvocations);
-                    numInvocations++;
-                });
-            SC_TEST_EXPECT(numInvocations == 1);
             queue.remove(items[0]);
+            queue.remove(items[2]);
             SC_TEST_EXPECT(queue.isEmpty());
             SC_TEST_EXPECT(queue.back == nullptr and queue.front == nullptr);
             SC_TEST_EXPECT(items[0].next == nullptr);

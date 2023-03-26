@@ -3,6 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include <Windows.h>
 
+#include "EventLoop.h"
+
 struct SC::EventLoop::Internal
 {
     FileDescriptor loopFd;
@@ -27,36 +29,6 @@ struct SC::EventLoop::Internal
         // Not needed, we can just use PostQueuedCompletionStatus directly
         return true;
     }
-
-    struct KernelQueue
-    {
-        static constexpr int totalNumEvents = 128;
-        OVERLAPPED_ENTRY     events[totalNumEvents];
-        ULONG                newEvents = 0;
-
-        [[nodiscard]] ReturnCode addReadWatcher(FileDescriptor& loopFd, FileDescriptorNative fileDescriptor)
-        {
-            return true;
-        }
-
-        [[nodiscard]] ReturnCode poll(FileDescriptor& loopFd, IntegerMilliseconds* actualTimeout)
-        {
-            FileDescriptorNative loopNativeDescriptor;
-            SC_TRY_IF(loopFd.handle.get(loopNativeDescriptor, "KernelQueue::poll() - Invalid Handle"_a8));
-
-            const BOOL success = GetQueuedCompletionStatusEx(
-                loopNativeDescriptor, events, static_cast<ULONG>(ConstantArraySize(events)), &newEvents,
-                actualTimeout ? static_cast<ULONG>(actualTimeout->ms) : INFINITE, FALSE);
-            if (not success and GetLastError() != WAIT_TIMEOUT)
-            {
-                // TODO: GetQueuedCompletionStatusEx error handling
-                return "KernelQueue::poll() - GetQueuedCompletionStatusEx error"_a8;
-            }
-            return true;
-        }
-
-      private:
-    };
 };
 
 SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
@@ -71,3 +43,65 @@ SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
     }
     return true;
 }
+
+struct SC::EventLoop::KernelQueue
+{
+    static constexpr int totalNumEvents = 128;
+    OVERLAPPED_ENTRY     events[totalNumEvents];
+    ULONG                newEvents = 0;
+
+    [[nodiscard]] ReturnCode pushAsync(EventLoop& eventLoop, Async* async)
+    {
+        switch (async->operation.type)
+        {
+        case Async::Operation::Type::Timeout: {
+            eventLoop.activeTimers.queueBack(*async);
+        }
+        break;
+        case Async::Operation::Type::Read: {
+            addReadWatcher(eventLoop.internal.get().loopFd, async->operation.fields.read.fileDescriptor);
+            eventLoop.stagedHandles.queueBack(*async);
+        }
+        break;
+        }
+        return true;
+    }
+
+    [[nodiscard]] bool isFull() const { return newEvents >= totalNumEvents; }
+
+    void addReadWatcher(FileDescriptor& loopFd, FileDescriptorNative fileDescriptor) {}
+
+    [[nodiscard]] ReturnCode poll(EventLoop& self, const TimeCounter* nextTimer)
+    {
+        FileDescriptorNative loopNativeDescriptor;
+        SC_TRY_IF(self.internal.get().loopFd.handle.get(loopNativeDescriptor,
+                                                        "EventLoop::Internal::poll() - Invalid Handle"_a8));
+        IntegerMilliseconds timeout;
+        if (nextTimer)
+        {
+            if (nextTimer->isLaterThanOrEqualTo(self.loopTime))
+            {
+                timeout = nextTimer->subtractApproximate(self.loopTime).inRoundedUpperMilliseconds();
+            }
+        }
+        const BOOL success =
+            GetQueuedCompletionStatusEx(loopNativeDescriptor, events, static_cast<ULONG>(ConstantArraySize(events)),
+                                        &newEvents, nextTimer ? static_cast<ULONG>(timeout.ms) : INFINITE, FALSE);
+        if (not success and GetLastError() != WAIT_TIMEOUT)
+        {
+            // TODO: GetQueuedCompletionStatusEx error handling
+            return "KernelQueue::poll() - GetQueuedCompletionStatusEx error"_a8;
+        }
+        return true;
+    }
+
+    [[nodiscard]] ReturnCode commitQueue(EventLoop& self)
+    {
+        FileDescriptorNative loopNativeDescriptor;
+        SC_TRY_IF(self.internal.get().loopFd.handle.get(loopNativeDescriptor,
+                                                        "EventLoop::Internal::commitQueue() - Invalid Handle"_a8));
+        return true;
+    }
+
+  private:
+};

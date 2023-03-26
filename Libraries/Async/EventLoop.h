@@ -6,6 +6,7 @@
 #include "../Foundation/Function.h"
 #include "../Foundation/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Limits.h"
+#include "../Foundation/Optional.h"
 #include "../Foundation/TaggedUnion.h"
 #include "../Foundation/Time.h"
 #include "../InputOutput/FileDescriptor.h"
@@ -81,7 +82,8 @@ struct SC::EventLoop
 
     // Execution
     [[nodiscard]] ReturnCode run();
-    [[nodiscard]] ReturnCode runOnce();
+
+    ReturnCode runOnce();
 
     // Async Operations
     void addTimeout(IntegerMilliseconds expiration, Async& async, Function<void(AsyncResult&)>&& callback);
@@ -91,22 +93,25 @@ struct SC::EventLoop
     [[nodiscard]] ReturnCode wakeUpFromExternalThread();
 
   private:
-    void submitAsync(Async& async);
-
     IntrusiveDoubleLinkedList<Async> submission;
+    IntrusiveDoubleLinkedList<Async> activeTimers;
+    IntrusiveDoubleLinkedList<Async> stagedHandles;
 
     TimeCounter loopTime;
-    int         activeHandles = 0;
 
     struct Internal;
+    struct KernelQueue;
     static constexpr int InternalSize      = 1024;
     static constexpr int InternalAlignment = alignof(void*);
     template <typename T, int N, int Alignment>
     friend struct OpaqueFunctions;
     OpaqueUniqueObject<Internal, InternalSize, InternalAlignment> internal;
 
+    void invokeExpiredTimers();
+    void updateTime() { loopTime.snap(); }
+    void submitAsync(Async& async);
+
     [[nodiscard]] bool               shouldQuit();
     [[nodiscard]] const TimeCounter* findEarliestTimer() const;
-    void                             invokeExpiredTimers();
-    void                             updateTime() { loopTime.snap(); }
+    [[nodiscard]] ReturnCode         stageSubmissions(KernelQueue& queue);
 };

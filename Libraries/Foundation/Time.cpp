@@ -145,11 +145,23 @@ bool SC::TimeCounter::isLaterThanOrEqualTo(TimeCounter other) const
 #endif
 }
 
-SC::RelativeTime SC::TimeCounter::subtract(TimeCounter other) const
+SC::RelativeTime SC::TimeCounter::subtractApproximate(TimeCounter other) const
 {
+    TimeCounter res = subtractExact(other);
 #if SC_PLATFORM_WINDOWS
-    int64_t newSeconds = part1 - other.part1;
-    return RelativeTime::fromSeconds(static_cast<double>(newSeconds) / part2);
+    return RelativeTime::fromSeconds(static_cast<double>(res.part1) / res.part2);
+#else
+    constexpr int32_t secondsToNanoseconds = 1e9;
+    return RelativeTime::fromSeconds(res.part1 + static_cast<double>(res.part2) / secondsToNanoseconds);
+#endif
+}
+
+[[nodiscard]] SC::TimeCounter SC::TimeCounter::subtractExact(TimeCounter other) const
+{
+    TimeCounter res;
+#if SC_PLATFORM_WINDOWS
+    res.part1 = part1 - other.part1;
+    res.part2 = part2;
 #else
     int64_t           newSeconds           = part1 - other.part1;
     int64_t           newNanoseconds       = part2 - other.part2;
@@ -159,6 +171,8 @@ SC::RelativeTime SC::TimeCounter::subtract(TimeCounter other) const
         newNanoseconds += secondsToNanoseconds;
         newSeconds -= 1;
     }
-    return RelativeTime::fromSeconds(newSeconds + static_cast<double>(newNanoseconds) / secondsToNanoseconds);
+    res.part1 = newSeconds;
+    res.part2 = newNanoseconds;
 #endif
+    return res;
 }

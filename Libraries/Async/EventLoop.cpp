@@ -29,8 +29,8 @@ void SC::OpaqueFunctions<SC::EventLoop::Internal, SC::EventLoop::InternalSize,
 void SC::EventLoop::addTimeout(IntegerMilliseconds expiration, Async& async, Function<void(AsyncResult&)>&& callback)
 {
     Async::Timeout timeout;
-    // TODO: Should probably use loopTime
-    timeout.expirationTime = TimeCounter().snap().offsetBy(expiration);
+    updateTime();
+    timeout.expirationTime = loopTime.offsetBy(expiration);
     timeout.timeout        = expiration;
     async.operation.assignValue(move(timeout));
     async.callback = move(callback);
@@ -47,6 +47,7 @@ void SC::EventLoop::addRead(FileDescriptorNative fd, Async& async)
 
 void SC::EventLoop::submitAsync(Async& async)
 {
+    SC_RELEASE_ASSERT(async.state == Async::State::Free);
     async.state = Async::State::Submitting;
     submission.queueBack(async);
 }
@@ -65,37 +66,38 @@ SC::ReturnCode SC::EventLoop::run()
 const SC::TimeCounter* SC::EventLoop::findEarliestTimer() const
 {
     const TimeCounter* earliestTime = nullptr;
-    submission.forEachFrontToBack(
-        [&earliestTime](const Async* async)
+    for (Async* async = activeTimers.front; async != nullptr; async = async->next)
+    {
+        SC_RELEASE_ASSERT(async->operation.type == Async::Operation::Type::Timeout);
+        const auto& expirationTime = async->operation.fields.timeout.expirationTime;
+        if (earliestTime == nullptr or earliestTime->isLaterThanOrEqualTo(expirationTime))
         {
-            if (async->operation.type == Async::Operation::Type::Timeout)
-            {
-                const auto& expirationTime = async->operation.fields.timeout.expirationTime;
-                if (earliestTime == nullptr or earliestTime->isLaterThanOrEqualTo(expirationTime))
-                {
-                    earliestTime = &expirationTime;
-                }
-            }
-        });
+            earliestTime = &expirationTime;
+        }
+    };
     return earliestTime;
 }
 
 void SC::EventLoop::invokeExpiredTimers()
 {
-    submission.forEachFrontToBack(
-        [this](Async* async)
+    for (Async* async = activeTimers.front; async != nullptr;)
+    {
+        SC_RELEASE_ASSERT(async->operation.type == Async::Operation::Type::Timeout);
+        const auto& expirationTime = async->operation.fields.timeout.expirationTime;
+        if (loopTime.isLaterThanOrEqualTo(expirationTime))
         {
-            if (async->operation.type == Async::Operation::Type::Timeout)
-            {
-                const auto& expirationTime = async->operation.fields.timeout.expirationTime;
-                if (loopTime.isLaterThanOrEqualTo(expirationTime))
-                {
-                    submission.remove(*async);
-                    AsyncResult res{*this, *async};
-                    async->callback(res);
-                }
-            }
-        });
+            Async* currentAsync = async;
+            async               = async->next;
+            activeTimers.remove(*currentAsync);
+            currentAsync->state = Async::State::Free;
+            AsyncResult res{*this, *currentAsync};
+            currentAsync->callback(res);
+        }
+        else
+        {
+            async = async->next;
+        }
+    }
 }
 
 [[nodiscard]] SC::ReturnCode SC::EventLoop::create()
@@ -103,66 +105,83 @@ void SC::EventLoop::invokeExpiredTimers()
     Internal& self = internal.get();
     SC_TRY_IF(self.createEventLoop());
     SC_TRY_IF(self.createWakeup(*this));
-    updateTime();
+    return true;
+}
+
+SC::ReturnCode SC::EventLoop::stageSubmissions(SC::EventLoop::KernelQueue& queue)
+{
+    while (Async* async = submission.dequeueFront())
+    {
+        switch (async->state)
+        {
+        case Async::State::Submitting: {
+            SC_TRY_IF(queue.pushAsync(*this, async));
+            async->state = Async::State::Active;
+            if (queue.isFull())
+            {
+                SC_TRY_IF(queue.commitQueue(*this));
+                stagedHandles.clear();
+            }
+        }
+        break;
+        case Async::State::Free: {
+            // TODO: Stop the completion, it has been cancelled before being submitted
+            SC_RELEASE_ASSERT(false);
+        }
+        break;
+        case Async::State::Cancelling: {
+            // TODO: issue an actual kevent for removal
+            SC_RELEASE_ASSERT(false);
+        }
+        break;
+        case Async::State::Active: {
+            SC_DEBUG_ASSERT(false);
+            return "EventLoop::processSubmissions() got Active handle"_a8;
+        }
+        break;
+        }
+    }
     return true;
 }
 
 SC::ReturnCode SC::EventLoop::runOnce()
 {
-    Internal& self = internal.get();
-    updateTime();
+    KernelQueue queue;
 
-    Optional<IntegerMilliseconds> potentialTimeout;
-    const TimeCounter*            earliestTimer = findEarliestTimer();
-    if (earliestTimer)
-    {
-        updateTime();
-        IntegerMilliseconds timeout = earliestTimer->subtract(loopTime).inMilliseconds();
-        if (timeout.ms < 0)
+    auto defer = MakeDeferred(
+        [this]
         {
-            timeout.ms = 0;
-        }
-        potentialTimeout = timeout;
-    }
-
-    FileDescriptorNative loopFd;
-    SC_TRY_IF(self.loopFd.handle.get(loopFd, "Invalid loopFd"_a8));
-    for (;;)
-    {
-        IntegerMilliseconds* actualTimeout = nullptr;
-        SC_TRUST_RESULT(potentialTimeout.get(actualTimeout));
-        Internal::KernelQueue queue;
-        for (Async* async = submission.front; async != nullptr; async = async->next)
-        {
-            if (async->operation.type == Async::Operation::Type::Read)
+            if (not stagedHandles.isEmpty())
             {
-                submission.remove(*async);
-                SC_TRY_IF(queue.addReadWatcher(self.loopFd, async->operation.fields.read.fileDescriptor));
+                // TODO: we should re-append stagedHandles to submissions and transition them to Submitting state
+                SC_RELEASE_ASSERT(false);
             }
-        }
+        });
+    SC_TRY_IF(stageSubmissions(queue));
 
-        SC_TRY_IF(queue.poll(self.loopFd, actualTimeout));
-        updateTime();
-        // We should be rounding to the upper millisecond or so but this is fine
-        loopTime = loopTime.offsetBy(1_ms);
-        if (queue.newEvents == 0 && earliestTimer) // if no io event happened that interrupted timeout
+    SC_RELEASE_ASSERT(submission.isEmpty());
+
+    const TimeCounter* nextTimer = findEarliestTimer();
+    SC_TRY_IF(queue.poll(*this, nextTimer));
+    stagedHandles.clear();
+
+    if (nextTimer)
+    {
+        const bool timeoutOccurredWithoutIO = queue.newEvents == 0;
+        const bool timeoutWasAlreadyExpired = loopTime.isLaterThanOrEqualTo(*nextTimer);
+        if (timeoutOccurredWithoutIO or timeoutWasAlreadyExpired)
         {
-            // This will also handle WAIT_TIMEOUT events on windows and EINTR cases
-            // When we will be actually dequeing IO it will be important to know whow many
-            // actual events we need to handle
-            if (not loopTime.isLaterThanOrEqualTo(*earliestTimer))
+            if (timeoutWasAlreadyExpired)
             {
-                IntegerMilliseconds timeout = earliestTimer->subtract(loopTime).inMilliseconds();
-                if (timeout.ms < 0)
-                {
-                    timeout.ms = 0;
-                }
-                potentialTimeout = timeout;
-                continue;
+                // Not sure if this is really possible.
+                updateTime();
             }
+            else
+            {
+                loopTime = *nextTimer;
+            }
+            invokeExpiredTimers();
         }
-        break;
     }
-    invokeExpiredTimers();
     return true;
 }

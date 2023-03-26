@@ -7,6 +7,8 @@
 #include <sys/time.h>  // timespec
 #include <unistd.h>
 
+#include "EventLoop.h"
+
 struct SC::EventLoop::Internal
 {
     FileDescriptor loopFd;
@@ -48,78 +50,110 @@ struct SC::EventLoop::Internal
         loop.addRead(pipeHandle, wakeupAsync);
         return true;
     }
+};
 
-    struct KernelQueue
+struct SC::EventLoop::KernelQueue
+{
+    static constexpr int totalNumEvents         = 1024;
+    struct kevent        events[totalNumEvents] = {0};
+    int                  newEvents              = 0;
+
+    [[nodiscard]] ReturnCode pushAsync(EventLoop& eventLoop, Async* async)
     {
-        static constexpr int totalNumEvents         = 1024;
-        struct kevent        events[totalNumEvents] = {0};
-        int                  newEvents              = 0;
-
-        [[nodiscard]] ReturnCode addReadWatcher(FileDescriptor& loopFd, FileDescriptorNative fileDescriptor)
+        switch (async->operation.type)
         {
-            int fflags = 0;
-            EV_SET(events + newEvents, fileDescriptor, EVFILT_READ, EV_ADD, fflags, 0, 0);
-            newEvents += 1;
-            if (newEvents == totalNumEvents)
-            {
-                SC_TRY_IF(commitQueue(loopFd));
-            }
-            return true;
+        case Async::Operation::Type::Timeout: {
+            eventLoop.activeTimers.queueBack(*async);
         }
+        break;
+        case Async::Operation::Type::Read: {
+            addReadWatcher(eventLoop.internal.get().loopFd, async->operation.fields.read.fileDescriptor);
+            eventLoop.stagedHandles.queueBack(*async);
+        }
+        break;
+        }
+        return true;
+    }
 
-        [[nodiscard]] ReturnCode poll(FileDescriptor& loopFd, IntegerMilliseconds* actualTimeout)
+    [[nodiscard]] bool isFull() const { return newEvents >= totalNumEvents; }
+
+    void addReadWatcher(FileDescriptor& loopFd, FileDescriptorNative fileDescriptor)
+    {
+        int fflags = 0;
+        EV_SET(events + newEvents, fileDescriptor, EVFILT_READ, EV_ADD, fflags, 0, 0);
+        newEvents += 1;
+    }
+
+    static struct timespec timerToTimespec(const TimeCounter& loopTime, const TimeCounter* nextTimer)
+    {
+        struct timespec specTimeout;
+        if (nextTimer)
         {
-            FileDescriptorNative loopNativeDescriptor;
-            SC_TRY_IF(loopFd.handle.get(loopNativeDescriptor, "EventLoop::Internal::poll() - Invalid Handle"_a8));
-            struct timespec specTimeout;
-            if (actualTimeout)
+            if (nextTimer->isLaterThanOrEqualTo(loopTime))
             {
-                convertToTimespec(*actualTimeout, specTimeout);
+                const TimeCounter diff = nextTimer->subtractExact(loopTime);
+                struct timespec   specTimeout;
+                specTimeout.tv_sec  = diff.part1;
+                specTimeout.tv_nsec = diff.part2;
+                return specTimeout;
             }
-
-            size_t res;
-            do
-            {
-                res = kevent(loopNativeDescriptor, events, newEvents, events, totalNumEvents,
-                             actualTimeout ? &specTimeout : nullptr);
-            } while (res == -1 && errno == EINTR);
-            if (res == -1)
-            {
-                return "EventLoop::Internal::poll() - kevent failed"_a8;
-            }
-            newEvents = static_cast<int>(res);
-            return true;
         }
+        specTimeout.tv_sec  = 0;
+        specTimeout.tv_nsec = 0;
+        return specTimeout;
+    }
 
-      private:
-        static void convertToTimespec(IntegerMilliseconds expiration, struct timespec& spec)
+    [[nodiscard]] ReturnCode poll(EventLoop& self, const TimeCounter* nextTimer)
+    {
+        FileDescriptorNative loopNativeDescriptor;
+        SC_TRY_IF(self.internal.get().loopFd.handle.get(loopNativeDescriptor,
+                                                        "EventLoop::Internal::poll() - Invalid Handle"_a8));
+
+        struct timespec specTimeout;
+        specTimeout = timerToTimespec(self.loopTime, nextTimer);
+        size_t res;
+        do
         {
-            constexpr uint32_t secondsToNanoseconds  = 1000000;
-            constexpr uint32_t secondsToMilliseconds = 1000;
-
-            spec.tv_sec  = expiration.ms / secondsToMilliseconds;
-            spec.tv_nsec = (expiration.ms % secondsToMilliseconds) * secondsToNanoseconds;
-        }
-
-        [[nodiscard]] ReturnCode commitQueue(FileDescriptor& loopFd)
-        {
-            FileDescriptorNative loopNativeDescriptor;
-            SC_TRY_IF(
-                loopFd.handle.get(loopNativeDescriptor, "EventLoop::Internal::commitQueue() - Invalid Handle"_a8));
-
-            int res;
-            do
+            res = kevent(loopNativeDescriptor, events, newEvents, events, totalNumEvents,
+                         nextTimer ? &specTimeout : nullptr);
+            if (res == -1 && errno == EINTR)
             {
-                res = kevent(loopNativeDescriptor, events, newEvents, nullptr, 0, nullptr);
-            } while (res == -1 && errno == EINTR);
-            if (res != 0)
-            {
-                return "EventLoop::Internal::commitQueue() - kevent failed"_a8;
+                // Interrupted, we must recompute timeout
+                if (nextTimer)
+                {
+                    self.updateTime();
+                    specTimeout = timerToTimespec(self.loopTime, nextTimer);
+                }
+                continue;
             }
-            newEvents = 0;
-            return true;
+            break;
+        } while (true);
+        if (res == -1)
+        {
+            return "EventLoop::Internal::poll() - kevent failed"_a8;
         }
-    };
+        newEvents = static_cast<int>(res);
+        return true;
+    }
+
+    [[nodiscard]] ReturnCode commitQueue(EventLoop& self)
+    {
+        FileDescriptorNative loopNativeDescriptor;
+        SC_TRY_IF(self.internal.get().loopFd.handle.get(loopNativeDescriptor,
+                                                        "EventLoop::Internal::commitQueue() - Invalid Handle"_a8));
+
+        int res;
+        do
+        {
+            res = kevent(loopNativeDescriptor, events, newEvents, nullptr, 0, nullptr);
+        } while (res == -1 && errno == EINTR);
+        if (res != 0)
+        {
+            return "EventLoop::Internal::commitQueue() - kevent failed"_a8;
+        }
+        newEvents = 0;
+        return true;
+    }
 };
 
 SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()

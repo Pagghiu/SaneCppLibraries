@@ -147,6 +147,20 @@ struct [[nodiscard]] SC::Optional
         }
         return false;
     }
+
+    [[nodiscard]] Value* get()
+    {
+        if (valueExists)
+            return &value;
+        return nullptr;
+    }
+
+    [[nodiscard]] const Value* get() const
+    {
+        if (valueExists)
+            return &value;
+        return nullptr;
+    }
 };
 
 template <typename Value>

@@ -20,40 +20,10 @@ struct SC::IntrusiveDoubleLinkedList
 
     [[nodiscard]] bool isEmpty() const { return peekFront() == nullptr; }
 
-    template <typename Lambda>
-    void forEachFrontToBack(Lambda&& lambda)
+    void clear()
     {
-        for (T* it = front; it != nullptr; it = it->next)
-        {
-            lambda(it);
-        }
-    }
-
-    template <typename Lambda>
-    void forEachBackToFront(Lambda&& lambda)
-    {
-        for (T* it = back; it != nullptr; it = it->prev)
-        {
-            lambda(it);
-        }
-    }
-
-    template <typename Lambda>
-    void forEachFrontToBack(Lambda&& lambda) const
-    {
-        for (const T* it = front; it != nullptr; it = it->next)
-        {
-            lambda(it);
-        }
-    }
-
-    template <typename Lambda>
-    void forEachBackToFront(Lambda&& lambda) const
-    {
-        for (const T* it = back; it != nullptr; it = it->prev)
-        {
-            lambda(it);
-        }
+        back  = nullptr;
+        front = nullptr;
     }
 
     void queueBack(T& item)

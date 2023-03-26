@@ -32,16 +32,17 @@ struct SC::TimeTest : public SC::TestCase
             start.snap();
             Thread::Sleep(100);
             end.snap();
-            RelativeTime elapsed = end.subtract(start);
-            SC_TEST_EXPECT(elapsed.inMilliseconds().ms < 150 and elapsed.inMilliseconds().ms > 50);
+            RelativeTime elapsed = end.subtractApproximate(start);
+            SC_TEST_EXPECT(elapsed.inRoundedUpperMilliseconds().ms < 150 and
+                           elapsed.inRoundedUpperMilliseconds().ms > 50);
         }
         if (test_section("TimeCounter::offsetBy"))
         {
             TimeCounter start;
             start.snap();
             const TimeCounter end     = start.offsetBy(IntegerMilliseconds(321));
-            RelativeTime      elapsed = end.subtract(start);
-            SC_TEST_EXPECT(elapsed.inMilliseconds().ms == 321);
+            RelativeTime      elapsed = end.subtractApproximate(start);
+            SC_TEST_EXPECT(elapsed.inRoundedUpperMilliseconds().ms == 321);
         }
         if (test_section("TimeCounter::isLaterOnOrEqual"))
         {

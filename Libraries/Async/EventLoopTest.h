@@ -24,7 +24,7 @@ struct SC::EventLoopTest : public SC::TestCase
             int   called1 = 0;
             int   called2 = 0;
             Async c1, c2;
-            loop.addTimeout(10_ms, c1,
+            loop.addTimeout(1_ms, c1,
                             [&](AsyncResult& res)
                             {
                                 // As we are in a timeout callback we know for fact that we could easily access
@@ -32,11 +32,15 @@ struct SC::EventLoopTest : public SC::TestCase
                                 // unionAs<...>() however is more safe, as it will return nullptr when casted to wrong
                                 // type.
                                 Async::Timeout* timeout = res.async.operation.unionAs<Async::Timeout>();
-                                SC_TEST_EXPECT(timeout and timeout->timeout.ms == 10);
+                                SC_TEST_EXPECT(timeout and timeout->timeout.ms == 1);
                                 called1++;
                             });
             loop.addTimeout(100_ms, c2,
-                            [&](AsyncResult&) { called2++; }); // TODO: investigate allowing dropping AsyncResult
+                            [&](AsyncResult&)
+                            {
+                                // TODO: investigate allowing dropping AsyncResult
+                                called2++;
+                            });
             SC_TEST_EXPECT(loop.runOnce());
             SC_TEST_EXPECT(called1 == 1 and called2 == 0);
             SC_TEST_EXPECT(loop.runOnce());
