@@ -50,6 +50,8 @@ struct SC::EventLoop::Internal
         loop.addRead(pipeHandle, wakeupAsync);
         return true;
     }
+
+    [[nodiscard]] bool isWakeUp(const struct kevent& event) const { return event.udata == &wakeupAsync; }
 };
 
 struct SC::EventLoop::KernelQueue
@@ -67,7 +69,7 @@ struct SC::EventLoop::KernelQueue
         }
         break;
         case Async::Operation::Type::Read: {
-            addReadWatcher(eventLoop.internal.get().loopFd, async->operation.fields.read.fileDescriptor);
+            addReadWatcher(eventLoop.internal.get().loopFd, async->operation.fields.read.fileDescriptor, async);
             eventLoop.stagedHandles.queueBack(*async);
         }
         break;
@@ -77,10 +79,10 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] bool isFull() const { return newEvents >= totalNumEvents; }
 
-    void addReadWatcher(FileDescriptor& loopFd, FileDescriptorNative fileDescriptor)
+    void addReadWatcher(FileDescriptor& loopFd, FileDescriptorNative fileDescriptor, Async* udata)
     {
         int fflags = 0;
-        EV_SET(events + newEvents, fileDescriptor, EVFILT_READ, EV_ADD, fflags, 0, 0);
+        EV_SET(events + newEvents, fileDescriptor, EVFILT_READ, EV_ADD, fflags, 0, udata);
         newEvents += 1;
     }
 

@@ -183,5 +183,55 @@ SC::ReturnCode SC::EventLoop::runOnce()
             invokeExpiredTimers();
         }
     }
+
+    for (decltype(KernelQueue::newEvents) idx = 0; idx < queue.newEvents; ++idx)
+    {
+        if (internal.get().isWakeUp(queue.events[idx]))
+        {
+            runCompletionForNotifiers();
+        }
+    }
+
     return true;
+}
+
+SC::ReturnCode SC::EventLoop::initNotifier(ExternalThreadNotifier& notifier, Function<void(EventLoop&)>&& callback)
+{
+    SC_TRY_MSG(notifier.loop == nullptr and notifier.pending.load() == false or notifier.next != nullptr or
+                   notifier.prev != nullptr,
+               "EventLoop::registerNotifier re-using already in use notifier"_a8);
+    notifier.callback = forward<Function<void(EventLoop&)>>(callback);
+    notifier.loop     = this;
+    notifiers.queueBack(notifier);
+    return true;
+}
+
+void SC::EventLoop::removeNotifier(ExternalThreadNotifier& notifier)
+{
+    notifiers.remove(notifier);
+    notifier.loop     = nullptr;
+    notifier.callback = Function<void(EventLoop&)>();
+}
+
+SC::ReturnCode SC::EventLoop::notifyFromExternalThread(ExternalThreadNotifier& notifier)
+{
+    if (not notifier.pending.exchange(true))
+    {
+        // This executes if current thread is lucky enough to atomically exchange pending from false to true.
+        // This effectively allows coalescing calls from different threads into a single notification.
+        SC_TRY_IF(notifier.loop->wakeUpFromExternalThread());
+    }
+    return true;
+}
+
+void SC::EventLoop::runCompletionForNotifiers()
+{
+    for (ExternalThreadNotifier* first = notifiers.front; first != nullptr; first = first->next)
+    {
+        if (first->pending.load() == true)
+        {
+            first->callback(*this);
+            first->pending.exchange(false); // allow executing the notification again
+        }
+    }
 }

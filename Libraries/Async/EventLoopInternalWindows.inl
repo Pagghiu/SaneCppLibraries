@@ -9,6 +9,8 @@ struct SC::EventLoop::Internal
 {
     FileDescriptor loopFd;
 
+    OVERLAPPED wakeupOverlapped = {0};
+
     ~Internal() { SC_TRUST_RESULT(close()); }
     [[nodiscard]] ReturnCode close() { return loopFd.handle.close(); }
 
@@ -29,6 +31,8 @@ struct SC::EventLoop::Internal
         // Not needed, we can just use PostQueuedCompletionStatus directly
         return true;
     }
+
+    [[nodiscard]] bool isWakeUp(const OVERLAPPED_ENTRY& event) const { return event.lpOverlapped == &wakeupOverlapped; }
 };
 
 SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
@@ -37,7 +41,7 @@ SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
     FileDescriptorNative loopNativeDescriptor;
     SC_TRY_IF(self.loopFd.handle.get(loopNativeDescriptor, "watchInputs - Invalid Handle"_a8));
 
-    if (not PostQueuedCompletionStatus(loopNativeDescriptor, 0, 0, nullptr))
+    if (not PostQueuedCompletionStatus(loopNativeDescriptor, 0, 0, &self.wakeupOverlapped))
     {
         return "EventLoop::wakeUpFromExternalThread() - PostQueuedCompletionStatus"_a8;
     }
@@ -95,13 +99,7 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] ReturnCode commitQueue(EventLoop& self)
-    {
-        FileDescriptorNative loopNativeDescriptor;
-        SC_TRY_IF(self.internal.get().loopFd.handle.get(loopNativeDescriptor,
-                                                        "EventLoop::Internal::commitQueue() - Invalid Handle"_a8));
-        return true;
-    }
+    [[nodiscard]] ReturnCode commitQueue(EventLoop& self) { return true; }
 
   private:
 };

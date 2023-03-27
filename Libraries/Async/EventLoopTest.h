@@ -16,7 +16,6 @@ struct SC::EventLoopTest : public SC::TestCase
     {
         using namespace SC;
         // TODO: Add EventLoop::resetTimeout
-        // TODO: Implement async lifecycle
         if (test_section("addTimeout"))
         {
             EventLoop loop;
@@ -67,6 +66,58 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(newThread.join());
             SC_TEST_EXPECT(threadCalled == 1);
             SC_TEST_EXPECT(wakeUpFromExternalThreadSucceeded == 1);
+        }
+        if (test_section("ExternalThreadNotifier"))
+        {
+            EventLoop loop;
+            int       notifier1Called = 0;
+            int       notifier2Called = 0;
+            SC_TEST_EXPECT(loop.create());
+            EventLoop::ExternalThreadNotifier notifier1;
+            EventLoop::ExternalThreadNotifier notifier2;
+
+            const auto notifier1res = loop.initNotifier(notifier1,
+                                                        [&](EventLoop&)
+                                                        {
+                                                            // TODO: Add thread id check
+                                                            notifier1Called++;
+                                                        });
+            SC_TEST_EXPECT(notifier1res);
+            const auto notifier2res = loop.initNotifier(notifier2,
+                                                        [&](EventLoop&)
+                                                        {
+                                                            // TODO: Add thread id check
+                                                            notifier2Called++;
+                                                        });
+            SC_TEST_EXPECT(notifier2res);
+            Thread     newThread1;
+            Thread     newThread2;
+            ReturnCode loopRes1   = false;
+            ReturnCode loopRes2   = false;
+            const auto threadRes1 = newThread1.start("test1",
+                                                     [&]
+                                                     {
+                                                         loopRes1 = loop.notifyFromExternalThread(notifier1);
+                                                         // TODO: Add a waitFor / event signal for callback called
+                                                     });
+            const auto threadRes2 = newThread2.start("test2",
+                                                     [&]
+                                                     {
+                                                         loopRes2 = loop.notifyFromExternalThread(notifier1);
+                                                         // TODO: Add a waitFor / event signal for callback called
+                                                     });
+            SC_TEST_EXPECT(threadRes1);
+            SC_TEST_EXPECT(threadRes2);
+            SC_TEST_EXPECT(newThread1.join());
+            SC_TEST_EXPECT(newThread2.join());
+            SC_TEST_EXPECT(loopRes1);
+            SC_TEST_EXPECT(loopRes2);
+            SC_TEST_EXPECT(loop.runOnce());
+            SC_TEST_EXPECT(notifier1Called == 1);
+            SC_TEST_EXPECT(notifier2Called == 0);
+            loop.removeNotifier(notifier1);
+            loop.removeNotifier(notifier2);
+            // TODO: Add get thread id and check in the notifier that we have the same thread id
         }
     }
 };

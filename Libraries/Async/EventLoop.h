@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 
+#include "../Foundation/Atomic.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Limits.h"
@@ -90,12 +91,26 @@ struct SC::EventLoop
     void addRead(FileDescriptorNative fd, Async& async);
 
     // Operations
+    struct ExternalThreadNotifier
+    {
+        ExternalThreadNotifier*    next = nullptr;
+        ExternalThreadNotifier*    prev = nullptr;
+        Function<void(EventLoop&)> callback;
+        Atomic<bool>               pending = false;
+        EventLoop*                 loop    = nullptr;
+    };
+    [[nodiscard]] ReturnCode initNotifier(ExternalThreadNotifier& notifier, Function<void(EventLoop&)>&& callback);
+    [[nodiscard]] ReturnCode notifyFromExternalThread(ExternalThreadNotifier& notifier);
+    void                     removeNotifier(ExternalThreadNotifier& notifier);
+
     [[nodiscard]] ReturnCode wakeUpFromExternalThread();
 
   private:
     IntrusiveDoubleLinkedList<Async> submission;
     IntrusiveDoubleLinkedList<Async> activeTimers;
     IntrusiveDoubleLinkedList<Async> stagedHandles;
+
+    IntrusiveDoubleLinkedList<ExternalThreadNotifier> notifiers;
 
     TimeCounter loopTime;
 
@@ -110,6 +125,8 @@ struct SC::EventLoop
     void invokeExpiredTimers();
     void updateTime() { loopTime.snap(); }
     void submitAsync(Async& async);
+
+    void runCompletionForNotifiers();
 
     [[nodiscard]] bool               shouldQuit();
     [[nodiscard]] const TimeCounter* findEarliestTimer() const;
