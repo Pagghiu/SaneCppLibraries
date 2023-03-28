@@ -17,6 +17,7 @@ namespace SC
 struct EventLoop;
 struct Async;
 struct AsyncResult;
+struct EventObject;
 } // namespace SC
 
 struct SC::AsyncResult
@@ -83,8 +84,7 @@ struct SC::EventLoop
 
     // Execution
     [[nodiscard]] ReturnCode run();
-
-    ReturnCode runOnce();
+    [[nodiscard]] ReturnCode runOnce();
 
     // Async Operations
     void addTimeout(IntegerMilliseconds expiration, Async& async, Function<void(AsyncResult&)>&& callback);
@@ -96,10 +96,12 @@ struct SC::EventLoop
         ExternalThreadNotifier*    next = nullptr;
         ExternalThreadNotifier*    prev = nullptr;
         Function<void(EventLoop&)> callback;
-        Atomic<bool>               pending = false;
-        EventLoop*                 loop    = nullptr;
+        Atomic<bool>               pending     = false;
+        EventLoop*                 loop        = nullptr;
+        EventObject*               eventObject = nullptr;
     };
-    [[nodiscard]] ReturnCode initNotifier(ExternalThreadNotifier& notifier, Function<void(EventLoop&)>&& callback);
+    [[nodiscard]] ReturnCode initNotifier(ExternalThreadNotifier& notifier, Function<void(EventLoop&)>&& callback,
+                                          EventObject* eventObject = nullptr);
     [[nodiscard]] ReturnCode notifyFromExternalThread(ExternalThreadNotifier& notifier);
     void                     removeNotifier(ExternalThreadNotifier& notifier);
 

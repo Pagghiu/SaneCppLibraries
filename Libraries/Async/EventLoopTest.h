@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/Test.h"
+#include "../Threading/Threading.h" // EventObject
 #include "EventLoop.h"
 
 namespace SC
@@ -80,7 +81,6 @@ struct SC::EventLoopTest : public SC::TestCase
             const auto notifier1res     = loop.initNotifier(notifier1,
                                                             [&](EventLoop&)
                                                             {
-                                                            // TODO: Add thread id check
                                                             callbackThreadID = Thread::CurrentThreadID();
                                                             notifier1Called++;
                                                         });
@@ -89,20 +89,12 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(notifier2res);
             Thread     newThread1;
             Thread     newThread2;
-            ReturnCode loopRes1   = false;
-            ReturnCode loopRes2   = false;
-            const auto threadRes1 = newThread1.start("test1",
-                                                     [&]
-                                                     {
-                                                         loopRes1 = loop.notifyFromExternalThread(notifier1);
-                                                         // TODO: Add a waitFor / event signal for callback called
-                                                     });
-            const auto threadRes2 = newThread2.start("test2",
-                                                     [&]
-                                                     {
-                                                         loopRes2 = loop.notifyFromExternalThread(notifier1);
-                                                         // TODO: Add a waitFor / event signal for callback called
-                                                     });
+            ReturnCode loopRes1 = false;
+            ReturnCode loopRes2 = false;
+            const auto threadRes1 =
+                newThread1.start("test1", [&] { loopRes1 = loop.notifyFromExternalThread(notifier1); });
+            const auto threadRes2 =
+                newThread2.start("test2", [&] { loopRes2 = loop.notifyFromExternalThread(notifier1); });
             SC_TEST_EXPECT(threadRes1);
             SC_TEST_EXPECT(threadRes2);
             SC_TEST_EXPECT(newThread1.join());
@@ -115,7 +107,46 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(callbackThreadID == Thread::CurrentThreadID());
             loop.removeNotifier(notifier1);
             loop.removeNotifier(notifier2);
-            // TODO: Add get thread id and check in the notifier that we have the same thread id
+        }
+        if (test_section("ExternalThreadNotifier with sync eventObject"))
+        {
+            EventLoop loop;
+            struct Params
+            {
+                int         notifier1Called         = 0;
+                int         observedNotifier1Called = -1;
+                EventObject eventObject;
+            } params;
+            SC_TEST_EXPECT(loop.create());
+            EventLoop::ExternalThreadNotifier notifier1;
+
+            uint64_t   callbackThreadID = 0;
+            const auto notifier1res     = loop.initNotifier(
+                notifier1,
+                [&](EventLoop&)
+                {
+                    callbackThreadID = Thread::CurrentThreadID();
+                    params.notifier1Called++;
+                },
+                &params.eventObject);
+            SC_TEST_EXPECT(notifier1res);
+            Thread     newThread1;
+            ReturnCode loopRes1   = false;
+            const auto threadRes1 = newThread1.start("test1",
+                                                     [&]
+                                                     {
+                                                         loopRes1 = loop.notifyFromExternalThread(notifier1);
+                                                         params.eventObject.wait();
+                                                         params.observedNotifier1Called = params.notifier1Called;
+                                                     });
+            SC_TEST_EXPECT(threadRes1);
+            SC_TEST_EXPECT(loop.runOnce());
+            SC_TEST_EXPECT(loopRes1);
+            SC_TEST_EXPECT(params.notifier1Called == 1);
+            SC_TEST_EXPECT(newThread1.join());
+            SC_TEST_EXPECT(params.observedNotifier1Called == 1);
+            SC_TEST_EXPECT(callbackThreadID == Thread::CurrentThreadID());
+            loop.removeNotifier(notifier1);
         }
     }
 };

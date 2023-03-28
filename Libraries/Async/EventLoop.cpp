@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "EventLoop.h"
 #include "../Foundation/Optional.h"
+#include "../Threading/Threading.h" // EventObject
 
 #if SC_PLATFORM_WINDOWS
 #include "EventLoopInternalWindows.inl"
@@ -195,13 +196,15 @@ SC::ReturnCode SC::EventLoop::runOnce()
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::initNotifier(ExternalThreadNotifier& notifier, Function<void(EventLoop&)>&& callback)
+SC::ReturnCode SC::EventLoop::initNotifier(ExternalThreadNotifier& notifier, Function<void(EventLoop&)>&& callback,
+                                           EventObject* eventObject)
 {
     SC_TRY_MSG(notifier.loop == nullptr and notifier.pending.load() == false or notifier.next != nullptr or
                    notifier.prev != nullptr,
                "EventLoop::registerNotifier re-using already in use notifier"_a8);
-    notifier.callback = forward<Function<void(EventLoop&)>>(callback);
-    notifier.loop     = this;
+    notifier.callback    = forward<Function<void(EventLoop&)>>(callback);
+    notifier.loop        = this;
+    notifier.eventObject = eventObject;
     notifiers.queueBack(notifier);
     return true;
 }
@@ -226,12 +229,16 @@ SC::ReturnCode SC::EventLoop::notifyFromExternalThread(ExternalThreadNotifier& n
 
 void SC::EventLoop::runCompletionForNotifiers()
 {
-    for (ExternalThreadNotifier* first = notifiers.front; first != nullptr; first = first->next)
+    for (ExternalThreadNotifier* notifier = notifiers.front; notifier != nullptr; notifier = notifier->next)
     {
-        if (first->pending.load() == true)
+        if (notifier->pending.load() == true)
         {
-            first->callback(*this);
-            first->pending.exchange(false); // allow executing the notification again
+            notifier->callback(*this);
+            if (notifier->eventObject)
+            {
+                notifier->eventObject->signal();
+            }
+            notifier->pending.exchange(false); // allow executing the notification again
         }
     }
 }
