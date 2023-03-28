@@ -12,6 +12,8 @@ struct SC::EventLoop::Internal
     [[nodiscard]] ReturnCode createEventLoop() { return true; }
     [[nodiscard]] ReturnCode createWakeup(EventLoop&) { return true; }
     [[nodiscard]] bool       isWakeUp(const int& event) const { return false; }
+    [[nodiscard]] Async*     getAsync(const int& event) const { return nullptr; }
+    void                     runCompletionForWakeUp(Async& async) {}
 };
 struct SC::EventLoop::KernelQueue
 {

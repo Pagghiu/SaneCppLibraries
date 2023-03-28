@@ -7,12 +7,14 @@
 #include <sys/time.h>  // timespec
 #include <unistd.h>
 
+#include "../Foundation/Array.h"
 #include "EventLoop.h"
 
 struct SC::EventLoop::Internal
 {
     FileDescriptor loopFd;
 
+    uint8_t            wakeupBuf[10];
     Async              wakeupAsync;
     FileDescriptorPipe wakeupPipe;
 
@@ -44,14 +46,37 @@ struct SC::EventLoop::Internal
         SC_TRY_IF(wakeupPipe.writePipe.setBlocking(false));
 
         // Register
-        FileDescriptorNative pipeHandle;
-        SC_TRY_IF(wakeupPipe.readPipe.handle.get(pipeHandle,
+        Async::Read readOp;
+        readOp.readBuffer = {wakeupBuf, sizeof(wakeupBuf)};
+        SC_TRY_IF(wakeupPipe.readPipe.handle.get(readOp.fileDescriptor,
                                                  "EventLoop::Internal::createWakeup() - Async read handle invalid"_a8));
-        loop.addRead(pipeHandle, wakeupAsync);
+        SC_TRY_IF(loop.addRead(readOp, wakeupAsync));
         return true;
     }
 
-    [[nodiscard]] bool isWakeUp(const struct kevent& event) const { return event.udata == &wakeupAsync; }
+    [[nodiscard]] bool   isWakeUp(const struct kevent& event) const { return event.udata == &wakeupAsync; }
+    [[nodiscard]] Async* getAsync(const struct kevent& event) const { return static_cast<Async*>(event.udata); }
+
+    void runCompletionForWakeUp(Async& async)
+    {
+        // TODO: Investigate usage of MACHPORT to avoid executing this additional read syscall
+        auto& readOp   = async.operation.fields.read;
+        auto  readSpan = readOp.readBuffer;
+        do
+        {
+            const ssize_t res = read(readOp.fileDescriptor, readSpan.data(), readSpan.sizeInBytes());
+
+            if (res == readSpan.sizeInBytes())
+                continue;
+
+            if (res != -1)
+                break;
+
+            if (errno == EWOULDBLOCK or errno == EAGAIN)
+                break;
+
+        } while (errno == EINTR);
+    }
 };
 
 struct SC::EventLoop::KernelQueue

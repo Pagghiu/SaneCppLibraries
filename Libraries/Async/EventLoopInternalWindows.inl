@@ -33,6 +33,8 @@ struct SC::EventLoop::Internal
     }
 
     [[nodiscard]] bool isWakeUp(const OVERLAPPED_ENTRY& event) const { return event.lpOverlapped == &wakeupOverlapped; }
+    [[nodiscard]] Async* getAsync(const OVERLAPPED_ENTRY& event) const { return nullptr; }
+    void                 runCompletionForWakeUp(Async& async) {}
 };
 
 SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()

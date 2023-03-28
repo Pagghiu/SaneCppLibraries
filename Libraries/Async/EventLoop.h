@@ -8,6 +8,7 @@
 #include "../Foundation/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Limits.h"
 #include "../Foundation/Optional.h"
+#include "../Foundation/Span.h"
 #include "../Foundation/TaggedUnion.h"
 #include "../Foundation/Time.h"
 #include "../InputOutput/FileDescriptor.h"
@@ -38,7 +39,7 @@ struct SC::Async
     struct Read
     {
         FileDescriptorNative fileDescriptor;
-        // TODO: We should add also the read buffer to make it io_uring / completion style
+        Span<uint8_t>        readBuffer;
     };
 
     union Operation
@@ -87,8 +88,9 @@ struct SC::EventLoop
     [[nodiscard]] ReturnCode runOnce();
 
     // Async Operations
-    void addTimeout(IntegerMilliseconds expiration, Async& async, Function<void(AsyncResult&)>&& callback);
-    void addRead(FileDescriptorNative fd, Async& async);
+    [[nodiscard]] ReturnCode addTimeout(IntegerMilliseconds expiration, Async& async,
+                                        Function<void(AsyncResult&)>&& callback);
+    [[nodiscard]] ReturnCode addRead(Async::Read readOp, Async& async);
 
     // Operations
     struct ExternalThreadNotifier
@@ -97,7 +99,7 @@ struct SC::EventLoop
         ExternalThreadNotifier*    prev = nullptr;
         Function<void(EventLoop&)> callback;
         Atomic<bool>               pending     = false;
-        EventLoop*                 loop        = nullptr;
+        EventLoop*                 eventLoop   = nullptr;
         EventObject*               eventObject = nullptr;
     };
     [[nodiscard]] ReturnCode initNotifier(ExternalThreadNotifier& notifier, Function<void(EventLoop&)>&& callback,

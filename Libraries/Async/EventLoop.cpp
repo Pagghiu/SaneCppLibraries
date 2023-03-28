@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "EventLoop.h"
 #include "../Foundation/Optional.h"
+#include "../Foundation/Result.h"
 #include "../Threading/Threading.h" // EventObject
 
 #if SC_PLATFORM_WINDOWS
@@ -27,7 +28,8 @@ void SC::OpaqueFunctions<SC::EventLoop::Internal, SC::EventLoop::InternalSize,
     obj.~Internal();
 }
 
-void SC::EventLoop::addTimeout(IntegerMilliseconds expiration, Async& async, Function<void(AsyncResult&)>&& callback)
+SC::ReturnCode SC::EventLoop::addTimeout(IntegerMilliseconds expiration, Async& async,
+                                         Function<void(AsyncResult&)>&& callback)
 {
     Async::Timeout timeout;
     updateTime();
@@ -36,14 +38,15 @@ void SC::EventLoop::addTimeout(IntegerMilliseconds expiration, Async& async, Fun
     async.operation.assignValue(move(timeout));
     async.callback = move(callback);
     submitAsync(async);
+    return true;
 }
 
-void SC::EventLoop::addRead(FileDescriptorNative fd, Async& async)
+SC::ReturnCode SC::EventLoop::addRead(Async::Read readOp, Async& async)
 {
-    Async::Read read;
-    read.fileDescriptor = fd;
-    async.operation.assignValue(move(read));
+    SC_TRY_MSG(readOp.readBuffer.sizeInBytes() > 0, "EventLoop::addRead - Zero sized read buffer"_a8);
+    async.operation.assignValue(move(readOp));
     submitAsync(async);
+    return true;
 }
 
 void SC::EventLoop::submitAsync(Async& async)
@@ -187,9 +190,27 @@ SC::ReturnCode SC::EventLoop::runOnce()
 
     for (decltype(KernelQueue::newEvents) idx = 0; idx < queue.newEvents; ++idx)
     {
+        Async* async = internal.get().getAsync(queue.events[idx]);
         if (internal.get().isWakeUp(queue.events[idx]))
         {
+            if (async)
+            {
+                internal.get().runCompletionForWakeUp(*async);
+            }
             runCompletionForNotifiers();
+        }
+        if (async)
+        {
+            switch (async->operation.type)
+            {
+            case Async::Operation::Type::Timeout: {
+                return "Unexpected operation"_a8;
+            }
+            break;
+            case Async::Operation::Type::Read: {
+            }
+            break;
+            }
         }
     }
 
@@ -199,11 +220,11 @@ SC::ReturnCode SC::EventLoop::runOnce()
 SC::ReturnCode SC::EventLoop::initNotifier(ExternalThreadNotifier& notifier, Function<void(EventLoop&)>&& callback,
                                            EventObject* eventObject)
 {
-    SC_TRY_MSG(notifier.loop == nullptr and notifier.pending.load() == false or notifier.next != nullptr or
+    SC_TRY_MSG(notifier.eventLoop == nullptr and notifier.pending.load() == false or notifier.next != nullptr or
                    notifier.prev != nullptr,
                "EventLoop::registerNotifier re-using already in use notifier"_a8);
     notifier.callback    = forward<Function<void(EventLoop&)>>(callback);
-    notifier.loop        = this;
+    notifier.eventLoop   = this;
     notifier.eventObject = eventObject;
     notifiers.queueBack(notifier);
     return true;
@@ -212,8 +233,8 @@ SC::ReturnCode SC::EventLoop::initNotifier(ExternalThreadNotifier& notifier, Fun
 void SC::EventLoop::removeNotifier(ExternalThreadNotifier& notifier)
 {
     notifiers.remove(notifier);
-    notifier.loop     = nullptr;
-    notifier.callback = Function<void(EventLoop&)>();
+    notifier.eventLoop = nullptr;
+    notifier.callback  = Function<void(EventLoop&)>();
 }
 
 SC::ReturnCode SC::EventLoop::notifyFromExternalThread(ExternalThreadNotifier& notifier)
@@ -222,7 +243,7 @@ SC::ReturnCode SC::EventLoop::notifyFromExternalThread(ExternalThreadNotifier& n
     {
         // This executes if current thread is lucky enough to atomically exchange pending from false to true.
         // This effectively allows coalescing calls from different threads into a single notification.
-        SC_TRY_IF(notifier.loop->wakeUpFromExternalThread());
+        SC_TRY_IF(notifier.eventLoop->wakeUpFromExternalThread());
     }
     return true;
 }
