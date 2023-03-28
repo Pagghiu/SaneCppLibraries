@@ -94,6 +94,7 @@ struct SC::Thread
     Thread(const Thread&)            = delete;
     Thread& operator=(const Thread&) = delete;
 
+    static uint64_t CurrentThreadID();
     // Starts the new thread with given name and func
     // The passed in func will get copied on thread stack and destructed there
     [[nodiscard]] ReturnCode start(StringView threadName, Action&& func);

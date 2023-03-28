@@ -76,19 +76,16 @@ struct SC::EventLoopTest : public SC::TestCase
             EventLoop::ExternalThreadNotifier notifier1;
             EventLoop::ExternalThreadNotifier notifier2;
 
-            const auto notifier1res = loop.initNotifier(notifier1,
-                                                        [&](EventLoop&)
-                                                        {
+            uint64_t   callbackThreadID = 0;
+            const auto notifier1res     = loop.initNotifier(notifier1,
+                                                            [&](EventLoop&)
+                                                            {
                                                             // TODO: Add thread id check
+                                                            callbackThreadID = Thread::CurrentThreadID();
                                                             notifier1Called++;
                                                         });
             SC_TEST_EXPECT(notifier1res);
-            const auto notifier2res = loop.initNotifier(notifier2,
-                                                        [&](EventLoop&)
-                                                        {
-                                                            // TODO: Add thread id check
-                                                            notifier2Called++;
-                                                        });
+            const auto notifier2res = loop.initNotifier(notifier2, [&](EventLoop&) { notifier2Called++; });
             SC_TEST_EXPECT(notifier2res);
             Thread     newThread1;
             Thread     newThread2;
@@ -115,6 +112,7 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(loop.runOnce());
             SC_TEST_EXPECT(notifier1Called == 1);
             SC_TEST_EXPECT(notifier2Called == 0);
+            SC_TEST_EXPECT(callbackThreadID == Thread::CurrentThreadID());
             loop.removeNotifier(notifier1);
             loop.removeNotifier(notifier2);
             // TODO: Add get thread id and check in the notifier that we have the same thread id

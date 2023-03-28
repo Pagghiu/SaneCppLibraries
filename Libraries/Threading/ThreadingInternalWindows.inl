@@ -62,3 +62,5 @@ struct SC::Thread::Internal
 };
 
 void SC::Thread::Sleep(uint32_t milliseconds) { ::Sleep(milliseconds); }
+
+SC::uint64_t SC::Thread::CurrentThreadID() { return ::GetCurrentThreadId(); }

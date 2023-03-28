@@ -65,3 +65,14 @@ struct SC::Thread::Internal
 };
 
 void SC::Thread::Sleep(uint32_t milliseconds) { ::usleep(milliseconds * 1e3); }
+
+SC::uint64_t SC::Thread::CurrentThreadID()
+{
+#if SC_PLATFORM_EMSCRIPTEN
+    return 0;
+#else
+    uint64_t tid;
+    pthread_threadid_np(NULL, &tid);
+    return tid;
+#endif
+}
