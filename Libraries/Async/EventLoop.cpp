@@ -28,7 +28,7 @@ void SC::OpaqueFunctions<SC::EventLoop::Internal, SC::EventLoop::InternalSize,
     obj.~Internal();
 }
 
-SC::ReturnCode SC::EventLoop::addTimeout(IntegerMilliseconds expiration, Async& async,
+SC::ReturnCode SC::EventLoop::addTimeout(AsyncTimeout& async, IntegerMilliseconds expiration,
                                          Function<void(AsyncResult&)>&& callback)
 {
     Async::Timeout timeout;
@@ -41,10 +41,25 @@ SC::ReturnCode SC::EventLoop::addTimeout(IntegerMilliseconds expiration, Async& 
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::addRead(Async::Read readOp, Async& async)
+SC::ReturnCode SC::EventLoop::addRead(AsyncRead& async, FileDescriptorNative fileDescriptor, Span<uint8_t> readBuffer)
 {
-    SC_TRY_MSG(readOp.readBuffer.sizeInBytes() > 0, "EventLoop::addRead - Zero sized read buffer"_a8);
+    SC_TRY_MSG(readBuffer.sizeInBytes() > 0, "EventLoop::addRead - Zero sized read buffer"_a8);
+    Async::Read readOp;
+    readOp.fileDescriptor = fileDescriptor;
+    readOp.readBuffer     = readBuffer;
     async.operation.assignValue(move(readOp));
+    submitAsync(async);
+    return true;
+}
+
+SC::ReturnCode SC::EventLoop::addWakeUp(AsyncWakeUp& async, Function<void(EventLoop&)>&& callback,
+                                        EventObject* eventObject)
+{
+    Async::WakeUp wakeUp;
+    wakeUp.callback    = move(callback);
+    wakeUp.eventObject = eventObject;
+    wakeUp.eventLoop   = this;
+    async.operation.assignValue(move(wakeUp));
     submitAsync(async);
     return true;
 }
@@ -210,6 +225,9 @@ SC::ReturnCode SC::EventLoop::runOnce()
             case Async::Operation::Type::Read: {
             }
             break;
+            case Async::Operation::Type::WakeUp: {
+            }
+            break;
             }
         }
     }
@@ -217,41 +235,24 @@ SC::ReturnCode SC::EventLoop::runOnce()
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::initNotifier(ExternalThreadNotifier& notifier, Function<void(EventLoop&)>&& callback,
-                                           EventObject* eventObject)
+SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread(Async::WakeUp& wakeUp)
 {
-    SC_TRY_MSG(notifier.eventLoop == nullptr and notifier.pending.load() == false or notifier.next != nullptr or
-                   notifier.prev != nullptr,
-               "EventLoop::registerNotifier re-using already in use notifier"_a8);
-    notifier.callback    = forward<Function<void(EventLoop&)>>(callback);
-    notifier.eventLoop   = this;
-    notifier.eventObject = eventObject;
-    notifiers.queueBack(notifier);
-    return true;
-}
-
-void SC::EventLoop::removeNotifier(ExternalThreadNotifier& notifier)
-{
-    notifiers.remove(notifier);
-    notifier.eventLoop = nullptr;
-    notifier.callback  = Function<void(EventLoop&)>();
-}
-
-SC::ReturnCode SC::EventLoop::notifyFromExternalThread(ExternalThreadNotifier& notifier)
-{
-    if (not notifier.pending.exchange(true))
+    SC_TRY_MSG(wakeUp.eventLoop == this,
+               "EventLoop::wakeUpFromExternalThread - Wakeup belonging to different EventLoop"_a8);
+    if (not wakeUp.pending.exchange(true))
     {
         // This executes if current thread is lucky enough to atomically exchange pending from false to true.
         // This effectively allows coalescing calls from different threads into a single notification.
-        SC_TRY_IF(notifier.eventLoop->wakeUpFromExternalThread());
+        SC_TRY_IF(wakeUpFromExternalThread());
     }
     return true;
 }
 
 void SC::EventLoop::runCompletionForNotifiers()
 {
-    for (ExternalThreadNotifier* notifier = notifiers.front; notifier != nullptr; notifier = notifier->next)
+    for (Async* async = activeWakeUps.front; async != nullptr; async = async->next)
     {
+        Async::WakeUp* notifier = &async->operation.fields.wakeUp;
         if (notifier->pending.load() == true)
         {
             notifier->callback(*this);
@@ -262,4 +263,10 @@ void SC::EventLoop::runCompletionForNotifiers()
             notifier->pending.exchange(false); // allow executing the notification again
         }
     }
+}
+
+[[nodiscard]] SC::ReturnCode SC::AsyncWakeUp::wakeUp()
+{
+    Async::WakeUp& self = *operation.unionAs<Async::WakeUp>();
+    return self.eventLoop->wakeUpFromExternalThread(self);
 }

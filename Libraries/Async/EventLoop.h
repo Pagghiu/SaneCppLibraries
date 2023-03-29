@@ -17,6 +17,9 @@ namespace SC
 {
 struct EventLoop;
 struct Async;
+struct AsyncTimeout;
+struct AsyncRead;
+struct AsyncWakeUp;
 struct AsyncResult;
 struct EventObject;
 } // namespace SC
@@ -42,12 +45,22 @@ struct SC::Async
         Span<uint8_t>        readBuffer;
     };
 
+    struct WakeUp
+    {
+        Function<void(EventLoop&)> callback;
+
+        EventObject* eventObject = nullptr;
+        Atomic<bool> pending     = false;
+        EventLoop*   eventLoop   = nullptr;
+    };
+
     union Operation
     {
         enum class Type
         {
             Timeout,
-            Read
+            Read,
+            WakeUp
         };
 
         Operation() {}
@@ -55,10 +68,12 @@ struct SC::Async
 
         Timeout timeout;
         Read    read;
+        WakeUp  wakeUp;
 
         using FieldsTypes =
             TypeList<TaggedField<Operation, Type, decltype(timeout), &Operation::timeout, Type::Timeout>,
-                     TaggedField<Operation, Type, decltype(read), &Operation::read, Type::Read>>;
+                     TaggedField<Operation, Type, decltype(read), &Operation::read, Type::Read>,
+                     TaggedField<Operation, Type, decltype(wakeUp), &Operation::wakeUp, Type::WakeUp>>;
     };
 
     enum class State
@@ -77,6 +92,19 @@ struct SC::Async
     Function<void(AsyncResult&)> callback;
 };
 
+struct SC::AsyncTimeout : public Async
+{
+};
+
+struct SC::AsyncRead : public Async
+{
+};
+
+struct SC::AsyncWakeUp : public Async
+{
+    [[nodiscard]] ReturnCode wakeUp();
+};
+
 struct SC::EventLoop
 {
     // Creation
@@ -88,33 +116,24 @@ struct SC::EventLoop
     [[nodiscard]] ReturnCode runOnce();
 
     // Async Operations
-    [[nodiscard]] ReturnCode addTimeout(IntegerMilliseconds expiration, Async& async,
+    [[nodiscard]] ReturnCode addTimeout(AsyncTimeout& async, IntegerMilliseconds expiration,
                                         Function<void(AsyncResult&)>&& callback);
-    [[nodiscard]] ReturnCode addRead(Async::Read readOp, Async& async);
 
-    // Operations
-    struct ExternalThreadNotifier
-    {
-        ExternalThreadNotifier*    next = nullptr;
-        ExternalThreadNotifier*    prev = nullptr;
-        Function<void(EventLoop&)> callback;
-        Atomic<bool>               pending     = false;
-        EventLoop*                 eventLoop   = nullptr;
-        EventObject*               eventObject = nullptr;
-    };
-    [[nodiscard]] ReturnCode initNotifier(ExternalThreadNotifier& notifier, Function<void(EventLoop&)>&& callback,
-                                          EventObject* eventObject = nullptr);
-    [[nodiscard]] ReturnCode notifyFromExternalThread(ExternalThreadNotifier& notifier);
-    void                     removeNotifier(ExternalThreadNotifier& notifier);
+    [[nodiscard]] ReturnCode addRead(AsyncRead& async, FileDescriptorNative fileDescriptor, Span<uint8_t> readBuffer);
+
+    [[nodiscard]] ReturnCode addWakeUp(AsyncWakeUp& async, Function<void(EventLoop&)>&& callback,
+                                       EventObject* eventObject = nullptr);
+
+    // WakeUp support
+    [[nodiscard]] ReturnCode wakeUpFromExternalThread(Async::WakeUp& wakeUp);
 
     [[nodiscard]] ReturnCode wakeUpFromExternalThread();
 
   private:
     IntrusiveDoubleLinkedList<Async> submission;
-    IntrusiveDoubleLinkedList<Async> activeTimers;
     IntrusiveDoubleLinkedList<Async> stagedHandles;
-
-    IntrusiveDoubleLinkedList<ExternalThreadNotifier> notifiers;
+    IntrusiveDoubleLinkedList<Async> activeTimers;
+    IntrusiveDoubleLinkedList<Async> activeWakeUps;
 
     TimeCounter loopTime;
 

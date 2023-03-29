@@ -60,15 +60,12 @@ struct SC::EventLoop::KernelQueue
     {
         switch (async->operation.type)
         {
-        case Async::Operation::Type::Timeout: {
-            eventLoop.activeTimers.queueBack(*async);
-        }
-        break;
-        case Async::Operation::Type::Read: {
+        case Async::Operation::Type::Timeout: eventLoop.activeTimers.queueBack(*async); break;
+        case Async::Operation::Type::Read:
             addReadWatcher(eventLoop.internal.get().loopFd, async->operation.fields.read.fileDescriptor);
             eventLoop.stagedHandles.queueBack(*async);
-        }
-        break;
+            break;
+        case Async::Operation::Type::WakeUp: eventLoop.activeWakeUps.queueBack(*async); break;
         }
         return true;
     }

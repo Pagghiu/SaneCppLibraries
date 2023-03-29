@@ -14,8 +14,8 @@ struct SC::EventLoop::Internal
 {
     FileDescriptor loopFd;
 
-    uint8_t            wakeupBuf[10];
-    Async              wakeupAsync;
+    uint8_t            wakeupPipeReadBuf[10];
+    AsyncRead          wakeupPipeRead;
     FileDescriptorPipe wakeupPipe;
 
     ~Internal() { SC_TRUST_RESULT(close()); }
@@ -46,15 +46,14 @@ struct SC::EventLoop::Internal
         SC_TRY_IF(wakeupPipe.writePipe.setBlocking(false));
 
         // Register
-        Async::Read readOp;
-        readOp.readBuffer = {wakeupBuf, sizeof(wakeupBuf)};
-        SC_TRY_IF(wakeupPipe.readPipe.handle.get(readOp.fileDescriptor,
+        FileDescriptorNative wakeUpPipeDescriptor;
+        SC_TRY_IF(wakeupPipe.readPipe.handle.get(wakeUpPipeDescriptor,
                                                  "EventLoop::Internal::createWakeup() - Async read handle invalid"_a8));
-        SC_TRY_IF(loop.addRead(readOp, wakeupAsync));
+        SC_TRY_IF(loop.addRead(wakeupPipeRead, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)}));
         return true;
     }
 
-    [[nodiscard]] bool   isWakeUp(const struct kevent& event) const { return event.udata == &wakeupAsync; }
+    [[nodiscard]] bool   isWakeUp(const struct kevent& event) const { return event.udata == &wakeupPipeRead; }
     [[nodiscard]] Async* getAsync(const struct kevent& event) const { return static_cast<Async*>(event.udata); }
 
     void runCompletionForWakeUp(Async& async)
@@ -89,15 +88,12 @@ struct SC::EventLoop::KernelQueue
     {
         switch (async->operation.type)
         {
-        case Async::Operation::Type::Timeout: {
-            eventLoop.activeTimers.queueBack(*async);
-        }
-        break;
-        case Async::Operation::Type::Read: {
+        case Async::Operation::Type::Timeout: eventLoop.activeTimers.queueBack(*async); break;
+        case Async::Operation::Type::Read:
             addReadWatcher(eventLoop.internal.get().loopFd, async->operation.fields.read.fileDescriptor, async);
             eventLoop.stagedHandles.queueBack(*async);
-        }
-        break;
+            break;
+        case Async::Operation::Type::WakeUp: eventLoop.activeWakeUps.queueBack(*async); break;
         }
         return true;
     }
