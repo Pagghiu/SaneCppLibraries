@@ -47,11 +47,9 @@ struct SC::Async
 
     struct WakeUp
     {
-        Function<void(EventLoop&)> callback;
-
         EventObject* eventObject = nullptr;
         Atomic<bool> pending     = false;
-        EventLoop*   eventLoop   = nullptr;
+        EventLoop*   eventLoop   = nullptr; // Maybe this should be moved as part of every async
     };
 
     union Operation
@@ -121,7 +119,7 @@ struct SC::EventLoop
 
     [[nodiscard]] ReturnCode addRead(AsyncRead& async, FileDescriptorNative fileDescriptor, Span<uint8_t> readBuffer);
 
-    [[nodiscard]] ReturnCode addWakeUp(AsyncWakeUp& async, Function<void(EventLoop&)>&& callback,
+    [[nodiscard]] ReturnCode addWakeUp(AsyncWakeUp& async, Function<void(AsyncResult&)>&& callback,
                                        EventObject* eventObject = nullptr);
 
     // WakeUp support

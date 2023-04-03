@@ -25,7 +25,7 @@ template <>
 void SC::OpaqueFunctions<SC::EventLoop::Internal, SC::EventLoop::InternalSize,
                          SC::EventLoop::InternalAlignment>::destruct(Object& obj)
 {
-    obj.~Internal();
+    obj.~Object();
 }
 
 SC::ReturnCode SC::EventLoop::addTimeout(AsyncTimeout& async, IntegerMilliseconds expiration,
@@ -52,14 +52,14 @@ SC::ReturnCode SC::EventLoop::addRead(AsyncRead& async, FileDescriptorNative fil
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::addWakeUp(AsyncWakeUp& async, Function<void(EventLoop&)>&& callback,
+SC::ReturnCode SC::EventLoop::addWakeUp(AsyncWakeUp& async, Function<void(AsyncResult&)>&& callback,
                                         EventObject* eventObject)
 {
     Async::WakeUp wakeUp;
-    wakeUp.callback    = move(callback);
     wakeUp.eventObject = eventObject;
     wakeUp.eventLoop   = this;
     async.operation.assignValue(move(wakeUp));
+    async.callback = move(callback);
     submitAsync(async);
     return true;
 }
@@ -255,7 +255,8 @@ void SC::EventLoop::runCompletionForNotifiers()
         Async::WakeUp* notifier = &async->operation.fields.wakeUp;
         if (notifier->pending.load() == true)
         {
-            notifier->callback(*this);
+            AsyncResult res{*this, *async};
+            async->callback(res);
             if (notifier->eventObject)
             {
                 notifier->eventObject->signal();

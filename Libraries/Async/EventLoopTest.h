@@ -79,13 +79,13 @@ struct SC::EventLoopTest : public SC::TestCase
             AsyncWakeUp wakeUp1;
             AsyncWakeUp wakeUp2;
 
-            auto lambda1 = [&](EventLoop&)
+            auto lambda1 = [&](AsyncResult&)
             {
                 wakeUp1ThreadID = Thread::CurrentThreadID();
                 wakeUp1Called++;
             };
             SC_TEST_EXPECT(eventLoop.addWakeUp(wakeUp1, lambda1));
-            SC_TEST_EXPECT(eventLoop.addWakeUp(wakeUp2, [&](EventLoop&) { wakeUp2Called++; }));
+            SC_TEST_EXPECT(eventLoop.addWakeUp(wakeUp2, [&](AsyncResult&) { wakeUp2Called++; }));
             Thread     newThread1;
             Thread     newThread2;
             ReturnCode loopRes1 = false;
@@ -118,7 +118,7 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.create());
             AsyncWakeUp wakeUp;
 
-            auto eventLoopLambda = [&](EventLoop&)
+            auto eventLoopLambda = [&](AsyncResult&)
             {
                 callbackThreadID = Thread::CurrentThreadID();
                 params.notifier1Called++;
