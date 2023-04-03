@@ -331,6 +331,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\AtomicTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\UniquePtr.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemInternalPosix.inl">
