@@ -24,12 +24,8 @@ struct SC::ThreadingTest : public SC::TestCase
             Thread thread2 = move(thread);
             SC_TEST_EXPECT(not thread.join());
             SC_TEST_EXPECT(not thread.detach());
-            SC_TEST_EXPECT(thread2.start("test thread",
-                                         [&]
-                                         {
-                                             // The thread
-                                             threadCalled = true;
-                                         }));
+            Action lambda = [&] { threadCalled = true; };
+            SC_TEST_EXPECT(thread2.start("test thread", &lambda));
             Thread thread3 = move(thread2);
             SC_TEST_EXPECT(not thread2.join());
             SC_TEST_EXPECT(not thread2.detach());

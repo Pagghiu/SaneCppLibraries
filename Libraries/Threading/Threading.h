@@ -95,9 +95,10 @@ struct SC::Thread
     Thread& operator=(const Thread&) = delete;
 
     static uint64_t CurrentThreadID();
-    // Starts the new thread with given name and func
-    // The passed in func will get copied on thread stack and destructed there
-    [[nodiscard]] ReturnCode start(StringView threadName, Action&& func);
+    /// Starts the new thread with given name and func
+    /// @param func     Function running on thread. Must be a valid pointer to action for the entire duration of thread.
+    /// @param syncFunc Function garanteed to be run before  start returns
+    [[nodiscard]] ReturnCode start(StringView threadName, Action* func, Action* syncFunc = nullptr);
     [[nodiscard]] ReturnCode join();
     [[nodiscard]] ReturnCode detach();
 
@@ -112,6 +113,8 @@ struct SC::Thread
 
 struct SC::EventObject
 {
+    bool autoReset = true;
+
     void wait();
     void signal();
 

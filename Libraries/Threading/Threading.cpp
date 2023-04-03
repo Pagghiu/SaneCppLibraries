@@ -13,10 +13,11 @@
 
 struct SC::Thread::CreateParams
 {
-    CreateParams(Action&& callback, Thread* thread) : callback(forward<Action>(callback)), thread(thread) {}
+    CreateParams(Thread* thread) : thread(thread) {}
 
     EventObject event;
-    Action&&    callback;
+    Action*     callback;
+    Action*     syncCallback;
     Thread*     thread;
     StringView  nameNullTerminated;
 
@@ -30,21 +31,30 @@ struct SC::Thread::CreateParams
         {
             Internal::setThreadName(self.threadHandle, self.nameNullTerminated);
         }
+        if (self.syncCallback)
+        {
+            (*self.syncCallback)();
+        }
         // Note: If cb has captured heap allocated objects, they will get freed on the thread
-        Action cb = move(self.callback);
+        auto callback = self.callback;
         self.event.signal();
-        cb();
+        if (callback)
+        {
+            (*callback)();
+        }
         return 0;
     }
 };
 
 SC::Thread::~Thread() { SC_DEBUG_ASSERT(not thread.hasValue() && "Forgot to call join() or detach()"); }
 
-SC::ReturnCode SC::Thread::start(StringView name, Action&& func)
+SC::ReturnCode SC::Thread::start(StringView name, Action* func, Action* syncFunc)
 {
     if (thread.hasValue())
         return "Error thread already started"_a8;
-    CreateParams      self(forward<Action>(func), this);
+    CreateParams self(this);
+    self.callback     = func;
+    self.syncCallback = syncFunc;
     StringNative<128> nameNative;
     SC_TRY_IF(nameNative.convertNullTerminateFastPath(name, self.nameNullTerminated));
     OpaqueThread opaqueThread;
@@ -79,7 +89,10 @@ void SC::EventObject::wait()
     {
         cond.wait(mutex);
     }
-    isSignaled = false;
+    if (autoReset)
+    {
+        isSignaled = false;
+    }
     mutex.unlock();
 }
 
