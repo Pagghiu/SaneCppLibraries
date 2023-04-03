@@ -252,9 +252,19 @@ constexpr auto CombineHash(uint32_t... hash1)
 template <typename F>
 struct Deferred
 {
-    F f;
     Deferred(F f) : f(f) {}
-    ~Deferred() { f(); }
+    void disarm() { armed = false; }
+    ~Deferred()
+    {
+        if (armed)
+        {
+            f();
+        }
+    }
+
+  private:
+    F    f;
+    bool armed = true;
 };
 
 template <typename F>
