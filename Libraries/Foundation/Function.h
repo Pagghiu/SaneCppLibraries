@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "Assert.h"
 #include "Language.h" // RemoveReference
 #include "LibC.h"     // memset
 #include "Types.h"
@@ -23,7 +24,7 @@ template <typename R, typename... Args>
 struct SC::Function<R(Args...)>
 {
   private:
-    using StubFunction = R (*)(FunctionErasedOperation operation, void* other, const void* const*,
+    using StubFunction = R (*)(FunctionErasedOperation operation, const void** other, const void* const*,
                                typename AddPointer<Args>::type...);
 
     static const int LAMBDA_SIZE = sizeof(uint64_t) * 4;
@@ -34,7 +35,7 @@ struct SC::Function<R(Args...)>
         const void* classInstance;
         char_t      lambdaMemory[LAMBDA_SIZE];
     };
-    void sendLambdaSignal(FunctionErasedOperation operation, void* other) const
+    void sendLambdaSignal(FunctionErasedOperation operation, const void** other) const
     {
         if (functionStub)
         {
@@ -101,6 +102,8 @@ struct SC::Function<R(Args...)>
         return *this;
     }
 
+    bool isValid() const { return functionStub != nullptr; }
+
     bool operator==(const Function& other) const
     {
         return functionStub == other.functionStub && memcmp(lambdaMemory, other.lambdaMemory, LAMBDA_SIZE) == 0;
@@ -111,7 +114,7 @@ struct SC::Function<R(Args...)>
     {
         new (&classInstance, PlacementNew()) Lambda(forward<Lambda>(lambda));
         static_assert(sizeof(Lambda) <= sizeof(lambdaMemory), "Lambda is too big");
-        functionStub = [](FunctionErasedOperation operation, void* other, const void* const* p,
+        functionStub = [](FunctionErasedOperation operation, const void** other, const void* const* p,
                           typename AddPointer<Args>::type... args) -> R
         {
             Lambda& lambda = *reinterpret_cast<Lambda*>(const_cast<void**>(p));
@@ -128,29 +131,32 @@ struct SC::Function<R(Args...)>
     }
 
     template <R (*FreeFunction)(Args...)>
-    void bind()
+    Function& bind()
     {
         sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
         classInstance = nullptr;
         functionStub  = &FunctionWrapper<FreeFunction>;
+        return *this;
     }
 
     template <typename Class, R (Class::*MemberFunction)(Args...) const>
-    void bind(const Class* c)
+    Function& bind(const Class* c)
     {
         sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
         SC_RELEASE_ASSERT(c != nullptr);
         classInstance = c;
         functionStub  = &MemberWrapper<Class, MemberFunction>;
+        return *this;
     }
 
     template <typename Class, R (Class::*MemberFunction)(Args...)>
-    void bind(Class* c)
+    Function& bind(Class* c)
     {
         sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
         SC_RELEASE_ASSERT(c != nullptr);
         classInstance = c;
         functionStub  = &MemberWrapper<Class, MemberFunction>;
+        return *this;
     }
 
     [[nodiscard]] R operator()(Args... args) const
@@ -162,7 +168,7 @@ struct SC::Function<R(Args...)>
     template <typename R2, class Class2, typename... Args2>
     friend struct FunctionDeducerCreator;
     template <typename Class, R (Class::*MemberFunction)(Args...)>
-    static R MemberWrapper(FunctionErasedOperation operation, void* other, const void* const* p,
+    static R MemberWrapper(FunctionErasedOperation operation, const void** other, const void* const* p,
                            typename RemoveReference<Args>::type*... args)
     {
         if (operation == FunctionErasedOperation::Execute)
@@ -171,10 +177,16 @@ struct SC::Function<R(Args...)>
                 Class* cls = const_cast<Class*>(static_cast<const Class*>(*p));
                 return (cls->*MemberFunction)(*args...);
             }
+        else if (operation == FunctionErasedOperation::LambdaCopyConstruct or
+                 operation == FunctionErasedOperation::LambdaMoveConstruct)
+        {
+            *other = *p;
+        }
+
         return R();
     }
     template <typename Class, R (Class::*MemberFunction)(Args...) const>
-    static R MemberWrapper(FunctionErasedOperation operation, void* other, const void* const* p,
+    static R MemberWrapper(FunctionErasedOperation operation, const void** other, const void* const* p,
                            typename RemoveReference<Args>::type*... args)
     {
         if (operation == FunctionErasedOperation::Execute)
@@ -183,11 +195,16 @@ struct SC::Function<R(Args...)>
                 const Class* cls = static_cast<const Class*>(*p);
                 return (cls->*MemberFunction)(*args...);
             }
+        else if (operation == FunctionErasedOperation::LambdaCopyConstruct or
+                 operation == FunctionErasedOperation::LambdaMoveConstruct)
+        {
+            *other = *p;
+        }
         return R();
     }
 
     template <R (*FreeFunction)(Args...)>
-    static R FunctionWrapper(FunctionErasedOperation operation, void* other, const void* const* p,
+    static R FunctionWrapper(FunctionErasedOperation operation, const void** other, const void* const* p,
                              typename RemoveReference<Args>::type*... args)
     {
         if (operation == FunctionErasedOperation::Execute)

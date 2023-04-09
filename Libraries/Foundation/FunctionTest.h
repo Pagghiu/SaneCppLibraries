@@ -41,6 +41,11 @@ struct SC::FunctionTest : public SC::TestCase
             SC_TEST_EXPECT(getValue() == 0);
             setValue(3);
             SC_TEST_EXPECT(getValue() == 3);
+            Function<int(void)> getValueCopy = getValue;
+            Function<int(void)> getValueMove = move(getValue);
+            SC_TEST_EXPECT(not getValue.isValid()); // it has been moved
+            SC_TEST_EXPECT(getValueCopy() == 3);
+            SC_TEST_EXPECT(getValueMove() == 3);
             SC_TEST_EXPECT(freeFunc(2) == 3);
         }
         if (test_section("deduct"))
