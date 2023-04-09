@@ -238,6 +238,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoop.h" />
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopWindows.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ArrayTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />

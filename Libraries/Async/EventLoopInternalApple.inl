@@ -14,9 +14,9 @@ struct SC::EventLoop::Internal
 {
     FileDescriptor loopFd;
 
-    uint8_t            wakeupPipeReadBuf[10];
     AsyncRead          wakeupPipeRead;
     FileDescriptorPipe wakeupPipe;
+    uint8_t            wakeupPipeReadBuf[10];
 
     ~Internal() { SC_TRUST_RESULT(close()); }
 
@@ -49,18 +49,21 @@ struct SC::EventLoop::Internal
         FileDescriptorNative wakeUpPipeDescriptor;
         SC_TRY_IF(wakeupPipe.readPipe.handle.get(wakeUpPipeDescriptor,
                                                  "EventLoop::Internal::createWakeup() - Async read handle invalid"_a8));
+        wakeupPipeRead.callback.bind<Internal, &Internal::runCompletionForWakeUp>(this);
         SC_TRY_IF(loop.addRead(wakeupPipeRead, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)}));
         return true;
     }
 
-    [[nodiscard]] bool   isWakeUp(const struct kevent& event) const { return event.udata == &wakeupPipeRead; }
     [[nodiscard]] Async* getAsync(const struct kevent& event) const { return static_cast<Async*>(event.udata); }
 
-    void runCompletionForWakeUp(Async& async)
+    [[nodiscard]] void* getUserData(const struct kevent& event) const { return nullptr; }
+
+    void runCompletionForWakeUp(AsyncResult& asyncResult)
     {
+        Async& async = asyncResult.async;
         // TODO: Investigate usage of MACHPORT to avoid executing this additional read syscall
-        auto& readOp   = async.operation.fields.read;
-        auto  readSpan = readOp.readBuffer;
+        Async::Read&  readOp   = *async.operation.unionAs<Async::Read>();
+        Span<uint8_t> readSpan = readOp.readBuffer;
         do
         {
             const ssize_t res = read(readOp.fileDescriptor, readSpan.data(), readSpan.sizeInBytes());
@@ -75,6 +78,7 @@ struct SC::EventLoop::Internal
                 break;
 
         } while (errno == EINTR);
+        asyncResult.eventLoop.runCompletionForNotifiers();
     }
 };
 

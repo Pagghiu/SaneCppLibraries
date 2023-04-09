@@ -72,6 +72,7 @@
 		7B19C9AA297AF95B001C0627 /* PathTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PathTest.h; path = ../../../../Libraries/Foundation/PathTest.h; sourceTree = "<group>"; };
 		7B19C9AB297AF95B001C0627 /* Path.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Path.h; path = ../../../../Libraries/Foundation/Path.h; sourceTree = "<group>"; };
 		7B1A39FA29BA7B220087F688 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
+		7B281DBF29E2BAF400363F69 /* EventLoopWindows.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = EventLoopWindows.h; path = ../../../../Libraries/Async/EventLoopWindows.h; sourceTree = "<group>"; };
 		7B2AEB1729D0DA4C003E1B6F /* Atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Atomic.h; path = ../../../../Libraries/Foundation/Atomic.h; sourceTree = "<group>"; };
 		7B2AEB1829D0DA67003E1B6F /* AtomicTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AtomicTest.h; path = ../../../../Libraries/Foundation/AtomicTest.h; sourceTree = "<group>"; };
 		7B2F86E029887CA400EFC5FB /* FileSystemInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalEmscripten.inl; path = ../../../../Libraries/InputOutput/FileSystemInternalEmscripten.inl; sourceTree = "<group>"; };
@@ -389,6 +390,7 @@
 				7BD8E37B29BE8357004AB23D /* EventLoopInternalEmscripten.inl */,
 				7BD8E37A29BE8357004AB23D /* EventLoopInternalWindows.inl */,
 				7BA7D47A29B5488200811076 /* EventLoopTest.h */,
+				7B281DBF29E2BAF400363F69 /* EventLoopWindows.h */,
 			);
 			name = Async;
 			sourceTree = "<group>";

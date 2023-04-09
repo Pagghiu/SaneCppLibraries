@@ -4,12 +4,14 @@
 #include <Windows.h>
 
 #include "EventLoop.h"
+#include "EventLoopWindows.h"
 
 struct SC::EventLoop::Internal
 {
     FileDescriptor loopFd;
+    Async          wakeUpAsync;
 
-    OVERLAPPED wakeupOverlapped = {0};
+    EventLoopWindowsOverlapped wakeUpOverlapped = {&wakeUpAsync};
 
     ~Internal() { SC_TRUST_RESULT(close()); }
     [[nodiscard]] ReturnCode close() { return loopFd.handle.close(); }
@@ -28,13 +30,22 @@ struct SC::EventLoop::Internal
 
     [[nodiscard]] ReturnCode createWakeup(EventLoop& loop)
     {
-        // Not needed, we can just use PostQueuedCompletionStatus directly
+        wakeUpAsync.callback.bind<Internal, &Internal::runCompletionForWakeUp>(this);
+        // No need to register it with EventLoop as we're calling PostQueuedCompletionStatus manually
         return true;
     }
 
-    [[nodiscard]] bool isWakeUp(const OVERLAPPED_ENTRY& event) const { return event.lpOverlapped == &wakeupOverlapped; }
-    [[nodiscard]] Async* getAsync(const OVERLAPPED_ENTRY& event) const { return nullptr; }
-    void                 runCompletionForWakeUp(Async& async) {}
+    [[nodiscard]] Async* getAsync(OVERLAPPED_ENTRY& event) const
+    {
+        return EventLoopWindowsOverlapped::getUserDataFromOverlapped<Async>(event.lpOverlapped);
+    }
+
+    [[nodiscard]] void* getUserData(OVERLAPPED_ENTRY& event) const
+    {
+        return reinterpret_cast<void*>(event.lpCompletionKey);
+    }
+
+    void runCompletionForWakeUp(AsyncResult& result) { result.eventLoop.runCompletionForNotifiers(); }
 };
 
 SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
@@ -43,7 +54,7 @@ SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
     FileDescriptorNative loopNativeDescriptor;
     SC_TRY_IF(self.loopFd.handle.get(loopNativeDescriptor, "watchInputs - Invalid Handle"_a8));
 
-    if (not PostQueuedCompletionStatus(loopNativeDescriptor, 0, 0, &self.wakeupOverlapped))
+    if (PostQueuedCompletionStatus(loopNativeDescriptor, 0, 0, &self.wakeUpOverlapped.overlapped) == FALSE)
     {
         return "EventLoop::wakeUpFromExternalThread() - PostQueuedCompletionStatus"_a8;
     }

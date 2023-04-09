@@ -203,33 +203,12 @@ SC::ReturnCode SC::EventLoop::runOnce()
         }
     }
 
+    Internal& self = internal.get();
     for (decltype(KernelQueue::newEvents) idx = 0; idx < queue.newEvents; ++idx)
     {
-        Async* async = internal.get().getAsync(queue.events[idx]);
-        if (internal.get().isWakeUp(queue.events[idx]))
-        {
-            if (async)
-            {
-                internal.get().runCompletionForWakeUp(*async);
-            }
-            runCompletionForNotifiers();
-        }
-        if (async)
-        {
-            switch (async->operation.type)
-            {
-            case Async::Operation::Type::Timeout: {
-                return "Unexpected operation"_a8;
-            }
-            break;
-            case Async::Operation::Type::Read: {
-            }
-            break;
-            case Async::Operation::Type::WakeUp: {
-            }
-            break;
-            }
-        }
+        Async*      async = self.getAsync(queue.events[idx]);
+        AsyncResult result{*this, *async, self.getUserData(queue.events[idx])};
+        async->callback(result);
     }
 
     return true;
@@ -266,7 +245,12 @@ void SC::EventLoop::runCompletionForNotifiers()
     }
 }
 
-[[nodiscard]] SC::ReturnCode SC::AsyncWakeUp::wakeUp()
+SC::ReturnCode SC::EventLoop::getLoopFileDescriptor(SC::FileDescriptorNative& fileDescriptor) const
+{
+    return internal.get().loopFd.handle.get(fileDescriptor, "EventLoop::getLoopFileDescriptor invalid handle"_a8);
+}
+
+SC::ReturnCode SC::AsyncWakeUp::wakeUp()
 {
     Async::WakeUp& self = *operation.unionAs<Async::WakeUp>();
     return self.eventLoop->wakeUpFromExternalThread(self);

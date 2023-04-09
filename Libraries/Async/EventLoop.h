@@ -26,8 +26,9 @@ struct EventObject;
 
 struct SC::AsyncResult
 {
-    EventLoop& loop;
+    EventLoop& eventLoop;
     Async&     async;
+    void*      userData = nullptr;
     // TODO: Add AsyncResult error
 };
 
@@ -126,6 +127,8 @@ struct SC::EventLoop
     [[nodiscard]] ReturnCode wakeUpFromExternalThread(Async::WakeUp& wakeUp);
 
     [[nodiscard]] ReturnCode wakeUpFromExternalThread();
+
+    [[nodiscard]] ReturnCode getLoopFileDescriptor(FileDescriptorNative& fileDescriptor) const;
 
   private:
     IntrusiveDoubleLinkedList<Async> submission;

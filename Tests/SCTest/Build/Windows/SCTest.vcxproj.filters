@@ -334,6 +334,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\UniquePtr.h">
       <Filter>Foundation</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopWindows.h">
+      <Filter>Async</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\InputOutput\FileSystemInternalPosix.inl">
