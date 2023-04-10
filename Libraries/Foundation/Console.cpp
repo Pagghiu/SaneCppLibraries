@@ -38,7 +38,7 @@ void SC::Console::print(const StringView str)
         else
         {
             printConversionBuffer.clearWithoutInitializing();
-            if (StringConverter::toNullTerminatedUTF16(str, printConversionBuffer, encodedPath, false))
+            if (StringConverter::convertEncodingToUTF16(str, printConversionBuffer, &encodedPath))
             {
                 OutputDebugStringW(encodedPath.getNullTerminatedNative());
             }
@@ -53,7 +53,7 @@ void SC::Console::print(const StringView str)
     else
     {
         printConversionBuffer.clearWithoutInitializing();
-        if (StringConverter::toNullTerminatedUTF16(str, printConversionBuffer, encodedPath, false))
+        if (StringConverter::convertEncodingToUTF16(str, printConversionBuffer, &encodedPath))
         {
             WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), encodedPath.getNullTerminatedNative(),
                           static_cast<DWORD>(encodedPath.sizeInBytes() / sizeof(wchar_t)), nullptr, nullptr);

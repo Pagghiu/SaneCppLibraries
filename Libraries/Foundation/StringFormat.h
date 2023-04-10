@@ -63,8 +63,10 @@ template <> struct StringFormatterFor<SC::uint16_t> {static bool format(StringFo
 template <> struct StringFormatterFor<SC::int8_t>   {static bool format(StringFormatOutput&, StringIteratorASCII, const SC::int8_t);};
 template <> struct StringFormatterFor<SC::uint8_t>  {static bool format(StringFormatOutput&, StringIteratorASCII, const SC::uint8_t);};
 template <> struct StringFormatterFor<SC::char_t>   {static bool format(StringFormatOutput&, StringIteratorASCII, const SC::char_t);};
+template <> struct StringFormatterFor<wchar_t>      {static bool format(StringFormatOutput&, StringIteratorASCII, const wchar_t);};
 template <> struct StringFormatterFor<StringView>   {static bool format(StringFormatOutput&, StringIteratorASCII, const StringView);};
 template <> struct StringFormatterFor<const SC::char_t*> {static bool format(StringFormatOutput&, StringIteratorASCII, const SC::char_t*);};
+template <> struct StringFormatterFor<const wchar_t*> {static bool format(StringFormatOutput&, StringIteratorASCII, const wchar_t*);};
 // clang-format on
 
 template <typename RangeIterator>

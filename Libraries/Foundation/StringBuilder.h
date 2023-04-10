@@ -47,21 +47,7 @@ struct StringBuilder
         if (str.isEmpty())
             return true;
         SC_TRY_IF(backingString.popNulltermIfExists());
-        StringView encodedText;
-        switch (backingString.getEncoding())
-        {
-        case StringEncoding::Ascii:
-            SC_TRY_IF(StringConverter::toNullTerminatedUTF8(str, backingString.data, encodedText, true));
-            break;
-        case StringEncoding::Utf8:
-            SC_TRY_IF(StringConverter::toNullTerminatedUTF8(str, backingString.data, encodedText, true));
-            break;
-        case StringEncoding::Utf16:
-            SC_TRY_IF(StringConverter::toNullTerminatedUTF16(str, backingString.data, encodedText, true));
-            break;
-        case StringEncoding::Utf32: return false;
-        }
-        return true;
+        return StringConverter::convertEncodingTo(backingString.getEncoding(), str, backingString.data);
     }
 
     [[nodiscard]] StringView view() { return backingString.view(); }

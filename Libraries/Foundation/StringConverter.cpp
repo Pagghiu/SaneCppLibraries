@@ -3,14 +3,17 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "StringConverter.h"
 #include "Result.h"
+#include "String.h"
 
 #if SC_PLATFORM_WINDOWS
 #include <Windows.h>
 #endif
 
-bool SC::StringConverter::toNullTerminatedUTF8(StringView file, Vector<char>& buffer, StringView& encodedText,
-                                               bool forceCopy)
+bool SC::StringConverter::convertEncodingToUTF8(StringView file, Vector<char>& buffer, StringView* encodedText,
+                                                NullTermination terminate)
 {
+    const bool nullTerminate = terminate == AddZeroTerminator;
+    const bool forceCopy     = encodedText == nullptr;
     if (file.isEmpty())
     {
         return false;
@@ -21,21 +24,40 @@ bool SC::StringConverter::toNullTerminatedUTF8(StringView file, Vector<char>& bu
         {
             if (forceCopy)
             {
-                SC_TRY_IF(buffer.appendCopy(file.bytesIncludingTerminator(), file.sizeInBytesIncludingTerminator()));
-                encodedText = StringView(buffer.data(), buffer.size() - 1, true, StringEncoding::Utf8);
+                SC_TRY_IF(buffer.appendCopy(file.bytesIncludingTerminator(), nullTerminate
+                                                                                 ? file.sizeInBytesIncludingTerminator()
+                                                                                 : file.sizeInBytes()));
             }
             else
             {
-                encodedText = file;
+                if (nullTerminate)
+                {
+                    *encodedText = file;
+                }
+                else
+                {
+                    *encodedText =
+                        StringView(file.bytesWithoutTerminator(), file.sizeInBytes(), false, file.getEncoding());
+                }
             }
             return true;
         }
         else
         {
-            SC_TRY_IF(buffer.reserve(buffer.size() + file.sizeInBytes() + 1));
-            SC_TRY_IF(buffer.appendCopy(file.bytesWithoutTerminator(), file.sizeInBytes()));
-            encodedText = StringView(buffer.data(), buffer.size(), true, StringEncoding::Utf8);
-            SC_TRY_IF(buffer.push_back(0)); // null terminator
+            if (nullTerminate)
+            {
+                SC_TRY_IF(buffer.reserve(buffer.size() + file.sizeInBytes() + 1));
+                SC_TRY_IF(buffer.appendCopy(file.bytesWithoutTerminator(), file.sizeInBytes()));
+                if (encodedText)
+                {
+                    *encodedText = StringView(buffer.data(), buffer.size(), true, StringEncoding::Utf8);
+                }
+                SC_TRY_IF(buffer.push_back(0)); // null terminator
+            }
+            else if (encodedText)
+            {
+                *encodedText = file;
+            }
             return true;
         }
     }
@@ -51,20 +73,36 @@ bool SC::StringConverter::toNullTerminatedUTF8(StringView file, Vector<char>& bu
             return false;
         }
         const auto oldSize = buffer.size();
-        SC_TRY_IF(buffer.resizeWithoutInitializing(oldSize + (static_cast<size_t>(numChars) + 1)));
+        SC_TRY_IF(
+            buffer.resizeWithoutInitializing(oldSize + (static_cast<size_t>(numChars) + (nullTerminate ? 1 : 0))));
         WideCharToMultiByte(CP_UTF8, 0, source, sourceSizeInBytes / sizeof(wchar_t),
                             reinterpret_cast<char_t*>(buffer.data() + oldSize), numChars, nullptr, 0);
-        buffer[buffer.size() - 1] = 0;
-        encodedText               = StringView(buffer.data(), buffer.size() - 1, true, StringEncoding::Utf8);
+        if (nullTerminate)
+        {
+            buffer[buffer.size() - 1] = 0;
+        }
+        if (encodedText)
+        {
+            if (nullTerminate)
+            {
+                *encodedText = StringView(buffer.data(), buffer.size() - 1, true, StringEncoding::Utf8);
+            }
+            else
+            {
+                *encodedText = StringView(buffer.data(), buffer.size(), false, StringEncoding::Utf8);
+            }
+        }
         return true;
 #endif
     }
     return false;
 }
 
-bool SC::StringConverter::toNullTerminatedUTF16(StringView file, Vector<char>& buffer, StringView& encodedText,
-                                                bool forceCopy)
+bool SC::StringConverter::convertEncodingToUTF16(StringView file, Vector<char>& buffer, StringView* encodedText,
+                                                 NullTermination terminate)
 {
+    const bool nullTerminate = terminate == AddZeroTerminator;
+    const bool forceCopy     = encodedText == nullptr;
     if (file.isEmpty())
     {
         return false;
@@ -75,21 +113,40 @@ bool SC::StringConverter::toNullTerminatedUTF16(StringView file, Vector<char>& b
         {
             if (forceCopy)
             {
-                SC_TRY_IF(buffer.appendCopy(file.bytesIncludingTerminator(), file.sizeInBytesIncludingTerminator()));
-                encodedText = StringView(buffer.data(), buffer.size() - sizeof(wchar_t), true, StringEncoding::Utf16);
+                SC_TRY_IF(buffer.appendCopy(file.bytesIncludingTerminator(), nullTerminate
+                                                                                 ? file.sizeInBytesIncludingTerminator()
+                                                                                 : file.sizeInBytes()));
             }
             else
             {
-                encodedText = file;
+                if (nullTerminate)
+                {
+                    *encodedText = file;
+                }
+                else
+                {
+                    *encodedText =
+                        StringView(file.bytesWithoutTerminator(), file.sizeInBytes(), false, file.getEncoding());
+                }
             }
             return true;
         }
         else
         {
-            SC_TRY_IF(buffer.reserve(buffer.size() + file.sizeInBytes() + sizeof(wchar_t)));
-            SC_TRY_IF(buffer.appendCopy(file.bytesWithoutTerminator(), file.sizeInBytes()));
-            encodedText = StringView(buffer.data(), buffer.size(), true, StringEncoding::Utf16);
-            SC_TRY_IF(buffer.resize(buffer.size() + sizeof(wchar_t), 0)); // null terminator
+            if (nullTerminate)
+            {
+                SC_TRY_IF(buffer.reserve(buffer.size() + file.sizeInBytes() + sizeof(wchar_t)));
+                SC_TRY_IF(buffer.appendCopy(file.bytesWithoutTerminator(), file.sizeInBytes()));
+                if (encodedText)
+                {
+                    *encodedText = StringView(buffer.data(), buffer.size(), true, StringEncoding::Utf16);
+                }
+                SC_TRY_IF(buffer.resize(buffer.size() + sizeof(wchar_t), 0)); // null terminator
+            }
+            else if (encodedText)
+            {
+                *encodedText = file;
+            }
             return true;
         }
     }
@@ -103,27 +160,74 @@ bool SC::StringConverter::toNullTerminatedUTF16(StringView file, Vector<char>& b
             return false;
         }
         const auto oldSize = buffer.size();
-        SC_TRY_IF(buffer.resizeWithoutInitializing(oldSize + (static_cast<size_t>(numWChars) + 1) * sizeof(wchar_t)));
+        SC_TRY_IF(buffer.resizeWithoutInitializing(
+            oldSize + (static_cast<size_t>(numWChars) + (nullTerminate ? 1 : 0)) * sizeof(wchar_t)));
         MultiByteToWideChar(CP_UTF8, 0, file.bytesWithoutTerminator(), static_cast<int>(file.sizeInBytes()),
                             reinterpret_cast<wchar_t*>(buffer.data() + oldSize), numWChars);
-        buffer[buffer.size() - 2] = 0; // null terminator
-        buffer[buffer.size() - 1] = 0; // null terminator
-        encodedText = StringView(buffer.data(), buffer.size() - sizeof(wchar_t), true, StringEncoding::Utf16);
+        if (nullTerminate)
+        {
+            buffer[buffer.size() - 2] = 0; // null terminator
+            buffer[buffer.size() - 1] = 0; // null terminator
+            if (encodedText)
+            {
+                *encodedText = StringView(buffer.data(), buffer.size() - sizeof(wchar_t), true, StringEncoding::Utf16);
+            }
+        }
+        else if (encodedText)
+        {
+            *encodedText = StringView(buffer.data(), buffer.size(), false, StringEncoding::Utf16);
+        }
         return true;
 #endif
     }
     return false;
 }
 
-bool SC::StringConverter::toNullTerminated(StringEncoding encoding, StringView text, Vector<char>& buffer,
-                                           StringView& encodedText, bool forceCopy)
+bool SC::StringConverter::convertEncodingTo(StringEncoding encoding, StringView text, Vector<char>& buffer,
+                                            StringView* encodedText, NullTermination terminate)
 {
     switch (encoding)
     {
-    case StringEncoding::Ascii: return toNullTerminatedUTF8(text, buffer, encodedText, forceCopy);
-    case StringEncoding::Utf8: return toNullTerminatedUTF8(text, buffer, encodedText, forceCopy);
-    case StringEncoding::Utf16: return toNullTerminatedUTF16(text, buffer, encodedText, forceCopy);
+    case StringEncoding::Ascii: return convertEncodingToUTF8(text, buffer, encodedText, terminate);
+    case StringEncoding::Utf8: return convertEncodingToUTF8(text, buffer, encodedText, terminate);
+    case StringEncoding::Utf16: return convertEncodingToUTF16(text, buffer, encodedText, terminate);
     case StringEncoding::Utf32: break;
     }
     return false;
+}
+
+void SC::StringConverter::clear() { text.data.clearWithoutInitializing(); }
+
+bool SC::StringConverter::convertNullTerminateFastPath(StringView input, StringView& encodedText)
+{
+    text.data.clearWithoutInitializing();
+    SC_TRY_IF(internalAppend(input, &encodedText));
+    return true;
+}
+
+bool SC::StringConverter::appendNullTerminated(StringView input)
+{
+    SC_TRY_IF(text.popNulltermIfExists());
+    return internalAppend(input, nullptr);
+}
+
+bool SC::StringConverter::setTextLengthInBytesIncludingTerminator(size_t newDataSize)
+{
+    const auto zeroSize = StringEncodingGetSize(text.getEncoding());
+    if (newDataSize >= zeroSize)
+    {
+        const bool res = text.data.resizeWithoutInitializing(newDataSize - zeroSize);
+        return res && text.data.resize(newDataSize, 0); // Adds the null terminator
+    }
+    return true;
+}
+
+SC::StringView SC::StringConverter::view() const { return text.view(); }
+
+bool SC::StringConverter::growToFullCapacity() { return text.data.resizeWithoutInitializing(text.data.capacity()); }
+
+/// Appends the input string null terminated
+bool SC::StringConverter::internalAppend(StringView input, StringView* encodedText)
+{
+    return StringConverter::convertEncodingTo(StringEncoding::Native, input, text.data, encodedText);
 }

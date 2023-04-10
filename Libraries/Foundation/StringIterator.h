@@ -20,6 +20,12 @@ enum class StringEncoding : uint8_t
 #endif
 };
 
+constexpr bool StringEncodingAreBinaryCompatible(StringEncoding encoding1, StringEncoding encoding2)
+{
+    return (encoding1 == encoding2) or (encoding2 == StringEncoding::Ascii && encoding1 == StringEncoding::Utf8) or
+           (encoding2 == StringEncoding::Utf8 && encoding1 == StringEncoding::Ascii);
+}
+
 constexpr uint32_t StringEncodingGetSize(StringEncoding encoding)
 {
     switch (encoding)

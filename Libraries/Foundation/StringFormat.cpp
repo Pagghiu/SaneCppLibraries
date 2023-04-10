@@ -7,6 +7,7 @@
 
 #include <inttypes.h> // PRIu64 / PRIi64
 #include <stdio.h>    // snprintf
+#include <wchar.h>    // wcslen
 
 namespace SC
 {
@@ -112,7 +113,13 @@ bool StringFormatterFor<double>::format(StringFormatOutput& data, const StringIt
 bool StringFormatterFor<SC::char_t>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
                                             const SC::char_t value)
 {
-    return data.write(StringView(&value, 1, false, StringEncoding::Ascii));
+    return data.write(StringView(&value, sizeof(value), false, StringEncoding::Ascii));
+}
+
+bool StringFormatterFor<wchar_t>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
+                                         const wchar_t value)
+{
+    return data.write(StringView({&value, sizeof(value)}, false, StringEncoding::Utf16));
 }
 
 bool StringFormatterFor<const SC::char_t*>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
@@ -121,32 +128,31 @@ bool StringFormatterFor<const SC::char_t*>::format(StringFormatOutput& data, con
     return data.write(StringView(value, strlen(value), true, StringEncoding::Ascii));
 }
 
+bool StringFormatterFor<const wchar_t*>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
+                                                const wchar_t* value)
+{
+    return data.write(StringView({value, wcslen(value) * sizeof(wchar_t)}, true, StringEncoding::Utf16));
+}
+
 bool StringFormatterFor<SC::StringView>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
                                                 const SC::StringView value)
 {
-    if (value.getEncoding() == StringEncoding::Utf16)
-    {
-        // TODO: This logic for conversion doesn't make sense for console, as on windows will convert to utf16 again...
-        StringView encodedText;
-        bool       res = false;
-        if (data.getEncoding() == StringEncoding::Utf8)
-        {
-            res = StringConverter::toNullTerminatedUTF8(value, data.temporaryBuffer, encodedText, true);
-        }
-        else if (data.getEncoding() == StringEncoding::Utf16)
-        {
-            res = StringConverter::toNullTerminatedUTF16(value, data.temporaryBuffer, encodedText, true);
-        }
-        return res && data.write(encodedText);
-    }
+    if (StringEncodingAreBinaryCompatible(value.getEncoding(), data.getEncoding()))
+        SC_LIKELY { return data.write(value); }
     else
     {
-        return data.write(value);
+        StringView encodedText;
+        SC_TRY_IF(StringConverter::convertEncodingTo(data.getEncoding(), value, data.temporaryBuffer, &encodedText));
+        return data.write(encodedText);
     }
 }
 
 bool StringFormatOutput::write(StringView text)
 {
+    if (text.isEmpty())
+    {
+        return true;
+    }
     if (console != nullptr)
     {
         console->print(text);
@@ -154,17 +160,14 @@ bool StringFormatOutput::write(StringView text)
     }
     else if (data != nullptr)
     {
-        if ((encoding == text.getEncoding()) or
-            (encoding == StringEncoding::Utf8 and text.getEncoding() == StringEncoding::Ascii) or
-            (encoding == StringEncoding::Ascii and text.getEncoding() == StringEncoding::Utf8))
+        if (StringEncodingAreBinaryCompatible(encoding, text.getEncoding()))
         {
             return data->appendCopy(text.bytesWithoutTerminator(), text.sizeInBytes());
         }
         else
         {
-            // TODO: Implement mixing different encodings when writing to buffer
-            SC_DEBUG_ASSERT("Not Implemented" && 0);
-            return false;
+            return StringConverter::convertEncodingTo(encoding, text, *data, nullptr,
+                                                      StringConverter::DoNotAddZeroTerminator);
         }
     }
     else

@@ -13,45 +13,22 @@ struct StringNative;
 
 // Allows obtaining a null terminated char pointer to use with SystemDebug native api
 template <int N>
-struct SC::StringNative
+struct SC::StringNative : public StringConverter
 {
-    void clear() { text.data.clearWithoutInitializing(); }
+    SmallString<N * sizeof(utf_char_t)> bufferText;
+    StringNative() : bufferText(StringEncoding::Native), StringConverter(bufferText) {}
 
-    [[nodiscard]] bool convertNullTerminateFastPath(StringView input, StringView& encodedText)
+    // TODO: Refactor to use String/SmallString(s) and use StringConverter at need to avoid its dangerous reference.
+    StringNative(StringNative&& other) : bufferText(move(other.bufferText)), StringConverter(bufferText) {}
+    StringNative(const StringNative& other) : bufferText(other.bufferText), StringConverter(bufferText) {}
+    StringNative& operator=(StringNative&& other)
     {
-        text.data.clearWithoutInitializing();
-        SC_TRY_IF(internalAppend(input, false, encodedText));
-        return true;
+        bufferText = move(other.bufferText);
+        return *this;
     }
-
-    /// Appends the input string null terminated
-    [[nodiscard]] bool appendNullTerminated(StringView input)
+    StringNative& operator=(const StringNative& other)
     {
-        SC_TRY_IF(text.popNulltermIfExists());
-        StringView encodedText;
-        return internalAppend(input, true, encodedText);
-    }
-
-    [[nodiscard]] bool setTextLengthInBytesIncludingTerminator(size_t newDataSize)
-    {
-        const auto zeroSize = StringEncodingGetSize(text.getEncoding());
-        if (newDataSize >= zeroSize)
-        {
-            const bool res = text.data.resizeWithoutInitializing(newDataSize - zeroSize);
-            return res && text.data.resize(newDataSize, 0); // Adds the null terminator
-        }
-        return true;
-    }
-
-    StringView view() const { return text.view(); }
-
-    [[nodiscard]] bool growToFullCapacity() { return text.data.resizeWithoutInitializing(text.data.capacity()); }
-    SmallString<N * sizeof(utf_char_t)> text = StringEncoding::Native;
-
-  private:
-    /// Appends the input string null terminated
-    [[nodiscard]] bool internalAppend(StringView input, bool forceCopy, StringView& encodedText)
-    {
-        return StringConverter::toNullTerminated(StringEncoding::Native, input, text.data, encodedText, forceCopy);
+        bufferText = other.bufferText;
+        return *this;
     }
 };

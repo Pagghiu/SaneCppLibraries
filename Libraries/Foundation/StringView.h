@@ -159,9 +159,7 @@ struct SC::StringView
     }
     [[nodiscard]] bool hasCompatibleEncoding(StringView str) const
     {
-        return (encoding == str.encoding) or
-               (str.encoding == StringEncoding::Ascii && encoding == StringEncoding::Utf8) or
-               (str.encoding == StringEncoding::Utf8 && encoding == StringEncoding::Ascii);
+        return StringEncodingAreBinaryCompatible(encoding, str.encoding);
     }
 
     [[nodiscard]] bool setSizeInBytesWithoutTerminator(size_t newSize)
@@ -235,8 +233,14 @@ struct SC::StringView
     template <typename StringIterator = StringIteratorASCII>
     [[nodiscard]] StringView sliceStart(size_t start) const
     {
-        return sliceStartEnd<StringIterator>(start, start + sizeInBytes());
+        StringIterator it = getIterator<StringIterator>();
+        SC_RELEASE_ASSERT(it.advanceCodePoints(start));
+        StringIterator startIt = it;
+        it.rewindToEnd();
+        const auto distance = it.bytesDistanceFrom(startIt);
+        return StringView(startIt.getIt(), distance, start + distance == sizeInBytesIncludingTerminator(), encoding);
     }
+
     template <typename Lambda>
     [[nodiscard]] size_t splitASCII(char_t separator, Lambda&& lambda,
                                     SplitOptions options = {SplitOptions::SkipEmpty, SplitOptions::SkipSeparator})
@@ -281,6 +285,11 @@ struct SC::StringView
     [[nodiscard]] bool parseInt32(int32_t* value) const;
 };
 
+#if SC_PLATFORM_WINDOWS
+#define SC_STR_L(str) L##str
+#else
+#define SC_STR_L(str) str
+#endif
 namespace SC
 {
 #if SC_MSVC
