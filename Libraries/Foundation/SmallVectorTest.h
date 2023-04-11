@@ -25,6 +25,24 @@ struct SC::SmallVectorTest : public SC::TestCase
             SegmentHeader* vecHeader = SegmentHeader::getSegmentHeader(vec.items);
             SC_TEST_EXPECT(vecHeader->options.isSmallVector);
         }
+        if (test_section("resize stack heap"))
+        {
+            SmallVector<int, 3> vec;
+            SC_TEST_EXPECT(vec.resize(3));
+            SegmentHeader* header;
+            header = SegmentHeader::getSegmentHeader(vec.items);
+            SC_TEST_EXPECT(header->options.isSmallVector);
+            SC_TEST_EXPECT(not header->options.isFollowedBySmallVector);
+            SC_TEST_EXPECT(vec.resize(4));
+            header = SegmentHeader::getSegmentHeader(vec.items);
+            SC_TEST_EXPECT(not header->options.isSmallVector);
+            SC_TEST_EXPECT(header->options.isFollowedBySmallVector);
+            SC_TEST_EXPECT(vec.resize(3));
+            SC_TEST_EXPECT(vec.shrink_to_fit());
+            header = SegmentHeader::getSegmentHeader(vec.items);
+            SC_TEST_EXPECT(header->options.isSmallVector);
+            SC_TEST_EXPECT(not header->options.isFollowedBySmallVector);
+        }
         if (test_section("construction copy stack"))
         {
             SmallVector<int, 3> vec2;

@@ -24,8 +24,17 @@ struct SC::VectorAllocator
         {
             return nullptr;
         }
-        SegmentHeader* newHeader =
-            static_cast<SegmentHeader*>(memoryReallocate(oldHeader, sizeof(SegmentHeader) + newSize));
+        SegmentHeader* newHeader;
+        if (oldHeader->options.isSmallVector)
+        {
+            newHeader = static_cast<SegmentHeader*>(memoryAllocate(sizeof(SegmentHeader) + newSize));
+            newHeader->options.isSmallVector           = false;
+            newHeader->options.isFollowedBySmallVector = true;
+        }
+        else
+        {
+            newHeader = static_cast<SegmentHeader*>(memoryReallocate(oldHeader, sizeof(SegmentHeader) + newSize));
+        }
         if (newHeader)
         {
             newHeader->capacityBytes = static_cast<SegmentHeader::HeaderBytesType>(newSize);
