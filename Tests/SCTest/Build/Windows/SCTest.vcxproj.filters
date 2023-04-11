@@ -217,9 +217,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringConverter.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringNative.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.h">
       <Filter>InputOutput</Filter>
     </ClInclude>

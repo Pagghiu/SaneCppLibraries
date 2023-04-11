@@ -71,9 +71,9 @@ SC::ReturnCode SC::Process::run(const ProcessOptions& options)
     }
 
     // In documentation it's explicitly stated that this buffer will be modified (!?)
-    LPWSTR  wideCmd = command.text.nativeWritableBytesIncludingTerminator();
+    LPWSTR  wideCmd = command.nativeWritableBytesIncludingTerminator();
     LPCWSTR wideDir = currentDirectory.view().isEmpty() ? nullptr : currentDirectory.view().getNullTerminatedNative();
-    LPWSTR wideEnv = environment.view().isEmpty() ? nullptr : environment.text.nativeWritableBytesIncludingTerminator();
+    LPWSTR  wideEnv = environment.view().isEmpty() ? nullptr : environment.nativeWritableBytesIncludingTerminator();
     PROCESS_INFORMATION processInfo;
     ZeroMemory(&processInfo, sizeof(PROCESS_INFORMATION));
     BOOL success;

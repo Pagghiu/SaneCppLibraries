@@ -281,7 +281,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringFormat.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringIterator.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringConverter.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringNative.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringView.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringViewTest.h" />

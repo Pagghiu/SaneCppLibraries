@@ -37,15 +37,13 @@ struct SC::FileSystem::Internal
         return false;
     }
 
-    template <int N>
-    [[nodiscard]] static bool copyDirectory(StringNative<N>& sourceFile, StringNative<N>& destinationFile,
+    [[nodiscard]] static bool copyDirectory(String& sourceFile, String& destinationFile,
                                             FileSystem::CopyFlags options)
     {
         return false;
     }
 
-    template <int N>
-    static bool removeDirectoryRecursive(StringNative<N>& directory)
+    static bool removeDirectoryRecursive(String& directory)
     {
         return false;
     }

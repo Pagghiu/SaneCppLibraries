@@ -92,7 +92,7 @@ SC::ReturnCode SC::Process::run(const ProcessOptions& options)
     {
         if (options.useShell)
         {
-            execl("/bin/sh", "sh", "-c", command.text.view().getNullTerminatedNative(), nullptr);
+            execl("/bin/sh", "sh", "-c", command.view().getNullTerminatedNative(), nullptr);
         }
         else
         {

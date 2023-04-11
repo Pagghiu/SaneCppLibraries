@@ -4,9 +4,7 @@
 #include "Console.h"
 #include "Limits.h"
 #include "Platform.h"
-#include "String.h"
 #include "StringConverter.h"
-#include "StringNative.h"
 
 #include <stdio.h> // stdout
 

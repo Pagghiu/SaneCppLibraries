@@ -76,7 +76,6 @@
 		7B2AEB1729D0DA4C003E1B6F /* Atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Atomic.h; path = ../../../../Libraries/Foundation/Atomic.h; sourceTree = "<group>"; };
 		7B2AEB1829D0DA67003E1B6F /* AtomicTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AtomicTest.h; path = ../../../../Libraries/Foundation/AtomicTest.h; sourceTree = "<group>"; };
 		7B2F86E029887CA400EFC5FB /* FileSystemInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalEmscripten.inl; path = ../../../../Libraries/InputOutput/FileSystemInternalEmscripten.inl; sourceTree = "<group>"; };
-		7B2F86E129888F2600EFC5FB /* StringNative.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StringNative.h; path = ../../../../Libraries/Foundation/StringNative.h; sourceTree = "<group>"; };
 		7B4A291B29B3CD4A00F13DCB /* Time.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Time.cpp; path = ../../../../Libraries/Foundation/Time.cpp; sourceTree = "<group>"; };
 		7B4A291C29B3CD4A00F13DCB /* Time.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Time.h; path = ../../../../Libraries/Foundation/Time.h; sourceTree = "<group>"; };
 		7B4B99EF2937EBAC003D17A6 /* ReflectionAutoAggregates.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ReflectionAutoAggregates.h; path = ../../../../Libraries/Reflection/ReflectionAutoAggregates.h; sourceTree = "<group>"; };
@@ -290,7 +289,6 @@
 				7B515FFC29243097006996AA /* StringFormat.cpp */,
 				7B515FFA29243097006996AA /* StringFormat.h */,
 				7B51600829243097006996AA /* StringIterator.h */,
-				7B2F86E129888F2600EFC5FB /* StringNative.h */,
 				7B51600F29243097006996AA /* StringTest.h */,
 				7B515FFF29243097006996AA /* StringView.cpp */,
 				7B51600329243097006996AA /* StringView.h */,
@@ -461,7 +459,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastUpgradeCheck = 1420;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					7B52501328E85B9100827290 = {
 						CreatedOnToolsVersion = 14.0.1;

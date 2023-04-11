@@ -172,16 +172,13 @@ struct SC::FileSystem::Internal
         return copyRes == 0;
     }
 
-    template <int N>
-    [[nodiscard]] static bool copyDirectory(StringNative<N>& sourceFile, StringNative<N>& destinationFile,
-                                            FileSystem::CopyFlags options)
+    [[nodiscard]] static bool copyDirectory(String& sourceFile, String& destinationFile, FileSystem::CopyFlags options)
     {
         return copyFile(sourceFile.view().getNullTerminatedNative(), destinationFile.view().getNullTerminatedNative(),
                         options, true); // true == isDirectory
     }
 
-    template <int N>
-    static bool removeDirectoryRecursive(StringNative<N>& directory)
+    static bool removeDirectoryRecursive(String& directory)
     {
         removefile_state_t state = removefile_state_alloc();
         int                res   = removefile(directory.view().getNullTerminatedNative(), state, REMOVEFILE_RECURSIVE);

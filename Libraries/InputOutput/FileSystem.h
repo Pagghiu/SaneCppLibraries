@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/StringNative.h"
+#include "../Foundation/String.h"
 
 namespace SC
 {
@@ -11,7 +11,7 @@ struct FileSystem;
 
 struct SC::FileSystem
 {
-    StringNative<512> currentDirectory;
+    StringNative<512> currentDirectory = StringEncoding::Native;
 
     bool localizedErrorMessages = true;
     bool preciseErrorMessages   = true;
@@ -75,9 +75,9 @@ struct SC::FileSystem
     [[nodiscard]] bool pushFile1(StringView file, StringView& encodedPath);
     [[nodiscard]] bool pushFile2(StringView file, StringView& encodedPath);
 
-    StringNative<128> fileFormatBuffer1;
-    StringNative<128> fileFormatBuffer2;
-    StringNative<128> errorMessageBuffer;
+    StringNative<128> fileFormatBuffer1  = StringEncoding::Native;
+    StringNative<128> fileFormatBuffer2  = StringEncoding::Native;
+    StringNative<128> errorMessageBuffer = StringEncoding::Native;
 
     ReturnCode formatError(int errorNumber, StringView item, bool isWindowsNativeError);
     struct Internal;

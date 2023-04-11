@@ -111,9 +111,8 @@ struct SC::FileSystem::Internal
         return res == TRUE;
     }
 
-    template <int N>
-    [[nodiscard]] static ReturnCode copyDirectory(StringNative<N>& sourceDirectory,
-                                                  StringNative<N>& destinationDirectory, FileSystem::CopyFlags options)
+    [[nodiscard]] static ReturnCode copyDirectory(String& sourceDirectory, String& destinationDirectory,
+                                                  FileSystem::CopyFlags options)
     {
         SHFILEOPSTRUCTW s    = {0};
         const wchar_t*  dest = destinationDirectory.view().getNullTerminatedNative();
@@ -130,24 +129,23 @@ struct SC::FileSystem::Internal
         }
         s.fFlags = FOF_SILENT | FOF_NOCONFIRMMKDIR | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NO_UI;
         s.wFunc  = FO_COPY;
-        SC_TRY_IF(sourceDirectory.appendNullTerminated(L"\\*"));
+        SC_TRY_IF(StringConverter(sourceDirectory).appendNullTerminated(L"\\*"));
         // SHFileOperationW needs two null termination bytes
-        sourceDirectory.text.pushNullTerm();
-        destinationDirectory.text.pushNullTerm();
+        sourceDirectory.pushNullTerm();
+        destinationDirectory.pushNullTerm();
         s.pFrom       = sourceDirectory.view().getNullTerminatedNative();
         s.pTo         = dest;
         const int res = SHFileOperationW(&s);
         return res == 0;
     }
 
-    template <int N>
-    [[nodiscard]] static bool removeDirectoryRecursive(StringNative<N>& sourceDirectory)
+    [[nodiscard]] static bool removeDirectoryRecursive(String& sourceDirectory)
     {
         SHFILEOPSTRUCTW s = {0};
         s.fFlags          = FOF_SILENT | FOF_NOCONFIRMMKDIR | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NO_UI;
         s.wFunc           = FO_DELETE;
         // SHFileOperationW needs two null termination bytes
-        sourceDirectory.text.pushNullTerm();
+        sourceDirectory.pushNullTerm();
         s.pFrom       = sourceDirectory.view().getNullTerminatedNative();
         const int res = SHFileOperationW(&s);
         return res == 0;

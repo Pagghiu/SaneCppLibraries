@@ -3,7 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "Threading.h"
 
-#include "../Foundation/StringNative.h"
+#include "../Foundation/String.h"
+#include "../Foundation/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
 #include "ThreadingInternalWindows.inl"
@@ -55,8 +56,9 @@ SC::ReturnCode SC::Thread::start(StringView name, Action* func, Action* syncFunc
     CreateParams self(this);
     self.callback     = func;
     self.syncCallback = syncFunc;
-    StringNative<128> nameNative;
-    SC_TRY_IF(nameNative.convertNullTerminateFastPath(name, self.nameNullTerminated));
+
+    StringNative<128> nameNative = StringEncoding::Native;
+    SC_TRY_IF(StringConverter(nameNative).convertNullTerminateFastPath(name, self.nameNullTerminated));
     OpaqueThread opaqueThread;
     SC_TRY_IF(Internal::createThread(self, opaqueThread, self.threadHandle, &CreateParams::threadFunc));
     thread.assign(move(opaqueThread));

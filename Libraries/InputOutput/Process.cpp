@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "Process.h"
+#include "../Foundation/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
 #include "ProcessInternalWindows.inl"
@@ -112,7 +113,9 @@ SC::ReturnCode SC::ProcessShell::waitSync()
 
 SC::ReturnCode SC::ProcessShell::queueProcess(Span<StringView*> spanArguments)
 {
-    Process process;
+    Process         process;
+    StringConverter command(process.command);
+
     if (options.useShell)
     {
         bool first = true;
@@ -120,19 +123,19 @@ SC::ReturnCode SC::ProcessShell::queueProcess(Span<StringView*> spanArguments)
         {
             if (not first)
             {
-                SC_TRY_IF(process.command.appendNullTerminated(" "));
+                SC_TRY_IF(command.appendNullTerminated(" "));
             }
             first = false;
             if (svp->containsASCIICharacter(' '))
             {
                 // has space, must escape it
-                SC_TRY_IF(process.command.appendNullTerminated("\""));
-                SC_TRY_IF(process.command.appendNullTerminated(*svp));
-                SC_TRY_IF(process.command.appendNullTerminated("\""));
+                SC_TRY_IF(command.appendNullTerminated("\""));
+                SC_TRY_IF(command.appendNullTerminated(*svp));
+                SC_TRY_IF(command.appendNullTerminated("\""));
             }
             else
             {
-                SC_TRY_IF(process.command.appendNullTerminated(*svp));
+                SC_TRY_IF(command.appendNullTerminated(*svp));
             }
         }
     }

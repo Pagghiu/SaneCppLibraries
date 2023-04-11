@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 // clang-format off
 #include "FileSystemWalker.h"
+#include "../Foundation/StringConverter.h"
 // clang-format on
 #include <dirent.h>
 #include <errno.h>
@@ -48,7 +49,7 @@ struct SC::FileSystemWalker::Internal
         }
     };
     SmallVector<StackEntry, 64> recurseStack;
-    StringNative<512>           currentPath;
+    StringNative<512>           currentPathString = StringEncoding::Native;
     Internal() {}
 
     ~Internal()
@@ -62,6 +63,7 @@ struct SC::FileSystemWalker::Internal
 
     [[nodiscard]] ReturnCode init(StringView directory)
     {
+        StringConverter currentPath(currentPathString);
         currentPath.clear();
         SC_TRY_IF(currentPath.appendNullTerminated(directory));
         StackEntry entry;
@@ -73,6 +75,7 @@ struct SC::FileSystemWalker::Internal
 
     ReturnCode enumerateNext(Entry& entry, const Options& options)
     {
+        StringConverter currentPath(currentPathString);
         if (recurseStack.isEmpty())
             return "Forgot to call init"_a8;
         StackEntry&    parent = recurseStack.back();
@@ -132,7 +135,8 @@ struct SC::FileSystemWalker::Internal
 
     [[nodiscard]] ReturnCode recurseSubdirectory(Entry& entry)
     {
-        StackEntry newParent;
+        StringConverter currentPath(currentPathString);
+        StackEntry      newParent;
         SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
         SC_TRY_IF(currentPath.appendNullTerminated("/"_u8));
         SC_TRY_IF(currentPath.appendNullTerminated(entry.name));

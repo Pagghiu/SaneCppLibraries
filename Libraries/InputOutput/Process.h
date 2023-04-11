@@ -5,7 +5,7 @@
 #include "../Foundation/Function.h"
 #include "../Foundation/Opaque.h"
 #include "../Foundation/Optional.h"
-#include "../Foundation/StringNative.h"
+#include "../Foundation/String.h"
 #include "FileDescriptor.h"
 
 namespace SC
@@ -50,9 +50,9 @@ struct SC::Process
     FileDescriptor      standardInput;
     FileDescriptor      standardOutput;
     FileDescriptor      standardError;
-    StringNative<255>   command;
-    StringNative<255>   currentDirectory;
-    StringNative<1024>  environment;
+    StringNative<255>   command          = StringEncoding::Native;
+    StringNative<255>   currentDirectory = StringEncoding::Native;
+    StringNative<1024>  environment      = StringEncoding::Native;
     ProcessNativeHandle handle;
 
     [[nodiscard]] ReturnCode waitProcessExit();

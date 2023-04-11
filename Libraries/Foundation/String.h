@@ -127,3 +127,9 @@ struct SC::StringFormatterFor<SC::String>
 {
     static bool format(StringFormatOutput& data, const StringIteratorASCII specifier, const String& value);
 };
+
+namespace SC
+{
+template <int N>
+using StringNative = SmallString<N * sizeof(utf_char_t)>;
+} // namespace SC

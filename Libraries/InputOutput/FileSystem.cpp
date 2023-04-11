@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "FileSystem.h"
+#include "../Foundation/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
 #include "FileSystemInternalWindows.inl"
@@ -21,8 +22,9 @@ SC::ReturnCode SC::FileSystem::init(StringView currentWorkingDirectory)
 
 SC::ReturnCode SC::FileSystem::changeDirectory(StringView currentWorkingDirectory)
 {
-    currentDirectory.clear();
-    SC_TRY_IF(currentDirectory.appendNullTerminated(currentWorkingDirectory));
+    StringConverter converter(currentDirectory);
+    converter.clear();
+    SC_TRY_IF(converter.appendNullTerminated(currentWorkingDirectory));
     // TODO: Assert if path is not absolute
     return true;
 }
@@ -32,38 +34,42 @@ void SC::FileSystem::close() {}
 // TODO: We should also combine paths using paths api to resolve relative paths
 bool SC::FileSystem::pushFile1(StringView file, StringView& encodedPath)
 {
+    StringConverter converter(fileFormatBuffer1);
     if (Path::isAbsolute(file))
     {
-        return fileFormatBuffer1.convertNullTerminateFastPath(file, encodedPath);
+        return converter.convertNullTerminateFastPath(file, encodedPath);
     }
-    if (currentDirectory.text.isEmpty())
+    if (currentDirectory.isEmpty())
         return false;
-    SC_TRY_IF(fileFormatBuffer1.text.assign(currentDirectory.text.view()));
+    converter.clear();
+    SC_TRY_IF(converter.appendNullTerminated(currentDirectory.view()));
 #if SC_PLATFORM_WINDOWS
-    SC_TRY_IF(fileFormatBuffer1.appendNullTerminated(L"\\"));
+    SC_TRY_IF(converter.appendNullTerminated(L"\\"));
 #else
-    SC_TRY_IF(fileFormatBuffer1.appendNullTerminated("/"));
+    SC_TRY_IF(converter.appendNullTerminated("/"));
 #endif
-    SC_TRY_IF(fileFormatBuffer1.appendNullTerminated(file));
+    SC_TRY_IF(converter.appendNullTerminated(file));
     encodedPath = fileFormatBuffer1.view();
     return true;
 }
 
 bool SC::FileSystem::pushFile2(StringView file, StringView& encodedPath)
 {
+    StringConverter converter(fileFormatBuffer2);
     if (Path::isAbsolute(file))
     {
-        return fileFormatBuffer2.convertNullTerminateFastPath(file, encodedPath);
+        return converter.convertNullTerminateFastPath(file, encodedPath);
     }
-    if (currentDirectory.text.isEmpty())
+    if (currentDirectory.isEmpty())
         return false;
-    SC_TRY_IF(fileFormatBuffer2.text.assign(currentDirectory.text.view()));
+    converter.clear();
+    SC_TRY_IF(converter.appendNullTerminated(currentDirectory.view()));
 #if SC_PLATFORM_WINDOWS
-    SC_TRY_IF(fileFormatBuffer2.appendNullTerminated(L"\\"));
+    SC_TRY_IF(converter.appendNullTerminated(L"\\"));
 #else
-    SC_TRY_IF(fileFormatBuffer2.appendNullTerminated("/"));
+    SC_TRY_IF(converter.appendNullTerminated("/"));
 #endif
-    SC_TRY_IF(fileFormatBuffer2.appendNullTerminated(file));
+    SC_TRY_IF(converter.appendNullTerminated(file));
     encodedPath = fileFormatBuffer2.view();
     return true;
 }
@@ -173,7 +179,7 @@ SC::ReturnCode SC::FileSystem::formatError(int errorNumber, StringView item, boo
         {
             return "Windows Error"_a8;
         }
-        if (not UtilityWindows::formatWindowsError(errorNumber, errorMessageBuffer.text))
+        if (not UtilityWindows::formatWindowsError(errorNumber, errorMessageBuffer))
         {
             return "SC::FileSystem::formatError - Cannot format error"_a8;
         }
@@ -186,14 +192,15 @@ SC::ReturnCode SC::FileSystem::formatError(int errorNumber, StringView item, boo
             return getErrorCode(errorNumber);
         }
 
-        if (not Internal::formatError(errorNumber, errorMessageBuffer.text))
+        if (not Internal::formatError(errorNumber, errorMessageBuffer))
         {
             return "SC::FileSystem::formatError - Cannot format error"_a8;
         }
     }
-    SC_TRY_IF(errorMessageBuffer.appendNullTerminated(" for \""));
-    SC_TRY_IF(errorMessageBuffer.appendNullTerminated(item));
-    SC_TRY_IF(errorMessageBuffer.appendNullTerminated("\""));
+    StringConverter errorMessage(errorMessageBuffer);
+    SC_TRY_IF(errorMessage.appendNullTerminated(" for \""));
+    SC_TRY_IF(errorMessage.appendNullTerminated(item));
+    SC_TRY_IF(errorMessage.appendNullTerminated("\""));
     return errorMessageBuffer.view();
 }
 
@@ -221,7 +228,7 @@ SC::ReturnCode SC::FileSystem::removeDirectoryRecursive(Span<const StringView> d
 
 SC::ReturnCode SC::FileSystem::copyFile(Span<const CopyOperation> sourceDestination)
 {
-    if (currentDirectory.text.isEmpty())
+    if (currentDirectory.isEmpty())
         return false;
     StringView encodedPath1, encodedPath2;
     for (const CopyOperation& op : sourceDestination)
@@ -237,7 +244,7 @@ SC::ReturnCode SC::FileSystem::copyFile(Span<const CopyOperation> sourceDestinat
 
 SC::ReturnCode SC::FileSystem::copyDirectory(Span<const CopyOperation> sourceDestination)
 {
-    if (currentDirectory.text.isEmpty())
+    if (currentDirectory.isEmpty())
         return false;
     StringView encodedPath1, encodedPath2;
     for (const CopyOperation& op : sourceDestination)

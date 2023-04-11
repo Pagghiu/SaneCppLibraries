@@ -2,7 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../Foundation/SmallVector.h"
-#include "../Foundation/StringNative.h"
+#include "../Foundation/String.h"
+#include "../Foundation/StringConverter.h"
+
 #include "FileSystemWalker.h"
 
 #include <Windows.h>
@@ -37,7 +39,7 @@ struct SC::FileSystemWalker::Internal
     WIN32_FIND_DATAW            dirEnumerator;
     bool                        expectDotDirectories = true;
     SmallVector<StackEntry, 64> recurseStack;
-    StringNative<512>           currentPath;
+    StringNative<512>           currentPathString = StringEncoding::Native;
     Internal() {}
 
     ~Internal()
@@ -51,6 +53,7 @@ struct SC::FileSystemWalker::Internal
 
     [[nodiscard]] ReturnCode init(StringView directory)
     {
+        StringConverter currentPath(currentPathString);
         currentPath.clear();
         StackEntry entry;
         SC_TRY_IF(currentPath.appendNullTerminated(directory));
@@ -65,7 +68,8 @@ struct SC::FileSystemWalker::Internal
 
     [[nodiscard]] ReturnCode enumerateNext(Entry& entry, const Options& options)
     {
-        StackEntry& parent = recurseStack.back();
+        StringConverter currentPath(currentPathString);
+        StackEntry&     parent = recurseStack.back();
         for (;;)
         {
             if (not expectDotDirectories)
@@ -123,7 +127,8 @@ struct SC::FileSystemWalker::Internal
 
     [[nodiscard]] ReturnCode recurseSubdirectory(Entry& entry)
     {
-        StackEntry newParent;
+        StringConverter currentPath(currentPathString);
+        StackEntry      newParent;
         SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
         SC_TRY_IF(currentPath.appendNullTerminated(L"\\"));
         SC_TRY_IF(currentPath.appendNullTerminated(entry.name));
