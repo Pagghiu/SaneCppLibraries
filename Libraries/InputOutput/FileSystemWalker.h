@@ -53,11 +53,19 @@ struct SC::FileSystemWalker
 
   private:
     struct Internal;
-    static constexpr int InternalSize      = 256 * sizeof(void*) + (512 + 128) * sizeof(utf_char_t);
-    static constexpr int InternalAlignment = alignof(void*);
-    template <typename T, int N, int Alignment>
-    friend struct OpaqueFunctions;
-    OpaqueUniqueObject<Internal, InternalSize, InternalAlignment> internal;
+    struct InternalSizes
+    {
+        static constexpr int Windows = 3216;
+        static constexpr int Apple   = 2104;
+        static constexpr int Default = sizeof(void*);
+    };
+
+  public:
+    using InternalTraits = OpaqueTraits<Internal, InternalSizes>;
+
+  private:
+    using InternalOpaque = OpaqueUniqueObject<OpaqueFuncs<InternalTraits>>;
+    InternalOpaque internal;
 
     Entry      entry;
     ReturnCode errorResult   = true;

@@ -15,15 +15,12 @@
 #endif
 
 template <>
-void SC::OpaqueFunctions<SC::EventLoop::Internal, SC::EventLoop::InternalSize,
-                         SC::EventLoop::InternalAlignment>::construct(Handle& buffer)
+void SC::OpaqueFuncs<SC::EventLoop::InternalTraits>::construct(Handle& buffer)
 {
     new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object();
 }
-
 template <>
-void SC::OpaqueFunctions<SC::EventLoop::Internal, SC::EventLoop::InternalSize,
-                         SC::EventLoop::InternalAlignment>::destruct(Object& obj)
+void SC::OpaqueFuncs<SC::EventLoop::InternalTraits>::destruct(Object& obj)
 {
     obj.~Object();
 }

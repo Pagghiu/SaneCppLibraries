@@ -6,13 +6,19 @@
 
 namespace SC
 {
+template <typename T, size_t E, size_t R = sizeof(T)>
+void static_assert_size()
+{
+    static_assert(R <= E, "Size mismatch");
+}
+
 template <int N, int Alignment>
 struct OpaqueHandle
 {
     template <typename T>
     T& reinterpret_as()
     {
-        static_assert(sizeof(T) <= N, "Increase size of OpaqueHandle");
+        static_assert_size<T, N>();
         static_assert(alignof(T) <= Alignment, "Increase Alignment of OpaqueHandle");
         return *reinterpret_cast<T*>(bytes);
     }
@@ -21,21 +27,42 @@ struct OpaqueHandle
     alignas(Alignment) char bytes[N];
 };
 
-template <typename T, int N, int Alignment>
-struct OpaqueFunctions
+template <typename T, typename Sizes, int A = alignof(void*)>
+struct OpaqueTraits
 {
-    using Handle = OpaqueHandle<N, Alignment>;
     using Object = T;
-    static void construct(Handle& buffer);
-    static void destruct(T& obj);
-    static void moveConstruct(Handle& buffer, T&& obj);
-    static void moveAssign(T& pthis, T&& obj);
+#if SC_PLATFORM_WINDOWS
+    static constexpr int Size = Sizes::Windows;
+#elif SC_PLATFORM_APPLE
+    static constexpr int Size = Sizes::Apple;
+#else
+    static constexpr int Size = Sizes::Default;
+#endif
+    static constexpr int Alignment = A;
+    using Handle                   = OpaqueHandle<Size, Alignment>;
 };
 
-template <typename T, int N = sizeof(void*), int Alignment = alignof(void*)>
+template <typename Traits>
+struct OpaqueFuncs
+{
+    using Handle = typename Traits::Handle;
+    using Object = typename Traits::Object;
+
+    static constexpr int Size      = Traits::Size;
+    static constexpr int Alignment = Traits::Alignment;
+
+    static void construct(Handle& buffer);
+    static void destruct(Object& obj);
+    static void moveConstruct(Handle& buffer, Object&& obj);
+    static void moveAssign(Object& pthis, Object&& obj);
+};
+
+template <typename OpaqueOps>
 struct OpaqueUniqueObject
 {
-    static constexpr int BufferSizeInBytes = N;
+    using T                        = typename OpaqueOps::Object;
+    static constexpr int N         = OpaqueOps::Size;
+    static constexpr int Alignment = OpaqueOps::Alignment;
 
     OpaqueUniqueObject() { OpaqueOps::construct(buffer); }
     ~OpaqueUniqueObject() { OpaqueOps::destruct(get()); }
@@ -54,7 +81,6 @@ struct OpaqueUniqueObject
     const T& get() const { return reinterpret_cast<const T&>(buffer); }
 
   private:
-    using OpaqueOps = OpaqueFunctions<T, N, Alignment>;
     OpaqueHandle<N, Alignment> buffer;
 };
 

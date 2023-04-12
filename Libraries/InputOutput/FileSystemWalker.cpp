@@ -11,17 +11,14 @@
 #endif
 
 template <>
-void SC::OpaqueFunctions<SC::FileSystemWalker::Internal, SC::FileSystemWalker::InternalSize,
-                         SC::FileSystemWalker::InternalAlignment>::construct(Handle& buffer)
+void SC::OpaqueFuncs<SC::FileSystemWalker::InternalTraits>::construct(Handle& buffer)
 {
     new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object();
 }
-
 template <>
-void SC::OpaqueFunctions<SC::FileSystemWalker::Internal, SC::FileSystemWalker::InternalSize,
-                         SC::FileSystemWalker::InternalAlignment>::destruct(Object& obj)
+void SC::OpaqueFuncs<SC::FileSystemWalker::InternalTraits>::destruct(Object& obj)
 {
-    obj.~Internal();
+    obj.~Object();
 }
 
 SC::FileSystemWalker::~FileSystemWalker()

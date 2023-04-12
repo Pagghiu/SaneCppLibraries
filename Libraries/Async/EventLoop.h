@@ -138,13 +138,22 @@ struct SC::EventLoop
 
     TimeCounter loopTime;
 
-    struct Internal;
     struct KernelQueue;
-    static constexpr int InternalSize      = 1024;
-    static constexpr int InternalAlignment = alignof(void*);
-    template <typename T, int N, int Alignment>
-    friend struct OpaqueFunctions;
-    OpaqueUniqueObject<Internal, InternalSize, InternalAlignment> internal;
+
+    struct Internal;
+    struct InternalSizes
+    {
+        static constexpr int Windows = 144;
+        static constexpr int Apple   = 128;
+        static constexpr int Default = sizeof(void*);
+    };
+
+  public:
+    using InternalTraits = OpaqueTraits<Internal, InternalSizes>;
+
+  private:
+    using InternalOpaque = OpaqueUniqueObject<OpaqueFuncs<InternalTraits>>;
+    InternalOpaque internal;
 
     void invokeExpiredTimers();
     void updateTime() { loopTime.snap(); }
