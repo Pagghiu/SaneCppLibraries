@@ -4,11 +4,7 @@
 //
 // Path - Parse filesystem paths for windows and posix
 #pragma once
-#include "../Foundation/Result.h"
-#include "../Foundation/SmallVector.h"
-#include "../Foundation/StringIterator.h"
-#include "../Foundation/StringView.h"
-#include "StringIterator.h"
+#include "StringView.h"
 
 namespace SC
 {
@@ -17,6 +13,7 @@ struct PathView;
 struct PathParsedView;
 struct Extension;
 struct FileName;
+struct String;
 } // namespace SC
 
 // Holds parsing windows and posix path and name/extension pairs
@@ -63,6 +60,7 @@ struct SC::PathView
 // Allow parsing windows and posix path and name/extension pairs
 struct SC::Path
 {
+    [[nodiscard]] static bool join(String& output, Span<const StringView> inputs);
     /// Splits a StringView of type "name.ext" into "name" and "ext"
     /// @param[in] input        An input path coded as UTF8 sequence (ex. "name.ext")
     /// @param[out] name         Output string holding name ("name" in "name.ext")
@@ -108,9 +106,9 @@ struct SC::Path
         [[nodiscard]] static bool isAbsolute(StringView input);
     };
 #if SC_PLATFORM_WINDOWS
-    static const char Separator = '\\';
+    static constexpr char Separator = '\\';
 #else
-    static const char Separator = '/';
+    static constexpr char Separator = '/';
 #endif
   private:
     friend struct PathParsedView;

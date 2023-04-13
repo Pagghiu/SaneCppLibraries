@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "Path.h"
+#include "StringBuilder.h" // join
 
 struct SC::Path::Internal
 {
@@ -288,3 +289,21 @@ SC::StringView SC::Path::Posix::basename(StringView input, StringView suffix)
 }
 
 bool SC::Path::Posix::isAbsolute(StringView input) { return input.startsWith('/'); }
+
+bool SC::Path::join(String& output, Span<const StringView> inputs)
+{
+    static constexpr auto localSep = Path::Separator;
+    // TODO: This will bring unnecessary conversions...
+    StringView    sep(&localSep, sizeof(localSep), false, StringEncoding::Ascii);
+    StringBuilder sb(output);
+    const size_t  numElements = inputs.sizeInElements();
+    for (size_t idx = 0; idx < numElements; ++idx)
+    {
+        SC_TRY_IF(sb.append(inputs.data()[idx]));
+        if (idx + 1 != numElements)
+        {
+            SC_TRY_IF(sb.append(sep));
+        }
+    }
+    return true;
+}
