@@ -101,13 +101,14 @@ struct SC::FileSystem::Internal
         return false;
     }
 
-    [[nodiscard]] static bool copyFile(const wchar_t* sourceFile, const wchar_t* destinationFile,
+    [[nodiscard]] static bool copyFile(const StringView& source, const StringView& destination,
                                        FileSystem::CopyFlags options)
     {
         DWORD flags = COPY_FILE_FAIL_IF_EXISTS;
         if (options.overwrite)
             flags &= ~COPY_FILE_FAIL_IF_EXISTS;
-        BOOL res = CopyFileExW(sourceFile, destinationFile, nullptr, nullptr, nullptr, flags);
+        BOOL res = CopyFileExW(source.getNullTerminatedNative(), destination.getNullTerminatedNative(), nullptr,
+                               nullptr, nullptr, flags);
         return res == TRUE;
     }
 

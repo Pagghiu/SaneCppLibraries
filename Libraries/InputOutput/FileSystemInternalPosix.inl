@@ -114,9 +114,12 @@ struct SC::FileSystem::Internal
 #if __APPLE__
     // TODO: We should add a version of copyfile/clonefile that uses the file descriptors already opened by the file
     // walker
-    [[nodiscard]] static bool copyFile(const char* sourceFile, const char* destinationFile,
+    [[nodiscard]] static bool copyFile(const StringView& source, const StringView& destination,
                                        FileSystem::CopyFlags options, bool isDirectory = false)
     {
+        const char* sourceFile      = source.getNullTerminatedNative();
+        const char* destinationFile = destination.getNullTerminatedNative();
+
         // Try clonefile and fallback to copyfile in case it fails with ENOTSUP
         // https://www.manpagez.com/man/2/clonefile/
         // https://www.manpagez.com/man/3/copyfile/
@@ -174,8 +177,7 @@ struct SC::FileSystem::Internal
 
     [[nodiscard]] static bool copyDirectory(String& sourceFile, String& destinationFile, FileSystem::CopyFlags options)
     {
-        return copyFile(sourceFile.view().getNullTerminatedNative(), destinationFile.view().getNullTerminatedNative(),
-                        options, true); // true == isDirectory
+        return copyFile(sourceFile.view(), destinationFile.view(), options, true); // true == isDirectory
     }
 
     static bool removeDirectoryRecursive(String& directory)

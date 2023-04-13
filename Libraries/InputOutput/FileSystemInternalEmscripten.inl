@@ -31,7 +31,7 @@ struct SC::FileSystem::Internal
 
     [[nodiscard]] static bool formatError(int errorNumber, String& buffer) { return false; }
 
-    [[nodiscard]] static bool copyFile(const char* sourceFile, const char* destinationFile,
+    [[nodiscard]] static bool copyFile(const StringView& sourceFile, const StringView& destinationFile,
                                        FileSystem::CopyFlags options)
     {
         return false;

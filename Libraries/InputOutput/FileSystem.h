@@ -7,6 +7,7 @@
 namespace SC
 {
 struct FileSystem;
+struct StringConverter;
 } // namespace SC
 
 struct SC::FileSystem
@@ -18,7 +19,6 @@ struct SC::FileSystem
 
     ReturnCode init(StringView currentWorkingDirectory);
     ReturnCode changeDirectory(StringView currentWorkingDirectory);
-    void       close();
 
     struct CopyFlags
     {
@@ -72,8 +72,7 @@ struct SC::FileSystem
     [[nodiscard]] ReturnCode read(StringView file, String& data, StringEncoding encoding);
 
   private:
-    [[nodiscard]] bool pushFile1(StringView file, StringView& encodedPath);
-    [[nodiscard]] bool pushFile2(StringView file, StringView& encodedPath);
+    [[nodiscard]] bool convert(const StringView file, String& destination, StringView* encodedPath = nullptr);
 
     StringNative<128> fileFormatBuffer1  = StringEncoding::Native;
     StringNative<128> fileFormatBuffer2  = StringEncoding::Native;
