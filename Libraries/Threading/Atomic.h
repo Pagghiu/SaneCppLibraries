@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "Types.h"
+#include "../Foundation/Types.h"
 
 #if _MSC_VER
 extern "C"

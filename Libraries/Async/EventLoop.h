@@ -4,7 +4,6 @@
 #pragma once
 
 #include "../FileSystem/FileDescriptor.h"
-#include "../Foundation/Atomic.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Limits.h"
@@ -12,6 +11,7 @@
 #include "../Foundation/Span.h"
 #include "../Foundation/TaggedUnion.h"
 #include "../Foundation/Time.h"
+#include "../Threading/Atomic.h"
 
 namespace SC
 {

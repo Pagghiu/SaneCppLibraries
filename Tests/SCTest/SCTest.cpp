@@ -4,7 +4,6 @@
 
 // Foundation
 #include "../../Libraries/Foundation/ArrayTest.h"
-#include "../../Libraries/Foundation/AtomicTest.h"
 #include "../../Libraries/Foundation/ConsoleTest.h"
 #include "../../Libraries/Foundation/FunctionTest.h"
 #include "../../Libraries/Foundation/IntrusiveDoubleLinkedListTest.h"
@@ -37,6 +36,7 @@
 #include "../../Libraries/Serialization/SerializationTypeErasedTest.h"
 
 // Threading
+#include "../../Libraries/Threading/AtomicTest.h"
 #include "../../Libraries/Threading/ThreadingTest.h"
 
 // Async
@@ -58,7 +58,6 @@ int main(int argc, const char* argv[])
 
     // Foundation tests
     { ArrayTest                     test(report); }
-    { AtomicTest                    test(report); }
     { ConsoleTest                   test(report); }
     { FunctionTest                  test(report); }
     { IntrusiveDoubleLinkedListTest test(report); }
@@ -91,6 +90,7 @@ int main(int argc, const char* argv[])
     { SerializationTypeErasedTest   test(report); }
 
     // Threading tests
+    { AtomicTest                    test(report); }
     { ThreadingTest                 test(report); }
 
     // Async tests

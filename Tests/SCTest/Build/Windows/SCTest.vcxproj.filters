@@ -319,12 +319,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\IntrusiveDoubleLinkedListTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Atomic.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\AtomicTest.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.h">
       <Filter>Async</Filter>
     </ClInclude>
@@ -336,6 +330,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopWindows.h">
       <Filter>Async</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Threading\Atomic.h">
+      <Filter>Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Threading\AtomicTest.h">
+      <Filter>Threading</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

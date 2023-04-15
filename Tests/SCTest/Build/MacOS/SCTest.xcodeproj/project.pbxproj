@@ -75,8 +75,8 @@
 		7B19C9AB297AF95B001C0627 /* Path.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Path.h; path = ../../../../Libraries/Foundation/Path.h; sourceTree = "<group>"; };
 		7B1A39FA29BA7B220087F688 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 		7B281DBF29E2BAF400363F69 /* EventLoopWindows.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = EventLoopWindows.h; path = ../../../../Libraries/Async/EventLoopWindows.h; sourceTree = "<group>"; };
-		7B2AEB1729D0DA4C003E1B6F /* Atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Atomic.h; path = ../../../../Libraries/Foundation/Atomic.h; sourceTree = "<group>"; };
-		7B2AEB1829D0DA67003E1B6F /* AtomicTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AtomicTest.h; path = ../../../../Libraries/Foundation/AtomicTest.h; sourceTree = "<group>"; };
+		7B2AEB1729D0DA4C003E1B6F /* Atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Atomic.h; path = ../../../../Libraries/Threading/Atomic.h; sourceTree = "<group>"; };
+		7B2AEB1829D0DA67003E1B6F /* AtomicTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AtomicTest.h; path = ../../../../Libraries/Threading/AtomicTest.h; sourceTree = "<group>"; };
 		7B2F86E029887CA400EFC5FB /* FileSystemInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalEmscripten.inl; path = ../../../../Libraries/FileSystem/FileSystemInternalEmscripten.inl; sourceTree = "<group>"; };
 		7B358DD829D88E92002A7D1C /* FileSystemWatcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FileSystemWatcher.h; path = ../../../../Libraries/FileSystem/FileSystemWatcher.h; sourceTree = "<group>"; };
 		7B358DD929D88E92002A7D1C /* FileSystemWatcherInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWatcherInternalApple.inl; path = ../../../../Libraries/FileSystem/FileSystemWatcherInternalApple.inl; sourceTree = "<group>"; };
@@ -260,8 +260,6 @@
 				7B515FD329243086006996AA /* ArrayTest.h */,
 				7B515FE929243087006996AA /* Assert.cpp */,
 				7B515FD229243086006996AA /* Assert.h */,
-				7B2AEB1729D0DA4C003E1B6F /* Atomic.h */,
-				7B2AEB1829D0DA67003E1B6F /* AtomicTest.h */,
 				7B515FE529243087006996AA /* Compiler.h */,
 				7B515FEE29243087006996AA /* Console.cpp */,
 				7B515FD529243086006996AA /* Console.h */,
@@ -377,6 +375,8 @@
 		7B872C4729AFFC3F00949BD2 /* Threading */ = {
 			isa = PBXGroup;
 			children = (
+				7B2AEB1729D0DA4C003E1B6F /* Atomic.h */,
+				7B2AEB1829D0DA67003E1B6F /* AtomicTest.h */,
 				7B872C4A29AFFC4900949BD2 /* Threading.cpp */,
 				7B872C4C29AFFC4900949BD2 /* Threading.h */,
 				7B872C4829AFFC4900949BD2 /* ThreadingInternalPosix.inl */,

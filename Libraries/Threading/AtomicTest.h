@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Foundation/Test.h"
 #include "Atomic.h"
-#include "Test.h"
 
 namespace SC
 {
