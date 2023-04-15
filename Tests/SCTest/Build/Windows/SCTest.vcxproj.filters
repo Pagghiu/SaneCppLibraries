@@ -19,6 +19,9 @@
     <Filter Include="Threading">
       <UniqueIdentifier>{d44e6dde-d6eb-4e7e-9b5f-78e958cb07d5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="System">
+      <UniqueIdentifier>{6b6b8c15-cf55-4813-8be0-a9c16e86b3f5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\SCTest.cpp">
@@ -65,9 +68,6 @@
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWalker.cpp">
       <Filter>FileSystem</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\FileSystem\Process.cpp">
-      <Filter>FileSystem</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileDescriptor.cpp">
       <Filter>FileSystem</Filter>
     </ClCompile>
@@ -81,7 +81,10 @@
       <Filter>Foundation</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp">
-      <Filter>Async</Filter>
+      <Filter>FileSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\System\Process.cpp">
+      <Filter>System</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -265,12 +268,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionTest.h">
       <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\FileSystem\Process.h">
-      <Filter>FileSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\FileSystem\ProcessTest.h">
-      <Filter>FileSystem</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Optional.h">
       <Filter>Foundation</Filter>
     </ClInclude>
@@ -320,10 +317,10 @@
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.h">
-      <Filter>Async</Filter>
+      <Filter>FileSystem</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherTest.h">
-      <Filter>Async</Filter>
+      <Filter>FileSystem</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\UniquePtr.h">
       <Filter>Foundation</Filter>
@@ -336,6 +333,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Threading\AtomicTest.h">
       <Filter>Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\System\Process.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\System\ProcessTest.h">
+      <Filter>System</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -363,15 +366,6 @@
     <None Include="..\..\..\..\Libraries\FileSystem\FileDescriptorInternalWindows.inl">
       <Filter>FileSystem</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\FileSystem\ProcessInternalEmscripten.inl">
-      <Filter>FileSystem</Filter>
-    </None>
-    <None Include="..\..\..\..\Libraries\FileSystem\ProcessInternalPosix.inl">
-      <Filter>FileSystem</Filter>
-    </None>
-    <None Include="..\..\..\..\Libraries\FileSystem\ProcessInternalWindows.inl">
-      <Filter>FileSystem</Filter>
-    </None>
     <None Include="..\..\..\..\Libraries\Foundation\SystemInternalEmscripten.inl">
       <Filter>Foundation</Filter>
     </None>
@@ -397,13 +391,22 @@
       <Filter>Threading</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalApple.inl">
-      <Filter>Async</Filter>
+      <Filter>FileSystem</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalEmscripten.inl">
-      <Filter>Async</Filter>
+      <Filter>FileSystem</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalWindows.inl">
-      <Filter>Async</Filter>
+      <Filter>FileSystem</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\System\ProcessInternalEmscripten.inl">
+      <Filter>System</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\System\ProcessInternalPosix.inl">
+      <Filter>System</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\System\ProcessInternalWindows.inl">
+      <Filter>System</Filter>
     </None>
   </ItemGroup>
 </Project>

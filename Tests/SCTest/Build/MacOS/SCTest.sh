@@ -48,7 +48,6 @@ Libraries/FileSystem/FileDescriptor.cpp     \
 Libraries/FileSystem/FileSystem.cpp         \
 Libraries/FileSystem/FileSystemWalker.cpp   \
 Libraries/FileSystem/FileSystemWatcher.cpp  \
-Libraries/FileSystem/Process.cpp            \
 Libraries/Foundation/Assert.cpp             \
 Libraries/Foundation/Console.cpp            \
 Libraries/Foundation/Memory.cpp             \
@@ -62,5 +61,6 @@ Libraries/Foundation/StringView.cpp         \
 Libraries/Foundation/System.cpp             \
 Libraries/Foundation/Test.cpp               \
 Libraries/Foundation/Time.cpp               \
+Libraries/System/Process.cpp                \
 Libraries/Threading/Threading.cpp           \
 ${SCRIPT_DIR}/../../SCTest.cpp

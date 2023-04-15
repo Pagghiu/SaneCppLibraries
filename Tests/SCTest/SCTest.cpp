@@ -26,7 +26,6 @@
 #include "../../Libraries/FileSystem/FileSystemTest.h"
 #include "../../Libraries/FileSystem/FileSystemWalkerTest.h"
 #include "../../Libraries/FileSystem/FileSystemWatcherTest.h"
-#include "../../Libraries/FileSystem/ProcessTest.h"
 
 // Reflection
 #include "../../Libraries/Reflection/ReflectionTest.h"
@@ -34,6 +33,9 @@
 // Serialization
 #include "../../Libraries/Serialization/SerializationTemplateTest.h"
 #include "../../Libraries/Serialization/SerializationTypeErasedTest.h"
+
+// System
+#include "../../Libraries/System/ProcessTest.h"
 
 // Threading
 #include "../../Libraries/Threading/AtomicTest.h"
@@ -80,7 +82,6 @@ int main(int argc, const char* argv[])
     { FileSystemTest                test(report); }
     { FileSystemWalkerTest          test(report); }
     { FileSystemWatcherTest         test(report); }
-    { ProcessTest                   test(report); }
 
     // Reflection tests
     { ReflectionTest                test(report); }
@@ -88,6 +89,9 @@ int main(int argc, const char* argv[])
     // Serialization tests
     { SerializationTemplateTest     test(report); }
     { SerializationTypeErasedTest   test(report); }
+
+    // System tests
+    { ProcessTest                   test(report); }
 
     // Threading tests
     { AtomicTest                    test(report); }
