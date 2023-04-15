@@ -41,11 +41,13 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 time g++-12 -std=c++14 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -I${SCRIPT_DIR}/../../ \
 -framework CoreFoundation \
+-framework CoreServices \
 -o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest \
-Libraries/Async/EventLoop.cpp                    \
+Libraries/Async/EventLoop.cpp               \
 Libraries/FileSystem/FileDescriptor.cpp     \
 Libraries/FileSystem/FileSystem.cpp         \
 Libraries/FileSystem/FileSystemWalker.cpp   \
+Libraries/FileSystem/FileSystemWatcher.cpp  \
 Libraries/FileSystem/Process.cpp            \
 Libraries/Foundation/Assert.cpp             \
 Libraries/Foundation/Console.cpp            \

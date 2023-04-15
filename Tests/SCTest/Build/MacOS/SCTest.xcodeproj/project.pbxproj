@@ -11,6 +11,8 @@
 		7B19C9AC297AF99F001C0627 /* Path.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B19C9A9297AF95B001C0627 /* Path.cpp */; };
 		7B19C9AD297AF9A2001C0627 /* Path.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B19C9A9297AF95B001C0627 /* Path.cpp */; };
 		7B1A39FB29BA7B220087F688 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B1A39FA29BA7B220087F688 /* CoreFoundation.framework */; };
+		7B358DDE29D88FFC002A7D1C /* FileSystemWatcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B358DDC29D88E93002A7D1C /* FileSystemWatcher.cpp */; };
+		7B358DE029D8F063002A7D1C /* CoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B358DDF29D8F063002A7D1C /* CoreServices.framework */; };
 		7B4A291D29B3CD4A00F13DCB /* Time.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B4A291B29B3CD4A00F13DCB /* Time.cpp */; };
 		7B515FF529243087006996AA /* Memory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FD429243086006996AA /* Memory.cpp */; };
 		7B515FF829243087006996AA /* Assert.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FE929243087006996AA /* Assert.cpp */; };
@@ -76,6 +78,13 @@
 		7B2AEB1729D0DA4C003E1B6F /* Atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Atomic.h; path = ../../../../Libraries/Foundation/Atomic.h; sourceTree = "<group>"; };
 		7B2AEB1829D0DA67003E1B6F /* AtomicTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AtomicTest.h; path = ../../../../Libraries/Foundation/AtomicTest.h; sourceTree = "<group>"; };
 		7B2F86E029887CA400EFC5FB /* FileSystemInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalEmscripten.inl; path = ../../../../Libraries/FileSystem/FileSystemInternalEmscripten.inl; sourceTree = "<group>"; };
+		7B358DD829D88E92002A7D1C /* FileSystemWatcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FileSystemWatcher.h; path = ../../../../Libraries/FileSystem/FileSystemWatcher.h; sourceTree = "<group>"; };
+		7B358DD929D88E92002A7D1C /* FileSystemWatcherInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWatcherInternalApple.inl; path = ../../../../Libraries/FileSystem/FileSystemWatcherInternalApple.inl; sourceTree = "<group>"; };
+		7B358DDA29D88E92002A7D1C /* FileSystemWatcherInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWatcherInternalEmscripten.inl; path = ../../../../Libraries/FileSystem/FileSystemWatcherInternalEmscripten.inl; sourceTree = "<group>"; };
+		7B358DDB29D88E92002A7D1C /* FileSystemWatcherTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FileSystemWatcherTest.h; path = ../../../../Libraries/FileSystem/FileSystemWatcherTest.h; sourceTree = "<group>"; };
+		7B358DDC29D88E93002A7D1C /* FileSystemWatcher.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FileSystemWatcher.cpp; path = ../../../../Libraries/FileSystem/FileSystemWatcher.cpp; sourceTree = "<group>"; };
+		7B358DDD29D88E93002A7D1C /* FileSystemWatcherInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWatcherInternalWindows.inl; path = ../../../../Libraries/FileSystem/FileSystemWatcherInternalWindows.inl; sourceTree = "<group>"; };
+		7B358DDF29D8F063002A7D1C /* CoreServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreServices.framework; path = System/Library/Frameworks/CoreServices.framework; sourceTree = SDKROOT; };
 		7B4A291B29B3CD4A00F13DCB /* Time.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Time.cpp; path = ../../../../Libraries/Foundation/Time.cpp; sourceTree = "<group>"; };
 		7B4A291C29B3CD4A00F13DCB /* Time.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Time.h; path = ../../../../Libraries/Foundation/Time.h; sourceTree = "<group>"; };
 		7B4B99EF2937EBAC003D17A6 /* ReflectionAutoAggregates.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ReflectionAutoAggregates.h; path = ../../../../Libraries/Reflection/ReflectionAutoAggregates.h; sourceTree = "<group>"; };
@@ -194,6 +203,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B358DE029D8F063002A7D1C /* CoreServices.framework in Frameworks */,
 				7B1A39FB29BA7B220087F688 /* CoreFoundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -227,6 +237,12 @@
 				7BC56BD929946B1800EED472 /* FileSystemWalkerInternalPosix.inl */,
 				7BC56BDA29946B1800EED472 /* FileSystemWalkerInternalWindows.inl */,
 				7BC56BD629946AD100EED472 /* FileSystemWalkerTest.h */,
+				7B358DDC29D88E93002A7D1C /* FileSystemWatcher.cpp */,
+				7B358DD829D88E92002A7D1C /* FileSystemWatcher.h */,
+				7B358DD929D88E92002A7D1C /* FileSystemWatcherInternalApple.inl */,
+				7B358DDA29D88E92002A7D1C /* FileSystemWatcherInternalEmscripten.inl */,
+				7B358DDD29D88E93002A7D1C /* FileSystemWatcherInternalWindows.inl */,
+				7B358DDB29D88E92002A7D1C /* FileSystemWatcherTest.h */,
 				7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */,
 				7BE5C80E29A26E3E00CBCAD1 /* Process.h */,
 				7B0A83C329A98B8200C16EBF /* ProcessInternalEmscripten.inl */,
@@ -373,6 +389,7 @@
 		7B9F61822995BDA20011F4D4 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				7B358DDF29D8F063002A7D1C /* CoreServices.framework */,
 				7B1A39FA29BA7B220087F688 /* CoreFoundation.framework */,
 				7B9F61832995BDA20011F4D4 /* libobjc.tbd */,
 			);
@@ -513,6 +530,7 @@
 				7B515FF829243087006996AA /* Assert.cpp in Sources */,
 				7B515FF929243087006996AA /* Console.cpp in Sources */,
 				7BA892AA297E03B50093152B /* System.cpp in Sources */,
+				7B358DDE29D88FFC002A7D1C /* FileSystemWatcher.cpp in Sources */,
 				7B583F6A2922ECF900FBE019 /* SCTest.cpp in Sources */,
 				7B4A291D29B3CD4A00F13DCB /* Time.cpp in Sources */,
 				7B19C9AC297AF99F001C0627 /* Path.cpp in Sources */,

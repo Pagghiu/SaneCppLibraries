@@ -215,6 +215,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Assert.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Console.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp" />
@@ -239,6 +240,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoop.h" />
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopWindows.h" />
+    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.h" />
+    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ArrayTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
@@ -323,6 +326,9 @@
     <None Include="..\..\..\..\Libraries\Async\EventLoopInternalApple.inl" />
     <None Include="..\..\..\..\Libraries\Async\EventLoopInternalEmscripten.inl" />
     <None Include="..\..\..\..\Libraries\Async\EventLoopInternalWindows.inl" />
+    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalApple.inl" />
+    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalEmscripten.inl" />
+    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\Foundation\SystemInternalEmscripten.inl" />
     <None Include="..\..\..\..\Libraries\Foundation\SystemInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\Foundation\SystemInternalWindows.inl" />

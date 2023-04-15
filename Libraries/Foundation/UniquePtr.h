@@ -27,6 +27,8 @@ struct UniquePtr
     T&       operator*() { return *ptr; }
     const T& operator*() const { return *ptr; }
 
+    bool isValid() const { return ptr; }
+
   private:
     T* ptr = nullptr;
     template <typename Q, typename... Args>

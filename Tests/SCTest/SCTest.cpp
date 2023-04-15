@@ -23,9 +23,10 @@
 #include "../../Libraries/Foundation/TimeTest.h"
 #include "../../Libraries/Foundation/VectorTest.h"
 
-// InputOutput
+// FileSystem
 #include "../../Libraries/FileSystem/FileSystemTest.h"
 #include "../../Libraries/FileSystem/FileSystemWalkerTest.h"
+#include "../../Libraries/FileSystem/FileSystemWatcherTest.h"
 #include "../../Libraries/FileSystem/ProcessTest.h"
 
 // Reflection
@@ -76,9 +77,10 @@ int main(int argc, const char* argv[])
     { TimeTest                      test(report); }
     { VectorTest                    test(report); }
 
-    // InputOutput tests
+    // FileSystem tests
     { FileSystemTest                test(report); }
     { FileSystemWalkerTest          test(report); }
+    { FileSystemWatcherTest         test(report); }
     { ProcessTest                   test(report); }
 
     // Reflection tests

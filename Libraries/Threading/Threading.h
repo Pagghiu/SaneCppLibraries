@@ -101,6 +101,7 @@ struct SC::Thread
     [[nodiscard]] ReturnCode start(StringView threadName, Action* func, Action* syncFunc = nullptr);
     [[nodiscard]] ReturnCode join();
     [[nodiscard]] ReturnCode detach();
+    [[nodiscard]] bool       wasStarted() const;
 
     static void Sleep(uint32_t milliseconds);
 

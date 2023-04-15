@@ -1,15 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Source Files">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
     <Filter Include="Foundation">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
     </Filter>
-    <Filter Include="InputOutput">
+    <Filter Include="FileSystem">
       <UniqueIdentifier>{0c8b9b79-9b52-4f3d-85e6-0586825ad41e}</UniqueIdentifier>
     </Filter>
     <Filter Include="Reflection">
@@ -27,7 +22,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\SCTest.cpp">
-      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Assert.cpp">
       <Filter>Foundation</Filter>
@@ -60,7 +54,7 @@
       <Filter>Foundation</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystem.cpp">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\System.cpp">
       <Filter>Foundation</Filter>
@@ -69,13 +63,13 @@
       <Filter>Foundation</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWalker.cpp">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\Process.cpp">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileDescriptor.cpp">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp">
       <Filter>Async</Filter>
@@ -85,6 +79,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Time.cpp">
       <Filter>Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp">
+      <Filter>Async</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -209,19 +206,19 @@
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystem.h">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemTest.h">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringConverter.h">
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWalker.h">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerTest.h">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinarySkipper.h">
       <Filter>Serialization</Filter>
@@ -269,10 +266,10 @@
       <Filter>Reflection</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\Process.h">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\ProcessTest.h">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Optional.h">
       <Filter>Foundation</Filter>
@@ -281,7 +278,7 @@
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileDescriptor.h">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Opaque.h">
       <Filter>Foundation</Filter>
@@ -328,6 +325,12 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\AtomicTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.h">
+      <Filter>Async</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherTest.h">
+      <Filter>Async</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\UniquePtr.h">
       <Filter>Foundation</Filter>
     </ClInclude>
@@ -337,37 +340,37 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalPosix.inl">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalWindows.inl">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerInternalEmscripten.inl">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerInternalPosix.inl">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerInternalWindows.inl">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\FileSystem\UtilityWindows.inl">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\FileSystem\FileDescriptorInternalPosix.inl">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\FileSystem\FileDescriptorInternalWindows.inl">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\FileSystem\ProcessInternalEmscripten.inl">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\FileSystem\ProcessInternalPosix.inl">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\FileSystem\ProcessInternalWindows.inl">
-      <Filter>InputOutput</Filter>
+      <Filter>FileSystem</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\Foundation\SystemInternalEmscripten.inl">
       <Filter>Foundation</Filter>
@@ -392,6 +395,15 @@
     </None>
     <None Include="..\..\..\..\Libraries\Threading\ThreadingInternalWindows.inl">
       <Filter>Threading</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalApple.inl">
+      <Filter>Async</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalEmscripten.inl">
+      <Filter>Async</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalWindows.inl">
+      <Filter>Async</Filter>
     </None>
   </ItemGroup>
 </Project>

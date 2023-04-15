@@ -116,12 +116,18 @@ void SC::EventLoop::invokeExpiredTimers()
     }
 }
 
-[[nodiscard]] SC::ReturnCode SC::EventLoop::create()
+SC::ReturnCode SC::EventLoop::create()
 {
     Internal& self = internal.get();
     SC_TRY_IF(self.createEventLoop());
     SC_TRY_IF(self.createWakeup(*this));
     return true;
+}
+
+SC::ReturnCode SC::EventLoop::close()
+{
+    Internal& self = internal.get();
+    return self.close();
 }
 
 SC::ReturnCode SC::EventLoop::stageSubmissions(SC::EventLoop::KernelQueue& queue)

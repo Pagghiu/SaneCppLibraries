@@ -53,10 +53,11 @@ time em++ -std=c++20 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -sEXPORTED_FUNCTIONS=["_malloc","_free","_main"] \
 -sASYNCIFY \
 --no-entry \
-Libraries/Async/EventLoop.cpp                    \
+Libraries/Async/EventLoop.cpp              	\
 Libraries/FileSystem/FileDescriptor.cpp     \
 Libraries/FileSystem/FileSystem.cpp         \
 Libraries/FileSystem/FileSystemWalker.cpp   \
+Libraries/FileSystem/FileSystemWatcher.cpp	\
 Libraries/FileSystem/Process.cpp            \
 Libraries/Foundation/Assert.cpp             \
 Libraries/Foundation/Console.cpp            \

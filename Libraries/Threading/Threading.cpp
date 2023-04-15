@@ -84,6 +84,8 @@ SC::ReturnCode SC::Thread::detach()
     return true;
 }
 
+bool SC::Thread::wasStarted() const { return thread.hasValue(); }
+
 void SC::EventObject::wait()
 {
     mutex.lock();
