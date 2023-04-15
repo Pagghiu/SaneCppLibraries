@@ -37,14 +37,10 @@ struct SC::FileSystem::Internal
         return false;
     }
 
-    [[nodiscard]] static bool copyDirectory(String& sourceFile, String& destinationFile,
-                                            FileSystem::CopyFlags options)
+    [[nodiscard]] static bool copyDirectory(String& sourceFile, String& destinationFile, FileSystem::CopyFlags options)
     {
         return false;
     }
 
-    static bool removeDirectoryRecursive(String& directory)
-    {
-        return false;
-    }
+    static bool removeDirectoryRecursive(String& directory) { return false; }
 };

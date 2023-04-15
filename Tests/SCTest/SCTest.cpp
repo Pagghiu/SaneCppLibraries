@@ -24,9 +24,9 @@
 #include "../../Libraries/Foundation/VectorTest.h"
 
 // InputOutput
-#include "../../Libraries/InputOutput/FileSystemTest.h"
-#include "../../Libraries/InputOutput/FileSystemWalkerTest.h"
-#include "../../Libraries/InputOutput/ProcessTest.h"
+#include "../../Libraries/FileSystem/FileSystemTest.h"
+#include "../../Libraries/FileSystem/FileSystemWalkerTest.h"
+#include "../../Libraries/FileSystem/ProcessTest.h"
 
 // Reflection
 #include "../../Libraries/Reflection/ReflectionTest.h"

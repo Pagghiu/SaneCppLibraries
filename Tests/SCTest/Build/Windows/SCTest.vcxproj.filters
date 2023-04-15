@@ -59,7 +59,7 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Path.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystem.cpp">
+    <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystem.cpp">
       <Filter>InputOutput</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\System.cpp">
@@ -68,13 +68,13 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringConverter.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.cpp">
+    <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWalker.cpp">
       <Filter>InputOutput</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\InputOutput\Process.cpp">
+    <ClCompile Include="..\..\..\..\Libraries\FileSystem\Process.cpp">
       <Filter>InputOutput</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\InputOutput\FileDescriptor.cpp">
+    <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileDescriptor.cpp">
       <Filter>InputOutput</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp">
@@ -208,19 +208,19 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\PathTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystem.h">
+    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystem.h">
       <Filter>InputOutput</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemTest.h">
+    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemTest.h">
       <Filter>InputOutput</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringConverter.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemWalker.h">
+    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWalker.h">
       <Filter>InputOutput</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerTest.h">
+    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerTest.h">
       <Filter>InputOutput</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinarySkipper.h">
@@ -268,10 +268,10 @@
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionTest.h">
       <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\InputOutput\Process.h">
+    <ClInclude Include="..\..\..\..\Libraries\FileSystem\Process.h">
       <Filter>InputOutput</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\InputOutput\ProcessTest.h">
+    <ClInclude Include="..\..\..\..\Libraries\FileSystem\ProcessTest.h">
       <Filter>InputOutput</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Optional.h">
@@ -280,7 +280,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\OptionalTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\InputOutput\FileDescriptor.h">
+    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileDescriptor.h">
       <Filter>InputOutput</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Opaque.h">
@@ -336,37 +336,37 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\..\Libraries\InputOutput\FileSystemInternalPosix.inl">
+    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalPosix.inl">
       <Filter>InputOutput</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\InputOutput\FileSystemInternalWindows.inl">
+    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalWindows.inl">
       <Filter>InputOutput</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalEmscripten.inl">
+    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerInternalEmscripten.inl">
       <Filter>InputOutput</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalPosix.inl">
+    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerInternalPosix.inl">
       <Filter>InputOutput</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\InputOutput\FileSystemWalkerInternalWindows.inl">
+    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerInternalWindows.inl">
       <Filter>InputOutput</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\InputOutput\UtilityWindows.inl">
+    <None Include="..\..\..\..\Libraries\FileSystem\UtilityWindows.inl">
       <Filter>InputOutput</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalPosix.inl">
+    <None Include="..\..\..\..\Libraries\FileSystem\FileDescriptorInternalPosix.inl">
       <Filter>InputOutput</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\InputOutput\FileDescriptorInternalWindows.inl">
+    <None Include="..\..\..\..\Libraries\FileSystem\FileDescriptorInternalWindows.inl">
       <Filter>InputOutput</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\InputOutput\ProcessInternalEmscripten.inl">
+    <None Include="..\..\..\..\Libraries\FileSystem\ProcessInternalEmscripten.inl">
       <Filter>InputOutput</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\InputOutput\ProcessInternalPosix.inl">
+    <None Include="..\..\..\..\Libraries\FileSystem\ProcessInternalPosix.inl">
       <Filter>InputOutput</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\InputOutput\ProcessInternalWindows.inl">
+    <None Include="..\..\..\..\Libraries\FileSystem\ProcessInternalWindows.inl">
       <Filter>InputOutput</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\Foundation\SystemInternalEmscripten.inl">

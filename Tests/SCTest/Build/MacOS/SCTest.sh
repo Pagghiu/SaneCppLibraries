@@ -43,6 +43,10 @@ time g++-12 -std=c++14 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -framework CoreFoundation \
 -o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest \
 Libraries/Async/EventLoop.cpp                    \
+Libraries/FileSystem/FileDescriptor.cpp     \
+Libraries/FileSystem/FileSystem.cpp         \
+Libraries/FileSystem/FileSystemWalker.cpp   \
+Libraries/FileSystem/Process.cpp            \
 Libraries/Foundation/Assert.cpp             \
 Libraries/Foundation/Console.cpp            \
 Libraries/Foundation/Memory.cpp             \
@@ -56,9 +60,5 @@ Libraries/Foundation/StringView.cpp         \
 Libraries/Foundation/System.cpp             \
 Libraries/Foundation/Test.cpp               \
 Libraries/Foundation/Time.cpp               \
-Libraries/InputOutput/FileDescriptor.cpp    \
-Libraries/InputOutput/FileSystem.cpp        \
-Libraries/InputOutput/FileSystemWalker.cpp  \
-Libraries/InputOutput/Process.cpp           \
 Libraries/Threading/Threading.cpp           \
 ${SCRIPT_DIR}/../../SCTest.cpp

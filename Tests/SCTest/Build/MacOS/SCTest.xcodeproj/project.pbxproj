@@ -59,15 +59,15 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		7B0A83C029A989A000C16EBF /* FileDescriptorInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileDescriptorInternalWindows.inl; path = ../../../../Libraries/InputOutput/FileDescriptorInternalWindows.inl; sourceTree = "<group>"; };
-		7B0A83C129A98B2000C16EBF /* ProcessInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = ProcessInternalPosix.inl; path = ../../../../Libraries/InputOutput/ProcessInternalPosix.inl; sourceTree = "<group>"; };
-		7B0A83C229A98B2000C16EBF /* ProcessInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = ProcessInternalWindows.inl; path = ../../../../Libraries/InputOutput/ProcessInternalWindows.inl; sourceTree = "<group>"; };
-		7B0A83C329A98B8200C16EBF /* ProcessInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = ProcessInternalEmscripten.inl; path = ../../../../Libraries/InputOutput/ProcessInternalEmscripten.inl; sourceTree = "<group>"; };
-		7B0C299A297CA7CC0071C5B4 /* FileSystem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FileSystem.h; path = ../../../../Libraries/InputOutput/FileSystem.h; sourceTree = "<group>"; };
-		7B0C299B297CA7CC0071C5B4 /* FileSystemTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FileSystemTest.h; path = ../../../../Libraries/InputOutput/FileSystemTest.h; sourceTree = "<group>"; };
-		7B0C299C297CA7CC0071C5B4 /* FileSystem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = FileSystem.cpp; path = ../../../../Libraries/InputOutput/FileSystem.cpp; sourceTree = "<group>"; };
-		7B14DE9E29858C35004C4F3B /* FileSystemInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalWindows.inl; path = ../../../../Libraries/InputOutput/FileSystemInternalWindows.inl; sourceTree = "<group>"; };
-		7B14DE9F29858C35004C4F3B /* FileSystemInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalPosix.inl; path = ../../../../Libraries/InputOutput/FileSystemInternalPosix.inl; sourceTree = "<group>"; };
+		7B0A83C029A989A000C16EBF /* FileDescriptorInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileDescriptorInternalWindows.inl; path = ../../../../Libraries/FileSystem/FileDescriptorInternalWindows.inl; sourceTree = "<group>"; };
+		7B0A83C129A98B2000C16EBF /* ProcessInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = ProcessInternalPosix.inl; path = ../../../../Libraries/FileSystem/ProcessInternalPosix.inl; sourceTree = "<group>"; };
+		7B0A83C229A98B2000C16EBF /* ProcessInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = ProcessInternalWindows.inl; path = ../../../../Libraries/FileSystem/ProcessInternalWindows.inl; sourceTree = "<group>"; };
+		7B0A83C329A98B8200C16EBF /* ProcessInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = ProcessInternalEmscripten.inl; path = ../../../../Libraries/FileSystem/ProcessInternalEmscripten.inl; sourceTree = "<group>"; };
+		7B0C299A297CA7CC0071C5B4 /* FileSystem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FileSystem.h; path = ../../../../Libraries/FileSystem/FileSystem.h; sourceTree = "<group>"; };
+		7B0C299B297CA7CC0071C5B4 /* FileSystemTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FileSystemTest.h; path = ../../../../Libraries/FileSystem/FileSystemTest.h; sourceTree = "<group>"; };
+		7B0C299C297CA7CC0071C5B4 /* FileSystem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = FileSystem.cpp; path = ../../../../Libraries/FileSystem/FileSystem.cpp; sourceTree = "<group>"; };
+		7B14DE9E29858C35004C4F3B /* FileSystemInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalWindows.inl; path = ../../../../Libraries/FileSystem/FileSystemInternalWindows.inl; sourceTree = "<group>"; };
+		7B14DE9F29858C35004C4F3B /* FileSystemInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalPosix.inl; path = ../../../../Libraries/FileSystem/FileSystemInternalPosix.inl; sourceTree = "<group>"; };
 		7B19C9A9297AF95B001C0627 /* Path.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Path.cpp; path = ../../../../Libraries/Foundation/Path.cpp; sourceTree = "<group>"; };
 		7B19C9AA297AF95B001C0627 /* PathTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PathTest.h; path = ../../../../Libraries/Foundation/PathTest.h; sourceTree = "<group>"; };
 		7B19C9AB297AF95B001C0627 /* Path.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Path.h; path = ../../../../Libraries/Foundation/Path.h; sourceTree = "<group>"; };
@@ -75,7 +75,7 @@
 		7B281DBF29E2BAF400363F69 /* EventLoopWindows.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = EventLoopWindows.h; path = ../../../../Libraries/Async/EventLoopWindows.h; sourceTree = "<group>"; };
 		7B2AEB1729D0DA4C003E1B6F /* Atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Atomic.h; path = ../../../../Libraries/Foundation/Atomic.h; sourceTree = "<group>"; };
 		7B2AEB1829D0DA67003E1B6F /* AtomicTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AtomicTest.h; path = ../../../../Libraries/Foundation/AtomicTest.h; sourceTree = "<group>"; };
-		7B2F86E029887CA400EFC5FB /* FileSystemInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalEmscripten.inl; path = ../../../../Libraries/InputOutput/FileSystemInternalEmscripten.inl; sourceTree = "<group>"; };
+		7B2F86E029887CA400EFC5FB /* FileSystemInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalEmscripten.inl; path = ../../../../Libraries/FileSystem/FileSystemInternalEmscripten.inl; sourceTree = "<group>"; };
 		7B4A291B29B3CD4A00F13DCB /* Time.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Time.cpp; path = ../../../../Libraries/Foundation/Time.cpp; sourceTree = "<group>"; };
 		7B4A291C29B3CD4A00F13DCB /* Time.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Time.h; path = ../../../../Libraries/Foundation/Time.h; sourceTree = "<group>"; };
 		7B4B99EF2937EBAC003D17A6 /* ReflectionAutoAggregates.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ReflectionAutoAggregates.h; path = ../../../../Libraries/Reflection/ReflectionAutoAggregates.h; sourceTree = "<group>"; };
@@ -172,21 +172,21 @@
 		7BA892A9297E03540093152B /* System.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = System.cpp; path = ../../../../Libraries/Foundation/System.cpp; sourceTree = "<group>"; };
 		7BA892AC297E06040093152B /* StringConverter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringConverter.h; path = ../../../../Libraries/Foundation/StringConverter.h; sourceTree = "<group>"; };
 		7BA892AD297E06040093152B /* StringConverter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringConverter.cpp; path = ../../../../Libraries/Foundation/StringConverter.cpp; sourceTree = "<group>"; };
-		7BC56BD529946AD100EED472 /* FileSystemWalker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FileSystemWalker.h; path = ../../../../Libraries/InputOutput/FileSystemWalker.h; sourceTree = "<group>"; };
-		7BC56BD629946AD100EED472 /* FileSystemWalkerTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FileSystemWalkerTest.h; path = ../../../../Libraries/InputOutput/FileSystemWalkerTest.h; sourceTree = "<group>"; };
-		7BC56BD729946AD100EED472 /* FileSystemWalker.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FileSystemWalker.cpp; path = ../../../../Libraries/InputOutput/FileSystemWalker.cpp; sourceTree = "<group>"; };
-		7BC56BD829946B1800EED472 /* FileSystemWalkerInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalEmscripten.inl; path = ../../../../Libraries/InputOutput/FileSystemWalkerInternalEmscripten.inl; sourceTree = "<group>"; };
-		7BC56BD929946B1800EED472 /* FileSystemWalkerInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalPosix.inl; path = ../../../../Libraries/InputOutput/FileSystemWalkerInternalPosix.inl; sourceTree = "<group>"; };
-		7BC56BDA29946B1800EED472 /* FileSystemWalkerInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalWindows.inl; path = ../../../../Libraries/InputOutput/FileSystemWalkerInternalWindows.inl; sourceTree = "<group>"; };
+		7BC56BD529946AD100EED472 /* FileSystemWalker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FileSystemWalker.h; path = ../../../../Libraries/FileSystem/FileSystemWalker.h; sourceTree = "<group>"; };
+		7BC56BD629946AD100EED472 /* FileSystemWalkerTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FileSystemWalkerTest.h; path = ../../../../Libraries/FileSystem/FileSystemWalkerTest.h; sourceTree = "<group>"; };
+		7BC56BD729946AD100EED472 /* FileSystemWalker.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FileSystemWalker.cpp; path = ../../../../Libraries/FileSystem/FileSystemWalker.cpp; sourceTree = "<group>"; };
+		7BC56BD829946B1800EED472 /* FileSystemWalkerInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalEmscripten.inl; path = ../../../../Libraries/FileSystem/FileSystemWalkerInternalEmscripten.inl; sourceTree = "<group>"; };
+		7BC56BD929946B1800EED472 /* FileSystemWalkerInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalPosix.inl; path = ../../../../Libraries/FileSystem/FileSystemWalkerInternalPosix.inl; sourceTree = "<group>"; };
+		7BC56BDA29946B1800EED472 /* FileSystemWalkerInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalWindows.inl; path = ../../../../Libraries/FileSystem/FileSystemWalkerInternalWindows.inl; sourceTree = "<group>"; };
 		7BD8E37929BE8357004AB23D /* EventLoopInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalApple.inl; path = ../../../../Libraries/Async/EventLoopInternalApple.inl; sourceTree = "<group>"; };
 		7BD8E37A29BE8357004AB23D /* EventLoopInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalWindows.inl; path = ../../../../Libraries/Async/EventLoopInternalWindows.inl; sourceTree = "<group>"; };
 		7BD8E37B29BE8357004AB23D /* EventLoopInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalEmscripten.inl; path = ../../../../Libraries/Async/EventLoopInternalEmscripten.inl; sourceTree = "<group>"; };
-		7BE50C9729AEB4CC00BE6C25 /* FileDescriptorInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileDescriptorInternalPosix.inl; path = ../../../../Libraries/InputOutput/FileDescriptorInternalPosix.inl; sourceTree = "<group>"; };
-		7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Process.cpp; path = ../../../../Libraries/InputOutput/Process.cpp; sourceTree = "<group>"; };
-		7BE5C80E29A26E3E00CBCAD1 /* Process.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Process.h; path = ../../../../Libraries/InputOutput/Process.h; sourceTree = "<group>"; };
-		7BE5C80F29A26E3E00CBCAD1 /* ProcessTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ProcessTest.h; path = ../../../../Libraries/InputOutput/ProcessTest.h; sourceTree = "<group>"; };
-		7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = FileDescriptor.cpp; path = ../../../../Libraries/InputOutput/FileDescriptor.cpp; sourceTree = "<group>"; };
-		7BE5C81229A2707E00CBCAD1 /* FileDescriptor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FileDescriptor.h; path = ../../../../Libraries/InputOutput/FileDescriptor.h; sourceTree = "<group>"; };
+		7BE50C9729AEB4CC00BE6C25 /* FileDescriptorInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileDescriptorInternalPosix.inl; path = ../../../../Libraries/FileSystem/FileDescriptorInternalPosix.inl; sourceTree = "<group>"; };
+		7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Process.cpp; path = ../../../../Libraries/FileSystem/Process.cpp; sourceTree = "<group>"; };
+		7BE5C80E29A26E3E00CBCAD1 /* Process.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Process.h; path = ../../../../Libraries/FileSystem/Process.h; sourceTree = "<group>"; };
+		7BE5C80F29A26E3E00CBCAD1 /* ProcessTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ProcessTest.h; path = ../../../../Libraries/FileSystem/ProcessTest.h; sourceTree = "<group>"; };
+		7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = FileDescriptor.cpp; path = ../../../../Libraries/FileSystem/FileDescriptor.cpp; sourceTree = "<group>"; };
+		7BE5C81229A2707E00CBCAD1 /* FileDescriptor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FileDescriptor.h; path = ../../../../Libraries/FileSystem/FileDescriptor.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -208,7 +208,7 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		7B0C2999297CA7C10071C5B4 /* InputOutput */ = {
+		7B0C2999297CA7C10071C5B4 /* FileSystem */ = {
 			isa = PBXGroup;
 			children = (
 				7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */,
@@ -234,7 +234,7 @@
 				7B0A83C229A98B2000C16EBF /* ProcessInternalWindows.inl */,
 				7BE5C80F29A26E3E00CBCAD1 /* ProcessTest.h */,
 			);
-			name = InputOutput;
+			name = FileSystem;
 			sourceTree = "<group>";
 		};
 		7B515F932924305E006996AA /* Foundation */ = {
@@ -320,8 +320,8 @@
 			isa = PBXGroup;
 			children = (
 				7BA7D47829B5473100811076 /* Async */,
+				7B0C2999297CA7C10071C5B4 /* FileSystem */,
 				7B515F932924305E006996AA /* Foundation */,
-				7B0C2999297CA7C10071C5B4 /* InputOutput */,
 				7B7044552995A2180034458B /* Reflection */,
 				7B7044562995A2290034458B /* Serialization */,
 				7B872C4729AFFC3F00949BD2 /* Threading */,
