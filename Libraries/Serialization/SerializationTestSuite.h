@@ -6,10 +6,10 @@
 #include "../Foundation/String.h"
 #include "../Foundation/StringBuilder.h"
 #include "../Foundation/StringView.h"
-#include "../Foundation/Test.h"
 #include "../Foundation/Vector.h"
 #include "../Reflection/Reflection.h"
 #include "../System/Console.h"
+#include "../Testing/Test.h"
 
 namespace SC
 {

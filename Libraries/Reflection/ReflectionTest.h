@@ -4,8 +4,8 @@
 #pragma once
 #include "../Foundation/Array.h"
 #include "../Foundation/StringBuilder.h"
-#include "../Foundation/Test.h"
 #include "../Foundation/Vector.h"
+#include "../Testing/Test.h"
 #include "ReflectionFlatSchemaCompiler.h"
 #include "ReflectionSC.h"
 

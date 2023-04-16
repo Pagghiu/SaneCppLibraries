@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Testing/Test.h"
 #include "Optional.h"
 #include "String.h"
-#include "Test.h"
 
 namespace SC
 {

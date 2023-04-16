@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Foundation/StringView.h"
 #include "../System/Console.h" // SC_BREAK_DEBUGGER
-#include "StringView.h"
 
 namespace SC
 {

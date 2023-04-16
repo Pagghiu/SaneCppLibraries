@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Testing/Test.h"
 #include "Memory.h"
-#include "Test.h"
 
 namespace SC
 {

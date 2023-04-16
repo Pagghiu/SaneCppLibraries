@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Test.h"
+#include "../Testing/Test.h"
 #include "Path.h"
 
 namespace SC

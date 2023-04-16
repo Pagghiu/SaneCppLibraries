@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Testing/Test.h"
 #include "Array.h"
-#include "Test.h"
 #include "Vector.h"
 
 namespace SC

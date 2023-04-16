@@ -22,6 +22,9 @@
     <Filter Include="System">
       <UniqueIdentifier>{6b6b8c15-cf55-4813-8be0-a9c16e86b3f5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Testing">
+      <UniqueIdentifier>{ae591710-8f56-41d2-a3a8-9b0db6a7380b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\SCTest.cpp">
@@ -39,9 +42,6 @@
       <Filter>Foundation</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringView.cpp">
-      <Filter>Foundation</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Test.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\Path.cpp">
@@ -76,6 +76,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\System\System.cpp">
       <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Testing\Test.cpp">
+      <Filter>Testing</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -170,9 +173,6 @@
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringViewTest.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Test.h">
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Types.h">
@@ -327,6 +327,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\System\SystemTest.h">
       <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Testing\Test.h">
+      <Filter>Testing</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -4,7 +4,7 @@
 #pragma once
 #include "../Foundation/SmallVector.h"
 #include "../Foundation/String.h"
-#include "../Foundation/Test.h"
+#include "../Testing/Test.h"
 #include "Console.h"
 
 namespace SC

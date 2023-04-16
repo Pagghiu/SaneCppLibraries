@@ -125,7 +125,7 @@
 		7B515FF229243087006996AA /* MemoryTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MemoryTest.h; path = ../../../../Libraries/Foundation/MemoryTest.h; sourceTree = "<group>"; };
 		7B515FF329243087006996AA /* Array.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Array.h; path = ../../../../Libraries/Foundation/Array.h; sourceTree = "<group>"; };
 		7B515FFA29243097006996AA /* StringFormat.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringFormat.h; path = ../../../../Libraries/Foundation/StringFormat.h; sourceTree = "<group>"; };
-		7B515FFB29243097006996AA /* Test.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Test.cpp; path = ../../../../Libraries/Foundation/Test.cpp; sourceTree = "<group>"; };
+		7B515FFB29243097006996AA /* Test.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Test.cpp; path = ../../../../Libraries/Testing/Test.cpp; sourceTree = "<group>"; };
 		7B515FFC29243097006996AA /* StringFormat.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringFormat.cpp; path = ../../../../Libraries/Foundation/StringFormat.cpp; sourceTree = "<group>"; };
 		7B515FFF29243097006996AA /* StringView.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringView.cpp; path = ../../../../Libraries/Foundation/StringView.cpp; sourceTree = "<group>"; };
 		7B51600029243097006996AA /* VectorTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VectorTest.h; path = ../../../../Libraries/Foundation/VectorTest.h; sourceTree = "<group>"; };
@@ -134,7 +134,7 @@
 		7B51600329243097006996AA /* StringView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringView.h; path = ../../../../Libraries/Foundation/StringView.h; sourceTree = "<group>"; };
 		7B51600429243097006996AA /* StringViewTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringViewTest.h; path = ../../../../Libraries/Foundation/StringViewTest.h; sourceTree = "<group>"; };
 		7B51600529243097006996AA /* Vector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Vector.h; path = ../../../../Libraries/Foundation/Vector.h; sourceTree = "<group>"; };
-		7B51600629243097006996AA /* Test.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Test.h; path = ../../../../Libraries/Foundation/Test.h; sourceTree = "<group>"; };
+		7B51600629243097006996AA /* Test.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Test.h; path = ../../../../Libraries/Testing/Test.h; sourceTree = "<group>"; };
 		7B51600729243097006996AA /* String.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = String.h; path = ../../../../Libraries/Foundation/String.h; sourceTree = "<group>"; };
 		7B51600829243097006996AA /* StringIterator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringIterator.h; path = ../../../../Libraries/Foundation/StringIterator.h; sourceTree = "<group>"; };
 		7B51600E29243097006996AA /* StringBuilder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringBuilder.h; path = ../../../../Libraries/Foundation/StringBuilder.h; sourceTree = "<group>"; };
@@ -227,8 +227,18 @@
 				7BC56BD629946AD100EED472 /* FileSystemWalkerTest.h */,
 				7B19C9A9297AF95B001C0627 /* Path.cpp */,
 				7B19C9AB297AF95B001C0627 /* Path.h */,
+				7B19C9AA297AF95B001C0627 /* PathTest.h */,
 			);
 			name = FileSystem;
+			sourceTree = "<group>";
+		};
+		7B1FCC2329ECB4B3001D75F7 /* Testing */ = {
+			isa = PBXGroup;
+			children = (
+				7B515FFB29243097006996AA /* Test.cpp */,
+				7B51600629243097006996AA /* Test.h */,
+			);
+			name = Testing;
 			sourceTree = "<group>";
 		};
 		7B515F932924305E006996AA /* Foundation */ = {
@@ -255,7 +265,6 @@
 				7B91CBEF29B17F470013E95E /* OpaqueTest.h */,
 				7B75258729A16F8000779F2A /* Optional.h */,
 				7B75258629A16F8000779F2A /* OptionalTest.h */,
-				7B19C9AA297AF95B001C0627 /* PathTest.h */,
 				7B515FE029243087006996AA /* Platform.h */,
 				7B515FD729243086006996AA /* Result.h */,
 				7B515FC729243086006996AA /* ResultTest.h */,
@@ -278,8 +287,6 @@
 				7B51600429243097006996AA /* StringViewTest.h */,
 				7B89A60329BFD9D6006EF085 /* TaggedUnion.h */,
 				7B89A60229BFD9D6006EF085 /* TaggedUnionTest.h */,
-				7B515FFB29243097006996AA /* Test.cpp */,
-				7B51600629243097006996AA /* Test.h */,
 				7B89A60429BFE1A4006EF085 /* TypeList.h */,
 				7B51600229243097006996AA /* Types.h */,
 				7B8B919929DB868C0051AF74 /* UniquePtr.h */,
@@ -298,6 +305,7 @@
 				7B7044552995A2180034458B /* Reflection */,
 				7B7044562995A2290034458B /* Serialization */,
 				7B8B90C629EB6B470092805F /* System */,
+				7B1FCC2329ECB4B3001D75F7 /* Testing */,
 				7B872C4729AFFC3F00949BD2 /* Threading */,
 			);
 			name = Libraries;

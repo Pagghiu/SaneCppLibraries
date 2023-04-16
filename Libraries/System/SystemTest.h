@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/Limits.h"
-#include "../Foundation/Test.h"
+#include "../Testing/Test.h"
 #include "System.h"
 
 namespace SC

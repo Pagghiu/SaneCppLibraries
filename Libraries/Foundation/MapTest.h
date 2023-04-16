@@ -2,10 +2,10 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Testing/Test.h"
 #include "Array.h"
 #include "Map.h"
 #include "String.h"
-#include "Test.h"
 
 namespace SC
 {
