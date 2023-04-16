@@ -4,6 +4,8 @@
 // clang-format off
 #include "FileSystemWalker.h"
 #include "../Foundation/StringConverter.h"
+#include "../Foundation/SmallVector.h"
+
 // clang-format on
 #include <dirent.h>
 #include <errno.h>
@@ -67,8 +69,8 @@ struct SC::FileSystemWalker::Internal
         currentPath.clear();
         SC_TRY_IF(currentPath.appendNullTerminated(directory));
         StackEntry entry;
-        entry.textLengthInBytes = currentPath.view().sizeInBytesIncludingTerminator();
-        SC_TRY_IF(entry.init(open(currentPath.view().getNullTerminatedNative(), O_DIRECTORY)));
+        entry.textLengthInBytes = currentPathString.view().sizeInBytesIncludingTerminator();
+        SC_TRY_IF(entry.init(open(currentPathString.view().getNullTerminatedNative(), O_DIRECTORY)));
         SC_TRY_IF(recurseStack.push_back(move(entry)));
         return true;
     }
@@ -114,7 +116,7 @@ struct SC::FileSystemWalker::Internal
         SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
         SC_TRY_IF(currentPath.appendNullTerminated("/"_u8));
         SC_TRY_IF(currentPath.appendNullTerminated(entry.name));
-        entry.path  = currentPath.view();
+        entry.path  = currentPathString.view();
         entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
         entry.parentFileDescriptor.handle.detach();
         SC_TRY_IF(entry.parentFileDescriptor.handle.assign(parent.fileDescriptor));
@@ -140,7 +142,7 @@ struct SC::FileSystemWalker::Internal
         SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
         SC_TRY_IF(currentPath.appendNullTerminated("/"_u8));
         SC_TRY_IF(currentPath.appendNullTerminated(entry.name));
-        newParent.textLengthInBytes = currentPath.view().sizeInBytesIncludingTerminator();
+        newParent.textLengthInBytes = currentPathString.view().sizeInBytesIncludingTerminator();
         FileDescriptorNative handle;
         SC_TRY_IF(entry.parentFileDescriptor.handle.get(handle, ReturnCode("recurseSubdirectory - InvalidHandle"_a8)));
         SC_TRY_IF(newParent.init(openat(handle, entry.name.bytesIncludingTerminator(), O_DIRECTORY)));

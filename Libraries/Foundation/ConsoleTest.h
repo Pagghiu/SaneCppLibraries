@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "Console.h"
+#include "SmallVector.h"
 #include "String.h"
 #include "Test.h"
 
@@ -17,10 +18,9 @@ struct SC::ConsoleTest : public SC::TestCase
     {
         using namespace SC;
 
-        SmallVector<char, 512 * sizeof(utf_char_t)> consoleBuffer;
-        SmallVector<char, 512 * sizeof(utf_char_t)> formatBuffer;
+        SmallVector<char, 512 * sizeof(utf_char_t)> consoleConversionBuffer;
 
-        Console console(consoleBuffer, formatBuffer);
+        Console console(consoleConversionBuffer);
 
         if (test_section("printAssertion"))
         {

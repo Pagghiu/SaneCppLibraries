@@ -221,7 +221,6 @@
     <ClCompile Include="..\..\..\..\Libraries\System\System.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Path.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\String.cpp" />
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\StringBuilder.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringFormat.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringConverter.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringView.cpp" />
@@ -278,7 +277,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Span.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\String.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringBuilder.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringBuilderTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringFormat.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringIterator.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringConverter.h" />

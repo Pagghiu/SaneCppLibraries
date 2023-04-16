@@ -3,24 +3,20 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "Result.h"
-#include "SmallVector.h"
 #include "StringIterator.h"
 #include "StringView.h"
-#include "Vector.h"
 
 namespace SC
 {
+template <typename T>
+struct Vector;
 struct Console;
 template <typename T>
 struct StringFormatterFor;
 
 struct StringFormatOutput
 {
-    Vector<char>& temporaryBuffer;
-
-    StringFormatOutput(Vector<char>& tempBuffer, StringEncoding encoding)
-        : temporaryBuffer(tempBuffer), encoding(encoding)
-    {}
+    StringFormatOutput(StringEncoding encoding) : encoding(encoding) {}
 
     bool write(StringView text);
     void redirectToBuffer(Vector<char>& destination)

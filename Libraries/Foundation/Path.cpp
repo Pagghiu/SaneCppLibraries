@@ -46,10 +46,8 @@ struct SC::Path::Internal
     {
         if (input.startsWith('/'))
         {
-            StringView root = input;
-            (void)root.setSizeInBytesWithoutTerminator(1);
             // we want to return a string view pointing at the "/" char of the input string
-            return root;
+            return input.sliceStartLength(0, 1);
         }
         return StringView();
     }

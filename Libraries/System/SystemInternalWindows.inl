@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../Foundation/Path.h"
+#include "../Foundation/SmallVector.h"
 #include "../Foundation/StringBuilder.h"
 #include "System.h"
 
@@ -38,7 +39,7 @@ bool SC::SystemDirectories::init()
     executableFile = ""_u8;
     StringBuilder builder(executableFile);
     SC_TRY_IF(builder.append(utf16executable));
-    applicationRootDirectory = Path::Windows::dirname(builder.getResultString().view());
+    applicationRootDirectory = Path::Windows::dirname(executableFile.view());
     return true;
 }
 

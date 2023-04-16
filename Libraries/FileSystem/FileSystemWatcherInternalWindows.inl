@@ -244,6 +244,6 @@ SC::ReturnCode SC::FileSystemWatcher::Notification::getFullPath(String& buffer, 
     SC_TRY_IF(builder.append(basePath));
     SC_TRY_IF(builder.append("\\"_a8));
     SC_TRY_IF(builder.append(relativePath));
-    outStringView = builder.view();
+    outStringView = buffer.view();
     return true;
 }

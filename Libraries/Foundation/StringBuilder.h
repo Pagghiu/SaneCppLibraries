@@ -3,27 +3,25 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "String.h"
-#include "StringConverter.h"
 #include "StringFormat.h"
 
 namespace SC
 {
+struct String;
 struct StringBuilder
 {
-    StringBuilder(String& backingString, Vector<char>* temporaryBuffer = nullptr)
-        : backingString(backingString), temporaryBuffer(temporaryBuffer)
-    {}
+    StringBuilder(String& backingString) : backingString(backingString) {}
 
     template <typename... Types>
     [[nodiscard]] bool format(StringView fmt, Types&&... args)
     {
-        reset();
+        clear();
         return append(fmt, forward<Types>(args)...);
     }
 
     [[nodiscard]] bool format(StringView text)
     {
-        reset();
+        clear();
         return append(text);
     }
 
@@ -31,36 +29,7 @@ struct StringBuilder
     [[nodiscard]] bool append(StringView fmt, Types&&... args)
     {
         SC_TRY_IF(backingString.popNulltermIfExists());
-        if (temporaryBuffer)
-        {
-            return printWithTemporaryBuffer(*temporaryBuffer, fmt, forward<Types>(args)...);
-        }
-        else
-        {
-            SmallVector<char, 512> buffer;
-            return printWithTemporaryBuffer(buffer, fmt, forward<Types>(args)...);
-        }
-    }
-
-    [[nodiscard]] bool append(StringView str)
-    {
-        if (str.isEmpty())
-            return true;
-        SC_TRY_IF(backingString.popNulltermIfExists());
-        return StringConverter::convertEncodingTo(backingString.getEncoding(), str, backingString.data);
-    }
-
-    [[nodiscard]] StringView view() { return backingString.view(); }
-
-    void reset() { backingString.data.clearWithoutInitializing(); }
-
-    [[nodiscard]] const String& getResultString() { return backingString; }
-
-  private:
-    template <typename... Types>
-    [[nodiscard]] bool printWithTemporaryBuffer(Vector<char>& buffer, StringView fmt, Types&&... args)
-    {
-        StringFormatOutput sfo(buffer, backingString.getEncoding());
+        StringFormatOutput sfo(backingString.getEncoding());
         sfo.redirectToBuffer(backingString.data);
         if (fmt.getEncoding() == StringEncoding::Ascii || fmt.getEncoding() == StringEncoding::Utf8)
         {
@@ -70,7 +39,12 @@ struct StringBuilder
         }
         return false; // UTF16/32 format strings are not supported
     }
-    String&       backingString;
-    Vector<char>* temporaryBuffer;
+
+    [[nodiscard]] bool append(StringView str);
+
+  private:
+    void clear() { backingString.data.clearWithoutInitializing(); }
+
+    String& backingString;
 };
 } // namespace SC

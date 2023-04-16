@@ -40,7 +40,6 @@ struct SC::SystemTest : public SC::TestCase
             SC_TEST_EXPECT(directories.init());
             report.console.print("executableFile=\"{}\"\n", directories.executableFile.view());
             report.console.print("applicationRootDirectory=\"{}\"\n", directories.applicationRootDirectory.view());
-            SC_TEST_EXPECT(directories.close());
         }
     }
 };

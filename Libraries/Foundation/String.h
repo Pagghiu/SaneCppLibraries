@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "Array.h"
 #include "StringFormat.h"
 #include "StringView.h"
 #include "Vector.h"
@@ -15,18 +16,12 @@ struct SmallString;
 } // namespace SC
 struct SC::String
 {
-  private:
-  public:
     String(StringEncoding encoding = StringEncoding::Utf8) : encoding(encoding) {}
-    String(StringView sv) { SC_RELEASE_ASSERT(assign(sv)); }
 
-    [[nodiscard]] bool assign(StringView sv);
-    String&            operator=(StringView sv)
-    {
-        data.clear();
-        SC_RELEASE_ASSERT(assign(sv));
-        return *this;
-    }
+    // TODO: Figure out if removing this constructor in favour of the fallible assign makes the api ugly
+    String(const StringView& sv) { SC_RELEASE_ASSERT(assign(sv)); }
+
+    [[nodiscard]] bool assign(const StringView& sv);
 
     // const methods
     [[nodiscard]] StringEncoding getEncoding() const { return encoding; }
@@ -41,38 +36,11 @@ struct SC::String
 #endif
     [[nodiscard]] bool isEmpty() const { return data.isEmpty(); }
 
-    [[nodiscard]] StringView view() const
-    {
-        if (data.isEmpty())
-        {
-            return StringView(nullptr, 0, false, encoding);
-        }
-        else
-        {
-            return StringView(data.items, data.size() - StringEncodingGetSize(encoding), true, encoding);
-        }
-    }
+    [[nodiscard]] StringView view() const;
 
-    bool popNulltermIfExists()
-    {
-        const auto sizeOfZero = StringEncodingGetSize(encoding);
-        const auto dataSize   = data.size();
-        if (dataSize >= sizeOfZero)
-        {
-            return data.resizeWithoutInitializing(dataSize - sizeOfZero);
-        }
-        return true;
-    }
+    [[nodiscard]] bool popNulltermIfExists();
+    [[nodiscard]] bool pushNullTerm();
 
-    bool pushNullTerm()
-    {
-        auto numZeros = StringEncodingGetSize(encoding);
-        while (numZeros--)
-        {
-            SC_TRY_IF(data.push_back(0));
-        }
-        return true;
-    }
     // Operators
     [[nodiscard]] bool operator==(const String& other) const { return view() == (other.view()); }
     [[nodiscard]] bool operator!=(const String& other) const { return not operator==(other); }
@@ -80,7 +48,7 @@ struct SC::String
     [[nodiscard]] bool operator!=(const StringView other) const { return not operator==(other); }
     [[nodiscard]] bool operator<(const StringView other) const { return view() < other; }
 
-    // Data
+    // TODO: we should probably make these private and provide alternative abstractions to manipulate it
     StringEncoding encoding;
     Vector<char>   data;
 };

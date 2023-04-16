@@ -12,6 +12,4 @@
 #include "SystemInternalPosix.inl"
 #endif
 
-bool SC::SystemDirectories::close() { return true; }
-
 bool SC::printBacktrace() { return SystemDebug::printBacktrace(); }

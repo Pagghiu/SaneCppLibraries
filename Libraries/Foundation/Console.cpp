@@ -18,6 +18,7 @@ void SC::Console::printLine(const StringView str)
     print(str);
     print("\n"_a8);
 }
+
 void SC::Console::print(const StringView str)
 {
     if (str.isEmpty())
@@ -36,8 +37,8 @@ void SC::Console::print(const StringView str)
         }
         else
         {
-            printConversionBuffer.clearWithoutInitializing();
-            if (StringConverter::convertEncodingToUTF16(str, printConversionBuffer, &encodedPath))
+            encodingConversionBuffer.clearWithoutInitializing();
+            if (StringConverter::convertEncodingToUTF16(str, encodingConversionBuffer, &encodedPath))
             {
                 OutputDebugStringW(encodedPath.getNullTerminatedNative());
             }
@@ -51,8 +52,8 @@ void SC::Console::print(const StringView str)
     }
     else
     {
-        printConversionBuffer.clearWithoutInitializing();
-        if (StringConverter::convertEncodingToUTF16(str, printConversionBuffer, &encodedPath))
+        encodingConversionBuffer.clearWithoutInitializing();
+        if (StringConverter::convertEncodingToUTF16(str, encodingConversionBuffer, &encodedPath))
         {
             WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), encodedPath.getNullTerminatedNative(),
                           static_cast<DWORD>(encodedPath.sizeInBytes() / sizeof(wchar_t)), nullptr, nullptr);
@@ -76,7 +77,6 @@ void SC::Console::printNullTerminatedASCII(const StringView str)
     if (str.isEmpty() || str.getEncoding() != StringEncoding::Ascii)
         return;
 
-        // SC_DEBUG_ASSERT(str.sizeInBytes() < static_cast<int>(MaxValue()));
 #if SC_PLATFORM_WINDOWS
     WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), str.bytesWithoutTerminator(), static_cast<DWORD>(str.sizeInBytes()),
                   nullptr, nullptr);
@@ -88,7 +88,7 @@ void SC::Console::printNullTerminatedASCII(const StringView str)
 
 void SC::printAssertion(const char_t* expression, const char_t* filename, const char_t* functionName, int lineNumber)
 {
-    // Here we're explicitly avoiding usage of StringFormat to avoid synamic allocation
+    // Here we're explicitly avoiding usage of StringFormat to avoid dynamic allocation
     Console::printNullTerminatedASCII("Assertion failed: ("_a8);
     Console::printNullTerminatedASCII(StringView(expression, strlen(expression), true, StringEncoding::Ascii));
     Console::printNullTerminatedASCII(")\nFile: "_a8);

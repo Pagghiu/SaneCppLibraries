@@ -11,21 +11,12 @@ namespace SC
 struct String;
 struct Console
 {
-
-    Console(Vector<char>& printConversionBuffer, Vector<char>& formatBuffer)
-        : printConversionBuffer(printConversionBuffer), formatBuffer(formatBuffer)
-    {}
+    Console(Vector<char>& encodingConversionBuffer) : encodingConversionBuffer(encodingConversionBuffer) {}
 
     template <typename... Types>
     bool print(StringView fmt, Types&&... args)
     {
-        return printWithCustomTemporaryBuffer(formatBuffer, fmt, forward<Types>(args)...);
-    }
-
-    template <typename... Types>
-    bool printWithCustomTemporaryBuffer(Vector<char>& buffer, StringView fmt, Types&&... args)
-    {
-        StringFormatOutput output(buffer, fmt.getEncoding());
+        StringFormatOutput output(fmt.getEncoding());
         output.redirectToConsole(*this);
         if (fmt.getEncoding() == StringEncoding::Ascii || fmt.getEncoding() == StringEncoding::Utf8)
         {
@@ -42,7 +33,6 @@ struct Console
     static void printNullTerminatedASCII(const StringView str);
 
   private:
-    Vector<char>& printConversionBuffer;
-    Vector<char>& formatBuffer;
+    Vector<char>& encodingConversionBuffer;
 };
 } // namespace SC

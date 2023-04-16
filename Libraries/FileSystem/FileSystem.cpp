@@ -53,7 +53,7 @@ bool SC::FileSystem::convert(const StringView file, String& destination, StringV
     SC_TRY_IF(converter.appendNullTerminated(file));
     if (encodedPath != nullptr)
     {
-        *encodedPath = converter.view();
+        *encodedPath = destination.view();
     }
     return true;
 }

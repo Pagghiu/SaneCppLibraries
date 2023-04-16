@@ -3,9 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "InitializerList.h"
-#include "Language.h"
-#include "LibC.h"
-#include "Types.h"
+#include "Language.h" // SameConstnessAs
 
 namespace SC
 {
@@ -15,8 +13,6 @@ struct SpanVoid;
 template <typename Type>
 struct Span
 {
-    typedef typename SameConstnessAs<Type, uint8_t>::type ByteType;
-
     typedef SC::size_t Size;
 
     constexpr Span() : items(nullptr), sizeBytes(0) {}

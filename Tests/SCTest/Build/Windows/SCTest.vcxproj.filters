@@ -35,9 +35,6 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\String.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\StringBuilder.cpp">
-      <Filter>Foundation</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringFormat.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
@@ -158,9 +155,6 @@
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringBuilder.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringBuilderTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringFormat.h">

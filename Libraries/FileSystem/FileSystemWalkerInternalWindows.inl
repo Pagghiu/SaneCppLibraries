@@ -57,9 +57,9 @@ struct SC::FileSystemWalker::Internal
         currentPath.clear();
         StackEntry entry;
         SC_TRY_IF(currentPath.appendNullTerminated(directory));
-        entry.textLengthInBytes = currentPath.view().sizeInBytesIncludingTerminator();
+        entry.textLengthInBytes = currentPathString.view().sizeInBytesIncludingTerminator();
         SC_TRY_IF(currentPath.appendNullTerminated(L"\\*.*"));
-        SC_TRY_IF(entry.init(currentPath.view().getNullTerminatedNative(), dirEnumerator));
+        SC_TRY_IF(entry.init(currentPathString.view().getNullTerminatedNative(), dirEnumerator));
         SC_TRY_IF(recurseStack.push_back(entry));
         SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
         expectDotDirectories = true;
@@ -108,7 +108,7 @@ struct SC::FileSystemWalker::Internal
         SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
         SC_TRY_IF(currentPath.appendNullTerminated(L"\\"));
         SC_TRY_IF(currentPath.appendNullTerminated(entry.name));
-        entry.path  = currentPath.view();
+        entry.path  = currentPathString.view();
         entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
         if (dirEnumerator.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
         {
@@ -132,9 +132,9 @@ struct SC::FileSystemWalker::Internal
         SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
         SC_TRY_IF(currentPath.appendNullTerminated(L"\\"));
         SC_TRY_IF(currentPath.appendNullTerminated(entry.name));
-        newParent.textLengthInBytes = currentPath.view().sizeInBytesIncludingTerminator();
+        newParent.textLengthInBytes = currentPathString.view().sizeInBytesIncludingTerminator();
         SC_TRY_IF(currentPath.appendNullTerminated(L"\\*.*"));
-        SC_TRY_IF(newParent.init(currentPath.view().getNullTerminatedNative(), dirEnumerator));
+        SC_TRY_IF(newParent.init(currentPathString.view().getNullTerminatedNative(), dirEnumerator));
         SC_TRY_IF(recurseStack.push_back(newParent));
         expectDotDirectories = true;
         return true;

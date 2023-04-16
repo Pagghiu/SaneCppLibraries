@@ -3,10 +3,11 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "StringView.h"
-#include "Vector.h"
 
 namespace SC
 {
+template <typename T>
+struct Vector;
 struct StringConverter;
 struct String;
 } // namespace SC
@@ -44,13 +45,8 @@ struct SC::StringConverter
 
     [[nodiscard]] bool setTextLengthInBytesIncludingTerminator(size_t newDataSize);
 
-    [[nodiscard]] StringView view() const;
-
-    [[nodiscard]] bool growToFullCapacity();
-
-    String& text;
-
   private:
+    String& text;
     /// Appends the input string null terminated
     [[nodiscard]] bool internalAppend(StringView input, StringView* encodedText);
 };

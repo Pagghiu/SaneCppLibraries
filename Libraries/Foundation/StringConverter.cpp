@@ -222,10 +222,6 @@ bool SC::StringConverter::setTextLengthInBytesIncludingTerminator(size_t newData
     return true;
 }
 
-SC::StringView SC::StringConverter::view() const { return text.view(); }
-
-bool SC::StringConverter::growToFullCapacity() { return text.data.resizeWithoutInitializing(text.data.capacity()); }
-
 /// Appends the input string null terminated
 bool SC::StringConverter::internalAppend(StringView input, StringView* encodedText)
 {

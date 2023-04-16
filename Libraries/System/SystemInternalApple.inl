@@ -23,7 +23,7 @@ bool SC::SystemDirectories::init()
 
     uint32_t executable_length = 0;
     _NSGetExecutablePath(NULL, &executable_length);
-    executableFile = ""_u8;
+    SC_TRY_IF(executableFile.assign(""_u8));
     if (executable_length > 1)
     {
         SC_TRY_IF(executableFile.data.resizeWithoutInitializing(executable_length));
@@ -44,9 +44,8 @@ bool SC::SystemDirectories::init()
             if (CFURLGetFileSystemRepresentation(bundleURL, true, reinterpret_cast<uint8_t*>(urlToFs), MaxPathLength))
             {
                 StringView bundlePath(urlToFs, strlen(urlToFs), true, StringEncoding::Utf8);
-                applicationRootDirectory = bundlePath;
                 CFRelease(bundleURL);
-                return true;
+                return applicationRootDirectory.assign(bundlePath);
             }
             CFRelease(bundleURL);
         }

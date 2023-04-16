@@ -85,7 +85,7 @@ SC::ReturnCode SC::ProcessShell::readOutputSync(String* outputString, String* er
         {
             SC_TRY(readResult, outputPipe.readPipe.readAppend(outputString->data, {buffer.data(), buffer.size()}));
         }
-        outputString->pushNullTerm();
+        SC_TRY_IF(outputString->pushNullTerm());
     }
     if (errorPipe.readPipe.handle.isValid() && errorString)
     {
@@ -93,7 +93,7 @@ SC::ReturnCode SC::ProcessShell::readOutputSync(String* outputString, String* er
         {
             SC_TRY(readResult, errorPipe.readPipe.readAppend(errorString->data, {buffer.data(), buffer.size()}));
         }
-        errorString->pushNullTerm();
+        SC_TRY_IF(errorString->pushNullTerm());
     }
     return true;
 }

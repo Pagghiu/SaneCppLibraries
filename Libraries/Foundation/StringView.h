@@ -2,11 +2,6 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "Assert.h"
-#include "Compiler.h"
-#include "InitializerList.h"
-#include "Limits.h"
-#include "Memory.h"
 #include "Span.h"
 #include "StringIterator.h"
 
@@ -32,7 +27,7 @@ struct SplitOptions
     }
     bool has(Value v) const { return (value & v) != None; }
 };
-enum class Comparison
+enum class StringComparison
 {
     Smaller = -1,
     Equals  = 0,
@@ -97,18 +92,9 @@ struct SC::StringView
     }
 #endif
 
-    [[nodiscard]] Comparison compareASCII(StringView other) const
-    {
-        const int res = memcmp(text.data(), other.text.data(), min(text.sizeInBytes(), other.text.sizeInBytes()));
-        if (res < 0)
-            return Comparison::Smaller;
-        else if (res == 0)
-            return Comparison::Equals;
-        else
-            return Comparison::Bigger;
-    }
+    [[nodiscard]] StringComparison compareASCII(StringView other) const;
 
-    [[nodiscard]] bool operator<(StringView other) const { return compareASCII(other) == Comparison::Smaller; }
+    [[nodiscard]] bool operator<(StringView other) const { return compareASCII(other) == StringComparison::Smaller; }
 
     template <typename StringIterator>
     StringIterator getIterator() const
@@ -129,29 +115,13 @@ struct SC::StringView
 
     [[nodiscard]] constexpr size_t sizeInBytesIncludingTerminator() const
     {
+        SC_RELEASE_ASSERT(hasNullTerm);
         return text.sizeInBytes() > 0 ? text.sizeInBytes() + StringEncodingGetSize(encoding) : 0;
     }
     [[nodiscard]] bool endsWith(char_t c) const { return isEmpty() ? false : text.data()[text.sizeInBytes() - 1] == c; }
     [[nodiscard]] bool startsWith(char_t c) const { return isEmpty() ? false : text.data()[0] == c; }
-    [[nodiscard]] bool startsWith(const StringView str) const
-    {
-        if (encoding == str.encoding && str.text.sizeInBytes() <= text.sizeInBytes())
-        {
-            const StringView ours(text.data(), str.text.sizeInBytes(), false, encoding);
-            return str == ours;
-        }
-        return false;
-    }
-    [[nodiscard]] bool endsWith(const StringView str) const
-    {
-        if (hasCompatibleEncoding(str) && str.sizeInBytes() <= sizeInBytes())
-        {
-            const StringView ours(text.data() + text.sizeInBytes() - str.text.sizeInBytes(), str.text.sizeInBytes(),
-                                  false, encoding);
-            return str == ours;
-        }
-        return false;
-    }
+    [[nodiscard]] bool startsWith(const StringView str) const;
+    [[nodiscard]] bool endsWith(const StringView str) const;
 
     [[nodiscard]] bool containsASCIICharacter(char c)
     {
@@ -160,16 +130,6 @@ struct SC::StringView
     [[nodiscard]] bool hasCompatibleEncoding(StringView str) const
     {
         return StringEncodingAreBinaryCompatible(encoding, str.encoding);
-    }
-
-    [[nodiscard]] bool setSizeInBytesWithoutTerminator(size_t newSize)
-    {
-        if (newSize <= text.sizeInBytes())
-        {
-            text.setSizeInBytes(newSize);
-            return true;
-        }
-        return false;
     }
 
     /// Returns a StringView from two iterators. The from iterator will be shortened until the start of to
@@ -203,20 +163,13 @@ struct SC::StringView
     }
 
     size_t sizeASCII() const { return sizeInBytes(); }
+
     /// Returns a section of a string.
     /// @param start The index to the beginning of the specified portion of StringView.
     /// @param end The index to the end of the specified portion of StringView. The substring includes the characters up
     /// to, but not including, the character indicated by end.
-    template <typename StringIterator>
-    [[nodiscard]] StringView sliceStartEnd(size_t start, size_t end) const
-    {
-        StringIterator it = getIterator<StringIterator>();
-        SC_RELEASE_ASSERT(it.advanceCodePoints(start));
-        StringIterator startIt = it;
-        SC_RELEASE_ASSERT(start <= end && it.advanceCodePoints(end - start));
-        const auto distance = it.bytesDistanceFrom(startIt);
-        return StringView(startIt.getIt(), distance, start + distance == sizeInBytesIncludingTerminator(), encoding);
-    }
+    template <typename StringIterator = StringIteratorASCII>
+    [[nodiscard]] StringView sliceStartEnd(size_t start, size_t end) const;
 
     /// Returns a section of a string.
     /// @param start The index to the beginning of the specified portion of StringView.
@@ -231,15 +184,7 @@ struct SC::StringView
     /// Returns a section of a string.
     /// @param start The index to the beginning of the specified portion of StringView.
     template <typename StringIterator = StringIteratorASCII>
-    [[nodiscard]] StringView sliceStart(size_t start) const
-    {
-        StringIterator it = getIterator<StringIterator>();
-        SC_RELEASE_ASSERT(it.advanceCodePoints(start));
-        StringIterator startIt = it;
-        it.rewindToEnd();
-        const auto distance = it.bytesDistanceFrom(startIt);
-        return StringView(startIt.getIt(), distance, start + distance == sizeInBytesIncludingTerminator(), encoding);
-    }
+    [[nodiscard]] StringView sliceStart(size_t start) const;
 
     template <typename Lambda>
     [[nodiscard]] size_t splitASCII(char_t separator, Lambda&& lambda,
@@ -248,6 +193,7 @@ struct SC::StringView
         return split<StringIteratorASCII>(separator, forward<Lambda>(lambda), options);
     }
 
+    // TODO: make split using iterator pattern instead of lambda so we can move it to cpp
     template <typename StringIterator, typename Lambda, typename CharacterType>
     [[nodiscard]] size_t split(CharacterType separator, Lambda&& lambda, SplitOptions options)
     {
@@ -283,6 +229,9 @@ struct SC::StringView
 
     /// Parses int32, returning false if it fails
     [[nodiscard]] bool parseInt32(int32_t* value) const;
+
+  private:
+    struct Internal;
 };
 
 #if SC_PLATFORM_WINDOWS

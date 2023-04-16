@@ -14,7 +14,7 @@
 #include "../../Libraries/Foundation/PathTest.h"
 #include "../../Libraries/Foundation/ResultTest.h"
 #include "../../Libraries/Foundation/SmallVectorTest.h"
-#include "../../Libraries/Foundation/StringBuilderTest.h"
+#include "../../Libraries/Foundation/StringFormatTest.h"
 #include "../../Libraries/Foundation/StringTest.h"
 #include "../../Libraries/Foundation/StringViewTest.h"
 #include "../../Libraries/Foundation/TaggedUnionTest.h"
@@ -44,8 +44,7 @@
 // Async
 #include "../../Libraries/Async/EventLoopTest.h"
 
-SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> globalConsoleBuffer;
-SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> formatConsoleBuffer;
+SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> globalConsoleConversionBuffer;
 
 int main(int argc, const char* argv[])
 {
@@ -53,7 +52,7 @@ int main(int argc, const char* argv[])
     SystemDirectories directories;
     if (not directories.init())
         return -2;
-    Console    console(globalConsoleBuffer, formatConsoleBuffer);
+    Console    console(globalConsoleConversionBuffer);
     TestReport report(console, directories, argc, argv);
     report.debugBreakOnFailedTest = true;
     // clang-format off
@@ -70,7 +69,7 @@ int main(int argc, const char* argv[])
     { PathTest                      test(report); }
     { ResultTest                    test(report); }
     { SmallVectorTest               test(report); }
-    { StringBuilderTest             test(report); }
+    { StringFormatTest              test(report); }
     { StringTest                    test(report); }
     { StringViewTest                test(report); }
     { SystemTest                    test(report); }

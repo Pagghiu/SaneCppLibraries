@@ -60,7 +60,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
                 StringBuilder expected(expectedBuffer);
                 SC_TEST_EXPECT(expected.format("{}{}{}", params.appDirectory, nativeSep, "test.txt"));
-                SC_TEST_EXPECT(fullPath == expected.view());
+                SC_TEST_EXPECT(fullPath == expectedBuffer.view());
                 params.eventObject.signal();
             };
 
@@ -121,7 +121,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
                 StringBuilder expected(expectedBuffer);
                 SC_TEST_EXPECT(expected.format("{}{}{}", params.appDirectory, nativeSep, dirBuffer.view()));
-                SC_TEST_EXPECT(fullPath == expected.view());
+                SC_TEST_EXPECT(fullPath == expectedBuffer.view());
             };
 
             FileSystem fs;

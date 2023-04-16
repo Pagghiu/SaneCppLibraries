@@ -62,7 +62,6 @@ Libraries/Foundation/Console.cpp            \
 Libraries/Foundation/Memory.cpp             \
 Libraries/Foundation/Path.cpp               \
 Libraries/Foundation/String.cpp             \
-Libraries/Foundation/StringBuilder.cpp      \
 Libraries/Foundation/StringConverter.cpp    \
 Libraries/Foundation/StringFormat.cpp       \
 Libraries/Foundation/StringView.cpp         \

@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "StringFormat.h"
 #include "Console.h"
+#include "StringBuilder.h"
 #include "StringConverter.h"
 
 #include <inttypes.h> // PRIu64 / PRIi64
@@ -14,8 +15,8 @@ namespace SC
 {
 
 template <size_t BUFFER_SIZE = 100, size_t SPECIFIER_LENGTH, typename Value>
-bool formatSprintf(StringFormatOutput& data, char (&formatSpecifier)[SPECIFIER_LENGTH], StringIteratorASCII specifier,
-                   const Value value)
+bool formatSprintf(StringFormatOutput& data, const char (&formatSpecifier)[SPECIFIER_LENGTH],
+                   StringIteratorASCII specifier, const Value value)
 {
     const int SPECIFIER_SIZE = 50;
     char      compoundSpecifier[SPECIFIER_SIZE];
@@ -35,14 +36,14 @@ bool formatSprintf(StringFormatOutput& data, char (&formatSpecifier)[SPECIFIER_L
 bool StringFormatterFor<SC::size_t>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
                                             const SC::size_t value)
 {
-    char_t formatSpecifier[] = "zu";
+    constexpr char_t formatSpecifier[] = "zu";
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 
 bool StringFormatterFor<SC::ssize_t>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
                                              const SC::ssize_t value)
 {
-    char_t formatSpecifier[] = "zd";
+    constexpr char_t formatSpecifier[] = "zd";
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 #endif
@@ -50,28 +51,28 @@ bool StringFormatterFor<SC::ssize_t>::format(StringFormatOutput& data, const Str
 bool StringFormatterFor<SC::int64_t>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
                                              const SC::int64_t value)
 {
-    char_t formatSpecifier[] = PRIi64;
+    constexpr char_t formatSpecifier[] = PRIi64;
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 
 bool StringFormatterFor<SC::uint64_t>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
                                               const SC::uint64_t value)
 {
-    char_t formatSpecifier[] = PRIu64;
+    constexpr char_t formatSpecifier[] = PRIu64;
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 
 bool StringFormatterFor<SC::int32_t>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
                                              const SC::int32_t value)
 {
-    char_t formatSpecifier[] = "d";
+    constexpr char_t formatSpecifier[] = "d";
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 
 bool StringFormatterFor<SC::uint32_t>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
                                               const SC::uint32_t value)
 {
-    char_t formatSpecifier[] = "d";
+    constexpr char_t formatSpecifier[] = "d";
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 
@@ -100,14 +101,14 @@ bool StringFormatterFor<SC::uint8_t>::format(StringFormatOutput& data, const Str
 
 bool StringFormatterFor<float>::format(StringFormatOutput& data, StringIteratorASCII specifier, const float value)
 {
-    char_t formatSpecifier[] = "f";
+    constexpr char_t formatSpecifier[] = "f";
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 
 bool StringFormatterFor<double>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
                                         const double value)
 {
-    char_t formatSpecifier[] = "f";
+    constexpr char_t formatSpecifier[] = "f";
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 
@@ -138,14 +139,7 @@ bool StringFormatterFor<const wchar_t*>::format(StringFormatOutput& data, const 
 bool StringFormatterFor<SC::StringView>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
                                                 const SC::StringView value)
 {
-    if (StringEncodingAreBinaryCompatible(value.getEncoding(), data.getEncoding()))
-        SC_LIKELY { return data.write(value); }
-    else
-    {
-        StringView encodedText;
-        SC_TRY_IF(StringConverter::convertEncodingTo(data.getEncoding(), value, data.temporaryBuffer, &encodedText));
-        return data.write(encodedText);
-    }
+    return data.write(value);
 }
 
 bool StringFormatOutput::write(StringView text)
@@ -192,14 +186,8 @@ bool StringFormatOutput::onFormatSucceded()
     {
         if (backupSize < data->size())
         {
-            // TODO: we should push depending on encoding
-            int  numZeroes = StringEncodingGetSize(encoding);
-            bool res       = true;
-            while (numZeroes-- > 0)
-            {
-                res &= data->push_back(0);
-            }
-            return res;
+            // Add null terminator
+            return data->resize(data->size() + StringEncodingGetSize(encoding));
         }
     }
     return true;
@@ -212,4 +200,13 @@ void StringFormatOutput::onFormatFailed()
         (void)data->resize(backupSize);
     }
 }
+
+bool StringBuilder::append(StringView str)
+{
+    if (str.isEmpty())
+        return true;
+    SC_TRY_IF(backingString.popNulltermIfExists());
+    return StringConverter::convertEncodingTo(backingString.getEncoding(), str, backingString.data);
+}
+
 } // namespace SC

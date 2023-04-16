@@ -132,21 +132,21 @@ struct SC::FileSystem::Internal
         s.wFunc  = FO_COPY;
         SC_TRY_IF(StringConverter(sourceDirectory).appendNullTerminated(L"\\*"));
         // SHFileOperationW needs two null termination bytes
-        sourceDirectory.pushNullTerm();
-        destinationDirectory.pushNullTerm();
+        SC_TRY_IF(sourceDirectory.pushNullTerm());
+        SC_TRY_IF(destinationDirectory.pushNullTerm());
         s.pFrom       = sourceDirectory.view().getNullTerminatedNative();
         s.pTo         = dest;
         const int res = SHFileOperationW(&s);
         return res == 0;
     }
 
-    [[nodiscard]] static bool removeDirectoryRecursive(String& sourceDirectory)
+    [[nodiscard]] static ReturnCode removeDirectoryRecursive(String& sourceDirectory)
     {
         SHFILEOPSTRUCTW s = {0};
         s.fFlags          = FOF_SILENT | FOF_NOCONFIRMMKDIR | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NO_UI;
         s.wFunc           = FO_DELETE;
         // SHFileOperationW needs two null termination bytes
-        sourceDirectory.pushNullTerm();
+        SC_TRY_IF(sourceDirectory.pushNullTerm());
         s.pFrom       = sourceDirectory.view().getNullTerminatedNative();
         const int res = SHFileOperationW(&s);
         return res == 0;

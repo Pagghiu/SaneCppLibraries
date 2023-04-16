@@ -26,5 +26,4 @@ struct SC::SystemDirectories
     SmallString<StaticPathSize> applicationRootDirectory; // Full path to (native encoding) Application directory
 
     [[nodiscard]] bool init();
-    [[nodiscard]] bool close();
 };

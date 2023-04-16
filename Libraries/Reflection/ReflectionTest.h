@@ -238,7 +238,7 @@ inline int printAtoms(Console& console, int currentAtomIdx, const MetaProperties
         (void)builder.append("\t");
 
     (void)builder.append("}\n");
-    console.print(builder.view());
+    console.print(buffer.view());
     return atom->numSubAtoms;
 }
 } // namespace SC
