@@ -216,12 +216,10 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp" />
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Assert.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Console.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\System\System.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Path.cpp" />
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\StaticAsserts.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\String.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringBuilder.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringFormat.cpp" />

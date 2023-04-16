@@ -26,16 +26,10 @@
   <ItemGroup>
     <ClCompile Include="..\..\SCTest.cpp">
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Assert.cpp">
-      <Filter>Foundation</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Console.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp">
-      <Filter>Foundation</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\StaticAsserts.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\String.cpp">

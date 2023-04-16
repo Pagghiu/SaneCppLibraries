@@ -15,13 +15,11 @@
 		7B358DE029D8F063002A7D1C /* CoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B358DDF29D8F063002A7D1C /* CoreServices.framework */; };
 		7B4A291D29B3CD4A00F13DCB /* Time.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B4A291B29B3CD4A00F13DCB /* Time.cpp */; };
 		7B515FF529243087006996AA /* Memory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FD429243086006996AA /* Memory.cpp */; };
-		7B515FF829243087006996AA /* Assert.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FE929243087006996AA /* Assert.cpp */; };
 		7B515FF929243087006996AA /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FEE29243087006996AA /* Console.cpp */; };
 		7B51601029243097006996AA /* Test.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FFB29243097006996AA /* Test.cpp */; };
 		7B51601129243097006996AA /* StringFormat.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FFC29243097006996AA /* StringFormat.cpp */; };
 		7B51601229243097006996AA /* StringView.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FFF29243097006996AA /* StringView.cpp */; };
 		7B51601329243097006996AA /* String.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B51600129243097006996AA /* String.cpp */; };
-		7B51601529243097006996AA /* StaticAsserts.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B51600B29243097006996AA /* StaticAsserts.cpp */; };
 		7B51601629243097006996AA /* StringBuilder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B51600C29243097006996AA /* StringBuilder.cpp */; };
 		7B583F6A2922ECF900FBE019 /* SCTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F692922ECF900FBE019 /* SCTest.cpp */; };
 		7B583F6D2922ED2700FBE019 /* SCTestXCTest.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */; };
@@ -116,7 +114,6 @@
 		7B515FE629243087006996AA /* ConsoleTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ConsoleTest.h; path = ../../../../Libraries/Foundation/ConsoleTest.h; sourceTree = "<group>"; };
 		7B515FE729243087006996AA /* ReflectionFlatSchemaCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionFlatSchemaCompiler.h; path = ../../../../Libraries/Reflection/ReflectionFlatSchemaCompiler.h; sourceTree = "<group>"; };
 		7B515FE829243087006996AA /* SerializationBinarySkipper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationBinarySkipper.h; path = ../../../../Libraries/Serialization/SerializationBinarySkipper.h; sourceTree = "<group>"; };
-		7B515FE929243087006996AA /* Assert.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Assert.cpp; path = ../../../../Libraries/Foundation/Assert.cpp; sourceTree = "<group>"; };
 		7B515FEA29243087006996AA /* Memory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Memory.h; path = ../../../../Libraries/Foundation/Memory.h; sourceTree = "<group>"; };
 		7B515FEB29243087006996AA /* InitializerList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = InitializerList.h; path = ../../../../Libraries/Foundation/InitializerList.h; sourceTree = "<group>"; };
 		7B515FEC29243087006996AA /* Map.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Map.h; path = ../../../../Libraries/Foundation/Map.h; sourceTree = "<group>"; };
@@ -141,7 +138,6 @@
 		7B51600729243097006996AA /* String.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = String.h; path = ../../../../Libraries/Foundation/String.h; sourceTree = "<group>"; };
 		7B51600829243097006996AA /* StringIterator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringIterator.h; path = ../../../../Libraries/Foundation/StringIterator.h; sourceTree = "<group>"; };
 		7B51600A29243097006996AA /* StringBuilderTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringBuilderTest.h; path = ../../../../Libraries/Foundation/StringBuilderTest.h; sourceTree = "<group>"; };
-		7B51600B29243097006996AA /* StaticAsserts.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StaticAsserts.cpp; path = ../../../../Libraries/Foundation/StaticAsserts.cpp; sourceTree = "<group>"; };
 		7B51600C29243097006996AA /* StringBuilder.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringBuilder.cpp; path = ../../../../Libraries/Foundation/StringBuilder.cpp; sourceTree = "<group>"; };
 		7B51600E29243097006996AA /* StringBuilder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringBuilder.h; path = ../../../../Libraries/Foundation/StringBuilder.h; sourceTree = "<group>"; };
 		7B51600F29243097006996AA /* StringTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringTest.h; path = ../../../../Libraries/Foundation/StringTest.h; sourceTree = "<group>"; };
@@ -240,7 +236,6 @@
 			children = (
 				7B515FF329243087006996AA /* Array.h */,
 				7B515FD329243086006996AA /* ArrayTest.h */,
-				7B515FE929243087006996AA /* Assert.cpp */,
 				7B515FD229243086006996AA /* Assert.h */,
 				7B515FE529243087006996AA /* Compiler.h */,
 				7B515FEE29243087006996AA /* Console.cpp */,
@@ -274,7 +269,6 @@
 				7B515FE129243087006996AA /* SmallVector.h */,
 				7B515FF129243087006996AA /* SmallVectorTest.h */,
 				7B515FF029243087006996AA /* Span.h */,
-				7B51600B29243097006996AA /* StaticAsserts.cpp */,
 				7B51600129243097006996AA /* String.cpp */,
 				7B51600729243097006996AA /* String.h */,
 				7B51600C29243097006996AA /* StringBuilder.cpp */,
@@ -530,9 +524,7 @@
 				7B51601229243097006996AA /* StringView.cpp in Sources */,
 				7B51601129243097006996AA /* StringFormat.cpp in Sources */,
 				7B872C4D29AFFC4900949BD2 /* Threading.cpp in Sources */,
-				7B51601529243097006996AA /* StaticAsserts.cpp in Sources */,
 				7B51601029243097006996AA /* Test.cpp in Sources */,
-				7B515FF829243087006996AA /* Assert.cpp in Sources */,
 				7B515FF929243087006996AA /* Console.cpp in Sources */,
 				7BA892AA297E03B50093152B /* System.cpp in Sources */,
 				7B358DDE29D88FFC002A7D1C /* FileSystemWatcher.cpp in Sources */,
