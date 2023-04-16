@@ -1,10 +1,9 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#include "../Foundation/Path.h"
+#include "../Foundation/StringBuilder.h"
 #include "System.h"
-
-#include "Path.h"
-#include "StringBuilder.h"
 
 #include <Windows.h>
 

@@ -2,8 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "String.h"
-#include "Types.h"
+#include "../Foundation/String.h"
 
 namespace SC
 {

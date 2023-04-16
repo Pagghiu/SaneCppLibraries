@@ -17,10 +17,10 @@
 #include "../../Libraries/Foundation/StringBuilderTest.h"
 #include "../../Libraries/Foundation/StringTest.h"
 #include "../../Libraries/Foundation/StringViewTest.h"
-#include "../../Libraries/Foundation/SystemTest.h"
 #include "../../Libraries/Foundation/TaggedUnionTest.h"
 #include "../../Libraries/Foundation/TimeTest.h"
 #include "../../Libraries/Foundation/VectorTest.h"
+#include "../../Libraries/System/SystemTest.h"
 
 // FileSystem
 #include "../../Libraries/FileSystem/FileSystemTest.h"

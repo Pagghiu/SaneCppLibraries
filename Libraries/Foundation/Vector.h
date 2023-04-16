@@ -5,6 +5,7 @@
 #include "Assert.h"
 #include "Limits.h"
 #include "Memory.h"
+#include "Result.h"
 #include "Segment.h"
 #include "Types.h"
 

@@ -59,9 +59,6 @@
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystem.cpp">
       <Filter>FileSystem</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\System.cpp">
-      <Filter>Foundation</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringConverter.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
@@ -84,6 +81,9 @@
       <Filter>FileSystem</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\System\Process.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\System\System.cpp">
       <Filter>System</Filter>
     </ClCompile>
   </ItemGroup>
@@ -137,12 +137,6 @@
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\MemoryTest.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\System.h">
-      <Filter>Foundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\SystemTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Platform.h">
@@ -340,6 +334,12 @@
     <ClInclude Include="..\..\..\..\Libraries\System\ProcessTest.h">
       <Filter>System</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\System\System.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\System\SystemTest.h">
+      <Filter>System</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalPosix.inl">
@@ -365,15 +365,6 @@
     </None>
     <None Include="..\..\..\..\Libraries\FileSystem\FileDescriptorInternalWindows.inl">
       <Filter>FileSystem</Filter>
-    </None>
-    <None Include="..\..\..\..\Libraries\Foundation\SystemInternalEmscripten.inl">
-      <Filter>Foundation</Filter>
-    </None>
-    <None Include="..\..\..\..\Libraries\Foundation\SystemInternalPosix.inl">
-      <Filter>Foundation</Filter>
-    </None>
-    <None Include="..\..\..\..\Libraries\Foundation\SystemInternalWindows.inl">
-      <Filter>Foundation</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\Async\EventLoopInternalApple.inl">
       <Filter>Async</Filter>
@@ -406,6 +397,15 @@
       <Filter>System</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\System\ProcessInternalWindows.inl">
+      <Filter>System</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\System\SystemInternalEmscripten.inl">
+      <Filter>System</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\System\SystemInternalPosix.inl">
+      <Filter>System</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\System\SystemInternalWindows.inl">
       <Filter>System</Filter>
     </None>
   </ItemGroup>

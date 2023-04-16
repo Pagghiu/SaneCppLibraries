@@ -2,10 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "Compiler.h"
+#include "StringFormat.h"
 #include "StringView.h"
-#include "System.h"
-#include "Types.h"
+#include "Vector.h"
 
 namespace SC
 {

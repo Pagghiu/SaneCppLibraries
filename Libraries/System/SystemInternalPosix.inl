@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "System.h"
 
-#include "Console.h"
+#include "../Foundation/Console.h"
 
 #include <execinfo.h> // backtrace
 #include <stdlib.h>   // free
