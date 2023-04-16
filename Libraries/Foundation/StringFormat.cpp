@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "StringFormat.h"
-#include "Console.h"
+#include "../System/Console.h" // TODO: Console here is a module circular dependency. Consider type-erasing with a Function
 #include "StringBuilder.h"
 #include "StringConverter.h"
 

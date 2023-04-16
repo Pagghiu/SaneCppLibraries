@@ -59,13 +59,13 @@ Libraries/FileSystem/FileSystem.cpp         \
 Libraries/FileSystem/FileSystemWalker.cpp   \
 Libraries/FileSystem/FileSystemWatcher.cpp	\
 Libraries/FileSystem/Path.cpp               \
-Libraries/Foundation/Console.cpp            \
 Libraries/Foundation/Memory.cpp             \
 Libraries/Foundation/String.cpp             \
 Libraries/Foundation/StringConverter.cpp    \
 Libraries/Foundation/StringFormat.cpp       \
 Libraries/Foundation/StringView.cpp         \
 Libraries/Foundation/Test.cpp               \
+Libraries/System/Console.cpp                \
 Libraries/System/Process.cpp                \
 Libraries/System/System.cpp                 \
 Libraries/System/Time.cpp                   \

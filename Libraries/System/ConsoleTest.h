@@ -2,10 +2,10 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Foundation/SmallVector.h"
+#include "../Foundation/String.h"
+#include "../Foundation/Test.h"
 #include "Console.h"
-#include "SmallVector.h"
-#include "String.h"
-#include "Test.h"
 
 namespace SC
 {

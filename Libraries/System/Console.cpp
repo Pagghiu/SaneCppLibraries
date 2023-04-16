@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "Console.h"
-#include "Limits.h"
-#include "Platform.h"
-#include "StringConverter.h"
+#include "../Foundation/Limits.h"
+#include "../Foundation/Platform.h"
+#include "../Foundation/StringConverter.h"
 
 #include <stdio.h>  // stdout
 #include <string.h> // strlen

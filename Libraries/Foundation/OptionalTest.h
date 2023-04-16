@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "Optional.h"
+#include "String.h"
 #include "Test.h"
 
 namespace SC

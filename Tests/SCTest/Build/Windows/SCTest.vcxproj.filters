@@ -26,8 +26,8 @@
   <ItemGroup>
     <ClCompile Include="..\..\SCTest.cpp">
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Console.cpp">
-      <Filter>Foundation</Filter>
+    <ClCompile Include="..\..\..\..\Libraries\System\Console.cpp">
+      <Filter>System</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp">
       <Filter>Foundation</Filter>
@@ -91,11 +91,11 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Compiler.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Console.h">
-      <Filter>Foundation</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\System\Console.h">
+      <Filter>System</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\ConsoleTest.h">
-      <Filter>Foundation</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\System\ConsoleTest.h">
+      <Filter>System</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionUtility.h">
       <Filter>Reflection</Filter>

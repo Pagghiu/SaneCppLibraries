@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "StringFormat.h"
-#include "StringView.h"
-#include "Vector.h"
+#include "../Foundation/StringFormat.h"
+#include "../Foundation/StringView.h"
+#include "../Foundation/Vector.h"
 
 namespace SC
 {

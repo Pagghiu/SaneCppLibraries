@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "Test.h"
+#include "../System/Console.h"
 #include "Assert.h"
-#include "Console.h"
 #include <stdlib.h> // exit
 #include <string.h> // strlen
 

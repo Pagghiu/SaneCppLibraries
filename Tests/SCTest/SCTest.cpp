@@ -3,15 +3,14 @@
 // All Rights Reserved. Reproduction is not allowed.
 
 // Foundation
+#include "../../Libraries/FileSystem/PathTest.h"
 #include "../../Libraries/Foundation/ArrayTest.h"
-#include "../../Libraries/Foundation/ConsoleTest.h"
 #include "../../Libraries/Foundation/FunctionTest.h"
 #include "../../Libraries/Foundation/IntrusiveDoubleLinkedListTest.h"
 #include "../../Libraries/Foundation/MapTest.h"
 #include "../../Libraries/Foundation/MemoryTest.h"
 #include "../../Libraries/Foundation/OpaqueTest.h"
 #include "../../Libraries/Foundation/OptionalTest.h"
-#include "../../Libraries/FileSystem/PathTest.h"
 #include "../../Libraries/Foundation/ResultTest.h"
 #include "../../Libraries/Foundation/SmallVectorTest.h"
 #include "../../Libraries/Foundation/StringFormatTest.h"
@@ -19,6 +18,7 @@
 #include "../../Libraries/Foundation/StringViewTest.h"
 #include "../../Libraries/Foundation/TaggedUnionTest.h"
 #include "../../Libraries/Foundation/VectorTest.h"
+#include "../../Libraries/System/ConsoleTest.h"
 
 // FileSystem
 #include "../../Libraries/FileSystem/FileSystemTest.h"

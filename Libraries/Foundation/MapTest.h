@@ -4,6 +4,7 @@
 #pragma once
 #include "Array.h"
 #include "Map.h"
+#include "String.h"
 #include "Test.h"
 
 namespace SC

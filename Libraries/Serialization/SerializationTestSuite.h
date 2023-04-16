@@ -3,13 +3,13 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/Array.h"
-#include "../Foundation/Console.h"
 #include "../Foundation/String.h"
 #include "../Foundation/StringBuilder.h"
 #include "../Foundation/StringView.h"
 #include "../Foundation/Test.h"
 #include "../Foundation/Vector.h"
 #include "../Reflection/Reflection.h"
+#include "../System/Console.h"
 
 namespace SC
 {
