@@ -219,7 +219,7 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Console.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\System\System.cpp" />
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Path.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\FileSystem\Path.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\String.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringFormat.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringConverter.cpp" />
@@ -266,8 +266,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\OptionalTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\System\System.h" />
     <ClInclude Include="..\..\..\..\Libraries\System\SystemTest.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Path.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\PathTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\FileSystem\Path.h" />
+    <ClInclude Include="..\..\..\..\Libraries\FileSystem\PathTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Platform.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Result.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ResultTest.h" />

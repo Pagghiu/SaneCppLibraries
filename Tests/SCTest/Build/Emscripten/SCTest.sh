@@ -58,9 +58,9 @@ Libraries/FileSystem/FileDescriptor.cpp     \
 Libraries/FileSystem/FileSystem.cpp         \
 Libraries/FileSystem/FileSystemWalker.cpp   \
 Libraries/FileSystem/FileSystemWatcher.cpp	\
+Libraries/FileSystem/Path.cpp               \
 Libraries/Foundation/Console.cpp            \
 Libraries/Foundation/Memory.cpp             \
-Libraries/Foundation/Path.cpp               \
 Libraries/Foundation/String.cpp             \
 Libraries/Foundation/StringConverter.cpp    \
 Libraries/Foundation/StringFormat.cpp       \

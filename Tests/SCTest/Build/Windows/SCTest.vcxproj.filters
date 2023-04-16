@@ -44,8 +44,8 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Test.cpp">
       <Filter>Foundation</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Path.cpp">
-      <Filter>Foundation</Filter>
+    <ClCompile Include="..\..\..\..\Libraries\FileSystem\Path.cpp">
+      <Filter>FileSystem</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystem.cpp">
       <Filter>FileSystem</Filter>
@@ -184,11 +184,11 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\VectorTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Path.h">
-      <Filter>Foundation</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\FileSystem\Path.h">
+      <Filter>FileSystem</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\PathTest.h">
-      <Filter>Foundation</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\FileSystem\PathTest.h">
+      <Filter>FileSystem</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystem.h">
       <Filter>FileSystem</Filter>

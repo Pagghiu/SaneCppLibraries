@@ -11,7 +11,7 @@
 #include "../../Libraries/Foundation/MemoryTest.h"
 #include "../../Libraries/Foundation/OpaqueTest.h"
 #include "../../Libraries/Foundation/OptionalTest.h"
-#include "../../Libraries/Foundation/PathTest.h"
+#include "../../Libraries/FileSystem/PathTest.h"
 #include "../../Libraries/Foundation/ResultTest.h"
 #include "../../Libraries/Foundation/SmallVectorTest.h"
 #include "../../Libraries/Foundation/StringFormatTest.h"

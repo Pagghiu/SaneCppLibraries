@@ -66,9 +66,9 @@
 		7B0C299C297CA7CC0071C5B4 /* FileSystem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = FileSystem.cpp; path = ../../../../Libraries/FileSystem/FileSystem.cpp; sourceTree = "<group>"; };
 		7B14DE9E29858C35004C4F3B /* FileSystemInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalWindows.inl; path = ../../../../Libraries/FileSystem/FileSystemInternalWindows.inl; sourceTree = "<group>"; };
 		7B14DE9F29858C35004C4F3B /* FileSystemInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalPosix.inl; path = ../../../../Libraries/FileSystem/FileSystemInternalPosix.inl; sourceTree = "<group>"; };
-		7B19C9A9297AF95B001C0627 /* Path.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Path.cpp; path = ../../../../Libraries/Foundation/Path.cpp; sourceTree = "<group>"; };
-		7B19C9AA297AF95B001C0627 /* PathTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PathTest.h; path = ../../../../Libraries/Foundation/PathTest.h; sourceTree = "<group>"; };
-		7B19C9AB297AF95B001C0627 /* Path.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Path.h; path = ../../../../Libraries/Foundation/Path.h; sourceTree = "<group>"; };
+		7B19C9A9297AF95B001C0627 /* Path.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Path.cpp; path = ../../../../Libraries/FileSystem/Path.cpp; sourceTree = "<group>"; };
+		7B19C9AA297AF95B001C0627 /* PathTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PathTest.h; path = ../../../../Libraries/FileSystem/PathTest.h; sourceTree = "<group>"; };
+		7B19C9AB297AF95B001C0627 /* Path.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Path.h; path = ../../../../Libraries/FileSystem/Path.h; sourceTree = "<group>"; };
 		7B1A39FA29BA7B220087F688 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 		7B27836029EBE4F0002CA0A4 /* StringFormatTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StringFormatTest.h; path = ../../../../Libraries/Foundation/StringFormatTest.h; sourceTree = "<group>"; };
 		7B281DBF29E2BAF400363F69 /* EventLoopWindows.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = EventLoopWindows.h; path = ../../../../Libraries/Async/EventLoopWindows.h; sourceTree = "<group>"; };
@@ -225,6 +225,8 @@
 				7BC56BD929946B1800EED472 /* FileSystemWalkerInternalPosix.inl */,
 				7BC56BDA29946B1800EED472 /* FileSystemWalkerInternalWindows.inl */,
 				7BC56BD629946AD100EED472 /* FileSystemWalkerTest.h */,
+				7B19C9A9297AF95B001C0627 /* Path.cpp */,
+				7B19C9AB297AF95B001C0627 /* Path.h */,
 			);
 			name = FileSystem;
 			sourceTree = "<group>";
@@ -256,8 +258,6 @@
 				7B91CBEF29B17F470013E95E /* OpaqueTest.h */,
 				7B75258729A16F8000779F2A /* Optional.h */,
 				7B75258629A16F8000779F2A /* OptionalTest.h */,
-				7B19C9A9297AF95B001C0627 /* Path.cpp */,
-				7B19C9AB297AF95B001C0627 /* Path.h */,
 				7B19C9AA297AF95B001C0627 /* PathTest.h */,
 				7B515FE029243087006996AA /* Platform.h */,
 				7B515FD729243086006996AA /* Result.h */,

@@ -13,7 +13,7 @@
 #include "FileSystemInternalPosix.inl"
 #endif
 
-#include "../Foundation/Path.h"
+#include "../FileSystem/Path.h"
 
 SC::ReturnCode SC::FileSystem::init(StringView currentWorkingDirectory)
 {

@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Path.h"
+#include "../FileSystem/Path.h"
 #include "FileSystem.h"
 
 namespace SC

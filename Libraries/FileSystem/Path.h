@@ -4,15 +4,13 @@
 //
 // Path - Parse filesystem paths for windows and posix
 #pragma once
-#include "StringView.h"
+#include "../Foundation/StringView.h"
 
 namespace SC
 {
 struct Path;
 struct PathView;
 struct PathParsedView;
-struct Extension;
-struct FileName;
 struct String;
 } // namespace SC
 

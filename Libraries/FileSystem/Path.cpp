@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "Path.h"
-#include "StringBuilder.h" // join
+#include "../Foundation/StringBuilder.h" // join
 
 struct SC::Path::Internal
 {
