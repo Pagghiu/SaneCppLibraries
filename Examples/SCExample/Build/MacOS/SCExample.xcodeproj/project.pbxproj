@@ -64,7 +64,7 @@
 		7B0C90802972F28C001D97A2 /* LibC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = LibC.h; path = ../../../../Libraries/Foundation/LibC.h; sourceTree = "<group>"; };
 		7B0C90812972F28C001D97A2 /* Segment.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Segment.h; path = ../../../../Libraries/Foundation/Segment.h; sourceTree = "<group>"; };
 		7B0C90822972F28C001D97A2 /* StaticAsserts.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StaticAsserts.cpp; path = ../../../../Libraries/Foundation/StaticAsserts.cpp; sourceTree = "<group>"; };
-		7B0C90832972F28C001D97A2 /* ConstexprTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ConstexprTypes.h; path = ../../../../Libraries/Foundation/ConstexprTypes.h; sourceTree = "<group>"; };
+		7B0C90832972F28C001D97A2 /* ReflectionUtility.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionUtility.h; path = ../../../../Libraries/Reflection/ReflectionUtility.h; sourceTree = "<group>"; };
 		7B0C90842972F28C001D97A2 /* StringFormat.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringFormat.cpp; path = ../../../../Libraries/Foundation/StringFormat.cpp; sourceTree = "<group>"; };
 		7B0C90852972F28C001D97A2 /* Reflection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Reflection.h; path = ../../../../Libraries/Reflection/Reflection.h; sourceTree = "<group>"; };
 		7B0C90862972F28C001D97A2 /* Platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Platform.h; path = ../../../../Libraries/Foundation/Platform.h; sourceTree = "<group>"; };
@@ -200,7 +200,7 @@
 				7B0C90782972F28C001D97A2 /* Console.cpp */,
 				7B0C907B2972F28C001D97A2 /* Console.h */,
 				7B0C90892972F28C001D97A2 /* ConsoleTest.h */,
-				7B0C90832972F28C001D97A2 /* ConstexprTypes.h */,
+				7B0C90832972F28C001D97A2 /* ReflectionUtility.h */,
 				7B9F61312995ACCE0011F4D4 /* FixedSizePimpl.h */,
 				7B0C90A92972F28C001D97A2 /* Function.h */,
 				7B0C90AE2972F28C001D97A2 /* FunctionTest.h */,

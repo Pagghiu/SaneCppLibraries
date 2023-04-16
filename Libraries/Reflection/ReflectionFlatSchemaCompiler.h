@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/ConstexprTypes.h"
 #include "../Foundation/Span.h" // TODO: Remove Span.h dependency
 #include "Reflection.h"
+#include "ReflectionUtility.h"
 
 namespace SC
 {

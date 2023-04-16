@@ -97,8 +97,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ConsoleTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\ConstexprTypes.h">
-      <Filter>Foundation</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionUtility.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Function.h">
       <Filter>Foundation</Filter>

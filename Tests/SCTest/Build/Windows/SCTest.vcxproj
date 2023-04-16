@@ -250,7 +250,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Opaque.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Console.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ConsoleTest.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\ConstexprTypes.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionUtility.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Function.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\FunctionTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\InitializerList.h" />
