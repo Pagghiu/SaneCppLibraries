@@ -7,6 +7,7 @@
 
 #include <inttypes.h> // PRIu64 / PRIi64
 #include <stdio.h>    // snprintf
+#include <string.h>   // strlen
 #include <wchar.h>    // wcslen
 
 namespace SC

@@ -82,7 +82,7 @@ struct SC::ResultTest : public SC::TestCase
         else
         {
             Vector<char> valueTest;
-            SC_TRY_MSG(valueTest.appendCopy("CIAO!", strlen("CIAO!") + 1), "Failed Append"_a8);
+            SC_TRY_MSG(valueTest.appendCopy("CIAO!", 6), "Failed Append"_a8);
             return valueTest;
         }
     }

@@ -3,6 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "StringView.h"
 
+#include <stdlib.h> //atoi
+
 bool SC::StringView::parseInt32(int32_t* value) const
 {
     if (isIntegerNumber<StringIteratorASCII>())

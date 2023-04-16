@@ -6,7 +6,8 @@
 #include "Platform.h"
 #include "StringConverter.h"
 
-#include <stdio.h> // stdout
+#include <stdio.h>  // stdout
+#include <string.h> // strlen
 
 #if SC_PLATFORM_WINDOWS
 #include <Windows.h>

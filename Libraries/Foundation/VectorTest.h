@@ -4,6 +4,7 @@
 #pragma once
 #include "Test.h"
 #include "Vector.h"
+
 namespace SC
 {
 struct VectorTest;
@@ -127,7 +128,7 @@ struct SC::VectorTestClass
         }
         else
         {
-            return StringView(data, strlen(data), true, StringEncoding::Ascii);
+            return StringView(data, dataLength(data), true, StringEncoding::Ascii);
         }
     }
 
@@ -138,9 +139,18 @@ struct SC::VectorTestClass
     }
 
   private:
+    static size_t dataLength(const char* str)
+    {
+        size_t idx = 0;
+        while (str[idx] != 0)
+        {
+            ++idx;
+        }
+        return idx;
+    }
     void copyString(const char_t* initData)
     {
-        const size_t numBytes = strlen(initData) + 1;
+        const size_t numBytes = dataLength(initData) + 1;
         data                  = static_cast<char_t*>(memoryAllocate(numBytes));
         memcpy(data, initData, numBytes);
     }

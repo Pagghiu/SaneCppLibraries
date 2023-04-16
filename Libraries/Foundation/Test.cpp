@@ -5,6 +5,8 @@
 #include "Assert.h"
 #include "Console.h"
 #include <stdlib.h> // exit
+#include <string.h> // strlen
+
 namespace SC
 {
 static const StringView redEMOJI   = "\xf0\x9f\x9f\xa5"_u8;
