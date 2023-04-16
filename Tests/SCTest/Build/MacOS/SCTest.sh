@@ -56,8 +56,8 @@ Libraries/Foundation/StringConverter.cpp    \
 Libraries/Foundation/StringFormat.cpp       \
 Libraries/Foundation/StringView.cpp         \
 Libraries/Foundation/Test.cpp               \
-Libraries/Foundation/Time.cpp               \
 Libraries/System/Process.cpp                \
 Libraries/System/System.cpp                 \
+Libraries/System/Time.cpp                   \
 Libraries/Threading/Threading.cpp           \
 ${SCRIPT_DIR}/../../SCTest.cpp

@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Foundation/Test.h"
 #include "../Threading/Threading.h"
-#include "Test.h"
 #include "Time.h"
 
 namespace SC

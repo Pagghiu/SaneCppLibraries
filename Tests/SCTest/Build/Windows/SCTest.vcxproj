@@ -225,7 +225,7 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringConverter.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringView.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Test.cpp" />
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Time.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\System\Time.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileDescriptor.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystem.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWalker.cpp" />
@@ -286,8 +286,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\TaggedUnion.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\TaggedUnionTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Test.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Time.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\TimeTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\System\Time.h" />
+    <ClInclude Include="..\..\..\..\Libraries\System\TimeTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\TypeList.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Types.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\UniquePtr.h" />

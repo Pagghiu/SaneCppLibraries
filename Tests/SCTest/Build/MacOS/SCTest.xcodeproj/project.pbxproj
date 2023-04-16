@@ -77,8 +77,8 @@
 		7B2F86E029887CA400EFC5FB /* FileSystemInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalEmscripten.inl; path = ../../../../Libraries/FileSystem/FileSystemInternalEmscripten.inl; sourceTree = "<group>"; };
 		7B358DDC29D88E93002A7D1C /* FileSystemWatcher.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FileSystemWatcher.cpp; path = ../../../../Libraries/FileSystem/FileSystemWatcher.cpp; sourceTree = "<group>"; };
 		7B358DDF29D8F063002A7D1C /* CoreServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreServices.framework; path = System/Library/Frameworks/CoreServices.framework; sourceTree = SDKROOT; };
-		7B4A291B29B3CD4A00F13DCB /* Time.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Time.cpp; path = ../../../../Libraries/Foundation/Time.cpp; sourceTree = "<group>"; };
-		7B4A291C29B3CD4A00F13DCB /* Time.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Time.h; path = ../../../../Libraries/Foundation/Time.h; sourceTree = "<group>"; };
+		7B4A291B29B3CD4A00F13DCB /* Time.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Time.cpp; path = ../../../../Libraries/System/Time.cpp; sourceTree = "<group>"; };
+		7B4A291C29B3CD4A00F13DCB /* Time.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Time.h; path = ../../../../Libraries/System/Time.h; sourceTree = "<group>"; };
 		7B4B99EF2937EBAC003D17A6 /* ReflectionAutoAggregates.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ReflectionAutoAggregates.h; path = ../../../../Libraries/Reflection/ReflectionAutoAggregates.h; sourceTree = "<group>"; };
 		7B4B99F02937EBAC003D17A6 /* ReflectionAutoStructured.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ReflectionAutoStructured.h; path = ../../../../Libraries/Reflection/ReflectionAutoStructured.h; sourceTree = "<group>"; };
 		7B5119C5293C0DF60061646E /* SCConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SCConfig.h; path = ../../SCConfig.h; sourceTree = "<group>"; };
@@ -146,7 +146,7 @@
 		7B5A353328E8640B00B2F589 /* SCTestXCTest.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SCTestXCTest.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B67008C29C28DF600174AB8 /* IntrusiveDoubleLinkedList.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = IntrusiveDoubleLinkedList.h; path = ../../../../Libraries/Foundation/IntrusiveDoubleLinkedList.h; sourceTree = "<group>"; };
 		7B67008D29C28DF600174AB8 /* IntrusiveDoubleLinkedListTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = IntrusiveDoubleLinkedListTest.h; path = ../../../../Libraries/Foundation/IntrusiveDoubleLinkedListTest.h; sourceTree = "<group>"; };
-		7B6A1E9F29B2B07F00DDCF40 /* TimeTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TimeTest.h; path = ../../../../Libraries/Foundation/TimeTest.h; sourceTree = "<group>"; };
+		7B6A1E9F29B2B07F00DDCF40 /* TimeTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TimeTest.h; path = ../../../../Libraries/System/TimeTest.h; sourceTree = "<group>"; };
 		7B75258629A16F8000779F2A /* OptionalTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OptionalTest.h; path = ../../../../Libraries/Foundation/OptionalTest.h; sourceTree = "<group>"; };
 		7B75258729A16F8000779F2A /* Optional.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Optional.h; path = ../../../../Libraries/Foundation/Optional.h; sourceTree = "<group>"; };
 		7B872C4629AFF1D900949BD2 /* SystemInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SystemInternalApple.inl; path = ../../../../Libraries/System/SystemInternalApple.inl; sourceTree = "<group>"; };
@@ -283,9 +283,6 @@
 				7B89A60229BFD9D6006EF085 /* TaggedUnionTest.h */,
 				7B515FFB29243097006996AA /* Test.cpp */,
 				7B51600629243097006996AA /* Test.h */,
-				7B4A291B29B3CD4A00F13DCB /* Time.cpp */,
-				7B4A291C29B3CD4A00F13DCB /* Time.h */,
-				7B6A1E9F29B2B07F00DDCF40 /* TimeTest.h */,
 				7B89A60429BFE1A4006EF085 /* TypeList.h */,
 				7B51600229243097006996AA /* Types.h */,
 				7B8B919929DB868C0051AF74 /* UniquePtr.h */,
@@ -369,6 +366,9 @@
 				7B515FE429243087006996AA /* SystemInternalPosix.inl */,
 				7BA892A7297E032F0093152B /* SystemInternalWindows.inl */,
 				7B515FC829243086006996AA /* SystemTest.h */,
+				7B4A291B29B3CD4A00F13DCB /* Time.cpp */,
+				7B4A291C29B3CD4A00F13DCB /* Time.h */,
+				7B6A1E9F29B2B07F00DDCF40 /* TimeTest.h */,
 			);
 			name = System;
 			sourceTree = "<group>";

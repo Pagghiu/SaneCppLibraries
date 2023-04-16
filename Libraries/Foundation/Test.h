@@ -8,22 +8,21 @@
 namespace SC
 {
 struct TestCase;
-struct SystemDirectories;
 
 struct TestReport
 {
-    bool               abortOnFirstFailedTest = true;
-    bool               debugBreakOnFailedTest = true;
-    uint32_t           numTestsSucceeded      = 0;
-    uint32_t           numTestsFailed         = 0;
-    StringView         currentSection;
-    StringView         firstFailedTest;
-    StringView         testToRun;
-    StringView         sectionToRun;
-    Console&           console;
-    SystemDirectories& paths;
+    bool       abortOnFirstFailedTest = true;
+    bool       debugBreakOnFailedTest = true;
+    uint32_t   numTestsSucceeded      = 0;
+    uint32_t   numTestsFailed         = 0;
+    StringView currentSection;
+    StringView firstFailedTest;
+    StringView testToRun;
+    StringView sectionToRun;
+    StringView applicationRootDirectory;
+    Console&   console;
 
-    TestReport(Console& console, SystemDirectories& paths, int argc, const char** argv);
+    TestReport(Console& console, int argc, const char** argv);
     ~TestReport();
 
     void testCaseFinished(TestCase& testCase);

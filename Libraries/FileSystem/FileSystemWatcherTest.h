@@ -16,7 +16,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
     FileSystemWatcherTest(SC::TestReport& report) : TestCase(report, "FileSystemWatcherTest")
     {
         using namespace SC;
-        const StringView appDirectory = report.paths.applicationRootDirectory.view();
+        const StringView appDirectory = report.applicationRootDirectory;
         if (test_section("Init/Close"))
         {
             FileSystemWatcher::ThreadRunner runner;

@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "Time.h"
-#include "Limits.h"
+#include "../Foundation/Limits.h"
 
 #if SC_PLATFORM_WINDOWS
 #include <Windows.h>

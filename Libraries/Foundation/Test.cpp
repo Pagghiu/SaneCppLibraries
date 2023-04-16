@@ -12,8 +12,7 @@ namespace SC
 static const StringView redEMOJI   = "\xf0\x9f\x9f\xa5"_u8;
 static const StringView greenEMOJI = "\xf0\x9f\x9f\xa9"_u8;
 } // namespace SC
-SC::TestReport::TestReport(Console& console, SystemDirectories& paths, int argc, const char** argv)
-    : console(console), paths(paths)
+SC::TestReport::TestReport(Console& console, int argc, const char** argv) : console(console)
 {
     for (int idx = 1; idx < argc; ++idx)
     {

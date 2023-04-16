@@ -4,6 +4,7 @@
 #pragma once
 #include "../Foundation/Path.h"
 #include "FileSystem.h"
+
 namespace SC
 {
 struct FileSystemTest;
@@ -17,7 +18,7 @@ struct SC::FileSystemTest : public SC::TestCase
         if (test_section("formatError"))
         {
             FileSystem fs;
-            SC_TEST_EXPECT(fs.init(report.paths.applicationRootDirectory.view()));
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
             fs.preciseErrorMessages = true;
 
             ReturnCode res = fs.removeEmptyDirectory("randomNonExistingDirectory"_a8);
@@ -37,7 +38,7 @@ struct SC::FileSystemTest : public SC::TestCase
         if (test_section("makeDirectory / isDirectory / removeEmptyDirectory"))
         {
             FileSystem fs;
-            SC_TEST_EXPECT(fs.init(report.paths.applicationRootDirectory.view()));
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
 
             SC_TEST_EXPECT(not fs.existsAndIsDirectory("Test"));
             SC_TEST_EXPECT(fs.makeDirectory("Test"_a8));
@@ -58,7 +59,7 @@ struct SC::FileSystemTest : public SC::TestCase
         if (test_section("write / read / removeFile"))
         {
             FileSystem fs;
-            SC_TEST_EXPECT(fs.init(report.paths.applicationRootDirectory.view()));
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
             StringView content = "ASDF content"_a8;
             SC_TEST_EXPECT(not fs.exists("file.txt"));
             SC_TEST_EXPECT(fs.write("file.txt", content));
@@ -73,7 +74,7 @@ struct SC::FileSystemTest : public SC::TestCase
         {
             FileSystem fs;
             StringView contentSource = "this is some content"_a8;
-            SC_TEST_EXPECT(fs.init(report.paths.applicationRootDirectory.view()));
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
             SC_TEST_EXPECT(not fs.exists("sourceFile.txt"));
             SC_TEST_EXPECT(fs.write("sourceFile.txt", contentSource));
             SC_TEST_EXPECT(fs.existsAndIsFile("sourceFile.txt"));
@@ -95,7 +96,7 @@ struct SC::FileSystemTest : public SC::TestCase
         if (test_section("Copy Directory (recursive)"))
         {
             FileSystem fs;
-            SC_TEST_EXPECT(fs.init(report.paths.applicationRootDirectory.view()));
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
             // Create a directory
             SC_TEST_EXPECT(fs.makeDirectory("copyDirectory"_a8));
             SC_TEST_EXPECT(fs.write("copyDirectory/testFile.txt", "asdf"_a8));
@@ -124,7 +125,7 @@ struct SC::FileSystemTest : public SC::TestCase
         if (test_section("Remove Directory (recursive)"))
         {
             FileSystem fs;
-            SC_TEST_EXPECT(fs.init(report.paths.applicationRootDirectory.view()));
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
             SC_TEST_EXPECT(fs.makeDirectory("removeDirectoryTest"_a8));
             SC_TEST_EXPECT(fs.write("removeDirectoryTest/testFile.txt", "asdf"_a8));
             SC_TEST_EXPECT(fs.makeDirectory("removeDirectoryTest/another"_a8));

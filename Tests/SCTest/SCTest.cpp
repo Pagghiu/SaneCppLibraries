@@ -18,9 +18,7 @@
 #include "../../Libraries/Foundation/StringTest.h"
 #include "../../Libraries/Foundation/StringViewTest.h"
 #include "../../Libraries/Foundation/TaggedUnionTest.h"
-#include "../../Libraries/Foundation/TimeTest.h"
 #include "../../Libraries/Foundation/VectorTest.h"
-#include "../../Libraries/System/SystemTest.h"
 
 // FileSystem
 #include "../../Libraries/FileSystem/FileSystemTest.h"
@@ -36,6 +34,8 @@
 
 // System
 #include "../../Libraries/System/ProcessTest.h"
+#include "../../Libraries/System/SystemTest.h"
+#include "../../Libraries/System/TimeTest.h"
 
 // Threading
 #include "../../Libraries/Threading/AtomicTest.h"
@@ -53,8 +53,9 @@ int main(int argc, const char* argv[])
     if (not directories.init())
         return -2;
     Console    console(globalConsoleConversionBuffer);
-    TestReport report(console, directories, argc, argv);
-    report.debugBreakOnFailedTest = true;
+    TestReport report(console, argc, argv);
+    report.applicationRootDirectory = directories.applicationRootDirectory.view();
+    report.debugBreakOnFailedTest   = true;
     // clang-format off
 
     // Foundation tests
@@ -72,9 +73,7 @@ int main(int argc, const char* argv[])
     { StringFormatTest              test(report); }
     { StringTest                    test(report); }
     { StringViewTest                test(report); }
-    { SystemTest                    test(report); }
     { TaggedUnionTest               test(report); }
-    { TimeTest                      test(report); }
     { VectorTest                    test(report); }
 
     // FileSystem tests
@@ -91,6 +90,8 @@ int main(int argc, const char* argv[])
 
     // System tests
     { ProcessTest                   test(report); }
+    { SystemTest                    test(report); }
+    { TimeTest                      test(report); }
 
     // Threading tests
     { AtomicTest                    test(report); }

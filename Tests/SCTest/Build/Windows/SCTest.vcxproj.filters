@@ -65,8 +65,8 @@
     <ClCompile Include="..\..\..\..\Libraries\Threading\Threading.cpp">
       <Filter>Threading</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Time.cpp">
-      <Filter>Foundation</Filter>
+    <ClCompile Include="..\..\..\..\Libraries\System\Time.cpp">
+      <Filter>System</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp">
       <Filter>FileSystem</Filter>
@@ -265,11 +265,11 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\OpaqueTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Time.h">
-      <Filter>Foundation</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\System\Time.h">
+      <Filter>System</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\TimeTest.h">
-      <Filter>Foundation</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\System\TimeTest.h">
+      <Filter>System</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\TypeList.h">
       <Filter>Foundation</Filter>

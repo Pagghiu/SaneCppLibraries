@@ -10,7 +10,7 @@
 #include "../Foundation/Optional.h"
 #include "../Foundation/Span.h"
 #include "../Foundation/TaggedUnion.h"
-#include "../Foundation/Time.h"
+#include "../System/Time.h"
 #include "../Threading/Atomic.h"
 
 namespace SC
