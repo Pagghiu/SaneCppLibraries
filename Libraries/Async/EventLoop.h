@@ -6,8 +6,6 @@
 #include "../FileSystem/FileDescriptor.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/IntrusiveDoubleLinkedList.h"
-#include "../Foundation/Limits.h"
-#include "../Foundation/Optional.h"
 #include "../Foundation/Span.h"
 #include "../Foundation/TaggedUnion.h"
 #include "../System/Time.h"

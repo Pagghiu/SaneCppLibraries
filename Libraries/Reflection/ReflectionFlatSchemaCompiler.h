@@ -4,7 +4,7 @@
 #pragma once
 #include "../Foundation/Span.h" // TODO: Remove Span.h dependency
 #include "Reflection.h"
-#include "ReflectionUtility.h"
+#include "ReflectionMetaprogramming.h"
 
 namespace SC
 {

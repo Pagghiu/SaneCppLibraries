@@ -29,7 +29,7 @@ struct SC::VectorAllocator
         if (oldHeader->options.isSmallVector)
         {
             newHeader = static_cast<SegmentHeader*>(memoryAllocate(sizeof(SegmentHeader) + newSize));
-            newHeader->options.isSmallVector           = false;
+            newHeader->initDefaults();
             newHeader->options.isFollowedBySmallVector = true;
         }
         else
@@ -248,15 +248,6 @@ struct SC::Vector
     }
 
     void clearWithoutInitializing() { (void)resizeWithoutInitializing(0); }
-
-    template <typename Comparison = SmallerThan<T>>
-    void sort(Comparison comparison = Comparison())
-    {
-        if (items != nullptr)
-        {
-            bubbleSort(begin(), end(), comparison);
-        }
-    }
 
     [[nodiscard]] bool shrink_to_fit() { return SegmentOperationsT::shrink_to_fit(items); }
 

@@ -698,12 +698,6 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
         return *this;
     }
 
-    template <typename Comparison = SmallerThan<T>>
-    void sort(Comparison comparison = Comparison())
-    {
-        bubbleSort(begin(), end(), comparison);
-    }
-
     [[nodiscard]] bool push_back(const T& element)
     {
         T* oldItems = items;

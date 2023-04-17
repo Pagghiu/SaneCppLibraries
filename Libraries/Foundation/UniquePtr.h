@@ -2,7 +2,6 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "Language.h"
 
 namespace SC
 {
@@ -11,12 +10,12 @@ struct UniquePtr
 {
     UniquePtr() = default;
     ~UniquePtr() { delete ptr; }
-    UniquePtr(UniquePtr&& other) { swap(ptr, other.ptr); }
+    UniquePtr(UniquePtr&& other) : ptr(other.ptr) { other.ptr = nullptr; }
     UniquePtr& operator=(UniquePtr&& other)
     {
         delete ptr;
-        ptr = nullptr;
-        swap(ptr, other.ptr);
+        ptr       = other.ptr;
+        other.ptr = nullptr;
         return *this;
     }
     UniquePtr(const UniquePtr&)            = delete;

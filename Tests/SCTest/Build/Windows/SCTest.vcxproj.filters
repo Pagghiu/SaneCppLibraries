@@ -100,9 +100,6 @@
     <ClInclude Include="..\..\..\..\Libraries\System\ConsoleTest.h">
       <Filter>System</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionUtility.h">
-      <Filter>Reflection</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Function.h">
       <Filter>Foundation</Filter>
     </ClInclude>
@@ -330,6 +327,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Testing\Test.h">
       <Filter>Testing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionMetaprogramming.h">
+      <Filter>Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\AlgorithmSort.h">
+      <Filter>Foundation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

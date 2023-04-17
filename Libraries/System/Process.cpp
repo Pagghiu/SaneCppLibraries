@@ -61,7 +61,7 @@ SC::ProcessShell& SC::ProcessShell::pipe(StringView s1, StringView s2, StringVie
         return *this;
     }
     StringView* arguments[]  = {&s1, &s2, &s3, &s4};
-    size_t      numArguments = ConstantArraySize(arguments);
+    size_t      numArguments = SizeOfArray(arguments);
     for (; numArguments > 0; --numArguments)
     {
         if (!arguments[numArguments - 1]->isEmpty())

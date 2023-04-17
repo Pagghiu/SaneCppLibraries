@@ -99,7 +99,7 @@ struct SC::EventLoop::KernelQueue
             }
         }
         const BOOL success =
-            GetQueuedCompletionStatusEx(loopNativeDescriptor, events, static_cast<ULONG>(ConstantArraySize(events)),
+            GetQueuedCompletionStatusEx(loopNativeDescriptor, events, static_cast<ULONG>(SizeOfArray(events)),
                                         &newEvents, nextTimer ? static_cast<ULONG>(timeout.ms) : INFINITE, FALSE);
         if (not success and GetLastError() != WAIT_TIMEOUT)
         {

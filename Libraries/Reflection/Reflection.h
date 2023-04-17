@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "ReflectionClassInfo.h"
-#include "ReflectionUtility.h"
+#include "ReflectionMetaprogramming.h"
 #if SC_CPP_LESS_THAN_20
 #include "ReflectionAutoAggregates.h"
 #else

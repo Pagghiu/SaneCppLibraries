@@ -135,4 +135,25 @@ struct TypeToString
 #endif
 };
 
+template <class IntegerType, IntegerType... Values>
+struct IntegerSequence
+{
+    typedef IntegerType     value_type;
+    static constexpr size_t size() noexcept { return sizeof...(Values); }
+};
+
+#if SC_GCC
+template <class IntegerType, IntegerType N>
+using MakeIntegerSequence = IntegerSequence<IntegerType, __integer_pack(N)...>;
+#else
+template <class IntegerType, IntegerType N>
+using MakeIntegerSequence = __make_integer_seq<IntegerSequence, IntegerType, N>;
+#endif
+template <size_t N>
+using MakeIndexSequence = MakeIntegerSequence<size_t, N>;
+template <class... T>
+using IndexSequenceFor = MakeIndexSequence<sizeof...(T)>;
+template <size_t... N>
+using IndexSequence = IntegerSequence<size_t, N...>;
+
 } // namespace SC

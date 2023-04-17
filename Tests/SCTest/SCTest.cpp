@@ -3,7 +3,6 @@
 // All Rights Reserved. Reproduction is not allowed.
 
 // Foundation
-#include "../../Libraries/FileSystem/PathTest.h"
 #include "../../Libraries/Foundation/ArrayTest.h"
 #include "../../Libraries/Foundation/FunctionTest.h"
 #include "../../Libraries/Foundation/IntrusiveDoubleLinkedListTest.h"
@@ -18,12 +17,12 @@
 #include "../../Libraries/Foundation/StringViewTest.h"
 #include "../../Libraries/Foundation/TaggedUnionTest.h"
 #include "../../Libraries/Foundation/VectorTest.h"
-#include "../../Libraries/System/ConsoleTest.h"
 
 // FileSystem
 #include "../../Libraries/FileSystem/FileSystemTest.h"
 #include "../../Libraries/FileSystem/FileSystemWalkerTest.h"
 #include "../../Libraries/FileSystem/FileSystemWatcherTest.h"
+#include "../../Libraries/FileSystem/PathTest.h"
 
 // Reflection
 #include "../../Libraries/Reflection/ReflectionTest.h"
@@ -33,6 +32,7 @@
 #include "../../Libraries/Serialization/SerializationTypeErasedTest.h"
 
 // System
+#include "../../Libraries/System/ConsoleTest.h"
 #include "../../Libraries/System/ProcessTest.h"
 #include "../../Libraries/System/SystemTest.h"
 #include "../../Libraries/System/TimeTest.h"
@@ -60,14 +60,12 @@ int main(int argc, const char* argv[])
 
     // Foundation tests
     { ArrayTest                     test(report); }
-    { ConsoleTest                   test(report); }
     { FunctionTest                  test(report); }
     { IntrusiveDoubleLinkedListTest test(report); }
     { MapTest                       test(report); }
     { MemoryTest                    test(report); }
     { OpaqueTest                    test(report); }
     { OptionalTest                  test(report); }
-    { PathTest                      test(report); }
     { ResultTest                    test(report); }
     { SmallVectorTest               test(report); }
     { StringFormatTest              test(report); }
@@ -80,6 +78,7 @@ int main(int argc, const char* argv[])
     { FileSystemTest                test(report); }
     { FileSystemWalkerTest          test(report); }
     { FileSystemWatcherTest         test(report); }
+    { PathTest                      test(report); }
 
     // Reflection tests
     { ReflectionTest                test(report); }
@@ -89,6 +88,7 @@ int main(int argc, const char* argv[])
     { SerializationTypeErasedTest   test(report); }
 
     // System tests
+    { ConsoleTest                   test(report); }
     { ProcessTest                   test(report); }
     { SystemTest                    test(report); }
     { TimeTest                      test(report); }

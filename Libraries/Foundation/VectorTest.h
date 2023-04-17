@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Testing/Test.h"
+#include "AlgorithmSort.h"
 #include "Vector.h"
 
 namespace SC
@@ -580,7 +581,7 @@ void SC::VectorTest::testBasicType()
         (void)elements.push_back(1);
         (void)elements.push_back(0);
         (void)elements.push_back(2);
-        elements.sort();
+        bubbleSort(elements.begin(), elements.end());
         SC_TEST_EXPECT(elements[0] == 0);
         SC_TEST_EXPECT(elements[1] == 1);
         SC_TEST_EXPECT(elements[2] == 2);

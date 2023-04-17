@@ -70,6 +70,7 @@
 		7B19C9AA297AF95B001C0627 /* PathTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PathTest.h; path = ../../../../Libraries/FileSystem/PathTest.h; sourceTree = "<group>"; };
 		7B19C9AB297AF95B001C0627 /* Path.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Path.h; path = ../../../../Libraries/FileSystem/Path.h; sourceTree = "<group>"; };
 		7B1A39FA29BA7B220087F688 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
+		7B1FCC2429ECBDAF001D75F7 /* AlgorithmSort.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AlgorithmSort.h; path = ../../../../Libraries/Foundation/AlgorithmSort.h; sourceTree = "<group>"; };
 		7B27836029EBE4F0002CA0A4 /* StringFormatTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StringFormatTest.h; path = ../../../../Libraries/Foundation/StringFormatTest.h; sourceTree = "<group>"; };
 		7B281DBF29E2BAF400363F69 /* EventLoopWindows.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = EventLoopWindows.h; path = ../../../../Libraries/Async/EventLoopWindows.h; sourceTree = "<group>"; };
 		7B2AEB1729D0DA4C003E1B6F /* Atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Atomic.h; path = ../../../../Libraries/Threading/Atomic.h; sourceTree = "<group>"; };
@@ -101,7 +102,7 @@
 		7B515FD829243086006996AA /* ReflectionClassInfo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionClassInfo.h; path = ../../../../Libraries/Reflection/ReflectionClassInfo.h; sourceTree = "<group>"; };
 		7B515FD929243086006996AA /* SerializationTemplateTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTemplateTest.h; path = ../../../../Libraries/Serialization/SerializationTemplateTest.h; sourceTree = "<group>"; };
 		7B515FDA29243086006996AA /* SerializationTypeErasedCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTypeErasedCompiler.h; path = ../../../../Libraries/Serialization/SerializationTypeErasedCompiler.h; sourceTree = "<group>"; };
-		7B515FDB29243086006996AA /* ReflectionUtility.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionUtility.h; path = ../../../../Libraries/Reflection/ReflectionUtility.h; sourceTree = "<group>"; };
+		7B515FDB29243086006996AA /* ReflectionMetaprogramming.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionMetaprogramming.h; path = ../../../../Libraries/Reflection/ReflectionMetaprogramming.h; sourceTree = "<group>"; };
 		7B515FDC29243086006996AA /* System.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = System.h; path = ../../../../Libraries/System/System.h; sourceTree = "<group>"; };
 		7B515FDD29243087006996AA /* SerializationTemplate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTemplate.h; path = ../../../../Libraries/Serialization/SerializationTemplate.h; sourceTree = "<group>"; };
 		7B515FDE29243087006996AA /* ReflectionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionTest.h; path = ../../../../Libraries/Reflection/ReflectionTest.h; sourceTree = "<group>"; };
@@ -244,6 +245,7 @@
 		7B515F932924305E006996AA /* Foundation */ = {
 			isa = PBXGroup;
 			children = (
+				7B1FCC2429ECBDAF001D75F7 /* AlgorithmSort.h */,
 				7B515FF329243087006996AA /* Array.h */,
 				7B515FD329243086006996AA /* ArrayTest.h */,
 				7B515FD229243086006996AA /* Assert.h */,
@@ -314,12 +316,12 @@
 		7B7044552995A2180034458B /* Reflection */ = {
 			isa = PBXGroup;
 			children = (
-				7B515FDB29243086006996AA /* ReflectionUtility.h */,
 				7B515FCC29243086006996AA /* Reflection.h */,
 				7B4B99EF2937EBAC003D17A6 /* ReflectionAutoAggregates.h */,
 				7B4B99F02937EBAC003D17A6 /* ReflectionAutoStructured.h */,
 				7B515FD829243086006996AA /* ReflectionClassInfo.h */,
 				7B515FE729243087006996AA /* ReflectionFlatSchemaCompiler.h */,
+				7B515FDB29243086006996AA /* ReflectionMetaprogramming.h */,
 				7B515FCE29243086006996AA /* ReflectionSC.h */,
 				7B515FDE29243087006996AA /* ReflectionTest.h */,
 			);

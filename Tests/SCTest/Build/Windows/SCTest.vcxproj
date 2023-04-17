@@ -239,6 +239,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopWindows.h" />
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.h" />
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\AlgorithmSort.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ArrayTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
@@ -250,7 +251,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Opaque.h" />
     <ClInclude Include="..\..\..\..\Libraries\System\Console.h" />
     <ClInclude Include="..\..\..\..\Libraries\System\ConsoleTest.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionUtility.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionMetaprogramming.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Function.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\FunctionTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\InitializerList.h" />

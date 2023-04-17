@@ -18,7 +18,6 @@ template <typename T>               struct IsSame<T, T> { static constexpr bool 
 template <class T> struct RemoveReference       { typedef T type; };
 template <class T> struct RemoveReference<T&>   { typedef T type; };
 template <class T> struct RemoveReference<T&&>  { typedef T type; };
-template <class T> using RemoveReferenceT = typename RemoveReference<T>::type;
 
 template <class T> struct RemovePointer       { typedef T type; };
 template <class T> struct RemovePointer<T*>   { typedef T type; };
@@ -32,33 +31,6 @@ template <class T> struct AddPointer      { using type = typename RemoveReferenc
 
 template <class T> struct RemoveConst           { typedef T type;};
 template <class T> struct RemoveConst<const T>  { typedef T type; };
-
-template <class T> struct RemoveConstRef { typedef typename RemoveConst<typename RemoveReference<T>::type>::type type; };
-
-template<typename T> constexpr bool AlwaysFalse = false;
- 
-template<typename T>
-constexpr typename AddReference<T>::type declval() noexcept
-{
-    static_assert(AlwaysFalse<T>, "declval not allowed in an evaluated context");
-}
-
-template<class IntegerType, IntegerType... Values>
-struct IntegerSequence
-{
-    typedef IntegerType value_type;
-    static constexpr size_t size() noexcept { return sizeof...(Values); }
-};
-
-#if SC_GCC
-template<class IntegerType, IntegerType N> using MakeIntegerSequence = IntegerSequence<IntegerType, __integer_pack(N)...>;
-#else
-template<class IntegerType, IntegerType N> using MakeIntegerSequence = __make_integer_seq<IntegerSequence, IntegerType, N>;
-#endif
-template<size_t N> using MakeIndexSequence = MakeIntegerSequence<size_t, N>;
-template<class... T> using IndexSequenceFor = MakeIndexSequence<sizeof...(T)>;
-template<size_t... N> using IndexSequence = IntegerSequence<size_t, N...>;
-
 
 template <class T, T v>
 struct IntegralConstant
@@ -78,37 +50,7 @@ using false_type = IntegralConstant<bool, false>;
 template <typename T> struct IsConst            : public false_type { typedef T type; };
 template <typename T> struct IsConst<const T>   : public true_type  { typedef T type; };
 
-template <typename T> struct IsVoid : public false_type { typedef T type; };
-template <> struct IsVoid<void>     : public true_type  { typedef void type; };
-
-template <class T> struct IsEmpty : public IntegralConstant<bool, __is_empty(T)> {};
-
-template <typename T>
-struct IsUnion : false_type { }; // TODO: This needs compiler instrinsics
-template <class T> IntegralConstant<bool, !IsUnion<T>::value> isClassTest(char T::*);
-template <class> false_type isClassTest(...);
-
-template <class T> struct IsClass : decltype(isClassTest<T>(nullptr)) { };
-
-template <typename T>        struct IsArray : false_type { };
-template <typename T, int N> struct IsArray<T[N]> : true_type { typedef T type; };
-
 template <typename T> struct IsTriviallyCopyable  : public IntegralConstant<bool, __is_trivially_copyable(T)> { };
-
-#if SC_GCC and not SC_CLANG
-// Not easy on GCC as it doesn't implement __is_convertible_to that is a Microsoft extension
-// see https://opensource.apple.com/source/lldb/lldb-69/llvm/tools/clang/docs/LanguageExtensions.html
-// gcc/x.y.z/include/c++/xy/tr1/type_traits has a super complex thing, we'll try to play it easy here
-// When trying it out inside SC_TRY_IF to convert to ReturnCode if conversion exist, this made a constexpr
-// function not be considered anymore constexpr, for absolutely no reason, needs some more debug
-template <typename From, typename To, typename ENABLE = void>
-struct IsConvertible : false_type { };
-template <typename From, typename To>
-struct IsConvertible<From, To, decltype(declval<void (*)(To)>()(declval<From>()))> : true_type { };
-#else
-template <typename T1, typename T2>
-struct IsConvertible : public IntegralConstant<bool, __is_convertible_to(T1, T2)> { };
-#endif
 
 template <class T> struct IsLValueReference     : false_type { };
 template <class T> struct IsLValueReference<T&> : true_type  { };
@@ -123,7 +65,19 @@ using ConditionalT = typename Conditional<B,T,F>::type;
 
 template <typename SourceType, typename T> struct SameConstnessAs { using type = typename Conditional<IsConst<SourceType>::value, const T, T>::type; };
 
-// clang-format on
+template <typename T> constexpr T min(T t1, T t2) { return t1 < t2 ? t1 : t2; }
+template <typename T> constexpr T max(T t1, T t2) { return t1 > t2 ? t1 : t2; }
+
+template <typename T, size_t N> constexpr size_t SizeOfArray(const T (&text)[N]) { return N; }
+
+template <typename T> constexpr T&& move(T& value) { return static_cast<T&&>(value); }
+template <typename T> constexpr T&& forward(typename RemoveReference<T>::type& value) { return static_cast<T&&>(value); }
+template <typename T> constexpr T&& forward(typename RemoveReference<T>::type&& value)
+{
+    static_assert(!IsLValueReference<T>::value, "Forward an rvalue as an lvalue is not allowed");
+    return static_cast<T&&>(value);
+}
+
 template <typename T>
 struct ReferenceWrapper
 {
@@ -134,147 +88,31 @@ struct ReferenceWrapper
     operator const T&() const { return *ptr; }
     operator T&() { return *ptr; }
 };
-template <typename T>
-constexpr T&& move(T& value)
-{
-    return static_cast<T&&>(value);
-}
-
-template <typename T>
-constexpr T&& forward(typename RemoveReference<T>::type& value)
-{
-    return static_cast<T&&>(value);
-}
-template <typename T>
-constexpr T&& forward(typename RemoveReference<T>::type&& value)
-{
-    static_assert(!IsLValueReference<T>::value, "Forward an rvalue as an lvalue is not allowed");
-    return static_cast<T&&>(value);
-}
-struct PlacementNew
-{
-};
-
-template <typename T>
-constexpr T min(T t1, T t2)
-{
-    return t1 < t2 ? t1 : t2;
-}
-
-template <typename T>
-constexpr T max(T t1, T t2)
-{
-    return t1 > t2 ? t1 : t2;
-}
-
-template <typename T>
-void swap(T& t1, T& t2)
-{
-    T temp = move(t1);
-    t1     = move(t2);
-    t2     = move(temp);
-}
-template <typename T>
-struct SmallerThan
-{
-    bool operator()(const T& a, const T& b) { return a < b; }
-};
-
-template <typename Iterator, typename Comparison>
-void bubbleSort(Iterator first, Iterator last, Comparison comparison)
-{
-    if (first >= last)
-    {
-        return;
-    }
-    bool doSwap = true;
-    while (doSwap)
-    {
-        doSwap      = false;
-        Iterator p0 = first;
-        Iterator p1 = first + 1;
-        while (p1 != last)
-        {
-            if (comparison(*p1, *p0))
-            {
-                swap(*p1, *p0);
-                doSwap = true;
-            }
-            ++p0;
-            ++p1;
-        }
-    }
-}
-
-template <typename T, size_t N>
-constexpr size_t ConstantArraySize(const T (&text)[N])
-{
-    return N;
-}
-template <unsigned int N, unsigned int I>
-struct FnvHash
-{
-    static constexpr uint32_t Hash(const char (&str)[N])
-    {
-        return (FnvHash<N, I - 1>::Hash(str) ^ str[I - 1]) * 16777619u;
-    }
-};
-
-template <uint32_t N>
-struct FnvHash<N, 1>
-{
-    static constexpr uint32_t Hash(const char (&str)[N]) { return (2166136261u ^ str[0]) * 16777619u; }
-};
-
-template <unsigned int N>
-constexpr uint32_t StringHash(const char (&str)[N])
-{
-    return FnvHash<N, N>::Hash(str);
-}
-
-template <typename... uint32_t>
-constexpr auto CombineHash(uint32_t... hash1)
-{
-    char parts2[sizeof...(uint32_t)][4] = {
-        {static_cast<char>((hash1 & 0xff) >> 0), static_cast<char>((hash1 & 0xff00) >> 8),
-         static_cast<char>((hash1 & 0xff0000) >> 16), static_cast<char>((hash1 & 0xff0000) >> 24)}...};
-    char combinedChars[sizeof(parts2)] = {0};
-    for (int i = 0; i < sizeof...(uint32_t); ++i)
-    {
-        combinedChars[i * 4 + 0] = parts2[i][0];
-        combinedChars[i * 4 + 1] = parts2[i][1];
-        combinedChars[i * 4 + 2] = parts2[i][2];
-        combinedChars[i * 4 + 3] = parts2[i][3];
-    }
-    return StringHash(combinedChars);
-}
 
 template <typename F>
 struct Deferred
 {
-    Deferred(F f) : f(f) {}
+    Deferred(F&& f) : f(forward<F>(f)) {}
+    ~Deferred() { if (armed) f(); }
     void disarm() { armed = false; }
-    ~Deferred()
-    {
-        if (armed)
-        {
-            f();
-        }
-    }
 
   private:
     F    f;
     bool armed = true;
 };
 
-template <typename F>
-Deferred<F> MakeDeferred(F f)
-{
-    return Deferred<F>(f);
-}
+template <typename F> Deferred<F> MakeDeferred(F&& f) { return Deferred<F>(forward<F>(f)); }
+
+// clang-format on
 
 } // namespace SC
 
+namespace SC
+{
+struct PlacementNew
+{
+};
+} // namespace SC
 #if SC_MSVC
 inline void* operator new(size_t, void* p, SC::PlacementNew) noexcept { return p; }
 inline void  operator delete(void* p, SC::PlacementNew) noexcept {}

@@ -34,8 +34,6 @@ enum class StringComparison
     Bigger  = 1
 };
 
-template <typename StringIterator>
-struct StringFunctions;
 } // namespace SC
 
 struct SC::StringView

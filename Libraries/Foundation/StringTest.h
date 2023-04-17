@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Testing/Test.h"
+#include "AlgorithmSort.h"
 #include "String.h"
 
 namespace SC
