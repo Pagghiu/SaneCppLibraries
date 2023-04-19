@@ -63,8 +63,6 @@
 		7B0C907F2972F28C001D97A2 /* SmallVectorTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SmallVectorTest.h; path = ../../../../Libraries/Foundation/SmallVectorTest.h; sourceTree = "<group>"; };
 		7B0C90802972F28C001D97A2 /* LibC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = LibC.h; path = ../../../../Libraries/Foundation/LibC.h; sourceTree = "<group>"; };
 		7B0C90812972F28C001D97A2 /* Segment.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Segment.h; path = ../../../../Libraries/Foundation/Segment.h; sourceTree = "<group>"; };
-		7B0C90822972F28C001D97A2 /* StaticAsserts.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StaticAsserts.cpp; path = ../../../../Libraries/Foundation/StaticAsserts.cpp; sourceTree = "<group>"; };
-		7B0C90832972F28C001D97A2 /* ReflectionUtility.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionUtility.h; path = ../../../../Libraries/Reflection/ReflectionUtility.h; sourceTree = "<group>"; };
 		7B0C90842972F28C001D97A2 /* StringFormat.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringFormat.cpp; path = ../../../../Libraries/Foundation/StringFormat.cpp; sourceTree = "<group>"; };
 		7B0C90852972F28C001D97A2 /* Reflection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Reflection.h; path = ../../../../Libraries/Reflection/Reflection.h; sourceTree = "<group>"; };
 		7B0C90862972F28C001D97A2 /* Platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Platform.h; path = ../../../../Libraries/Foundation/Platform.h; sourceTree = "<group>"; };
@@ -72,12 +70,9 @@
 		7B0C90882972F28C001D97A2 /* ArrayTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ArrayTest.h; path = ../../../../Libraries/Foundation/ArrayTest.h; sourceTree = "<group>"; };
 		7B0C90892972F28C001D97A2 /* ConsoleTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ConsoleTest.h; path = ../../../../Libraries/System/ConsoleTest.h; sourceTree = "<group>"; };
 		7B0C908A2972F28C001D97A2 /* StringFormat.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringFormat.h; path = ../../../../Libraries/Foundation/StringFormat.h; sourceTree = "<group>"; };
-		7B0C908B2972F28C001D97A2 /* OSApple.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = OSApple.mm; path = ../../../../Libraries/Foundation/OSApple.mm; sourceTree = "<group>"; };
-		7B0C908C2972F28C001D97A2 /* Assert.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Assert.cpp; path = ../../../../Libraries/Foundation/Assert.cpp; sourceTree = "<group>"; };
 		7B0C908D2972F28C001D97A2 /* InitializerList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = InitializerList.h; path = ../../../../Libraries/Foundation/InitializerList.h; sourceTree = "<group>"; };
 		7B0C908E2972F28C001D97A2 /* Array.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Array.h; path = ../../../../Libraries/Foundation/Array.h; sourceTree = "<group>"; };
 		7B0C908F2972F28C001D97A2 /* System.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = System.h; path = ../../../../Libraries/System/System.h; sourceTree = "<group>"; };
-		7B0C90902972F28C001D97A2 /* StringBuilderTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringBuilderTest.h; path = ../../../../Libraries/Foundation/StringBuilderTest.h; sourceTree = "<group>"; };
 		7B0C90912972F28C001D97A2 /* SerializationTypeErased.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTypeErased.h; path = ../../../../Libraries/Serialization/SerializationTypeErased.h; sourceTree = "<group>"; };
 		7B0C90922972F28C001D97A2 /* SerializationTemplate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTemplate.h; path = ../../../../Libraries/Serialization/SerializationTemplate.h; sourceTree = "<group>"; };
 		7B0C90932972F28C001D97A2 /* ReflectionAutoAggregates.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionAutoAggregates.h; path = ../../../../Libraries/Reflection/ReflectionAutoAggregates.h; sourceTree = "<group>"; };
@@ -85,15 +80,12 @@
 		7B0C90952972F28C001D97A2 /* Map.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Map.h; path = ../../../../Libraries/Foundation/Map.h; sourceTree = "<group>"; };
 		7B0C90962972F28C001D97A2 /* String.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = String.cpp; path = ../../../../Libraries/Foundation/String.cpp; sourceTree = "<group>"; };
 		7B0C90972972F28C001D97A2 /* SerializationTypeErasedCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTypeErasedCompiler.h; path = ../../../../Libraries/Serialization/SerializationTypeErasedCompiler.h; sourceTree = "<group>"; };
-		7B0C90982972F28C001D97A2 /* OSPosix.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OSPosix.cpp; path = ../../../../Libraries/Foundation/OSPosix.cpp; sourceTree = "<group>"; };
 		7B0C90992972F28C001D97A2 /* SerializationTestSuite.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTestSuite.h; path = ../../../../Libraries/Serialization/SerializationTestSuite.h; sourceTree = "<group>"; };
 		7B0C909A2972F28C001D97A2 /* MapTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MapTest.h; path = ../../../../Libraries/Foundation/MapTest.h; sourceTree = "<group>"; };
 		7B0C909B2972F28C001D97A2 /* Language.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Language.h; path = ../../../../Libraries/Foundation/Language.h; sourceTree = "<group>"; };
 		7B0C909C2972F28C001D97A2 /* StringIterator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringIterator.h; path = ../../../../Libraries/Foundation/StringIterator.h; sourceTree = "<group>"; };
 		7B0C909D2972F28C001D97A2 /* ReflectionClassInfo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionClassInfo.h; path = ../../../../Libraries/Reflection/ReflectionClassInfo.h; sourceTree = "<group>"; };
-		7B0C909E2972F28C001D97A2 /* OSEmscripten.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OSEmscripten.cpp; path = ../../../../Libraries/Foundation/OSEmscripten.cpp; sourceTree = "<group>"; };
 		7B0C90A02972F28C001D97A2 /* ResultTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ResultTest.h; path = ../../../../Libraries/Foundation/ResultTest.h; sourceTree = "<group>"; };
-		7B0C90A12972F28C001D97A2 /* OSWindows.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OSWindows.cpp; path = ../../../../Libraries/Foundation/OSWindows.cpp; sourceTree = "<group>"; };
 		7B0C90A22972F28C001D97A2 /* Limits.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Limits.h; path = ../../../../Libraries/Foundation/Limits.h; sourceTree = "<group>"; };
 		7B0C90A32972F28C001D97A2 /* MemoryTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MemoryTest.h; path = ../../../../Libraries/Foundation/MemoryTest.h; sourceTree = "<group>"; };
 		7B0C90A42972F28C001D97A2 /* SerializationBinarySkipper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationBinarySkipper.h; path = ../../../../Libraries/Serialization/SerializationBinarySkipper.h; sourceTree = "<group>"; };
@@ -104,11 +96,23 @@
 		7B0C90A92972F28C001D97A2 /* Function.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Function.h; path = ../../../../Libraries/Foundation/Function.h; sourceTree = "<group>"; };
 		7B0C90AA2972F28C001D97A2 /* ReflectionFlatSchemaCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionFlatSchemaCompiler.h; path = ../../../../Libraries/Reflection/ReflectionFlatSchemaCompiler.h; sourceTree = "<group>"; };
 		7B0C90AB2972F28C001D97A2 /* Memory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Memory.h; path = ../../../../Libraries/Foundation/Memory.h; sourceTree = "<group>"; };
-		7B0C90AC2972F28C001D97A2 /* StringBuilder.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringBuilder.cpp; path = ../../../../Libraries/Foundation/StringBuilder.cpp; sourceTree = "<group>"; };
 		7B0C90AD2972F28C001D97A2 /* Span.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Span.h; path = ../../../../Libraries/Foundation/Span.h; sourceTree = "<group>"; };
 		7B0C90AE2972F28C001D97A2 /* FunctionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FunctionTest.h; path = ../../../../Libraries/Foundation/FunctionTest.h; sourceTree = "<group>"; };
 		7B0C90AF2972F28C001D97A2 /* StringBuilder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringBuilder.h; path = ../../../../Libraries/Foundation/StringBuilder.h; sourceTree = "<group>"; };
 		7B0C90B02972F28C001D97A2 /* ReflectionSC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionSC.h; path = ../../../../Libraries/Reflection/ReflectionSC.h; sourceTree = "<group>"; };
+		7B14821229EDCED200477EF4 /* OptionalTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OptionalTest.h; path = ../../../../Libraries/Foundation/OptionalTest.h; sourceTree = "<group>"; };
+		7B14821329EDCED200477EF4 /* UniquePtr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = UniquePtr.h; path = ../../../../Libraries/Foundation/UniquePtr.h; sourceTree = "<group>"; };
+		7B14821429EDCED200477EF4 /* TaggedUnionTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TaggedUnionTest.h; path = ../../../../Libraries/Foundation/TaggedUnionTest.h; sourceTree = "<group>"; };
+		7B14821529EDCED200477EF4 /* Opaque.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Opaque.h; path = ../../../../Libraries/Foundation/Opaque.h; sourceTree = "<group>"; };
+		7B14821629EDCED200477EF4 /* TaggedUnion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TaggedUnion.h; path = ../../../../Libraries/Foundation/TaggedUnion.h; sourceTree = "<group>"; };
+		7B14821729EDCED200477EF4 /* AlgorithmSort.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AlgorithmSort.h; path = ../../../../Libraries/Foundation/AlgorithmSort.h; sourceTree = "<group>"; };
+		7B14821829EDCED200477EF4 /* Optional.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Optional.h; path = ../../../../Libraries/Foundation/Optional.h; sourceTree = "<group>"; };
+		7B14821929EDCED200477EF4 /* StringFormatTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StringFormatTest.h; path = ../../../../Libraries/Foundation/StringFormatTest.h; sourceTree = "<group>"; };
+		7B14821A29EDCED200477EF4 /* StringTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StringTest.h; path = ../../../../Libraries/Foundation/StringTest.h; sourceTree = "<group>"; };
+		7B14821B29EDCED200477EF4 /* TypeList.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TypeList.h; path = ../../../../Libraries/Foundation/TypeList.h; sourceTree = "<group>"; };
+		7B14821C29EDCED200477EF4 /* IntrusiveDoubleLinkedList.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = IntrusiveDoubleLinkedList.h; path = ../../../../Libraries/Foundation/IntrusiveDoubleLinkedList.h; sourceTree = "<group>"; };
+		7B14821D29EDCED200477EF4 /* IntrusiveDoubleLinkedListTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = IntrusiveDoubleLinkedListTest.h; path = ../../../../Libraries/Foundation/IntrusiveDoubleLinkedListTest.h; sourceTree = "<group>"; };
+		7B14821E29EDCED200477EF4 /* OpaqueTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OpaqueTest.h; path = ../../../../Libraries/Foundation/OpaqueTest.h; sourceTree = "<group>"; };
 		7B23DC14295B9B0F00002529 /* SCExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SCExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B23DC1B295B9B1000002529 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7B23DC1D295B9B1000002529 /* Entitlements.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Entitlements.entitlements; sourceTree = "<group>"; };
@@ -132,7 +136,6 @@
 		7B9F611C2995AC430011F4D4 /* PlatformApplication.html */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.html; name = PlatformApplication.html; path = ../../../../Libraries/UserInterface/PlatformApplication.html; sourceTree = "<group>"; };
 		7B9F611D2995AC430011F4D4 /* PlatformApplication.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = PlatformApplication.cpp; path = ../../../../Libraries/UserInterface/PlatformApplication.cpp; sourceTree = "<group>"; };
 		7B9F61242995ACCE0011F4D4 /* StringConverter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringConverter.cpp; path = ../../../../Libraries/Foundation/StringConverter.cpp; sourceTree = "<group>"; };
-		7B9F61252995ACCE0011F4D4 /* StringNative.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringNative.h; path = ../../../../Libraries/Foundation/StringNative.h; sourceTree = "<group>"; };
 		7B9F61262995ACCE0011F4D4 /* Path.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Path.h; path = ../../../../Libraries/FileSystem/Path.h; sourceTree = "<group>"; };
 		7B9F61272995ACCE0011F4D4 /* StringView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringView.h; path = ../../../../Libraries/Foundation/StringView.h; sourceTree = "<group>"; };
 		7B9F61282995ACCE0011F4D4 /* Vector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Vector.h; path = ../../../../Libraries/Foundation/Vector.h; sourceTree = "<group>"; };
@@ -141,10 +144,8 @@
 		7B9F612B2995ACCE0011F4D4 /* System.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = System.cpp; path = ../../../../Libraries/System/System.cpp; sourceTree = "<group>"; };
 		7B9F612C2995ACCE0011F4D4 /* StringConverter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringConverter.h; path = ../../../../Libraries/Foundation/StringConverter.h; sourceTree = "<group>"; };
 		7B9F612D2995ACCE0011F4D4 /* StringView.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringView.cpp; path = ../../../../Libraries/Foundation/StringView.cpp; sourceTree = "<group>"; };
-		7B9F612E2995ACCE0011F4D4 /* StringTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringTest.h; path = ../../../../Libraries/Foundation/StringTest.h; sourceTree = "<group>"; };
 		7B9F612F2995ACCE0011F4D4 /* StringViewTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringViewTest.h; path = ../../../../Libraries/Foundation/StringViewTest.h; sourceTree = "<group>"; };
 		7B9F61302995ACCE0011F4D4 /* Types.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Types.h; path = ../../../../Libraries/Foundation/Types.h; sourceTree = "<group>"; };
-		7B9F61312995ACCE0011F4D4 /* FixedSizePimpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FixedSizePimpl.h; path = ../../../../Libraries/Foundation/FixedSizePimpl.h; sourceTree = "<group>"; };
 		7B9F61322995ACCE0011F4D4 /* Path.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Path.cpp; path = ../../../../Libraries/FileSystem/Path.cpp; sourceTree = "<group>"; };
 		7BA622D32972B7C0002BEDD9 /* DependencySokol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencySokol.c; path = ../../../../Dependencies/sokol/DependencySokol.c; sourceTree = "<group>"; };
 		7BA622D52972B83B002BEDD9 /* DependencyStb.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = DependencyStb.c; path = ../../../../Dependencies/stb/DependencyStb.c; sourceTree = "<group>"; };
@@ -192,19 +193,19 @@
 		7B0C90752972F278001D97A2 /* Foundation */ = {
 			isa = PBXGroup;
 			children = (
+				7B14821729EDCED200477EF4 /* AlgorithmSort.h */,
 				7B0C908E2972F28C001D97A2 /* Array.h */,
 				7B0C90882972F28C001D97A2 /* ArrayTest.h */,
-				7B0C908C2972F28C001D97A2 /* Assert.cpp */,
 				7B0C90A72972F28C001D97A2 /* Assert.h */,
 				7B0C907E2972F28C001D97A2 /* Compiler.h */,
 				7B0C90782972F28C001D97A2 /* Console.cpp */,
 				7B0C907B2972F28C001D97A2 /* Console.h */,
 				7B0C90892972F28C001D97A2 /* ConsoleTest.h */,
-				7B0C90832972F28C001D97A2 /* ReflectionUtility.h */,
-				7B9F61312995ACCE0011F4D4 /* FixedSizePimpl.h */,
 				7B0C90A92972F28C001D97A2 /* Function.h */,
 				7B0C90AE2972F28C001D97A2 /* FunctionTest.h */,
 				7B0C908D2972F28C001D97A2 /* InitializerList.h */,
+				7B14821C29EDCED200477EF4 /* IntrusiveDoubleLinkedList.h */,
+				7B14821D29EDCED200477EF4 /* IntrusiveDoubleLinkedListTest.h */,
 				7B0C909B2972F28C001D97A2 /* Language.h */,
 				7B0C90802972F28C001D97A2 /* LibC.h */,
 				7B0C90A22972F28C001D97A2 /* Limits.h */,
@@ -213,13 +214,10 @@
 				7B0C90A62972F28C001D97A2 /* Memory.cpp */,
 				7B0C90AB2972F28C001D97A2 /* Memory.h */,
 				7B0C90A32972F28C001D97A2 /* MemoryTest.h */,
-				7B9F612B2995ACCE0011F4D4 /* System.cpp */,
-				7B0C908F2972F28C001D97A2 /* System.h */,
-				7B0C908B2972F28C001D97A2 /* OSApple.mm */,
-				7B0C909E2972F28C001D97A2 /* OSEmscripten.cpp */,
-				7B0C90982972F28C001D97A2 /* OSPosix.cpp */,
-				7B0C907D2972F28C001D97A2 /* SystemTest.h */,
-				7B0C90A12972F28C001D97A2 /* OSWindows.cpp */,
+				7B14821529EDCED200477EF4 /* Opaque.h */,
+				7B14821E29EDCED200477EF4 /* OpaqueTest.h */,
+				7B14821829EDCED200477EF4 /* Optional.h */,
+				7B14821229EDCED200477EF4 /* OptionalTest.h */,
 				7B9F61322995ACCE0011F4D4 /* Path.cpp */,
 				7B9F61262995ACCE0011F4D4 /* Path.h */,
 				7B9F61292995ACCE0011F4D4 /* PathTest.h */,
@@ -230,23 +228,27 @@
 				7B0C90A52972F28C001D97A2 /* SmallVector.h */,
 				7B0C907F2972F28C001D97A2 /* SmallVectorTest.h */,
 				7B0C90AD2972F28C001D97A2 /* Span.h */,
-				7B0C90822972F28C001D97A2 /* StaticAsserts.cpp */,
 				7B0C90962972F28C001D97A2 /* String.cpp */,
 				7B0C90792972F28C001D97A2 /* String.h */,
-				7B0C90AC2972F28C001D97A2 /* StringBuilder.cpp */,
 				7B0C90AF2972F28C001D97A2 /* StringBuilder.h */,
-				7B0C90902972F28C001D97A2 /* StringBuilderTest.h */,
 				7B9F61242995ACCE0011F4D4 /* StringConverter.cpp */,
 				7B9F612C2995ACCE0011F4D4 /* StringConverter.h */,
 				7B0C90842972F28C001D97A2 /* StringFormat.cpp */,
 				7B0C908A2972F28C001D97A2 /* StringFormat.h */,
+				7B14821929EDCED200477EF4 /* StringFormatTest.h */,
 				7B0C909C2972F28C001D97A2 /* StringIterator.h */,
-				7B9F61252995ACCE0011F4D4 /* StringNative.h */,
-				7B9F612E2995ACCE0011F4D4 /* StringTest.h */,
+				7B14821A29EDCED200477EF4 /* StringTest.h */,
 				7B9F612D2995ACCE0011F4D4 /* StringView.cpp */,
 				7B9F61272995ACCE0011F4D4 /* StringView.h */,
 				7B9F612F2995ACCE0011F4D4 /* StringViewTest.h */,
+				7B9F612B2995ACCE0011F4D4 /* System.cpp */,
+				7B0C908F2972F28C001D97A2 /* System.h */,
+				7B0C907D2972F28C001D97A2 /* SystemTest.h */,
+				7B14821629EDCED200477EF4 /* TaggedUnion.h */,
+				7B14821429EDCED200477EF4 /* TaggedUnionTest.h */,
+				7B14821B29EDCED200477EF4 /* TypeList.h */,
 				7B9F61302995ACCE0011F4D4 /* Types.h */,
+				7B14821329EDCED200477EF4 /* UniquePtr.h */,
 				7B9F61282995ACCE0011F4D4 /* Vector.h */,
 				7B9F612A2995ACCE0011F4D4 /* VectorTest.h */,
 			);
@@ -399,7 +401,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1420;
-				LastUpgradeCheck = 1420;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					7B23DC13295B9B0F00002529 = {
 						CreatedOnToolsVersion = 14.2;
@@ -490,6 +492,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/../../../../_Build/Output/macOS-13-arm64_x86_64-Xcode-$(CONFIGURATION)";
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -558,6 +561,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/../../../../_Build/Output/macOS-13-arm64_x86_64-Xcode-$(CONFIGURATION)";
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -593,6 +597,7 @@
 				CODE_SIGN_ENTITLEMENTS = Entitlements.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
@@ -632,6 +637,7 @@
 				CODE_SIGN_ENTITLEMENTS = Entitlements.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (

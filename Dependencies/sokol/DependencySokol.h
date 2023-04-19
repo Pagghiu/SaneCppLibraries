@@ -14,7 +14,17 @@
 #define SOKOL_NO_ENTRY
 #endif
 
+#if __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wstrict-prototypes"
+#endif
+
 #include "_sokol/sokol_app.h"
+
+#if __clang__
+#pragma clang diagnostic pop
+#endif
+
 #include "_sokol/sokol_gfx.h"
 #include "_sokol/sokol_glue.h"
 #include "_sokol/sokol_time.h"
