@@ -4,25 +4,25 @@
 #pragma once
 #include "../FileSystem/FileDescriptor.h"
 #include "../Foundation/Function.h"
+#include "../Foundation/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Opaque.h"
 #include "../Foundation/Optional.h"
 #include "../Foundation/String.h"
 
 namespace SC
 {
+
+struct Process;
+struct ProcessChain;
+struct ProcessChainOptions;
+struct ProcessOptions
+{
+    bool inheritFileDescriptors = false;
+};
+
 struct ProcessID
 {
     int32_t pid = 0;
-};
-
-struct Process;
-struct ProcessOptions
-{
-    bool useShell               = true;
-    bool pipeSTDIN              = false;
-    bool pipeSTDOUT             = false;
-    bool pipeSTDERR             = false;
-    bool inheritFileDescriptors = false;
 };
 
 struct ProcessExitStatus
@@ -55,47 +55,74 @@ struct SC::Process
     StringNative<1024>  environment      = StringEncoding::Native;
     ProcessNativeHandle handle;
 
-    [[nodiscard]] ReturnCode waitProcessExit();
-    [[nodiscard]] ReturnCode run(const ProcessOptions& options);
+    ProcessChain* parent = nullptr;
+
+    Process* next = nullptr;
+    Process* prev = nullptr;
+
+    template <typename... StringView>
+    [[nodiscard]] ReturnCode formatCommand(StringView&&... args)
+    {
+        return formatCommand({forward<StringView>(args)...});
+    }
+    [[nodiscard]] ReturnCode formatCommand(std::initializer_list<StringView> cmd);
+    [[nodiscard]] ReturnCode waitForExitSync();
+    template <typename... StringView>
+    [[nodiscard]] ReturnCode launch(StringView&&... args)
+    {
+        SC_TRY_IF(formatCommand({forward<StringView>(args)...}));
+        return launch();
+    }
+    [[nodiscard]] ReturnCode launch(ProcessOptions options = {});
+    [[nodiscard]] ReturnCode redirectStdOutTo(FileDescriptorPipe& pipe);
+    [[nodiscard]] ReturnCode redirectStdErrTo(FileDescriptorPipe& pipe);
+    [[nodiscard]] ReturnCode redirectStdInTo(FileDescriptorPipe& pipe);
 
   private:
     struct Internal;
+
     template <typename Lambda>
     [[nodiscard]] ReturnCode spawn(Lambda&& lambda);
     [[nodiscard]] ReturnCode fork();
     [[nodiscard]] bool       isChild() const;
 };
 
-namespace SC
+struct SC::ProcessChainOptions
 {
-struct ProcessShell;
-} // namespace SC
+    bool pipeSTDIN  = false;
+    bool pipeSTDOUT = false;
+    bool pipeSTDERR = false;
+};
+struct SC::ProcessChain
+{
 
-struct SC::ProcessShell
-{
     struct Error
     {
         ReturnCode returnCode = true;
     };
-    ProcessOptions options;
 
-    ProcessShell(Delegate<const Error&> onError) : onError(onError) {}
+    ProcessChain(Delegate<const Error&> onError) : onError(onError) {}
 
-    [[nodiscard]] ProcessShell& pipe(StringView s1, StringView s2 = StringView(), StringView s3 = StringView(),
-                                     StringView s4 = StringView());
-
-    ReturnCode launch();
-    ReturnCode readOutputSync(String* outputString = nullptr, String* errorString = nullptr);
-    ReturnCode waitSync();
+    template <typename... StringView>
+    [[nodiscard]] ReturnCode pipe(Process& p, StringView&&... args)
+    {
+        return pipe(p, {forward<StringView>(args)...});
+    }
+    [[nodiscard]] ReturnCode pipe(Process& p, std::initializer_list<StringView> cmd);
+    [[nodiscard]] ReturnCode launch(ProcessChainOptions options = ProcessChainOptions());
+    [[nodiscard]] ReturnCode waitForExitSync();
+    [[nodiscard]] ReturnCode readStdOutUntilEOFSync(String& destination);
+    [[nodiscard]] ReturnCode readStdErrUntilEOFSync(String& destination);
+    [[nodiscard]] ReturnCode readStdOutUntilEOFSync(Vector<char_t>& destination);
+    [[nodiscard]] ReturnCode readStdErrUntilEOFSync(Vector<char_t>& destination);
 
   private:
     Delegate<const Error&> onError;
     Error                  error;
-    Vector<Process>        processes;
+
+    IntrusiveDoubleLinkedList<Process> processes;
 
     FileDescriptorPipe inputPipe;
     FileDescriptorPipe outputPipe;
     FileDescriptorPipe errorPipe;
-
-    ReturnCode queueProcess(Span<StringView*> spanArguments);
 };

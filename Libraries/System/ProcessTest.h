@@ -15,71 +15,110 @@ struct SC::ProcessTest : public SC::TestCase
     ProcessTest(SC::TestReport& report) : TestCase(report, "ProcessTest")
     {
         using namespace SC;
-        // Additional USAGES HYPOTESIS
-        // using cmd     = Span<const StringView>;
-        // SC_TRY_IF((shell | cmd{"ls", "-l"} | cmd{"grep", "salver"}));
-        if (test_section("inherit single"))
+        if (test_section("Process inherit"))
         {
-            bool         hasError = false;
-            auto         onErr    = [&](const ProcessShell::Error& err) { hasError = true; };
-            ProcessShell shell(onErr);
+            Process process;
 #if SC_PLATFORM_APPLE
-            SC_TEST_EXPECT(shell.pipe("ls", "~/Public").launch());
+            SC_TEST_EXPECT(process.launch("which", "sudo"));
 #else
-
-            SC_TEST_EXPECT(shell.pipe("where", "where.exe").launch());
+            SC_TEST_EXPECT(process.launch("where", "where.exe"));
 #endif
-            SC_TEST_EXPECT(shell.waitSync());
-            SC_TEST_EXPECT(not hasError);
+            SC_TEST_EXPECT(process.waitForExitSync());
         }
-        if (test_section("inherit piped"))
+        if (test_section("Process piped"))
         {
-            bool         hasError = false;
-            auto         onErr    = [&](const ProcessShell::Error& err) { hasError = true; };
-            ProcessShell shell(onErr);
+            Process process;
 #if SC_PLATFORM_APPLE
-            SC_TEST_EXPECT(shell.pipe("ls", "~").pipe("grep", "Desktop").launch());
-#else
-            SC_TEST_EXPECT(shell.pipe("where", "/?").pipe("findstr", "dir]").launch());
-#endif
-            SC_TEST_EXPECT(shell.waitSync());
-            SC_TEST_EXPECT(not hasError);
-        }
-        if (test_section("pipe single"))
-        {
-            bool         hasError = false;
-            auto         onErr    = [&](const ProcessShell::Error& err) { hasError = true; };
-            ProcessShell shell(onErr);
-            shell.options.pipeSTDOUT = true;
-            String output(StringEncoding::Ascii);
-#if SC_PLATFORM_APPLE
-            StringView expectedOutput = "asd\n"_a8;
-            SC_TEST_EXPECT(shell.pipe("echo", "asd").launch());
+            StringView expectedOutput = "/usr/bin/sudo\n"_a8;
+            SC_TEST_EXPECT(process.formatCommand("which", "sudo"));
 #else
             StringView expectedOutput = "C:\\Windows\\System32\\where.exe\r\n"_a8;
-            SC_TEST_EXPECT(shell.pipe("where", "where.exe").launch());
+            SC_TEST_EXPECT(process.formatCommand("where", "where.exe"));
 #endif
-            SC_TEST_EXPECT(shell.readOutputSync(&output));
-            SC_TEST_EXPECT(shell.waitSync());
+            FileDescriptorPipe outputPipe;
+            SC_TEST_EXPECT(process.redirectStdOutTo(outputPipe));
+            SC_TEST_EXPECT(process.launch());
+
+            SmallString<255> output = StringEncoding::Ascii;
+            SC_TEST_EXPECT(outputPipe.readUntilEOF(output));
+            SC_TEST_EXPECT(process.waitForExitSync());
+            SC_TEST_EXPECT(output.view() == expectedOutput);
+        }
+        if (test_section("ProcessChain inherit single"))
+        {
+            bool         hasError = false;
+            auto         onErr    = [&](const ProcessChain::Error& err) { hasError = true; };
+            Process      p1;
+            ProcessChain chain(onErr);
+#if SC_PLATFORM_APPLE
+            SC_TEST_EXPECT(chain.pipe(p1, {"ls", "~/Public"}));
+#else
+            SC_TEST_EXPECT(chain.pipe(p1, {"where", "where.exe"}));
+#endif
+            SC_TEST_EXPECT(chain.launch());
+            SC_TEST_EXPECT(chain.waitForExitSync());
+            SC_TEST_EXPECT(not hasError);
+        }
+        if (test_section("ProcessChain inherit dual"))
+        {
+            bool         hasError = false;
+            auto         onErr    = [&](const ProcessChain::Error& err) { hasError = true; };
+            ProcessChain chain(onErr);
+            Process      p1, p2;
+#if SC_PLATFORM_APPLE
+            SC_TEST_EXPECT(chain.pipe(p1, "ls", "~"));
+            SC_TEST_EXPECT(chain.pipe(p2, "grep", "Desktop"));
+#else
+            SC_TEST_EXPECT(chain.pipe(p1, "where", "/?"))
+            SC_TEST_EXPECT(chain.pipe(p2, "findstr", "dir]"));
+#endif
+            SC_TEST_EXPECT(chain.launch());
+            SC_TEST_EXPECT(chain.waitForExitSync());
+            SC_TEST_EXPECT(not hasError);
+        }
+        if (test_section("ProcessChain pipe single"))
+        {
+            bool         hasError = false;
+            auto         onErr    = [&](const ProcessChain::Error& err) { hasError = true; };
+            ProcessChain chain(onErr);
+            String       output(StringEncoding::Ascii);
+            Process      p1;
+#if SC_PLATFORM_APPLE
+            StringView expectedOutput = "asd\n"_a8;
+            SC_TEST_EXPECT(chain.pipe(p1, "echo", "asd"));
+#else
+            StringView expectedOutput = "C:\\Windows\\System32\\where.exe\r\n"_a8;
+            SC_TEST_EXPECT(chain.pipe(p1, "where", "where.exe"));
+#endif
+            ProcessChainOptions options;
+            options.pipeSTDOUT = true;
+            SC_TEST_EXPECT(chain.launch(options));
+            SC_TEST_EXPECT(chain.readStdOutUntilEOFSync(output));
+            SC_TEST_EXPECT(chain.waitForExitSync());
             SC_TEST_EXPECT(output == expectedOutput);
             SC_TEST_EXPECT(not hasError);
         }
-        if (test_section("pipe dual"))
+        if (test_section("ProcessChain pipe dual"))
         {
             bool         hasError = false;
-            auto         onErr    = [&](const ProcessShell::Error& err) { hasError = true; };
-            ProcessShell shell(onErr);
-            shell.options.pipeSTDOUT = true;
-            String output(StringEncoding::Ascii);
+            auto         onErr    = [&](const ProcessChain::Error& err) { hasError = true; };
+            ProcessChain chain(onErr);
+            String       output(StringEncoding::Ascii);
+            Process      p1, p2;
 #if SC_PLATFORM_APPLE
             StringView expectedOutput = "Desktop\n"_a8;
-            SC_TEST_EXPECT(shell.pipe("ls", "~").pipe("grep", "Desktop").launch());
+            SC_TEST_EXPECT(chain.pipe(p1, {"ls", "~"}));
+            SC_TEST_EXPECT(chain.pipe(p2, {"grep", "Desktop"}));
 #else
             StringView expectedOutput = "WHERE [/R dir] [/Q] [/F] [/T] pattern...\r\n"_a8;
-            SC_TEST_EXPECT(shell.pipe("where", "/?").pipe("findstr", "dir]").launch());
+            SC_TEST_EXPECT(chain.pipe(p1, {"where", "/?"}));
+            SC_TEST_EXPECT(chain.pipe(p2, {"findstr", "dir]"}));
 #endif
-            SC_TEST_EXPECT(shell.readOutputSync(&output));
-            SC_TEST_EXPECT(shell.waitSync());
+            ProcessChainOptions options;
+            options.pipeSTDOUT = true;
+            SC_TEST_EXPECT(chain.launch(options));
+            SC_TEST_EXPECT(chain.readStdOutUntilEOFSync(output));
+            SC_TEST_EXPECT(chain.waitForExitSync());
             SC_TEST_EXPECT(output == expectedOutput);
             SC_TEST_EXPECT(not hasError);
         }

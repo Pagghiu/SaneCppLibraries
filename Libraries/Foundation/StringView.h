@@ -121,7 +121,7 @@ struct SC::StringView
     [[nodiscard]] bool startsWith(const StringView str) const;
     [[nodiscard]] bool endsWith(const StringView str) const;
 
-    [[nodiscard]] bool containsASCIICharacter(char c)
+    [[nodiscard]] bool containsASCIICharacter(char c) const
     {
         return getIterator<StringIteratorASCII>().advanceUntilMatches(c);
     }

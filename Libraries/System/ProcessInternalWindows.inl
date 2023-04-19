@@ -19,7 +19,7 @@ SC::ReturnCode SC::ProcessNativeHandleClose(HANDLE& handle)
     return true;
 }
 
-SC::ReturnCode SC::Process::waitProcessExit()
+SC::ReturnCode SC::Process::waitForExitSync()
 {
     HANDLE hProcess;
     SC_TRY_IF(handle.get(hProcess, ReturnCode("ProcesEntry::waitProcessExit - Invalid handle"_a8)));
@@ -34,7 +34,7 @@ SC::ReturnCode SC::Process::waitProcessExit()
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/procthread/creating-a-child-process-with-redirected-input-and-output
-SC::ReturnCode SC::Process::run(const ProcessOptions& options)
+SC::ReturnCode SC::Process::launch(ProcessOptions options)
 {
     STARTUPINFO startupInfo;
     const bool  someRedirection =

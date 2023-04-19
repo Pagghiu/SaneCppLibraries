@@ -29,7 +29,7 @@ SC::ReturnCode SC::Process::fork()
 
 bool SC::Process::isChild() const { return processID.pid == 0; }
 
-SC::ReturnCode SC::Process::waitProcessExit()
+SC::ReturnCode SC::Process::waitForExitSync()
 {
     int   status = -1;
     pid_t waitPid;
@@ -86,19 +86,8 @@ SC::ReturnCode SC::Process::spawn(Lambda&& lambda)
     SC_UNREACHABLE();
 }
 
-SC::ReturnCode SC::Process::run(const ProcessOptions& options)
+SC::ReturnCode SC::Process::launch(ProcessOptions options)
 {
-    auto spawnLambda = [&]()
-    {
-        if (options.useShell)
-        {
-            execl("/bin/sh", "sh", "-c", command.view().getNullTerminatedNative(), nullptr);
-        }
-        else
-        {
-            return false;
-        }
-        return true;
-    };
+    auto spawnLambda = [&]() { execl("/bin/sh", "sh", "-c", command.view().getNullTerminatedNative(), nullptr); };
     return spawn(spawnLambda);
 }
