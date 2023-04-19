@@ -7,6 +7,7 @@
 #include "../Foundation/Vector.h"
 namespace SC
 {
+struct String;
 struct FileDescriptor;
 struct FileDescriptorPipe;
 struct FileDescriptorWindows;
@@ -57,8 +58,11 @@ struct SC::FileDescriptor
     };
     [[nodiscard]] Result<ReadResult> readAppend(Vector<char>& output, Span<char> fallbackBuffer);
 
+    [[nodiscard]] ReturnCode readUntilEOF(Vector<char_t>& destination);
+    [[nodiscard]] ReturnCode readUntilEOF(String& destination);
     [[nodiscard]] ReturnCode setBlocking(bool blocking);
     [[nodiscard]] ReturnCode setInheritable(bool inheritable);
+    [[nodiscard]] ReturnCode close() { return handle.close(); }
 
     FileDescriptorPosix   posix() { return {*this}; }
     FileDescriptorWindows windows() { return {*this}; }
@@ -85,4 +89,7 @@ struct SC::FileDescriptorPipe
 
     /// Creates a Pipe. Default is non-inheritable / blocking
     [[nodiscard]] ReturnCode createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag);
+    [[nodiscard]] ReturnCode readUntilEOF(Vector<char_t>& destination);
+    [[nodiscard]] ReturnCode readUntilEOF(String& destination);
+    [[nodiscard]] ReturnCode close();
 };

@@ -6,6 +6,24 @@
 
 #include <Windows.h>
 
+struct SC::FileDescriptor::Internal
+{
+    [[nodiscard]] static bool isActualError(BOOL success, DWORD numReadBytes, FileDescriptorNative fileDescriptor)
+    {
+        if (success == FALSE && numReadBytes == 0 && GetFileType(fileDescriptor) == FILE_TYPE_PIPE &&
+            GetLastError() == ERROR_BROKEN_PIPE)
+        {
+            // https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-readfile
+            // Pipes
+
+            // If an anonymous pipe is being used and the write handle has been closed, when ReadFile attempts to read
+            // using the pipe's corresponding read handle, the function returns FALSE and GetLastError returns
+            // ERROR_BROKEN_PIPE.
+            return false;
+        }
+        return success == FALSE;
+    }
+};
 SC::ReturnCode SC::FileDescriptorNativeClose(FileDescriptorNative& fileDescriptor)
 {
     if (::CloseHandle(fileDescriptor) == FALSE)
@@ -18,38 +36,26 @@ SC::ReturnCode SC::FileDescriptorNativeClose(FileDescriptorNative& fileDescripto
 SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector<char>& output,
                                                                           Span<char>    fallbackBuffer)
 {
-    DWORD                numReadBytes = 0xffffffff;
-    bool                 gotError     = true;
-    const bool           useVector    = output.capacity() > output.size();
     FileDescriptorNative fileDescriptor;
     SC_TRY_IF(handle.get(fileDescriptor, "FileDescriptor::readAppend - Invalid Handle"_a8));
+
+    const bool useVector = output.capacity() > output.size();
+
+    DWORD numReadBytes = 0xffffffff;
+    BOOL  success;
     if (useVector)
     {
-        BOOL success = ReadFile(fileDescriptor, output.data() + output.size(),
-                                static_cast<DWORD>(output.capacity() - output.size()), &numReadBytes, nullptr);
-        gotError     = success == FALSE;
+        success = ReadFile(fileDescriptor, output.data() + output.size(),
+                           static_cast<DWORD>(output.capacity() - output.size()), &numReadBytes, nullptr);
     }
     else
     {
         SC_TRY_MSG(fallbackBuffer.sizeInBytes() != 0,
                    "FileDescriptor::readAppend - buffer must be bigger than zero"_a8);
-        BOOL success = ReadFile(fileDescriptor, fallbackBuffer.data(), static_cast<DWORD>(fallbackBuffer.sizeInBytes()),
-                                &numReadBytes, nullptr);
-
-        gotError = success == FALSE;
-        if (gotError && numReadBytes == 0 && GetFileType(fileDescriptor) == FILE_TYPE_PIPE &&
-            GetLastError() == ERROR_BROKEN_PIPE)
-        {
-            // https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-readfile
-            // Pipes
-
-            // If an anonymous pipe is being used and the write handle has been closed, when ReadFile attempts to read
-            // using the pipe's corresponding read handle, the function returns FALSE and GetLastError returns
-            // ERROR_BROKEN_PIPE.
-            gotError = false;
-        }
+        success = ReadFile(fileDescriptor, fallbackBuffer.data(), static_cast<DWORD>(fallbackBuffer.sizeInBytes()),
+                           &numReadBytes, nullptr);
     }
-    if (gotError)
+    if (Internal::isActualError(success, numReadBytes, fileDescriptor))
     {
         // TODO: Parse read result ERROR
         return ReturnCode("FileDescriptor::readAppend ReadFile failed"_a8);
