@@ -4,12 +4,15 @@
 #pragma once
 #include <Windows.h>
 
+#include "../FileSystem/FileDescriptor.h"
+#include "../Foundation/Opaque.h"
 #include "EventLoop.h"
 
 namespace SC
 {
 struct EventLoopWindowsOverlapped;
-}
+struct EventLoopWindowsWaitHandle;
+} // namespace SC
 
 // We store a user pointer at a fixed offset from overlapped to allow getting back source object
 // with results from GetQueuedCompletionStatusEx.
@@ -26,4 +29,26 @@ struct SC::EventLoopWindowsOverlapped
         constexpr size_t offsetOfAsync      = offsetof(EventLoopWindowsOverlapped, userData);
         return *reinterpret_cast<T**>(reinterpret_cast<uint8_t*>(lpOverlapped) - offsetOfOverlapped + offsetOfAsync);
     }
+};
+
+namespace SC
+{
+inline ReturnCode EventLoopWindowsWaitHandleClose(FileDescriptorNative& waitHandle)
+{
+    if (waitHandle != INVALID_HANDLE_VALUE)
+    {
+        BOOL res   = UnregisterWaitEx(waitHandle, INVALID_HANDLE_VALUE);
+        waitHandle = INVALID_HANDLE_VALUE;
+        if (res == FALSE)
+        {
+            return "UnregisterWaitEx failed"_a8;
+        }
+    }
+    return true;
+}
+} // namespace SC
+
+struct SC::EventLoopWindowsWaitHandle : public UniqueTaggedHandle<FileDescriptorNative, FileDescriptorNativeInvalid,
+                                                                  ReturnCode, EventLoopWindowsWaitHandleClose>
+{
 };

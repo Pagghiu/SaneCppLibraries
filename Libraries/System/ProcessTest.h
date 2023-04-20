@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Async/EventLoop.h"
 #include "../Testing/Test.h"
 #include "Process.h"
 
@@ -121,6 +122,25 @@ struct SC::ProcessTest : public SC::TestCase
             SC_TEST_EXPECT(chain.waitForExitSync());
             SC_TEST_EXPECT(output == expectedOutput);
             SC_TEST_EXPECT(not hasError);
+        }
+        if (test_section("Process EventLoop"))
+        {
+            EventLoop eventLoop;
+            SC_TEST_EXPECT(eventLoop.create());
+            Process process;
+#if SC_PLATFORM_APPLE
+            SC_TEST_EXPECT(process.launch("which", "sudo"));
+#else
+            SC_TEST_EXPECT(process.launch("where", "where.exe"));
+#endif
+            ProcessNative processHandle;
+            SC_TEST_EXPECT(process.handle.get(processHandle, false));
+            ProcessExitStatus exitStatus;
+            auto processLambda = [&](const AsyncResult& res) { exitStatus = res.result.fields.processExit.exitStatus; };
+            AsyncProcessExit async;
+            SC_TEST_EXPECT(eventLoop.addProcessExit(async, processLambda, processHandle));
+            SC_TEST_EXPECT(eventLoop.runOnce());
+            SC_TEST_EXPECT(exitStatus.status.hasValue());
         }
     }
 };

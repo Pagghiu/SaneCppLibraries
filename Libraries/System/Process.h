@@ -2,16 +2,16 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "ProcessDescriptor.h"
+
 #include "../FileSystem/FileDescriptor.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/IntrusiveDoubleLinkedList.h"
-#include "../Foundation/Opaque.h"
 #include "../Foundation/Optional.h"
 #include "../Foundation/String.h"
 
 namespace SC
 {
-
 struct Process;
 struct ProcessChain;
 struct ProcessChainOptions;
@@ -19,32 +19,11 @@ struct ProcessOptions
 {
     bool inheritFileDescriptors = false;
 };
-
-struct ProcessID
-{
-    int32_t pid = 0;
-};
-
-struct ProcessExitStatus
-{
-    Optional<int32_t> value = 0;
-};
-#if SC_PLATFORM_WINDOWS
-using ProcessNative                                 = void*;   // HANDLE
-static constexpr ProcessNative ProcessNativeInvalid = nullptr; // INVALID_HANDLE_VALUE
-#else
-using ProcessNative                                 = int; // pid_t
-static constexpr ProcessNative ProcessNativeInvalid = 0;
-#endif
-ReturnCode ProcessNativeHandleClose(ProcessNative& handle);
-struct ProcessNativeHandle
-    : public UniqueTaggedHandle<ProcessNative, ProcessNativeInvalid, ReturnCode, &ProcessNativeHandleClose>
-{
-};
 } // namespace SC
 
 struct SC::Process
 {
+    ProcessNativeHandle handle;
     ProcessID           processID;
     ProcessExitStatus   exitStatus;
     FileDescriptor      standardInput;
@@ -53,7 +32,6 @@ struct SC::Process
     StringNative<255>   command          = StringEncoding::Native;
     StringNative<255>   currentDirectory = StringEncoding::Native;
     StringNative<1024>  environment      = StringEncoding::Native;
-    ProcessNativeHandle handle;
 
     ProcessChain* parent = nullptr;
 

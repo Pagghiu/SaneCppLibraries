@@ -27,7 +27,7 @@ SC::ReturnCode SC::Process::waitForExitSync()
     DWORD processStatus;
     if (GetExitCodeProcess(hProcess, &processStatus))
     {
-        exitStatus.value = static_cast<int32_t>(processStatus);
+        exitStatus.status = static_cast<int32_t>(processStatus);
         return true;
     }
     return "Process::wait - GetExitCodeProcess failed"_a8;

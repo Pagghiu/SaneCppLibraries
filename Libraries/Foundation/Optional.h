@@ -69,7 +69,7 @@ struct [[nodiscard]] SC::Optional
         }
     }
 
-    constexpr Optional& operator=(const Optional& other) const
+    constexpr Optional& operator=(const Optional& other)
     {
         if (valueExists)
         {

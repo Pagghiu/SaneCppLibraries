@@ -6,6 +6,12 @@
 #include "EventLoop.h"
 #include "EventLoopWindows.h"
 
+struct SC::Async::ProcessExitInternal
+{
+    EventLoopWindowsOverlapped overlapped;
+    EventLoopWindowsWaitHandle waitHandle;
+};
+
 struct SC::EventLoop::Internal
 {
     FileDescriptor loopFd;
@@ -30,7 +36,9 @@ struct SC::EventLoop::Internal
 
     [[nodiscard]] ReturnCode createWakeup(EventLoop& loop)
     {
-        wakeUpAsync.callback.bind<Internal, &Internal::runCompletionForWakeUp>(this);
+        // Optimization: we avoid one indirect function call, see runCompletionFor checking if async == wakeUpAsync
+        // wakeUpAsync.callback.bind<Internal, &Internal::runCompletionForWakeUp>(this);
+        wakeUpAsync.operation.assignValue(Async::WakeUp());
         // No need to register it with EventLoop as we're calling PostQueuedCompletionStatus manually
         return true;
     }
@@ -46,6 +54,47 @@ struct SC::EventLoop::Internal
     }
 
     void runCompletionForWakeUp(AsyncResult& result) { result.eventLoop.runCompletionForNotifiers(); }
+
+    [[nodiscard]] ReturnCode runCompletionFor(AsyncResult& result, const OVERLAPPED_ENTRY& entry)
+    {
+        switch (result.async.operation.type)
+        {
+        case Async::Type::Timeout: {
+            // This is used for overlapped notifications (like FileSystemWatcher)
+            // It would be probably better to create a dedicated enum type for Overlapped Notifications
+            break;
+        }
+        case Async::Type::Read: {
+            // TODO: do the actual read operation here
+            break;
+        }
+        case Async::Type::WakeUp: {
+            if (&result.async == &wakeUpAsync)
+            {
+                runCompletionForWakeUp(result);
+            }
+            break;
+        }
+        case Async::Type::ProcessExit: {
+            // Process has exited
+            // Gather exit code
+            Async::ProcessExit&         processExit = result.async.operation.fields.processExit;
+            Async::ProcessExitInternal& internal    = processExit.opaque.get();
+            SC_TRY_IF(internal.waitHandle.close());
+            // UnregisterWait(internal.wait_handle);
+            // GetExitCodeProcess(handle->process_handle, &status);
+            DWORD processStatus;
+            if (GetExitCodeProcess(processExit.handle, &processStatus) == FALSE)
+            {
+                return "GetExitCodeProcess failed"_a8;
+            }
+            result.result.fields.processExit.exitStatus.status = static_cast<int32_t>(processStatus);
+
+            break;
+        }
+        }
+        return true;
+    }
 };
 
 SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
@@ -71,19 +120,64 @@ struct SC::EventLoop::KernelQueue
     {
         switch (async->operation.type)
         {
-        case Async::Operation::Type::Timeout: eventLoop.activeTimers.queueBack(*async); break;
-        case Async::Operation::Type::Read:
-            addReadWatcher(eventLoop.internal.get().loopFd, async->operation.fields.read.fileDescriptor);
+        case Async::Type::Timeout: {
+            eventLoop.activeTimers.queueBack(*async);
+            break;
+        }
+        case Async::Type::Read: {
+            SC_TRY_IF(addReadWatcher(eventLoop.internal.get().loopFd, async->operation.fields.read.fileDescriptor));
             eventLoop.stagedHandles.queueBack(*async);
             break;
-        case Async::Operation::Type::WakeUp: eventLoop.activeWakeUps.queueBack(*async); break;
+        }
+        case Async::Type::WakeUp: {
+            eventLoop.activeWakeUps.queueBack(*async);
+            break;
+        }
+        case Async::Type::ProcessExit: {
+            SC_TRY_IF(addProcessWatcher(eventLoop.internal.get().loopFd, *async));
+            eventLoop.stagedHandles.queueBack(*async);
+            break;
+        }
         }
         return true;
     }
 
     [[nodiscard]] bool isFull() const { return newEvents >= totalNumEvents; }
 
-    void addReadWatcher(FileDescriptor& loopFd, FileDescriptorNative fileDescriptor) {}
+    [[nodiscard]] ReturnCode addReadWatcher(FileDescriptor& loopFd, FileDescriptorNative fileDescriptor)
+    {
+        return true;
+    }
+
+    [[nodiscard]] ReturnCode addProcessWatcher(FileDescriptor& loopFd, Async& async)
+    {
+        const ProcessNative         processHandle = async.operation.fields.processExit.handle;
+        Async::ProcessExitInternal& internal      = async.operation.fields.processExit.opaque.get();
+        internal.overlapped.userData              = &async;
+        HANDLE waitHandle;
+        BOOL result = RegisterWaitForSingleObject(&waitHandle, processHandle, KernelQueue::processExitCallback, &async,
+                                                  INFINITE, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE);
+        if (result == FALSE)
+        {
+            return "RegisterWaitForSingleObject failed"_a8;
+        }
+        return internal.waitHandle.assign(waitHandle);
+    }
+
+    // This is executed on windows thread pool
+    static void CALLBACK processExitCallback(void* data, BOOLEAN timeoutOccurred)
+    {
+        Async&               async = *static_cast<Async*>(data);
+        FileDescriptorNative loopNativeDescriptor;
+        SC_TRUST_RESULT(async.eventLoop->getLoopFileDescriptor(loopNativeDescriptor));
+        Async::ProcessExitInternal& internal = async.operation.fields.processExit.opaque.get();
+
+        if (PostQueuedCompletionStatus(loopNativeDescriptor, 0, 0, &internal.overlapped.overlapped) == FALSE)
+        {
+            // TODO: Report error?
+            // return "EventLoop::wakeUpFromExternalThread() - PostQueuedCompletionStatus"_a8;
+        }
+    }
 
     [[nodiscard]] ReturnCode poll(EventLoop& self, const TimeCounter* nextTimer)
     {

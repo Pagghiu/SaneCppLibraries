@@ -37,6 +37,10 @@ SC::ReturnCode SC::Process::waitForExitSync()
     {
         waitPid = waitpid(processID.pid, &status, 0);
     } while (waitPid == -1 and errno == EINTR);
+    if (WIFEXITED(status) != 0)
+    {
+        exitStatus.status = WEXITSTATUS(status);
+    }
     return true;
 }
 

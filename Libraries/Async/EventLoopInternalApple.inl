@@ -5,10 +5,14 @@
 #include <errno.h>
 #include <sys/event.h> // kqueue
 #include <sys/time.h>  // timespec
+#include <sys/wait.h>  // WIFEXITED / WEXITSTATUS
 #include <unistd.h>
 
 #include "../Foundation/Array.h"
 #include "EventLoop.h"
+struct SC::Async::ProcessExitInternal
+{
+};
 
 struct SC::EventLoop::Internal
 {
@@ -49,7 +53,8 @@ struct SC::EventLoop::Internal
         FileDescriptorNative wakeUpPipeDescriptor;
         SC_TRY_IF(wakeupPipe.readPipe.handle.get(wakeUpPipeDescriptor,
                                                  "EventLoop::Internal::createWakeup() - Async read handle invalid"_a8));
-        wakeupPipeRead.callback.bind<Internal, &Internal::runCompletionForWakeUp>(this);
+        // Optimization: we avoid one indirect function call, see runCompletionFor checking if async == wakeupPipeRead
+        // wakeupPipeRead.callback.bind<Internal, &Internal::runCompletionForWakeUp>(this);
         SC_TRY_IF(loop.addRead(wakeupPipeRead, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)}));
         return true;
     }
@@ -80,6 +85,47 @@ struct SC::EventLoop::Internal
         } while (errno == EINTR);
         asyncResult.eventLoop.runCompletionForNotifiers();
     }
+
+    [[nodiscard]] ReturnCode runCompletionFor(AsyncResult& result, const struct kevent& event)
+    {
+        switch (result.async.operation.type)
+        {
+        case Async::Type::Timeout: {
+            SC_RELEASE_ASSERT(false and "Async::Type::Timeout cannot be argument of completion");
+            break;
+        }
+        case Async::Type::Read: {
+            if (&result.async == &wakeupPipeRead)
+            {
+                runCompletionForWakeUp(result);
+            }
+            else
+            {
+                // TODO: do the actual read operation here
+            }
+            break;
+        }
+        case Async::Type::WakeUp: {
+            SC_RELEASE_ASSERT(false and "Async::Type::WakeUp cannot be argument of completion");
+            break;
+        }
+        case Async::Type::ProcessExit: {
+            // Process has exited
+            if ((event.fflags & (NOTE_EXIT | NOTE_EXITSTATUS)) > 0)
+            {
+                AsyncResult::ProcessExit& res = result.result.fields.processExit;
+
+                const uint32_t data = static_cast<uint32_t>(event.data);
+                if (WIFEXITED(data) != 0)
+                {
+                    res.exitStatus.status.assign(WEXITSTATUS(data));
+                }
+            }
+            break;
+        }
+        }
+        return true;
+    }
 };
 
 struct SC::EventLoop::KernelQueue
@@ -92,12 +138,24 @@ struct SC::EventLoop::KernelQueue
     {
         switch (async->operation.type)
         {
-        case Async::Operation::Type::Timeout: eventLoop.activeTimers.queueBack(*async); break;
-        case Async::Operation::Type::Read:
+        case Async::Type::Timeout:
+            // Let's just queue the timeout in the active timers
+            eventLoop.activeTimers.queueBack(*async);
+            break;
+        case Async::Type::WakeUp:
+            // Let's just queue the wakeup in the active wake ups
+            eventLoop.activeWakeUps.queueBack(*async);
+            break;
+        case Async::Type::Read:
+            // Here we need to add an actual file descriptor watcher and add to stagedHandles
             addReadWatcher(eventLoop.internal.get().loopFd, async->operation.fields.read.fileDescriptor, async);
             eventLoop.stagedHandles.queueBack(*async);
             break;
-        case Async::Operation::Type::WakeUp: eventLoop.activeWakeUps.queueBack(*async); break;
+        case Async::Type::ProcessExit:
+            // Here we need to initialize a proc event and add to stagedHandles
+            addProcWatcher(eventLoop.internal.get().loopFd, async->operation.fields.processExit.handle, async);
+            eventLoop.stagedHandles.queueBack(*async);
+            break;
         }
         return true;
     }
@@ -106,8 +164,15 @@ struct SC::EventLoop::KernelQueue
 
     void addReadWatcher(FileDescriptor& loopFd, FileDescriptorNative fileDescriptor, Async* udata)
     {
-        int fflags = 0;
+        constexpr int fflags = 0;
         EV_SET(events + newEvents, fileDescriptor, EVFILT_READ, EV_ADD, fflags, 0, udata);
+        newEvents += 1;
+    }
+
+    void addProcWatcher(FileDescriptor& loopFd, ProcessNative processHandle, Async* udata)
+    {
+        constexpr int fflags = NOTE_EXIT | NOTE_EXITSTATUS;
+        EV_SET(events + newEvents, processHandle, EVFILT_PROC, EV_ADD | EV_ENABLE, fflags, 0, udata);
         newEvents += 1;
     }
 

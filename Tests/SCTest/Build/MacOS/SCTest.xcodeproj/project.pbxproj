@@ -76,6 +76,7 @@
 		7B2AEB1729D0DA4C003E1B6F /* Atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Atomic.h; path = ../../../../Libraries/Threading/Atomic.h; sourceTree = "<group>"; };
 		7B2AEB1829D0DA67003E1B6F /* AtomicTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AtomicTest.h; path = ../../../../Libraries/Threading/AtomicTest.h; sourceTree = "<group>"; };
 		7B2F86E029887CA400EFC5FB /* FileSystemInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalEmscripten.inl; path = ../../../../Libraries/FileSystem/FileSystemInternalEmscripten.inl; sourceTree = "<group>"; };
+		7B2FCA8329F0999E009B70E1 /* ProcessDescriptor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ProcessDescriptor.h; path = ../../../../Libraries/System/ProcessDescriptor.h; sourceTree = "<group>"; };
 		7B358DDC29D88E93002A7D1C /* FileSystemWatcher.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FileSystemWatcher.cpp; path = ../../../../Libraries/FileSystem/FileSystemWatcher.cpp; sourceTree = "<group>"; };
 		7B358DDF29D8F063002A7D1C /* CoreServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreServices.framework; path = System/Library/Frameworks/CoreServices.framework; sourceTree = SDKROOT; };
 		7B4A291B29B3CD4A00F13DCB /* Time.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Time.cpp; path = ../../../../Libraries/System/Time.cpp; sourceTree = "<group>"; };
@@ -161,6 +162,12 @@
 		7B8B919929DB868C0051AF74 /* UniquePtr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = UniquePtr.h; path = ../../../../Libraries/Foundation/UniquePtr.h; sourceTree = "<group>"; };
 		7B91CBEE29B17F470013E95E /* Opaque.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Opaque.h; path = ../../../../Libraries/Foundation/Opaque.h; sourceTree = "<group>"; };
 		7B91CBEF29B17F470013E95E /* OpaqueTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OpaqueTest.h; path = ../../../../Libraries/Foundation/OpaqueTest.h; sourceTree = "<group>"; };
+		7B9C4FBD29F1C0B100504902 /* FileSystemWatcherInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWatcherInternalEmscripten.inl; path = ../../../../Libraries/FileSystem/FileSystemWatcherInternalEmscripten.inl; sourceTree = "<group>"; };
+		7B9C4FBE29F1C0B100504902 /* FileSystemWatcherTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FileSystemWatcherTest.h; path = ../../../../Libraries/FileSystem/FileSystemWatcherTest.h; sourceTree = "<group>"; };
+		7B9C4FBF29F1C0B100504902 /* UtilityWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = UtilityWindows.inl; path = ../../../../Libraries/FileSystem/UtilityWindows.inl; sourceTree = "<group>"; };
+		7B9C4FC029F1C0B100504902 /* FileSystemWatcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FileSystemWatcher.h; path = ../../../../Libraries/FileSystem/FileSystemWatcher.h; sourceTree = "<group>"; };
+		7B9C4FC129F1C0B100504902 /* FileSystemWatcherInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWatcherInternalWindows.inl; path = ../../../../Libraries/FileSystem/FileSystemWatcherInternalWindows.inl; sourceTree = "<group>"; };
+		7B9C4FC229F1C0B100504902 /* FileSystemWatcherInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWatcherInternalApple.inl; path = ../../../../Libraries/FileSystem/FileSystemWatcherInternalApple.inl; sourceTree = "<group>"; };
 		7B9F61832995BDA20011F4D4 /* libobjc.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libobjc.tbd; path = usr/lib/libobjc.tbd; sourceTree = SDKROOT; };
 		7BA7D47929B5488200811076 /* EventLoop.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = EventLoop.h; path = ../../../../Libraries/Async/EventLoop.h; sourceTree = "<group>"; };
 		7BA7D47A29B5488200811076 /* EventLoopTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = EventLoopTest.h; path = ../../../../Libraries/Async/EventLoopTest.h; sourceTree = "<group>"; };
@@ -226,9 +233,16 @@
 				7BC56BD929946B1800EED472 /* FileSystemWalkerInternalPosix.inl */,
 				7BC56BDA29946B1800EED472 /* FileSystemWalkerInternalWindows.inl */,
 				7BC56BD629946AD100EED472 /* FileSystemWalkerTest.h */,
+				7B358DDC29D88E93002A7D1C /* FileSystemWatcher.cpp */,
+				7B9C4FC029F1C0B100504902 /* FileSystemWatcher.h */,
+				7B9C4FC229F1C0B100504902 /* FileSystemWatcherInternalApple.inl */,
+				7B9C4FBD29F1C0B100504902 /* FileSystemWatcherInternalEmscripten.inl */,
+				7B9C4FC129F1C0B100504902 /* FileSystemWatcherInternalWindows.inl */,
+				7B9C4FBE29F1C0B100504902 /* FileSystemWatcherTest.h */,
 				7B19C9A9297AF95B001C0627 /* Path.cpp */,
 				7B19C9AB297AF95B001C0627 /* Path.h */,
 				7B19C9AA297AF95B001C0627 /* PathTest.h */,
+				7B9C4FBF29F1C0B100504902 /* UtilityWindows.inl */,
 			);
 			name = FileSystem;
 			sourceTree = "<group>";
@@ -365,6 +379,7 @@
 				7B515FE629243087006996AA /* ConsoleTest.h */,
 				7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */,
 				7BE5C80E29A26E3E00CBCAD1 /* Process.h */,
+				7B2FCA8329F0999E009B70E1 /* ProcessDescriptor.h */,
 				7B0A83C329A98B8200C16EBF /* ProcessInternalEmscripten.inl */,
 				7B0A83C129A98B2000C16EBF /* ProcessInternalPosix.inl */,
 				7B0A83C229A98B2000C16EBF /* ProcessInternalWindows.inl */,
@@ -386,7 +401,6 @@
 		7B8B90C729EB711A0092805F /* Recovered References */ = {
 			isa = PBXGroup;
 			children = (
-				7B358DDC29D88E93002A7D1C /* FileSystemWatcher.cpp */,
 			);
 			name = "Recovered References";
 			sourceTree = "<group>";
