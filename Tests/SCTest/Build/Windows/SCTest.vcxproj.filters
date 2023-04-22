@@ -25,6 +25,9 @@
     <Filter Include="Testing">
       <UniqueIdentifier>{ae591710-8f56-41d2-a3a8-9b0db6a7380b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Networking">
+      <UniqueIdentifier>{1ab7acac-33e2-4be0-8b0a-178a5edfaf9e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\SCTest.cpp">
@@ -79,6 +82,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Testing\Test.cpp">
       <Filter>Testing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Networking\Networking.cpp">
+      <Filter>Networking</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -333,6 +339,15 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\AlgorithmSort.h">
       <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Networking\SocketDescriptor.h">
+      <Filter>Networking</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Networking\Networking.h">
+      <Filter>Networking</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Networking\NetworkingTest.h">
+      <Filter>Networking</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

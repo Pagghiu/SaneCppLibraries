@@ -216,6 +216,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Networking\Networking.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\System\Console.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\System\System.cpp" />
@@ -243,6 +244,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ArrayTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Networking\Networking.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Networking\NetworkingTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Networking\SocketDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\Atomic.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\AtomicTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Compiler.h" />

@@ -64,6 +64,7 @@ Libraries/Foundation/String.cpp             \
 Libraries/Foundation/StringConverter.cpp    \
 Libraries/Foundation/StringFormat.cpp       \
 Libraries/Foundation/StringView.cpp         \
+Libraries/Networking/Networking.cpp         \
 Libraries/System/Console.cpp                \
 Libraries/System/Process.cpp                \
 Libraries/System/System.cpp                 \

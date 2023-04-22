@@ -225,5 +225,5 @@ bool SC::StringConverter::setTextLengthInBytesIncludingTerminator(size_t newData
 /// Appends the input string null terminated
 bool SC::StringConverter::internalAppend(StringView input, StringView* encodedText)
 {
-    return StringConverter::convertEncodingTo(StringEncoding::Native, input, text.data, encodedText);
+    return StringConverter::convertEncodingTo(text.getEncoding(), input, text.data, encodedText);
 }

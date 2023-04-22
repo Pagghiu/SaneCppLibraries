@@ -24,6 +24,7 @@
 		7B583F6D2922ED2700FBE019 /* SCTestXCTest.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */; };
 		7B583FCB2922EE7300FBE019 /* SCTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F692922ECF900FBE019 /* SCTest.cpp */; };
 		7B872C4D29AFFC4900949BD2 /* Threading.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B872C4A29AFFC4900949BD2 /* Threading.cpp */; };
+		7B8BF9B129F3BADC0055BC3A /* Networking.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B8BF9AC29F3BADC0055BC3A /* Networking.cpp */; };
 		7BA7D47C29B5488200811076 /* EventLoop.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA7D47B29B5488200811076 /* EventLoop.cpp */; };
 		7BA892AA297E03B50093152B /* System.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892A9297E03540093152B /* System.cpp */; };
 		7BA892AE297E06040093152B /* StringConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892AD297E06040093152B /* StringConverter.cpp */; };
@@ -160,6 +161,10 @@
 		7B89A60329BFD9D6006EF085 /* TaggedUnion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TaggedUnion.h; path = ../../../../Libraries/Foundation/TaggedUnion.h; sourceTree = "<group>"; };
 		7B89A60429BFE1A4006EF085 /* TypeList.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TypeList.h; path = ../../../../Libraries/Foundation/TypeList.h; sourceTree = "<group>"; };
 		7B8B919929DB868C0051AF74 /* UniquePtr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = UniquePtr.h; path = ../../../../Libraries/Foundation/UniquePtr.h; sourceTree = "<group>"; };
+		7B8BF9AC29F3BADC0055BC3A /* Networking.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Networking.cpp; path = ../../../../Libraries/Networking/Networking.cpp; sourceTree = "<group>"; };
+		7B8BF9AE29F3BADC0055BC3A /* Networking.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Networking.h; path = ../../../../Libraries/Networking/Networking.h; sourceTree = "<group>"; };
+		7B8BF9AF29F3BADC0055BC3A /* NetworkingTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = NetworkingTest.h; path = ../../../../Libraries/Networking/NetworkingTest.h; sourceTree = "<group>"; };
+		7B8BF9B229F3C07F0055BC3A /* SocketDescriptor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SocketDescriptor.h; path = ../../../../Libraries/Networking/SocketDescriptor.h; sourceTree = "<group>"; };
 		7B91CBEE29B17F470013E95E /* Opaque.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Opaque.h; path = ../../../../Libraries/Foundation/Opaque.h; sourceTree = "<group>"; };
 		7B91CBEF29B17F470013E95E /* OpaqueTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OpaqueTest.h; path = ../../../../Libraries/Foundation/OpaqueTest.h; sourceTree = "<group>"; };
 		7B9C4FBD29F1C0B100504902 /* FileSystemWatcherInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWatcherInternalEmscripten.inl; path = ../../../../Libraries/FileSystem/FileSystemWatcherInternalEmscripten.inl; sourceTree = "<group>"; };
@@ -318,6 +323,7 @@
 				7BA7D47829B5473100811076 /* Async */,
 				7B0C2999297CA7C10071C5B4 /* FileSystem */,
 				7B515F932924305E006996AA /* Foundation */,
+				7B8BF9AB29F3B9B60055BC3A /* Networking */,
 				7B7044552995A2180034458B /* Reflection */,
 				7B7044562995A2290034458B /* Serialization */,
 				7B8B90C629EB6B470092805F /* System */,
@@ -403,6 +409,17 @@
 			children = (
 			);
 			name = "Recovered References";
+			sourceTree = "<group>";
+		};
+		7B8BF9AB29F3B9B60055BC3A /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+				7B8BF9B229F3C07F0055BC3A /* SocketDescriptor.h */,
+				7B8BF9AC29F3BADC0055BC3A /* Networking.cpp */,
+				7B8BF9AE29F3BADC0055BC3A /* Networking.h */,
+				7B8BF9AF29F3BADC0055BC3A /* NetworkingTest.h */,
+			);
+			name = Networking;
 			sourceTree = "<group>";
 		};
 		7B9F61822995BDA20011F4D4 /* Frameworks */ = {
@@ -553,6 +570,7 @@
 				7B4A291D29B3CD4A00F13DCB /* Time.cpp in Sources */,
 				7B19C9AC297AF99F001C0627 /* Path.cpp in Sources */,
 				7BE5C81029A26E3E00CBCAD1 /* Process.cpp in Sources */,
+				7B8BF9B129F3BADC0055BC3A /* Networking.cpp in Sources */,
 				7B51601329243097006996AA /* String.cpp in Sources */,
 				7BE5C81329A2707E00CBCAD1 /* FileDescriptor.cpp in Sources */,
 				7BA892AE297E06040093152B /* StringConverter.cpp in Sources */,

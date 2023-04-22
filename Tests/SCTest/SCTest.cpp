@@ -24,6 +24,9 @@
 #include "../../Libraries/FileSystem/FileSystemWatcherTest.h"
 #include "../../Libraries/FileSystem/PathTest.h"
 
+// Networking
+#include "../../Libraries/Networking/NetworkingTest.h"
+
 // Reflection
 #include "../../Libraries/Reflection/ReflectionTest.h"
 
@@ -43,6 +46,9 @@
 
 // Async
 #include "../../Libraries/Async/EventLoopTest.h"
+
+#include "../../Libraries/Foundation/SmallVector.h"
+#include "../../Libraries/System/System.h"
 
 SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> globalConsoleConversionBuffer;
 
@@ -79,6 +85,9 @@ int main(int argc, const char* argv[])
     { FileSystemWalkerTest          test(report); }
     { FileSystemWatcherTest         test(report); }
     { PathTest                      test(report); }
+
+    // Networking tests
+    { NetworkingTest                 test(report); }
 
     // Reflection tests
     { ReflectionTest                test(report); }

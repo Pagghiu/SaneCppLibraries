@@ -97,7 +97,7 @@ struct SC::FileSystemWatcher::Internal
 
     [[nodiscard]] ReturnCode startWatching(FolderWatcher* entry)
     {
-        StringNative<1024> buffer; // TODO: this needs to go into caller context
+        StringNative<1024> buffer = StringEncoding::Native; // TODO: this needs to go into caller context
         StringConverter    converter(buffer);
         if (threadingRunner)
         {
