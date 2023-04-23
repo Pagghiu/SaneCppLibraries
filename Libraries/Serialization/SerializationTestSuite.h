@@ -339,7 +339,7 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
             SC_TEST_EXPECT(topLevelRead.vectorOfInts.size() == 4);
             for (size_t idx = 0; idx < topLevel.vectorOfInts.size(); ++idx)
             {
-                SC_TEST_EXPECT(topLevel.vectorOfInts[idx] = topLevelRead.vectorOfInts[idx]);
+                SC_TEST_EXPECT(topLevel.vectorOfInts[idx] == topLevelRead.vectorOfInts[idx]);
             }
         }
         if (test_section("VectorStructComplex"))

@@ -174,7 +174,11 @@ SC::ReturnCode SC::TCPClient::write(Span<const char> data)
     SocketDescriptorNative nativeSocket;
     SC_TRY_IF(socket.get(nativeSocket, "Invalid socket"_a8));
     const auto written = ::send(nativeSocket, data.data(), static_cast<int>(data.sizeInBytes()), 0);
-    if (written != data.sizeInBytes())
+    if (written < 0)
+    {
+        return "send error"_a8;
+    }
+    if (static_cast<decltype(data.sizeInBytes())>(written) != data.sizeInBytes())
     {
         return "send error"_a8;
     }

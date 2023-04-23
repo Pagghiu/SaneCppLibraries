@@ -42,11 +42,11 @@ struct TestCase
 
     [[nodiscard]] bool test_section(StringView sectionName);
 
+    TestReport&      report;
     const StringView testName;
     uint32_t         numTestsSucceeded;
-    uint32_t         numSectionTestsFailed;
     uint32_t         numTestsFailed;
-    TestReport&      report;
+    uint32_t         numSectionTestsFailed;
     bool             printedSection;
 };
 } // namespace SC

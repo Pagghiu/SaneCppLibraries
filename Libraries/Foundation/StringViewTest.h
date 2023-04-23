@@ -105,12 +105,12 @@ struct SC::StringViewTest : public SC::TestCase
             }
             {
                 StringView str       = "___";
-                auto       numSplits = str.splitASCII('_', [&](StringView v) {}, {SplitOptions::SkipSeparator});
+                auto       numSplits = str.splitASCII('_', [&](StringView) {}, {SplitOptions::SkipSeparator});
                 SC_TEST_EXPECT(numSplits == 3);
             }
             {
                 StringView str       = "";
-                auto       numSplits = str.splitASCII('_', [&](StringView v) {}, {SplitOptions::SkipSeparator});
+                auto       numSplits = str.splitASCII('_', [&](StringView) {}, {SplitOptions::SkipSeparator});
                 SC_TEST_EXPECT(numSplits == 0);
             }
         }

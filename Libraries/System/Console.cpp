@@ -1,6 +1,7 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+
 #include "Console.h"
 #include "../Foundation/Limits.h"
 #include "../Foundation/Platform.h"
@@ -10,6 +11,7 @@
 #include <string.h> // strlen
 
 #if SC_PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #endif
 

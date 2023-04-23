@@ -4,7 +4,11 @@
 #pragma once
 #include "Process.h"
 
+#if SC_PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <stdlib.h> // _exit
+#endif
 
 struct SC::Process::Internal
 {

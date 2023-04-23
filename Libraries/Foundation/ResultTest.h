@@ -27,7 +27,7 @@ struct SC::ResultTest : public SC::TestCase
         if (test_section("nested_succeed"))
         {
             SC_MUST(int res, nestedFail2(false));
-            SC_TEST_EXPECT(res = 7);
+            SC_TEST_EXPECT(res == 6);
         }
         if (test_section("nested_fail"))
         {

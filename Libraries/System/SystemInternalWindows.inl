@@ -47,6 +47,7 @@ bool SC::SystemDebug::printBacktrace() { return true; }
 
 bool SC::SystemDebug::printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeInBytes)
 {
+    SC_UNUSED(backtraceBufferSizeInBytes);
     if (!backtraceBuffer)
         return false;
     return true;
@@ -55,6 +56,8 @@ bool SC::SystemDebug::printBacktrace(void** backtraceBuffer, size_t backtraceBuf
 SC::size_t SC::SystemDebug::captureBacktrace(size_t framesToSkip, void** backtraceBuffer,
                                              size_t backtraceBufferSizeInBytes, uint32_t* hash)
 {
+    SC_UNUSED(framesToSkip);
+    SC_UNUSED(backtraceBufferSizeInBytes);
     if (hash)
         *hash = 1;
     if (backtraceBuffer == nullptr)

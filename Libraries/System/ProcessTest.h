@@ -48,7 +48,7 @@ struct SC::ProcessTest : public SC::TestCase
         if (test_section("ProcessChain inherit single"))
         {
             bool         hasError = false;
-            auto         onErr    = [&](const ProcessChain::Error& err) { hasError = true; };
+            auto         onErr    = [&](const ProcessChain::Error&) { hasError = true; };
             Process      p1;
             ProcessChain chain(onErr);
 #if SC_PLATFORM_APPLE
@@ -63,7 +63,7 @@ struct SC::ProcessTest : public SC::TestCase
         if (test_section("ProcessChain inherit dual"))
         {
             bool         hasError = false;
-            auto         onErr    = [&](const ProcessChain::Error& err) { hasError = true; };
+            auto         onErr    = [&](const ProcessChain::Error&) { hasError = true; };
             ProcessChain chain(onErr);
             Process      p1, p2;
 #if SC_PLATFORM_APPLE
@@ -80,7 +80,7 @@ struct SC::ProcessTest : public SC::TestCase
         if (test_section("ProcessChain pipe single"))
         {
             bool         hasError = false;
-            auto         onErr    = [&](const ProcessChain::Error& err) { hasError = true; };
+            auto         onErr    = [&](const ProcessChain::Error&) { hasError = true; };
             ProcessChain chain(onErr);
             String       output(StringEncoding::Ascii);
             Process      p1;
@@ -102,7 +102,7 @@ struct SC::ProcessTest : public SC::TestCase
         if (test_section("ProcessChain pipe dual"))
         {
             bool         hasError = false;
-            auto         onErr    = [&](const ProcessChain::Error& err) { hasError = true; };
+            auto         onErr    = [&](const ProcessChain::Error&) { hasError = true; };
             ProcessChain chain(onErr);
             String       output(StringEncoding::Ascii);
             Process      p1, p2;

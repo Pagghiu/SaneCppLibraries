@@ -79,12 +79,13 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
     static bool resize(SpanVoid<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
                        VectorVTable::DropEccessItems dropEccessItems)
     {
+        SC_UNUSED(property);
+        SC_UNUSED(dropEccessItems);
         if (object.sizeInBytes() >= sizeof(void*))
         {
-            auto& vectorByte = *static_cast<Container*>(object.data());
-            auto  numItems   = sizeInBytes / sizeof(ItemType);
-            if (N >= 0)
-                numItems = min(numItems, static_cast<decltype(numItems)>(N));
+            auto&      vectorByte = *static_cast<Container*>(object.data());
+            const auto numItems   = N >= 0 ? min(sizeInBytes / sizeof(ItemType), static_cast<decltype(sizeInBytes)>(N))
+                                           : sizeInBytes / sizeof(ItemType);
             return vectorByte.resize(numItems);
         }
         else
@@ -95,12 +96,13 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
     static bool resizeWithoutInitialize(SpanVoid<void> object, Reflection::MetaProperties property,
                                         uint64_t sizeInBytes, VectorVTable::DropEccessItems dropEccessItems)
     {
+        SC_UNUSED(property);
+        SC_UNUSED(dropEccessItems);
         if (object.sizeInBytes() >= sizeof(void*))
         {
-            auto& vectorByte = *static_cast<Container*>(object.data());
-            auto  numItems   = sizeInBytes / sizeof(ItemType);
-            if (N >= 0)
-                numItems = min(numItems, static_cast<decltype(numItems)>(N));
+            auto&      vectorByte = *static_cast<Container*>(object.data());
+            const auto numItems   = N >= 0 ? min(sizeInBytes / sizeof(ItemType), static_cast<decltype(sizeInBytes)>(N))
+                                           : sizeInBytes / sizeof(ItemType);
             return vectorByte.resizeWithoutInitializing(numItems);
         }
         else
@@ -113,6 +115,7 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
     [[nodiscard]] static constexpr bool getSegmentSpan(Reflection::MetaProperties property, SpanVoid<VoidType> object,
                                                        SpanVoid<VoidType>& itemBegin)
     {
+        SC_UNUSED(property);
         if (object.sizeInBytes() >= sizeof(void*))
         {
             typedef typename SameConstnessAs<VoidType, Container>::type VectorType;
@@ -128,7 +131,9 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
     template <typename Q = ItemType>
     [[nodiscard]] static typename EnableIf<not IsTriviallyCopyable<Q>::value, void>::type //
         constexpr assignResizeWithoutInitialize(VectorVTable& vector)
-    {}
+    {
+        SC_UNUSED(vector);
+    }
 
     template <typename Q = ItemType>
     [[nodiscard]] static typename EnableIf<IsTriviallyCopyable<Q>::value, void>::type //

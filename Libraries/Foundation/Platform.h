@@ -11,24 +11,26 @@
 #define SC_RELEASE 1
 #endif
 
-#if __APPLE__
+#if defined(__APPLE__)
 #define SC_PLATFORM_APPLE      1
 #define SC_PLATFORM_LINUX      0
 #define SC_PLATFORM_WINDOWS    0
 #define SC_PLATFORM_EMSCRIPTEN 0
-#elif _WIN32 || _WIN64
+#elif defined(_WIN32) || defined(_WIN64)
 #define SC_PLATFORM_APPLE      0
 #define SC_PLATFORM_LINUX      0
 #define SC_PLATFORM_WINDOWS    1
 #define SC_PLATFORM_EMSCRIPTEN 0
-#elif __EMSCRIPTEN__
+#elif defined(__EMSCRIPTEN__)
 #define SC_PLATFORM_APPLE      0
 #define SC_PLATFORM_LINUX      0
 #define SC_PLATFORM_WINDOWS    0
 #define SC_PLATFORM_EMSCRIPTEN 1
-#elif __linux__
+#elif defined(__linux__)
 #define SC_PLATFORM_APPLE      0
 #define SC_PLATFORM_LINUX      1
 #define SC_PLATFORM_WINDOWS    0
 #define SC_PLATFORM_EMSCRIPTEN 0
+#else
+#error "Unsupported platform"
 #endif

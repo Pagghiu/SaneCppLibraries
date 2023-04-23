@@ -1,11 +1,13 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+
 #include "StringConverter.h"
 #include "Result.h"
 #include "String.h"
 
 #if SC_PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #endif
 

@@ -166,50 +166,50 @@ SC::VectorTest::VectorTest(SC::TestReport& report) : TestCase(report, "VectorTes
 void SC::VectorTest::testClassType()
 {
     using namespace SC;
-    VectorTestReport& report = VectorTestReport::get();
-    report.reset();
+    VectorTestReport& vecReport = VectorTestReport::get();
+    vecReport.reset();
     if (test_section("class_resize"))
     {
         StringView      myString("MyData");
         VectorTestClass testClass(myString.bytesWithoutTerminator());
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::CONSTRUCTOR);
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::CONSTRUCTOR);
         SC_TEST_EXPECT(myString == testClass.toString());
         SC::Vector<VectorTestClass> myVector;
-        SC_TEST_EXPECT(report.numSequences == 1);
-        report.reset();
+        SC_TEST_EXPECT(vecReport.numSequences == 1);
+        vecReport.reset();
         auto result = myVector.resize(2);
-        SC_TEST_EXPECT(report.numSequences == 4);
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::CONSTRUCTOR);      // DEFAULT PARAM
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // FIRST ELEMENT
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // SECOND ELEMENT
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::DESTRUCTOR);       // DEFAULT PARAM DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.numSequences == 4);
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::CONSTRUCTOR);      // DEFAULT PARAM
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // FIRST ELEMENT
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // SECOND ELEMENT
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR);       // DEFAULT PARAM DESTRUCTOR
         SC_TEST_EXPECT(myVector[0].toString().isEmpty());
         SC_TEST_EXPECT(myVector[1].toString().isEmpty());
 
-        report.reset();
+        vecReport.reset();
         result = myVector.resize(3, VectorTestClass("Custom"));
-        SC_TEST_EXPECT(report.numSequences == 5);
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::CONSTRUCTOR);      // DEFAULT PARAM
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::MOVE_CONSTRUCTOR); // ITEM[1] CONSTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::MOVE_CONSTRUCTOR); // ITEM[2] CONSTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[3] COPY_CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.numSequences == 5);
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::CONSTRUCTOR);      // DEFAULT PARAM
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::MOVE_CONSTRUCTOR); // ITEM[1] CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::MOVE_CONSTRUCTOR); // ITEM[2] CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[3] COPY_CONSTRUCTOR
         // (DEFAULT PARAM)
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::DESTRUCTOR); // DEFAULT PARAM DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR); // DEFAULT PARAM DESTRUCTOR
         SC_TEST_EXPECT(myVector[0].toString().isEmpty());
         SC_TEST_EXPECT(myVector[1].toString().isEmpty());
         SC_TEST_EXPECT(myVector[2].toString() == StringView("Custom"));
-        report.reset();
+        vecReport.reset();
         result = myVector.resize(2);
-        SC_TEST_EXPECT(report.numSequences == 3);
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::CONSTRUCTOR); // DEFAULT PARAM
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::DESTRUCTOR);  // ITEM[3] DESTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::DESTRUCTOR);  // DEFAULT PARAM DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.numSequences == 3);
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::CONSTRUCTOR); // DEFAULT PARAM
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR);  // ITEM[3] DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR);  // DEFAULT PARAM DESTRUCTOR
         SC_TEST_EXPECT(myVector.resize(0));
-        report.reset();
+        vecReport.reset();
         SC_TEST_EXPECT(myVector.resize(1));
-        SC_TEST_EXPECT(report.numSequences == 3);
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::CONSTRUCTOR);      // DEFAULT PARAM
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[3] COPY_CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.numSequences == 3);
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::CONSTRUCTOR);      // DEFAULT PARAM
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[3] COPY_CONSTRUCTOR
         SC_TEST_EXPECT(not myVector.resize(INSANE_NUMBER));
     }
 
@@ -221,56 +221,56 @@ void SC::VectorTest::testClassType()
         SC_TEST_EXPECT(myVector.capacity() == 0);
         SC_TEST_EXPECT(myVector.resize(3));
         SC_TEST_EXPECT(myVector.resize(2));
-        report.reset();
+        vecReport.reset();
         SC_TEST_EXPECT(myVector.shrink_to_fit());
-        SC_TEST_EXPECT(report.numSequences == 2);
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::MOVE_CONSTRUCTOR); // ITEM[1] CONSTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::MOVE_CONSTRUCTOR); // ITEM[2] CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.numSequences == 2);
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::MOVE_CONSTRUCTOR); // ITEM[1] CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::MOVE_CONSTRUCTOR); // ITEM[2] CONSTRUCTOR
     }
 
     if (test_section("class_clear"))
     {
         SC::Vector<VectorTestClass> myVector;
         SC_TEST_EXPECT(myVector.resize(2));
-        report.reset();
+        vecReport.reset();
         myVector.clear();
-        SC_TEST_EXPECT(report.numSequences == 2);
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::DESTRUCTOR); // ITEM[1] DESTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::DESTRUCTOR); // ITEM[2] DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.numSequences == 2);
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR); // ITEM[1] DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR); // ITEM[2] DESTRUCTOR
     }
 
     if (test_section("class_reserve"))
     {
         SC::Vector<VectorTestClass> newVector;
-        report.reset();
+        vecReport.reset();
         SC_TEST_EXPECT(newVector.reserve(2));
         SC_TEST_EXPECT(newVector.reserve(1));
         SC_TEST_EXPECT(newVector.size() == 0);
         SC_TEST_EXPECT(newVector.capacity() == 2);
-        SC_TEST_EXPECT(report.numSequences == 0);
+        SC_TEST_EXPECT(vecReport.numSequences == 0);
     }
 
     if (test_section("class_destructor"))
     {
         {
             SC::Vector<VectorTestClass> newVector;
-            report.reset();
+            vecReport.reset();
             SC_TEST_EXPECT(newVector.resize(2, VectorTestClass("CIAO")));
         }
-        SC_TEST_EXPECT(report.numSequences == 6);
+        SC_TEST_EXPECT(vecReport.numSequences == 6);
 
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::CONSTRUCTOR);      // DEFAULT PARAM
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[1] COPY CONSTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[2] COPY CONSTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::DESTRUCTOR);       // DEFAULT PARAM DESTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::DESTRUCTOR);       // ITEM[1] DESTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::DESTRUCTOR);       // ITEM[2] DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::CONSTRUCTOR);      // DEFAULT PARAM
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[1] COPY CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[2] COPY CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR);       // DEFAULT PARAM DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR);       // ITEM[1] DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR);       // ITEM[2] DESTRUCTOR
     }
 
     if (test_section("class_copy_construct"))
     {
         SC::Vector<VectorTestClass> newVector;
-        report.reset();
+        vecReport.reset();
         VectorTestClass value = VectorTestClass("CIAO");
         SC_TEST_EXPECT(newVector.resize(2, value));
         SC::Vector<VectorTestClass> otherVector = newVector;
@@ -283,7 +283,7 @@ void SC::VectorTest::testClassType()
     if (test_section("class_copy_assign"))
     {
         SC::Vector<VectorTestClass> newVector, otherVector;
-        report.reset();
+        vecReport.reset();
         VectorTestClass value = VectorTestClass("CIAO");
         SC_TEST_EXPECT(newVector.resize(2, value));
         otherVector = newVector;
@@ -296,15 +296,15 @@ void SC::VectorTest::testClassType()
     if (test_section("class_move_assign"))
     {
         SC::Vector<VectorTestClass> newVector, otherVector;
-        report.reset();
+        vecReport.reset();
         VectorTestClass value = VectorTestClass("CIAO");
         SC_TEST_EXPECT(newVector.resize(2, value));
         SC_TEST_EXPECT(otherVector.resize(2, value));
-        report.reset();
+        vecReport.reset();
         otherVector = move(newVector);
-        SC_TEST_EXPECT(report.numSequences == 2);
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::DESTRUCTOR); // ITEM[1] DESTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::DESTRUCTOR); // ITEM[2] DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.numSequences == 2);
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR); // ITEM[1] DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR); // ITEM[2] DESTRUCTOR
         SC_TEST_EXPECT(newVector.size() == 0);
         // SC_TEST_EXPECT(newVector.items == nullptr);
         SC_TEST_EXPECT(otherVector.size() == 2);
@@ -316,15 +316,15 @@ void SC::VectorTest::testClassType()
     if (test_section("class_copy_assign"))
     {
         SC::Vector<VectorTestClass> newVector, otherVector;
-        report.reset();
+        vecReport.reset();
         VectorTestClass value = VectorTestClass("CIAO");
         SC_TEST_EXPECT(newVector.resize(2, value));
         SC_TEST_EXPECT(otherVector.resize(2, value));
-        report.reset();
+        vecReport.reset();
         otherVector = newVector;
-        SC_TEST_EXPECT(report.numSequences == 2);
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::COPY_ASSIGNMENT); // ITEM[1] COPY
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::COPY_ASSIGNMENT); // ITEM[2] COPY
+        SC_TEST_EXPECT(vecReport.numSequences == 2);
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_ASSIGNMENT); // ITEM[1] COPY
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_ASSIGNMENT); // ITEM[2] COPY
         SC_TEST_EXPECT(newVector.size() == 2);
         // SC_TEST_EXPECT(newVector.items == nullptr);
         SC_TEST_EXPECT(otherVector.size() == 2);
@@ -332,29 +332,29 @@ void SC::VectorTest::testClassType()
         SC_TEST_EXPECT(otherVector[0].toString() == StringView("CIAO"));
         SC_TEST_EXPECT(otherVector[1].toString() == StringView("CIAO"));
         SC_TEST_EXPECT(newVector.resize(4));
-        report.reset();
+        vecReport.reset();
         otherVector = newVector;
-        SC_TEST_EXPECT(report.numSequences == 6);
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::DESTRUCTOR);       // ITEM[1] DESTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::DESTRUCTOR);       // ITEM[2] DESTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[1] COPY_CONSTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[2] COPY_CONSTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[1] COPY_CONSTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[2] COPY_CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.numSequences == 6);
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR);       // ITEM[1] DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR);       // ITEM[2] DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[1] COPY_CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[2] COPY_CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[1] COPY_CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[2] COPY_CONSTRUCTOR
         SC_TEST_EXPECT(newVector.resize(2));
-        report.reset();
+        vecReport.reset();
         otherVector = newVector;
-        SC_TEST_EXPECT(report.numSequences == 4);
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::COPY_ASSIGNMENT); // ITEM[1] COPY_CONSTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::COPY_ASSIGNMENT); // ITEM[2] COPY_CONSTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::DESTRUCTOR);      // ITEM[1] DESTRUCTOR
-        SC_TEST_EXPECT(report.nextOperation() == VectorTestReport::DESTRUCTOR);      // ITEM[2] DESTRUCTOR
-                                                                                     //
+        SC_TEST_EXPECT(vecReport.numSequences == 4);
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_ASSIGNMENT); // ITEM[1] COPY_CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_ASSIGNMENT); // ITEM[2] COPY_CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR);      // ITEM[1] DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR);      // ITEM[2] DESTRUCTOR
+                                                                                        //
     }
     if (test_section("class_insertMove_full_full_middle"))
     {
         SC::Vector<VectorTestClass> vector1, vector2;
-        report.reset();
+        vecReport.reset();
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("0")));
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("3")));
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("4")));
@@ -375,7 +375,7 @@ void SC::VectorTest::testClassType()
     if (test_section("class_appendMove"))
     {
         SC::Vector<VectorTestClass> vector1, vector2;
-        report.reset();
+        vecReport.reset();
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("0")));
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("1")));
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("2")));
@@ -394,7 +394,7 @@ void SC::VectorTest::testClassType()
     if (test_section("class_appendMove_empty"))
     {
         SC::Vector<VectorTestClass> vector1, vector2;
-        report.reset();
+        vecReport.reset();
         SC_TEST_EXPECT(vector2.push_back(VectorTestClass("0")));
         SC_TEST_EXPECT(vector2.push_back(VectorTestClass("1")));
         SC_TEST_EXPECT(vector1.appendMove(vector2.begin(), vector2.size()));
@@ -411,7 +411,7 @@ void SC::VectorTest::testClassType()
     if (test_section("class_push_back_pop_back"))
     {
         SC::Vector<VectorTestClass> test;
-        report.reset();
+        vecReport.reset();
         SC_TEST_EXPECT(test.push_back(VectorTestClass("1")));
         int32_t value = -1;
         SC_TEST_EXPECT(test[0].toString().parseInt32(&value));
@@ -439,7 +439,7 @@ void SC::VectorTest::testClassType()
     if (test_section("class_copy_assignment"))
     {
         SC::Vector<VectorTestClass> vector1, vector2;
-        report.reset();
+        vecReport.reset();
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("0")));
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("1")));
 
@@ -456,7 +456,7 @@ void SC::VectorTest::testClassType()
     if (test_section("class_move_assignment"))
     {
         SC::Vector<VectorTestClass> vector1, vector2;
-        report.reset();
+        vecReport.reset();
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("0")));
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("1")));
 
@@ -472,7 +472,7 @@ void SC::VectorTest::testClassType()
     if (test_section("class_remove_at"))
     {
         SC::Vector<VectorTestClass> vector1;
-        report.reset();
+        vecReport.reset();
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("0")));
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("1")));
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("2")));
@@ -513,7 +513,7 @@ void SC::VectorTest::testBasicType()
             elements[idx] = static_cast<int>(idx);
         }
 
-        SC_TEST_EXPECT(numFailures = 1);
+        SC_TEST_EXPECT(numFailures == 1);
 
         SC_TEST_EXPECT(not elements.resize(INSANE_NUMBER));
         SC_TEST_EXPECT(elements.size() == 10);

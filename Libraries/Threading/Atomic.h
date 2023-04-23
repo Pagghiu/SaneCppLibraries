@@ -143,7 +143,7 @@ struct Atomic<bool>
     bool exchange(bool desired)
     {
 #if _MSC_VER
-        return _InterlockedExchange8(reinterpret_cast<volatile char*>(&value), desired);
+        return static_cast<bool>(_InterlockedExchange8(reinterpret_cast<volatile char*>(&value), desired));
 #else
         bool res;
         __atomic_exchange(&value, &desired, &res, __ATOMIC_SEQ_CST);

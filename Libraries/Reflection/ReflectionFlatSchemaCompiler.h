@@ -46,7 +46,11 @@ struct FlatSchemaCompiler
         build(container);
         if (container.atoms.capacityWasEnough())
         {
-            atoms.values[container.initialSize].properties.numSubAtoms = container.atoms.size - 1;
+            const auto lastAtomIndex = container.atoms.size - 1;
+            if (lastAtomIndex > static_cast<decltype(MetaProperties::numSubAtoms)>(MaxValue()))
+                return false;
+            atoms.values[container.initialSize].properties.numSubAtoms =
+                static_cast<decltype(MetaProperties::numSubAtoms)>(lastAtomIndex);
             atoms.size += container.atoms.size;
             return true;
         }
@@ -83,16 +87,18 @@ struct FlatSchemaCompiler
             Atom&      atom        = result.atoms.values[atomIndex];
             const bool isEmptyLink = atom.properties.getLinkIndex() < 0;
             int        numSubAtoms = 0;
-            if (isEmptyLink && (numSubAtoms = countAtoms(atom)) > 0)
+            if (isEmptyLink and (numSubAtoms = countAtoms(atom)) > 0)
             {
                 int outIndex = -1;
                 if (alreadyVisitedTypes.contains(atom.build, &outIndex))
                 {
-                    atom.properties.setLinkIndex(alreadyVisitedLinkID.values[outIndex]);
+                    if (not atom.properties.setLinkIndex(alreadyVisitedLinkID.values[outIndex]))
+                        return {};
                 }
                 else
                 {
-                    atom.properties.setLinkIndex(result.atoms.size);
+                    if (not atom.properties.setLinkIndex(result.atoms.size))
+                        return {};
                     if (not alreadyVisitedLinkID.push_back(result.atoms.size))
                         return {};
                     if (not alreadyVisitedTypes.push_back(atom.build))

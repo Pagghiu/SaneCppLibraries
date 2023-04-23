@@ -41,10 +41,11 @@ struct SC::FileDescriptorPosix
 
 struct FileDescriptorOptions
 {
-    bool                   inheritable = false;
-    FileDescriptorOptions& setInheritable(bool inheritable)
+    bool inheritable = false;
+
+    FileDescriptorOptions& setInheritable(bool value)
     {
-        this->inheritable = inheritable;
+        inheritable = value;
         return *this;
     }
 };

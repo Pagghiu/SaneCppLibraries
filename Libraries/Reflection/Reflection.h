@@ -49,18 +49,29 @@ struct MetaProperties
     uint16_t offsetInBytes; // 2
     uint16_t sizeInBytes;   // 2
 
-    constexpr MetaProperties() : type(MetaType::TypeInvalid), order(0), offsetInBytes(0), sizeInBytes(0), numSubAtoms(0)
+    constexpr MetaProperties() : type(MetaType::TypeInvalid), numSubAtoms(0), order(0), offsetInBytes(0), sizeInBytes(0)
     {
         static_assert(sizeof(MetaProperties) == 8, "Size must be 8 bytes");
     }
+
     constexpr MetaProperties(MetaType type, uint8_t order, uint16_t offsetInBytes, uint16_t sizeInBytes,
                              int8_t numSubAtoms)
-        : type(type), order(order), offsetInBytes(offsetInBytes), sizeInBytes(sizeInBytes), numSubAtoms(numSubAtoms)
+        : type(type), numSubAtoms(numSubAtoms), order(order), offsetInBytes(offsetInBytes), sizeInBytes(sizeInBytes)
     {}
-    constexpr void                   setLinkIndex(int8_t linkIndex) { numSubAtoms = linkIndex; }
-    [[nodiscard]] constexpr int8_t   getLinkIndex() const { return numSubAtoms; }
+
+    [[nodiscard]] constexpr int8_t getLinkIndex() const { return numSubAtoms; }
+
+    [[nodiscard]] constexpr bool setLinkIndex(ssize_t linkIndex)
+    {
+        if (linkIndex > static_cast<decltype(numSubAtoms)>(MaxValue()))
+            return false;
+        numSubAtoms = static_cast<decltype(numSubAtoms)>(linkIndex);
+        return true;
+    }
+
     [[nodiscard]] constexpr uint32_t getCustomUint32() const { return (offsetInBytes << 16) | order; }
-    constexpr void                   setCustomUint32(uint32_t N)
+
+    constexpr void setCustomUint32(uint32_t N)
     {
         const uint16_t lowN  = N & 0xffff;
         const uint16_t highN = (N >> 16) & 0xffff;
@@ -72,6 +83,7 @@ struct MetaProperties
     {
         return type >= MetaType::TypeUINT8 && type <= MetaType::TypeDOUBLE64;
     }
+
     [[nodiscard]] constexpr bool isPrimitiveOrRecursivelyPacked() const
     {
         if (isPrimitiveType())
@@ -88,7 +100,7 @@ struct MetaProperties
 };
 
 // clang-format off
-struct MetaPrimitive { template<typename MemberVisitor>  static constexpr void build( MemberVisitor& builder) { } };
+struct MetaPrimitive { template<typename MemberVisitor>  static constexpr void build( MemberVisitor&) { } };
 
 template<typename data_tlist, int N>
 struct CallVisitorFor
@@ -292,7 +304,7 @@ struct MetaArrayView
     }
 
     template <typename R, typename T, int N>
-    [[nodiscard]] constexpr bool operator()(int order, const char (&name)[N], R T::*field, size_t offset)
+    [[nodiscard]] constexpr bool operator()(uint8_t order, const char (&name)[N], R T::*field, size_t offset)
     {
         push(Type::create(order, name, field, offset));
         return true;
@@ -316,7 +328,7 @@ struct AtomBase
     {}
 
     template <typename R, typename T, int N>
-    [[nodiscard]] static constexpr AtomBase create(int order, const char (&name)[N], R T::*, size_t offset)
+    [[nodiscard]] static constexpr AtomBase create(uint8_t order, const char (&name)[N], R T::*, size_t offset)
     {
         return {MetaProperties(MetaClass<R>::getMetaType(), order, static_cast<SC::uint16_t>(offset), sizeof(R), -1),
                 ConstexprStringView(name, N), &MetaClass<R>::build};
@@ -347,7 +359,7 @@ struct MetaClassBuilder
     {}
 
     template <typename R, typename T, int N>
-    [[nodiscard]] constexpr bool operator()(int order, const char (&name)[N], R T::*field, size_t offset)
+    [[nodiscard]] constexpr bool operator()(uint8_t order, const char (&name)[N], R T::*field, size_t offset)
     {
         return atoms(order, name, field, offset);
     }
@@ -395,6 +407,7 @@ struct MetaStruct<MetaClass<Type>>
         template <typename R, int N>
         constexpr bool operator()(int order, const char (&name)[N], R Type::*field, size_t offset) const
         {
+            SC_UNUSED(offset);
             return builder(order, name, object.*field);
         }
     };

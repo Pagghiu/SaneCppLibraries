@@ -2,7 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <stddef.h> // offsetof
 
 #include "../FileSystem/FileDescriptor.h"
 #include "../Foundation/Opaque.h"

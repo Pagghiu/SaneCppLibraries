@@ -9,7 +9,7 @@ namespace SC
 {
 #if SC_PLATFORM_WINDOWS
 using SocketDescriptorNative                                          = uint64_t; // SOCKET
-static constexpr SocketDescriptorNative SocketDescriptorNativeInvalid = ~0;       // INVALID_SOCKET
+static constexpr SocketDescriptorNative SocketDescriptorNativeInvalid = ~0ull;    // INVALID_SOCKET
 #else
 using SocketDescriptorNative                                          = int; // Posix FD
 static constexpr SocketDescriptorNative SocketDescriptorNativeInvalid = -1;  // Posix Invalid FD

@@ -32,6 +32,8 @@ struct SerializerMemberIterator
     template <typename R, int N>
     constexpr bool operator()(int order, const char (&name)[N], R& field) const
     {
+        SC_UNUSED(order);
+        SC_UNUSED(name);
         return Serializer<BinaryStream, R>::serialize(field, stream);
     }
 };
@@ -81,6 +83,7 @@ struct SerializerVersionedMemberIterator
     template <typename R, int N>
     constexpr bool operator()(int order, const char (&name)[N], R& field)
     {
+        SC_UNUSED(name);
         if (matchOrder == order)
         {
             consumed            = true;

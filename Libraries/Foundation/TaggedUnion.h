@@ -61,6 +61,7 @@ struct SC::TaggedUnion
         template <int Index>
         static void visit(TaggedUnion* t1, TaggedUnion* t2)
         {
+            SC_UNUSED(t2);
             using T = typename TypeAt<Index>::type;
             t1->fieldAt<Index>().~T();
         }
@@ -124,7 +125,7 @@ struct SC::TaggedUnion
     template <typename Visitor, typename T1, typename T2>
     struct RuntimeEnumVisit<Visitor, T1, T2, 0>
     {
-        static void visit(T1* t1, T2* t2, EnumType enumType) { Visitor::template visit<0>(t1, t2); }
+        static void visit(T1* t1, T2* t2, EnumType) { Visitor::template visit<0>(t1, t2); }
     };
 
     void destruct() { RuntimeEnumVisit<Destruct, TaggedUnion, TaggedUnion>::visit(this, this, type); }

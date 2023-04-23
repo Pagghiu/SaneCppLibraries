@@ -137,6 +137,7 @@ struct SC::SegmentItems : public SegmentHeader
     static typename EnableIf<IsTriviallyCopyable<Q>::value, void>::type //
     moveAndDestroy(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN)
     {
+        SC_UNUSED(oldSize);
         // TODO: add code to handle memcpy destination overlapping source
         memcpy(newItems, oldItems, keepFirstN * sizeof(T));
     }
@@ -146,6 +147,7 @@ struct SC::SegmentItems : public SegmentHeader
     copyReplaceTrivialOrNot(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
                             const size_t numToDestroy, U* other, size_t otherSize)
     {
+        SC_UNUSED(otherSize);
         copyAssignElements(oldItems, 0, numToAssign, other);
         copyConstruct(oldItems, numToAssign, numToCopyConstruct, other + numToAssign);
         destroyElements(oldItems, numToAssign + numToCopyConstruct, numToDestroy);
@@ -156,6 +158,9 @@ struct SC::SegmentItems : public SegmentHeader
     copyReplaceTrivialOrNot(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
                             const size_t numToDestroy, U* other, size_t otherSize)
     {
+        SC_UNUSED(numToAssign);
+        SC_UNUSED(numToCopyConstruct);
+        SC_UNUSED(numToDestroy);
         // TODO: add code to handle memcpy destination overlapping source
         memcpy(oldItems, other, otherSize * sizeof(T));
     }
@@ -176,6 +181,8 @@ struct SC::SegmentItems : public SegmentHeader
     insertItemsTrivialOrNot(T*& oldItems, size_t position, const size_t numElements, const size_t newSize, U* other,
                             size_t otherSize)
     {
+        SC_UNUSED(numElements);
+        SC_UNUSED(newSize);
         static_assert(sizeof(T) == sizeof(U), "What?");
         // TODO: add code to handle memcpy destination overlapping source
         memcpy(oldItems + position, other, otherSize * sizeof(T));
@@ -235,10 +242,38 @@ struct SC::SegmentOperations
         return true;
     }
 
-    template <int size>
-    static void memcpyWithoutWarning(int32_t& val, const void* defaultValue)
+    template <bool sizeOfTIsSmallerThanInt>
+    static typename EnableIf<sizeOfTIsSmallerThanInt == true, void>::type // sizeof(T) <= sizeof(int)
+    reserveInternalTrivialInitializeTemplate(T* items, const size_t oldSize, const size_t newSize,
+                                             const T& defaultValue)
     {
-        memcpy(&val, defaultValue, size);
+        int32_t val = 0;
+        memcpy(&val, &defaultValue, sizeof(T));
+
+        // This optimization would need to be split into another template
+        // if(sizeof(T) == 1)
+        // {
+        //     memset(items + oldSize, val, newSize - oldSize);
+        // } else
+
+        if (val == 0) // sizeof(T) > sizeof(uint8_t)
+        {
+            memset(items + oldSize, 0, sizeof(T) * (newSize - oldSize));
+        }
+        else
+        {
+            reserveInternalTrivialInitializeTemplate<false>(items, oldSize, newSize, defaultValue);
+        }
+    }
+
+    template <bool sizeOfTIsSmallerThanInt>
+    static
+        typename EnableIf<sizeOfTIsSmallerThanInt == false, void>::type // sizeof(T) > sizeof(int) (cannot use memset)
+        reserveInternalTrivialInitializeTemplate(T* items, const size_t oldSize, const size_t newSize,
+                                                 const T& defaultValue)
+    {
+        // This should by copyAssign, but for trivial objects it's the same as copyConstruct
+        SegmentItems<T>::copyConstructSingle(items, oldSize, newSize - oldSize, defaultValue);
     }
 
     static void reserveInternalTrivialInitialize(T* items, const size_t oldSize, const size_t newSize,
@@ -246,24 +281,8 @@ struct SC::SegmentOperations
     {
         if (newSize > oldSize)
         {
-            int32_t        val            = 0;
             constexpr bool smallerThanInt = sizeof(T) <= sizeof(int32_t);
-            if (smallerThanInt)
-            {
-                // We are separating in a different function because CLANG complains
-                // with this memcpy when sizeof(T) > sizeof(int32_t) even if this branch
-                // will never be taken...
-                memcpyWithoutWarning<sizeof(T)>(val, &defaultValue);
-            }
-            if (smallerThanInt && val == 0)
-            {
-                memset(items + oldSize, 0, sizeof(T) * (newSize - oldSize));
-            }
-            else
-            {
-                // This should by copyAssign, but for trivial objects it's the same as copyConstruct
-                SegmentItems<T>::copyConstructSingle(items, oldSize, newSize - oldSize, defaultValue);
-            }
+            reserveInternalTrivialInitializeTemplate<smallerThanInt>(items, oldSize, newSize, defaultValue);
         }
     }
 
@@ -390,7 +409,7 @@ struct SC::SegmentOperations
         newSegment->setSize(oldSize);
         if (oldSize > 0)
         {
-            auto oldSegment = SegmentItems<T>::getSegment(oldItems);
+            oldSegment = SegmentItems<T>::getSegment(oldItems);
             SegmentItems<T>::moveAndDestroy(Allocator::template getItems<T>(oldSegment),
                                             Allocator::template getItems<T>(newSegment), oldSize, keepFirstN);
             Allocator::release(oldSegment);
@@ -633,8 +652,8 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
     {
         if (&other != this)
         {
-            T*         items = Segment::items;
-            const bool res   = Segment::operations::copy(items, other.items, other.size());
+            T*         tItems = Segment::items;
+            const bool res    = Segment::operations::copy(tItems, other.items, other.size());
             (void)res;
             SC_DEBUG_ASSERT(res);
         }

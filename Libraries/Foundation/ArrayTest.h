@@ -91,15 +91,15 @@ struct SC::ArrayTest : public SC::TestCase
             myArr2 = myArr1;
             SC_TEST_EXPECT(myArr2.size() == 10);
             SC_TEST_EXPECT(myArr2.capacity() == 10);
-            size_t numTestsFailed = 0;
+            size_t failedComparisons = 0;
             for (size_t idx = 0; idx < 10; ++idx)
             {
                 if (myArr2[idx] != 12)
                 {
-                    numTestsFailed++;
+                    failedComparisons++;
                 }
             }
-            SC_TEST_EXPECT(numTestsFailed == 0);
+            SC_TEST_EXPECT(failedComparisons == 0);
             myArr1 = move(myArr2);
         }
         if (test_section("sort"))

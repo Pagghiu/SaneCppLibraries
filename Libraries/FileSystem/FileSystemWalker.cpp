@@ -31,7 +31,7 @@ SC::FileSystemWalker::~FileSystemWalker()
 
 [[nodiscard]] SC::ReturnCode SC::FileSystemWalker::enumerateNext()
 {
-    ReturnCode res = internal.get().enumerateNext(entry, options);
+    ReturnCode res = internal.get().enumerateNext(currentEntry, options);
     if (not res)
     {
         if (res.message != "Iteration Finished"_a8)
@@ -51,5 +51,5 @@ SC::FileSystemWalker::~FileSystemWalker()
         errorsChecked = false;
         return errorResult;
     }
-    return internal.get().recurseSubdirectory(entry);
+    return internal.get().recurseSubdirectory(currentEntry);
 }

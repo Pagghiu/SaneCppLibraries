@@ -1,29 +1,31 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "Time.h"
+#include <time.h>
+
 #include "../Foundation/Limits.h"
+#include "Time.h"
 
 #if SC_PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <sys/timeb.h>
 #else
 #include <math.h> // round
 #endif
-#include <time.h>
 
 struct SC::AbsoluteTime::Internal
 {
     static void tmToParsed(const struct tm& result, Parsed& local)
     {
-        local.year             = 1900 + result.tm_year;
-        local.month            = result.tm_mon;
-        local.dayOfMonth       = result.tm_mday;
-        local.dayOfWeek        = result.tm_wday;
-        local.dayOfYear        = result.tm_yday;
-        local.hour             = result.tm_hour;
-        local.minutes          = result.tm_min;
-        local.seconds          = result.tm_sec;
+        local.year             = static_cast<decltype(local.year)>(1900 + result.tm_year);
+        local.month            = static_cast<decltype(local.month)>(result.tm_mon);
+        local.dayOfMonth       = static_cast<decltype(local.dayOfMonth)>(result.tm_mday);
+        local.dayOfWeek        = static_cast<decltype(local.dayOfWeek)>(result.tm_wday);
+        local.dayOfYear        = static_cast<decltype(local.dayOfYear)>(result.tm_yday);
+        local.hour             = static_cast<decltype(local.hour)>(result.tm_hour);
+        local.minutes          = static_cast<decltype(local.minutes)>(result.tm_min);
+        local.seconds          = static_cast<decltype(local.seconds)>(result.tm_sec);
         local.isDaylightSaving = result.tm_isdst > 0;
     }
 };

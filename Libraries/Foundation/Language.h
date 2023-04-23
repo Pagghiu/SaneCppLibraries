@@ -68,7 +68,7 @@ template <typename SourceType, typename T> struct SameConstnessAs { using type =
 template <typename T> constexpr T min(T t1, T t2) { return t1 < t2 ? t1 : t2; }
 template <typename T> constexpr T max(T t1, T t2) { return t1 > t2 ? t1 : t2; }
 
-template <typename T, size_t N> constexpr size_t SizeOfArray(const T (&text)[N]) { return N; }
+template <typename T, size_t N> constexpr size_t SizeOfArray(const T (&)[N]) { return N; }
 
 template <typename T> constexpr T&& move(T& value) { return static_cast<T&&>(value); }
 template <typename T> constexpr T&& forward(typename RemoveReference<T>::type& value) { return static_cast<T&&>(value); }
@@ -115,7 +115,7 @@ struct PlacementNew
 } // namespace SC
 #if SC_MSVC
 inline void* operator new(size_t, void* p, SC::PlacementNew) noexcept { return p; }
-inline void  operator delete(void* p, SC::PlacementNew) noexcept {}
+inline void  operator delete(void*, SC::PlacementNew) noexcept {}
 #else
 inline void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { return p; }
 #endif
@@ -193,3 +193,5 @@ inline void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { retu
 #define SC_LIKELY
 #define SC_UNLIKELY
 #endif
+
+#define SC_UNUSED(param) ((void)param);

@@ -20,7 +20,7 @@ struct SC::SystemTest : public SC::TestCase
         if (test_section("SystemDebug::printBacktrace"))
         {
             SC_TEST_EXPECT(SystemDebug::printBacktrace());
-            size_t frames = SystemDebug::printBacktrace(0, -1);
+            size_t frames = SystemDebug::printBacktrace(0, static_cast<size_t>(MaxValue()));
             SC_TEST_EXPECT(frames == 0);
         }
         if (test_section("SystemDebug::captureBacktrace"))

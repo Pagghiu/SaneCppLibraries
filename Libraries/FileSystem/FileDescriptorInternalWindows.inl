@@ -2,9 +2,10 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "FileDescriptor.h"
-
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+
+#include "FileDescriptor.h"
 
 struct SC::FileDescriptor::Internal
 {
@@ -87,6 +88,7 @@ SC::ReturnCode SC::FileDescriptor::setBlocking(bool blocking)
     FileDescriptorNative fileDescriptor;
     SC_TRY_IF(handle.get(fileDescriptor, "FileDescriptor::setBlocking - Invalid Handle"_a8));
     // TODO: IMPLEMENT
+    SC_UNUSED(blocking);
     return false;
 }
 

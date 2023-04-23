@@ -74,8 +74,6 @@ static constexpr Nm ClNm()
     const char* name = __FUNCSIG__;
     constexpr char separating_char = '<';
     constexpr char ending_char = '>';
-    constexpr int  skip_chars = 8;  // struct, class or nothing
-    int         length = 0;
     const char* it = name;
     while (*it != separating_char)
         it++;

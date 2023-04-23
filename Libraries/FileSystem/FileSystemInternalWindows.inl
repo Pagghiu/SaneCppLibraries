@@ -1,12 +1,15 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "FileSystem.h"
 // clang-format off
 #include <stdio.h>
 #include <wchar.h>
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <shellapi.h>
 // clang-format on
+
+#include "FileSystem.h"
 
 namespace SC
 {

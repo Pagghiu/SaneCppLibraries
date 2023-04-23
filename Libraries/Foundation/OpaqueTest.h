@@ -19,7 +19,7 @@ struct SC::OpaqueTest : public SC::TestCase
             static bool deleteCalled = false;
             return deleteCalled;
         }
-        static bool deleteHandle(int& sad)
+        static bool deleteHandle(int&)
         {
             getDeleteCalled() = true;
             return true;

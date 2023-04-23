@@ -1,6 +1,7 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 #include "../Foundation/StringBuilder.h"

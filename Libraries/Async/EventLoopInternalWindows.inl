@@ -1,6 +1,7 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 #include "EventLoop.h"
@@ -36,6 +37,7 @@ struct SC::EventLoop::Internal
 
     [[nodiscard]] ReturnCode createWakeup(EventLoop& loop)
     {
+        SC_UNUSED(loop);
         // Optimization: we avoid one indirect function call, see runCompletionFor checking if async == wakeUpAsync
         // wakeUpAsync.callback.bind<Internal, &Internal::runCompletionForWakeUp>(this);
         wakeUpAsync.operation.assignValue(Async::WakeUp());
@@ -57,6 +59,7 @@ struct SC::EventLoop::Internal
 
     [[nodiscard]] ReturnCode runCompletionFor(AsyncResult& result, const OVERLAPPED_ENTRY& entry)
     {
+        SC_UNUSED(entry);
         switch (result.async.operation.type)
         {
         case Async::Type::Timeout: {
@@ -78,11 +81,9 @@ struct SC::EventLoop::Internal
         case Async::Type::ProcessExit: {
             // Process has exited
             // Gather exit code
-            Async::ProcessExit&         processExit = result.async.operation.fields.processExit;
-            Async::ProcessExitInternal& internal    = processExit.opaque.get();
-            SC_TRY_IF(internal.waitHandle.close());
-            // UnregisterWait(internal.wait_handle);
-            // GetExitCodeProcess(handle->process_handle, &status);
+            Async::ProcessExit&         processExit  = result.async.operation.fields.processExit;
+            Async::ProcessExitInternal& procInternal = processExit.opaque.get();
+            SC_TRY_IF(procInternal.waitHandle.close());
             DWORD processStatus;
             if (GetExitCodeProcess(processExit.handle, &processStatus) == FALSE)
             {
@@ -146,14 +147,17 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] ReturnCode addReadWatcher(FileDescriptor& loopFd, FileDescriptorNative fileDescriptor)
     {
+        SC_UNUSED(loopFd);
+        SC_UNUSED(fileDescriptor);
         return true;
     }
 
     [[nodiscard]] ReturnCode addProcessWatcher(FileDescriptor& loopFd, Async& async)
     {
-        const ProcessNative         processHandle = async.operation.fields.processExit.handle;
-        Async::ProcessExitInternal& internal      = async.operation.fields.processExit.opaque.get();
-        internal.overlapped.userData              = &async;
+        SC_UNUSED(loopFd);
+        const ProcessNative         processHandle   = async.operation.fields.processExit.handle;
+        Async::ProcessExitInternal& processInternal = async.operation.fields.processExit.opaque.get();
+        processInternal.overlapped.userData         = &async;
         HANDLE waitHandle;
         BOOL result = RegisterWaitForSingleObject(&waitHandle, processHandle, KernelQueue::processExitCallback, &async,
                                                   INFINITE, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE);
@@ -161,12 +165,13 @@ struct SC::EventLoop::KernelQueue
         {
             return "RegisterWaitForSingleObject failed"_a8;
         }
-        return internal.waitHandle.assign(waitHandle);
+        return processInternal.waitHandle.assign(waitHandle);
     }
 
     // This is executed on windows thread pool
     static void CALLBACK processExitCallback(void* data, BOOLEAN timeoutOccurred)
     {
+        SC_UNUSED(timeoutOccurred);
         Async&               async = *static_cast<Async*>(data);
         FileDescriptorNative loopNativeDescriptor;
         SC_TRUST_RESULT(async.eventLoop->getLoopFileDescriptor(loopNativeDescriptor));
@@ -203,7 +208,11 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] ReturnCode commitQueue(EventLoop& self) { return true; }
+    [[nodiscard]] ReturnCode commitQueue(EventLoop& self)
+    {
+        SC_UNUSED(self);
+        return true;
+    }
 
   private:
 };

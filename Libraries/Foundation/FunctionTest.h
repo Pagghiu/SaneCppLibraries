@@ -69,7 +69,7 @@ struct SC::FunctionTest : public SC::TestCase
                 Function<int(int)> lambda = [=](int value) -> int
                 { return static_cast<int>(val1 + val2 + val3 + value); };
                 SC_TEST_EXPECT(lambda(2) == 5);
-                auto               func    = [](int val) -> int { return 1; };
+                auto               func    = [](int) -> int { return 1; };
                 Function<int(int)> lambda2 = func;
                 SC_TEST_EXPECT(freeFunc(23) == 24);
                 SC_TEST_EXPECT(getValue() == 0);

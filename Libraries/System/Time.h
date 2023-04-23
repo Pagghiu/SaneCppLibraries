@@ -56,8 +56,6 @@ struct SC::AbsoluteTime
 
     struct Parsed
     {
-        bool isDaylightSaving = false;
-
         uint16_t year       = 0;
         uint8_t  month      = 0;
         uint8_t  dayOfMonth = 0;
@@ -66,6 +64,8 @@ struct SC::AbsoluteTime
         uint8_t  hour       = 0;
         uint8_t  minutes    = 0;
         uint8_t  seconds    = 0;
+
+        bool isDaylightSaving = false;
     };
 
     [[nodiscard]] bool parseLocal(Parsed& result) const;

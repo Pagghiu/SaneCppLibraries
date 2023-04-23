@@ -172,7 +172,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             {
                 int changes = 0;
             } params;
-            auto lambda = [&](const FileSystemWatcher::Notification& notification) { params.changes++; };
+            auto lambda = [&](const FileSystemWatcher::Notification&) { params.changes++; };
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path, move(lambda)));
             SC_TEST_EXPECT(fs.write("salve.txt", "content"));
             SC_TEST_EXPECT(fs.write("atutti.txt", "content"));

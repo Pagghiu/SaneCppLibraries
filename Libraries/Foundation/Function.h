@@ -207,6 +207,8 @@ struct SC::Function<R(Args...)>
     static R FunctionWrapper(FunctionErasedOperation operation, const void** other, const void* const* p,
                              typename RemoveReference<Args>::type*... args)
     {
+        SC_UNUSED(other);
+        SC_UNUSED(p);
         if (operation == FunctionErasedOperation::Execute)
             SC_LIKELY { return FreeFunction(*args...); }
         return R();

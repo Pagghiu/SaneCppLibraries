@@ -46,6 +46,10 @@ struct ClassInfoStruct
     template <typename R, int N>
     constexpr bool operator()(int order, const char (&name)[N], R T::*member, size_t offset)
     {
+        SC_UNUSED(order);
+        SC_UNUSED(name);
+        SC_UNUSED(member);
+        SC_UNUSED(offset);
         if (not ClassInfo<R>().IsPacked)
         {
             return false;

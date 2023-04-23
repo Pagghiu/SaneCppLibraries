@@ -21,11 +21,13 @@ struct SC::ArrayAllocator
     }
     [[nodiscard]] static SegmentHeader* allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* pself)
     {
+        SC_UNUSED(numNewBytes);
+        SC_UNUSED(pself);
         oldHeader->initDefaults();
         return oldHeader;
     }
 
-    static void release(SegmentHeader* oldHeader) {}
+    static void release(SegmentHeader* oldHeader) { SC_UNUSED(oldHeader); }
 
     template <typename T>
     static T* getItems(SegmentHeader* header)

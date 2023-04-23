@@ -101,6 +101,9 @@ struct StringFormat
     [[nodiscard]] static bool formatArgumentAndRecurse(StringFormatOutput& data, StringEncoding encoding,
                                                        RangeIterator it)
     {
+        SC_UNUSED(data);
+        SC_UNUSED(encoding);
+        SC_UNUSED(it);
         return false;
     }
 
@@ -133,13 +136,25 @@ struct StringFormat
                 // arriving here means end of string with as single, unescaped '}'
                 return false;
             }
-            if (sizeof...(Types) == 0)
-            {
-                // All arguments have been eaten, so let's append all remaining chars
-                return data.write(StringView(startingPoint.sliceUntilEnd(), false, encoding));
-            }
-            return false; // we have more arguments than specifiers
+            // This template is used to avoid 'conditional expression is constant' warning on MSVC
+            return writeDataIfTypesZero<sizeof...(Types) == 0>(data, startingPoint, encoding);
         }
+    }
+
+    template <bool sizeofTypesIsZero>
+    static typename EnableIf<sizeofTypesIsZero == true, bool>::type //
+    writeDataIfTypesZero(StringFormatOutput& data, const RangeIterator& startingPoint, StringEncoding encoding)
+    {
+        // sizeof...(Types) == 0
+        return data.write(StringView(startingPoint.sliceUntilEnd(), false, encoding));
+    }
+
+    template <bool sizeofTypesIsZero>
+    static typename EnableIf<sizeofTypesIsZero == false, bool>::type //
+    writeDataIfTypesZero(StringFormatOutput&, const RangeIterator&, StringEncoding)
+    {
+        // sizeof...(Types) > 0
+        return false; // we have more arguments than specifiers
     }
 };
 

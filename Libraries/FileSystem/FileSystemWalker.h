@@ -37,7 +37,7 @@ struct SC::FileSystemWalker
 
     ~FileSystemWalker();
 
-    const Entry& get() const { return entry; }
+    const Entry& get() const { return currentEntry; }
 
     [[nodiscard]] ReturnCode checkErrors()
     {
@@ -67,7 +67,7 @@ struct SC::FileSystemWalker
     using InternalOpaque = OpaqueUniqueObject<OpaqueFuncs<InternalTraits>>;
     InternalOpaque internal;
 
-    Entry      entry;
+    Entry      currentEntry;
     ReturnCode errorResult   = true;
     bool       errorsChecked = false;
 };
