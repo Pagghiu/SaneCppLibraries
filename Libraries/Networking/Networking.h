@@ -5,6 +5,7 @@
 
 #include "../Foundation/Result.h"
 #include "../Foundation/StringView.h"
+#include "../System/Time.h"
 #include "../Threading/Atomic.h"
 #include "../Threading/Threading.h"
 #include "SocketDescriptor.h"
@@ -44,4 +45,5 @@ struct SC::TCPClient
     [[nodiscard]] ReturnCode close();
     [[nodiscard]] ReturnCode write(Span<const char> data);
     [[nodiscard]] ReturnCode read(Span<char> data);
+    [[nodiscard]] ReturnCode readWithTimeout(Span<char> data, IntegerMilliseconds timeout);
 };

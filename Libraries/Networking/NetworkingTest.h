@@ -18,7 +18,19 @@ struct SC::NetworkingTest : public SC::TestCase
         if (test_section("tcp client server"))
         {
             TCPServer server;
-            SC_TEST_EXPECT(server.listen("127.0.0.1", 5050));
+            // Look for an available port
+            constexpr int startTcpPort = 5050;
+            int           tcpPort;
+            ReturnCode    bound = true;
+            for (tcpPort = startTcpPort; tcpPort < startTcpPort + 10; ++tcpPort)
+            {
+                bound = server.listen("127.0.0.1", tcpPort);
+                if (bound)
+                {
+                    break;
+                }
+            }
+            SC_TEST_EXPECT(bound);
             constexpr char testValue = 123;
             struct Params
             {
@@ -30,9 +42,12 @@ struct SC::NetworkingTest : public SC::TestCase
             Action func = [&]()
             {
                 TCPClient client;
-                params.connectRes = client.connect("127.0.0.1", 5050);
+                params.connectRes = client.connect("127.0.0.1", tcpPort);
                 char buf[1]       = {testValue};
                 params.writeRes   = client.write({buf, sizeof(buf)});
+                params.eventObject.wait();
+                buf[0]++;
+                params.writeRes = client.write({buf, sizeof(buf)});
                 params.eventObject.wait();
                 params.closeRes = client.close();
             };
@@ -44,8 +59,12 @@ struct SC::NetworkingTest : public SC::TestCase
             char buf[1] = {0};
             SC_TEST_EXPECT(acceptedClient.read({buf, sizeof(buf)}));
             SC_TEST_EXPECT(buf[0] == testValue and testValue != 0);
-            SC_TEST_EXPECT(server.close());
+            SC_TEST_EXPECT(not acceptedClient.readWithTimeout({buf, sizeof(buf)}, 10_ms));
+            params.eventObject.signal();
+            SC_TEST_EXPECT(acceptedClient.readWithTimeout({buf, sizeof(buf)}, 10000_ms));
+            SC_TEST_EXPECT(buf[0] == testValue + 1);
             SC_TEST_EXPECT(acceptedClient.close());
+            SC_TEST_EXPECT(server.close());
             params.eventObject.signal();
             SC_TEST_EXPECT(thread.join());
             SC_TEST_EXPECT(params.connectRes and params.writeRes and params.closeRes);

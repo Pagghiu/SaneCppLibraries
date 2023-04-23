@@ -44,6 +44,7 @@ SC::ReturnCode SC::Network::shutdown()
 #else
 
 #include <netdb.h>
+#include <sys/select.h> // fd_set for emscripten
 #include <unistd.h>
 constexpr int  SOCKET_ERROR = -1;
 SC::ReturnCode SC::Network::init() { return true; }
@@ -63,6 +64,8 @@ SC::ReturnCode SC::SocketDescriptorNativeClose(SC::SocketDescriptorNative& fd)
 }
 
 SC::ReturnCode SC::TCPServer::close() { return socket.close(); }
+
+// TODO: Add EINTR checks for all TCPServer/TCPClient os calls.
 
 SC::ReturnCode SC::TCPServer::listen(StringView interfaceAddress, uint32_t port)
 {
@@ -100,11 +103,13 @@ SC::ReturnCode SC::TCPServer::listen(StringView interfaceAddress, uint32_t port)
 
     if (::bind(openedSocket, addressInfos->ai_addr, static_cast<int>(addressInfos->ai_addrlen)) == SOCKET_ERROR)
     {
+        SC_TRUST_RESULT(socket.close());
         return "Could not bind socket to port"_a8;
     }
     constexpr int numberOfWaitingConnections = 2; // TODO: Expose numberOfWaitingConnections?
     if (::listen(openedSocket, numberOfWaitingConnections) == SOCKET_ERROR)
     {
+        SC_TRUST_RESULT(socket.close());
         return "Could not listen"_a8;
     }
     return true;
@@ -186,4 +191,32 @@ SC::ReturnCode SC::TCPClient::read(Span<char> data)
         return "recv error"_a8;
     }
     return true;
+}
+
+SC::ReturnCode SC::TCPClient::readWithTimeout(Span<char> data, IntegerMilliseconds timeout)
+{
+    SocketDescriptorNative nativeSocket;
+    SC_TRY_IF(socket.get(nativeSocket, "Invalid socket"_a8));
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(nativeSocket, &fds);
+
+    struct timeval tv;
+    tv.tv_sec  = static_cast<int>(timeout.ms / 1000);
+    tv.tv_usec = (int)((timeout.ms % 1000) * 1000);
+#if SC_PLATFORM_WINDOWS
+    int maxFd = -1;
+#else
+    int maxFd = nativeSocket;
+#endif
+    const auto result = select(maxFd + 1, &fds, NULL, NULL, &tv);
+    if (result == SOCKET_ERROR)
+    {
+        return "select failed"_a8;
+    }
+    if (FD_ISSET(nativeSocket, &fds))
+    {
+        return read(data);
+    }
+    return false;
 }
