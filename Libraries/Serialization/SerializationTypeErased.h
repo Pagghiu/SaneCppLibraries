@@ -106,7 +106,7 @@ struct SimpleBinaryWriter
     Span<const SC::ConstexprStringView>    sourceNames;
     BinaryBuffer&                          destination;
     SpanVoid<const void>                   sourceObject;
-    int                                    sourceTypeIndex;
+    uint32_t                               sourceTypeIndex;
     Reflection::MetaProperties             sourceProperty;
     ArrayAccess                            arrayAccess;
 
@@ -168,14 +168,14 @@ struct SimpleBinaryWriter
         }
         else
         {
-            for (int16_t idx = 0; idx < structSourceProperty.numSubAtoms; ++idx)
+            for (uint32_t idx = 0; idx < static_cast<uint32_t>(structSourceProperty.numSubAtoms); ++idx)
             {
                 sourceTypeIndex = structSourceTypeIndex + idx + 1;
                 SC_TRY_IF(structSourceRoot.viewAtBytes(sourceProperties.data()[sourceTypeIndex].offsetInBytes,
                                                        sourceProperties.data()[sourceTypeIndex].sizeInBytes,
                                                        sourceObject));
                 if (sourceProperties.data()[sourceTypeIndex].getLinkIndex() >= 0)
-                    sourceTypeIndex = sourceProperties.data()[sourceTypeIndex].getLinkIndex();
+                    sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
                 SC_TRY_IF(write());
             }
         }
@@ -202,7 +202,7 @@ struct SimpleBinaryWriter
         sourceTypeIndex     = arrayTypeIndex + 1;
         const auto itemSize = sourceProperties.data()[sourceTypeIndex].sizeInBytes;
         if (sourceProperties.data()[sourceTypeIndex].getLinkIndex() >= 0)
-            sourceTypeIndex = sourceProperties.data()[sourceTypeIndex].getLinkIndex();
+            sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
 
         const bool isBulkWriteable = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
         if (isBulkWriteable)
@@ -229,7 +229,7 @@ struct SimpleBinaryReader
     Span<const Reflection::MetaProperties> sinkProperties;
     Span<const SC::ConstexprStringView>    sinkNames;
     Reflection::MetaProperties             sinkProperty;
-    int                                    sinkTypeIndex = 0;
+    uint32_t                               sinkTypeIndex = 0;
     SpanVoid<void>                         sinkObject;
     BinaryBuffer&                          source;
     ArrayAccess                            arrayAccess;
@@ -294,13 +294,13 @@ struct SimpleBinaryReader
         }
         else
         {
-            for (int16_t idx = 0; idx < structSinkProperty.numSubAtoms; ++idx)
+            for (uint32_t idx = 0; idx < static_cast<uint32_t>(structSinkProperty.numSubAtoms); ++idx)
             {
                 sinkTypeIndex = structSinkTypeIndex + idx + 1;
                 SC_TRY_IF(structSinkObject.viewAtBytes(sinkProperties.data()[sinkTypeIndex].offsetInBytes,
                                                        sinkProperties.data()[sinkTypeIndex].sizeInBytes, sinkObject));
                 if (sinkProperties.data()[sinkTypeIndex].getLinkIndex() >= 0)
-                    sinkTypeIndex = sinkProperties.data()[sinkTypeIndex].getLinkIndex();
+                    sinkTypeIndex = static_cast<uint32_t>(sinkProperties.data()[sinkTypeIndex].getLinkIndex());
                 SC_TRY_IF(read());
             }
         }
@@ -315,7 +315,7 @@ struct SimpleBinaryReader
         SpanVoid<void> arraySinkObject = sinkObject;
         const auto     sinkItemSize    = sinkProperties.data()[sinkTypeIndex].sizeInBytes;
         if (sinkProperties.data()[sinkTypeIndex].getLinkIndex() >= 0)
-            sinkTypeIndex = sinkProperties.data()[sinkTypeIndex].getLinkIndex();
+            sinkTypeIndex = static_cast<uint32_t>(sinkProperties.data()[sinkTypeIndex].getLinkIndex());
         const bool     isBulkReadable = sinkProperties.data()[sinkTypeIndex].isPrimitiveOrRecursivelyPacked();
         SpanVoid<void> arraySinkStart;
         if (arraySinkProperty.type == Reflection::MetaType::TypeArray)
@@ -375,12 +375,12 @@ struct SimpleBinaryReaderVersioned
     Span<const Reflection::MetaProperties> sinkProperties;
     SpanVoid<void>                         sinkObject;
     Reflection::MetaProperties             sinkProperty;
-    int                                    sinkTypeIndex = 0;
+    uint32_t                               sinkTypeIndex = 0;
 
     Span<const Reflection::MetaProperties> sourceProperties;
     BinaryWriter*                          sourceObject = nullptr;
     Reflection::MetaProperties             sourceProperty;
-    int                                    sourceTypeIndex = 0;
+    uint32_t                               sourceTypeIndex = 0;
 
     template <typename T>
     [[nodiscard]] bool serializeVersioned(T& object, BinaryWriter& source, VersionSchema& schema)
@@ -522,12 +522,12 @@ struct SimpleBinaryReaderVersioned
         const auto     structSinkTypeIndex   = sinkTypeIndex;
         SpanVoid<void> structSinkObject      = sinkObject;
 
-        for (int16_t idx = 0; idx < structSourceProperty.numSubAtoms; ++idx)
+        for (uint32_t idx = 0; idx < static_cast<uint32_t>(structSourceProperty.numSubAtoms); ++idx)
         {
             sourceTypeIndex        = structSourceTypeIndex + idx + 1;
             const auto sourceOrder = sourceProperties.data()[sourceTypeIndex].order;
-            int16_t    findIdx     = structSinkProperty.numSubAtoms;
-            for (findIdx = 0; findIdx < structSinkProperty.numSubAtoms; ++findIdx)
+            uint32_t   findIdx;
+            for (findIdx = 0; findIdx < static_cast<uint32_t>(structSinkProperty.numSubAtoms); ++findIdx)
             {
                 const auto typeIndex = structSinkTypeIndex + findIdx + 1;
                 if (sinkProperties.data()[typeIndex].order == sourceOrder)
@@ -536,15 +536,15 @@ struct SimpleBinaryReaderVersioned
                 }
             }
             if (sourceProperties.data()[sourceTypeIndex].getLinkIndex() >= 0)
-                sourceTypeIndex = sourceProperties.data()[sourceTypeIndex].getLinkIndex();
-            if (findIdx != structSinkProperty.numSubAtoms)
+                sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
+            if (findIdx != static_cast<uint32_t>(structSinkProperty.numSubAtoms))
             {
                 // Member with same order ordinal has been found
                 sinkTypeIndex = structSinkTypeIndex + findIdx + 1;
                 SC_TRY_IF(structSinkObject.viewAtBytes(sinkProperties.data()[sinkTypeIndex].offsetInBytes,
                                                        sinkProperties.data()[sinkTypeIndex].sizeInBytes, sinkObject));
                 if (sinkProperties.data()[sinkTypeIndex].getLinkIndex() >= 0)
-                    sinkTypeIndex = sinkProperties.data()[sinkTypeIndex].getLinkIndex();
+                    sinkTypeIndex = static_cast<uint32_t>(sinkProperties.data()[sinkTypeIndex].getLinkIndex());
                 SC_TRY_IF(read());
             }
             else
@@ -616,9 +616,9 @@ struct SimpleBinaryReaderVersioned
         else
         {
             if (sinkProperties.data()[sinkTypeIndex].getLinkIndex() >= 0)
-                sinkTypeIndex = sinkProperties.data()[sinkTypeIndex].getLinkIndex();
+                sinkTypeIndex = static_cast<uint32_t>(sinkProperties.data()[sinkTypeIndex].getLinkIndex());
             if (sinkProperties.data()[sourceTypeIndex].getLinkIndex() >= 0)
-                sourceTypeIndex = sourceProperties.data()[sourceTypeIndex].getLinkIndex();
+                sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
             const uint64_t sinkNumElements     = arraySinkStart.sizeInBytes() / sinkItemSize;
             const uint64_t sourceNumElements   = sourceNumBytes / sourceItemSize;
             const auto     itemSinkTypeIndex   = sinkTypeIndex;

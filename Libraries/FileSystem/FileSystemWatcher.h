@@ -81,9 +81,9 @@ struct SC::FileSystemWatcher
     struct EventLoopRunner
     {
         EventLoop&  eventLoop;
-        AsyncWakeUp eventLoopAsync;
+        AsyncWakeUp eventLoopAsync = {};
 #if SC_PLATFORM_APPLE
-        EventObject eventObject;
+        EventObject eventObject = {};
 #endif
     };
 

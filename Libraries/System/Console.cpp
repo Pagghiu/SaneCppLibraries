@@ -70,7 +70,7 @@ void SC::Console::print(const StringView str)
         }
     }
 #else
-    fwrite(str.bytesWithoutTerminator(), sizeof(char), static_cast<int>(str.sizeInBytes()), stdout);
+    fwrite(str.bytesWithoutTerminator(), sizeof(char), str.sizeInBytes(), stdout);
 #endif
 }
 
@@ -84,7 +84,7 @@ void SC::Console::printNullTerminatedASCII(const StringView str)
                   nullptr, nullptr);
     OutputDebugStringA(str.bytesIncludingTerminator());
 #else
-    fwrite(str.bytesWithoutTerminator(), sizeof(char), static_cast<int>(str.sizeInBytes()), stdout);
+    fwrite(str.bytesWithoutTerminator(), sizeof(char), str.sizeInBytes(), stdout);
 #endif
 }
 
@@ -100,6 +100,7 @@ void SC::printAssertion(const char_t* expression, const char_t* filename, const 
     Console::printNullTerminatedASCII("\nLine: "_a8);
     char_t    buffer[50];
     const int numCharsExcludingTerminator = snprintf(buffer, sizeof(buffer), "%d", lineNumber);
-    Console::printNullTerminatedASCII(StringView(buffer, numCharsExcludingTerminator, true, StringEncoding::Ascii));
+    Console::printNullTerminatedASCII(
+        StringView(buffer, static_cast<size_t>(numCharsExcludingTerminator), true, StringEncoding::Ascii));
     Console::printNullTerminatedASCII("\n"_a8);
 }

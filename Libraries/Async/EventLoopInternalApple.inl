@@ -61,7 +61,11 @@ struct SC::EventLoop::Internal
 
     [[nodiscard]] Async* getAsync(const struct kevent& event) const { return static_cast<Async*>(event.udata); }
 
-    [[nodiscard]] void* getUserData(const struct kevent& event) const { return nullptr; }
+    [[nodiscard]] void* getUserData(const struct kevent& event) const
+    {
+        SC_UNUSED(event);
+        return nullptr;
+    }
 
     void runCompletionForWakeUp(AsyncResult& asyncResult)
     {
@@ -73,7 +77,7 @@ struct SC::EventLoop::Internal
         {
             const ssize_t res = read(readOp.fileDescriptor, readSpan.data(), readSpan.sizeInBytes());
 
-            if (res == readSpan.sizeInBytes())
+            if (res >= 0 and (static_cast<size_t>(res) == readSpan.sizeInBytes()))
                 continue;
 
             if (res != -1)
@@ -130,9 +134,13 @@ struct SC::EventLoop::Internal
 
 struct SC::EventLoop::KernelQueue
 {
-    static constexpr int totalNumEvents         = 1024;
-    struct kevent        events[totalNumEvents] = {0};
-    int                  newEvents              = 0;
+    static constexpr int totalNumEvents = 1024;
+
+    struct kevent events[totalNumEvents];
+
+    int newEvents = 0;
+
+    KernelQueue() { memset(events, 0, sizeof(events)); }
 
     [[nodiscard]] ReturnCode pushAsync(EventLoop& eventLoop, Async* async)
     {
@@ -164,6 +172,7 @@ struct SC::EventLoop::KernelQueue
 
     void addReadWatcher(FileDescriptor& loopFd, FileDescriptorNative fileDescriptor, Async* udata)
     {
+        SC_UNUSED(loopFd);
         constexpr int fflags = 0;
         EV_SET(events + newEvents, fileDescriptor, EVFILT_READ, EV_ADD, fflags, 0, udata);
         newEvents += 1;
@@ -171,7 +180,8 @@ struct SC::EventLoop::KernelQueue
 
     void addProcWatcher(FileDescriptor& loopFd, ProcessNative processHandle, Async* udata)
     {
-        constexpr int fflags = NOTE_EXIT | NOTE_EXITSTATUS;
+        SC_UNUSED(loopFd);
+        constexpr uint32_t fflags = NOTE_EXIT | NOTE_EXITSTATUS;
         EV_SET(events + newEvents, processHandle, EVFILT_PROC, EV_ADD | EV_ENABLE, fflags, 0, udata);
         newEvents += 1;
     }
@@ -184,9 +194,8 @@ struct SC::EventLoop::KernelQueue
             if (nextTimer->isLaterThanOrEqualTo(loopTime))
             {
                 const TimeCounter diff = nextTimer->subtractExact(loopTime);
-                struct timespec   specTimeout;
-                specTimeout.tv_sec  = diff.part1;
-                specTimeout.tv_nsec = diff.part2;
+                specTimeout.tv_sec     = diff.part1;
+                specTimeout.tv_nsec    = diff.part2;
                 return specTimeout;
             }
         }
@@ -203,7 +212,7 @@ struct SC::EventLoop::KernelQueue
 
         struct timespec specTimeout;
         specTimeout = timerToTimespec(self.loopTime, nextTimer);
-        size_t res;
+        int res;
         do
         {
             res = kevent(loopNativeDescriptor, events, newEvents, events, totalNumEvents,
@@ -253,18 +262,16 @@ SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
     Internal& self = internal.get();
     // TODO: We need an atomic bool swap to wait until next run
     const void* fakeBuffer;
-    ssize_t     numBytes;
     int         asyncFd;
     ssize_t     writtenBytes;
     SC_TRY_IF(self.wakeupPipe.writePipe.handle.get(asyncFd, "writePipe handle"_a8));
     fakeBuffer = "";
-    numBytes   = 1;
     do
     {
-        writtenBytes = ::write(asyncFd, fakeBuffer, numBytes);
+        writtenBytes = ::write(asyncFd, fakeBuffer, 1);
     } while (writtenBytes == -1 && errno == EINTR);
 
-    if (writtenBytes != numBytes)
+    if (writtenBytes != 1)
     {
         return "EventLoop::wakeUpFromExternalThread - Error in write"_a8;
     }

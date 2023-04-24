@@ -586,6 +586,7 @@ struct SC::SegmentOperations
 template <typename Allocator, typename T, int N>
 struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
 {
+    static_assert(N > 0, "Array must have N > 0");
     typedef SegmentItems<T>                 Parent;
     typedef SegmentOperations<Allocator, T> operations;
     union
@@ -602,8 +603,8 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
     Segment(std::initializer_list<T> ilist)
     {
         const auto sz = min(static_cast<int>(ilist.size()), N);
-        Parent::copyConstruct(items, 0, sz, ilist.begin());
-        Parent::setSize(sz);
+        Parent::copyConstruct(items, 0, static_cast<size_t>(sz), ilist.begin());
+        Parent::setSize(static_cast<size_t>(sz));
     }
     ~Segment() { operations::destroy(this); }
 

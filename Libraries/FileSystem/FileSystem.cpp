@@ -127,9 +127,10 @@ SC::ReturnCode SC::FileSystem::read(StringView path, Vector<char>& data)
     FILE* handle;
     SC_TRY_FORMAT_ERRNO(path, Internal::openFileRead(encodedPath.getNullTerminatedNative(), handle));
     SC_TRY_FORMAT_LIBC(fseek(handle, 0, SEEK_END));
-    const auto fileSize = ftell(handle);
-    SC_TRY_FORMAT_LIBC(fileSize);
+    const auto fileSizeRes = ftell(handle);
+    SC_TRY_FORMAT_LIBC(fileSizeRes);
     SC_TRY_FORMAT_LIBC(fseek(handle, 0, SEEK_SET));
+    const size_t fileSize = static_cast<size_t>(fileSizeRes);
     SC_TRY_IF(data.resizeWithoutInitializing(fileSize));
 
     const auto readBytes = fread(data.data(), 1, fileSize, handle);
@@ -171,6 +172,7 @@ SC::ReturnCode SC::FileSystem::formatError(int errorNumber, StringView item, boo
     else
 #endif
     {
+        SC_UNUSED(isWindowsNativeError);
         if (not preciseErrorMessages)
         {
             return getErrorCode(errorNumber);

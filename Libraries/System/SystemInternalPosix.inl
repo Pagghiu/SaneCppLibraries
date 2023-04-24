@@ -46,12 +46,14 @@ SC::size_t SC::SystemDebug::captureBacktrace(size_t framesToSkip, void** backtra
     // This signature maps 1 to 1 with windows CaptureStackBackTrace, at some
     // point we will allow framesToSkip > 0 and compute has
     int numFrames = backtrace(backtraceBuffer, static_cast<int>(framesToCapture));
+    if (framesToSkip > static_cast<size_t>(numFrames))
+        return 0;
     numFrames -= framesToSkip;
     if (framesToSkip > 0)
     {
-        for (int i = 0; i < numFrames; ++i)
+        for (int frame = 0; frame < numFrames; ++frame)
         {
-            backtraceBuffer[i] = backtraceBuffer[i + framesToSkip];
+            backtraceBuffer[frame] = backtraceBuffer[static_cast<size_t>(frame) + framesToSkip];
         }
     }
     if (hash)
@@ -66,5 +68,5 @@ SC::size_t SC::SystemDebug::captureBacktrace(size_t framesToSkip, void** backtra
         }
         *hash = computedHash;
     }
-    return numFrames;
+    return static_cast<size_t>(numFrames);
 }

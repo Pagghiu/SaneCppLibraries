@@ -137,7 +137,9 @@ struct SC::StringView
         // TODO: Make StringView::fromIterators return bool to make it fallible
         if (to.getIt() <= from.getEnd() && to.getIt() >= from.getIt())
         {
-            return StringView(from.getIt(), to.getIt() - from.getIt(), false, StringIterator::getEncoding());
+            SC_DEBUG_ASSERT(to.getIt() >= from.getIt());
+            return StringView(from.getIt(), static_cast<size_t>(to.getIt() - from.getIt()), false,
+                              StringIterator::getEncoding());
         }
         return StringView();
     }
@@ -148,7 +150,9 @@ struct SC::StringView
     template <typename StringIterator>
     static StringView fromIteratorUntilEnd(StringIterator it)
     {
-        return StringView(it.getIt(), it.getEnd() - it.getIt(), false, StringIterator::getEncoding());
+        SC_DEBUG_ASSERT(it.getEnd() >= it.getIt());
+        return StringView(it.getIt(), static_cast<size_t>(it.getEnd() - it.getIt()), false,
+                          StringIterator::getEncoding());
     }
 
     /// Returns a section of a string.
@@ -157,7 +161,9 @@ struct SC::StringView
     template <typename StringIterator>
     static StringView fromIteratorFromStart(StringIterator it)
     {
-        return StringView(it.getStart(), it.getIt() - it.getStart(), false, StringIterator::getEncoding());
+        SC_DEBUG_ASSERT(it.getIt() >= it.getStart());
+        return StringView(it.getStart(), static_cast<size_t>(it.getIt() - it.getStart()), false,
+                          StringIterator::getEncoding());
     }
 
     size_t sizeASCII() const { return sizeInBytes(); }

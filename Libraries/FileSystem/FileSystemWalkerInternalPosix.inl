@@ -75,7 +75,7 @@ struct SC::FileSystemWalker::Internal
         return true;
     }
 
-    ReturnCode enumerateNext(Entry& entry, const Options& options)
+    ReturnCode enumerateNext(Entry& entry, const Options& opts)
     {
         StringConverter currentPath(currentPathString);
         if (recurseStack.isEmpty())
@@ -123,7 +123,7 @@ struct SC::FileSystemWalker::Internal
         if (item->d_type == DT_DIR)
         {
             entry.type = Type::Directory;
-            if (options.recursive)
+            if (opts.recursive)
             {
                 SC_TRY_IF(recurseSubdirectory(entry));
             }

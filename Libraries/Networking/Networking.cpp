@@ -98,10 +98,13 @@ SC::ReturnCode SC::TCPServer::listen(StringView interfaceAddress, uint32_t port)
 #if SC_PLATFORM_WINDOWS
     char value = 1;
     setsockopt(openedSocket, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
+    const int addrLen = static_cast<int>(addressInfos->ai_addrlen);
+#else
+    const auto addrLen = addressInfos->ai_addrlen;
 #endif
     SC_TRY_IF(socket.assign(openedSocket));
 
-    if (::bind(openedSocket, addressInfos->ai_addr, static_cast<int>(addressInfos->ai_addrlen)) == SOCKET_ERROR)
+    if (::bind(openedSocket, addressInfos->ai_addr, addrLen) == SOCKET_ERROR)
     {
         SC_TRUST_RESULT(socket.close());
         return "Could not bind socket to port"_a8;
@@ -159,7 +162,12 @@ SC::ReturnCode SC::TCPClient::connect(StringView address, uint32_t port)
         openedSocket = ::socket(it->ai_family, it->ai_socktype, it->ai_protocol);
         if (openedSocket == SocketDescriptorNativeInvalid)
             continue;
-        if (::connect(openedSocket, it->ai_addr, (int)it->ai_addrlen) == 0)
+#if SC_PLATFORM_WINDOWS
+        const int addrLen = static_cast<int>(it->ai_addrlen);
+#else
+        const auto addrLen = it->ai_addrlen;
+#endif
+        if (::connect(openedSocket, it->ai_addr, addrLen) == 0)
             break;
         SC_TRY_IF(SocketDescriptorNativeClose(openedSocket));
     }
@@ -173,7 +181,12 @@ SC::ReturnCode SC::TCPClient::write(Span<const char> data)
 {
     SocketDescriptorNative nativeSocket;
     SC_TRY_IF(socket.get(nativeSocket, "Invalid socket"_a8));
-    const auto written = ::send(nativeSocket, data.data(), static_cast<int>(data.sizeInBytes()), 0);
+#if SC_PLATFORM_WINDOWS
+    const int sizeInBytes = static_cast<int>(data.sizeInBytes());
+#else
+    const auto sizeInBytes = data.sizeInBytes();
+#endif
+    const auto written = ::send(nativeSocket, data.data(), sizeInBytes, 0);
     if (written < 0)
     {
         return "send error"_a8;
@@ -189,7 +202,12 @@ SC::ReturnCode SC::TCPClient::read(Span<char> data)
 {
     SocketDescriptorNative nativeSocket;
     SC_TRY_IF(socket.get(nativeSocket, "Invalid socket"_a8));
-    const auto result = ::recv(nativeSocket, data.data(), static_cast<int>(data.sizeInBytes()), 0);
+#if SC_PLATFORM_WINDOWS
+    const int sizeInBytes = static_cast<int>(data.sizeInBytes());
+#else
+    const auto sizeInBytes = data.sizeInBytes();
+#endif
+    const auto result = ::recv(nativeSocket, data.data(), sizeInBytes, 0);
     if (result < 0)
     {
         return "recv error"_a8;
@@ -211,7 +229,7 @@ SC::ReturnCode SC::TCPClient::readWithTimeout(Span<char> data, IntegerMillisecon
 #if SC_PLATFORM_WINDOWS
     int maxFd = -1;
 #else
-    int maxFd = nativeSocket;
+    int        maxFd       = nativeSocket;
 #endif
     const auto result = select(maxFd + 1, &fds, NULL, NULL, &tv);
     if (result == SOCKET_ERROR)

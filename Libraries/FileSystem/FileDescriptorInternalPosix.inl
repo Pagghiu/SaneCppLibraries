@@ -90,7 +90,7 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
     {
         if (useVector)
         {
-            SC_TRY_MSG(output.resizeWithoutInitializing(output.size() + numReadBytes),
+            SC_TRY_MSG(output.resizeWithoutInitializing(output.size() + static_cast<size_t>(numReadBytes)),
                        "FileDescriptor::readAppend - resize failed"_a8);
         }
         else

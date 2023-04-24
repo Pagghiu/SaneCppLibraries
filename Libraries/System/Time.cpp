@@ -39,7 +39,7 @@ SC::AbsoluteTime SC::AbsoluteTime::now()
 #else
     struct timespec tspec;
     clock_gettime(CLOCK_REALTIME, &tspec);
-    return round(tspec.tv_nsec / 1.0e6) + tspec.tv_sec * 1000;
+    return static_cast<int64_t>(round(tspec.tv_nsec / 1.0e6) + tspec.tv_sec * 1000);
 #endif
 }
 
@@ -83,7 +83,7 @@ bool SC::AbsoluteTime::parseUTC(Parsed& result) const
 
 SC::RelativeTime SC::AbsoluteTime::subtract(AbsoluteTime other)
 {
-    const uint64_t diff = millisecondsSinceEpoch - other.millisecondsSinceEpoch;
+    const auto diff = millisecondsSinceEpoch - other.millisecondsSinceEpoch;
     return RelativeTime::fromSeconds(diff / 1000.0);
 }
 

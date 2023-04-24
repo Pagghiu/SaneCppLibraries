@@ -44,7 +44,7 @@ extern "C" int __cxa_guard_acquire(SC::uint64_t* guard_object)
 }
 
 extern "C" void __cxa_guard_release(SC::uint64_t* guard_object) { setInitializerHasRun(guard_object); }
-extern "C" void __cxa_guard_abort(SC::uint64_t* guard_object) {}
+extern "C" void __cxa_guard_abort(SC::uint64_t* guard_object) { SC_UNUSED(guard_object); }
 #endif
 #endif
 

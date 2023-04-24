@@ -21,7 +21,8 @@ struct TestClassBuilder : public MetaClassBuilder<TestClassBuilder>
     {
     };
     EmptyPayload payload;
-    constexpr TestClassBuilder(Atom* output = nullptr, const int capacity = 0) : MetaClassBuilder(output, capacity) {}
+    constexpr TestClassBuilder(Atom* output = nullptr, const uint32_t capacity = 0) : MetaClassBuilder(output, capacity)
+    {}
 };
 
 using FlatSchemaTest = Reflection::FlatSchemaCompiler<TestClassBuilder>;

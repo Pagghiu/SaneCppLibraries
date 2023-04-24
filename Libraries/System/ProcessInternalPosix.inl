@@ -16,7 +16,12 @@ struct SC::Process::Internal
     static FileDescriptorNative getStandardErrorFDS() { return fileno(stderr); };
 };
 
-SC::ReturnCode SC::ProcessNativeHandleClose(pid_t& handle) { return true; }
+SC::ReturnCode SC::ProcessNativeHandleClose(pid_t& handle)
+{
+    handle = ProcessNativeInvalid;
+    return true;
+}
+
 SC::ReturnCode SC::Process::fork()
 {
     processID.pid = ::fork();
@@ -92,6 +97,7 @@ SC::ReturnCode SC::Process::spawn(Lambda&& lambda)
 
 SC::ReturnCode SC::Process::launch(ProcessOptions options)
 {
+    SC_UNUSED(options);
     auto spawnLambda = [&]() { execl("/bin/sh", "sh", "-c", command.view().getNullTerminatedNative(), nullptr); };
     return spawn(spawnLambda);
 }

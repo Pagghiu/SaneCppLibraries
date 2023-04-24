@@ -20,15 +20,18 @@ bool formatSprintf(StringFormatOutput& data, const char (&formatSpecifier)[SPECI
 {
     const int SPECIFIER_SIZE = 50;
     char      compoundSpecifier[SPECIFIER_SIZE];
-    compoundSpecifier[0]   = '%';
-    size_t specifierLength = specifier.getEnd() - specifier.getIt();
+    compoundSpecifier[0] = '%';
+    SC_DEBUG_ASSERT(specifier.getEnd() >= specifier.getIt());
+    size_t specifierLength = static_cast<size_t>(specifier.getEnd() - specifier.getIt());
     memcpy(compoundSpecifier + 1, specifier.getIt(), specifierLength);
     memcpy(compoundSpecifier + 1 + specifierLength, formatSpecifier, SPECIFIER_LENGTH);
     compoundSpecifier[1 + specifierLength + SPECIFIER_LENGTH] = 0;
     char_t     buffer[BUFFER_SIZE];
     const int  numCharsExcludingTerminator = snprintf(buffer, sizeof(buffer), compoundSpecifier, value);
-    const bool validResult = numCharsExcludingTerminator >= 0 && numCharsExcludingTerminator + 1 < BUFFER_SIZE;
-    return validResult && data.write(StringView(buffer, numCharsExcludingTerminator, true, StringEncoding::Ascii));
+    const bool validResult =
+        (numCharsExcludingTerminator >= 0) and (static_cast<size_t>(numCharsExcludingTerminator + 1) < BUFFER_SIZE);
+    return validResult && data.write(StringView(buffer, static_cast<size_t>(numCharsExcludingTerminator), true,
+                                                StringEncoding::Ascii));
 }
 #if SC_MSVC
 #else

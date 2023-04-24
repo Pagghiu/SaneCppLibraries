@@ -364,11 +364,11 @@ void SC::VectorTest::testClassType()
         SC_TEST_EXPECT(vector1.insertMove(1, vector2.begin(), 0));
         SC_TEST_EXPECT(not vector1.insertMove(1, vector2.begin(), INSANE_NUMBER));
         SC_TEST_EXPECT(vector1.size() == 5);
-        for (int32_t idx = 0; idx < 5; ++idx)
+        for (size_t idx = 0; idx < 5; ++idx)
         {
             int32_t value = 0;
             SC_TEST_EXPECT(vector1[idx].toString().parseInt32(&value));
-            SC_TEST_EXPECT(value == idx);
+            SC_TEST_EXPECT(value == static_cast<int32_t>(idx));
         }
     }
 
@@ -383,11 +383,11 @@ void SC::VectorTest::testClassType()
         SC_TEST_EXPECT(vector2.push_back(VectorTestClass("4")));
         SC_TEST_EXPECT(vector1.appendMove(vector2.begin(), vector2.size()));
         SC_TEST_EXPECT(vector1.size() == 5);
-        for (int32_t idx = 0; idx < 5; ++idx)
+        for (size_t idx = 0; idx < 5; ++idx)
         {
             int32_t value = 0;
             SC_TEST_EXPECT(vector1[idx].toString().parseInt32(&value));
-            SC_TEST_EXPECT(value == idx);
+            SC_TEST_EXPECT(value == static_cast<int32_t>(idx));
         }
     }
 
@@ -525,7 +525,7 @@ void SC::VectorTest::testBasicType()
         numFailures = 0;
         for (size_t idx = 0; idx < 10; ++idx)
         {
-            if (elements[idx] != idx)
+            if (elements[idx] != static_cast<int>(idx))
             {
                 numFailures++;
             }
@@ -547,7 +547,7 @@ void SC::VectorTest::testBasicType()
         SC_TEST_EXPECT(elements.shrink_to_fit());
         for (size_t idx = 0; idx < elements.size(); ++idx)
         {
-            if (elements[idx] != idx)
+            if (elements[idx] != static_cast<int>(idx))
             {
                 numFailures++;
             }

@@ -43,9 +43,11 @@ struct SC::SerializationTestSuite::PrimitiveStruct
 
     bool operator!=(const PrimitiveStruct& other) const
     {
-        for (int i = 0; i < SizeOfArray(arrayValue); ++i)
+        for (size_t i = 0; i < SizeOfArray(arrayValue); ++i)
+        {
             if (arrayValue[i] != other.arrayValue[i])
                 return true;
+        }
         if (floatValue != other.floatValue)
             return true;
         if (int64Value != other.int64Value)
@@ -71,7 +73,7 @@ struct SC::SerializationTestSuite::NestedStruct
     {
         if (int16Value != other.int16Value)
             return true;
-        for (int i = 0; i < SizeOfArray(structsArray); ++i)
+        for (size_t i = 0; i < SizeOfArray(structsArray); ++i)
             if (structsArray[i] != other.structsArray[i])
                 return true;
         if (doubleVal != other.doubleVal)
@@ -259,7 +261,7 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
 {
     // Used only for the test
     template <typename T>
-    [[nodiscard]] constexpr const T readPrimitive(const Vector<uint8_t>& buffer, int& index)
+    [[nodiscard]] constexpr const T readPrimitive(const Vector<uint8_t>& buffer, uint32_t& index)
     {
         T alignedRead;
         memcpy(&alignedRead, &buffer[index], sizeof(T));
@@ -278,8 +280,8 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
             SerializerWriter   writer(streamWriter);
             SC_TEST_EXPECT(writer.serialize(primitive));
             SC_TEST_EXPECT(streamWriter.numberOfOperations == 1);
-            int index = 0;
-            for (int i = 0; i < 4; ++i)
+            uint32_t index = 0;
+            for (uint32_t i = 0; i < 4; ++i)
             {
                 SC_TEST_EXPECT(readPrimitive<uint8_t>(streamWriter.buffer, index) == primitive.arrayValue[i]);
             }

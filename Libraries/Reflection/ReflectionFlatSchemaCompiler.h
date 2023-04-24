@@ -10,7 +10,7 @@ namespace SC
 {
 namespace Reflection
 {
-template <typename Atom, typename Payload, int MAX_TOTAL_ATOMS>
+template <typename Atom, typename Payload, uint32_t MAX_TOTAL_ATOMS>
 struct FlatSchemaCompilerResult
 {
     ConstexprArray<Atom, MAX_TOTAL_ATOMS> atoms;
@@ -23,7 +23,7 @@ struct FlatSchemaCompiler
     typedef typename MetaClassBuilder::Atom     Atom;
     typedef typename Atom::MetaClassBuildFunc   MetaClassBuildFunc;
     typedef decltype(MetaClassBuilder::payload) PayloadType;
-    template <int MAX_TOTAL_ATOMS>
+    template <uint32_t MAX_TOTAL_ATOMS>
     struct FlatSchema
     {
         ConstexprArray<MetaProperties, MAX_TOTAL_ATOMS>      properties;
@@ -37,7 +37,7 @@ struct FlatSchemaCompiler
         constexpr auto namesAsSpan() const { return Span<const ConstexprStringView>(names.values, names.size); }
     };
 
-    template <int MAX_ATOMS>
+    template <uint32_t MAX_ATOMS>
     [[nodiscard]] static constexpr bool appendAtomsTo(ConstexprArray<Atom, MAX_ATOMS>& atoms, MetaClassBuildFunc build,
                                                       MetaClassBuilder& container)
     {
@@ -46,8 +46,9 @@ struct FlatSchemaCompiler
         build(container);
         if (container.atoms.capacityWasEnough())
         {
-            const auto lastAtomIndex = container.atoms.size - 1;
-            if (lastAtomIndex > static_cast<decltype(MetaProperties::numSubAtoms)>(MaxValue()))
+            const auto     lastAtomIndex = container.atoms.size - 1;
+            constexpr auto maxSubAtoms   = static_cast<decltype(MetaProperties::numSubAtoms)>(MaxValue());
+            if (lastAtomIndex > maxSubAtoms)
                 return false;
             atoms.values[container.initialSize].properties.numSubAtoms =
                 static_cast<decltype(MetaProperties::numSubAtoms)>(lastAtomIndex);
@@ -57,7 +58,7 @@ struct FlatSchemaCompiler
         return false;
     }
 
-    [[nodiscard]] static constexpr int countAtoms(const Atom& atom)
+    [[nodiscard]] static constexpr uint32_t countAtoms(const Atom& atom)
     {
         if (atom.build != nullptr)
         {
@@ -68,7 +69,7 @@ struct FlatSchemaCompiler
         return 0;
     }
 
-    template <int MAX_LINK_BUFFER_SIZE, int MAX_TOTAL_ATOMS, typename Func>
+    template <uint32_t MAX_LINK_BUFFER_SIZE, uint32_t MAX_TOTAL_ATOMS, typename Func>
     constexpr static FlatSchemaCompilerResult<Atom, PayloadType, MAX_TOTAL_ATOMS> compileAllAtomsFor(Func f)
     {
         FlatSchemaCompilerResult<Atom, PayloadType, MAX_TOTAL_ATOMS> result;
@@ -76,20 +77,19 @@ struct FlatSchemaCompiler
         MetaClassBuilder container(result.atoms.values, MAX_TOTAL_ATOMS);
 
         ConstexprArray<MetaClassBuildFunc, MAX_LINK_BUFFER_SIZE> alreadyVisitedTypes;
-        ConstexprArray<int, MAX_LINK_BUFFER_SIZE>                alreadyVisitedLinkID;
+        ConstexprArray<uint32_t, MAX_LINK_BUFFER_SIZE>           alreadyVisitedLinkID;
         if (not appendAtomsTo(result.atoms, f, container))
         {
             return {};
         }
-        int atomIndex = 1;
+        uint32_t atomIndex = 1;
         while (atomIndex < result.atoms.size)
         {
             Atom&      atom        = result.atoms.values[atomIndex];
             const bool isEmptyLink = atom.properties.getLinkIndex() < 0;
-            int        numSubAtoms = 0;
-            if (isEmptyLink and (numSubAtoms = countAtoms(atom)) > 0)
+            if (isEmptyLink and countAtoms(atom) > 0)
             {
-                int outIndex = -1;
+                uint32_t outIndex = 0;
                 if (alreadyVisitedTypes.contains(atom.build, &outIndex))
                 {
                     if (not atom.properties.setLinkIndex(alreadyVisitedLinkID.values[outIndex]))
@@ -116,14 +116,14 @@ struct FlatSchemaCompiler
     // You can customize:
     // - MAX_LINK_BUFFER_SIZE: maximum number of "complex types" (anything that is not a primitive) that can be built
     // - MAX_TOTAL_ATOMS: maximum number of atoms (struct members). When using constexpr it will trim it to actual size.
-    template <typename T, int MAX_LINK_BUFFER_SIZE = 20, int MAX_TOTAL_ATOMS = 100>
+    template <typename T, uint32_t MAX_LINK_BUFFER_SIZE = 20, uint32_t MAX_TOTAL_ATOMS = 100>
     static constexpr auto compile()
     {
         constexpr auto schema =
             compileAllAtomsFor<MAX_LINK_BUFFER_SIZE, MAX_TOTAL_ATOMS>(&MetaClass<T>::template build<MetaClassBuilder>);
         static_assert(schema.atoms.size > 0, "Something failed in compileAllAtomsFor");
         FlatSchema<schema.atoms.size> result;
-        for (int i = 0; i < schema.atoms.size; ++i)
+        for (uint32_t i = 0; i < schema.atoms.size; ++i)
         {
             result.properties.values[i] = schema.atoms.values[i].properties;
             result.names.values[i]      = schema.atoms.values[i].name;

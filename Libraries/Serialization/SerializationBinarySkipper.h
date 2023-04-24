@@ -16,7 +16,8 @@ struct BinarySkipper
     Span<const Reflection::MetaProperties> sourceProperties;
     Reflection::MetaProperties             sourceProperty;
 
-    BinarySkipper(BinaryStream& stream, int& sourceTypeIndex) : sourceObject(stream), sourceTypeIndex(sourceTypeIndex)
+    BinarySkipper(BinaryStream& stream, uint32_t& sourceTypeIndex)
+        : sourceObject(stream), sourceTypeIndex(sourceTypeIndex)
     {}
 
     [[nodiscard]] bool skip()
@@ -40,7 +41,7 @@ struct BinarySkipper
 
   private:
     BinaryStream& sourceObject;
-    int&          sourceTypeIndex;
+    uint32_t&     sourceTypeIndex;
 
     [[nodiscard]] bool skipStruct()
     {
@@ -54,11 +55,11 @@ struct BinarySkipper
         }
         else
         {
-            for (int16_t idx = 0; idx < structSourceProperty.numSubAtoms; ++idx)
+            for (uint32_t idx = 0; idx < static_cast<uint32_t>(structSourceProperty.numSubAtoms); ++idx)
             {
                 sourceTypeIndex = structSourceTypeIndex + idx + 1;
                 if (sourceProperties.data()[sourceTypeIndex].getLinkIndex() >= 0)
-                    sourceTypeIndex = sourceProperties.data()[sourceTypeIndex].getLinkIndex();
+                    sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
                 SC_TRY_IF(skip());
             }
         }
@@ -91,7 +92,7 @@ struct BinarySkipper
             {
                 sourceTypeIndex = itemSourceTypeIndex;
                 if (sourceProperties.data()[sourceTypeIndex].getLinkIndex() >= 0)
-                    sourceTypeIndex = sourceProperties.data()[sourceTypeIndex].getLinkIndex();
+                    sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
                 SC_TRY_IF(skip());
             }
             return true;

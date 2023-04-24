@@ -50,7 +50,7 @@ struct VersionSchema
 
     Span<const Reflection::MetaProperties> sourceProperties;
 
-    int sourceTypeIndex = 0;
+    uint32_t sourceTypeIndex = 0;
 
     constexpr Reflection::MetaProperties current() const { return sourceProperties.data()[sourceTypeIndex]; }
 
@@ -59,7 +59,7 @@ struct VersionSchema
     constexpr void resolveLink()
     {
         if (sourceProperties.data()[sourceTypeIndex].getLinkIndex() >= 0)
-            sourceTypeIndex = sourceProperties.data()[sourceTypeIndex].getLinkIndex();
+            sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
     }
 
     template <typename BinaryStream>
@@ -106,11 +106,11 @@ struct Serializer
         {
             return false;
         }
-        const int numMembers      = schema.current().numSubAtoms;
-        const int structTypeIndex = schema.sourceTypeIndex;
-        for (int i = 0; i < numMembers; ++i)
+        const uint32_t numMembers      = static_cast<uint32_t>(schema.current().numSubAtoms);
+        const auto     structTypeIndex = schema.sourceTypeIndex;
+        for (uint32_t idx = 0; idx < numMembers; ++idx)
         {
-            schema.sourceTypeIndex          = structTypeIndex + i + 1;
+            schema.sourceTypeIndex          = structTypeIndex + idx + 1;
             VersionedMemberIterator visitor = {schema, stream, schema.current().order};
             schema.resolveLink();
             Reflection::MetaClass<T>::visitObject(visitor, object);

@@ -140,7 +140,7 @@ struct SC::AsyncResult
     Async&     async;
     void*      userData = nullptr;
 
-    TaggedUnion<Result> result;
+    TaggedUnion<Result> result = {};
 
     // TODO: Add AsyncResult error
 };

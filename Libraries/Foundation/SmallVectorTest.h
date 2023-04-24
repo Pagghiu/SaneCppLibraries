@@ -215,20 +215,20 @@ struct SC::SmallVectorTest : public SC::TestCase
     }
 
     template <typename Container>
-    void checkItems(Container& container, int numItems)
+    void checkItems(Container& container, size_t numItems)
     {
-        for (int idx = 0; idx < numItems; ++idx)
+        for (size_t idx = 0; idx < numItems; ++idx)
         {
-            SC_TEST_EXPECT(container[idx] == idx);
+            SC_TEST_EXPECT(container[idx] == static_cast<int>(idx));
         }
     }
 
     template <typename Container>
-    void addItems(Container& container, int numItems)
+    void addItems(Container& container, size_t numItems)
     {
-        for (int idx = 0; idx < numItems; ++idx)
+        for (size_t idx = 0; idx < numItems; ++idx)
         {
-            SC_TEST_EXPECT(container.push_back(idx));
+            SC_TEST_EXPECT(container.push_back(static_cast<int>(idx)));
         }
     }
 };

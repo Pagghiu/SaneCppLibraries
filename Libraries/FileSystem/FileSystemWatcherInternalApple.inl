@@ -34,6 +34,7 @@ struct SC::FileSystemWatcher::Internal
 
     [[nodiscard]] ReturnCode init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
+        SC_UNUSED(runner);
         self = &parent;
         return true;
     }
@@ -52,7 +53,8 @@ struct SC::FileSystemWatcher::Internal
     {
         closing.exchange(false);
         // Create Signal to go from Loop --> CFRunLoop
-        CFRunLoopSourceContext signalContext = {0};
+        CFRunLoopSourceContext signalContext;
+        memset(&signalContext, 0, sizeof(signalContext));
 
         signalContext.info    = this;
         signalContext.perform = &Internal::threadExecuteRefresh;
@@ -126,7 +128,7 @@ struct SC::FileSystemWatcher::Internal
         constexpr CFAbsoluteTime           watchLatency = 0.5;
         constexpr FSEventStreamCreateFlags watchFlags =
             kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer;
-        FSEventStreamContext fsEventContext = {0};
+        FSEventStreamContext fsEventContext;
 
         fsEventContext.info = this;
         fsEventStream       = FSEventStreamCreate(nullptr,                       //
@@ -179,10 +181,10 @@ struct SC::FileSystemWatcher::Internal
             });
         StringNative<1024> buffer;
         StringConverter    converter(buffer);
-        for (FolderWatcher* watcher = self->watchers.front; watcher != nullptr; watcher = watcher->next)
+        for (FolderWatcher* it = self->watchers.front; it != nullptr; it = it->next)
         {
             StringView encodedPath;
-            SC_TRY_IF(converter.convertNullTerminateFastPath(watcher->path->view(), encodedPath));
+            SC_TRY_IF(converter.convertNullTerminateFastPath(it->path->view(), encodedPath));
             watchedPaths[numAllocatedPaths] =
                 CFStringCreateWithFileSystemRepresentation(nullptr, encodedPath.getNullTerminatedNative());
             if (not watchedPaths[numAllocatedPaths])
@@ -193,7 +195,8 @@ struct SC::FileSystemWatcher::Internal
         }
         if (numAllocatedPaths > 0)
         {
-            pathsArray = CFArrayCreate(nullptr, (const void**)watchedPaths, numAllocatedPaths, nullptr);
+            pathsArray =
+                CFArrayCreate(nullptr, (const void**)watchedPaths, static_cast<CFIndex>(numAllocatedPaths), nullptr);
             if (not pathsArray)
             {
                 return "CFArrayCreate failed"_a8;
@@ -221,6 +224,8 @@ struct SC::FileSystemWatcher::Internal
                                    const FSEventStreamEventFlags* eventFlags, //
                                    const FSEventStreamEventId*    eventIds)
     {
+        SC_UNUSED(streamRef);
+        SC_UNUSED(eventIds);
         Internal&    internal = *reinterpret_cast<Internal*>(info);
         const char** paths    = reinterpret_cast<const char**>(eventPaths);
         for (size_t idx = 0; idx < numEvents; ++idx)

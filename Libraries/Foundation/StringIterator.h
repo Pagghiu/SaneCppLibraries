@@ -48,7 +48,8 @@ struct StringIteratorASCII
     [[nodiscard]] bool advanceUntilMatches(char_t c)
     {
 #if 1
-        auto res = memchr(it, c, end - it); // may be faster with longer strings...
+        SC_DEBUG_ASSERT(end >= it);
+        auto res = memchr(it, c, static_cast<size_t>(end - it)); // may be faster with longer strings...
         if (res != nullptr)
             it = static_cast<const SC::char_t*>(res);
         else
@@ -166,18 +167,34 @@ struct StringIteratorASCII
         return StringIteratorASCII(it, otherPoint.it - 1);
     }
 
-    [[nodiscard]] size_t bytesDistanceFrom(StringIteratorASCII other) const { return it - other.it; }
+    [[nodiscard]] size_t bytesDistanceFrom(StringIteratorASCII other) const
+    {
+        SC_DEBUG_ASSERT(it >= other.it);
+        return static_cast<size_t>(it - other.it);
+    }
 
     Span<const char> sliceUntil(StringIteratorASCII other) const
     {
         if (other.it >= start && other.it <= end)
         {
-            return Span<const char>(it, other.it - it);
+            SC_DEBUG_ASSERT(other.it >= it);
+            return Span<const char>(it, static_cast<size_t>(other.it - it));
         }
         return {};
     }
-    Span<const char> sliceUntilEnd() const { return Span<const char>(it, end - it); }
-    Span<const char> sliceFromStart() const { return Span<const char>(start, it - start); }
+
+    Span<const char> sliceUntilEnd() const
+    {
+        SC_DEBUG_ASSERT(end >= it);
+
+        return Span<const char>(it, static_cast<size_t>(end - it));
+    }
+
+    Span<const char> sliceFromStart() const
+    {
+        SC_DEBUG_ASSERT(it >= start);
+        return Span<const char>(start, static_cast<size_t>(it - start));
+    }
 
     const char_t* getStart() const { return start; }
     const char_t* getIt() const { return it; }

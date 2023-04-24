@@ -20,7 +20,7 @@ struct SC::NetworkingTest : public SC::TestCase
             TCPServer server;
             // Look for an available port
             constexpr int startTcpPort = 5050;
-            int           tcpPort;
+            uint32_t      tcpPort;
             ReturnCode    bound = true;
             for (tcpPort = startTcpPort; tcpPort < startTcpPort + 10; ++tcpPort)
             {

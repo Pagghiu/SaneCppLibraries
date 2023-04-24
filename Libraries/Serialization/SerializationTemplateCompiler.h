@@ -15,7 +15,7 @@ struct MetaClassBuilderTemplate : public MetaClassBuilder<MetaClassBuilderTempla
     {
     };
     EmptyPayload payload;
-    constexpr MetaClassBuilderTemplate(Atom* output = nullptr, const int capacity = 0)
+    constexpr MetaClassBuilderTemplate(Atom* output = nullptr, const uint32_t capacity = 0)
         : MetaClassBuilder(output, capacity)
     {}
 };

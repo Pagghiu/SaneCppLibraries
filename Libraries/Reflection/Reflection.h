@@ -69,7 +69,10 @@ struct MetaProperties
         return true;
     }
 
-    [[nodiscard]] constexpr uint32_t getCustomUint32() const { return (offsetInBytes << 16) | order; }
+    [[nodiscard]] constexpr uint32_t getCustomUint32() const
+    {
+        return (static_cast<uint32_t>(offsetInBytes) << 16) | order;
+    }
 
     constexpr void setCustomUint32(uint32_t N)
     {
@@ -118,6 +121,7 @@ struct CallVisitorFor<data_tlist,  0>
     template<typename Visitor>
     constexpr static bool visit(Visitor&& visitor)
     {
+        SC_UNUSED(visitor);
         return true;
     }
 };
@@ -268,18 +272,18 @@ template <> struct MetaClass<double>   : public MetaPrimitive {static constexpr 
 template <typename Type>
 struct MetaArrayView
 {
-    int&  size;
-    int   wantedCapacity;
-    Type* output;
-    int   capacity;
+    uint32_t& size;
+    uint32_t  wantedCapacity;
+    Type*     output;
+    uint32_t  capacity;
 
-    constexpr MetaArrayView(int& size, Type* output = nullptr, const int capacity = 0)
+    constexpr MetaArrayView(uint32_t& size, Type* output = nullptr, const uint32_t capacity = 0)
         : size(size), wantedCapacity(0), output(nullptr), capacity(0)
     {
         init(output, capacity);
     }
 
-    constexpr void init(Type* initOutput, int initCapacity)
+    constexpr void init(Type* initOutput, uint32_t initCapacity)
     {
         size           = 0;
         wantedCapacity = 0;
@@ -303,7 +307,7 @@ struct MetaArrayView
         push(Type::template create<T>());
     }
 
-    template <typename R, typename T, int N>
+    template <typename R, typename T, uint32_t N>
     [[nodiscard]] constexpr bool operator()(uint8_t order, const char (&name)[N], R T::*field, size_t offset)
     {
         push(Type::create(order, name, field, offset));
@@ -351,11 +355,11 @@ struct MetaClassBuilder
 {
     typedef AtomBase<MemberVisitor> Atom;
 
-    int                 atomsSize;
-    MetaArrayView<Atom> atoms;
+    uint32_t            atomsSize;
     uint32_t            initialSize;
-    constexpr MetaClassBuilder(Atom* output = nullptr, const int capacity = 0)
-        : atomsSize(0), atoms(atomsSize, output, capacity), initialSize(0)
+    MetaArrayView<Atom> atoms;
+    constexpr MetaClassBuilder(Atom* output = nullptr, const uint32_t capacity = 0)
+        : atomsSize(0), initialSize(0), atoms(atomsSize, output, capacity)
     {}
 
     template <typename R, typename T, int N>

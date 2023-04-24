@@ -45,11 +45,11 @@ struct ReflectionVTables
 struct MetaClassBuilderTypeErased : public MetaClassBuilder<MetaClassBuilderTypeErased>
 {
     typedef AtomBase<MetaClassBuilderTypeErased> Atom;
-    static const int                             MAX_VTABLES = 100;
+    static const uint32_t                        MAX_VTABLES = 100;
     ReflectionVTables<MAX_VTABLES>               payload;
     MetaArrayView<VectorVTable>                  vectorVtable;
 
-    constexpr MetaClassBuilderTypeErased(Atom* output = nullptr, const int capacity = 0)
+    constexpr MetaClassBuilderTypeErased(Atom* output = nullptr, const uint32_t capacity = 0)
         : MetaClassBuilder(output, capacity), vectorVtable(payload.vector.size)
     {
         if (capacity > 0)
@@ -71,7 +71,7 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
             assignResizeWithoutInitialize(vector);
             vector.getSegmentSpan      = &getSegmentSpan<void>;
             vector.getSegmentSpanConst = &getSegmentSpan<const void>;
-            vector.linkID              = builder.initialSize + builder.atoms.size;
+            vector.linkID              = builder.initialSize + static_cast<unsigned>(builder.atoms.size);
             builder.vectorVtable.push(vector);
         }
     }

@@ -36,7 +36,7 @@ struct SC::Map
             if (item.key == key)
             {
                 if (outIndex)
-                    *outIndex = &item - items.begin();
+                    *outIndex = static_cast<size_t>(&item - items.begin());
                 return true;
             }
         }

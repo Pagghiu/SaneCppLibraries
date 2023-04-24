@@ -38,6 +38,7 @@ struct SC::Thread::Internal
 
     static void setThreadName(pthread_t& threadHandle, const StringView& nameNullTerminated)
     {
+        SC_UNUSED(threadHandle);
 #if !SC_PLATFORM_EMSCRIPTEN
         pthread_setname_np(nameNullTerminated.getNullTerminatedNative());
 #endif
@@ -64,7 +65,7 @@ struct SC::Thread::Internal
     }
 };
 
-void SC::Thread::Sleep(uint32_t milliseconds) { ::usleep(milliseconds * 1e3); }
+void SC::Thread::Sleep(uint32_t milliseconds) { ::usleep(milliseconds * 1000); }
 
 SC::uint64_t SC::Thread::CurrentThreadID()
 {

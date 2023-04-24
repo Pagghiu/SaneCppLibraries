@@ -159,8 +159,8 @@ struct SC::FileSystem::Internal
             }
         }
         copyfile_state_t state;
-        state     = copyfile_state_alloc();
-        int flags = COPYFILE_CLONE_FORCE; // Note: clone in copyfile is best effort
+        state          = copyfile_state_alloc();
+        uint32_t flags = COPYFILE_CLONE_FORCE; // Note: clone in copyfile is best effort
         if (options.overwrite)
         {
             flags |= COPYFILE_UNLINK;

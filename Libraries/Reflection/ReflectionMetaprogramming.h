@@ -5,15 +5,15 @@
 #include "../Foundation/Compiler.h"
 namespace SC
 {
-template <typename T, int N>
+template <typename T, uint32_t N>
 struct ConstexprArray
 {
-    T   values[N] = {};
-    int size      = 0;
+    T        values[N] = {};
+    uint32_t size      = 0;
 
-    [[nodiscard]] constexpr bool contains(T value, int* outIndex = nullptr) const
+    [[nodiscard]] constexpr bool contains(T value, uint32_t* outIndex = nullptr) const
     {
-        for (int i = 0; i < size; ++i)
+        for (uint32_t i = 0; i < size; ++i)
         {
             if (values[i] == value)
             {
@@ -25,12 +25,12 @@ struct ConstexprArray
         return false;
     }
 
-    template <int N2>
+    template <uint32_t N2>
     [[nodiscard]] constexpr bool append(const ConstexprArray<T, N2>& other)
     {
         if (size + other.size >= N)
             return false;
-        for (int i = 0; i < other.size; ++i)
+        for (uint32_t i = 0; i < other.size; ++i)
         {
             values[size++] = other.values[i];
         }
@@ -51,19 +51,19 @@ struct ConstexprArray
 struct ConstexprStringView
 {
     const char* data;
-    int         length;
+    uint32_t    length;
     constexpr ConstexprStringView() : data(nullptr), length(0) {}
-    template <int N>
+    template <uint32_t N>
     constexpr ConstexprStringView(const char (&data)[N]) : data(data), length(N)
     {}
-    constexpr ConstexprStringView(const char* data, int length) : data(data), length(length) {}
+    constexpr ConstexprStringView(const char* data, uint32_t length) : data(data), length(length) {}
 };
 // These are short names because they end up in symbol table (as we're storing their stringized signature)
 struct Nm
 {
     const char* data;
-    int         length;
-    constexpr Nm(const char* data, int length) : data(data), length(length) {}
+    uint32_t    length;
+    constexpr Nm(const char* data, uint32_t length) : data(data), length(length) {}
 };
 
 template <typename T>
@@ -88,9 +88,9 @@ static constexpr Nm ClNm()
 #else
     const char* name = __PRETTY_FUNCTION__;
     constexpr char separating_char = '=';
-    constexpr int  skip_chars = 2;
-    constexpr int  trim_chars = 1;
-    int         length = 0;
+    constexpr uint32_t  skip_chars = 2;
+    constexpr uint32_t  trim_chars = 1;
+    uint32_t         length = 0;
     const char* it = name;
     while (*it != separating_char)
         it++;
