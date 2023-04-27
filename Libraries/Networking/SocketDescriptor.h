@@ -4,6 +4,7 @@
 #pragma once
 
 #include "../Foundation/Opaque.h"
+#include "../Threading/Threading.h"
 
 namespace SC
 {
@@ -19,4 +20,15 @@ struct SocketDescriptorNativeHandle : public UniqueTaggedHandle<SocketDescriptor
                                                                 ReturnCode, SocketDescriptorNativeClose>
 {
 };
+struct Network;
 } // namespace SC
+struct SC::Network
+{
+    [[nodiscard]] static ReturnCode init();
+    [[nodiscard]] static ReturnCode shutdown();
+#if SC_PLATFORM_WINDOWS
+  private:
+    static bool  inited;
+    static Mutex mutex;
+#endif
+};

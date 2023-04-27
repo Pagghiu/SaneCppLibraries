@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Networking/Networking.h"
 #include "../Testing/Test.h"
 #include "../Threading/Threading.h" // EventObject
 #include "EventLoop.h"
@@ -140,5 +141,63 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(params.observedNotifier1Called == 1);
             SC_TEST_EXPECT(callbackThreadID == Thread::CurrentThreadID());
         }
+        if (test_section("accept"))
+        {
+            EventLoop eventLoop;
+            SC_TEST_EXPECT(eventLoop.create());
+
+            TCPServer server;
+            uint32_t  tcpPort = 0;
+            SC_TEST_EXPECT(listenToAvailablePort(server, "127.0.0.1", 5050, 5060, tcpPort));
+
+            int       numClient = 0;
+            TCPClient acceptedClient[2];
+
+            auto onNewClient = [&](AsyncResult& res)
+            {
+                SC_TEST_EXPECT(acceptedClient[numClient].socket.assign(res.result.fields.accept.acceptedClient));
+                numClient++;
+            };
+            Async::AcceptSupport support;
+            AsyncAccept          accept;
+            SC_TEST_EXPECT(eventLoop.addAccept(accept, support, server.socket, onNewClient));
+            TCPClient client1, client2;
+
+            auto onTimeout = [&](AsyncResult&)
+            {
+                SC_TEST_EXPECT(client1.connect("127.0.0.1", tcpPort));
+                SC_TEST_EXPECT(client2.connect("127.0.0.1", tcpPort));
+            };
+            AsyncTimeout timeout;
+            SC_TEST_EXPECT(eventLoop.addTimeout(timeout, 1_ms, onTimeout));
+            SC_TEST_EXPECT(not acceptedClient[0].socket.isValid());
+            SC_TEST_EXPECT(not acceptedClient[1].socket.isValid());
+            SC_TEST_EXPECT(eventLoop.runOnce()); // timeout
+            SC_TEST_EXPECT(eventLoop.runOnce()); // first connect
+            SC_TEST_EXPECT(eventLoop.runOnce()); // second connect
+            SC_TEST_EXPECT(acceptedClient[0].socket.isValid());
+            SC_TEST_EXPECT(acceptedClient[1].socket.isValid());
+            SC_TEST_EXPECT(client1.close());
+            SC_TEST_EXPECT(client2.close());
+            SC_TEST_EXPECT(acceptedClient[0].close());
+            SC_TEST_EXPECT(acceptedClient[1].close());
+            SC_TEST_EXPECT(server.close());
+            SC_TEST_EXPECT(eventLoop.close());
+        }
+    }
+
+    [[nodiscard]] ReturnCode listenToAvailablePort(TCPServer& server, StringView address, const uint32_t startTcpPort,
+                                                   const uint32_t endTcpPort, uint32_t& tcpPort)
+    {
+        ReturnCode bound = false;
+        for (tcpPort = startTcpPort; tcpPort < endTcpPort; ++tcpPort)
+        {
+            bound = server.listen(address, tcpPort);
+            if (bound)
+            {
+                return true;
+            }
+        }
+        return bound;
     }
 };

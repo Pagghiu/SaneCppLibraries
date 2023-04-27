@@ -2,6 +2,11 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #define WIN32_LEAN_AND_MEAN
+#include <WinSock2.h>
+// Order is important
+#include <MSWSock.h> // AcceptEx
+#pragma comment(lib, "Mswsock.lib")
+//  Order is important
 #include <Windows.h>
 
 #include "EventLoop.h"
@@ -93,6 +98,24 @@ struct SC::EventLoop::Internal
 
             break;
         }
+        case Async::Type::Accept: {
+            Async::Accept& accept = result.async.operation.fields.accept;
+
+            DWORD transferred = 0;
+            DWORD flags       = 0;
+            BOOL  res         = ::WSAGetOverlappedResult(accept.handle, &accept.support->overlapped.get().overlapped,
+                                                         &transferred, FALSE, &flags);
+            if (res == FALSE)
+            {
+                // TODO: report error
+                return "WSAGetOverlappedResult error"_a8;
+            }
+            ::setsockopt(result.result.fields.accept.acceptedClient, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, nullptr, 0);
+            SC_TRY_IF(
+                accept.support->clientSocket.get(result.result.fields.accept.acceptedClient, "Invalid handle"_a8));
+            accept.support->clientSocket.detach();
+            return true;
+        }
         }
         return true;
     }
@@ -117,42 +140,44 @@ struct SC::EventLoop::KernelQueue
     OVERLAPPED_ENTRY     events[totalNumEvents];
     ULONG                newEvents = 0;
 
-    [[nodiscard]] ReturnCode pushAsync(EventLoop& eventLoop, Async* async)
+    [[nodiscard]] ReturnCode stageAsync(EventLoop& eventLoop, Async& async)
     {
-        switch (async->operation.type)
+        FileDescriptor& loopFd = eventLoop.internal.get().loopFd;
+        switch (async.operation.type)
         {
-        case Async::Type::Timeout: {
-            eventLoop.activeTimers.queueBack(*async);
-            break;
+        case Async::Type::Timeout: eventLoop.activeTimers.queueBack(async); return true;
+        case Async::Type::WakeUp: eventLoop.activeWakeUps.queueBack(async); return true;
+        case Async::Type::Read: SC_TRY_IF(startReadWatcher(loopFd, async.operation.fields.read.fileDescriptor)); break;
+        case Async::Type::ProcessExit: SC_TRY_IF(startProcessExitWatcher(loopFd, async)); break;
+        case Async::Type::Accept: SC_TRY_IF(startAcceptWatcher(loopFd, async)); break;
         }
-        case Async::Type::Read: {
-            SC_TRY_IF(addReadWatcher(eventLoop.internal.get().loopFd, async->operation.fields.read.fileDescriptor));
-            eventLoop.stagedHandles.queueBack(*async);
-            break;
-        }
-        case Async::Type::WakeUp: {
-            eventLoop.activeWakeUps.queueBack(*async);
-            break;
-        }
-        case Async::Type::ProcessExit: {
-            SC_TRY_IF(addProcessWatcher(eventLoop.internal.get().loopFd, *async));
-            eventLoop.stagedHandles.queueBack(*async);
-            break;
-        }
-        }
+        eventLoop.stagedHandles.queueBack(async);
         return true;
     }
 
     [[nodiscard]] bool isFull() const { return newEvents >= totalNumEvents; }
 
-    [[nodiscard]] ReturnCode addReadWatcher(FileDescriptor& loopFd, FileDescriptorNative fileDescriptor)
+    [[nodiscard]] static ReturnCode startReadWatcher(FileDescriptor& loopFd, FileDescriptorNative fileDescriptor)
     {
         SC_UNUSED(loopFd);
         SC_UNUSED(fileDescriptor);
         return true;
     }
 
-    [[nodiscard]] ReturnCode addProcessWatcher(FileDescriptor& loopFd, Async& async)
+    [[nodiscard]] static ReturnCode startAcceptWatcher(FileDescriptor& loopFd, Async& async)
+    {
+        SC_TRY_IF(Network::init());
+        Async::Accept& asyncAccept = async.operation.fields.accept;
+        HANDLE         loopHandle;
+        SC_TRY_IF(loopFd.handle.get(loopHandle, "loop handle"_a8));
+        HANDLE iocp;
+        HANDLE listenHandle = reinterpret_cast<HANDLE>(asyncAccept.handle);
+        iocp                = ::CreateIoCompletionPort(listenHandle, loopHandle, 0, 0);
+        SC_TRY_MSG(iocp == loopHandle, "CreateIoCompletionPort server"_a8);
+        return true;
+    }
+
+    [[nodiscard]] ReturnCode startProcessExitWatcher(FileDescriptor& loopFd, Async& async)
     {
         SC_UNUSED(loopFd);
         const ProcessNative         processHandle   = async.operation.fields.processExit.handle;
@@ -208,11 +233,82 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] ReturnCode commitQueue(EventLoop& self)
+    [[nodiscard]] ReturnCode flushQueue(EventLoop& self)
     {
         SC_UNUSED(self);
         return true;
     }
 
+    [[nodiscard]] static ReturnCode rearmAsync(EventLoop& eventLoop, Async& async)
+    {
+        switch (async.operation.type)
+        {
+        case Async::Type::Accept: return rearmAcceptWatcher(eventLoop.internal.get().loopFd, async);
+        default: break;
+        }
+        return true;
+    }
+
+    [[nodiscard]] static ReturnCode rearmAcceptWatcher(FileDescriptor& loopFd, Async& async)
+    {
+        Async::Accept& asyncAccept = async.operation.fields.accept;
+        HANDLE         loopHandle;
+        SC_TRY_IF(loopFd.handle.get(loopHandle, "loop handle"_a8));
+        SOCKET clientSocket = ::WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0,
+                                           WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT);
+        SC_TRY_MSG(clientSocket != INVALID_SOCKET, "WSASocketW failed"_a8);
+        auto   deferDeleteSocket = MakeDeferred([&] { closesocket(clientSocket); });
+        HANDLE socketHandle      = reinterpret_cast<HANDLE>(clientSocket);
+        HANDLE iocp;
+        iocp = ::CreateIoCompletionPort(socketHandle, loopHandle, 0, 0);
+        SC_TRY_MSG(iocp == loopHandle, "CreateIoCompletionPort client"_a8);
+
+        ::SetFileCompletionNotificationModes(socketHandle,
+                                             FILE_SKIP_COMPLETION_PORT_ON_SUCCESS | FILE_SKIP_SET_EVENT_ON_HANDLE);
+
+        static_assert(sizeof(Async::AcceptSupport::acceptBuffer) == sizeof(struct sockaddr_storage) * 2 + 32);
+        Async::AcceptSupport& support = *asyncAccept.support;
+
+        EventLoopWindowsOverlapped& overlapped = support.overlapped.get();
+
+        overlapped.userData = &async;
+
+        DWORD sync_bytes_read = 0;
+
+        BOOL res;
+        res =
+            ::AcceptEx(asyncAccept.handle, clientSocket, support.acceptBuffer, 0, sizeof(struct sockaddr_storage) + 16,
+                       sizeof(struct sockaddr_storage) + 16, &sync_bytes_read, &overlapped.overlapped);
+        if (res == FALSE and WSAGetLastError() != WSA_IO_PENDING)
+        {
+            // TODO: Check AcceptEx WSA error codes
+            return "AcceptEx failed"_a8;
+        }
+        // TODO: Handle synchronous success
+        deferDeleteSocket.disarm();
+        return support.clientSocket.assign(clientSocket);
+    }
+
   private:
 };
+
+template <>
+void SC::OpaqueFuncs<SC::EventLoopWindowsOverlappedTraits>::construct(Handle& buffer)
+{
+    new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object();
+}
+template <>
+void SC::OpaqueFuncs<SC::EventLoopWindowsOverlappedTraits>::destruct(Object& obj)
+{
+    obj.~Object();
+}
+template <>
+void SC::OpaqueFuncs<SC::EventLoopWindowsOverlappedTraits>::moveConstruct(Handle& buffer, Object&& obj)
+{
+    new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object(move(obj));
+}
+template <>
+void SC::OpaqueFuncs<SC::EventLoopWindowsOverlappedTraits>::moveAssign(Object& pthis, Object&& obj)
+{
+    pthis = move(obj);
+}

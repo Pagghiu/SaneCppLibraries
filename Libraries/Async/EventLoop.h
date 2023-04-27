@@ -8,6 +8,7 @@
 #include "../Foundation/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Span.h"
 #include "../Foundation/TaggedUnion.h"
+#include "../Networking/SocketDescriptor.h"
 #include "../System/ProcessDescriptor.h"
 #include "../System/Time.h"
 #include "../Threading/Atomic.h"
@@ -20,8 +21,20 @@ struct AsyncTimeout;
 struct AsyncRead;
 struct AsyncWakeUp;
 struct AsyncProcessExit;
+struct AsyncAccept;
 struct AsyncResult;
 struct EventObject;
+} // namespace SC
+
+namespace SC
+{
+struct EventLoopWindowsOverlapped;
+struct EventLoopWindowsOverlappedSizes
+{
+    static constexpr int Windows = sizeof(void*) * 7;
+};
+using EventLoopWindowsOverlappedTraits = OpaqueTraits<EventLoopWindowsOverlapped, EventLoopWindowsOverlappedSizes>;
+using EventLoopWindowsOverlappedOpaque = OpaqueUniqueObject<OpaqueFuncs<EventLoopWindowsOverlappedTraits>>;
 } // namespace SC
 
 struct SC::Async
@@ -56,15 +69,30 @@ struct SC::Async
 
     struct ProcessExit
     {
-        ProcessNative     handle;
+        ProcessNative     handle = ProcessNativeInvalid;
         ProcessExitOpaque opaque; // TODO: We should make this a pointer as it's too big on Win
+    };
+
+    struct AcceptSupport
+    {
+#if SC_PLATFORM_WINDOWS
+        SocketDescriptorNativeHandle     clientSocket;
+        EventLoopWindowsOverlappedOpaque overlapped;
+        uint8_t                          acceptBuffer[288];
+#endif
+    };
+    struct Accept
+    {
+        SocketDescriptorNative handle  = SocketDescriptorNativeInvalid;
+        AcceptSupport*         support = nullptr;
     };
     enum class Type
     {
         Timeout,
         Read,
         WakeUp,
-        ProcessExit
+        ProcessExit,
+        Accept
     };
     union Operation
     {
@@ -75,12 +103,14 @@ struct SC::Async
         Read        read;
         WakeUp      wakeUp;
         ProcessExit processExit;
+        Accept      accept;
 
         using FieldsTypes =
             TypeList<TaggedField<Operation, Type, decltype(timeout), &Operation::timeout, Type::Timeout>,
                      TaggedField<Operation, Type, decltype(read), &Operation::read, Type::Read>,
                      TaggedField<Operation, Type, decltype(wakeUp), &Operation::wakeUp, Type::WakeUp>,
-                     TaggedField<Operation, Type, decltype(processExit), &Operation::processExit, Type::ProcessExit>>;
+                     TaggedField<Operation, Type, decltype(processExit), &Operation::processExit, Type::ProcessExit>,
+                     TaggedField<Operation, Type, decltype(accept), &Operation::accept, Type::Accept>>;
     };
 
     enum class State
@@ -118,6 +148,12 @@ struct SC::AsyncResult
     {
         ProcessExitStatus exitStatus;
     };
+
+    struct Accept
+    {
+        SocketDescriptorNative acceptedClient =
+            SocketDescriptorNativeInvalid; // TODO: Make this SocketDescriptorNativeHandle
+    };
     using Type = Async::Type;
     union Result
     {
@@ -128,12 +164,14 @@ struct SC::AsyncResult
         Read        read;
         WakeUp      wakeUp;
         ProcessExit processExit;
+        Accept      accept;
 
         using FieldsTypes =
             TypeList<TaggedField<Result, Type, decltype(timeout), &Result::timeout, Type::Timeout>,
                      TaggedField<Result, Type, decltype(read), &Result::read, Type::Read>,
                      TaggedField<Result, Type, decltype(wakeUp), &Result::wakeUp, Type::WakeUp>,
-                     TaggedField<Result, Type, decltype(processExit), &Result::processExit, Type::ProcessExit>>;
+                     TaggedField<Result, Type, decltype(processExit), &Result::processExit, Type::ProcessExit>,
+                     TaggedField<Result, Type, decltype(accept), &Result::accept, Type::Accept>>;
     };
 
     EventLoop& eventLoop;
@@ -162,6 +200,10 @@ struct SC::AsyncProcessExit : public Async
 {
 };
 
+struct SC::AsyncAccept : public Async
+{
+};
+
 struct SC::EventLoop
 {
     // Creation
@@ -183,6 +225,10 @@ struct SC::EventLoop
 
     [[nodiscard]] ReturnCode addProcessExit(AsyncProcessExit& async, Function<void(AsyncResult&)>&& callback,
                                             ProcessNative process);
+
+    [[nodiscard]] ReturnCode addAccept(AsyncAccept& async, Async::AcceptSupport& support,
+                                       const SocketDescriptorNativeHandle& socketDescriptor,
+                                       Function<void(AsyncResult&)>&&      callback);
 
     // WakeUp support
     [[nodiscard]] ReturnCode wakeUpFromExternalThread(AsyncWakeUp& wakeUp);

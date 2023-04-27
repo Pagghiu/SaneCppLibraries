@@ -70,6 +70,19 @@ SC::ReturnCode SC::EventLoop::addRead(AsyncRead& async, FileDescriptorNative fil
     return true;
 }
 
+SC::ReturnCode SC::EventLoop::addAccept(AsyncAccept& async, Async::AcceptSupport& support,
+                                        const SocketDescriptorNativeHandle& socketDescriptor,
+                                        Function<void(AsyncResult&)>&&      callback)
+{
+    Async::Accept operation;
+    SC_TRY_IF(socketDescriptor.get(operation.handle, "Invalid handle"_a8));
+    operation.support = &support;
+    async.operation.assignValue(move(operation));
+    async.callback = move(callback);
+    submitAsync(async);
+    return true;
+}
+
 SC::ReturnCode SC::EventLoop::addWakeUp(AsyncWakeUp& async, Function<void(AsyncResult&)>&& callback,
                                         EventObject* eventObject)
 {
@@ -170,11 +183,12 @@ SC::ReturnCode SC::EventLoop::stageSubmissions(SC::EventLoop::KernelQueue& queue
         switch (async->state)
         {
         case Async::State::Submitting: {
-            SC_TRY_IF(queue.pushAsync(*this, async));
+            SC_TRY_IF(queue.stageAsync(*this, *async));
+            SC_TRY_IF(queue.rearmAsync(*this, *async));
             async->state = Async::State::Active;
             if (queue.isFull())
             {
-                SC_TRY_IF(queue.commitQueue(*this));
+                SC_TRY_IF(queue.flushQueue(*this));
                 stagedHandles.clear();
             }
         }
@@ -242,13 +256,15 @@ SC::ReturnCode SC::EventLoop::runOnce()
     Internal& self = internal.get();
     for (decltype(KernelQueue::newEvents) idx = 0; idx < queue.newEvents; ++idx)
     {
-        Async*      async = self.getAsync(queue.events[idx]);
-        AsyncResult result{*this, *async, self.getUserData(queue.events[idx])};
+        Async&      async = *self.getAsync(queue.events[idx]);
+        AsyncResult result{*this, async, self.getUserData(queue.events[idx])};
         auto        res = self.runCompletionFor(result, queue.events[idx]);
         if (res and result.async.callback.isValid())
         {
             result.async.callback(result);
         }
+        // TODO: rearmAsync should happen only if async has not been cancelled
+        SC_TRY_IF(queue.rearmAsync(*this, async));
     }
 
     return true;

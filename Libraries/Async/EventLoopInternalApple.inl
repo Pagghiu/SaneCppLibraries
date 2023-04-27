@@ -10,6 +10,11 @@
 
 #include "../Foundation/Array.h"
 #include "EventLoop.h"
+
+#include <netdb.h>
+#include <sys/select.h> // fd_set for emscripten
+#include <unistd.h>
+
 struct SC::Async::ProcessExitInternal
 {
 };
@@ -127,6 +132,19 @@ struct SC::EventLoop::Internal
             }
             break;
         }
+        case Async::Type::Accept: {
+            SocketDescriptorNative listenDescriptor = result.async.operation.fields.accept.handle;
+
+            struct sockaddr_in sAddr;
+            socklen_t          sAddrSize = sizeof(sAddr);
+
+            SocketDescriptorNative acceptedClient;
+            acceptedClient = ::accept(listenDescriptor, reinterpret_cast<struct sockaddr*>(&sAddr), &sAddrSize);
+            SC_TRY_MSG(acceptedClient != SocketDescriptorNativeInvalid, "accept failed"_a8);
+
+            result.result.fields.accept.acceptedClient = acceptedClient;
+            break;
+        }
         }
         return true;
     }
@@ -142,47 +160,47 @@ struct SC::EventLoop::KernelQueue
 
     KernelQueue() { memset(events, 0, sizeof(events)); }
 
-    [[nodiscard]] ReturnCode pushAsync(EventLoop& eventLoop, Async* async)
+    [[nodiscard]] ReturnCode stageAsync(EventLoop& eventLoop, Async& async)
     {
-        switch (async->operation.type)
+        FileDescriptor& loopFd = eventLoop.internal.get().loopFd;
+        switch (async.operation.type)
         {
-        case Async::Type::Timeout:
-            // Let's just queue the timeout in the active timers
-            eventLoop.activeTimers.queueBack(*async);
-            break;
-        case Async::Type::WakeUp:
-            // Let's just queue the wakeup in the active wake ups
-            eventLoop.activeWakeUps.queueBack(*async);
-            break;
-        case Async::Type::Read:
-            // Here we need to add an actual file descriptor watcher and add to stagedHandles
-            addReadWatcher(eventLoop.internal.get().loopFd, async->operation.fields.read.fileDescriptor, async);
-            eventLoop.stagedHandles.queueBack(*async);
-            break;
-        case Async::Type::ProcessExit:
-            // Here we need to initialize a proc event and add to stagedHandles
-            addProcWatcher(eventLoop.internal.get().loopFd, async->operation.fields.processExit.handle, async);
-            eventLoop.stagedHandles.queueBack(*async);
-            break;
+        case Async::Type::Timeout: eventLoop.activeTimers.queueBack(async); return true;
+        case Async::Type::WakeUp: eventLoop.activeWakeUps.queueBack(async); return true;
+        case Async::Type::Read: startReadWatcher(loopFd, async); break;
+        case Async::Type::ProcessExit: startProcessExitWatcher(loopFd, async); break;
+        case Async::Type::Accept: startAcceptWatcher(loopFd, async); break;
         }
+        eventLoop.stagedHandles.queueBack(async);
         return true;
     }
 
     [[nodiscard]] bool isFull() const { return newEvents >= totalNumEvents; }
 
-    void addReadWatcher(FileDescriptor& loopFd, FileDescriptorNative fileDescriptor, Async* udata)
+    void startReadWatcher(FileDescriptor& loopFd, Async& async)
     {
+        FileDescriptorNative fileDescriptor = async.operation.fields.read.fileDescriptor;
         SC_UNUSED(loopFd);
         constexpr int fflags = 0;
-        EV_SET(events + newEvents, fileDescriptor, EVFILT_READ, EV_ADD, fflags, 0, udata);
+        EV_SET(events + newEvents, fileDescriptor, EVFILT_READ, EV_ADD, fflags, 0, &async);
         newEvents += 1;
     }
 
-    void addProcWatcher(FileDescriptor& loopFd, ProcessNative processHandle, Async* udata)
+    void startAcceptWatcher(FileDescriptor& loopFd, Async& async)
     {
+        SocketDescriptorNative socketDescriptor = async.operation.fields.accept.handle;
+        SC_UNUSED(loopFd);
+        constexpr int fflags = 0;
+        EV_SET(events + newEvents, socketDescriptor, EVFILT_READ, EV_ADD | EV_ENABLE, fflags, 0, &async);
+        newEvents += 1;
+    }
+
+    void startProcessExitWatcher(FileDescriptor& loopFd, Async& async)
+    {
+        ProcessNative processHandle = async.operation.fields.processExit.handle;
         SC_UNUSED(loopFd);
         constexpr uint32_t fflags = NOTE_EXIT | NOTE_EXITSTATUS;
-        EV_SET(events + newEvents, processHandle, EVFILT_PROC, EV_ADD | EV_ENABLE, fflags, 0, udata);
+        EV_SET(events + newEvents, processHandle, EVFILT_PROC, EV_ADD | EV_ENABLE, fflags, 0, &async);
         newEvents += 1;
     }
 
@@ -237,11 +255,11 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] ReturnCode commitQueue(EventLoop& self)
+    [[nodiscard]] ReturnCode flushQueue(EventLoop& self)
     {
         FileDescriptorNative loopNativeDescriptor;
         SC_TRY_IF(self.internal.get().loopFd.handle.get(loopNativeDescriptor,
-                                                        "EventLoop::Internal::commitQueue() - Invalid Handle"_a8));
+                                                        "EventLoop::Internal::flushQueue() - Invalid Handle"_a8));
 
         int res;
         do
@@ -250,9 +268,16 @@ struct SC::EventLoop::KernelQueue
         } while (res == -1 && errno == EINTR);
         if (res != 0)
         {
-            return "EventLoop::Internal::commitQueue() - kevent failed"_a8;
+            return "EventLoop::Internal::flushQueue() - kevent failed"_a8;
         }
         newEvents = 0;
+        return true;
+    }
+    
+    [[nodiscard]] static ReturnCode rearmAsync(EventLoop& eventLoop, Async& async)
+    {
+        SC_UNUSED(eventLoop);
+        SC_UNUSED(async);
         return true;
     }
 };

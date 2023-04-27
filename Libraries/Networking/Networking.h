@@ -6,27 +6,13 @@
 #include "../Foundation/Result.h"
 #include "../Foundation/StringView.h"
 #include "../System/Time.h"
-#include "../Threading/Atomic.h"
-#include "../Threading/Threading.h"
 #include "SocketDescriptor.h"
 
 namespace SC
 {
-struct Network;
 struct TCPClient;
 struct TCPServer;
 } // namespace SC
-
-struct SC::Network
-{
-    [[nodiscard]] static ReturnCode init();
-    [[nodiscard]] static ReturnCode shutdown();
-#if SC_PLATFORM_WINDOWS
-  private:
-    static bool  inited;
-    static Mutex mutex;
-#endif
-};
 
 struct SC::TCPServer
 {
