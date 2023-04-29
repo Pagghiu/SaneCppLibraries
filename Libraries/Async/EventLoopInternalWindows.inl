@@ -113,10 +113,7 @@ struct SC::EventLoop::Internal
                 return "WSAGetOverlappedResult error"_a8;
             }
             ::setsockopt(result.result.fields.accept.acceptedClient, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, nullptr, 0);
-            SC_TRY_IF(
-                accept.support->clientSocket.get(result.result.fields.accept.acceptedClient, "Invalid handle"_a8));
-            accept.support->clientSocket.detach();
-            return true;
+            return result.result.fields.accept.acceptedClient.assign(accept.support->clientSocket);
         }
         }
         return true;

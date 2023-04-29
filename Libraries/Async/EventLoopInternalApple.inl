@@ -153,8 +153,7 @@ struct SC::EventLoop::Internal
             acceptedClient = ::accept(listenDescriptor, reinterpret_cast<struct sockaddr*>(&sAddr), &sAddrSize);
             SC_TRY_MSG(acceptedClient != SocketDescriptorNativeInvalid, "accept failed"_a8);
 
-            result.result.fields.accept.acceptedClient = acceptedClient;
-            break;
+            return result.result.fields.accept.acceptedClient.assign(acceptedClient);
         }
         }
         return true;

@@ -151,10 +151,10 @@ struct SC::AsyncResult
 
     struct Accept
     {
-        SocketDescriptorNative acceptedClient =
-            SocketDescriptorNativeInvalid; // TODO: Make this SocketDescriptorNativeHandle
+        SocketDescriptorNativeHandle acceptedClient;
     };
     using Type = Async::Type;
+
     union Result
     {
         Result() {}
