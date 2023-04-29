@@ -1,16 +1,18 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#define WIN32_LEAN_AND_MEAN
+
 #include <WinSock2.h>
 // Order is important
 #include <MSWSock.h> // AcceptEx
 #pragma comment(lib, "Mswsock.lib")
-//  Order is important
-#include <Windows.h>
 
 #include "EventLoop.h"
 #include "EventLoopWindows.h"
+
+#include "EventLoopInternalWindowsAPI.h"
+
+NTSetInformationFile pNtSetInformationFile = NULL;
 
 struct SC::Async::ProcessExitInternal
 {
@@ -60,7 +62,7 @@ struct SC::EventLoop::Internal
         return reinterpret_cast<void*>(event.lpCompletionKey);
     }
 
-    void runCompletionForWakeUp(AsyncResult& result) { result.eventLoop.runCompletionForNotifiers(); }
+    void runCompletionForWakeUp(AsyncResult& result) { result.eventLoop.executeWakeUps(); }
 
     [[nodiscard]] ReturnCode runCompletionFor(AsyncResult& result, const OVERLAPPED_ENTRY& entry)
     {
@@ -142,44 +144,76 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] ReturnCode stageAsync(EventLoop& eventLoop, Async& async)
     {
-        FileDescriptor& loopFd = eventLoop.internal.get().loopFd;
+        HANDLE loopHandle;
+        SC_TRY_IF(eventLoop.internal.get().loopFd.handle.get(loopHandle, "loop handle"_a8));
         switch (async.operation.type)
         {
         case Async::Type::Timeout: eventLoop.activeTimers.queueBack(async); return true;
         case Async::Type::WakeUp: eventLoop.activeWakeUps.queueBack(async); return true;
-        case Async::Type::Read: SC_TRY_IF(startReadWatcher(loopFd, async.operation.fields.read.fileDescriptor)); break;
-        case Async::Type::ProcessExit: SC_TRY_IF(startProcessExitWatcher(loopFd, async)); break;
-        case Async::Type::Accept: SC_TRY_IF(startAcceptWatcher(loopFd, async)); break;
+        case Async::Type::Read: SC_TRY_IF(startReadWatcher(*async.operation.unionAs<Async::Read>())); break;
+        case Async::Type::ProcessExit: SC_TRY_IF(startProcessExitWatcher(async)); break;
+        case Async::Type::Accept:
+            SC_TRY_IF(startAcceptWatcher(loopHandle, *async.operation.unionAs<Async::Accept>()));
+            break;
         }
-        eventLoop.stagedHandles.queueBack(async);
+        // On Windows we push directly to activeHandles and not stagedHandles as we've already created kernel objects
+        eventLoop.activeHandles.queueBack(async);
         return true;
     }
 
-    [[nodiscard]] bool isFull() const { return newEvents >= totalNumEvents; }
-
-    [[nodiscard]] static ReturnCode startReadWatcher(FileDescriptor& loopFd, FileDescriptorNative fileDescriptor)
+    [[nodiscard]] static ReturnCode startReadWatcher(Async::Read& async)
     {
-        SC_UNUSED(loopFd);
-        SC_UNUSED(fileDescriptor);
+        SC_UNUSED(async);
         return true;
     }
 
-    [[nodiscard]] static ReturnCode startAcceptWatcher(FileDescriptor& loopFd, Async& async)
+    [[nodiscard]] static ReturnCode stopReadWatcher(Async::Read& async)
+    {
+        SC_UNUSED(async);
+        return true;
+    }
+
+    [[nodiscard]] static ReturnCode startAcceptWatcher(HANDLE loopHandle, Async::Accept& asyncAccept)
     {
         SC_TRY_IF(Network::init());
-        Async::Accept& asyncAccept = async.operation.fields.accept;
-        HANDLE         loopHandle;
-        SC_TRY_IF(loopFd.handle.get(loopHandle, "loop handle"_a8));
-        HANDLE iocp;
         HANDLE listenHandle = reinterpret_cast<HANDLE>(asyncAccept.handle);
-        iocp                = ::CreateIoCompletionPort(listenHandle, loopHandle, 0, 0);
-        SC_TRY_MSG(iocp == loopHandle, "CreateIoCompletionPort server"_a8);
+        HANDLE iocp         = ::CreateIoCompletionPort(listenHandle, loopHandle, 0, 0);
+        SC_TRY_MSG(iocp == loopHandle, "startAcceptWatcher CreateIoCompletionPort failed"_a8);
         return true;
     }
 
-    [[nodiscard]] ReturnCode startProcessExitWatcher(FileDescriptor& loopFd, Async& async)
+    [[nodiscard]] static ReturnCode stopAcceptWatcher(Async::Accept& asyncAccept)
     {
-        SC_UNUSED(loopFd);
+        // TODO: Make this threadsafe
+        if (!pNtSetInformationFile)
+        {
+            HMODULE ntdll = GetModuleHandleA("ntdll.dll");
+            pNtSetInformationFile =
+                reinterpret_cast<NTSetInformationFile>(GetProcAddress(ntdll, "NtSetInformationFile"));
+        }
+
+        HANDLE listenHandle = reinterpret_cast<HANDLE>(asyncAccept.handle);
+
+        struct FILE_COMPLETION_INFORMATION file_completion_info;
+        file_completion_info.Key  = NULL;
+        file_completion_info.Port = NULL;
+
+        struct IO_STATUS_BLOCK status_block;
+        memset(&status_block, 0, sizeof(status_block));
+
+        NTSTATUS status = pNtSetInformationFile(listenHandle, &status_block, &file_completion_info,
+                                                sizeof(file_completion_info), FileReplaceCompletionInformation);
+
+        if (!status)
+        {
+            return "FileReplaceCompletionInformation failed"_a8;
+        }
+        // This will cause one more event loop run with GetOverlappedIO failing
+        return asyncAccept.support->clientSocket.close();
+    }
+
+    [[nodiscard]] static ReturnCode startProcessExitWatcher(Async& async)
+    {
         const ProcessNative         processHandle   = async.operation.fields.processExit.handle;
         Async::ProcessExitInternal& processInternal = async.operation.fields.processExit.opaque.get();
         processInternal.overlapped.userData         = &async;
@@ -191,6 +225,11 @@ struct SC::EventLoop::KernelQueue
             return "RegisterWaitForSingleObject failed"_a8;
         }
         return processInternal.waitHandle.assign(waitHandle);
+    }
+
+    [[nodiscard]] static ReturnCode stopProcessExitWatcher(Async::ProcessExit& async)
+    {
+        return async.opaque.get().waitHandle.close();
     }
 
     // This is executed on windows thread pool
@@ -209,8 +248,9 @@ struct SC::EventLoop::KernelQueue
         }
     }
 
-    [[nodiscard]] ReturnCode poll(EventLoop& self, const TimeCounter* nextTimer)
+    [[nodiscard]] ReturnCode pollAsync(EventLoop& self, PollMode pollMode)
     {
+        const TimeCounter*   nextTimer = self.findEarliestTimer();
         FileDescriptorNative loopNativeDescriptor;
         SC_TRY_IF(self.internal.get().loopFd.handle.get(loopNativeDescriptor,
                                                         "EventLoop::Internal::poll() - Invalid Handle"_a8));
@@ -222,45 +262,42 @@ struct SC::EventLoop::KernelQueue
                 timeout = nextTimer->subtractApproximate(self.loopTime).inRoundedUpperMilliseconds();
             }
         }
-        const BOOL success =
-            GetQueuedCompletionStatusEx(loopNativeDescriptor, events, static_cast<ULONG>(SizeOfArray(events)),
-                                        &newEvents, nextTimer ? static_cast<ULONG>(timeout.ms) : INFINITE, FALSE);
+        const BOOL success = GetQueuedCompletionStatusEx(
+            loopNativeDescriptor, events, static_cast<ULONG>(SizeOfArray(events)), &newEvents,
+            nextTimer or pollMode == PollMode::NoWait ? static_cast<ULONG>(timeout.ms) : INFINITE, FALSE);
         if (not success and GetLastError() != WAIT_TIMEOUT)
         {
             // TODO: GetQueuedCompletionStatusEx error handling
             return "KernelQueue::poll() - GetQueuedCompletionStatusEx error"_a8;
         }
+        if (nextTimer)
+        {
+            self.executeTimers(*this, *nextTimer);
+        }
         return true;
     }
 
-    [[nodiscard]] ReturnCode flushQueue(EventLoop& self)
+    [[nodiscard]] static ReturnCode activateAsync(EventLoop& eventLoop, Async& async)
     {
-        SC_UNUSED(self);
-        return true;
-    }
-
-    [[nodiscard]] static ReturnCode rearmAsync(EventLoop& eventLoop, Async& async)
-    {
+        HANDLE loopHandle;
+        SC_TRY_IF(eventLoop.internal.get().loopFd.handle.get(loopHandle, "loop handle"_a8));
         switch (async.operation.type)
         {
-        case Async::Type::Accept: return rearmAcceptWatcher(eventLoop.internal.get().loopFd, async);
+        case Async::Type::Accept: return activateAcceptWatcher(loopHandle, async);
         default: break;
         }
         return true;
     }
 
-    [[nodiscard]] static ReturnCode rearmAcceptWatcher(FileDescriptor& loopFd, Async& async)
+    [[nodiscard]] static ReturnCode activateAcceptWatcher(HANDLE loopHandle, Async& async)
     {
-        Async::Accept& asyncAccept = async.operation.fields.accept;
-        HANDLE         loopHandle;
-        SC_TRY_IF(loopFd.handle.get(loopHandle, "loop handle"_a8));
-        SOCKET clientSocket = ::WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0,
-                                           WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT);
+        Async::Accept& asyncAccept  = async.operation.fields.accept;
+        SOCKET         clientSocket = ::WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0,
+                                                   WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT);
         SC_TRY_MSG(clientSocket != INVALID_SOCKET, "WSASocketW failed"_a8);
         auto   deferDeleteSocket = MakeDeferred([&] { closesocket(clientSocket); });
         HANDLE socketHandle      = reinterpret_cast<HANDLE>(clientSocket);
-        HANDLE iocp;
-        iocp = ::CreateIoCompletionPort(socketHandle, loopHandle, 0, 0);
+        HANDLE iocp              = ::CreateIoCompletionPort(socketHandle, loopHandle, 0, 0);
         SC_TRY_MSG(iocp == loopHandle, "CreateIoCompletionPort client"_a8);
 
         ::SetFileCompletionNotificationModes(socketHandle,
@@ -287,6 +324,20 @@ struct SC::EventLoop::KernelQueue
         // TODO: Handle synchronous success
         deferDeleteSocket.disarm();
         return support.clientSocket.assign(clientSocket);
+    }
+
+    [[nodiscard]] static ReturnCode cancelAsync(EventLoop& eventLoop, Async& async)
+    {
+        SC_UNUSED(eventLoop);
+        switch (async.operation.type)
+        {
+        case Async::Type::Timeout: return true;
+        case Async::Type::WakeUp: return true;
+        case Async::Type::Read: return stopReadWatcher(*async.operation.unionAs<Async::Read>());
+        case Async::Type::ProcessExit: return stopProcessExitWatcher(*async.operation.unionAs<Async::ProcessExit>());
+        case Async::Type::Accept: return stopAcceptWatcher(*async.operation.unionAs<Async::Accept>());
+        }
+        return false;
     }
 
   private:

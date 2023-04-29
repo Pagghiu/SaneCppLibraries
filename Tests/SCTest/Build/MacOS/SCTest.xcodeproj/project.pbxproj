@@ -197,6 +197,7 @@
 		7BE5C80F29A26E3E00CBCAD1 /* ProcessTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ProcessTest.h; path = ../../../../Libraries/System/ProcessTest.h; sourceTree = "<group>"; };
 		7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = FileDescriptor.cpp; path = ../../../../Libraries/FileSystem/FileDescriptor.cpp; sourceTree = "<group>"; };
 		7BE5C81229A2707E00CBCAD1 /* FileDescriptor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FileDescriptor.h; path = ../../../../Libraries/FileSystem/FileDescriptor.h; sourceTree = "<group>"; };
+		7BE906C429FD071E0073D7A8 /* EventLoopInternalWindowsAPI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = EventLoopInternalWindowsAPI.h; path = ../../../../Libraries/Async/EventLoopInternalWindowsAPI.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -440,6 +441,7 @@
 				7BD8E37929BE8357004AB23D /* EventLoopInternalApple.inl */,
 				7BD8E37B29BE8357004AB23D /* EventLoopInternalEmscripten.inl */,
 				7BD8E37A29BE8357004AB23D /* EventLoopInternalWindows.inl */,
+				7BE906C429FD071E0073D7A8 /* EventLoopInternalWindowsAPI.h */,
 				7BA7D47A29B5488200811076 /* EventLoopTest.h */,
 				7B281DBF29E2BAF400363F69 /* EventLoopWindows.h */,
 			);

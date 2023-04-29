@@ -46,75 +46,80 @@ void SC::OpaqueFuncs<SC::Async::ProcessExitTraits>::moveAssign(Object& pthis, Ob
     pthis = move(obj);
 }
 
-SC::ReturnCode SC::EventLoop::addTimeout(AsyncTimeout& async, IntegerMilliseconds expiration,
-                                         Function<void(AsyncResult&)>&& callback)
+SC::ReturnCode SC::EventLoop::startTimeout(AsyncTimeout& async, IntegerMilliseconds expiration,
+                                           Function<void(AsyncResult&)>&& callback)
 {
+    SC_TRY_IF(queueSubmission(async, move(callback)));
     Async::Timeout operation;
     updateTime();
     operation.expirationTime = loopTime.offsetBy(expiration);
     operation.timeout        = expiration;
     async.operation.assignValue(move(operation));
-    async.callback = move(callback);
-    submitAsync(async);
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::addRead(AsyncRead& async, FileDescriptorNative fileDescriptor, Span<uint8_t> readBuffer)
+SC::ReturnCode SC::EventLoop::startRead(AsyncRead& async, FileDescriptorNative fileDescriptor, Span<uint8_t> readBuffer,
+                                        Function<void(AsyncResult&)>&& callback)
 {
-    SC_TRY_MSG(readBuffer.sizeInBytes() > 0, "EventLoop::addRead - Zero sized read buffer"_a8);
+    SC_TRY_MSG(readBuffer.sizeInBytes() > 0, "EventLoop::startRead - Zero sized read buffer"_a8);
+    SC_TRY_IF(queueSubmission(async, move(callback)));
     Async::Read operation;
     operation.fileDescriptor = fileDescriptor;
     operation.readBuffer     = readBuffer;
     async.operation.assignValue(move(operation));
-    submitAsync(async);
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::addAccept(AsyncAccept& async, Async::AcceptSupport& support,
-                                        const SocketDescriptorNativeHandle& socketDescriptor,
-                                        Function<void(AsyncResult&)>&&      callback)
+SC::ReturnCode SC::EventLoop::startAccept(AsyncAccept& async, AsyncAccept::Support& support,
+                                          const SocketDescriptorNativeHandle& socketDescriptor,
+                                          Function<void(AsyncResult&)>&&      callback)
 {
+    SC_TRY_IF(queueSubmission(async, move(callback)));
     Async::Accept operation;
     SC_TRY_IF(socketDescriptor.get(operation.handle, "Invalid handle"_a8));
     operation.support = &support;
     async.operation.assignValue(move(operation));
-    async.callback = move(callback);
-    submitAsync(async);
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::addWakeUp(AsyncWakeUp& async, Function<void(AsyncResult&)>&& callback,
-                                        EventObject* eventObject)
+SC::ReturnCode SC::EventLoop::startWakeUp(AsyncWakeUp& async, Function<void(AsyncResult&)>&& callback,
+                                          EventObject* eventObject)
 {
+    SC_TRY_IF(queueSubmission(async, move(callback)));
     Async::WakeUp operation;
     operation.eventObject = eventObject;
     async.operation.assignValue(move(operation));
-    async.callback = move(callback);
-    submitAsync(async);
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::addProcessExit(AsyncProcessExit& async, Function<void(AsyncResult&)>&& callback,
-                                             ProcessNative process)
+SC::ReturnCode SC::EventLoop::startProcessExit(AsyncProcessExit& async, Function<void(AsyncResult&)>&& callback,
+                                               ProcessNative process)
 {
+    SC_TRY_IF(queueSubmission(async, move(callback)));
     Async::ProcessExit operation;
     operation.handle = process;
     async.operation.assignValue(move(operation));
-    async.callback = move(callback);
-    submitAsync(async);
     return true;
 }
 
-void SC::EventLoop::submitAsync(Async& async)
+SC::ReturnCode SC::EventLoop::queueSubmission(Async& async, Function<void(AsyncResult&)>&& callback)
 {
-    SC_RELEASE_ASSERT(async.state == Async::State::Free);
-    SC_RELEASE_ASSERT(async.eventLoop == nullptr);
-    async.state = Async::State::Submitting;
-    submission.queueBack(async);
+    const bool asyncStateIsFree      = async.state == Async::State::Free;
+    const bool asyncIsNotOwnedByLoop = async.eventLoop == nullptr;
+    SC_DEBUG_ASSERT(asyncStateIsFree and asyncIsNotOwnedByLoop);
+    SC_TRY_MSG(asyncStateIsFree, "Trying to stage Async that is in use"_a8);
+    SC_TRY_MSG(asyncIsNotOwnedByLoop, "Trying to add Async belonging to another Loop"_a8);
+    async.callback = move(callback);
+    async.state    = Async::State::Submitting;
+    submissions.queueBack(async);
     async.eventLoop = this;
+    return true;
 }
 
-bool SC::EventLoop::shouldQuit() { return submission.isEmpty(); }
+bool SC::EventLoop::shouldQuit()
+{
+    return activeHandles.isEmpty() and activeTimers.isEmpty() and activeWakeUps.isEmpty();
+}
 
 SC::ReturnCode SC::EventLoop::run()
 {
@@ -130,7 +135,7 @@ const SC::TimeCounter* SC::EventLoop::findEarliestTimer() const
     const TimeCounter* earliestTime = nullptr;
     for (Async* async = activeTimers.front; async != nullptr; async = async->next)
     {
-        SC_RELEASE_ASSERT(async->operation.type == Async::Type::Timeout);
+        SC_DEBUG_ASSERT(async->operation.type == Async::Type::Timeout);
         const auto& expirationTime = async->operation.fields.timeout.expirationTime;
         if (earliestTime == nullptr or earliestTime->isLaterThanOrEqualTo(expirationTime))
         {
@@ -144,7 +149,7 @@ void SC::EventLoop::invokeExpiredTimers()
 {
     for (Async* async = activeTimers.front; async != nullptr;)
     {
-        SC_RELEASE_ASSERT(async->operation.type == Async::Type::Timeout);
+        SC_DEBUG_ASSERT(async->operation.type == Async::Type::Timeout);
         const auto& expirationTime = async->operation.fields.timeout.expirationTime;
         if (loopTime.isLaterThanOrEqualTo(expirationTime))
         {
@@ -153,6 +158,7 @@ void SC::EventLoop::invokeExpiredTimers()
             activeTimers.remove(*currentAsync);
             currentAsync->state = Async::State::Free;
             AsyncResult res{*this, *currentAsync};
+            res.async.eventLoop = nullptr; // Allow reusing it
             currentAsync->callback(res);
         }
         else
@@ -178,19 +184,14 @@ SC::ReturnCode SC::EventLoop::close()
 
 SC::ReturnCode SC::EventLoop::stageSubmissions(SC::EventLoop::KernelQueue& queue)
 {
-    while (Async* async = submission.dequeueFront())
+    while (Async* async = submissions.dequeueFront())
     {
         switch (async->state)
         {
         case Async::State::Submitting: {
             SC_TRY_IF(queue.stageAsync(*this, *async));
-            SC_TRY_IF(queue.rearmAsync(*this, *async));
+            SC_TRY_IF(queue.activateAsync(*this, *async));
             async->state = Async::State::Active;
-            if (queue.isFull())
-            {
-                SC_TRY_IF(queue.flushQueue(*this));
-                stagedHandles.clear();
-            }
         }
         break;
         case Async::State::Free: {
@@ -199,8 +200,7 @@ SC::ReturnCode SC::EventLoop::stageSubmissions(SC::EventLoop::KernelQueue& queue
         }
         break;
         case Async::State::Cancelling: {
-            // TODO: issue an actual kevent for removal
-            SC_RELEASE_ASSERT(false);
+            SC_TRY_IF(queue.cancelAsync(*this, *async));
         }
         break;
         case Async::State::Active: {
@@ -213,7 +213,10 @@ SC::ReturnCode SC::EventLoop::stageSubmissions(SC::EventLoop::KernelQueue& queue
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::runOnce()
+SC::ReturnCode SC::EventLoop::runOnce() { return runStep(PollMode::ForcedForwardProgress); }
+SC::ReturnCode SC::EventLoop::runNoWait() { return runStep(PollMode::NoWait); }
+
+SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
 {
     KernelQueue queue;
 
@@ -228,46 +231,77 @@ SC::ReturnCode SC::EventLoop::runOnce()
         });
     SC_TRY_IF(stageSubmissions(queue));
 
-    SC_RELEASE_ASSERT(submission.isEmpty());
+    SC_RELEASE_ASSERT(submissions.isEmpty());
 
-    const TimeCounter* nextTimer = findEarliestTimer();
-    SC_TRY_IF(queue.poll(*this, nextTimer));
-    stagedHandles.clear();
-
-    if (nextTimer)
-    {
-        const bool timeoutOccurredWithoutIO = queue.newEvents == 0;
-        const bool timeoutWasAlreadyExpired = loopTime.isLaterThanOrEqualTo(*nextTimer);
-        if (timeoutOccurredWithoutIO or timeoutWasAlreadyExpired)
-        {
-            if (timeoutWasAlreadyExpired)
-            {
-                // Not sure if this is really possible.
-                updateTime();
-            }
-            else
-            {
-                loopTime = *nextTimer;
-            }
-            invokeExpiredTimers();
-        }
-    }
+    SC_TRY_IF(queue.pollAsync(*this, pollMode));
 
     Internal& self = internal.get();
     for (decltype(KernelQueue::newEvents) idx = 0; idx < queue.newEvents; ++idx)
     {
         Async&      async = *self.getAsync(queue.events[idx]);
         AsyncResult result{*this, async, self.getUserData(queue.events[idx])};
-        auto        res = self.runCompletionFor(result, queue.events[idx]);
+        ReturnCode  res = self.runCompletionFor(result, queue.events[idx]);
         if (res and result.async.callback.isValid())
         {
             result.async.callback(result);
         }
-        // TODO: rearmAsync should happen only if async has not been cancelled
-        SC_TRY_IF(queue.rearmAsync(*this, async));
+        switch (async.state)
+        {
+        case Async::State::Active: SC_TRY_IF(queue.activateAsync(*this, async)); break;
+        default: break;
+        }
     }
 
     return true;
+}
+
+SC::ReturnCode SC::EventLoop::stopAsync(Async& async)
+{
+    const bool asyncStateIsNotFree    = async.state != Async::State::Free;
+    const bool asyncIsOwnedByThisLoop = async.eventLoop == this;
+    SC_DEBUG_ASSERT(asyncStateIsNotFree and asyncIsOwnedByThisLoop);
+    SC_TRY_MSG(asyncStateIsNotFree, "Trying to stop Async that is not active"_a8);
+    SC_TRY_MSG(asyncIsOwnedByThisLoop, "Trying to add Async belonging to another Loop"_a8);
+    switch (async.state)
+    {
+    case Async::State::Active: {
+        // We don't know in which queue this is gone so we remove from all
+        activeHandles.remove(async);
+        activeTimers.remove(async);
+        activeWakeUps.remove(async);
+        async.state = Async::State::Cancelling;
+        submissions.queueBack(async);
+        break;
+    }
+    case Async::State::Submitting: {
+        submissions.remove(async);
+        break;
+    }
+    case Async::State::Free: return "Trying to stop Async that is not active"_a8;
+    case Async::State::Cancelling: return "Trying to Stop Async that is already being cancelled"_a8;
+    }
+    return true;
+}
+
+void SC::EventLoop::updateTime() { loopTime.snap(); }
+
+void SC::EventLoop::executeTimers(KernelQueue& queue, const TimeCounter& nextTimer)
+{
+    const bool timeoutOccurredWithoutIO = queue.newEvents == 0;
+    const bool timeoutWasAlreadyExpired = loopTime.isLaterThanOrEqualTo(nextTimer);
+    if (timeoutOccurredWithoutIO or timeoutWasAlreadyExpired)
+    {
+        if (timeoutWasAlreadyExpired)
+        {
+            // Not sure if this is really possible.
+            updateTime();
+        }
+        else
+        {
+            loopTime = nextTimer;
+        }
+        invokeExpiredTimers();
+    }
 }
 
 SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread(AsyncWakeUp& wakeUp)
@@ -283,7 +317,7 @@ SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread(AsyncWakeUp& wakeUp)
     return true;
 }
 
-void SC::EventLoop::runCompletionForNotifiers()
+void SC::EventLoop::executeWakeUps()
 {
     for (Async* async = activeWakeUps.front; async != nullptr; async = async->next)
     {

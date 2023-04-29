@@ -18,7 +18,7 @@ struct SC::EventLoopTest : public SC::TestCase
     {
         using namespace SC;
         // TODO: Add EventLoop::resetTimeout
-        if (test_section("addTimeout"))
+        if (test_section("startTimeout"))
         {
             AsyncTimeout timeout1, timeout2;
             EventLoop    eventLoop;
@@ -35,13 +35,13 @@ struct SC::EventLoopTest : public SC::TestCase
                 SC_TEST_EXPECT(timeout and timeout->timeout.ms == 1);
                 timeout1Called++;
             };
-            SC_TEST_EXPECT(eventLoop.addTimeout(timeout1, 1_ms, move(timeout1Callback)));
+            SC_TEST_EXPECT(eventLoop.startTimeout(timeout1, 1_ms, move(timeout1Callback)));
             auto timeout2Callback = [&](AsyncResult&)
             {
                 // TODO: investigate allowing dropping AsyncResult
                 timeout2Called++;
             };
-            SC_TEST_EXPECT(eventLoop.addTimeout(timeout2, 100_ms, move(timeout2Callback)));
+            SC_TEST_EXPECT(eventLoop.startTimeout(timeout2, 100_ms, move(timeout2Callback)));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(timeout1Called == 1 and timeout2Called == 0);
             SC_TEST_EXPECT(eventLoop.runOnce());
@@ -85,8 +85,8 @@ struct SC::EventLoopTest : public SC::TestCase
                 wakeUp1ThreadID = Thread::CurrentThreadID();
                 wakeUp1Called++;
             };
-            SC_TEST_EXPECT(eventLoop.addWakeUp(wakeUp1, lambda1));
-            SC_TEST_EXPECT(eventLoop.addWakeUp(wakeUp2, [&](AsyncResult&) { wakeUp2Called++; }));
+            SC_TEST_EXPECT(eventLoop.startWakeUp(wakeUp1, lambda1));
+            SC_TEST_EXPECT(eventLoop.startWakeUp(wakeUp2, [&](AsyncResult&) { wakeUp2Called++; }));
             Thread     newThread1;
             Thread     newThread2;
             ReturnCode loopRes1 = false;
@@ -124,7 +124,7 @@ struct SC::EventLoopTest : public SC::TestCase
                 callbackThreadID = Thread::CurrentThreadID();
                 params.notifier1Called++;
             };
-            SC_TEST_EXPECT(eventLoop.addWakeUp(wakeUp, eventLoopLambda, &params.eventObject));
+            SC_TEST_EXPECT(eventLoop.startWakeUp(wakeUp, eventLoopLambda, &params.eventObject));
             Thread     newThread1;
             ReturnCode loopRes1     = false;
             Action     threadLambda = [&]
@@ -151,28 +151,22 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(listenToAvailablePort(server, "127.0.0.1", 5050, 5060, tcpPort));
 
             int       numClient = 0;
-            TCPClient acceptedClient[2];
+            TCPClient acceptedClient[3];
 
             auto onNewClient = [&](AsyncResult& res)
             {
                 SC_TEST_EXPECT(acceptedClient[numClient].socket.assign(res.result.fields.accept.acceptedClient));
                 numClient++;
             };
-            Async::AcceptSupport support;
+            AsyncAccept::Support support;
             AsyncAccept          accept;
-            SC_TEST_EXPECT(eventLoop.addAccept(accept, support, server.socket, onNewClient));
-            TCPClient client1, client2;
+            SC_TEST_EXPECT(eventLoop.startAccept(accept, support, server.socket, onNewClient));
 
-            auto onTimeout = [&](AsyncResult&)
-            {
-                SC_TEST_EXPECT(client1.connect("127.0.0.1", tcpPort));
-                SC_TEST_EXPECT(client2.connect("127.0.0.1", tcpPort));
-            };
-            AsyncTimeout timeout;
-            SC_TEST_EXPECT(eventLoop.addTimeout(timeout, 1_ms, onTimeout));
+            TCPClient client1, client2;
+            SC_TEST_EXPECT(client1.connect("127.0.0.1", tcpPort));
+            SC_TEST_EXPECT(client2.connect("127.0.0.1", tcpPort));
             SC_TEST_EXPECT(not acceptedClient[0].socket.isValid());
             SC_TEST_EXPECT(not acceptedClient[1].socket.isValid());
-            SC_TEST_EXPECT(eventLoop.runOnce()); // timeout
             SC_TEST_EXPECT(eventLoop.runOnce()); // first connect
             SC_TEST_EXPECT(eventLoop.runOnce()); // second connect
             SC_TEST_EXPECT(acceptedClient[0].socket.isValid());
@@ -181,6 +175,21 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(client2.close());
             SC_TEST_EXPECT(acceptedClient[0].close());
             SC_TEST_EXPECT(acceptedClient[1].close());
+
+            SC_TEST_EXPECT(eventLoop.stopAsync(accept));
+
+            // on Windows stopAsync generates one more eventloop run because
+            // of the closing of the clientsocket used for acceptex, so to unify
+            // the behaviours in the test we do a runNoWait
+            SC_TEST_EXPECT(eventLoop.runNoWait());
+
+            TCPClient client3;
+            SC_TEST_EXPECT(client3.connect("127.0.0.1", tcpPort));
+
+            // Now we need a runNoWait for both because there are for sure no other events to be dequeued
+            SC_TEST_EXPECT(eventLoop.runNoWait());
+
+            SC_TEST_EXPECT(not acceptedClient[2].socket.isValid());
             SC_TEST_EXPECT(server.close());
             SC_TEST_EXPECT(eventLoop.close());
         }

@@ -202,6 +202,7 @@ struct SC::AsyncProcessExit : public Async
 
 struct SC::AsyncAccept : public Async
 {
+    using Support = Async::AcceptSupport;
 };
 
 struct SC::EventLoop
@@ -213,33 +214,40 @@ struct SC::EventLoop
     // Execution
     [[nodiscard]] ReturnCode run();
     [[nodiscard]] ReturnCode runOnce();
+    [[nodiscard]] ReturnCode runNoWait();
 
-    // Async Operations
-    [[nodiscard]] ReturnCode addTimeout(AsyncTimeout& async, IntegerMilliseconds expiration,
-                                        Function<void(AsyncResult&)>&& callback);
+    // Stop any async operation
+    [[nodiscard]] ReturnCode stopAsync(Async& async);
 
-    [[nodiscard]] ReturnCode addRead(AsyncRead& async, FileDescriptorNative fileDescriptor, Span<uint8_t> readBuffer);
+    // Start specific async operation
+    [[nodiscard]] ReturnCode startTimeout(AsyncTimeout& async, IntegerMilliseconds expiration,
+                                          Function<void(AsyncResult&)>&& callback);
 
-    [[nodiscard]] ReturnCode addWakeUp(AsyncWakeUp& async, Function<void(AsyncResult&)>&& callback,
-                                       EventObject* eventObject = nullptr);
+    [[nodiscard]] ReturnCode startRead(AsyncRead& async, FileDescriptorNative fileDescriptor, Span<uint8_t> readBuffer,
+                                       Function<void(AsyncResult&)>&& callback);
 
-    [[nodiscard]] ReturnCode addProcessExit(AsyncProcessExit& async, Function<void(AsyncResult&)>&& callback,
-                                            ProcessNative process);
+    [[nodiscard]] ReturnCode startWakeUp(AsyncWakeUp& async, Function<void(AsyncResult&)>&& callback,
+                                         EventObject* eventObject = nullptr);
 
-    [[nodiscard]] ReturnCode addAccept(AsyncAccept& async, Async::AcceptSupport& support,
-                                       const SocketDescriptorNativeHandle& socketDescriptor,
-                                       Function<void(AsyncResult&)>&&      callback);
+    [[nodiscard]] ReturnCode startProcessExit(AsyncProcessExit& async, Function<void(AsyncResult&)>&& callback,
+                                              ProcessNative process);
+
+    [[nodiscard]] ReturnCode startAccept(AsyncAccept& async, Async::AcceptSupport& support,
+                                         const SocketDescriptorNativeHandle& socketDescriptor,
+                                         Function<void(AsyncResult&)>&&      callback);
 
     // WakeUp support
     [[nodiscard]] ReturnCode wakeUpFromExternalThread(AsyncWakeUp& wakeUp);
 
     [[nodiscard]] ReturnCode wakeUpFromExternalThread();
 
+    // Access Internals
     [[nodiscard]] ReturnCode getLoopFileDescriptor(FileDescriptorNative& fileDescriptor) const;
 
   private:
-    IntrusiveDoubleLinkedList<Async> submission;
+    IntrusiveDoubleLinkedList<Async> submissions;
     IntrusiveDoubleLinkedList<Async> stagedHandles;
+    IntrusiveDoubleLinkedList<Async> activeHandles;
     IntrusiveDoubleLinkedList<Async> activeTimers;
     IntrusiveDoubleLinkedList<Async> activeWakeUps;
 
@@ -262,13 +270,27 @@ struct SC::EventLoop
     using InternalOpaque = OpaqueUniqueObject<OpaqueFuncs<InternalTraits>>;
     InternalOpaque internal;
 
-    void invokeExpiredTimers();
-    void updateTime() { loopTime.snap(); }
-    void submitAsync(Async& async);
-
-    void                             runCompletionForNotifiers();
-    void                             runCompletionFor(AsyncResult& result);
-    [[nodiscard]] bool               shouldQuit();
+    // Timers
     [[nodiscard]] const TimeCounter* findEarliestTimer() const;
-    [[nodiscard]] ReturnCode         stageSubmissions(KernelQueue& queue);
+
+    void invokeExpiredTimers();
+    void updateTime();
+    void executeTimers(KernelQueue& queue, const TimeCounter& nextTimer);
+
+    // WakeUp
+    void executeWakeUps();
+
+    // Setup
+    [[nodiscard]] ReturnCode queueSubmission(Async& async, Function<void(AsyncResult&)>&& callback);
+    [[nodiscard]] bool       shouldQuit();
+
+    // Phases
+    [[nodiscard]] ReturnCode stageSubmissions(KernelQueue& queue);
+
+    enum class PollMode
+    {
+        NoWait,
+        ForcedForwardProgress
+    };
+    [[nodiscard]] ReturnCode runStep(PollMode pollMode);
 };

@@ -349,6 +349,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Networking\NetworkingTest.h">
       <Filter>Networking</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopInternalWindowsAPI.h">
+      <Filter>Async</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalPosix.inl">

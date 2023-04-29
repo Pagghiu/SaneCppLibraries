@@ -58,9 +58,8 @@ struct SC::EventLoop::Internal
         FileDescriptorNative wakeUpPipeDescriptor;
         SC_TRY_IF(wakeupPipe.readPipe.handle.get(wakeUpPipeDescriptor,
                                                  "EventLoop::Internal::createWakeup() - Async read handle invalid"_a8));
-        // Optimization: we avoid one indirect function call, see runCompletionFor checking if async == wakeupPipeRead
-        // wakeupPipeRead.callback.bind<Internal, &Internal::runCompletionForWakeUp>(this);
-        SC_TRY_IF(loop.addRead(wakeupPipeRead, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)}));
+        SC_TRY_IF(loop.startRead(wakeupPipeRead, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)},
+                                 Function<void(AsyncResult&)>()));
         return true;
     }
 
@@ -92,11 +91,23 @@ struct SC::EventLoop::Internal
                 break;
 
         } while (errno == EINTR);
-        asyncResult.eventLoop.runCompletionForNotifiers();
+        asyncResult.eventLoop.executeWakeUps();
     }
 
     [[nodiscard]] ReturnCode runCompletionFor(AsyncResult& result, const struct kevent& event)
     {
+        if ((event.flags & EV_DELETE) != 0)
+        {
+            result.eventLoop.activeHandles.remove(result.async);
+            return false; // Do not call callback
+        }
+        if ((event.flags & EV_ERROR) != 0)
+        {
+            // TODO: Handle EV_ERROR case
+            SC_RELEASE_ASSERT(false);
+            return false;
+        }
+        // regular path
         switch (result.async.operation.type)
         {
         case Async::Type::Timeout: {
@@ -162,46 +173,72 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] ReturnCode stageAsync(EventLoop& eventLoop, Async& async)
     {
-        FileDescriptor& loopFd = eventLoop.internal.get().loopFd;
         switch (async.operation.type)
         {
         case Async::Type::Timeout: eventLoop.activeTimers.queueBack(async); return true;
         case Async::Type::WakeUp: eventLoop.activeWakeUps.queueBack(async); return true;
-        case Async::Type::Read: startReadWatcher(loopFd, async); break;
-        case Async::Type::ProcessExit: startProcessExitWatcher(loopFd, async); break;
-        case Async::Type::Accept: startAcceptWatcher(loopFd, async); break;
+        case Async::Type::Read: startReadWatcher(async, *async.operation.unionAs<Async::Read>()); break;
+        case Async::Type::ProcessExit:
+            startProcessExitWatcher(async, *async.operation.unionAs<Async::ProcessExit>());
+            break;
+        case Async::Type::Accept: startAcceptWatcher(async, *async.operation.unionAs<Async::Accept>()); break;
         }
+        newEvents += 1;
+        // The handles are not active until we "poll" or "flush"
         eventLoop.stagedHandles.queueBack(async);
+        if (isFull())
+        {
+            SC_TRY_IF(flushQueue(eventLoop));
+        }
         return true;
     }
 
     [[nodiscard]] bool isFull() const { return newEvents >= totalNumEvents; }
 
-    void startReadWatcher(FileDescriptor& loopFd, Async& async)
+    ReturnCode stopKeventWatcher(Async& async, SocketDescriptorNative handle, short filter)
     {
-        FileDescriptorNative fileDescriptor = async.operation.fields.read.fileDescriptor;
-        SC_UNUSED(loopFd);
-        constexpr int fflags = 0;
-        EV_SET(events + newEvents, fileDescriptor, EVFILT_READ, EV_ADD, fflags, 0, &async);
-        newEvents += 1;
+        FileDescriptorNative loopNativeDescriptor;
+        SC_TRUST_RESULT(async.eventLoop->internal.get().loopFd.handle.get(
+            loopNativeDescriptor, "EventLoop::Internal::pollAsync() - Invalid Handle"_a8));
+        struct kevent kev;
+        EV_SET(&kev, handle, filter, EV_DELETE, 0, 0, nullptr);
+        const int res = kevent(loopNativeDescriptor, &kev, 1, 0, 0, nullptr);
+        if (res == 0 or (errno == EBADF or errno == ENOENT))
+        {
+            return true;
+        }
+        return "kevent EV_DELETE failed"_a8;
     }
 
-    void startAcceptWatcher(FileDescriptor& loopFd, Async& async)
+    void startReadWatcher(Async& async, Async::Read& asyncRead)
     {
-        SocketDescriptorNative socketDescriptor = async.operation.fields.accept.handle;
-        SC_UNUSED(loopFd);
-        constexpr int fflags = 0;
-        EV_SET(events + newEvents, socketDescriptor, EVFILT_READ, EV_ADD | EV_ENABLE, fflags, 0, &async);
-        newEvents += 1;
+        EV_SET(events + newEvents, asyncRead.fileDescriptor, EVFILT_READ, EV_ADD, 0, 0, &async);
     }
 
-    void startProcessExitWatcher(FileDescriptor& loopFd, Async& async)
+    ReturnCode stopReadWatcher(Async& async, Async::Read& asyncRead)
     {
-        ProcessNative processHandle = async.operation.fields.processExit.handle;
-        SC_UNUSED(loopFd);
-        constexpr uint32_t fflags = NOTE_EXIT | NOTE_EXITSTATUS;
-        EV_SET(events + newEvents, processHandle, EVFILT_PROC, EV_ADD | EV_ENABLE, fflags, 0, &async);
-        newEvents += 1;
+        return stopKeventWatcher(async, asyncRead.fileDescriptor, EVFILT_READ);
+    }
+
+    void startAcceptWatcher(Async& async, Async::Accept& asyncAccept)
+    {
+        EV_SET(events + newEvents, asyncAccept.handle, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, &async);
+    }
+
+    ReturnCode stopAcceptWatcher(Async& async, Async::Accept& asyncAccept)
+    {
+        return stopKeventWatcher(async, asyncAccept.handle, EVFILT_READ);
+    }
+
+    void startProcessExitWatcher(Async& async, Async::ProcessExit& asyncProcessExit)
+    {
+        EV_SET(events + newEvents, asyncProcessExit.handle, EVFILT_PROC, EV_ADD | EV_ENABLE,
+               NOTE_EXIT | NOTE_EXITSTATUS, 0, &async);
+    }
+
+    ReturnCode stopProcessExitWatcher(Async& async, Async::ProcessExit& asyncProcessExit)
+    {
+        return stopKeventWatcher(async, asyncProcessExit.handle, EVFILT_PROC);
     }
 
     static struct timespec timerToTimespec(const TimeCounter& loopTime, const TimeCounter* nextTimer)
@@ -222,19 +259,23 @@ struct SC::EventLoop::KernelQueue
         return specTimeout;
     }
 
-    [[nodiscard]] ReturnCode poll(EventLoop& self, const TimeCounter* nextTimer)
+    [[nodiscard]] ReturnCode pollAsync(EventLoop& self, PollMode pollMode)
     {
+        const TimeCounter* nextTimer = pollMode == PollMode::ForcedForwardProgress ? self.findEarliestTimer() : nullptr;
         FileDescriptorNative loopNativeDescriptor;
         SC_TRY_IF(self.internal.get().loopFd.handle.get(loopNativeDescriptor,
-                                                        "EventLoop::Internal::poll() - Invalid Handle"_a8));
+                                                        "EventLoop::Internal::pollAsync() - Invalid Handle"_a8));
 
         struct timespec specTimeout;
+        // when nextTimer is null, specTimeout is initialized to 0, so that PollMode::NoWait
         specTimeout = timerToTimespec(self.loopTime, nextTimer);
         int res;
+        // in the next kevent call the staged handles will become active
+        self.activeHandles.appendBack(self.stagedHandles);
         do
         {
             res = kevent(loopNativeDescriptor, events, newEvents, events, totalNumEvents,
-                         nextTimer ? &specTimeout : nullptr);
+                         nextTimer or pollMode == PollMode::NoWait ? &specTimeout : nullptr);
             if (res == -1 && errno == EINTR)
             {
                 // Interrupted, we must recompute timeout
@@ -252,6 +293,10 @@ struct SC::EventLoop::KernelQueue
             return "EventLoop::Internal::poll() - kevent failed"_a8;
         }
         newEvents = static_cast<int>(res);
+        if (nextTimer)
+        {
+            self.executeTimers(*this, *nextTimer);
+        }
         return true;
     }
 
@@ -262,6 +307,8 @@ struct SC::EventLoop::KernelQueue
                                                         "EventLoop::Internal::flushQueue() - Invalid Handle"_a8));
 
         int res;
+        // in the next kevent call the staged handles will become active
+        self.activeHandles.appendBack(self.stagedHandles);
         do
         {
             res = kevent(loopNativeDescriptor, events, newEvents, nullptr, 0, nullptr);
@@ -273,12 +320,27 @@ struct SC::EventLoop::KernelQueue
         newEvents = 0;
         return true;
     }
-    
-    [[nodiscard]] static ReturnCode rearmAsync(EventLoop& eventLoop, Async& async)
+
+    [[nodiscard]] static ReturnCode activateAsync(EventLoop& eventLoop, Async& async)
     {
         SC_UNUSED(eventLoop);
         SC_UNUSED(async);
         return true;
+    }
+
+    [[nodiscard]] ReturnCode cancelAsync(EventLoop& eventLoop, Async& async)
+    {
+        SC_UNUSED(eventLoop);
+        switch (async.operation.type)
+        {
+        case Async::Type::Timeout: return true;
+        case Async::Type::WakeUp: return true;
+        case Async::Type::Read: return stopReadWatcher(async, *async.operation.unionAs<Async::Read>());
+        case Async::Type::ProcessExit:
+            return stopProcessExitWatcher(async, *async.operation.unionAs<Async::ProcessExit>());
+        case Async::Type::Accept: return stopAcceptWatcher(async, *async.operation.unionAs<Async::Accept>());
+        }
+        return false;
     }
 };
 

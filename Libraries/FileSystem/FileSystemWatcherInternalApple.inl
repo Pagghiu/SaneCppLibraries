@@ -45,8 +45,8 @@ struct SC::FileSystemWatcher::Internal
         eventLoopRunner = &runner;
         Function<void(AsyncResult&)> cb;
         cb.bind<Internal, &Internal::onMainLoop>(this);
-        return eventLoopRunner->eventLoop.addWakeUp(eventLoopRunner->eventLoopAsync, move(cb),
-                                                    &eventLoopRunner->eventObject);
+        return eventLoopRunner->eventLoop.startWakeUp(eventLoopRunner->eventLoopAsync, move(cb),
+                                                      &eventLoopRunner->eventObject);
     }
 
     [[nodiscard]] ReturnCode initThread()

@@ -244,6 +244,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoop.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopInternalWindowsAPI.h" />
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopWindows.h" />
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.h" />

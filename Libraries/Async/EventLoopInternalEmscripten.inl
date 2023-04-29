@@ -24,10 +24,9 @@ struct SC::EventLoop::KernelQueue
     int events[1] = {0};
 
     [[nodiscard]] ReturnCode stageAsync(EventLoop& eventLoop, Async& async) { return false; }
-    [[nodiscard]] ReturnCode rearmAsync(EventLoop& eventLoop, Async& async) { return false; }
-    [[nodiscard]] ReturnCode flushQueue(EventLoop& self) { return false; }
-    [[nodiscard]] ReturnCode poll(EventLoop& eventLoop, const TimeCounter* nextTimer) { return false; }
-    [[nodiscard]] bool       isFull() { return false; }
+    [[nodiscard]] ReturnCode activateAsync(EventLoop& eventLoop, Async& async) { return false; }
+    [[nodiscard]] ReturnCode cancelAsync(EventLoop& eventLoop, Async& async) { return false; }
+    [[nodiscard]] ReturnCode pollAsync(EventLoop& eventLoop, PollMode pollMode) { return false; }
 };
 
 SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread() { return true; }

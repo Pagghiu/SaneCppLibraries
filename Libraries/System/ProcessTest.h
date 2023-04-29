@@ -138,7 +138,7 @@ struct SC::ProcessTest : public SC::TestCase
             ProcessExitStatus exitStatus;
             auto processLambda = [&](const AsyncResult& res) { exitStatus = res.result.fields.processExit.exitStatus; };
             AsyncProcessExit async;
-            SC_TEST_EXPECT(eventLoop.addProcessExit(async, processLambda, processHandle));
+            SC_TEST_EXPECT(eventLoop.startProcessExit(async, processLambda, processHandle));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(exitStatus.status.hasValue());
         }
