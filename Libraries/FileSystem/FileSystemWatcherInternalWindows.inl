@@ -58,41 +58,56 @@ struct SC::FileSystemWatcher::Internal
     {
         if (threadingRunner)
         {
-            threadingRunner->shouldStop.exchange(true);
+            if (threadingRunner->thread.wasStarted())
+            {
+                threadingRunner->shouldStop.exchange(true);
+                for (FolderWatcher* entry = self->watchers.front; entry != nullptr; entry = entry->next)
+                {
+                    signalWatcherEvent(*entry);
+                }
+                SC_TRY_IF(threadingRunner->thread.join());
+                threadingRunner->shouldStop.exchange(false);
+            }
         }
         for (FolderWatcher* entry = self->watchers.front; entry != nullptr; entry = entry->next)
         {
             SC_TRY_IF(stopWatching(*entry));
         }
-
-        if (threadingRunner)
-        {
-            if (threadingRunner->thread.wasStarted())
-            {
-                SC_TRY_IF(threadingRunner->thread.join());
-            }
-        }
-
         return true;
     }
 
-    [[nodiscard]] ReturnCode stopWatching(FolderWatcher& watcher)
+    void signalWatcherEvent(FolderWatcher& watcher)
     {
         auto& opaque = watcher.internal.get();
-        if (threadingRunner)
-        {
-            HANDLE hEvent = opaque.overlapped.overlapped.hEvent;
-            SetEvent(hEvent);
-            CloseHandle(hEvent);
-            opaque.overlapped.overlapped.hEvent = INVALID_HANDLE_VALUE;
-        }
+        SetEvent(opaque.overlapped.overlapped.hEvent);
+    }
+
+    void closeWatcherEvent(FolderWatcher& watcher)
+    {
+        auto& opaque = watcher.internal.get();
+        CloseHandle(opaque.overlapped.overlapped.hEvent);
+        opaque.overlapped.overlapped.hEvent = INVALID_HANDLE_VALUE;
+    }
+
+    void closeFileHandle(FolderWatcher& watcher)
+    {
+        auto& opaque = watcher.internal.get();
         if (opaque.fileHandle != INVALID_HANDLE_VALUE)
         {
             ::CancelIo(opaque.fileHandle);
             ::CloseHandle(opaque.fileHandle);
             opaque.fileHandle = INVALID_HANDLE_VALUE;
         }
+    }
 
+    [[nodiscard]] ReturnCode stopWatching(FolderWatcher& watcher)
+    {
+        if (threadingRunner)
+        {
+            signalWatcherEvent(watcher);
+            closeWatcherEvent(watcher);
+        }
+        closeFileHandle(watcher);
         return true;
     }
 
