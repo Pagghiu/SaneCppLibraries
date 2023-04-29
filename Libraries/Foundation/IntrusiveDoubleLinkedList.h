@@ -26,9 +26,27 @@ struct SC::IntrusiveDoubleLinkedList
         front = nullptr;
     }
 
+    void appendBack(IntrusiveDoubleLinkedList& other)
+    {
+        if (&other == this)
+            return;
+        if (other.front)
+        {
+            SC_DEBUG_ASSERT(other.front->prev == nullptr);
+            queueBackUnchecked(*other.front);
+        }
+        other.clear();
+    }
+
     void queueBack(T& item)
     {
         SC_DEBUG_ASSERT(item.next == nullptr and item.prev == nullptr);
+        queueBackUnchecked(item);
+    }
+
+  private:
+    void queueBackUnchecked(T& item)
+    {
         if (back)
         {
             back->next = &item;
@@ -43,6 +61,7 @@ struct SC::IntrusiveDoubleLinkedList
         }
     }
 
+  public:
     [[nodiscard]] T* dequeueFront()
     {
         if (not front)

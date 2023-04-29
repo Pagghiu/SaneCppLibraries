@@ -69,5 +69,35 @@ struct SC::IntrusiveDoubleLinkedListTest : public SC::TestCase
             SC_TEST_EXPECT(items[2].next == nullptr);
             SC_TEST_EXPECT(items[2].prev == nullptr);
         }
+
+        if (test_section("queue"))
+        {
+            IntrusiveDoubleLinkedList<Item> queue1, queue2;
+
+            Item items1[3];
+            items1[0].data = 0;
+            items1[1].data = 1;
+            items1[2].data = 2;
+            queue1.queueBack(items1[0]);
+            queue1.queueBack(items1[1]);
+            queue1.queueBack(items1[2]);
+            Item items2[3];
+            items2[0].data = 3;
+            items2[1].data = 4;
+            items2[2].data = 5;
+            queue2.queueBack(items2[0]);
+            queue2.queueBack(items2[1]);
+            queue2.queueBack(items2[2]);
+
+            queue1.appendBack(queue2);
+
+            SC_TEST_EXPECT(queue2.isEmpty());
+            int expected = 0;
+            while (Item* item = queue1.dequeueFront())
+            {
+                SC_TEST_EXPECT(item->data == expected)
+                expected++;
+            }
+        }
     }
 };
