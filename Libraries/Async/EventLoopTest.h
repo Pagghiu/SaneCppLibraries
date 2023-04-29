@@ -155,7 +155,7 @@ struct SC::EventLoopTest : public SC::TestCase
 
             auto onNewClient = [&](AsyncResult& res)
             {
-                SC_TEST_EXPECT(acceptedClient[numClient].socket.assign(res.result.fields.accept.acceptedClient));
+                SC_TEST_EXPECT(acceptedClient[numClient].socket.assign(move(res.result.fields.accept.acceptedClient)));
                 numClient++;
             };
             AsyncAccept::Support support;

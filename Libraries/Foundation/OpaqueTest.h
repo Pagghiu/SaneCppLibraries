@@ -34,18 +34,18 @@ struct SC::OpaqueTest : public SC::TestCase
             UniqueTaggedHandle<int, -1, bool, &MyDeleter::deleteHandle> myInt;
             {
                 SC_TEST_EXPECT(not MyDeleter::getDeleteCalled());
-                SC_TEST_EXPECT(not myInt);
+                SC_TEST_EXPECT(not myInt.isValid());
                 SC_TEST_EXPECT(myInt.assign(1));
                 SC_TEST_EXPECT(not MyDeleter::getDeleteCalled());
-                SC_TEST_EXPECT(myInt);
+                SC_TEST_EXPECT(myInt.isValid());
             }
             SC_TEST_EXPECT(myInt.close());
             SC_TEST_EXPECT(MyDeleter::getDeleteCalled());
             MyDeleter::getDeleteCalled() = false;
             myInt.detach();
-            SC_TEST_EXPECT(not myInt);
+            SC_TEST_EXPECT(not myInt.isValid());
             decltype(myInt) myInt2 = 12;
-            SC_TEST_EXPECT(myInt2);
+            SC_TEST_EXPECT(myInt2.isValid());
             SC_TEST_EXPECT(not MyDeleter::getDeleteCalled());
             int handleValue;
             SC_TEST_EXPECT(myInt2.get(handleValue, false));

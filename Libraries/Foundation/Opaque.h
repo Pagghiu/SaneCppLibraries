@@ -122,9 +122,9 @@ struct UniqueTaggedHandle
         return *this;
     }
 
-    [[nodiscard]]      operator bool() const { return handle != InvalidSentinel; }
     [[nodiscard]] bool isValid() const { return handle != InvalidSentinel; }
-    void               detach() { handle = InvalidSentinel; }
+
+    void detach() { handle = InvalidSentinel; }
 
     [[nodiscard]] CloseReturnType get(HandleType& outHandle, CloseReturnType invalidReturnType) const
     {

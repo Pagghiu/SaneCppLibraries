@@ -112,8 +112,10 @@ struct SC::EventLoop::Internal
                 // TODO: report error
                 return "WSAGetOverlappedResult error"_a8;
             }
-            ::setsockopt(result.result.fields.accept.acceptedClient, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, nullptr, 0);
-            return result.result.fields.accept.acceptedClient.assign(accept.support->clientSocket);
+            SOCKET clientSocket;
+            SC_TRY_IF(accept.support->clientSocket.get(clientSocket, "clientSocket error"_a8));
+            ::setsockopt(clientSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, nullptr, 0);
+            return result.result.fields.accept.acceptedClient.assign(move(accept.support->clientSocket));
         }
         }
         return true;
