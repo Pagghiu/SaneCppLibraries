@@ -75,9 +75,13 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             StringNative<1024> path;
             SC_TEST_EXPECT(path.assign(appDirectory));
             FileSystemWatcher::FolderWatcher watcher;
-            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path, move(lambda)));
-            SC_TEST_EXPECT(fs.write("test.txt", "content"));
+            // We save the results and expect them after the wait to avoid Thread Sanitizer issues
+            // due to the SC_TEST_EXPECT calls inside the labmda that runs in the thread
+            const ReturnCode res        = fileEventsWatcher.watch(watcher, path, move(lambda));
+            const bool       fsWriteRes = fs.write("test.txt", "content");
             params.eventObject.wait();
+            SC_TEST_EXPECT(fsWriteRes);
+            SC_TEST_EXPECT(res);
             SC_TEST_EXPECT(params.changes > 0);
             SC_TEST_EXPECT(fileEventsWatcher.close());
             SC_TEST_EXPECT(params.callbackThreadID != Thread::CurrentThreadID());

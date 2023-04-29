@@ -96,7 +96,7 @@ struct SC::FileSystemWatcher
     struct InternalSizes
     {
         static constexpr int Windows = 3 * sizeof(void*);
-        static constexpr int Apple   = 43 * sizeof(void*);
+        static constexpr int Apple   = 43 * sizeof(void*) + sizeof(Mutex);
         static constexpr int Default = sizeof(void*);
     };
 

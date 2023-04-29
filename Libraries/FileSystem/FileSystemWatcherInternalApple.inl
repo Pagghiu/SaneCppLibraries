@@ -14,6 +14,7 @@ struct SC::FileSystemWatcher::ThreadRunnerInternal
 struct SC::FileSystemWatcher::FolderWatcherInternal
 {
 };
+
 struct SC::FileSystemWatcher::Internal
 {
     FileSystemWatcher* self          = nullptr;
@@ -22,9 +23,9 @@ struct SC::FileSystemWatcher::Internal
     FSEventStreamRef   fsEventStream = nullptr;
     Thread             pollingThread;
     Action             pollingFunction;
-    CFArrayRef         pathsArray       = nullptr;
     ReturnCode         signalReturnCode = false;
     EventObject        refreshSignalFinished;
+    Mutex              mutex;
     EventLoopRunner*   eventLoopRunner = nullptr;
 
     // Used to pass data from thread to async callback
@@ -120,21 +121,65 @@ struct SC::FileSystemWatcher::Internal
         CFRunLoopRemoveSource(copyRunLoop, refreshSignal, kCFRunLoopDefaultMode);
     }
 
-    [[nodiscard]] ReturnCode threadCreateFSEvent(CFArrayRef watchedPaths)
+    [[nodiscard]] ReturnCode threadCreateFSEvent()
     {
         SC_TRY_IF(runLoop);
+        CFArrayRef   pathsArray   = nullptr;
+        CFStringRef* watchedPaths = (CFStringRef*)malloc(sizeof(CFStringRef) * ThreadRunnerSizes::MaxWatchablePaths);
+        SC_TRY_MSG(watchedPaths != nullptr, "Cannot allocate paths"_a8);
+        // TODO: Loop to convert paths
+        auto deferFreeMalloc = MakeDeferred(
+            [&]
+            {
+                free(watchedPaths);
+            });
+        size_t numAllocatedPaths = 0;
+        auto   deferDeletePaths  = MakeDeferred(
+            [&]
+            {
+                for (size_t idx = 0; idx < numAllocatedPaths; ++idx)
+                {
+                    CFRelease(watchedPaths[idx]);
+                }
+            });
+        for (FolderWatcher* it = self->watchers.front; it != nullptr; it = it->next)
+        {
+            StringNative<1024> buffer;
+            StringConverter    converter(buffer);
+            StringView         encodedPath;
+            SC_TRY_IF(converter.convertNullTerminateFastPath(it->path->view(), encodedPath));
+            watchedPaths[numAllocatedPaths] =
+                CFStringCreateWithFileSystemRepresentation(nullptr, encodedPath.getNullTerminatedNative());
+            if (not watchedPaths[numAllocatedPaths])
+                return "CFStringCreateWithFileSystemRepresentation failed"_a8;
+            numAllocatedPaths++;
+            SC_TRY_MSG(numAllocatedPaths <= ThreadRunnerSizes::MaxWatchablePaths,
+                       "Exceeded max size of 1024 paths to watch"_a8);
+        }
+        if (numAllocatedPaths == 0)
+        {
+            return true;
+        }
+        pathsArray = CFArrayCreate(nullptr, reinterpret_cast<const void**>(watchedPaths),
+                                   static_cast<CFIndex>(numAllocatedPaths), nullptr);
+        if (not pathsArray)
+        {
+            return "CFArrayCreate failed"_a8;
+        }
+        deferDeletePaths.disarm();
+        deferFreeMalloc.disarm();
 
         // Create Stream
         constexpr CFAbsoluteTime           watchLatency = 0.5;
         constexpr FSEventStreamCreateFlags watchFlags =
             kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer;
         FSEventStreamContext fsEventContext;
-
+        memset(&fsEventContext, 0, sizeof(fsEventContext));
         fsEventContext.info = this;
         fsEventStream       = FSEventStreamCreate(nullptr,                       //
                                                   &Internal::threadOnNewFSEvent, //
                                                   &fsEventContext,               //
-                                                  watchedPaths,                  //
+                                                  pathsArray,                    //
                                                   kFSEventStreamEventIdSinceNow, //
                                                   watchLatency,                  //
                                                   watchFlags);
@@ -160,7 +205,14 @@ struct SC::FileSystemWatcher::Internal
         fsEventStream = nullptr;
     }
 
-    [[nodiscard]] ReturnCode stopWatching(FolderWatcher&) { return startWatching(nullptr); }
+    [[nodiscard]] ReturnCode stopWatching(FolderWatcher& folderWatcher)
+    {
+        mutex.lock();
+        folderWatcher.parent->watchers.remove(folderWatcher);
+        folderWatcher.parent = nullptr;
+        mutex.unlock();
+        return startWatching(nullptr);
+    }
 
     [[nodiscard]] ReturnCode startWatching(FolderWatcher*)
     {
@@ -168,52 +220,7 @@ struct SC::FileSystemWatcher::Internal
         {
             SC_TRY_IF(initThread());
         }
-        // TODO: Loop to convert paths
-        CFStringRef watchedPaths[ThreadRunnerSizes::MaxWatchablePaths];
-        size_t      numAllocatedPaths = 0;
-        auto        deferDeletePaths  = MakeDeferred(
-            [&]
-            {
-                for (size_t idx = 0; idx < numAllocatedPaths; ++idx)
-                {
-                    CFRelease(watchedPaths[idx]);
-                }
-            });
-        StringNative<1024> buffer;
-        StringConverter    converter(buffer);
-        for (FolderWatcher* it = self->watchers.front; it != nullptr; it = it->next)
-        {
-            StringView encodedPath;
-            SC_TRY_IF(converter.convertNullTerminateFastPath(it->path->view(), encodedPath));
-            watchedPaths[numAllocatedPaths] =
-                CFStringCreateWithFileSystemRepresentation(nullptr, encodedPath.getNullTerminatedNative());
-            if (not watchedPaths[numAllocatedPaths])
-                return "CFStringCreateWithFileSystemRepresentation failed"_a8;
-            numAllocatedPaths++;
-            SC_TRY_MSG(numAllocatedPaths <= ThreadRunnerSizes::MaxWatchablePaths,
-                       "Exceeded max size of 1024 paths to watch"_a8);
-        }
-        if (numAllocatedPaths > 0)
-        {
-            pathsArray =
-                CFArrayCreate(nullptr, (const void**)watchedPaths, static_cast<CFIndex>(numAllocatedPaths), nullptr);
-            if (not pathsArray)
-            {
-                return "CFArrayCreate failed"_a8;
-            }
-        }
-        deferDeletePaths.disarm();
         wakeUpFSEventThread();
-        if (numAllocatedPaths > 0 and not signalReturnCode)
-        {
-            CFRelease(pathsArray);
-        }
-        pathsArray = nullptr;
-        if (numAllocatedPaths == 0)
-        {
-            SC_TRY_IF(pollingThread.join());
-            releaseResources();
-        }
         return signalReturnCode;
     }
 
@@ -278,8 +285,10 @@ struct SC::FileSystemWatcher::Internal
                 }
             }
 
-            // TODO: Mutex this access to watchers
-            for (FolderWatcher* watcher = internal.self->watchers.front; watcher != nullptr; watcher = watcher->next)
+            internal.mutex.lock();
+            FolderWatcher* watcher = internal.self->watchers.front;
+            internal.mutex.unlock();
+            while (watcher != nullptr)
             {
                 if (path.startsWith(watcher->path->view())) // TODO: This works only if encodings are the same
                 {
@@ -313,6 +322,11 @@ struct SC::FileSystemWatcher::Internal
                         watcher->notifyCallback(internal.notification);
                     }
                 }
+                // TODO: This is not right. If someone removes this watcher in the callback we will skip notifying
+                // remaining ones.
+                internal.mutex.lock();
+                watcher = watcher->next;
+                internal.mutex.unlock();
             }
             if (internal.closing.load())
             {
@@ -330,14 +344,14 @@ struct SC::FileSystemWatcher::Internal
         {
             self.threadDestroyFSEvent();
         }
-        if (self.pathsArray)
-        {
-            self.signalReturnCode = self.threadCreateFSEvent(self.pathsArray);
-        }
-        else
+        if (self.closing.load())
         {
             CFRunLoopStop(self.runLoop);
             self.runLoop = nullptr;
+        }
+        else
+        {
+            self.signalReturnCode = self.threadCreateFSEvent();
         }
         self.refreshSignalFinished.signal();
     }

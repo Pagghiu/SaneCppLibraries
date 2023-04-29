@@ -30,10 +30,7 @@ SC::ReturnCode SC::FileSystemWatcher::watch(FolderWatcher& watcher, String& path
 SC::ReturnCode SC::FileSystemWatcher::FolderWatcher::unwatch()
 {
     SC_TRY_MSG(parent != nullptr, "FolderWatcher already unwatched"_a8);
-    parent->watchers.remove(*this);
-    auto fsw = parent;
-    parent   = nullptr;
-    return fsw->internal.get().stopWatching(*this);
+    return parent->internal.get().stopWatching(*this);
 }
 
 template <>

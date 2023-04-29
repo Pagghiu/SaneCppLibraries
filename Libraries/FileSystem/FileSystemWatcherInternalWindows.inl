@@ -100,14 +100,16 @@ struct SC::FileSystemWatcher::Internal
         }
     }
 
-    [[nodiscard]] ReturnCode stopWatching(FolderWatcher& watcher)
+    [[nodiscard]] ReturnCode stopWatching(FolderWatcher& folderWatcher)
     {
+        folderWatcher.parent->watchers.remove(folderWatcher);
+        folderWatcher.parent = nullptr;
         if (threadingRunner)
         {
-            signalWatcherEvent(watcher);
-            closeWatcherEvent(watcher);
+            signalWatcherEvent(folderWatcher);
+            closeWatcherEvent(folderWatcher);
         }
-        closeFileHandle(watcher);
+        closeFileHandle(folderWatcher);
         return true;
     }
 
