@@ -147,7 +147,7 @@ struct UniqueTaggedHandle
         return true;
     }
 
-  private:
+  protected:
     HandleType handle = InvalidSentinel;
 };
 

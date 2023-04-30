@@ -3,64 +3,14 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "FileDescriptor.h"
 
-#include <errno.h>
-#include <fcntl.h>     // fcntl
+#include "../System/SystemPosix.h"
+
 #include <stdio.h>     // stdout, stdin
 #include <sys/ioctl.h> // ioctl
 #include <unistd.h>    // close
 
 struct SC::FileDescriptor::Internal
 {
-  private:
-    enum TypeFlag
-    {
-        TypeStatusFlag,
-        TypeDescriptorFlag
-    };
-    static ReturnCode setFileFlags(int flagRead, int flagWrite, const FileDescriptorNative fileDescriptor,
-                                   const bool setFlag, const int flag)
-    {
-        int oldFlags;
-        do
-        {
-            oldFlags = ::fcntl(fileDescriptor, flagRead);
-        } while (oldFlags == -1 and errno == EINTR);
-        if (oldFlags == -1)
-        {
-            return "fcntl getFlag failed"_a8;
-        }
-        const int newFlags = setFlag ? oldFlags | flag : oldFlags & (~flag);
-        if (newFlags != oldFlags)
-        {
-            int res;
-            do
-            {
-                res = ::fcntl(fileDescriptor, flagWrite, newFlags);
-            } while (res == -1 and errno == EINTR);
-            if (res != 0)
-            {
-                return "fcntl setFlag failed"_a8;
-            }
-        }
-        return true;
-    }
-
-  public:
-    template <int flag>
-    static ReturnCode setFileDescriptorFlags(FileDescriptorNative fileDescriptor, bool setFlag)
-    {
-        // We can OR the allowed flags here to provide some safety
-        static_assert(flag == FD_CLOEXEC, "setFileStatusFlags invalid value");
-        return setFileFlags(F_GETFD, F_SETFD, fileDescriptor, setFlag, flag);
-    }
-
-    template <int flag>
-    static ReturnCode setFileStatusFlags(FileDescriptorNative fileDescriptor, bool setFlag)
-    {
-        // We can OR the allowed flags here to provide some safety
-        static_assert(flag == O_NONBLOCK, "setFileStatusFlags invalid value");
-        return setFileFlags(F_GETFL, F_SETFL, fileDescriptor, setFlag, flag);
-    }
 };
 
 SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector<char>& output,
@@ -74,7 +24,7 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
     {
         do
         {
-            numReadBytes = read(fileDescriptor, output.data() + output.size(), output.capacity() - output.size());
+            numReadBytes = ::read(fileDescriptor, output.data() + output.size(), output.capacity() - output.size());
         } while (numReadBytes == -1 && errno == EINTR); // Syscall may be interrupted and userspace must retry
     }
     else
@@ -83,7 +33,7 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
                    "FileDescriptor::readAppend - buffer must be bigger than zero"_a8);
         do
         {
-            numReadBytes = read(fileDescriptor, fallbackBuffer.data(), fallbackBuffer.sizeInBytes());
+            numReadBytes = ::read(fileDescriptor, fallbackBuffer.data(), fallbackBuffer.sizeInBytes());
         } while (numReadBytes == -1 && errno == EINTR); // Syscall may be interrupted and userspace must retry
     }
     if (numReadBytes > 0)
@@ -117,14 +67,14 @@ SC::ReturnCode SC::FileDescriptor::setBlocking(bool blocking)
 {
     FileDescriptorNative fileDescriptor;
     SC_TRY_IF(handle.get(fileDescriptor, "FileDescriptor::setBlocking - Invalid Handle"_a8));
-    return Internal::setFileStatusFlags<O_NONBLOCK>(fileDescriptor, not blocking);
+    return FileDescriptorPosixHelpers::setFileStatusFlags<O_NONBLOCK>(fileDescriptor, not blocking);
 }
 
 SC::ReturnCode SC::FileDescriptor::setInheritable(bool inheritable)
 {
     FileDescriptorNative fileDescriptor;
     SC_TRY_IF(handle.get(fileDescriptor, "FileDescriptor::setInheritable - Invalid Handle"_a8));
-    return Internal::setFileDescriptorFlags<FD_CLOEXEC>(fileDescriptor, not inheritable);
+    return FileDescriptorPosixHelpers::setFileDescriptorFlags<FD_CLOEXEC>(fileDescriptor, not inheritable);
 }
 
 SC::ReturnCode SC::FileDescriptorNativeClose(FileDescriptorNative& fileDescriptor)
@@ -139,6 +89,7 @@ SC::ReturnCode SC::FileDescriptorNativeClose(FileDescriptorNative& fileDescripto
 SC::ReturnCode SC::FileDescriptorPipe::createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag)
 {
     int pipes[2];
+    // TODO: Use pipe2 to set cloexec flags immediately
     if (::pipe(pipes) != 0)
     {
         return ReturnCode("FileDescriptorPipe::createPipe - pipe failed"_a8);

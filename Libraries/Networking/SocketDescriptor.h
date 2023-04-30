@@ -19,6 +19,30 @@ ReturnCode SocketDescriptorNativeClose(SocketDescriptorNative&);
 struct SocketDescriptorNativeHandle : public UniqueTaggedHandle<SocketDescriptorNative, SocketDescriptorNativeInvalid,
                                                                 ReturnCode, SocketDescriptorNativeClose>
 {
+    enum BlockingType
+    {
+        NonBlocking,
+        Blocking
+    };
+    enum InheritableType
+    {
+        NonInheritable,
+        Inheritable
+    };
+    enum IPType
+    {
+        IPTypeV4,
+        IPTypeV6,
+    };
+    enum Protocol
+    {
+        ProtocolTcp,
+    };
+    [[nodiscard]] ReturnCode create(IPType ipType, Protocol protocol, BlockingType blocking = NonBlocking,
+                                    InheritableType inheritable = NonInheritable);
+    [[nodiscard]] ReturnCode isInheritable(bool& value) const;
+    [[nodiscard]] ReturnCode setInheritable(bool value);
+    [[nodiscard]] ReturnCode setBlocking(bool value);
 };
 struct Network;
 } // namespace SC

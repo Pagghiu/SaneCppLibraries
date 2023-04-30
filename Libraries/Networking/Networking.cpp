@@ -43,6 +43,7 @@ SC::ReturnCode SC::Network::shutdown()
 }
 #else
 
+#include "../System/SystemPosix.h"
 #include <netdb.h>
 #include <sys/select.h> // fd_set for emscripten
 #include <unistd.h>
@@ -50,6 +51,12 @@ constexpr int  SOCKET_ERROR = -1;
 SC::ReturnCode SC::Network::init() { return true; }
 
 SC::ReturnCode SC::Network::shutdown() { return true; }
+
+#if !defined(SOCK_NONBLOCK) || !defined(SOCK_CLOEXEC)
+// on macOS these flags are not supported
+#include <fcntl.h>
+#endif
+
 #endif
 
 SC::ReturnCode SC::SocketDescriptorNativeClose(SC::SocketDescriptorNative& fd)
@@ -62,6 +69,128 @@ SC::ReturnCode SC::SocketDescriptorNativeClose(SC::SocketDescriptorNative& fd)
     fd = SocketDescriptorNativeInvalid;
     return true;
 }
+
+SC::ReturnCode SC::SocketDescriptorNativeHandle::create(IPType ipType, Protocol protocol, BlockingType blocking,
+                                                        InheritableType inheritable)
+{
+    SC_TRY_IF(Network::init());
+    SC_TRUST_RESULT(close());
+    int type = AF_UNSPEC;
+    switch (ipType)
+    {
+    case IPTypeV4: type = AF_INET; break;
+    case IPTypeV6: type = AF_INET6; break;
+    }
+
+    int proto = IPPROTO_TCP;
+
+    switch (protocol)
+    {
+    case ProtocolTcp: proto = IPPROTO_TCP; break;
+    }
+
+#if SC_PLATFORM_WINDOWS
+    DWORD flags = 0;
+    if (inheritable == NonInheritable)
+    {
+        flags |= WSA_FLAG_NO_HANDLE_INHERIT;
+    }
+    if (blocking == NonBlocking)
+    {
+        flags |= WSA_FLAG_OVERLAPPED;
+    }
+    handle = ::WSASocketW(type, SOCK_STREAM, proto, nullptr, 0, flags);
+    if (!isValid())
+    {
+        return "WSASocketW failed"_a8;
+    }
+    SC_TRY_IF(setBlocking(blocking == Blocking));
+#else
+    int flags = SOCK_STREAM;
+#if defined(SOCK_NONBLOCK)
+    if (blocking == NonBlocking)
+    {
+        flags |= SOCK_NONBLOCK;
+    }
+#endif // defined(SOCK_NONBLOCK)
+#if defined(SOCK_CLOEXEC)
+    if (inheritable == NonInheritable)
+    {
+        flags |= SOCK_CLOEXEC;
+    }
+#endif // defined(SOCK_CLOEXEC)
+    do
+    {
+        handle = ::socket(type, flags, proto);
+    } while (handle == -1 and errno == EINTR);
+#if !defined(SOCK_CLOEXEC)
+    SC_TRY_IF(setInheritable(inheritable == Inheritable));
+#endif // !defined(SOCK_CLOEXEC)
+#if !defined(SOCK_NONBLOCK)
+    SC_TRY_IF(setBlocking(blocking == Blocking));
+#endif // !defined(SOCK_NONBLOCK)
+
+#if defined(SO_NOSIGPIPE)
+    {
+        int active = 1;
+        setsockopt(handle, SOL_SOCKET, SO_NOSIGPIPE, &active, sizeof(active));
+    }
+#endif // defined(SO_NOSIGPIPE)
+#endif // !SC_PLATFORM_WINDOWS
+    return isValid();
+}
+
+#if SC_PLATFORM_WINDOWS
+SC::ReturnCode SC::SocketDescriptorNativeHandle::setInheritable(bool inheritable)
+{
+    if (::SetHandleInformation(reinterpret_cast<HANDLE>(handle), HANDLE_FLAG_INHERIT, inheritable ? TRUE : FALSE) ==
+        FALSE)
+    {
+        "SetHandleInformation failed"_a8;
+    }
+    return true;
+}
+
+SC::ReturnCode SC::SocketDescriptorNativeHandle::setBlocking(bool blocking)
+{
+    ULONG enable = blocking ? 0 : 1;
+    if (::ioctlsocket(handle, FIONBIO, &enable) == SOCKET_ERROR)
+    {
+        return "ioctlsocket failed"_a8;
+    }
+    return true;
+}
+
+SC::ReturnCode SC::SocketDescriptorNativeHandle::isInheritable(bool& hasValue) const
+{
+    DWORD flags;
+    if (::GetHandleInformation(reinterpret_cast<HANDLE>(handle), &flags) == FALSE)
+    {
+        return "GetHandleInformation failed"_a8;
+    }
+    hasValue = (flags & HANDLE_FLAG_INHERIT) != 0;
+    return true;
+}
+#else
+
+SC::ReturnCode SC::SocketDescriptorNativeHandle::setInheritable(bool inheritable)
+{
+    return FileDescriptorPosixHelpers::setFileDescriptorFlags<FD_CLOEXEC>(handle, not inheritable);
+}
+
+SC::ReturnCode SC::SocketDescriptorNativeHandle::setBlocking(bool blocking)
+{
+    return FileDescriptorPosixHelpers::setFileStatusFlags<O_NONBLOCK>(handle, not blocking);
+}
+
+SC::ReturnCode SC::SocketDescriptorNativeHandle::isInheritable(bool& hasValue) const
+{
+    bool closeOnExec = false;
+    auto res         = FileDescriptorPosixHelpers::hasFileDescriptorFlags<FD_CLOEXEC>(handle, closeOnExec);
+    hasValue         = not closeOnExec;
+    return res;
+}
+#endif
 
 SC::ReturnCode SC::TCPServer::close() { return socket.close(); }
 
@@ -159,6 +288,7 @@ SC::ReturnCode SC::TCPClient::connect(StringView address, uint32_t port)
     SocketDescriptorNative openedSocket = SocketDescriptorNativeInvalid;
     for (struct addrinfo* it = addressInfos; it != nullptr; it = it->ai_next)
     {
+        // SOCK_NONBLOCK
         openedSocket = ::socket(it->ai_family, it->ai_socktype, it->ai_protocol);
         if (openedSocket == SocketDescriptorNativeInvalid)
             continue;

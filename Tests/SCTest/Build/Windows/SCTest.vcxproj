@@ -357,6 +357,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Networking\Networking.h" />
     <ClInclude Include="..\..\..\..\Libraries\Networking\NetworkingTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Networking\SocketDescriptor.h" />
+    <ClInclude Include="..\..\..\..\Libraries\System\SystemPosix.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\Atomic.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\AtomicTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Compiler.h" />

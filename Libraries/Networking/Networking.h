@@ -10,23 +10,25 @@
 
 namespace SC
 {
+struct NetworkSocket;
 struct TCPClient;
 struct TCPServer;
 } // namespace SC
 
-struct SC::TCPServer
+struct SC::NetworkSocket
 {
     SocketDescriptorNativeHandle socket;
+};
 
+struct SC::TCPServer : public NetworkSocket
+{
     [[nodiscard]] ReturnCode listen(StringView interfaceAddres, uint32_t port);
     [[nodiscard]] ReturnCode close();
     [[nodiscard]] ReturnCode accept(TCPClient& newClient);
 };
 
-struct SC::TCPClient
+struct SC::TCPClient : public NetworkSocket
 {
-    SocketDescriptorNativeHandle socket;
-
     [[nodiscard]] ReturnCode connect(StringView address, uint32_t port);
     [[nodiscard]] ReturnCode close();
     [[nodiscard]] ReturnCode write(Span<const char> data);

@@ -191,6 +191,7 @@
 		7BD8E37929BE8357004AB23D /* EventLoopInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalApple.inl; path = ../../../../Libraries/Async/EventLoopInternalApple.inl; sourceTree = "<group>"; };
 		7BD8E37A29BE8357004AB23D /* EventLoopInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalWindows.inl; path = ../../../../Libraries/Async/EventLoopInternalWindows.inl; sourceTree = "<group>"; };
 		7BD8E37B29BE8357004AB23D /* EventLoopInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalEmscripten.inl; path = ../../../../Libraries/Async/EventLoopInternalEmscripten.inl; sourceTree = "<group>"; };
+		7BDF3E3F29FE833F000079BB /* SystemPosix.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SystemPosix.h; path = ../../../../Libraries/System/SystemPosix.h; sourceTree = "<group>"; };
 		7BE50C9729AEB4CC00BE6C25 /* FileDescriptorInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileDescriptorInternalPosix.inl; path = ../../../../Libraries/FileSystem/FileDescriptorInternalPosix.inl; sourceTree = "<group>"; };
 		7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Process.cpp; path = ../../../../Libraries/System/Process.cpp; sourceTree = "<group>"; };
 		7BE5C80E29A26E3E00CBCAD1 /* Process.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Process.h; path = ../../../../Libraries/System/Process.h; sourceTree = "<group>"; };
@@ -397,6 +398,7 @@
 				7BA892A8297E03340093152B /* SystemInternalEmscripten.inl */,
 				7B515FE429243087006996AA /* SystemInternalPosix.inl */,
 				7BA892A7297E032F0093152B /* SystemInternalWindows.inl */,
+				7BDF3E3F29FE833F000079BB /* SystemPosix.h */,
 				7B515FC829243086006996AA /* SystemTest.h */,
 				7B4A291B29B3CD4A00F13DCB /* Time.cpp */,
 				7B4A291C29B3CD4A00F13DCB /* Time.h */,

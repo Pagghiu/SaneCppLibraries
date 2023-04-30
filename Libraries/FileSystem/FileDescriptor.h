@@ -38,18 +38,6 @@ struct SC::FileDescriptorPosix
     SC::FileDescriptor&      fileDescriptor;
     [[nodiscard]] ReturnCode duplicateAndReplace(int fds);
 };
-
-struct FileDescriptorOptions
-{
-    bool inheritable = false;
-
-    FileDescriptorOptions& setInheritable(bool value)
-    {
-        inheritable = value;
-        return *this;
-    }
-};
-
 struct SC::FileDescriptor
 {
     struct ReadResult
