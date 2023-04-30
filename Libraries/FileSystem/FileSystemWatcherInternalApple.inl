@@ -128,11 +128,7 @@ struct SC::FileSystemWatcher::Internal
         CFStringRef* watchedPaths = (CFStringRef*)malloc(sizeof(CFStringRef) * ThreadRunnerSizes::MaxWatchablePaths);
         SC_TRY_MSG(watchedPaths != nullptr, "Cannot allocate paths"_a8);
         // TODO: Loop to convert paths
-        auto deferFreeMalloc = MakeDeferred(
-            [&]
-            {
-                free(watchedPaths);
-            });
+        auto   deferFreeMalloc   = MakeDeferred([&] { free(watchedPaths); });
         size_t numAllocatedPaths = 0;
         auto   deferDeletePaths  = MakeDeferred(
             [&]

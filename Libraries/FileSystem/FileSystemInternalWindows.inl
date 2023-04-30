@@ -115,6 +115,8 @@ struct SC::FileSystem::Internal
         return res == TRUE;
     }
 
+    // TODO: replace SHFileOperationW with something else as it's slow at first use( it loads a lot of DLLs) and ASAN
+    // complains
     [[nodiscard]] static ReturnCode copyDirectory(String& sourceDirectory, String& destinationDirectory,
                                                   FileSystem::CopyFlags options)
     {

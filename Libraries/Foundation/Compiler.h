@@ -26,10 +26,12 @@
 #endif
 
 #if SC_MSVC
-#define SC_ALWAYS_INLINE  __forceinline
-#define SC_BREAK_DEBUGGER __debugbreak()
+#define SC_NO_RETURN(func) __declspec(noreturn) func
+#define SC_ALWAYS_INLINE   __forceinline
+#define SC_BREAK_DEBUGGER  __debugbreak()
 #else
-#define SC_ALWAYS_INLINE __attribute__((always_inline)) inline
+#define SC_NO_RETURN(func) func __attribute__((__noreturn__))
+#define SC_ALWAYS_INLINE   __attribute__((always_inline)) inline
 #ifdef __has_builtin
 #if __has_builtin(__builtin_debugtrap)
 #define SC_BREAK_DEBUGGER __builtin_debugtrap()
@@ -61,5 +63,11 @@
 
 #define SC_DISABLE_OFFSETOF_WARNING
 #define SC_ENABLE_OFFSETOF_WARNING
+
+#ifdef __SANITIZE_ADDRESS__
+#define SC_ADDRESS_SANITIZER 1
+#else
+#define SC_ADDRESS_SANITIZER 0
+#endif
 
 #endif

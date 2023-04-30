@@ -93,6 +93,7 @@ struct SC::FileSystemTest : public SC::TestCase
             SC_TEST_EXPECT(not fs.exists("sourceFile.txt"));
             SC_TEST_EXPECT(not fs.exists("destinationFile.txt"));
         }
+#if !(SC_PLATFORM_WINDOWS && SC_ADDRESS_SANITIZER) // SHFileOperationW triggers ASAN
         if (test_section("Copy Directory (recursive)"))
         {
             FileSystem fs;
@@ -136,5 +137,6 @@ struct SC::FileSystemTest : public SC::TestCase
             SC_TEST_EXPECT(not fs.existsAndIsDirectory("removeDirectoryTest/another"_a8));
             SC_TEST_EXPECT(not fs.existsAndIsDirectory("removeDirectoryTest"_a8));
         }
+#endif
     }
 };

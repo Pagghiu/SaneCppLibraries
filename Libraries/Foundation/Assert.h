@@ -15,6 +15,7 @@ namespace SC
 #endif
 void printAssertion(const char_t* expression, const char_t* filename, const char_t* functionName, int lineNumber);
 [[nodiscard]] bool printBacktrace();
+SC_NO_RETURN(void exit(int code));
 
 } // namespace SC
 
@@ -25,7 +26,7 @@ void printAssertion(const char_t* expression, const char_t* filename, const char
             SC::printAssertion(#e, __FILE__, __func__, __LINE__);                                                      \
             (void)SC::printBacktrace();                                                                                \
             SC_BREAK_DEBUGGER;                                                                                         \
-            exit(-1);                                                                                                  \
+            SC::exit(-1);                                                                                              \
         }
 #if SC_DEBUG
 #define SC_DEBUG_ASSERT(e) SC_RELEASE_ASSERT(e)
