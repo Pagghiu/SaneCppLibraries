@@ -70,22 +70,7 @@ template <typename T>
 static constexpr Nm ClNm()
 {
     // clang-format off
-#if SC_MSVC
-    const char* name = __FUNCSIG__;
-    constexpr char separating_char = '<';
-    constexpr char ending_char = '>';
-    const char* it = name;
-    while (*it != separating_char)
-        it++;
-    auto itStart = it+1;
-    while (*it != ending_char)
-    {
-        if (*it == ' ')
-            itStart = it + 1;
-        it++;
-    }
-    return Nm(itStart, static_cast<int>(it - itStart));
-#else
+#if SC_CLANG || SC_GCC
     const char* name = __PRETTY_FUNCTION__;
     constexpr char separating_char = '=';
     constexpr uint32_t  skip_chars = 2;
@@ -98,6 +83,21 @@ static constexpr Nm ClNm()
     while (it[length] != 0)
         length++;
     return Nm(it, length - trim_chars);
+#else
+    const char* name = __FUNCSIG__;
+    constexpr char separating_char = '<';
+    constexpr char ending_char = '>';
+    const char* it = name;
+    while (*it != separating_char)
+        it++;
+    auto itStart = it + 1;
+    while (*it != ending_char)
+    {
+        if (*it == ' ')
+            itStart = it + 1;
+        it++;
+    }
+    return Nm(itStart, static_cast<int>(it - itStart));
 #endif
 }
 

@@ -62,7 +62,7 @@ void operator delete[](void* p) noexcept
 // system includes
 #include <float.h>  // FLT_MAX / DBL_MAX
 #include <stdlib.h> // *_MAX (integer)
-#if SC_MSVC
+#if SC_MSVC || SC_CLANG_CL
 #include <BaseTsd.h>
 #include <stdint.h>
 typedef SSIZE_T ssize_t;

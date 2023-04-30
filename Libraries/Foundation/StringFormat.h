@@ -45,7 +45,7 @@ struct StringFormatOutput
 // clang-format off
 template <> struct StringFormatterFor<float>        {static bool format(StringFormatOutput&, StringIteratorASCII, const float);};
 template <> struct StringFormatterFor<double>       {static bool format(StringFormatOutput&, StringIteratorASCII, const double);};
-#if SC_MSVC
+#if SC_MSVC || SC_CLANG_CL
 #else
 template <> struct StringFormatterFor<SC::size_t>   {static bool format(StringFormatOutput&, StringIteratorASCII, const SC::size_t);};
 template <> struct StringFormatterFor<SC::ssize_t>  {static bool format(StringFormatOutput&, StringIteratorASCII, const SC::ssize_t);};

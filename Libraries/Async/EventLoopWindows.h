@@ -21,8 +21,10 @@ struct EventLoopWindowsWaitHandle;
 // We must do it because there is no void* userData pointer in the OVERLAPPED struct
 struct SC::EventLoopWindowsOverlapped
 {
-    void*      userData   = nullptr;
-    OVERLAPPED overlapped = {0};
+    void*      userData = nullptr;
+    OVERLAPPED overlapped;
+
+    EventLoopWindowsOverlapped() { memset(&overlapped, 0, sizeof(overlapped)); }
 
     template <typename T>
     [[nodiscard]] static T* getUserDataFromOverlapped(LPOVERLAPPED lpOverlapped)

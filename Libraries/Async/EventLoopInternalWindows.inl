@@ -25,7 +25,9 @@ struct SC::EventLoop::Internal
     FileDescriptor loopFd;
     Async          wakeUpAsync;
 
-    EventLoopWindowsOverlapped wakeUpOverlapped = {&wakeUpAsync};
+    EventLoopWindowsOverlapped wakeUpOverlapped;
+
+    Internal() { wakeUpOverlapped.userData = &wakeUpAsync; }
 
     ~Internal() { SC_TRUST_RESULT(close()); }
     [[nodiscard]] ReturnCode close() { return loopFd.handle.close(); }
@@ -302,7 +304,8 @@ struct SC::EventLoop::KernelQueue
         ::SetFileCompletionNotificationModes(socketHandle,
                                              FILE_SKIP_COMPLETION_PORT_ON_SUCCESS | FILE_SKIP_SET_EVENT_ON_HANDLE);
 
-        static_assert(sizeof(Async::AcceptSupport::acceptBuffer) == sizeof(struct sockaddr_storage) * 2 + 32);
+        static_assert(sizeof(Async::AcceptSupport::acceptBuffer) == sizeof(struct sockaddr_storage) * 2 + 32,
+                      "Check acceptBuffer size");
         Async::AcceptSupport& support = *asyncAccept.support;
 
         EventLoopWindowsOverlapped& overlapped = support.overlapped.get();

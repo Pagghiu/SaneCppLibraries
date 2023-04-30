@@ -112,7 +112,6 @@ struct SC::TaggedUnion
         {
             if (enumType == TypeAt<Index>::value)
             {
-                using Type = typename TypeAt<Index>::type;
                 Visitor::template visit<Index>(t1, t2);
             }
             else

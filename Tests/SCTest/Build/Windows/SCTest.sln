@@ -7,6 +7,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SCTest", "SCTest.vcxproj", 
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug ASAN Clang|ARM64 = Debug ASAN Clang|ARM64
+		Debug ASAN Clang|x64 = Debug ASAN Clang|x64
+		Debug ASAN Clang|x86 = Debug ASAN Clang|x86
 		Debug|ARM64 = Debug|ARM64
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
@@ -15,6 +18,12 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug ASAN Clang|ARM64.ActiveCfg = Debug ASAN Clang|ARM64
+		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug ASAN Clang|ARM64.Build.0 = Debug ASAN Clang|ARM64
+		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug ASAN Clang|x64.ActiveCfg = Debug ASAN Clang|x64
+		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug ASAN Clang|x64.Build.0 = Debug ASAN Clang|x64
+		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug ASAN Clang|x86.ActiveCfg = Debug ASAN Clang|Win32
+		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug ASAN Clang|x86.Build.0 = Debug ASAN Clang|Win32
 		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug|ARM64.ActiveCfg = Debug|ARM64
 		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug|ARM64.Build.0 = Debug|ARM64
 		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug|x64.ActiveCfg = Debug|x64

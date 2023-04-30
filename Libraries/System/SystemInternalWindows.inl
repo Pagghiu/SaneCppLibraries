@@ -15,8 +15,8 @@ bool SC::SystemDirectories::init()
     // Additionally we must convert to utf8 at the end otherwise path::dirname will not work
     SmallVector<wchar_t, MAX_PATH> buffer;
 
-    int numChars;
-    int tries = 0;
+    size_t numChars;
+    int    tries = 0;
     do
     {
         SC_TRY_IF(buffer.resizeWithoutInitializing(buffer.size() + MAX_PATH));

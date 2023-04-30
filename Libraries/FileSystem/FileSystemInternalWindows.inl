@@ -120,8 +120,9 @@ struct SC::FileSystem::Internal
     [[nodiscard]] static ReturnCode copyDirectory(String& sourceDirectory, String& destinationDirectory,
                                                   FileSystem::CopyFlags options)
     {
-        SHFILEOPSTRUCTW s    = {0};
-        const wchar_t*  dest = destinationDirectory.view().getNullTerminatedNative();
+        SHFILEOPSTRUCTW shFileOp;
+        memset(&shFileOp, 0, sizeof(shFileOp));
+        const wchar_t* dest = destinationDirectory.view().getNullTerminatedNative();
         if (not options.overwrite)
         {
             if (existsAndIsDirectory(dest))
@@ -133,27 +134,28 @@ struct SC::FileSystem::Internal
                 return "A file already exists at the location"_a8;
             }
         }
-        s.fFlags = FOF_SILENT | FOF_NOCONFIRMMKDIR | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NO_UI;
-        s.wFunc  = FO_COPY;
+        shFileOp.fFlags = FOF_SILENT | FOF_NOCONFIRMMKDIR | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NO_UI;
+        shFileOp.wFunc  = FO_COPY;
         SC_TRY_IF(StringConverter(sourceDirectory).appendNullTerminated(L"\\*"));
         // SHFileOperationW needs two null termination bytes
         SC_TRY_IF(sourceDirectory.pushNullTerm());
         SC_TRY_IF(destinationDirectory.pushNullTerm());
-        s.pFrom       = sourceDirectory.view().getNullTerminatedNative();
-        s.pTo         = dest;
-        const int res = SHFileOperationW(&s);
+        shFileOp.pFrom = sourceDirectory.view().getNullTerminatedNative();
+        shFileOp.pTo   = dest;
+        const int res  = SHFileOperationW(&shFileOp);
         return res == 0;
     }
 
     [[nodiscard]] static ReturnCode removeDirectoryRecursive(String& sourceDirectory)
     {
-        SHFILEOPSTRUCTW s = {0};
-        s.fFlags          = FOF_SILENT | FOF_NOCONFIRMMKDIR | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NO_UI;
-        s.wFunc           = FO_DELETE;
+        SHFILEOPSTRUCTW shFileOp;
+        memset(&shFileOp, 0, sizeof(shFileOp));
+        shFileOp.fFlags = FOF_SILENT | FOF_NOCONFIRMMKDIR | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NO_UI;
+        shFileOp.wFunc  = FO_DELETE;
         // SHFileOperationW needs two null termination bytes
         SC_TRY_IF(sourceDirectory.pushNullTerm());
-        s.pFrom       = sourceDirectory.view().getNullTerminatedNative();
-        const int res = SHFileOperationW(&s);
+        shFileOp.pFrom = sourceDirectory.view().getNullTerminatedNative();
+        const int res  = SHFileOperationW(&shFileOp);
         return res == 0;
     }
 #undef SC_TRY_LIBC

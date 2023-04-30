@@ -4,18 +4,26 @@
 #pragma once
 #include "SCConfig.h"
 // Compiler name
-#if _MSC_VER
-#define SC_CLANG 0
-#define SC_GCC   0
-#define SC_MSVC  1
-#elif __clang__
+
+#if __clang__
 #define SC_CLANG 1
 #define SC_GCC   0
 #define SC_MSVC  0
+#if _MSC_VER
+#define SC_CLANG_CL 1
 #else
-#define SC_CLANG 0
-#define SC_GCC   1
-#define SC_MSVC  0
+#define SC_CLANG_CL 0
+#endif
+#elif _MSC_VER
+#define SC_CLANG    0
+#define SC_GCC      0
+#define SC_MSVC     1
+#define SC_CLANG_CL 0
+#else
+#define SC_CLANG    0
+#define SC_GCC      1
+#define SC_MSVC     0
+#define SC_CLANG_CL 0
 #endif
 
 // Compiler Attributes
@@ -64,10 +72,10 @@
 #define SC_DISABLE_OFFSETOF_WARNING
 #define SC_ENABLE_OFFSETOF_WARNING
 
+#endif
+
 #ifdef __SANITIZE_ADDRESS__
 #define SC_ADDRESS_SANITIZER 1
 #else
 #define SC_ADDRESS_SANITIZER 0
-#endif
-
 #endif

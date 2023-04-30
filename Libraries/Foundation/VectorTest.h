@@ -177,7 +177,7 @@ void SC::VectorTest::testClassType()
         SC::Vector<VectorTestClass> myVector;
         SC_TEST_EXPECT(vecReport.numSequences == 1);
         vecReport.reset();
-        auto result = myVector.resize(2);
+        SC_TEST_EXPECT(myVector.resize(2));
         SC_TEST_EXPECT(vecReport.numSequences == 4);
         SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::CONSTRUCTOR);      // DEFAULT PARAM
         SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // FIRST ELEMENT
@@ -187,7 +187,7 @@ void SC::VectorTest::testClassType()
         SC_TEST_EXPECT(myVector[1].toString().isEmpty());
 
         vecReport.reset();
-        result = myVector.resize(3, VectorTestClass("Custom"));
+        SC_TEST_EXPECT(myVector.resize(3, VectorTestClass("Custom")));
         SC_TEST_EXPECT(vecReport.numSequences == 5);
         SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::CONSTRUCTOR);      // DEFAULT PARAM
         SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::MOVE_CONSTRUCTOR); // ITEM[1] CONSTRUCTOR
@@ -199,7 +199,7 @@ void SC::VectorTest::testClassType()
         SC_TEST_EXPECT(myVector[1].toString().isEmpty());
         SC_TEST_EXPECT(myVector[2].toString() == StringView("Custom"));
         vecReport.reset();
-        result = myVector.resize(2);
+        SC_TEST_EXPECT(myVector.resize(2));
         SC_TEST_EXPECT(vecReport.numSequences == 3);
         SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::CONSTRUCTOR); // DEFAULT PARAM
         SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR);  // ITEM[3] DESTRUCTOR

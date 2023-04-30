@@ -107,7 +107,8 @@ SC::ReturnCode SC::FileDescriptorPipe::createPipe(InheritableReadFlag readFlag, 
 {
     // On Windows to inherit flags they must be flagged as inheritable
     // https://devblogs.microsoft.com/oldnewthing/20111216-00/?p=8873
-    SECURITY_ATTRIBUTES security  = {0};
+    SECURITY_ATTRIBUTES security;
+    memset(&security, 0, sizeof(security));
     security.nLength              = sizeof(security);
     security.bInheritHandle       = readFlag == ReadInheritable or writeFlag == WriteInheritable ? TRUE : FALSE;
     security.lpSecurityDescriptor = nullptr;

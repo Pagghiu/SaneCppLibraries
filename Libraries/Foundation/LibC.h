@@ -7,7 +7,7 @@
 
 extern "C"
 {
-#if SC_MSVC
+#if SC_MSVC || SC_CLANG_CL
     void* __cdecl memcpy(void* dst, const void* src, size_t n);
     int __cdecl memcmp(const void* s1, const void* s2, size_t n);
     void* __cdecl memset(void* dst, SC::int32_t c, size_t len);
