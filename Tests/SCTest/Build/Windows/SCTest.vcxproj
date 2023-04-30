@@ -339,7 +339,7 @@
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileDescriptor.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystem.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWalker.cpp" />
-    <ClCompile Include="..\..\..\..\Libraries\System\Process.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Process\Process.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Threading\Threading.cpp" />
     <ClCompile Include="..\..\SCTest.cpp" />
   </ItemGroup>
@@ -357,6 +357,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Networking\Networking.h" />
     <ClInclude Include="..\..\..\..\Libraries\Networking\NetworkingTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Networking\SocketDescriptor.h" />
+    <ClInclude Include="..\..\..\..\Libraries\System\ProcessDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\System\SystemPosix.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\Atomic.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\AtomicTest.h" />
@@ -414,8 +415,8 @@
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWalker.h" />
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerTest.h" />
-    <ClInclude Include="..\..\..\..\Libraries\System\Process.h" />
-    <ClInclude Include="..\..\..\..\Libraries\System\ProcessTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Process\Process.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Process\ProcessTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\Reflection.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAutoAggregates.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAutoStructured.h" />
@@ -451,9 +452,9 @@
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerInternalEmscripten.inl" />
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerInternalWindows.inl" />
-    <None Include="..\..\..\..\Libraries\System\ProcessInternalEmscripten.inl" />
-    <None Include="..\..\..\..\Libraries\System\ProcessInternalPosix.inl" />
-    <None Include="..\..\..\..\Libraries\System\ProcessInternalWindows.inl" />
+    <None Include="..\..\..\..\Libraries\Process\ProcessInternalEmscripten.inl" />
+    <None Include="..\..\..\..\Libraries\Process\ProcessInternalPosix.inl" />
+    <None Include="..\..\..\..\Libraries\Process\ProcessInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\FileSystem\UtilityWindows.inl" />
     <None Include="..\..\..\..\Libraries\Threading\ThreadingInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\Threading\ThreadingInternalWindows.inl" />

@@ -28,6 +28,9 @@
     <Filter Include="Networking">
       <UniqueIdentifier>{1ab7acac-33e2-4be0-8b0a-178a5edfaf9e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Process">
+      <UniqueIdentifier>{c61ee96b-740d-45aa-ba08-9835cb7b073a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\SCTest.cpp">
@@ -74,9 +77,6 @@
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp">
       <Filter>FileSystem</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\System\Process.cpp">
-      <Filter>System</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\System\System.cpp">
       <Filter>System</Filter>
     </ClCompile>
@@ -85,6 +85,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Networking\Networking.cpp">
       <Filter>Networking</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Process\Process.cpp">
+      <Filter>Process</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -319,12 +322,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Threading\AtomicTest.h">
       <Filter>Threading</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\System\Process.h">
-      <Filter>System</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\System\ProcessTest.h">
-      <Filter>System</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\System\System.h">
       <Filter>System</Filter>
     </ClInclude>
@@ -351,6 +348,16 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopInternalWindowsAPI.h">
       <Filter>Async</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\System\SystemPosix.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Process\Process.h">
+      <Filter>Process</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Process\ProcessTest.h">
+      <Filter>Process</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\System\ProcessDescriptor.h">
+      <Filter>System</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -402,15 +409,6 @@
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalWindows.inl">
       <Filter>FileSystem</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\System\ProcessInternalEmscripten.inl">
-      <Filter>System</Filter>
-    </None>
-    <None Include="..\..\..\..\Libraries\System\ProcessInternalPosix.inl">
-      <Filter>System</Filter>
-    </None>
-    <None Include="..\..\..\..\Libraries\System\ProcessInternalWindows.inl">
-      <Filter>System</Filter>
-    </None>
     <None Include="..\..\..\..\Libraries\System\SystemInternalEmscripten.inl">
       <Filter>System</Filter>
     </None>
@@ -419,6 +417,15 @@
     </None>
     <None Include="..\..\..\..\Libraries\System\SystemInternalWindows.inl">
       <Filter>System</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Process\ProcessInternalEmscripten.inl">
+      <Filter>Process</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Process\ProcessInternalPosix.inl">
+      <Filter>Process</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Process\ProcessInternalWindows.inl">
+      <Filter>Process</Filter>
     </None>
   </ItemGroup>
 </Project>

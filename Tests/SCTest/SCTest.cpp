@@ -27,6 +27,9 @@
 // Networking
 #include "../../Libraries/Networking/NetworkingTest.h"
 
+// Process
+#include "../../Libraries/Process/ProcessTest.h"
+
 // Reflection
 #include "../../Libraries/Reflection/ReflectionTest.h"
 
@@ -36,7 +39,6 @@
 
 // System
 #include "../../Libraries/System/ConsoleTest.h"
-#include "../../Libraries/System/ProcessTest.h"
 #include "../../Libraries/System/SystemTest.h"
 #include "../../Libraries/System/TimeTest.h"
 
@@ -86,7 +88,10 @@ int main(int argc, const char* argv[])
     { PathTest                      test(report); }
 
     // Networking tests
-    { NetworkingTest                 test(report); }
+    { NetworkingTest                test(report); }
+
+    // Process tests
+    { ProcessTest                   test(report); }
 
     // Reflection tests
     { ReflectionTest                test(report); }
@@ -97,7 +102,6 @@ int main(int argc, const char* argv[])
 
     // System tests
     { ConsoleTest                   test(report); }
-    { ProcessTest                   test(report); }
     { SystemTest                    test(report); }
     { TimeTest                      test(report); }
 

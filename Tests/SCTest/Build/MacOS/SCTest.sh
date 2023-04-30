@@ -55,8 +55,8 @@ Libraries/Foundation/StringConverter.cpp    \
 Libraries/Foundation/StringFormat.cpp       \
 Libraries/Foundation/StringView.cpp         \
 Libraries/Networking/Networking.cpp         \
+Libraries/Process/Process.cpp               \
 Libraries/System/Console.cpp                \
-Libraries/System/Process.cpp                \
 Libraries/System/System.cpp                 \
 Libraries/System/Time.cpp                   \
 Libraries/Threading/Threading.cpp           \
