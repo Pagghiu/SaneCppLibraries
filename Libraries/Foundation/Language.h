@@ -32,6 +32,11 @@ template <class T> struct AddPointer      { using type = typename RemoveReferenc
 template <class T> struct RemoveConst           { typedef T type;};
 template <class T> struct RemoveConst<const T>  { typedef T type; };
 
+template <typename T> struct ReturnType;
+template <typename R, typename... Args> struct ReturnType<R(Args...)> { using type = R; };
+template <typename R, typename... Args> struct ReturnType<R(*)(Args...)> { using type = R; };
+template <typename R, typename C, typename... Args> struct ReturnType<R(C::*)(Args...)> { using type = R; };
+
 template <class T, T v>
 struct IntegralConstant
 {
