@@ -59,6 +59,9 @@ int main(int argc, const char* argv[])
     SystemDirectories directories;
     if (not directories.init())
         return -2;
+    SystemFunctions functions;
+    if (not functions.initNetworking())
+        return -3;
     Console    console(globalConsoleConversionBuffer);
     TestReport report(console, argc, argv);
     report.applicationRootDirectory = directories.applicationRootDirectory.view();

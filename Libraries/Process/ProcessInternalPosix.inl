@@ -11,16 +11,21 @@
 
 struct SC::Process::Internal
 {
-    static FileDescriptorNative getStandardInputFDS() { return fileno(stdin); };
-    static FileDescriptorNative getStandardOutputFDS() { return fileno(stdout); };
-    static FileDescriptorNative getStandardErrorFDS() { return fileno(stderr); };
-};
+    static FileDescriptor::Handle getStandardInputFDS() { return fileno(stdin); };
+    static FileDescriptor::Handle getStandardOutputFDS() { return fileno(stdout); };
+    static FileDescriptor::Handle getStandardErrorFDS() { return fileno(stderr); };
 
-SC::ReturnCode SC::ProcessNativeHandleClose(pid_t& handle)
-{
-    handle = ProcessNativeInvalid;
-    return true;
-}
+    static ReturnCode duplicateAndReplace(FileDescriptor& handle, FileDescriptor::Handle fds)
+    {
+        FileDescriptor::Handle nativeFd;
+        SC_TRY_IF(handle.get(nativeFd, "duplicateAndReplace - Invalid Handle"_a8));
+        if (::dup2(nativeFd, fds) == -1)
+        {
+            return ReturnCode("dup2 failed"_a8);
+        }
+        return true;
+    }
+};
 
 SC::ReturnCode SC::Process::fork()
 {
@@ -56,17 +61,17 @@ SC::ReturnCode SC::Process::spawn(Lambda&& lambda)
     if (isChild())
     {
         auto exitDeferred = MakeDeferred([&] { _exit(127); });
-        if (standardInput.handle.isValid())
+        if (standardInput.isValid())
         {
-            SC_TRY_IF(standardInput.posix().duplicateAndReplace(Internal::getStandardInputFDS()));
+            SC_TRY_IF(Internal::duplicateAndReplace(standardInput, Internal::getStandardInputFDS()));
         }
-        if (standardOutput.handle.isValid())
+        if (standardOutput.isValid())
         {
-            SC_TRY_IF(standardOutput.posix().duplicateAndReplace(Internal::getStandardOutputFDS()));
+            SC_TRY_IF(Internal::duplicateAndReplace(standardOutput, Internal::getStandardOutputFDS()));
         }
-        if (standardError.handle.isValid())
+        if (standardError.isValid())
         {
-            SC_TRY_IF(standardError.posix().duplicateAndReplace(Internal::getStandardErrorFDS()));
+            SC_TRY_IF(Internal::duplicateAndReplace(standardError, Internal::getStandardErrorFDS()));
         }
         // As std handles have been duplicated / redirected, we can close all of them.
         // We explicitly close them because some may have not been marked as CLOEXEC.
@@ -78,17 +83,17 @@ SC::ReturnCode SC::Process::spawn(Lambda&& lambda)
         // still valid between the fork() and the exec() call to do anything needed
         // (like the duplication / redirect we're doing here) without risk of leaking
         // any FD to the newly executed child process.
-        SC_TRY_IF(standardInput.handle.close());
-        SC_TRY_IF(standardOutput.handle.close());
-        SC_TRY_IF(standardError.handle.close());
+        SC_TRY_IF(standardInput.close());
+        SC_TRY_IF(standardOutput.close());
+        SC_TRY_IF(standardError.close());
         lambda();
     }
     else
     {
         SC_TRY_IF(handle.assign(processID.pid));
-        SC_TRY_IF(standardInput.handle.close());
-        SC_TRY_IF(standardOutput.handle.close());
-        SC_TRY_IF(standardError.handle.close());
+        SC_TRY_IF(standardInput.close());
+        SC_TRY_IF(standardOutput.close());
+        SC_TRY_IF(standardError.close());
         return true;
     }
     // The exit(127) inside isChild makes this unreachable

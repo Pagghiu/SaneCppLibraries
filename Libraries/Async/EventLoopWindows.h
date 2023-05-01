@@ -6,53 +6,55 @@
 #include <Windows.h>
 #include <stddef.h> // offsetof
 
-#include "../FileSystem/FileDescriptor.h"
 #include "../Foundation/Opaque.h"
-#include "EventLoop.h"
+#include "../System/Descriptors.h"
 
 namespace SC
 {
-struct EventLoopWindowsOverlapped;
-struct EventLoopWindowsWaitHandle;
+struct EventLoopWinOverlapped;
+struct EventLoopWinWaitHandle;
+struct EventLoopWinWaitTraits;
 } // namespace SC
 
 // We store a user pointer at a fixed offset from overlapped to allow getting back source object
 // with results from GetQueuedCompletionStatusEx.
 // We must do it because there is no void* userData pointer in the OVERLAPPED struct
-struct SC::EventLoopWindowsOverlapped
+struct SC::EventLoopWinOverlapped
 {
     void*      userData = nullptr;
     OVERLAPPED overlapped;
 
-    EventLoopWindowsOverlapped() { memset(&overlapped, 0, sizeof(overlapped)); }
+    EventLoopWinOverlapped() { memset(&overlapped, 0, sizeof(overlapped)); }
 
     template <typename T>
     [[nodiscard]] static T* getUserDataFromOverlapped(LPOVERLAPPED lpOverlapped)
     {
-        constexpr size_t offsetOfOverlapped = offsetof(EventLoopWindowsOverlapped, overlapped);
-        constexpr size_t offsetOfAsync      = offsetof(EventLoopWindowsOverlapped, userData);
+        constexpr size_t offsetOfOverlapped = offsetof(EventLoopWinOverlapped, overlapped);
+        constexpr size_t offsetOfAsync      = offsetof(EventLoopWinOverlapped, userData);
         return *reinterpret_cast<T**>(reinterpret_cast<uint8_t*>(lpOverlapped) - offsetOfOverlapped + offsetOfAsync);
     }
 };
 
-namespace SC
+struct SC::EventLoopWinWaitTraits
 {
-inline ReturnCode EventLoopWindowsWaitHandleClose(FileDescriptorNative& waitHandle)
-{
-    if (waitHandle != INVALID_HANDLE_VALUE)
-    {
-        BOOL res   = UnregisterWaitEx(waitHandle, INVALID_HANDLE_VALUE);
-        waitHandle = INVALID_HANDLE_VALUE;
-        if (res == FALSE)
-        {
-            return "UnregisterWaitEx failed"_a8;
-        }
-    }
-    return true;
-}
-} // namespace SC
+    using Handle                    = FileDescriptor::Handle;  // fd
+    static constexpr Handle Invalid = FileDescriptor::Invalid; // invalid fd
 
-struct SC::EventLoopWindowsWaitHandle : public UniqueTaggedHandle<FileDescriptorNative, FileDescriptorNativeInvalid,
-                                                                  ReturnCode, EventLoopWindowsWaitHandleClose>
+    static ReturnCode releaseHandle(Handle& waitHandle)
+    {
+        if (waitHandle != INVALID_HANDLE_VALUE)
+        {
+            BOOL res   = ::UnregisterWaitEx(waitHandle, INVALID_HANDLE_VALUE);
+            waitHandle = INVALID_HANDLE_VALUE;
+            if (res == FALSE)
+            {
+                return "UnregisterWaitEx failed"_a8;
+            }
+        }
+        return true;
+    }
+};
+
+struct SC::EventLoopWinWaitHandle : public SC::UniqueTaggedHandleTraits<SC::EventLoopWinWaitTraits>
 {
 };

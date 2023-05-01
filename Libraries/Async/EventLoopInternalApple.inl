@@ -23,15 +23,15 @@ struct SC::EventLoop::Internal
 {
     FileDescriptor loopFd;
 
-    AsyncRead          wakeupPipeRead;
-    FileDescriptorPipe wakeupPipe;
-    uint8_t            wakeupPipeReadBuf[10];
+    AsyncRead      wakeupPipeRead;
+    PipeDescriptor wakeupPipe;
+    uint8_t        wakeupPipeReadBuf[10];
 
     ~Internal() { SC_TRUST_RESULT(close()); }
 
     [[nodiscard]] ReturnCode close()
     {
-        return wakeupPipe.readPipe.handle.close() and wakeupPipe.writePipe.handle.close() and loopFd.handle.close();
+        return wakeupPipe.readPipe.close() and wakeupPipe.writePipe.close() and loopFd.close();
     }
 
     [[nodiscard]] ReturnCode createEventLoop()
@@ -42,22 +42,21 @@ struct SC::EventLoop::Internal
             // TODO: Better kqueue error handling
             return "EventLoop::Internal::createEventLoop() - kqueue failed"_a8;
         }
-        SC_TRY_IF(loopFd.handle.assign(newQueue));
+        SC_TRY_IF(loopFd.assign(newQueue));
         return true;
     }
 
     [[nodiscard]] ReturnCode createWakeup(EventLoop& loop)
     {
         // Create
-        SC_TRY_IF(
-            wakeupPipe.createPipe(FileDescriptorPipe::ReadNonInheritable, FileDescriptorPipe::WriteNonInheritable));
+        SC_TRY_IF(wakeupPipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteNonInheritable));
         SC_TRY_IF(wakeupPipe.readPipe.setBlocking(false));
         SC_TRY_IF(wakeupPipe.writePipe.setBlocking(false));
 
         // Register
-        FileDescriptorNative wakeUpPipeDescriptor;
-        SC_TRY_IF(wakeupPipe.readPipe.handle.get(wakeUpPipeDescriptor,
-                                                 "EventLoop::Internal::createWakeup() - Async read handle invalid"_a8));
+        FileDescriptor::Handle wakeUpPipeDescriptor;
+        SC_TRY_IF(wakeupPipe.readPipe.get(wakeUpPipeDescriptor,
+                                          "EventLoop::Internal::createWakeup() - Async read handle invalid"_a8));
         SC_TRY_IF(loop.startRead(wakeupPipeRead, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)},
                                  Function<void(AsyncResult&)>()));
         return true;
@@ -144,14 +143,14 @@ struct SC::EventLoop::Internal
             break;
         }
         case Async::Type::Accept: {
-            SocketDescriptorNative listenDescriptor = result.async.operation.fields.accept.handle;
+            SocketDescriptor::Handle listenDescriptor = result.async.operation.fields.accept.handle;
 
             struct sockaddr_in sAddr;
             socklen_t          sAddrSize = sizeof(sAddr);
 
-            SocketDescriptorNative acceptedClient;
+            SocketDescriptor::Handle acceptedClient;
             acceptedClient = ::accept(listenDescriptor, reinterpret_cast<struct sockaddr*>(&sAddr), &sAddrSize);
-            SC_TRY_MSG(acceptedClient != SocketDescriptorNativeInvalid, "accept failed"_a8);
+            SC_TRY_MSG(acceptedClient != SocketDescriptor::Invalid, "accept failed"_a8);
 
             return result.result.fields.accept.acceptedClient.assign(acceptedClient);
         }
@@ -194,10 +193,10 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] bool isFull() const { return newEvents >= totalNumEvents; }
 
-    ReturnCode stopKeventWatcher(Async& async, SocketDescriptorNative handle, short filter)
+    ReturnCode stopKeventWatcher(Async& async, SocketDescriptor::Handle handle, short filter)
     {
-        FileDescriptorNative loopNativeDescriptor;
-        SC_TRUST_RESULT(async.eventLoop->internal.get().loopFd.handle.get(
+        FileDescriptor::Handle loopNativeDescriptor;
+        SC_TRUST_RESULT(async.eventLoop->internal.get().loopFd.get(
             loopNativeDescriptor, "EventLoop::Internal::pollAsync() - Invalid Handle"_a8));
         struct kevent kev;
         EV_SET(&kev, handle, filter, EV_DELETE, 0, 0, nullptr);
@@ -261,9 +260,9 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] ReturnCode pollAsync(EventLoop& self, PollMode pollMode)
     {
         const TimeCounter* nextTimer = pollMode == PollMode::ForcedForwardProgress ? self.findEarliestTimer() : nullptr;
-        FileDescriptorNative loopNativeDescriptor;
-        SC_TRY_IF(self.internal.get().loopFd.handle.get(loopNativeDescriptor,
-                                                        "EventLoop::Internal::pollAsync() - Invalid Handle"_a8));
+        FileDescriptor::Handle loopNativeDescriptor;
+        SC_TRY_IF(self.internal.get().loopFd.get(loopNativeDescriptor,
+                                                 "EventLoop::Internal::pollAsync() - Invalid Handle"_a8));
 
         struct timespec specTimeout;
         // when nextTimer is null, specTimeout is initialized to 0, so that PollMode::NoWait
@@ -301,9 +300,9 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] ReturnCode flushQueue(EventLoop& self)
     {
-        FileDescriptorNative loopNativeDescriptor;
-        SC_TRY_IF(self.internal.get().loopFd.handle.get(loopNativeDescriptor,
-                                                        "EventLoop::Internal::flushQueue() - Invalid Handle"_a8));
+        FileDescriptor::Handle loopNativeDescriptor;
+        SC_TRY_IF(self.internal.get().loopFd.get(loopNativeDescriptor,
+                                                 "EventLoop::Internal::flushQueue() - Invalid Handle"_a8));
 
         int res;
         // in the next kevent call the staged handles will become active
@@ -350,7 +349,7 @@ SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
     const void* fakeBuffer;
     int         asyncFd;
     ssize_t     writtenBytes;
-    SC_TRY_IF(self.wakeupPipe.writePipe.handle.get(asyncFd, "writePipe handle"_a8));
+    SC_TRY_IF(self.wakeupPipe.writePipe.get(asyncFd, "writePipe handle"_a8));
     fakeBuffer = "";
     do
     {

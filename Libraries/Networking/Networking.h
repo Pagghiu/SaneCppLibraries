@@ -5,30 +5,28 @@
 
 #include "../Foundation/Result.h"
 #include "../Foundation/StringView.h"
+#include "../System/Descriptors.h"
 #include "../System/Time.h"
-#include "SocketDescriptor.h"
 
 namespace SC
 {
-struct NetworkSocket;
 struct TCPClient;
 struct TCPServer;
 } // namespace SC
 
-struct SC::NetworkSocket
+struct SC::TCPServer
 {
-    SocketDescriptorNativeHandle socket;
-};
+    SocketDescriptor socket;
 
-struct SC::TCPServer : public NetworkSocket
-{
     [[nodiscard]] ReturnCode listen(StringView interfaceAddres, uint32_t port);
     [[nodiscard]] ReturnCode close();
     [[nodiscard]] ReturnCode accept(TCPClient& newClient);
 };
 
-struct SC::TCPClient : public NetworkSocket
+struct SC::TCPClient
 {
+    SocketDescriptor socket;
+
     [[nodiscard]] ReturnCode connect(StringView address, uint32_t port);
     [[nodiscard]] ReturnCode close();
     [[nodiscard]] ReturnCode write(Span<const char> data);

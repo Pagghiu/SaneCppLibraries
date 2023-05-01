@@ -62,7 +62,7 @@
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWalker.cpp">
       <Filter>FileSystem</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileDescriptor.cpp">
+    <ClCompile Include="..\..\..\..\Libraries\System\Descriptors.cpp">
       <Filter>FileSystem</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp">
@@ -262,7 +262,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\OptionalTest.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileDescriptor.h">
+    <ClInclude Include="..\..\..\..\Libraries\System\Descriptors.h">
       <Filter>FileSystem</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Opaque.h">
@@ -379,10 +379,10 @@
     <None Include="..\..\..\..\Libraries\FileSystem\UtilityWindows.inl">
       <Filter>FileSystem</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\FileSystem\FileDescriptorInternalPosix.inl">
+    <None Include="..\..\..\..\Libraries\System\DescriptorInternalPosix.inl">
       <Filter>FileSystem</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\FileSystem\FileDescriptorInternalWindows.inl">
+    <None Include="..\..\..\..\Libraries\System\DescriptorInternalWindows.inl">
       <Filter>FileSystem</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\Async\EventLoopInternalApple.inl">

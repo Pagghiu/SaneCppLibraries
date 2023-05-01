@@ -16,13 +16,6 @@ struct SC::Process::Internal
     static void exit(int code) { _exit(code); }
 };
 
-SC::ReturnCode SC::ProcessNativeHandleClose(HANDLE& handle)
-{
-    if (::CloseHandle(handle) == FALSE)
-        return "ProcessNativeHandleClose - CloseHandle failed"_a8;
-    return true;
-}
-
 SC::ReturnCode SC::Process::waitForExitSync()
 {
     HANDLE hProcess;
@@ -41,8 +34,7 @@ SC::ReturnCode SC::Process::waitForExitSync()
 SC::ReturnCode SC::Process::launch(ProcessOptions options)
 {
     STARTUPINFO startupInfo;
-    const bool  someRedirection =
-        standardInput.handle.isValid() || standardOutput.handle.isValid() || standardError.handle.isValid();
+    const bool  someRedirection = standardInput.isValid() || standardOutput.isValid() || standardError.isValid();
 
     // On Windows to inherit flags they must be flagged as inheritable AND CreateProcess bInheritHandles must be true
     // TODO: This is not thread-safe in regard to handle inheritance, check out Microsoft Article on the topic
@@ -57,17 +49,17 @@ SC::ReturnCode SC::Process::launch(ProcessOptions options)
     startupInfo.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
     startupInfo.hStdError  = GetStdHandle(STD_ERROR_HANDLE);
 
-    if (standardInput.handle.isValid())
+    if (standardInput.isValid())
     {
-        SC_TRY_IF(standardInput.handle.get(startupInfo.hStdInput, false));
+        SC_TRY_IF(standardInput.get(startupInfo.hStdInput, false));
     }
-    if (standardOutput.handle.isValid())
+    if (standardOutput.isValid())
     {
-        SC_TRY_IF(standardOutput.handle.get(startupInfo.hStdOutput, false));
+        SC_TRY_IF(standardOutput.get(startupInfo.hStdOutput, false));
     }
-    if (standardError.handle.isValid())
+    if (standardError.isValid())
     {
-        SC_TRY_IF(standardError.handle.get(startupInfo.hStdError, false));
+        SC_TRY_IF(standardError.get(startupInfo.hStdError, false));
     }
     if (someRedirection)
     {
@@ -100,8 +92,8 @@ SC::ReturnCode SC::Process::launch(ProcessOptions options)
 
     SC_TRY_ASSIGN(processID.pid, processInfo.dwProcessId, "processInfo.dwProcessId exceeds processID.pid"_a8);
     SC_TRY_IF(handle.assign(processInfo.hProcess));
-    SC_TRY_IF(standardInput.handle.close());
-    SC_TRY_IF(standardOutput.handle.close());
-    SC_TRY_IF(standardError.handle.close());
+    SC_TRY_IF(standardInput.close());
+    SC_TRY_IF(standardOutput.close());
+    SC_TRY_IF(standardError.close());
     return true;
 }

@@ -21,28 +21,25 @@ struct SC::NetworkingTest : public SC::TestCase
 
             // We are testing only the inheritable because on windows there is no reliable
             // way of checking if a non-connected socket is in non-blocking mode
-            SocketDescriptorNativeHandle socket;
-            SC_TEST_EXPECT(
-                socket.create(SocketDescriptorNativeHandle::IPTypeV4, SocketDescriptorNativeHandle::ProtocolTcp,
-                              SocketDescriptorNativeHandle::NonBlocking, SocketDescriptorNativeHandle::NonInheritable));
+            SocketDescriptor socket;
+            SC_TEST_EXPECT(socket.create(SocketDescriptor::IPTypeV4, SocketDescriptor::ProtocolTcp,
+                                         SocketDescriptor::NonBlocking, SocketDescriptor::NonInheritable));
             SC_TEST_EXPECT(socket.isValid());
             isInheritable = false;
             SC_TEST_EXPECT(socket.isInheritable(isInheritable));
             SC_TEST_EXPECT(not isInheritable);
             SC_TEST_EXPECT(socket.close());
 
-            SC_TEST_EXPECT(
-                socket.create(SocketDescriptorNativeHandle::IPTypeV4, SocketDescriptorNativeHandle::ProtocolTcp,
-                              SocketDescriptorNativeHandle::Blocking, SocketDescriptorNativeHandle::NonInheritable));
+            SC_TEST_EXPECT(socket.create(SocketDescriptor::IPTypeV4, SocketDescriptor::ProtocolTcp,
+                                         SocketDescriptor::Blocking, SocketDescriptor::NonInheritable));
             SC_TEST_EXPECT(socket.isValid());
             isInheritable = false;
             SC_TEST_EXPECT(socket.isInheritable(isInheritable));
             SC_TEST_EXPECT(not isInheritable);
             SC_TEST_EXPECT(socket.close());
 
-            SC_TEST_EXPECT(
-                socket.create(SocketDescriptorNativeHandle::IPTypeV4, SocketDescriptorNativeHandle::ProtocolTcp,
-                              SocketDescriptorNativeHandle::Blocking, SocketDescriptorNativeHandle::Inheritable));
+            SC_TEST_EXPECT(socket.create(SocketDescriptor::IPTypeV4, SocketDescriptor::ProtocolTcp,
+                                         SocketDescriptor::Blocking, SocketDescriptor::Inheritable));
             SC_TEST_EXPECT(socket.isValid());
             isInheritable = false;
             SC_TEST_EXPECT(socket.isInheritable(isInheritable));

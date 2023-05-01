@@ -2,13 +2,12 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../System/ProcessDescriptor.h"
 
-#include "../FileSystem/FileDescriptor.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Optional.h"
 #include "../Foundation/String.h"
+#include "../System/Descriptors.h"
 
 namespace SC
 {
@@ -19,19 +18,24 @@ struct ProcessOptions
 {
     bool inheritFileDescriptors = false;
 };
+struct ProcessID
+{
+    int32_t pid = 0;
+};
 } // namespace SC
 
 struct SC::Process
 {
-    ProcessNativeHandle handle;
-    ProcessID           processID;
-    ProcessExitStatus   exitStatus;
-    FileDescriptor      standardInput;
-    FileDescriptor      standardOutput;
-    FileDescriptor      standardError;
-    StringNative<255>   command          = StringEncoding::Native;
-    StringNative<255>   currentDirectory = StringEncoding::Native;
-    StringNative<1024>  environment      = StringEncoding::Native;
+    ProcessDescriptor  handle;
+    ProcessID          processID;
+    FileDescriptor     standardInput;
+    FileDescriptor     standardOutput;
+    FileDescriptor     standardError;
+    StringNative<255>  command          = StringEncoding::Native;
+    StringNative<255>  currentDirectory = StringEncoding::Native;
+    StringNative<1024> environment      = StringEncoding::Native;
+
+    ProcessDescriptor::ExitStatus exitStatus;
 
     ProcessChain* parent = nullptr;
 
@@ -52,9 +56,9 @@ struct SC::Process
         return launch();
     }
     [[nodiscard]] ReturnCode launch(ProcessOptions options = {});
-    [[nodiscard]] ReturnCode redirectStdOutTo(FileDescriptorPipe& pipe);
-    [[nodiscard]] ReturnCode redirectStdErrTo(FileDescriptorPipe& pipe);
-    [[nodiscard]] ReturnCode redirectStdInTo(FileDescriptorPipe& pipe);
+    [[nodiscard]] ReturnCode redirectStdOutTo(PipeDescriptor& pipe);
+    [[nodiscard]] ReturnCode redirectStdErrTo(PipeDescriptor& pipe);
+    [[nodiscard]] ReturnCode redirectStdInTo(PipeDescriptor& pipe);
 
   private:
     struct Internal;
@@ -100,7 +104,7 @@ struct SC::ProcessChain
 
     IntrusiveDoubleLinkedList<Process> processes;
 
-    FileDescriptorPipe inputPipe;
-    FileDescriptorPipe outputPipe;
-    FileDescriptorPipe errorPipe;
+    PipeDescriptor inputPipe;
+    PipeDescriptor outputPipe;
+    PipeDescriptor errorPipe;
 };

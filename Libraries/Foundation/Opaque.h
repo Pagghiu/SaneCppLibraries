@@ -84,18 +84,21 @@ struct OpaqueUniqueObject
     OpaqueHandle<N, Alignment> buffer;
 };
 
-template <typename HandleType, HandleType InvalidSentinel, typename CloseReturnType,
-          CloseReturnType (*DeleteFunc)(HandleType&)>
-struct UniqueTaggedHandle
+template <typename Traits>
+struct UniqueTaggedHandleTraits
 {
-    UniqueTaggedHandle()                                           = default;
-    UniqueTaggedHandle(const UniqueTaggedHandle& v)                = delete;
-    UniqueTaggedHandle& operator=(const UniqueTaggedHandle& other) = delete;
-    UniqueTaggedHandle(UniqueTaggedHandle&& v) : handle(v.handle) { v.detach(); }
-    UniqueTaggedHandle(const HandleType& externalHandle) : handle(externalHandle) {}
-    ~UniqueTaggedHandle() { (void)close(); }
+    using Handle                    = typename Traits::Handle;
+    static constexpr Handle Invalid = Traits::Invalid;
+    using CloseReturnType           = typename ReturnType<decltype(Traits::releaseHandle)>::type;
 
-    [[nodiscard]] CloseReturnType assign(UniqueTaggedHandle&& other)
+    UniqueTaggedHandleTraits()                                                 = default;
+    UniqueTaggedHandleTraits(const UniqueTaggedHandleTraits& v)                = delete;
+    UniqueTaggedHandleTraits& operator=(const UniqueTaggedHandleTraits& other) = delete;
+    UniqueTaggedHandleTraits(UniqueTaggedHandleTraits&& v) : handle(v.handle) { v.detach(); }
+    UniqueTaggedHandleTraits(const Handle& externalHandle) : handle(externalHandle) {}
+    ~UniqueTaggedHandleTraits() { (void)close(); }
+
+    [[nodiscard]] CloseReturnType assign(UniqueTaggedHandleTraits&& other)
     {
         if (close())
         {
@@ -106,7 +109,7 @@ struct UniqueTaggedHandle
         return false;
     }
 
-    [[nodiscard]] CloseReturnType assign(const HandleType& externalHandle)
+    [[nodiscard]] CloseReturnType assign(const Handle& externalHandle)
     {
         if (close())
         {
@@ -116,17 +119,17 @@ struct UniqueTaggedHandle
         return false;
     }
 
-    UniqueTaggedHandle& operator=(UniqueTaggedHandle&& other)
+    UniqueTaggedHandleTraits& operator=(UniqueTaggedHandleTraits&& other)
     {
-        (void)(assign(forward<UniqueTaggedHandle>(other)));
+        (void)(assign(forward<UniqueTaggedHandleTraits>(other)));
         return *this;
     }
 
-    [[nodiscard]] bool isValid() const { return handle != InvalidSentinel; }
+    [[nodiscard]] bool isValid() const { return handle != Invalid; }
 
-    void detach() { handle = InvalidSentinel; }
+    void detach() { handle = Invalid; }
 
-    [[nodiscard]] CloseReturnType get(HandleType& outHandle, CloseReturnType invalidReturnType) const
+    [[nodiscard]] CloseReturnType get(Handle& outHandle, CloseReturnType invalidReturnType) const
     {
         if (isValid())
         {
@@ -140,15 +143,15 @@ struct UniqueTaggedHandle
     {
         if (isValid())
         {
-            HandleType handleCopy = handle;
+            Handle handleCopy = handle;
             detach();
-            return DeleteFunc(handleCopy);
+            return Traits::releaseHandle(handleCopy);
         }
         return true;
     }
 
   protected:
-    HandleType handle = InvalidSentinel;
+    Handle handle = Invalid;
 };
 
 } // namespace SC

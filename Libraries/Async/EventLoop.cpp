@@ -58,8 +58,8 @@ SC::ReturnCode SC::EventLoop::startTimeout(AsyncTimeout& async, IntegerMilliseco
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::startRead(AsyncRead& async, FileDescriptorNative fileDescriptor, Span<uint8_t> readBuffer,
-                                        Function<void(AsyncResult&)>&& callback)
+SC::ReturnCode SC::EventLoop::startRead(AsyncRead& async, FileDescriptor::Handle fileDescriptor,
+                                        Span<uint8_t> readBuffer, Function<void(AsyncResult&)>&& callback)
 {
     SC_TRY_MSG(readBuffer.sizeInBytes() > 0, "EventLoop::startRead - Zero sized read buffer"_a8);
     SC_TRY_IF(queueSubmission(async, move(callback)));
@@ -71,8 +71,8 @@ SC::ReturnCode SC::EventLoop::startRead(AsyncRead& async, FileDescriptorNative f
 }
 
 SC::ReturnCode SC::EventLoop::startAccept(AsyncAccept& async, AsyncAccept::Support& support,
-                                          const SocketDescriptorNativeHandle& socketDescriptor,
-                                          Function<void(AsyncResult&)>&&      callback)
+                                          const SocketDescriptor&        socketDescriptor,
+                                          Function<void(AsyncResult&)>&& callback)
 {
     SC_TRY_IF(queueSubmission(async, move(callback)));
     Async::Accept operation;
@@ -93,7 +93,7 @@ SC::ReturnCode SC::EventLoop::startWakeUp(AsyncWakeUp& async, Function<void(Asyn
 }
 
 SC::ReturnCode SC::EventLoop::startProcessExit(AsyncProcessExit& async, Function<void(AsyncResult&)>&& callback,
-                                               ProcessNative process)
+                                               ProcessDescriptor::Handle process)
 {
     SC_TRY_IF(queueSubmission(async, move(callback)));
     Async::ProcessExit operation;
@@ -335,9 +335,9 @@ void SC::EventLoop::executeWakeUps()
     }
 }
 
-SC::ReturnCode SC::EventLoop::getLoopFileDescriptor(SC::FileDescriptorNative& fileDescriptor) const
+SC::ReturnCode SC::EventLoop::getLoopFileDescriptor(SC::FileDescriptor::Handle& fileDescriptor) const
 {
-    return internal.get().loopFd.handle.get(fileDescriptor, "EventLoop::getLoopFileDescriptor invalid handle"_a8);
+    return internal.get().loopFd.get(fileDescriptor, "EventLoop::getLoopFileDescriptor invalid handle"_a8);
 }
 
 SC::ReturnCode SC::AsyncWakeUp::wakeUp() { return eventLoop->wakeUpFromExternalThread(*this); }

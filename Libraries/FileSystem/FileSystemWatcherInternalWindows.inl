@@ -6,14 +6,13 @@
 
 #include "../Foundation/StringBuilder.h"
 #include "../Foundation/StringConverter.h"
-#include "../Foundation/UniquePtr.h"
 #include "../Threading/Threading.h"
 
-#include "../Async/EventLoopWindows.h" // EventLoopWindowsOverlapped
+#include "../Async/EventLoopWindows.h" // EventLoopWinOverlapped
 
 struct SC::FileSystemWatcher::FolderWatcherInternal
 {
-    EventLoopWindowsOverlapped overlapped;
+    EventLoopWinOverlapped overlapped;
 
     HANDLE  fileHandle = INVALID_HANDLE_VALUE;
     uint8_t changesBuffer[FolderWatcherSizes::MaxChangesBufferSize];
@@ -121,7 +120,7 @@ struct SC::FileSystemWatcher::Internal
         {
             threadingRunner->numEntries = 0;
         }
-        FileDescriptorNative loopFDS = FileDescriptorNativeInvalid;
+        FileDescriptor::Handle loopFDS = FileDescriptor::Invalid;
         if (eventLoopRunner)
         {
             SC_TRY_IF(eventLoopRunner->eventLoop.getLoopFileDescriptor(loopFDS));

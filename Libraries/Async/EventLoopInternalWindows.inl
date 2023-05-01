@@ -12,12 +12,15 @@
 
 #include "EventLoopInternalWindowsAPI.h"
 
+#include "../System/System.h" // SystemFunctions
+
+// TODO: Make this threadsafe
 NTSetInformationFile pNtSetInformationFile = NULL;
 
 struct SC::Async::ProcessExitInternal
 {
-    EventLoopWindowsOverlapped overlapped;
-    EventLoopWindowsWaitHandle waitHandle;
+    EventLoopWinOverlapped overlapped;
+    EventLoopWinWaitHandle waitHandle;
 };
 
 struct SC::EventLoop::Internal
@@ -25,12 +28,12 @@ struct SC::EventLoop::Internal
     FileDescriptor loopFd;
     Async          wakeUpAsync;
 
-    EventLoopWindowsOverlapped wakeUpOverlapped;
+    EventLoopWinOverlapped wakeUpOverlapped;
 
     Internal() { wakeUpOverlapped.userData = &wakeUpAsync; }
 
     ~Internal() { SC_TRUST_RESULT(close()); }
-    [[nodiscard]] ReturnCode close() { return loopFd.handle.close(); }
+    [[nodiscard]] ReturnCode close() { return loopFd.close(); }
 
     [[nodiscard]] ReturnCode createEventLoop()
     {
@@ -40,7 +43,7 @@ struct SC::EventLoop::Internal
             // TODO: Better CreateIoCompletionPort error handling
             return "EventLoop::Internal::createEventLoop() - CreateIoCompletionPort"_a8;
         }
-        SC_TRY_IF(loopFd.handle.assign(newQueue));
+        SC_TRY_IF(loopFd.assign(newQueue));
         return true;
     }
 
@@ -56,7 +59,7 @@ struct SC::EventLoop::Internal
 
     [[nodiscard]] Async* getAsync(OVERLAPPED_ENTRY& event) const
     {
-        return EventLoopWindowsOverlapped::getUserDataFromOverlapped<Async>(event.lpOverlapped);
+        return EventLoopWinOverlapped::getUserDataFromOverlapped<Async>(event.lpOverlapped);
     }
 
     [[nodiscard]] void* getUserData(OVERLAPPED_ENTRY& event) const
@@ -126,9 +129,9 @@ struct SC::EventLoop::Internal
 
 SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
 {
-    Internal&            self = internal.get();
-    FileDescriptorNative loopNativeDescriptor;
-    SC_TRY_IF(self.loopFd.handle.get(loopNativeDescriptor, "watchInputs - Invalid Handle"_a8));
+    Internal&              self = internal.get();
+    FileDescriptor::Handle loopNativeDescriptor;
+    SC_TRY_IF(self.loopFd.get(loopNativeDescriptor, "watchInputs - Invalid Handle"_a8));
 
     if (PostQueuedCompletionStatus(loopNativeDescriptor, 0, 0, &self.wakeUpOverlapped.overlapped) == FALSE)
     {
@@ -146,7 +149,7 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] ReturnCode stageAsync(EventLoop& eventLoop, Async& async)
     {
         HANDLE loopHandle;
-        SC_TRY_IF(eventLoop.internal.get().loopFd.handle.get(loopHandle, "loop handle"_a8));
+        SC_TRY_IF(eventLoop.internal.get().loopFd.get(loopHandle, "loop handle"_a8));
         switch (async.operation.type)
         {
         case Async::Type::Timeout: eventLoop.activeTimers.queueBack(async); return true;
@@ -176,7 +179,7 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] static ReturnCode startAcceptWatcher(HANDLE loopHandle, Async::Accept& asyncAccept)
     {
-        SC_TRY_IF(Network::init());
+        SC_TRY_IF(SystemFunctions::isNetworkingInited());
         HANDLE listenHandle = reinterpret_cast<HANDLE>(asyncAccept.handle);
         HANDLE iocp         = ::CreateIoCompletionPort(listenHandle, loopHandle, 0, 0);
         SC_TRY_MSG(iocp == loopHandle, "startAcceptWatcher CreateIoCompletionPort failed"_a8);
@@ -185,7 +188,6 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] static ReturnCode stopAcceptWatcher(Async::Accept& asyncAccept)
     {
-        // TODO: Make this threadsafe
         if (!pNtSetInformationFile)
         {
             HMODULE ntdll = GetModuleHandleA("ntdll.dll");
@@ -215,9 +217,9 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] static ReturnCode startProcessExitWatcher(Async& async)
     {
-        const ProcessNative         processHandle   = async.operation.fields.processExit.handle;
-        Async::ProcessExitInternal& processInternal = async.operation.fields.processExit.opaque.get();
-        processInternal.overlapped.userData         = &async;
+        const ProcessDescriptor::Handle processHandle   = async.operation.fields.processExit.handle;
+        Async::ProcessExitInternal&     processInternal = async.operation.fields.processExit.opaque.get();
+        processInternal.overlapped.userData             = &async;
         HANDLE waitHandle;
         BOOL result = RegisterWaitForSingleObject(&waitHandle, processHandle, KernelQueue::processExitCallback, &async,
                                                   INFINITE, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE);
@@ -237,8 +239,8 @@ struct SC::EventLoop::KernelQueue
     static void CALLBACK processExitCallback(void* data, BOOLEAN timeoutOccurred)
     {
         SC_UNUSED(timeoutOccurred);
-        Async&               async = *static_cast<Async*>(data);
-        FileDescriptorNative loopNativeDescriptor;
+        Async&                 async = *static_cast<Async*>(data);
+        FileDescriptor::Handle loopNativeDescriptor;
         SC_TRUST_RESULT(async.eventLoop->getLoopFileDescriptor(loopNativeDescriptor));
         Async::ProcessExitInternal& internal = async.operation.fields.processExit.opaque.get();
 
@@ -251,10 +253,10 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] ReturnCode pollAsync(EventLoop& self, PollMode pollMode)
     {
-        const TimeCounter*   nextTimer = self.findEarliestTimer();
-        FileDescriptorNative loopNativeDescriptor;
-        SC_TRY_IF(self.internal.get().loopFd.handle.get(loopNativeDescriptor,
-                                                        "EventLoop::Internal::poll() - Invalid Handle"_a8));
+        const TimeCounter*     nextTimer = self.findEarliestTimer();
+        FileDescriptor::Handle loopNativeDescriptor;
+        SC_TRY_IF(
+            self.internal.get().loopFd.get(loopNativeDescriptor, "EventLoop::Internal::poll() - Invalid Handle"_a8));
         IntegerMilliseconds timeout;
         if (nextTimer)
         {
@@ -281,7 +283,7 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] static ReturnCode activateAsync(EventLoop& eventLoop, Async& async)
     {
         HANDLE loopHandle;
-        SC_TRY_IF(eventLoop.internal.get().loopFd.handle.get(loopHandle, "loop handle"_a8));
+        SC_TRY_IF(eventLoop.internal.get().loopFd.get(loopHandle, "loop handle"_a8));
         switch (async.operation.type)
         {
         case Async::Type::Accept: return activateAcceptWatcher(loopHandle, async);
@@ -308,7 +310,7 @@ struct SC::EventLoop::KernelQueue
                       "Check acceptBuffer size");
         Async::AcceptSupport& support = *asyncAccept.support;
 
-        EventLoopWindowsOverlapped& overlapped = support.overlapped.get();
+        EventLoopWinOverlapped& overlapped = support.overlapped.get();
 
         overlapped.userData = &async;
 
@@ -346,22 +348,22 @@ struct SC::EventLoop::KernelQueue
 };
 
 template <>
-void SC::OpaqueFuncs<SC::EventLoopWindowsOverlappedTraits>::construct(Handle& buffer)
+void SC::OpaqueFuncs<SC::EventLoopWinOverlappedTraits>::construct(Handle& buffer)
 {
     new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object();
 }
 template <>
-void SC::OpaqueFuncs<SC::EventLoopWindowsOverlappedTraits>::destruct(Object& obj)
+void SC::OpaqueFuncs<SC::EventLoopWinOverlappedTraits>::destruct(Object& obj)
 {
     obj.~Object();
 }
 template <>
-void SC::OpaqueFuncs<SC::EventLoopWindowsOverlappedTraits>::moveConstruct(Handle& buffer, Object&& obj)
+void SC::OpaqueFuncs<SC::EventLoopWinOverlappedTraits>::moveConstruct(Handle& buffer, Object&& obj)
 {
     new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object(move(obj));
 }
 template <>
-void SC::OpaqueFuncs<SC::EventLoopWindowsOverlappedTraits>::moveAssign(Object& pthis, Object&& obj)
+void SC::OpaqueFuncs<SC::EventLoopWinOverlappedTraits>::moveAssign(Object& pthis, Object&& obj)
 {
     pthis = move(obj);
 }

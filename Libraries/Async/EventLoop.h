@@ -3,13 +3,11 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 
-#include "../FileSystem/FileDescriptor.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Span.h"
 #include "../Foundation/TaggedUnion.h"
-#include "../Networking/SocketDescriptor.h"
-#include "../System/ProcessDescriptor.h"
+#include "../System/Descriptors.h"
 #include "../System/Time.h"
 #include "../Threading/Atomic.h"
 
@@ -28,13 +26,13 @@ struct EventObject;
 
 namespace SC
 {
-struct EventLoopWindowsOverlapped;
-struct EventLoopWindowsOverlappedSizes
+struct EventLoopWinOverlapped;
+struct EventLoopWinOverlappedSizes
 {
     static constexpr int Windows = sizeof(void*) * 7;
 };
-using EventLoopWindowsOverlappedTraits = OpaqueTraits<EventLoopWindowsOverlapped, EventLoopWindowsOverlappedSizes>;
-using EventLoopWindowsOverlappedOpaque = OpaqueUniqueObject<OpaqueFuncs<EventLoopWindowsOverlappedTraits>>;
+using EventLoopWinOverlappedTraits = OpaqueTraits<EventLoopWinOverlapped, EventLoopWinOverlappedSizes>;
+using EventLoopWinOverlappedOpaque = OpaqueUniqueObject<OpaqueFuncs<EventLoopWinOverlappedTraits>>;
 } // namespace SC
 
 struct SC::Async
@@ -57,8 +55,8 @@ struct SC::Async
 
     struct Read
     {
-        FileDescriptorNative fileDescriptor;
-        Span<uint8_t>        readBuffer;
+        FileDescriptor::Handle fileDescriptor;
+        Span<uint8_t>          readBuffer;
     };
 
     struct WakeUp
@@ -69,22 +67,22 @@ struct SC::Async
 
     struct ProcessExit
     {
-        ProcessNative     handle = ProcessNativeInvalid;
-        ProcessExitOpaque opaque; // TODO: We should make this a pointer as it's too big on Win
+        ProcessDescriptor::Handle handle = ProcessDescriptor::Invalid;
+        ProcessExitOpaque         opaque; // TODO: We should make this a pointer as it's too big on Win
     };
 
     struct AcceptSupport
     {
 #if SC_PLATFORM_WINDOWS
-        SocketDescriptorNativeHandle     clientSocket;
-        EventLoopWindowsOverlappedOpaque overlapped;
-        uint8_t                          acceptBuffer[288];
+        SocketDescriptor             clientSocket;
+        EventLoopWinOverlappedOpaque overlapped;
+        uint8_t                      acceptBuffer[288];
 #endif
     };
     struct Accept
     {
-        SocketDescriptorNative handle  = SocketDescriptorNativeInvalid;
-        AcceptSupport*         support = nullptr;
+        SocketDescriptor::Handle handle  = SocketDescriptor::Invalid;
+        AcceptSupport*           support = nullptr;
     };
     enum class Type
     {
@@ -146,12 +144,12 @@ struct SC::AsyncResult
 
     struct ProcessExit
     {
-        ProcessExitStatus exitStatus;
+        ProcessDescriptor::ExitStatus exitStatus;
     };
 
     struct Accept
     {
-        SocketDescriptorNativeHandle acceptedClient;
+        SocketDescriptor acceptedClient;
     };
     using Type = Async::Type;
 
@@ -223,18 +221,18 @@ struct SC::EventLoop
     [[nodiscard]] ReturnCode startTimeout(AsyncTimeout& async, IntegerMilliseconds expiration,
                                           Function<void(AsyncResult&)>&& callback);
 
-    [[nodiscard]] ReturnCode startRead(AsyncRead& async, FileDescriptorNative fileDescriptor, Span<uint8_t> readBuffer,
-                                       Function<void(AsyncResult&)>&& callback);
+    [[nodiscard]] ReturnCode startRead(AsyncRead& async, FileDescriptor::Handle fileDescriptor,
+                                       Span<uint8_t> readBuffer, Function<void(AsyncResult&)>&& callback);
 
     [[nodiscard]] ReturnCode startWakeUp(AsyncWakeUp& async, Function<void(AsyncResult&)>&& callback,
                                          EventObject* eventObject = nullptr);
 
     [[nodiscard]] ReturnCode startProcessExit(AsyncProcessExit& async, Function<void(AsyncResult&)>&& callback,
-                                              ProcessNative process);
+                                              ProcessDescriptor::Handle process);
 
     [[nodiscard]] ReturnCode startAccept(AsyncAccept& async, Async::AcceptSupport& support,
-                                         const SocketDescriptorNativeHandle& socketDescriptor,
-                                         Function<void(AsyncResult&)>&&      callback);
+                                         const SocketDescriptor&        socketDescriptor,
+                                         Function<void(AsyncResult&)>&& callback);
 
     // WakeUp support
     [[nodiscard]] ReturnCode wakeUpFromExternalThread(AsyncWakeUp& wakeUp);
@@ -242,7 +240,7 @@ struct SC::EventLoop
     [[nodiscard]] ReturnCode wakeUpFromExternalThread();
 
     // Access Internals
-    [[nodiscard]] ReturnCode getLoopFileDescriptor(FileDescriptorNative& fileDescriptor) const;
+    [[nodiscard]] ReturnCode getLoopFileDescriptor(FileDescriptor::Handle& fileDescriptor) const;
 
   private:
     IntrusiveDoubleLinkedList<Async> submissions;

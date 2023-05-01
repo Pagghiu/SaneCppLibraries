@@ -36,12 +36,12 @@ struct SC::ProcessTest : public SC::TestCase
             StringView expectedOutput = "C:\\Windows\\System32\\where.exe\r\n"_a8;
             SC_TEST_EXPECT(process.formatCommand("where", "where.exe"));
 #endif
-            FileDescriptorPipe outputPipe;
+            PipeDescriptor outputPipe;
             SC_TEST_EXPECT(process.redirectStdOutTo(outputPipe));
             SC_TEST_EXPECT(process.launch());
 
             SmallString<255> output = StringEncoding::Ascii;
-            SC_TEST_EXPECT(outputPipe.readUntilEOF(output));
+            SC_TEST_EXPECT(outputPipe.readPipe.readUntilEOF(output));
             SC_TEST_EXPECT(process.waitForExitSync());
             SC_TEST_EXPECT(output.view() == expectedOutput);
         }
@@ -133,9 +133,9 @@ struct SC::ProcessTest : public SC::TestCase
 #else
             SC_TEST_EXPECT(process.launch("where", "where.exe"));
 #endif
-            ProcessNative processHandle;
+            ProcessDescriptor::Handle processHandle;
             SC_TEST_EXPECT(process.handle.get(processHandle, false));
-            ProcessExitStatus exitStatus;
+            ProcessDescriptor::ExitStatus exitStatus;
             auto processLambda = [&](const AsyncResult& res) { exitStatus = res.result.fields.processExit.exitStatus; };
             AsyncProcessExit async;
             SC_TEST_EXPECT(eventLoop.startProcessExit(async, processLambda, processHandle));

@@ -45,9 +45,9 @@ SC::ReturnCode SC::ProcessChain::launch(ProcessChainOptions options)
             return error.returnCode;
         }
     }
-    SC_TRY_IF(inputPipe.readPipe.handle.close());
-    SC_TRY_IF(outputPipe.writePipe.handle.close());
-    SC_TRY_IF(errorPipe.writePipe.handle.close());
+    SC_TRY_IF(inputPipe.readPipe.close());
+    SC_TRY_IF(outputPipe.writePipe.close());
+    SC_TRY_IF(errorPipe.writePipe.close());
     return true;
 }
 
@@ -57,10 +57,10 @@ SC::ReturnCode SC::ProcessChain::pipe(Process& process, std::initializer_list<St
 
     if (not processes.isEmpty())
     {
-        FileDescriptorPipe chainPipe;
-        SC_TRY_IF(chainPipe.createPipe(FileDescriptorPipe::ReadInheritable, FileDescriptorPipe::WriteInheritable));
-        SC_TRY_IF(processes.back->standardOutput.handle.assign(move(chainPipe.writePipe.handle)));
-        SC_TRY_IF(process.standardInput.handle.assign(move(chainPipe.readPipe.handle)));
+        PipeDescriptor chainPipe;
+        SC_TRY_IF(chainPipe.createPipe(PipeDescriptor::ReadInheritable, PipeDescriptor::WriteInheritable));
+        SC_TRY_IF(processes.back->standardOutput.assign(move(chainPipe.writePipe)));
+        SC_TRY_IF(process.standardInput.assign(move(chainPipe.readPipe)));
     }
     SC_TRY_IF(process.formatCommand(cmd));
     process.parent = this;
@@ -96,9 +96,9 @@ SC::ReturnCode SC::ProcessChain::waitForExitSync()
         process->parent = nullptr;
     }
     processes.clear();
-    SC_TRY_IF(inputPipe.writePipe.handle.close());
-    SC_TRY_IF(outputPipe.readPipe.handle.close());
-    SC_TRY_IF(errorPipe.readPipe.handle.close());
+    SC_TRY_IF(inputPipe.writePipe.close());
+    SC_TRY_IF(outputPipe.readPipe.close());
+    SC_TRY_IF(errorPipe.readPipe.close());
     return error.returnCode;
 }
 
@@ -129,20 +129,20 @@ SC::ReturnCode SC::Process::formatCommand(std::initializer_list<StringView> para
     return true;
 }
 
-SC::ReturnCode SC::Process::redirectStdOutTo(FileDescriptorPipe& pipe)
+SC::ReturnCode SC::Process::redirectStdOutTo(PipeDescriptor& pipe)
 {
-    SC_TRY_IF(pipe.createPipe(FileDescriptorPipe::ReadNonInheritable, FileDescriptorPipe::WriteInheritable));
-    return standardOutput.handle.assign(move(pipe.writePipe.handle));
+    SC_TRY_IF(pipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteInheritable));
+    return standardOutput.assign(move(pipe.writePipe));
 }
 
-SC::ReturnCode SC::Process::redirectStdErrTo(FileDescriptorPipe& pipe)
+SC::ReturnCode SC::Process::redirectStdErrTo(PipeDescriptor& pipe)
 {
-    SC_TRY_IF(pipe.createPipe(FileDescriptorPipe::ReadNonInheritable, FileDescriptorPipe::WriteInheritable));
-    return standardError.handle.assign(move(pipe.writePipe.handle));
+    SC_TRY_IF(pipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteInheritable));
+    return standardError.assign(move(pipe.writePipe));
 }
 
-SC::ReturnCode SC::Process::redirectStdInTo(FileDescriptorPipe& pipe)
+SC::ReturnCode SC::Process::redirectStdInTo(PipeDescriptor& pipe)
 {
-    SC_TRY_IF(pipe.createPipe(FileDescriptorPipe::ReadInheritable, FileDescriptorPipe::WriteNonInheritable));
-    return standardInput.handle.assign(move(pipe.readPipe.handle));
+    SC_TRY_IF(pipe.createPipe(PipeDescriptor::ReadInheritable, PipeDescriptor::WriteNonInheritable));
+    return standardInput.assign(move(pipe.readPipe));
 }

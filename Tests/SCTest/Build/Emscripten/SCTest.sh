@@ -54,7 +54,6 @@ time em++ -std=c++20 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -sASYNCIFY \
 --no-entry \
 Libraries/Async/EventLoop.cpp              	\
-Libraries/FileSystem/FileDescriptor.cpp     \
 Libraries/FileSystem/FileSystem.cpp         \
 Libraries/FileSystem/FileSystemWalker.cpp   \
 Libraries/FileSystem/FileSystemWatcher.cpp	\
@@ -67,6 +66,7 @@ Libraries/Foundation/StringView.cpp         \
 Libraries/Networking/Networking.cpp         \
 Libraries/Process/Process.cpp               \
 Libraries/System/Console.cpp                \
+Libraries/System/Descriptors.cpp            \
 Libraries/System/System.cpp                 \
 Libraries/System/Time.cpp                   \
 Libraries/Threading/Threading.cpp           \

@@ -5,7 +5,7 @@
 #include "../Foundation/Opaque.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/StringView.h"
-#include "FileDescriptor.h"
+#include "../System/Descriptors.h"
 
 namespace SC
 {

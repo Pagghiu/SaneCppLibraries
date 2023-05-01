@@ -7,6 +7,5 @@
 struct SC::Process::Internal
 {
 };
-SC::ReturnCode SC::ProcessNativeHandleClose(int& handle) { return true; }
 SC::ReturnCode SC::Process::launch(ProcessOptions options) { return true; }
 SC::ReturnCode SC::Process::waitForExitSync() { return true; }

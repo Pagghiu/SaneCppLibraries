@@ -11,7 +11,7 @@ struct SC::EventLoop::Internal
     FileDescriptor loopFd;
 
     ~Internal() { SC_TRUST_RESULT(close()); }
-    [[nodiscard]] ReturnCode close() { return loopFd.handle.close(); }
+    [[nodiscard]] ReturnCode close() { return loopFd.close(); }
     [[nodiscard]] ReturnCode createEventLoop() { return true; }
     [[nodiscard]] ReturnCode createWakeup(EventLoop&) { return true; }
     [[nodiscard]] Async*     getAsync(const int& event) const { return nullptr; }

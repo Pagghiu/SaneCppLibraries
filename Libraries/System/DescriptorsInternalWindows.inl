@@ -2,14 +2,45 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include <WinSock2.h>
+
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include "FileDescriptor.h"
+#include "../Foundation/Vector.h"
+#include "Descriptors.h"
+#include "System.h"
+
+// FileDescriptor
+
+SC::ReturnCode SC::FileDescriptorTraits::releaseHandle(Handle& handle)
+{
+    if (::CloseHandle(handle) == FALSE)
+    {
+        return "FileDescriptorTraits::releaseHandle - CloseHandle failed"_a8;
+    }
+    return true;
+}
+
+SC::ReturnCode SC::FileDescriptor::setBlocking(bool blocking)
+{
+    // TODO: IMPLEMENT
+    SC_UNUSED(blocking);
+    return false;
+}
+
+SC::ReturnCode SC::FileDescriptor::setInheritable(bool inheritable)
+{
+    if (SetHandleInformation(handle, HANDLE_FLAG_INHERIT, inheritable ? TRUE : FALSE) == FALSE)
+    {
+        return "FileDescriptor::setInheritable - ::SetHandleInformation failed"_a8;
+    }
+    return true;
+}
 
 struct SC::FileDescriptor::Internal
 {
-    [[nodiscard]] static bool isActualError(BOOL success, DWORD numReadBytes, FileDescriptorNative fileDescriptor)
+    [[nodiscard]] static bool isActualError(BOOL success, DWORD numReadBytes, FileDescriptor::Handle fileDescriptor)
     {
         if (success == FALSE && numReadBytes == 0 && GetFileType(fileDescriptor) == FILE_TYPE_PIPE &&
             GetLastError() == ERROR_BROKEN_PIPE)
@@ -25,20 +56,12 @@ struct SC::FileDescriptor::Internal
         return success == FALSE;
     }
 };
-SC::ReturnCode SC::FileDescriptorNativeClose(FileDescriptorNative& fileDescriptor)
-{
-    if (::CloseHandle(fileDescriptor) == FALSE)
-    {
-        return "FileDescriptorNativeClose - CloseHandle failed"_a8;
-    }
-    return true;
-}
 
 SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector<char>& output,
                                                                           Span<char>    fallbackBuffer)
 {
-    FileDescriptorNative fileDescriptor;
-    SC_TRY_IF(handle.get(fileDescriptor, "FileDescriptor::readAppend - Invalid Handle"_a8));
+    FileDescriptor::Handle fileDescriptor;
+    SC_TRY_IF(get(fileDescriptor, "FileDescriptor::readAppend - Invalid Handle"_a8));
 
     const bool useVector = output.capacity() > output.size();
 
@@ -83,27 +106,95 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
     }
 }
 
-SC::ReturnCode SC::FileDescriptor::setBlocking(bool blocking)
+// SocketDescriptor
+
+SC::ReturnCode SC::SocketDescriptorTraits::releaseHandle(Handle& handle)
 {
-    FileDescriptorNative fileDescriptor;
-    SC_TRY_IF(handle.get(fileDescriptor, "FileDescriptor::setBlocking - Invalid Handle"_a8));
-    // TODO: IMPLEMENT
-    SC_UNUSED(blocking);
-    return false;
+    ::closesocket(handle);
+    handle = SocketDescriptor::Invalid;
+    return true;
 }
 
-SC::ReturnCode SC::FileDescriptor::setInheritable(bool inheritable)
+SC::ReturnCode SC::SocketDescriptor::setInheritable(bool inheritable)
 {
-    FileDescriptorNative fileDescriptor;
-    SC_TRY_IF(handle.get(fileDescriptor, "FileDescriptor::setInheritable - Invalid Handle"_a8));
-    if (SetHandleInformation(fileDescriptor, HANDLE_FLAG_INHERIT, inheritable ? TRUE : FALSE) == FALSE)
+    if (::SetHandleInformation(reinterpret_cast<HANDLE>(handle), HANDLE_FLAG_INHERIT, inheritable ? TRUE : FALSE) ==
+        FALSE)
     {
-        return "FileDescriptor::setInheritable - ::SetHandleInformation failed"_a8;
+        "SetHandleInformation failed"_a8;
     }
     return true;
 }
 
-SC::ReturnCode SC::FileDescriptorPipe::createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag)
+SC::ReturnCode SC::SocketDescriptor::setBlocking(bool blocking)
+{
+    ULONG enable = blocking ? 0 : 1;
+    if (::ioctlsocket(handle, FIONBIO, &enable) == SOCKET_ERROR)
+    {
+        return "ioctlsocket failed"_a8;
+    }
+    return true;
+}
+
+SC::ReturnCode SC::SocketDescriptor::isInheritable(bool& hasValue) const
+{
+    DWORD flags;
+    if (::GetHandleInformation(reinterpret_cast<HANDLE>(handle), &flags) == FALSE)
+    {
+        return "GetHandleInformation failed"_a8;
+    }
+    hasValue = (flags & HANDLE_FLAG_INHERIT) != 0;
+    return true;
+}
+
+SC::ReturnCode SC::SocketDescriptor::create(IPType ipType, Protocol protocol, BlockingType blocking,
+                                            InheritableType inheritable)
+{
+    SC_TRY_IF(SystemFunctions::isNetworkingInited());
+    SC_TRUST_RESULT(close());
+    int type = AF_UNSPEC;
+    switch (ipType)
+    {
+    case IPTypeV4: type = AF_INET; break;
+    case IPTypeV6: type = AF_INET6; break;
+    }
+
+    int proto = IPPROTO_TCP;
+
+    switch (protocol)
+    {
+    case ProtocolTcp: proto = IPPROTO_TCP; break;
+    }
+
+    DWORD flags = 0;
+    if (inheritable == NonInheritable)
+    {
+        flags |= WSA_FLAG_NO_HANDLE_INHERIT;
+    }
+    if (blocking == NonBlocking)
+    {
+        flags |= WSA_FLAG_OVERLAPPED;
+    }
+    handle = ::WSASocketW(type, SOCK_STREAM, proto, nullptr, 0, flags);
+    if (!isValid())
+    {
+        return "WSASocketW failed"_a8;
+    }
+    SC_TRY_IF(setBlocking(blocking == Blocking));
+    return isValid();
+}
+
+// ProcessDescriptor
+
+SC::ReturnCode SC::ProcessDescriptorTraits::releaseHandle(HANDLE& handle)
+{
+    if (::CloseHandle(handle) == FALSE)
+        return "ProcessNativeHandleClose - CloseHandle failed"_a8;
+    return true;
+}
+
+// PipeDescriptor
+
+SC::ReturnCode SC::PipeDescriptor::createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag)
 {
     // On Windows to inherit flags they must be flagged as inheritable
     // https://devblogs.microsoft.com/oldnewthing/20111216-00/?p=8873
@@ -117,10 +208,10 @@ SC::ReturnCode SC::FileDescriptorPipe::createPipe(InheritableReadFlag readFlag, 
 
     if (CreatePipe(&pipeRead, &pipeWrite, &security, 0) == FALSE)
     {
-        return "FileDescriptorPipe::createPipe - ::CreatePipe failed"_a8;
+        return "PipeDescriptor::createPipe - ::CreatePipe failed"_a8;
     }
-    SC_TRY_IF(readPipe.handle.assign(pipeRead));
-    SC_TRY_IF(writePipe.handle.assign(pipeWrite));
+    SC_TRY_IF(readPipe.assign(pipeRead));
+    SC_TRY_IF(writePipe.assign(pipeWrite));
 
     if (security.bInheritHandle)
     {
