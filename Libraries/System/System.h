@@ -8,6 +8,7 @@ namespace SC
 {
 struct SystemDebug;
 struct SystemDirectories;
+struct SystemFunctions;
 } // namespace SC
 
 struct SC::SystemDebug
@@ -26,4 +27,21 @@ struct SC::SystemDirectories
     SmallString<StaticPathSize> applicationRootDirectory; // Full path to (native encoding) Application directory
 
     [[nodiscard]] bool init();
+};
+
+struct SC::SystemFunctions
+{
+    SystemFunctions() = default;
+    ~SystemFunctions();
+
+    [[nodiscard]] ReturnCode  initNetworking();
+    [[nodiscard]] ReturnCode  shutdownNetworking();
+    [[nodiscard]] static bool isNetworkingInited();
+
+  private:
+    struct Internal;
+    SystemFunctions(const SystemFunctions&)            = delete;
+    SystemFunctions& operator=(const SystemFunctions&) = delete;
+    SystemFunctions(SystemFunctions&&)                 = delete;
+    SystemFunctions& operator=(SystemFunctions&&)      = delete;
 };

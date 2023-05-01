@@ -4,9 +4,11 @@
 #include "../FileSystem/Path.h"
 #include "../Foundation/SmallVector.h"
 #include "../Foundation/StringBuilder.h"
+#include "../Threading/Atomic.h"
 #include "System.h"
 
 #include <Windows.h>
+#pragma comment(lib, "Ws2_32.lib")
 
 bool SC::SystemDirectories::init()
 {
@@ -63,4 +65,38 @@ SC::size_t SC::SystemDebug::captureBacktrace(size_t framesToSkip, void** backtra
     if (backtraceBuffer == nullptr)
         return 0;
     return 1;
+}
+
+struct SC::SystemFunctions::Internal
+{
+    Atomic<bool> networkingInited = false;
+
+    static Internal& get()
+    {
+        static Internal internal;
+        return internal;
+    }
+};
+
+bool SC::SystemFunctions::isNetworkingInited() { return Internal::get().networkingInited.load(); }
+
+SC::ReturnCode SC::SystemFunctions::initNetworking()
+{
+    if (isNetworkingInited() == false)
+    {
+        WSADATA wsa;
+        if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+        {
+            return "WSAStartup failed"_a8;
+        }
+        Internal::get().networkingInited.exchange(true);
+    }
+    return true;
+}
+
+SC::ReturnCode SC::SystemFunctions::shutdownNetworking()
+{
+    WSACleanup();
+    Internal::get().networkingInited.exchange(false);
+    return true;
 }

@@ -19,3 +19,14 @@ void SC::exit(int code) { ::emscripten_force_exit(code); }
 void SC::exit(int code) { ::_exit(code); }
 #endif
 bool SC::printBacktrace() { return SystemDebug::printBacktrace(); }
+
+#if !SC_PLATFORM_WINDOWS
+
+SC::ReturnCode SC::SystemFunctions::initNetworking() { return true; }
+
+SC::ReturnCode SC::SystemFunctions::shutdownNetworking() { return true; }
+
+bool SC::SystemFunctions::isNetworkingInited() { return true; }
+#endif
+
+SC::SystemFunctions::~SystemFunctions() { SC_TRUST_RESULT(shutdownNetworking()); }
