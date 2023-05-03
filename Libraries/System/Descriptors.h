@@ -12,6 +12,7 @@ struct String;
 template <typename T>
 struct Vector;
 
+struct Descriptor;
 struct FileDescriptor;
 struct SocketDescriptor;
 struct ProcessDescriptor;
@@ -67,6 +68,43 @@ struct ProcessDescriptorTraits
 
 } // namespace SC
 
+struct SC::Descriptor
+{
+    enum BlockingType
+    {
+        NonBlocking,
+        Blocking
+    };
+    enum InheritableType
+    {
+        NonInheritable,
+        Inheritable
+    };
+    enum AddressFamily
+    {
+        AddressFamilyIPV4,
+        AddressFamilyIPV6,
+    };
+    [[nodiscard]] static AddressFamily AddressFamilyFromInt(int value);
+    [[nodiscard]] static unsigned char toNative(AddressFamily family);
+
+    enum SocketType
+    {
+        SocketStream,
+        SocketDgram
+    };
+    [[nodiscard]] static SocketType SocketTypeFromInt(int value);
+    [[nodiscard]] static int        toNative(SocketType family);
+
+    enum ProtocolType
+    {
+        ProtocolTcp,
+        ProtocolUdp,
+    };
+    [[nodiscard]] static ProtocolType ProtocolTypeFromInt(int value);
+    [[nodiscard]] static int          toNative(ProtocolType family);
+};
+
 struct SC::FileDescriptor : public SC::UniqueTaggedHandleTraits<SC::FileDescriptorTraits>
 {
     struct ReadResult
@@ -89,30 +127,15 @@ struct SC::FileDescriptor : public SC::UniqueTaggedHandleTraits<SC::FileDescript
 
 struct SC::SocketDescriptor : public UniqueTaggedHandleTraits<SocketDescriptorTraits>
 {
-    enum BlockingType
-    {
-        NonBlocking,
-        Blocking
-    };
-    enum InheritableType
-    {
-        NonInheritable,
-        Inheritable
-    };
-    enum IPType
-    {
-        IPTypeV4,
-        IPTypeV6,
-    };
-    enum Protocol
-    {
-        ProtocolTcp,
-    };
-    [[nodiscard]] ReturnCode create(IPType ipType, Protocol protocol, BlockingType blocking = NonBlocking,
-                                    InheritableType inheritable = NonInheritable);
+    [[nodiscard]] ReturnCode create(Descriptor::AddressFamily   addressFamily,
+                                    Descriptor::SocketType      socketType  = Descriptor::SocketStream,
+                                    Descriptor::ProtocolType    protocol    = Descriptor::ProtocolTcp,
+                                    Descriptor::BlockingType    blocking    = Descriptor::Blocking,
+                                    Descriptor::InheritableType inheritable = Descriptor::NonInheritable);
     [[nodiscard]] ReturnCode isInheritable(bool& value) const;
     [[nodiscard]] ReturnCode setInheritable(bool value);
     [[nodiscard]] ReturnCode setBlocking(bool value);
+    [[nodiscard]] ReturnCode getAddressFamily(Descriptor::AddressFamily& addressFamily) const;
 };
 
 struct SC::ProcessDescriptor : public UniqueTaggedHandleTraits<ProcessDescriptorTraits>

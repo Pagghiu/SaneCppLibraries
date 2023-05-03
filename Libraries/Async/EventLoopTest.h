@@ -146,9 +146,11 @@ struct SC::EventLoopTest : public SC::TestCase
             EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
+            constexpr uint32_t numWaitingConnections = 2;
+
             TCPServer server;
-            uint32_t  tcpPort = 0;
-            SC_TEST_EXPECT(listenToAvailablePort(server, "127.0.0.1", 5050, 5060, tcpPort));
+            uint16_t  tcpPort = 0;
+            SC_TEST_EXPECT(listenToAvailablePort(server, "127.0.0.1", numWaitingConnections, 5050, 5060, tcpPort));
 
             int       numClient = 0;
             TCPClient acceptedClient[3];
@@ -195,13 +197,14 @@ struct SC::EventLoopTest : public SC::TestCase
         }
     }
 
-    [[nodiscard]] ReturnCode listenToAvailablePort(TCPServer& server, StringView address, const uint32_t startTcpPort,
-                                                   const uint32_t endTcpPort, uint32_t& tcpPort)
+    [[nodiscard]] ReturnCode listenToAvailablePort(TCPServer& server, StringView address,
+                                                   uint32_t numWaitingConnections, const uint16_t startTcpPort,
+                                                   const uint16_t endTcpPort, uint16_t& tcpPort)
     {
         ReturnCode bound = false;
         for (tcpPort = startTcpPort; tcpPort < endTcpPort; ++tcpPort)
         {
-            bound = server.listen(address, tcpPort);
+            bound = server.listen(address, tcpPort, numWaitingConnections);
             if (bound)
             {
                 return true;

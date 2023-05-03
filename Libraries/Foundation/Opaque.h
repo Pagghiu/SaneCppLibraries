@@ -12,7 +12,7 @@ void static_assert_size()
     static_assert(R <= E, "Size mismatch");
 }
 
-template <int N, int Alignment>
+template <int N, int Alignment = alignof(void*)>
 struct OpaqueHandle
 {
     template <typename T>
@@ -100,6 +100,8 @@ struct UniqueTaggedHandleTraits
 
     [[nodiscard]] CloseReturnType assign(UniqueTaggedHandleTraits&& other)
     {
+        if (other.handle == handle)
+            return false;
         if (close())
         {
             handle = other.handle;
@@ -111,6 +113,8 @@ struct UniqueTaggedHandleTraits
 
     [[nodiscard]] CloseReturnType assign(const Handle& externalHandle)
     {
+        if (handle == externalHandle)
+            return false;
         if (close())
         {
             handle = externalHandle;

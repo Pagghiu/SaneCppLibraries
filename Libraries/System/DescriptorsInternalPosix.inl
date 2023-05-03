@@ -9,6 +9,7 @@
 #include <fcntl.h>  // fcntl
 #include <netdb.h>  // AF_INET / IPPROTO_TCP / AF_UNSPEC
 #include <unistd.h> // close
+constexpr int SOCKET_ERROR = -1;
 
 namespace SC
 {
@@ -188,47 +189,42 @@ SC::ReturnCode SC::SocketDescriptor::isInheritable(bool& hasValue) const
     hasValue = not hasValue;
     return res;
 }
-SC::ReturnCode SC::SocketDescriptor::create(IPType ipType, Protocol protocol, BlockingType blocking,
-                                            InheritableType inheritable)
+
+SC::ReturnCode SC::SocketDescriptor::create(Descriptor::AddressFamily addressFamily, Descriptor::SocketType socketType,
+                                            Descriptor::ProtocolType protocol, Descriptor::BlockingType blocking,
+                                            Descriptor::InheritableType inheritable)
 {
     SC_TRY_IF(SystemFunctions::isNetworkingInited());
     SC_TRUST_RESULT(close());
-    int type = AF_UNSPEC;
-    switch (ipType)
-    {
-    case IPTypeV4: type = AF_INET; break;
-    case IPTypeV6: type = AF_INET6; break;
-    }
 
-    int proto = IPPROTO_TCP;
-
-    switch (protocol)
-    {
-    case ProtocolTcp: proto = IPPROTO_TCP; break;
-    }
-
-    int flags = SOCK_STREAM;
+    int typeWithAdditions = Descriptor::toNative(socketType);
 #if defined(SOCK_NONBLOCK)
-    if (blocking == NonBlocking)
+    if (blocking == Descriptor::NonBlocking)
     {
-        flags |= SOCK_NONBLOCK;
+        typeWithAdditions |= SOCK_NONBLOCK;
     }
 #endif // defined(SOCK_NONBLOCK)
 #if defined(SOCK_CLOEXEC)
-    if (inheritable == NonInheritable)
+    if (inheritable == Descriptor::NonInheritable)
     {
-        flags |= SOCK_CLOEXEC;
+        typeWithAdditions |= SOCK_CLOEXEC;
     }
 #endif // defined(SOCK_CLOEXEC)
     do
     {
-        handle = ::socket(type, flags, proto);
+        handle = ::socket(Descriptor::toNative(addressFamily), typeWithAdditions, Descriptor::toNative(protocol));
     } while (handle == -1 and errno == EINTR);
 #if !defined(SOCK_CLOEXEC)
-    SC_TRY_IF(setInheritable(inheritable == Inheritable));
+    if (inheritable == Descriptor::NonInheritable)
+    {
+        SC_TRY_IF(setInheritable(false));
+    }
 #endif // !defined(SOCK_CLOEXEC)
 #if !defined(SOCK_NONBLOCK)
-    SC_TRY_IF(setBlocking(blocking == Blocking));
+    if (blocking == Descriptor::NonBlocking)
+    {
+        SC_TRY_IF(setBlocking(false));
+    }
 #endif // !defined(SOCK_NONBLOCK)
 
 #if defined(SO_NOSIGPIPE)

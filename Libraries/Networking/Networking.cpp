@@ -10,66 +10,126 @@
 #if SC_PLATFORM_WINDOWS
 
 #include <WinSock2.h>
-#include <Ws2tcpip.h> // getaddrinfo
+#include <Ws2tcpip.h> // sockadd_in6
 
 using socklen_t = int;
 
 #else
 
-#include <netdb.h>      // AF_INET / IPPROTO_TCP / AF_UNSPEC
+#include <arpa/inet.h>  // inet_pton
 #include <sys/select.h> // fd_set for emscripten
 constexpr int SOCKET_ERROR = -1;
 
 #endif
 
+namespace SC
+{
+struct NetworkingInternal
+{
+    [[nodiscard]] static ReturnCode parseIPV4(StringView ipAddress, uint16_t port, struct sockaddr_in& inaddr)
+    {
+        SmallString<64> buffer = StringEncoding::Ascii;
+        StringView      ipNullTerm;
+        SC_TRY_IF(StringConverter(buffer).convertNullTerminateFastPath(ipAddress, ipNullTerm));
+        memset(&inaddr, 0, sizeof(inaddr));
+        inaddr.sin_port   = htons(port);
+        inaddr.sin_family = Descriptor::toNative(Descriptor::AddressFamilyIPV4);
+        const auto res    = ::inet_pton(inaddr.sin_family, ipNullTerm.bytesIncludingTerminator(), &inaddr.sin_addr);
+        if (res == 0)
+        {
+            return "inet_pton Invalid IPV4 Address"_a8;
+        }
+        else if (res == -1)
+        {
+            return "inet_pton IPV4 failed"_a8;
+        }
+        return true;
+    }
+
+    [[nodiscard]] static ReturnCode parseIPV6(StringView ipAddress, uint16_t port, struct sockaddr_in6& inaddr)
+    {
+        SmallString<64> buffer = StringEncoding::Ascii;
+        StringView      ipNullTerm;
+        SC_TRY_IF(StringConverter(buffer).convertNullTerminateFastPath(ipAddress, ipNullTerm));
+        memset(&inaddr, 0, sizeof(inaddr));
+        inaddr.sin6_port   = htons(port);
+        inaddr.sin6_family = Descriptor::toNative(Descriptor::AddressFamilyIPV6);
+        const auto res     = ::inet_pton(inaddr.sin6_family, ipNullTerm.bytesIncludingTerminator(), &inaddr.sin6_addr);
+        if (res == 0)
+        {
+            return "inet_pton Invalid IPV6 Address"_a8;
+        }
+        else if (res == -1)
+        {
+            return "inet_pton IPV6 failed"_a8;
+        }
+        return true;
+    }
+};
+} // namespace SC
+
+SC::uint32_t SC::NativeIPAddress::sizeOfHandle() const
+{
+    switch (addressFamily)
+    {
+    case Descriptor::AddressFamilyIPV4: return sizeof(sockaddr_in);
+    case Descriptor::AddressFamilyIPV6: return sizeof(sockaddr_in6);
+    }
+    SC_UNREACHABLE();
+}
+
+SC::ReturnCode SC::NativeIPAddress::fromAddressPort(StringView interfaceAddress, uint16_t port)
+{
+    static_assert(sizeof(sockaddr_in6) >= sizeof(sockaddr_in), "size");
+    static_assert(alignof(sockaddr_in6) >= alignof(sockaddr_in), "size");
+
+    ReturnCode ipParsedOk = NetworkingInternal::parseIPV4(interfaceAddress, port, handle.reinterpret_as<sockaddr_in>());
+    if (not ipParsedOk)
+    {
+        ipParsedOk = NetworkingInternal::parseIPV6(interfaceAddress, port, handle.reinterpret_as<sockaddr_in6>());
+        if (not ipParsedOk)
+        {
+            return ipParsedOk;
+        }
+        addressFamily = Descriptor::AddressFamilyIPV6;
+    }
+    else
+    {
+        addressFamily = Descriptor::AddressFamilyIPV4;
+    }
+    return true;
+}
+
 SC::ReturnCode SC::TCPServer::close() { return socket.close(); }
 
 // TODO: Add EINTR checks for all TCPServer/TCPClient os calls.
 
-SC::ReturnCode SC::TCPServer::listen(StringView interfaceAddress, uint32_t port)
+SC::ReturnCode SC::TCPServer::listen(StringView interfaceAddress, uint16_t port, uint32_t numberOfWaitingConnections)
 {
     SC_TRY_IF(SystemFunctions::isNetworkingInited());
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family   = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags    = AI_PASSIVE;
 
-    SmallString<12> service = StringEncoding::Ascii; // 10 digits + sign + nullterm
-    SC_TRY_IF(StringBuilder(service).format("{}", port));
-
-    SmallString<64> addressBuffer = StringEncoding::Ascii;
-    StringView      addressZeroTerminated;
-    SC_TRY_IF(StringConverter(addressBuffer).convertNullTerminateFastPath(interfaceAddress, addressZeroTerminated));
-
-    struct addrinfo* addressInfos;
-
-    if (::getaddrinfo(addressZeroTerminated.bytesIncludingTerminator(), service.data.data(), &hints, &addressInfos) !=
-        0)
+    NativeIPAddress nativeAddress;
+    SC_TRY_IF(nativeAddress.fromAddressPort(interfaceAddress, port));
+    if (not socket.isValid())
     {
-        return "Cannot resolve hostname"_a8;
+        SC_TRY_IF(socket.create(nativeAddress.getAddressFamily(), Descriptor::SocketStream, Descriptor::ProtocolTcp));
     }
-    auto destroyAddresses = MakeDeferred([&]() { freeaddrinfo(addressInfos); });
 
-    SocketDescriptor::Handle openedSocket;
-    openedSocket = ::socket(addressInfos->ai_family, addressInfos->ai_socktype, addressInfos->ai_protocol);
-    SC_TRY_MSG(openedSocket != SocketDescriptor::Invalid, "Cannot create listening socket"_a8);
-#if SC_PLATFORM_WINDOWS
+    SocketDescriptor::Handle listenSocket;
+    SC_TRUST_RESULT(socket.get(listenSocket, "invalid listen socket"_a8));
+
+    // TODO: Expose SO_REUSEADDR as an option?
+#if !SC_PLATFORM_EMSCRIPTEN
     char value = 1;
-    setsockopt(openedSocket, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
-    const int addrLen = static_cast<int>(addressInfos->ai_addrlen);
-#else
-    const auto addrLen = addressInfos->ai_addrlen;
+    setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
 #endif
-    SC_TRY_IF(socket.assign(openedSocket));
-
-    if (::bind(openedSocket, addressInfos->ai_addr, addrLen) == SOCKET_ERROR)
+    if (::bind(listenSocket, &nativeAddress.handle.reinterpret_as<const struct sockaddr>(),
+               nativeAddress.sizeOfHandle()) == SOCKET_ERROR)
     {
         SC_TRUST_RESULT(socket.close());
         return "Could not bind socket to port"_a8;
     }
-    constexpr int numberOfWaitingConnections = 2; // TODO: Expose numberOfWaitingConnections?
-    if (::listen(openedSocket, numberOfWaitingConnections) == SOCKET_ERROR)
+    if (::listen(listenSocket, static_cast<int>(numberOfWaitingConnections)) == SOCKET_ERROR)
     {
         SC_TRUST_RESULT(socket.close());
         return "Could not listen"_a8;
@@ -77,62 +137,38 @@ SC::ReturnCode SC::TCPServer::listen(StringView interfaceAddress, uint32_t port)
     return true;
 }
 
-SC::ReturnCode SC::TCPServer::accept(TCPClient& newClient)
+SC::ReturnCode SC::TCPServer::accept(Descriptor::AddressFamily addressFamily, TCPClient& newClient)
 {
     SC_TRY_MSG(not newClient.socket.isValid(), "destination socket already in use"_a8);
     SocketDescriptor::Handle listenDescriptor;
     SC_TRY_IF(socket.get(listenDescriptor, "Invalid socket"_a8));
-
-    struct sockaddr_in sAddr;
-    socklen_t          sAddrSize = sizeof(sAddr);
-
-    SocketDescriptor::Handle acceptedClient;
-    acceptedClient = ::accept(listenDescriptor, reinterpret_cast<struct sockaddr*>(&sAddr), &sAddrSize);
+    NativeIPAddress          nativeAddress(addressFamily);
+    socklen_t                nativeSize = nativeAddress.sizeOfHandle();
+    SocketDescriptor::Handle acceptedClient =
+        ::accept(listenDescriptor, &nativeAddress.handle.reinterpret_as<struct sockaddr>(), &nativeSize);
     SC_TRY_MSG(acceptedClient != SocketDescriptor::Invalid, "accept failed"_a8);
     return newClient.socket.assign(acceptedClient);
 }
 
-SC::ReturnCode SC::TCPClient::connect(StringView address, uint32_t port)
+SC::ReturnCode SC::TCPClient::connect(StringView address, uint16_t port)
 {
     SC_TRY_IF(SystemFunctions::isNetworkingInited());
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family   = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
 
-    SmallString<12> service = StringEncoding::Ascii; // 10 digits + sign + nullterm
-    SC_TRY_IF(StringBuilder(service).format("{}", port));
-
-    SmallString<64> addressBuffer = StringEncoding::Ascii;
-    StringView      addressZeroTerminated;
-    SC_TRY_IF(StringConverter(addressBuffer).convertNullTerminateFastPath(address, addressZeroTerminated));
-
-    struct addrinfo* addressInfos;
-    if (::getaddrinfo(addressZeroTerminated.bytesIncludingTerminator(), service.data.data(), &hints, &addressInfos) !=
-        0)
+    NativeIPAddress nativeAddress;
+    SC_TRY_IF(nativeAddress.fromAddressPort(address, port));
+    if (not socket.isValid())
     {
-        return "Cannot resolve hostname"_a8;
+        SC_TRY_IF(socket.create(nativeAddress.getAddressFamily(), Descriptor::SocketStream, Descriptor::ProtocolTcp));
     }
-    auto destroyAddresses = MakeDeferred([&]() { freeaddrinfo(addressInfos); });
-
-    SocketDescriptor::Handle openedSocket = SocketDescriptor::Invalid;
-    for (struct addrinfo* it = addressInfos; it != nullptr; it = it->ai_next)
+    SocketDescriptor::Handle openedSocket;
+    SC_TRUST_RESULT(socket.get(openedSocket, "invalid connect socket"_a8));
+    socklen_t nativeSize = nativeAddress.sizeOfHandle();
+    if (::connect(openedSocket, &nativeAddress.handle.reinterpret_as<const struct sockaddr>(), nativeSize) ==
+        SOCKET_ERROR)
     {
-        // SOCK_NONBLOCK
-        openedSocket = ::socket(it->ai_family, it->ai_socktype, it->ai_protocol);
-        if (openedSocket == SocketDescriptor::Invalid)
-            continue;
-#if SC_PLATFORM_WINDOWS
-        const int addrLen = static_cast<int>(it->ai_addrlen);
-#else
-        const auto addrLen = it->ai_addrlen;
-#endif
-        if (::connect(openedSocket, it->ai_addr, addrLen) == 0)
-            break;
-        SC_TRY_IF(SocketDescriptorTraits::releaseHandle(openedSocket));
+        "connect failed"_a8;
     }
-    SC_TRY_MSG(openedSocket != SocketDescriptor::Invalid, "Cannot connect to host"_a8);
-    return socket.assign(openedSocket);
+    return true;
 }
 
 SC::ReturnCode SC::TCPClient::close() { return socket.close(); }

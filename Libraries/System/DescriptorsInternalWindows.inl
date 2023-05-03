@@ -3,6 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include <WinSock2.h>
+#include <Ws2tcpip.h> // sockadd_in6
+using socklen_t = int;
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -146,40 +148,29 @@ SC::ReturnCode SC::SocketDescriptor::isInheritable(bool& hasValue) const
     return true;
 }
 
-SC::ReturnCode SC::SocketDescriptor::create(IPType ipType, Protocol protocol, BlockingType blocking,
-                                            InheritableType inheritable)
+SC::ReturnCode SC::SocketDescriptor::create(Descriptor::AddressFamily addressFamily, Descriptor::SocketType socketType,
+                                            Descriptor::ProtocolType protocol, Descriptor::BlockingType blocking,
+                                            Descriptor::InheritableType inheritable)
 {
     SC_TRY_IF(SystemFunctions::isNetworkingInited());
     SC_TRUST_RESULT(close());
-    int type = AF_UNSPEC;
-    switch (ipType)
-    {
-    case IPTypeV4: type = AF_INET; break;
-    case IPTypeV6: type = AF_INET6; break;
-    }
-
-    int proto = IPPROTO_TCP;
-
-    switch (protocol)
-    {
-    case ProtocolTcp: proto = IPPROTO_TCP; break;
-    }
 
     DWORD flags = 0;
-    if (inheritable == NonInheritable)
+    if (inheritable == Descriptor::NonInheritable)
     {
         flags |= WSA_FLAG_NO_HANDLE_INHERIT;
     }
-    if (blocking == NonBlocking)
+    if (blocking == Descriptor::NonBlocking)
     {
         flags |= WSA_FLAG_OVERLAPPED;
     }
-    handle = ::WSASocketW(type, SOCK_STREAM, proto, nullptr, 0, flags);
+    handle = ::WSASocketW(Descriptor::toNative(addressFamily), Descriptor::toNative(socketType),
+                          Descriptor::toNative(protocol), nullptr, 0, flags);
     if (!isValid())
     {
         return "WSASocketW failed"_a8;
     }
-    SC_TRY_IF(setBlocking(blocking == Blocking));
+    SC_TRY_IF(setBlocking(blocking == Descriptor::Blocking));
     return isValid();
 }
 

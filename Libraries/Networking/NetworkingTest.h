@@ -22,24 +22,24 @@ struct SC::NetworkingTest : public SC::TestCase
             // We are testing only the inheritable because on windows there is no reliable
             // way of checking if a non-connected socket is in non-blocking mode
             SocketDescriptor socket;
-            SC_TEST_EXPECT(socket.create(SocketDescriptor::IPTypeV4, SocketDescriptor::ProtocolTcp,
-                                         SocketDescriptor::NonBlocking, SocketDescriptor::NonInheritable));
+            SC_TEST_EXPECT(socket.create(Descriptor::AddressFamilyIPV4, Descriptor::SocketStream,
+                                         Descriptor::ProtocolTcp, Descriptor::NonBlocking, Descriptor::NonInheritable));
             SC_TEST_EXPECT(socket.isValid());
             isInheritable = false;
             SC_TEST_EXPECT(socket.isInheritable(isInheritable));
             SC_TEST_EXPECT(not isInheritable);
             SC_TEST_EXPECT(socket.close());
 
-            SC_TEST_EXPECT(socket.create(SocketDescriptor::IPTypeV4, SocketDescriptor::ProtocolTcp,
-                                         SocketDescriptor::Blocking, SocketDescriptor::NonInheritable));
+            SC_TEST_EXPECT(socket.create(Descriptor::AddressFamilyIPV4, Descriptor::SocketStream,
+                                         Descriptor::ProtocolTcp, Descriptor::Blocking, Descriptor::NonInheritable));
             SC_TEST_EXPECT(socket.isValid());
             isInheritable = false;
             SC_TEST_EXPECT(socket.isInheritable(isInheritable));
             SC_TEST_EXPECT(not isInheritable);
             SC_TEST_EXPECT(socket.close());
 
-            SC_TEST_EXPECT(socket.create(SocketDescriptor::IPTypeV4, SocketDescriptor::ProtocolTcp,
-                                         SocketDescriptor::Blocking, SocketDescriptor::Inheritable));
+            SC_TEST_EXPECT(socket.create(Descriptor::AddressFamilyIPV4, Descriptor::SocketStream,
+                                         Descriptor::ProtocolTcp, Descriptor::Blocking, Descriptor::Inheritable));
             SC_TEST_EXPECT(socket.isValid());
             isInheritable = false;
             SC_TEST_EXPECT(socket.isInheritable(isInheritable));
@@ -50,12 +50,13 @@ struct SC::NetworkingTest : public SC::TestCase
         {
             TCPServer server;
             // Look for an available port
-            constexpr int startTcpPort = 5050;
-            uint32_t      tcpPort;
-            ReturnCode    bound = true;
+            constexpr int    startTcpPort = 5050;
+            uint16_t         tcpPort;
+            ReturnCode       bound         = true;
+            const StringView serverAddress = "::1"; //"127.0.0.1"
             for (tcpPort = startTcpPort; tcpPort < startTcpPort + 10; ++tcpPort)
             {
-                bound = server.listen("127.0.0.1", tcpPort);
+                bound = server.listen(serverAddress, tcpPort);
                 if (bound)
                 {
                     break;
@@ -73,7 +74,7 @@ struct SC::NetworkingTest : public SC::TestCase
             Action func = [&]()
             {
                 TCPClient client;
-                params.connectRes = client.connect("127.0.0.1", tcpPort);
+                params.connectRes = client.connect(serverAddress, tcpPort);
                 char buf[1]       = {testValue};
                 params.writeRes   = client.write({buf, sizeof(buf)});
                 params.eventObject.wait();
@@ -84,8 +85,10 @@ struct SC::NetworkingTest : public SC::TestCase
             };
             Thread thread;
             SC_TEST_EXPECT(thread.start("tcp", &func));
+            Descriptor::AddressFamily family;
+            SC_TEST_EXPECT(server.socket.getAddressFamily(family));
             TCPClient acceptedClient;
-            SC_TEST_EXPECT(server.accept(acceptedClient));
+            SC_TEST_EXPECT(server.accept(family, acceptedClient));
             SC_TEST_EXPECT(acceptedClient.socket.isValid());
             char buf[1] = {0};
             SC_TEST_EXPECT(acceptedClient.read({buf, sizeof(buf)}));
