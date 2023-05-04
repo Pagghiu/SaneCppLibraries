@@ -174,15 +174,6 @@ SC::ReturnCode SC::SocketDescriptor::create(Descriptor::AddressFamily addressFam
     return isValid();
 }
 
-// ProcessDescriptor
-
-SC::ReturnCode SC::ProcessDescriptorTraits::releaseHandle(HANDLE& handle)
-{
-    if (::CloseHandle(handle) == FALSE)
-        return "ProcessNativeHandleClose - CloseHandle failed"_a8;
-    return true;
-}
-
 // PipeDescriptor
 
 SC::ReturnCode SC::PipeDescriptor::createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag)

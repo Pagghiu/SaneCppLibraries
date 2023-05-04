@@ -34,13 +34,6 @@ struct SocketDescriptorTraits
     static ReturnCode       releaseHandle(Handle& handle);
 };
 
-struct ProcessDescriptorTraits
-{
-    using Handle                    = void*;      // HANDLE
-    static constexpr Handle Invalid = (Handle)-1; // INVALID_HANDLE_VALUE
-    static ReturnCode       releaseHandle(Handle& handle);
-};
-
 #else
 
 struct FileDescriptorTraits
@@ -54,13 +47,6 @@ struct SocketDescriptorTraits
 {
     using Handle                    = int; // fd
     static constexpr Handle Invalid = -1;  // invalid fd
-    static ReturnCode       releaseHandle(Handle& handle);
-};
-
-struct ProcessDescriptorTraits
-{
-    using Handle                    = int; // pid_t
-    static constexpr Handle Invalid = 0;   // invalid pid_t
     static ReturnCode       releaseHandle(Handle& handle);
 };
 
@@ -136,14 +122,6 @@ struct SC::SocketDescriptor : public UniqueTaggedHandleTraits<SocketDescriptorTr
     [[nodiscard]] ReturnCode setInheritable(bool value);
     [[nodiscard]] ReturnCode setBlocking(bool value);
     [[nodiscard]] ReturnCode getAddressFamily(Descriptor::AddressFamily& addressFamily) const;
-};
-
-struct SC::ProcessDescriptor : public UniqueTaggedHandleTraits<ProcessDescriptorTraits>
-{
-    struct ExitStatus
-    {
-        Optional<int32_t> status;
-    };
 };
 
 struct SC::PipeDescriptor

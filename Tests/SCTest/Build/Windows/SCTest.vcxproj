@@ -356,6 +356,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
     <ClInclude Include="..\..\..\..\Libraries\Networking\Networking.h" />
     <ClInclude Include="..\..\..\..\Libraries\Networking\NetworkingTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Process\ProcessDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\System\SystemPosix.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\Atomic.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\AtomicTest.h" />

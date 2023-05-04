@@ -8,6 +8,7 @@
 #include "../Foundation/Optional.h"
 #include "../Foundation/String.h"
 #include "../System/Descriptors.h"
+#include "ProcessDescriptor.h"
 
 namespace SC
 {

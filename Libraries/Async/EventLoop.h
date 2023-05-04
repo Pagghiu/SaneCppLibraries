@@ -7,6 +7,7 @@
 #include "../Foundation/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Span.h"
 #include "../Foundation/TaggedUnion.h"
+#include "../Process/ProcessDescriptor.h"
 #include "../System/Descriptors.h"
 #include "../System/Time.h"
 #include "../Threading/Atomic.h"

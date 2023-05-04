@@ -236,14 +236,6 @@ SC::ReturnCode SC::SocketDescriptor::create(Descriptor::AddressFamily addressFam
     return isValid();
 }
 
-// ProcessDescriptor
-
-SC::ReturnCode SC::ProcessDescriptorTraits::releaseHandle(pid_t& handle)
-{
-    handle = Invalid;
-    return true;
-}
-
 // PipeDescriptor
 
 SC::ReturnCode SC::PipeDescriptor::createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag)

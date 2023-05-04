@@ -10,6 +10,13 @@
 #include <stdlib.h> // _exit
 #endif
 
+SC::ReturnCode SC::ProcessDescriptorTraits::releaseHandle(HANDLE& handle)
+{
+    if (::CloseHandle(handle) == FALSE)
+        return "ProcessNativeHandleClose - CloseHandle failed"_a8;
+    return true;
+}
+
 struct SC::Process::Internal
 {
     // TODO: this could be migrated to SystemDebug

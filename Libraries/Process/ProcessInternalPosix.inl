@@ -9,6 +9,12 @@
 #include <sys/wait.h> // waitpid
 #include <unistd.h>   // pipe fork execl _exit
 
+SC::ReturnCode SC::ProcessDescriptorTraits::releaseHandle(pid_t& handle)
+{
+    handle = Invalid;
+    return true;
+}
+
 struct SC::Process::Internal
 {
     static FileDescriptor::Handle getStandardInputFDS() { return fileno(stdin); };

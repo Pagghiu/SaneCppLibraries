@@ -196,6 +196,7 @@
 		7BE5C81129A2707E00CBCAD1 /* Descriptors.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Descriptors.cpp; path = ../../../../Libraries/System/Descriptors.cpp; sourceTree = "<group>"; };
 		7BE5C81229A2707E00CBCAD1 /* Descriptors.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Descriptors.h; path = ../../../../Libraries/System/Descriptors.h; sourceTree = "<group>"; };
 		7BE906C429FD071E0073D7A8 /* EventLoopInternalWindowsAPI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = EventLoopInternalWindowsAPI.h; path = ../../../../Libraries/Async/EventLoopInternalWindowsAPI.h; sourceTree = "<group>"; };
+		7BF876572A04615B00ABA178 /* ProcessDescriptor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ProcessDescriptor.h; path = ../../../../Libraries/Process/ProcessDescriptor.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -419,6 +420,7 @@
 			children = (
 				7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */,
 				7BE5C80E29A26E3E00CBCAD1 /* Process.h */,
+				7BF876572A04615B00ABA178 /* ProcessDescriptor.h */,
 				7B0A83C329A98B8200C16EBF /* ProcessInternalEmscripten.inl */,
 				7B0A83C129A98B2000C16EBF /* ProcessInternalPosix.inl */,
 				7B0A83C229A98B2000C16EBF /* ProcessInternalWindows.inl */,
