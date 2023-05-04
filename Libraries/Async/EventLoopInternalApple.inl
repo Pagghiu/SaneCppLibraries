@@ -143,16 +143,14 @@ struct SC::EventLoop::Internal
             break;
         }
         case Async::Type::Accept: {
-            SocketDescriptor::Handle listenDescriptor = result.async.operation.fields.accept.handle;
-
-            struct sockaddr_in sAddr;
-            socklen_t          sAddrSize = sizeof(sAddr);
-
-            SocketDescriptor::Handle acceptedClient;
-            acceptedClient = ::accept(listenDescriptor, reinterpret_cast<struct sockaddr*>(&sAddr), &sAddrSize);
-            SC_TRY_MSG(acceptedClient != SocketDescriptor::Invalid, "accept failed"_a8);
-
-            return result.result.fields.accept.acceptedClient.assign(acceptedClient);
+            Async::Accept& async = result.async.operation.fields.accept;
+            SocketServer   server;
+            SC_TRY_IF(server.socket.assign(async.handle));
+            auto         detach = MakeDeferred([&] { server.socket.detach(); });
+            SocketClient client;
+            SC_TRY_IF(server.accept(async.addressFamily, client));
+            result.result.fields.accept.acceptedClient.detach();
+            return result.result.fields.accept.acceptedClient.assign(move(client.socket));
         }
         }
         return true;

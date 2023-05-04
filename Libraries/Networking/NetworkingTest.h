@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Testing/Test.h"
-#include "Networking.h"
+#include "SocketDescriptor.h"
 
 namespace SC
 {
@@ -51,7 +51,7 @@ struct SC::NetworkingTest : public SC::TestCase
         }
         if (test_section("tcp client server"))
         {
-            TCPServer server;
+            SocketServer server;
             // Look for an available port
             constexpr int    startTcpPort = 5050;
             uint16_t         tcpPort;
@@ -76,7 +76,7 @@ struct SC::NetworkingTest : public SC::TestCase
             } params;
             Action func = [&]()
             {
-                TCPClient client;
+                SocketClient client;
                 params.connectRes = client.connect(serverAddress, tcpPort);
                 char buf[1]       = {testValue};
                 params.writeRes   = client.write({buf, sizeof(buf)});
@@ -90,7 +90,7 @@ struct SC::NetworkingTest : public SC::TestCase
             SC_TEST_EXPECT(thread.start("tcp", &func));
             SocketFlags::AddressFamily family;
             SC_TEST_EXPECT(server.socket.getAddressFamily(family));
-            TCPClient acceptedClient;
+            SocketClient acceptedClient;
             SC_TEST_EXPECT(server.accept(family, acceptedClient));
             SC_TEST_EXPECT(acceptedClient.socket.isValid());
             char buf[1] = {0};

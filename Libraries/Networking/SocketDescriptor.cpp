@@ -1,11 +1,10 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "Networking.h"
-
 #include "../Foundation/StringBuilder.h"
 #include "../Foundation/StringConverter.h"
 #include "../System/System.h"
+#include "../System/Time.h"
 
 #if SC_PLATFORM_WINDOWS
 
@@ -82,7 +81,7 @@ SC::ReturnCode SC::SocketDescriptor::getAddressFamily(SocketFlags::AddressFamily
     addressFamily = SocketFlags::AddressFamilyFromInt(socketInfo.sin6_family);
     return true;
 }
-SC::uint32_t SC::NativeIPAddress::sizeOfHandle() const
+SC::uint32_t SC::SocketIPAddress::sizeOfHandle() const
 {
     switch (addressFamily)
     {
@@ -92,7 +91,7 @@ SC::uint32_t SC::NativeIPAddress::sizeOfHandle() const
     SC_UNREACHABLE();
 }
 
-SC::ReturnCode SC::NativeIPAddress::fromAddressPort(StringView interfaceAddress, uint16_t port)
+SC::ReturnCode SC::SocketIPAddress::fromAddressPort(StringView interfaceAddress, uint16_t port)
 {
     static_assert(sizeof(sockaddr_in6) >= sizeof(sockaddr_in), "size");
     static_assert(alignof(sockaddr_in6) >= alignof(sockaddr_in), "size");
@@ -114,15 +113,15 @@ SC::ReturnCode SC::NativeIPAddress::fromAddressPort(StringView interfaceAddress,
     return true;
 }
 
-SC::ReturnCode SC::TCPServer::close() { return socket.close(); }
+SC::ReturnCode SC::SocketServer::close() { return socket.close(); }
 
-// TODO: Add EINTR checks for all TCPServer/TCPClient os calls.
+// TODO: Add EINTR checks for all SocketServer/SocketClient os calls.
 
-SC::ReturnCode SC::TCPServer::listen(StringView interfaceAddress, uint16_t port, uint32_t numberOfWaitingConnections)
+SC::ReturnCode SC::SocketServer::listen(StringView interfaceAddress, uint16_t port, uint32_t numberOfWaitingConnections)
 {
     SC_TRY_IF(SystemFunctions::isNetworkingInited());
 
-    NativeIPAddress nativeAddress;
+    SocketIPAddress nativeAddress;
     SC_TRY_IF(nativeAddress.fromAddressPort(interfaceAddress, port));
     if (not socket.isValid())
     {
@@ -151,12 +150,12 @@ SC::ReturnCode SC::TCPServer::listen(StringView interfaceAddress, uint16_t port,
     return true;
 }
 
-SC::ReturnCode SC::TCPServer::accept(SocketFlags::AddressFamily addressFamily, TCPClient& newClient)
+SC::ReturnCode SC::SocketServer::accept(SocketFlags::AddressFamily addressFamily, SocketClient& newClient)
 {
     SC_TRY_MSG(not newClient.socket.isValid(), "destination socket already in use"_a8);
     SocketDescriptor::Handle listenDescriptor;
     SC_TRY_IF(socket.get(listenDescriptor, "Invalid socket"_a8));
-    NativeIPAddress          nativeAddress(addressFamily);
+    SocketIPAddress          nativeAddress(addressFamily);
     socklen_t                nativeSize = nativeAddress.sizeOfHandle();
     SocketDescriptor::Handle acceptedClient =
         ::accept(listenDescriptor, &nativeAddress.handle.reinterpret_as<struct sockaddr>(), &nativeSize);
@@ -164,11 +163,11 @@ SC::ReturnCode SC::TCPServer::accept(SocketFlags::AddressFamily addressFamily, T
     return newClient.socket.assign(acceptedClient);
 }
 
-SC::ReturnCode SC::TCPClient::connect(StringView address, uint16_t port)
+SC::ReturnCode SC::SocketClient::connect(StringView address, uint16_t port)
 {
     SC_TRY_IF(SystemFunctions::isNetworkingInited());
 
-    NativeIPAddress nativeAddress;
+    SocketIPAddress nativeAddress;
     SC_TRY_IF(nativeAddress.fromAddressPort(address, port));
     if (not socket.isValid())
     {
@@ -185,9 +184,9 @@ SC::ReturnCode SC::TCPClient::connect(StringView address, uint16_t port)
     return true;
 }
 
-SC::ReturnCode SC::TCPClient::close() { return socket.close(); }
+SC::ReturnCode SC::SocketClient::close() { return socket.close(); }
 
-SC::ReturnCode SC::TCPClient::write(Span<const char> data)
+SC::ReturnCode SC::SocketClient::write(Span<const char> data)
 {
     SocketDescriptor::Handle nativeSocket;
     SC_TRY_IF(socket.get(nativeSocket, "Invalid socket"_a8));
@@ -208,7 +207,7 @@ SC::ReturnCode SC::TCPClient::write(Span<const char> data)
     return true;
 }
 
-SC::ReturnCode SC::TCPClient::read(Span<char> data)
+SC::ReturnCode SC::SocketClient::read(Span<char> data)
 {
     SocketDescriptor::Handle nativeSocket;
     SC_TRY_IF(socket.get(nativeSocket, "Invalid socket"_a8));
@@ -225,7 +224,7 @@ SC::ReturnCode SC::TCPClient::read(Span<char> data)
     return true;
 }
 
-SC::ReturnCode SC::TCPClient::readWithTimeout(Span<char> data, IntegerMilliseconds timeout)
+SC::ReturnCode SC::SocketClient::readWithTimeout(Span<char> data, IntegerMilliseconds timeout)
 {
     SocketDescriptor::Handle nativeSocket;
     SC_TRY_IF(socket.get(nativeSocket, "Invalid socket"_a8));

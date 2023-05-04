@@ -62,7 +62,7 @@
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWalker.cpp">
       <Filter>FileSystem</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\System\Descriptors.cpp">
+    <ClCompile Include="..\..\..\..\Libraries\System\FileDescriptor.cpp">
       <Filter>FileSystem</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp">
@@ -83,7 +83,7 @@
     <ClCompile Include="..\..\..\..\Libraries\Testing\Test.cpp">
       <Filter>Testing</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Networking\Networking.cpp">
+    <ClCompile Include="..\..\..\..\Libraries\Networking\SocketDescriptor.cpp">
       <Filter>Networking</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Process\Process.cpp">
@@ -337,12 +337,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\AlgorithmSort.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Networking\SocketDescriptor.h">
-      <Filter>Networking</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Networking\Networking.h">
-      <Filter>Networking</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Networking\NetworkingTest.h">
       <Filter>Networking</Filter>
     </ClInclude>
@@ -356,8 +350,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Process\ProcessTest.h">
       <Filter>Process</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\System\ProcessDescriptor.h">
-      <Filter>System</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Process\ProcessDescriptor.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Networking\SocketDescriptor.h">
+      <Filter>Networking</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -426,6 +421,12 @@
     </None>
     <None Include="..\..\..\..\Libraries\Process\ProcessInternalWindows.inl">
       <Filter>Process</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Networking\SocketDescriptorInternalPosix.inl">
+      <Filter>Networking</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Networking\SocketDescriptorInternalWindows.inl">
+      <Filter>Networking</Filter>
     </None>
   </ItemGroup>
 </Project>

@@ -24,7 +24,7 @@
 		7B583F6D2922ED2700FBE019 /* SCTestXCTest.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */; };
 		7B583FCB2922EE7300FBE019 /* SCTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F692922ECF900FBE019 /* SCTest.cpp */; };
 		7B872C4D29AFFC4900949BD2 /* Threading.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B872C4A29AFFC4900949BD2 /* Threading.cpp */; };
-		7B8BF9B129F3BADC0055BC3A /* Networking.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B8BF9AC29F3BADC0055BC3A /* Networking.cpp */; };
+		7B8BF9B129F3BADC0055BC3A /* SocketDescriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B8BF9AC29F3BADC0055BC3A /* SocketDescriptor.cpp */; };
 		7BA7D47C29B5488200811076 /* EventLoop.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA7D47B29B5488200811076 /* EventLoop.cpp */; };
 		7BA892AA297E03B50093152B /* System.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892A9297E03540093152B /* System.cpp */; };
 		7BA892AE297E06040093152B /* StringConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892AD297E06040093152B /* StringConverter.cpp */; };
@@ -32,7 +32,7 @@
 		7BC56BDB29946C9200EED472 /* FileSystemWalker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BC56BD729946AD100EED472 /* FileSystemWalker.cpp */; };
 		7BC56BDC29946C9200EED472 /* FileSystemWalker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BC56BD729946AD100EED472 /* FileSystemWalker.cpp */; };
 		7BE5C81029A26E3E00CBCAD1 /* Process.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */; };
-		7BE5C81329A2707E00CBCAD1 /* Descriptors.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE5C81129A2707E00CBCAD1 /* Descriptors.cpp */; };
+		7BE5C81329A2707E00CBCAD1 /* FileDescriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -58,7 +58,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		7B0A83C029A989A000C16EBF /* DescriptorsInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = DescriptorsInternalWindows.inl; path = ../../../../Libraries/System/DescriptorsInternalWindows.inl; sourceTree = "<group>"; };
+		7B0A83C029A989A000C16EBF /* FileDescriptorInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileDescriptorInternalWindows.inl; path = ../../../../Libraries/System/FileDescriptorInternalWindows.inl; sourceTree = "<group>"; };
 		7B0A83C129A98B2000C16EBF /* ProcessInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = ProcessInternalPosix.inl; path = ../../../../Libraries/Process/ProcessInternalPosix.inl; sourceTree = "<group>"; };
 		7B0A83C229A98B2000C16EBF /* ProcessInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = ProcessInternalWindows.inl; path = ../../../../Libraries/Process/ProcessInternalWindows.inl; sourceTree = "<group>"; };
 		7B0A83C329A98B8200C16EBF /* ProcessInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = ProcessInternalEmscripten.inl; path = ../../../../Libraries/Process/ProcessInternalEmscripten.inl; sourceTree = "<group>"; };
@@ -160,8 +160,7 @@
 		7B89A60329BFD9D6006EF085 /* TaggedUnion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TaggedUnion.h; path = ../../../../Libraries/Foundation/TaggedUnion.h; sourceTree = "<group>"; };
 		7B89A60429BFE1A4006EF085 /* TypeList.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TypeList.h; path = ../../../../Libraries/Foundation/TypeList.h; sourceTree = "<group>"; };
 		7B8B919929DB868C0051AF74 /* UniquePtr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = UniquePtr.h; path = ../../../../Libraries/Foundation/UniquePtr.h; sourceTree = "<group>"; };
-		7B8BF9AC29F3BADC0055BC3A /* Networking.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Networking.cpp; path = ../../../../Libraries/Networking/Networking.cpp; sourceTree = "<group>"; };
-		7B8BF9AE29F3BADC0055BC3A /* Networking.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Networking.h; path = ../../../../Libraries/Networking/Networking.h; sourceTree = "<group>"; };
+		7B8BF9AC29F3BADC0055BC3A /* SocketDescriptor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SocketDescriptor.cpp; path = ../../../../Libraries/Networking/SocketDescriptor.cpp; sourceTree = "<group>"; };
 		7B8BF9AF29F3BADC0055BC3A /* NetworkingTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = NetworkingTest.h; path = ../../../../Libraries/Networking/NetworkingTest.h; sourceTree = "<group>"; };
 		7B91CBEE29B17F470013E95E /* Opaque.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Opaque.h; path = ../../../../Libraries/Foundation/Opaque.h; sourceTree = "<group>"; };
 		7B91CBEF29B17F470013E95E /* OpaqueTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OpaqueTest.h; path = ../../../../Libraries/Foundation/OpaqueTest.h; sourceTree = "<group>"; };
@@ -189,12 +188,12 @@
 		7BD8E37929BE8357004AB23D /* EventLoopInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalApple.inl; path = ../../../../Libraries/Async/EventLoopInternalApple.inl; sourceTree = "<group>"; };
 		7BD8E37A29BE8357004AB23D /* EventLoopInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalWindows.inl; path = ../../../../Libraries/Async/EventLoopInternalWindows.inl; sourceTree = "<group>"; };
 		7BD8E37B29BE8357004AB23D /* EventLoopInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalEmscripten.inl; path = ../../../../Libraries/Async/EventLoopInternalEmscripten.inl; sourceTree = "<group>"; };
-		7BE50C9729AEB4CC00BE6C25 /* DescriptorsInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = DescriptorsInternalPosix.inl; path = ../../../../Libraries/System/DescriptorsInternalPosix.inl; sourceTree = "<group>"; };
+		7BE50C9729AEB4CC00BE6C25 /* FileDescriptorInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileDescriptorInternalPosix.inl; path = ../../../../Libraries/System/FileDescriptorInternalPosix.inl; sourceTree = "<group>"; };
 		7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Process.cpp; path = ../../../../Libraries/Process/Process.cpp; sourceTree = "<group>"; };
 		7BE5C80E29A26E3E00CBCAD1 /* Process.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Process.h; path = ../../../../Libraries/Process/Process.h; sourceTree = "<group>"; };
 		7BE5C80F29A26E3E00CBCAD1 /* ProcessTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ProcessTest.h; path = ../../../../Libraries/Process/ProcessTest.h; sourceTree = "<group>"; };
-		7BE5C81129A2707E00CBCAD1 /* Descriptors.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Descriptors.cpp; path = ../../../../Libraries/System/Descriptors.cpp; sourceTree = "<group>"; };
-		7BE5C81229A2707E00CBCAD1 /* Descriptors.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Descriptors.h; path = ../../../../Libraries/System/Descriptors.h; sourceTree = "<group>"; };
+		7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = FileDescriptor.cpp; path = ../../../../Libraries/System/FileDescriptor.cpp; sourceTree = "<group>"; };
+		7BE5C81229A2707E00CBCAD1 /* FileDescriptor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FileDescriptor.h; path = ../../../../Libraries/System/FileDescriptor.h; sourceTree = "<group>"; };
 		7BE906C429FD071E0073D7A8 /* EventLoopInternalWindowsAPI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = EventLoopInternalWindowsAPI.h; path = ../../../../Libraries/Async/EventLoopInternalWindowsAPI.h; sourceTree = "<group>"; };
 		7BF876572A04615B00ABA178 /* ProcessDescriptor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ProcessDescriptor.h; path = ../../../../Libraries/Process/ProcessDescriptor.h; sourceTree = "<group>"; };
 		7BF876582A04633600ABA178 /* SocketDescriptorInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SocketDescriptorInternalPosix.inl; path = ../../../../Libraries/Networking/SocketDescriptorInternalPosix.inl; sourceTree = "<group>"; };
@@ -383,10 +382,10 @@
 				7B515FEE29243087006996AA /* Console.cpp */,
 				7B515FD529243086006996AA /* Console.h */,
 				7B515FE629243087006996AA /* ConsoleTest.h */,
-				7BE5C81129A2707E00CBCAD1 /* Descriptors.cpp */,
-				7BE5C81229A2707E00CBCAD1 /* Descriptors.h */,
-				7BE50C9729AEB4CC00BE6C25 /* DescriptorsInternalPosix.inl */,
-				7B0A83C029A989A000C16EBF /* DescriptorsInternalWindows.inl */,
+				7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */,
+				7BE5C81229A2707E00CBCAD1 /* FileDescriptor.h */,
+				7BE50C9729AEB4CC00BE6C25 /* FileDescriptorInternalPosix.inl */,
+				7B0A83C029A989A000C16EBF /* FileDescriptorInternalWindows.inl */,
 				7BA892A9297E03540093152B /* System.cpp */,
 				7B515FDC29243086006996AA /* System.h */,
 				7B872C4629AFF1D900949BD2 /* SystemInternalApple.inl */,
@@ -414,8 +413,7 @@
 				7BF876592A04633600ABA178 /* SocketDescriptor.h */,
 				7BF876582A04633600ABA178 /* SocketDescriptorInternalPosix.inl */,
 				7BF8765A2A04633600ABA178 /* SocketDescriptorInternalWindows.inl */,
-				7B8BF9AC29F3BADC0055BC3A /* Networking.cpp */,
-				7B8BF9AE29F3BADC0055BC3A /* Networking.h */,
+				7B8BF9AC29F3BADC0055BC3A /* SocketDescriptor.cpp */,
 				7B8BF9AF29F3BADC0055BC3A /* NetworkingTest.h */,
 			);
 			name = Networking;
@@ -584,9 +582,9 @@
 				7B4A291D29B3CD4A00F13DCB /* Time.cpp in Sources */,
 				7B19C9AC297AF99F001C0627 /* Path.cpp in Sources */,
 				7BE5C81029A26E3E00CBCAD1 /* Process.cpp in Sources */,
-				7B8BF9B129F3BADC0055BC3A /* Networking.cpp in Sources */,
+				7B8BF9B129F3BADC0055BC3A /* SocketDescriptor.cpp in Sources */,
 				7B51601329243097006996AA /* String.cpp in Sources */,
-				7BE5C81329A2707E00CBCAD1 /* Descriptors.cpp in Sources */,
+				7BE5C81329A2707E00CBCAD1 /* FileDescriptor.cpp in Sources */,
 				7BA892AE297E06040093152B /* StringConverter.cpp in Sources */,
 				7BC56BDB29946C9200EED472 /* FileSystemWalker.cpp in Sources */,
 				7BA7D47C29B5488200811076 /* EventLoop.cpp in Sources */,

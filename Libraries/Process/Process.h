@@ -7,7 +7,7 @@
 #include "../Foundation/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Optional.h"
 #include "../Foundation/String.h"
-#include "../System/Descriptors.h"
+#include "../System/FileDescriptor.h"
 #include "ProcessDescriptor.h"
 
 namespace SC

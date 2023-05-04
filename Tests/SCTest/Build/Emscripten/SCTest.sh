@@ -63,10 +63,10 @@ Libraries/Foundation/String.cpp             \
 Libraries/Foundation/StringConverter.cpp    \
 Libraries/Foundation/StringFormat.cpp       \
 Libraries/Foundation/StringView.cpp         \
-Libraries/Networking/Networking.cpp         \
+Libraries/Networking/SocketDescriptor.cpp   \
 Libraries/Process/Process.cpp               \
 Libraries/System/Console.cpp                \
-Libraries/System/Descriptors.cpp            \
+Libraries/System/FileDescriptor.cpp         \
 Libraries/System/System.cpp                 \
 Libraries/System/Time.cpp                   \
 Libraries/Threading/Threading.cpp           \

@@ -5,7 +5,7 @@
 #include "../Foundation/Opaque.h"
 #include "../Foundation/Optional.h"
 #include "../Foundation/Result.h"
-#include "../System/Descriptors.h"
+#include "../System/FileDescriptor.h"
 
 namespace SC
 {
@@ -19,6 +19,7 @@ namespace SC
 struct SocketDescriptor;
 struct SocketDescriptorTraits;
 struct SocketFlags;
+struct SocketIPAddress;
 } // namespace SC
 
 #if SC_PLATFORM_WINDOWS
@@ -68,6 +69,25 @@ struct SC::SocketFlags
     [[nodiscard]] static int          toNative(ProtocolType family);
 };
 
+struct SC::SocketIPAddress
+{
+    SocketIPAddress(SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4)
+        : addressFamily(addressFamily)
+    {}
+
+    [[nodiscard]] SocketFlags::AddressFamily getAddressFamily() { return addressFamily; }
+
+    [[nodiscard]] ReturnCode fromAddressPort(StringView interfaceAddress, uint16_t port);
+
+  private:
+    friend struct SocketClient;
+    friend struct SocketServer;
+    SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
+
+    OpaqueHandle<28> handle;
+    uint32_t         sizeOfHandle() const;
+};
+
 struct SC::SocketDescriptor : public UniqueTaggedHandleTraits<SocketDescriptorTraits>
 {
     [[nodiscard]] ReturnCode create(SocketFlags::AddressFamily       addressFamily,
@@ -79,4 +99,29 @@ struct SC::SocketDescriptor : public UniqueTaggedHandleTraits<SocketDescriptorTr
     [[nodiscard]] ReturnCode setInheritable(bool value);
     [[nodiscard]] ReturnCode setBlocking(bool value);
     [[nodiscard]] ReturnCode getAddressFamily(SocketFlags::AddressFamily& addressFamily) const;
+};
+
+namespace SC
+{
+struct SocketClient;
+struct SocketServer;
+} // namespace SC
+
+struct SC::SocketServer
+{
+    SocketDescriptor         socket;
+    [[nodiscard]] ReturnCode listen(StringView interfaceAddress, uint16_t port,
+                                    uint32_t numberOfWaitingConnections = 1);
+    [[nodiscard]] ReturnCode close();
+    [[nodiscard]] ReturnCode accept(SocketFlags::AddressFamily addressFamily, SocketClient& newClient);
+};
+
+struct SC::SocketClient
+{
+    SocketDescriptor         socket;
+    [[nodiscard]] ReturnCode connect(StringView address, uint16_t port);
+    [[nodiscard]] ReturnCode close();
+    [[nodiscard]] ReturnCode write(Span<const char> data);
+    [[nodiscard]] ReturnCode read(Span<char> data);
+    [[nodiscard]] ReturnCode readWithTimeout(Span<char> data, IntegerMilliseconds timeout);
 };

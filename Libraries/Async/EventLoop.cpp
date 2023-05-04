@@ -77,6 +77,7 @@ SC::ReturnCode SC::EventLoop::startAccept(AsyncAccept& async, AsyncAccept::Suppo
     SC_TRY_IF(queueSubmission(async, move(callback)));
     Async::Accept operation;
     SC_TRY_IF(socketDescriptor.get(operation.handle, "Invalid handle"_a8));
+    SC_TRY_IF(socketDescriptor.getAddressFamily(operation.addressFamily));
     operation.support = &support;
     async.operation.assignValue(move(operation));
     return true;

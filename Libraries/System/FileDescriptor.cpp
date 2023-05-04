@@ -1,12 +1,12 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "Descriptors.h"
+#include "FileDescriptor.h"
 
 #if SC_PLATFORM_WINDOWS
-#include "DescriptorsInternalWindows.inl"
+#include "FileDescriptorInternalWindows.inl"
 #else
-#include "DescriptorsInternalPosix.inl"
+#include "FileDescriptorInternalPosix.inl"
 #endif
 
 #include "../Foundation/String.h"

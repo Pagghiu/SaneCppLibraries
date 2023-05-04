@@ -2,7 +2,6 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Networking/Networking.h"
 #include "../Testing/Test.h"
 #include "../Threading/Threading.h" // EventObject
 #include "EventLoop.h"
@@ -148,12 +147,12 @@ struct SC::EventLoopTest : public SC::TestCase
 
             constexpr uint32_t numWaitingConnections = 2;
 
-            TCPServer server;
-            uint16_t  tcpPort = 0;
+            SocketServer server;
+            uint16_t     tcpPort = 0;
             SC_TEST_EXPECT(listenToAvailablePort(server, "127.0.0.1", numWaitingConnections, 5050, 5060, tcpPort));
 
-            int       numClient = 0;
-            TCPClient acceptedClient[3];
+            int          numClient = 0;
+            SocketClient acceptedClient[3];
 
             auto onNewClient = [&](AsyncResult& res)
             {
@@ -164,7 +163,7 @@ struct SC::EventLoopTest : public SC::TestCase
             AsyncAccept          accept;
             SC_TEST_EXPECT(eventLoop.startAccept(accept, support, server.socket, onNewClient));
 
-            TCPClient client1, client2;
+            SocketClient client1, client2;
             SC_TEST_EXPECT(client1.connect("127.0.0.1", tcpPort));
             SC_TEST_EXPECT(client2.connect("127.0.0.1", tcpPort));
             SC_TEST_EXPECT(not acceptedClient[0].socket.isValid());
@@ -185,7 +184,7 @@ struct SC::EventLoopTest : public SC::TestCase
             // the behaviours in the test we do a runNoWait
             SC_TEST_EXPECT(eventLoop.runNoWait());
 
-            TCPClient client3;
+            SocketClient client3;
             SC_TEST_EXPECT(client3.connect("127.0.0.1", tcpPort));
 
             // Now we need a runNoWait for both because there are for sure no other events to be dequeued
@@ -197,7 +196,7 @@ struct SC::EventLoopTest : public SC::TestCase
         }
     }
 
-    [[nodiscard]] ReturnCode listenToAvailablePort(TCPServer& server, StringView address,
+    [[nodiscard]] ReturnCode listenToAvailablePort(SocketServer& server, StringView address,
                                                    uint32_t numWaitingConnections, const uint16_t startTcpPort,
                                                    const uint16_t endTcpPort, uint16_t& tcpPort)
     {

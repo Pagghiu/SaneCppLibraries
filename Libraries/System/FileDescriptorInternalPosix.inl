@@ -2,14 +2,12 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../Foundation/Vector.h"
-#include "Descriptors.h"
+#include "FileDescriptor.h"
 #include "System.h"
 
 #include <errno.h>  // errno
 #include <fcntl.h>  // fcntl
-#include <netdb.h>  // AF_INET / IPPROTO_TCP / AF_UNSPEC
 #include <unistd.h> // close
-constexpr int SOCKET_ERROR = -1;
 
 namespace SC
 {

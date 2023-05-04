@@ -13,7 +13,7 @@
 // Descriptors
 #include "../Networking/SocketDescriptor.h"
 #include "../Process/ProcessDescriptor.h"
-#include "../System/Descriptors.h"
+#include "../System/FileDescriptor.h"
 
 namespace SC
 {
@@ -83,11 +83,14 @@ struct SC::Async
         uint8_t                      acceptBuffer[288];
 #endif
     };
+
     struct Accept
     {
-        SocketDescriptor::Handle handle  = SocketDescriptor::Invalid;
-        AcceptSupport*           support = nullptr;
+        SocketDescriptor::Handle   handle        = SocketDescriptor::Invalid;
+        SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
+        AcceptSupport*             support       = nullptr;
     };
+
     enum class Type
     {
         Timeout,

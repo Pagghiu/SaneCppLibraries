@@ -2,15 +2,11 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include <WinSock2.h>
-#include <Ws2tcpip.h> // sockadd_in6
-using socklen_t = int;
-
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 #include "../Foundation/Vector.h"
-#include "Descriptors.h"
+#include "FileDescriptor.h"
 #include "System.h"
 
 // FileDescriptor
