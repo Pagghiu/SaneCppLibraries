@@ -22,6 +22,13 @@ struct OpaqueHandle
         static_assert(alignof(T) <= Alignment, "Increase Alignment of OpaqueHandle");
         return *reinterpret_cast<T*>(bytes);
     }
+    template <typename T>
+    const T& reinterpret_as() const
+    {
+        static_assert_size<T, N>();
+        static_assert(alignof(T) <= Alignment, "Increase Alignment of OpaqueHandle");
+        return *reinterpret_cast<const T*>(bytes);
+    }
 
   private:
     alignas(Alignment) char bytes[N];
