@@ -33,10 +33,21 @@ SC::ReturnCode SC::FileDescriptor::setBlocking(bool blocking)
 
 SC::ReturnCode SC::FileDescriptor::setInheritable(bool inheritable)
 {
-    if (SetHandleInformation(handle, HANDLE_FLAG_INHERIT, inheritable ? TRUE : FALSE) == FALSE)
+    if (::SetHandleInformation(handle, HANDLE_FLAG_INHERIT, inheritable ? TRUE : FALSE) == FALSE)
     {
         return "FileDescriptor::setInheritable - ::SetHandleInformation failed"_a8;
     }
+    return true;
+}
+
+SC::ReturnCode SC::FileDescriptor::isInheritable(bool& hasValue) const
+{
+    DWORD dwFlags = 0;
+    if (::GetHandleInformation(handle, &dwFlags) == FALSE)
+    {
+        return "FileDescriptor::getInheritable = ::GetHandleInformation failed"_a8;
+    }
+    hasValue = (dwFlags & HANDLE_FLAG_INHERIT) != 0;
     return true;
 }
 
@@ -106,72 +117,6 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
         // EOF
         return ReadResult{0, true};
     }
-}
-
-// SocketDescriptor
-
-SC::ReturnCode SC::SocketDescriptorTraits::releaseHandle(Handle& handle)
-{
-    ::closesocket(handle);
-    handle = SocketDescriptor::Invalid;
-    return true;
-}
-
-SC::ReturnCode SC::SocketDescriptor::setInheritable(bool inheritable)
-{
-    if (::SetHandleInformation(reinterpret_cast<HANDLE>(handle), HANDLE_FLAG_INHERIT, inheritable ? TRUE : FALSE) ==
-        FALSE)
-    {
-        "SetHandleInformation failed"_a8;
-    }
-    return true;
-}
-
-SC::ReturnCode SC::SocketDescriptor::setBlocking(bool blocking)
-{
-    ULONG enable = blocking ? 0 : 1;
-    if (::ioctlsocket(handle, FIONBIO, &enable) == SOCKET_ERROR)
-    {
-        return "ioctlsocket failed"_a8;
-    }
-    return true;
-}
-
-SC::ReturnCode SC::SocketDescriptor::isInheritable(bool& hasValue) const
-{
-    DWORD flags;
-    if (::GetHandleInformation(reinterpret_cast<HANDLE>(handle), &flags) == FALSE)
-    {
-        return "GetHandleInformation failed"_a8;
-    }
-    hasValue = (flags & HANDLE_FLAG_INHERIT) != 0;
-    return true;
-}
-
-SC::ReturnCode SC::SocketDescriptor::create(Descriptor::AddressFamily addressFamily, Descriptor::SocketType socketType,
-                                            Descriptor::ProtocolType protocol, Descriptor::BlockingType blocking,
-                                            Descriptor::InheritableType inheritable)
-{
-    SC_TRY_IF(SystemFunctions::isNetworkingInited());
-    SC_TRUST_RESULT(close());
-
-    DWORD flags = 0;
-    if (inheritable == Descriptor::NonInheritable)
-    {
-        flags |= WSA_FLAG_NO_HANDLE_INHERIT;
-    }
-    if (blocking == Descriptor::NonBlocking)
-    {
-        flags |= WSA_FLAG_OVERLAPPED;
-    }
-    handle = ::WSASocketW(Descriptor::toNative(addressFamily), Descriptor::toNative(socketType),
-                          Descriptor::toNative(protocol), nullptr, 0, flags);
-    if (!isValid())
-    {
-        return "WSASocketW failed"_a8;
-    }
-    SC_TRY_IF(setBlocking(blocking == Descriptor::Blocking));
-    return isValid();
 }
 
 // PipeDescriptor

@@ -115,6 +115,13 @@ SC::ReturnCode SC::FileDescriptor::setInheritable(bool inheritable)
     return FileDescriptorPosixHelpers::setFileDescriptorFlags<FD_CLOEXEC>(handle, not inheritable);
 }
 
+SC::ReturnCode SC::FileDescriptor::isInheritable(bool& hasValue) const
+{
+    auto res = FileDescriptorPosixHelpers::hasFileDescriptorFlags<FD_CLOEXEC>(handle, hasValue);
+    hasValue = not hasValue;
+    return res;
+}
+
 SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector<char>& output,
                                                                           Span<char>    fallbackBuffer)
 {
@@ -163,77 +170,6 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
         // TODO: Parse read result errno
         return ReturnCode("read failed"_a8);
     }
-}
-
-// SocketDescriptorTraits
-
-SC::ReturnCode SC::SocketDescriptorTraits::releaseHandle(Handle& handle)
-{
-    ::close(handle);
-    handle = Invalid;
-    return true;
-}
-SC::ReturnCode SC::SocketDescriptor::setInheritable(bool inheritable)
-{
-    return FileDescriptorPosixHelpers::setFileDescriptorFlags<FD_CLOEXEC>(handle, not inheritable);
-}
-
-SC::ReturnCode SC::SocketDescriptor::setBlocking(bool blocking)
-{
-    return FileDescriptorPosixHelpers::setFileStatusFlags<O_NONBLOCK>(handle, not blocking);
-}
-
-SC::ReturnCode SC::SocketDescriptor::isInheritable(bool& hasValue) const
-{
-    auto res = FileDescriptorPosixHelpers::hasFileDescriptorFlags<FD_CLOEXEC>(handle, hasValue);
-    hasValue = not hasValue;
-    return res;
-}
-
-SC::ReturnCode SC::SocketDescriptor::create(Descriptor::AddressFamily addressFamily, Descriptor::SocketType socketType,
-                                            Descriptor::ProtocolType protocol, Descriptor::BlockingType blocking,
-                                            Descriptor::InheritableType inheritable)
-{
-    SC_TRY_IF(SystemFunctions::isNetworkingInited());
-    SC_TRUST_RESULT(close());
-
-    int typeWithAdditions = Descriptor::toNative(socketType);
-#if defined(SOCK_NONBLOCK)
-    if (blocking == Descriptor::NonBlocking)
-    {
-        typeWithAdditions |= SOCK_NONBLOCK;
-    }
-#endif // defined(SOCK_NONBLOCK)
-#if defined(SOCK_CLOEXEC)
-    if (inheritable == Descriptor::NonInheritable)
-    {
-        typeWithAdditions |= SOCK_CLOEXEC;
-    }
-#endif // defined(SOCK_CLOEXEC)
-    do
-    {
-        handle = ::socket(Descriptor::toNative(addressFamily), typeWithAdditions, Descriptor::toNative(protocol));
-    } while (handle == -1 and errno == EINTR);
-#if !defined(SOCK_CLOEXEC)
-    if (inheritable == Descriptor::NonInheritable)
-    {
-        SC_TRY_IF(setInheritable(false));
-    }
-#endif // !defined(SOCK_CLOEXEC)
-#if !defined(SOCK_NONBLOCK)
-    if (blocking == Descriptor::NonBlocking)
-    {
-        SC_TRY_IF(setBlocking(false));
-    }
-#endif // !defined(SOCK_NONBLOCK)
-
-#if defined(SO_NOSIGPIPE)
-    {
-        int active = 1;
-        setsockopt(handle, SOL_SOCKET, SO_NOSIGPIPE, &active, sizeof(active));
-    }
-#endif // defined(SO_NOSIGPIPE)
-    return isValid();
 }
 
 // PipeDescriptor

@@ -5,8 +5,8 @@
 
 #include "../Foundation/Result.h"
 #include "../Foundation/StringView.h"
-#include "../System/Descriptors.h"
 #include "../System/Time.h"
+#include "SocketDescriptor.h"
 
 namespace SC
 {
@@ -17,18 +17,18 @@ struct NativeIPAddress;
 
 struct SC::NativeIPAddress
 {
-    NativeIPAddress(Descriptor::AddressFamily addressFamily = Descriptor::AddressFamilyIPV4)
+    NativeIPAddress(SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4)
         : addressFamily(addressFamily)
     {}
 
-    [[nodiscard]] Descriptor::AddressFamily getAddressFamily() { return addressFamily; }
+    [[nodiscard]] SocketFlags::AddressFamily getAddressFamily() { return addressFamily; }
 
     [[nodiscard]] ReturnCode fromAddressPort(StringView interfaceAddress, uint16_t port);
 
   private:
     friend struct TCPClient;
     friend struct TCPServer;
-    Descriptor::AddressFamily addressFamily = Descriptor::AddressFamilyIPV4;
+    SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
 
     OpaqueHandle<28> handle;
     uint32_t         sizeOfHandle() const;
@@ -40,7 +40,7 @@ struct SC::TCPServer
     [[nodiscard]] ReturnCode listen(StringView interfaceAddress, uint16_t port,
                                     uint32_t numberOfWaitingConnections = 1);
     [[nodiscard]] ReturnCode close();
-    [[nodiscard]] ReturnCode accept(Descriptor::AddressFamily addressFamily, TCPClient& newClient);
+    [[nodiscard]] ReturnCode accept(SocketFlags::AddressFamily addressFamily, TCPClient& newClient);
 };
 
 struct SC::TCPClient

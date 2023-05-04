@@ -197,6 +197,9 @@
 		7BE5C81229A2707E00CBCAD1 /* Descriptors.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Descriptors.h; path = ../../../../Libraries/System/Descriptors.h; sourceTree = "<group>"; };
 		7BE906C429FD071E0073D7A8 /* EventLoopInternalWindowsAPI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = EventLoopInternalWindowsAPI.h; path = ../../../../Libraries/Async/EventLoopInternalWindowsAPI.h; sourceTree = "<group>"; };
 		7BF876572A04615B00ABA178 /* ProcessDescriptor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ProcessDescriptor.h; path = ../../../../Libraries/Process/ProcessDescriptor.h; sourceTree = "<group>"; };
+		7BF876582A04633600ABA178 /* SocketDescriptorInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SocketDescriptorInternalPosix.inl; path = ../../../../Libraries/Networking/SocketDescriptorInternalPosix.inl; sourceTree = "<group>"; };
+		7BF876592A04633600ABA178 /* SocketDescriptor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SocketDescriptor.h; path = ../../../../Libraries/Networking/SocketDescriptor.h; sourceTree = "<group>"; };
+		7BF8765A2A04633600ABA178 /* SocketDescriptorInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SocketDescriptorInternalWindows.inl; path = ../../../../Libraries/Networking/SocketDescriptorInternalWindows.inl; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -408,6 +411,9 @@
 		7B8BF9AB29F3B9B60055BC3A /* Networking */ = {
 			isa = PBXGroup;
 			children = (
+				7BF876592A04633600ABA178 /* SocketDescriptor.h */,
+				7BF876582A04633600ABA178 /* SocketDescriptorInternalPosix.inl */,
+				7BF8765A2A04633600ABA178 /* SocketDescriptorInternalWindows.inl */,
 				7B8BF9AC29F3BADC0055BC3A /* Networking.cpp */,
 				7B8BF9AE29F3BADC0055BC3A /* Networking.h */,
 				7B8BF9AF29F3BADC0055BC3A /* NetworkingTest.h */,

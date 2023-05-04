@@ -22,24 +22,27 @@ struct SC::NetworkingTest : public SC::TestCase
             // We are testing only the inheritable because on windows there is no reliable
             // way of checking if a non-connected socket is in non-blocking mode
             SocketDescriptor socket;
-            SC_TEST_EXPECT(socket.create(Descriptor::AddressFamilyIPV4, Descriptor::SocketStream,
-                                         Descriptor::ProtocolTcp, Descriptor::NonBlocking, Descriptor::NonInheritable));
+            SC_TEST_EXPECT(socket.create(SocketFlags::AddressFamilyIPV4, SocketFlags::SocketStream,
+                                         SocketFlags::ProtocolTcp, DescriptorFlags::NonBlocking,
+                                         DescriptorFlags::NonInheritable));
             SC_TEST_EXPECT(socket.isValid());
             isInheritable = false;
             SC_TEST_EXPECT(socket.isInheritable(isInheritable));
             SC_TEST_EXPECT(not isInheritable);
             SC_TEST_EXPECT(socket.close());
 
-            SC_TEST_EXPECT(socket.create(Descriptor::AddressFamilyIPV4, Descriptor::SocketStream,
-                                         Descriptor::ProtocolTcp, Descriptor::Blocking, Descriptor::NonInheritable));
+            SC_TEST_EXPECT(socket.create(SocketFlags::AddressFamilyIPV4, SocketFlags::SocketStream,
+                                         SocketFlags::ProtocolTcp, DescriptorFlags::Blocking,
+                                         DescriptorFlags::NonInheritable));
             SC_TEST_EXPECT(socket.isValid());
             isInheritable = false;
             SC_TEST_EXPECT(socket.isInheritable(isInheritable));
             SC_TEST_EXPECT(not isInheritable);
             SC_TEST_EXPECT(socket.close());
 
-            SC_TEST_EXPECT(socket.create(Descriptor::AddressFamilyIPV4, Descriptor::SocketStream,
-                                         Descriptor::ProtocolTcp, Descriptor::Blocking, Descriptor::Inheritable));
+            SC_TEST_EXPECT(socket.create(SocketFlags::AddressFamilyIPV4, SocketFlags::SocketStream,
+                                         SocketFlags::ProtocolTcp, DescriptorFlags::Blocking,
+                                         DescriptorFlags::Inheritable));
             SC_TEST_EXPECT(socket.isValid());
             isInheritable = false;
             SC_TEST_EXPECT(socket.isInheritable(isInheritable));
@@ -85,7 +88,7 @@ struct SC::NetworkingTest : public SC::TestCase
             };
             Thread thread;
             SC_TEST_EXPECT(thread.start("tcp", &func));
-            Descriptor::AddressFamily family;
+            SocketFlags::AddressFamily family;
             SC_TEST_EXPECT(server.socket.getAddressFamily(family));
             TCPClient acceptedClient;
             SC_TEST_EXPECT(server.accept(family, acceptedClient));

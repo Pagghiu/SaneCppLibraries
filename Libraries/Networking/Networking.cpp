@@ -13,12 +13,13 @@
 #include <Ws2tcpip.h> // sockadd_in6
 
 using socklen_t = int;
+#include "SocketDescriptorInternalWindows.inl"
 
 #else
 
+#include "SocketDescriptorInternalPosix.inl"
 #include <arpa/inet.h>  // inet_pton
 #include <sys/select.h> // fd_set for emscripten
-constexpr int SOCKET_ERROR = -1;
 
 #endif
 
@@ -33,7 +34,7 @@ struct NetworkingInternal
         SC_TRY_IF(StringConverter(buffer).convertNullTerminateFastPath(ipAddress, ipNullTerm));
         memset(&inaddr, 0, sizeof(inaddr));
         inaddr.sin_port   = htons(port);
-        inaddr.sin_family = Descriptor::toNative(Descriptor::AddressFamilyIPV4);
+        inaddr.sin_family = SocketFlags::toNative(SocketFlags::AddressFamilyIPV4);
         const auto res    = ::inet_pton(inaddr.sin_family, ipNullTerm.bytesIncludingTerminator(), &inaddr.sin_addr);
         if (res == 0)
         {
@@ -53,7 +54,7 @@ struct NetworkingInternal
         SC_TRY_IF(StringConverter(buffer).convertNullTerminateFastPath(ipAddress, ipNullTerm));
         memset(&inaddr, 0, sizeof(inaddr));
         inaddr.sin6_port   = htons(port);
-        inaddr.sin6_family = Descriptor::toNative(Descriptor::AddressFamilyIPV6);
+        inaddr.sin6_family = SocketFlags::toNative(SocketFlags::AddressFamilyIPV6);
         const auto res     = ::inet_pton(inaddr.sin6_family, ipNullTerm.bytesIncludingTerminator(), &inaddr.sin6_addr);
         if (res == 0)
         {
@@ -68,12 +69,25 @@ struct NetworkingInternal
 };
 } // namespace SC
 
+SC::ReturnCode SC::SocketDescriptor::getAddressFamily(SocketFlags::AddressFamily& addressFamily) const
+{
+
+    struct sockaddr_in6 socketInfo;
+    socklen_t           socketInfoLen = sizeof(socketInfo);
+
+    if (::getsockname(handle, reinterpret_cast<struct sockaddr*>(&socketInfo), &socketInfoLen) == SOCKET_ERROR)
+    {
+        return "getsockname failed"_a8;
+    }
+    addressFamily = SocketFlags::AddressFamilyFromInt(socketInfo.sin6_family);
+    return true;
+}
 SC::uint32_t SC::NativeIPAddress::sizeOfHandle() const
 {
     switch (addressFamily)
     {
-    case Descriptor::AddressFamilyIPV4: return sizeof(sockaddr_in);
-    case Descriptor::AddressFamilyIPV6: return sizeof(sockaddr_in6);
+    case SocketFlags::AddressFamilyIPV4: return sizeof(sockaddr_in);
+    case SocketFlags::AddressFamilyIPV6: return sizeof(sockaddr_in6);
     }
     SC_UNREACHABLE();
 }
@@ -91,11 +105,11 @@ SC::ReturnCode SC::NativeIPAddress::fromAddressPort(StringView interfaceAddress,
         {
             return ipParsedOk;
         }
-        addressFamily = Descriptor::AddressFamilyIPV6;
+        addressFamily = SocketFlags::AddressFamilyIPV6;
     }
     else
     {
-        addressFamily = Descriptor::AddressFamilyIPV4;
+        addressFamily = SocketFlags::AddressFamilyIPV4;
     }
     return true;
 }
@@ -112,7 +126,7 @@ SC::ReturnCode SC::TCPServer::listen(StringView interfaceAddress, uint16_t port,
     SC_TRY_IF(nativeAddress.fromAddressPort(interfaceAddress, port));
     if (not socket.isValid())
     {
-        SC_TRY_IF(socket.create(nativeAddress.getAddressFamily(), Descriptor::SocketStream, Descriptor::ProtocolTcp));
+        SC_TRY_IF(socket.create(nativeAddress.getAddressFamily(), SocketFlags::SocketStream, SocketFlags::ProtocolTcp));
     }
 
     SocketDescriptor::Handle listenSocket;
@@ -137,7 +151,7 @@ SC::ReturnCode SC::TCPServer::listen(StringView interfaceAddress, uint16_t port,
     return true;
 }
 
-SC::ReturnCode SC::TCPServer::accept(Descriptor::AddressFamily addressFamily, TCPClient& newClient)
+SC::ReturnCode SC::TCPServer::accept(SocketFlags::AddressFamily addressFamily, TCPClient& newClient)
 {
     SC_TRY_MSG(not newClient.socket.isValid(), "destination socket already in use"_a8);
     SocketDescriptor::Handle listenDescriptor;
@@ -158,7 +172,7 @@ SC::ReturnCode SC::TCPClient::connect(StringView address, uint16_t port)
     SC_TRY_IF(nativeAddress.fromAddressPort(address, port));
     if (not socket.isValid())
     {
-        SC_TRY_IF(socket.create(nativeAddress.getAddressFamily(), Descriptor::SocketStream, Descriptor::ProtocolTcp));
+        SC_TRY_IF(socket.create(nativeAddress.getAddressFamily(), SocketFlags::SocketStream, SocketFlags::ProtocolTcp));
     }
     SocketDescriptor::Handle openedSocket;
     SC_TRUST_RESULT(socket.get(openedSocket, "invalid connect socket"_a8));
@@ -237,4 +251,63 @@ SC::ReturnCode SC::TCPClient::readWithTimeout(Span<char> data, IntegerMillisecon
         return read(data);
     }
     return false;
+}
+
+SC::SocketFlags::AddressFamily SC::SocketFlags::AddressFamilyFromInt(int value)
+{
+    switch (value)
+    {
+    case AF_INET: return SocketFlags::AddressFamilyIPV4;
+    case AF_INET6: return SocketFlags::AddressFamilyIPV6;
+    }
+    SC_UNREACHABLE();
+}
+
+unsigned char SC::SocketFlags::toNative(SocketFlags::AddressFamily type)
+{
+    switch (type)
+    {
+    case SocketFlags::AddressFamilyIPV4: return AF_INET;
+    case SocketFlags::AddressFamilyIPV6: return AF_INET6;
+    }
+    SC_UNREACHABLE();
+}
+
+SC::SocketFlags::SocketType SC::SocketFlags::SocketTypeFromInt(int value)
+{
+    switch (value)
+    {
+    case SOCK_STREAM: return SocketStream;
+    case SOCK_DGRAM: return SocketDgram;
+    }
+    SC_UNREACHABLE();
+}
+int SC::SocketFlags::toNative(SocketType type)
+{
+    switch (type)
+    {
+    case SocketStream: return SOCK_STREAM;
+    case SocketDgram: return SOCK_DGRAM;
+    }
+    SC_UNREACHABLE();
+}
+
+SC::SocketFlags::ProtocolType SC::SocketFlags::ProtocolTypeFromInt(int value)
+{
+    switch (value)
+    {
+    case IPPROTO_TCP: return ProtocolTcp;
+    case IPPROTO_UDP: return ProtocolUdp;
+    }
+    SC_UNREACHABLE();
+}
+
+int SC::SocketFlags::toNative(ProtocolType family)
+{
+    switch (family)
+    {
+    case ProtocolTcp: return IPPROTO_TCP;
+    case ProtocolUdp: return IPPROTO_UDP;
+    }
+    SC_UNREACHABLE();
 }
