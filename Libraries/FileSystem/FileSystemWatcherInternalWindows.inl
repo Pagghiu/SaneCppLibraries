@@ -60,12 +60,14 @@ struct SC::FileSystemWatcher::Internal
             if (threadingRunner->thread.wasStarted())
             {
                 threadingRunner->shouldStop.exchange(true);
-                for (FolderWatcher* entry = self->watchers.front; entry != nullptr; entry = entry->next)
+                do
                 {
-                    signalWatcherEvent(*entry);
-                }
+                    for (FolderWatcher* entry = self->watchers.front; entry != nullptr; entry = entry->next)
+                    {
+                        signalWatcherEvent(*entry);
+                    }
+                } while (threadingRunner->shouldStop.load());
                 SC_TRY_IF(threadingRunner->thread.join());
-                threadingRunner->shouldStop.exchange(false);
             }
         }
         for (FolderWatcher* entry = self->watchers.front; entry != nullptr; entry = entry->next)
@@ -202,6 +204,7 @@ struct SC::FileSystemWatcher::Internal
                 notifyEntry(entry);
             }
         }
+        threadingRunner->shouldStop.exchange(false);
     }
 
     void onEventLoopNotification(AsyncResult& result)
