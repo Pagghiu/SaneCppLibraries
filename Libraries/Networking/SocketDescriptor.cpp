@@ -150,9 +150,9 @@ SC::ReturnCode SC::SocketServer::listen(StringView interfaceAddress, uint16_t po
     return true;
 }
 
-SC::ReturnCode SC::SocketServer::accept(SocketFlags::AddressFamily addressFamily, SocketClient& newClient)
+SC::ReturnCode SC::SocketServer::accept(SocketFlags::AddressFamily addressFamily, SocketDescriptor& newClient)
 {
-    SC_TRY_MSG(not newClient.socket.isValid(), "destination socket already in use"_a8);
+    SC_TRY_MSG(not newClient.isValid(), "destination socket already in use"_a8);
     SocketDescriptor::Handle listenDescriptor;
     SC_TRY_IF(socket.get(listenDescriptor, "Invalid socket"_a8));
     SocketIPAddress          nativeAddress(addressFamily);
@@ -160,26 +160,34 @@ SC::ReturnCode SC::SocketServer::accept(SocketFlags::AddressFamily addressFamily
     SocketDescriptor::Handle acceptedClient =
         ::accept(listenDescriptor, &nativeAddress.handle.reinterpret_as<struct sockaddr>(), &nativeSize);
     SC_TRY_MSG(acceptedClient != SocketDescriptor::Invalid, "accept failed"_a8);
-    return newClient.socket.assign(acceptedClient);
+    return newClient.assign(acceptedClient);
 }
 
 SC::ReturnCode SC::SocketClient::connect(StringView address, uint16_t port)
 {
-    SC_TRY_IF(SystemFunctions::isNetworkingInited());
-
     SocketIPAddress nativeAddress;
     SC_TRY_IF(nativeAddress.fromAddressPort(address, port));
     if (not socket.isValid())
     {
         SC_TRY_IF(socket.create(nativeAddress.getAddressFamily(), SocketFlags::SocketStream, SocketFlags::ProtocolTcp));
     }
+    return connect(nativeAddress);
+}
+
+SC::ReturnCode SC::SocketClient::connect(SocketIPAddress ipAddress)
+{
+    SC_TRY_IF(SystemFunctions::isNetworkingInited());
     SocketDescriptor::Handle openedSocket;
     SC_TRUST_RESULT(socket.get(openedSocket, "invalid connect socket"_a8));
-    socklen_t nativeSize = nativeAddress.sizeOfHandle();
-    if (::connect(openedSocket, &nativeAddress.handle.reinterpret_as<const struct sockaddr>(), nativeSize) ==
-        SOCKET_ERROR)
+    socklen_t nativeSize = ipAddress.sizeOfHandle();
+    int       res;
+    do
     {
-        "connect failed"_a8;
+        res = ::connect(openedSocket, &ipAddress.handle.reinterpret_as<const struct sockaddr>(), nativeSize);
+    } while (res == SOCKET_ERROR and errno == EINTR);
+    if (res == SOCKET_ERROR)
+    {
+        return "connect failed"_a8;
     }
     return true;
 }

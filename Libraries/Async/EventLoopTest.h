@@ -146,32 +146,31 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.create());
 
             constexpr uint32_t numWaitingConnections = 2;
-
-            SocketServer server;
-            uint16_t     tcpPort = 0;
+            SocketDescriptor   server;
+            uint16_t           tcpPort = 0;
             SC_TEST_EXPECT(listenToAvailablePort(server, "127.0.0.1", numWaitingConnections, 5050, 5060, tcpPort));
 
-            int          numClient = 0;
-            SocketClient acceptedClient[3];
+            int              acceptedCount = 0;
+            SocketDescriptor acceptedClient[3];
 
-            auto onNewClient = [&](AsyncResult& res)
+            auto onAccepted = [&](AsyncResult& res)
             {
-                SC_TEST_EXPECT(acceptedClient[numClient].socket.assign(move(res.result.fields.accept.acceptedClient)));
-                numClient++;
+                SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.result.fields.accept.acceptedClient)));
+                acceptedCount++;
             };
             AsyncAccept::Support support;
             AsyncAccept          accept;
-            SC_TEST_EXPECT(eventLoop.startAccept(accept, support, server.socket, onNewClient));
+            SC_TEST_EXPECT(eventLoop.startAccept(accept, support, server, onAccepted));
 
-            SocketClient client1, client2;
-            SC_TEST_EXPECT(client1.connect("127.0.0.1", tcpPort));
-            SC_TEST_EXPECT(client2.connect("127.0.0.1", tcpPort));
-            SC_TEST_EXPECT(not acceptedClient[0].socket.isValid());
-            SC_TEST_EXPECT(not acceptedClient[1].socket.isValid());
+            SocketDescriptor client1, client2;
+            SC_TEST_EXPECT(SocketClient(client1).connect("127.0.0.1", tcpPort));
+            SC_TEST_EXPECT(SocketClient(client2).connect("127.0.0.1", tcpPort));
+            SC_TEST_EXPECT(not acceptedClient[0].isValid());
+            SC_TEST_EXPECT(not acceptedClient[1].isValid());
             SC_TEST_EXPECT(eventLoop.runOnce()); // first connect
             SC_TEST_EXPECT(eventLoop.runOnce()); // second connect
-            SC_TEST_EXPECT(acceptedClient[0].socket.isValid());
-            SC_TEST_EXPECT(acceptedClient[1].socket.isValid());
+            SC_TEST_EXPECT(acceptedClient[0].isValid());
+            SC_TEST_EXPECT(acceptedClient[1].isValid());
             SC_TEST_EXPECT(client1.close());
             SC_TEST_EXPECT(client2.close());
             SC_TEST_EXPECT(acceptedClient[0].close());
@@ -184,26 +183,30 @@ struct SC::EventLoopTest : public SC::TestCase
             // the behaviours in the test we do a runNoWait
             SC_TEST_EXPECT(eventLoop.runNoWait());
 
-            SocketClient client3;
-            SC_TEST_EXPECT(client3.connect("127.0.0.1", tcpPort));
+            SocketDescriptor client3;
+            SC_TEST_EXPECT(SocketClient(client3).connect("127.0.0.1", tcpPort));
 
             // Now we need a runNoWait for both because there are for sure no other events to be dequeued
             SC_TEST_EXPECT(eventLoop.runNoWait());
 
-            SC_TEST_EXPECT(not acceptedClient[2].socket.isValid());
+            SC_TEST_EXPECT(not acceptedClient[2].isValid());
             SC_TEST_EXPECT(server.close());
             SC_TEST_EXPECT(eventLoop.close());
         }
     }
 
-    [[nodiscard]] ReturnCode listenToAvailablePort(SocketServer& server, StringView address,
+    [[nodiscard]] ReturnCode listenToAvailablePort(SocketDescriptor& server, StringView address,
                                                    uint32_t numWaitingConnections, const uint16_t startTcpPort,
                                                    const uint16_t endTcpPort, uint16_t& tcpPort)
     {
         ReturnCode bound = false;
+        SC_TRY_IF(server.create(address.containsASCIICharacter('.') ? SocketFlags::AddressFamilyIPV4
+                                                                    : SocketFlags::AddressFamilyIPV6,
+                                SocketFlags::SocketStream, SocketFlags::ProtocolTcp, DescriptorFlags::NonBlocking,
+                                DescriptorFlags::NonInheritable));
         for (tcpPort = startTcpPort; tcpPort < endTcpPort; ++tcpPort)
         {
-            bound = server.listen(address, tcpPort, numWaitingConnections);
+            bound = SocketServer(server).listen(address, tcpPort, numWaitingConnections);
             if (bound)
             {
                 return true;

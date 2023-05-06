@@ -79,13 +79,12 @@ struct SC::SocketIPAddress
 
     [[nodiscard]] ReturnCode fromAddressPort(StringView interfaceAddress, uint16_t port);
 
-  private:
-    friend struct SocketClient;
-    friend struct SocketServer;
-    SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
-
-    OpaqueHandle<28> handle;
+    // TODO: maybe we should only save a binary address instead of native structs (IPV6 would need 16 bytes)
     uint32_t         sizeOfHandle() const;
+    OpaqueHandle<28> handle;
+
+  private:
+    SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
 };
 
 struct SC::SocketDescriptor : public UniqueTaggedHandleTraits<SocketDescriptorTraits>
@@ -109,19 +108,28 @@ struct SocketServer;
 
 struct SC::SocketServer
 {
-    SocketDescriptor         socket;
+    SocketServer(SocketDescriptor& socket) : socket(socket) {}
+
     [[nodiscard]] ReturnCode listen(StringView interfaceAddress, uint16_t port,
                                     uint32_t numberOfWaitingConnections = 1);
     [[nodiscard]] ReturnCode close();
-    [[nodiscard]] ReturnCode accept(SocketFlags::AddressFamily addressFamily, SocketClient& newClient);
+    [[nodiscard]] ReturnCode accept(SocketFlags::AddressFamily addressFamily, SocketDescriptor& newClient);
+
+  private:
+    SocketDescriptor& socket;
 };
 
 struct SC::SocketClient
 {
-    SocketDescriptor         socket;
+    SocketClient(SocketDescriptor& socket) : socket(socket) {}
+
     [[nodiscard]] ReturnCode connect(StringView address, uint16_t port);
+    [[nodiscard]] ReturnCode connect(SocketIPAddress ipAddress);
     [[nodiscard]] ReturnCode close();
     [[nodiscard]] ReturnCode write(Span<const char> data);
     [[nodiscard]] ReturnCode read(Span<char> data);
     [[nodiscard]] ReturnCode readWithTimeout(Span<char> data, IntegerMilliseconds timeout);
+
+  private:
+    SocketDescriptor& socket;
 };

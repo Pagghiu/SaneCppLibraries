@@ -143,14 +143,12 @@ struct SC::EventLoop::Internal
             break;
         }
         case Async::Type::Accept: {
-            Async::Accept& async = result.async.operation.fields.accept;
-            SocketServer   server;
-            SC_TRY_IF(server.socket.assign(async.handle));
-            auto         detach = MakeDeferred([&] { server.socket.detach(); });
-            SocketClient client;
-            SC_TRY_IF(server.accept(async.addressFamily, client));
+            Async::Accept&   async = result.async.operation.fields.accept;
+            SocketDescriptor serverSocket;
+            SC_TRY_IF(serverSocket.assign(async.handle));
+            auto detach = MakeDeferred([&] { serverSocket.detach(); });
             result.result.fields.accept.acceptedClient.detach();
-            return result.result.fields.accept.acceptedClient.assign(move(client.socket));
+            return SocketServer(serverSocket).accept(async.addressFamily, result.result.fields.accept.acceptedClient);
         }
         }
         return true;

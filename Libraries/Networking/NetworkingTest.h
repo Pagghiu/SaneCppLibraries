@@ -51,7 +51,8 @@ struct SC::NetworkingTest : public SC::TestCase
         }
         if (test_section("tcp client server"))
         {
-            SocketServer server;
+            SocketDescriptor serverSocket;
+            SocketServer     server(serverSocket);
             // Look for an available port
             constexpr int    startTcpPort = 5050;
             uint16_t         tcpPort;
@@ -76,7 +77,8 @@ struct SC::NetworkingTest : public SC::TestCase
             } params;
             Action func = [&]()
             {
-                SocketClient client;
+                SocketDescriptor clientSocket;
+                SocketClient     client(clientSocket);
                 params.connectRes = client.connect(serverAddress, tcpPort);
                 char buf[1]       = {testValue};
                 params.writeRes   = client.write({buf, sizeof(buf)});
@@ -89,11 +91,12 @@ struct SC::NetworkingTest : public SC::TestCase
             Thread thread;
             SC_TEST_EXPECT(thread.start("tcp", &func));
             SocketFlags::AddressFamily family;
-            SC_TEST_EXPECT(server.socket.getAddressFamily(family));
-            SocketClient acceptedClient;
-            SC_TEST_EXPECT(server.accept(family, acceptedClient));
-            SC_TEST_EXPECT(acceptedClient.socket.isValid());
-            char buf[1] = {0};
+            SC_TEST_EXPECT(serverSocket.getAddressFamily(family));
+            SocketDescriptor acceptedClientSocket;
+            SC_TEST_EXPECT(server.accept(family, acceptedClientSocket));
+            SC_TEST_EXPECT(acceptedClientSocket.isValid());
+            char         buf[1] = {0};
+            SocketClient acceptedClient(acceptedClientSocket);
             SC_TEST_EXPECT(acceptedClient.read({buf, sizeof(buf)}));
             SC_TEST_EXPECT(buf[0] == testValue and testValue != 0);
             SC_TEST_EXPECT(not acceptedClient.readWithTimeout({buf, sizeof(buf)}, 10_ms));
