@@ -83,6 +83,19 @@ SC::ReturnCode SC::EventLoop::startAccept(AsyncAccept& async, AsyncAccept::Suppo
     return true;
 }
 
+SC::ReturnCode SC::EventLoop::startConnect(AsyncConnect& async, Async::ConnectSupport& support,
+                                           const SocketDescriptor& socketDescriptor, SocketIPAddress ipAddress,
+                                           Function<void(AsyncResult&)>&& callback)
+{
+    SC_TRY_IF(queueSubmission(async, move(callback)));
+    Async::Connect operation;
+    SC_TRY_IF(socketDescriptor.get(operation.handle, "Invalid handle"_a8));
+    operation.support            = &support;
+    operation.support->ipAddress = ipAddress;
+    async.operation.assignValue(move(operation));
+    return true;
+}
+
 SC::ReturnCode SC::EventLoop::startWakeUp(AsyncWakeUp& async, Function<void(AsyncResult&)>&& callback,
                                           EventObject* eventObject)
 {
@@ -117,17 +130,12 @@ SC::ReturnCode SC::EventLoop::queueSubmission(Async& async, Function<void(AsyncR
     return true;
 }
 
-bool SC::EventLoop::shouldQuit()
-{
-    return activeHandles.isEmpty() and activeTimers.isEmpty() and activeWakeUps.isEmpty();
-}
-
 SC::ReturnCode SC::EventLoop::run()
 {
-    while (!shouldQuit())
+    do
     {
         SC_TRY_IF(runOnce());
-    }
+    } while (numberOfActiveHandles > 0);
     return true;
 }
 

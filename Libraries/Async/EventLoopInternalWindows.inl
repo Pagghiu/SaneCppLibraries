@@ -4,8 +4,9 @@
 
 #include <WinSock2.h>
 // Order is important
-#include <MSWSock.h> // AcceptEx
-#pragma comment(lib, "Mswsock.lib")
+#include <MSWSock.h> // AcceptEx, LPFN_CONNECTEX
+// #pragma comment(lib, "Mswsock.lib")
+#include <Ws2tcpip.h> // sockadd_in6
 
 #include "EventLoop.h"
 #include "EventLoopWindows.h"
@@ -13,9 +14,6 @@
 #include "EventLoopInternalWindowsAPI.h"
 
 #include "../System/System.h" // SystemFunctions
-
-// TODO: Make this threadsafe
-NTSetInformationFile pNtSetInformationFile = NULL;
 
 struct SC::Async::ProcessExitInternal
 {
@@ -25,12 +23,49 @@ struct SC::Async::ProcessExitInternal
 
 struct SC::EventLoop::Internal
 {
-    FileDescriptor loopFd;
-    Async          wakeUpAsync;
-
+    FileDescriptor         loopFd;
+    Async                  wakeUpAsync;
+    NTSetInformationFile   pNtSetInformationFile = nullptr;
+    LPFN_CONNECTEX         pConnectEx            = nullptr;
+    LPFN_ACCEPTEX          pAcceptEx             = nullptr;
     EventLoopWinOverlapped wakeUpOverlapped;
 
-    Internal() { wakeUpOverlapped.userData = &wakeUpAsync; }
+    Internal()
+    {
+        HMODULE ntdll         = GetModuleHandleA("ntdll.dll");
+        pNtSetInformationFile = reinterpret_cast<NTSetInformationFile>(GetProcAddress(ntdll, "NtSetInformationFile"));
+
+        wakeUpOverlapped.userData = &wakeUpAsync;
+    }
+
+    [[nodiscard]] ReturnCode ensureConnectFunction(SocketDescriptor::Handle sock)
+    {
+        if (pConnectEx == nullptr)
+        {
+
+            DWORD dwBytes;
+            GUID  guid = WSAID_CONNECTEX;
+            int   rc   = WSAIoctl(sock, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid), &pConnectEx,
+                                  sizeof(pConnectEx), &dwBytes, NULL, NULL);
+            if (rc != 0)
+                return "WSAIoctl failed"_a8;
+        }
+        return true;
+    }
+
+    [[nodiscard]] ReturnCode ensureAcceptFunction(SocketDescriptor::Handle sock)
+    {
+        if (pAcceptEx == nullptr)
+        {
+            DWORD dwBytes;
+            GUID  guid = WSAID_ACCEPTEX;
+            int   rc   = WSAIoctl(sock, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid), &pAcceptEx,
+                                  sizeof(pAcceptEx), &dwBytes, NULL, NULL);
+            if (rc != 0)
+                return "WSAIoctl failed"_a8;
+        }
+        return true;
+    }
 
     ~Internal() { SC_TRUST_RESULT(close()); }
     [[nodiscard]] ReturnCode close() { return loopFd.close(); }
@@ -50,8 +85,6 @@ struct SC::EventLoop::Internal
     [[nodiscard]] ReturnCode createWakeup(EventLoop& loop)
     {
         SC_UNUSED(loop);
-        // Optimization: we avoid one indirect function call, see runCompletionFor checking if async == wakeUpAsync
-        // wakeUpAsync.callback.bind<Internal, &Internal::runCompletionForWakeUp>(this);
         wakeUpAsync.operation.assignValue(Async::WakeUp());
         // No need to register it with EventLoop as we're calling PostQueuedCompletionStatus manually
         return true;
@@ -102,7 +135,6 @@ struct SC::EventLoop::Internal
                 return "GetExitCodeProcess failed"_a8;
             }
             result.result.fields.processExit.exitStatus.status = static_cast<int32_t>(processStatus);
-
             break;
         }
         case Async::Type::Accept: {
@@ -121,6 +153,23 @@ struct SC::EventLoop::Internal
             SC_TRY_IF(accept.support->clientSocket.get(clientSocket, "clientSocket error"_a8));
             ::setsockopt(clientSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, nullptr, 0);
             return result.result.fields.accept.acceptedClient.assign(move(accept.support->clientSocket));
+        }
+        case Async::Type::Connect: {
+            Async::Connect& connect = result.async.operation.fields.connect;
+
+            DWORD transferred = 0;
+            DWORD flags       = 0;
+            BOOL  res         = ::WSAGetOverlappedResult(connect.handle, &connect.support->overlapped.get().overlapped,
+                                                         &transferred, FALSE, &flags);
+            if (res == FALSE)
+            {
+                // TODO: report error
+                return "WSAGetOverlappedResult error"_a8;
+            }
+            // TODO: should we reset also completion port?
+            result.eventLoop.numberOfActiveHandles -= 1;
+            result.eventLoop.activeHandles.remove(result.async);
+            break;
         }
         }
         return true;
@@ -152,16 +201,30 @@ struct SC::EventLoop::KernelQueue
         SC_TRY_IF(eventLoop.internal.get().loopFd.get(loopHandle, "loop handle"_a8));
         switch (async.operation.type)
         {
-        case Async::Type::Timeout: eventLoop.activeTimers.queueBack(async); return true;
-        case Async::Type::WakeUp: eventLoop.activeWakeUps.queueBack(async); return true;
-        case Async::Type::Read: SC_TRY_IF(startReadWatcher(*async.operation.unionAs<Async::Read>())); break;
-        case Async::Type::ProcessExit: SC_TRY_IF(startProcessExitWatcher(async)); break;
+        case Async::Type::Timeout:
+            eventLoop.activeTimers.queueBack(async);
+            eventLoop.numberOfActiveHandles += 1;
+            return true;
+        case Async::Type::WakeUp:
+            eventLoop.activeWakeUps.queueBack(async);
+            eventLoop.numberOfActiveHandles += 1;
+            return true;
+        case Async::Type::Read: //
+            SC_TRY_IF(startReadWatcher(*async.operation.unionAs<Async::Read>()));
+            break;
+        case Async::Type::ProcessExit: //
+            SC_TRY_IF(startProcessExitWatcher(async));
+            break;
         case Async::Type::Accept:
             SC_TRY_IF(startAcceptWatcher(loopHandle, *async.operation.unionAs<Async::Accept>()));
+            break;
+        case Async::Type::Connect:
+            SC_TRY_IF(startConnectWatcher(loopHandle, eventLoop, async, *async.operation.unionAs<Async::Connect>()));
             break;
         }
         // On Windows we push directly to activeHandles and not stagedHandles as we've already created kernel objects
         eventLoop.activeHandles.queueBack(async);
+        eventLoop.numberOfActiveHandles += 1;
         return true;
     }
 
@@ -186,15 +249,8 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] static ReturnCode stopAcceptWatcher(Async::Accept& asyncAccept)
+    [[nodiscard]] ReturnCode stopAcceptWatcher(EventLoop& eventLoop, Async::Accept& asyncAccept)
     {
-        if (!pNtSetInformationFile)
-        {
-            HMODULE ntdll = GetModuleHandleA("ntdll.dll");
-            pNtSetInformationFile =
-                reinterpret_cast<NTSetInformationFile>(GetProcAddress(ntdll, "NtSetInformationFile"));
-        }
-
         HANDLE listenHandle = reinterpret_cast<HANDLE>(asyncAccept.handle);
 
         struct FILE_COMPLETION_INFORMATION file_completion_info;
@@ -204,8 +260,9 @@ struct SC::EventLoop::KernelQueue
         struct IO_STATUS_BLOCK status_block;
         memset(&status_block, 0, sizeof(status_block));
 
-        NTSTATUS status = pNtSetInformationFile(listenHandle, &status_block, &file_completion_info,
-                                                sizeof(file_completion_info), FileReplaceCompletionInformation);
+        NTSTATUS status = eventLoop.internal.get().pNtSetInformationFile(
+            listenHandle, &status_block, &file_completion_info, sizeof(file_completion_info),
+            FileReplaceCompletionInformation);
 
         if (!status)
         {
@@ -213,6 +270,62 @@ struct SC::EventLoop::KernelQueue
         }
         // This will cause one more event loop run with GetOverlappedIO failing
         return asyncAccept.support->clientSocket.close();
+    }
+
+    [[nodiscard]] static ReturnCode startConnectWatcher(HANDLE loopHandle, EventLoop& eventLoop, Async& async,
+                                                        Async::Connect& asyncConnect)
+    {
+        SC_TRY_IF(SystemFunctions::isNetworkingInited());
+
+        // To allow loading connect function we must first bind the socket
+        int bindRes;
+        if (asyncConnect.support->ipAddress.getAddressFamily() == SocketFlags::AddressFamilyIPV4)
+        {
+            struct sockaddr_in addr;
+            ZeroMemory(&addr, sizeof(addr));
+            addr.sin_family      = AF_INET;
+            addr.sin_addr.s_addr = INADDR_ANY;
+            addr.sin_port        = 0;
+            bindRes              = ::bind(asyncConnect.handle, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
+        }
+        else
+        {
+            struct sockaddr_in6 addr;
+            ZeroMemory(&addr, sizeof(addr));
+            addr.sin6_family = AF_INET6;
+            addr.sin6_port   = 0;
+            bindRes          = ::bind(asyncConnect.handle, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
+        }
+        if (bindRes == SOCKET_ERROR)
+        {
+            return "bind failed"_a8;
+        }
+        SC_TRY_IF(eventLoop.internal.get().ensureConnectFunction(asyncConnect.handle));
+        HANDLE connectHandle = reinterpret_cast<HANDLE>(asyncConnect.handle);
+
+        HANDLE iocp = ::CreateIoCompletionPort(connectHandle, loopHandle, 0, 0);
+        SC_TRY_MSG(iocp == loopHandle, "startConnectWatcher CreateIoCompletionPort failed"_a8);
+
+        auto& overlapped    = asyncConnect.support->overlapped.get();
+        overlapped.userData = &async;
+        const struct sockaddr* sockAddr =
+            &asyncConnect.support->ipAddress.handle.reinterpret_as<const struct sockaddr>();
+        const int sockAddrLen = asyncConnect.support->ipAddress.sizeOfHandle();
+        DWORD     dummyTransferred;
+        BOOL connectRes = eventLoop.internal.get().pConnectEx(asyncConnect.handle, sockAddr, sockAddrLen, nullptr, 0,
+                                                              &dummyTransferred, &overlapped.overlapped);
+        if (connectRes == FALSE and WSAGetLastError() != WSA_IO_PENDING)
+        {
+            return "ConnectEx failed"_a8;
+        }
+        ::setsockopt(asyncConnect.handle, SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, nullptr, 0);
+        return true;
+    }
+
+    [[nodiscard]] static ReturnCode stopConnectWatcher(Async::Connect& asyncConnect)
+    {
+        SC_UNUSED(asyncConnect);
+        return true;
     }
 
     [[nodiscard]] static ReturnCode startProcessExitWatcher(Async& async)
@@ -286,13 +399,13 @@ struct SC::EventLoop::KernelQueue
         SC_TRY_IF(eventLoop.internal.get().loopFd.get(loopHandle, "loop handle"_a8));
         switch (async.operation.type)
         {
-        case Async::Type::Accept: return activateAcceptWatcher(loopHandle, async);
+        case Async::Type::Accept: return activateAcceptWatcher(eventLoop, loopHandle, async);
         default: break;
         }
         return true;
     }
 
-    [[nodiscard]] static ReturnCode activateAcceptWatcher(HANDLE loopHandle, Async& async)
+    [[nodiscard]] static ReturnCode activateAcceptWatcher(EventLoop& eventLoop, HANDLE loopHandle, Async& async)
     {
         Async::Accept& asyncAccept  = async.operation.fields.accept;
         SOCKET         clientSocket = ::WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0,
@@ -316,32 +429,44 @@ struct SC::EventLoop::KernelQueue
 
         DWORD sync_bytes_read = 0;
 
+        SC_TRY_IF(eventLoop.internal.get().ensureAcceptFunction(asyncAccept.handle));
         BOOL res;
-        res =
-            ::AcceptEx(asyncAccept.handle, clientSocket, support.acceptBuffer, 0, sizeof(struct sockaddr_storage) + 16,
-                       sizeof(struct sockaddr_storage) + 16, &sync_bytes_read, &overlapped.overlapped);
+        res = eventLoop.internal.get().pAcceptEx(
+            asyncAccept.handle, clientSocket, support.acceptBuffer, 0, sizeof(struct sockaddr_storage) + 16,
+            sizeof(struct sockaddr_storage) + 16, &sync_bytes_read, &overlapped.overlapped);
         if (res == FALSE and WSAGetLastError() != WSA_IO_PENDING)
         {
             // TODO: Check AcceptEx WSA error codes
             return "AcceptEx failed"_a8;
         }
+        ::setsockopt(asyncAccept.handle, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, nullptr, 0);
         // TODO: Handle synchronous success
         deferDeleteSocket.disarm();
         return support.clientSocket.assign(clientSocket);
     }
 
-    [[nodiscard]] static ReturnCode cancelAsync(EventLoop& eventLoop, Async& async)
+    [[nodiscard]] ReturnCode cancelAsync(EventLoop& eventLoop, Async& async)
     {
         SC_UNUSED(eventLoop);
         switch (async.operation.type)
         {
-        case Async::Type::Timeout: return true;
-        case Async::Type::WakeUp: return true;
-        case Async::Type::Read: return stopReadWatcher(*async.operation.unionAs<Async::Read>());
-        case Async::Type::ProcessExit: return stopProcessExitWatcher(*async.operation.unionAs<Async::ProcessExit>());
-        case Async::Type::Accept: return stopAcceptWatcher(*async.operation.unionAs<Async::Accept>());
+        case Async::Type::Timeout: break;
+        case Async::Type::WakeUp: break;
+        case Async::Type::Read: //
+            SC_TRY_IF(stopReadWatcher(*async.operation.unionAs<Async::Read>()));
+            break;
+        case Async::Type::ProcessExit: //
+            SC_TRY_IF(stopProcessExitWatcher(*async.operation.unionAs<Async::ProcessExit>()));
+            break;
+        case Async::Type::Accept: //
+            SC_TRY_IF(stopAcceptWatcher(eventLoop, *async.operation.unionAs<Async::Accept>()));
+            break;
+        case Async::Type::Connect: //
+            SC_TRY_IF(stopConnectWatcher(*async.operation.unionAs<Async::Connect>()));
+            break;
         }
-        return false;
+        eventLoop.numberOfActiveHandles -= 1;
+        return true;
     }
 
   private:

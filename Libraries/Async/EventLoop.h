@@ -24,6 +24,7 @@ struct AsyncRead;
 struct AsyncWakeUp;
 struct AsyncProcessExit;
 struct AsyncAccept;
+struct AsyncConnect;
 struct AsyncResult;
 struct EventObject;
 } // namespace SC
@@ -91,13 +92,27 @@ struct SC::Async
         AcceptSupport*             support       = nullptr;
     };
 
+    struct ConnectSupport
+    {
+        SocketIPAddress ipAddress;
+#if SC_PLATFORM_WINDOWS
+        EventLoopWinOverlappedOpaque overlapped;
+#endif
+    };
+
+    struct Connect
+    {
+        SocketDescriptor::Handle handle  = SocketDescriptor::Invalid;
+        ConnectSupport*          support = nullptr;
+    };
     enum class Type
     {
         Timeout,
         Read,
         WakeUp,
         ProcessExit,
-        Accept
+        Accept,
+        Connect
     };
     union Operation
     {
@@ -109,13 +124,15 @@ struct SC::Async
         WakeUp      wakeUp;
         ProcessExit processExit;
         Accept      accept;
+        Connect     connect;
 
         using FieldsTypes =
             TypeList<TaggedField<Operation, Type, decltype(timeout), &Operation::timeout, Type::Timeout>,
                      TaggedField<Operation, Type, decltype(read), &Operation::read, Type::Read>,
                      TaggedField<Operation, Type, decltype(wakeUp), &Operation::wakeUp, Type::WakeUp>,
                      TaggedField<Operation, Type, decltype(processExit), &Operation::processExit, Type::ProcessExit>,
-                     TaggedField<Operation, Type, decltype(accept), &Operation::accept, Type::Accept>>;
+                     TaggedField<Operation, Type, decltype(accept), &Operation::accept, Type::Accept>,
+                     TaggedField<Operation, Type, decltype(connect), &Operation::connect, Type::Connect>>;
     };
 
     enum class State
@@ -158,6 +175,10 @@ struct SC::AsyncResult
     {
         SocketDescriptor acceptedClient;
     };
+
+    struct Connect
+    {
+    };
     using Type = Async::Type;
 
     union Result
@@ -170,13 +191,15 @@ struct SC::AsyncResult
         WakeUp      wakeUp;
         ProcessExit processExit;
         Accept      accept;
+        Connect     connect;
 
         using FieldsTypes =
             TypeList<TaggedField<Result, Type, decltype(timeout), &Result::timeout, Type::Timeout>,
                      TaggedField<Result, Type, decltype(read), &Result::read, Type::Read>,
                      TaggedField<Result, Type, decltype(wakeUp), &Result::wakeUp, Type::WakeUp>,
                      TaggedField<Result, Type, decltype(processExit), &Result::processExit, Type::ProcessExit>,
-                     TaggedField<Result, Type, decltype(accept), &Result::accept, Type::Accept>>;
+                     TaggedField<Result, Type, decltype(accept), &Result::accept, Type::Accept>,
+                     TaggedField<Result, Type, decltype(connect), &Result::connect, Type::Connect>>;
     };
 
     EventLoop& eventLoop;
@@ -210,6 +233,10 @@ struct SC::AsyncAccept : public Async
     using Support = Async::AcceptSupport;
 };
 
+struct SC::AsyncConnect : public Async
+{
+    using Support = Async::ConnectSupport;
+};
 struct SC::EventLoop
 {
     // Creation
@@ -241,6 +268,10 @@ struct SC::EventLoop
                                          const SocketDescriptor&        socketDescriptor,
                                          Function<void(AsyncResult&)>&& callback);
 
+    [[nodiscard]] ReturnCode startConnect(AsyncConnect& async, Async::ConnectSupport& support,
+                                          const SocketDescriptor& socketDescriptor, SocketIPAddress ipAddress,
+                                          Function<void(AsyncResult&)>&& callback);
+
     // WakeUp support
     [[nodiscard]] ReturnCode wakeUpFromExternalThread(AsyncWakeUp& wakeUp);
 
@@ -250,6 +281,7 @@ struct SC::EventLoop
     [[nodiscard]] ReturnCode getLoopFileDescriptor(FileDescriptor::Handle& fileDescriptor) const;
 
   private:
+    int                              numberOfActiveHandles = 0;
     IntrusiveDoubleLinkedList<Async> submissions;
     IntrusiveDoubleLinkedList<Async> stagedHandles;
     IntrusiveDoubleLinkedList<Async> activeHandles;
@@ -263,7 +295,7 @@ struct SC::EventLoop
     struct Internal;
     struct InternalSizes
     {
-        static constexpr int Windows = 192;
+        static constexpr int Windows = 216;
         static constexpr int Apple   = 136;
         static constexpr int Default = sizeof(void*);
     };
@@ -287,7 +319,6 @@ struct SC::EventLoop
 
     // Setup
     [[nodiscard]] ReturnCode queueSubmission(Async& async, Function<void(AsyncResult&)>&& callback);
-    [[nodiscard]] bool       shouldQuit();
 
     // Phases
     [[nodiscard]] ReturnCode stageSubmissions(KernelQueue& queue);

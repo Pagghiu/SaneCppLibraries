@@ -193,6 +193,61 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(server.close());
             SC_TEST_EXPECT(eventLoop.close());
         }
+        if (test_section("connect"))
+        {
+            EventLoop eventLoop;
+            SC_TEST_EXPECT(eventLoop.create());
+
+            SocketDescriptor server;
+            uint16_t         tcpPort;
+            auto             addressFamily  = SocketFlags::AddressFamilyIPV6;
+            StringView       connectAddress = "::1";
+            SC_TEST_EXPECT(listenToAvailablePort(server, connectAddress, 0, 5050, 5060, tcpPort));
+
+            int              acceptedCount = 0;
+            SocketDescriptor acceptedClient[3];
+
+            auto onAccepted = [&](AsyncResult& res)
+            {
+                SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.result.fields.accept.acceptedClient)));
+                acceptedCount++;
+            };
+            AsyncAccept::Support acceptSupport;
+            AsyncAccept          accept;
+            SC_TEST_EXPECT(server.setBlocking(false));
+            SC_TEST_EXPECT(eventLoop.startAccept(accept, acceptSupport, server, onAccepted));
+
+            int  connectedCount = 0;
+            auto onConnected    = [&](AsyncResult& res)
+            {
+                connectedCount++;
+                if (connectedCount == 2)
+                {
+                    SC_TEST_EXPECT(res.eventLoop.stopAsync(res.async));
+                }
+            };
+            SocketIPAddress localHost;
+
+            SC_TEST_EXPECT(localHost.fromAddressPort(connectAddress, tcpPort));
+
+            AsyncConnect::Support connectSupport[2];
+            AsyncConnect          connect[2];
+            SocketDescriptor      clients[2];
+
+            SC_TEST_EXPECT(clients[0].create(addressFamily, SocketFlags::SocketStream, SocketFlags::ProtocolTcp,
+                                             DescriptorFlags::NonBlocking, DescriptorFlags::NonInheritable));
+            SC_TEST_EXPECT(eventLoop.startConnect(connect[0], connectSupport[0], clients[0], localHost, onConnected));
+
+            SC_TEST_EXPECT(clients[1].create(addressFamily, SocketFlags::SocketStream, SocketFlags::ProtocolTcp,
+                                             DescriptorFlags::NonBlocking, DescriptorFlags::NonInheritable));
+            SC_TEST_EXPECT(eventLoop.startConnect(connect[1], connectSupport[1], clients[1], localHost, onConnected));
+
+            SC_TEST_EXPECT(connectedCount == 0);
+            SC_TEST_EXPECT(acceptedCount == 0);
+            SC_TEST_EXPECT(eventLoop.run());
+            SC_TEST_EXPECT(acceptedCount == 2);
+            SC_TEST_EXPECT(connectedCount == 2);
+        }
     }
 
     [[nodiscard]] ReturnCode listenToAvailablePort(SocketDescriptor& server, StringView address,

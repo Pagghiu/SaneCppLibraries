@@ -59,6 +59,7 @@ struct SC::EventLoop::Internal
                                           "EventLoop::Internal::createWakeup() - Async read handle invalid"_a8));
         SC_TRY_IF(loop.startRead(wakeupPipeRead, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)},
                                  Function<void(AsyncResult&)>()));
+        loop.numberOfActiveHandles -= 1; // we don't want the read to keep the queue up
         return true;
     }
 
@@ -150,8 +151,43 @@ struct SC::EventLoop::Internal
             result.result.fields.accept.acceptedClient.detach();
             return SocketServer(serverSocket).accept(async.addressFamily, result.result.fields.accept.acceptedClient);
         }
+        case Async::Type::Connect: {
+            Async::Connect& async = result.async.operation.fields.connect;
+
+            int       errorCode;
+            socklen_t errorSize = sizeof(errorCode);
+            const int socketRes = ::getsockopt(async.handle, SOL_SOCKET, SO_ERROR, &errorCode, &errorSize);
+            // TODO: This is making a syscall for each connected socket, we should probably aggregate them
+            // And additionally it's stupid as probably WRITE will be subscribed again anyway
+            // But probably this means to review the entire process of async stop
+            SC_TRUST_RESULT(stopSingleWatcherImmediate(result.async, async.handle, EVFILT_WRITE));
+            result.async.eventLoop->activeHandles.remove(result.async);
+            result.async.eventLoop->numberOfActiveHandles -= 1;
+            if (socketRes == 0)
+            {
+                SC_TRY_MSG(errorCode == 0, "connect SO_ERROR"_a8);
+                return true;
+            }
+            return "connect getsockopt failed"_a8;
+            break;
+        }
         }
         return true;
+    }
+
+    static ReturnCode stopSingleWatcherImmediate(Async& async, SocketDescriptor::Handle handle, short filter)
+    {
+        FileDescriptor::Handle loopNativeDescriptor;
+        SC_TRUST_RESULT(async.eventLoop->internal.get().loopFd.get(
+            loopNativeDescriptor, "EventLoop::Internal::pollAsync() - Invalid Handle"_a8));
+        struct kevent kev;
+        EV_SET(&kev, handle, filter, EV_DELETE, 0, 0, nullptr);
+        const int res = kevent(loopNativeDescriptor, &kev, 1, 0, 0, nullptr);
+        if (res == 0 or (errno == EBADF or errno == ENOENT))
+        {
+            return true;
+        }
+        return "kevent EV_DELETE failed"_a8;
     }
 };
 
@@ -169,13 +205,26 @@ struct SC::EventLoop::KernelQueue
     {
         switch (async.operation.type)
         {
-        case Async::Type::Timeout: eventLoop.activeTimers.queueBack(async); return true;
-        case Async::Type::WakeUp: eventLoop.activeWakeUps.queueBack(async); return true;
-        case Async::Type::Read: startReadWatcher(async, *async.operation.unionAs<Async::Read>()); break;
+        case Async::Type::Timeout:
+            eventLoop.activeTimers.queueBack(async);
+            eventLoop.numberOfActiveHandles += 1;
+            return true;
+        case Async::Type::WakeUp:
+            eventLoop.activeWakeUps.queueBack(async);
+            eventLoop.numberOfActiveHandles += 1;
+            return true;
+        case Async::Type::Read: //
+            startReadWatcher(async, *async.operation.unionAs<Async::Read>());
+            break;
         case Async::Type::ProcessExit:
             startProcessExitWatcher(async, *async.operation.unionAs<Async::ProcessExit>());
             break;
-        case Async::Type::Accept: startAcceptWatcher(async, *async.operation.unionAs<Async::Accept>()); break;
+        case Async::Type::Accept: //
+            startAcceptWatcher(async, *async.operation.unionAs<Async::Accept>());
+            break;
+        case Async::Type::Connect:
+            SC_TRY_IF(startConnectWatcher(async, *async.operation.unionAs<Async::Connect>()));
+            break;
         }
         newEvents += 1;
         // The handles are not active until we "poll" or "flush"
@@ -189,21 +238,6 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] bool isFull() const { return newEvents >= totalNumEvents; }
 
-    ReturnCode stopKeventWatcher(Async& async, SocketDescriptor::Handle handle, short filter)
-    {
-        FileDescriptor::Handle loopNativeDescriptor;
-        SC_TRUST_RESULT(async.eventLoop->internal.get().loopFd.get(
-            loopNativeDescriptor, "EventLoop::Internal::pollAsync() - Invalid Handle"_a8));
-        struct kevent kev;
-        EV_SET(&kev, handle, filter, EV_DELETE, 0, 0, nullptr);
-        const int res = kevent(loopNativeDescriptor, &kev, 1, 0, 0, nullptr);
-        if (res == 0 or (errno == EBADF or errno == ENOENT))
-        {
-            return true;
-        }
-        return "kevent EV_DELETE failed"_a8;
-    }
-
     void startReadWatcher(Async& async, Async::Read& asyncRead)
     {
         EV_SET(events + newEvents, asyncRead.fileDescriptor, EVFILT_READ, EV_ADD, 0, 0, &async);
@@ -211,7 +245,7 @@ struct SC::EventLoop::KernelQueue
 
     ReturnCode stopReadWatcher(Async& async, Async::Read& asyncRead)
     {
-        return stopKeventWatcher(async, asyncRead.fileDescriptor, EVFILT_READ);
+        return Internal::stopSingleWatcherImmediate(async, asyncRead.fileDescriptor, EVFILT_READ);
     }
 
     void startAcceptWatcher(Async& async, Async::Accept& asyncAccept)
@@ -221,7 +255,32 @@ struct SC::EventLoop::KernelQueue
 
     ReturnCode stopAcceptWatcher(Async& async, Async::Accept& asyncAccept)
     {
-        return stopKeventWatcher(async, asyncAccept.handle, EVFILT_READ);
+        return Internal::stopSingleWatcherImmediate(async, asyncAccept.handle, EVFILT_READ);
+    }
+
+    ReturnCode startConnectWatcher(Async& async, Async::Connect& asyncConnect)
+    {
+        SocketDescriptor client;
+        SC_TRY_IF(client.assign(asyncConnect.handle));
+        auto detach = MakeDeferred([&] { client.detach(); });
+        SC_TRY_IF(client.setBlocking(false)); // make sure it's in non blocking mode
+        auto res = SocketClient(client).connect(asyncConnect.support->ipAddress);
+        // we expect connect to fail with
+        if (res)
+        {
+            return "connect failed (succeded?)"_a8;
+        }
+        if (errno != EAGAIN and errno != EINPROGRESS)
+        {
+            return "connect failed"_a8;
+        }
+        EV_SET(events + newEvents, asyncConnect.handle, EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, &async);
+        return true;
+    }
+
+    ReturnCode stopConnectWatcher(Async& async, Async::Connect& asyncConnect)
+    {
+        return Internal::stopSingleWatcherImmediate(async, asyncConnect.handle, EVFILT_WRITE);
     }
 
     void startProcessExitWatcher(Async& async, Async::ProcessExit& asyncProcessExit)
@@ -232,7 +291,7 @@ struct SC::EventLoop::KernelQueue
 
     ReturnCode stopProcessExitWatcher(Async& async, Async::ProcessExit& asyncProcessExit)
     {
-        return stopKeventWatcher(async, asyncProcessExit.handle, EVFILT_PROC);
+        return Internal::stopSingleWatcherImmediate(async, asyncProcessExit.handle, EVFILT_PROC);
     }
 
     static struct timespec timerToTimespec(const TimeCounter& loopTime, const TimeCounter* nextTimer)
@@ -264,8 +323,6 @@ struct SC::EventLoop::KernelQueue
         // when nextTimer is null, specTimeout is initialized to 0, so that PollMode::NoWait
         specTimeout = timerToTimespec(self.loopTime, nextTimer);
         int res;
-        // in the next kevent call the staged handles will become active
-        self.activeHandles.appendBack(self.stagedHandles);
         do
         {
             res = kevent(loopNativeDescriptor, events, newEvents, events, totalNumEvents,
@@ -286,6 +343,8 @@ struct SC::EventLoop::KernelQueue
         {
             return "EventLoop::Internal::poll() - kevent failed"_a8;
         }
+        self.activeHandles.appendBack(self.stagedHandles);
+        self.numberOfActiveHandles += newEvents;
         newEvents = static_cast<int>(res);
         if (nextTimer)
         {
@@ -301,8 +360,6 @@ struct SC::EventLoop::KernelQueue
                                                  "EventLoop::Internal::flushQueue() - Invalid Handle"_a8));
 
         int res;
-        // in the next kevent call the staged handles will become active
-        self.activeHandles.appendBack(self.stagedHandles);
         do
         {
             res = kevent(loopNativeDescriptor, events, newEvents, nullptr, 0, nullptr);
@@ -311,6 +368,8 @@ struct SC::EventLoop::KernelQueue
         {
             return "EventLoop::Internal::flushQueue() - kevent failed"_a8;
         }
+        self.activeHandles.appendBack(self.stagedHandles);
+        self.numberOfActiveHandles += newEvents;
         newEvents = 0;
         return true;
     }
@@ -327,14 +386,19 @@ struct SC::EventLoop::KernelQueue
         SC_UNUSED(eventLoop);
         switch (async.operation.type)
         {
-        case Async::Type::Timeout: return true;
-        case Async::Type::WakeUp: return true;
-        case Async::Type::Read: return stopReadWatcher(async, *async.operation.unionAs<Async::Read>());
+        case Async::Type::Timeout:
+        case Async::Type::WakeUp: break;
+        case Async::Type::Read: SC_TRY_IF(stopReadWatcher(async, *async.operation.unionAs<Async::Read>())); break;
         case Async::Type::ProcessExit:
-            return stopProcessExitWatcher(async, *async.operation.unionAs<Async::ProcessExit>());
-        case Async::Type::Accept: return stopAcceptWatcher(async, *async.operation.unionAs<Async::Accept>());
+            SC_TRY_IF(stopProcessExitWatcher(async, *async.operation.unionAs<Async::ProcessExit>()));
+            break;
+        case Async::Type::Accept: SC_TRY_IF(stopAcceptWatcher(async, *async.operation.unionAs<Async::Accept>())); break;
+        case Async::Type::Connect:
+            SC_TRY_IF(stopConnectWatcher(async, *async.operation.unionAs<Async::Connect>()));
+            break;
         }
-        return false;
+        eventLoop.numberOfActiveHandles -= 1;
+        return true;
     }
 };
 
