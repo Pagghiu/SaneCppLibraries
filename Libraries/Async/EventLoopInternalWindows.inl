@@ -110,7 +110,8 @@ struct SC::EventLoop::Internal
         case Async::Type::Timeout: {
             // This is used for overlapped notifications (like FileSystemWatcher)
             // It would be probably better to create a dedicated enum type for Overlapped Notifications
-            break;
+            return true;
+            // Do not unregister async
         }
         case Async::Type::Read: {
             // TODO: do the actual read operation here
@@ -121,7 +122,8 @@ struct SC::EventLoop::Internal
             {
                 runCompletionForWakeUp(result);
             }
-            break;
+            return true;
+            // Do not unregister async
         }
         case Async::Type::ProcessExit: {
             // Process has exited
@@ -138,40 +140,41 @@ struct SC::EventLoop::Internal
             break;
         }
         case Async::Type::Accept: {
-            Async::Accept& accept = result.async.operation.fields.accept;
-
-            DWORD transferred = 0;
-            DWORD flags       = 0;
-            BOOL  res         = ::WSAGetOverlappedResult(accept.handle, &accept.support->overlapped.get().overlapped,
-                                                         &transferred, FALSE, &flags);
-            if (res == FALSE)
-            {
-                // TODO: report error
-                return "WSAGetOverlappedResult error"_a8;
-            }
+            Async::Accept& operation = result.async.operation.fields.accept;
+            SC_TRY_IF(checkWSAResult(operation.handle, operation.support->overlapped.get().overlapped));
             SOCKET clientSocket;
-            SC_TRY_IF(accept.support->clientSocket.get(clientSocket, "clientSocket error"_a8));
+            SC_TRY_IF(operation.support->clientSocket.get(clientSocket, "clientSocket error"_a8));
             ::setsockopt(clientSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, nullptr, 0);
-            return result.result.fields.accept.acceptedClient.assign(move(accept.support->clientSocket));
+            return result.result.fields.accept.acceptedClient.assign(move(operation.support->clientSocket));
+            // Do not unregister async
         }
         case Async::Type::Connect: {
-            Async::Connect& connect = result.async.operation.fields.connect;
-
-            DWORD transferred = 0;
-            DWORD flags       = 0;
-            BOOL  res         = ::WSAGetOverlappedResult(connect.handle, &connect.support->overlapped.get().overlapped,
-                                                         &transferred, FALSE, &flags);
-            if (res == FALSE)
-            {
-                // TODO: report error
-                return "WSAGetOverlappedResult error"_a8;
-            }
-            // TODO: should we reset also completion port?
-            result.eventLoop.numberOfActiveHandles -= 1;
-            result.eventLoop.activeHandles.remove(result.async);
+            Async::Connect& operation = result.async.operation.fields.connect;
+            SC_TRY_IF(checkWSAResult(operation.handle, operation.support->overlapped.get().overlapped));
+            break;
+        }
+        case Async::Type::Send: {
+            Async::Send& operation = result.async.operation.fields.send;
+            SC_TRY_IF(checkWSAResult(operation.handle, operation.support->overlapped.get().overlapped));
             break;
         }
         }
+        result.eventLoop.numberOfActiveHandles -= 1;
+        result.eventLoop.activeHandles.remove(result.async);
+        return true;
+    }
+
+    static ReturnCode checkWSAResult(SOCKET handle, OVERLAPPED& overlapped)
+    {
+        DWORD transferred = 0;
+        DWORD flags       = 0;
+        BOOL  res         = ::WSAGetOverlappedResult(handle, &overlapped, &transferred, FALSE, &flags);
+        if (res == FALSE)
+        {
+            // TODO: report error
+            return "WSAGetOverlappedResult error"_a8;
+        }
+        // TODO: should we reset also completion port?
         return true;
     }
 };
@@ -220,6 +223,9 @@ struct SC::EventLoop::KernelQueue
             break;
         case Async::Type::Connect:
             SC_TRY_IF(startConnectWatcher(loopHandle, eventLoop, async, *async.operation.unionAs<Async::Connect>()));
+            break;
+        case Async::Type::Send:
+            SC_TRY_IF(startSendWatcher(loopHandle, async, *async.operation.unionAs<Async::Send>()));
             break;
         }
         // On Windows we push directly to activeHandles and not stagedHandles as we've already created kernel objects
@@ -325,6 +331,31 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] static ReturnCode stopConnectWatcher(Async::Connect& asyncConnect)
     {
         SC_UNUSED(asyncConnect);
+        return true;
+    }
+
+    [[nodiscard]] static ReturnCode startSendWatcher(HANDLE loopHandle, Async& async, Async::Send& operation)
+    {
+        SC_TRY_IF(SystemFunctions::isNetworkingInited());
+        SC_UNUSED(loopHandle);
+        SC_UNUSED(operation);
+        HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(operation.handle), loopHandle, 0, 0);
+        SC_TRY_MSG(iocp == loopHandle, "startSendWatcher CreateIoCompletionPort failed"_a8);
+        auto& overlapped    = operation.support->overlapped.get();
+        overlapped.userData = &async;
+        WSABUF buffer;
+        // this const_cast is caused by WSABUF being used for both send and receive
+        buffer.buf = const_cast<CHAR*>(operation.data.data());
+        buffer.len = static_cast<ULONG>(operation.data.sizeInBytes());
+        DWORD     transferred;
+        const int res = ::WSASend(operation.handle, &buffer, 1, &transferred, 0, &overlapped.overlapped, nullptr);
+        SC_TRY_MSG(res != SOCKET_ERROR, "WSASend failed"_a8);
+        return true;
+    }
+
+    [[nodiscard]] ReturnCode stopSendWatcher(Async::Send& operation)
+    {
+        SC_UNUSED(operation);
         return true;
     }
 
@@ -463,6 +494,9 @@ struct SC::EventLoop::KernelQueue
             break;
         case Async::Type::Connect: //
             SC_TRY_IF(stopConnectWatcher(*async.operation.unionAs<Async::Connect>()));
+            break;
+        case Async::Type::Send: //
+            SC_TRY_IF(stopSendWatcher(*async.operation.unionAs<Async::Send>()));
             break;
         }
         eventLoop.numberOfActiveHandles -= 1;

@@ -17,16 +17,20 @@
 
 namespace SC
 {
+struct EventObject;
 struct EventLoop;
+
 struct Async;
+struct AsyncResult;
+
+// Operations
 struct AsyncTimeout;
 struct AsyncRead;
 struct AsyncWakeUp;
 struct AsyncProcessExit;
 struct AsyncAccept;
 struct AsyncConnect;
-struct AsyncResult;
-struct EventObject;
+struct AsyncSend;
 } // namespace SC
 
 namespace SC
@@ -105,6 +109,21 @@ struct SC::Async
         SocketDescriptor::Handle handle  = SocketDescriptor::Invalid;
         ConnectSupport*          support = nullptr;
     };
+
+    struct SendSupport
+    {
+#if SC_PLATFORM_WINDOWS
+        EventLoopWinOverlappedOpaque overlapped;
+#endif
+    };
+
+    struct Send
+    {
+        SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
+        Span<const char>         data;
+        SendSupport*             support = nullptr;
+    };
+
     enum class Type
     {
         Timeout,
@@ -112,8 +131,10 @@ struct SC::Async
         WakeUp,
         ProcessExit,
         Accept,
-        Connect
+        Connect,
+        Send
     };
+
     union Operation
     {
         Operation() {}
@@ -125,6 +146,7 @@ struct SC::Async
         ProcessExit processExit;
         Accept      accept;
         Connect     connect;
+        Send        send;
 
         using FieldsTypes =
             TypeList<TaggedField<Operation, Type, decltype(timeout), &Operation::timeout, Type::Timeout>,
@@ -132,7 +154,8 @@ struct SC::Async
                      TaggedField<Operation, Type, decltype(wakeUp), &Operation::wakeUp, Type::WakeUp>,
                      TaggedField<Operation, Type, decltype(processExit), &Operation::processExit, Type::ProcessExit>,
                      TaggedField<Operation, Type, decltype(accept), &Operation::accept, Type::Accept>,
-                     TaggedField<Operation, Type, decltype(connect), &Operation::connect, Type::Connect>>;
+                     TaggedField<Operation, Type, decltype(connect), &Operation::connect, Type::Connect>,
+                     TaggedField<Operation, Type, decltype(send), &Operation::send, Type::Send>>;
     };
 
     enum class State
@@ -237,6 +260,12 @@ struct SC::AsyncConnect : public Async
 {
     using Support = Async::ConnectSupport;
 };
+
+struct SC::AsyncSend : public Async
+{
+    using Support = Async::SendSupport;
+};
+
 struct SC::EventLoop
 {
     // Creation
@@ -272,6 +301,10 @@ struct SC::EventLoop
                                           const SocketDescriptor& socketDescriptor, SocketIPAddress ipAddress,
                                           Function<void(AsyncResult&)>&& callback);
 
+    [[nodiscard]] ReturnCode startSend(AsyncSend& async, AsyncSend::SendSupport& support,
+                                       const SocketDescriptor& socketDescriptor, Span<const char> data,
+                                       Function<void(AsyncResult&)>&& callback);
+
     // WakeUp support
     [[nodiscard]] ReturnCode wakeUpFromExternalThread(AsyncWakeUp& wakeUp);
 
@@ -296,7 +329,7 @@ struct SC::EventLoop
     struct InternalSizes
     {
         static constexpr int Windows = 216;
-        static constexpr int Apple   = 136;
+        static constexpr int Apple   = 144;
         static constexpr int Default = sizeof(void*);
     };
 

@@ -17,7 +17,7 @@ struct SC::EventLoopTest : public SC::TestCase
     {
         using namespace SC;
         // TODO: Add EventLoop::resetTimeout
-        if (test_section("startTimeout"))
+        if (test_section("timeout"))
         {
             AsyncTimeout timeout1, timeout2;
             EventLoop    eventLoop;
@@ -69,7 +69,7 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(threadWasCalled == 1);
             SC_TEST_EXPECT(wakeUpSucceded == 1);
         }
-        if (test_section("AsyncWakeUp::wakeUp"))
+        if (test_section("wakeUp"))
         {
             int       wakeUp1Called   = 0;
             int       wakeUp2Called   = 0;
@@ -103,7 +103,7 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(wakeUp2Called == 0);
             SC_TEST_EXPECT(wakeUp1ThreadID == Thread::CurrentThreadID());
         }
-        if (test_section("AsyncWakeUp::wakeUp with sync eventObject"))
+        if (test_section("wakeUp-eventObject"))
         {
             struct TestParams
             {
@@ -200,7 +200,6 @@ struct SC::EventLoopTest : public SC::TestCase
 
             SocketDescriptor server;
             uint16_t         tcpPort;
-            auto             addressFamily  = SocketFlags::AddressFamilyIPV6;
             StringView       connectAddress = "::1";
             SC_TEST_EXPECT(listenToAvailablePort(server, connectAddress, 0, 5050, 5060, tcpPort));
 
@@ -214,7 +213,6 @@ struct SC::EventLoopTest : public SC::TestCase
             };
             AsyncAccept::Support acceptSupport;
             AsyncAccept          accept;
-            SC_TEST_EXPECT(server.setBlocking(false));
             SC_TEST_EXPECT(eventLoop.startAccept(accept, acceptSupport, server, onAccepted));
 
             int  connectedCount = 0;
@@ -234,12 +232,10 @@ struct SC::EventLoopTest : public SC::TestCase
             AsyncConnect          connect[2];
             SocketDescriptor      clients[2];
 
-            SC_TEST_EXPECT(clients[0].create(addressFamily, SocketFlags::SocketStream, SocketFlags::ProtocolTcp,
-                                             DescriptorFlags::NonBlocking, DescriptorFlags::NonInheritable));
+            SC_TEST_EXPECT(clients[0].createAsyncTCPSocketIPV6());
             SC_TEST_EXPECT(eventLoop.startConnect(connect[0], connectSupport[0], clients[0], localHost, onConnected));
 
-            SC_TEST_EXPECT(clients[1].create(addressFamily, SocketFlags::SocketStream, SocketFlags::ProtocolTcp,
-                                             DescriptorFlags::NonBlocking, DescriptorFlags::NonInheritable));
+            SC_TEST_EXPECT(clients[1].createAsyncTCPSocketIPV6());
             SC_TEST_EXPECT(eventLoop.startConnect(connect[1], connectSupport[1], clients[1], localHost, onConnected));
 
             SC_TEST_EXPECT(connectedCount == 0);
@@ -248,6 +244,40 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(acceptedCount == 2);
             SC_TEST_EXPECT(connectedCount == 2);
         }
+        if (test_section("send"))
+        {
+            EventLoop eventLoop;
+            SC_TEST_EXPECT(eventLoop.create());
+
+            SocketDescriptor server;
+            uint16_t         tcpPort;
+            StringView       connectAddress = "::1";
+            SC_TEST_EXPECT(listenToAvailablePort(server, connectAddress, 0, 5050, 5060, tcpPort));
+
+            SocketDescriptor client;
+            SC_TEST_EXPECT(SocketClient(client).connect(connectAddress, tcpPort));
+            SocketDescriptor serverSideClient;
+            SC_TEST_EXPECT(SocketServer(server).accept(SocketFlags::AddressFamilyIPV6, serverSideClient));
+            SC_TEST_EXPECT(client.setBlocking(false));
+            AsyncSend::Support asyncSupport;
+            AsyncSend          async;
+
+            char dataBuffer[1] = {123};
+
+            Span<const char> data = {dataBuffer, sizeof(dataBuffer)};
+
+            int  sendCount = 0;
+            auto callback  = [&](AsyncResult& res)
+            {
+                SC_UNUSED(res);
+                sendCount++;
+            };
+            SC_TEST_EXPECT(eventLoop.startSend(async, asyncSupport, client, data, callback));
+            SC_TEST_EXPECT(eventLoop.runOnce());
+            SC_TEST_EXPECT(sendCount == 1);
+            SC_TEST_EXPECT(eventLoop.runNoWait());
+            SC_TEST_EXPECT(sendCount == 1);
+        }
     }
 
     [[nodiscard]] ReturnCode listenToAvailablePort(SocketDescriptor& server, StringView address,
@@ -255,10 +285,6 @@ struct SC::EventLoopTest : public SC::TestCase
                                                    const uint16_t endTcpPort, uint16_t& tcpPort)
     {
         ReturnCode bound = false;
-        SC_TRY_IF(server.create(address.containsASCIICharacter('.') ? SocketFlags::AddressFamilyIPV4
-                                                                    : SocketFlags::AddressFamilyIPV6,
-                                SocketFlags::SocketStream, SocketFlags::ProtocolTcp, DescriptorFlags::NonBlocking,
-                                DescriptorFlags::NonInheritable));
         for (tcpPort = startTcpPort; tcpPort < endTcpPort; ++tcpPort)
         {
             bound = SocketServer(server).listen(address, tcpPort, numWaitingConnections);

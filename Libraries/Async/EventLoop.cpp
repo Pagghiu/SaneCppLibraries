@@ -96,6 +96,19 @@ SC::ReturnCode SC::EventLoop::startConnect(AsyncConnect& async, Async::ConnectSu
     return true;
 }
 
+SC::ReturnCode SC::EventLoop::startSend(AsyncSend& async, AsyncSend::Support& support,
+                                        const SocketDescriptor& socketDescriptor, Span<const char> data,
+                                        Function<void(AsyncResult&)>&& callback)
+{
+    SC_TRY_IF(queueSubmission(async, move(callback)));
+    Async::Send operation;
+    SC_TRY_IF(socketDescriptor.get(operation.handle, "Invalid handle"_a8));
+    operation.data    = data;
+    operation.support = &support;
+    async.operation.assignValue(move(operation));
+    return true;
+}
+
 SC::ReturnCode SC::EventLoop::startWakeUp(AsyncWakeUp& async, Function<void(AsyncResult&)>&& callback,
                                           EventObject* eventObject)
 {

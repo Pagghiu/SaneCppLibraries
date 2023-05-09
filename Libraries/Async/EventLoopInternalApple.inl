@@ -169,7 +169,16 @@ struct SC::EventLoop::Internal
                 return true;
             }
             return "connect getsockopt failed"_a8;
-            break;
+        }
+        case Async::Type::Send: {
+            Async::Send& async = result.async.operation.fields.send;
+            ssize_t      res   = ::send(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
+            SC_TRY_MSG(res >= 0, "error in send"_a8);
+            SC_TRY_MSG(size_t(res) == async.data.sizeInBytes(), "send didn't send all data"_a8);
+            SC_TRUST_RESULT(stopSingleWatcherImmediate(result.async, async.handle, EVFILT_WRITE));
+            result.async.eventLoop->activeHandles.remove(result.async);
+            result.async.eventLoop->numberOfActiveHandles -= 1;
+            return true;
         }
         }
         return true;
@@ -216,14 +225,17 @@ struct SC::EventLoop::KernelQueue
         case Async::Type::Read: //
             startReadWatcher(async, *async.operation.unionAs<Async::Read>());
             break;
-        case Async::Type::ProcessExit:
+        case Async::Type::ProcessExit: //
             startProcessExitWatcher(async, *async.operation.unionAs<Async::ProcessExit>());
             break;
         case Async::Type::Accept: //
             startAcceptWatcher(async, *async.operation.unionAs<Async::Accept>());
             break;
-        case Async::Type::Connect:
+        case Async::Type::Connect: //
             SC_TRY_IF(startConnectWatcher(async, *async.operation.unionAs<Async::Connect>()));
+            break;
+        case Async::Type::Send: //
+            startSendWatcher(async, *async.operation.unionAs<Async::Send>());
             break;
         }
         newEvents += 1;
@@ -292,6 +304,16 @@ struct SC::EventLoop::KernelQueue
     ReturnCode stopProcessExitWatcher(Async& async, Async::ProcessExit& asyncProcessExit)
     {
         return Internal::stopSingleWatcherImmediate(async, asyncProcessExit.handle, EVFILT_PROC);
+    }
+
+    void startSendWatcher(Async& async, Async::Send& operation)
+    {
+        EV_SET(events + newEvents, operation.handle, EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, &async);
+    }
+
+    ReturnCode stopSendWatcher(Async& async, Async::Send& operation)
+    {
+        return Internal::stopSingleWatcherImmediate(async, operation.handle, EVFILT_WRITE);
     }
 
     static struct timespec timerToTimespec(const TimeCounter& loopTime, const TimeCounter* nextTimer)
@@ -388,13 +410,20 @@ struct SC::EventLoop::KernelQueue
         {
         case Async::Type::Timeout:
         case Async::Type::WakeUp: break;
-        case Async::Type::Read: SC_TRY_IF(stopReadWatcher(async, *async.operation.unionAs<Async::Read>())); break;
-        case Async::Type::ProcessExit:
+        case Async::Type::Read: //
+            SC_TRY_IF(stopReadWatcher(async, *async.operation.unionAs<Async::Read>()));
+            break;
+        case Async::Type::ProcessExit: //
             SC_TRY_IF(stopProcessExitWatcher(async, *async.operation.unionAs<Async::ProcessExit>()));
             break;
-        case Async::Type::Accept: SC_TRY_IF(stopAcceptWatcher(async, *async.operation.unionAs<Async::Accept>())); break;
-        case Async::Type::Connect:
+        case Async::Type::Accept: //
+            SC_TRY_IF(stopAcceptWatcher(async, *async.operation.unionAs<Async::Accept>()));
+            break;
+        case Async::Type::Connect: //
             SC_TRY_IF(stopConnectWatcher(async, *async.operation.unionAs<Async::Connect>()));
+            break;
+        case Async::Type::Send: //
+            SC_TRY_IF(stopSendWatcher(async, *async.operation.unionAs<Async::Send>()));
             break;
         }
         eventLoop.numberOfActiveHandles -= 1;
