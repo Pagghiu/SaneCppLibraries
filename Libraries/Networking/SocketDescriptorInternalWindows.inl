@@ -58,14 +58,10 @@ SC::ReturnCode SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFa
     SC_TRY_IF(SystemFunctions::isNetworkingInited());
     SC_TRUST_RESULT(close());
 
-    DWORD flags = 0;
+    DWORD flags = WSA_FLAG_OVERLAPPED;
     if (inheritable == DescriptorFlags::NonInheritable)
     {
         flags |= WSA_FLAG_NO_HANDLE_INHERIT;
-    }
-    if (blocking == DescriptorFlags::NonBlocking)
-    {
-        flags |= WSA_FLAG_OVERLAPPED;
     }
     handle = ::WSASocketW(SocketFlags::toNative(addressFamily), SocketFlags::toNative(socketType),
                           SocketFlags::toNative(protocol), nullptr, 0, flags);

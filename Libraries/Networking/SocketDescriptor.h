@@ -94,6 +94,8 @@ struct SC::SocketDescriptor : public UniqueTaggedHandleTraits<SocketDescriptorTr
                                     SocketFlags::ProtocolType        protocol    = SocketFlags::ProtocolTcp,
                                     DescriptorFlags::BlockingType    blocking    = DescriptorFlags::Blocking,
                                     DescriptorFlags::InheritableType inheritable = DescriptorFlags::NonInheritable);
+    [[nodiscard]] ReturnCode createAsyncTCPSocketIPV6();
+    [[nodiscard]] ReturnCode createAsyncTCPSocketIPV4();
     [[nodiscard]] ReturnCode isInheritable(bool& value) const;
     [[nodiscard]] ReturnCode setInheritable(bool value);
     [[nodiscard]] ReturnCode setBlocking(bool value);
