@@ -352,8 +352,17 @@ struct SC::EventLoop
     // Access Internals
     [[nodiscard]] ReturnCode getLoopFileDescriptor(FileDescriptor::Handle& fileDescriptor) const;
 
+    void increaseActiveCount();
+    void decreaseActiveCount();
+
+    int getTotalNumberOfActiveHandle() const;
+
   private:
-    int                              numberOfActiveHandles = 0;
+    int numberOfActiveHandles = 0;
+    int numberOfTimers        = 0;
+    int numberOfWakeups       = 0;
+    int numberOfExternals     = 0;
+
     IntrusiveDoubleLinkedList<Async> submissions;
     IntrusiveDoubleLinkedList<Async> stagedHandles;
     IntrusiveDoubleLinkedList<Async> activeHandles;
@@ -367,7 +376,7 @@ struct SC::EventLoop
     struct Internal;
     struct InternalSizes
     {
-        static constexpr int Windows = 216;
+        static constexpr int Windows = 224;
         static constexpr int Apple   = 144;
         static constexpr int Default = sizeof(void*);
     };

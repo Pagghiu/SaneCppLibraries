@@ -14,9 +14,9 @@ using socklen_t = int;
 
 SC::ReturnCode SC::SocketDescriptorTraits::releaseHandle(Handle& handle)
 {
-    ::closesocket(handle);
-    handle = SocketDescriptor::Invalid;
-    return true;
+    const int res = ::closesocket(handle);
+    handle        = SocketDescriptor::Invalid;
+    return res != -1;
 }
 
 SC::ReturnCode SC::SocketDescriptor::setInheritable(bool inheritable)

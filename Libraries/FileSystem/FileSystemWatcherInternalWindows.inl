@@ -110,6 +110,10 @@ struct SC::FileSystemWatcher::Internal
             signalWatcherEvent(folderWatcher);
             closeWatcherEvent(folderWatcher);
         }
+        else
+        {
+            eventLoopRunner->eventLoop.decreaseActiveCount();
+        }
         closeFileHandle(folderWatcher);
         return true;
     }
@@ -166,6 +170,7 @@ struct SC::FileSystemWatcher::Internal
                 // TODO: Parse error properly
                 return "CreateIoCompletionPort error"_a8;
             }
+            eventLoopRunner->eventLoop.increaseActiveCount();
         }
 
         BOOL success = ReadDirectoryChangesW(opaque.fileHandle,                 //

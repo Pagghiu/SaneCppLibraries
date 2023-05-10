@@ -161,7 +161,7 @@ SC::ReturnCode SC::EventLoop::run()
     do
     {
         SC_TRY_IF(runOnce());
-    } while (numberOfActiveHandles > 0);
+    } while (getTotalNumberOfActiveHandle() > 0);
     return true;
 }
 
@@ -248,26 +248,41 @@ SC::ReturnCode SC::EventLoop::stageSubmissions(SC::EventLoop::KernelQueue& queue
     return true;
 }
 
+void SC::EventLoop::increaseActiveCount() { numberOfExternals += 1; }
+
+void SC::EventLoop::decreaseActiveCount() { numberOfExternals -= 1; }
+
+int SC::EventLoop::getTotalNumberOfActiveHandle() const
+{
+    return numberOfActiveHandles + numberOfTimers + numberOfWakeups + numberOfExternals;
+}
+
 SC::ReturnCode SC::EventLoop::runOnce() { return runStep(PollMode::ForcedForwardProgress); }
+
 SC::ReturnCode SC::EventLoop::runNoWait() { return runStep(PollMode::NoWait); }
 
 SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
 {
     KernelQueue queue;
 
-    auto defer = MakeDeferred(
+    auto onErrorRestoreSubmissions = MakeDeferred(
         [this]
         {
             if (not stagedHandles.isEmpty())
             {
-                // TODO: we should re-append stagedHandles to submissions and transition them to Submitting state
-                SC_RELEASE_ASSERT(false);
+                while (Async* async = submissions.dequeueFront())
+                {
+                    async->state = Async::State::Submitting;
+                    submissions.queueBack(*async);
+                }
             }
         });
     SC_TRY_IF(stageSubmissions(queue));
 
     SC_RELEASE_ASSERT(submissions.isEmpty());
 
+    if (stagedHandles.isEmpty() and getTotalNumberOfActiveHandle() <= 0)
+        return true; // happens when we do cancelAsync on the last active one
     SC_TRY_IF(queue.pollAsync(*this, pollMode));
 
     Internal& self = internal.get();

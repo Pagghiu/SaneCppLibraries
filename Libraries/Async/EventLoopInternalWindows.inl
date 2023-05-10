@@ -28,6 +28,7 @@ struct SC::EventLoop::Internal
     NTSetInformationFile   pNtSetInformationFile = nullptr;
     LPFN_CONNECTEX         pConnectEx            = nullptr;
     LPFN_ACCEPTEX          pAcceptEx             = nullptr;
+    LPFN_DISCONNECTEX      pDisconnectEx         = nullptr;
     EventLoopWinOverlapped wakeUpOverlapped;
 
     Internal()
@@ -64,6 +65,15 @@ struct SC::EventLoop::Internal
             if (rc != 0)
                 return "WSAIoctl failed"_a8;
         }
+        if (pDisconnectEx == nullptr)
+        {
+            DWORD dwBytes;
+            GUID  guid = WSAID_DISCONNECTEX;
+            int   rc   = WSAIoctl(sock, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid), &pDisconnectEx,
+                                  sizeof(pDisconnectEx), &dwBytes, NULL, NULL);
+            if (rc != 0)
+                return "WSAIoctl failed"_a8;
+        }
         return true;
     }
 
@@ -87,6 +97,7 @@ struct SC::EventLoop::Internal
         SC_UNUSED(loop);
         wakeUpAsync.operation.assignValue(Async::WakeUp());
         // No need to register it with EventLoop as we're calling PostQueuedCompletionStatus manually
+        // As a consequence we don't need to do loop.decreseActiveCount()
         return true;
     }
 
@@ -108,16 +119,19 @@ struct SC::EventLoop::Internal
         switch (result.async.operation.type)
         {
         case Async::Type::Timeout: {
+            result.result.assignValue(AsyncResult::Timeout());
             // This is used for overlapped notifications (like FileSystemWatcher)
             // It would be probably better to create a dedicated enum type for Overlapped Notifications
             return true;
             // Do not unregister async
         }
         case Async::Type::Read: {
+            result.result.assignValue(AsyncResult::Read());
             // TODO: do the actual read operation here
             break;
         }
         case Async::Type::WakeUp: {
+            result.result.assignValue(AsyncResult::WakeUp());
             if (&result.async == &wakeUpAsync)
             {
                 runCompletionForWakeUp(result);
@@ -126,6 +140,7 @@ struct SC::EventLoop::Internal
             // Do not unregister async
         }
         case Async::Type::ProcessExit: {
+            result.result.assignValue(AsyncResult::ProcessExit());
             // Process has exited
             // Gather exit code
             Async::ProcessExit&         processExit  = result.async.operation.fields.processExit;
@@ -140,25 +155,31 @@ struct SC::EventLoop::Internal
             break;
         }
         case Async::Type::Accept: {
+            result.result.assignValue(AsyncResult::Accept());
             Async::Accept& operation = result.async.operation.fields.accept;
             SC_TRY_IF(checkWSAResult(operation.handle, operation.support->overlapped.get().overlapped));
             SOCKET clientSocket;
             SC_TRY_IF(operation.support->clientSocket.get(clientSocket, "clientSocket error"_a8));
-            ::setsockopt(clientSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, nullptr, 0);
+            const int socketOpRes = ::setsockopt(clientSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
+                                                 reinterpret_cast<char*>(&operation.handle), sizeof(operation.handle));
+            SC_TRY_MSG(socketOpRes == 0, "setsockopt SO_UPDATE_ACCEPT_CONTEXT failed"_a8);
             return result.result.fields.accept.acceptedClient.assign(move(operation.support->clientSocket));
             // Do not unregister async
         }
         case Async::Type::Connect: {
+            result.result.assignValue(AsyncResult::Connect());
             Async::Connect& operation = result.async.operation.fields.connect;
             SC_TRY_IF(checkWSAResult(operation.handle, operation.support->overlapped.get().overlapped));
             break;
         }
         case Async::Type::Send: {
+            result.result.assignValue(AsyncResult::Send());
             Async::Send& operation = result.async.operation.fields.send;
             SC_TRY_IF(checkWSAResult(operation.handle, operation.support->overlapped.get().overlapped));
             break;
         }
         case Async::Type::Receive: {
+            result.result.assignValue(AsyncResult::Receive());
             Async::Receive& operation = result.async.operation.fields.receive;
             SC_TRY_IF(checkWSAResult(operation.handle, operation.support->overlapped.get().overlapped));
             break;
@@ -211,11 +232,11 @@ struct SC::EventLoop::KernelQueue
         {
         case Async::Type::Timeout:
             eventLoop.activeTimers.queueBack(async);
-            eventLoop.numberOfActiveHandles += 1;
+            eventLoop.numberOfTimers += 1;
             return true;
         case Async::Type::WakeUp:
             eventLoop.activeWakeUps.queueBack(async);
-            eventLoop.numberOfActiveHandles += 1;
+            eventLoop.numberOfWakeups += 1;
             return true;
         case Async::Type::Read: //
             SC_TRY_IF(startReadWatcher(*async.operation.unionAs<Async::Read>()));
@@ -266,24 +287,25 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] ReturnCode stopAcceptWatcher(EventLoop& eventLoop, Async::Accept& asyncAccept)
     {
         HANDLE listenHandle = reinterpret_cast<HANDLE>(asyncAccept.handle);
-
+        // This will cause one more event loop run with GetOverlappedIO failing
+        SC_TRY_IF(asyncAccept.support->clientSocket.close());
         struct FILE_COMPLETION_INFORMATION file_completion_info;
         file_completion_info.Key  = NULL;
         file_completion_info.Port = NULL;
-
         struct IO_STATUS_BLOCK status_block;
         memset(&status_block, 0, sizeof(status_block));
 
         NTSTATUS status = eventLoop.internal.get().pNtSetInformationFile(
             listenHandle, &status_block, &file_completion_info, sizeof(file_completion_info),
             FileReplaceCompletionInformation);
-
-        if (!status)
+        if (status != STATUS_SUCCESS)
         {
-            return "FileReplaceCompletionInformation failed"_a8;
+            // This will fail if we have a pending AcceptEx call.
+            // I've tried ::CancelIoEx, ::shutdown and of course ::closesocket but nothing works
+            // return "FileReplaceCompletionInformation failed"_a8;
+            return true;
         }
-        // This will cause one more event loop run with GetOverlappedIO failing
-        return asyncAccept.support->clientSocket.close();
+        return true;
     }
 
     [[nodiscard]] static ReturnCode startConnectWatcher(HANDLE loopHandle, EventLoop& eventLoop, Async& async,
@@ -503,7 +525,6 @@ struct SC::EventLoop::KernelQueue
             // TODO: Check AcceptEx WSA error codes
             return "AcceptEx failed"_a8;
         }
-        ::setsockopt(asyncAccept.handle, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, nullptr, 0);
         // TODO: Handle synchronous success
         deferDeleteSocket.disarm();
         return support.clientSocket.assign(clientSocket);
@@ -514,8 +535,12 @@ struct SC::EventLoop::KernelQueue
         SC_UNUSED(eventLoop);
         switch (async.operation.type)
         {
-        case Async::Type::Timeout: break;
-        case Async::Type::WakeUp: break;
+        case Async::Type::Timeout: //
+            eventLoop.numberOfTimers -= 1;
+            return true;
+        case Async::Type::WakeUp: //
+            eventLoop.numberOfWakeups -= 1;
+            return true;
         case Async::Type::Read: //
             SC_TRY_IF(stopReadWatcher(*async.operation.unionAs<Async::Read>()));
             break;

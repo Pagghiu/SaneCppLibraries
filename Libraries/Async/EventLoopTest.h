@@ -79,13 +79,19 @@ struct SC::EventLoopTest : public SC::TestCase
             AsyncWakeUp wakeUp1;
             AsyncWakeUp wakeUp2;
 
-            auto lambda1 = [&](AsyncResult&)
+            auto lambda1 = [&](AsyncResult& res)
             {
                 wakeUp1ThreadID = Thread::CurrentThreadID();
                 wakeUp1Called++;
+                SC_TEST_EXPECT(res.eventLoop.stopAsync(res.async));
             };
             SC_TEST_EXPECT(eventLoop.startWakeUp(wakeUp1, lambda1));
-            SC_TEST_EXPECT(eventLoop.startWakeUp(wakeUp2, [&](AsyncResult&) { wakeUp2Called++; }));
+            auto lambda2 = [&](AsyncResult& res)
+            {
+                wakeUp2Called++;
+                SC_TEST_EXPECT(res.eventLoop.stopAsync(res.async));
+            };
+            SC_TEST_EXPECT(eventLoop.startWakeUp(wakeUp2, lambda2));
             Thread     newThread1;
             Thread     newThread2;
             ReturnCode loopRes1 = false;
@@ -210,6 +216,10 @@ struct SC::EventLoopTest : public SC::TestCase
             {
                 SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.result.fields.accept.acceptedClient)));
                 acceptedCount++;
+                if (acceptedCount == 2)
+                {
+                    SC_TEST_EXPECT(res.eventLoop.stopAsync(res.async));
+                }
             };
             AsyncAccept::Support acceptSupport;
             AsyncAccept          accept;
@@ -219,10 +229,7 @@ struct SC::EventLoopTest : public SC::TestCase
             auto onConnected    = [&](AsyncResult& res)
             {
                 connectedCount++;
-                if (connectedCount == 2)
-                {
-                    SC_TEST_EXPECT(res.eventLoop.stopAsync(res.async));
-                }
+                SC_UNUSED(res);
             };
             SocketIPAddress localHost;
 

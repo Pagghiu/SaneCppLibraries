@@ -38,3 +38,5 @@ enum FILE_INFORMATION_CLASS
 typedef NTSTATUS(NTAPI* NTSetInformationFile)(HANDLE fileHandle, struct IO_STATUS_BLOCK* ioStatusBlock,
                                               void* fileInformation, ULONG length,
                                               enum FILE_INFORMATION_CLASS fileInformationClass);
+
+static constexpr NTSTATUS STATUS_SUCCESS = 0;
