@@ -171,13 +171,23 @@ struct SC::EventLoop::Internal
             return "connect getsockopt failed"_a8;
         }
         case Async::Type::Send: {
-            Async::Send& async = result.async.operation.fields.send;
-            ssize_t      res   = ::send(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
+            Async::Send&  async = result.async.operation.fields.send;
+            const ssize_t res   = ::send(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
+            result.async.eventLoop->activeHandles.remove(result.async);
+            result.async.eventLoop->numberOfActiveHandles -= 1;
             SC_TRY_MSG(res >= 0, "error in send"_a8);
             SC_TRY_MSG(size_t(res) == async.data.sizeInBytes(), "send didn't send all data"_a8);
             SC_TRUST_RESULT(stopSingleWatcherImmediate(result.async, async.handle, EVFILT_WRITE));
+            return true;
+        }
+        case Async::Type::Receive: {
+            Async::Receive& async = result.async.operation.fields.receive;
+            const ssize_t   res   = ::recv(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
             result.async.eventLoop->activeHandles.remove(result.async);
             result.async.eventLoop->numberOfActiveHandles -= 1;
+            SC_TRY_MSG(res >= 0, "error in recv"_a8);
+            SC_TRY_MSG(size_t(res) == async.data.sizeInBytes(), "send didn't send all data"_a8);
+            SC_TRUST_RESULT(stopSingleWatcherImmediate(result.async, async.handle, EVFILT_READ));
             return true;
         }
         }
@@ -236,6 +246,9 @@ struct SC::EventLoop::KernelQueue
             break;
         case Async::Type::Send: //
             startSendWatcher(async, *async.operation.unionAs<Async::Send>());
+            break;
+        case Async::Type::Receive: //
+            startReceiveWatcher(async, *async.operation.unionAs<Async::Receive>());
             break;
         }
         newEvents += 1;
@@ -314,6 +327,16 @@ struct SC::EventLoop::KernelQueue
     ReturnCode stopSendWatcher(Async& async, Async::Send& operation)
     {
         return Internal::stopSingleWatcherImmediate(async, operation.handle, EVFILT_WRITE);
+    }
+
+    void startReceiveWatcher(Async& async, Async::Receive& operation)
+    {
+        EV_SET(events + newEvents, operation.handle, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, &async);
+    }
+
+    ReturnCode stopReceiveWatcher(Async& async, Async::Receive& operation)
+    {
+        return Internal::stopSingleWatcherImmediate(async, operation.handle, EVFILT_READ);
     }
 
     static struct timespec timerToTimespec(const TimeCounter& loopTime, const TimeCounter* nextTimer)
@@ -424,6 +447,9 @@ struct SC::EventLoop::KernelQueue
             break;
         case Async::Type::Send: //
             SC_TRY_IF(stopSendWatcher(async, *async.operation.unionAs<Async::Send>()));
+            break;
+        case Async::Type::Receive: //
+            SC_TRY_IF(stopReceiveWatcher(async, *async.operation.unionAs<Async::Receive>()));
             break;
         }
         eventLoop.numberOfActiveHandles -= 1;

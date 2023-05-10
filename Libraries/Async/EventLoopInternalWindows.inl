@@ -158,6 +158,11 @@ struct SC::EventLoop::Internal
             SC_TRY_IF(checkWSAResult(operation.handle, operation.support->overlapped.get().overlapped));
             break;
         }
+        case Async::Type::Receive: {
+            Async::Receive& operation = result.async.operation.fields.receive;
+            SC_TRY_IF(checkWSAResult(operation.handle, operation.support->overlapped.get().overlapped));
+            break;
+        }
         }
         result.eventLoop.numberOfActiveHandles -= 1;
         result.eventLoop.activeHandles.remove(result.async);
@@ -226,6 +231,9 @@ struct SC::EventLoop::KernelQueue
             break;
         case Async::Type::Send:
             SC_TRY_IF(startSendWatcher(loopHandle, async, *async.operation.unionAs<Async::Send>()));
+            break;
+        case Async::Type::Receive:
+            SC_TRY_IF(startReceiveWatcher(loopHandle, async, *async.operation.unionAs<Async::Receive>()));
             break;
         }
         // On Windows we push directly to activeHandles and not stagedHandles as we've already created kernel objects
@@ -354,6 +362,31 @@ struct SC::EventLoop::KernelQueue
     }
 
     [[nodiscard]] ReturnCode stopSendWatcher(Async::Send& operation)
+    {
+        SC_UNUSED(operation);
+        return true;
+    }
+
+    [[nodiscard]] static ReturnCode startReceiveWatcher(HANDLE loopHandle, Async& async, Async::Receive& operation)
+    {
+        SC_TRY_IF(SystemFunctions::isNetworkingInited());
+        SC_UNUSED(loopHandle);
+        SC_UNUSED(operation);
+        HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(operation.handle), loopHandle, 0, 0);
+        SC_TRY_MSG(iocp == loopHandle, "startReceiveWatcher CreateIoCompletionPort failed"_a8);
+        auto& overlapped    = operation.support->overlapped.get();
+        overlapped.userData = &async;
+        WSABUF buffer;
+        buffer.buf = operation.data.data();
+        buffer.len = static_cast<ULONG>(operation.data.sizeInBytes());
+        DWORD     transferred;
+        DWORD     flags = 0;
+        const int res = ::WSARecv(operation.handle, &buffer, 1, &transferred, &flags, &overlapped.overlapped, nullptr);
+        SC_TRY_MSG(res != SOCKET_ERROR, "WSARecv failed"_a8);
+        return true;
+    }
+
+    [[nodiscard]] ReturnCode stopReceiveWatcher(Async::Receive& operation)
     {
         SC_UNUSED(operation);
         return true;
@@ -497,6 +530,9 @@ struct SC::EventLoop::KernelQueue
             break;
         case Async::Type::Send: //
             SC_TRY_IF(stopSendWatcher(*async.operation.unionAs<Async::Send>()));
+            break;
+        case Async::Type::Receive: //
+            SC_TRY_IF(stopReceiveWatcher(*async.operation.unionAs<Async::Receive>()));
             break;
         }
         eventLoop.numberOfActiveHandles -= 1;

@@ -31,6 +31,7 @@ struct AsyncProcessExit;
 struct AsyncAccept;
 struct AsyncConnect;
 struct AsyncSend;
+struct AsyncReceive;
 } // namespace SC
 
 namespace SC
@@ -124,6 +125,20 @@ struct SC::Async
         SendSupport*             support = nullptr;
     };
 
+    struct ReceiveSupport
+    {
+#if SC_PLATFORM_WINDOWS
+        EventLoopWinOverlappedOpaque overlapped;
+#endif
+    };
+
+    struct Receive
+    {
+        SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
+        Span<char>               data;
+        ReceiveSupport*          support = nullptr;
+    };
+
     enum class Type
     {
         Timeout,
@@ -132,7 +147,8 @@ struct SC::Async
         ProcessExit,
         Accept,
         Connect,
-        Send
+        Send,
+        Receive,
     };
 
     union Operation
@@ -147,6 +163,7 @@ struct SC::Async
         Accept      accept;
         Connect     connect;
         Send        send;
+        Receive     receive;
 
         using FieldsTypes =
             TypeList<TaggedField<Operation, Type, decltype(timeout), &Operation::timeout, Type::Timeout>,
@@ -155,7 +172,8 @@ struct SC::Async
                      TaggedField<Operation, Type, decltype(processExit), &Operation::processExit, Type::ProcessExit>,
                      TaggedField<Operation, Type, decltype(accept), &Operation::accept, Type::Accept>,
                      TaggedField<Operation, Type, decltype(connect), &Operation::connect, Type::Connect>,
-                     TaggedField<Operation, Type, decltype(send), &Operation::send, Type::Send>>;
+                     TaggedField<Operation, Type, decltype(send), &Operation::send, Type::Send>,
+                     TaggedField<Operation, Type, decltype(receive), &Operation::receive, Type::Receive>>;
     };
 
     enum class State
@@ -202,6 +220,14 @@ struct SC::AsyncResult
     struct Connect
     {
     };
+
+    struct Send
+    {
+    };
+
+    struct Receive
+    {
+    };
     using Type = Async::Type;
 
     union Result
@@ -215,6 +241,8 @@ struct SC::AsyncResult
         ProcessExit processExit;
         Accept      accept;
         Connect     connect;
+        Send        send;
+        Receive     receive;
 
         using FieldsTypes =
             TypeList<TaggedField<Result, Type, decltype(timeout), &Result::timeout, Type::Timeout>,
@@ -222,7 +250,9 @@ struct SC::AsyncResult
                      TaggedField<Result, Type, decltype(wakeUp), &Result::wakeUp, Type::WakeUp>,
                      TaggedField<Result, Type, decltype(processExit), &Result::processExit, Type::ProcessExit>,
                      TaggedField<Result, Type, decltype(accept), &Result::accept, Type::Accept>,
-                     TaggedField<Result, Type, decltype(connect), &Result::connect, Type::Connect>>;
+                     TaggedField<Result, Type, decltype(connect), &Result::connect, Type::Connect>,
+                     TaggedField<Result, Type, decltype(send), &Result::send, Type::Send>,
+                     TaggedField<Result, Type, decltype(receive), &Result::receive, Type::Receive>>;
     };
 
     EventLoop& eventLoop;
@@ -266,6 +296,11 @@ struct SC::AsyncSend : public Async
     using Support = Async::SendSupport;
 };
 
+struct SC::AsyncReceive : public Async
+{
+    using Support = Async::ReceiveSupport;
+};
+
 struct SC::EventLoop
 {
     // Creation
@@ -304,6 +339,10 @@ struct SC::EventLoop
     [[nodiscard]] ReturnCode startSend(AsyncSend& async, AsyncSend::SendSupport& support,
                                        const SocketDescriptor& socketDescriptor, Span<const char> data,
                                        Function<void(AsyncResult&)>&& callback);
+
+    [[nodiscard]] ReturnCode startReceive(AsyncReceive& async, AsyncReceive::ReceiveSupport& support,
+                                          const SocketDescriptor& socketDescriptor, Span<char> data,
+                                          Function<void(AsyncResult&)>&& callback);
 
     // WakeUp support
     [[nodiscard]] ReturnCode wakeUpFromExternalThread(AsyncWakeUp& wakeUp);

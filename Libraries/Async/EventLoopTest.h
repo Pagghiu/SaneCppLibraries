@@ -244,7 +244,7 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(acceptedCount == 2);
             SC_TEST_EXPECT(connectedCount == 2);
         }
-        if (test_section("send"))
+        if (test_section("send/receive"))
         {
             EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
@@ -259,24 +259,47 @@ struct SC::EventLoopTest : public SC::TestCase
             SocketDescriptor serverSideClient;
             SC_TEST_EXPECT(SocketServer(server).accept(SocketFlags::AddressFamilyIPV6, serverSideClient));
             SC_TEST_EXPECT(client.setBlocking(false));
-            AsyncSend::Support asyncSupport;
-            AsyncSend          async;
+            SC_TEST_EXPECT(serverSideClient.setBlocking(false));
 
-            char dataBuffer[1] = {123};
+            AsyncSend::Support sendSupport;
+            AsyncSend          sendAsync;
 
-            Span<const char> data = {dataBuffer, sizeof(dataBuffer)};
+            const char sendBuffer[1] = {123};
+
+            Span<const char> sendData = {sendBuffer, sizeof(sendBuffer)};
 
             int  sendCount = 0;
-            auto callback  = [&](AsyncResult& res)
+            auto onSend    = [&](AsyncResult& res)
             {
                 SC_UNUSED(res);
                 sendCount++;
             };
-            SC_TEST_EXPECT(eventLoop.startSend(async, asyncSupport, client, data, callback));
+
+            SC_TEST_EXPECT(eventLoop.startSend(sendAsync, sendSupport, client, sendData, onSend));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(sendCount == 1);
             SC_TEST_EXPECT(eventLoop.runNoWait());
             SC_TEST_EXPECT(sendCount == 1);
+
+            int  receiveCount = 0;
+            auto onReceive    = [&](AsyncResult& res)
+            {
+                SC_UNUSED(res);
+                receiveCount++;
+            };
+
+            char       receiveBuffer[1] = {0};
+            Span<char> receiveData      = {receiveBuffer, sizeof(receiveBuffer)};
+
+            AsyncReceive::Support receiveSupport;
+            AsyncReceive          receiveAsync;
+            SC_TEST_EXPECT(
+                eventLoop.startReceive(receiveAsync, receiveSupport, serverSideClient, receiveData, onReceive));
+            SC_TEST_EXPECT(eventLoop.runOnce());
+            SC_TEST_EXPECT(sendCount == 1);
+            SC_TEST_EXPECT(eventLoop.runNoWait());
+            SC_TEST_EXPECT(sendCount == 1);
+            SC_TEST_EXPECT(receiveBuffer[0] == sendBuffer[0]);
         }
     }
 
