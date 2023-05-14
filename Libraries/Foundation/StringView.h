@@ -45,6 +45,9 @@ struct SC::StringView
 
   public:
     constexpr StringView() : text(nullptr, 0), encoding(StringEncoding::Ascii), hasNullTerm(false) {}
+    constexpr StringView(Span<char> text, bool nullTerm, StringEncoding encoding)
+        : text{text.data(), text.sizeInBytes()}, encoding(encoding), hasNullTerm(nullTerm)
+    {}
     constexpr StringView(Span<const char> text, bool nullTerm, StringEncoding encoding)
         : text(text), encoding(encoding), hasNullTerm(nullTerm)
     {}
@@ -57,6 +60,8 @@ struct SC::StringView
     {}
 
     SpanVoid<const void> toVoidSpan() const { return text; }
+
+    Span<const char> toCharSpan() const { return text; }
 
     template <size_t N>
     constexpr StringView(const char (&text)[N]) : text{text, N - 1}, encoding(StringEncoding::Ascii), hasNullTerm(true)

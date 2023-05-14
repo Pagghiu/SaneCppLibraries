@@ -95,7 +95,7 @@ struct SC::IntrusiveDoubleLinkedListTest : public SC::TestCase
             int expected = 0;
             while (Item* item = queue1.dequeueFront())
             {
-                SC_TEST_EXPECT(item->data == expected)
+                SC_TEST_EXPECT(item->data == expected);
                 expected++;
             }
         }

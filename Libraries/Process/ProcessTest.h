@@ -70,7 +70,7 @@ struct SC::ProcessTest : public SC::TestCase
             SC_TEST_EXPECT(chain.pipe(p1, "ls", "~"));
             SC_TEST_EXPECT(chain.pipe(p2, "grep", "Desktop"));
 #else
-            SC_TEST_EXPECT(chain.pipe(p1, "where", "/?"))
+            SC_TEST_EXPECT(chain.pipe(p1, "where", "/?"));
             SC_TEST_EXPECT(chain.pipe(p2, "findstr", "dir]"));
 #endif
             SC_TEST_EXPECT(chain.launch());
