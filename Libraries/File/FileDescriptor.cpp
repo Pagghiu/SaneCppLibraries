@@ -17,6 +17,8 @@ SC::ReturnCode SC::PipeDescriptor::close()
     return writePipe.close();
 }
 
+SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode) { return open(path, mode, OpenOptions()); }
+
 SC::ReturnCode SC::FileDescriptor::readUntilEOF(Vector<char_t>& destination)
 {
     char buffer[1024];

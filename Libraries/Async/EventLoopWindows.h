@@ -6,8 +6,8 @@
 #include <Windows.h>
 #include <stddef.h> // offsetof
 
+#include "../File/FileDescriptor.h"
 #include "../Foundation/Opaque.h"
-#include "../System/FileDescriptor.h"
 
 namespace SC
 {

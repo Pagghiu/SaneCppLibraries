@@ -11,9 +11,9 @@
 #include "../Threading/Atomic.h"
 
 // Descriptors
+#include "../File/FileDescriptor.h"
 #include "../Networking/SocketDescriptor.h"
 #include "../Process/ProcessDescriptor.h"
-#include "../System/FileDescriptor.h"
 
 namespace SC
 {

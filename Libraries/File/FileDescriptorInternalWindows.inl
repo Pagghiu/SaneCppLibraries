@@ -5,9 +5,10 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+#include "../Foundation/String.h"
+#include "../Foundation/StringConverter.h"
 #include "../Foundation/Vector.h"
 #include "FileDescriptor.h"
-#include "System.h"
 
 // FileDescriptor
 
@@ -18,6 +19,50 @@ SC::ReturnCode SC::FileDescriptorTraits::releaseHandle(Handle& handle)
         return "FileDescriptorTraits::releaseHandle - CloseHandle failed"_a8;
     }
     return true;
+}
+
+SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOptions options)
+{
+    StringNative<1024> buffer = StringEncoding::Native;
+    StringConverter    convert(buffer);
+    StringView         filePath;
+    SC_TRY_IF(convert.convertNullTerminateFastPath(path, filePath));
+    const wchar_t* wpath        = filePath.getNullTerminatedNative();
+    const bool     isThreeChars = filePath.sizeInBytes() >= 3 * sizeof(utf_char_t);
+    if (not isThreeChars or (wpath[0] != L'\\' and wpath[1] != L':'))
+    {
+        return "Path must be absolute"_a8;
+    }
+    DWORD accessMode        = 0;
+    DWORD createDisposition = 0;
+    switch (mode)
+    {
+    case ReadOnly:
+        accessMode |= FILE_GENERIC_READ;
+        createDisposition |= OPEN_EXISTING;
+        break;
+    case WriteCreateTruncate:
+        accessMode |= FILE_GENERIC_WRITE;
+        createDisposition |= CREATE_ALWAYS;
+        break;
+    case WriteAppend:
+        accessMode |= FILE_GENERIC_WRITE;
+        createDisposition |= CREATE_NEW;
+        break;
+    case ReadAndWrite: accessMode |= FILE_GENERIC_READ | FILE_GENERIC_WRITE; break;
+    }
+    DWORD               shareMode  = FILE_SHARE_READ | FILE_SHARE_WRITE;
+    DWORD               attributes = options.async ? FILE_FLAG_OVERLAPPED : 0;
+    SECURITY_ATTRIBUTES security;
+    security.nLength              = sizeof(SECURITY_ATTRIBUTES);
+    security.bInheritHandle       = options.inheritable ? TRUE : FALSE;
+    security.lpSecurityDescriptor = nullptr;
+    HANDLE fileDescriptor         = CreateFileW(filePath.getNullTerminatedNative(), accessMode, shareMode, &security,
+                                                createDisposition, attributes, nullptr);
+    DWORD  lastErr                = ::GetLastError();
+    SC_UNUSED(lastErr);
+    SC_TRY_MSG(fileDescriptor != INVALID_HANDLE_VALUE, "CreateFileW failed"_a8);
+    return assign(fileDescriptor);
 }
 
 SC::ReturnCode SC::FileDescriptor::setBlocking(bool blocking)
@@ -113,6 +158,54 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
         // EOF
         return ReadResult{0, true};
     }
+}
+
+SC::ReturnCode SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
+{
+    int flags = 0;
+    switch (seekMode)
+    {
+    case SeekMode::SeekStart: flags = FILE_BEGIN; break;
+    case SeekMode::SeekEnd: flags = FILE_END; break;
+    case SeekMode::SeekCurrent: flags = FILE_CURRENT; break;
+    }
+    const DWORD offsetLow  = static_cast<DWORD>(offset & 0xffffffff);
+    DWORD       offsetHigh = static_cast<DWORD>((offset >> 32) & 0xffffffff);
+    const DWORD newPos     = ::SetFilePointer(handle, offsetLow, (LONG*)&offsetHigh, flags);
+    SC_TRY_MSG(newPos != INVALID_SET_FILE_POINTER, "SetFilePointer failed"_a8);
+    return static_cast<uint64_t>(newPos) == offset;
+}
+
+SC::ReturnCode SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
+{
+    SC_TRY_IF(seek(SeekStart, offset));
+    return write(data);
+}
+
+SC::ReturnCode SC::FileDescriptor::write(Span<const char> data)
+{
+    DWORD      numberOfWrittenBytes;
+    const BOOL res =
+        ::WriteFile(handle, data.data(), static_cast<DWORD>(data.sizeInBytes()), &numberOfWrittenBytes, nullptr);
+    SC_TRY_MSG(res, "WriteFile failed"_a8);
+    return static_cast<size_t>(numberOfWrittenBytes) == data.sizeInBytes();
+}
+
+SC::ReturnCode SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, uint64_t offset)
+{
+    SC_TRY_IF(seek(SeekStart, offset));
+    return read(data, actuallyRead, offset);
+}
+
+SC::ReturnCode SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
+{
+    DWORD      numberOfReadBytes;
+    const BOOL res =
+        ::ReadFile(handle, data.data(), static_cast<DWORD>(data.sizeInBytes()), &numberOfReadBytes, nullptr);
+    SC_TRY_MSG(res, "ReadFile failed"_a8);
+    actuallyRead = data;
+    actuallyRead.setSizeInBytes(static_cast<size_t>(numberOfReadBytes));
+    return true;
 }
 
 // PipeDescriptor

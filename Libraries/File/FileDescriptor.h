@@ -38,21 +38,54 @@ struct FileDescriptorTraits
 
 } // namespace SC
 
-
 struct SC::FileDescriptor : public SC::UniqueTaggedHandleTraits<SC::FileDescriptorTraits>
 {
-    struct ReadResult
+    enum OpenMode
     {
-        size_t actuallyRead = 0;
-        bool   isEOF        = false;
+        ReadOnly,
+        WriteCreateTruncate,
+        WriteAppend,
+        ReadAndWrite
     };
+
+    struct OpenOptions
+    {
+        bool inheritable = false;
+        bool blocking    = true;
+        bool async       = false;
+    };
+
+    [[nodiscard]] ReturnCode open(StringView path, OpenMode mode);
+    [[nodiscard]] ReturnCode open(StringView path, OpenMode mode, OpenOptions options);
 
     [[nodiscard]] ReturnCode setBlocking(bool blocking);
     [[nodiscard]] ReturnCode setInheritable(bool inheritable);
     [[nodiscard]] ReturnCode isInheritable(bool& hasValue) const;
 
+    [[nodiscard]] ReturnCode read(Span<char> data, Span<char>& actuallyRead, uint64_t offset);
+    [[nodiscard]] ReturnCode read(Span<char> data, Span<char>& actuallyRead);
+
+    [[nodiscard]] ReturnCode write(Span<const char> data, uint64_t offset);
+    [[nodiscard]] ReturnCode write(Span<const char> data);
+
+    enum SeekMode
+    {
+        SeekStart,
+        SeekEnd,
+        SeekCurrent,
+    };
+
+    [[nodiscard]] ReturnCode seek(SeekMode seekMode, uint64_t offset);
+
+    // TODO: Maybe readUntilEOF and readAppend should go into some other class
     [[nodiscard]] ReturnCode readUntilEOF(Vector<char_t>& destination);
     [[nodiscard]] ReturnCode readUntilEOF(String& destination);
+
+    struct ReadResult
+    {
+        size_t actuallyRead = 0;
+        bool   isEOF        = false;
+    };
 
     [[nodiscard]] Result<ReadResult> readAppend(Vector<char>& output, Span<char> fallbackBuffer);
 

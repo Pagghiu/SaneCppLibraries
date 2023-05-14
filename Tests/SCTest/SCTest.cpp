@@ -18,6 +18,9 @@
 #include "../../Libraries/Foundation/TaggedUnionTest.h"
 #include "../../Libraries/Foundation/VectorTest.h"
 
+// File
+#include "../../Libraries/File/FileDescriptorTest.h"
+
 // FileSystem
 #include "../../Libraries/FileSystem/FileSystemTest.h"
 #include "../../Libraries/FileSystem/FileSystemWalkerTest.h"
@@ -83,6 +86,9 @@ int main(int argc, const char* argv[])
     { StringViewTest                test(report); }
     { TaggedUnionTest               test(report); }
     { VectorTest                    test(report); }
+
+    // File tests
+    { FileDescriptorTest            test(report); }
 
     // FileSystem tests
     { FileSystemTest                test(report); }

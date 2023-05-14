@@ -1,9 +1,10 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#include "../Foundation/String.h"
+#include "../Foundation/StringConverter.h"
 #include "../Foundation/Vector.h"
 #include "FileDescriptor.h"
-#include "System.h"
 
 #include <errno.h>  // errno
 #include <fcntl.h>  // fcntl
@@ -103,6 +104,33 @@ SC::ReturnCode SC::FileDescriptorTraits::releaseHandle(Handle& handle)
     return true;
 }
 
+SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOptions options)
+{
+    StringNative<1024> buffer = StringEncoding::Native;
+    StringConverter    convert(buffer);
+    StringView         filePath;
+    SC_TRY_IF(convert.convertNullTerminateFastPath(path, filePath));
+    if (not filePath.startsWith('/'))
+        return "Path must be absolute"_a8;
+    int flags = 0;
+    switch (mode)
+    {
+    case ReadOnly: flags |= O_RDONLY; break;
+    case WriteCreateTruncate: flags |= O_WRONLY | O_CREAT | O_TRUNC; break;
+    case WriteAppend: flags |= O_WRONLY | O_APPEND; break;
+    case ReadAndWrite: flags |= O_RDWR; break;
+    }
+
+    if (not options.inheritable)
+    {
+        flags |= O_CLOEXEC;
+    }
+    const int access         = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
+    const int fileDescriptor = ::open(filePath.getNullTerminatedNative(), flags, access);
+    SC_TRY_MSG(fileDescriptor != -1, "open failed"_a8);
+    return assign(fileDescriptor);
+}
+
 SC::ReturnCode SC::FileDescriptor::setBlocking(bool blocking)
 {
     return FileDescriptorPosixHelpers::setFileStatusFlags<O_NONBLOCK>(handle, not blocking);
@@ -168,6 +196,52 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
         // TODO: Parse read result errno
         return ReturnCode("read failed"_a8);
     }
+}
+
+SC::ReturnCode SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
+{
+    int flags = 0;
+    switch (seekMode)
+    {
+    case SeekMode::SeekStart: flags = SEEK_SET; break;
+    case SeekMode::SeekEnd: flags = SEEK_END; break;
+    case SeekMode::SeekCurrent: flags = SEEK_CUR; break;
+    }
+    const off_t res = ::lseek(handle, static_cast<off_t>(offset), flags);
+    SC_TRY_MSG(res >= 0, "lseek failed"_a8);
+    return static_cast<uint64_t>(res) == offset;
+}
+
+SC::ReturnCode SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
+{
+    const ssize_t res = ::pwrite(handle, data.data(), data.sizeInBytes(), static_cast<off_t>(offset));
+    SC_TRY_MSG(res >= 0, "pwrite failed"_a8);
+    return static_cast<size_t>(res) == data.sizeInBytes();
+}
+
+SC::ReturnCode SC::FileDescriptor::write(Span<const char> data)
+{
+    const ssize_t res = ::write(handle, data.data(), data.sizeInBytes());
+    SC_TRY_MSG(res >= 0, "write failed"_a8);
+    return static_cast<size_t>(res) == data.sizeInBytes();
+}
+
+SC::ReturnCode SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, uint64_t offset)
+{
+    const ssize_t res = ::pread(handle, data.data(), data.sizeInBytes(), static_cast<off_t>(offset));
+    SC_TRY_MSG(res >= 0, "pread failed"_a8);
+    actuallyRead = data;
+    actuallyRead.setSizeInBytes(static_cast<size_t>(res));
+    return true;
+}
+
+SC::ReturnCode SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
+{
+    const ssize_t res = ::read(handle, data.data(), data.sizeInBytes());
+    SC_TRY_MSG(res >= 0, "read failed"_a8);
+    actuallyRead = data;
+    actuallyRead.setSizeInBytes(static_cast<size_t>(res));
+    return true;
 }
 
 // PipeDescriptor

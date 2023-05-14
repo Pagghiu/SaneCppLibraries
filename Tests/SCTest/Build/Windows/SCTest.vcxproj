@@ -336,7 +336,7 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\StringView.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Testing\Test.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\System\Time.cpp" />
-    <ClCompile Include="..\..\..\..\Libraries\System\FileDescriptor.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\File\FileDescriptor.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystem.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWalker.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Process\Process.cpp" />
@@ -357,7 +357,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Networking\NetworkingTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Networking\SocketDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\Process\ProcessDescriptor.h" />
-    <ClInclude Include="..\..\..\..\Libraries\System\SystemPosix.h" />
+    <ClInclude Include="..\..\..\..\Libraries\File\FileDescriptor.h" />
+    <ClInclude Include="..\..\..\..\Libraries\File\FileDescriptorTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\Atomic.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\AtomicTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Compiler.h" />
@@ -409,7 +410,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\UniquePtr.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Vector.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\VectorTest.h" />
-    <ClInclude Include="..\..\..\..\Libraries\System\Descriptors.h" />
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystem.h" />
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWalker.h" />
@@ -443,11 +443,11 @@
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\Networking\SocketDescriptorInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\Networking\SocketDescriptorInternalWindows.inl" />
+    <None Include="..\..\..\..\Libraries\File\FileDescriptorInternalPosix.inl" />
+    <None Include="..\..\..\..\Libraries\File\FileDescriptorInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\System\SystemInternalEmscripten.inl" />
     <None Include="..\..\..\..\Libraries\System\SystemInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\System\SystemInternalWindows.inl" />
-    <None Include="..\..\..\..\Libraries\System\DescriptorInternalPosix.inl" />
-    <None Include="..\..\..\..\Libraries\System\DescriptorInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerInternalEmscripten.inl" />
