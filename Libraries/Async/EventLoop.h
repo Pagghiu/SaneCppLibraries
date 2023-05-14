@@ -25,13 +25,14 @@ struct AsyncResult;
 
 // Operations
 struct AsyncTimeout;
-struct AsyncRead;
 struct AsyncWakeUp;
 struct AsyncProcessExit;
 struct AsyncAccept;
 struct AsyncConnect;
 struct AsyncSend;
 struct AsyncReceive;
+struct AsyncRead;
+struct AsyncWrite;
 } // namespace SC
 
 namespace SC
@@ -61,12 +62,6 @@ struct SC::Async
     {
         IntegerMilliseconds timeout; // not needed, but keeping just for debugging
         TimeCounter         expirationTime;
-    };
-
-    struct Read
-    {
-        FileDescriptor::Handle fileDescriptor;
-        Span<uint8_t>          readBuffer;
     };
 
     struct WakeUp
@@ -139,16 +134,49 @@ struct SC::Async
         ReceiveSupport*          support = nullptr;
     };
 
+    struct ReadSupport
+    {
+#if SC_PLATFORM_WINDOWS
+        EventLoopWinOverlappedOpaque overlapped;
+#endif
+    };
+    struct Read
+    {
+        FileDescriptor::Handle fileDescriptor;
+        uint64_t               offset = 0;
+        SpanVoid<void>         readBuffer;
+#if SC_PLATFORM_WINDOWS
+        ReadSupport* support = nullptr;
+#endif
+    };
+
+    struct WriteSupport
+    {
+#if SC_PLATFORM_WINDOWS
+        EventLoopWinOverlappedOpaque overlapped;
+#endif
+    };
+    struct Write
+    {
+        FileDescriptor::Handle fileDescriptor;
+        uint64_t               offset = 0;
+        SpanVoid<const void>   writeBuffer;
+#if SC_PLATFORM_WINDOWS
+        WriteSupport* support = nullptr;
+#endif
+    };
+
     enum class Type
     {
         Timeout,
-        Read,
         WakeUp,
         ProcessExit,
         Accept,
         Connect,
         Send,
         Receive,
+        Read,
+        Write,
     };
 
     union Operation
@@ -157,23 +185,25 @@ struct SC::Async
         ~Operation() {}
 
         Timeout     timeout;
-        Read        read;
         WakeUp      wakeUp;
         ProcessExit processExit;
         Accept      accept;
         Connect     connect;
         Send        send;
         Receive     receive;
+        Read        read;
+        Write       write;
 
         using FieldsTypes =
             TypeList<TaggedField<Operation, Type, decltype(timeout), &Operation::timeout, Type::Timeout>,
-                     TaggedField<Operation, Type, decltype(read), &Operation::read, Type::Read>,
                      TaggedField<Operation, Type, decltype(wakeUp), &Operation::wakeUp, Type::WakeUp>,
                      TaggedField<Operation, Type, decltype(processExit), &Operation::processExit, Type::ProcessExit>,
                      TaggedField<Operation, Type, decltype(accept), &Operation::accept, Type::Accept>,
                      TaggedField<Operation, Type, decltype(connect), &Operation::connect, Type::Connect>,
                      TaggedField<Operation, Type, decltype(send), &Operation::send, Type::Send>,
-                     TaggedField<Operation, Type, decltype(receive), &Operation::receive, Type::Receive>>;
+                     TaggedField<Operation, Type, decltype(receive), &Operation::receive, Type::Receive>,
+                     TaggedField<Operation, Type, decltype(read), &Operation::read, Type::Read>,
+                     TaggedField<Operation, Type, decltype(write), &Operation::write, Type::Write>>;
     };
 
     enum class State
@@ -196,10 +226,6 @@ struct SC::Async
 struct SC::AsyncResult
 {
     struct Timeout
-    {
-    };
-
-    struct Read
     {
     };
 
@@ -228,6 +254,16 @@ struct SC::AsyncResult
     struct Receive
     {
     };
+
+    struct Read
+    {
+        size_t readBytes = 0;
+    };
+
+    struct Write
+    {
+        size_t writtenBytes = 0;
+    };
     using Type = Async::Type;
 
     union Result
@@ -236,23 +272,25 @@ struct SC::AsyncResult
         ~Result() {}
 
         Timeout     timeout;
-        Read        read;
         WakeUp      wakeUp;
         ProcessExit processExit;
         Accept      accept;
         Connect     connect;
         Send        send;
         Receive     receive;
+        Read        read;
+        Write       write;
 
         using FieldsTypes =
             TypeList<TaggedField<Result, Type, decltype(timeout), &Result::timeout, Type::Timeout>,
-                     TaggedField<Result, Type, decltype(read), &Result::read, Type::Read>,
                      TaggedField<Result, Type, decltype(wakeUp), &Result::wakeUp, Type::WakeUp>,
                      TaggedField<Result, Type, decltype(processExit), &Result::processExit, Type::ProcessExit>,
                      TaggedField<Result, Type, decltype(accept), &Result::accept, Type::Accept>,
                      TaggedField<Result, Type, decltype(connect), &Result::connect, Type::Connect>,
                      TaggedField<Result, Type, decltype(send), &Result::send, Type::Send>,
-                     TaggedField<Result, Type, decltype(receive), &Result::receive, Type::Receive>>;
+                     TaggedField<Result, Type, decltype(receive), &Result::receive, Type::Receive>,
+                     TaggedField<Result, Type, decltype(read), &Result::read, Type::Read>,
+                     TaggedField<Result, Type, decltype(write), &Result::write, Type::Write>>;
     };
 
     EventLoop& eventLoop;
@@ -265,10 +303,6 @@ struct SC::AsyncResult
 };
 
 struct SC::AsyncTimeout : public Async
-{
-};
-
-struct SC::AsyncRead : public Async
 {
 };
 
@@ -301,6 +335,13 @@ struct SC::AsyncReceive : public Async
     using Support = Async::ReceiveSupport;
 };
 
+struct SC::AsyncRead : public Async
+{
+};
+
+struct SC::AsyncWrite : public Async
+{
+};
 struct SC::EventLoop
 {
     // Creation
@@ -318,9 +359,6 @@ struct SC::EventLoop
     // Start specific async operation
     [[nodiscard]] ReturnCode startTimeout(AsyncTimeout& async, IntegerMilliseconds expiration,
                                           Function<void(AsyncResult&)>&& callback);
-
-    [[nodiscard]] ReturnCode startRead(AsyncRead& async, FileDescriptor::Handle fileDescriptor,
-                                       Span<uint8_t> readBuffer, Function<void(AsyncResult&)>&& callback);
 
     [[nodiscard]] ReturnCode startWakeUp(AsyncWakeUp& async, Function<void(AsyncResult&)>&& callback,
                                          EventObject* eventObject = nullptr);
@@ -343,6 +381,14 @@ struct SC::EventLoop
     [[nodiscard]] ReturnCode startReceive(AsyncReceive& async, AsyncReceive::ReceiveSupport& support,
                                           const SocketDescriptor& socketDescriptor, Span<char> data,
                                           Function<void(AsyncResult&)>&& callback);
+
+    [[nodiscard]] ReturnCode startRead(AsyncRead& async, AsyncRead::ReadSupport& support,
+                                       FileDescriptor::Handle fileDescriptor, SpanVoid<void> readBuffer,
+                                       Function<void(AsyncResult&)>&& callback);
+
+    [[nodiscard]] ReturnCode startWrite(AsyncWrite& async, AsyncWrite::WriteSupport& support,
+                                        FileDescriptor::Handle fileDescriptor, SpanVoid<const void> writeBuffer,
+                                        Function<void(AsyncResult&)>&& callback);
 
     // WakeUp support
     [[nodiscard]] ReturnCode wakeUpFromExternalThread(AsyncWakeUp& wakeUp);

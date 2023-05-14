@@ -308,6 +308,57 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(sendCount == 1);
             SC_TEST_EXPECT(receiveBuffer[0] == sendBuffer[0]);
         }
+        if (test_section("read/write"))
+        {
+            EventLoop eventLoop;
+            SC_TEST_EXPECT(eventLoop.create());
+            StringNative<255> filePath = StringEncoding::Native;
+            StringNative<255> dirPath  = StringEncoding::Native;
+            const StringView  name     = "AsyncTest";
+            const StringView  fileName = "test.txt";
+            SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory, name}));
+            SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
+
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+            SC_TEST_EXPECT(fs.makeDirectory(name));
+
+            FileDescriptor              fd;
+            FileDescriptor::OpenOptions options;
+            options.async    = true;
+            options.blocking = false;
+            SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, options));
+
+            AsyncWrite               write;
+            AsyncWrite::WriteSupport writeSupport;
+
+            auto writeLambda = [](AsyncResult& res) { SC_UNUSED(res); };
+            auto writeSpan   = StringView("test").toVoidSpan();
+
+            FileDescriptor::Handle handle;
+            SC_TEST_EXPECT(fd.get(handle, "asd"_a8));
+            SC_TEST_EXPECT(eventLoop.startWrite(write, writeSupport, handle, writeSpan, writeLambda));
+            SC_TEST_EXPECT(eventLoop.runOnce());
+            SC_TEST_EXPECT(fd.close());
+
+            AsyncRead              read;
+            AsyncRead::ReadSupport readSupport;
+
+            SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::ReadOnly, options));
+            char           buffer[4]  = {0};
+            SpanVoid<void> readSpan   = {buffer, sizeof(buffer)};
+            auto           readLambda = [](AsyncResult& res) { SC_UNUSED(res); };
+            SC_TEST_EXPECT(eventLoop.startRead(read, readSupport, handle, readSpan, readLambda));
+            SC_TEST_EXPECT(eventLoop.runOnce());
+            SC_TEST_EXPECT(fd.close());
+
+            StringView sv(buffer, sizeof(buffer), false, StringEncoding::Ascii);
+            SC_TEST_EXPECT(sv.compareASCII("test") == StringComparison::Equals);
+            SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
+            SC_TEST_EXPECT(fs.removeFile(fileName));
+            SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory));
+            SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
+        }
     }
 
     [[nodiscard]] ReturnCode listenToAvailablePort(SocketDescriptor& server, StringView address,

@@ -23,9 +23,10 @@ struct SC::EventLoop::Internal
 {
     FileDescriptor loopFd;
 
-    AsyncRead      wakeupPipeRead;
-    PipeDescriptor wakeupPipe;
-    uint8_t        wakeupPipeReadBuf[10];
+    AsyncRead              wakeupPipeRead;
+    AsyncRead::ReadSupport wakeupPipeReadSupport;
+    PipeDescriptor         wakeupPipe;
+    uint8_t                wakeupPipeReadBuf[10];
 
     ~Internal() { SC_TRUST_RESULT(close()); }
 
@@ -57,8 +58,8 @@ struct SC::EventLoop::Internal
         FileDescriptor::Handle wakeUpPipeDescriptor;
         SC_TRY_IF(wakeupPipe.readPipe.get(wakeUpPipeDescriptor,
                                           "EventLoop::Internal::createWakeup() - Async read handle invalid"_a8));
-        SC_TRY_IF(loop.startRead(wakeupPipeRead, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)},
-                                 Function<void(AsyncResult&)>()));
+        SC_TRY_IF(loop.startRead(wakeupPipeRead, wakeupPipeReadSupport, wakeUpPipeDescriptor,
+                                 {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)}, Function<void(AsyncResult&)>()));
         SC_TRY_IF(loop.runNoWait()); // We want to register the read handle before everything else
         loop.decreaseActiveCount();  // we don't want the read to keep the queue up
         return true;
@@ -76,8 +77,8 @@ struct SC::EventLoop::Internal
     {
         Async& async = asyncResult.async;
         // TODO: Investigate usage of MACHPORT to avoid executing this additional read syscall
-        Async::Read&  readOp   = *async.operation.unionAs<Async::Read>();
-        Span<uint8_t> readSpan = readOp.readBuffer;
+        Async::Read& readOp   = *async.operation.unionAs<Async::Read>();
+        auto         readSpan = readOp.readBuffer;
         do
         {
             const ssize_t res = read(readOp.fileDescriptor, readSpan.data(), readSpan.sizeInBytes());
@@ -124,8 +125,32 @@ struct SC::EventLoop::Internal
             }
             else
             {
-                // TODO: do the actual read operation here
+                Async::Read& operation = *result.async.operation.unionAs<Async::Read>();
+                auto         span      = operation.readBuffer;
+                ssize_t      res;
+                do
+                {
+                    res = ::pread(operation.fileDescriptor, span.data(), span.sizeInBytes(),
+                                  static_cast<off_t>(operation.offset));
+                } while ((res == -1) and (errno == EINTR));
+                SC_TRY_MSG(res >= 0, "::read failed"_a8);
+                result.result.fields.read.readBytes = static_cast<size_t>(res);
             }
+            break;
+        }
+        case Async::Type::Write: {
+
+            Async::Write& operation = *result.async.operation.unionAs<Async::Write>();
+            auto          span      = operation.writeBuffer;
+            ssize_t       res;
+            do
+            {
+                res = ::pwrite(operation.fileDescriptor, span.data(), span.sizeInBytes(),
+                               static_cast<off_t>(operation.offset));
+            } while ((res == -1) and (errno == EINTR));
+            SC_TRY_MSG(res >= 0, "::write failed"_a8);
+            result.result.fields.read.readBytes = static_cast<size_t>(res);
+
             break;
         }
         case Async::Type::WakeUp: {
@@ -241,9 +266,6 @@ struct SC::EventLoop::KernelQueue
             eventLoop.activeWakeUps.queueBack(async);
             eventLoop.numberOfWakeups += 1;
             return true;
-        case Async::Type::Read: //
-            startReadWatcher(async, *async.operation.unionAs<Async::Read>());
-            break;
         case Async::Type::ProcessExit: //
             startProcessExitWatcher(async, *async.operation.unionAs<Async::ProcessExit>());
             break;
@@ -258,6 +280,12 @@ struct SC::EventLoop::KernelQueue
             break;
         case Async::Type::Receive: //
             startReceiveWatcher(async, *async.operation.unionAs<Async::Receive>());
+            break;
+        case Async::Type::Read: //
+            startReadWatcher(async, *async.operation.unionAs<Async::Read>());
+            break;
+        case Async::Type::Write: //
+            startWriteWatcher(async, *async.operation.unionAs<Async::Write>());
             break;
         }
         newEvents += 1;
@@ -280,6 +308,15 @@ struct SC::EventLoop::KernelQueue
     ReturnCode stopReadWatcher(Async& async, Async::Read& asyncRead)
     {
         return Internal::stopSingleWatcherImmediate(async, asyncRead.fileDescriptor, EVFILT_READ);
+    }
+    void startWriteWatcher(Async& async, Async::Write& operation)
+    {
+        EV_SET(events + newEvents, operation.fileDescriptor, EVFILT_WRITE, EV_ADD, 0, 0, &async);
+    }
+
+    ReturnCode stopWriteWatcher(Async& async, Async::Write& operation)
+    {
+        return Internal::stopSingleWatcherImmediate(async, operation.fileDescriptor, EVFILT_WRITE);
     }
 
     void startAcceptWatcher(Async& async, Async::Accept& asyncAccept)
@@ -444,6 +481,9 @@ struct SC::EventLoop::KernelQueue
         case Async::Type::WakeUp: eventLoop.numberOfWakeups -= 1; return true;
         case Async::Type::Read: //
             SC_TRY_IF(stopReadWatcher(async, *async.operation.unionAs<Async::Read>()));
+            break;
+        case Async::Type::Write: //
+            SC_TRY_IF(stopWriteWatcher(async, *async.operation.unionAs<Async::Write>()));
             break;
         case Async::Type::ProcessExit: //
             SC_TRY_IF(stopProcessExitWatcher(async, *async.operation.unionAs<Async::ProcessExit>()));

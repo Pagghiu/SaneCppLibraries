@@ -58,14 +58,38 @@ SC::ReturnCode SC::EventLoop::startTimeout(AsyncTimeout& async, IntegerMilliseco
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::startRead(AsyncRead& async, FileDescriptor::Handle fileDescriptor,
-                                        Span<uint8_t> readBuffer, Function<void(AsyncResult&)>&& callback)
+SC::ReturnCode SC::EventLoop::startRead(AsyncRead& async, AsyncRead::ReadSupport& support,
+                                        FileDescriptor::Handle fileDescriptor, SpanVoid<void> readBuffer,
+                                        Function<void(AsyncResult&)>&& callback)
 {
     SC_TRY_MSG(readBuffer.sizeInBytes() > 0, "EventLoop::startRead - Zero sized read buffer"_a8);
     SC_TRY_IF(queueSubmission(async, move(callback)));
     Async::Read operation;
     operation.fileDescriptor = fileDescriptor;
     operation.readBuffer     = readBuffer;
+#if SC_PLATFORM_WINDOWS
+    operation.support = &support;
+#else
+    SC_UNUSED(support);
+#endif
+    async.operation.assignValue(move(operation));
+    return true;
+}
+
+SC::ReturnCode SC::EventLoop::startWrite(AsyncWrite& async, AsyncWrite::WriteSupport& support,
+                                         FileDescriptor::Handle fileDescriptor, SpanVoid<const void> writeBuffer,
+                                         Function<void(AsyncResult&)>&& callback)
+{
+    SC_TRY_MSG(writeBuffer.sizeInBytes() > 0, "EventLoop::startWrite - Zero sized write buffer"_a8);
+    SC_TRY_IF(queueSubmission(async, move(callback)));
+    Async::Write operation;
+    operation.fileDescriptor = fileDescriptor;
+    operation.writeBuffer    = writeBuffer;
+#if SC_PLATFORM_WINDOWS
+    operation.support = &support;
+#else
+    SC_UNUSED(support);
+#endif
     async.operation.assignValue(move(operation));
     return true;
 }

@@ -21,13 +21,14 @@ struct SC::FileDescriptorTest : public SC::TestCase
         {
             StringNative<255> filePath = StringEncoding::Native;
             StringNative<255> dirPath  = StringEncoding::Native;
-            FileSystem        fs;
-            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
-            const StringView name     = "FileDescriptorTest";
-            const StringView fileName = "test.txt";
-            SC_TEST_EXPECT(fs.makeDirectory(name));
+            const StringView  name     = "FileDescriptorTest";
+            const StringView  fileName = "test.txt";
             SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory, name}));
             SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
+
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+            SC_TEST_EXPECT(fs.makeDirectory(name));
 
             SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
 
