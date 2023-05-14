@@ -38,19 +38,6 @@ struct FileDescriptorTraits
 
 } // namespace SC
 
-struct SC::DescriptorFlags
-{
-    enum BlockingType
-    {
-        NonBlocking,
-        Blocking
-    };
-    enum InheritableType
-    {
-        NonInheritable,
-        Inheritable
-    };
-};
 
 struct SC::FileDescriptor : public SC::UniqueTaggedHandleTraits<SC::FileDescriptorTraits>
 {

@@ -43,21 +43,21 @@ SC::ReturnCode SC::SocketDescriptor::isInheritable(bool& hasValue) const
 
 SC::ReturnCode SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily,
                                             SocketFlags::SocketType socketType, SocketFlags::ProtocolType protocol,
-                                            DescriptorFlags::BlockingType    blocking,
-                                            DescriptorFlags::InheritableType inheritable)
+                                            SocketFlags::BlockingType    blocking,
+                                            SocketFlags::InheritableType inheritable)
 {
     SC_TRY_IF(SystemFunctions::isNetworkingInited());
     SC_TRUST_RESULT(close());
 
     int typeWithAdditions = SocketFlags::toNative(socketType);
 #if defined(SOCK_NONBLOCK)
-    if (blocking == DescriptorFlags::NonBlocking)
+    if (blocking == SocketFlags::NonBlocking)
     {
         typeWithAdditions |= SOCK_NONBLOCK;
     }
 #endif // defined(SOCK_NONBLOCK)
 #if defined(SOCK_CLOEXEC)
-    if (inheritable == DescriptorFlags::NonInheritable)
+    if (inheritable == SocketFlags::NonInheritable)
     {
         typeWithAdditions |= SOCK_CLOEXEC;
     }
@@ -67,13 +67,13 @@ SC::ReturnCode SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFa
         handle = ::socket(SocketFlags::toNative(addressFamily), typeWithAdditions, SocketFlags::toNative(protocol));
     } while (handle == -1 and errno == EINTR);
 #if !defined(SOCK_CLOEXEC)
-    if (inheritable == DescriptorFlags::NonInheritable)
+    if (inheritable == SocketFlags::NonInheritable)
     {
         SC_TRY_IF(setInheritable(false));
     }
 #endif // !defined(SOCK_CLOEXEC)
 #if !defined(SOCK_NONBLOCK)
-    if (blocking == DescriptorFlags::NonBlocking)
+    if (blocking == SocketFlags::NonBlocking)
     {
         SC_TRY_IF(setBlocking(false));
     }

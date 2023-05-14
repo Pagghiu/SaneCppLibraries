@@ -23,8 +23,8 @@ struct SC::NetworkingTest : public SC::TestCase
             // way of checking if a non-connected socket is in non-blocking mode
             SocketDescriptor socket;
             SC_TEST_EXPECT(socket.create(SocketFlags::AddressFamilyIPV4, SocketFlags::SocketStream,
-                                         SocketFlags::ProtocolTcp, DescriptorFlags::NonBlocking,
-                                         DescriptorFlags::NonInheritable));
+                                         SocketFlags::ProtocolTcp, SocketFlags::NonBlocking,
+                                         SocketFlags::NonInheritable));
             SC_TEST_EXPECT(socket.isValid());
             isInheritable = false;
             SC_TEST_EXPECT(socket.isInheritable(isInheritable));
@@ -32,8 +32,7 @@ struct SC::NetworkingTest : public SC::TestCase
             SC_TEST_EXPECT(socket.close());
 
             SC_TEST_EXPECT(socket.create(SocketFlags::AddressFamilyIPV4, SocketFlags::SocketStream,
-                                         SocketFlags::ProtocolTcp, DescriptorFlags::Blocking,
-                                         DescriptorFlags::NonInheritable));
+                                         SocketFlags::ProtocolTcp, SocketFlags::Blocking, SocketFlags::NonInheritable));
             SC_TEST_EXPECT(socket.isValid());
             isInheritable = false;
             SC_TEST_EXPECT(socket.isInheritable(isInheritable));
@@ -41,8 +40,7 @@ struct SC::NetworkingTest : public SC::TestCase
             SC_TEST_EXPECT(socket.close());
 
             SC_TEST_EXPECT(socket.create(SocketFlags::AddressFamilyIPV4, SocketFlags::SocketStream,
-                                         SocketFlags::ProtocolTcp, DescriptorFlags::Blocking,
-                                         DescriptorFlags::Inheritable));
+                                         SocketFlags::ProtocolTcp, SocketFlags::Blocking, SocketFlags::Inheritable));
             SC_TEST_EXPECT(socket.isValid());
             isInheritable = false;
             SC_TEST_EXPECT(socket.isInheritable(isInheritable));

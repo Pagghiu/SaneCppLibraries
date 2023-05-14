@@ -70,14 +70,14 @@ struct NetworkingInternal
 SC::ReturnCode SC::SocketDescriptor::createAsyncTCPSocketIPV6()
 {
     return create(SocketFlags::AddressFamilyIPV6, SocketFlags::SocketStream, SocketFlags::ProtocolTcp,
-                  DescriptorFlags::NonBlocking, DescriptorFlags::NonInheritable);
+                  SocketFlags::NonBlocking, SocketFlags::NonInheritable);
 }
 
 SC::ReturnCode SC::SocketDescriptor::createAsyncTCPSocketIPV4()
 {
 
     return create(SocketFlags::AddressFamilyIPV4, SocketFlags::SocketStream, SocketFlags::ProtocolTcp,
-                  DescriptorFlags::NonBlocking, DescriptorFlags::NonInheritable);
+                  SocketFlags::NonBlocking, SocketFlags::NonInheritable);
 }
 
 SC::ReturnCode SC::SocketDescriptor::getAddressFamily(SocketFlags::AddressFamily& addressFamily) const

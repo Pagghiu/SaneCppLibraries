@@ -52,14 +52,14 @@ SC::ReturnCode SC::SocketDescriptor::isInheritable(bool& hasValue) const
 
 SC::ReturnCode SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily,
                                             SocketFlags::SocketType socketType, SocketFlags::ProtocolType protocol,
-                                            DescriptorFlags::BlockingType    blocking,
-                                            DescriptorFlags::InheritableType inheritable)
+                                            SocketFlags::BlockingType    blocking,
+                                            SocketFlags::InheritableType inheritable)
 {
     SC_TRY_IF(SystemFunctions::isNetworkingInited());
     SC_TRUST_RESULT(close());
 
     DWORD flags = WSA_FLAG_OVERLAPPED;
-    if (inheritable == DescriptorFlags::NonInheritable)
+    if (inheritable == SocketFlags::NonInheritable)
     {
         flags |= WSA_FLAG_NO_HANDLE_INHERIT;
     }
@@ -69,6 +69,6 @@ SC::ReturnCode SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFa
     {
         return "WSASocketW failed"_a8;
     }
-    SC_TRY_IF(setBlocking(blocking == DescriptorFlags::Blocking));
+    SC_TRY_IF(setBlocking(blocking == SocketFlags::Blocking));
     return isValid();
 }

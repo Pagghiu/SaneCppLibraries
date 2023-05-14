@@ -44,6 +44,16 @@ struct SC::SocketDescriptorTraits
 
 struct SC::SocketFlags
 {
+    enum BlockingType
+    {
+        NonBlocking,
+        Blocking
+    };
+    enum InheritableType
+    {
+        NonInheritable,
+        Inheritable
+    };
     enum AddressFamily
     {
         AddressFamilyIPV4,
@@ -89,11 +99,11 @@ struct SC::SocketIPAddress
 
 struct SC::SocketDescriptor : public UniqueTaggedHandleTraits<SocketDescriptorTraits>
 {
-    [[nodiscard]] ReturnCode create(SocketFlags::AddressFamily       addressFamily,
-                                    SocketFlags::SocketType          socketType  = SocketFlags::SocketStream,
-                                    SocketFlags::ProtocolType        protocol    = SocketFlags::ProtocolTcp,
-                                    DescriptorFlags::BlockingType    blocking    = DescriptorFlags::Blocking,
-                                    DescriptorFlags::InheritableType inheritable = DescriptorFlags::NonInheritable);
+    [[nodiscard]] ReturnCode create(SocketFlags::AddressFamily   addressFamily,
+                                    SocketFlags::SocketType      socketType  = SocketFlags::SocketStream,
+                                    SocketFlags::ProtocolType    protocol    = SocketFlags::ProtocolTcp,
+                                    SocketFlags::BlockingType    blocking    = SocketFlags::Blocking,
+                                    SocketFlags::InheritableType inheritable = SocketFlags::NonInheritable);
     [[nodiscard]] ReturnCode createAsyncTCPSocketIPV6();
     [[nodiscard]] ReturnCode createAsyncTCPSocketIPV4();
     [[nodiscard]] ReturnCode isInheritable(bool& value) const;
