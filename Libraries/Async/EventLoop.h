@@ -12,8 +12,8 @@
 
 // Descriptors
 #include "../File/FileDescriptor.h"
-#include "../Networking/SocketDescriptor.h"
 #include "../Process/ProcessDescriptor.h"
+#include "../Socket/SocketDescriptor.h"
 
 namespace SC
 {

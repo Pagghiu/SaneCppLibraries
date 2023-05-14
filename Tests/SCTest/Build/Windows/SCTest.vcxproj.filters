@@ -25,14 +25,14 @@
     <Filter Include="Testing">
       <UniqueIdentifier>{ae591710-8f56-41d2-a3a8-9b0db6a7380b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Networking">
-      <UniqueIdentifier>{1ab7acac-33e2-4be0-8b0a-178a5edfaf9e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Process">
       <UniqueIdentifier>{c61ee96b-740d-45aa-ba08-9835cb7b073a}</UniqueIdentifier>
     </Filter>
     <Filter Include="File">
       <UniqueIdentifier>{dea72a02-835f-46a5-abcf-6beea7cfa09f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Socket">
+      <UniqueIdentifier>{1ab7acac-33e2-4be0-8b0a-178a5edfaf9e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -80,8 +80,8 @@
     <ClCompile Include="..\..\..\..\Libraries\Testing\Test.cpp">
       <Filter>Testing</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Networking\SocketDescriptor.cpp">
-      <Filter>Networking</Filter>
+    <ClCompile Include="..\..\..\..\Libraries\Socket\SocketDescriptor.cpp">
+      <Filter>Socket</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Process\Process.cpp">
       <Filter>Process</Filter>
@@ -337,9 +337,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\AlgorithmSort.h">
       <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Networking\NetworkingTest.h">
-      <Filter>Networking</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopInternalWindowsAPI.h">
       <Filter>Async</Filter>
     </ClInclude>
@@ -349,8 +346,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Process\ProcessTest.h">
       <Filter>Process</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Networking\SocketDescriptor.h">
-      <Filter>Networking</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Socket\SocketDescriptor.h">
+      <Filter>Socket</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Process\ProcessDescriptor.h">
       <Filter>Process</Filter>
@@ -360,6 +357,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\File\FileDescriptorTest.h">
       <Filter>File</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Socket\SocketDescriptorTest.h">
+      <Filter>Socket</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -423,11 +423,11 @@
     <None Include="..\..\..\..\Libraries\Process\ProcessInternalWindows.inl">
       <Filter>Process</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Networking\SocketDescriptorInternalPosix.inl">
-      <Filter>Networking</Filter>
+    <None Include="..\..\..\..\Libraries\Socket\SocketDescriptorInternalPosix.inl">
+      <Filter>Socket</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Networking\SocketDescriptorInternalWindows.inl">
-      <Filter>Networking</Filter>
+    <None Include="..\..\..\..\Libraries\Socket\SocketDescriptorInternalWindows.inl">
+      <Filter>Socket</Filter>
     </None>
     <None Include="..\..\..\..\Libraries\File\FileDescriptorInternalPosix.inl">
       <Filter>File</Filter>

@@ -54,8 +54,8 @@ Libraries/Foundation/String.cpp             \
 Libraries/Foundation/StringConverter.cpp    \
 Libraries/Foundation/StringFormat.cpp       \
 Libraries/Foundation/StringView.cpp         \
-Libraries/Networking/SocketDescriptor.cpp   \
 Libraries/Process/Process.cpp               \
+Libraries/Socket/SocketDescriptor.cpp       \
 Libraries/System/Console.cpp                \
 Libraries/System/System.cpp                 \
 Libraries/System/Time.cpp                   \

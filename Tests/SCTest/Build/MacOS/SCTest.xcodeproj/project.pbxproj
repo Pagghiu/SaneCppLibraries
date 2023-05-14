@@ -161,8 +161,8 @@
 		7B89A60329BFD9D6006EF085 /* TaggedUnion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TaggedUnion.h; path = ../../../../Libraries/Foundation/TaggedUnion.h; sourceTree = "<group>"; };
 		7B89A60429BFE1A4006EF085 /* TypeList.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TypeList.h; path = ../../../../Libraries/Foundation/TypeList.h; sourceTree = "<group>"; };
 		7B8B919929DB868C0051AF74 /* UniquePtr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = UniquePtr.h; path = ../../../../Libraries/Foundation/UniquePtr.h; sourceTree = "<group>"; };
-		7B8BF9AC29F3BADC0055BC3A /* SocketDescriptor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SocketDescriptor.cpp; path = ../../../../Libraries/Networking/SocketDescriptor.cpp; sourceTree = "<group>"; };
-		7B8BF9AF29F3BADC0055BC3A /* NetworkingTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = NetworkingTest.h; path = ../../../../Libraries/Networking/NetworkingTest.h; sourceTree = "<group>"; };
+		7B8BF9AC29F3BADC0055BC3A /* SocketDescriptor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SocketDescriptor.cpp; path = ../../../../Libraries/Socket/SocketDescriptor.cpp; sourceTree = "<group>"; };
+		7B8BF9AF29F3BADC0055BC3A /* SocketDescriptorTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SocketDescriptorTest.h; path = ../../../../Libraries/Socket/SocketDescriptorTest.h; sourceTree = "<group>"; };
 		7B91CBEE29B17F470013E95E /* Opaque.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Opaque.h; path = ../../../../Libraries/Foundation/Opaque.h; sourceTree = "<group>"; };
 		7B91CBEF29B17F470013E95E /* OpaqueTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OpaqueTest.h; path = ../../../../Libraries/Foundation/OpaqueTest.h; sourceTree = "<group>"; };
 		7B9C4FBD29F1C0B100504902 /* FileSystemWatcherInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWatcherInternalEmscripten.inl; path = ../../../../Libraries/FileSystem/FileSystemWatcherInternalEmscripten.inl; sourceTree = "<group>"; };
@@ -197,9 +197,9 @@
 		7BE5C81229A2707E00CBCAD1 /* FileDescriptor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FileDescriptor.h; path = ../../../../Libraries/File/FileDescriptor.h; sourceTree = "<group>"; };
 		7BE906C429FD071E0073D7A8 /* EventLoopInternalWindowsAPI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = EventLoopInternalWindowsAPI.h; path = ../../../../Libraries/Async/EventLoopInternalWindowsAPI.h; sourceTree = "<group>"; };
 		7BF876572A04615B00ABA178 /* ProcessDescriptor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ProcessDescriptor.h; path = ../../../../Libraries/Process/ProcessDescriptor.h; sourceTree = "<group>"; };
-		7BF876582A04633600ABA178 /* SocketDescriptorInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SocketDescriptorInternalPosix.inl; path = ../../../../Libraries/Networking/SocketDescriptorInternalPosix.inl; sourceTree = "<group>"; };
-		7BF876592A04633600ABA178 /* SocketDescriptor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SocketDescriptor.h; path = ../../../../Libraries/Networking/SocketDescriptor.h; sourceTree = "<group>"; };
-		7BF8765A2A04633600ABA178 /* SocketDescriptorInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SocketDescriptorInternalWindows.inl; path = ../../../../Libraries/Networking/SocketDescriptorInternalWindows.inl; sourceTree = "<group>"; };
+		7BF876582A04633600ABA178 /* SocketDescriptorInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SocketDescriptorInternalPosix.inl; path = ../../../../Libraries/Socket/SocketDescriptorInternalPosix.inl; sourceTree = "<group>"; };
+		7BF876592A04633600ABA178 /* SocketDescriptor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SocketDescriptor.h; path = ../../../../Libraries/Socket/SocketDescriptor.h; sourceTree = "<group>"; };
+		7BF8765A2A04633600ABA178 /* SocketDescriptorInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SocketDescriptorInternalWindows.inl; path = ../../../../Libraries/Socket/SocketDescriptorInternalWindows.inl; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -335,10 +335,10 @@
 				7B44ADC12A10EE9600FAAADC /* File */,
 				7B0C2999297CA7C10071C5B4 /* FileSystem */,
 				7B515F932924305E006996AA /* Foundation */,
-				7B8BF9AB29F3B9B60055BC3A /* Networking */,
 				7B956A2029FF16AA007740C6 /* Process */,
 				7B7044552995A2180034458B /* Reflection */,
 				7B7044562995A2290034458B /* Serialization */,
+				7B8BF9AB29F3B9B60055BC3A /* Socket */,
 				7B8B90C629EB6B470092805F /* System */,
 				7B1FCC2329ECB4B3001D75F7 /* Testing */,
 				7B872C4729AFFC3F00949BD2 /* Threading */,
@@ -410,23 +410,16 @@
 			name = System;
 			sourceTree = "<group>";
 		};
-		7B8B90C729EB711A0092805F /* Recovered References */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			name = "Recovered References";
-			sourceTree = "<group>";
-		};
-		7B8BF9AB29F3B9B60055BC3A /* Networking */ = {
+		7B8BF9AB29F3B9B60055BC3A /* Socket */ = {
 			isa = PBXGroup;
 			children = (
 				7BF876592A04633600ABA178 /* SocketDescriptor.h */,
 				7BF876582A04633600ABA178 /* SocketDescriptorInternalPosix.inl */,
 				7BF8765A2A04633600ABA178 /* SocketDescriptorInternalWindows.inl */,
 				7B8BF9AC29F3BADC0055BC3A /* SocketDescriptor.cpp */,
-				7B8BF9AF29F3BADC0055BC3A /* NetworkingTest.h */,
+				7B8BF9AF29F3BADC0055BC3A /* SocketDescriptorTest.h */,
 			);
-			name = Networking;
+			name = Socket;
 			sourceTree = "<group>";
 		};
 		7B956A2029FF16AA007740C6 /* Process */ = {
@@ -477,7 +470,6 @@
 				7B583F2E2922EC9F00FBE019 /* Libraries */,
 				7BF4DF6728DE7A5E008CBB53 /* Products */,
 				7B9F61822995BDA20011F4D4 /* Frameworks */,
-				7B8B90C729EB711A0092805F /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};

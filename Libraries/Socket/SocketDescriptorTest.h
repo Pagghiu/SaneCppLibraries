@@ -7,12 +7,12 @@
 
 namespace SC
 {
-struct NetworkingTest;
+struct SocketDescriptorTest;
 }
 
-struct SC::NetworkingTest : public SC::TestCase
+struct SC::SocketDescriptorTest : public SC::TestCase
 {
-    NetworkingTest(SC::TestReport& report) : TestCase(report, "NetworkingTest")
+    SocketDescriptorTest(SC::TestReport& report) : TestCase(report, "SocketDescriptorTest")
     {
         using namespace SC;
         if (test_section("socket"))

@@ -325,7 +325,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp" />
-    <ClCompile Include="..\..\..\..\Libraries\Networking\SocketDescriptor.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Socket\SocketDescriptor.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\System\Console.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\System\System.cpp" />
@@ -354,11 +354,11 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ArrayTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Networking\NetworkingTest.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Networking\SocketDescriptor.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Socket\SocketDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\Process\ProcessDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\File\FileDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\File\FileDescriptorTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Socket\SocketDescriptorTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\Atomic.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\AtomicTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Compiler.h" />
@@ -441,8 +441,8 @@
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalApple.inl" />
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalEmscripten.inl" />
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalWindows.inl" />
-    <None Include="..\..\..\..\Libraries\Networking\SocketDescriptorInternalPosix.inl" />
-    <None Include="..\..\..\..\Libraries\Networking\SocketDescriptorInternalWindows.inl" />
+    <None Include="..\..\..\..\Libraries\Socket\SocketDescriptorInternalPosix.inl" />
+    <None Include="..\..\..\..\Libraries\Socket\SocketDescriptorInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\File\FileDescriptorInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\File\FileDescriptorInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\System\SystemInternalEmscripten.inl" />

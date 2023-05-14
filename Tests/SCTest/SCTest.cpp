@@ -27,9 +27,6 @@
 #include "../../Libraries/FileSystem/FileSystemWatcherTest.h"
 #include "../../Libraries/FileSystem/PathTest.h"
 
-// Networking
-#include "../../Libraries/Networking/NetworkingTest.h"
-
 // Process
 #include "../../Libraries/Process/ProcessTest.h"
 
@@ -39,6 +36,9 @@
 // Serialization
 #include "../../Libraries/Serialization/SerializationTemplateTest.h"
 #include "../../Libraries/Serialization/SerializationTypeErasedTest.h"
+
+// Socket
+#include "../../Libraries/Socket/SocketDescriptorTest.h"
 
 // System
 #include "../../Libraries/System/ConsoleTest.h"
@@ -96,9 +96,6 @@ int main(int argc, const char* argv[])
     { FileSystemWatcherTest         test(report); }
     { PathTest                      test(report); }
 
-    // Networking tests
-    { NetworkingTest                test(report); }
-
     // Process tests
     { ProcessTest                   test(report); }
 
@@ -108,6 +105,9 @@ int main(int argc, const char* argv[])
     // Serialization tests
     { SerializationTemplateTest     test(report); }
     { SerializationTypeErasedTest   test(report); }
+
+    // Socket tests
+    { SocketDescriptorTest          test(report); }
 
     // System tests
     { ConsoleTest                   test(report); }
