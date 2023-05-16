@@ -34,27 +34,3 @@ struct SC::EventLoopWinOverlapped
         return *reinterpret_cast<T**>(reinterpret_cast<uint8_t*>(lpOverlapped) - offsetOfOverlapped + offsetOfAsync);
     }
 };
-
-struct SC::EventLoopWinWaitTraits
-{
-    using Handle                    = FileDescriptor::Handle;  // fd
-    static constexpr Handle Invalid = FileDescriptor::Invalid; // invalid fd
-
-    static ReturnCode releaseHandle(Handle& waitHandle)
-    {
-        if (waitHandle != INVALID_HANDLE_VALUE)
-        {
-            BOOL res   = ::UnregisterWaitEx(waitHandle, INVALID_HANDLE_VALUE);
-            waitHandle = INVALID_HANDLE_VALUE;
-            if (res == FALSE)
-            {
-                return "UnregisterWaitEx failed"_a8;
-            }
-        }
-        return true;
-    }
-};
-
-struct SC::EventLoopWinWaitHandle : public SC::UniqueTaggedHandleTraits<SC::EventLoopWinWaitTraits>
-{
-};

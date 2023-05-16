@@ -80,10 +80,15 @@ struct SC::FileSystemWatcher
 
     struct EventLoopRunner
     {
-        EventLoop&  eventLoop;
-        AsyncWakeUp eventLoopAsync = {};
+        EventLoop& eventLoop;
+
 #if SC_PLATFORM_APPLE
-        EventObject eventObject = {};
+        AsyncWakeUp eventLoopAsync = {};
+        EventObject eventObject    = {};
+#elif SC_PLATFORM_WINDOWS
+        // Convention for overlapped notifications
+        // TODO: Create a dedicated enum type for OVERLAPPED notifications instead of using Timeout
+        AsyncTimeout eventLoopAsync = {};
 #endif
     };
 

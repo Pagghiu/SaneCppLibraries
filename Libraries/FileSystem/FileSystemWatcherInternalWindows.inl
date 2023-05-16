@@ -160,9 +160,6 @@ struct SC::FileSystemWatcher::Internal
             // TODO: wrap this into a method
             opaque.overlapped.userData                = &eventLoopRunner->eventLoopAsync;
             eventLoopRunner->eventLoopAsync.eventLoop = &eventLoopRunner->eventLoop;
-            // Convention for overlapped notifications
-            // TODO: Create a dedicated enum type for OVERLAPPED notifications instead of using Timeout
-            eventLoopRunner->eventLoopAsync.operation.type = Async::Type::Timeout;
             // 3rd parameter (lpCompletionKey) will get reported in AsyncResult::userData in the callback
             HANDLE res = CreateIoCompletionPort(opaque.fileHandle, loopFDS, reinterpret_cast<ULONG_PTR>(entry), 0);
             if (res == NULL)

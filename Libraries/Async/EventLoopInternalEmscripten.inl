@@ -2,10 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "EventLoop.h"
-struct SC::Async::ProcessExitInternal
-{
-    bool dummy;
-};
+
 struct SC::EventLoop::Internal
 {
     FileDescriptor loopFd;

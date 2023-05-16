@@ -15,18 +15,13 @@
 #include <sys/select.h> // fd_set for emscripten
 #include <unistd.h>
 
-struct SC::Async::ProcessExitInternal
-{
-};
-
 struct SC::EventLoop::Internal
 {
     FileDescriptor loopFd;
 
-    AsyncRead              wakeupPipeRead;
-    AsyncRead::ReadSupport wakeupPipeReadSupport;
-    PipeDescriptor         wakeupPipe;
-    uint8_t                wakeupPipeReadBuf[10];
+    AsyncRead      wakeupPipeRead;
+    PipeDescriptor wakeupPipe;
+    uint8_t        wakeupPipeReadBuf[10];
 
     ~Internal() { SC_TRUST_RESULT(close()); }
 
@@ -58,8 +53,8 @@ struct SC::EventLoop::Internal
         FileDescriptor::Handle wakeUpPipeDescriptor;
         SC_TRY_IF(wakeupPipe.readPipe.get(wakeUpPipeDescriptor,
                                           "EventLoop::Internal::createWakeup() - Async read handle invalid"_a8));
-        SC_TRY_IF(loop.startRead(wakeupPipeRead, wakeupPipeReadSupport, wakeUpPipeDescriptor,
-                                 {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)}, Function<void(AsyncResult&)>()));
+        SC_TRY_IF(loop.startRead(wakeupPipeRead, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)},
+                                 Function<void(AsyncResult&)>()));
         SC_TRY_IF(loop.runNoWait()); // We want to register the read handle before everything else
         loop.decreaseActiveCount();  // we don't want the read to keep the queue up
         return true;
@@ -77,7 +72,7 @@ struct SC::EventLoop::Internal
     {
         Async& async = asyncResult.async;
         // TODO: Investigate usage of MACHPORT to avoid executing this additional read syscall
-        Async::Read& readOp   = *async.operation.unionAs<Async::Read>();
+        Async::Read& readOp   = *async.asRead();
         auto         readSpan = readOp.readBuffer;
         do
         {
@@ -110,7 +105,7 @@ struct SC::EventLoop::Internal
             return false;
         }
         // regular path
-        switch (result.async.operation.type)
+        switch (result.async.getType())
         {
         case Async::Type::Timeout: {
             result.result.assignValue(AsyncResult::Timeout());
@@ -125,7 +120,7 @@ struct SC::EventLoop::Internal
             }
             else
             {
-                Async::Read& operation = *result.async.operation.unionAs<Async::Read>();
+                Async::Read& operation = *result.async.asRead();
                 auto         span      = operation.readBuffer;
                 ssize_t      res;
                 do
@@ -140,7 +135,7 @@ struct SC::EventLoop::Internal
         }
         case Async::Type::Write: {
 
-            Async::Write& operation = *result.async.operation.unionAs<Async::Write>();
+            Async::Write& operation = *result.async.asWrite();
             auto          span      = operation.writeBuffer;
             ssize_t       res;
             do
@@ -175,7 +170,7 @@ struct SC::EventLoop::Internal
         }
         case Async::Type::Accept: {
             result.result.assignValue(AsyncResult::Accept());
-            Async::Accept&   async = result.async.operation.fields.accept;
+            Async::Accept&   async = *result.async.asAccept();
             SocketDescriptor serverSocket;
             SC_TRY_IF(serverSocket.assign(async.handle));
             auto detach = MakeDeferred([&] { serverSocket.detach(); });
@@ -184,7 +179,7 @@ struct SC::EventLoop::Internal
         }
         case Async::Type::Connect: {
             result.result.assignValue(AsyncResult::Connect());
-            Async::Connect& async = result.async.operation.fields.connect;
+            Async::Connect& async = *result.async.asConnect();
 
             int       errorCode;
             socklen_t errorSize = sizeof(errorCode);
@@ -204,7 +199,7 @@ struct SC::EventLoop::Internal
         }
         case Async::Type::Send: {
             result.result.assignValue(AsyncResult::Send());
-            Async::Send&  async = result.async.operation.fields.send;
+            Async::Send&  async = *result.async.asSend();
             const ssize_t res   = ::send(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
             result.async.eventLoop->activeHandles.remove(result.async);
             result.async.eventLoop->numberOfActiveHandles -= 1;
@@ -215,7 +210,7 @@ struct SC::EventLoop::Internal
         }
         case Async::Type::Receive: {
             result.result.assignValue(AsyncResult::Receive());
-            Async::Receive& async = result.async.operation.fields.receive;
+            Async::Receive& async = *result.async.asReceive();
             const ssize_t   res   = ::recv(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
             result.async.eventLoop->activeHandles.remove(result.async);
             result.async.eventLoop->numberOfActiveHandles -= 1;
@@ -256,7 +251,7 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] ReturnCode stageAsync(EventLoop& eventLoop, Async& async)
     {
-        switch (async.operation.type)
+        switch (async.getType())
         {
         case Async::Type::Timeout:
             eventLoop.activeTimers.queueBack(async);
@@ -267,25 +262,25 @@ struct SC::EventLoop::KernelQueue
             eventLoop.numberOfWakeups += 1;
             return true;
         case Async::Type::ProcessExit: //
-            startProcessExitWatcher(async, *async.operation.unionAs<Async::ProcessExit>());
+            startProcessExitWatcher(async, *async.asProcessExit());
             break;
         case Async::Type::Accept: //
-            startAcceptWatcher(async, *async.operation.unionAs<Async::Accept>());
+            startAcceptWatcher(async, *async.asAccept());
             break;
         case Async::Type::Connect: //
-            SC_TRY_IF(startConnectWatcher(async, *async.operation.unionAs<Async::Connect>()));
+            SC_TRY_IF(startConnectWatcher(async, *async.asConnect()));
             break;
         case Async::Type::Send: //
-            startSendWatcher(async, *async.operation.unionAs<Async::Send>());
+            startSendWatcher(async, *async.asSend());
             break;
         case Async::Type::Receive: //
-            startReceiveWatcher(async, *async.operation.unionAs<Async::Receive>());
+            startReceiveWatcher(async, *async.asReceive());
             break;
         case Async::Type::Read: //
-            startReadWatcher(async, *async.operation.unionAs<Async::Read>());
+            startReadWatcher(async, *async.asRead());
             break;
         case Async::Type::Write: //
-            startWriteWatcher(async, *async.operation.unionAs<Async::Write>());
+            startWriteWatcher(async, *async.asWrite());
             break;
         }
         newEvents += 1;
@@ -335,7 +330,7 @@ struct SC::EventLoop::KernelQueue
         SC_TRY_IF(client.assign(asyncConnect.handle));
         auto detach = MakeDeferred([&] { client.detach(); });
         SC_TRY_IF(client.setBlocking(false)); // make sure it's in non blocking mode
-        auto res = SocketClient(client).connect(asyncConnect.support->ipAddress);
+        auto res = SocketClient(client).connect(asyncConnect.ipAddress);
         // we expect connect to fail with
         if (res)
         {
@@ -475,30 +470,30 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] ReturnCode cancelAsync(EventLoop& eventLoop, Async& async)
     {
         SC_UNUSED(eventLoop);
-        switch (async.operation.type)
+        switch (async.getType())
         {
         case Async::Type::Timeout: eventLoop.numberOfTimers -= 1; return true;
         case Async::Type::WakeUp: eventLoop.numberOfWakeups -= 1; return true;
         case Async::Type::Read: //
-            SC_TRY_IF(stopReadWatcher(async, *async.operation.unionAs<Async::Read>()));
+            SC_TRY_IF(stopReadWatcher(async, *async.asRead()));
             break;
         case Async::Type::Write: //
-            SC_TRY_IF(stopWriteWatcher(async, *async.operation.unionAs<Async::Write>()));
+            SC_TRY_IF(stopWriteWatcher(async, *async.asWrite()));
             break;
         case Async::Type::ProcessExit: //
-            SC_TRY_IF(stopProcessExitWatcher(async, *async.operation.unionAs<Async::ProcessExit>()));
+            SC_TRY_IF(stopProcessExitWatcher(async, *async.asProcessExit()));
             break;
         case Async::Type::Accept: //
-            SC_TRY_IF(stopAcceptWatcher(async, *async.operation.unionAs<Async::Accept>()));
+            SC_TRY_IF(stopAcceptWatcher(async, *async.asAccept()));
             break;
         case Async::Type::Connect: //
-            SC_TRY_IF(stopConnectWatcher(async, *async.operation.unionAs<Async::Connect>()));
+            SC_TRY_IF(stopConnectWatcher(async, *async.asConnect()));
             break;
         case Async::Type::Send: //
-            SC_TRY_IF(stopSendWatcher(async, *async.operation.unionAs<Async::Send>()));
+            SC_TRY_IF(stopSendWatcher(async, *async.asSend()));
             break;
         case Async::Type::Receive: //
-            SC_TRY_IF(stopReceiveWatcher(async, *async.operation.unionAs<Async::Receive>()));
+            SC_TRY_IF(stopReceiveWatcher(async, *async.asReceive()));
             break;
         }
         eventLoop.numberOfActiveHandles -= 1;

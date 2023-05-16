@@ -25,124 +25,69 @@ void SC::OpaqueFuncs<SC::EventLoop::InternalTraits>::destruct(Object& obj)
     obj.~Object();
 }
 
-template <>
-void SC::OpaqueFuncs<SC::Async::ProcessExitTraits>::construct(Handle& buffer)
-{
-    new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object();
-}
-template <>
-void SC::OpaqueFuncs<SC::Async::ProcessExitTraits>::destruct(Object& obj)
-{
-    obj.~Object();
-}
-template <>
-void SC::OpaqueFuncs<SC::Async::ProcessExitTraits>::moveConstruct(Handle& buffer, Object&& obj)
-{
-    new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object(move(obj));
-}
-template <>
-void SC::OpaqueFuncs<SC::Async::ProcessExitTraits>::moveAssign(Object& pthis, Object&& obj)
-{
-    pthis = move(obj);
-}
-
 SC::ReturnCode SC::EventLoop::startTimeout(AsyncTimeout& async, IntegerMilliseconds expiration,
                                            Function<void(AsyncResult&)>&& callback)
 {
     SC_TRY_IF(queueSubmission(async, move(callback)));
-    Async::Timeout operation;
     updateTime();
-    operation.expirationTime = loopTime.offsetBy(expiration);
-    operation.timeout        = expiration;
-    async.operation.assignValue(move(operation));
+    async.expirationTime = loopTime.offsetBy(expiration);
+    async.timeout        = expiration;
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::startRead(AsyncRead& async, AsyncRead::ReadSupport& support,
-                                        FileDescriptor::Handle fileDescriptor, SpanVoid<void> readBuffer,
-                                        Function<void(AsyncResult&)>&& callback)
+SC::ReturnCode SC::EventLoop::startRead(AsyncRead& async, FileDescriptor::Handle fileDescriptor,
+                                        SpanVoid<void> readBuffer, Function<void(AsyncResult&)>&& callback)
 {
     SC_TRY_MSG(readBuffer.sizeInBytes() > 0, "EventLoop::startRead - Zero sized read buffer"_a8);
     SC_TRY_IF(queueSubmission(async, move(callback)));
-    Async::Read operation;
-    operation.fileDescriptor = fileDescriptor;
-    operation.readBuffer     = readBuffer;
-#if SC_PLATFORM_WINDOWS
-    operation.support = &support;
-#else
-    SC_UNUSED(support);
-#endif
-    async.operation.assignValue(move(operation));
+    async.fileDescriptor = fileDescriptor;
+    async.readBuffer     = readBuffer;
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::startWrite(AsyncWrite& async, AsyncWrite::WriteSupport& support,
-                                         FileDescriptor::Handle fileDescriptor, SpanVoid<const void> writeBuffer,
-                                         Function<void(AsyncResult&)>&& callback)
+SC::ReturnCode SC::EventLoop::startWrite(AsyncWrite& async, FileDescriptor::Handle fileDescriptor,
+                                         SpanVoid<const void> writeBuffer, Function<void(AsyncResult&)>&& callback)
 {
     SC_TRY_MSG(writeBuffer.sizeInBytes() > 0, "EventLoop::startWrite - Zero sized write buffer"_a8);
     SC_TRY_IF(queueSubmission(async, move(callback)));
-    Async::Write operation;
-    operation.fileDescriptor = fileDescriptor;
-    operation.writeBuffer    = writeBuffer;
-#if SC_PLATFORM_WINDOWS
-    operation.support = &support;
-#else
-    SC_UNUSED(support);
-#endif
-    async.operation.assignValue(move(operation));
+    async.fileDescriptor = fileDescriptor;
+    async.writeBuffer    = writeBuffer;
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::startAccept(AsyncAccept& async, AsyncAccept::Support& support,
-                                          const SocketDescriptor&        socketDescriptor,
+SC::ReturnCode SC::EventLoop::startAccept(AsyncAccept& async, const SocketDescriptor& socketDescriptor,
                                           Function<void(AsyncResult&)>&& callback)
 {
     SC_TRY_IF(queueSubmission(async, move(callback)));
-    Async::Accept operation;
-    SC_TRY_IF(socketDescriptor.get(operation.handle, "Invalid handle"_a8));
-    SC_TRY_IF(socketDescriptor.getAddressFamily(operation.addressFamily));
-    operation.support = &support;
-    async.operation.assignValue(move(operation));
+    SC_TRY_IF(socketDescriptor.get(async.handle, "Invalid handle"_a8));
+    SC_TRY_IF(socketDescriptor.getAddressFamily(async.addressFamily));
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::startConnect(AsyncConnect& async, Async::ConnectSupport& support,
-                                           const SocketDescriptor& socketDescriptor, SocketIPAddress ipAddress,
-                                           Function<void(AsyncResult&)>&& callback)
+SC::ReturnCode SC::EventLoop::startConnect(AsyncConnect& async, const SocketDescriptor& socketDescriptor,
+                                           SocketIPAddress ipAddress, Function<void(AsyncResult&)>&& callback)
 {
     SC_TRY_IF(queueSubmission(async, move(callback)));
-    Async::Connect operation;
-    SC_TRY_IF(socketDescriptor.get(operation.handle, "Invalid handle"_a8));
-    operation.support            = &support;
-    operation.support->ipAddress = ipAddress;
-    async.operation.assignValue(move(operation));
+    SC_TRY_IF(socketDescriptor.get(async.handle, "Invalid handle"_a8));
+    async.ipAddress = ipAddress;
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::startSend(AsyncSend& async, AsyncSend::Support& support,
-                                        const SocketDescriptor& socketDescriptor, Span<const char> data,
-                                        Function<void(AsyncResult&)>&& callback)
+SC::ReturnCode SC::EventLoop::startSend(AsyncSend& async, const SocketDescriptor& socketDescriptor,
+                                        Span<const char> data, Function<void(AsyncResult&)>&& callback)
 {
     SC_TRY_IF(queueSubmission(async, move(callback)));
-    Async::Send operation;
-    SC_TRY_IF(socketDescriptor.get(operation.handle, "Invalid handle"_a8));
-    operation.data    = data;
-    operation.support = &support;
-    async.operation.assignValue(move(operation));
+    SC_TRY_IF(socketDescriptor.get(async.handle, "Invalid handle"_a8));
+    async.data = data;
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::startReceive(AsyncReceive& async, AsyncReceive::Support& support,
-                                           const SocketDescriptor& socketDescriptor, Span<char> data,
-                                           Function<void(AsyncResult&)>&& callback)
+SC::ReturnCode SC::EventLoop::startReceive(AsyncReceive& async, const SocketDescriptor& socketDescriptor,
+                                           Span<char> data, Function<void(AsyncResult&)>&& callback)
 {
     SC_TRY_IF(queueSubmission(async, move(callback)));
-    Async::Receive operation;
-    SC_TRY_IF(socketDescriptor.get(operation.handle, "Invalid handle"_a8));
-    operation.data    = data;
-    operation.support = &support;
-    async.operation.assignValue(move(operation));
+    SC_TRY_IF(socketDescriptor.get(async.handle, "Invalid handle"_a8));
+    async.data = data;
     return true;
 }
 
@@ -150,9 +95,7 @@ SC::ReturnCode SC::EventLoop::startWakeUp(AsyncWakeUp& async, Function<void(Asyn
                                           EventObject* eventObject)
 {
     SC_TRY_IF(queueSubmission(async, move(callback)));
-    Async::WakeUp operation;
-    operation.eventObject = eventObject;
-    async.operation.assignValue(move(operation));
+    async.eventObject = eventObject;
     return true;
 }
 
@@ -160,9 +103,7 @@ SC::ReturnCode SC::EventLoop::startProcessExit(AsyncProcessExit& async, Function
                                                ProcessDescriptor::Handle process)
 {
     SC_TRY_IF(queueSubmission(async, move(callback)));
-    Async::ProcessExit operation;
-    operation.handle = process;
-    async.operation.assignValue(move(operation));
+    async.handle = process;
     return true;
 }
 
@@ -194,8 +135,8 @@ const SC::TimeCounter* SC::EventLoop::findEarliestTimer() const
     const TimeCounter* earliestTime = nullptr;
     for (Async* async = activeTimers.front; async != nullptr; async = async->next)
     {
-        SC_DEBUG_ASSERT(async->operation.type == Async::Type::Timeout);
-        const auto& expirationTime = async->operation.fields.timeout.expirationTime;
+        SC_DEBUG_ASSERT(async->getType() == Async::Type::Timeout);
+        const auto& expirationTime = async->asTimeout()->expirationTime;
         if (earliestTime == nullptr or earliestTime->isLaterThanOrEqualTo(expirationTime))
         {
             earliestTime = &expirationTime;
@@ -208,8 +149,8 @@ void SC::EventLoop::invokeExpiredTimers()
 {
     for (Async* async = activeTimers.front; async != nullptr;)
     {
-        SC_DEBUG_ASSERT(async->operation.type == Async::Type::Timeout);
-        const auto& expirationTime = async->operation.fields.timeout.expirationTime;
+        SC_DEBUG_ASSERT(async->getType() == Async::Type::Timeout);
+        const auto& expirationTime = async->asTimeout()->expirationTime;
         if (loopTime.isLaterThanOrEqualTo(expirationTime))
         {
             Async* currentAsync = async;
@@ -382,7 +323,7 @@ SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread(AsyncWakeUp& wakeUp)
 {
     SC_TRY_MSG(wakeUp.eventLoop == this,
                "EventLoop::wakeUpFromExternalThread - Wakeup belonging to different EventLoop"_a8);
-    if (not wakeUp.operation.fields.wakeUp.pending.exchange(true))
+    if (not wakeUp.asWakeUp()->pending.exchange(true))
     {
         // This executes if current thread is lucky enough to atomically exchange pending from false to true.
         // This effectively allows coalescing calls from different threads into a single notification.
@@ -395,7 +336,7 @@ void SC::EventLoop::executeWakeUps()
 {
     for (Async* async = activeWakeUps.front; async != nullptr; async = async->next)
     {
-        Async::WakeUp* notifier = &async->operation.fields.wakeUp;
+        Async::WakeUp* notifier = async->asWakeUp();
         if (notifier->pending.load() == true)
         {
             AsyncResult res{*this, *async};

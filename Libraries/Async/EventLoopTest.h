@@ -26,11 +26,7 @@ struct SC::EventLoopTest : public SC::TestCase
             int  timeout2Called   = 0;
             auto timeout1Callback = [&](AsyncResult& res)
             {
-                // As we are in a timeout callback we know for fact that we could easily access
-                // what we need with res.async.operation.fields.timeout, playing at the edge of UB.
-                // unionAs<...>() however is more safe, as it will return nullptr when casted to wrong
-                // type.
-                Async::Timeout* timeout = res.async.operation.unionAs<Async::Timeout>();
+                Async::Timeout* timeout = res.async.asTimeout();
                 SC_TEST_EXPECT(timeout and timeout->timeout.ms == 1);
                 timeout1Called++;
             };
@@ -164,9 +160,8 @@ struct SC::EventLoopTest : public SC::TestCase
                 SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.result.fields.accept.acceptedClient)));
                 acceptedCount++;
             };
-            AsyncAccept::Support support;
-            AsyncAccept          accept;
-            SC_TEST_EXPECT(eventLoop.startAccept(accept, support, server, onAccepted));
+            AsyncAccept accept;
+            SC_TEST_EXPECT(eventLoop.startAccept(accept, server, onAccepted));
 
             SocketDescriptor client1, client2;
             SC_TEST_EXPECT(SocketClient(client1).connect("127.0.0.1", tcpPort));
@@ -221,9 +216,8 @@ struct SC::EventLoopTest : public SC::TestCase
                     SC_TEST_EXPECT(res.eventLoop.stopAsync(res.async));
                 }
             };
-            AsyncAccept::Support acceptSupport;
-            AsyncAccept          accept;
-            SC_TEST_EXPECT(eventLoop.startAccept(accept, acceptSupport, server, onAccepted));
+            AsyncAccept accept;
+            SC_TEST_EXPECT(eventLoop.startAccept(accept, server, onAccepted));
 
             int  connectedCount = 0;
             auto onConnected    = [&](AsyncResult& res)
@@ -235,15 +229,14 @@ struct SC::EventLoopTest : public SC::TestCase
 
             SC_TEST_EXPECT(localHost.fromAddressPort(connectAddress, tcpPort));
 
-            AsyncConnect::Support connectSupport[2];
-            AsyncConnect          connect[2];
-            SocketDescriptor      clients[2];
+            AsyncConnect     connect[2];
+            SocketDescriptor clients[2];
 
             SC_TEST_EXPECT(clients[0].createAsyncTCPSocketIPV6());
-            SC_TEST_EXPECT(eventLoop.startConnect(connect[0], connectSupport[0], clients[0], localHost, onConnected));
+            SC_TEST_EXPECT(eventLoop.startConnect(connect[0], clients[0], localHost, onConnected));
 
             SC_TEST_EXPECT(clients[1].createAsyncTCPSocketIPV6());
-            SC_TEST_EXPECT(eventLoop.startConnect(connect[1], connectSupport[1], clients[1], localHost, onConnected));
+            SC_TEST_EXPECT(eventLoop.startConnect(connect[1], clients[1], localHost, onConnected));
 
             SC_TEST_EXPECT(connectedCount == 0);
             SC_TEST_EXPECT(acceptedCount == 0);
@@ -268,8 +261,7 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(client.setBlocking(false));
             SC_TEST_EXPECT(serverSideClient.setBlocking(false));
 
-            AsyncSend::Support sendSupport;
-            AsyncSend          sendAsync;
+            AsyncSend sendAsync;
 
             const char sendBuffer[1] = {123};
 
@@ -282,7 +274,7 @@ struct SC::EventLoopTest : public SC::TestCase
                 sendCount++;
             };
 
-            SC_TEST_EXPECT(eventLoop.startSend(sendAsync, sendSupport, client, sendData, onSend));
+            SC_TEST_EXPECT(eventLoop.startSend(sendAsync, client, sendData, onSend));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(sendCount == 1);
             SC_TEST_EXPECT(eventLoop.runNoWait());
@@ -298,10 +290,8 @@ struct SC::EventLoopTest : public SC::TestCase
             char       receiveBuffer[1] = {0};
             Span<char> receiveData      = {receiveBuffer, sizeof(receiveBuffer)};
 
-            AsyncReceive::Support receiveSupport;
-            AsyncReceive          receiveAsync;
-            SC_TEST_EXPECT(
-                eventLoop.startReceive(receiveAsync, receiveSupport, serverSideClient, receiveData, onReceive));
+            AsyncReceive receiveAsync;
+            SC_TEST_EXPECT(eventLoop.startReceive(receiveAsync, serverSideClient, receiveData, onReceive));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(sendCount == 1);
             SC_TEST_EXPECT(eventLoop.runNoWait());
@@ -329,26 +319,24 @@ struct SC::EventLoopTest : public SC::TestCase
             options.blocking = false;
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, options));
 
-            AsyncWrite               write;
-            AsyncWrite::WriteSupport writeSupport;
+            AsyncWrite write;
 
             auto writeLambda = [](AsyncResult& res) { SC_UNUSED(res); };
             auto writeSpan   = StringView("test").toVoidSpan();
 
             FileDescriptor::Handle handle;
             SC_TEST_EXPECT(fd.get(handle, "asd"_a8));
-            SC_TEST_EXPECT(eventLoop.startWrite(write, writeSupport, handle, writeSpan, writeLambda));
+            SC_TEST_EXPECT(eventLoop.startWrite(write, handle, writeSpan, writeLambda));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(fd.close());
 
-            AsyncRead              read;
-            AsyncRead::ReadSupport readSupport;
+            AsyncRead read;
 
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::ReadOnly, options));
             char           buffer[4]  = {0};
             SpanVoid<void> readSpan   = {buffer, sizeof(buffer)};
             auto           readLambda = [](AsyncResult& res) { SC_UNUSED(res); };
-            SC_TEST_EXPECT(eventLoop.startRead(read, readSupport, handle, readSpan, readLambda));
+            SC_TEST_EXPECT(eventLoop.startRead(read, handle, readSpan, readLambda));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(fd.close());
 
