@@ -34,6 +34,16 @@ struct AsyncReceive;
 struct AsyncRead;
 struct AsyncWrite;
 
+struct AsyncTimeoutResult;
+struct AsyncWakeUpResult;
+struct AsyncProcessExitResult;
+struct AsyncAcceptResult;
+struct AsyncConnectResult;
+struct AsyncSendResult;
+struct AsyncReceiveResult;
+struct AsyncReadResult;
+struct AsyncWriteResult;
+
 } // namespace SC
 
 namespace SC
@@ -120,80 +130,32 @@ struct SC::Async
 
 struct SC::AsyncResult
 {
-    struct Timeout
-    {
-    };
+    using Timeout     = AsyncTimeoutResult;
+    using WakeUp      = AsyncWakeUpResult;
+    using ProcessExit = AsyncProcessExitResult;
+    using Accept      = AsyncAcceptResult;
+    using Connect     = AsyncConnectResult;
+    using Send        = AsyncSendResult;
+    using Receive     = AsyncReceiveResult;
+    using Read        = AsyncReadResult;
+    using Write       = AsyncWriteResult;
 
-    struct WakeUp
-    {
-    };
-
-    struct ProcessExit
-    {
-        ProcessDescriptor::ExitStatus exitStatus;
-    };
-
-    struct Accept
-    {
-        SocketDescriptor acceptedClient;
-    };
-
-    struct Connect
-    {
-    };
-
-    struct Send
-    {
-    };
-
-    struct Receive
-    {
-    };
-
-    struct Read
-    {
-        size_t readBytes = 0;
-    };
-
-    struct Write
-    {
-        size_t writtenBytes = 0;
-    };
     using Type = Async::Type;
 
-    union Result
-    {
-        Result() {}
-        ~Result() {}
+    AsyncTimeoutResult*     asTimeout();
+    AsyncWakeUpResult*      asWakeUp();
+    AsyncProcessExitResult* asProcessExit();
+    AsyncAcceptResult*      asAccept();
+    AsyncConnectResult*     asConnect();
+    AsyncSendResult*        asSend();
+    AsyncReceiveResult*     asReceive();
+    AsyncReadResult*        asRead();
+    AsyncWriteResult*       asWrite();
 
-        Timeout     timeout;
-        WakeUp      wakeUp;
-        ProcessExit processExit;
-        Accept      accept;
-        Connect     connect;
-        Send        send;
-        Receive     receive;
-        Read        read;
-        Write       write;
+    Async& async;
+    void*  userData = nullptr;
 
-        using FieldsTypes =
-            TypeList<TaggedField<Result, Type, decltype(timeout), &Result::timeout, Type::Timeout>,
-                     TaggedField<Result, Type, decltype(wakeUp), &Result::wakeUp, Type::WakeUp>,
-                     TaggedField<Result, Type, decltype(processExit), &Result::processExit, Type::ProcessExit>,
-                     TaggedField<Result, Type, decltype(accept), &Result::accept, Type::Accept>,
-                     TaggedField<Result, Type, decltype(connect), &Result::connect, Type::Connect>,
-                     TaggedField<Result, Type, decltype(send), &Result::send, Type::Send>,
-                     TaggedField<Result, Type, decltype(receive), &Result::receive, Type::Receive>,
-                     TaggedField<Result, Type, decltype(read), &Result::read, Type::Read>,
-                     TaggedField<Result, Type, decltype(write), &Result::write, Type::Write>>;
-    };
-
-    EventLoop& eventLoop;
-    Async&     async;
-    void*      userData = nullptr;
-
-    TaggedUnion<Result> result = {};
-
+    AsyncResult(Async& async, void* userData) : async(async), userData(userData) {}
     // TODO: Add AsyncResult error
 };
 
@@ -296,33 +258,77 @@ struct SC::AsyncWrite : public Async
 #endif
 };
 
-inline SC::AsyncTimeout* SC::Async::asTimeout()
+struct SC::AsyncTimeoutResult : public AsyncResult
 {
-    return type == Type::Timeout ? static_cast<AsyncTimeout*>(this) : nullptr;
-}
-inline SC::AsyncWakeUp* SC::Async::asWakeUp()
+    AsyncTimeoutResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+};
+
+struct SC::AsyncWakeUpResult : public AsyncResult
 {
-    return type == Type::WakeUp ? static_cast<AsyncWakeUp*>(this) : nullptr;
-}
-inline SC::AsyncProcessExit* SC::Async::asProcessExit()
+    AsyncWakeUpResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+};
+
+struct SC::AsyncProcessExitResult : public AsyncResult
 {
-    return type == Type::ProcessExit ? static_cast<AsyncProcessExit*>(this) : nullptr;
-}
-inline SC::AsyncAccept* SC::Async::asAccept()
+    AsyncProcessExitResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+    ProcessDescriptor::ExitStatus exitStatus;
+};
+
+struct SC::AsyncAcceptResult : public AsyncResult
 {
-    return type == Type::Accept ? static_cast<AsyncAccept*>(this) : nullptr;
-}
-inline SC::AsyncConnect* SC::Async::asConnect()
+    AsyncAcceptResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+    SocketDescriptor acceptedClient;
+};
+
+struct SC::AsyncConnectResult : public AsyncResult
 {
-    return type == Type::Connect ? static_cast<AsyncConnect*>(this) : nullptr;
-}
-inline SC::AsyncSend*    SC::Async::asSend() { return type == Type::Send ? static_cast<AsyncSend*>(this) : nullptr; }
-inline SC::AsyncReceive* SC::Async::asReceive()
+    AsyncConnectResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+};
+
+struct SC::AsyncSendResult : public AsyncResult
 {
-    return type == Type::Receive ? static_cast<AsyncReceive*>(this) : nullptr;
-}
-inline SC::AsyncRead*  SC::Async::asRead() { return type == Type::Read ? static_cast<AsyncRead*>(this) : nullptr; }
-inline SC::AsyncWrite* SC::Async::asWrite() { return type == Type::Write ? static_cast<AsyncWrite*>(this) : nullptr; }
+    AsyncSendResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+};
+
+struct SC::AsyncReceiveResult : public AsyncResult
+{
+    AsyncReceiveResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+};
+
+struct SC::AsyncReadResult : public AsyncResult
+{
+    AsyncReadResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+    size_t readBytes = 0;
+};
+
+struct SC::AsyncWriteResult : public AsyncResult
+{
+    AsyncWriteResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+    size_t writtenBytes = 0;
+};
+
+// clang-format off
+inline SC::AsyncTimeout*    SC::Async::asTimeout()  { return type == Type::Timeout ? static_cast<AsyncTimeout*>(this) : nullptr;}
+inline SC::AsyncWakeUp*     SC::Async::asWakeUp()   { return type == Type::WakeUp ? static_cast<AsyncWakeUp*>(this) : nullptr;}
+inline SC::AsyncProcessExit* SC::Async::asProcessExit() { return type == Type::ProcessExit ? static_cast<AsyncProcessExit*>(this) : nullptr;}
+inline SC::AsyncAccept*     SC::Async::asAccept()   { return type == Type::Accept ? static_cast<AsyncAccept*>(this) : nullptr;}
+inline SC::AsyncConnect*    SC::Async::asConnect()  { return type == Type::Connect ? static_cast<AsyncConnect*>(this) : nullptr;}
+inline SC::AsyncSend*       SC::Async::asSend()     { return type == Type::Send ? static_cast<AsyncSend*>(this) : nullptr; }
+inline SC::AsyncReceive*    SC::Async::asReceive()  { return type == Type::Receive ? static_cast<AsyncReceive*>(this) : nullptr;}
+inline SC::AsyncRead*       SC::Async::asRead()     { return type == Type::Read ? static_cast<AsyncRead*>(this) : nullptr; }
+inline SC::AsyncWrite*      SC::Async::asWrite()    { return type == Type::Write ? static_cast<AsyncWrite*>(this) : nullptr; }
+
+inline SC::AsyncTimeoutResult*    SC::AsyncResult::asTimeout()  { return async.getType() == Type::Timeout ? static_cast<AsyncTimeoutResult*>(this) : nullptr;}
+inline SC::AsyncWakeUpResult*     SC::AsyncResult::asWakeUp()   { return async.getType() == Type::WakeUp ? static_cast<AsyncWakeUpResult*>(this) : nullptr;}
+inline SC::AsyncProcessExitResult* SC::AsyncResult::asProcessExit() { return async.getType() == Type::ProcessExit ? static_cast<AsyncProcessExitResult*>(this) : nullptr;}
+inline SC::AsyncAcceptResult*     SC::AsyncResult::asAccept()   { return async.getType() == Type::Accept ? static_cast<AsyncAcceptResult*>(this) : nullptr;}
+inline SC::AsyncConnectResult*    SC::AsyncResult::asConnect()  { return async.getType() == Type::Connect ? static_cast<AsyncConnectResult*>(this) : nullptr;}
+inline SC::AsyncSendResult*       SC::AsyncResult::asSend()     { return async.getType() == Type::Send ? static_cast<AsyncSendResult*>(this) : nullptr; }
+inline SC::AsyncReceiveResult*    SC::AsyncResult::asReceive()  { return async.getType() == Type::Receive ? static_cast<AsyncReceiveResult*>(this) : nullptr;}
+inline SC::AsyncReadResult*       SC::AsyncResult::asRead()     { return async.getType() == Type::Read ? static_cast<AsyncReadResult*>(this) : nullptr; }
+inline SC::AsyncWriteResult*      SC::AsyncResult::asWrite()    { return async.getType() == Type::Write ? static_cast<AsyncWriteResult*>(this) : nullptr; }
+
+// clang-format on
 
 struct SC::EventLoop
 {

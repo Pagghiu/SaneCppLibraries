@@ -157,7 +157,7 @@ void SC::EventLoop::invokeExpiredTimers()
             async               = async->next;
             activeTimers.remove(*currentAsync);
             currentAsync->state = Async::State::Free;
-            AsyncResult res{*this, *currentAsync};
+            AsyncResult::Timeout res(*currentAsync, nullptr);
             res.async.eventLoop = nullptr; // Allow reusing it
             currentAsync->callback(res);
         }
@@ -253,13 +253,95 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
     Internal& self = internal.get();
     for (decltype(KernelQueue::newEvents) idx = 0; idx < queue.newEvents; ++idx)
     {
-        Async&      async = *self.getAsync(queue.events[idx]);
-        AsyncResult result{*this, async, self.getUserData(queue.events[idx])};
-        ReturnCode  res = self.runCompletionFor(result, queue.events[idx]);
-        if (res and result.async.callback.isValid())
+        Async& async = *self.getAsync(queue.events[idx]);
+        if (!self.canRunCompletionFor(async, queue.events[idx]))
+            continue;
+        void* userData = self.getUserData(queue.events[idx]);
+        switch (async.getType())
         {
-            result.async.callback(result);
+        case Async::Type::Timeout: {
+            AsyncResult::Timeout result(async, userData);
+            ReturnCode           res = self.runCompletionFor(result, queue.events[idx]);
+            if (res and result.async.callback.isValid())
+            {
+                result.async.callback(result);
+            }
+            break;
         }
+        case Async::Type::Read: {
+            AsyncResult::Read result(async, userData);
+            ReturnCode        res = self.runCompletionFor(result, queue.events[idx]);
+            if (res and result.async.callback.isValid())
+            {
+                result.async.callback(result);
+            }
+            break;
+        }
+        case Async::Type::Write: {
+            AsyncResult::Write result(async, userData);
+            ReturnCode         res = self.runCompletionFor(result, queue.events[idx]);
+            if (res and result.async.callback.isValid())
+            {
+                result.async.callback(result);
+            }
+            break;
+        }
+        case Async::Type::WakeUp: {
+            AsyncResult::WakeUp result(async, userData);
+            ReturnCode          res = self.runCompletionFor(result, queue.events[idx]);
+            if (res and result.async.callback.isValid())
+            {
+                result.async.callback(result);
+            }
+            break;
+        }
+        case Async::Type::ProcessExit: {
+            AsyncResult::ProcessExit result(async, userData);
+            ReturnCode               res = self.runCompletionFor(result, queue.events[idx]);
+            if (res and result.async.callback.isValid())
+            {
+                result.async.callback(result);
+            }
+            break;
+        }
+        case Async::Type::Accept: {
+            AsyncResult::Accept result(async, userData);
+            ReturnCode          res = self.runCompletionFor(result, queue.events[idx]);
+            if (res and result.async.callback.isValid())
+            {
+                result.async.callback(result);
+            }
+            break;
+        }
+        case Async::Type::Connect: {
+            AsyncResult::Connect result(async, userData);
+            ReturnCode           res = self.runCompletionFor(result, queue.events[idx]);
+            if (res and result.async.callback.isValid())
+            {
+                result.async.callback(result);
+            }
+            break;
+        }
+        case Async::Type::Send: {
+            AsyncResult::Send result(async, userData);
+            ReturnCode        res = self.runCompletionFor(result, queue.events[idx]);
+            if (res and result.async.callback.isValid())
+            {
+                result.async.callback(result);
+            }
+            break;
+        }
+        case Async::Type::Receive: {
+            AsyncResult::Receive result(async, userData);
+            ReturnCode           res = self.runCompletionFor(result, queue.events[idx]);
+            if (res and result.async.callback.isValid())
+            {
+                result.async.callback(result);
+            }
+            break;
+        }
+        }
+
         switch (async.state)
         {
         case Async::State::Active: SC_TRY_IF(queue.activateAsync(*this, async)); break;
@@ -339,7 +421,7 @@ void SC::EventLoop::executeWakeUps()
         Async::WakeUp* notifier = async->asWakeUp();
         if (notifier->pending.load() == true)
         {
-            AsyncResult res{*this, *async};
+            AsyncResult::WakeUp res(*async, nullptr);
             async->callback(res);
             if (notifier->eventObject)
             {

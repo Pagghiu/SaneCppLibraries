@@ -79,13 +79,13 @@ struct SC::EventLoopTest : public SC::TestCase
             {
                 wakeUp1ThreadID = Thread::CurrentThreadID();
                 wakeUp1Called++;
-                SC_TEST_EXPECT(res.eventLoop.stopAsync(res.async));
+                SC_TEST_EXPECT(res.async.eventLoop->stopAsync(res.async));
             };
             SC_TEST_EXPECT(eventLoop.startWakeUp(wakeUp1, lambda1));
             auto lambda2 = [&](AsyncResult& res)
             {
                 wakeUp2Called++;
-                SC_TEST_EXPECT(res.eventLoop.stopAsync(res.async));
+                SC_TEST_EXPECT(res.async.eventLoop->stopAsync(res.async));
             };
             SC_TEST_EXPECT(eventLoop.startWakeUp(wakeUp2, lambda2));
             Thread     newThread1;
@@ -157,7 +157,7 @@ struct SC::EventLoopTest : public SC::TestCase
 
             auto onAccepted = [&](AsyncResult& res)
             {
-                SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.result.fields.accept.acceptedClient)));
+                SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.asAccept()->acceptedClient)));
                 acceptedCount++;
             };
             AsyncAccept accept;
@@ -209,11 +209,11 @@ struct SC::EventLoopTest : public SC::TestCase
 
             auto onAccepted = [&](AsyncResult& res)
             {
-                SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.result.fields.accept.acceptedClient)));
+                SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.asAccept()->acceptedClient)));
                 acceptedCount++;
                 if (acceptedCount == 2)
                 {
-                    SC_TEST_EXPECT(res.eventLoop.stopAsync(res.async));
+                    SC_TEST_EXPECT(res.async.eventLoop->stopAsync(res.async));
                 }
             };
             AsyncAccept accept;

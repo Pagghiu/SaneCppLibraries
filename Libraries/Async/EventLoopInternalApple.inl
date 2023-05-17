@@ -88,14 +88,14 @@ struct SC::EventLoop::Internal
                 break;
 
         } while (errno == EINTR);
-        asyncResult.eventLoop.executeWakeUps();
+        asyncResult.async.eventLoop->executeWakeUps();
     }
 
-    [[nodiscard]] ReturnCode runCompletionFor(AsyncResult& result, const struct kevent& event)
+    [[nodiscard]] ReturnCode canRunCompletionFor(Async& async, const struct kevent& event)
     {
         if ((event.flags & EV_DELETE) != 0)
         {
-            result.eventLoop.activeHandles.remove(result.async);
+            async.eventLoop->activeHandles.remove(async);
             return false; // Do not call callback
         }
         if ((event.flags & EV_ERROR) != 0)
@@ -104,122 +104,123 @@ struct SC::EventLoop::Internal
             SC_RELEASE_ASSERT(false);
             return false;
         }
-        // regular path
-        switch (result.async.getType())
-        {
-        case Async::Type::Timeout: {
-            result.result.assignValue(AsyncResult::Timeout());
-            SC_RELEASE_ASSERT(false and "Async::Type::Timeout cannot be argument of completion");
-            break;
-        }
-        case Async::Type::Read: {
-            result.result.assignValue(AsyncResult::Read());
-            if (&result.async == &wakeupPipeRead)
-            {
-                runCompletionForWakeUp(result);
-            }
-            else
-            {
-                Async::Read& operation = *result.async.asRead();
-                auto         span      = operation.readBuffer;
-                ssize_t      res;
-                do
-                {
-                    res = ::pread(operation.fileDescriptor, span.data(), span.sizeInBytes(),
-                                  static_cast<off_t>(operation.offset));
-                } while ((res == -1) and (errno == EINTR));
-                SC_TRY_MSG(res >= 0, "::read failed"_a8);
-                result.result.fields.read.readBytes = static_cast<size_t>(res);
-            }
-            break;
-        }
-        case Async::Type::Write: {
+        return true;
+    }
 
-            Async::Write& operation = *result.async.asWrite();
-            auto          span      = operation.writeBuffer;
-            ssize_t       res;
+    [[nodiscard]] ReturnCode runCompletionFor(AsyncResult::Timeout& result, const struct kevent&)
+    {
+        SC_UNUSED(result);
+        SC_RELEASE_ASSERT(false and "Async::Type::Timeout cannot be argument of completion");
+        return false;
+    }
+
+    [[nodiscard]] ReturnCode runCompletionFor(AsyncResult::Read& result, const struct kevent&)
+    {
+        if (&result.async == &wakeupPipeRead)
+        {
+            runCompletionForWakeUp(result);
+        }
+        else
+        {
+            Async::Read& operation = *result.async.asRead();
+            auto         span      = operation.readBuffer;
+            ssize_t      res;
             do
             {
-                res = ::pwrite(operation.fileDescriptor, span.data(), span.sizeInBytes(),
-                               static_cast<off_t>(operation.offset));
+                res = ::pread(operation.fileDescriptor, span.data(), span.sizeInBytes(),
+                              static_cast<off_t>(operation.offset));
             } while ((res == -1) and (errno == EINTR));
-            SC_TRY_MSG(res >= 0, "::write failed"_a8);
-            result.result.fields.read.readBytes = static_cast<size_t>(res);
+            SC_TRY_MSG(res >= 0, "::read failed"_a8);
+            result.readBytes = static_cast<size_t>(res);
+        }
+        return true;
+    }
 
-            break;
-        }
-        case Async::Type::WakeUp: {
-            result.result.assignValue(AsyncResult::WakeUp());
-            SC_RELEASE_ASSERT(false and "Async::Type::WakeUp cannot be argument of completion");
-            break;
-        }
-        case Async::Type::ProcessExit: {
-            result.result.assignValue(AsyncResult::ProcessExit());
-            // Process has exited
-            if ((event.fflags & (NOTE_EXIT | NOTE_EXITSTATUS)) > 0)
+    [[nodiscard]] ReturnCode runCompletionFor(AsyncResult::Write& result, const struct kevent&)
+    {
+        AsyncWrite& async = *result.async.asWrite();
+        auto        span  = async.writeBuffer;
+        ssize_t     res;
+        do
+        {
+            res = ::pwrite(async.fileDescriptor, span.data(), span.sizeInBytes(), static_cast<off_t>(async.offset));
+        } while ((res == -1) and (errno == EINTR));
+        SC_TRY_MSG(res >= 0, "::write failed"_a8);
+        result.writtenBytes = static_cast<size_t>(res);
+        return true;
+    }
+
+    [[nodiscard]] ReturnCode runCompletionFor(AsyncResult::WakeUp& result, const struct kevent&)
+    {
+        SC_UNUSED(result);
+        SC_RELEASE_ASSERT(false and "Async::Type::WakeUp cannot be argument of completion");
+        return false;
+    }
+
+    [[nodiscard]] ReturnCode runCompletionFor(AsyncResult::ProcessExit& result, const struct kevent& event)
+    {
+        if ((event.fflags & (NOTE_EXIT | NOTE_EXITSTATUS)) > 0)
+        {
+            const uint32_t data = static_cast<uint32_t>(event.data);
+            if (WIFEXITED(data) != 0)
             {
-                AsyncResult::ProcessExit& res = result.result.fields.processExit;
-
-                const uint32_t data = static_cast<uint32_t>(event.data);
-                if (WIFEXITED(data) != 0)
-                {
-                    res.exitStatus.status.assign(WEXITSTATUS(data));
-                }
+                result.exitStatus.status.assign(WEXITSTATUS(data));
             }
-            break;
-        }
-        case Async::Type::Accept: {
-            result.result.assignValue(AsyncResult::Accept());
-            Async::Accept&   async = *result.async.asAccept();
-            SocketDescriptor serverSocket;
-            SC_TRY_IF(serverSocket.assign(async.handle));
-            auto detach = MakeDeferred([&] { serverSocket.detach(); });
-            result.result.fields.accept.acceptedClient.detach();
-            return SocketServer(serverSocket).accept(async.addressFamily, result.result.fields.accept.acceptedClient);
-        }
-        case Async::Type::Connect: {
-            result.result.assignValue(AsyncResult::Connect());
-            Async::Connect& async = *result.async.asConnect();
-
-            int       errorCode;
-            socklen_t errorSize = sizeof(errorCode);
-            const int socketRes = ::getsockopt(async.handle, SOL_SOCKET, SO_ERROR, &errorCode, &errorSize);
-            result.async.eventLoop->activeHandles.remove(result.async);
-            result.async.eventLoop->numberOfActiveHandles -= 1;
-            // TODO: This is making a syscall for each connected socket, we should probably aggregate them
-            // And additionally it's stupid as probably WRITE will be subscribed again anyway
-            // But probably this means to review the entire process of async stop
-            SC_TRUST_RESULT(stopSingleWatcherImmediate(result.async, async.handle, EVFILT_WRITE));
-            if (socketRes == 0)
-            {
-                SC_TRY_MSG(errorCode == 0, "connect SO_ERROR"_a8);
-                return true;
-            }
-            return "connect getsockopt failed"_a8;
-        }
-        case Async::Type::Send: {
-            result.result.assignValue(AsyncResult::Send());
-            Async::Send&  async = *result.async.asSend();
-            const ssize_t res   = ::send(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
-            result.async.eventLoop->activeHandles.remove(result.async);
-            result.async.eventLoop->numberOfActiveHandles -= 1;
-            SC_TRY_MSG(res >= 0, "error in send"_a8);
-            SC_TRY_MSG(size_t(res) == async.data.sizeInBytes(), "send didn't send all data"_a8);
-            SC_TRUST_RESULT(stopSingleWatcherImmediate(result.async, async.handle, EVFILT_WRITE));
             return true;
         }
-        case Async::Type::Receive: {
-            result.result.assignValue(AsyncResult::Receive());
-            Async::Receive& async = *result.async.asReceive();
-            const ssize_t   res   = ::recv(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
-            result.async.eventLoop->activeHandles.remove(result.async);
-            result.async.eventLoop->numberOfActiveHandles -= 1;
-            SC_TRY_MSG(res >= 0, "error in recv"_a8);
-            SC_TRY_MSG(size_t(res) == async.data.sizeInBytes(), "send didn't send all data"_a8);
-            SC_TRUST_RESULT(stopSingleWatcherImmediate(result.async, async.handle, EVFILT_READ));
+        return false;
+    }
+
+    [[nodiscard]] ReturnCode runCompletionFor(AsyncResult::Accept& result, const struct kevent&)
+    {
+        Async::Accept&   async = *result.async.asAccept();
+        SocketDescriptor serverSocket;
+        SC_TRY_IF(serverSocket.assign(async.handle));
+        auto detach = MakeDeferred([&] { serverSocket.detach(); });
+        result.acceptedClient.detach();
+        return SocketServer(serverSocket).accept(async.addressFamily, result.acceptedClient);
+    }
+
+    [[nodiscard]] ReturnCode runCompletionFor(AsyncResult::Connect& result, const struct kevent&)
+    {
+        Async::Connect& async = *result.async.asConnect();
+
+        int       errorCode;
+        socklen_t errorSize = sizeof(errorCode);
+        const int socketRes = ::getsockopt(async.handle, SOL_SOCKET, SO_ERROR, &errorCode, &errorSize);
+        result.async.eventLoop->activeHandles.remove(result.async);
+        result.async.eventLoop->numberOfActiveHandles -= 1;
+        // TODO: This is making a syscall for each connected socket, we should probably aggregate them
+        // And additionally it's stupid as probably WRITE will be subscribed again anyway
+        // But probably this means to review the entire process of async stop
+        SC_TRUST_RESULT(stopSingleWatcherImmediate(result.async, async.handle, EVFILT_WRITE));
+        if (socketRes == 0)
+        {
+            SC_TRY_MSG(errorCode == 0, "connect SO_ERROR"_a8);
             return true;
         }
-        }
+        return "connect getsockopt failed"_a8;
+    }
+    [[nodiscard]] ReturnCode runCompletionFor(AsyncResult::Send& result, const struct kevent&)
+    {
+        Async::Send&  async = *result.async.asSend();
+        const ssize_t res   = ::send(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
+        result.async.eventLoop->activeHandles.remove(result.async);
+        result.async.eventLoop->numberOfActiveHandles -= 1;
+        SC_TRY_MSG(res >= 0, "error in send"_a8);
+        SC_TRY_MSG(size_t(res) == async.data.sizeInBytes(), "send didn't send all data"_a8);
+        SC_TRUST_RESULT(stopSingleWatcherImmediate(result.async, async.handle, EVFILT_WRITE));
+        return true;
+    }
+    [[nodiscard]] ReturnCode runCompletionFor(AsyncResult::Receive& result, const struct kevent&)
+    {
+        Async::Receive& async = *result.async.asReceive();
+        const ssize_t   res   = ::recv(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
+        result.async.eventLoop->activeHandles.remove(result.async);
+        result.async.eventLoop->numberOfActiveHandles -= 1;
+        SC_TRY_MSG(res >= 0, "error in recv"_a8);
+        SC_TRY_MSG(size_t(res) == async.data.sizeInBytes(), "send didn't send all data"_a8);
+        SC_TRUST_RESULT(stopSingleWatcherImmediate(result.async, async.handle, EVFILT_READ));
         return true;
     }
 
