@@ -26,9 +26,10 @@ void SC::OpaqueFuncs<SC::EventLoop::InternalTraits>::destruct(Object& obj)
 }
 
 SC::ReturnCode SC::EventLoop::startTimeout(AsyncTimeout& async, IntegerMilliseconds expiration,
-                                           Function<void(AsyncResult&)>&& callback)
+                                           Function<void(AsyncTimeoutResult&)>&& callback)
 {
-    SC_TRY_IF(queueSubmission(async, move(callback)));
+    SC_TRY_IF(queueSubmission(async));
+    async.callback = callback;
     updateTime();
     async.expirationTime = loopTime.offsetBy(expiration);
     async.timeout        = expiration;
@@ -36,86 +37,94 @@ SC::ReturnCode SC::EventLoop::startTimeout(AsyncTimeout& async, IntegerMilliseco
 }
 
 SC::ReturnCode SC::EventLoop::startRead(AsyncRead& async, FileDescriptor::Handle fileDescriptor,
-                                        SpanVoid<void> readBuffer, Function<void(AsyncResult&)>&& callback)
+                                        SpanVoid<void> readBuffer, Function<void(AsyncReadResult&)>&& callback)
 {
     SC_TRY_MSG(readBuffer.sizeInBytes() > 0, "EventLoop::startRead - Zero sized read buffer"_a8);
-    SC_TRY_IF(queueSubmission(async, move(callback)));
+    SC_TRY_IF(queueSubmission(async));
+    async.callback       = callback;
     async.fileDescriptor = fileDescriptor;
     async.readBuffer     = readBuffer;
     return true;
 }
 
 SC::ReturnCode SC::EventLoop::startWrite(AsyncWrite& async, FileDescriptor::Handle fileDescriptor,
-                                         SpanVoid<const void> writeBuffer, Function<void(AsyncResult&)>&& callback)
+                                         SpanVoid<const void> writeBuffer, Function<void(AsyncWriteResult&)>&& callback)
 {
     SC_TRY_MSG(writeBuffer.sizeInBytes() > 0, "EventLoop::startWrite - Zero sized write buffer"_a8);
-    SC_TRY_IF(queueSubmission(async, move(callback)));
+    SC_TRY_IF(queueSubmission(async));
+    async.callback       = callback;
     async.fileDescriptor = fileDescriptor;
     async.writeBuffer    = writeBuffer;
     return true;
 }
 
 SC::ReturnCode SC::EventLoop::startAccept(AsyncAccept& async, const SocketDescriptor& socketDescriptor,
-                                          Function<void(AsyncResult&)>&& callback)
+                                          Function<void(AsyncAcceptResult&)>&& callback)
 {
-    SC_TRY_IF(queueSubmission(async, move(callback)));
+    SC_TRY_IF(queueSubmission(async));
+    async.callback = callback;
     SC_TRY_IF(socketDescriptor.get(async.handle, "Invalid handle"_a8));
     SC_TRY_IF(socketDescriptor.getAddressFamily(async.addressFamily));
     return true;
 }
 
 SC::ReturnCode SC::EventLoop::startConnect(AsyncConnect& async, const SocketDescriptor& socketDescriptor,
-                                           SocketIPAddress ipAddress, Function<void(AsyncResult&)>&& callback)
+                                           SocketIPAddress ipAddress, Function<void(AsyncConnectResult&)>&& callback)
 {
-    SC_TRY_IF(queueSubmission(async, move(callback)));
+    SC_TRY_IF(queueSubmission(async));
+    async.callback = callback;
     SC_TRY_IF(socketDescriptor.get(async.handle, "Invalid handle"_a8));
     async.ipAddress = ipAddress;
     return true;
 }
 
 SC::ReturnCode SC::EventLoop::startSend(AsyncSend& async, const SocketDescriptor& socketDescriptor,
-                                        Span<const char> data, Function<void(AsyncResult&)>&& callback)
+                                        Span<const char> data, Function<void(AsyncSendResult&)>&& callback)
 {
-    SC_TRY_IF(queueSubmission(async, move(callback)));
+    SC_TRY_IF(queueSubmission(async));
+    async.callback = callback;
     SC_TRY_IF(socketDescriptor.get(async.handle, "Invalid handle"_a8));
     async.data = data;
     return true;
 }
 
 SC::ReturnCode SC::EventLoop::startReceive(AsyncReceive& async, const SocketDescriptor& socketDescriptor,
-                                           Span<char> data, Function<void(AsyncResult&)>&& callback)
+                                           Span<char> data, Function<void(AsyncReceiveResult&)>&& callback)
 {
-    SC_TRY_IF(queueSubmission(async, move(callback)));
+    SC_TRY_IF(queueSubmission(async));
+    async.callback = callback;
     SC_TRY_IF(socketDescriptor.get(async.handle, "Invalid handle"_a8));
     async.data = data;
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::startWakeUp(AsyncWakeUp& async, Function<void(AsyncResult&)>&& callback,
+SC::ReturnCode SC::EventLoop::startWakeUp(AsyncWakeUp& async, Function<void(AsyncWakeUpResult&)>&& callback,
                                           EventObject* eventObject)
 {
-    SC_TRY_IF(queueSubmission(async, move(callback)));
+    SC_TRY_IF(queueSubmission(async));
+    async.callback    = callback;
     async.eventObject = eventObject;
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::startProcessExit(AsyncProcessExit& async, Function<void(AsyncResult&)>&& callback,
-                                               ProcessDescriptor::Handle process)
+SC::ReturnCode SC::EventLoop::startProcessExit(AsyncProcessExit&                         async,
+                                               Function<void(AsyncProcessExitResult&)>&& callback,
+                                               ProcessDescriptor::Handle                 process)
 {
-    SC_TRY_IF(queueSubmission(async, move(callback)));
-    async.handle = process;
+    SC_TRY_IF(queueSubmission(async));
+    async.callback = callback;
+    async.handle   = process;
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::queueSubmission(Async& async, Function<void(AsyncResult&)>&& callback)
+SC::ReturnCode SC::EventLoop::queueSubmission(Async& async)
 {
     const bool asyncStateIsFree      = async.state == Async::State::Free;
     const bool asyncIsNotOwnedByLoop = async.eventLoop == nullptr;
     SC_DEBUG_ASSERT(asyncStateIsFree and asyncIsNotOwnedByLoop);
     SC_TRY_MSG(asyncStateIsFree, "Trying to stage Async that is in use"_a8);
     SC_TRY_MSG(asyncIsNotOwnedByLoop, "Trying to add Async belonging to another Loop"_a8);
-    async.callback = move(callback);
-    async.state    = Async::State::Submitting;
+    async.state = Async::State::Submitting;
     submissions.queueBack(async);
     async.eventLoop = this;
     return true;
@@ -159,7 +168,7 @@ void SC::EventLoop::invokeExpiredTimers()
             currentAsync->state = Async::State::Free;
             AsyncResult::Timeout res(*currentAsync, nullptr);
             res.async.eventLoop = nullptr; // Allow reusing it
-            currentAsync->callback(res);
+            currentAsync->asTimeout()->callback(static_cast<AsyncResult::Timeout&>(res));
         }
         else
         {
@@ -263,81 +272,63 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
             AsyncResult::Timeout result(async, userData);
             ReturnCode           res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
-            {
                 result.async.callback(result);
-            }
             break;
         }
         case Async::Type::Read: {
             AsyncResult::Read result(async, userData);
             ReturnCode        res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
-            {
                 result.async.callback(result);
-            }
             break;
         }
         case Async::Type::Write: {
             AsyncResult::Write result(async, userData);
             ReturnCode         res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
-            {
                 result.async.callback(result);
-            }
             break;
         }
         case Async::Type::WakeUp: {
             AsyncResult::WakeUp result(async, userData);
             ReturnCode          res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
-            {
                 result.async.callback(result);
-            }
             break;
         }
         case Async::Type::ProcessExit: {
             AsyncResult::ProcessExit result(async, userData);
             ReturnCode               res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
-            {
                 result.async.callback(result);
-            }
             break;
         }
         case Async::Type::Accept: {
             AsyncResult::Accept result(async, userData);
             ReturnCode          res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
-            {
                 result.async.callback(result);
-            }
             break;
         }
         case Async::Type::Connect: {
             AsyncResult::Connect result(async, userData);
             ReturnCode           res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
-            {
                 result.async.callback(result);
-            }
             break;
         }
         case Async::Type::Send: {
             AsyncResult::Send result(async, userData);
             ReturnCode        res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
-            {
                 result.async.callback(result);
-            }
             break;
         }
         case Async::Type::Receive: {
             AsyncResult::Receive result(async, userData);
             ReturnCode           res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
-            {
                 result.async.callback(result);
-            }
             break;
         }
         }
@@ -364,7 +355,7 @@ SC::ReturnCode SC::EventLoop::stopAsync(Async& async)
     case Async::State::Active: {
         // We don't know in which queue this is gone so we remove from all
         activeHandles.remove(async);
-        activeTimers.remove(async);
+        activeTimers.remove(static_cast<Async::Timeout&>(async));
         activeWakeUps.remove(async);
         async.state = Async::State::Cancelling;
         submissions.queueBack(async);
@@ -422,7 +413,7 @@ void SC::EventLoop::executeWakeUps()
         if (notifier->pending.load() == true)
         {
             AsyncResult::WakeUp res(*async, nullptr);
-            async->callback(res);
+            res.async.callback(res);
             if (notifier->eventObject)
             {
                 notifier->eventObject->signal();

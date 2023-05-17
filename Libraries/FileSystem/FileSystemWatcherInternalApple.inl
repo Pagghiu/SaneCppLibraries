@@ -44,7 +44,7 @@ struct SC::FileSystemWatcher::Internal
     {
         self            = &parent;
         eventLoopRunner = &runner;
-        Function<void(AsyncResult&)> cb;
+        Function<void(AsyncWakeUpResult&)> cb;
         cb.bind<Internal, &Internal::onMainLoop>(this);
         return eventLoopRunner->eventLoop.startWakeUp(eventLoopRunner->eventLoopAsync, move(cb),
                                                       &eventLoopRunner->eventObject);
@@ -331,7 +331,7 @@ struct SC::FileSystemWatcher::Internal
         }
     }
 
-    void onMainLoop(AsyncResult&) { watcher->notifyCallback(notification); }
+    void onMainLoop(AsyncWakeUpResult&) { watcher->notifyCallback(notification); }
 
     static void threadExecuteRefresh(void* arg)
     {

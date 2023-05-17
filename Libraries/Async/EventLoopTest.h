@@ -24,14 +24,13 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.create());
             int  timeout1Called   = 0;
             int  timeout2Called   = 0;
-            auto timeout1Callback = [&](AsyncResult& res)
+            auto timeout1Callback = [&](AsyncResult::Timeout& res)
             {
-                Async::Timeout* timeout = res.async.asTimeout();
-                SC_TEST_EXPECT(timeout and timeout->timeout.ms == 1);
+                SC_TEST_EXPECT(res.async.timeout.ms == 1);
                 timeout1Called++;
             };
             SC_TEST_EXPECT(eventLoop.startTimeout(timeout1, 1_ms, move(timeout1Callback)));
-            auto timeout2Callback = [&](AsyncResult&)
+            auto timeout2Callback = [&](AsyncResult::Timeout&)
             {
                 // TODO: investigate allowing dropping AsyncResult
                 timeout2Called++;
@@ -75,14 +74,14 @@ struct SC::EventLoopTest : public SC::TestCase
             AsyncWakeUp wakeUp1;
             AsyncWakeUp wakeUp2;
 
-            auto lambda1 = [&](AsyncResult& res)
+            auto lambda1 = [&](AsyncResult::WakeUp& res)
             {
                 wakeUp1ThreadID = Thread::CurrentThreadID();
                 wakeUp1Called++;
                 SC_TEST_EXPECT(res.async.eventLoop->stopAsync(res.async));
             };
             SC_TEST_EXPECT(eventLoop.startWakeUp(wakeUp1, lambda1));
-            auto lambda2 = [&](AsyncResult& res)
+            auto lambda2 = [&](AsyncResult::WakeUp& res)
             {
                 wakeUp2Called++;
                 SC_TEST_EXPECT(res.async.eventLoop->stopAsync(res.async));
@@ -120,7 +119,7 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.create());
             AsyncWakeUp wakeUp;
 
-            auto eventLoopLambda = [&](AsyncResult&)
+            auto eventLoopLambda = [&](AsyncResult::WakeUp&)
             {
                 callbackThreadID = Thread::CurrentThreadID();
                 params.notifier1Called++;
@@ -155,9 +154,9 @@ struct SC::EventLoopTest : public SC::TestCase
             int              acceptedCount = 0;
             SocketDescriptor acceptedClient[3];
 
-            auto onAccepted = [&](AsyncResult& res)
+            auto onAccepted = [&](AsyncResult::Accept& res)
             {
-                SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.asAccept()->acceptedClient)));
+                SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.acceptedClient)));
                 acceptedCount++;
             };
             AsyncAccept accept;
@@ -207,9 +206,9 @@ struct SC::EventLoopTest : public SC::TestCase
             int              acceptedCount = 0;
             SocketDescriptor acceptedClient[3];
 
-            auto onAccepted = [&](AsyncResult& res)
+            auto onAccepted = [&](AsyncResult::Accept& res)
             {
-                SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.asAccept()->acceptedClient)));
+                SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.acceptedClient)));
                 acceptedCount++;
                 if (acceptedCount == 2)
                 {
@@ -220,7 +219,7 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.startAccept(accept, server, onAccepted));
 
             int  connectedCount = 0;
-            auto onConnected    = [&](AsyncResult& res)
+            auto onConnected    = [&](AsyncResult::Connect& res)
             {
                 connectedCount++;
                 SC_UNUSED(res);
@@ -268,7 +267,7 @@ struct SC::EventLoopTest : public SC::TestCase
             Span<const char> sendData = {sendBuffer, sizeof(sendBuffer)};
 
             int  sendCount = 0;
-            auto onSend    = [&](AsyncResult& res)
+            auto onSend    = [&](AsyncResult::Send& res)
             {
                 SC_UNUSED(res);
                 sendCount++;
@@ -281,7 +280,7 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(sendCount == 1);
 
             int  receiveCount = 0;
-            auto onReceive    = [&](AsyncResult& res)
+            auto onReceive    = [&](AsyncResult::Receive& res)
             {
                 SC_UNUSED(res);
                 receiveCount++;
@@ -321,7 +320,7 @@ struct SC::EventLoopTest : public SC::TestCase
 
             AsyncWrite write;
 
-            auto writeLambda = [](AsyncResult& res) { SC_UNUSED(res); };
+            auto writeLambda = [&](AsyncResult::Write& res) { SC_TEST_EXPECT(res.writtenBytes == 4); };
             auto writeSpan   = StringView("test").toVoidSpan();
 
             FileDescriptor::Handle handle;
@@ -335,7 +334,7 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::ReadOnly, options));
             char           buffer[4]  = {0};
             SpanVoid<void> readSpan   = {buffer, sizeof(buffer)};
-            auto           readLambda = [](AsyncResult& res) { SC_UNUSED(res); };
+            auto           readLambda = [&](AsyncResult::Read& res) { SC_TEST_EXPECT(res.readBytes == 4); };
             SC_TEST_EXPECT(eventLoop.startRead(read, handle, readSpan, readLambda));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(fd.close());

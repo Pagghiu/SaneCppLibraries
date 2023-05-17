@@ -53,8 +53,8 @@ struct SC::EventLoop::Internal
         FileDescriptor::Handle wakeUpPipeDescriptor;
         SC_TRY_IF(wakeupPipe.readPipe.get(wakeUpPipeDescriptor,
                                           "EventLoop::Internal::createWakeup() - Async read handle invalid"_a8));
-        SC_TRY_IF(loop.startRead(wakeupPipeRead, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)},
-                                 Function<void(AsyncResult&)>()));
+        SC_TRY_IF(
+            loop.startRead(wakeupPipeRead, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)}, {}));
         SC_TRY_IF(loop.runNoWait()); // We want to register the read handle before everything else
         loop.decreaseActiveCount();  // we don't want the read to keep the queue up
         return true;
@@ -68,7 +68,7 @@ struct SC::EventLoop::Internal
         return nullptr;
     }
 
-    void runCompletionForWakeUp(AsyncResult& asyncResult)
+    void runCompletionForWakeUp(AsyncResult::Read& asyncResult)
     {
         Async& async = asyncResult.async;
         // TODO: Investigate usage of MACHPORT to avoid executing this additional read syscall
@@ -255,7 +255,7 @@ struct SC::EventLoop::KernelQueue
         switch (async.getType())
         {
         case Async::Type::Timeout:
-            eventLoop.activeTimers.queueBack(async);
+            eventLoop.activeTimers.queueBack(static_cast<Async::Timeout&>(async));
             eventLoop.numberOfTimers += 1;
             return true;
         case Async::Type::WakeUp:

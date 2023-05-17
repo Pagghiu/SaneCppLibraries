@@ -116,8 +116,6 @@ struct SC::Async
 
     Type getType() const { return type; }
 
-    Function<void(AsyncResult&)> callback;
-
     EventLoop* eventLoop = nullptr;
     Async*     next      = nullptr;
     Async*     prev      = nullptr;
@@ -142,26 +140,17 @@ struct SC::AsyncResult
 
     using Type = Async::Type;
 
-    AsyncTimeoutResult*     asTimeout();
-    AsyncWakeUpResult*      asWakeUp();
-    AsyncProcessExitResult* asProcessExit();
-    AsyncAcceptResult*      asAccept();
-    AsyncConnectResult*     asConnect();
-    AsyncSendResult*        asSend();
-    AsyncReceiveResult*     asReceive();
-    AsyncReadResult*        asRead();
-    AsyncWriteResult*       asWrite();
+    void* userData = nullptr;
 
-    Async& async;
-    void*  userData = nullptr;
-
-    AsyncResult(Async& async, void* userData) : async(async), userData(userData) {}
+    AsyncResult(void* userData) : userData(userData) {}
     // TODO: Add AsyncResult error
 };
 
 struct SC::AsyncTimeout : public Async
 {
     AsyncTimeout() : Async(Type::Timeout) {}
+
+    Function<void(AsyncTimeoutResult&)> callback;
 
     IntegerMilliseconds timeout; // not needed, but keeping just for debugging
     TimeCounter         expirationTime;
@@ -170,6 +159,8 @@ struct SC::AsyncTimeout : public Async
 struct SC::AsyncWakeUp : public Async
 {
     AsyncWakeUp() : Async(Type::WakeUp) {}
+
+    Function<void(AsyncWakeUpResult&)> callback;
 
     [[nodiscard]] ReturnCode wakeUp();
 
@@ -181,6 +172,8 @@ struct SC::AsyncProcessExit : public Async
 {
     AsyncProcessExit() : Async(Type::ProcessExit) {}
 
+    Function<void(AsyncProcessExitResult&)> callback;
+
     ProcessDescriptor::Handle handle = ProcessDescriptor::Invalid;
 #if SC_PLATFORM_WINDOWS
     EventLoopWinOverlappedOpaque overlapped;
@@ -191,6 +184,8 @@ struct SC::AsyncProcessExit : public Async
 struct SC::AsyncAccept : public Async
 {
     AsyncAccept() : Async(Type::Accept) {}
+
+    Function<void(AsyncAcceptResult&)> callback;
 
     SocketDescriptor::Handle   handle        = SocketDescriptor::Invalid;
     SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
@@ -205,6 +200,8 @@ struct SC::AsyncConnect : public Async
 {
     AsyncConnect() : Async(Type::Connect) {}
 
+    Function<void(AsyncConnectResult&)> callback;
+
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
     SocketIPAddress          ipAddress;
 #if SC_PLATFORM_WINDOWS
@@ -215,6 +212,8 @@ struct SC::AsyncConnect : public Async
 struct SC::AsyncSend : public Async
 {
     AsyncSend() : Async(Type::Send) {}
+
+    Function<void(AsyncSendResult&)> callback;
 
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
     Span<const char>         data;
@@ -227,6 +226,8 @@ struct SC::AsyncReceive : public Async
 {
     AsyncReceive() : Async(Type::Receive) {}
 
+    Function<void(AsyncReceiveResult&)> callback;
+
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
     Span<char>               data;
 #if SC_PLATFORM_WINDOWS
@@ -236,6 +237,7 @@ struct SC::AsyncReceive : public Async
 
 struct SC::AsyncRead : public Async
 {
+    Function<void(AsyncReadResult&)> callback;
     AsyncRead() : Async(Type::Read) {}
 
     FileDescriptor::Handle fileDescriptor;
@@ -250,6 +252,8 @@ struct SC::AsyncWrite : public Async
 {
     AsyncWrite() : Async(Type::Write) {}
 
+    Function<void(AsyncWriteResult&)> callback;
+
     FileDescriptor::Handle fileDescriptor;
     uint64_t               offset = 0;
     SpanVoid<const void>   writeBuffer;
@@ -260,51 +264,69 @@ struct SC::AsyncWrite : public Async
 
 struct SC::AsyncTimeoutResult : public AsyncResult
 {
-    AsyncTimeoutResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+    AsyncTimeoutResult(Async& async, void* userData) : async(*async.asTimeout()), AsyncResult(userData) {}
+
+    AsyncTimeout& async;
 };
 
 struct SC::AsyncWakeUpResult : public AsyncResult
 {
-    AsyncWakeUpResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+    AsyncWakeUpResult(Async& async, void* userData) : async(*async.asWakeUp()), AsyncResult(userData) {}
+
+    AsyncWakeUp& async;
 };
 
 struct SC::AsyncProcessExitResult : public AsyncResult
 {
-    AsyncProcessExitResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+    AsyncProcessExitResult(Async& async, void* userData) : async(*async.asProcessExit()), AsyncResult(userData) {}
+
+    AsyncProcessExit&             async;
     ProcessDescriptor::ExitStatus exitStatus;
 };
 
 struct SC::AsyncAcceptResult : public AsyncResult
 {
-    AsyncAcceptResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+    AsyncAcceptResult(Async& async, void* userData) : async(*async.asAccept()), AsyncResult(userData) {}
+
+    AsyncAccept&     async;
     SocketDescriptor acceptedClient;
 };
 
 struct SC::AsyncConnectResult : public AsyncResult
 {
-    AsyncConnectResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+    AsyncConnectResult(Async& async, void* userData) : async(*async.asConnect()), AsyncResult(userData) {}
+
+    AsyncConnect& async;
 };
 
 struct SC::AsyncSendResult : public AsyncResult
 {
-    AsyncSendResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+    AsyncSendResult(Async& async, void* userData) : async(*async.asSend()), AsyncResult(userData) {}
+
+    AsyncSend& async;
 };
 
 struct SC::AsyncReceiveResult : public AsyncResult
 {
-    AsyncReceiveResult(Async& async, void* userData) : AsyncResult(async, userData) {}
+    AsyncReceiveResult(Async& async, void* userData) : async(*async.asReceive()), AsyncResult(userData) {}
+
+    AsyncReceive& async;
 };
 
 struct SC::AsyncReadResult : public AsyncResult
 {
-    AsyncReadResult(Async& async, void* userData) : AsyncResult(async, userData) {}
-    size_t readBytes = 0;
+    AsyncReadResult(Async& async, void* userData) : async(*async.asRead()), AsyncResult(userData) {}
+
+    AsyncRead& async;
+    size_t     readBytes = 0;
 };
 
 struct SC::AsyncWriteResult : public AsyncResult
 {
-    AsyncWriteResult(Async& async, void* userData) : AsyncResult(async, userData) {}
-    size_t writtenBytes = 0;
+    AsyncWriteResult(Async& async, void* userData) : async(*async.asWrite()), AsyncResult(userData) {}
+
+    AsyncWrite& async;
+    size_t      writtenBytes = 0;
 };
 
 // clang-format off
@@ -317,17 +339,6 @@ inline SC::AsyncSend*       SC::Async::asSend()     { return type == Type::Send 
 inline SC::AsyncReceive*    SC::Async::asReceive()  { return type == Type::Receive ? static_cast<AsyncReceive*>(this) : nullptr;}
 inline SC::AsyncRead*       SC::Async::asRead()     { return type == Type::Read ? static_cast<AsyncRead*>(this) : nullptr; }
 inline SC::AsyncWrite*      SC::Async::asWrite()    { return type == Type::Write ? static_cast<AsyncWrite*>(this) : nullptr; }
-
-inline SC::AsyncTimeoutResult*    SC::AsyncResult::asTimeout()  { return async.getType() == Type::Timeout ? static_cast<AsyncTimeoutResult*>(this) : nullptr;}
-inline SC::AsyncWakeUpResult*     SC::AsyncResult::asWakeUp()   { return async.getType() == Type::WakeUp ? static_cast<AsyncWakeUpResult*>(this) : nullptr;}
-inline SC::AsyncProcessExitResult* SC::AsyncResult::asProcessExit() { return async.getType() == Type::ProcessExit ? static_cast<AsyncProcessExitResult*>(this) : nullptr;}
-inline SC::AsyncAcceptResult*     SC::AsyncResult::asAccept()   { return async.getType() == Type::Accept ? static_cast<AsyncAcceptResult*>(this) : nullptr;}
-inline SC::AsyncConnectResult*    SC::AsyncResult::asConnect()  { return async.getType() == Type::Connect ? static_cast<AsyncConnectResult*>(this) : nullptr;}
-inline SC::AsyncSendResult*       SC::AsyncResult::asSend()     { return async.getType() == Type::Send ? static_cast<AsyncSendResult*>(this) : nullptr; }
-inline SC::AsyncReceiveResult*    SC::AsyncResult::asReceive()  { return async.getType() == Type::Receive ? static_cast<AsyncReceiveResult*>(this) : nullptr;}
-inline SC::AsyncReadResult*       SC::AsyncResult::asRead()     { return async.getType() == Type::Read ? static_cast<AsyncReadResult*>(this) : nullptr; }
-inline SC::AsyncWriteResult*      SC::AsyncResult::asWrite()    { return async.getType() == Type::Write ? static_cast<AsyncWriteResult*>(this) : nullptr; }
-
 // clang-format on
 
 struct SC::EventLoop
@@ -346,31 +357,32 @@ struct SC::EventLoop
 
     // Start specific async operation
     [[nodiscard]] ReturnCode startTimeout(AsyncTimeout& async, IntegerMilliseconds expiration,
-                                          Function<void(AsyncResult&)>&& callback);
+                                          Function<void(AsyncTimeoutResult&)>&& callback);
 
-    [[nodiscard]] ReturnCode startWakeUp(AsyncWakeUp& async, Function<void(AsyncResult&)>&& callback,
+    [[nodiscard]] ReturnCode startWakeUp(AsyncWakeUp& async, Function<void(AsyncWakeUpResult&)>&& callback,
                                          EventObject* eventObject = nullptr);
 
-    [[nodiscard]] ReturnCode startProcessExit(AsyncProcessExit& async, Function<void(AsyncResult&)>&& callback,
-                                              ProcessDescriptor::Handle process);
+    [[nodiscard]] ReturnCode startProcessExit(AsyncProcessExit&                         async,
+                                              Function<void(AsyncProcessExitResult&)>&& callback,
+                                              ProcessDescriptor::Handle                 process);
 
     [[nodiscard]] ReturnCode startAccept(AsyncAccept& async, const SocketDescriptor& socketDescriptor,
-                                         Function<void(AsyncResult&)>&& callback);
+                                         Function<void(AsyncAcceptResult&)>&& callback);
 
     [[nodiscard]] ReturnCode startConnect(AsyncConnect& async, const SocketDescriptor& socketDescriptor,
-                                          SocketIPAddress ipAddress, Function<void(AsyncResult&)>&& callback);
+                                          SocketIPAddress ipAddress, Function<void(AsyncConnectResult&)>&& callback);
 
     [[nodiscard]] ReturnCode startSend(AsyncSend& async, const SocketDescriptor& socketDescriptor,
-                                       Span<const char> data, Function<void(AsyncResult&)>&& callback);
+                                       Span<const char> data, Function<void(AsyncSendResult&)>&& callback);
 
     [[nodiscard]] ReturnCode startReceive(AsyncReceive& async, const SocketDescriptor& socketDescriptor,
-                                          Span<char> data, Function<void(AsyncResult&)>&& callback);
+                                          Span<char> data, Function<void(AsyncReceiveResult&)>&& callback);
 
     [[nodiscard]] ReturnCode startRead(AsyncRead& async, FileDescriptor::Handle fileDescriptor,
-                                       SpanVoid<void> readBuffer, Function<void(AsyncResult&)>&& callback);
+                                       SpanVoid<void> readBuffer, Function<void(AsyncReadResult&)>&& callback);
 
     [[nodiscard]] ReturnCode startWrite(AsyncWrite& async, FileDescriptor::Handle fileDescriptor,
-                                        SpanVoid<const void> writeBuffer, Function<void(AsyncResult&)>&& callback);
+                                        SpanVoid<const void> writeBuffer, Function<void(AsyncWriteResult&)>&& callback);
 
     // WakeUp support
     [[nodiscard]] ReturnCode wakeUpFromExternalThread(AsyncWakeUp& wakeUp);
@@ -427,7 +439,7 @@ struct SC::EventLoop
     void executeWakeUps();
 
     // Setup
-    [[nodiscard]] ReturnCode queueSubmission(Async& async, Function<void(AsyncResult&)>&& callback);
+    [[nodiscard]] ReturnCode queueSubmission(Async& async);
 
     // Phases
     [[nodiscard]] ReturnCode stageSubmissions(KernelQueue& queue);

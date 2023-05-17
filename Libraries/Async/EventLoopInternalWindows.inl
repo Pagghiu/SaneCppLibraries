@@ -203,6 +203,7 @@ struct SC::EventLoop::Internal
             // TODO: report error
             return "GetOverlappedResult error"_a8;
         }
+        result.readBytes = transferred;
         return true;
     }
 
@@ -217,6 +218,7 @@ struct SC::EventLoop::Internal
             // TODO: report error
             return "GetOverlappedResult error"_a8;
         }
+        result.writtenBytes = transferred;
         return true;
     }
 
