@@ -38,7 +38,7 @@ rm -rf "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}"
 mkdir -p "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}"
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
-time g++-12 -std=c++14 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
+time g++-13 -std=c++14 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -I${SCRIPT_DIR}/../../ \
 -framework CoreFoundation \
 -framework CoreServices \
@@ -54,6 +54,7 @@ Libraries/Foundation/String.cpp             \
 Libraries/Foundation/StringConverter.cpp    \
 Libraries/Foundation/StringFormat.cpp       \
 Libraries/Foundation/StringView.cpp         \
+Libraries/Json/Json.cpp                     \
 Libraries/Process/Process.cpp               \
 Libraries/Socket/SocketDescriptor.cpp       \
 Libraries/System/Console.cpp                \

@@ -64,6 +64,7 @@ Libraries/Foundation/String.cpp             \
 Libraries/Foundation/StringConverter.cpp    \
 Libraries/Foundation/StringFormat.cpp       \
 Libraries/Foundation/StringView.cpp         \
+Libraries/Json/Json.cpp                     \
 Libraries/Process/Process.cpp               \
 Libraries/Socket/SocketDescriptor.cpp       \
 Libraries/System/Console.cpp                \

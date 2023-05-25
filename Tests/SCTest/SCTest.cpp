@@ -27,6 +27,9 @@
 #include "../../Libraries/FileSystem/FileSystemWatcherTest.h"
 #include "../../Libraries/FileSystem/PathTest.h"
 
+// JSON
+#include "../../Libraries/Json/JsonStreamWriterTest.h"
+
 // Process
 #include "../../Libraries/Process/ProcessTest.h"
 
@@ -95,6 +98,9 @@ int main(int argc, const char* argv[])
     { FileSystemWalkerTest          test(report); }
     { FileSystemWatcherTest         test(report); }
     { PathTest                      test(report); }
+
+    // JSON tests
+    { JsonStreamWriterTest          test(report); }
 
     // Process tests
     { ProcessTest                   test(report); }

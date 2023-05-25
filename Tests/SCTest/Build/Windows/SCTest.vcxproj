@@ -325,6 +325,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Json\Json.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Socket\SocketDescriptor.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\System\Console.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp" />
@@ -354,6 +355,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ArrayTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Json\JsonStreamWriter.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Json\JsonStreamWriterTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Socket\SocketDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\Process\ProcessDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\File\FileDescriptor.h" />
@@ -441,6 +444,7 @@
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalApple.inl" />
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalEmscripten.inl" />
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalWindows.inl" />
+    <None Include="..\..\..\..\Libraries\Json\JsonStreamWriter.inl" />
     <None Include="..\..\..\..\Libraries\Socket\SocketDescriptorInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\Socket\SocketDescriptorInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\File\FileDescriptorInternalPosix.inl" />

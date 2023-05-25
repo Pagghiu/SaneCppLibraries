@@ -34,6 +34,9 @@
     <Filter Include="Socket">
       <UniqueIdentifier>{1ab7acac-33e2-4be0-8b0a-178a5edfaf9e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Json">
+      <UniqueIdentifier>{0b853960-e20b-4906-89e7-1532a3e5ca17}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\SCTest.cpp">
@@ -91,6 +94,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystem.cpp">
       <Filter>FileSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Json\Json.cpp">
+      <Filter>Json</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -361,6 +367,12 @@
     <ClInclude Include="..\..\..\..\Libraries\Socket\SocketDescriptorTest.h">
       <Filter>Socket</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Json\JsonStreamWriter.h">
+      <Filter>Json</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Json\JsonStreamWriterTest.h">
+      <Filter>Json</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalPosix.inl">
@@ -434,6 +446,9 @@
     </None>
     <None Include="..\..\..\..\Libraries\File\FileDescriptorInternalWindows.inl">
       <Filter>File</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Json\JsonStreamWriter.inl">
+      <Filter>Json</Filter>
     </None>
   </ItemGroup>
 </Project>
