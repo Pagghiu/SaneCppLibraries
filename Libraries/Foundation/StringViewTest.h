@@ -34,24 +34,62 @@ struct SC::StringViewTest : public SC::TestCase
         {
             StringView other;
             int32_t    value;
-            SC_TEST_EXPECT(not other.parseInt32(&value));
+            SC_TEST_EXPECT(not other.parseInt32(value));
             other = "\0";
-            SC_TEST_EXPECT(not other.parseInt32(&value));
+            SC_TEST_EXPECT(not other.parseInt32(value));
             other = "+";
-            SC_TEST_EXPECT(not other.parseInt32(&value));
+            SC_TEST_EXPECT(not other.parseInt32(value));
             other = "-";
-            SC_TEST_EXPECT(not other.parseInt32(&value));
+            SC_TEST_EXPECT(not other.parseInt32(value));
             other = "+ ";
-            SC_TEST_EXPECT(not other.parseInt32(&value));
+            SC_TEST_EXPECT(not other.parseInt32(value));
             other = "+1";
-            SC_TEST_EXPECT(other.parseInt32(&value));
+            SC_TEST_EXPECT(other.parseInt32(value));
             SC_TEST_EXPECT(value == 1);
             other = "-123";
-            SC_TEST_EXPECT(other.parseInt32(&value));
+            SC_TEST_EXPECT(other.parseInt32(value));
             SC_TEST_EXPECT(value == -123);
             other = StringView("-456___", 4, false, StringEncoding::Ascii);
-            SC_TEST_EXPECT(other.parseInt32(&value));
+            SC_TEST_EXPECT(other.parseInt32(value));
             SC_TEST_EXPECT(value == -456);
+            SC_TEST_EXPECT(StringView("0").parseInt32(value) and value == 0);
+            SC_TEST_EXPECT(StringView("-0").parseInt32(value) and value == 0);
+            SC_TEST_EXPECT(not StringView("").parseInt32(value));
+        }
+
+        if (test_section("parseFloat"))
+        {
+            StringView other;
+            float      value;
+            SC_TEST_EXPECT(not other.parseFloat(value));
+            other = "\0";
+            SC_TEST_EXPECT(not other.parseFloat(value));
+            other = "+";
+            SC_TEST_EXPECT(not other.parseFloat(value));
+            other = "-";
+            SC_TEST_EXPECT(not other.parseFloat(value));
+            other = "+ ";
+            SC_TEST_EXPECT(not other.parseFloat(value));
+            other = "+1";
+            SC_TEST_EXPECT(other.parseFloat(value));
+            SC_TEST_EXPECT(value == 1.0f);
+            other = "-123";
+            SC_TEST_EXPECT(other.parseFloat(value));
+            SC_TEST_EXPECT(value == -123.0f);
+            other = StringView("-456___", 4, false, StringEncoding::Ascii);
+            SC_TEST_EXPECT(other.parseFloat(value));
+            SC_TEST_EXPECT(value == -456.0f);
+            other = StringView("-456.2___", 6, false, StringEncoding::Ascii);
+            SC_TEST_EXPECT(other.parseFloat(value));
+            SC_TEST_EXPECT(StringView(".2").parseFloat(value) and value == 0.2f);
+            SC_TEST_EXPECT(StringView("-.2").parseFloat(value) and value == -0.2f);
+            SC_TEST_EXPECT(StringView(".0").parseFloat(value) and value == 0.0f);
+            SC_TEST_EXPECT(StringView("-.0").parseFloat(value) and value == -0.0f);
+            SC_TEST_EXPECT(StringView("0").parseFloat(value) and value == 0.0f);
+            SC_TEST_EXPECT(StringView("-0").parseFloat(value) and value == -0.0f);
+            SC_TEST_EXPECT(not StringView("-.").parseFloat(value));
+            SC_TEST_EXPECT(not StringView("-..0").parseFloat(value));
+            SC_TEST_EXPECT(not StringView("").parseFloat(value));
         }
 
         if (test_section("startsWith/endsWith"))

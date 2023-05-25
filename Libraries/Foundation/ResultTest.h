@@ -76,7 +76,7 @@ struct SC::ResultTest : public SC::TestCase
         {
             StringView sv = "-12";
             int32_t    value;
-            SC_TRY_MSG(sv.parseInt32(&value), "Parse Int failed"_a8);
+            SC_TRY_MSG(sv.parseInt32(value), "Parse Int failed"_a8);
             return ReturnCode("Error: cannot do stuff"_a8);
         }
         else

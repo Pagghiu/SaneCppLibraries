@@ -18,20 +18,14 @@ struct StringFormatOutput
 {
     StringFormatOutput(StringEncoding encoding) : encoding(encoding) {}
 
-    bool write(StringView text);
-    void redirectToBuffer(Vector<char>& destination)
-    {
-        data    = &destination;
-        console = nullptr;
-    }
-    void redirectToConsole(Console& newConsole)
-    {
-        data    = nullptr;
-        console = &newConsole;
-    }
+    [[nodiscard]] bool write(StringView text);
+    [[nodiscard]] bool onFormatSucceded();
+
     void onFormatBegin();
-    bool onFormatSucceded();
     void onFormatFailed();
+
+    void redirectToBuffer(Vector<char>& destination);
+    void redirectToConsole(Console& newConsole);
 
     StringEncoding getEncoding() const { return encoding; }
 

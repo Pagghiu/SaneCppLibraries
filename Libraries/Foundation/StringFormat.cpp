@@ -180,6 +180,18 @@ bool StringFormatOutput::write(StringView text)
     }
 }
 
+void StringFormatOutput::redirectToBuffer(Vector<char>& destination)
+{
+    data    = &destination;
+    console = nullptr;
+}
+
+void StringFormatOutput::redirectToConsole(Console& newConsole)
+{
+    data    = nullptr;
+    console = &newConsole;
+}
+
 void StringFormatOutput::onFormatBegin()
 {
     if (data != nullptr)
@@ -205,7 +217,7 @@ void StringFormatOutput::onFormatFailed()
 {
     if (data != nullptr)
     {
-        (void)data->resize(backupSize);
+        SC_TRUST_RESULT(data->resize(backupSize));
     }
 }
 

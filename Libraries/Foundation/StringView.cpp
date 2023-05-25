@@ -34,30 +34,109 @@ struct SC::StringView::Internal
     }
 };
 
-bool SC::StringView::parseInt32(int32_t* value) const
+bool SC::StringView::parseInt32(int32_t& value) const
 {
-    if (isIntegerNumber<StringIteratorASCII>())
-    {
-        if (hasNullTerm)
-        {
-            *value = atoi(text.data());
-        }
-        else
-        {
-            char_t buffer[12]; // 10 digits + sign + nullterm
-            if (text.sizeInBytes() >= sizeof(buffer))
-                return false;
-            memcpy(buffer, text.data(), text.sizeInBytes());
-            buffer[text.sizeInBytes()] = 0;
-
-            *value = atoi(buffer);
-        }
-        return true;
-    }
-    else
+    if (encoding != StringEncoding::Ascii and encoding != StringEncoding::Utf8)
     {
         return false;
     }
+
+    if (hasNullTerm)
+    {
+        value = atoi(text.data());
+    }
+    else
+    {
+        char_t buffer[12]; // 10 digits + sign + nullterm
+        if (text.sizeInBytes() >= sizeof(buffer))
+            return false;
+        memcpy(buffer, text.data(), text.sizeInBytes());
+        buffer[text.sizeInBytes()] = 0;
+
+        value = atoi(buffer);
+    }
+    if (value == 0)
+    {
+        // atoi returns 0 on failed parsing...
+        StringIteratorASCII it = getIterator<StringIteratorASCII>();
+        if (it.isEmpty())
+        {
+            return false;
+        }
+        if (it.matchesAny({'-', '+'}))
+        {
+            (void)it.skipNext();
+        }
+        if (it.isEmpty())
+        {
+            return false;
+        }
+        while (it.matches('0'))
+        {
+            (void)it.skipNext();
+        }
+        return it.isEmpty();
+    }
+    return true;
+}
+
+bool SC::StringView::parseFloat(float& value) const
+{
+    double dValue;
+    if (parseDouble(dValue))
+    {
+        value = static_cast<float>(dValue);
+        return true;
+    }
+    return false;
+}
+
+bool SC::StringView::parseDouble(double& value) const
+{
+    if (hasNullTerm)
+    {
+        value = atof(text.data());
+    }
+    else
+    {
+        char         buffer[255];
+        const size_t bufferSize = min(text.sizeInBytes(), sizeof(buffer) - 1);
+        memcpy(buffer, text.data(), bufferSize);
+        buffer[bufferSize] = 0;
+        value              = atof(buffer);
+    }
+    if (value == 0.0f)
+    {
+        // atof returns 0 on failed parsing...
+        // TODO: Handle float scientific notation
+        StringIteratorASCII it = getIterator<StringIteratorASCII>();
+        if (it.isEmpty())
+        {
+            return false;
+        }
+        if (it.matchesAny({'-', '+'}))
+        {
+            (void)it.skipNext();
+        }
+        if (it.isEmpty())
+        {
+            return false;
+        }
+        if (it.matches('.'))
+        {
+            (void)it.skipNext();
+            if (it.isEmpty())
+            {
+                return false;
+            }
+        }
+        while (it.matches('0'))
+        {
+            (void)it.skipNext();
+        }
+        return it.isEmpty();
+    }
+    return true;
 }
 
 template <typename StringIterator>

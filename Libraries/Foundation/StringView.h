@@ -237,7 +237,13 @@ struct SC::StringView
     [[nodiscard]] bool isIntegerNumber() const;
 
     /// Parses int32, returning false if it fails
-    [[nodiscard]] bool parseInt32(int32_t* value) const;
+    [[nodiscard]] bool parseInt32(int32_t& value) const;
+
+    /// Parses float, returning false if it fails
+    [[nodiscard]] bool parseFloat(float& value) const;
+
+    /// Parses double, returning false if it fails
+    [[nodiscard]] bool parseDouble(double& value) const;
 
   private:
     struct Internal;
