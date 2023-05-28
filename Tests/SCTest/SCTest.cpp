@@ -29,6 +29,7 @@
 
 // JSON
 #include "../../Libraries/Json/JsonStreamWriterTest.h"
+#include "../../Libraries/Json/JsonTokenizerTest.h"
 
 // Process
 #include "../../Libraries/Process/ProcessTest.h"
@@ -102,6 +103,7 @@ int main(int argc, const char* argv[])
 
     // JSON tests
     { JsonStreamWriterTest          test(report); }
+    { JsonTokenizerTest             test(report); }
 
     // Process tests
     { ProcessTest                   test(report); }

@@ -1,5 +1,4 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "JsonStreamWriter.inl"
-#include "JsonTokenizer.inl"
+#include "JsonTokenizer.h"

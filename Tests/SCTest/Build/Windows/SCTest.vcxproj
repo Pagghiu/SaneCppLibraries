@@ -357,6 +357,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonStreamWriter.h" />
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonStreamWriterTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Json\JsonTokenizer.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Json\JsonTokenizerTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAuto.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionFoundation.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionMetaType.h" />
@@ -446,6 +448,7 @@
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalEmscripten.inl" />
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\Json\JsonStreamWriter.inl" />
+    <None Include="..\..\..\..\Libraries\Json\JsonTokenizer.inl" />
     <None Include="..\..\..\..\Libraries\Socket\SocketDescriptorInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\Socket\SocketDescriptorInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\File\FileDescriptorInternalPosix.inl" />
