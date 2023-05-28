@@ -57,7 +57,7 @@ SC::StringView SC::String::view() const
     }
 }
 
-bool SC::StringFormatterFor<SC::String>::format(StringFormatOutput& data, const StringIteratorASCII specifier,
+bool SC::StringFormatterFor<SC::String>::format(StringFormatOutput& data, const StringView specifier,
                                                 const SC::String& value)
 {
     return StringFormatterFor<SC::StringView>::format(data, specifier, value.view());

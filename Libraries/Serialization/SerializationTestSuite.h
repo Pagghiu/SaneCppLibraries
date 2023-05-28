@@ -323,10 +323,10 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
         if (test_section("VectorStructSimple"))
         {
             VectorStructSimple topLevel;
-            (void)topLevel.vectorOfInts.push_back(1);
-            (void)topLevel.vectorOfInts.push_back(2);
-            (void)topLevel.vectorOfInts.push_back(3);
-            (void)topLevel.vectorOfInts.push_back(4);
+            SC_TRUST_RESULT(topLevel.vectorOfInts.push_back(1));
+            SC_TRUST_RESULT(topLevel.vectorOfInts.push_back(2));
+            SC_TRUST_RESULT(topLevel.vectorOfInts.push_back(3));
+            SC_TRUST_RESULT(topLevel.vectorOfInts.push_back(4));
             BinaryWriterStream streamWriter;
             SerializerWriter   writer(streamWriter);
             SC_TEST_EXPECT(writer.serialize(topLevel));
@@ -347,9 +347,9 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
         if (test_section("VectorStructComplex"))
         {
             VectorStructComplex topLevel;
-            (void)topLevel.vectorOfStrings.push_back("asdasdasd1"_a8);
-            (void)topLevel.vectorOfStrings.push_back("asdasdasd2"_a8);
-            (void)topLevel.vectorOfStrings.push_back("asdasdasd3"_a8);
+            SC_TRUST_RESULT(topLevel.vectorOfStrings.push_back("asdasdasd1"_a8));
+            SC_TRUST_RESULT(topLevel.vectorOfStrings.push_back("asdasdasd2"_a8));
+            SC_TRUST_RESULT(topLevel.vectorOfStrings.push_back("asdasdasd3"_a8));
             BinaryWriterStream streamWriter;
             SerializerWriter   writer(streamWriter);
             SC_TEST_EXPECT(writer.serialize(topLevel));
@@ -390,9 +390,9 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
         if (test_section("VersionedArray1/2"))
         {
             VersionedArray1 array1;
-            (void)array1.points.push_back({1.0f, 2.0f});
-            (void)array1.points.push_back({3.0f, 4.0f});
-            (void)array1.points.push_back({5.0f, 6.0f});
+            SC_TRUST_RESULT(array1.points.push_back({1.0f, 2.0f}));
+            SC_TRUST_RESULT(array1.points.push_back({3.0f, 4.0f}));
+            SC_TRUST_RESULT(array1.points.push_back({5.0f, 6.0f}));
             BinaryWriterStream streamWriter;
             SerializerWriter   writer(streamWriter);
             SC_TEST_EXPECT(writer.serialize(array1));

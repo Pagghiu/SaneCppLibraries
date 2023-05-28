@@ -36,36 +36,41 @@ constexpr uint32_t StringEncodingGetSize(StringEncoding encoding)
     }
 }
 
+// Invariants: start <= end and it >= start and it <= end
 struct StringIteratorASCII
 {
-    StringIteratorASCII(const char_t* it, const char_t* end) : it(it), start(it), end(end) {}
+    static constexpr StringEncoding getEncoding() { return StringEncoding::Ascii; }
 
-    static StringEncoding getEncoding() { return StringEncoding::Ascii; }
+    [[nodiscard]] constexpr bool isEmpty() const { return it == end; }
 
-    void rewindToStart() { it = start; }
-    void rewindToEnd() { it = end; }
+    constexpr void setToStart() { it = start; }
 
-    [[nodiscard]] bool advanceUntilMatches(char_t c)
+    constexpr void setToEnd() { it = end; }
+
+    [[nodiscard]] constexpr bool advanceUntilMatches(char c)
     {
-#if 1
-        SC_DEBUG_ASSERT(end >= it);
-        auto res = memchr(it, c, static_cast<size_t>(end - it)); // may be faster with longer strings...
-        if (res != nullptr)
-            it = static_cast<const SC::char_t*>(res);
-        else
-            it = end;
-        return it != end;
-#else
-        while (it != end)
+        if (__builtin_is_constant_evaluated())
         {
-            if (*it == c)
-                return true;
-            ++it;
+            while (it != end)
+            {
+                if (*it == c)
+                    return true;
+                ++it;
+            }
+            return false;
         }
-        return false;
-#endif
+        else
+        {
+            auto res = memchr(it, c, static_cast<size_t>(end - it));
+            if (res != nullptr)
+                it = static_cast<const char*>(res);
+            else
+                it = end;
+            return it != end;
+        }
     }
-    [[nodiscard]] bool reverseUntilMatches(char_t c)
+
+    [[nodiscard]] constexpr bool reverseAdvanceUntilMatches(char c)
     {
         while (it != start)
         {
@@ -76,7 +81,7 @@ struct StringIteratorASCII
         return false;
     }
 
-    [[nodiscard]] bool advanceUntilMatches(char_t c1, char_t c2, char_t* matched)
+    [[nodiscard]] constexpr bool advanceUntilMatches(char c1, char c2, char* matched)
     {
         while (it != end)
         {
@@ -96,50 +101,92 @@ struct StringIteratorASCII
         return false;
     }
 
-    [[nodiscard]] bool advanceUntilMatchesAfter(char_t c)
+    constexpr void advanceUntilDifferentFrom(char c)
     {
-        if (advanceUntilMatches(c))
+        while (it != end)
+        {
+            if (*it != c)
+            {
+                break;
+            }
+            ++it;
+        }
+    }
+
+    [[nodiscard]] constexpr bool advanceIfMatches(char c)
+    {
+        if (it != end && *it == c)
         {
             ++it;
             return true;
         }
         return false;
     }
-    [[nodiscard]] bool isEmpty() const { return it == end; }
 
-    [[nodiscard]] bool matches(char_t c) const { return *it == c; }
-
-    [[nodiscard]] bool matchesAny(std::initializer_list<char> items) const
+    [[nodiscard]] constexpr bool advanceIfMatchesAny(std::initializer_list<char> items)
     {
-        for (auto i : items)
+        if (it != end)
         {
-            if (*it == i)
-                return true;
+            for (auto c : items)
+            {
+                if (*it == c)
+                {
+                    ++it;
+                    return true;
+                }
+            }
         }
         return false;
     }
 
-    [[nodiscard]] bool skipNext()
+    [[nodiscard]] constexpr bool advanceIfMatchesRange(char first, char last)
+    {
+        SC_RELEASE_ASSERT(first <= last);
+        if (it != end)
+        {
+            if (*it >= first and *it <= last)
+            {
+                ++it;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    [[nodiscard]] constexpr bool match(char c) { return it != end and *it == c; }
+
+    [[nodiscard]] constexpr bool advanceRead(char& c)
+    {
+        if (it != end)
+        {
+            c = *it;
+            ++it;
+            return true;
+        }
+        return false;
+    }
+
+    [[nodiscard]] constexpr bool stepForward()
     {
         if (it != end)
         {
             ++it;
-            return it != end;
+            return true;
         }
         return false;
     }
 
-    [[nodiscard]] bool skipPrev()
+    [[nodiscard]] constexpr bool stepBackward()
     {
         if (it != start)
         {
             --it;
-            return it != start;
+            return true;
         }
         return false;
     }
 
-    [[nodiscard]] bool advanceCodePoints(size_t numCodePoints)
+    [[nodiscard]] constexpr bool advanceCodePoints(size_t numCodePoints)
     {
         while (numCodePoints-- > 0)
         {
@@ -152,7 +199,7 @@ struct StringIteratorASCII
         return true;
     }
 
-    [[nodiscard]] bool isFollowedBy(char_t c)
+    [[nodiscard]] constexpr bool isFollowedBy(char c)
     {
         if (it != end)
         {
@@ -161,49 +208,30 @@ struct StringIteratorASCII
         return false;
     }
 
-    StringIteratorASCII untilBefore(StringIteratorASCII otherPoint) const
+    [[nodiscard]] constexpr bool isPrecededBy(char c) const
     {
-        SC_RELEASE_ASSERT(it + 1 <= otherPoint.it);
-        return StringIteratorASCII(it, otherPoint.it - 1);
-    }
-
-    [[nodiscard]] size_t bytesDistanceFrom(StringIteratorASCII other) const
-    {
-        SC_DEBUG_ASSERT(it >= other.it);
-        return static_cast<size_t>(it - other.it);
-    }
-
-    Span<const char> sliceUntil(StringIteratorASCII other) const
-    {
-        if (other.it >= start && other.it <= end)
+        if (it != start)
         {
-            SC_DEBUG_ASSERT(other.it >= it);
-            return Span<const char>(it, static_cast<size_t>(other.it - it));
+            return it[-1] == c;
         }
-        return {};
+        return false;
     }
 
-    Span<const char> sliceUntilEnd() const
+    constexpr StringIteratorASCII sliceFromStartUntil(StringIteratorASCII otherPoint) const
     {
-        SC_DEBUG_ASSERT(end >= it);
-
-        return Span<const char>(it, static_cast<size_t>(end - it));
+        SC_RELEASE_ASSERT(it <= otherPoint.it);
+        return StringIteratorASCII(it, otherPoint.it);
     }
 
-    Span<const char> sliceFromStart() const
-    {
-        SC_DEBUG_ASSERT(it >= start);
-        return Span<const char>(start, static_cast<size_t>(it - start));
-    }
-
-    const char_t* getStart() const { return start; }
-    const char_t* getIt() const { return it; }
-    const char_t* getEnd() const { return end; }
+    [[nodiscard]] constexpr ssize_t bytesDistanceFrom(StringIteratorASCII other) const { return it - other.it; }
 
   private:
-    const char_t* it;
-    const char_t* start;
-    const char_t* end;
+    constexpr StringIteratorASCII(const char* it, const char* end) : it(it), start(it), end(end) {}
+    constexpr const char* getCurrentIt() const { return it; }
+    friend struct StringView;
+    const char* it;
+    const char* start;
+    const char* end;
 };
 
 } // namespace SC

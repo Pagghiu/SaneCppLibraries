@@ -578,9 +578,9 @@ void SC::VectorTest::testBasicType()
     if (test_section("sort"))
     {
         Vector<int> elements;
-        (void)elements.push_back(1);
-        (void)elements.push_back(0);
-        (void)elements.push_back(2);
+        SC_TRUST_RESULT(elements.push_back(1));
+        SC_TRUST_RESULT(elements.push_back(0));
+        SC_TRUST_RESULT(elements.push_back(2));
         bubbleSort(elements.begin(), elements.end());
         SC_TEST_EXPECT(elements[0] == 0);
         SC_TEST_EXPECT(elements[1] == 1);
@@ -589,22 +589,22 @@ void SC::VectorTest::testBasicType()
     if (test_section("contains/find"))
     {
         Vector<int> elements;
-        (void)elements.push_back(1);
-        (void)elements.push_back(0);
-        (void)elements.push_back(2);
+        SC_TRUST_RESULT(elements.push_back(1));
+        SC_TRUST_RESULT(elements.push_back(0));
+        SC_TRUST_RESULT(elements.push_back(2));
         size_t index = 0;
         SC_TEST_EXPECT(elements.contains(2, &index) && index == 2);
         SC_TEST_EXPECT(not elements.contains(44));
-        (void)elements.push_back(2);
+        SC_TRUST_RESULT(elements.push_back(2));
         index = 0;
         SC_TEST_EXPECT(elements.find([](auto& val) { return val >= 2; }, &index) && index == 2);
     }
     if (test_section("removeAll"))
     {
         Vector<int> elements;
-        (void)elements.push_back(1);
-        (void)elements.push_back(0);
-        (void)elements.push_back(2);
+        SC_TRUST_RESULT(elements.push_back(1));
+        SC_TRUST_RESULT(elements.push_back(0));
+        SC_TRUST_RESULT(elements.push_back(2));
         SC_TEST_EXPECT(elements.remove(0));
         SC_TEST_EXPECT(elements.size() == 2);
         SC_TEST_EXPECT(elements[0] == 1);

@@ -209,36 +209,37 @@ inline int printAtoms(Console& console, int currentAtomIdx, const MetaProperties
 {
     String        buffer(StringEncoding::Ascii);
     StringBuilder builder(buffer);
-    (void)builder.append("[{:02}]", currentAtomIdx);
+    SC_TRUST_RESULT(builder.append("[{:02}]", currentAtomIdx));
     for (int i = 0; i < indentation; ++i)
-        (void)builder.append("\t");
-    (void)builder.append("[LinkIndex={:2}] {} ({} atoms)\n", currentAtomIdx,
-                         StringView(atomName->data, atomName->length, false, StringEncoding::Ascii), atom->numSubAtoms);
+        SC_TRUST_RESULT(builder.append("\t"));
+    SC_TRUST_RESULT(builder.append("[LinkIndex={:2}] {} ({} atoms)\n", currentAtomIdx,
+                                   StringView(atomName->data, atomName->length, false, StringEncoding::Ascii),
+                                   atom->numSubAtoms));
     for (int i = 0; i < indentation; ++i)
-        (void)builder.append("\t");
-    (void)builder.append("{\n");
+        SC_TRUST_RESULT(builder.append("\t"));
+    SC_TRUST_RESULT(builder.append("{\n"));
     for (int idx = 0; idx < atom->numSubAtoms; ++idx)
     {
         auto& field     = atom[idx + 1];
         auto  fieldName = atomName[idx + 1];
-        (void)builder.append("[{:02}]", currentAtomIdx + idx + 1);
+        SC_TRUST_RESULT(builder.append("[{:02}]", currentAtomIdx + idx + 1));
 
         for (int i = 0; i < indentation + 1; ++i)
-            (void)builder.append("\t");
+            SC_TRUST_RESULT(builder.append("\t"));
 
-        (void)builder.append("Type={}\tOffset={}\tSize={}\tName={}", (int)field.type, field.offsetInBytes,
-                             field.sizeInBytes,
-                             StringView(fieldName.data, fieldName.length, false, StringEncoding::Ascii));
+        SC_TRUST_RESULT(builder.append("Type={}\tOffset={}\tSize={}\tName={}", (int)field.type, field.offsetInBytes,
+                                       field.sizeInBytes,
+                                       StringView(fieldName.data, fieldName.length, false, StringEncoding::Ascii)));
         if (field.getLinkIndex() >= 0)
         {
-            (void)builder.append("\t[LinkIndex={}]", field.getLinkIndex());
+            SC_TRUST_RESULT(builder.append("\t[LinkIndex={}]", field.getLinkIndex()));
         }
-        (void)builder.append("\n");
+        SC_TRUST_RESULT(builder.append("\n"));
     }
     for (int i = 0; i < indentation; ++i)
-        (void)builder.append("\t");
+        SC_TRUST_RESULT(builder.append("\t"));
 
-    (void)builder.append("}\n");
+    SC_TRUST_RESULT(builder.append("}\n"));
     console.print(buffer.view());
     return atom->numSubAtoms;
 }

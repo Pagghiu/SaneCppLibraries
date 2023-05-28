@@ -7,7 +7,6 @@
 #include "Limits.h"
 
 // system includes
-#include <memory.h> // memcmp
 #include <stdlib.h> // malloc
 
 void* SC::memoryReallocate(void* memory, SC::size_t numBytes) { return realloc(memory, numBytes); }

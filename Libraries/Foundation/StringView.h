@@ -100,16 +100,29 @@ struct SC::StringView
     [[nodiscard]] bool operator<(StringView other) const { return compareASCII(other) == StringComparison::Smaller; }
 
     template <typename StringIterator>
-    StringIterator getIterator() const
+    constexpr StringIterator getIterator() const
     {
         return StringIterator(bytesWithoutTerminator(), bytesWithoutTerminator() + sizeInBytes());
     }
 
-    [[nodiscard]] bool operator==(StringView other) const
+    [[nodiscard]] constexpr bool operator==(StringView other) const
     {
-        return hasCompatibleEncoding(other) && text.sizeInBytes() == other.text.sizeInBytes()
-                   ? memcmp(text.data(), other.text.data(), text.sizeInBytes()) == 0
-                   : false;
+        if (not hasCompatibleEncoding(other) or text.sizeInBytes() != other.text.sizeInBytes())
+            return false;
+        if (__builtin_is_constant_evaluated())
+        {
+            auto it1 = text.data();
+            auto it2 = other.text.data();
+            auto sz  = text.sizeInBytes();
+            for (size_t idx = 0; idx < sz; ++idx)
+                if (it1[idx] != it2[idx])
+                    return false;
+            return true;
+        }
+        else
+        {
+            return memcmp(text.data(), other.text.data(), text.sizeInBytes()) == 0;
+        }
     }
     [[nodiscard]] bool             operator!=(StringView other) const { return not operator==(other); }
     [[nodiscard]] constexpr bool   isEmpty() const { return text.data() == nullptr || text.sizeInBytes() == 0; }
@@ -126,11 +139,11 @@ struct SC::StringView
     [[nodiscard]] bool startsWith(const StringView str) const;
     [[nodiscard]] bool endsWith(const StringView str) const;
 
-    [[nodiscard]] bool containsASCIICharacter(char c) const
+    [[nodiscard]] constexpr bool containsASCIICharacter(char c) const
     {
         return getIterator<StringIteratorASCII>().advanceUntilMatches(c);
     }
-    [[nodiscard]] bool hasCompatibleEncoding(StringView str) const
+    [[nodiscard]] constexpr bool hasCompatibleEncoding(StringView str) const
     {
         return StringEncodingAreBinaryCompatible(encoding, str.encoding);
     }
@@ -139,14 +152,16 @@ struct SC::StringView
     template <typename StringIterator>
     static StringView fromIterators(StringIterator from, StringIterator to)
     {
-        // TODO: Make StringView::fromIterators return bool to make it fallible
-        if (to.getIt() <= from.getEnd() && to.getIt() >= from.getIt())
+        const ssize_t numBytes = to.bytesDistanceFrom(from);
+        if (numBytes >= 0)
         {
-            SC_DEBUG_ASSERT(to.getIt() >= from.getIt());
-            return StringView(from.getIt(), static_cast<size_t>(to.getIt() - from.getIt()), false,
-                              StringIterator::getEncoding());
+            StringIterator fromEnd = from;
+            fromEnd.setToEnd();
+            if (fromEnd.bytesDistanceFrom(to) >= 0) // If current iterator of to is inside from range
+                return StringView(from.getCurrentIt(), static_cast<size_t>(numBytes), false,
+                                  StringIterator::getEncoding());
         }
-        return StringView();
+        return StringView(); // TODO: Make StringView::fromIterators return bool to make it fallible
     }
 
     /// Returns a section of a string.
@@ -155,20 +170,22 @@ struct SC::StringView
     template <typename StringIterator>
     static StringView fromIteratorUntilEnd(StringIterator it)
     {
-        SC_DEBUG_ASSERT(it.getEnd() >= it.getIt());
-        return StringView(it.getIt(), static_cast<size_t>(it.getEnd() - it.getIt()), false,
-                          StringIterator::getEncoding());
+        StringIterator endIt = it;
+        endIt.setToEnd();
+        const size_t numBytes = static_cast<size_t>(endIt.bytesDistanceFrom(it));
+        return StringView(it.getCurrentIt(), numBytes, false, StringIterator::getEncoding());
     }
 
     /// Returns a section of a string.
     /// @param it The index to the beginning of the specified portion of StringView. The substring includes the
     /// characters from iterator start up to its current position
     template <typename StringIterator>
-    static StringView fromIteratorFromStart(StringIterator it)
+    static constexpr StringView fromIteratorFromStart(StringIterator it)
     {
-        SC_DEBUG_ASSERT(it.getIt() >= it.getStart());
-        return StringView(it.getStart(), static_cast<size_t>(it.getIt() - it.getStart()), false,
-                          StringIterator::getEncoding());
+        StringIterator start = it;
+        start.setToStart();
+        const size_t numBytes = static_cast<size_t>(it.bytesDistanceFrom(start));
+        return StringView(start.getCurrentIt(), numBytes, false, StringIterator::getEncoding());
     }
 
     size_t sizeASCII() const { return sizeInBytes(); }
@@ -178,14 +195,22 @@ struct SC::StringView
     /// @param end The index to the end of the specified portion of StringView. The substring includes the characters up
     /// to, but not including, the character indicated by end.
     template <typename StringIterator = StringIteratorASCII>
-    [[nodiscard]] StringView sliceStartEnd(size_t start, size_t end) const;
-
+    [[nodiscard]] constexpr StringView sliceStartEnd(size_t start, size_t end) const
+    {
+        auto it = getIterator<StringIterator>();
+        SC_RELEASE_ASSERT(it.advanceCodePoints(start));
+        auto startIt = it;
+        SC_RELEASE_ASSERT(start <= end && it.advanceCodePoints(end - start));
+        const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
+        return StringView(startIt.getCurrentIt(), distance,
+                          hasNullTerm and (start + distance == sizeInBytesIncludingTerminator()), encoding);
+    }
     /// Returns a section of a string.
     /// @param start The index to the beginning of the specified portion of StringView.
     /// @param length The number of characters to include. The substring includes the characters up to, but not
     /// including, the character indicated by end.
     template <typename StringIterator = StringIteratorASCII>
-    [[nodiscard]] StringView sliceStartLength(size_t start, size_t length) const
+    [[nodiscard]] constexpr StringView sliceStartLength(size_t start, size_t length) const
     {
         return sliceStartEnd<StringIterator>(start, start + length);
     }
@@ -193,7 +218,16 @@ struct SC::StringView
     /// Returns a section of a string.
     /// @param start The index to the beginning of the specified portion of StringView.
     template <typename StringIterator = StringIteratorASCII>
-    [[nodiscard]] StringView sliceStart(size_t start) const;
+    [[nodiscard]] constexpr StringView sliceStart(size_t start) const
+    {
+        auto it = getIterator<StringIterator>();
+        SC_RELEASE_ASSERT(it.advanceCodePoints(start));
+        auto startIt = it;
+        it.setToEnd();
+        const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
+        return StringView(startIt.getCurrentIt(), distance,
+                          hasNullTerm and (start + distance == sizeInBytesIncludingTerminator()), encoding);
+    }
 
     template <typename Lambda>
     [[nodiscard]] size_t splitASCII(char_t separator, Lambda&& lambda,
@@ -218,7 +252,7 @@ struct SC::StringView
             StringView component = StringView::fromIterators(itBackup, it);
             if (options.has(SplitOptions::SkipSeparator))
             {
-                (void)it.skipNext(); // No need to check return result, we already checked in advanceUntilMatches
+                (void)it.stepForward(); // we already checked in advanceUntilMatches
                 continueSplit = !it.isEmpty();
             }
             // directory
@@ -234,7 +268,31 @@ struct SC::StringView
 
     /// If the current view is an integer number, returns true
     template <typename StringIterator>
-    [[nodiscard]] bool isIntegerNumber() const;
+    [[nodiscard]] constexpr bool isIntegerNumber() const
+    {
+        auto it = getIterator<StringIterator>();
+        (void)it.advanceIfMatchesAny({'-', '+'}); // optional
+        bool matchedAtLeastOneDigit = false;
+        while (it.advanceIfMatchesRange('0', '9'))
+            matchedAtLeastOneDigit = true;
+        return matchedAtLeastOneDigit and it.isEmpty();
+    }
+
+    /// If the current view is a floating number, returns true
+    template <typename StringIterator>
+    [[nodiscard]] constexpr bool isFloatingNumber() const
+    {
+        // TODO: Floating point exponential notation
+        auto it = getIterator<StringIterator>();
+        (void)it.advanceIfMatchesAny({'-', '+'}); // optional
+        bool matchedAtLeastOneDigit = false;
+        while (it.advanceIfMatchesRange('0', '9'))
+            matchedAtLeastOneDigit = true;
+        if (it.advanceIfMatches('.')) // optional
+            while (it.advanceIfMatchesRange('0', '9'))
+                matchedAtLeastOneDigit = true;
+        return matchedAtLeastOneDigit and it.isEmpty();
+    }
 
     /// Parses int32, returning false if it fails
     [[nodiscard]] bool parseInt32(int32_t& value) const;
@@ -244,9 +302,6 @@ struct SC::StringView
 
     /// Parses double, returning false if it fails
     [[nodiscard]] bool parseDouble(double& value) const;
-
-  private:
-    struct Internal;
 };
 
 #if SC_PLATFORM_WINDOWS

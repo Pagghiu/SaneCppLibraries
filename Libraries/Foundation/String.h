@@ -93,7 +93,7 @@ struct SC::SmallString : public String
 template <>
 struct SC::StringFormatterFor<SC::String>
 {
-    static bool format(StringFormatOutput& data, const StringIteratorASCII specifier, const String& value);
+    static bool format(StringFormatOutput& data, const StringView specifier, const String& value);
 };
 
 namespace SC

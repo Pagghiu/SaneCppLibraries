@@ -105,9 +105,9 @@ struct SC::ArrayTest : public SC::TestCase
         if (test_section("sort"))
         {
             Array<int, 3> elements;
-            (void)elements.push_back(1);
-            (void)elements.push_back(0);
-            (void)elements.push_back(2);
+            SC_TRUST_RESULT(elements.push_back(1));
+            SC_TRUST_RESULT(elements.push_back(0));
+            SC_TRUST_RESULT(elements.push_back(2));
             bubbleSort(elements.begin(), elements.end());
             SC_TEST_EXPECT(elements[0] == 0);
             SC_TEST_EXPECT(elements[1] == 1);

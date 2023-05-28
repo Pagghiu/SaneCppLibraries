@@ -152,5 +152,35 @@ struct SC::StringViewTest : public SC::TestCase
                 SC_TEST_EXPECT(numSplits == 0);
             }
         }
+        if (test_section("isInteger"))
+        {
+            static_assert("0"_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
+            static_assert(not ""_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
+            static_assert(not "-"_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
+            static_assert(not "."_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
+            static_assert(not "-."_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
+            static_assert("-34"_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
+            static_assert("+12"_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
+            static_assert(not "+12$"_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
+            static_assert(not "$+12"_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
+            static_assert(not "+$12"_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
+        }
+        if (test_section("isFloating"))
+        {
+            static_assert("0"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+            static_assert(not ""_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+            static_assert(not "-"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+            static_assert(not "."_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+            static_assert(not "-."_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+            static_assert("-34"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+            static_assert("+12"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+            static_assert(not "+12$"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+            static_assert(not "$+12"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+            static_assert(not "+$12"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+            static_assert("-34."_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+            static_assert("-34.0"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+            static_assert("0.34"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+            static_assert(not "-34.0_"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+        }
     }
 };
