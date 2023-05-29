@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 
-// Enables Auto reflection in C++14
+// Enables auto reflection in C++14
 // Issues so far:
 // - C-Arrays are not handled properly (they collapse to a single element)
 // - Declaring a constructor on a struct will break the member detection

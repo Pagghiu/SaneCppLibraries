@@ -15,12 +15,7 @@ namespace Reflection
 {
 struct TestClassBuilder : public MetaClassBuilder<TestClassBuilder>
 {
-    typedef AtomBase<TestClassBuilder> Atom;
-
-    struct EmptyPayload
-    {
-    };
-    EmptyPayload payload;
+    using Atom = AtomBase<TestClassBuilder>;
     constexpr TestClassBuilder(Atom* output = nullptr, const uint32_t capacity = 0) : MetaClassBuilder(output, capacity)
     {}
 };
@@ -143,14 +138,16 @@ SC_META_STRUCT_LEAVE()
 
 struct TestNamespace::PackedStruct
 {
-    float x, y, z = 0.0f;
+    float x = 0.0f, y = 0.0f, z = 0.0f;
 };
 
+#if !SC_META_ENABLE_AUTO_REFLECTION
 SC_META_STRUCT_VISIT(TestNamespace::PackedStruct)
 SC_META_STRUCT_FIELD(0, x)
 SC_META_STRUCT_FIELD(1, y)
 SC_META_STRUCT_FIELD(2, z)
 SC_META_STRUCT_LEAVE()
+#endif
 
 struct TestNamespace::UnpackedStruct
 {
@@ -194,7 +191,7 @@ namespace SC
 // TODO: Move printFlatSchema somewhere else
 template <int NUM_ATOMS, typename MetaProperties>
 inline void printFlatSchema(Console& console, const MetaProperties (&atom)[NUM_ATOMS],
-                            const SC::ConstexprStringView (&names)[NUM_ATOMS])
+                            const Reflection::SymbolStringView (&names)[NUM_ATOMS])
 {
     int atomIndex = 0;
     while (atomIndex < NUM_ATOMS)
@@ -205,7 +202,7 @@ inline void printFlatSchema(Console& console, const MetaProperties (&atom)[NUM_A
 
 template <typename MetaProperties>
 inline int printAtoms(Console& console, int currentAtomIdx, const MetaProperties* atom,
-                      const SC::ConstexprStringView* atomName, int indentation)
+                      const Reflection::SymbolStringView* atomName, int indentation)
 {
     String        buffer(StringEncoding::Ascii);
     StringBuilder builder(buffer);
@@ -247,58 +244,11 @@ inline int printAtoms(Console& console, int currentAtomIdx, const MetaProperties
 
 struct SC::ReflectionTest : public SC::TestCase
 {
-
-    [[nodiscard]] static constexpr bool constexprEquals(const StringView str1, const StringView other)
-    {
-        if (str1.sizeInBytes() != other.sizeInBytes())
-            return false;
-        for (size_t i = 0; i < str1.sizeInBytes(); ++i)
-            if (str1.bytesWithoutTerminator()[i] != other.bytesWithoutTerminator()[i])
-                return false;
-        return true;
-    }
     ReflectionTest(SC::TestReport& report) : TestCase(report, "ReflectionTest")
     {
-        // clang++ -Xclang -ast-dump -Xclang -ast-dump-filter=SimpleStructure -std=c++14
-        // Libraries/Reflection/ReflectionTest.h clang -cc1 -xc++ -fsyntax-only -code-completion-at
-        // libraries/Reflection/ReflectionTest.h:94:12 libraries/Reflection/ReflectionTest.h -std=c++14 echo '#include
-        // "libraries/Reflection/ReflectionTest.h"\nTestNamespace::SimpleStructure\n::\n"' | clang -cc1 -xc++
-        // -fsyntax-only -code-completion-at -:3:3 - -std=c++14
         using namespace SC;
         using namespace SC::Reflection;
-        if (test_section("Packing"))
-        {
-            constexpr auto packedStructWithArray      = FlatSchemaTest::compile<TestNamespace::PackedStructWithArray>();
-            constexpr auto packedStructWithArrayFlags = packedStructWithArray.properties.values[0].getCustomUint32();
-            static_assert(packedStructWithArrayFlags & MetaStructFlags::IsPacked,
-                          "nestedPacked struct should be recursively packed");
 
-            constexpr auto packedStruct      = FlatSchemaTest::compile<TestNamespace::PackedStruct>();
-            constexpr auto packedStructFlags = packedStruct.properties.values[0].getCustomUint32();
-            static_assert(packedStructFlags & MetaStructFlags::IsPacked,
-                          "nestedPacked struct should be recursively packed");
-
-            constexpr auto unpackedStruct      = FlatSchemaTest::compile<TestNamespace::UnpackedStruct>();
-            constexpr auto unpackedStructFlags = unpackedStruct.properties.values[0].getCustomUint32();
-            static_assert(not(unpackedStructFlags & MetaStructFlags::IsPacked),
-                          "Unpacked struct should be recursively packed");
-
-            constexpr auto nestedUnpackedStruct      = FlatSchemaTest::compile<TestNamespace::NestedUnpackedStruct>();
-            constexpr auto nestedUnpackedStructFlags = nestedUnpackedStruct.properties.values[0].getCustomUint32();
-            static_assert(not(nestedUnpackedStructFlags & MetaStructFlags::IsPacked),
-                          "nestedPacked struct should not be recursively packed");
-
-            constexpr auto structWithArrayPacked      = FlatSchemaTest::compile<TestNamespace::StructWithArrayPacked>();
-            constexpr auto structWithArrayPackedFlags = structWithArrayPacked.properties.values[0].getCustomUint32();
-            static_assert(structWithArrayPackedFlags & MetaStructFlags::IsPacked,
-                          "structWithArrayPacked struct should not be recursively packed");
-
-            constexpr auto structWithArrayUnpacked = FlatSchemaTest::compile<TestNamespace::StructWithArrayUnpacked>();
-            constexpr auto structWithArrayUnpackedFlags =
-                structWithArrayUnpacked.properties.values[0].getCustomUint32();
-            static_assert(not(structWithArrayUnpackedFlags & MetaStructFlags::IsPacked),
-                          "structWithArrayUnpacked struct should not be recursively packed");
-        }
         if (test_section("Print Simple structure"))
         {
             constexpr auto SimpleStructureFlatSchema = FlatSchemaTest::compile<TestNamespace::SimpleStructure>();
@@ -307,19 +257,48 @@ struct SC::ReflectionTest : public SC::TestCase
         }
         if (test_section("Print Complex structure"))
         {
-            constexpr auto       className    = TypeToString<TestNamespace::ComplexStructure>::get();
-            constexpr StringView classNameStr = "TestNamespace::ComplexStructure";
-            static_assert(constexprEquals(StringView(className.data, className.length, false, StringEncoding::Ascii),
-                                          classNameStr),
-                          "Please update SC::ClNm for your compiler");
-            constexpr auto       intName    = TypeToString<int>::get();
-            constexpr StringView intNameStr = "int";
-            static_assert(
-                constexprEquals(StringView(intName.data, intName.length, false, StringEncoding::Ascii), intNameStr),
-                "Please update SC::ClNm for your compiler");
             constexpr auto ComplexStructureFlatSchema = FlatSchemaTest::compile<TestNamespace::ComplexStructure>();
             printFlatSchema(report.console, ComplexStructureFlatSchema.properties.values,
                             ComplexStructureFlatSchema.names.values);
         }
+
+        constexpr auto packedStructWithArray      = FlatSchemaTest::compile<TestNamespace::PackedStructWithArray>();
+        constexpr auto packedStructWithArrayFlags = packedStructWithArray.properties.values[0].getCustomUint32();
+        static_assert(packedStructWithArrayFlags & MetaStructFlags::IsPacked,
+                      "nestedPacked struct should be recursively packed");
+
+        constexpr auto packedStruct      = FlatSchemaTest::compile<TestNamespace::PackedStruct>();
+        constexpr auto packedStructFlags = packedStruct.properties.values[0].getCustomUint32();
+        static_assert(packedStructFlags & MetaStructFlags::IsPacked,
+                      "nestedPacked struct should be recursively packed");
+
+        constexpr auto unpackedStruct      = FlatSchemaTest::compile<TestNamespace::UnpackedStruct>();
+        constexpr auto unpackedStructFlags = unpackedStruct.properties.values[0].getCustomUint32();
+        static_assert(not(unpackedStructFlags & MetaStructFlags::IsPacked),
+                      "Unpacked struct should be recursively packed");
+
+        constexpr auto nestedUnpackedStruct      = FlatSchemaTest::compile<TestNamespace::NestedUnpackedStruct>();
+        constexpr auto nestedUnpackedStructFlags = nestedUnpackedStruct.properties.values[0].getCustomUint32();
+        static_assert(not(nestedUnpackedStructFlags & MetaStructFlags::IsPacked),
+                      "nestedPacked struct should not be recursively packed");
+
+        constexpr auto structWithArrayPacked      = FlatSchemaTest::compile<TestNamespace::StructWithArrayPacked>();
+        constexpr auto structWithArrayPackedFlags = structWithArrayPacked.properties.values[0].getCustomUint32();
+        static_assert(structWithArrayPackedFlags & MetaStructFlags::IsPacked,
+                      "structWithArrayPacked struct should not be recursively packed");
+
+        constexpr auto structWithArrayUnpacked      = FlatSchemaTest::compile<TestNamespace::StructWithArrayUnpacked>();
+        constexpr auto structWithArrayUnpackedFlags = structWithArrayUnpacked.properties.values[0].getCustomUint32();
+        static_assert(not(structWithArrayUnpackedFlags & MetaStructFlags::IsPacked),
+                      "structWithArrayUnpacked struct should not be recursively packed");
+
+        constexpr auto       className        = TypeToString<TestNamespace::ComplexStructure>::get();
+        constexpr StringView classNameExected = "TestNamespace::ComplexStructure"_a8;
+        constexpr StringView classNameView(className.data, className.length, false, StringEncoding::Ascii);
+        static_assert(classNameView == classNameExected, "Please update SC::ClNm for your compiler");
+        constexpr auto intName         = TypeToString<int>::get();
+        constexpr auto intNameExpected = "int"_a8;
+        constexpr auto intNameView     = StringView(intName.data, intName.length, false, StringEncoding::Ascii);
+        static_assert(intNameView == intNameExpected, "Please update SC::ClNm for your compiler");
     }
 };

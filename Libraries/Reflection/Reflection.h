@@ -2,45 +2,22 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "ReflectionClassInfo.h"
-#include "ReflectionMetaprogramming.h"
+
+#if SC_META_ENABLE_AUTO_REFLECTION
 #if SC_CPP_LESS_THAN_20
 #include "ReflectionAutoAggregates.h"
 #else
 #include "ReflectionAutoStructured.h"
 #endif
+#endif
+
+#include "ReflectionFoundation.h"
+#include "ReflectionMetaType.h"
 
 namespace SC
 {
 namespace Reflection
 {
-struct MetaStructFlags
-{
-    static const uint32_t IsPacked = 1 << 1; // IsPacked AND No padding in every contained field (recursively)
-};
-
-enum class MetaType : uint8_t
-{
-    // Invalid sentinel
-    TypeInvalid = 0,
-
-    // Primitive types
-    TypeUINT8    = 1,
-    TypeUINT16   = 2,
-    TypeUINT32   = 3,
-    TypeUINT64   = 4,
-    TypeINT8     = 5,
-    TypeINT16    = 6,
-    TypeINT32    = 7,
-    TypeINT64    = 8,
-    TypeFLOAT32  = 9,
-    TypeDOUBLE64 = 10,
-
-    TypeStruct = 11,
-    TypeArray  = 12,
-    TypeVector = 13,
-};
-
 struct MetaProperties
 {
     MetaType type;          // 1
@@ -102,160 +79,14 @@ struct MetaProperties
     }
 };
 
+struct MetaPrimitive
+{
+    template <typename MemberVisitor>
+    static constexpr void build(MemberVisitor&)
+    {}
+};
+
 // clang-format off
-struct MetaPrimitive { template<typename MemberVisitor>  static constexpr void build( MemberVisitor&) { } };
-
-template<typename data_tlist, int N>
-struct CallVisitorFor
-{
-    template<typename Visitor>
-    constexpr static bool visit(Visitor&& visitor)
-    {
-        typedef TypeListGetT<data_tlist, N-1> R;
-        return CallVisitorFor<data_tlist, N-1>::visit(forward<Visitor>(visitor)) and visitor.template visit<N-1, R>();
-    }
-};
-template<typename data_tlist>
-struct CallVisitorFor<data_tlist,  0>
-{
-    template<typename Visitor>
-    constexpr static bool visit(Visitor&& visitor)
-    {
-        SC_UNUSED(visitor);
-        return true;
-    }
-};
-
-
-#if SC_CPP_AT_LEAST_20
-template<typename T, typename MemberVisitor, int NumMembers>
-struct MetaClassLoopholeVisitor
-{
-    MemberVisitor& builder;
-
-    template<int Order, typename R>
-    constexpr bool visit()
-    {
-        R T::* ptr = nullptr;
-        constexpr auto fieldOffset = MemberOffsetOf<T, R, Order, NumMembers>();
-        return builder(Order, "", ptr, fieldOffset);
-    }
-};
-template <typename T> struct MetaClassAutomaticStructured
-{
-    using TypeList = loophole_structured::TypeListFor<T>;
-    [[nodiscard]] static constexpr MetaType getMetaType() { return MetaType::TypeStruct; }
-
-    template <typename MemberVisitor>
-    static constexpr void build(MemberVisitor& builder)
-    {
-        builder.atoms.template Struct<T>();
-        visit(builder);
-    }
-
-    template <typename MemberVisitor>
-    static constexpr bool visit(MemberVisitor&& builder)
-    {
-        return CallVisitorFor<TypeList, TypeList::size>::visit(MetaClassLoopholeVisitor<T, MemberVisitor, TypeList::size>{builder});
-    }
-    
-    template <typename MemberVisitor>
-    struct VisitObjectAdapter
-    {
-        MemberVisitor& builder;
-        T& object;
-        int order = 0;
-        
-        template <typename FirstType, typename... Types>
-        constexpr bool operator()(FirstType& first, Types&... types)
-        {
-            return builder(order++, "", first) and operator()(types...);
-        }
-    
-        constexpr bool operator()() { return true; }
-    };
-    
-    template <typename MemberVisitor>
-    static constexpr bool visitObject(MemberVisitor&& builder, T& object)
-    {
-        constexpr auto NumMembers = loophole_structured::CountNumMembers<T>(0);
-        return Reflection::MemberApply<NumMembers>(object, VisitObjectAdapter<MemberVisitor>{builder, object});
-    }
-};
-
-
-template<typename Class>
-struct MetaClass : public  MetaClassAutomaticStructured<Class>{};
-// we are using a specific macro for auto member binding to keep explicit track of which fields are being actually "automatically" tracked
-#define SC_META_STRUCT_AUTO_BINDINGS(Class)
-#elif SC_META_ENABLE_CPP14_AUTO_REFLECTION
-template<typename T, typename MemberVisitor, int NumMembers>
-struct MetaClassLoopholeVisitor
-{
-    MemberVisitor& builder;
-    int currentOffset = 0;
-
-    template<int Order, typename R>
-    constexpr bool visit()
-    {
-        R T::* ptr = nullptr;
-        // Simulate offsetof(T, f) under assumption that user is not manipulating members packing.
-        currentOffset = (currentOffset + alignof(R) - 1) & ~(alignof(R) - 1);
-        const auto fieldOffset = currentOffset;
-        currentOffset += sizeof(R);
-        return builder(Order, "", ptr, fieldOffset);
-    }
-};
-template <typename T> struct MetaClassAutomaticAggregates
-{
-    using TypeList = loophole_aggregates::TypeListFor<T>;
-    [[nodiscard]] static constexpr MetaType getMetaType() { return MetaType::TypeStruct; }
-
-    template <typename MemberVisitor>
-    static constexpr void build(MemberVisitor& builder)
-    {
-        builder.atoms.template Struct<T>();
-        visit(builder);
-    }
-
-    template <typename MemberVisitor>
-    static constexpr bool visit(MemberVisitor&& builder)
-    {
-        return CallVisitorFor<TypeList, TypeList::size>::visit(MetaClassLoopholeVisitor<T, MemberVisitor, TypeList::size>{builder});
-    }
-    
-    template <typename MemberVisitor>
-    struct VisitObjectAdapter
-    {
-        MemberVisitor& builder;
-        T& object;
-        
-        // Cannot be constexpr as we're reinterpret_cast-ing
-        template <typename R, int N>
-        /*constexpr*/ bool operator()(int order, const char (&name)[N], R T::*field, size_t offset) const
-        {
-            R& member =  *reinterpret_cast<R*>(reinterpret_cast<uint8_t*>(&object) + offset);
-            return builder(order, name, member);
-        }
-    };
-    
-    // Cannot be constexpr as we're reinterpret_cast-ing
-    template <typename MemberVisitor>
-    static /*constexpr*/ bool visitObject(MemberVisitor&& builder, T& object)
-    {
-        return visit(VisitObjectAdapter<MemberVisitor>{builder, object});
-    }
-};
-template<typename Class>
-struct MetaClass : public  MetaClassAutomaticAggregates<Class>{};
-// we are using a specific macro for auto member binding to keep explicit track of which fields are being actually "automatically" tracked
-#define SC_META_STRUCT_AUTO_BINDINGS(Class)
-#else
-
-#define SC_META_STRUCT_AUTO_BINDINGS(Class) static_assert(0, "You need SC_META_ENABLE_CPP14_AUTO_REFLECTION or C++ 20 enabled to use this feature");
-
-#endif
-
 template <> struct MetaClass<char_t>   : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT8;}};
 template <> struct MetaClass<uint8_t>  : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT8;}};
 template <> struct MetaClass<uint16_t> : public MetaPrimitive {static constexpr MetaType getMetaType(){return MetaType::TypeUINT16;}};
@@ -270,14 +101,14 @@ template <> struct MetaClass<double>   : public MetaPrimitive {static constexpr 
 // clang-format on
 
 template <typename Type>
-struct MetaArrayView
+struct SizedArrayView
 {
     uint32_t& size;
     uint32_t  wantedCapacity;
     Type*     output;
     uint32_t  capacity;
 
-    constexpr MetaArrayView(uint32_t& size, Type* output = nullptr, const uint32_t capacity = 0)
+    constexpr SizedArrayView(uint32_t& size, Type* output = nullptr, const uint32_t capacity = 0)
         : size(size), wantedCapacity(0), output(nullptr), capacity(0)
     {
         init(output, capacity);
@@ -322,12 +153,12 @@ struct AtomBase
 {
     typedef void (*MetaClassBuildFunc)(MemberVisitor& builder);
 
-    MetaProperties      properties;
-    ConstexprStringView name;
-    MetaClassBuildFunc  build;
+    MetaProperties     properties;
+    SymbolStringView   name;
+    MetaClassBuildFunc build;
 
     constexpr AtomBase() : build(nullptr) {}
-    constexpr AtomBase(const MetaProperties properties, ConstexprStringView name, MetaClassBuildFunc build)
+    constexpr AtomBase(const MetaProperties properties, SymbolStringView name, MetaClassBuildFunc build)
         : properties(properties), name(name), build(build)
     {}
 
@@ -335,14 +166,14 @@ struct AtomBase
     [[nodiscard]] static constexpr AtomBase create(uint8_t order, const char (&name)[N], R T::*, size_t offset)
     {
         return {MetaProperties(MetaClass<R>::getMetaType(), order, static_cast<SC::uint16_t>(offset), sizeof(R), -1),
-                ConstexprStringView(name, N), &MetaClass<R>::build};
+                SymbolStringView(name, N), &MetaClass<R>::build};
     }
 
     template <typename T>
-    [[nodiscard]] static constexpr AtomBase create(ConstexprStringView name = TypeToString<T>::get())
+    [[nodiscard]] static constexpr AtomBase create(SymbolStringView name = TypeToString<T>::get())
     {
         AtomBase atom = {MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), name, &MetaClass<T>::build};
-        if (ClassInfo<T>::IsPacked)
+        if (MetaTypeInfo<T>::IsPacked)
         {
             atom.properties.setCustomUint32(MetaStructFlags::IsPacked);
         }
@@ -353,11 +184,15 @@ struct AtomBase
 template <typename MemberVisitor>
 struct MetaClassBuilder
 {
+    struct EmptyVTables
+    {
+    };
+    EmptyVTables                    vtables;
     typedef AtomBase<MemberVisitor> Atom;
 
-    uint32_t            atomsSize;
-    uint32_t            initialSize;
-    MetaArrayView<Atom> atoms;
+    uint32_t             atomsSize;
+    uint32_t             initialSize;
+    SizedArrayView<Atom> atoms;
     constexpr MetaClassBuilder(Atom* output = nullptr, const uint32_t capacity = 0)
         : atomsSize(0), initialSize(0), atoms(atomsSize, output, capacity)
     {}

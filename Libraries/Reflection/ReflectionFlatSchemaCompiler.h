@@ -2,19 +2,17 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Span.h" // TODO: Remove Span.h dependency
 #include "Reflection.h"
-#include "ReflectionMetaprogramming.h"
 
 namespace SC
 {
 namespace Reflection
 {
-template <typename Atom, typename Payload, uint32_t MAX_TOTAL_ATOMS>
+template <typename Atom, typename VTablesType, uint32_t MAX_TOTAL_ATOMS>
 struct FlatSchemaCompilerResult
 {
-    ConstexprArray<Atom, MAX_TOTAL_ATOMS> atoms;
-    Payload                               payload;
+    SizedArray<Atom, MAX_TOTAL_ATOMS> atoms;
+    VTablesType                       vtables;
 };
 
 template <typename MetaClassBuilder>
@@ -22,23 +20,17 @@ struct FlatSchemaCompiler
 {
     typedef typename MetaClassBuilder::Atom     Atom;
     typedef typename Atom::MetaClassBuildFunc   MetaClassBuildFunc;
-    typedef decltype(MetaClassBuilder::payload) PayloadType;
+    typedef decltype(MetaClassBuilder::vtables) PayloadType;
     template <uint32_t MAX_TOTAL_ATOMS>
     struct FlatSchema
     {
-        ConstexprArray<MetaProperties, MAX_TOTAL_ATOMS>      properties;
-        ConstexprArray<ConstexprStringView, MAX_TOTAL_ATOMS> names;
-        PayloadType                                          payload;
-
-        constexpr auto propertiesAsSpan() const
-        {
-            return Span<const MetaProperties>(properties.values, properties.size);
-        }
-        constexpr auto namesAsSpan() const { return Span<const ConstexprStringView>(names.values, names.size); }
+        SizedArray<MetaProperties, MAX_TOTAL_ATOMS>   properties;
+        SizedArray<SymbolStringView, MAX_TOTAL_ATOMS> names;
+        PayloadType                                   vtables;
     };
 
     template <uint32_t MAX_ATOMS>
-    [[nodiscard]] static constexpr bool appendAtomsTo(ConstexprArray<Atom, MAX_ATOMS>& atoms, MetaClassBuildFunc build,
+    [[nodiscard]] static constexpr bool appendAtomsTo(SizedArray<Atom, MAX_ATOMS>& atoms, MetaClassBuildFunc build,
                                                       MetaClassBuilder& container)
     {
         container.initialSize = atoms.size;
@@ -76,8 +68,8 @@ struct FlatSchemaCompiler
 
         MetaClassBuilder container(result.atoms.values, MAX_TOTAL_ATOMS);
 
-        ConstexprArray<MetaClassBuildFunc, MAX_LINK_BUFFER_SIZE> alreadyVisitedTypes;
-        ConstexprArray<uint32_t, MAX_LINK_BUFFER_SIZE>           alreadyVisitedLinkID;
+        SizedArray<MetaClassBuildFunc, MAX_LINK_BUFFER_SIZE> alreadyVisitedTypes;
+        SizedArray<uint32_t, MAX_LINK_BUFFER_SIZE>           alreadyVisitedLinkID;
         if (not appendAtomsTo(result.atoms, f, container))
         {
             return {};
@@ -109,7 +101,7 @@ struct FlatSchemaCompiler
             }
             atomIndex++;
         }
-        result.payload = container.payload;
+        result.vtables = container.vtables;
         return result;
     }
 
@@ -130,7 +122,7 @@ struct FlatSchemaCompiler
         }
         result.properties.size = schema.atoms.size;
         result.names.size      = schema.atoms.size;
-        result.payload         = schema.payload;
+        result.vtables         = schema.vtables;
         return result;
     }
 };

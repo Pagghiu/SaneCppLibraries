@@ -39,24 +39,19 @@ struct VectorVTable
 template <int MAX_VTABLES>
 struct ReflectionVTables
 {
-    ConstexprArray<VectorVTable, MAX_VTABLES> vector;
+    SizedArray<VectorVTable, MAX_VTABLES> vector;
 };
 
 struct MetaClassBuilderTypeErased : public MetaClassBuilder<MetaClassBuilderTypeErased>
 {
-    typedef AtomBase<MetaClassBuilderTypeErased> Atom;
-    static const uint32_t                        MAX_VTABLES = 100;
-    ReflectionVTables<MAX_VTABLES>               payload;
-    MetaArrayView<VectorVTable>                  vectorVtable;
+    using Atom = AtomBase<MetaClassBuilderTypeErased>;
+
+    static const uint32_t          MAX_VTABLES = 100;
+    ReflectionVTables<MAX_VTABLES> vtables;
 
     constexpr MetaClassBuilderTypeErased(Atom* output = nullptr, const uint32_t capacity = 0)
-        : MetaClassBuilder(output, capacity), vectorVtable(payload.vector.size)
-    {
-        if (capacity > 0)
-        {
-            vectorVtable.init(payload.vector.values, MAX_VTABLES);
-        }
-    }
+        : MetaClassBuilder(output, capacity)
+    {}
 };
 
 template <typename Container, typename ItemType, int N>
@@ -64,16 +59,13 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
 {
     constexpr static void build(MetaClassBuilderTypeErased& builder)
     {
-        if (builder.vectorVtable.capacity > 0)
-        {
-            VectorVTable vector;
-            vector.resize = &resize;
-            assignResizeWithoutInitialize(vector);
-            vector.getSegmentSpan      = &getSegmentSpan<void>;
-            vector.getSegmentSpanConst = &getSegmentSpan<const void>;
-            vector.linkID              = builder.initialSize + static_cast<unsigned>(builder.atoms.size);
-            builder.vectorVtable.push(vector);
-        }
+        VectorVTable vector;
+        vector.resize = &resize;
+        assignResizeWithoutInitialize(vector);
+        vector.getSegmentSpan      = &getSegmentSpan<void>;
+        vector.getSegmentSpanConst = &getSegmentSpan<const void>;
+        vector.linkID              = builder.initialSize + static_cast<unsigned>(builder.atoms.size);
+        (void)builder.vtables.vector.push_back(vector);
     }
 
     static bool resize(SpanVoid<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,

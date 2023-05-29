@@ -382,7 +382,7 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
             BinaryReaderStream  streamReader;
             streamReader.buffer = move(streamWriter.buffer);
             VersionSchema versionSchema;
-            versionSchema.sourceProperties = schema.propertiesAsSpan();
+            versionSchema.sourceProperties = {schema.properties.values, schema.properties.size};
             SC_TEST_EXPECT(reader.serializeVersioned(struct2, streamReader, versionSchema));
             SC_TEST_EXPECT(streamReader.index == streamReader.buffer.size());
             SC_TEST_EXPECT(not(struct2 != struct1));
@@ -403,7 +403,7 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
             BinaryReaderStream  streamReader;
             streamReader.buffer = move(streamWriter.buffer);
             VersionSchema versionSchema;
-            versionSchema.sourceProperties = schema.propertiesAsSpan();
+            versionSchema.sourceProperties = {schema.properties.values, schema.properties.size};
             SC_TEST_EXPECT(reader.serializeVersioned(array2, streamReader, versionSchema));
             SC_TEST_EXPECT(streamReader.index == streamReader.buffer.size());
             SC_TEST_EXPECT(array2.points.size() == 2);
@@ -423,7 +423,7 @@ struct SC::SerializationTestSuite::SerializationTestBase : public SC::TestCase
             BinaryReaderStream  streamReader;
             streamReader.buffer = move(streamWriter.buffer);
             VersionSchema versionSchema;
-            versionSchema.sourceProperties = schema.propertiesAsSpan();
+            versionSchema.sourceProperties = {schema.properties.values, schema.properties.size};
             SC_TEST_EXPECT(reader.serializeVersioned(struct2, streamReader, versionSchema));
             SC_TEST_EXPECT(streamReader.index == streamReader.buffer.size());
             SC_TEST_EXPECT(struct2.intToFloat == struct1.intToFloat);

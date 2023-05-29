@@ -10,11 +10,7 @@ namespace Reflection
 {
 struct MetaClassBuilderTemplate : public MetaClassBuilder<MetaClassBuilderTemplate>
 {
-    typedef AtomBase<MetaClassBuilderTemplate> Atom;
-    struct EmptyPayload
-    {
-    };
-    EmptyPayload payload;
+    using Atom = AtomBase<MetaClassBuilderTemplate>;
     constexpr MetaClassBuilderTemplate(Atom* output = nullptr, const uint32_t capacity = 0)
         : MetaClassBuilder(output, capacity)
     {}

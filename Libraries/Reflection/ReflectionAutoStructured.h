@@ -1,21 +1,16 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-//------------------------------------------------------------------------
-// Adapted from "C++ Type Loophole" but using structured bindings
-// Up-to-date source is at GitHub repo: https://github.com/alexpolt/luple
-// Author: Alexandr Poltavsky, http://alexpolt.github.io
-// http://alexpolt.github.io/type-loophole.html
-// Original Code License: Public Domain
-//------------------------------------------------------------------------
 #pragma once
-#include "ReflectionAutoAggregates.h"
+#include "ReflectionAuto.h"
+#include "ReflectionMetaType.h"
 
 namespace SC
 {
 namespace Reflection
 {
-
+namespace AutoStructured
+{
 // UniversallyConstructible is Constructible from anything. It's declared with a size parameter
 // to allow declaring a variable number of them using an index sequence
 template <size_t>
@@ -27,11 +22,11 @@ struct UniversallyConstructible
 };
 
 // ArgumentGetAt returns the Nth argument passed to it's operator()
-template <size_t N, typename = MakeIndexSequence<N>>
+template <size_t N, typename = Auto::MakeIndexSequence<N>>
 struct ArgumentGetAt;
 
 template <size_t N, size_t... Index>
-struct ArgumentGetAt<N, IndexSequence<Index...>>
+struct ArgumentGetAt<N, Auto::IndexSequence<Index...>>
 {
     template <typename T, typename... Rest>
     constexpr decltype(auto) operator()(UniversallyConstructible<Index>..., T&& x, Rest&&...) const
@@ -66,68 +61,68 @@ struct Pad<Member, 0>
 
 // MemberApply decomposes type T into NumMembers fields and applies function F to all of the extracted members
 template <int NumMembers, typename T, typename F>
-constexpr decltype(auto) MemberApply(T& obj, F f)
+constexpr decltype(auto) MemberApply(T& obj, F func)
 {
     if constexpr (NumMembers == 1)
     {
         auto& [a] = obj;
-        return f(a);
+        return func(a);
     }
     else if constexpr (NumMembers == 2)
     {
         auto& [a, b] = obj;
-        return f(a, b);
+        return func(a, b);
     }
     else if constexpr (NumMembers == 3)
     {
         auto& [a, b, c] = obj;
-        return f(a, b, c);
+        return func(a, b, c);
     }
     else if constexpr (NumMembers == 4)
     {
         auto& [a, b, c, d] = obj;
-        return f(a, b, c, d);
+        return func(a, b, c, d);
     }
     else if constexpr (NumMembers == 5)
     {
         auto& [a, b, c, d, e] = obj;
-        return f(a, b, c, d, e);
+        return func(a, b, c, d, e);
     }
     else if constexpr (NumMembers == 6)
     {
         auto& [a, b, c, d, e, f] = obj;
-        return f(a, b, c, d, e, f);
+        return func(a, b, c, d, e, f);
     }
     else if constexpr (NumMembers == 7)
     {
         auto& [a, b, c, d, e, f, g] = obj;
-        return f(a, b, c, d, e, f, g);
+        return func(a, b, c, d, e, f, g);
     }
     else if constexpr (NumMembers == 8)
     {
         auto& [a, b, c, d, e, f, g, h] = obj;
-        return f(a, b, c, d, e, f, g, h);
+        return func(a, b, c, d, e, f, g, h);
     }
     else if constexpr (NumMembers == 9)
     {
         auto& [a, b, c, d, e, f, g, h, i] = obj;
-        return f(a, b, c, d, e, f, g, h, i);
+        return func(a, b, c, d, e, f, g, h, i);
     }
     else if constexpr (NumMembers == 10)
     {
         auto& [a, b, c, d, e, f, g, h, i, j] = obj;
-        return f(a, b, c, d, e, f, g, h, i, j);
+        return func(a, b, c, d, e, f, g, h, i, j);
     }
     else if constexpr (NumMembers == 11)
     {
         auto& [a, b, c, d, e, f, g, h, i, j, k] = obj;
-        return f(a, b, c, d, e, f, g, h, i, j, k);
+        return func(a, b, c, d, e, f, g, h, i, j, k);
     }
     else if constexpr (NumMembers > 11)
     {
         static_assert(NumMembers == 11, "NOT IMPLEMENTED");
     }
-    return f();
+    return func();
 }
 
 template <int NumMembers, int N, typename T>
@@ -219,7 +214,7 @@ constexpr auto MemberOffsetOf()
 {
 #if __clang__
 #pragma clang diagnostic push
-// Clang complains for MakeUnion::u not being a static constexpr, but it's only used in constexpr contexts
+    // Clang complains for MakeUnion::u not being a static constexpr, but it's only used in constexpr contexts
 #pragma clang diagnostic ignored "-Wundefined-var-template"
 #endif
     using UnionType = MakeUnion<T, MemberType, StartOffset>;
@@ -245,80 +240,20 @@ constexpr auto MemberOffsetOf()
 #pragma clang diagnostic pop
 #endif
 }
-} // namespace Reflection
-} // namespace SC
-
-namespace loophole_structured
-{
-template <typename T>
-struct loopholeResult
-{
-    typedef T type;
-};
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wnon-template-friend"
-#endif
-template <typename T, int N>
-struct tag
-{
-    friend auto          loophole(tag<T, N>);
-    constexpr friend int cloophole(tag<T, N>);
-};
-
-template <typename T, typename U, int N, bool B>
-struct fn_def
-{
-    friend auto          loophole(tag<T, N>) { return loopholeResult<U>(); }
-    constexpr friend int cloophole(tag<T, N>) { return 0; }
-};
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
-
-template <typename T, typename U, int N>
-struct fn_def<T, U, N, true>
-{
-};
-
-template <typename T, int N>
-struct c_op
-{
-    template <typename U, int M>
-    static auto inserter(...) -> int;
-    template <typename U, int M, int = cloophole(tag<T, M>{})>
-    static auto inserter(int) -> char;
-
-    template <typename U, int = sizeof(fn_def<T, U, N, sizeof(inserter<U, N>(0)) == sizeof(char)>)>
-    using type = U;
-};
-
-template <typename T, typename U>
-struct loophole_TypeList;
-
-template <typename T, int... NN>
-struct loophole_TypeList<T, SC::IntegerSequence<int, NN...>>
-{
-    static constexpr int size = sizeof...(NN);
-    using type                = SC::TypeList<typename decltype(loophole(tag<T, NN>{}))::type...>;
-};
-
-template <typename T, int N, typename F>
-using as_TypeList = typename loophole_TypeList<T, SC::MakeIntegerSequence<int, N>>::type;
 
 template <typename T, typename U>
 struct loophole_type_insert;
 
 template <typename T, int... NN>
-struct loophole_type_insert<T, SC::IntegerSequence<int, NN...>>
+struct loophole_type_insert<T, Auto::IntegerSequence<int, NN...>>
 {
     template <typename... Types>
-    using type = SC::IndexSequenceFor<typename c_op<T, NN>::template type<Types>...>;
+    using type = Auto::IndexSequenceFor<typename Auto::c_op<T, NN>::template type<Types>...>;
 };
 
 template <typename T, typename... Types>
 using InsertAsFriendDeclarations =
-    typename loophole_type_insert<T, SC::MakeIntegerSequence<int, sizeof...(Types)>>::template type<Types...>;
+    typename loophole_type_insert<T, Auto::MakeIntegerSequence<int, sizeof...(Types)>>::template type<Types...>;
 
 template <typename T, int N>
 struct DecomposeInElements
@@ -329,66 +264,66 @@ struct DecomposeInElements
 // clang-format off
 template <typename T>
 struct DecomposeInElements<T, 1> { using type = decltype([](T& val) {
-    auto& [a] = val;
+    [[maybe_unused]] auto& [a] = val;
     return InsertAsFriendDeclarations<T, decltype(a)>{};
 });};
 
 template <typename T>
 struct DecomposeInElements<T, 2> { using type = decltype([](T& val){
-auto& [a, b] = val;
-return InsertAsFriendDeclarations<T, decltype(a), decltype(b)>{};
+    [[maybe_unused]] auto& [a, b] = val;
+    return InsertAsFriendDeclarations<T, decltype(a), decltype(b)>{};
 });};
 
 template <typename T>
 struct DecomposeInElements<T, 3> { using type = decltype([](T& val){
-auto& [a, b, c] = val;
-return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c)>{};
+    [[maybe_unused]] auto& [a, b, c] = val;
+    return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c)>{};
 });};
 
 template <typename T>
 struct DecomposeInElements<T, 4> { using type = decltype([](T& val){
-auto& [a, b, c, d] = val;
-return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d)>{};
+    [[maybe_unused]] auto& [a, b, c, d] = val;
+    return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d)>{};
 });};
 
 template <typename T>
 struct DecomposeInElements<T, 5> { using type = decltype([](T& val){
-auto& [a, b, c, d, e] = val;
-return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d), decltype(e)>{};
+    [[maybe_unused]] auto& [a, b, c, d, e] = val;
+    return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d), decltype(e)>{};
 });};
 
 template <typename T>
 struct DecomposeInElements<T, 6> { using type = decltype([](T& val){
-auto& [a, b, c, d, e, f] = val;
-return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d), decltype(e), decltype(f)>{};
+    [[maybe_unused]] auto& [a, b, c, d, e, f] = val;
+    return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d), decltype(e), decltype(f)>{};
 });};
 
 template <typename T>
 struct DecomposeInElements<T, 7> { using type = decltype([](T& val){
-auto& [a, b, c, d, e, f, g] = val;
-return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d), decltype(e), decltype(f), decltype(g)>{};
+    [[maybe_unused]] auto& [a, b, c, d, e, f, g] = val;
+    return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d), decltype(e), decltype(f), decltype(g)>{};
 });};
 
 template <typename T>
 struct DecomposeInElements<T, 8> { using type = decltype([](T& val){
-auto& [a, b, c, d, e, f, g, h] = val;
-return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d), decltype(e), decltype(f), decltype(g), decltype(h)>{};
+    [[maybe_unused]] auto& [a, b, c, d, e, f, g, h] = val;
+    return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d), decltype(e), decltype(f), decltype(g), decltype(h)>{};
 });};
 
 template <typename T>
 struct DecomposeInElements<T, 9> { using type = decltype([](T& val){
-auto& [a, b, c, d, e, f, g, h, i] = val;
-return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d), decltype(e), decltype(f), decltype(g), decltype(h), decltype(i)>{};
+    [[maybe_unused]] auto& [a, b, c, d, e, f, g, h, i] = val;
+    return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d), decltype(e), decltype(f), decltype(g), decltype(h), decltype(i)>{};
 });};
 template <typename T>
 struct DecomposeInElements<T, 10> { using type = decltype([](T& val){
-auto& [a, b, c, d, e, f, g, h, i, j] = val;
-return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d), decltype(e), decltype(f), decltype(g), decltype(h), decltype(i), decltype(j)>{};
+    [[maybe_unused]] auto& [a, b, c, d, e, f, g, h, i, j] = val;
+    return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d), decltype(e), decltype(f), decltype(g), decltype(h), decltype(i), decltype(j)>{};
 });};
 template <typename T>
 struct DecomposeInElements<T, 11> { using type = decltype([](T& val){
-auto& [a, b, c, d, e, f, g, h, i, j, k] = val;
-return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d), decltype(e), decltype(f), decltype(g), decltype(h), decltype(i), decltype(j), decltype(k)>{};
+    [[maybe_unused]] auto& [a, b, c, d, e, f, g, h, i, j, k] = val;
+    return InsertAsFriendDeclarations<T, decltype(a), decltype(b), decltype(c), decltype(d), decltype(e), decltype(f), decltype(g), decltype(h), decltype(i), decltype(j), decltype(k)>{};
 });};
 // clang-format on
 template <int N>
@@ -399,16 +334,82 @@ struct UniversallyConvertible
 };
 
 template <typename T, int... NN>
-constexpr int CountNumMembers(...)
+constexpr int CountAggregates(...)
 {
     return static_cast<int>(sizeof...(NN) - 1);
 }
 template <typename T, int... NN>
-constexpr auto CountNumMembers(int) -> decltype(T{{UniversallyConvertible<NN>{}}...}, 0)
+constexpr auto CountAggregates(int) -> decltype(T{{UniversallyConvertible<NN>{}}...}, 0)
 {
-    return CountNumMembers<T, NN..., sizeof...(NN)>(0);
+    return CountAggregates<T, NN..., sizeof...(NN)>(0);
 }
-template <typename T, int N = CountNumMembers<T>(0), typename F = typename DecomposeInElements<T, N>::type>
-using TypeListFor = as_TypeList<T, N, F>;
+template <typename T, int N = CountAggregates<T>(0), typename F = typename DecomposeInElements<T, N>::type>
+using TypeListFor = typename Auto::type_list<T, Auto::MakeIntegerSequence<int, N>>::type;
 
-} // namespace loophole_structured
+template <typename T, typename MemberVisitor, int NumMembers>
+struct MetaClassLoopholeVisitor
+{
+    MemberVisitor& builder;
+
+    template <int Order, typename R>
+    constexpr bool visit()
+    {
+        R T::*         ptr         = nullptr;
+        constexpr auto fieldOffset = AutoStructured::MemberOffsetOf<T, R, Order, NumMembers>();
+        return builder(Order, "", ptr, fieldOffset);
+    }
+};
+
+template <typename T>
+struct MetaClassAutomaticStructured
+{
+    using TypeList = AutoStructured::TypeListFor<T>;
+    [[nodiscard]] static constexpr MetaType getMetaType() { return MetaType::TypeStruct; }
+
+    template <typename MemberVisitor>
+    static constexpr void build(MemberVisitor& builder)
+    {
+        builder.atoms.template Struct<T>();
+        visit(builder);
+    }
+
+    template <typename MemberVisitor>
+    static constexpr bool visit(MemberVisitor&& builder)
+    {
+        return Auto::MetaTypeListVisit<TypeList, TypeList::size>::visit(
+            MetaClassLoopholeVisitor<T, MemberVisitor, TypeList::size>{builder});
+    }
+
+    template <typename MemberVisitor>
+    struct VisitObjectAdapter
+    {
+        MemberVisitor& builder;
+        T&             object;
+        int            order = 0;
+
+        template <typename FirstType, typename... Types>
+        constexpr bool operator()(FirstType& first, Types&... types)
+        {
+            return builder(order++, "", first) and operator()(types...);
+        }
+
+        constexpr bool operator()() { return true; }
+    };
+
+    template <typename MemberVisitor>
+    static constexpr bool visitObject(MemberVisitor&& builder, T& object)
+    {
+        constexpr auto NumMembers = AutoStructured::CountAggregates<T>(0);
+        return Reflection::AutoStructured::MemberApply<NumMembers>(object,
+                                                                   VisitObjectAdapter<MemberVisitor>{builder, object});
+    }
+};
+} // namespace AutoStructured
+
+template <typename Class>
+struct MetaClass : public AutoStructured::MetaClassAutomaticStructured<Class>
+{
+};
+
+} // namespace Reflection
+} // namespace SC

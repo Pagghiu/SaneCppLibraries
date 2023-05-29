@@ -57,6 +57,7 @@
 
 #include "../../Libraries/Foundation/SmallVector.h"
 #include "../../Libraries/System/System.h"
+#include "../../Libraries/Testing/Test.h"
 
 int main(int argc, const char* argv[])
 {

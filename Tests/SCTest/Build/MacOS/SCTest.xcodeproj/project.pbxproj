@@ -102,10 +102,10 @@
 		7B515FD529243086006996AA /* Console.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Console.h; path = ../../../../Libraries/System/Console.h; sourceTree = "<group>"; };
 		7B515FD629243086006996AA /* Limits.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Limits.h; path = ../../../../Libraries/Foundation/Limits.h; sourceTree = "<group>"; };
 		7B515FD729243086006996AA /* Result.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Result.h; path = ../../../../Libraries/Foundation/Result.h; sourceTree = "<group>"; };
-		7B515FD829243086006996AA /* ReflectionClassInfo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionClassInfo.h; path = ../../../../Libraries/Reflection/ReflectionClassInfo.h; sourceTree = "<group>"; };
+		7B515FD829243086006996AA /* ReflectionMetaType.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionMetaType.h; path = ../../../../Libraries/Reflection/ReflectionMetaType.h; sourceTree = "<group>"; };
 		7B515FD929243086006996AA /* SerializationTemplateTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTemplateTest.h; path = ../../../../Libraries/Serialization/SerializationTemplateTest.h; sourceTree = "<group>"; };
 		7B515FDA29243086006996AA /* SerializationTypeErasedCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTypeErasedCompiler.h; path = ../../../../Libraries/Serialization/SerializationTypeErasedCompiler.h; sourceTree = "<group>"; };
-		7B515FDB29243086006996AA /* ReflectionMetaprogramming.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionMetaprogramming.h; path = ../../../../Libraries/Reflection/ReflectionMetaprogramming.h; sourceTree = "<group>"; };
+		7B515FDB29243086006996AA /* ReflectionFoundation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionFoundation.h; path = ../../../../Libraries/Reflection/ReflectionFoundation.h; sourceTree = "<group>"; };
 		7B515FDC29243086006996AA /* System.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = System.h; path = ../../../../Libraries/System/System.h; sourceTree = "<group>"; };
 		7B515FDD29243087006996AA /* SerializationTemplate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTemplate.h; path = ../../../../Libraries/Serialization/SerializationTemplate.h; sourceTree = "<group>"; };
 		7B515FDE29243087006996AA /* ReflectionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionTest.h; path = ../../../../Libraries/Reflection/ReflectionTest.h; sourceTree = "<group>"; };
@@ -185,6 +185,7 @@
 		7BA892A9297E03540093152B /* System.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = System.cpp; path = ../../../../Libraries/System/System.cpp; sourceTree = "<group>"; };
 		7BA892AC297E06040093152B /* StringConverter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringConverter.h; path = ../../../../Libraries/Foundation/StringConverter.h; sourceTree = "<group>"; };
 		7BA892AD297E06040093152B /* StringConverter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringConverter.cpp; path = ../../../../Libraries/Foundation/StringConverter.cpp; sourceTree = "<group>"; };
+		7BA8BF852A2539D400A410F8 /* ReflectionAuto.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ReflectionAuto.h; path = ../../../../Libraries/Reflection/ReflectionAuto.h; sourceTree = "<group>"; };
 		7BC56BD529946AD100EED472 /* FileSystemWalker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FileSystemWalker.h; path = ../../../../Libraries/FileSystem/FileSystemWalker.h; sourceTree = "<group>"; };
 		7BC56BD629946AD100EED472 /* FileSystemWalkerTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FileSystemWalkerTest.h; path = ../../../../Libraries/FileSystem/FileSystemWalkerTest.h; sourceTree = "<group>"; };
 		7BC56BD729946AD100EED472 /* FileSystemWalker.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FileSystemWalker.cpp; path = ../../../../Libraries/FileSystem/FileSystemWalker.cpp; sourceTree = "<group>"; };
@@ -356,11 +357,12 @@
 			isa = PBXGroup;
 			children = (
 				7B515FCC29243086006996AA /* Reflection.h */,
+				7BA8BF852A2539D400A410F8 /* ReflectionAuto.h */,
 				7B4B99EF2937EBAC003D17A6 /* ReflectionAutoAggregates.h */,
 				7B4B99F02937EBAC003D17A6 /* ReflectionAutoStructured.h */,
-				7B515FD829243086006996AA /* ReflectionClassInfo.h */,
 				7B515FE729243087006996AA /* ReflectionFlatSchemaCompiler.h */,
-				7B515FDB29243086006996AA /* ReflectionMetaprogramming.h */,
+				7B515FDB29243086006996AA /* ReflectionFoundation.h */,
+				7B515FD829243086006996AA /* ReflectionMetaType.h */,
 				7B515FCE29243086006996AA /* ReflectionSC.h */,
 				7B515FDE29243087006996AA /* ReflectionTest.h */,
 			);

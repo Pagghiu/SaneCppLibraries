@@ -253,9 +253,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAutoStructured.h">
       <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionClassInfo.h">
-      <Filter>Reflection</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionFlatSchemaCompiler.h">
       <Filter>Reflection</Filter>
     </ClInclude>
@@ -337,9 +334,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Testing\Test.h">
       <Filter>Testing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionMetaprogramming.h">
-      <Filter>Reflection</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\AlgorithmSort.h">
       <Filter>Foundation</Filter>
     </ClInclude>
@@ -372,6 +366,15 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonStreamWriterTest.h">
       <Filter>Json</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionMetaType.h">
+      <Filter>Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAuto.h">
+      <Filter>Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionFoundation.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -9,8 +9,37 @@ namespace SC
 {
 namespace Reflection
 {
+
 template <typename T>
 struct MetaClass;
+
+struct MetaStructFlags
+{
+    static const uint32_t IsPacked = 1 << 1; // IsPacked AND No padding in every contained field (recursively)
+};
+
+enum class MetaType : uint8_t
+{
+    // Invalid sentinel
+    TypeInvalid = 0,
+
+    // Primitive types
+    TypeUINT8    = 1,
+    TypeUINT16   = 2,
+    TypeUINT32   = 3,
+    TypeUINT64   = 4,
+    TypeINT8     = 5,
+    TypeINT16    = 6,
+    TypeINT32    = 7,
+    TypeINT64    = 8,
+    TypeFLOAT32  = 9,
+    TypeDOUBLE64 = 10,
+
+    TypeStruct = 11,
+    TypeArray  = 12,
+    TypeVector = 13,
+};
+
 // clang-format off
 template <typename T> struct IsPrimitive : false_type {};
 
@@ -28,15 +57,15 @@ template <> struct IsPrimitive<char_t>   : true_type  {};
 // clang-format on
 
 template <typename T, typename SFINAESelector = void>
-struct ClassInfo;
+struct MetaTypeInfo;
 
 template <typename T>
-struct ClassInfoStruct
+struct MetaTypeInfoStruct
 {
     size_t memberSizeSum = 0;
     bool   IsPacked      = false;
 
-    constexpr ClassInfoStruct()
+    constexpr MetaTypeInfoStruct()
     {
         if (MetaClass<T>::visit(*this))
         {
@@ -50,7 +79,7 @@ struct ClassInfoStruct
         SC_UNUSED(name);
         SC_UNUSED(member);
         SC_UNUSED(offset);
-        if (not ClassInfo<R>().IsPacked)
+        if (not MetaTypeInfo<R>().IsPacked)
         {
             return false;
         }
@@ -60,19 +89,19 @@ struct ClassInfoStruct
 };
 
 template <typename T, typename SFINAESelector>
-struct ClassInfo
+struct MetaTypeInfo
 {
-    static constexpr bool IsPacked = ClassInfoStruct<T>().IsPacked;
+    static constexpr bool IsPacked = MetaTypeInfoStruct<T>().IsPacked;
 };
 
 template <typename T, int N>
-struct ClassInfo<T[N]>
+struct MetaTypeInfo<T[N]>
 {
-    static constexpr bool IsPacked = ClassInfo<T>::IsPacked;
+    static constexpr bool IsPacked = MetaTypeInfo<T>::IsPacked;
 };
 
 template <typename T>
-struct ClassInfo<T, typename SC::EnableIf<IsPrimitive<T>::value>::type>
+struct MetaTypeInfo<T, typename SC::EnableIf<IsPrimitive<T>::value>::type>
 {
     static constexpr bool IsPacked = true;
 };

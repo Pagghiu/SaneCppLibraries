@@ -5,8 +5,10 @@
 #include "../Foundation/Compiler.h"
 namespace SC
 {
+namespace Reflection
+{
 template <typename T, uint32_t N>
-struct ConstexprArray
+struct SizedArray
 {
     T        values[N] = {};
     uint32_t size      = 0;
@@ -26,7 +28,7 @@ struct ConstexprArray
     }
 
     template <uint32_t N2>
-    [[nodiscard]] constexpr bool append(const ConstexprArray<T, N2>& other)
+    [[nodiscard]] constexpr bool append(const SizedArray<T, N2>& other)
     {
         if (size + other.size >= N)
             return false;
@@ -48,15 +50,15 @@ struct ConstexprArray
     }
 };
 
-struct ConstexprStringView
+struct SymbolStringView
 {
     const char* data;
     uint32_t    length;
-    constexpr ConstexprStringView() : data(nullptr), length(0) {}
+    constexpr SymbolStringView() : data(nullptr), length(0) {}
     template <uint32_t N>
-    constexpr ConstexprStringView(const char (&data)[N]) : data(data), length(N)
+    constexpr SymbolStringView(const char (&data)[N]) : data(data), length(N)
     {}
-    constexpr ConstexprStringView(const char* data, uint32_t length) : data(data), length(length) {}
+    constexpr SymbolStringView(const char* data, uint32_t length) : data(data), length(length) {}
 };
 // These are short names because they end up in symbol table (as we're storing their stringized signature)
 struct Nm
@@ -105,53 +107,32 @@ template <typename T>
 struct TypeToString
 {
 #if SC_CPP_AT_LEAST_17
-  private:
+private:
     // In C++ 17 we trim the long string producted by ClassName<T> to reduce executable size
     [[nodiscard]] static constexpr auto TrimClassName()
     {
         constexpr auto                         className = ClNm<T>();
-        ConstexprArray<char, className.length> trimmedName;
-        for (int i = 0; i < className.length; ++i)
+        SizedArray<char, className.length> trimmedName;
+        for (uint32_t i = 0; i < className.length; ++i)
         {
             trimmedName.values[i] = className.data[i];
         }
         trimmedName.size = className.length;
         return trimmedName;
     }
-
+    
     // Inline static constexpr requires C++17
     static inline constexpr auto value = TrimClassName();
-
-  public:
-    [[nodiscard]] static constexpr ConstexprStringView get() { return ConstexprStringView(value.values, value.size); }
+    
+public:
+    [[nodiscard]] static constexpr SymbolStringView get() { return SymbolStringView(value.values, value.size); }
 #else
-    [[nodiscard]] static constexpr ConstexprStringView get()
+    [[nodiscard]] static constexpr SymbolStringView get()
     {
         auto className = ClNm<T>();
-        return ConstexprStringView(className.data, className.length);
+        return SymbolStringView(className.data, className.length);
     }
 #endif
 };
-
-template <class IntegerType, IntegerType... Values>
-struct IntegerSequence
-{
-    typedef IntegerType     value_type;
-    static constexpr size_t size() noexcept { return sizeof...(Values); }
-};
-
-#if SC_GCC
-template <class IntegerType, IntegerType N>
-using MakeIntegerSequence = IntegerSequence<IntegerType, __integer_pack(N)...>;
-#else
-template <class IntegerType, IntegerType N>
-using MakeIntegerSequence = __make_integer_seq<IntegerSequence, IntegerType, N>;
-#endif
-template <size_t N>
-using MakeIndexSequence = MakeIntegerSequence<size_t, N>;
-template <class... T>
-using IndexSequenceFor = MakeIndexSequence<sizeof...(T)>;
-template <size_t... N>
-using IndexSequence = IntegerSequence<size_t, N...>;
-
+}
 } // namespace SC

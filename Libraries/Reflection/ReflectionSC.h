@@ -7,7 +7,6 @@
 #include "../Foundation/String.h"
 #include "../Foundation/Vector.h"
 #include "Reflection.h"
-#include "ReflectionClassInfo.h"
 
 namespace SC
 {
@@ -20,12 +19,12 @@ struct VectorArrayVTable
     static constexpr void build(MemberVisitor&) {}
 };
 template <typename T>
-struct ClassInfo<SC::Vector<T>>
+struct MetaTypeInfo<SC::Vector<T>>
 {
     static constexpr bool IsPacked = false;
 };
 template <typename T, int N>
-struct ClassInfo<SC::Array<T, N>>
+struct MetaTypeInfo<SC::Array<T, N>>
 {
     static constexpr bool IsPacked = false;
 };

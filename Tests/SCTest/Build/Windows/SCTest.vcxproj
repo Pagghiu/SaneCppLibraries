@@ -357,6 +357,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonStreamWriter.h" />
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonStreamWriterTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAuto.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionFoundation.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionMetaType.h" />
     <ClInclude Include="..\..\..\..\Libraries\Socket\SocketDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\Process\ProcessDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\File\FileDescriptor.h" />
@@ -370,7 +373,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Opaque.h" />
     <ClInclude Include="..\..\..\..\Libraries\System\Console.h" />
     <ClInclude Include="..\..\..\..\Libraries\System\ConsoleTest.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionMetaprogramming.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Function.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\FunctionTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\InitializerList.h" />
@@ -422,7 +424,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Reflection\Reflection.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAutoAggregates.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAutoStructured.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionClassInfo.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionFlatSchemaCompiler.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionSC.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionTest.h" />

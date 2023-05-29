@@ -97,7 +97,7 @@ struct SerializerVersionedMemberIterator
 template <typename BinaryStream, typename T, typename SFINAESelector>
 struct Serializer
 {
-    static constexpr bool IsItemPacked = Reflection::ClassInfo<T>::IsPacked;
+    static constexpr bool IsItemPacked = Reflection::MetaTypeInfo<T>::IsPacked;
 
     [[nodiscard]] static constexpr bool serializeVersioned(T& object, BinaryStream& stream, VersionSchema& schema)
     {
@@ -190,7 +190,7 @@ struct SerializerItems
 template <typename BinaryStream, typename T, int N>
 struct Serializer<BinaryStream, T[N]>
 {
-    static constexpr bool IsItemPacked = Reflection::ClassInfo<T>::IsPacked;
+    static constexpr bool IsItemPacked = Reflection::MetaTypeInfo<T>::IsPacked;
 
     [[nodiscard]] static constexpr bool serializeVersioned(T (&object)[N], BinaryStream& stream, VersionSchema& schema)
     {
@@ -220,7 +220,7 @@ struct Serializer<BinaryStream, T[N]>
 template <typename BinaryStream, typename Container, typename T>
 struct SerializerVector
 {
-    static constexpr bool IsItemPacked = Reflection::ClassInfo<T>::IsPacked;
+    static constexpr bool IsItemPacked = Reflection::MetaTypeInfo<T>::IsPacked;
 
     [[nodiscard]] static constexpr bool serialize(Container& object, BinaryStream& stream)
     {

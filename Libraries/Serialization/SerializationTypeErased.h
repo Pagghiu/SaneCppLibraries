@@ -102,13 +102,13 @@ struct ArrayAccess
 
 struct SimpleBinaryWriter
 {
-    Span<const Reflection::MetaProperties> sourceProperties;
-    Span<const SC::ConstexprStringView>    sourceNames;
-    BinaryBuffer&                          destination;
-    SpanVoid<const void>                   sourceObject;
-    uint32_t                               sourceTypeIndex;
-    Reflection::MetaProperties             sourceProperty;
-    ArrayAccess                            arrayAccess;
+    Span<const Reflection::MetaProperties>   sourceProperties;
+    Span<const Reflection::SymbolStringView> sourceNames;
+    BinaryBuffer&                            destination;
+    SpanVoid<const void>                     sourceObject;
+    uint32_t                                 sourceTypeIndex;
+    Reflection::MetaProperties               sourceProperty;
+    ArrayAccess                              arrayAccess;
 
     SimpleBinaryWriter(BinaryBuffer& destination) : destination(destination) {}
 
@@ -116,10 +116,10 @@ struct SimpleBinaryWriter
     [[nodiscard]] constexpr bool serialize(const T& object)
     {
         constexpr auto flatSchema      = Reflection::FlatSchemaTypeErased::compile<T>();
-        sourceProperties               = flatSchema.propertiesAsSpan();
-        sourceNames                    = flatSchema.namesAsSpan();
-        arrayAccess.vectorVtable       = {flatSchema.payload.vector.values,
-                                          static_cast<size_t>(flatSchema.payload.vector.size)};
+        sourceProperties               = {flatSchema.properties.values, flatSchema.properties.size};
+        sourceNames                    = {flatSchema.names.values, flatSchema.names.size};
+        arrayAccess.vectorVtable       = {flatSchema.vtables.vector.values,
+                                          static_cast<size_t>(flatSchema.vtables.vector.size)};
         sourceObject                   = SpanVoid<const void>(&object, sizeof(T));
         sourceTypeIndex                = 0;
         destination.numberOfOperations = 0;
@@ -226,13 +226,13 @@ struct SimpleBinaryWriter
 
 struct SimpleBinaryReader
 {
-    Span<const Reflection::MetaProperties> sinkProperties;
-    Span<const SC::ConstexprStringView>    sinkNames;
-    Reflection::MetaProperties             sinkProperty;
-    uint32_t                               sinkTypeIndex = 0;
-    SpanVoid<void>                         sinkObject;
-    BinaryBuffer&                          source;
-    ArrayAccess                            arrayAccess;
+    Span<const Reflection::MetaProperties>   sinkProperties;
+    Span<const Reflection::SymbolStringView> sinkNames;
+    Reflection::MetaProperties               sinkProperty;
+    uint32_t                                 sinkTypeIndex = 0;
+    SpanVoid<void>                           sinkObject;
+    BinaryBuffer&                            source;
+    ArrayAccess                              arrayAccess;
 
     SimpleBinaryReader(BinaryBuffer& source) : source(source) {}
 
@@ -241,13 +241,13 @@ struct SimpleBinaryReader
     {
         constexpr auto flatSchema = Reflection::FlatSchemaTypeErased::compile<T>();
 
-        sinkProperties = flatSchema.propertiesAsSpan();
-        sinkNames      = flatSchema.namesAsSpan();
+        sinkProperties = {flatSchema.properties.values, flatSchema.properties.size};
+        sinkNames      = {flatSchema.names.values, flatSchema.names.size};
         sinkObject     = SpanVoid<void>(&object, sizeof(T));
         sinkTypeIndex  = 0;
 
-        arrayAccess.vectorVtable = {flatSchema.payload.vector.values,
-                                    static_cast<size_t>(flatSchema.payload.vector.size)};
+        arrayAccess.vectorVtable = {flatSchema.vtables.vector.values,
+                                    static_cast<size_t>(flatSchema.vtables.vector.size)};
 
         if (sinkProperties.sizeInBytes() == 0 || sinkProperties.data()[0].type != Reflection::MetaType::TypeStruct)
         {
@@ -368,7 +368,7 @@ struct SimpleBinaryReaderVersioned
     };
     Options options;
 
-    Span<const SC::ConstexprStringView> sinkNames;
+    Span<const Reflection::SymbolStringView> sinkNames;
 
     ArrayAccess arrayAccess;
 
@@ -387,14 +387,14 @@ struct SimpleBinaryReaderVersioned
     {
         constexpr auto flatSchema = Reflection::FlatSchemaTypeErased::compile<T>();
         sourceProperties          = schema.sourceProperties;
-        sinkProperties            = flatSchema.propertiesAsSpan();
-        sinkNames                 = flatSchema.namesAsSpan();
+        sinkProperties            = {flatSchema.properties.values, flatSchema.properties.size};
+        sinkNames                 = {flatSchema.names.values, flatSchema.names.size};
         sinkObject                = SpanVoid<void>(&object, sizeof(T));
         sourceObject              = &source;
         sinkTypeIndex             = 0;
         sourceTypeIndex           = 0;
-        arrayAccess.vectorVtable  = {flatSchema.payload.vector.values,
-                                     static_cast<size_t>(flatSchema.payload.vector.size)};
+        arrayAccess.vectorVtable  = {flatSchema.vtables.vector.values,
+                                     static_cast<size_t>(flatSchema.vtables.vector.size)};
 
         if (sourceProperties.sizeInBytes() == 0 ||
             sourceProperties.data()[0].type != Reflection::MetaType::TypeStruct || sinkProperties.sizeInBytes() == 0 ||

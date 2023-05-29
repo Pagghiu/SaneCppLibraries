@@ -1,88 +1,98 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-//------------------------------------------------------------------------
-// Adapted from "C++ Type Loophole" with some changes to count aggregates collapsing arrays
-// Up-to-date source is at GitHub repo: https://github.com/alexpolt/luple
-// Author: Alexandr Poltavsky, http://alexpolt.github.io
-// http://alexpolt.github.io/type-loophole.html
-// Original Code License: Public Domain
-//------------------------------------------------------------------------
 #pragma once
-#include "../Foundation/Language.h"
-#include "../Foundation/TypeList.h"
+#include "ReflectionAuto.h"
+#include "ReflectionMetaType.h"
 
 namespace SC
 {
-template <typename T>
-struct loopholeResult
+namespace Reflection
 {
-    typedef T type;
-};
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wnon-template-friend"
-#endif
-template <typename T, int N>
-struct tag
+namespace AutoAggregates
 {
-    friend auto          loophole(tag<T, N>);
-    constexpr friend int cloophole(tag<T, N>);
-};
-
-template <typename T, typename U, int N, bool B>
-struct fn_def
-{
-    friend auto          loophole(tag<T, N>) { return loopholeResult<U>(); }
-    constexpr friend int cloophole(tag<T, N>) { return 0; }
-};
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
-
-template <typename T, typename U, int N>
-struct fn_def<T, U, N, true>
-{
-};
-
-template <typename T, int N>
-struct c_op
-{
-    template <typename U, int M>
-    static auto inserter(...) -> int;
-    template <typename U, int M, int = cloophole(tag<T, M>{})>
-    static auto inserter(int) -> char;
-
-    template <typename U, int = sizeof(fn_def<T, U, N, sizeof(inserter<U, N>(0)) == sizeof(char)>)>
-    operator U();
-};
-
-template <typename T, typename U>
-struct loophole_TypeList;
-
 template <typename T, int... NN>
-struct loophole_TypeList<T, IntegerSequence<int, NN...>>
-{
-    static constexpr int size = sizeof...(NN);
-    using type                = TypeList<typename decltype(loophole(tag<T, NN>{}))::type...>;
-};
-template <typename T, int... NN>
-constexpr int enumerate_fields_with_aggregates(...)
+constexpr int EnumerateAggregates(...)
 {
     return sizeof...(NN) - 1;
 }
 
 template <typename T, int... NN>
-constexpr auto enumerate_fields_with_aggregates(int) -> decltype(T{{c_op<T, NN>{}}...}, 0)
+constexpr auto EnumerateAggregates(int) -> decltype(T{{Auto::c_op<T, NN>{}}...}, 0)
 {
-    return enumerate_fields_with_aggregates<T, NN..., sizeof...(NN)>(0);
+    return EnumerateAggregates<T, NN..., sizeof...(NN)>(0);
 }
 
 template <typename T>
-using as_TypeList =
-    typename loophole_TypeList<T, MakeIntegerSequence<int, enumerate_fields_with_aggregates<T>(0)>>::type;
+using TypeListFor = typename Auto::type_list<T, Auto::MakeIntegerSequence<int, EnumerateAggregates<T>(0)>>::type;
+
+template <typename T, typename MemberVisitor, int NumMembers>
+struct MetaClassLoopholeVisitor
+{
+    MemberVisitor& builder;
+    size_t         currentOffset = 0;
+
+    template <int Order, typename R>
+    constexpr bool visit()
+    {
+        R T::*ptr = nullptr;
+        // Simulate offsetof(T, f) under assumption that user is not manipulating members packing.
+        currentOffset          = (currentOffset + alignof(R) - 1) & ~(alignof(R) - 1);
+        const auto fieldOffset = currentOffset;
+        currentOffset += sizeof(R);
+        return builder(Order, "", ptr, fieldOffset);
+    }
+};
 
 template <typename T>
-using TypeListFor = as_TypeList<T>;
+struct MetaClassAutomaticAggregates
+{
+    using TypeList = AutoAggregates::TypeListFor<T>;
+    [[nodiscard]] static constexpr MetaType getMetaType() { return MetaType::TypeStruct; }
 
+    template <typename MemberVisitor>
+    static constexpr void build(MemberVisitor& builder)
+    {
+        builder.atoms.template Struct<T>();
+        visit(builder);
+    }
+
+    template <typename MemberVisitor>
+    static constexpr bool visit(MemberVisitor&& builder)
+    {
+        return Auto::MetaTypeListVisit<TypeList, TypeList::size>::visit(
+            MetaClassLoopholeVisitor<T, MemberVisitor, TypeList::size>{builder});
+    }
+
+    template <typename MemberVisitor>
+    struct VisitObjectAdapter
+    {
+        MemberVisitor& builder;
+        T&             object;
+
+        // Cannot be constexpr as we're reinterpret_cast-ing
+        template <typename R, int N>
+        /*constexpr*/ bool operator()(int order, const char (&name)[N], R T::*, size_t offset) const
+        {
+            R& member = *reinterpret_cast<R*>(reinterpret_cast<uint8_t*>(&object) + offset);
+            return builder(order, name, member);
+        }
+    };
+
+    // Cannot be constexpr as we're reinterpret_cast-ing
+    template <typename MemberVisitor>
+    static /*constexpr*/ bool visitObject(MemberVisitor&& builder, T& object)
+    {
+        return visit(VisitObjectAdapter<MemberVisitor>{builder, object});
+    }
+};
+
+} // namespace AutoAggregates
+
+template <typename Class>
+struct MetaClass : public AutoAggregates::MetaClassAutomaticAggregates<Class>
+{
+};
+
+} // namespace Reflection
 } // namespace SC
