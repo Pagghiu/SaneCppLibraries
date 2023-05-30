@@ -3,12 +3,12 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "SerializationBinarySkipper.h" // This can be included in cpp explicitly templatized only with the BinaryReader
-#include "SerializationTemplate.h"
-#include "SerializationTestSuite.h"
+#include "SerializationBinaryTemplate.h"
+#include "SerializationBinaryTestSuite.h"
 
 namespace SC
 {
-struct SerializationTemplateTest;
+struct SerializationBinaryTemplateTest;
 } // namespace SC
 
 namespace SC
@@ -21,7 +21,7 @@ struct SerializerAdapter
     template <typename T>
     bool serialize(T& value)
     {
-        return SC::SerializationTemplate::Serializer<StreamType, T>::serialize(value, stream);
+        return SC::SerializationBinaryTemplate::Serializer<StreamType, T>::serialize(value, stream);
     }
 };
 
@@ -30,7 +30,7 @@ struct SerializerVersionedAdapter
     template <typename T, typename StreamType, typename VersionSchema>
     bool serializeVersioned(T& value, StreamType& stream, VersionSchema& versionSchema)
     {
-        return SC::SerializationTemplate::Serializer<StreamType, T>::serializeVersioned(value, stream, versionSchema);
+        return SC::SerializationBinaryTemplate::Serializer<StreamType, T>::serializeVersioned(value, stream, versionSchema);
     }
 };
 
@@ -76,19 +76,19 @@ struct BinaryReaderStream
 
 namespace SC
 {
-struct SerializationTemplateTest;
+struct SerializationBinaryTemplateTest;
 }
-struct SC::SerializationTemplateTest
-    : public SC::SerializationTestSuite::SerializationTestBase<SC::BinaryWriterStream,                        //
+struct SC::SerializationBinaryTemplateTest
+    : public SC::SerializationBinaryTestSuite::SerializationTestBase<SC::BinaryWriterStream,                        //
                                                                SC::BinaryReaderStream,                        //
                                                                SC::SerializerAdapter<SC::BinaryWriterStream>, //
                                                                SC::SerializerAdapter<SC::BinaryReaderStream>>
 {
-    SerializationTemplateTest(SC::TestReport& report) : SerializationTestBase(report, "SerializationTemplateTest")
+    SerializationBinaryTemplateTest(SC::TestReport& report) : SerializationTestBase(report, "SerializationBinaryTemplateTest")
     {
         runSameVersionTests();
 
         runVersionedTests<SC::Reflection::FlatSchemaTemplated, SerializerVersionedAdapter,
-                          SC::SerializationTemplate::VersionSchema>();
+                          SC::SerializationBinaryTemplate::VersionSchema>();
     }
 };

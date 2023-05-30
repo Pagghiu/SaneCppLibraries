@@ -90,12 +90,12 @@
 		7B515FC829243086006996AA /* SystemTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SystemTest.h; path = ../../../../Libraries/System/SystemTest.h; sourceTree = "<group>"; };
 		7B515FC929243086006996AA /* MapTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MapTest.h; path = ../../../../Libraries/Foundation/MapTest.h; sourceTree = "<group>"; };
 		7B515FCA29243086006996AA /* Segment.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Segment.h; path = ../../../../Libraries/Foundation/Segment.h; sourceTree = "<group>"; };
-		7B515FCB29243086006996AA /* SerializationTestSuite.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTestSuite.h; path = ../../../../Libraries/Serialization/SerializationTestSuite.h; sourceTree = "<group>"; };
+		7B515FCB29243086006996AA /* SerializationBinaryTestSuite.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationBinaryTestSuite.h; path = ../../../../Libraries/Serialization/SerializationBinaryTestSuite.h; sourceTree = "<group>"; };
 		7B515FCC29243086006996AA /* Reflection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Reflection.h; path = ../../../../Libraries/Reflection/Reflection.h; sourceTree = "<group>"; };
 		7B515FCD29243086006996AA /* Function.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Function.h; path = ../../../../Libraries/Foundation/Function.h; sourceTree = "<group>"; };
 		7B515FCE29243086006996AA /* ReflectionSC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionSC.h; path = ../../../../Libraries/Reflection/ReflectionSC.h; sourceTree = "<group>"; };
 		7B515FD029243086006996AA /* FunctionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FunctionTest.h; path = ../../../../Libraries/Foundation/FunctionTest.h; sourceTree = "<group>"; };
-		7B515FD129243086006996AA /* SerializationTypeErased.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTypeErased.h; path = ../../../../Libraries/Serialization/SerializationTypeErased.h; sourceTree = "<group>"; };
+		7B515FD129243086006996AA /* SerializationBinaryTypeErased.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationBinaryTypeErased.h; path = ../../../../Libraries/Serialization/SerializationBinaryTypeErased.h; sourceTree = "<group>"; };
 		7B515FD229243086006996AA /* Assert.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Assert.h; path = ../../../../Libraries/Foundation/Assert.h; sourceTree = "<group>"; };
 		7B515FD329243086006996AA /* ArrayTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ArrayTest.h; path = ../../../../Libraries/Foundation/ArrayTest.h; sourceTree = "<group>"; };
 		7B515FD429243086006996AA /* Memory.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Memory.cpp; path = ../../../../Libraries/Foundation/Memory.cpp; sourceTree = "<group>"; };
@@ -103,16 +103,16 @@
 		7B515FD629243086006996AA /* Limits.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Limits.h; path = ../../../../Libraries/Foundation/Limits.h; sourceTree = "<group>"; };
 		7B515FD729243086006996AA /* Result.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Result.h; path = ../../../../Libraries/Foundation/Result.h; sourceTree = "<group>"; };
 		7B515FD829243086006996AA /* ReflectionMetaType.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionMetaType.h; path = ../../../../Libraries/Reflection/ReflectionMetaType.h; sourceTree = "<group>"; };
-		7B515FD929243086006996AA /* SerializationTemplateTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTemplateTest.h; path = ../../../../Libraries/Serialization/SerializationTemplateTest.h; sourceTree = "<group>"; };
-		7B515FDA29243086006996AA /* SerializationTypeErasedCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTypeErasedCompiler.h; path = ../../../../Libraries/Serialization/SerializationTypeErasedCompiler.h; sourceTree = "<group>"; };
+		7B515FD929243086006996AA /* SerializationBinaryTemplateTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationBinaryTemplateTest.h; path = ../../../../Libraries/Serialization/SerializationBinaryTemplateTest.h; sourceTree = "<group>"; };
+		7B515FDA29243086006996AA /* SerializationBinaryTypeErasedCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationBinaryTypeErasedCompiler.h; path = ../../../../Libraries/Serialization/SerializationBinaryTypeErasedCompiler.h; sourceTree = "<group>"; };
 		7B515FDB29243086006996AA /* ReflectionFoundation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionFoundation.h; path = ../../../../Libraries/Reflection/ReflectionFoundation.h; sourceTree = "<group>"; };
 		7B515FDC29243086006996AA /* System.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = System.h; path = ../../../../Libraries/System/System.h; sourceTree = "<group>"; };
-		7B515FDD29243087006996AA /* SerializationTemplate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTemplate.h; path = ../../../../Libraries/Serialization/SerializationTemplate.h; sourceTree = "<group>"; };
+		7B515FDD29243087006996AA /* SerializationBinaryTemplate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationBinaryTemplate.h; path = ../../../../Libraries/Serialization/SerializationBinaryTemplate.h; sourceTree = "<group>"; };
 		7B515FDE29243087006996AA /* ReflectionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionTest.h; path = ../../../../Libraries/Reflection/ReflectionTest.h; sourceTree = "<group>"; };
 		7B515FDF29243087006996AA /* LibC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = LibC.h; path = ../../../../Libraries/Foundation/LibC.h; sourceTree = "<group>"; };
 		7B515FE029243087006996AA /* Platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Platform.h; path = ../../../../Libraries/Foundation/Platform.h; sourceTree = "<group>"; };
 		7B515FE129243087006996AA /* SmallVector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SmallVector.h; path = ../../../../Libraries/Foundation/SmallVector.h; sourceTree = "<group>"; };
-		7B515FE329243087006996AA /* SerializationTypeErasedTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTypeErasedTest.h; path = ../../../../Libraries/Serialization/SerializationTypeErasedTest.h; sourceTree = "<group>"; };
+		7B515FE329243087006996AA /* SerializationBinaryTypeErasedTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationBinaryTypeErasedTest.h; path = ../../../../Libraries/Serialization/SerializationBinaryTypeErasedTest.h; sourceTree = "<group>"; };
 		7B515FE429243087006996AA /* SystemInternalPosix.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = SystemInternalPosix.inl; path = ../../../../Libraries/System/SystemInternalPosix.inl; sourceTree = "<group>"; };
 		7B515FE529243087006996AA /* Compiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Compiler.h; path = ../../../../Libraries/Foundation/Compiler.h; sourceTree = "<group>"; };
 		7B515FE629243087006996AA /* ConsoleTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ConsoleTest.h; path = ../../../../Libraries/System/ConsoleTest.h; sourceTree = "<group>"; };
@@ -121,7 +121,7 @@
 		7B515FEA29243087006996AA /* Memory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Memory.h; path = ../../../../Libraries/Foundation/Memory.h; sourceTree = "<group>"; };
 		7B515FEB29243087006996AA /* InitializerList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = InitializerList.h; path = ../../../../Libraries/Foundation/InitializerList.h; sourceTree = "<group>"; };
 		7B515FEC29243087006996AA /* Map.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Map.h; path = ../../../../Libraries/Foundation/Map.h; sourceTree = "<group>"; };
-		7B515FED29243087006996AA /* SerializationTemplateCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationTemplateCompiler.h; path = ../../../../Libraries/Serialization/SerializationTemplateCompiler.h; sourceTree = "<group>"; };
+		7B515FED29243087006996AA /* SerializationBinaryTemplateCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationBinaryTemplateCompiler.h; path = ../../../../Libraries/Serialization/SerializationBinaryTemplateCompiler.h; sourceTree = "<group>"; };
 		7B515FEE29243087006996AA /* Console.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Console.cpp; path = ../../../../Libraries/System/Console.cpp; sourceTree = "<group>"; };
 		7B515FEF29243087006996AA /* Language.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Language.h; path = ../../../../Libraries/Foundation/Language.h; sourceTree = "<group>"; };
 		7B515FF029243087006996AA /* Span.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Span.h; path = ../../../../Libraries/Foundation/Span.h; sourceTree = "<group>"; };
@@ -376,13 +376,13 @@
 			isa = PBXGroup;
 			children = (
 				7B515FE829243087006996AA /* SerializationBinarySkipper.h */,
-				7B515FDD29243087006996AA /* SerializationTemplate.h */,
-				7B515FED29243087006996AA /* SerializationTemplateCompiler.h */,
-				7B515FD929243086006996AA /* SerializationTemplateTest.h */,
-				7B515FCB29243086006996AA /* SerializationTestSuite.h */,
-				7B515FD129243086006996AA /* SerializationTypeErased.h */,
-				7B515FDA29243086006996AA /* SerializationTypeErasedCompiler.h */,
-				7B515FE329243087006996AA /* SerializationTypeErasedTest.h */,
+				7B515FDD29243087006996AA /* SerializationBinaryTemplate.h */,
+				7B515FED29243087006996AA /* SerializationBinaryTemplateCompiler.h */,
+				7B515FD929243086006996AA /* SerializationBinaryTemplateTest.h */,
+				7B515FCB29243086006996AA /* SerializationBinaryTestSuite.h */,
+				7B515FD129243086006996AA /* SerializationBinaryTypeErased.h */,
+				7B515FDA29243086006996AA /* SerializationBinaryTypeErasedCompiler.h */,
+				7B515FE329243087006996AA /* SerializationBinaryTypeErasedTest.h */,
 			);
 			name = Serialization;
 			sourceTree = "<group>";

@@ -223,25 +223,25 @@
     <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinarySkipper.h">
       <Filter>Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTemplate.h">
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplate.h">
       <Filter>Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTemplateCompiler.h">
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateCompiler.h">
       <Filter>Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTemplateTest.h">
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateTest.h">
       <Filter>Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTestSuite.h">
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTestSuite.h">
       <Filter>Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTypeErased.h">
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErased.h">
       <Filter>Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTypeErasedCompiler.h">
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedCompiler.h">
       <Filter>Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationTypeErasedTest.h">
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedTest.h">
       <Filter>Serialization</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Reflection\Reflection.h">

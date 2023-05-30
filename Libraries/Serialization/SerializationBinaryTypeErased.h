@@ -4,10 +4,10 @@
 #pragma once
 #include "../Reflection/ReflectionSC.h"
 #include "SerializationBinarySkipper.h"
-#include "SerializationTypeErasedCompiler.h"
+#include "SerializationBinaryTypeErasedCompiler.h"
 namespace SC
 {
-namespace SerializationTypeErased
+namespace SerializationBinaryTypeErased
 {
 struct BinaryBuffer
 {
@@ -652,5 +652,5 @@ struct SimpleBinaryReaderVersioned
         return skipper.skip();
     }
 };
-} // namespace SerializationTypeErased
+} // namespace SerializationBinaryTypeErased
 } // namespace SC

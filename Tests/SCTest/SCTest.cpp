@@ -38,8 +38,8 @@
 #include "../../Libraries/Reflection/ReflectionTest.h"
 
 // Serialization
-#include "../../Libraries/Serialization/SerializationTemplateTest.h"
-#include "../../Libraries/Serialization/SerializationTypeErasedTest.h"
+#include "../../Libraries/Serialization/SerializationBinaryTemplateTest.h"
+#include "../../Libraries/Serialization/SerializationBinaryTypeErasedTest.h"
 
 // Socket
 #include "../../Libraries/Socket/SocketDescriptorTest.h"
@@ -112,8 +112,8 @@ int main(int argc, const char* argv[])
     { ReflectionTest                test(report); }
 
     // Serialization tests
-    { SerializationTemplateTest     test(report); }
-    { SerializationTypeErasedTest   test(report); }
+    { SerializationBinaryTemplateTest     test(report); }
+    { SerializationBinaryTypeErasedTest   test(report); }
 
     // Socket tests
     { SocketDescriptorTest          test(report); }

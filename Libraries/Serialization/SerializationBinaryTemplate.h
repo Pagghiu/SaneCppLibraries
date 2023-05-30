@@ -6,7 +6,7 @@
 #include "../Foundation/Result.h"
 #include "../Foundation/Vector.h"
 #include "../Reflection/ReflectionSC.h"
-#include "SerializationTemplateCompiler.h"
+#include "SerializationBinaryTemplateCompiler.h"
 
 namespace SC
 {
@@ -19,7 +19,7 @@ struct BinarySkipper;
 
 namespace SC
 {
-namespace SerializationTemplate
+namespace SerializationBinaryTemplate
 {
 template <typename BinaryStream, typename T, typename SFINAESelector = void>
 struct Serializer;
@@ -353,5 +353,5 @@ struct Serializer<BinaryStream, T, typename SC::EnableIf<Reflection::IsPrimitive
         return stream.serialize({&object, sizeof(T)});
     }
 };
-} // namespace SerializationTemplate
+} // namespace SerializationBinaryTemplate
 } // namespace SC
