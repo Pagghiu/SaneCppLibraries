@@ -361,10 +361,10 @@
     <ClInclude Include="..\..\..\..\Libraries\Socket\SocketDescriptorTest.h">
       <Filter>Socket</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Json\JsonStreamWriter.h">
+    <ClInclude Include="..\..\..\..\Libraries\Json\JsonFormatter.h">
       <Filter>Json</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Json\JsonStreamWriterTest.h">
+    <ClInclude Include="..\..\..\..\Libraries\Json\JsonFormatterTest.h">
       <Filter>Json</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionMetaType.h">
@@ -375,6 +375,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionFoundation.h">
       <Filter>Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Json\JsonTokenizer.h">
+      <Filter>Json</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Json\JsonTokenizerTest.h">
+      <Filter>Json</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -450,7 +456,10 @@
     <None Include="..\..\..\..\Libraries\File\FileDescriptorInternalWindows.inl">
       <Filter>File</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Json\JsonStreamWriter.inl">
+    <None Include="..\..\..\..\Libraries\Json\JsonFormatter.inl">
+      <Filter>Json</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Json\JsonTokenizer.inl">
       <Filter>Json</Filter>
     </None>
   </ItemGroup>

@@ -164,9 +164,9 @@
 		7B8B919929DB868C0051AF74 /* UniquePtr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = UniquePtr.h; path = ../../../../Libraries/Foundation/UniquePtr.h; sourceTree = "<group>"; };
 		7B8BF9AC29F3BADC0055BC3A /* SocketDescriptor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SocketDescriptor.cpp; path = ../../../../Libraries/Socket/SocketDescriptor.cpp; sourceTree = "<group>"; };
 		7B8BF9AF29F3BADC0055BC3A /* SocketDescriptorTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SocketDescriptorTest.h; path = ../../../../Libraries/Socket/SocketDescriptorTest.h; sourceTree = "<group>"; };
-		7B8DDDC02A2012B300D62F03 /* JsonStreamWriterTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = JsonStreamWriterTest.h; path = ../../../../Libraries/Json/JsonStreamWriterTest.h; sourceTree = "<group>"; };
-		7B8DDDC12A2012B300D62F03 /* JsonStreamWriter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = JsonStreamWriter.h; path = ../../../../Libraries/Json/JsonStreamWriter.h; sourceTree = "<group>"; };
-		7B8DDDC32A2012B300D62F03 /* JsonStreamWriter.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = JsonStreamWriter.inl; path = ../../../../Libraries/Json/JsonStreamWriter.inl; sourceTree = "<group>"; };
+		7B8DDDC02A2012B300D62F03 /* JsonFormatterTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = JsonFormatterTest.h; path = ../../../../Libraries/Json/JsonFormatterTest.h; sourceTree = "<group>"; };
+		7B8DDDC12A2012B300D62F03 /* JsonFormatter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = JsonFormatter.h; path = ../../../../Libraries/Json/JsonFormatter.h; sourceTree = "<group>"; };
+		7B8DDDC32A2012B300D62F03 /* JsonFormatter.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = JsonFormatter.inl; path = ../../../../Libraries/Json/JsonFormatter.inl; sourceTree = "<group>"; };
 		7B8DDDC42A2012B300D62F03 /* Json.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Json.cpp; path = ../../../../Libraries/Json/Json.cpp; sourceTree = "<group>"; };
 		7B91CBEE29B17F470013E95E /* Opaque.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Opaque.h; path = ../../../../Libraries/Foundation/Opaque.h; sourceTree = "<group>"; };
 		7B91CBEF29B17F470013E95E /* OpaqueTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OpaqueTest.h; path = ../../../../Libraries/Foundation/OpaqueTest.h; sourceTree = "<group>"; };
@@ -391,12 +391,12 @@
 			isa = PBXGroup;
 			children = (
 				7B8DDDC42A2012B300D62F03 /* Json.cpp */,
+				7B8DDDC12A2012B300D62F03 /* JsonFormatter.h */,
+				7B8DDDC32A2012B300D62F03 /* JsonFormatter.inl */,
+				7B8DDDC02A2012B300D62F03 /* JsonFormatterTest.h */,
 				7BBF439E2A215A4F00762DBF /* JsonTokenizer.h */,
 				7BBF439D2A215A4F00762DBF /* JsonTokenizer.inl */,
 				7BBF439F2A215A4F00762DBF /* JsonTokenizerTest.h */,
-				7B8DDDC12A2012B300D62F03 /* JsonStreamWriter.h */,
-				7B8DDDC32A2012B300D62F03 /* JsonStreamWriter.inl */,
-				7B8DDDC02A2012B300D62F03 /* JsonStreamWriterTest.h */,
 			);
 			name = Json;
 			sourceTree = "<group>";

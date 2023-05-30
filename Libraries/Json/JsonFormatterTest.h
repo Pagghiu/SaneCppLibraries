@@ -5,39 +5,39 @@
 #include "../Foundation/SmallVector.h"
 #include "../Foundation/String.h"
 #include "../Testing/Test.h"
-#include "JsonStreamWriter.h"
+#include "JsonFormatter.h"
 
 namespace SC
 {
-struct JsonStreamWriterTest;
+struct JsonFormatterTest;
 }
 
-struct SC::JsonStreamWriterTest : public SC::TestCase
+struct SC::JsonFormatterTest : public SC::TestCase
 {
-    JsonStreamWriterTest(SC::TestReport& report) : TestCase(report, "JsonStreamWriterTest")
+    JsonFormatterTest(SC::TestReport& report) : TestCase(report, "JsonFormatterTest")
     {
-        if (test_section("JsonStreamWriter::value"))
+        if (test_section("JsonFormatter::value"))
         {
-            SmallVector<JsonStreamWriter::State, 100> nestedStates;
+            SmallVector<JsonFormatter::State, 100> nestedStates;
 
             SmallString<255>   buffer;
             StringFormatOutput output(StringEncoding::Ascii);
             output.redirectToBuffer(buffer.data);
-            JsonStreamWriter writer(nestedStates, output);
+            JsonFormatter writer(nestedStates, output);
             constexpr float  fValue = 1.2f;
             SC_TEST_EXPECT(writer.writeFloat(fValue));
             float value;
             SC_TEST_EXPECT(buffer.view().parseFloat(value) and value == fValue);
         }
-        if (test_section("JsonStreamWriter::array"))
+        if (test_section("JsonFormatter::array"))
         {
-            SmallVector<JsonStreamWriter::State, 100> nestedStates;
+            SmallVector<JsonFormatter::State, 100> nestedStates;
 
             SmallString<255>   buffer;
             StringFormatOutput output(StringEncoding::Ascii);
             output.redirectToBuffer(buffer.data);
             {
-                JsonStreamWriter writer(nestedStates, output);
+                JsonFormatter writer(nestedStates, output);
                 SC_TEST_EXPECT(writer.startArray());
                 SC_TEST_EXPECT(writer.startArray());
                 SC_TEST_EXPECT(writer.endArray());
@@ -52,15 +52,15 @@ struct SC::JsonStreamWriterTest : public SC::TestCase
             }
             SC_TEST_EXPECT(buffer.view() == "[[],123,[\"456\",false,null],-678]"_a8);
         }
-        if (test_section("JsonStreamWriter::object"))
+        if (test_section("JsonFormatter::object"))
         {
-            SmallVector<JsonStreamWriter::State, 100> nestedStates;
+            SmallVector<JsonFormatter::State, 100> nestedStates;
 
             SmallString<255>   buffer;
             StringFormatOutput output(StringEncoding::Ascii);
             output.redirectToBuffer(buffer.data);
             {
-                JsonStreamWriter writer(nestedStates, output);
+                JsonFormatter writer(nestedStates, output);
                 SC_TEST_EXPECT(writer.startObject());
                 SC_TEST_EXPECT(not writer.writeUint64(123));
                 SC_TEST_EXPECT(writer.objectFieldName("a"));

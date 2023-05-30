@@ -6,14 +6,14 @@
 
 namespace SC
 {
-struct JsonStreamWriter;
+struct JsonFormatter;
 
 struct StringFormatOutput;
 template <typename T>
 struct Vector;
 } // namespace SC
 
-struct SC::JsonStreamWriter
+struct SC::JsonFormatter
 {
     enum State
     {
@@ -23,7 +23,7 @@ struct SC::JsonStreamWriter
         Object,
         ObjectValue
     };
-    JsonStreamWriter(Vector<State>& state, StringFormatOutput& output);
+    JsonFormatter(Vector<State>& state, StringFormatOutput& output);
 
     [[nodiscard]] bool writeFloat(float value);
     [[nodiscard]] bool writeDouble(double value);

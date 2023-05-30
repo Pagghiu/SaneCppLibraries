@@ -28,7 +28,7 @@
 #include "../../Libraries/FileSystem/PathTest.h"
 
 // JSON
-#include "../../Libraries/Json/JsonStreamWriterTest.h"
+#include "../../Libraries/Json/JsonFormatterTest.h"
 #include "../../Libraries/Json/JsonTokenizerTest.h"
 
 // Process
@@ -102,7 +102,7 @@ int main(int argc, const char* argv[])
     { PathTest                      test(report); }
 
     // JSON tests
-    { JsonStreamWriterTest          test(report); }
+    { JsonFormatterTest             test(report); }
     { JsonTokenizerTest             test(report); }
 
     // Process tests
