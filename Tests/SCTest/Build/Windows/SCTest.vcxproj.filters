@@ -98,6 +98,9 @@
     <ClCompile Include="..\..\..\..\Libraries\Json\Json.cpp">
       <Filter>Json</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Serialization\Serialization.cpp">
+      <Filter>Serialization</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h">
@@ -219,30 +222,6 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerTest.h">
       <Filter>FileSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinarySkipper.h">
-      <Filter>Serialization</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplate.h">
-      <Filter>Serialization</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateCompiler.h">
-      <Filter>Serialization</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateTest.h">
-      <Filter>Serialization</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTestSuite.h">
-      <Filter>Serialization</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErased.h">
-      <Filter>Serialization</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedCompiler.h">
-      <Filter>Serialization</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedTest.h">
-      <Filter>Serialization</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Reflection\Reflection.h">
       <Filter>Reflection</Filter>
@@ -381,6 +360,39 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonTokenizerTest.h">
       <Filter>Json</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationJson.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationJsonCompiler.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationJsonTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinarySkipper.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateCompiler.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateReadWriteFast.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateReadVersioned.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateTest.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTestSuite.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedCompiler.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedReadWriteFast.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedReadVersioned.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedTest.h">
+      <Filter>Serialization</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

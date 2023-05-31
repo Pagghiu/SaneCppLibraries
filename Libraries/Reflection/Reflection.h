@@ -11,6 +11,7 @@
 #endif
 #endif
 
+#include "../Foundation/Limits.h" // MaxValue
 #include "ReflectionFoundation.h"
 #include "ReflectionMetaType.h"
 

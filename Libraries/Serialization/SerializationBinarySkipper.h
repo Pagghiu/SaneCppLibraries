@@ -4,12 +4,27 @@
 #pragma once
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
+#include "../Foundation/Vector.h"
 #include "../Reflection/Reflection.h"
 
 namespace SC
 {
 namespace Serialization
 {
+// TODO: BinaryBuffer needs to go with once we transition to streaming interface
+struct BinaryBuffer
+{
+    SC::Vector<uint8_t> buffer;
+
+    size_t index              = 0;
+    int    numberOfOperations = 0;
+
+    [[nodiscard]] bool serialize(SpanVoid<const void> object);
+    [[nodiscard]] bool serialize(SpanVoid<void> object);
+    [[nodiscard]] bool advance(size_t numBytes);
+};
+
+// TODO: BinarySkipper should go out of header once we replace BinaryBuffer with a streaming interface
 template <typename BinaryStream>
 struct BinarySkipper
 {
@@ -47,9 +62,9 @@ struct BinarySkipper
     {
         const auto structSourceProperty  = sourceProperty;
         const auto structSourceTypeIndex = sourceTypeIndex;
-        const bool isBulkWriteable       = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
+        const bool isPacked              = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
 
-        if (isBulkWriteable)
+        if (isPacked)
         {
             SC_TRY_IF(sourceObject.advance(structSourceProperty.sizeInBytes));
         }
@@ -78,8 +93,8 @@ struct BinarySkipper
             SC_TRY_IF(sourceObject.serialize(SpanVoid<void>(&sourceNumBytes, sizeof(uint64_t))));
         }
 
-        const bool isBulkWriteable = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
-        if (isBulkWriteable)
+        const bool isPacked = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
+        if (isPacked)
         {
             return sourceObject.advance(sourceNumBytes);
         }

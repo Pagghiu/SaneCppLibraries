@@ -326,6 +326,7 @@
     <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Json\Json.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Serialization\Serialization.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Socket\SocketDescriptor.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\System\Console.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp" />
@@ -362,6 +363,16 @@
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAuto.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionFoundation.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionMetaType.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinarySkipper.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateCompiler.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateReadWriteFast.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateReadVersioned.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTestSuite.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedCompiler.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedReadWriteFast.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedReadVersioned.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Socket\SocketDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\Process\ProcessDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\File\FileDescriptor.h" />
@@ -429,14 +440,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionFlatSchemaCompiler.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionSC.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionTest.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinarySkipper.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplate.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateCompiler.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateTest.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTestSuite.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErased.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedCompiler.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\Threading.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\ThreadingTest.h" />
   </ItemGroup>

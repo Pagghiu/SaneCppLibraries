@@ -4,25 +4,26 @@
 #pragma once
 #include "../Testing/Test.h"
 #include "SerializationBinaryTestSuite.h"
-#include "SerializationBinaryTypeErased.h"
+#include "SerializationBinaryTypeErasedReadVersioned.h"
+#include "SerializationBinaryTypeErasedReadWriteFast.h"
 
 namespace SC
 {
 struct SerializationBinaryTypeErasedTest;
 
 }
-struct SC::SerializationBinaryTypeErasedTest
-    : public SC::SerializationBinaryTestSuite::SerializationTestBase<SC::SerializationBinaryTypeErased::BinaryBuffer,       //
-                                                               SC::SerializationBinaryTypeErased::BinaryBuffer,       //
-                                                               SC::SerializationBinaryTypeErased::SimpleBinaryWriter, //
-                                                               SC::SerializationBinaryTypeErased::SimpleBinaryReader>
+struct SC::SerializationBinaryTypeErasedTest : public SC::SerializationBinaryTestSuite::SerializationTestBase<
+                                                   SC::Serialization::BinaryBuffer,                            //
+                                                   SC::Serialization::BinaryBuffer,                            //
+                                                   SC::SerializationBinaryTypeErased::SerializerReadWriteFast, //
+                                                   SC::SerializationBinaryTypeErased::SimpleBinaryReader>
 {
-    SerializationBinaryTypeErasedTest(SC::TestReport& report) : SerializationTestBase(report, "SerializationBinaryTypeErasedTest")
+    SerializationBinaryTypeErasedTest(SC::TestReport& report)
+        : SerializationTestBase(report, "SerializationBinaryTypeErasedTest")
     {
         runSameVersionTests();
-        runVersionedTests<
-            SC::Reflection::FlatSchemaTypeErased,
-            SC::SerializationBinaryTypeErased::SimpleBinaryReaderVersioned<SC::SerializationBinaryTypeErased::BinaryBuffer>,
-            SC::SerializationBinaryTypeErased::VersionSchema>();
+        runVersionedTests<SC::Reflection::FlatSchemaTypeErased,
+                          SC::SerializationBinaryTypeErased::SerializerReadVersioned,
+                          SC::SerializationBinaryTypeErased::VersionSchema>();
     }
 };

@@ -138,4 +138,28 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
 using FlatSchemaTypeErased = Reflection::FlatSchemaCompiler<MetaClassBuilderTypeErased>;
 
 } // namespace Reflection
+
+namespace SerializationBinaryTypeErased
+{
+
+struct ArrayAccess
+{
+    Span<const Reflection::VectorVTable> vectorVtable;
+
+    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::MetaProperties property, SpanVoid<void> object,
+                                      SpanVoid<void>& itemBegin);
+    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::MetaProperties property, SpanVoid<const void> object,
+                                      SpanVoid<const void>& itemBegin);
+
+    typedef Reflection::VectorVTable::DropEccessItems DropEccessItems;
+    enum class Initialize
+    {
+        No,
+        Yes
+    };
+
+    bool resize(uint32_t linkID, SpanVoid<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
+                Initialize initialize, DropEccessItems dropEccessItems);
+};
+} // namespace SerializationBinaryTypeErased
 } // namespace SC

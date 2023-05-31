@@ -383,7 +383,7 @@ struct SC::SerializationBinaryTestSuite::SerializationTestBase : public SC::Test
             streamReader.buffer = move(streamWriter.buffer);
             VersionSchema versionSchema;
             versionSchema.sourceProperties = {schema.properties.values, schema.properties.size};
-            SC_TEST_EXPECT(reader.serializeVersioned(struct2, streamReader, versionSchema));
+            SC_TEST_EXPECT(reader.readVersioned(struct2, streamReader, versionSchema));
             SC_TEST_EXPECT(streamReader.index == streamReader.buffer.size());
             SC_TEST_EXPECT(not(struct2 != struct1));
         }
@@ -404,7 +404,7 @@ struct SC::SerializationBinaryTestSuite::SerializationTestBase : public SC::Test
             streamReader.buffer = move(streamWriter.buffer);
             VersionSchema versionSchema;
             versionSchema.sourceProperties = {schema.properties.values, schema.properties.size};
-            SC_TEST_EXPECT(reader.serializeVersioned(array2, streamReader, versionSchema));
+            SC_TEST_EXPECT(reader.readVersioned(array2, streamReader, versionSchema));
             SC_TEST_EXPECT(streamReader.index == streamReader.buffer.size());
             SC_TEST_EXPECT(array2.points.size() == 2);
             SC_TEST_EXPECT(array1.simpleInts.size() == 3); // It's dropping one element
@@ -424,7 +424,7 @@ struct SC::SerializationBinaryTestSuite::SerializationTestBase : public SC::Test
             streamReader.buffer = move(streamWriter.buffer);
             VersionSchema versionSchema;
             versionSchema.sourceProperties = {schema.properties.values, schema.properties.size};
-            SC_TEST_EXPECT(reader.serializeVersioned(struct2, streamReader, versionSchema));
+            SC_TEST_EXPECT(reader.readVersioned(struct2, streamReader, versionSchema));
             SC_TEST_EXPECT(streamReader.index == streamReader.buffer.size());
             SC_TEST_EXPECT(struct2.intToFloat == struct1.intToFloat);
             SC_TEST_EXPECT(struct2.floatToInt == struct1.floatToInt);

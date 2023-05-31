@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "SerializationBinarySkipper.h" // This can be included in cpp explicitly templatized only with the BinaryReader
-#include "SerializationBinaryTemplate.h"
+#include "SerializationBinaryTemplateReadVersioned.h"
+#include "SerializationBinaryTemplateReadWriteFast.h"
 #include "SerializationBinaryTestSuite.h"
 
 namespace SC
@@ -21,56 +21,28 @@ struct SerializerAdapter
     template <typename T>
     bool serialize(T& value)
     {
-        return SC::SerializationBinaryTemplate::Serializer<StreamType, T>::serialize(value, stream);
+        return SC::SerializationBinaryTemplate::SerializerReadWriteFast<StreamType, T>::serialize(value, stream);
     }
 };
 
-struct SerializerVersionedAdapter
+struct SerializerReadVersionedAdapter
 {
     template <typename T, typename StreamType, typename VersionSchema>
-    bool serializeVersioned(T& value, StreamType& stream, VersionSchema& versionSchema)
+    bool readVersioned(T& value, StreamType& stream, VersionSchema& versionSchema)
     {
-        return SC::SerializationBinaryTemplate::Serializer<StreamType, T>::serializeVersioned(value, stream, versionSchema);
+        return SC::SerializationBinaryTemplate::SerializerReadVersioned<StreamType, T>::readVersioned(value, stream,
+                                                                                                      versionSchema);
     }
 };
 
-struct BinaryWriterStream
+struct BinaryWriterStream : public SC::Serialization::BinaryBuffer
 {
-    SC::Vector<uint8_t> buffer;
-    int                 numberOfOperations = 0;
-
-    [[nodiscard]] bool serialize(SpanVoid<const void> object)
-    {
-        numberOfOperations++;
-        Span<const uint8_t> bytes = object.castTo<const uint8_t>();
-        return buffer.appendCopy(bytes.data(), bytes.sizeInBytes());
-    }
+    [[nodiscard]] bool serialize(SpanVoid<const void> object) { return BinaryBuffer::serialize(object); }
 };
 
-struct BinaryReaderStream
+struct BinaryReaderStream : public SC::Serialization::BinaryBuffer
 {
-    size_t              index = 0;
-    SC::Vector<uint8_t> buffer;
-    int                 numberOfOperations = 0;
-
-    [[nodiscard]] bool serialize(SpanVoid<void> object)
-    {
-        if (index + object.sizeInBytes() > buffer.size())
-            return false;
-        numberOfOperations++;
-        Span<uint8_t> bytes = object.castTo<uint8_t>();
-        memcpy(bytes.data(), &buffer[index], bytes.sizeInBytes());
-        index += bytes.sizeInBytes();
-        return true;
-    }
-
-    [[nodiscard]] bool advance(size_t numBytes)
-    {
-        if (index + numBytes > buffer.size())
-            return false;
-        index += numBytes;
-        return true;
-    }
+    [[nodiscard]] bool serialize(SpanVoid<void> object) { return BinaryBuffer::serialize(object); }
 };
 } // namespace SC
 
@@ -80,15 +52,16 @@ struct SerializationBinaryTemplateTest;
 }
 struct SC::SerializationBinaryTemplateTest
     : public SC::SerializationBinaryTestSuite::SerializationTestBase<SC::BinaryWriterStream,                        //
-                                                               SC::BinaryReaderStream,                        //
-                                                               SC::SerializerAdapter<SC::BinaryWriterStream>, //
-                                                               SC::SerializerAdapter<SC::BinaryReaderStream>>
+                                                                     SC::BinaryReaderStream,                        //
+                                                                     SC::SerializerAdapter<SC::BinaryWriterStream>, //
+                                                                     SC::SerializerAdapter<SC::BinaryReaderStream>>
 {
-    SerializationBinaryTemplateTest(SC::TestReport& report) : SerializationTestBase(report, "SerializationBinaryTemplateTest")
+    SerializationBinaryTemplateTest(SC::TestReport& report)
+        : SerializationTestBase(report, "SerializationBinaryTemplateTest")
     {
         runSameVersionTests();
 
-        runVersionedTests<SC::Reflection::FlatSchemaTemplated, SerializerVersionedAdapter,
+        runVersionedTests<SC::Reflection::FlatSchemaTemplated, SerializerReadVersionedAdapter,
                           SC::SerializationBinaryTemplate::VersionSchema>();
     }
 };

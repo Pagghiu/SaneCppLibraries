@@ -57,6 +57,7 @@ Libraries/Foundation/StringView.cpp         \
 Libraries/Json/Json.cpp                     \
 Libraries/Process/Process.cpp               \
 Libraries/Socket/SocketDescriptor.cpp       \
+Libraries/Serialization/Serialization.cpp   \
 Libraries/System/Console.cpp                \
 Libraries/System/System.cpp                 \
 Libraries/System/Time.cpp                   \
