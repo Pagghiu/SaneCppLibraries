@@ -4,3 +4,4 @@
 
 #include "SerializationBinaryTypeErasedReadVersioned.inl"
 #include "SerializationBinaryTypeErasedReadWriteFast.inl"
+#include "SerializationStructuredJson.inl"

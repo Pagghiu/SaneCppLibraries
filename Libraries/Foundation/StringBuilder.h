@@ -10,7 +10,7 @@ namespace SC
 struct String;
 struct StringBuilder
 {
-    StringBuilder(String& backingString) : backingString(backingString) {}
+    constexpr StringBuilder(String& backingString) : backingString(backingString) {}
 
     template <typename... Types>
     [[nodiscard]] bool format(StringView fmt, Types&&... args)

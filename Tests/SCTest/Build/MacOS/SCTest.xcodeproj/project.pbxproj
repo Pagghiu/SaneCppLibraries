@@ -74,6 +74,7 @@
 		7B19C9AB297AF95B001C0627 /* Path.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Path.h; path = ../../../../Libraries/FileSystem/Path.h; sourceTree = "<group>"; };
 		7B1A39FA29BA7B220087F688 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 		7B1FCC2429ECBDAF001D75F7 /* AlgorithmSort.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AlgorithmSort.h; path = ../../../../Libraries/Foundation/AlgorithmSort.h; sourceTree = "<group>"; };
+		7B20B39D2A27FCE400110F52 /* SerializationStructuredJsonTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SerializationStructuredJsonTest.h; path = ../../../../Libraries/Serialization/SerializationStructuredJsonTest.h; sourceTree = "<group>"; };
 		7B27836029EBE4F0002CA0A4 /* StringFormatTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StringFormatTest.h; path = ../../../../Libraries/Foundation/StringFormatTest.h; sourceTree = "<group>"; };
 		7B281DBF29E2BAF400363F69 /* EventLoopWindows.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = EventLoopWindows.h; path = ../../../../Libraries/Async/EventLoopWindows.h; sourceTree = "<group>"; };
 		7B2AEB1729D0DA4C003E1B6F /* Atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Atomic.h; path = ../../../../Libraries/Threading/Atomic.h; sourceTree = "<group>"; };
@@ -157,8 +158,11 @@
 		7B67008C29C28DF600174AB8 /* IntrusiveDoubleLinkedList.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = IntrusiveDoubleLinkedList.h; path = ../../../../Libraries/Foundation/IntrusiveDoubleLinkedList.h; sourceTree = "<group>"; };
 		7B67008D29C28DF600174AB8 /* IntrusiveDoubleLinkedListTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = IntrusiveDoubleLinkedListTest.h; path = ../../../../Libraries/Foundation/IntrusiveDoubleLinkedListTest.h; sourceTree = "<group>"; };
 		7B6A1E9F29B2B07F00DDCF40 /* TimeTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TimeTest.h; path = ../../../../Libraries/System/TimeTest.h; sourceTree = "<group>"; };
+		7B70AA5E2A2B97330047BD29 /* SerializationStructuredJson.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SerializationStructuredJson.h; path = ../../../../Libraries/Serialization/SerializationStructuredJson.h; sourceTree = "<group>"; };
+		7B70AA5F2A2B9D250047BD29 /* SerializationStructuredJson.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SerializationStructuredJson.inl; path = ../../../../Libraries/Serialization/SerializationStructuredJson.inl; sourceTree = "<group>"; };
 		7B75258629A16F8000779F2A /* OptionalTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OptionalTest.h; path = ../../../../Libraries/Foundation/OptionalTest.h; sourceTree = "<group>"; };
 		7B75258729A16F8000779F2A /* Optional.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Optional.h; path = ../../../../Libraries/Foundation/Optional.h; sourceTree = "<group>"; };
+		7B7B53A22A2B254100FA751E /* SerializationStructuredReadWriteFast.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SerializationStructuredReadWriteFast.h; path = ../../../../Libraries/Serialization/SerializationStructuredReadWriteFast.h; sourceTree = "<group>"; };
 		7B872C4629AFF1D900949BD2 /* SystemInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SystemInternalApple.inl; path = ../../../../Libraries/System/SystemInternalApple.inl; sourceTree = "<group>"; };
 		7B872C4829AFFC4900949BD2 /* ThreadingInternalPosix.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = ThreadingInternalPosix.inl; path = ../../../../Libraries/Threading/ThreadingInternalPosix.inl; sourceTree = "<group>"; };
 		7B872C4929AFFC4900949BD2 /* ThreadingInternalWindows.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = ThreadingInternalWindows.inl; path = ../../../../Libraries/Threading/ThreadingInternalWindows.inl; sourceTree = "<group>"; };
@@ -394,6 +398,10 @@
 				7B515FD129243086006996AA /* SerializationBinaryTypeErasedReadWriteFast.h */,
 				7B3AAB712A27E04C00F814A2 /* SerializationBinaryTypeErasedReadWriteFast.inl */,
 				7B515FE329243087006996AA /* SerializationBinaryTypeErasedTest.h */,
+				7B70AA5E2A2B97330047BD29 /* SerializationStructuredJson.h */,
+				7B70AA5F2A2B9D250047BD29 /* SerializationStructuredJson.inl */,
+				7B20B39D2A27FCE400110F52 /* SerializationStructuredJsonTest.h */,
+				7B7B53A22A2B254100FA751E /* SerializationStructuredReadWriteFast.h */,
 			);
 			name = Serialization;
 			sourceTree = "<group>";

@@ -373,6 +373,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedReadWriteFast.h" />
     <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedReadVersioned.h" />
     <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationStructuredJson.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationStructuredJsonTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationStructuredReadWriteFast.h" />
     <ClInclude Include="..\..\..\..\Libraries\Socket\SocketDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\Process\ProcessDescriptor.h" />
     <ClInclude Include="..\..\..\..\Libraries\File\FileDescriptor.h" />
@@ -452,6 +455,7 @@
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\Json\JsonFormatter.inl" />
     <None Include="..\..\..\..\Libraries\Json\JsonTokenizer.inl" />
+    <None Include="..\..\..\..\Libraries\Serialization\SerializationStructuredJson.inl" />
     <None Include="..\..\..\..\Libraries\Socket\SocketDescriptorInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\Socket\SocketDescriptorInternalWindows.inl" />
     <None Include="..\..\..\..\Libraries\File\FileDescriptorInternalPosix.inl" />

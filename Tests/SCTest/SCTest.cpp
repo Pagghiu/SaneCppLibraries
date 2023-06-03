@@ -40,6 +40,7 @@
 // Serialization
 #include "../../Libraries/Serialization/SerializationBinaryTemplateTest.h"
 #include "../../Libraries/Serialization/SerializationBinaryTypeErasedTest.h"
+#include "../../Libraries/Serialization/SerializationStructuredJsonTest.h"
 
 // Socket
 #include "../../Libraries/Socket/SocketDescriptorTest.h"
@@ -112,8 +113,9 @@ int main(int argc, const char* argv[])
     { ReflectionTest                test(report); }
 
     // Serialization tests
-    { SerializationBinaryTemplateTest     test(report); }
-    { SerializationBinaryTypeErasedTest   test(report); }
+    { SerializationBinaryTemplateTest   test(report); }
+    { SerializationBinaryTypeErasedTest test(report); }
+    { SerializationStructuredJsonTest   test(report); }
 
     // Socket tests
     { SocketDescriptorTest          test(report); }
