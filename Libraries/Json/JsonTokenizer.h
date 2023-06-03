@@ -32,22 +32,21 @@ struct SC::JsonTokenizer
         constexpr Token() : type(Invalid) {}
 
         Type   type;
-        size_t tokenStartBytes = 0;
-        size_t tokenLength     = 0;
+        size_t tokenStartBytes  = 0;
+        size_t tokenLengthBytes = 0;
 
         constexpr StringView getToken(StringView source) const
         {
             SC_DEBUG_ASSERT(StringEncodingGetSize(source.getEncoding()) == 1);
-            return source.sliceStartLength(tokenStartBytes, tokenLength); // Assuming it's utf8 or ASCII
+            return source.sliceStartLength(tokenStartBytes, tokenLengthBytes); // Assuming it's utf8 or ASCII
         }
     };
 
     // Return false when iterator is at end
-    [[nodiscard]] static constexpr bool tokenizeNext(StringIteratorASCII& it, Token& token, size_t tokenStartBytes)
+    [[nodiscard]] static constexpr bool tokenizeNext(StringIteratorASCII& it, Token& token)
     {
         if (skipWhitespaces(it))
         {
-            token.tokenStartBytes = tokenStartBytes;
             return scanToken(it, token);
         }
         return false;
@@ -73,33 +72,36 @@ struct SC::JsonTokenizer
         case 'f': tokenizeFalse(it, token); break;
         case 'n': tokenizeNull(it, token); break;
         case '"': tokenizeString(it, start, token); return true;
-        default: tokenizeNumber(it, token); break;
+        default: tokenizeNumber(it, current, token); break;
         }
-        token.tokenLength = static_cast<size_t>(it.bytesDistanceFrom(start));
+        token.tokenLengthBytes = static_cast<size_t>(it.bytesDistanceFrom(start));
+        auto realStart         = start;
+        realStart.setToStart();
+        token.tokenStartBytes = static_cast<size_t>(start.bytesDistanceFrom(realStart));
         return true;
     }
 
   private:
-    struct WhitespaceTable
+    struct SkipTable
     {
-        bool isWhitespace[256] = {false};
-        constexpr WhitespaceTable()
+        bool matches[256] = {false};
+        constexpr SkipTable(std::initializer_list<char> chars)
         {
-            isWhitespace['\t'] = true;
-            isWhitespace['\n'] = true;
-            isWhitespace['\r'] = true;
-            isWhitespace[' ']  = true;
+            for (auto c : chars)
+            {
+                matches[c] = true;
+            }
         }
     };
 
     // Returns false when iterator is at end
     [[nodiscard]] static constexpr bool skipWhitespaces(StringIteratorASCII& it)
     {
-        constexpr WhitespaceTable table;
-        char                      current = 0;
+        constexpr SkipTable table({'\t', '\n', '\r', ' '});
+        char                current = 0;
         while (it.advanceRead(current))
         {
-            if (not table.isWhitespace[current])
+            if (not table.matches[current])
             {
                 break;
             }
@@ -115,28 +117,37 @@ struct SC::JsonTokenizer
             if (it.isPrecededBy('\\')) // if the quote is escaped continue search
                 continue;
             StringIteratorASCII startNext = start;
-            (void)startNext.stepForward(); // but let's slice away leading '"'
-            token.type = Token::String;    // Ok we have an (unvalidated) string
-            token.tokenStartBytes += static_cast<size_t>(startNext.bytesDistanceFrom(start));
-            token.tokenLength = static_cast<size_t>(it.bytesDistanceFrom(startNext));
+            (void)startNext.stepForward();  // but let's slice away leading '"'
+            token.type     = Token::String; // Ok we have an (unvalidated) string
+            auto realStart = start;
+            realStart.setToStart();
+            token.tokenStartBytes  = static_cast<size_t>(startNext.bytesDistanceFrom(realStart));
+            token.tokenLengthBytes = static_cast<size_t>(it.bytesDistanceFrom(startNext));
+            (void)it.advanceCodePoints(1); // eat the ending \" in the iterator
             break;
         }
     }
-    static constexpr void tokenizeNumber(StringIteratorASCII& it, Token& token)
+    static constexpr void tokenizeNumber(StringIteratorASCII& it, char previousChar, Token& token)
     {
-        // eat all non whitespaces that could possibly form a number (to be validated)
-        constexpr WhitespaceTable table;
+        // eat all non whitespaces that could possibly form a number (to be validated, as it may contain multiple dots)
+        constexpr SkipTable numbersTable({'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.'});
 
-        char current                 = 0;
-        bool atLeastOneNonWhitespace = false;
+        if (not numbersTable.matches[previousChar])
+        {
+            return;
+        }
+        char current = 0;
         while (it.advanceRead(current))
         {
-            if (table.isWhitespace[current])
+            if (not numbersTable.matches[current])
+            {
+                // not dot and not number
+                (void)it.stepBackward(); // put it back
                 break;
-            atLeastOneNonWhitespace = true;
+            }
         }
-        if (atLeastOneNonWhitespace)
-            token.type = Token::Number; // Ok we have an (unvalidated) number
+
+        token.type = Token::Number;
     }
 
     static constexpr void tokenizeTrue(StringIteratorASCII& it, Token& token)

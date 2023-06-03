@@ -23,8 +23,8 @@ struct SC::JsonFormatterTest : public SC::TestCase
             SmallString<255>   buffer;
             StringFormatOutput output(StringEncoding::Ascii);
             output.redirectToBuffer(buffer.data);
-            JsonFormatter writer(nestedStates, output);
-            constexpr float  fValue = 1.2f;
+            JsonFormatter   writer(nestedStates, output);
+            constexpr float fValue = 1.2f;
             SC_TEST_EXPECT(writer.writeFloat(fValue));
             float value;
             SC_TEST_EXPECT(buffer.view().parseFloat(value) and value == fValue);

@@ -13,6 +13,7 @@ template <typename T>
 struct Vector;
 } // namespace SC
 
+// TODO: This class could be deleted potentially, unless we like to allow some dynamic formatting
 struct SC::JsonFormatter
 {
     enum State
@@ -24,7 +25,11 @@ struct SC::JsonFormatter
         ObjectValue
     };
     JsonFormatter(Vector<State>& state, StringFormatOutput& output);
-
+    struct Options
+    {
+        uint8_t floatDigits = 2;
+    };
+    [[nodiscard]] bool setOptions(Options options);
     [[nodiscard]] bool writeFloat(float value);
     [[nodiscard]] bool writeDouble(double value);
     [[nodiscard]] bool writeInt8(int8_t value);
@@ -43,9 +48,11 @@ struct SC::JsonFormatter
     [[nodiscard]] bool endObject();
 
   private:
-    bool onBeforeValue();
-    bool onAfterValue();
-    bool writeSeparator();
+    Options options;
+    char    floatFormat[10];
+    bool    onBeforeValue();
+    bool    onAfterValue();
+    bool    writeSeparator();
 
     enum RunState
     {

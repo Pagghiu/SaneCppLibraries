@@ -7,9 +7,16 @@
 #include "JsonFormatter.h"
 
 #include <stdio.h> // snprintf
+#include <string.h>
 
 SC::JsonFormatter::JsonFormatter(Vector<State>& state, StringFormatOutput& output) : state(state), output(output)
-{}
+{
+#if SC_MSVC
+    strcpy_s(floatFormat, "%.2f");
+#else
+    strcpy(floatFormat, "%.2f");
+#endif
+}
 
 bool SC::JsonFormatter::writeSeparator()
 {
@@ -37,6 +44,13 @@ bool SC::JsonFormatter::writeSeparator()
         }
     }
     return true;
+}
+bool SC::JsonFormatter::setOptions(Options opt)
+{
+    options       = opt;
+    const int res = snprintf(floatFormat, sizeof(floatFormat), "%%.%df", options.floatDigits);
+
+    return res > 0;
 }
 
 bool SC::JsonFormatter::onBeforeValue()
@@ -94,13 +108,13 @@ bool SC::JsonFormatter::writeValue(int writtenChars, const char* buffer)
 bool SC::JsonFormatter::writeFloat(float value)
 {
     char buffer[100];
-    return writeValue(snprintf(buffer, sizeof(buffer), "%f", value), buffer);
+    return writeValue(snprintf(buffer, sizeof(buffer), floatFormat, value), buffer);
 }
 
 bool SC::JsonFormatter::writeDouble(double value)
 {
     char buffer[100];
-    return writeValue(snprintf(buffer, sizeof(buffer), "%f", value), buffer);
+    return writeValue(snprintf(buffer, sizeof(buffer), floatFormat, value), buffer);
 }
 
 bool SC::JsonFormatter::writeInt8(int8_t value)
