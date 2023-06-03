@@ -2,7 +2,6 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Result.h"
 // This needs to go before the compiler
 #include "../Reflection/ReflectionSC.h"
 // Compiler must be after
@@ -79,10 +78,7 @@ struct SerializerReadVersioned
     [[nodiscard]] static constexpr bool readVersioned(T& object, BinaryStream& stream, VersionSchema& schema)
     {
         typedef SerializerReadVersionedMemberIterator<BinaryStream, T> VersionedMemberIterator;
-        if (schema.current().type != Reflection::MetaType::TypeStruct)
-        {
-            return false;
-        }
+        SC_TRY_IF(schema.current().type == Reflection::MetaType::TypeStruct);
         const uint32_t numMembers      = static_cast<uint32_t>(schema.current().numSubAtoms);
         const auto     structTypeIndex = schema.sourceTypeIndex;
         for (uint32_t idx = 0; idx < numMembers; ++idx)

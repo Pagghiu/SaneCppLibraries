@@ -2,11 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Result.h"
-// This needs to go before the compiler
 #include "../Reflection/ReflectionSC.h"
-// Compiler must be after
-#include "SerializationBinaryTemplateCompiler.h"
 
 namespace SC
 {
