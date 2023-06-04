@@ -46,15 +46,14 @@ struct SC::SerializationStructuredTemplate::SerializationJsonWriter
     [[nodiscard]] bool endArray();
 
     template <typename Container>
-    [[nodiscard]] bool arrayItem(Container&, uint32_t&)
+    [[nodiscard]] bool endArrayItem(Container&, uint32_t&)
     {
         return true;
     }
 
-    [[nodiscard]] bool objectFieldName(uint32_t index, StringView text);
+    [[nodiscard]] bool startObjectField(uint32_t index, StringView text);
 
     [[nodiscard]] bool serialize(uint32_t index, const String& value);
-
     [[nodiscard]] bool serialize(uint32_t index, float value);
     [[nodiscard]] bool serialize(uint32_t index, double value);
 
@@ -74,9 +73,11 @@ struct SC::SerializationStructuredTemplate::SerializationJsonWriter
 
 struct SC::SerializationStructuredTemplate::SerializationJsonReader
 {
-    StringIteratorASCII  iterator;
     StringView           iteratorText;
-    JsonTokenizer::Token token = {};
+    StringIteratorASCII  iterator;
+    JsonTokenizer::Token token;
+
+    SerializationJsonReader(StringView text) : iteratorText(text), iterator(text.getIterator<StringIteratorASCII>()) {}
 
     [[nodiscard]] bool onSerializationStart() { return true; }
     [[nodiscard]] bool onSerializationEnd() { return true; }
@@ -92,11 +93,11 @@ struct SC::SerializationStructuredTemplate::SerializationJsonReader
         SC_TRY_IF(eventuallyExpectComma(index));
         SC_TRY_IF(JsonTokenizer::tokenizeNext(iterator, token));
         SC_TRY_IF(token.type == JsonTokenizer::Token::ArrayStart);
-        return arrayItem(container, size);
+        return endArrayItem(container, size);
     }
 
     template <typename Container>
-    [[nodiscard]] bool arrayItem(Container& container, uint32_t& size)
+    [[nodiscard]] bool endArrayItem(Container& container, uint32_t& size)
     {
         auto iteratorBackup = iterator;
         SC_TRY_IF(JsonTokenizer::tokenizeNext(iterator, token));
@@ -115,8 +116,9 @@ struct SC::SerializationStructuredTemplate::SerializationJsonReader
 
     [[nodiscard]] bool serialize(uint32_t index, String& text);
 
-    [[nodiscard]] bool objectFieldName(uint32_t index, StringView text);
-    [[nodiscard]] bool serialize(uint32_t index, float& value);
+    [[nodiscard]] bool startObjectField(uint32_t index, StringView text);
+    [[nodiscard]] bool getNextField(uint32_t index, StringView& text, bool& hasMore);
 
+    [[nodiscard]] bool serialize(uint32_t index, float& value);
     [[nodiscard]] bool serialize(uint32_t index, int32_t& value);
 };

@@ -44,7 +44,7 @@ struct SC::JsonFormatter
     [[nodiscard]] bool startArray();
     [[nodiscard]] bool endArray();
     [[nodiscard]] bool startObject();
-    [[nodiscard]] bool objectFieldName(StringView name);
+    [[nodiscard]] bool startObjectField(StringView name);
     [[nodiscard]] bool endObject();
 
   private:

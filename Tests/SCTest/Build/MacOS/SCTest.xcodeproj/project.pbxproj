@@ -162,7 +162,7 @@
 		7B70AA5F2A2B9D250047BD29 /* SerializationStructuredJson.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SerializationStructuredJson.inl; path = ../../../../Libraries/Serialization/SerializationStructuredJson.inl; sourceTree = "<group>"; };
 		7B75258629A16F8000779F2A /* OptionalTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OptionalTest.h; path = ../../../../Libraries/Foundation/OptionalTest.h; sourceTree = "<group>"; };
 		7B75258729A16F8000779F2A /* Optional.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Optional.h; path = ../../../../Libraries/Foundation/Optional.h; sourceTree = "<group>"; };
-		7B7B53A22A2B254100FA751E /* SerializationStructuredReadWriteFast.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SerializationStructuredReadWriteFast.h; path = ../../../../Libraries/Serialization/SerializationStructuredReadWriteFast.h; sourceTree = "<group>"; };
+		7B7B53A22A2B254100FA751E /* SerializationStructuredReadWrite.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SerializationStructuredReadWrite.h; path = ../../../../Libraries/Serialization/SerializationStructuredReadWrite.h; sourceTree = "<group>"; };
 		7B872C4629AFF1D900949BD2 /* SystemInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SystemInternalApple.inl; path = ../../../../Libraries/System/SystemInternalApple.inl; sourceTree = "<group>"; };
 		7B872C4829AFFC4900949BD2 /* ThreadingInternalPosix.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = ThreadingInternalPosix.inl; path = ../../../../Libraries/Threading/ThreadingInternalPosix.inl; sourceTree = "<group>"; };
 		7B872C4929AFFC4900949BD2 /* ThreadingInternalWindows.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = ThreadingInternalWindows.inl; path = ../../../../Libraries/Threading/ThreadingInternalWindows.inl; sourceTree = "<group>"; };
@@ -401,7 +401,7 @@
 				7B70AA5E2A2B97330047BD29 /* SerializationStructuredJson.h */,
 				7B70AA5F2A2B9D250047BD29 /* SerializationStructuredJson.inl */,
 				7B20B39D2A27FCE400110F52 /* SerializationStructuredJsonTest.h */,
-				7B7B53A22A2B254100FA751E /* SerializationStructuredReadWriteFast.h */,
+				7B7B53A22A2B254100FA751E /* SerializationStructuredReadWrite.h */,
 			);
 			name = Serialization;
 			sourceTree = "<group>";

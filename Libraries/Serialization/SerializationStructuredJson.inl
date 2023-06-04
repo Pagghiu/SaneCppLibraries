@@ -37,7 +37,7 @@ bool SC::SerializationStructuredTemplate::SerializationJsonWriter::startArray(ui
 
 bool SC::SerializationStructuredTemplate::SerializationJsonWriter::endArray() { return output.write("]"_a8); }
 
-bool SC::SerializationStructuredTemplate::SerializationJsonWriter::objectFieldName(uint32_t index, StringView text)
+bool SC::SerializationStructuredTemplate::SerializationJsonWriter::startObjectField(uint32_t index, StringView text)
 {
     SC_TRY_IF(eventuallyAddComma(index));
     // TODO: Escape JSON string
@@ -115,13 +115,32 @@ bool SC::SerializationStructuredTemplate::SerializationJsonReader::serialize(uin
     return text.assign(token.getToken(iteratorText));
 }
 
-bool SC::SerializationStructuredTemplate::SerializationJsonReader::objectFieldName(uint32_t index, StringView text)
+bool SC::SerializationStructuredTemplate::SerializationJsonReader::startObjectField(uint32_t index, StringView text)
 {
-    SC_UNUSED(text);
     SC_TRY_IF(eventuallyExpectComma(index));
     SC_TRY_IF(JsonTokenizer::tokenizeNext(iterator, token));
     SC_TRY_IF(token.type == JsonTokenizer::Token::String);
     SC_TRY_IF(text == token.getToken(iteratorText));
+    SC_TRY_IF(JsonTokenizer::tokenizeNext(iterator, token));
+    return token.type == JsonTokenizer::Token::Colon;
+}
+bool SC::SerializationStructuredTemplate::SerializationJsonReader::getNextField(uint32_t index, StringView& text,
+                                                                                bool& hasMore)
+{
+    auto iteratorBackup = iterator;
+    SC_TRY_IF(JsonTokenizer::tokenizeNext(iterator, token));
+    if (token.type == JsonTokenizer::Token::ObjectEnd)
+    {
+        iterator = iteratorBackup;
+        hasMore  = false;
+        return true;
+    }
+    iterator = iteratorBackup;
+    SC_TRY_IF(eventuallyExpectComma(index));
+    hasMore = true;
+    SC_TRY_IF(JsonTokenizer::tokenizeNext(iterator, token));
+    SC_TRY_IF(token.type == JsonTokenizer::Token::String);
+    text = token.getToken(iteratorText);
     SC_TRY_IF(JsonTokenizer::tokenizeNext(iterator, token));
     return token.type == JsonTokenizer::Token::Colon;
 }

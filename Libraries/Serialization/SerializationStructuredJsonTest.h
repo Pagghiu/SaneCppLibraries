@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "SerializationStructuredJson.h"
-#include "SerializationStructuredReadWriteFast.h"
+#include "SerializationStructuredReadWrite.h"
 
 #include "../Foundation/SmallVector.h"
 #include "../Foundation/StringBuilder.h"
@@ -56,22 +56,29 @@ struct SC::SerializationStructuredJsonTest : public SC::TestCase
             SmallString<256>   buffer;
             StringFormatOutput output(StringEncoding::Ascii);
             output.redirectToBuffer(buffer.data);
-            SerializationStructuredTemplate::SerializationJsonWriter jsBuffer{output};
-            using JsonWriter = SerializationStructuredTemplate::SerializationReadWriteFast<decltype(jsBuffer), Test>;
-            JsonWriter serializer;
-            SC_TEST_EXPECT(serializer.startSerialization(test, jsBuffer));
+            SerializationStructuredTemplate::SerializationJsonWriter writer(output);
+            SC_TEST_EXPECT(SerializationStructuredTemplate::serialize(test, writer));
             SC_TEST_EXPECT(buffer.view() == simpleJson);
         }
         if (test_section("JsonReaderFast"))
         {
-            SerializationStructuredTemplate::SerializationJsonReader jsBuffer{
-                simpleJson.getIterator<StringIteratorASCII>(), simpleJson};
-            using JsonReader = SerializationStructuredTemplate::SerializationReadWriteFast<
-                SerializationStructuredTemplate::SerializationJsonReader, Test>;
-            JsonReader serializer;
-            Test       test;
+            Test test;
             memset(&test, 0, sizeof(test));
-            SC_TEST_EXPECT(serializer.startSerialization(test, jsBuffer));
+            SerializationStructuredTemplate::SerializationJsonReader reader(simpleJson);
+            SC_TEST_EXPECT(SerializationStructuredTemplate::serialize(test, reader));
+            SC_TEST_EXPECT(test == Test());
+        }
+        if (test_section("JsonReaderVersioned"))
+        {
+            constexpr StringView scrambledJson =
+                R"({"y"  :  1.50, "x": 2.0, "myVector"  :  ["Str1","Str2"], "myTest":"asdf"})"_a8;
+            Test test;
+            test.x = 0;
+            test.y = 0;
+            (void)test.myVector.resize(1);
+            (void)test.myTest.assign("FDFSA"_a8);
+            SerializationStructuredTemplate::SerializationJsonReader reader(scrambledJson);
+            SC_TEST_EXPECT(SerializationStructuredTemplate::loadVersioned(test, reader));
             SC_TEST_EXPECT(test == Test());
         }
     }

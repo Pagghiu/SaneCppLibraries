@@ -230,7 +230,7 @@ bool SC::JsonFormatter::endObject()
     return false;
 }
 
-bool SC::JsonFormatter::objectFieldName(StringView name)
+bool SC::JsonFormatter::startObjectField(StringView name)
 {
     if (state.isEmpty() or ((state.back() != Object) and (state.back() != ObjectFirst)))
     {
