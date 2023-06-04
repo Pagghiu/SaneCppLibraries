@@ -21,11 +21,7 @@ void SC::OpaqueFuncs<SC::FileSystemWalker::InternalTraits>::destruct(Object& obj
     obj.~Object();
 }
 
-SC::FileSystemWalker::~FileSystemWalker()
-{
-    // You forgot to call FileSystemWalker::checkErrors
-    SC_DEBUG_ASSERT(errorsChecked);
-}
+SC::FileSystemWalker::~FileSystemWalker() {}
 
 [[nodiscard]] SC::ReturnCode SC::FileSystemWalker::init(StringView directory) { return internal.get().init(directory); }
 

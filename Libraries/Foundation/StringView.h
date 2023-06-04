@@ -39,59 +39,66 @@ enum class StringComparison
 struct SC::StringView
 {
   private:
-    Span<const char> text;
-    StringEncoding   encoding;
-    bool             hasNullTerm;
+    union
+    {
+        const char*    textUtf8;
+        const wchar_t* textUtf16;
+    };
+    size_t         textSizeInBytes;
+    StringEncoding encoding;
+    bool           hasNullTerm;
 
   public:
-    constexpr StringView() : text(nullptr, 0), encoding(StringEncoding::Ascii), hasNullTerm(false) {}
-    constexpr StringView(Span<char> text, bool nullTerm, StringEncoding encoding)
-        : text{text.data(), text.sizeInBytes()}, encoding(encoding), hasNullTerm(nullTerm)
+    constexpr StringView() : textUtf8(nullptr), textSizeInBytes(0), encoding(StringEncoding::Ascii), hasNullTerm(false)
     {}
-    constexpr StringView(Span<const char> text, bool nullTerm, StringEncoding encoding)
-        : text(text), encoding(encoding), hasNullTerm(nullTerm)
+    constexpr StringView(Span<char> textSpan, bool nullTerm, StringEncoding encoding)
+        : textUtf8(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(encoding), hasNullTerm(nullTerm)
+    {}
+    constexpr StringView(Span<const char> textSpan, bool nullTerm, StringEncoding encoding)
+        : textUtf8(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(encoding), hasNullTerm(nullTerm)
     {}
     constexpr StringView(const char_t* text, size_t bytes, bool nullTerm, StringEncoding encoding)
-        : text{text, bytes}, encoding(encoding), hasNullTerm(nullTerm)
+        : textUtf8(text), textSizeInBytes(bytes), encoding(encoding), hasNullTerm(nullTerm)
     {}
-    StringView(Span<const wchar_t> text, bool nullTerm, StringEncoding encoding)
-        : text{reinterpret_cast<const char_t*>(text.data()), text.sizeInBytes()}, encoding(encoding),
-          hasNullTerm(nullTerm)
+    constexpr StringView(const wchar_t* text, size_t bytes, bool nullTerm, StringEncoding encoding)
+        : textUtf16(text), textSizeInBytes(bytes), encoding(encoding), hasNullTerm(nullTerm)
+    {}
+    constexpr StringView(Span<const wchar_t> textSpan, bool nullTerm, StringEncoding encoding)
+        : textUtf16(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(encoding), hasNullTerm(nullTerm)
     {}
 
-    SpanVoid<const void> toVoidSpan() const { return text; }
+    constexpr SpanVoid<const void> toVoidSpan() const { return {textUtf8, textSizeInBytes}; }
 
-    Span<const char> toCharSpan() const { return text; }
+    constexpr Span<const char> toCharSpan() const { return {textUtf8, textSizeInBytes}; }
 
     template <size_t N>
-    constexpr StringView(const char (&text)[N]) : text{text, N - 1}, encoding(StringEncoding::Ascii), hasNullTerm(true)
+    constexpr StringView(const char (&text)[N])
+        : textUtf8(text), textSizeInBytes(N - 1), encoding(StringEncoding::Ascii), hasNullTerm(true)
     {}
-#if SC_PLATFORM_WINDOWS
     template <size_t N>
     StringView(const wchar_t (&text)[N])
-        : text{reinterpret_cast<const char*>(text), (N - 1) * sizeof(wchar_t)}, encoding(StringEncoding::Utf16),
+        : textUtf16(text), textSizeInBytes((N - 1) * sizeof(wchar_t)), encoding(StringEncoding::Utf16),
           hasNullTerm(true)
     {}
-#endif
 
     [[nodiscard]] constexpr StringEncoding getEncoding() const { return encoding; }
-    [[nodiscard]] constexpr const char_t*  bytesWithoutTerminator() const { return text.data(); }
+    [[nodiscard]] constexpr const char_t*  bytesWithoutTerminator() const { return textUtf8; }
     [[nodiscard]] constexpr const char_t*  bytesIncludingTerminator() const
     {
         SC_RELEASE_ASSERT(hasNullTerm);
-        return text.data();
+        return textUtf8;
     }
 #if SC_PLATFORM_WINDOWS
     [[nodiscard]] const wchar_t* getNullTerminatedNative() const
     {
         SC_RELEASE_ASSERT(hasNullTerm && (encoding == StringEncoding::Utf16));
-        return reinterpret_cast<const wchar_t*>(text.data());
+        return reinterpret_cast<const wchar_t*>(textUtf8);
     }
 #else
     [[nodiscard]] const char_t* getNullTerminatedNative() const
     {
         SC_RELEASE_ASSERT(hasNullTerm && (encoding == StringEncoding::Utf8 || encoding == StringEncoding::Ascii));
-        return text.data();
+        return textUtf8;
     }
 #endif
 
@@ -99,50 +106,148 @@ struct SC::StringView
 
     [[nodiscard]] bool operator<(StringView other) const { return compareASCII(other) == StringComparison::Smaller; }
 
+  private:
+    template <typename T>
+    struct identity
+    {
+        typedef T type;
+    };
+
+    template <typename Type>
+    constexpr StringIteratorASCII getIterator(identity<Type>) const
+    {
+        return StringIteratorASCII(textUtf8, textUtf8 + textSizeInBytes / sizeof(char));
+    }
+    constexpr StringIteratorUTF8 getIterator(identity<StringIteratorUTF8>) const
+    {
+        return StringIteratorUTF8(textUtf8, textUtf8 + textSizeInBytes / sizeof(char));
+    }
+    constexpr StringIteratorUTF16 getIterator(identity<StringIteratorUTF16>) const
+    {
+        return StringIteratorUTF16(textUtf16, textUtf16 + textSizeInBytes / sizeof(wchar_t));
+    }
+
+  public:
     template <typename StringIterator>
     constexpr StringIterator getIterator() const
     {
-        return StringIterator(bytesWithoutTerminator(), bytesWithoutTerminator() + sizeInBytes());
+        // For GCC complaining about specialization in non-namespace scope
+        return getIterator(identity<StringIterator>());
     }
 
     [[nodiscard]] constexpr bool operator==(StringView other) const
     {
-        if (not hasCompatibleEncoding(other) or text.sizeInBytes() != other.text.sizeInBytes())
-            return false;
-        if (__builtin_is_constant_evaluated())
+        if (hasCompatibleEncoding(other))
         {
-            auto it1 = text.data();
-            auto it2 = other.text.data();
-            auto sz  = text.sizeInBytes();
-            for (size_t idx = 0; idx < sz; ++idx)
-                if (it1[idx] != it2[idx])
-                    return false;
-            return true;
+            if (textSizeInBytes != other.textSizeInBytes)
+                return false;
+            if (__builtin_is_constant_evaluated())
+            {
+                auto it1 = textUtf8;
+                auto it2 = other.textUtf8;
+                auto sz  = textSizeInBytes;
+                for (size_t idx = 0; idx < sz; ++idx)
+                    if (it1[idx] != it2[idx])
+                        return false;
+            }
+            else
+            {
+                return memcmp(textUtf8, other.textUtf8, textSizeInBytes) == 0;
+            }
         }
-        else
-        {
-            return memcmp(text.data(), other.text.data(), text.sizeInBytes()) == 0;
-        }
+        return equals(other);
     }
-    [[nodiscard]] bool             operator!=(StringView other) const { return not operator==(other); }
-    [[nodiscard]] constexpr bool   isEmpty() const { return text.data() == nullptr || text.sizeInBytes() == 0; }
-    [[nodiscard]] constexpr bool   isNullTerminated() const { return hasNullTerm; }
-    [[nodiscard]] constexpr size_t sizeInBytes() const { return text.sizeInBytes(); }
+
+  private:
+    template <typename StringIterator1, typename StringIterator2>
+    static constexpr bool equalsIterator(StringIterator1 t1, StringIterator2 t2)
+    {
+        typename StringIterator1::CodePoint c1 = 0;
+        typename StringIterator2::CodePoint c2 = 0;
+        while (t1.advanceRead(c1) and t2.advanceRead(c2))
+        {
+            if (static_cast<uint32_t>(c1) != static_cast<uint32_t>(c2))
+            {
+                return false;
+            }
+        }
+        return t1.isAtEnd();
+    }
+
+    template <typename StringIterator>
+    constexpr bool equalsIterator(StringView other) const
+    {
+        auto it = getIterator<StringIterator>();
+        switch (other.getEncoding())
+        {
+        case StringEncoding::Ascii: return equalsIterator(it, other.getIterator<StringIteratorASCII>()); break;
+        case StringEncoding::Utf8: return equalsIterator(it, other.getIterator<StringIteratorUTF8>()); break;
+        case StringEncoding::Utf16: return equalsIterator(it, other.getIterator<StringIteratorUTF16>()); break;
+        }
+        SC_UNREACHABLE();
+    }
+
+    constexpr bool equals(StringView other) const
+    {
+        switch (getEncoding())
+        {
+        case StringEncoding::Ascii: return equalsIterator<StringIteratorASCII>(other);
+        case StringEncoding::Utf8: return equalsIterator<StringIteratorUTF8>(other);
+        case StringEncoding::Utf16: return equalsIterator<StringIteratorUTF16>(other);
+        }
+        SC_UNREACHABLE();
+    }
+
+  public:
+    [[nodiscard]] bool           operator!=(StringView other) const { return not operator==(other); }
+    [[nodiscard]] constexpr bool isEmpty() const { return textUtf8 == nullptr || textSizeInBytes == 0; }
+    [[nodiscard]] constexpr bool isNullTerminated() const { return hasNullTerm; }
+
+    size_t sizeASCII() const { return sizeInBytes(); }
+
+    [[nodiscard]] constexpr size_t sizeInBytes() const { return textSizeInBytes; }
 
     [[nodiscard]] constexpr size_t sizeInBytesIncludingTerminator() const
     {
         SC_RELEASE_ASSERT(hasNullTerm);
-        return text.sizeInBytes() > 0 ? text.sizeInBytes() + StringEncodingGetSize(encoding) : 0;
+        return textSizeInBytes > 0 ? textSizeInBytes + StringEncodingGetSize(encoding) : 0;
     }
-    [[nodiscard]] bool endsWith(char_t c) const { return isEmpty() ? false : text.data()[text.sizeInBytes() - 1] == c; }
-    [[nodiscard]] bool startsWith(char_t c) const { return isEmpty() ? false : text.data()[0] == c; }
+
+    template <typename Func>
+    [[nodiscard]] constexpr auto withIterator(Func&& func) const
+    {
+        switch (getEncoding())
+        {
+        case StringEncoding::Ascii: return func(getIterator<StringIteratorASCII>());
+        case StringEncoding::Utf8: return func(getIterator<StringIteratorUTF8>());
+        case StringEncoding::Utf16: return func(getIterator<StringIteratorUTF16>());
+        }
+        SC_UNREACHABLE();
+    }
+
+    template <typename CharType>
+    [[nodiscard]] constexpr bool endsWithChar(CharType c) const
+    {
+        return withIterator([c](auto it) { return it.endsWithChar(c); });
+    }
+
+    template <typename CharType>
+    [[nodiscard]] constexpr bool startsWithChar(CharType c) const
+    {
+        return withIterator([c](auto it) { return it.startsWithChar(c); });
+    }
+
     [[nodiscard]] bool startsWith(const StringView str) const;
     [[nodiscard]] bool endsWith(const StringView str) const;
+    // TODO: containsString will assert if strings have non compatible encoding
+    [[nodiscard]] bool containsString(const StringView str) const;
 
-    [[nodiscard]] constexpr bool containsASCIICharacter(char c) const
+    template <typename CharType>
+    [[nodiscard]] constexpr bool containsChar(CharType c) const
     {
-        return getIterator<StringIteratorASCII>().advanceUntilMatches(c);
+        return withIterator([c](auto it) { return it.advanceUntilMatches(it.castCodePoint(c)); });
     }
+
     [[nodiscard]] constexpr bool hasCompatibleEncoding(StringView str) const
     {
         return StringEncodingAreBinaryCompatible(encoding, str.encoding);
@@ -187,8 +292,6 @@ struct SC::StringView
         const size_t numBytes = static_cast<size_t>(it.bytesDistanceFrom(start));
         return StringView(start.getCurrentIt(), numBytes, false, StringIterator::getEncoding());
     }
-
-    size_t sizeASCII() const { return sizeInBytes(); }
 
     /// Returns a section of a string.
     /// @param start The index to the beginning of the specified portion of StringView.
@@ -253,7 +356,7 @@ struct SC::StringView
             if (options.has(SplitOptions::SkipSeparator))
             {
                 (void)it.stepForward(); // we already checked in advanceUntilMatches
-                continueSplit = !it.isEmpty();
+                continueSplit = !it.isAtEnd();
             }
             // directory
             if (!component.isEmpty() || !options.has(SplitOptions::SkipEmpty))
@@ -275,7 +378,7 @@ struct SC::StringView
         bool matchedAtLeastOneDigit = false;
         while (it.advanceIfMatchesRange('0', '9'))
             matchedAtLeastOneDigit = true;
-        return matchedAtLeastOneDigit and it.isEmpty();
+        return matchedAtLeastOneDigit and it.isAtEnd();
     }
 
     /// If the current view is a floating number, returns true
@@ -291,7 +394,7 @@ struct SC::StringView
         if (it.advanceIfMatches('.')) // optional
             while (it.advanceIfMatchesRange('0', '9'))
                 matchedAtLeastOneDigit = true;
-        return matchedAtLeastOneDigit and it.isEmpty();
+        return matchedAtLeastOneDigit and it.isAtEnd();
     }
 
     /// Parses int32, returning false if it fails
@@ -305,13 +408,12 @@ struct SC::StringView
 };
 
 #if SC_PLATFORM_WINDOWS
-#define SC_STR_L(str) L##str
+#define SC_STR_NATIVE(str) L##str
 #else
-#define SC_STR_L(str) str
+#define SC_STR_NATIVE(str) str
 #endif
 namespace SC
 {
-#if SC_MSVC
 constexpr inline SC::StringView operator"" _a8(const char* txt, size_t sz)
 {
     return SC::StringView(txt, sz, true, SC::StringEncoding::Ascii);
@@ -320,14 +422,4 @@ constexpr inline SC::StringView operator"" _u8(const char* txt, size_t sz)
 {
     return SC::StringView(txt, sz, true, SC::StringEncoding::Utf8);
 }
-#else
-constexpr inline SC::StringView operator"" _a8(const SC::char_t* txt, SC::size_t sz)
-{
-    return SC::StringView(txt, sz, true, SC::StringEncoding::Ascii);
-}
-constexpr inline SC::StringView operator"" _u8(const SC::char_t* txt, SC::size_t sz)
-{
-    return SC::StringView(txt, sz, true, SC::StringEncoding::Utf8);
-}
-#endif
 } // namespace SC

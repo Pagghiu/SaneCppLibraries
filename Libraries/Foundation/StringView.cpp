@@ -14,15 +14,15 @@ bool SC::StringView::parseInt32(int32_t& value) const
 
     if (hasNullTerm)
     {
-        value = atoi(text.data());
+        value = atoi(textUtf8);
     }
     else
     {
         char_t buffer[12]; // 10 digits + sign + nullterm
-        if (text.sizeInBytes() >= sizeof(buffer))
+        if (textSizeInBytes >= sizeof(buffer))
             return false;
-        memcpy(buffer, text.data(), text.sizeInBytes());
-        buffer[text.sizeInBytes()] = 0;
+        memcpy(buffer, textUtf8, textSizeInBytes);
+        buffer[textSizeInBytes] = 0;
 
         value = atoi(buffer);
     }
@@ -31,12 +31,12 @@ bool SC::StringView::parseInt32(int32_t& value) const
         // atoi returns 0 on failed parsing...
         StringIteratorASCII it = getIterator<StringIteratorASCII>();
         (void)it.advanceIfMatchesAny({'-', '+'}); // optional
-        if (it.isEmpty())
+        if (it.isAtEnd())
         {
             return false;
         }
         it.advanceUntilDifferentFrom('0'); // any number of 0s
-        return it.isEmpty();
+        return it.isAtEnd();
     }
     return true;
 }
@@ -56,13 +56,13 @@ bool SC::StringView::parseDouble(double& value) const
 {
     if (hasNullTerm)
     {
-        value = atof(text.data());
+        value = atof(textUtf8);
     }
     else
     {
         char         buffer[255];
-        const size_t bufferSize = min(text.sizeInBytes(), sizeof(buffer) - 1);
-        memcpy(buffer, text.data(), bufferSize);
+        const size_t bufferSize = min(textSizeInBytes, static_cast<decltype(textSizeInBytes)>(sizeof(buffer) - 1));
+        memcpy(buffer, textUtf8, bufferSize);
         buffer[bufferSize] = 0;
         value              = atof(buffer);
     }
@@ -72,26 +72,26 @@ bool SC::StringView::parseDouble(double& value) const
         // TODO: Handle float scientific notation
         StringIteratorASCII it = getIterator<StringIteratorASCII>();
         (void)it.advanceIfMatchesAny({'-', '+'}); // optional
-        if (it.isEmpty())                         // we now require something
+        if (it.isAtEnd())                         // we now require something
         {
             return false;
         }
         if (it.advanceIfMatches('.')) // optional
         {
-            if (it.isEmpty()) // but if it exists now we need at least a number
+            if (it.isAtEnd()) // but if it exists now we need at least a number
             {
                 return false;
             }
         }
         it.advanceUntilDifferentFrom('0'); // any number of 0s
-        return it.isEmpty();               // if they where all zeroes
+        return it.isAtEnd();               // if they where all zeroes
     }
     return true;
 }
 
 SC::StringComparison SC::StringView::compareASCII(StringView other) const
 {
-    const int res = memcmp(text.data(), other.text.data(), min(text.sizeInBytes(), other.text.sizeInBytes()));
+    const int res = memcmp(textUtf8, other.textUtf8, min(textSizeInBytes, other.textSizeInBytes));
     if (res < 0)
         return StringComparison::Smaller;
     else if (res == 0)
@@ -102,20 +102,35 @@ SC::StringComparison SC::StringView::compareASCII(StringView other) const
 
 bool SC::StringView::startsWith(const StringView str) const
 {
-    if (encoding == str.encoding && str.text.sizeInBytes() <= text.sizeInBytes())
+    if (hasCompatibleEncoding(str))
     {
-        const StringView ours(text.data(), str.text.sizeInBytes(), false, encoding);
-        return str == ours;
+        if (str.textSizeInBytes <= textSizeInBytes)
+        {
+            const StringView ours(textUtf8, str.textSizeInBytes, false, encoding);
+            return str == ours;
+        }
+        return false;
     }
-    return false;
+    return withIterator([str](auto it1) { return str.withIterator([it1](auto it2) { return it1.startsWith(it2); }); });
 }
+
 bool SC::StringView::endsWith(const StringView str) const
 {
-    if (hasCompatibleEncoding(str) && str.sizeInBytes() <= sizeInBytes())
+    if (hasCompatibleEncoding(str))
     {
-        const StringView ours(text.data() + text.sizeInBytes() - str.text.sizeInBytes(), str.text.sizeInBytes(), false,
-                              encoding);
-        return str == ours;
+        if (str.sizeInBytes() <= sizeInBytes())
+        {
+            const StringView ours(textUtf8 + textSizeInBytes - str.textSizeInBytes, str.textSizeInBytes, false,
+                                  encoding);
+            return str == ours;
+        }
+        return false;
     }
-    return false;
+    return withIterator([str](auto it1) { return str.withIterator([it1](auto it2) { return it1.endsWith(it2); }); });
+}
+
+[[nodiscard]] bool SC::StringView::containsString(const StringView str) const
+{
+    SC_RELEASE_ASSERT(hasCompatibleEncoding(str));
+    return withIterator([str](auto it) { return it.advanceAfterFinding(str.getIterator<decltype(it)>()); });
 }

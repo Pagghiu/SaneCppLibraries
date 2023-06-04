@@ -26,7 +26,7 @@ SC::ReturnCode SC::FileSystem::changeDirectory(StringView currentWorkingDirector
     converter.clear();
     SC_TRY_IF(converter.appendNullTerminated(currentWorkingDirectory));
     // TODO: Assert if path is not absolute
-    return true;
+    return existsAndIsDirectory(".");
 }
 
 bool SC::FileSystem::convert(const StringView file, String& destination, StringView* encodedPath)

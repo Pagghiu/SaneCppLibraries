@@ -193,7 +193,6 @@ bool SC::StringConverter::convertEncodingTo(StringEncoding encoding, StringView 
     case StringEncoding::Ascii: return convertEncodingToUTF8(text, buffer, encodedText, terminate);
     case StringEncoding::Utf8: return convertEncodingToUTF8(text, buffer, encodedText, terminate);
     case StringEncoding::Utf16: return convertEncodingToUTF16(text, buffer, encodedText, terminate);
-    case StringEncoding::Utf32: break;
     }
     return false;
 }

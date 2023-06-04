@@ -12,7 +12,6 @@ enum class StringEncoding : uint8_t
     Ascii = 0,
     Utf8  = 1,
     Utf16 = 2,
-    Utf32 = 3,
 #if SC_PLATFORM_WINDOWS
     Native = Utf16
 #else
@@ -30,108 +29,179 @@ constexpr uint32_t StringEncodingGetSize(StringEncoding encoding)
 {
     switch (encoding)
     {
-    case StringEncoding::Utf32: return 4;
     case StringEncoding::Utf16: return 2;
-    default: return 1;
+    case StringEncoding::Ascii: return 1;
+    case StringEncoding::Utf8: return 1;
     }
+    SC_UNREACHABLE();
 }
 
-// Invariants: start <= end and it >= start and it <= end
-struct StringIteratorASCII
+struct StringIteratorSkipTable
 {
-    static constexpr StringEncoding getEncoding() { return StringEncoding::Ascii; }
-
-    [[nodiscard]] constexpr bool isEmpty() const { return it == end; }
-
-    constexpr void setToStart() { it = start; }
-
-    constexpr void setToEnd() { it = end; }
-
-    [[nodiscard]] constexpr bool advanceUntilMatches(char c)
+    bool matches[256] = {false};
+    constexpr StringIteratorSkipTable(std::initializer_list<char> chars)
     {
-        if (__builtin_is_constant_evaluated())
+        for (auto c : chars)
         {
-            while (it != end)
-            {
-                if (*it == c)
-                    return true;
-                ++it;
-            }
-            return false;
-        }
-        else
-        {
-            auto res = memchr(it, c, static_cast<size_t>(end - it));
-            if (res != nullptr)
-                it = static_cast<const char*>(res);
-            else
-                it = end;
-            return it != end;
+            matches[c] = true;
         }
     }
+};
 
-    [[nodiscard]] constexpr bool reverseAdvanceUntilMatches(char c)
+// Invariants: start <= end and it >= start and it <= end
+template <typename TypeUnit, typename TypePoint, typename CharIterator>
+struct StringIterator
+{
+    static constexpr StringEncoding getEncoding() { return CharIterator::getEncoding(); }
+
+    using CodeUnit  = TypeUnit;
+    using CodePoint = TypePoint;
+
+    [[nodiscard]] constexpr bool isAtEnd() const { return it == end; }
+    [[nodiscard]] constexpr bool isAtStart() const { return it == start; }
+
+    constexpr StringIterator& setToStart()
+    {
+        it = start;
+        return *this;
+    }
+
+    constexpr StringIterator& setToEnd()
+    {
+        it = end;
+        return *this;
+    }
+
+    [[nodiscard]] constexpr bool advanceUntilMatches(CodePoint c)
+    {
+        while (it != end)
+        {
+            if (CharIterator::decode(it) == c)
+                return true;
+            it = getNextOf(it);
+        }
+        return false;
+    }
+
+    [[nodiscard]] constexpr bool reverseAdvanceUntilMatches(CodePoint c)
     {
         while (it != start)
         {
-            --it;
-            if (*it == c)
+            it = getPreviousOf(it);
+            if (CharIterator::decode(it) == c)
                 return true;
         }
         return false;
     }
 
-    [[nodiscard]] constexpr bool advanceUntilMatches(char c1, char c2, char* matched)
+    [[nodiscard]] constexpr bool advanceAfterFinding(StringIterator other)
     {
-        while (it != end)
-        {
-            if (*it == c1)
-            {
-                *matched = c1;
-                return true;
-            }
-            if (*it == c2)
-            {
-                *matched = c2;
-                return true;
-            }
+        const size_t thisLength  = static_cast<size_t>(end - it);
+        const size_t otherLength = static_cast<size_t>(other.end - other.it);
 
-            ++it;
+        if (otherLength > thisLength)
+        {
+            return false;
+        }
+
+        if (otherLength == thisLength)
+        {
+            if (memcmp(it, other.it, otherLength * sizeof(CodeUnit)) == 0)
+            {
+                setToEnd();
+                return true;
+            }
+            return false;
+        }
+
+        const size_t difference = thisLength - otherLength;
+        for (size_t index = 0; index <= difference; index++)
+        {
+            size_t subIndex = 0;
+            for (subIndex = 0; subIndex < otherLength; subIndex++)
+            {
+                if (it[index + subIndex] != other.it[subIndex])
+                    break;
+            }
+            if (subIndex == otherLength)
+            {
+                it += index + subIndex;
+                return true;
+            }
         }
         return false;
     }
 
-    constexpr void advanceUntilDifferentFrom(char c)
+    [[nodiscard]] constexpr bool advanceUntilMatchesAny(std::initializer_list<CodePoint> items, CodePoint& matched)
     {
         while (it != end)
         {
-            if (*it != c)
+            const auto decoded = CharIterator::decode(it);
+            for (auto c : items)
+            {
+                if (decoded == c)
+                {
+                    matched = c;
+                    return true;
+                }
+            }
+            it = getNextOf(it);
+        }
+        return false;
+    }
+
+    constexpr void advanceUntilDifferentFrom(CodePoint c)
+    {
+        while (it != end)
+        {
+            if (CharIterator::decode(it) != c)
             {
                 break;
             }
-            ++it;
+            it = getNextOf(it);
         }
     }
 
-    [[nodiscard]] constexpr bool advanceIfMatches(char c)
+    template <typename T>
+    static CodePoint castCodePoint(T c)
     {
-        if (it != end && *it == c)
+        return static_cast<CodePoint>(c);
+    }
+
+    [[nodiscard]] constexpr bool advanceIfMatches(CodePoint c)
+    {
+        if (it != end && CharIterator::decode(it) == c)
         {
-            ++it;
+            it = getNextOf(it);
             return true;
         }
         return false;
     }
 
-    [[nodiscard]] constexpr bool advanceIfMatchesAny(std::initializer_list<char> items)
+    [[nodiscard]] constexpr bool advanceBackwardIfMatches(CodePoint c)
+    {
+        if (it != start)
+        {
+            auto otherIt = getPreviousOf(it);
+            if (CharIterator::decode(otherIt) == c)
+            {
+                it = otherIt;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    [[nodiscard]] constexpr bool advanceIfMatchesAny(std::initializer_list<CodePoint> items)
     {
         if (it != end)
         {
+            const auto decoded = CharIterator::decode(it);
             for (auto c : items)
             {
-                if (*it == c)
+                if (decoded == c)
                 {
-                    ++it;
+                    it = getNextOf(it);
                     return true;
                 }
             }
@@ -139,28 +209,39 @@ struct StringIteratorASCII
         return false;
     }
 
-    [[nodiscard]] constexpr bool advanceIfMatchesRange(char first, char last)
+    [[nodiscard]] constexpr bool advanceIfMatchesRange(CodePoint first, CodePoint last)
     {
         SC_RELEASE_ASSERT(first <= last);
         if (it != end)
         {
-            if (*it >= first and *it <= last)
+            const auto decoded = CharIterator::decode(it);
+            if (decoded >= first and decoded <= last)
             {
-                ++it;
+                it = getNextOf(it);
                 return true;
             }
         }
         return false;
     }
 
-    [[nodiscard]] constexpr bool match(char c) { return it != end and *it == c; }
+    [[nodiscard]] constexpr bool match(CodePoint c) { return it != end and CharIterator::decode(it) == c; }
 
-    [[nodiscard]] constexpr bool advanceRead(char& c)
+    [[nodiscard]] constexpr bool advanceRead(CodePoint& c)
     {
         if (it != end)
         {
-            c = *it;
-            ++it;
+            c  = CharIterator::decode(it);
+            it = getNextOf(it);
+            return true;
+        }
+        return false;
+    }
+    [[nodiscard]] constexpr bool advanceBackwardRead(CodePoint& c)
+    {
+        if (it != start)
+        {
+            it = getPreviousOf(it);
+            c  = CharIterator::decode(it);
             return true;
         }
         return false;
@@ -170,7 +251,7 @@ struct StringIteratorASCII
     {
         if (it != end)
         {
-            ++it;
+            it = getNextOf(it);
             return true;
         }
         return false;
@@ -180,7 +261,7 @@ struct StringIteratorASCII
     {
         if (it != start)
         {
-            --it;
+            it = getPreviousOf(it);
             return true;
         }
         return false;
@@ -194,44 +275,240 @@ struct StringIteratorASCII
             {
                 return false;
             }
-            ++it;
+            it = getNextOf(it);
         }
         return true;
     }
 
-    [[nodiscard]] constexpr bool isFollowedBy(char c)
+    [[nodiscard]] constexpr bool isFollowedBy(CodePoint c)
     {
         if (it != end)
         {
-            return it[1] == c;
+            return *getNextOf(it) == c;
         }
         return false;
     }
 
-    [[nodiscard]] constexpr bool isPrecededBy(char c) const
+    [[nodiscard]] constexpr bool isPrecededBy(CodePoint c)
     {
         if (it != start)
         {
-            return it[-1] == c;
+            return *getPreviousOf(it) == c;
         }
         return false;
     }
 
-    constexpr StringIteratorASCII sliceFromStartUntil(StringIteratorASCII otherPoint) const
+    constexpr StringIterator sliceFromStartUntil(StringIterator otherPoint) const
     {
         SC_RELEASE_ASSERT(it <= otherPoint.it);
-        return StringIteratorASCII(it, otherPoint.it);
+        return StringIterator(it, otherPoint.it);
     }
 
-    [[nodiscard]] constexpr ssize_t bytesDistanceFrom(StringIteratorASCII other) const { return it - other.it; }
+    [[nodiscard]] constexpr ssize_t bytesDistanceFrom(StringIterator other) const
+    {
+        return (it - other.it) * static_cast<ssize_t>(sizeof(CodeUnit));
+    }
 
-  private:
-    constexpr StringIteratorASCII(const char* it, const char* end) : it(it), start(it), end(end) {}
-    constexpr const char* getCurrentIt() const { return it; }
+    template <typename CharType>
+    [[nodiscard]] constexpr bool endsWithChar(CharType character) const
+    {
+        if (start != end)
+        {
+            auto last = CharIterator::getPreviousOf(end);
+            return CharIterator::decode(last) == castCodePoint(character);
+        }
+        return false;
+    }
+    template <typename CharType>
+    [[nodiscard]] constexpr bool startsWithChar(CharType character) const
+    {
+        if (start != end)
+        {
+            return CharIterator::decode(start) == castCodePoint(character);
+        }
+        return false;
+    }
+
+    template <typename IteratorType>
+    [[nodiscard]] constexpr bool endsWith(IteratorType other) const
+    {
+        StringIterator copy = *this;
+        copy.setToEnd();
+        other.setToEnd();
+        typename IteratorType::CodePoint c;
+        while (other.advanceBackwardRead(c))
+        {
+            if (not copy.advanceBackwardIfMatches(castCodePoint(c)))
+                return false;
+        }
+        return other.isAtStart();
+    }
+
+    template <typename IteratorType>
+    [[nodiscard]] constexpr bool startsWith(IteratorType other) const
+    {
+        StringIterator copy = *this;
+        copy.setToStart();
+        other.setToStart();
+        typename IteratorType::CodePoint c;
+        while (other.advanceRead(c))
+        {
+            if (not copy.advanceIfMatches(castCodePoint(c)))
+                return false;
+        }
+        return other.isAtEnd();
+    }
+
+  protected:
     friend struct StringView;
-    const char* it;
-    const char* start;
-    const char* end;
+    static constexpr const CodeUnit* getNextOf(const CodeUnit* src) { return CharIterator::getNextOf(src); }
+    static constexpr const CodeUnit* getPreviousOf(const CodeUnit* src) { return CharIterator::getPreviousOf(src); }
+    constexpr StringIterator(const CodeUnit* it, const CodeUnit* end) : it(it), start(it), end(end) {}
+    constexpr auto* getCurrentIt() const { return it; }
+    const CodeUnit* it;
+    const CodeUnit* start;
+    const CodeUnit* end;
 };
+
+struct StringIteratorASCII : public StringIterator<char, char, StringIteratorASCII>
+{
+    static constexpr StringEncoding getEncoding() { return StringEncoding::Ascii; }
+    [[nodiscard]] constexpr bool    advanceUntilMatches(char c)
+    {
+        if (__builtin_is_constant_evaluated())
+        {
+            return Parent::advanceUntilMatches(c);
+        }
+        else
+        {
+            auto res = memchr(it, c, static_cast<size_t>(end - it));
+            if (res != nullptr)
+                it = static_cast<const char*>(res);
+            else
+                it = end;
+            return it != end;
+        }
+    }
+
+    static constexpr const char* getNextOf(const char* src) { return src + 1; }
+    static constexpr const char* getPreviousOf(const char* src) { return src - 1; }
+    static constexpr char        decode(const char* src) { return *src; }
+
+  protected:
+    using StringIterator::StringIterator;
+    friend struct StringView;
+    using Parent = StringIterator<char, char, StringIteratorASCII>;
+};
+
+struct StringIteratorUTF16 : public StringIterator<wchar_t, uint32_t, StringIteratorUTF16>
+{
+    static constexpr StringEncoding getEncoding() { return StringEncoding::Utf16; }
+    static constexpr const wchar_t* getNextOf(const wchar_t* src)
+    {
+        if ((src[0] & 0x80) == 0)
+        {
+            return src + 1; // Single-byte character
+        }
+        return src + 2; // Multi-byte character
+    }
+
+    static constexpr const wchar_t* getPreviousOf(const wchar_t* src)
+    {
+        src = src - 1;
+        if (src[0] >= 0xDC00 and src[0] <= 0xDFFF)
+        {
+            src = src - 1;
+        }
+        return src;
+    }
+
+    static constexpr uint32_t decode(const wchar_t* src)
+    {
+        const uint32_t character = static_cast<uint32_t>(src[0]);
+        if (character >= 0xD800 and character <= 0xDFFF)
+        {
+            const uint32_t nextCharacter = static_cast<uint32_t>(src[1]);
+            if (nextCharacter >= 0xDC00)
+            {
+                return 0x10000 + ((nextCharacter - 0xDC00) | ((character - 0xD800) << 10));
+            }
+        }
+        return character;
+    }
+
+  protected:
+    using StringIterator::StringIterator;
+    friend struct StringView;
+    using Parent = StringIterator<wchar_t, uint32_t, StringIteratorASCII>;
+};
+
+struct StringIteratorUTF8 : public StringIterator<char, uint32_t, StringIteratorUTF8>
+{
+    static constexpr StringEncoding getEncoding() { return StringEncoding::Utf8; }
+    static constexpr const char*    getNextOf(const char* src)
+    {
+        char character = src[0];
+        if ((character & 0x80) == 0)
+        {
+            return src + 1;
+        }
+        else if ((character & 0xE0) == 0xC0)
+        {
+            return src + 2;
+        }
+        else if ((character & 0xF0) == 0xE0)
+        {
+            return src + 3;
+        }
+        return src + 4;
+    }
+
+    static constexpr const char* getPreviousOf(const char* src)
+    {
+        do
+        {
+            --src;
+        } while ((*src & 0xC0) == 0x80);
+        return src;
+    }
+
+    static constexpr uint32_t decode(const char* src)
+    {
+        uint32_t character = static_cast<uint32_t>(src[0]);
+        if ((character & 0x80) == 0)
+        {
+            return character;
+        }
+        else if ((character & 0xE0) == 0xC0)
+        {
+            character = src[0] & 0x1F;
+            character = (character << 6) | (src[1] & 0x3F);
+        }
+        else if ((character & 0xF0) == 0xE0)
+        {
+            character = src[0] & 0x0F;
+            character = (character << 6) | (src[1] & 0x3F);
+            character = (character << 6) | (src[2] & 0x3F);
+        }
+        else
+        {
+            character = src[0] & 0x07;
+            character = (character << 6) | (src[1] & 0x3F);
+            character = (character << 6) | (src[2] & 0x3F);
+            character = (character << 6) | (src[3] & 0x3F);
+        }
+        return character;
+    }
+
+  protected:
+    using StringIterator::StringIterator;
+    friend struct StringView;
+    using Parent = StringIterator<char, uint32_t, StringIteratorUTF8>;
+};
+#if SC_PLATFORM_WINDOWS
+using StringIteratorNative = StringIteratorUTF16;
+#else
+using StringIteratorNative = StringIteratorUTF8;
+#endif
 
 } // namespace SC

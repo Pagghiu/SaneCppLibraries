@@ -49,7 +49,8 @@ SC::StringView SC::String::view() const
 {
     if (data.isEmpty())
     {
-        return StringView(nullptr, 0, false, encoding);
+        const char* cnull = nullptr;
+        return StringView(cnull, 0, false, encoding);
     }
     else
     {

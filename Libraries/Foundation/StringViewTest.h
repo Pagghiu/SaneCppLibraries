@@ -94,19 +94,32 @@ struct SC::StringViewTest : public SC::TestCase
 
         if (test_section("startsWith/endsWith"))
         {
-            StringView test("Ciao_123");
-            SC_TEST_EXPECT(test.startsWith('C'));
-            SC_TEST_EXPECT(test.endsWith('3'));
-            SC_TEST_EXPECT(test.startsWith("Ciao"));
-            SC_TEST_EXPECT(test.endsWith("123"));
-            SC_TEST_EXPECT(not test.startsWith('D'));
-            SC_TEST_EXPECT(not test.endsWith('4'));
-            SC_TEST_EXPECT(not test.startsWith("Cia_"));
-            SC_TEST_EXPECT(not test.endsWith("1_3"));
+            StringView test;
+            for (int i = 0; i < 2; ++i)
+            {
+                if (i == 0)
+                    test = StringView(L"Ciao_123");
+                if (i == 1)
+                    test = "Ciao_123"_a8;
+                if (i == 2)
+                    test = "Ciao_123"_u8;
+                SC_TEST_EXPECT(test.startsWithChar('C'));
+                SC_TEST_EXPECT(test.endsWithChar('3'));
+                SC_TEST_EXPECT(test.startsWith("Ciao"));
+                SC_TEST_EXPECT(test.startsWith("Ciao"_u8));
+                SC_TEST_EXPECT(test.startsWith(L"Ciao"));
+                SC_TEST_EXPECT(test.endsWith("123"));
+                SC_TEST_EXPECT(test.endsWith(L"123"));
+                SC_TEST_EXPECT(test.endsWith("123"_u8));
+                SC_TEST_EXPECT(not test.startsWithChar('D'));
+                SC_TEST_EXPECT(not test.endsWithChar('4'));
+                SC_TEST_EXPECT(not test.startsWith("Cia_"));
+                SC_TEST_EXPECT(not test.endsWith("1_3"));
+            }
 
             StringView test2;
-            SC_TEST_EXPECT(not test2.startsWith('a'));
-            SC_TEST_EXPECT(not test2.endsWith('a'));
+            SC_TEST_EXPECT(not test2.startsWithChar('a'));
+            SC_TEST_EXPECT(not test2.endsWithChar('a'));
             SC_TEST_EXPECT(test2.startsWith(""));
             SC_TEST_EXPECT(not test2.startsWith("A"));
             SC_TEST_EXPECT(test2.endsWith(""));
@@ -181,6 +194,14 @@ struct SC::StringViewTest : public SC::TestCase
             static_assert("-34.0"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
             static_assert("0.34"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
             static_assert(not "-34.0_"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+        }
+        if (test_section("contains"))
+        {
+            StringView asd = "123 456"_a8;
+            SC_TEST_EXPECT(asd.containsString("123"_a8));
+            SC_TEST_EXPECT(asd.containsString("456"_a8));
+            SC_TEST_EXPECT(not asd.containsString("124"_a8));
+            SC_TEST_EXPECT(not asd.containsString("4567"_a8));
         }
     }
 };

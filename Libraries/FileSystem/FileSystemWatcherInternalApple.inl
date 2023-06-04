@@ -292,7 +292,7 @@ struct SC::FileSystemWatcher::Internal
                     StringView relativePath = path.sliceStart<StringIteratorASCII>(watcher->path->view().sizeASCII());
 
                     // TODO: Refactor into a 'trimEnd'
-                    while (relativePath.sizeASCII() > 1 and relativePath.startsWith('/'))
+                    while (relativePath.sizeASCII() > 1 and relativePath.startsWithChar('/'))
                     {
                         // Remove initial '/'
                         relativePath = relativePath.sliceStart<StringIteratorASCII>(1);

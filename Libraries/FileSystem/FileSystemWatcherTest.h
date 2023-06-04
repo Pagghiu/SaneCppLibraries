@@ -54,7 +54,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                 SC_TEST_EXPECT(notification.operation == FileSystemWatcher::Operation::AddRemoveRename);
                 SC_TEST_EXPECT(notification.basePath == params.appDirectory);
                 // Comparisons must use the same encoding
-                SC_TEST_EXPECT(notification.relativePath == SC_STR_L("test.txt"));
+                SC_TEST_EXPECT(notification.relativePath == "test.txt"_a8);
                 StringView fullPath;
                 SC_TEST_EXPECT(notification.getFullPath(fullPathBuffer, fullPath));
 

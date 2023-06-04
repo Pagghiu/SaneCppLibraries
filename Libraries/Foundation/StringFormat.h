@@ -111,7 +111,7 @@ struct StringFormat
         char_t matchedChar;
         while (true)
         {
-            if (it.advanceUntilMatches('{', '}', &matchedChar)) // match start or end of specifier
+            if (it.advanceUntilMatchesAny({'{', '}'}, matchedChar)) // match start or end of specifier
             {
                 if (it.isFollowedBy(matchedChar))
                     SC_UNLIKELY // if it's the same matched, let's escape it

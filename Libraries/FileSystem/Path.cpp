@@ -7,11 +7,11 @@
 struct SC::Path::Internal
 {
     // Parses a windows drive (Example C:\\)
-    static StringView parseWindowsRoot(StringView input)
+    template <typename StringIterator>
+    static StringView parseWindowsRootTemplate(StringIterator it)
     {
-        auto   it       = input.getIterator<StringIteratorASCII>();
-        auto   itBackup = it;
-        char_t letter;
+        const auto                         itBackup = it;
+        typename StringIterator::CodePoint letter;
         if (it.advanceRead(letter))
         {
             if ((letter >= 'a' and letter <= 'z') or (letter >= 'A' and letter <= 'Z'))
@@ -37,10 +37,17 @@ struct SC::Path::Internal
         return StringView();
     }
 
+    static StringView parseWindowsRoot(StringView input)
+    {
+        if (input.getEncoding() == StringEncoding::Utf16)
+            return parseWindowsRootTemplate(input.getIterator<StringIteratorUTF16>());
+        else
+            return parseWindowsRootTemplate(input.getIterator<StringIteratorASCII>());
+    }
     // Parses a Posix root
     static StringView parsePosixRoot(StringView input)
     {
-        if (input.startsWith('/'))
+        if (input.startsWithChar('/'))
         {
             // we want to return a string view pointing at the "/" char of the input string
             return input.sliceStartLength(0, 1);
@@ -48,11 +55,11 @@ struct SC::Path::Internal
         return StringView();
     }
 
-    template <char separator>
-    static StringView parseBase(StringView input)
+    template <typename StringIterator, char separator>
+    static StringView parseBaseTemplate(StringView input)
     {
         // Parse the base
-        auto it = input.getIterator<StringIteratorASCII>();
+        auto it = input.getIterator<StringIterator>();
         it.setToEnd();
         (void)it.reverseAdvanceUntilMatches(separator);
         (void)it.stepForward();
@@ -60,19 +67,30 @@ struct SC::Path::Internal
     }
 
     template <char separator>
-    static bool rootIsFollowedByOnlySeparators(const StringView input, const StringView root)
+    static StringView parseBase(StringView input)
     {
-        StringView remaining = input.sliceStartEnd<StringIteratorASCII>(root.sizeASCII(), input.sizeASCII());
-
-        auto it = remaining.getIterator<StringIteratorASCII>();
-        it.advanceUntilDifferentFrom(separator);
-        return it.isEmpty();
+        if (input.getEncoding() == StringEncoding::Utf16)
+            return parseBaseTemplate<StringIteratorUTF16, separator>(input);
+        else
+            return parseBaseTemplate<StringIteratorASCII, separator>(input);
     }
 
-    template <char separator>
-    static StringView parseDirectory(const StringView input, const StringView root)
+    template <typename StringIterator, char separator>
+    static bool rootIsFollowedByOnlySeparators(const StringView input, const StringView root)
     {
-        auto       it       = input.getIterator<StringIteratorASCII>();
+        // TODO: This doesn't work with UTF16
+        SC_RELEASE_ASSERT(input.getEncoding() != StringEncoding::Utf16);
+        StringView remaining = input.sliceStartEnd<StringIterator>(root.sizeASCII(), input.sizeASCII());
+
+        auto it = remaining.getIterator<StringIterator>();
+        it.advanceUntilDifferentFrom(separator);
+        return it.isAtEnd();
+    }
+
+    template <typename StringIterator, char separator>
+    static StringView parseDirectoryTemplate(const StringView input, const StringView root)
+    {
+        auto       it       = input.getIterator<StringIterator>();
         const auto itBackup = it;
         it.setToEnd();
         if (it.reverseAdvanceUntilMatches(separator))
@@ -82,7 +100,7 @@ struct SC::Path::Internal
             {
                 return root;
             }
-            if (rootIsFollowedByOnlySeparators<separator>(input, root))
+            if (rootIsFollowedByOnlySeparators<StringIterator, separator>(input, root))
             {
                 return input;
             }
@@ -92,7 +110,16 @@ struct SC::Path::Internal
     }
 
     template <char separator>
-    static SC::StringView dirname(StringView input)
+    static StringView parseDirectory(const StringView input, const StringView root)
+    {
+        if (input.getEncoding() == StringEncoding::Utf16)
+            return parseDirectoryTemplate<StringIteratorUTF16, separator>(input, root);
+        else
+            return parseDirectoryTemplate<StringIteratorASCII, separator>(input, root);
+    }
+
+    template <typename StringIterator, char separator>
+    static SC::StringView dirnameTemplate(StringView input)
     {
         StringView dirn;
         StringView base = basename<separator>(input, &dirn);
@@ -104,9 +131,18 @@ struct SC::Path::Internal
     }
 
     template <char separator>
-    static SC::StringView basename(StringView input, StringView* dir = nullptr)
+    static SC::StringView dirname(StringView input)
     {
-        auto it = input.getIterator<StringIteratorASCII>();
+        if (input.getEncoding() == StringEncoding::Utf16)
+            return dirnameTemplate<StringIteratorUTF16, separator>(input);
+        else
+            return dirnameTemplate<StringIteratorASCII, separator>(input);
+    }
+
+    template <typename StringIterator, char separator>
+    static SC::StringView basenameTemplate(StringView input, StringView* dir = nullptr)
+    {
+        auto it = input.getIterator<StringIterator>();
         it.setToEnd();
         while (it.stepBackward() and it.match(separator)) {}
         auto itEnd = it;
@@ -124,14 +160,32 @@ struct SC::Path::Internal
     }
 
     template <char separator>
-    static SC::StringView basename(StringView input, StringView suffix)
+    static SC::StringView basename(StringView input, StringView* dir = nullptr)
+    {
+        if (input.getEncoding() == StringEncoding::Utf16)
+            return basenameTemplate<StringIteratorUTF16, separator>(input, dir);
+        else
+            return basenameTemplate<StringIteratorASCII, separator>(input, dir);
+    }
+
+    template <typename StringIterator, char separator>
+    static SC::StringView basenameTemplate(StringView input, StringView suffix)
     {
         StringView name = basename<separator>(input);
         if (name.endsWith(suffix))
         {
-            return name.sliceStartEnd<StringIteratorASCII>(0, name.sizeInBytes() - suffix.sizeInBytes());
+            return name.sliceStartEnd<StringIterator>(0, name.sizeInBytes() - suffix.sizeInBytes());
         }
         return name;
+    }
+
+    template <char separator>
+    static SC::StringView basename(StringView input, StringView suffix)
+    {
+        if (input.getEncoding() == StringEncoding::Utf16)
+            return basenameTemplate<StringIteratorUTF16, separator>(input, suffix);
+        else
+            return basenameTemplate<StringIteratorASCII, separator>(input, suffix);
     }
 
     /// Splits a Windows path of type "C:\\directory\\base" into root=C:\\ - directory=C:\\directory\\ - base=base
@@ -147,12 +201,12 @@ struct SC::Path::Internal
         // Everything after it will be the base.
         root      = Internal::parseWindowsRoot(input);
         directory = Internal::parseDirectory<'\\'>(input, root);
-        if (root.startsWith(directory) && root.endsWith('\\'))
+        if (root.startsWith(directory) && root.endsWithChar('\\'))
         {
             directory = root;
         }
         base              = Internal::parseBase<'\\'>(input);
-        endsWithSeparator = input.endsWith('\\');
+        endsWithSeparator = input.endsWithChar('\\');
         return !(root.isEmpty() && directory.isEmpty());
     }
 
@@ -168,7 +222,7 @@ struct SC::Path::Internal
         root              = Internal::parsePosixRoot(input);
         directory         = Internal::parseDirectory<'/'>(input, root);
         base              = Internal::parseBase<'/'>(input);
-        endsWithSeparator = input.endsWith('/');
+        endsWithSeparator = input.endsWithChar('/');
         return !(root.isEmpty() && directory.isEmpty());
     }
 };
@@ -277,7 +331,7 @@ SC::StringView SC::Path::Posix::basename(StringView input, StringView suffix)
     return Internal::basename<Separator>(input, suffix);
 }
 
-bool SC::Path::Posix::isAbsolute(StringView input) { return input.startsWith('/'); }
+bool SC::Path::Posix::isAbsolute(StringView input) { return input.startsWithChar('/'); }
 
 bool SC::Path::join(String& output, Span<const StringView> inputs)
 {

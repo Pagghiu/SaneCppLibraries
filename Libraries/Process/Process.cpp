@@ -114,7 +114,7 @@ SC::ReturnCode SC::Process::formatCommand(std::initializer_list<StringView> para
             SC_TRY_IF(formattedCmd.appendNullTerminated(" "));
         }
         first = false;
-        if (svp.containsASCIICharacter(' '))
+        if (svp.containsChar(' '))
         {
             // has space, must escape it
             SC_TRY_IF(formattedCmd.appendNullTerminated("\""));

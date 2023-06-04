@@ -19,7 +19,7 @@ struct SC::StringFormatTest : public SC::TestCase
         {
             String        buffer(StringEncoding::Ascii);
             StringBuilder builder(buffer);
-            SC_TEST_EXPECT(builder.append(StringView(nullptr, 0, true, StringEncoding::Ascii)));
+            SC_TEST_EXPECT(builder.append(StringView()));
             SC_TEST_EXPECT(buffer.isEmpty());
             SC_TEST_EXPECT(builder.append(""));
             SC_TEST_EXPECT(buffer.isEmpty());
@@ -112,7 +112,7 @@ struct SC::StringFormatTest : public SC::TestCase
             SC_TEST_EXPECT(buffer == "__asd__");
             SC_TEST_EXPECT(builder.format("__{}__", StringView("")));
             SC_TEST_EXPECT(buffer == "____");
-            SC_TEST_EXPECT(builder.format("__{}__", StringView(nullptr, 0, true, StringEncoding::Ascii)));
+            SC_TEST_EXPECT(builder.format("__{}__", StringView()));
             SC_TEST_EXPECT(buffer == "____");
             SC_TEST_EXPECT(builder.format("__{}__", String("asd")));
             SC_TEST_EXPECT(buffer == "__asd__");
