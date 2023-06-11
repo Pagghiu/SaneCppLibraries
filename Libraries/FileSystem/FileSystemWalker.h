@@ -61,7 +61,7 @@ struct SC::FileSystemWalker
     };
 
   public:
-    using InternalTraits = OpaqueTraits<Internal, InternalSizes>;
+    using InternalTraits = OpaqueTraits<Internal, InternalSizes, alignof(uint64_t)>;
 
   private:
     using InternalOpaque = OpaqueUniqueObject<OpaqueFuncs<InternalTraits>>;

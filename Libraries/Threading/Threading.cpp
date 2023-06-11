@@ -10,6 +10,7 @@
 #include "ThreadingInternalWindows.inl"
 #else
 #include "ThreadingInternalPosix.inl"
+#define WINAPI
 #endif
 
 struct SC::Thread::CreateParams
@@ -24,7 +25,7 @@ struct SC::Thread::CreateParams
 
     Internal::NativeHandle threadHandle;
 
-    static Internal::CallbackReturnType threadFunc(void* argument)
+    static Internal::CallbackReturnType WINAPI threadFunc(void* argument)
     {
         CreateParams& self = *static_cast<CreateParams*>(argument);
 

@@ -25,7 +25,6 @@ void SC::Console::print(const StringView str)
 {
     if (str.isEmpty())
         return;
-    SC_DEBUG_ASSERT(str.sizeInBytes() < static_cast<int>(MaxValue()));
 #if SC_PLATFORM_WINDOWS
     StringView encodedPath;
     if (str.getEncoding() == StringEncoding::Ascii)

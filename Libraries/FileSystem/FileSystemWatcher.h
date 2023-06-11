@@ -45,7 +45,8 @@ struct SC::FileSystemWatcher
     struct ThreadRunnerSizes
     {
         static constexpr int MaxWatchablePaths = 1024;
-        static constexpr int Windows = (2 * MaxWatchablePaths + 1) * sizeof(void*) + sizeof(Thread) + sizeof(Action);
+        static constexpr int Windows =
+            (2 * MaxWatchablePaths) * sizeof(void*) + sizeof(uint64_t) + sizeof(Thread) + sizeof(Action);
         static constexpr int Apple   = sizeof(void*);
         static constexpr int Default = sizeof(void*);
     };
@@ -57,7 +58,7 @@ struct SC::FileSystemWatcher
     {
         static constexpr int MaxChangesBufferSize = 1024;
 
-        static constexpr int Windows = MaxChangesBufferSize + sizeof(void*) * 6;
+        static constexpr int Windows = MaxChangesBufferSize + sizeof(void*) * 5 + sizeof(uint64_t);
         static constexpr int Apple   = sizeof(void*);
         static constexpr int Default = sizeof(void*);
     };

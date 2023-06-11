@@ -26,8 +26,8 @@ struct SocketIPAddress;
 
 struct SC::SocketDescriptorTraits
 {
-    using Handle                    = uint64_t; // SOCKET
-    static constexpr Handle Invalid = ~0ull;    // INVALID_SOCKET
+    using Handle                    = size_t;                  // SOCKET
+    static constexpr Handle Invalid = ~static_cast<Handle>(0); // INVALID_SOCKET
     static ReturnCode       releaseHandle(Handle& handle);
 };
 

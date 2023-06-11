@@ -20,8 +20,14 @@ using int16_t = short;
 using int32_t = int;
 using int64_t = long long;
 
+#if SC_PLATFORM_64_BIT
 using size_t  = unsigned __int64;
 using ssize_t = signed __int64;
+#else
+
+using size_t  = unsigned int;
+using ssize_t = long;
+#endif
 #else
 using utf_char_t = char;
 using char_t     = char;

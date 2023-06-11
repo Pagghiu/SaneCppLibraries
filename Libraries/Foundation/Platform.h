@@ -34,3 +34,14 @@
 #else
 #error "Unsupported platform"
 #endif
+
+#if defined(_WIN64)
+#define SC_PLATFORM_64_BIT 1
+#define SC_PLATFORM_32_BIT 0
+#elif defined(_WIN32)
+#define SC_PLATFORM_64_BIT 0
+#define SC_PLATFORM_32_BIT 1
+#else
+#define SC_PLATFORM_64_BIT 1
+#define SC_PLATFORM_32_BIT 0
+#endif

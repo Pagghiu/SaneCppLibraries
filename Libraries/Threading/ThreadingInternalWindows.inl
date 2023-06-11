@@ -30,7 +30,7 @@ struct SC::Thread::Internal
     using CallbackReturnType = DWORD;
 
     [[nodiscard]] static ReturnCode createThread(CreateParams& self, OpaqueThread& opaqueThread, HANDLE& threadHandle,
-                                                 DWORD (*threadFunc)(void* argument))
+                                                 DWORD(WINAPI* threadFunc)(void* argument))
     {
         DWORD threadID;
         opaqueThread.reinterpret_as<HANDLE>() =
