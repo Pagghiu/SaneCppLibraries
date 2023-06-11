@@ -4,11 +4,56 @@
 #include "../FileSystem/Path.h"
 #include "../Foundation/SmallVector.h"
 #include "../Foundation/StringBuilder.h"
+#include "../Foundation/StringConverter.h"
 #include "../Threading/Atomic.h"
 #include "System.h"
 
 #include <Windows.h>
 #pragma comment(lib, "Ws2_32.lib")
+
+SC::ReturnCode SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle)
+{
+    if (handle)
+    {
+        static_assert(sizeof(HMODULE) == sizeof(Handle), "sizeof(HMODULE)");
+        static_assert(alignof(HMODULE) == alignof(Handle), "alignof(HMODULE)");
+        HMODULE module;
+        memcpy(&module, &handle, sizeof(HMODULE));
+        handle         = nullptr;
+        const BOOL res = ::FreeLibrary(module);
+        return res == TRUE;
+    }
+    return true;
+}
+
+SC::ReturnCode SC::SystemDynamicLibrary::load(StringView fullPath)
+{
+    SC_TRY_IF(close());
+    SmallString<1024> string = StringEncoding::Native;
+    StringConverter   converter(string);
+    StringView        fullPathZeroTerminated;
+    SC_TRY_IF(converter.convertNullTerminateFastPath(fullPath, fullPathZeroTerminated));
+    HMODULE module = ::LoadLibraryW(fullPathZeroTerminated.getNullTerminatedNative());
+    if (module == nullptr)
+    {
+        return "LoadLibraryW failed"_a8;
+    }
+    memcpy(&handle, &module, sizeof(HMODULE));
+    return true;
+}
+
+SC::ReturnCode SC::SystemDynamicLibrary::getSymbol(StringView symbolName, void*& symbol)
+{
+    SC_TRY_MSG(isValid(), "Invalid GetProcAddress handle"_a8);
+    SmallString<1024> string = StringEncoding::Ascii;
+    StringConverter   converter(string);
+    StringView        symbolZeroTerminated;
+    SC_TRY_IF(converter.convertNullTerminateFastPath(symbolName, symbolZeroTerminated));
+    HMODULE module;
+    memcpy(&module, &handle, sizeof(HMODULE));
+    symbol = ::GetProcAddress(module, symbolZeroTerminated.bytesIncludingTerminator());
+    return symbol != nullptr;
+}
 
 bool SC::SystemDirectories::init()
 {

@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Foundation/Opaque.h"
 #include "../Foundation/String.h"
 
 namespace SC
@@ -9,7 +10,22 @@ namespace SC
 struct SystemDebug;
 struct SystemDirectories;
 struct SystemFunctions;
+struct SystemDynamicLibrary;
+struct SystemDynamicLibraryTraits;
 } // namespace SC
+
+struct SC::SystemDynamicLibraryTraits
+{
+    using Handle                    = void*;   // HANDLE
+    static constexpr Handle Invalid = nullptr; // INVALID_HANDLE_VALUE
+    static ReturnCode       releaseHandle(Handle& handle);
+};
+
+struct SC::SystemDynamicLibrary : public SC::UniqueTaggedHandleTraits<SC::SystemDynamicLibraryTraits>
+{
+    ReturnCode load(StringView fullPath);
+    ReturnCode getSymbol(StringView symbolName, void*& symbol);
+};
 
 struct SC::SystemDebug
 {
