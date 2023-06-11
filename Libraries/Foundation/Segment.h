@@ -6,6 +6,7 @@
 #include "InitializerList.h"
 #include "Language.h"
 #include "Limits.h"
+#include "Span.h"
 #include "Types.h"
 
 namespace SC
@@ -608,6 +609,9 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
     }
     ~Segment() { operations::destroy(this); }
 
+    Span<const T> toSpanConst() const { return {items, Parent::sizeBytes}; }
+    Span<T>       toSpan() { return {items, Parent::sizeBytes}; }
+
     [[nodiscard]] T& front()
     {
         const size_t numElements = Parent::size();
@@ -814,6 +818,8 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
     {
         return appendCopy(src.data(), src.size());
     }
+
+    [[nodiscard]] bool push_back(std::initializer_list<T> src) { return appendCopy(src.begin(), src.size()); }
 
     [[nodiscard]] bool contains(const T& value, size_t* foundIndex = nullptr) const
     {

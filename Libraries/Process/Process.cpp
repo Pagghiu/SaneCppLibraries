@@ -51,7 +51,7 @@ SC::ReturnCode SC::ProcessChain::launch(ProcessChainOptions options)
     return true;
 }
 
-SC::ReturnCode SC::ProcessChain::pipe(Process& process, std::initializer_list<StringView> cmd)
+SC::ReturnCode SC::ProcessChain::pipe(Process& process, std::initializer_list<const StringView> cmd)
 {
     SC_TRY_MSG(process.parent == nullptr, "Process::pipe - already in use"_a8);
 
@@ -62,7 +62,7 @@ SC::ReturnCode SC::ProcessChain::pipe(Process& process, std::initializer_list<St
         SC_TRY_IF(processes.back->standardOutput.assign(move(chainPipe.writePipe)));
         SC_TRY_IF(process.standardInput.assign(move(chainPipe.readPipe)));
     }
-    SC_TRY_IF(process.formatCommand(cmd));
+    SC_TRY_IF(process.formatArguments(Span<const StringView>(cmd)));
     process.parent = this;
     processes.queueBack(process);
     return true;
@@ -102,7 +102,7 @@ SC::ReturnCode SC::ProcessChain::waitForExitSync()
     return error.returnCode;
 }
 
-SC::ReturnCode SC::Process::formatCommand(std::initializer_list<StringView> params)
+SC::ReturnCode SC::Process::formatArguments(Span<const StringView> params)
 {
     command.data.clear();
     bool            first = true;

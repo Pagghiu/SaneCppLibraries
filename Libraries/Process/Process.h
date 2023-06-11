@@ -46,14 +46,15 @@ struct SC::Process
     template <typename... StringView>
     [[nodiscard]] ReturnCode formatCommand(StringView&&... args)
     {
-        return formatCommand({forward<StringView>(args)...});
+        return formatArguments({forward<StringView>(args)...});
     }
-    [[nodiscard]] ReturnCode formatCommand(std::initializer_list<StringView> cmd);
+
+    [[nodiscard]] ReturnCode formatArguments(Span<const StringView> cmd);
     [[nodiscard]] ReturnCode waitForExitSync();
     template <typename... StringView>
     [[nodiscard]] ReturnCode launch(StringView&&... args)
     {
-        SC_TRY_IF(formatCommand({forward<StringView>(args)...}));
+        SC_TRY_IF(formatArguments({forward<StringView>(args)...}));
         return launch();
     }
     [[nodiscard]] ReturnCode launch(ProcessOptions options = {});
@@ -89,9 +90,9 @@ struct SC::ProcessChain
     template <typename... StringView>
     [[nodiscard]] ReturnCode pipe(Process& p, StringView&&... args)
     {
-        return pipe(p, {forward<StringView>(args)...});
+        return pipe(p, {forward<const StringView>(args)...});
     }
-    [[nodiscard]] ReturnCode pipe(Process& p, std::initializer_list<StringView> cmd);
+    [[nodiscard]] ReturnCode pipe(Process& p, std::initializer_list<const StringView> cmd);
     [[nodiscard]] ReturnCode launch(ProcessChainOptions options = ProcessChainOptions());
     [[nodiscard]] ReturnCode waitForExitSync();
     [[nodiscard]] ReturnCode readStdOutUntilEOFSync(String& destination);

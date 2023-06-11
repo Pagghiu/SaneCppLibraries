@@ -251,8 +251,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(params.changes1 == 1);
             SC_TEST_EXPECT(params.changes2 == 1);
             SC_TEST_EXPECT(watcher2.unwatch());
-            SC_TEST_EXPECT(fs1.removeFile({"salve.txt"}));
-            SC_TEST_EXPECT(fs2.removeFile({"atutti.txt"}));
+            SC_TEST_EXPECT(fs1.removeFile("salve.txt"));
+            SC_TEST_EXPECT(fs2.removeFile("atutti.txt"));
 
             Thread::Sleep(waitForEventsTimeout);
             SC_TEST_EXPECT(eventLoop.runOnce());
@@ -270,14 +270,14 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(params.changes2 == 1);
 
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2, move(lambda2)));
-            SC_TEST_EXPECT(fs2.removeFile({"atutti.txt"}));
+            SC_TEST_EXPECT(fs2.removeFile("atutti.txt"));
             Thread::Sleep(waitForEventsTimeout);
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(params.changes1 == 2);
             SC_TEST_EXPECT(params.changes2 == 2);
 
             SC_TEST_EXPECT(fileEventsWatcher.close());
-            SC_TEST_EXPECT(fs1.removeFile({"salve.txt"}));
+            SC_TEST_EXPECT(fs1.removeFile("salve.txt"));
             SC_TEST_EXPECT(fs.removeEmptyDirectory(path1.view()));
             SC_TEST_EXPECT(fs.removeEmptyDirectory(path2.view()));
         }

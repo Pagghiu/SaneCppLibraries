@@ -157,6 +157,9 @@ struct SC::Vector
 
     ~Vector() { destroy(); }
 
+    Span<const T> toSpanConst() const { return {items, size() * sizeof(T)}; }
+    Span<T>       toSpan() { return {items, size() * sizeof(T)}; }
+
     // Reinterpret Vector to hold a different type (example Vector<int32_t> to Vector<int8_t>.
     // This works because the SegmentHeader stores item size and capacity in bytes
     template <typename Q>
@@ -186,6 +189,7 @@ struct SC::Vector
 
     [[nodiscard]] bool push_back(const T& element) { return SegmentOperationsT::push_back(items, element); }
     [[nodiscard]] bool push_back(T&& element) { return SegmentOperationsT::push_back(items, forward<T>(element)); }
+    [[nodiscard]] bool push_back(std::initializer_list<T> src) { return appendCopy(src.begin(), src.size()); }
     [[nodiscard]] bool pop_back() { return SegmentOperationsT::pop_back(items); }
     [[nodiscard]] bool pop_front() { return SegmentOperationsT::pop_front(items); }
 

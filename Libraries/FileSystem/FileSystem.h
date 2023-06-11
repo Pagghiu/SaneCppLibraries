@@ -60,6 +60,7 @@ struct SC::FileSystem
         return copyDirectory(CopyOperation{source, destination, copyFlags});
     }
     [[nodiscard]] ReturnCode removeFile(Span<const StringView> files);
+    [[nodiscard]] ReturnCode removeFile(StringView source) { return removeFile(Span<const StringView>{source}); }
     [[nodiscard]] ReturnCode removeDirectoryRecursive(Span<const StringView> directories);
     [[nodiscard]] ReturnCode removeEmptyDirectory(Span<const StringView> directories);
     [[nodiscard]] ReturnCode makeDirectory(Span<const StringView> directories);
