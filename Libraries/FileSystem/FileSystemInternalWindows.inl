@@ -64,7 +64,7 @@ struct SC::FileSystem::Internal
         {
             return false;
         }
-        return (res & FILE_ATTRIBUTE_NORMAL) != 0;
+        return (res & FILE_ATTRIBUTE_DIRECTORY) == 0;
     }
 
     [[nodiscard]] static bool removeEmptyDirectory(const wchar_t* dir)

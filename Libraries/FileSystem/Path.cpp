@@ -16,7 +16,7 @@ struct SC::Path::Internal
         {
             if ((letter >= 'a' and letter <= 'z') or (letter >= 'A' and letter <= 'Z'))
             {
-                if (it.advanceIfMatches(':') and it.advanceIfMatches('\\'))
+                if (it.advanceIfMatches(':') and it.advanceIfMatchesAny({'\\', '/'}))
                 {
                     return StringView::fromIterators(itBackup, it);
                 }
