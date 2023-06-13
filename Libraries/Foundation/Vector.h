@@ -29,7 +29,10 @@ struct SC::VectorAllocator
         if (oldHeader->options.isSmallVector)
         {
             newHeader = static_cast<SegmentHeader*>(memoryAllocate(sizeof(SegmentHeader) + newSize));
+            memcpy(newHeader, oldHeader,
+                   sizeof(SegmentHeader) + min(newSize, static_cast<decltype(newSize)>(oldHeader->sizeBytes)));
             newHeader->initDefaults();
+            newHeader->capacityBytes                   = static_cast<decltype(SegmentHeader::capacityBytes)>(newSize);
             newHeader->options.isFollowedBySmallVector = true;
         }
         else
