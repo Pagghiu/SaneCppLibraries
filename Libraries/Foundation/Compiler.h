@@ -2,7 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#ifndef SC_DISABLE_CONFIG
 #include "SCConfig.h"
+#endif
 // Compiler name
 
 #if __clang__

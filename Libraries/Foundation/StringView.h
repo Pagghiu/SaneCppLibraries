@@ -76,7 +76,7 @@ struct SC::StringView
         : textUtf8(text), textSizeInBytes(N - 1), encoding(StringEncoding::Ascii), hasNullTerm(true)
     {}
     template <size_t N>
-    StringView(const wchar_t (&text)[N])
+    constexpr StringView(const wchar_t (&text)[N])
         : textUtf16(text), textSizeInBytes((N - 1) * sizeof(wchar_t)), encoding(StringEncoding::Utf16),
           hasNullTerm(true)
     {}

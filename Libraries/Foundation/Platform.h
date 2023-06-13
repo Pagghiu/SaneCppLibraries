@@ -37,11 +37,14 @@
 
 #if defined(_WIN64)
 #define SC_PLATFORM_64_BIT 1
-#define SC_PLATFORM_32_BIT 0
 #elif defined(_WIN32)
 #define SC_PLATFORM_64_BIT 0
-#define SC_PLATFORM_32_BIT 1
 #else
 #define SC_PLATFORM_64_BIT 1
-#define SC_PLATFORM_32_BIT 0
+#endif
+
+#if defined(_M_ARM64) || defined(__aarch64__)
+#define SC_PLATFORM_ARM64 1
+#else
+#define SC_PLATFORM_ARM64 0
 #endif
