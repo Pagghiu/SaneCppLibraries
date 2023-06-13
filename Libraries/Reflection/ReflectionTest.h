@@ -129,12 +129,13 @@ struct TestNamespace::PackedStructWithArray
     float       floatValue    = 1.5f;
     SC::int64_t int64Value    = -13;
 };
-
+// #if !SC_META_ENABLE_AUTO_REFLECTION // TODO: This fails on MSVC
 SC_META_STRUCT_VISIT(TestNamespace::PackedStructWithArray)
 SC_META_STRUCT_FIELD(0, arrayValue)
 SC_META_STRUCT_FIELD(1, floatValue)
 SC_META_STRUCT_FIELD(2, int64Value)
 SC_META_STRUCT_LEAVE()
+// #endif
 
 struct TestNamespace::PackedStruct
 {
@@ -156,35 +157,43 @@ struct TestNamespace::UnpackedStruct
     float       z = 3;
 };
 
+#if !SC_META_ENABLE_AUTO_REFLECTION
 SC_META_STRUCT_VISIT(TestNamespace::UnpackedStruct)
 SC_META_STRUCT_FIELD(0, x)
 SC_META_STRUCT_FIELD(1, y)
 SC_META_STRUCT_FIELD(2, z)
 SC_META_STRUCT_LEAVE()
+#endif
 
 struct TestNamespace::NestedUnpackedStruct
 {
     UnpackedStruct unpackedMember;
 };
+#if !SC_META_ENABLE_AUTO_REFLECTION
 SC_META_STRUCT_VISIT(TestNamespace::NestedUnpackedStruct)
 SC_META_STRUCT_FIELD(0, unpackedMember);
 SC_META_STRUCT_LEAVE()
+#endif
 
 struct TestNamespace::StructWithArrayPacked
 {
     PackedStruct packedMember[3];
 };
+//#if !SC_META_ENABLE_AUTO_REFLECTION // TODO: This fails on clang
 SC_META_STRUCT_VISIT(TestNamespace::StructWithArrayPacked)
 SC_META_STRUCT_FIELD(0, packedMember);
 SC_META_STRUCT_LEAVE()
+//#endif
 
 struct TestNamespace::StructWithArrayUnpacked
 {
     NestedUnpackedStruct unpackedMember[3];
 };
+#if !SC_META_ENABLE_AUTO_REFLECTION
 SC_META_STRUCT_VISIT(TestNamespace::StructWithArrayUnpacked)
 SC_META_STRUCT_FIELD(0, unpackedMember);
 SC_META_STRUCT_LEAVE()
+#endif
 
 namespace SC
 {
