@@ -24,7 +24,14 @@ struct SC::SystemDynamicLibraryTraits
 struct SC::SystemDynamicLibrary : public SC::UniqueTaggedHandleTraits<SC::SystemDynamicLibraryTraits>
 {
     ReturnCode load(StringView fullPath);
-    ReturnCode getSymbol(StringView symbolName, void*& symbol);
+    template <typename R, typename... Args>
+    ReturnCode getSymbol(StringView symbolName, R (*&symbol)(Args...))
+    {
+        return loadSymbol(symbolName, reinterpret_cast<void*&>(symbol));
+    }
+
+  private:
+    ReturnCode loadSymbol(StringView symbolName, void*& symbol);
 };
 
 struct SC::SystemDebug
