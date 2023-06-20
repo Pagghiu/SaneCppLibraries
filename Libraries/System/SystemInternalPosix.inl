@@ -35,7 +35,7 @@ SC::ReturnCode SC::SystemDynamicLibrary::load(StringView fullPath)
     return true;
 }
 
-SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol)
+SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const
 {
     SC_TRY_MSG(isValid(), "Invalid dlsym handle"_a8);
     SmallString<1024> string = StringEncoding::Native;

@@ -7,7 +7,7 @@ SC::ReturnCode SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle) { r
 
 SC::ReturnCode SC::SystemDynamicLibrary::load(StringView fullPath) { return true; }
 
-SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) { return true; }
+SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const { return true; }
 
 bool SC::SystemDirectories::init() { return true; }
 

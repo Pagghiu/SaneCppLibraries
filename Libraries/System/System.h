@@ -25,13 +25,13 @@ struct SC::SystemDynamicLibrary : public SC::UniqueTaggedHandleTraits<SC::System
 {
     ReturnCode load(StringView fullPath);
     template <typename R, typename... Args>
-    ReturnCode getSymbol(StringView symbolName, R (*&symbol)(Args...))
+    ReturnCode getSymbol(StringView symbolName, R (*&symbol)(Args...)) const
     {
         return loadSymbol(symbolName, reinterpret_cast<void*&>(symbol));
     }
 
   private:
-    ReturnCode loadSymbol(StringView symbolName, void*& symbol);
+    ReturnCode loadSymbol(StringView symbolName, void*& symbol) const;
 };
 
 struct SC::SystemDebug
@@ -40,6 +40,14 @@ struct SC::SystemDebug
     [[nodiscard]] static bool   printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeInBytes);
     [[nodiscard]] static size_t captureBacktrace(size_t framesToSkip, void** backtraceBuffer,
                                                  size_t backtraceBufferSizeInBytes, uint32_t* hash);
+
+    // Support deleting locked PDB files
+    [[nodiscard]] static bool       isDebuggerConnected();
+    [[nodiscard]] static ReturnCode unlockFileFromAllProcesses(StringView fileName);
+    [[nodiscard]] static ReturnCode deleteForcefullyUnlockedFile(StringView fileName);
+
+  private:
+    struct Internal;
 };
 
 struct SC::SystemDirectories

@@ -11,6 +11,257 @@
 #include <Windows.h>
 #pragma comment(lib, "Ws2_32.lib")
 
+#include <RestartManager.h>
+#include <winternl.h>
+
+#pragma comment(lib, "ntdll.lib")
+#pragma comment(lib, "Rstrtmgr.lib")
+
+typedef struct _SYSTEM_HANDLE
+{
+    ULONG       ProcessId;
+    BYTE        ObjectTypeNumber;
+    BYTE        Flags;
+    USHORT      Handle;
+    PVOID       Object;
+    ACCESS_MASK GrantedAccess;
+} SYSTEM_HANDLE, *PSYSTEM_HANDLE;
+
+typedef struct _SYSTEM_HANDLE_INFORMATION
+{
+    ULONG         HandleCount;
+    SYSTEM_HANDLE Handles[1];
+} SYSTEM_HANDLE_INFORMATION, *PSYSTEM_HANDLE_INFORMATION;
+
+constexpr DWORD                    STATUS_INFO_LENGTH_MISMATCH = 0xc0000004;
+constexpr SYSTEM_INFORMATION_CLASS SystemHandleInformation     = (SYSTEM_INFORMATION_CLASS)0x10;
+constexpr OBJECT_INFORMATION_CLASS ObjectNameInformation       = (OBJECT_INFORMATION_CLASS)1;
+
+typedef struct _OBJECT_NAME_INFORMATION
+{
+    UNICODE_STRING Name;
+} OBJECT_NAME_INFORMATION, *POBJECT_NAME_INFORMATION;
+
+struct SC::SystemDebug::Internal
+{
+    // Loop all system handles and remotely close file handles inside given process that end with file name
+    [[nodiscard]] static bool unlockFileFromProcess(SC::StringView theFile, DWORD processId)
+    {
+        SC::Vector<WCHAR> nameBuffer;
+        SC_TRY_IF(nameBuffer.resizeWithoutInitializing(USHRT_MAX));
+
+        if (theFile.startsWithChar('\\'))
+        {
+            theFile = theFile.sliceStart(2); // Eat one slash
+        }
+        HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_DUP_HANDLE, FALSE, processId);
+        if (processHandle == nullptr)
+        {
+            return false;
+        }
+        auto deferDeleteProcessHandle = SC::MakeDeferred(
+            [&]
+            {
+                CloseHandle(processHandle);
+                processHandle = nullptr;
+            });
+
+        DWORD handleCount;
+        BOOL  error = GetProcessHandleCount(processHandle, &handleCount);
+        if (error == 0)
+        {
+            return false;
+        }
+
+        ULONG                      handleInfoSize = 0x100000;
+        PSYSTEM_HANDLE_INFORMATION handleInfo = reinterpret_cast<PSYSTEM_HANDLE_INFORMATION>(malloc(handleInfoSize));
+
+        auto deferDeleteHandleInfo = SC::MakeDeferred(
+            [&]
+            {
+                free(handleInfo);
+                handleInfo = nullptr;
+            });
+        while (NtQuerySystemInformation(SystemHandleInformation, handleInfo, handleInfoSize, NULL) ==
+               STATUS_INFO_LENGTH_MISMATCH)
+        {
+            handleInfoSize *= 2;
+            void* newMemory = realloc(handleInfo, handleInfoSize);
+            if (newMemory == nullptr)
+                return false;
+            handleInfo = (PSYSTEM_HANDLE_INFORMATION)newMemory;
+        }
+
+        const HANDLE currentProcess = GetCurrentProcess();
+        for (DWORD handleIdx = 0; handleIdx < handleInfo->HandleCount; ++handleIdx)
+        {
+            HANDLE        dupHandle;
+            SYSTEM_HANDLE handle = handleInfo->Handles[handleIdx];
+            if (handle.ProcessId != processId)
+                continue;
+
+            // Skip handles that will block NtDuplicateObject
+            if ((handle.GrantedAccess == 0x00120189) or (handle.GrantedAccess == 0x00100000) or
+                (handle.GrantedAccess == 0x0012019f) or (handle.GrantedAccess == 0x001a019f))
+            {
+                continue;
+            }
+            BOOL res = DuplicateHandle(processHandle, (HANDLE)handle.Handle, currentProcess, &dupHandle, 0, FALSE,
+                                       DUPLICATE_SAME_ACCESS);
+            if (res == FALSE)
+            {
+                continue;
+            }
+            auto deferDeleteDupHandle = SC::MakeDeferred(
+                [&]
+                {
+                    CloseHandle(dupHandle);
+                    dupHandle = nullptr;
+                });
+
+            // Get the required buffer size
+            ULONG    bufferSize = 0;
+            NTSTATUS status     = NtQueryObject(dupHandle, ObjectNameInformation, nullptr, 0, &bufferSize);
+            if (status != STATUS_INFO_LENGTH_MISMATCH)
+            {
+                continue;
+            }
+
+            // Allocate memory for the object name information
+            POBJECT_NAME_INFORMATION pObjectNameInfo =
+                reinterpret_cast<POBJECT_NAME_INFORMATION>(LocalAlloc(LPTR, bufferSize));
+            if (!pObjectNameInfo)
+            {
+                continue;
+            }
+            auto deferFreeObjectNameInfo = SC::MakeDeferred(
+                [&]
+                {
+                    LocalFree(pObjectNameInfo);
+                    pObjectNameInfo = nullptr;
+                });
+
+            // Retrieve the object name information
+            status = NtQueryObject(dupHandle, ObjectNameInformation, pObjectNameInfo, bufferSize, nullptr);
+            if (status != 0)
+            {
+                continue;
+            }
+
+            const size_t nameLengthInBytes = pObjectNameInfo->Name.Length;
+            wcsncpy_s(nameBuffer.data(), nameBuffer.size(), pObjectNameInfo->Name.Buffer,
+                      nameLengthInBytes / sizeof(WCHAR));
+            nameBuffer[nameLengthInBytes / sizeof(WCHAR)] = L'\0';
+
+            SC::StringView handleName =
+                SC::StringView(nameBuffer.data(), nameLengthInBytes, true, SC::StringEncoding::Utf16);
+            if (handleName.endsWith(theFile))
+            {
+                CloseHandle(dupHandle);
+                deferDeleteDupHandle.disarm();
+                dupHandle = INVALID_HANDLE_VALUE;
+                HANDLE newHandle;
+                if (DuplicateHandle(processHandle, reinterpret_cast<HANDLE>(handle.Handle), currentProcess, &newHandle,
+                                    0, FALSE, DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS))
+                {
+                    CloseHandle(newHandle);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+};
+
+// Find all processes that have an handle open on the given fileName and unlock it
+// https://devblogs.microsoft.com/oldnewthing/20120217-00/?p=8283
+SC::ReturnCode SC::SystemDebug::unlockFileFromAllProcesses(SC::StringView fileName)
+{
+    using namespace SC;
+    SC_TRY_MSG(fileName.isNullTerminated(), "Filename must be null terminated"_a8);
+    SC_TRY_MSG(fileName.getEncoding() == SC::StringEncoding::Utf16, "Filename must be UTF16"_a8);
+    DWORD dwSession;
+    WCHAR szSessionKey[CCH_RM_SESSION_KEY + 1] = {0};
+
+    DWORD dwError = RmStartSession(&dwSession, 0, szSessionKey);
+
+    if (dwError == ERROR_SUCCESS)
+    {
+        const wchar_t* pszFile = fileName.getNullTerminatedNative();
+        dwError                = RmRegisterResources(dwSession, 1, &pszFile, 0, NULL, 0, NULL);
+        if (dwError == ERROR_SUCCESS)
+        {
+            DWORD dwReason;
+            UINT  nProcInfoNeeded;
+            UINT  nProcInfo = 10;
+
+            RM_PROCESS_INFO rgpi[10];
+            dwError = RmGetList(dwSession, &nProcInfoNeeded, &nProcInfo, rgpi, &dwReason);
+            if (dwError == ERROR_SUCCESS)
+            {
+                for (UINT i = 0; i < nProcInfo; i++)
+                {
+                    HANDLE hProcess =
+                        OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, rgpi[i].Process.dwProcessId);
+                    if (hProcess)
+                    {
+                        FILETIME ftCreate, ftExit, ftKernel, ftUser;
+                        if (GetProcessTimes(hProcess, &ftCreate, &ftExit, &ftKernel, &ftUser) &&
+                            CompareFileTime(&rgpi[i].Process.ProcessStartTime, &ftCreate) == 0)
+                        {
+                            SC_TRY_IF(Internal::unlockFileFromProcess(fileName, rgpi[i].Process.dwProcessId));
+                        }
+                        CloseHandle(hProcess);
+                    }
+                }
+            }
+        }
+        RmEndSession(dwSession);
+    }
+    return true;
+}
+
+bool SC::SystemDebug::isDebuggerConnected() { return ::IsDebuggerPresent() == TRUE; }
+
+SC::ReturnCode SC::SystemDebug::deleteForcefullyUnlockedFile(SC::StringView fileName)
+{
+    using namespace SC;
+    SC_TRY_MSG(fileName.isNullTerminated(), "Filename must be null terminated"_a8);
+    SC_TRY_MSG(fileName.getEncoding() == SC::StringEncoding::Utf16, "Filename must be UTF16"_a8);
+    HANDLE fd = CreateFileW(fileName.getNullTerminatedNative(), // File path
+                            GENERIC_READ | GENERIC_WRITE,       // Desired access
+                            FILE_SHARE_DELETE,                  // Share mode (0 for exclusive access)
+                            NULL,                               // Security attributes
+                            OPEN_EXISTING,                      // Creation disposition
+                            FILE_FLAG_DELETE_ON_CLOSE,          // File attributes and flags
+                            NULL                                // Template file handle
+    );
+    SC_TRY_MSG(fd != INVALID_HANDLE_VALUE, "deleteForcefullyUnlockedFile CreateFileW failed"_a8);
+    return ::CloseHandle(fd) == TRUE;
+}
+
+bool SC::SystemDebug::printBacktrace() { return true; }
+
+bool SC::SystemDebug::printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeInBytes)
+{
+    SC_UNUSED(backtraceBufferSizeInBytes);
+    if (!backtraceBuffer)
+        return false;
+    return true;
+}
+
+SC::size_t SC::SystemDebug::captureBacktrace(size_t framesToSkip, void** backtraceBuffer,
+                                             size_t backtraceBufferSizeInBytes, uint32_t* hash)
+{
+    SC_UNUSED(framesToSkip);
+    SC_UNUSED(backtraceBufferSizeInBytes);
+    if (hash)
+        *hash = 1;
+    if (backtraceBuffer == nullptr)
+        return 0;
+    return 1;
+}
+
 SC::ReturnCode SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle)
 {
     if (handle)
@@ -42,7 +293,7 @@ SC::ReturnCode SC::SystemDynamicLibrary::load(StringView fullPath)
     return true;
 }
 
-SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol)
+SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const
 {
     SC_TRY_MSG(isValid(), "Invalid GetProcAddress handle"_a8);
     SmallString<1024> string = StringEncoding::Ascii;
@@ -88,28 +339,6 @@ bool SC::SystemDirectories::init()
     SC_TRY_IF(builder.append(utf16executable));
     applicationRootDirectory = Path::Windows::dirname(executableFile.view());
     return true;
-}
-
-bool SC::SystemDebug::printBacktrace() { return true; }
-
-bool SC::SystemDebug::printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeInBytes)
-{
-    SC_UNUSED(backtraceBufferSizeInBytes);
-    if (!backtraceBuffer)
-        return false;
-    return true;
-}
-
-SC::size_t SC::SystemDebug::captureBacktrace(size_t framesToSkip, void** backtraceBuffer,
-                                             size_t backtraceBufferSizeInBytes, uint32_t* hash)
-{
-    SC_UNUSED(framesToSkip);
-    SC_UNUSED(backtraceBufferSizeInBytes);
-    if (hash)
-        *hash = 1;
-    if (backtraceBuffer == nullptr)
-        return 0;
-    return 1;
 }
 
 struct SC::SystemFunctions::Internal
