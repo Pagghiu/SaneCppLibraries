@@ -86,7 +86,7 @@ template <typename T> constexpr T&& forward(typename RemoveReference<T>::type&& 
 template <typename T>
 struct ReferenceWrapper
 {
-    const typename RemoveReference<T>::type* ptr;
+    typename RemoveReference<T>::type* ptr;
 
     ReferenceWrapper(typename RemoveReference<T>::type& other) : ptr(&other) {}
     ~ReferenceWrapper() {}

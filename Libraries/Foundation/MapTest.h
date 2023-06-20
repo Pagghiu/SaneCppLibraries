@@ -46,7 +46,7 @@ struct SC::MapTest : public SC::TestCase
             SC_TEST_EXPECT(map.insert({"Ciao"_a8, "Fra"_a8}));
             SC_TEST_EXPECT(map.insert({"Bella"_a8, "Bro"_a8}));
             auto result1 = map.get("Ciao"_a8);
-            SC_TEST_EXPECT(*result1.releaseValue() == "Fra");
+            SC_TEST_EXPECT(result1.releaseValue() == "Fra");
             auto result2 = map.get("Fail"_a8);
             SC_TEST_EXPECT(result2.isError());
             SC_TEST_EXPECT(getTestString(map, "Bella").releaseValue() == "Bro"_a8);
@@ -54,9 +54,9 @@ struct SC::MapTest : public SC::TestCase
     }
 
     template <typename T>
-    static Result<const String&> getTestString(const T& map, StringView key)
+    static Result<String> getTestString(const T& map, StringView key)
     {
-        SC_TRY(auto result, map.get(key));
-        return *result;
+        SC_TRY(String result, map.get(key));
+        return result;
     }
 };

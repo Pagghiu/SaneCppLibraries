@@ -29,7 +29,9 @@ struct SC::Map
 
     [[nodiscard]] bool insert(Item&& item) { return items.push_back(forward<Item>(item)); }
     [[nodiscard]] bool insert(const Item& item) { return items.push_back(item); }
-    [[nodiscard]] bool contains(const Key& key, size_t* outIndex = nullptr) const
+
+    template <typename ComparableToKey>
+    [[nodiscard]] bool contains(const ComparableToKey& key, size_t* outIndex = nullptr) const
     {
         for (auto& item : items)
         {
@@ -57,6 +59,7 @@ struct SC::Map
         }
         return false;
     }
+
     template <typename ComparableToKey>
     [[nodiscard]] bool contains(const ComparableToKey& key, Value** outValue = nullptr)
     {
@@ -71,26 +74,27 @@ struct SC::Map
         }
         return false;
     }
+
     template <typename ComparableToKey>
-    [[nodiscard]] Result<const Value*> get(const ComparableToKey& key) const
+    [[nodiscard]] Result<const Value&> get(const ComparableToKey& key) const
     {
         for (auto& item : items)
         {
             if (item.key == key)
             {
-                return &item.value;
+                return item.value;
             }
         }
         return ReturnCode("Missing key"_a8);
     }
     template <typename ComparableToKey>
-    [[nodiscard]] Result<Value*> get(const ComparableToKey& key)
+    [[nodiscard]] Result<Value&> get(const ComparableToKey& key)
     {
         for (auto& item : items)
         {
             if (item.key == key)
             {
-                return &item.value;
+                return item.value;
             }
         }
         return ReturnCode("Missing key"_a8);

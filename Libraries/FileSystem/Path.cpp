@@ -182,6 +182,7 @@ struct SC::Path::Internal
     template <char separator>
     static SC::StringView basename(StringView input, StringView suffix)
     {
+        SC_DEBUG_ASSERT(input.getEncoding() == suffix.getEncoding());
         if (input.getEncoding() == StringEncoding::Utf16)
             return basenameTemplate<StringIteratorUTF16, separator>(input, suffix);
         else

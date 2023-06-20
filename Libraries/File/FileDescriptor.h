@@ -40,6 +40,7 @@ struct FileDescriptorTraits
 
 struct SC::FileDescriptor : public SC::UniqueTaggedHandleTraits<SC::FileDescriptorTraits>
 {
+    using UniqueTaggedHandleTraits::UniqueTaggedHandleTraits;
     enum OpenMode
     {
         ReadOnly,

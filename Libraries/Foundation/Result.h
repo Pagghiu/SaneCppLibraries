@@ -130,7 +130,7 @@ struct [[nodiscard]] SC::Result
     if (not(expression))                                                                                               \
         SC_UNLIKELY                                                                                                    \
         {                                                                                                              \
-            return ReturnCode(failedMessage);                                                                          \
+            return SC::ReturnCode(failedMessage);                                                                      \
         }
 
 #define SC__TRY_IMPL2(assignment, expression, Counter)                                                                 \
