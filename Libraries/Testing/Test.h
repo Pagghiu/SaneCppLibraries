@@ -20,6 +20,7 @@ struct TestReport
     StringView testToRun;
     StringView sectionToRun;
     StringView applicationRootDirectory;
+    StringView executableFile;
     Console&   console;
 
     TestReport(Console& console, int argc, const char** argv);

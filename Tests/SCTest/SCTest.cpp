@@ -74,6 +74,7 @@ int main(int argc, const char* argv[])
     Console    console(globalConsoleConversionBuffer);
     TestReport report(console, argc, argv);
     report.applicationRootDirectory = directories.applicationRootDirectory.view();
+    report.executableFile           = directories.executableFile.view();
     report.debugBreakOnFailedTest   = true;
     // clang-format off
 
