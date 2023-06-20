@@ -42,6 +42,8 @@ struct StringBuilder
 
     [[nodiscard]] bool append(StringView str);
 
+    [[nodiscard]] bool appendReplaceAll(StringView source, StringView occurencesOf, StringView with);
+
   private:
     void clear() { backingString.data.clearWithoutInitializing(); }
 

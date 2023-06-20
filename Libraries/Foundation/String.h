@@ -63,6 +63,13 @@ struct SC::SmallString : public String
         header->options.isSmallVector = true;
         String::data.items            = buffer.items;
     }
+    SmallString(StringView view) : String(view.getEncoding())
+    {
+        SegmentHeader* header         = SegmentHeader::getSegmentHeader(buffer.items);
+        header->options.isSmallVector = true;
+        String::data.items            = buffer.items;
+        SC_RELEASE_ASSERT(assign(view));
+    }
     SmallString(SmallString&& other) : String(forward<String>(other)) {}
     SmallString(const SmallString& other) : String(other) {}
     SmallString& operator=(SmallString&& other)
@@ -73,6 +80,12 @@ struct SC::SmallString : public String
     SmallString& operator=(const SmallString& other)
     {
         String::operator=(other);
+        return *this;
+    }
+
+    SmallString& operator=(StringView other)
+    {
+        SC_RELEASE_ASSERT(assign(other));
         return *this;
     }
 

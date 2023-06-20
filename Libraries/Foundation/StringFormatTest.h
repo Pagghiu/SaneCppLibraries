@@ -121,5 +121,16 @@ struct SC::StringFormatTest : public SC::TestCase
             SC_TEST_EXPECT(builder.format("__{}__", String()));
             SC_TEST_EXPECT(buffer == "____");
         }
+        if (test_section("appendReplaceAll"))
+        {
+            String        buffer(StringEncoding::Ascii);
+            StringBuilder builder(buffer);
+            SC_TEST_EXPECT(builder.appendReplaceAll("123 456 123 10", "123", "1234"));
+            report.console.printLine(buffer.view());
+            SC_TEST_EXPECT(buffer == "1234 456 1234 10");
+            buffer = String();
+            SC_TEST_EXPECT(builder.appendReplaceAll("088123", "123", "1"));
+            SC_TEST_EXPECT(buffer == "0881");
+        }
     }
 };

@@ -333,15 +333,15 @@ struct SC::StringView
     }
 
     template <typename Lambda>
-    [[nodiscard]] size_t splitASCII(char_t separator, Lambda&& lambda,
-                                    SplitOptions options = {SplitOptions::SkipEmpty, SplitOptions::SkipSeparator})
+    size_t splitASCII(char_t separator, Lambda&& lambda,
+                      SplitOptions options = {SplitOptions::SkipEmpty, SplitOptions::SkipSeparator})
     {
         return split<StringIteratorASCII>(separator, forward<Lambda>(lambda), options);
     }
 
     // TODO: make split using iterator pattern instead of lambda so we can move it to cpp
     template <typename StringIterator, typename Lambda, typename CharacterType>
-    [[nodiscard]] size_t split(CharacterType separator, Lambda&& lambda, SplitOptions options)
+    size_t split(CharacterType separator, Lambda&& lambda, SplitOptions options)
     {
         if (isEmpty())
             return 0;

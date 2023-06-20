@@ -228,4 +228,40 @@ bool StringBuilder::append(StringView str)
     return StringConverter::convertEncodingTo(backingString.getEncoding(), str, backingString.data);
 }
 
+bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf, StringView with)
+{
+    if (not source.hasCompatibleEncoding(occurrencesOf) or not source.hasCompatibleEncoding(with) or
+        not source.hasCompatibleEncoding(backingString.view()))
+    {
+        return false;
+    }
+    if (source.isEmpty())
+    {
+        return true;
+    }
+    if (occurrencesOf.isEmpty())
+    {
+        return append(source);
+    }
+    SC_TRY_IF(backingString.popNulltermIfExists());
+    StringView current             = source;
+    const auto occurrencesIterator = occurrencesOf.getIterator<StringIteratorASCII>();
+    bool       res;
+    do
+    {
+        auto sourceIt    = current.getIterator<StringIteratorASCII>();
+        res              = sourceIt.advanceBeforeFinding(occurrencesIterator);
+        StringView soFar = StringView::fromIteratorFromStart(sourceIt);
+        SC_TRY_IF(backingString.data.appendCopy(soFar.bytesWithoutTerminator(), soFar.sizeInBytes()));
+        if (res)
+        {
+            SC_TRY_IF(backingString.data.appendCopy(with.bytesWithoutTerminator(), with.sizeInBytes()));
+            res     = sourceIt.advanceByLengthOf(occurrencesIterator);
+            current = StringView::fromIteratorUntilEnd(sourceIt);
+        }
+    } while (res);
+    SC_TRY_IF(backingString.data.appendCopy(current.bytesWithoutTerminator(), current.sizeInBytes()));
+    return backingString.pushNullTerm();
+}
+
 } // namespace SC

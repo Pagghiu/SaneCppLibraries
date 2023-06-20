@@ -132,6 +132,33 @@ struct StringIterator
         return false;
     }
 
+    [[nodiscard]] constexpr bool advanceBeforeFinding(StringIterator other)
+    {
+        if (advanceAfterFinding(other))
+        {
+            return advanceOfBytes(other.it - other.end);
+        }
+        return false;
+    }
+
+  private:
+    [[nodiscard]] constexpr bool advanceOfBytes(ssize_t bytesLength)
+    {
+        auto newIt = it + bytesLength;
+        if (newIt >= start and newIt <= end)
+        {
+            it = newIt;
+            return true;
+        }
+        return false;
+    }
+
+  public:
+    [[nodiscard]] constexpr bool advanceByLengthOf(StringIterator other)
+    {
+        return advanceOfBytes(other.end - other.it);
+    }
+
     [[nodiscard]] constexpr bool advanceUntilMatchesAny(std::initializer_list<CodePoint> items, CodePoint& matched)
     {
         while (it != end)
