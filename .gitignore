@@ -7,3 +7,12 @@ x64
 Dependencies/*/*.txt
 *.aps
 *.db
+*.o
+*.obj
+*.lib
+*.exp
+*.a
+*.dylib
+*.dll
+*.pdb
+*.ilk

@@ -179,11 +179,11 @@ struct TestNamespace::StructWithArrayPacked
 {
     PackedStruct packedMember[3];
 };
-//#if !SC_META_ENABLE_AUTO_REFLECTION // TODO: This fails on clang
+// #if !SC_META_ENABLE_AUTO_REFLECTION // TODO: This fails on clang
 SC_META_STRUCT_VISIT(TestNamespace::StructWithArrayPacked)
 SC_META_STRUCT_FIELD(0, packedMember);
 SC_META_STRUCT_LEAVE()
-//#endif
+// #endif
 
 struct TestNamespace::StructWithArrayUnpacked
 {

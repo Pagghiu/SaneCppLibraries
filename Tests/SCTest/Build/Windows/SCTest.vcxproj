@@ -140,44 +140,47 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)\..\..\..\..\_Build\Output\windows-10-x86_64-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)\..\..\..\..\_Build\Intermediate\$(ProjectName)\windows-10-x86_64-msvc2022-$(Configuration)\</IntDir>
-    <IncludePath>..\..\;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\;..\..\..\..\..;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug ASAN Clang|x64'">
     <OutDir>$(SolutionDir)\..\..\..\..\_Build\Output\windows-10-x86_64-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)\..\..\..\..\_Build\Intermediate\$(ProjectName)\windows-10-x86_64-msvc2022-$(Configuration)\</IntDir>
-    <IncludePath>..\..\;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\;..\..\..\..\..;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <OutDir>$(SolutionDir)\..\..\..\..\_Build\Output\windows-10-arm64-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)\..\..\..\..\_Build\Intermediate\$(ProjectName)\windows-10-arm64-msvc2022-$(Configuration)\</IntDir>
-    <IncludePath>..\..\;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\;..\..\..\..\..;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug ASAN Clang|ARM64'">
     <OutDir>$(SolutionDir)\..\..\..\..\_Build\Output\windows-10-arm64-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)\..\..\..\..\_Build\Intermediate\$(ProjectName)\windows-10-arm64-msvc2022-$(Configuration)\</IntDir>
-    <IncludePath>..\..\;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\;..\..\..\..\..;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)\..\..\..\..\_Build\Output\windows-10-x86_64-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)\..\..\..\..\_Build\Intermediate\$(ProjectName)\windows-10-x86_64-msvc2022-$(Configuration)\</IntDir>
-    <IncludePath>..\..\;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\;..\..\..\..\..;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <OutDir>$(SolutionDir)\..\..\..\..\_Build\Output\windows-10-arm64-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)\..\..\..\..\_Build\Intermediate\$(ProjectName)\windows-10-arm64-msvc2022-$(Configuration)\</IntDir>
-    <IncludePath>..\..\;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\;..\..\..\..\..;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)\..\..\..\..\_Build\Output\windows-10-x86-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)\..\..\..\..\_Build\Intermediate\$(ProjectName)\windows-10-x86-msvc2022-$(Configuration)\</IntDir>
+    <IncludePath>..\..\;..\..\..\..\..;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug ASAN Clang|Win32'">
     <OutDir>$(SolutionDir)\..\..\..\..\_Build\Output\windows-10-x86-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)\..\..\..\..\_Build\Intermediate\$(ProjectName)\windows-10-x86-msvc2022-$(Configuration)\</IntDir>
+    <IncludePath>..\..\;..\..\..\..\..;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)\..\..\..\..\_Build\Output\windows-10-x86-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)\..\..\..\..\_Build\Intermediate\$(ProjectName)\windows-10-x86-msvc2022-$(Configuration)\</IntDir>
+    <IncludePath>..\..\;..\..\..\..\..;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -326,6 +329,9 @@
     <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Json\Json.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Plugin\Plugin.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginChild\TestPluginChild.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginParent\TestPluginParent.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Serialization\Serialization.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Socket\SocketDescriptor.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\System\Console.cpp" />
@@ -360,6 +366,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonFormatterTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonTokenizer.h" />
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonTokenizerTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Plugin\PluginMacros.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Plugin\Plugin.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Plugin\PluginTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAuto.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionFoundation.h" />
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionMetaType.h" />

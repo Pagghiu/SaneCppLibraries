@@ -6,7 +6,7 @@
 namespace SC
 {
 // Garanteed alignment at least 8
-void* memoryAllocate(size_t numBytes);
-void* memoryReallocate(void* allocatedMemory, size_t numBytes);
-void  memoryRelease(void* allocatedMemory);
+SC_EXPORT_SYMBOL void* memoryAllocate(size_t numBytes);
+SC_EXPORT_SYMBOL void* memoryReallocate(void* allocatedMemory, size_t numBytes);
+SC_EXPORT_SYMBOL void  memoryRelease(void* allocatedMemory);
 } // namespace SC

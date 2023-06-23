@@ -81,3 +81,17 @@
 #else
 #define SC_ADDRESS_SANITIZER 0
 #endif
+
+#if SC_MSVC
+#if defined(SC_PLUGIN_LIBRARY)
+#define SC_EXPORT_SYMBOL __declspec(dllimport)
+#else
+#define SC_EXPORT_SYMBOL __declspec(dllexport)
+#endif
+#else
+#if defined(SC_PLUGIN_LIBRARY)
+#define SC_EXPORT_SYMBOL
+#else
+#define SC_EXPORT_SYMBOL __attribute__((visibility("default")))
+#endif
+#endif

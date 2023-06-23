@@ -11,6 +11,7 @@
 		7B19C9AC297AF99F001C0627 /* Path.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B19C9A9297AF95B001C0627 /* Path.cpp */; };
 		7B19C9AD297AF9A2001C0627 /* Path.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B19C9A9297AF95B001C0627 /* Path.cpp */; };
 		7B1A39FB29BA7B220087F688 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B1A39FA29BA7B220087F688 /* CoreFoundation.framework */; };
+		7B25AE002A2CB9B1008936DE /* Plugin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B25ADFD2A2CB9B1008936DE /* Plugin.cpp */; };
 		7B358DDE29D88FFC002A7D1C /* FileSystemWatcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B358DDC29D88E93002A7D1C /* FileSystemWatcher.cpp */; };
 		7B358DE029D8F063002A7D1C /* CoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B358DDF29D8F063002A7D1C /* CoreServices.framework */; };
 		7B3AAB732A27E0CE00F814A2 /* Serialization.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B3AAB722A27E06F00F814A2 /* Serialization.cpp */; };
@@ -33,6 +34,8 @@
 		7BA892AF297E06040093152B /* StringConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892AD297E06040093152B /* StringConverter.cpp */; };
 		7BC56BDB29946C9200EED472 /* FileSystemWalker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BC56BD729946AD100EED472 /* FileSystemWalker.cpp */; };
 		7BC56BDC29946C9200EED472 /* FileSystemWalker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BC56BD729946AD100EED472 /* FileSystemWalker.cpp */; };
+		7BCACB892A44F745003D1658 /* TestPluginParent.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE94E412A4245C900AC61EF /* TestPluginParent.cpp */; };
+		7BCACB8A2A44F745003D1658 /* TestPluginChild.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE94E452A4245DB00AC61EF /* TestPluginChild.cpp */; };
 		7BE5C81029A26E3E00CBCAD1 /* Process.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */; };
 		7BE5C81329A2707E00CBCAD1 /* FileDescriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */; };
 /* End PBXBuildFile section */
@@ -69,12 +72,16 @@
 		7B0C299C297CA7CC0071C5B4 /* FileSystem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = FileSystem.cpp; path = ../../../../Libraries/FileSystem/FileSystem.cpp; sourceTree = "<group>"; };
 		7B14DE9E29858C35004C4F3B /* FileSystemInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalWindows.inl; path = ../../../../Libraries/FileSystem/FileSystemInternalWindows.inl; sourceTree = "<group>"; };
 		7B14DE9F29858C35004C4F3B /* FileSystemInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemInternalPosix.inl; path = ../../../../Libraries/FileSystem/FileSystemInternalPosix.inl; sourceTree = "<group>"; };
+		7B17F7FC2A3901A30052D291 /* PluginMacros.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PluginMacros.h; path = ../../../../Libraries/Plugin/PluginMacros.h; sourceTree = "<group>"; };
 		7B19C9A9297AF95B001C0627 /* Path.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Path.cpp; path = ../../../../Libraries/FileSystem/Path.cpp; sourceTree = "<group>"; };
 		7B19C9AA297AF95B001C0627 /* PathTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PathTest.h; path = ../../../../Libraries/FileSystem/PathTest.h; sourceTree = "<group>"; };
 		7B19C9AB297AF95B001C0627 /* Path.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Path.h; path = ../../../../Libraries/FileSystem/Path.h; sourceTree = "<group>"; };
 		7B1A39FA29BA7B220087F688 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 		7B1FCC2429ECBDAF001D75F7 /* AlgorithmSort.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AlgorithmSort.h; path = ../../../../Libraries/Foundation/AlgorithmSort.h; sourceTree = "<group>"; };
 		7B20B39D2A27FCE400110F52 /* SerializationStructuredJsonTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SerializationStructuredJsonTest.h; path = ../../../../Libraries/Serialization/SerializationStructuredJsonTest.h; sourceTree = "<group>"; };
+		7B25ADFD2A2CB9B1008936DE /* Plugin.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Plugin.cpp; path = ../../../../Libraries/Plugin/Plugin.cpp; sourceTree = "<group>"; };
+		7B25ADFE2A2CB9B1008936DE /* Plugin.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Plugin.h; path = ../../../../Libraries/Plugin/Plugin.h; sourceTree = "<group>"; };
+		7B25ADFF2A2CB9B1008936DE /* PluginTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = PluginTest.h; path = ../../../../Libraries/Plugin/PluginTest.h; sourceTree = "<group>"; };
 		7B27836029EBE4F0002CA0A4 /* StringFormatTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StringFormatTest.h; path = ../../../../Libraries/Foundation/StringFormatTest.h; sourceTree = "<group>"; };
 		7B281DBF29E2BAF400363F69 /* EventLoopWindows.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = EventLoopWindows.h; path = ../../../../Libraries/Async/EventLoopWindows.h; sourceTree = "<group>"; };
 		7B2AEB1729D0DA4C003E1B6F /* Atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Atomic.h; path = ../../../../Libraries/Threading/Atomic.h; sourceTree = "<group>"; };
@@ -215,6 +222,8 @@
 		7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = FileDescriptor.cpp; path = ../../../../Libraries/File/FileDescriptor.cpp; sourceTree = "<group>"; };
 		7BE5C81229A2707E00CBCAD1 /* FileDescriptor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FileDescriptor.h; path = ../../../../Libraries/File/FileDescriptor.h; sourceTree = "<group>"; };
 		7BE906C429FD071E0073D7A8 /* EventLoopInternalWindowsAPI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = EventLoopInternalWindowsAPI.h; path = ../../../../Libraries/Async/EventLoopInternalWindowsAPI.h; sourceTree = "<group>"; };
+		7BE94E412A4245C900AC61EF /* TestPluginParent.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = TestPluginParent.cpp; path = ../../../../Libraries/Plugin/PluginTestDirectory/TestPluginParent/TestPluginParent.cpp; sourceTree = "<group>"; };
+		7BE94E452A4245DB00AC61EF /* TestPluginChild.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = TestPluginChild.cpp; path = ../../../../Libraries/Plugin/PluginTestDirectory/TestPluginChild/TestPluginChild.cpp; sourceTree = "<group>"; };
 		7BF876572A04615B00ABA178 /* ProcessDescriptor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ProcessDescriptor.h; path = ../../../../Libraries/Process/ProcessDescriptor.h; sourceTree = "<group>"; };
 		7BF876582A04633600ABA178 /* SocketDescriptorInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SocketDescriptorInternalPosix.inl; path = ../../../../Libraries/Socket/SocketDescriptorInternalPosix.inl; sourceTree = "<group>"; };
 		7BF876592A04633600ABA178 /* SocketDescriptor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SocketDescriptor.h; path = ../../../../Libraries/Socket/SocketDescriptor.h; sourceTree = "<group>"; };
@@ -277,6 +286,35 @@
 				7B51600629243097006996AA /* Test.h */,
 			);
 			name = Testing;
+			sourceTree = "<group>";
+		};
+		7B25ADFC2A2CB9A6008936DE /* Plugin */ = {
+			isa = PBXGroup;
+			children = (
+				7B25ADFD2A2CB9B1008936DE /* Plugin.cpp */,
+				7B25ADFE2A2CB9B1008936DE /* Plugin.h */,
+				7B17F7FC2A3901A30052D291 /* PluginMacros.h */,
+				7B25ADFF2A2CB9B1008936DE /* PluginTest.h */,
+				7B25AE012A2CE70A008936DE /* PluginTestDirectory */,
+			);
+			name = Plugin;
+			sourceTree = "<group>";
+		};
+		7B25AE012A2CE70A008936DE /* PluginTestDirectory */ = {
+			isa = PBXGroup;
+			children = (
+				7B25AE022A2CE719008936DE /* TestPluginChild */,
+				7BD3D2702A4106D100DAC0E6 /* TestPluginParent */,
+			);
+			name = PluginTestDirectory;
+			sourceTree = "<group>";
+		};
+		7B25AE022A2CE719008936DE /* TestPluginChild */ = {
+			isa = PBXGroup;
+			children = (
+				7BE94E452A4245DB00AC61EF /* TestPluginChild.cpp */,
+			);
+			name = TestPluginChild;
 			sourceTree = "<group>";
 		};
 		7B44ADC12A10EE9600FAAADC /* File */ = {
@@ -355,6 +393,7 @@
 				7B0C2999297CA7C10071C5B4 /* FileSystem */,
 				7B515F932924305E006996AA /* Foundation */,
 				7B787CCB2A1980650098B120 /* Json */,
+				7B25ADFC2A2CB9A6008936DE /* Plugin */,
 				7B956A2029FF16AA007740C6 /* Process */,
 				7B7044552995A2180034458B /* Reflection */,
 				7B7044562995A2290034458B /* Serialization */,
@@ -505,6 +544,14 @@
 			name = Async;
 			sourceTree = "<group>";
 		};
+		7BD3D2702A4106D100DAC0E6 /* TestPluginParent */ = {
+			isa = PBXGroup;
+			children = (
+				7BE94E412A4245C900AC61EF /* TestPluginParent.cpp */,
+			);
+			name = TestPluginParent;
+			sourceTree = "<group>";
+		};
 		7BF4DF5D28DE7A5E008CBB53 = {
 			isa = PBXGroup;
 			children = (
@@ -617,6 +664,7 @@
 			files = (
 				7B515FF529243087006996AA /* Memory.cpp in Sources */,
 				7B0C299D297CA7CC0071C5B4 /* FileSystem.cpp in Sources */,
+				7B25AE002A2CB9B1008936DE /* Plugin.cpp in Sources */,
 				7B51601229243097006996AA /* StringView.cpp in Sources */,
 				7B51601129243097006996AA /* StringFormat.cpp in Sources */,
 				7B872C4D29AFFC4900949BD2 /* Threading.cpp in Sources */,
@@ -635,7 +683,9 @@
 				7BA892AE297E06040093152B /* StringConverter.cpp in Sources */,
 				7BC56BDB29946C9200EED472 /* FileSystemWalker.cpp in Sources */,
 				7BA7D47C29B5488200811076 /* EventLoop.cpp in Sources */,
+				7BCACB892A44F745003D1658 /* TestPluginParent.cpp in Sources */,
 				7B8DDDC52A2012B300D62F03 /* Json.cpp in Sources */,
+				7BCACB8A2A44F745003D1658 /* TestPluginChild.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -665,10 +715,8 @@
 		7B52501928E85B9100827290 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
-				DEAD_CODE_STRIPPING = YES;
 				GCC_ENABLE_CPP_EXCEPTIONS = NO;
 				GCC_ENABLE_CPP_RTTI = NO;
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
@@ -685,11 +733,8 @@
 		7B52501A28E85B9100827290 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
-				DEAD_CODE_STRIPPING = YES;
-				DEPLOYMENT_POSTPROCESSING = YES;
 				GCC_ENABLE_CPP_EXCEPTIONS = NO;
 				GCC_ENABLE_CPP_RTTI = NO;
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
@@ -736,7 +781,6 @@
 		7BF4DF6B28DE7A5E008CBB53 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
@@ -775,10 +819,8 @@
 				CLANG_WARN__EXIT_TIME_DESTRUCTORS = YES;
 				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/../../../../_Build/Output/macOS-13-arm64_x86_64-Xcode-$(CONFIGURATION)";
 				COPY_PHASE_STRIP = NO;
-				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_TESTABILITY = YES;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
@@ -806,6 +848,7 @@
 				GCC_WARN_UNUSED_LABEL = YES;
 				GCC_WARN_UNUSED_PARAMETER = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = ../../../../..;
 				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -818,7 +861,6 @@
 		7BF4DF6C28DE7A5E008CBB53 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
@@ -857,7 +899,6 @@
 				CLANG_WARN__EXIT_TIME_DESTRUCTORS = YES;
 				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/../../../../_Build/Output/macOS-13-arm64_x86_64-Xcode-$(CONFIGURATION)";
 				COPY_PHASE_STRIP = NO;
-				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -882,6 +923,7 @@
 				GCC_WARN_UNUSED_LABEL = YES;
 				GCC_WARN_UNUSED_PARAMETER = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = ../../../../..;
 				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;

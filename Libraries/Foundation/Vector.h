@@ -16,7 +16,7 @@ struct Vector;
 struct VectorAllocator;
 } // namespace SC
 
-struct SC::VectorAllocator
+struct SC_EXPORT_SYMBOL SC::VectorAllocator
 {
     static const size_t   SIZE_OF_VECTOR_T = 8;
     static SegmentHeader* reallocate(SegmentHeader* oldHeader, size_t newSize)

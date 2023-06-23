@@ -36,7 +36,7 @@ enum class StringComparison
 
 } // namespace SC
 
-struct SC::StringView
+struct SC_EXPORT_SYMBOL SC::StringView
 {
   private:
     union

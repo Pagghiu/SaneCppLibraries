@@ -9,7 +9,7 @@
 namespace SC
 {
 struct String;
-struct Console
+struct SC_EXPORT_SYMBOL Console
 {
     Console(Vector<char>& encodingConversionBuffer) : encodingConversionBuffer(encodingConversionBuffer) {}
 

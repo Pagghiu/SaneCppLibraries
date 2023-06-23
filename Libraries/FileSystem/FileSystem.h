@@ -14,8 +14,8 @@ struct SC::FileSystem
 {
     StringNative<512> currentDirectory = StringEncoding::Native;
 
-    bool localizedErrorMessages = true;
-    bool preciseErrorMessages   = true;
+    bool localizedErrorMessages = false;
+    bool preciseErrorMessages   = false;
 
     ReturnCode init(StringView currentWorkingDirectory);
     ReturnCode changeDirectory(StringView currentWorkingDirectory);

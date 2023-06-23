@@ -37,6 +37,15 @@
     <Filter Include="Json">
       <UniqueIdentifier>{0b853960-e20b-4906-89e7-1532a3e5ca17}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Plugin">
+      <UniqueIdentifier>{a432c53e-b64a-4518-9739-b2c8c92f502d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugin\TestPluginChild">
+      <UniqueIdentifier>{8282d14e-73c6-4975-8ad3-eb0a14c1c20a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugin\TestPluginParent">
+      <UniqueIdentifier>{690c696f-623b-4075-854b-b5c8b2e1dc2d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\SCTest.cpp">
@@ -100,6 +109,15 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Serialization\Serialization.cpp">
       <Filter>Serialization</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Plugin\Plugin.cpp">
+      <Filter>Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginChild\TestPluginChild.cpp">
+      <Filter>Plugin\TestPluginChild</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginParent\TestPluginParent.cpp">
+      <Filter>Plugin\TestPluginParent</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -399,6 +417,15 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationStructuredReadWrite.h">
       <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Plugin\Plugin.h">
+      <Filter>Plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Plugin\PluginTest.h">
+      <Filter>Plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Plugin\PluginMacros.h">
+      <Filter>Plugin</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

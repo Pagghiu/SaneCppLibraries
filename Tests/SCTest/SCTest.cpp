@@ -31,6 +31,9 @@
 #include "../../Libraries/Json/JsonFormatterTest.h"
 #include "../../Libraries/Json/JsonTokenizerTest.h"
 
+// Plugin
+#include "../../Libraries/Plugin/PluginTest.h"
+
 // Process
 #include "../../Libraries/Process/ProcessTest.h"
 
@@ -106,6 +109,9 @@ int main(int argc, const char* argv[])
     // JSON tests
     { JsonFormatterTest             test(report); }
     { JsonTokenizerTest             test(report); }
+
+    // Plugin tests
+    { PluginTest                    test(report); }
 
     // Process tests
     { ProcessTest                   test(report); }
