@@ -62,9 +62,9 @@ struct SC::FileSystemWatcher::Internal
                 threadingRunner->shouldStop.exchange(true);
                 do
                 {
-                    for (FolderWatcher* entry = self->watchers.front; entry != nullptr; entry = entry->next)
+                    for (DWORD idx = 0; idx < threadingRunner->numEntries; ++idx)
                     {
-                        signalWatcherEvent(*entry);
+                        ::SetEvent(threadingRunner->hEvents[idx]);
                     }
                 } while (threadingRunner->shouldStop.load());
                 SC_TRY_IF(threadingRunner->thread.join());
@@ -80,13 +80,13 @@ struct SC::FileSystemWatcher::Internal
     void signalWatcherEvent(FolderWatcher& watcher)
     {
         auto& opaque = watcher.internal.get();
-        SetEvent(opaque.overlapped.overlapped.hEvent);
+        ::SetEvent(opaque.overlapped.overlapped.hEvent);
     }
 
     void closeWatcherEvent(FolderWatcher& watcher)
     {
         auto& opaque = watcher.internal.get();
-        CloseHandle(opaque.overlapped.overlapped.hEvent);
+        ::CloseHandle(opaque.overlapped.overlapped.hEvent);
         opaque.overlapped.overlapped.hEvent = INVALID_HANDLE_VALUE;
     }
 
@@ -196,7 +196,7 @@ struct SC::FileSystemWatcher::Internal
         while (not runner.shouldStop.load())
         {
             const DWORD result = WaitForMultipleObjects(runner.numEntries, runner.hEvents, TRUE, INFINITE);
-            if (result != WAIT_FAILED)
+            if (result != WAIT_FAILED and not runner.shouldStop.load())
             {
                 const DWORD            index  = result - WAIT_OBJECT_0;
                 FolderWatcher&         entry  = *runner.entries[index];
