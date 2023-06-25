@@ -9,6 +9,7 @@
 #include <shellapi.h>
 // clang-format on
 
+#include "../File/FileDescriptor.h"
 #include "FileSystem.h"
 
 namespace SC
@@ -157,6 +158,51 @@ struct SC::FileSystem::Internal
         shFileOp.pFrom = sourceDirectory.view().getNullTerminatedNative();
         const int res  = SHFileOperationW(&shFileOp);
         return res == 0;
+    }
+
+    [[nodiscard]] static ReturnCode getFileTime(const wchar_t* file, FileTime& time)
+    {
+        HANDLE hFile =
+            CreateFileW(file, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        FileDescriptor deferFileClose = hFile;
+        SC_TRY_MSG(deferFileClose.isValid(), "getFileTime: Invalid file"_a8);
+        FILETIME creationTime, lastAccessTime, modifiedTime;
+        if (GetFileTime(hFile, &creationTime, &lastAccessTime, &modifiedTime))
+        {
+            ULARGE_INTEGER fileTimeValue;
+            fileTimeValue.LowPart  = modifiedTime.dwLowDateTime;
+            fileTimeValue.HighPart = modifiedTime.dwHighDateTime;
+            fileTimeValue.QuadPart -= 116444736000000000ULL;
+            time.modifiedTime = AbsoluteTime(fileTimeValue.QuadPart / 10000ULL);
+            return true;
+        }
+        return false;
+    }
+
+    [[nodiscard]] static ReturnCode setLastModifiedTime(const wchar_t* file, AbsoluteTime time)
+    {
+        HANDLE         hFile          = CreateFileW(file, FILE_WRITE_ATTRIBUTES, FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+                                                    FILE_ATTRIBUTE_NORMAL, NULL);
+        FileDescriptor deferFileClose = hFile;
+        SC_TRY_MSG(deferFileClose.isValid(), "setLastModifiedTime: Invalid file"_a8);
+
+        FILETIME creationTime, lastAccessTime;
+        if (!GetFileTime(hFile, &creationTime, &lastAccessTime, NULL))
+        {
+            return false;
+        }
+
+        FILETIME       modifiedTime;
+        ULARGE_INTEGER fileTimeValue;
+        fileTimeValue.QuadPart      = time.getMillisecondsSinceEpoch() * 10000ULL + 116444736000000000ULL;
+        modifiedTime.dwLowDateTime  = fileTimeValue.LowPart;
+        modifiedTime.dwHighDateTime = fileTimeValue.HighPart;
+        if (!SetFileTime(hFile, &creationTime, &lastAccessTime, &modifiedTime))
+        {
+            return false;
+        }
+
+        return true;
     }
 #undef SC_TRY_LIBC
 };

@@ -174,7 +174,7 @@ struct SC::Path::Internal
         StringView name = basename<separator>(input);
         if (name.endsWith(suffix))
         {
-            return name.sliceStartEnd<StringIterator>(0, name.sizeInBytes() - suffix.sizeInBytes());
+            return name.sliceStartEnd<StringIteratorASCII>(0, name.sizeInBytes() - suffix.sizeInBytes());
         }
         return name;
     }
@@ -182,7 +182,7 @@ struct SC::Path::Internal
     template <char separator>
     static SC::StringView basename(StringView input, StringView suffix)
     {
-        SC_DEBUG_ASSERT(input.getEncoding() == suffix.getEncoding());
+        SC_DEBUG_ASSERT(input.hasCompatibleEncoding(suffix));
         if (input.getEncoding() == StringEncoding::Utf16)
             return basenameTemplate<StringIteratorUTF16, separator>(input, suffix);
         else

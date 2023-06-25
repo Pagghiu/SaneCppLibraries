@@ -76,6 +76,8 @@ struct SC::AbsoluteTime
 
     [[nodiscard]] RelativeTime subtract(AbsoluteTime other);
 
+    [[nodiscard]] int64_t getMillisecondsSinceEpoch() const { return millisecondsSinceEpoch; }
+
   private:
     struct Internal;
     int64_t millisecondsSinceEpoch;

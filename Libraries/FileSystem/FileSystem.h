@@ -2,7 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Foundation/Optional.h"
 #include "../Foundation/String.h"
+#include "../System/Time.h"
 
 namespace SC
 {
@@ -71,6 +73,13 @@ struct SC::FileSystem
     [[nodiscard]] ReturnCode read(StringView file, Vector<char>& data);
     [[nodiscard]] ReturnCode write(StringView file, StringView text);
     [[nodiscard]] ReturnCode read(StringView file, String& data, StringEncoding encoding);
+
+    struct FileTime
+    {
+        AbsoluteTime modifiedTime = 0;
+    };
+    [[nodiscard]] Optional<FileTime> getFileTime(StringView file);
+    [[nodiscard]] ReturnCode         setLastModifiedTime(StringView file, AbsoluteTime time);
 
   private:
     [[nodiscard]] bool convert(const StringView file, String& destination, StringView* encodedPath = nullptr);

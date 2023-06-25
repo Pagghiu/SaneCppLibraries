@@ -9,6 +9,8 @@
 #include <sys/stat.h> // mkdir
 #include <unistd.h> // rmdir
 #include <string.h> //strerror_r
+#include <math.h> // round
+#include <fcntl.h> // AT_FDCWD
 #if __APPLE__
 #include <copyfile.h>
 #include <sys/attr.h>
@@ -194,6 +196,32 @@ struct SC::FileSystem::Internal
         return false;
     }
 #endif
+
+    [[nodiscard]] static ReturnCode getFileTime(const char* file, FileTime& time)
+    {
+        struct stat st;
+        if (::stat(file, &st) == 0)
+        {
+            time.modifiedTime = AbsoluteTime(
+                static_cast<int64_t>(::round(st.st_mtimespec.tv_nsec / 1.0e6) + st.st_mtimespec.tv_sec * 1000));
+            return true;
+        }
+        return false;
+    }
+
+    [[nodiscard]] static ReturnCode setLastModifiedTime(const char* file, AbsoluteTime time)
+    {
+        struct timespec times[2];
+        times[0].tv_sec  = time.getMillisecondsSinceEpoch() / 1000;
+        times[0].tv_nsec = time.getMillisecondsSinceEpoch() * 1000 * 1000;
+        times[1]         = times[0];
+
+        if (::utimensat(AT_FDCWD, file, times, 0) == 0)
+        {
+            return true;
+        }
+        return false;
+    }
 
 #undef SC_TRY_LIBC
 };

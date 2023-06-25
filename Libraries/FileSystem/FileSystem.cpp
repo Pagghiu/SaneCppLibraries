@@ -281,4 +281,25 @@ bool SC::FileSystem::existsAndIsDirectory(StringView directory)
     return Internal::existsAndIsFile(encodedPath.getNullTerminatedNative());
 }
 
+SC::Optional<SC::FileSystem::FileTime> SC::FileSystem::getFileTime(StringView file)
+{
+    StringView encodedPath;
+    if (convert(file, fileFormatBuffer1, &encodedPath))
+    {
+        FileTime time;
+        if (Internal::getFileTime(encodedPath.getNullTerminatedNative(), time))
+        {
+            return time;
+        }
+    }
+    return {};
+}
+
+SC::ReturnCode SC::FileSystem::setLastModifiedTime(StringView file, AbsoluteTime time)
+{
+    StringView encodedPath;
+    SC_TRY_IF(convert(file, fileFormatBuffer1, &encodedPath));
+    return Internal::setLastModifiedTime(encodedPath.getNullTerminatedNative(), time);
+}
+
 #undef SC_TRY_FORMAT_ERRNO
