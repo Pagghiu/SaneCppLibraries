@@ -119,6 +119,9 @@
     <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginParent\TestPluginParent.cpp">
       <Filter>Plugin\TestPluginParent</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginChild\AdditionalFile.cpp">
+      <Filter>Plugin\TestPluginChild</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h">

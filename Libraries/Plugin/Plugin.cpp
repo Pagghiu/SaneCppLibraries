@@ -148,34 +148,69 @@ SC::ReturnCode SC::PluginScanner::scanDirectory(const StringView directory, Vect
     FileSystemWalker walker;
     walker.options.recursive = false; // Manually recurse only first level dirs
     SC_TRY_IF(walker.init(directory));
-    SmallString<1024> path;
+    FileSystem fs;
+    SC_TRY_IF(fs.init(directory));
+    bool multiplePluginDefinitions = false;
+    // Iterate each directory at first level and tentatively build a Plugin Definition.
+    // A plugin will be valid if only a single Plugin Definition will be parsed.
+    // Both no plugin definition (identity.identifier.isEmpty()) and multiple
+    // contradictory plugin definitions (multiplePluginDefinitions) will prevent creation of the Plugin Definition
+    String file;
     while (walker.enumerateNext())
     {
         const auto& item = walker.get();
-        path             = ""_a8;
         if (item.isDirectory() and item.level == 0) // only recurse first level
         {
             SC_TRY_IF(walker.recurseSubdirectory());
+            const StringView pluginDirectory = item.path;
+            if (definitions.isEmpty() or not definitions.back().identity.identifier.isEmpty())
+            {
+                SC_TRY_IF(definitions.resize(definitions.size() + 1));
+            }
+            definitions.back().files.clear();
+            SC_TRY_IF(definitions.back().directory.assign(pluginDirectory));
+            multiplePluginDefinitions = false;
         }
-        if (item.name.endsWith(SC_STR_NATIVE(".cpp")))
+        if (item.level == 1 and item.name.endsWith(SC_STR_NATIVE(".cpp")))
         {
-            FileSystem fs;
-            SC_TRY_IF(fs.init(directory));
-            String file;
-            SC_TRY_IF(fs.read(item.path, file.data));
-            StringView extracted;
-            SC_TRY_IF(PluginDefinition::find(file.view(), extracted));
-            PluginDefinition pluginDefinition;
+            if (multiplePluginDefinitions)
+            {
+                continue;
+            }
+            PluginDefinition& pluginDefinition = definitions.back();
             {
                 PluginFile pluginFile;
                 SC_TRY_IF(pluginFile.absolutePath.assign(item.path));
                 SC_TRY_IF(pluginDefinition.files.push_back(move(pluginFile)));
             }
-            const StringView pluginDirectory     = Path::dirname(item.path);
-            pluginDefinition.identity.identifier = Path::basename(pluginDirectory);
-            SC_TRY_IF(pluginDefinition.directory.assign(pluginDirectory));
-            SC_TRY_IF(PluginDefinition::parse(extracted, pluginDefinition));
-            SC_TRY_IF(definitions.push_back(move(pluginDefinition)));
+            file.data.clear();
+            SC_TRY_IF(fs.read(item.path, file.data));
+            StringView extracted;
+            if (PluginDefinition::find(file.view(), extracted))
+            {
+                if (PluginDefinition::parse(extracted, pluginDefinition))
+                {
+                    if (pluginDefinition.identity.identifier.isEmpty())
+                    {
+                        const StringView identifier          = Path::basename(pluginDefinition.directory.view());
+                        pluginDefinition.identity.identifier = identifier;
+                        pluginDefinition.pluginFileIndex     = pluginDefinition.files.size() - 1;
+                    }
+                    else
+                    {
+                        multiplePluginDefinitions            = true;
+                        pluginDefinition.identity.identifier = StringView();
+                    }
+                }
+            }
+        }
+    }
+    // Cleanup the last definition if case it's not valid
+    if (not definitions.isEmpty())
+    {
+        if (definitions.back().identity.identifier.isEmpty())
+        {
+            SC_TRY_IF(definitions.pop_back());
         }
     }
     return walker.checkErrors();
@@ -202,7 +237,7 @@ SC::ReturnCode SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
                 compiler.compilerPath.data.clear();
                 compiler.linkerPath.data.clear();
                 StringBuilder compilerBuilder(compiler.compilerPath);
-                SC_TRY_IF(compilerBuilder.append(root[0]));
+                SC_TRY_IF(compilerBuilder.append(base));
                 SC_TRY_IF(compilerBuilder.append(L"/"));
                 SC_TRY_IF(compilerBuilder.append(candidate));
 #if SC_PLATFORM_ARM64
@@ -215,7 +250,7 @@ SC::ReturnCode SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
                 SC_TRY_IF(linkerBuilder.append(L"link.exe"));
                 SC_TRY_IF(compilerBuilder.append(L"cl.exe"));
                 FileSystem fs;
-                if (fs.init(root[0]))
+                if (fs.init(base))
                 {
                     if (fs.existsAndIsFile(compiler.compilerPath.view()) and
                         fs.existsAndIsFile(compiler.linkerPath.view()))
@@ -290,7 +325,7 @@ SC::ReturnCode SC::PluginCompiler::compile(const PluginDefinition& plugin) const
     for (auto& file : plugin.files)
     {
         StringView        dirname    = Path::dirname(file.absolutePath.view());
-        StringView        outputName = Path::basename(dirname);
+        StringView        outputName = Path::basename(file.absolutePath.view(), SC_STR_NATIVE(".cpp"));
         StringNative<256> destFile   = StringEncoding::Native;
         SC_TRY_IF(Path::join(destFile, {dirname, outputName}));
         StringBuilder builder(destFile);
@@ -312,7 +347,7 @@ SC::ReturnCode SC::PluginCompiler::link(const PluginDefinition& definition, Stri
         StringNative<256> objectPath = StringEncoding::Native;
         StringBuilder     b(objectPath);
         StringView        dirname    = Path::dirname(file.absolutePath.view());
-        StringView        outputName = Path::basename(dirname);
+        StringView        outputName = Path::basename(file.absolutePath.view(), SC_STR_NATIVE(".cpp"));
         SC_TRY_IF(b.append(dirname));
         SC_TRY_IF(b.append("/"));
         SC_TRY_IF(b.append(outputName));
@@ -337,7 +372,6 @@ SC::ReturnCode SC::PluginCompiler::link(const PluginDefinition& definition, Stri
     SC_TRY_IF(libNameBuilder.append(exeName));
     SC_TRY_IF(libNameBuilder.append(L".lib"));
 
-    // TODO: Find a solution for PDB Lock
     SC_TRY_IF(args.push_back(
         {linkerPath.view(), L"/DLL", L"/DEBUG", L"/NODEFAULTLIB", L"/ENTRY:DllMain", libPath.view(), libName.view()}));
     for (auto& obj : objectFiles)
@@ -490,7 +524,15 @@ SC::ReturnCode SC::PluginRegistry::removeAllBuildProducts(const StringView ident
     SC_TRY_IF(fmt.format("{}.dylib", identifier));
     SC_TRY_IF(fs.removeFile(buffer.view()));
 #endif
-    SC_TRY_IF(fmt.format("{}.o", identifier));
-    SC_TRY_IF(fs.removeFile(buffer.view()));
+    for (auto& file : lib.definition.files)
+    {
+        StringView        dirname    = Path::dirname(file.absolutePath.view());
+        StringView        outputName = Path::basename(file.absolutePath.view(), SC_STR_NATIVE(".cpp"));
+        StringNative<256> destFile   = StringEncoding::Native;
+        SC_TRY_IF(Path::join(destFile, {dirname, outputName}));
+        StringBuilder builder(destFile);
+        SC_TRY_IF(builder.append(".o"));
+        SC_TRY_IF(fs.removeFile(destFile.view()));
+    }
     return true;
 }

@@ -74,9 +74,11 @@ struct SC::PluginTest : public SC::TestCase
             // Save parent and child plugin identifiers and paths
             const int  parentIndex            = definitions.items[0].dependencies.isEmpty() ? 0 : 1;
             const int  childIndex             = parentIndex == 0 ? 1 : 0;
-            const auto identifierChildString  = definitions.items[childIndex].identity.identifier;
-            const auto identifierParentString = definitions.items[parentIndex].identity.identifier;
-            const auto pluginScriptPath       = definitions.items[childIndex].files[0].absolutePath;
+            const auto childItem              = definitions.items[childIndex];
+            const auto parentItem             = definitions.items[parentIndex];
+            const auto identifierChildString  = childItem.identity.identifier;
+            const auto identifierParentString = parentItem.identity.identifier;
+            const auto pluginScriptPath       = childItem.files[childItem.pluginFileIndex].absolutePath;
 
             const StringView identifierChild  = identifierChildString.view();
             const StringView identifierParent = identifierParentString.view();
@@ -104,6 +106,8 @@ struct SC::PluginTest : public SC::TestCase
             String     sourceContent;
             FileSystem fs;
             SC_TEST_EXPECT(fs.read(pluginScriptPath.view(), sourceContent, StringEncoding::Ascii));
+            auto scriptFileStat = fs.getFileTime(pluginScriptPath.view());
+            SC_TEST_EXPECT(scriptFileStat.hasValue());
             String sourceMod1;
             SC_TEST_EXPECT(StringBuilder(sourceMod1)
                                .appendReplaceAll(sourceContent.view(), //
@@ -133,6 +137,9 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(fs.write(pluginScriptPath.view(), sourceContent.view()));
             SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierChild));
             SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierParent));
+
+            // Restore last modified time to avoid triggering a rebuild as the file is included in the test project
+            SC_TEST_EXPECT(fs.setLastModifiedTime(pluginScriptPath.view(), scriptFileStat.get()->modifiedTime));
         }
     }
 };

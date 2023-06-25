@@ -25,6 +25,7 @@
 		7B583F6A2922ECF900FBE019 /* SCTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F692922ECF900FBE019 /* SCTest.cpp */; };
 		7B583F6D2922ED2700FBE019 /* SCTestXCTest.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */; };
 		7B583FCB2922EE7300FBE019 /* SCTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F692922ECF900FBE019 /* SCTest.cpp */; };
+		7B6B7A3A2A46D2C5007E8BE2 /* AdditionalFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B6B7A392A46D2C5007E8BE2 /* AdditionalFile.cpp */; };
 		7B872C4D29AFFC4900949BD2 /* Threading.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B872C4A29AFFC4900949BD2 /* Threading.cpp */; };
 		7B8BF9B129F3BADC0055BC3A /* SocketDescriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B8BF9AC29F3BADC0055BC3A /* SocketDescriptor.cpp */; };
 		7B8DDDC52A2012B300D62F03 /* Json.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B8DDDC42A2012B300D62F03 /* Json.cpp */; };
@@ -165,6 +166,7 @@
 		7B67008C29C28DF600174AB8 /* IntrusiveDoubleLinkedList.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = IntrusiveDoubleLinkedList.h; path = ../../../../Libraries/Foundation/IntrusiveDoubleLinkedList.h; sourceTree = "<group>"; };
 		7B67008D29C28DF600174AB8 /* IntrusiveDoubleLinkedListTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = IntrusiveDoubleLinkedListTest.h; path = ../../../../Libraries/Foundation/IntrusiveDoubleLinkedListTest.h; sourceTree = "<group>"; };
 		7B6A1E9F29B2B07F00DDCF40 /* TimeTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TimeTest.h; path = ../../../../Libraries/System/TimeTest.h; sourceTree = "<group>"; };
+		7B6B7A392A46D2C5007E8BE2 /* AdditionalFile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = AdditionalFile.cpp; path = ../../../../Libraries/Plugin/PluginTestDirectory/TestPluginChild/AdditionalFile.cpp; sourceTree = "<group>"; };
 		7B70AA5E2A2B97330047BD29 /* SerializationStructuredJson.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SerializationStructuredJson.h; path = ../../../../Libraries/Serialization/SerializationStructuredJson.h; sourceTree = "<group>"; };
 		7B70AA5F2A2B9D250047BD29 /* SerializationStructuredJson.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SerializationStructuredJson.inl; path = ../../../../Libraries/Serialization/SerializationStructuredJson.inl; sourceTree = "<group>"; };
 		7B75258629A16F8000779F2A /* OptionalTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OptionalTest.h; path = ../../../../Libraries/Foundation/OptionalTest.h; sourceTree = "<group>"; };
@@ -312,6 +314,7 @@
 		7B25AE022A2CE719008936DE /* TestPluginChild */ = {
 			isa = PBXGroup;
 			children = (
+				7B6B7A392A46D2C5007E8BE2 /* AdditionalFile.cpp */,
 				7BE94E452A4245DB00AC61EF /* TestPluginChild.cpp */,
 			);
 			name = TestPluginChild;
@@ -672,6 +675,7 @@
 				7B3AAB732A27E0CE00F814A2 /* Serialization.cpp in Sources */,
 				7B515FF929243087006996AA /* Console.cpp in Sources */,
 				7BA892AA297E03B50093152B /* System.cpp in Sources */,
+				7B6B7A3A2A46D2C5007E8BE2 /* AdditionalFile.cpp in Sources */,
 				7B358DDE29D88FFC002A7D1C /* FileSystemWatcher.cpp in Sources */,
 				7B583F6A2922ECF900FBE019 /* SCTest.cpp in Sources */,
 				7B4A291D29B3CD4A00F13DCB /* Time.cpp in Sources */,

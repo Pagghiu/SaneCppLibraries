@@ -18,6 +18,7 @@ struct PluginDynamicLibrary;
 struct PluginCompiler;
 struct PluginRegistry;
 struct PluginNetwork;
+using PluginIdentifier = SmallString<30>;
 } // namespace SC
 
 struct SC::PluginFile
@@ -27,10 +28,9 @@ struct SC::PluginFile
 
 struct SC::PluginIdentity
 {
-    using Identifier = SmallString<30>;
-    Identifier      identifier;
-    SmallString<30> name;
-    SmallString<10> version;
+    PluginIdentifier identifier;
+    SmallString<30>  name;
+    SmallString<10>  version;
 
     bool operator==(const PluginIdentity& other) const { return identifier == other.identifier; }
 };
@@ -42,9 +42,10 @@ struct SC::PluginDefinition
     SmallString<10>  category;
     SmallString<255> directory;
 
-    SmallVector<PluginIdentity::Identifier, 10> dependencies;
+    SmallVector<PluginIdentifier, 10> dependencies;
+    SmallVector<PluginFile, 10>       files;
 
-    SmallVector<PluginFile, 10> files;
+    size_t pluginFileIndex = 0;
 
     [[nodiscard]] static bool find(const StringView text, StringView& extracted);
     [[nodiscard]] static bool parse(StringView text, PluginDefinition& pluginDefinition);
@@ -111,5 +112,5 @@ struct SC::PluginRegistry
     [[nodiscard]] const PluginDynamicLibrary* findPlugin(const StringView identifier);
 
   private:
-    Map<PluginIdentity::Identifier, PluginDynamicLibrary> libraries;
+    Map<PluginIdentifier, PluginDynamicLibrary> libraries;
 };

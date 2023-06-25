@@ -330,6 +330,7 @@
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Json\Json.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Plugin\Plugin.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginChild\AdditionalFile.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginChild\TestPluginChild.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginParent\TestPluginParent.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Serialization\Serialization.cpp" />
