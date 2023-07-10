@@ -27,18 +27,48 @@ struct SC::Map
 
     Container items;
 
-    [[nodiscard]] bool insert(Item&& item) { return items.push_back(forward<Item>(item)); }
-    [[nodiscard]] bool insert(const Item& item) { return items.push_back(item); }
+    [[nodiscard]] const Container& getItems() const { return items; }
+
+    /// Inserts an item if it doesn't exist already. If it exists or insertion fails returns false.
+    [[nodiscard]] bool insertIfNotExists(Item&& item)
+    {
+        if (not contains(item.key))
+        {
+            return items.push_back(forward<Item>(item));
+        }
+        return false;
+    }
+
+    /// Inserts an item. If insertion fails returns false.
+    [[nodiscard]] bool insertOverwrite(Item&& item)
+    {
+        for (auto& it : items)
+        {
+            if (it.key == item.key)
+            {
+                it.value = move(item.value);
+                return true;
+            }
+        }
+        return items.push_back(forward<Item>(item));
+    }
+
+    [[nodiscard]] Result<Key&> insertValueUniqueKey(Value&& value)
+    {
+        if (items.push_back({Key::generateUniqueKey(*this), forward<Value>(value)}))
+        {
+            return items.back().key;
+        }
+        return ReturnCode{"insert error"_a8};
+    }
 
     template <typename ComparableToKey>
-    [[nodiscard]] bool contains(const ComparableToKey& key, size_t* outIndex = nullptr) const
+    [[nodiscard]] bool contains(const ComparableToKey& key) const
     {
         for (auto& item : items)
         {
             if (item.key == key)
             {
-                if (outIndex)
-                    *outIndex = static_cast<size_t>(&item - items.begin());
                 return true;
             }
         }
@@ -46,14 +76,13 @@ struct SC::Map
     }
 
     template <typename ComparableToKey>
-    [[nodiscard]] bool contains(const ComparableToKey& key, const Value** outValue = nullptr) const
+    [[nodiscard]] bool contains(const ComparableToKey& key, const Value*& outValue) const
     {
         for (auto& item : items)
         {
             if (item.key == key)
             {
-                if (outValue)
-                    *outValue = &item.value;
+                outValue = &item.value;
                 return true;
             }
         }
@@ -61,14 +90,13 @@ struct SC::Map
     }
 
     template <typename ComparableToKey>
-    [[nodiscard]] bool contains(const ComparableToKey& key, Value** outValue = nullptr)
+    [[nodiscard]] bool contains(const ComparableToKey& key, Value*& outValue)
     {
         for (auto& item : items)
         {
             if (item.key == key)
             {
-                if (outValue)
-                    *outValue = &item.value;
+                outValue = &item.value;
                 return true;
             }
         }

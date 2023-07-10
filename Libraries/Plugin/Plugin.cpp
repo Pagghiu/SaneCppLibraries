@@ -444,7 +444,7 @@ SC::ReturnCode SC::PluginRegistry::init(Vector<PluginDefinition>&& definitions)
     {
         PluginDynamicLibrary pdl;
         pdl.definition = move(definition);
-        SC_TRY_IF(libraries.insert({pdl.definition.identity.identifier, move(pdl)}));
+        SC_TRY_IF(libraries.insertIfNotExists({pdl.definition.identity.identifier, move(pdl)}));
     }
     definitions.clear();
     return true;
@@ -483,7 +483,7 @@ SC::ReturnCode SC::PluginRegistry::unloadPlugin(const StringView identifier)
     SC_TRY(SC::PluginDynamicLibrary & lib, libraries.get(identifier));
     if (lib.dynamicLibrary.isValid())
     {
-        for (const auto& kv : libraries.items)
+        for (const auto& kv : libraries.getItems())
         {
             // TODO: Shield against circular dependencies
             if (kv.value.definition.dependencies.contains(identifier))

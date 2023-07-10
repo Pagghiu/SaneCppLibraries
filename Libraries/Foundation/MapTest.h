@@ -6,6 +6,7 @@
 #include "Array.h"
 #include "Map.h"
 #include "String.h"
+#include "StrongID.h"
 
 namespace SC
 {
@@ -20,36 +21,52 @@ struct SC::MapTest : public SC::TestCase
         if (test_section("contains"))
         {
             Map<int, int> map;
-            SC_TEST_EXPECT(map.insert({1, 2}));
-            SC_TEST_EXPECT(map.insert({2, 3}));
+            SC_TEST_EXPECT(map.insertIfNotExists({1, 2}));
+            SC_TEST_EXPECT(map.insertIfNotExists({2, 3}));
             const int* value;
-            SC_TEST_EXPECT(map.contains(1, &value) && *value == 2);
-            SC_TEST_EXPECT(map.contains(2, &value) && *value == 3);
-            SC_TEST_EXPECT(map.contains(2, &value) && *value == 3);
-            size_t index = 0;
-            SC_TEST_EXPECT(map.contains(2, &index) && index == 1);
+            SC_TEST_EXPECT(map.contains(1, value) && *value == 2);
+            SC_TEST_EXPECT(map.contains(2, value) && *value == 3);
+            SC_TEST_EXPECT(map.contains(2, value) && *value == 3);
             SC_TEST_EXPECT(not map.contains(3));
         }
         if (test_section("array"))
         {
             Map<String, String, Array<MapItem<String, String>, 2>> map;
-            SC_TEST_EXPECT(map.insert({"Ciao"_a8, "Fra"_a8}));
-            SC_TEST_EXPECT(map.insert({"Bella"_a8, "Bro"_a8}));
-            SC_TEST_EXPECT(not map.insert({"Fail"_a8, "Fail"_a8}));
+            SC_TEST_EXPECT(map.insertIfNotExists({"Ciao"_a8, "Fra"_a8}));
+            SC_TEST_EXPECT(map.insertIfNotExists({"Bella"_a8, "Bro"_a8}));
+            SC_TEST_EXPECT(not map.insertIfNotExists({"Fail"_a8, "Fail"_a8}));
             const String* value;
-            SC_TEST_EXPECT(map.contains("Ciao"_a8, &value) && *value == "Fra");
-            SC_TEST_EXPECT(map.contains("Bella"_a8, &value) && *value == "Bro");
+            SC_TEST_EXPECT(map.contains("Ciao"_a8, value) && *value == "Fra");
+            SC_TEST_EXPECT(map.contains("Bella"_a8, value) && *value == "Bro");
         }
         if (test_section("get"))
         {
             Map<String, String, Array<MapItem<String, String>, 2>> map;
-            SC_TEST_EXPECT(map.insert({"Ciao"_a8, "Fra"_a8}));
-            SC_TEST_EXPECT(map.insert({"Bella"_a8, "Bro"_a8}));
+            SC_TEST_EXPECT(map.insertIfNotExists({"Ciao"_a8, "Fra"_a8}));
+            SC_TEST_EXPECT(map.insertIfNotExists({"Bella"_a8, "Bro"_a8}));
             auto result1 = map.get("Ciao"_a8);
             SC_TEST_EXPECT(result1.releaseValue() == "Fra");
             auto result2 = map.get("Fail"_a8);
             SC_TEST_EXPECT(result2.isError());
             SC_TEST_EXPECT(getTestString(map, "Bella").releaseValue() == "Bro"_a8);
+        }
+        if (test_section("StrongID"))
+        {
+            struct Key
+            {
+                using ID = StrongID<Key>;
+            };
+            Map<Key::ID, String> map;
+
+            const Key::ID key1 = Key::ID::generateUniqueKey(map);
+            SC_TEST_EXPECT(map.insertIfNotExists({key1, "key1"_a8}));
+            auto res = map.insertValueUniqueKey("key2"_a8);
+            SC_TEST_EXPECT(res.isValid());
+            const Key::ID key2 = res.releaseValue();
+            const Key::ID key3 = Key::ID::generateUniqueKey(map);
+            SC_TEST_EXPECT(map.get(key1).releaseValue().view() == "key1"_a8);
+            SC_TEST_EXPECT(map.get(key2).releaseValue().view() == "key2"_a8);
+            SC_TEST_EXPECT(map.get(key3).isError());
         }
     }
 
