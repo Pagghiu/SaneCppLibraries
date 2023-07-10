@@ -6,6 +6,7 @@
 
 #include "../Foundation/SmallVector.h"
 #include "../Foundation/String.h"
+#include "../Foundation/StringBuilder.h"
 #include "../Foundation/StringConverter.h"
 
 #include "FileSystemWalker.h"
@@ -103,12 +104,19 @@ struct SC::FileSystemWalker::Internal
             }
         }
 
-        entry.name =
-            StringView(reinterpret_cast<const char*>(dirEnumerator.cFileName),
-                       wcsnlen_s(dirEnumerator.cFileName, MAX_PATH) * sizeof(wchar_t), true, StringEncoding::Utf16);
+        entry.name = StringView(dirEnumerator.cFileName, wcsnlen_s(dirEnumerator.cFileName, MAX_PATH) * sizeof(wchar_t),
+                                true, StringEncoding::Utf16);
         SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
-        SC_TRY_IF(currentPath.appendNullTerminated(L"\\"));
+        SC_TRY_IF(currentPath.appendNullTerminated(options.forwardSlashes ? L"/" : L"\\"));
         SC_TRY_IF(currentPath.appendNullTerminated(entry.name));
+        if (options.forwardSlashes)
+        {
+            // TODO: Probably this allocation could be avoided using StringBuilder instead of StringConverter
+            auto copy = currentPathString;
+            currentPathString.data.clear();
+            StringBuilder sb(currentPathString);
+            SC_TRY_IF(sb.appendReplaceAll(copy.view(), L"\\", L"/"));
+        }
         entry.path  = currentPathString.view();
         entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
         if (dirEnumerator.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)

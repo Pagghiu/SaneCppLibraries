@@ -33,6 +33,16 @@ struct SC::Path::Internal
                 }
                 return StringView::fromIterators(itBackup, itCheckpoint);
             }
+            else if (it.advanceIfMatches('/') and it.advanceIfMatches('/'))
+            {
+                auto itCheckpoint = it;
+                // Try parsing long path form that includes ? and another backslash
+                if (it.advanceIfMatches('?') and it.advanceIfMatches('/'))
+                {
+                    return StringView::fromIterators(itBackup, it);
+                }
+                return StringView::fromIterators(itBackup, itCheckpoint);
+            }
         }
         return StringView();
     }

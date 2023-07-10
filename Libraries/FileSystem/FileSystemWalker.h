@@ -30,7 +30,8 @@ struct SC::FileSystemWalker
     };
     struct Options
     {
-        bool recursive = false;
+        bool recursive      = false;
+        bool forwardSlashes = false;
     };
 
     Options options;
