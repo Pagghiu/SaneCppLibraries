@@ -35,7 +35,7 @@ bool SC::StringView::parseInt32(int32_t& value) const
         {
             return false;
         }
-        it.advanceUntilDifferentFrom('0'); // any number of 0s
+        (void)it.advanceUntilDifferentFrom('0'); // any number of 0s
         return it.isAtEnd();
     }
     return true;
@@ -83,8 +83,8 @@ bool SC::StringView::parseDouble(double& value) const
                 return false;
             }
         }
-        it.advanceUntilDifferentFrom('0'); // any number of 0s
-        return it.isAtEnd();               // if they where all zeroes
+        (void)it.advanceUntilDifferentFrom('0'); // any number of 0s
+        return it.isAtEnd();                     // if they where all zeroes
     }
     return true;
 }

@@ -107,8 +107,8 @@ struct StringFormat
     [[nodiscard]] static bool recursiveFormat(StringFormatOutput& data, StringEncoding encoding, RangeIterator it,
                                               Types... args)
     {
-        auto   start = it;
-        char_t matchedChar;
+        auto                              start = it;
+        typename RangeIterator::CodePoint matchedChar;
         while (true)
         {
             if (it.advanceUntilMatchesAny({'{', '}'}, matchedChar)) // match start or end of specifier

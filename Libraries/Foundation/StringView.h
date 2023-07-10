@@ -333,7 +333,7 @@ struct SC_EXPORT_SYMBOL SC::StringView
     }
 
     template <typename Lambda>
-    size_t splitASCII(char_t separator, Lambda&& lambda,
+    size_t splitASCII(StringIteratorASCII::CodePoint separator, Lambda&& lambda,
                       SplitOptions options = {SplitOptions::SkipEmpty, SplitOptions::SkipSeparator})
     {
         return split<StringIteratorASCII>(separator, forward<Lambda>(lambda), options);

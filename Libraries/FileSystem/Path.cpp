@@ -93,7 +93,7 @@ struct SC::Path::Internal
         StringView remaining = input.sliceStartEnd<StringIterator>(root.sizeASCII(), input.sizeASCII());
 
         auto it = remaining.getIterator<StringIterator>();
-        it.advanceUntilDifferentFrom(separator);
+        (void)it.advanceUntilDifferentFrom(separator);
         return it.isAtEnd();
     }
 

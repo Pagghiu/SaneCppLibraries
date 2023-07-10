@@ -95,7 +95,7 @@ bool SC::PluginDefinition::parseLine(StringIteratorASCII& iterator, StringView& 
 {
     constexpr StringIteratorSkipTable skipTable({'\t', '\n', '\r', ' ', '/', ':'});
 
-    char current = 0;
+    StringIteratorASCII::CodePoint current = 0;
     while (iterator.advanceRead(current))
     {
         if (not skipTable.matches[current])

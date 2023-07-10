@@ -54,8 +54,8 @@ struct SC::JsonTokenizer
 
     [[nodiscard]] static constexpr bool scanToken(StringIteratorASCII& it, Token& token)
     {
-        char                      current = 0;
-        const StringIteratorASCII start   = it;
+        StringIteratorASCII::CodePoint current = 0;
+        const StringIteratorASCII      start   = it;
         if (not it.advanceRead(current))
         {
             return false;
@@ -86,7 +86,7 @@ struct SC::JsonTokenizer
     [[nodiscard]] static constexpr bool skipWhitespaces(StringIteratorASCII& it)
     {
         constexpr StringIteratorSkipTable table({'\t', '\n', '\r', ' '});
-        char                              current = 0;
+        StringIteratorASCII::CodePoint    current = 0;
         while (it.advanceRead(current))
         {
             if (not table.matches[current])
@@ -115,7 +115,8 @@ struct SC::JsonTokenizer
             break;
         }
     }
-    static constexpr void tokenizeNumber(StringIteratorASCII& it, char previousChar, Token& token)
+    static constexpr void tokenizeNumber(StringIteratorASCII& it, StringIteratorASCII::CodePoint previousChar,
+                                         Token& token)
     {
         // eat all non whitespaces that could possibly form a number (to be validated, as it may contain multiple dots)
         constexpr StringIteratorSkipTable numbersTable({'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.'});
@@ -124,7 +125,7 @@ struct SC::JsonTokenizer
         {
             return;
         }
-        char current = 0;
+        StringIteratorASCII::CodePoint current = 0;
         while (it.advanceRead(current))
         {
             if (not numbersTable.matches[current])
