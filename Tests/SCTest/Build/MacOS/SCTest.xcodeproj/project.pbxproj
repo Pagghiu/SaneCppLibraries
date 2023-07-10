@@ -187,6 +187,7 @@
 		7B8DDDC12A2012B300D62F03 /* JsonFormatter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = JsonFormatter.h; path = ../../../../Libraries/Json/JsonFormatter.h; sourceTree = "<group>"; };
 		7B8DDDC32A2012B300D62F03 /* JsonFormatter.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = JsonFormatter.inl; path = ../../../../Libraries/Json/JsonFormatter.inl; sourceTree = "<group>"; };
 		7B8DDDC42A2012B300D62F03 /* Json.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Json.cpp; path = ../../../../Libraries/Json/Json.cpp; sourceTree = "<group>"; };
+		7B8E9E2D2A4A2744009D4F5A /* StrongID.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StrongID.h; path = ../../../../Libraries/Foundation/StrongID.h; sourceTree = "<group>"; };
 		7B91CBEE29B17F470013E95E /* Opaque.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Opaque.h; path = ../../../../Libraries/Foundation/Opaque.h; sourceTree = "<group>"; };
 		7B91CBEF29B17F470013E95E /* OpaqueTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OpaqueTest.h; path = ../../../../Libraries/Foundation/OpaqueTest.h; sourceTree = "<group>"; };
 		7B9C4FBD29F1C0B100504902 /* FileSystemWatcherInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWatcherInternalEmscripten.inl; path = ../../../../Libraries/FileSystem/FileSystemWatcherInternalEmscripten.inl; sourceTree = "<group>"; };
@@ -377,6 +378,7 @@
 				7B515FFF29243097006996AA /* StringView.cpp */,
 				7B51600329243097006996AA /* StringView.h */,
 				7B51600429243097006996AA /* StringViewTest.h */,
+				7B8E9E2D2A4A2744009D4F5A /* StrongID.h */,
 				7B89A60329BFD9D6006EF085 /* TaggedUnion.h */,
 				7B89A60229BFD9D6006EF085 /* TaggedUnionTest.h */,
 				7B89A60429BFE1A4006EF085 /* TypeList.h */,
