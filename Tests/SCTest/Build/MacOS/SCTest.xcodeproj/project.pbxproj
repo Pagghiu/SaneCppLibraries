@@ -78,6 +78,7 @@
 		7B19C9AA297AF95B001C0627 /* PathTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PathTest.h; path = ../../../../Libraries/FileSystem/PathTest.h; sourceTree = "<group>"; };
 		7B19C9AB297AF95B001C0627 /* Path.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Path.h; path = ../../../../Libraries/FileSystem/Path.h; sourceTree = "<group>"; };
 		7B1A39FA29BA7B220087F688 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
+		7B1B497A2A5B09AF00F0089B /* StringViewAlgorithms.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StringViewAlgorithms.h; path = ../../../../Libraries/Foundation/StringViewAlgorithms.h; sourceTree = "<group>"; };
 		7B1FCC2429ECBDAF001D75F7 /* AlgorithmSort.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AlgorithmSort.h; path = ../../../../Libraries/Foundation/AlgorithmSort.h; sourceTree = "<group>"; };
 		7B20B39D2A27FCE400110F52 /* SerializationStructuredJsonTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SerializationStructuredJsonTest.h; path = ../../../../Libraries/Serialization/SerializationStructuredJsonTest.h; sourceTree = "<group>"; };
 		7B25ADFD2A2CB9B1008936DE /* Plugin.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Plugin.cpp; path = ../../../../Libraries/Plugin/Plugin.cpp; sourceTree = "<group>"; };
@@ -377,6 +378,7 @@
 				7B51600F29243097006996AA /* StringTest.h */,
 				7B515FFF29243097006996AA /* StringView.cpp */,
 				7B51600329243097006996AA /* StringView.h */,
+				7B1B497A2A5B09AF00F0089B /* StringViewAlgorithms.h */,
 				7B51600429243097006996AA /* StringViewTest.h */,
 				7B8E9E2D2A4A2744009D4F5A /* StrongID.h */,
 				7B89A60329BFD9D6006EF085 /* TaggedUnion.h */,

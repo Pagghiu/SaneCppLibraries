@@ -4,6 +4,7 @@
 #pragma once
 #include "../Testing/Test.h"
 #include "StringView.h"
+#include "StringViewAlgorithms.h"
 
 namespace SC
 {
@@ -202,6 +203,20 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(asd.containsString("456"_a8));
             SC_TEST_EXPECT(not asd.containsString("124"_a8));
             SC_TEST_EXPECT(not asd.containsString("4567"_a8));
+        }
+        if (test_section("wildcard"))
+        {
+            SC_TEST_EXPECT(StringAlgorithms::matchWildcard("1?3", "123"));
+            SC_TEST_EXPECT(StringAlgorithms::matchWildcard("1*3", "12223"));
+            SC_TEST_EXPECT(StringAlgorithms::matchWildcard("*2", "12"));
+            SC_TEST_EXPECT(not StringAlgorithms::matchWildcard("*1", "12"));
+            SC_TEST_EXPECT(not StringAlgorithms::matchWildcard("*1", "112"));
+            SC_TEST_EXPECT(not StringAlgorithms::matchWildcard("**1", "112"));
+            SC_TEST_EXPECT(not StringAlgorithms::matchWildcard("*?1", "112"));
+            SC_TEST_EXPECT(StringAlgorithms::matchWildcard("1*", "12123"));
+            SC_TEST_EXPECT(StringAlgorithms::matchWildcard("*/myString", "myString/myString/myString"));
+            SC_TEST_EXPECT(not StringAlgorithms::matchWildcard("*/String", "myString/myString/myString"));
+            SC_TEST_EXPECT(StringAlgorithms::matchWildcard("*/Directory/File.cpp", "/Root/Directory/File.cpp"));
         }
     }
 };

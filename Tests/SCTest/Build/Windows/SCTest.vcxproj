@@ -363,6 +363,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ArrayTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringViewAlgorithms.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StrongID.h" />
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonFormatter.h" />
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonFormatterTest.h" />

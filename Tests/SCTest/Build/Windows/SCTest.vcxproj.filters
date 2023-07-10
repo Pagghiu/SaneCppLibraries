@@ -430,6 +430,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Plugin\PluginMacros.h">
       <Filter>Plugin</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\StringViewAlgorithms.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StrongID.h">
       <Filter>Foundation</Filter>
     </ClInclude>
