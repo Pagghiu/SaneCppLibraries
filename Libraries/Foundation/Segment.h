@@ -821,6 +821,28 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
 
     [[nodiscard]] bool push_back(std::initializer_list<T> src) { return appendCopy(src.begin(), src.size()); }
 
+    template <typename U>
+    [[nodiscard]] bool push_back(Span<U> src)
+    {
+        const auto oldSize = Segment::size();
+        if (reserve(src.sizeInElements()))
+        {
+            for (auto& it : src)
+            {
+                if (not push_back(it))
+                {
+                    break;
+                }
+            }
+        }
+        if (oldSize + src.sizeInElements() != Segment::size())
+        {
+            SC_TRUST_RESULT(resize(oldSize));
+            return false;
+        }
+        return true;
+    }
+
     [[nodiscard]] bool contains(const T& value, size_t* foundIndex = nullptr) const
     {
         T* oldItems = items;

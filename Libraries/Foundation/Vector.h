@@ -193,6 +193,30 @@ struct SC::Vector
     [[nodiscard]] bool push_back(const T& element) { return SegmentOperationsT::push_back(items, element); }
     [[nodiscard]] bool push_back(T&& element) { return SegmentOperationsT::push_back(items, forward<T>(element)); }
     [[nodiscard]] bool push_back(std::initializer_list<T> src) { return appendCopy(src.begin(), src.size()); }
+
+    // TODO: Check if this can be unified with the same version inside Segment
+    template <typename U>
+    [[nodiscard]] bool push_back(Span<U> src)
+    {
+        const auto oldSize = size();
+        if (reserve(src.sizeInElements()))
+        {
+            for (auto& it : src)
+            {
+                if (not push_back(it))
+                {
+                    break;
+                }
+            }
+        }
+        if (oldSize + src.sizeInElements() != size())
+        {
+            SC_TRUST_RESULT(resize(oldSize));
+            return false;
+        }
+        return true;
+    }
+
     [[nodiscard]] bool pop_back() { return SegmentOperationsT::pop_back(items); }
     [[nodiscard]] bool pop_front() { return SegmentOperationsT::pop_front(items); }
 
