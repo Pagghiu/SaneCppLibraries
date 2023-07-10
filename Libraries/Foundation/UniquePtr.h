@@ -21,6 +21,8 @@ struct UniquePtr
     UniquePtr(const UniquePtr&)            = delete;
     UniquePtr& operator=(const UniquePtr&) = delete;
 
+    T*       get() { return ptr; }
+    const T* get() const { return ptr; }
     T*       operator->() { return ptr; }
     const T* operator->() const { return ptr; }
     T&       operator*() { return *ptr; }
