@@ -343,7 +343,8 @@ struct SC::Vector
         return appendCopy(src.data(), src.size());
     }
 
-    [[nodiscard]] bool contains(const T& value, size_t* foundIndex = nullptr) const
+    template <typename U>
+    [[nodiscard]] bool contains(const U& value, size_t* foundIndex = nullptr) const
     {
         return SegmentItems<T>::findIf(
             items, 0, size(), [&](const T& element) { return element == value; }, foundIndex);
