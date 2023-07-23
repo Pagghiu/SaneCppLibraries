@@ -40,17 +40,21 @@ struct SC::Map
     }
 
     /// Inserts an item. If insertion fails returns false.
-    [[nodiscard]] bool insertOverwrite(Item&& item)
+    [[nodiscard]] Value* insertOverwrite(Item&& item)
     {
         for (auto& it : items)
         {
             if (it.key == item.key)
             {
                 it.value = move(item.value);
-                return true;
+                return &it.value;
             }
         }
-        return items.push_back(forward<Item>(item));
+        if (items.push_back(forward<Item>(item)))
+        {
+            return &items.back().value;
+        }
+        return nullptr;
     }
 
     [[nodiscard]] Result<Key&> insertValueUniqueKey(Value&& value)
