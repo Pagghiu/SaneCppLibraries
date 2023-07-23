@@ -344,11 +344,10 @@ SC::StringView SC::Path::Posix::basename(StringView input, StringView suffix)
 
 bool SC::Path::Posix::isAbsolute(StringView input) { return input.startsWithChar('/'); }
 
-bool SC::Path::join(String& output, Span<const StringView> inputs)
+bool SC::Path::join(String& output, Span<const StringView> inputs, char separator)
 {
-    static constexpr auto localSep = Path::Separator;
     // TODO: This will bring unnecessary conversions...
-    StringView    sep(&localSep, sizeof(localSep), false, StringEncoding::Ascii);
+    StringView    sep(&separator, sizeof(separator), false, StringEncoding::Ascii);
     StringBuilder sb(output);
     const size_t  numElements = inputs.sizeInElements();
     for (size_t idx = 0; idx < numElements; ++idx)

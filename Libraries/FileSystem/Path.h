@@ -58,7 +58,7 @@ struct SC::PathView
 // Allow parsing windows and posix path and name/extension pairs
 struct SC::Path
 {
-    [[nodiscard]] static bool join(String& output, Span<const StringView> inputs);
+    [[nodiscard]] static bool join(String& output, Span<const StringView> inputs, char separator = Separator);
     /// Splits a StringView of type "name.ext" into "name" and "ext"
     /// @param[in] input        An input path coded as UTF8 sequence (ex. "name.ext")
     /// @param[out] name         Output string holding name ("name" in "name.ext")
