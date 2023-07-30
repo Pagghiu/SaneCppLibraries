@@ -29,6 +29,20 @@ struct SC::Map
 
     [[nodiscard]] const Container& getItems() const { return items; }
 
+    template <typename ComparableToKey>
+    [[nodiscard]] bool remove(const ComparableToKey& key)
+    {
+        size_t idx = 0;
+        for (auto& item : items)
+        {
+            ++idx;
+            if (item.key == key)
+            {
+                return items.removeAt(idx);
+            }
+        }
+        return false;
+    }
     /// Inserts an item if it doesn't exist already. If it exists or insertion fails returns false.
     [[nodiscard]] bool insertIfNotExists(Item&& item)
     {
@@ -39,7 +53,7 @@ struct SC::Map
         return false;
     }
 
-    /// Inserts an item. If insertion fails returns false.
+    /// Inserts an item. If insertion fails returns nullptr.
     [[nodiscard]] Value* insertOverwrite(Item&& item)
     {
         for (auto& it : items)
@@ -119,6 +133,7 @@ struct SC::Map
         }
         return ReturnCode("Missing key"_a8);
     }
+
     template <typename ComparableToKey>
     [[nodiscard]] Result<Value&> get(const ComparableToKey& key)
     {
@@ -130,5 +145,22 @@ struct SC::Map
             }
         }
         return ReturnCode("Missing key"_a8);
+    }
+
+    template <typename ComparableToKey>
+    [[nodiscard]] Value* getOrCreate(const ComparableToKey& key)
+    {
+        for (auto& item : items)
+        {
+            if (item.key == key)
+            {
+                return &item.value;
+            }
+        }
+        if (items.push_back({key, Value()}))
+        {
+            return &items.back().value;
+        }
+        return nullptr;
     }
 };
