@@ -200,3 +200,25 @@ inline void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { retu
 #endif
 
 #define SC_UNUSED(param) ((void)param);
+
+#ifndef SC_WARNING_DISABLE_UNUSED_RESULT
+#ifdef __clang__
+#define SC_WARNING_DISABLE_UNUSED_RESULT                                                                               \
+    _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wunused-result\"")
+#elif defined(__GNUC__)
+#define SC_WARNING_DISABLE_UNUSED_RESULT                                                                               \
+    _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wunused-result\"")
+#else
+#define SC_WARNING_DISABLE_UNUSED_RESULT _Pragma("warning(push)") _Pragma("warning(disable : 4834)")
+#endif
+#endif
+
+#ifndef SC_WARNING_RESTORE
+#ifdef __clang__
+#define SC_WARNING_RESTORE _Pragma("clang diagnostic pop")
+#elif defined(__GNUC__)
+#define SC_WARNING_RESTORE _Pragma("GCC diagnostic pop")
+#else
+#define SC_WARNING_RESTORE _Pragma("warning(pop)")
+#endif
+#endif

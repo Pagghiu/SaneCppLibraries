@@ -21,8 +21,9 @@ struct Span
     constexpr Span(Type&& type) : items(&type), sizeBytes(sizeof(Type)) {}
 
     // Specialization for converting const char* to StringView
-    constexpr Span(std::initializer_list<Type> ilist)
+    constexpr Span(std::initializer_list<Type> ilist) : items(nullptr), sizeBytes(0)
     {
+        // We need this two step initialization to avoid warnings on all compilers
         items     = ilist.begin();
         sizeBytes = ilist.size() * sizeof(Type);
     }
