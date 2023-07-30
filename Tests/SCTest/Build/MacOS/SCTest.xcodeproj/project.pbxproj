@@ -207,6 +207,7 @@
 		7BA892AC297E06040093152B /* StringConverter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringConverter.h; path = ../../../../Libraries/Foundation/StringConverter.h; sourceTree = "<group>"; };
 		7BA892AD297E06040093152B /* StringConverter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringConverter.cpp; path = ../../../../Libraries/Foundation/StringConverter.cpp; sourceTree = "<group>"; };
 		7BA8BF852A2539D400A410F8 /* ReflectionAuto.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ReflectionAuto.h; path = ../../../../Libraries/Reflection/ReflectionAuto.h; sourceTree = "<group>"; };
+		7BB1C6BA2A767B10001AF3AE /* AlgorithmMinMax.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AlgorithmMinMax.h; path = ../../../../Libraries/Foundation/AlgorithmMinMax.h; sourceTree = "<group>"; };
 		7BBF439D2A215A4F00762DBF /* JsonTokenizer.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = JsonTokenizer.inl; path = ../../../../Libraries/Json/JsonTokenizer.inl; sourceTree = "<group>"; };
 		7BBF439E2A215A4F00762DBF /* JsonTokenizer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = JsonTokenizer.h; path = ../../../../Libraries/Json/JsonTokenizer.h; sourceTree = "<group>"; };
 		7BBF439F2A215A4F00762DBF /* JsonTokenizerTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = JsonTokenizerTest.h; path = ../../../../Libraries/Json/JsonTokenizerTest.h; sourceTree = "<group>"; };
@@ -337,6 +338,7 @@
 		7B515F932924305E006996AA /* Foundation */ = {
 			isa = PBXGroup;
 			children = (
+				7BB1C6BA2A767B10001AF3AE /* AlgorithmMinMax.h */,
 				7B1FCC2429ECBDAF001D75F7 /* AlgorithmSort.h */,
 				7B515FF329243087006996AA /* Array.h */,
 				7B515FD329243086006996AA /* ArrayTest.h */,

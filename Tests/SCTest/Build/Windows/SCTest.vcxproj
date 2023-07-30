@@ -359,6 +359,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopWindows.h" />
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.h" />
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\AlgorithmMinMax.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\AlgorithmSort.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ArrayTest.h" />

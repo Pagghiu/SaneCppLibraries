@@ -436,6 +436,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StrongID.h">
       <Filter>Foundation</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\AlgorithmMinMax.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalPosix.inl">

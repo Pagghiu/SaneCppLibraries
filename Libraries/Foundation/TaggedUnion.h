@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Foundation/AlgorithmMinMax.h"
 #include "../Foundation/TypeList.h"
 #include "../Foundation/Types.h"
 namespace SC
@@ -12,15 +13,36 @@ struct TaggedUnion;
 
 namespace SC
 {
-template <typename UnionType, typename EnumType, typename MemberType, MemberType UnionType::*field, EnumType enumValue>
+template <size_t Len, class... Types>
+struct AlignedStorage
+{
+    static constexpr size_t alignment_value = max({alignof(Types)...});
+
+    struct type
+    {
+        alignas(alignment_value) char _s[max({Len, sizeof(Types)...})];
+    };
+};
+
+template <size_t Len, class... Types>
+struct AlignedStorage<Len, TypeList<Types...>>
+{
+    static constexpr size_t alignment_value = max({alignof(typename Types::type)...});
+
+    struct type
+    {
+        alignas(alignment_value) char _s[max({Len, sizeof(typename Types::type)...})];
+    };
+};
+
+template <typename EnumType, EnumType enumValue, typename MemberType>
 struct TaggedField
 {
     using type                      = MemberType;
     using enumType                  = EnumType;
     static constexpr EnumType value = enumValue;
-    static auto&              get(UnionType& u) { return u.*field; }
-    static const auto&        get(const UnionType& u) { return u.*field; }
 };
+
 } // namespace SC
 
 template <typename Union>
@@ -28,9 +50,10 @@ struct SC::TaggedUnion
 {
   private:
     template <int Index>
-    using TypeAt   = TypeListGetT<typename Union::FieldsTypes, Index>;
-    using EnumType = typename TypeAt<0>::enumType;
+    using TypeAt = TypeListGetT<typename Union::FieldsTypes, Index>;
 
+  public:
+    using EnumType                 = typename TypeAt<0>::enumType;
     static constexpr auto NumTypes = Union::FieldsTypes::size;
     template <typename T, int StartIndex = NumTypes>
     struct TypeToEnum
@@ -51,11 +74,31 @@ struct SC::TaggedUnion
     template <typename T>
     struct TypeToEnum<T, 0>
     {
-        static const EnumType enumType = TypeAt<0>::value;
-        using type                     = typename TypeAt<0>::type;
-        static constexpr int index     = 0;
+        using type = typename TypeAt<0>::type;
+        static_assert(IsSame<T, type>::value, "Type doesn't exist in list of types");
+        static constexpr int      index    = 0;
+        static constexpr EnumType enumType = TypeAt<0>::value;
     };
 
+    template <EnumType wantedEnum, int StartIndex = NumTypes>
+    struct EnumToType
+    {
+        static constexpr int index = wantedEnum == TypeAt<StartIndex - 1>::value
+                                         ? StartIndex - 1
+                                         : EnumToType<wantedEnum, StartIndex - 1>::index;
+        static_assert(index >= 0, "Type not found!");
+        using type = ConditionalT<wantedEnum == TypeAt<StartIndex - 1>::value, typename TypeAt<StartIndex - 1>::type,
+                                  typename EnumToType<wantedEnum, StartIndex - 1>::type>;
+    };
+
+    template <EnumType wantedEnum>
+    struct EnumToType<wantedEnum, 0>
+    {
+        using type                 = typename TypeAt<0>::type;
+        static constexpr int index = 0;
+    };
+
+  private:
     struct Destruct
     {
         template <int Index>
@@ -103,20 +146,29 @@ struct SC::TaggedUnion
         }
     };
 
+    struct Equals
+    {
+        template <int Index>
+        static auto visit(TaggedUnion* t1, TaggedUnion* t2)
+        {
+            return t1->fieldAt<Index>() == move(t2->fieldAt<Index>());
+        }
+    };
+
     template <typename Visitor, typename T1, typename T2, size_t StartIndex = NumTypes>
     struct RuntimeEnumVisit
     {
         static constexpr auto Index = StartIndex - 1;
 
-        static void visit(T1* t1, T2* t2, EnumType enumType)
+        static auto visit(T1* t1, T2* t2, EnumType enumType)
         {
             if (enumType == TypeAt<Index>::value)
             {
-                Visitor::template visit<Index>(t1, t2);
+                return Visitor::template visit<Index>(t1, t2);
             }
             else
             {
-                RuntimeEnumVisit<Visitor, T1, T2, StartIndex - 1>::visit(t1, t2, enumType);
+                return RuntimeEnumVisit<Visitor, T1, T2, StartIndex - 1>::visit(t1, t2, enumType);
             }
         }
     };
@@ -124,19 +176,64 @@ struct SC::TaggedUnion
     template <typename Visitor, typename T1, typename T2>
     struct RuntimeEnumVisit<Visitor, T1, T2, 0>
     {
-        static void visit(T1* t1, T2* t2, EnumType) { Visitor::template visit<0>(t1, t2); }
+        static auto visit(T1* t1, T2* t2, EnumType) { return Visitor::template visit<0>(t1, t2); }
     };
 
     void destruct() { RuntimeEnumVisit<Destruct, TaggedUnion, TaggedUnion>::visit(this, this, type); }
 
-  public:
-    Union    fields;
+    template <int index>
+    [[nodiscard]] auto& fieldAt()
+    {
+        using T = typename TypeAt<index>::type;
+        return *reinterpret_cast<T*>(&storage);
+    }
+
+    template <int index>
+    [[nodiscard]] const auto& fieldAt() const
+    {
+        using T = typename TypeAt<index>::type;
+        return *reinterpret_cast<const T*>(&storage);
+    }
+    using Storage = typename AlignedStorage<0, typename Union::FieldsTypes>::type;
+
+    Storage  storage;
     EnumType type;
+
+  public:
+    EnumType getType() const { return type; }
+
+    bool operator==(const TaggedUnion& other) const
+    {
+        return type == other.type and RuntimeEnumVisit<Equals, TaggedUnion, TaggedUnion>::visit(this, &other, type);
+    }
 
     TaggedUnion()
     {
         type = TypeAt<0>::value;
         new (&fieldAt<0>(), PlacementNew()) typename TypeAt<0>::type();
+    }
+
+    template <EnumType wantedEnum>
+    struct Constructor
+    {
+        typename EnumToType<wantedEnum>::type object;
+    };
+
+    template <EnumType wantedEnum>
+    TaggedUnion(Constructor<wantedEnum>&& other)
+    {
+        type    = wantedEnum;
+        using T = typename EnumToType<wantedEnum>::type;
+        new (&fieldAt<EnumToType<wantedEnum>::index>(), PlacementNew()) T(forward<T>(other.object));
+    }
+
+    template <typename U>
+    TaggedUnion(EnumType wantedEnum, U&& other)
+    {
+        using T = typename RemoveConst<typename RemoveReference<U>::type>::type;
+        type    = wantedEnum;
+
+        fieldAt<TypeToEnum<T>::index>() = other;
     }
 
     ~TaggedUnion() { destruct(); }
@@ -183,50 +280,57 @@ struct SC::TaggedUnion
         return *this;
     }
 
-    template <typename U>
-    void assignValue(U&& other)
+    template <EnumType wantedType, typename U>
+    void assign(U&& other)
     {
-        using T = typename RemoveConst<typename RemoveReference<U>::type>::type;
-        if (type == TypeToEnum<T>::enumType)
+        using T     = typename EnumToType<wantedType>::type;
+        auto& field = fieldAt<EnumToType<wantedType>::index>();
+        if (type == wantedType)
         {
-            *unionAs<T>() = forward<U>(other);
+            field = forward<U>(other);
         }
         else
         {
             destruct();
-            type = TypeToEnum<T>::enumType;
-            new (unionAs<T>(), PlacementNew()) T(forward<U>(other));
+            type = wantedType;
+            new (&field, PlacementNew()) T(forward<U>(other));
         }
     }
 
-    template <int index>
-    [[nodiscard]] auto& fieldAt()
+    template <EnumType wantedType>
+    typename TypeAt<EnumToType<wantedType>::index>::type& changeTo()
     {
-        return TypeAt<index>::get(fields);
-    }
-
-    template <int index>
-    [[nodiscard]] const auto& fieldAt() const
-    {
-        return TypeAt<index>::get(fields);
-    }
-
-    template <typename T>
-    [[nodiscard]] T* unionAs()
-    {
-        if (TypeToEnum<T>::enumType == type)
+        using T     = typename EnumToType<wantedType>::type;
+        auto& field = fieldAt<EnumToType<wantedType>::index>();
+        if (type == wantedType)
         {
-            return &TypeAt<TypeToEnum<T>::index>::get(fields);
+            return field;
+        }
+        else
+        {
+            destruct();
+            type = wantedType;
+            new (&field, PlacementNew()) T();
+            return field;
+        }
+    }
+
+    template <EnumType wantedType>
+    [[nodiscard]] typename TypeAt<EnumToType<wantedType>::index>::type* field()
+    {
+        if (wantedType == type)
+        {
+            return &fieldAt<EnumToType<wantedType>::index>();
         }
         return nullptr;
     }
 
-    template <typename T>
-    [[nodiscard]] const T* unionAs() const
+    template <EnumType wantedType>
+    [[nodiscard]] const typename TypeAt<EnumToType<wantedType>::index>::type* field() const
     {
-        if (TypeToEnum<T>::enumType == type)
+        if (wantedType == type)
         {
-            return &TypeAt<TypeToEnum<T>::index>::get(fields);
+            return &fieldAt<EnumToType<wantedType>::index>();
         }
         return nullptr;
     }
