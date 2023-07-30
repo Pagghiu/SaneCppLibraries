@@ -89,15 +89,50 @@ bool SC::StringView::parseDouble(double& value) const
     return true;
 }
 
-SC::StringComparison SC::StringView::compareASCII(StringView other) const
+SC::StringView::Comparison SC::StringView::compare(StringView other) const
 {
-    const int res = memcmp(textUtf8, other.textUtf8, min(textSizeInBytes, other.textSizeInBytes));
-    if (res < 0)
-        return StringComparison::Smaller;
-    else if (res == 0)
-        return StringComparison::Equals;
+    if (hasCompatibleEncoding(other))
+    {
+        const int res = memcmp(textUtf8, other.textUtf8, min(textSizeInBytes, other.textSizeInBytes));
+        if (res < 0)
+            return Comparison::Smaller;
+        else if (res == 0)
+            return Comparison::Equals;
+        else
+            return Comparison::Bigger;
+    }
     else
-        return StringComparison::Bigger;
+    {
+        return withIterator(
+            [other](auto it1)
+            {
+                return other.withIterator(
+                    [&it1](auto it2)
+                    {
+                        StringCodePoint c1 = 0, c2 = 0;
+                        while (it1.advanceRead(c1) and it2.advanceRead(c2))
+                        {
+                            if (c1 < c2)
+                            {
+                                return Comparison::Smaller;
+                            }
+                            else if (c1 > c2)
+                            {
+                                return Comparison::Bigger;
+                            }
+                        }
+                        if (it1.isAtEnd() and it2.isAtEnd())
+                        {
+                            return Comparison::Equals;
+                        }
+                        if (it1.isAtEnd())
+                        {
+                            return Comparison::Bigger;
+                        }
+                        return Comparison::Smaller;
+                    });
+            });
+    }
 }
 
 bool SC::StringView::startsWith(const StringView str) const
@@ -129,8 +164,158 @@ bool SC::StringView::endsWith(const StringView str) const
     return withIterator([str](auto it1) { return str.withIterator([it1](auto it2) { return it1.endsWith(it2); }); });
 }
 
-[[nodiscard]] bool SC::StringView::containsString(const StringView str) const
+bool SC::StringView::containsString(const StringView str) const
 {
     SC_RELEASE_ASSERT(hasCompatibleEncoding(str));
     return withIterator([str](auto it) { return it.advanceAfterFinding(str.getIterator<decltype(it)>()); });
+}
+
+bool SC::StringView::containsChar(StringCodePoint c) const
+{
+    return withIterator([c](auto it) { return it.advanceUntilMatches(c); });
+}
+
+bool SC::StringView::endsWithChar(StringCodePoint c) const
+{
+    return withIterator([c](auto it) { return it.endsWithChar(c); });
+}
+
+bool SC::StringView::startsWithChar(StringCodePoint c) const
+{
+    return withIterator([c](auto it) { return it.startsWithChar(c); });
+}
+
+SC::StringView SC::StringView::sliceStartEnd(size_t start, size_t end) const
+{
+    return withIterator(
+        [&](auto it)
+        {
+            SC_RELEASE_ASSERT(it.advanceCodePoints(start));
+            auto startIt = it;
+            SC_RELEASE_ASSERT(start <= end && it.advanceCodePoints(end - start));
+            const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
+            return StringView(startIt.getCurrentIt(), distance,
+                              hasNullTerm and (start + distance == sizeInBytesIncludingTerminator()), encoding);
+        });
+}
+
+SC::StringView SC::StringView::sliceStart(size_t offset) const
+{
+    return withIterator(
+        [&](auto it)
+        {
+            SC_RELEASE_ASSERT(it.advanceCodePoints(offset));
+            auto startIt = it;
+            it.setToEnd();
+            const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
+            return StringView(startIt.getCurrentIt(), distance,
+                              hasNullTerm and (offset + distance == sizeInBytesIncludingTerminator()), encoding);
+        });
+}
+
+SC::StringView SC::StringView::sliceEnd(size_t offset) const
+{
+    return withIterator(
+        [&](auto it)
+        {
+            auto startIt = it;
+            it.setToEnd();
+            SC_RELEASE_ASSERT(it.reverseAdvanceCodePoints(offset));
+            const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
+            return StringView(startIt.getCurrentIt(), distance,
+                              hasNullTerm and (offset + distance == sizeInBytesIncludingTerminator()), encoding);
+        });
+}
+
+SC::StringView SC::StringView::trimEndingChar(StringCodePoint c) const
+{
+    auto sv = *this;
+    while (sv.endsWithChar(c))
+    {
+        sv = sv.sliceEnd(1);
+    }
+    return sv;
+}
+
+SC::StringView SC::StringView::trimStartingChar(StringCodePoint c) const
+{
+    auto sv = *this;
+    while (sv.startsWithChar(c))
+    {
+        sv = sv.sliceStart(1);
+    }
+    return sv;
+}
+
+SC::StringView SC::StringView::sliceStartLength(size_t start, size_t length) const
+{
+    return sliceStartEnd(start, start + length);
+}
+
+bool SC::StringView::isIntegerNumber() const
+{
+    return withIterator(
+        [&](auto it)
+        {
+            (void)it.advanceIfMatchesAny({'-', '+'}); // optional
+            bool matchedAtLeastOneDigit = false;
+            while (it.advanceIfMatchesRange('0', '9'))
+                matchedAtLeastOneDigit = true;
+            return matchedAtLeastOneDigit and it.isAtEnd();
+        });
+}
+
+bool SC::StringView::isFloatingNumber() const
+{
+    // TODO: Floating point exponential notation
+    return withIterator(
+        [&](auto it)
+        {
+            (void)it.advanceIfMatchesAny({'-', '+'}); // optional
+            bool matchedAtLeastOneDigit = false;
+            while (it.advanceIfMatchesRange('0', '9'))
+                matchedAtLeastOneDigit = true;
+            if (it.advanceIfMatches('.')) // optional
+                while (it.advanceIfMatchesRange('0', '9'))
+                    matchedAtLeastOneDigit = true;
+            return matchedAtLeastOneDigit and it.isAtEnd();
+        });
+}
+
+bool SC::StringViewTokenizer::tokenizeNext(Span<const StringCodePoint> separators, Options options)
+{
+    if (current.isEmpty())
+    {
+        return false;
+    }
+    auto oldNonEmpty = numSplitsNonEmpty;
+    current.withIterator(
+        [&](auto iterator)
+        {
+            do
+            {
+                auto componentStart = iterator;
+                (void)iterator.advanceUntilMatchesAny(separators, splittingCharacter);
+                component = StringView::fromIterators(componentStart, iterator);
+                (void)iterator.stepForward();
+                current = StringView::fromIteratorUntilEnd(iterator);
+                numSplitsTotal++;
+                if (not component.isEmpty())
+                {
+                    numSplitsNonEmpty++;
+                    break;
+                }
+                else if (options == IncludeEmpty)
+                {
+                    break;
+                }
+            } while (not current.isEmpty());
+        });
+    return options == IncludeEmpty ? true : numSplitsNonEmpty > oldNonEmpty;
+}
+
+SC::StringViewTokenizer& SC::StringViewTokenizer::countTokens(Span<const StringCodePoint> separators)
+{
+    while (tokenizeNext(separators, SkipEmpty)) {}
+    return *this;
 }

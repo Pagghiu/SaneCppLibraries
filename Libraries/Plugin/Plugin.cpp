@@ -79,8 +79,11 @@ bool SC::PluginDefinition::parse(StringView text, PluginDefinition& pluginDefini
         }
         else if (key == "Dependencies") // Optional
         {
-            value.splitASCII(',', [&](StringView piece)
-                             { SC_TRUST_RESULT(pluginDefinition.dependencies.push_back(piece)); });
+            StringViewTokenizer tokenizer = value;
+            while (tokenizer.tokenizeNext(',', StringViewTokenizer::SkipEmpty))
+            {
+                SC_TRY_IF(pluginDefinition.dependencies.push_back(tokenizer.component));
+            }
         }
     }
     for (size_t i = 0; i < sizeof(gotFields) / sizeof(bool); ++i)

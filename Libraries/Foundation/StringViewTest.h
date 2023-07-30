@@ -132,69 +132,76 @@ struct SC::StringViewTest : public SC::TestCase
             StringView str = "123_567";
             SC_TEST_EXPECT(str.sliceStartLength(7, 0) == "");
             SC_TEST_EXPECT(str.sliceStartLength(0, 3) == "123");
-            SC_TEST_EXPECT(str.sliceStartEnd<StringIteratorASCII>(0, 3) == "123");
+            SC_TEST_EXPECT(str.sliceStartEnd(0, 3) == "123");
             SC_TEST_EXPECT(str.sliceStartLength(4, 3) == "567");
-            SC_TEST_EXPECT(str.sliceStartEnd<StringIteratorASCII>(4, 7) == "567");
+            SC_TEST_EXPECT(str.sliceStartEnd(4, 7) == "567");
+            SC_TEST_EXPECT(str.sliceStart(4) == "567");
+            SC_TEST_EXPECT(str.sliceEnd(4) == "123");
+
+            SC_TEST_EXPECT("myTest___"_a8.trimEndingChar('_') == "myTest");
+            SC_TEST_EXPECT("myTest"_a8.trimEndingChar('_') == "myTest");
+            SC_TEST_EXPECT("___myTest"_a8.trimStartingChar('_') == "myTest");
+            SC_TEST_EXPECT("_myTest"_a8.trimStartingChar('_') == "myTest");
         }
         if (test_section("split"))
         {
             {
-                StringView str   = "_123_567___";
-                int        index = 0;
-
-                auto numSplits = str.splitASCII('_',
-                                                [&](StringView v)
-                                                {
-                                                    switch (index)
-                                                    {
-                                                    case 0: SC_TEST_EXPECT(v == "123"); break;
-                                                    case 1: SC_TEST_EXPECT(v == "567"); break;
-                                                    }
-                                                    index++;
-                                                });
-                SC_TEST_EXPECT(index == 2);
-                SC_TEST_EXPECT(numSplits == 2);
+                StringViewTokenizer tokenizer("_123__567___");
+                int                 numInvocations = 0;
+                while (tokenizer.tokenizeNext('_', StringViewTokenizer::SkipEmpty))
+                {
+                    numInvocations++;
+                    if (tokenizer.numSplitsNonEmpty == 1)
+                    {
+                        SC_TEST_EXPECT(tokenizer.component == "123");
+                    }
+                    else if (tokenizer.numSplitsNonEmpty == 2)
+                    {
+                        SC_TEST_EXPECT(tokenizer.component == "567");
+                    }
+                }
+                SC_TEST_EXPECT(numInvocations == 2);
+                SC_TEST_EXPECT(tokenizer.numSplitsNonEmpty == 2);
+                SC_TEST_EXPECT(tokenizer.numSplitsTotal == 6);
             }
             {
-                StringView str       = "___";
-                auto       numSplits = str.splitASCII('_', [&](StringView) {}, {SplitOptions::SkipSeparator});
-                SC_TEST_EXPECT(numSplits == 3);
+                SC_TEST_EXPECT(StringViewTokenizer("___").countTokens('_').numSplitsNonEmpty == 0);
+                SC_TEST_EXPECT(StringViewTokenizer("___").countTokens('_').numSplitsTotal == 3);
             }
             {
-                StringView str       = "";
-                auto       numSplits = str.splitASCII('_', [&](StringView) {}, {SplitOptions::SkipSeparator});
-                SC_TEST_EXPECT(numSplits == 0);
+                SC_TEST_EXPECT(StringViewTokenizer("").countTokens('_').numSplitsNonEmpty == 0);
+                SC_TEST_EXPECT(StringViewTokenizer("").countTokens('_').numSplitsTotal == 0);
             }
         }
         if (test_section("isInteger"))
         {
-            static_assert("0"_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
-            static_assert(not ""_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
-            static_assert(not "-"_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
-            static_assert(not "."_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
-            static_assert(not "-."_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
-            static_assert("-34"_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
-            static_assert("+12"_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
-            static_assert(not "+12$"_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
-            static_assert(not "$+12"_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
-            static_assert(not "+$12"_a8.isIntegerNumber<StringIteratorASCII>(), "Invalid");
+            SC_TEST_EXPECT("0"_a8.isIntegerNumber());
+            SC_TEST_EXPECT(not ""_a8.isIntegerNumber());
+            SC_TEST_EXPECT(not "-"_a8.isIntegerNumber());
+            SC_TEST_EXPECT(not "."_a8.isIntegerNumber());
+            SC_TEST_EXPECT(not "-."_a8.isIntegerNumber());
+            SC_TEST_EXPECT("-34"_a8.isIntegerNumber());
+            SC_TEST_EXPECT("+12"_a8.isIntegerNumber());
+            SC_TEST_EXPECT(not "+12$"_a8.isIntegerNumber());
+            SC_TEST_EXPECT(not "$+12"_a8.isIntegerNumber());
+            SC_TEST_EXPECT(not "+$12"_a8.isIntegerNumber());
         }
         if (test_section("isFloating"))
         {
-            static_assert("0"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
-            static_assert(not ""_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
-            static_assert(not "-"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
-            static_assert(not "."_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
-            static_assert(not "-."_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
-            static_assert("-34"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
-            static_assert("+12"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
-            static_assert(not "+12$"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
-            static_assert(not "$+12"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
-            static_assert(not "+$12"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
-            static_assert("-34."_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
-            static_assert("-34.0"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
-            static_assert("0.34"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
-            static_assert(not "-34.0_"_a8.isFloatingNumber<StringIteratorASCII>(), "Invalid");
+            SC_TEST_EXPECT("0"_a8.isFloatingNumber());
+            SC_TEST_EXPECT(not ""_a8.isFloatingNumber());
+            SC_TEST_EXPECT(not "-"_a8.isFloatingNumber());
+            SC_TEST_EXPECT(not "."_a8.isFloatingNumber());
+            SC_TEST_EXPECT(not "-."_a8.isFloatingNumber());
+            SC_TEST_EXPECT("-34"_a8.isFloatingNumber());
+            SC_TEST_EXPECT("+12"_a8.isFloatingNumber());
+            SC_TEST_EXPECT(not "+12$"_a8.isFloatingNumber());
+            SC_TEST_EXPECT(not "$+12"_a8.isFloatingNumber());
+            SC_TEST_EXPECT(not "+$12"_a8.isFloatingNumber());
+            SC_TEST_EXPECT("-34."_a8.isFloatingNumber());
+            SC_TEST_EXPECT("-34.0"_a8.isFloatingNumber());
+            SC_TEST_EXPECT("0.34"_a8.isFloatingNumber());
+            SC_TEST_EXPECT(not "-34.0_"_a8.isFloatingNumber());
         }
         if (test_section("contains"))
         {
@@ -203,6 +210,8 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(asd.containsString("456"_a8));
             SC_TEST_EXPECT(not asd.containsString("124"_a8));
             SC_TEST_EXPECT(not asd.containsString("4567"_a8));
+            size_t overlapPoints = 0;
+            SC_TEST_EXPECT(not asd.fullyOverlaps("123___", overlapPoints) and overlapPoints == 3);
         }
         if (test_section("wildcard"))
         {

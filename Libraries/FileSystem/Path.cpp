@@ -90,7 +90,7 @@ struct SC::Path::Internal
     {
         // TODO: This doesn't work with UTF16
         SC_RELEASE_ASSERT(input.getEncoding() != StringEncoding::Utf16);
-        StringView remaining = input.sliceStartEnd<StringIterator>(root.sizeASCII(), input.sizeASCII());
+        StringView remaining = input.sliceStartEndBytes(root.sizeInBytes(), input.sizeInBytes());
 
         auto it = remaining.getIterator<StringIterator>();
         (void)it.advanceUntilDifferentFrom(separator);
@@ -184,7 +184,7 @@ struct SC::Path::Internal
         StringView name = basename<separator>(input);
         if (name.endsWith(suffix))
         {
-            return name.sliceStartEnd<StringIteratorASCII>(0, name.sizeInBytes() - suffix.sizeInBytes());
+            return name.sliceStartLengthBytes(0, name.sizeInBytes() - suffix.sizeInBytes());
         }
         return name;
     }
@@ -259,18 +259,18 @@ bool SC::Path::parseNameExtension(const StringView input, StringView& name, Stri
     return !(name.isEmpty() && extension.isEmpty());
 }
 
-bool SC::Path::parse(StringView input, PathParsedView& pathView)
+bool SC::Path::parse(StringView input, Path::ParsedView& pathView, Type type)
 {
-#if SC_PLATFORM_WINDOWS
-    return pathView.parseWindows(input);
-#else
-    return pathView.parsePosix(input);
-#endif
+    switch (type)
+    {
+    case AsWindows: return pathView.parseWindows(input);
+    case AsPosix: return pathView.parsePosix(input);
+    }
+    SC_UNREACHABLE();
 }
 
-bool SC::PathParsedView::parseWindows(StringView input)
+bool SC::Path::ParsedView::parseWindows(StringView input)
 {
-    type = TypeInvalid;
     if (!Path::Internal::parseWindows(input, root, directory, base, endsWithSeparator))
     {
         return false;
@@ -280,13 +280,12 @@ bool SC::PathParsedView::parseWindows(StringView input)
         if (!Path::parseNameExtension(base, name, ext))
             return false;
     }
-    type = TypeWindows;
+    type = AsWindows;
     return true;
 }
 
-bool SC::PathParsedView::parsePosix(StringView input)
+bool SC::Path::ParsedView::parsePosix(StringView input)
 {
-    type = TypeInvalid;
     if (!Path::Internal::parsePosix(input, root, directory, base, endsWithSeparator))
     {
         return false;
@@ -296,7 +295,7 @@ bool SC::PathParsedView::parsePosix(StringView input)
         if (!Path::parseNameExtension(base, name, ext))
             return false;
     }
-    type = TypePosix;
+    type = AsPosix;
     return true;
 }
 
@@ -360,3 +359,21 @@ bool SC::Path::join(String& output, Span<const StringView> inputs, char separato
     }
     return true;
 }
+
+bool SC::Path::extractDirectoryFromFILE(StringView fileLocation, String& outputPath)
+{
+    const StringView testPath = Path::dirname(fileLocation);
+#if SC_MSVC
+    if (testPath.startsWithChar('\\'))
+    {
+        // For some reason on MSVC __FILE__ returns paths on network drives with a single starting slash
+        SC_TRY_IF(Path::join(outputPath, {""_a8, testPath}));
+    }
+    else
+#endif
+    {
+        SC_TRY_IF(outputPath.assign(testPath));
+    }
+    return true;
+}
+

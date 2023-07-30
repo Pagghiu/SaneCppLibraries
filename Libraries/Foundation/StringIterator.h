@@ -3,10 +3,12 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "Assert.h"
+#include "Span.h"
 #include "Types.h"
 
 namespace SC
 {
+using StringCodePoint = uint32_t;
 enum class StringEncoding : uint8_t
 {
     Ascii = 0,
@@ -39,7 +41,7 @@ constexpr uint32_t StringEncodingGetSize(StringEncoding encoding)
 struct StringIteratorSkipTable
 {
     bool matches[256] = {false};
-    constexpr StringIteratorSkipTable(std::initializer_list<char> chars)
+    constexpr StringIteratorSkipTable(Span<const char> chars)
     {
         for (auto c : chars)
         {
@@ -49,13 +51,13 @@ struct StringIteratorSkipTable
 };
 
 // Invariants: start <= end and it >= start and it <= end
-template <typename TypeUnit, typename TypePoint, typename CharIterator>
+template <typename TypeUnit, typename CharIterator>
 struct StringIterator
 {
     static constexpr StringEncoding getEncoding() { return CharIterator::getEncoding(); }
 
     using CodeUnit  = TypeUnit;
-    using CodePoint = TypePoint;
+    using CodePoint = StringCodePoint;
 
     [[nodiscard]] constexpr bool isAtEnd() const { return it == end; }
     [[nodiscard]] constexpr bool isAtStart() const { return it == start; }
@@ -159,7 +161,7 @@ struct StringIterator
         return advanceOfBytes(other.end - other.it);
     }
 
-    [[nodiscard]] constexpr bool advanceUntilMatchesAny(std::initializer_list<CodePoint> items, CodePoint& matched)
+    [[nodiscard]] constexpr bool advanceUntilMatchesAny(Span<const CodePoint> items, CodePoint& matched)
     {
         while (it != end)
         {
@@ -196,12 +198,6 @@ struct StringIterator
         return false;
     }
 
-    template <typename T>
-    static CodePoint castCodePoint(T c)
-    {
-        return static_cast<CodePoint>(c);
-    }
-
     [[nodiscard]] constexpr bool advanceIfMatches(CodePoint c)
     {
         if (it != end && CharIterator::decode(it) == c)
@@ -226,7 +222,7 @@ struct StringIterator
         return false;
     }
 
-    [[nodiscard]] constexpr bool advanceIfMatchesAny(std::initializer_list<CodePoint> items)
+    [[nodiscard]] constexpr bool advanceIfMatchesAny(Span<const CodePoint> items)
     {
         if (it != end)
         {
@@ -325,6 +321,19 @@ struct StringIterator
         return true;
     }
 
+    [[nodiscard]] constexpr bool reverseAdvanceCodePoints(size_t numCodePoints)
+    {
+        while (numCodePoints-- > 0)
+        {
+            if (it == start)
+            {
+                return false;
+            }
+            it = getPreviousOf(it);
+        }
+        return true;
+    }
+
     [[nodiscard]] constexpr bool isFollowedBy(CodePoint c)
     {
         if (it != end)
@@ -360,7 +369,7 @@ struct StringIterator
         if (start != end)
         {
             auto last = CharIterator::getPreviousOf(end);
-            return CharIterator::decode(last) == castCodePoint(character);
+            return CharIterator::decode(last) == character;
         }
         return false;
     }
@@ -369,7 +378,7 @@ struct StringIterator
     {
         if (start != end)
         {
-            return CharIterator::decode(start) == castCodePoint(character);
+            return CharIterator::decode(start) == character;
         }
         return false;
     }
@@ -383,7 +392,7 @@ struct StringIterator
         typename IteratorType::CodePoint c;
         while (other.advanceBackwardRead(c))
         {
-            if (not copy.advanceBackwardIfMatches(castCodePoint(c)))
+            if (not copy.advanceBackwardIfMatches(c))
                 return false;
         }
         return other.isAtStart();
@@ -398,7 +407,7 @@ struct StringIterator
         typename IteratorType::CodePoint c;
         while (other.advanceRead(c))
         {
-            if (not copy.advanceIfMatches(castCodePoint(c)))
+            if (not copy.advanceIfMatches(c))
                 return false;
         }
         return other.isAtEnd();
@@ -415,7 +424,7 @@ struct StringIterator
     const CodeUnit* end;
 };
 
-struct StringIteratorASCII : public StringIterator<char, uint32_t, StringIteratorASCII>
+struct StringIteratorASCII : public StringIterator<char, StringIteratorASCII>
 {
     [[nodiscard]] constexpr bool advanceUntilMatches(CodePoint c)
     {
@@ -443,7 +452,7 @@ struct StringIteratorASCII : public StringIterator<char, uint32_t, StringIterato
 
   private:
     using StringIterator::StringIterator;
-    using Parent = StringIterator<char, uint32_t, StringIteratorASCII>;
+    using Parent = StringIterator<char, StringIteratorASCII>;
     friend Parent;
     friend struct StringView;
 
@@ -455,11 +464,11 @@ struct StringIteratorASCII : public StringIterator<char, uint32_t, StringIterato
     [[nodiscard]] static constexpr bool        isValidASCII(CodePoint c) { return c <= 127; }
 };
 
-struct StringIteratorUTF16 : public StringIterator<wchar_t, uint32_t, StringIteratorUTF16>
+struct StringIteratorUTF16 : public StringIterator<wchar_t, StringIteratorUTF16>
 {
   private:
     using StringIterator::StringIterator;
-    using Parent = StringIterator<wchar_t, uint32_t, StringIteratorUTF16>;
+    using Parent = StringIterator<wchar_t, StringIteratorUTF16>;
     friend Parent;
     friend struct StringView;
 
@@ -499,10 +508,10 @@ struct StringIteratorUTF16 : public StringIterator<wchar_t, uint32_t, StringIter
     }
 };
 
-struct StringIteratorUTF8 : public StringIterator<char, uint32_t, StringIteratorUTF8>
+struct StringIteratorUTF8 : public StringIterator<char, StringIteratorUTF8>
 {
   private:
-    using Parent = StringIterator<char, uint32_t, StringIteratorUTF8>;
+    using Parent = StringIterator<char, StringIteratorUTF8>;
     friend Parent;
     friend struct StringView;
     using StringIterator::StringIterator;

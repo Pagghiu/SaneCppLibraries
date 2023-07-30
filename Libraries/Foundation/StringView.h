@@ -8,31 +8,7 @@
 namespace SC
 {
 struct StringView;
-struct SplitOptions
-{
-    enum Value
-    {
-        None          = 0,
-        SkipEmpty     = 1,
-        SkipSeparator = 2
-    };
-    Value value;
-    SplitOptions(std::initializer_list<Value> ilist)
-    {
-        value = None;
-        for (auto v : ilist)
-        {
-            value = static_cast<Value>(static_cast<uint32_t>(value) | static_cast<uint32_t>(v));
-        }
-    }
-    bool has(Value v) const { return (value & v) != None; }
-};
-enum class StringComparison
-{
-    Smaller = -1,
-    Equals  = 0,
-    Bigger  = 1
-};
+struct StringViewTokenizer;
 
 } // namespace SC
 
@@ -47,6 +23,55 @@ struct SC_EXPORT_SYMBOL SC::StringView
     size_t         textSizeInBytes;
     StringEncoding encoding;
     bool           hasNullTerm;
+
+    template <typename StringIterator1, typename StringIterator2>
+    static constexpr bool equalsIterator(StringIterator1 t1, StringIterator2 t2, size_t& points)
+    {
+        typename StringIterator1::CodePoint c1 = 0;
+        typename StringIterator2::CodePoint c2 = 0;
+        while (t1.advanceRead(c1) and t2.advanceRead(c2))
+        {
+            if (static_cast<uint32_t>(c1) != static_cast<uint32_t>(c2))
+            {
+                return false;
+            }
+            points++;
+        }
+        return t1.isAtEnd() and t2.isAtEnd();
+    }
+
+    template <typename StringIterator>
+    constexpr bool equalsIterator(StringView other, size_t& points) const
+    {
+        auto it = getIterator<StringIterator>();
+        switch (other.getEncoding())
+        {
+        case StringEncoding::Ascii: return equalsIterator(it, other.getIterator<StringIteratorASCII>(), points);
+        case StringEncoding::Utf8: return equalsIterator(it, other.getIterator<StringIteratorUTF8>(), points);
+        case StringEncoding::Utf16: return equalsIterator(it, other.getIterator<StringIteratorUTF16>(), points);
+        }
+        SC_UNREACHABLE();
+    }
+
+    template <typename T>
+    struct identity
+    {
+        typedef T type;
+    };
+
+    template <typename Type>
+    constexpr StringIteratorASCII getIterator(identity<Type>) const
+    {
+        return StringIteratorASCII(textUtf8, textUtf8 + textSizeInBytes / sizeof(char));
+    }
+    constexpr StringIteratorUTF8 getIterator(identity<StringIteratorUTF8>) const
+    {
+        return StringIteratorUTF8(textUtf8, textUtf8 + textSizeInBytes / sizeof(char));
+    }
+    constexpr StringIteratorUTF16 getIterator(identity<StringIteratorUTF16>) const
+    {
+        return StringIteratorUTF16(textUtf16, textUtf16 + textSizeInBytes / sizeof(wchar_t));
+    }
 
   public:
     constexpr StringView() : textUtf8(nullptr), textSizeInBytes(0), encoding(StringEncoding::Ascii), hasNullTerm(false)
@@ -66,10 +91,6 @@ struct SC_EXPORT_SYMBOL SC::StringView
     constexpr StringView(Span<const wchar_t> textSpan, bool nullTerm, StringEncoding encoding)
         : textUtf16(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(encoding), hasNullTerm(nullTerm)
     {}
-
-    constexpr SpanVoid<const void> toVoidSpan() const { return {textUtf8, textSizeInBytes}; }
-
-    constexpr Span<const char> toCharSpan() const { return {textUtf8, textSizeInBytes}; }
 
     template <size_t N>
     constexpr StringView(const char (&text)[N])
@@ -102,32 +123,20 @@ struct SC_EXPORT_SYMBOL SC::StringView
     }
 #endif
 
-    [[nodiscard]] StringComparison compareASCII(StringView other) const;
+    constexpr SpanVoid<const void> toVoidSpan() const { return {textUtf8, textSizeInBytes}; }
+    constexpr Span<const char>     toCharSpan() const { return {textUtf8, textSizeInBytes}; }
 
-    [[nodiscard]] bool operator<(StringView other) const { return compareASCII(other) == StringComparison::Smaller; }
-
-  private:
-    template <typename T>
-    struct identity
+    enum class Comparison
     {
-        typedef T type;
+        Smaller = -1,
+        Equals  = 0,
+        Bigger  = 1
     };
 
-    template <typename Type>
-    constexpr StringIteratorASCII getIterator(identity<Type>) const
-    {
-        return StringIteratorASCII(textUtf8, textUtf8 + textSizeInBytes / sizeof(char));
-    }
-    constexpr StringIteratorUTF8 getIterator(identity<StringIteratorUTF8>) const
-    {
-        return StringIteratorUTF8(textUtf8, textUtf8 + textSizeInBytes / sizeof(char));
-    }
-    constexpr StringIteratorUTF16 getIterator(identity<StringIteratorUTF16>) const
-    {
-        return StringIteratorUTF16(textUtf16, textUtf16 + textSizeInBytes / sizeof(wchar_t));
-    }
+    [[nodiscard]] Comparison compare(StringView other) const;
 
-  public:
+    [[nodiscard]] bool operator<(StringView other) const { return compare(other) == Comparison::Smaller; }
+
     template <typename StringIterator>
     constexpr StringIterator getIterator() const
     {
@@ -155,55 +164,25 @@ struct SC_EXPORT_SYMBOL SC::StringView
                 return memcmp(textUtf8, other.textUtf8, textSizeInBytes) == 0;
             }
         }
-        return equals(other);
+        size_t commonOverlappingPoints = 0;
+        return fullyOverlaps(other, commonOverlappingPoints);
     }
 
-  private:
-    template <typename StringIterator1, typename StringIterator2>
-    static constexpr bool equalsIterator(StringIterator1 t1, StringIterator2 t2)
+    constexpr bool fullyOverlaps(StringView other, size_t& commonOverlappingPoints) const
     {
-        typename StringIterator1::CodePoint c1 = 0;
-        typename StringIterator2::CodePoint c2 = 0;
-        while (t1.advanceRead(c1) and t2.advanceRead(c2))
-        {
-            if (static_cast<uint32_t>(c1) != static_cast<uint32_t>(c2))
-            {
-                return false;
-            }
-        }
-        return t1.isAtEnd();
-    }
-
-    template <typename StringIterator>
-    constexpr bool equalsIterator(StringView other) const
-    {
-        auto it = getIterator<StringIterator>();
-        switch (other.getEncoding())
-        {
-        case StringEncoding::Ascii: return equalsIterator(it, other.getIterator<StringIteratorASCII>()); break;
-        case StringEncoding::Utf8: return equalsIterator(it, other.getIterator<StringIteratorUTF8>()); break;
-        case StringEncoding::Utf16: return equalsIterator(it, other.getIterator<StringIteratorUTF16>()); break;
-        }
-        SC_UNREACHABLE();
-    }
-
-    constexpr bool equals(StringView other) const
-    {
+        commonOverlappingPoints = 0;
         switch (getEncoding())
         {
-        case StringEncoding::Ascii: return equalsIterator<StringIteratorASCII>(other);
-        case StringEncoding::Utf8: return equalsIterator<StringIteratorUTF8>(other);
-        case StringEncoding::Utf16: return equalsIterator<StringIteratorUTF16>(other);
+        case StringEncoding::Ascii: return equalsIterator<StringIteratorASCII>(other, commonOverlappingPoints);
+        case StringEncoding::Utf8: return equalsIterator<StringIteratorUTF8>(other, commonOverlappingPoints);
+        case StringEncoding::Utf16: return equalsIterator<StringIteratorUTF16>(other, commonOverlappingPoints);
         }
         SC_UNREACHABLE();
     }
 
-  public:
     [[nodiscard]] bool           operator!=(StringView other) const { return not operator==(other); }
     [[nodiscard]] constexpr bool isEmpty() const { return textUtf8 == nullptr || textSizeInBytes == 0; }
     [[nodiscard]] constexpr bool isNullTerminated() const { return hasNullTerm; }
-
-    size_t sizeASCII() const { return sizeInBytes(); }
 
     [[nodiscard]] constexpr size_t sizeInBytes() const { return textSizeInBytes; }
 
@@ -225,28 +204,13 @@ struct SC_EXPORT_SYMBOL SC::StringView
         SC_UNREACHABLE();
     }
 
-    template <typename CharType>
-    [[nodiscard]] constexpr bool endsWithChar(CharType c) const
-    {
-        return withIterator([c](auto it) { return it.endsWithChar(c); });
-    }
-
-    template <typename CharType>
-    [[nodiscard]] constexpr bool startsWithChar(CharType c) const
-    {
-        return withIterator([c](auto it) { return it.startsWithChar(c); });
-    }
-
+    [[nodiscard]] bool endsWithChar(StringCodePoint c) const;
+    [[nodiscard]] bool startsWithChar(StringCodePoint c) const;
     [[nodiscard]] bool startsWith(const StringView str) const;
     [[nodiscard]] bool endsWith(const StringView str) const;
     // TODO: containsString will assert if strings have non compatible encoding
     [[nodiscard]] bool containsString(const StringView str) const;
-
-    template <typename CharType>
-    [[nodiscard]] constexpr bool containsChar(CharType c) const
-    {
-        return withIterator([c](auto it) { return it.advanceUntilMatches(it.castCodePoint(c)); });
-    }
+    [[nodiscard]] bool containsChar(StringCodePoint c) const;
 
     [[nodiscard]] constexpr bool hasCompatibleEncoding(StringView str) const
     {
@@ -297,105 +261,56 @@ struct SC_EXPORT_SYMBOL SC::StringView
     /// @param start The index to the beginning of the specified portion of StringView.
     /// @param end The index to the end of the specified portion of StringView. The substring includes the characters up
     /// to, but not including, the character indicated by end.
-    template <typename StringIterator = StringIteratorASCII>
-    [[nodiscard]] constexpr StringView sliceStartEnd(size_t start, size_t end) const
-    {
-        auto it = getIterator<StringIterator>();
-        SC_RELEASE_ASSERT(it.advanceCodePoints(start));
-        auto startIt = it;
-        SC_RELEASE_ASSERT(start <= end && it.advanceCodePoints(end - start));
-        const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
-        return StringView(startIt.getCurrentIt(), distance,
-                          hasNullTerm and (start + distance == sizeInBytesIncludingTerminator()), encoding);
-    }
-    /// Returns a section of a string.
-    /// @param start The index to the beginning of the specified portion of StringView.
-    /// @param length The number of characters to include. The substring includes the characters up to, but not
-    /// including, the character indicated by end.
-    template <typename StringIterator = StringIteratorASCII>
-    [[nodiscard]] constexpr StringView sliceStartLength(size_t start, size_t length) const
-    {
-        return sliceStartEnd<StringIterator>(start, start + length);
-    }
+    [[nodiscard]] StringView sliceStartEnd(size_t start, size_t end) const;
 
     /// Returns a section of a string.
-    /// @param start The index to the beginning of the specified portion of StringView.
-    template <typename StringIterator = StringIteratorASCII>
-    [[nodiscard]] constexpr StringView sliceStart(size_t start) const
+    /// @param start The offset from the beginning of the specified portion of StringView.
+    /// @param length The number of code points to include.
+    [[nodiscard]] StringView sliceStartLength(size_t start, size_t length) const;
+
+    /// Returns a section of a string.
+    /// @param offset The offset from the beginning of the specified portion of StringView.
+    [[nodiscard]] StringView sliceStart(size_t offset) const;
+
+    /// Returns a section of a string.
+    /// @param offset The index to the beginning of the specified portion of StringView.
+    [[nodiscard]] StringView sliceEnd(size_t offset) const;
+
+    [[nodiscard]] StringView trimEndingChar(StringCodePoint c) const;
+
+    [[nodiscard]] StringView trimStartingChar(StringCodePoint c) const;
+
+    [[nodiscard]] constexpr StringView sliceStartBytes(size_t start) const
     {
-        auto it = getIterator<StringIterator>();
-        SC_RELEASE_ASSERT(it.advanceCodePoints(start));
-        auto startIt = it;
-        it.setToEnd();
-        const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
-        return StringView(startIt.getCurrentIt(), distance,
-                          hasNullTerm and (start + distance == sizeInBytesIncludingTerminator()), encoding);
+        if (start < sizeInBytes())
+            return sliceStartLengthBytes(start, sizeInBytes() - start);
+        SC_RELEASE_ASSERT(start < sizeInBytes());
+        return StringView(textUtf8, 0, false, encoding);
     }
 
-    template <typename Lambda>
-    size_t splitASCII(StringIteratorASCII::CodePoint separator, Lambda&& lambda,
-                      SplitOptions options = {SplitOptions::SkipEmpty, SplitOptions::SkipSeparator})
+    [[nodiscard]] constexpr StringView sliceStartEndBytes(size_t start, size_t end) const
     {
-        return split<StringIteratorASCII>(separator, forward<Lambda>(lambda), options);
+        if (end >= start)
+            return sliceStartLengthBytes(start, end - start);
+        SC_RELEASE_ASSERT(end >= start);
+        return StringView(textUtf8, 0, false, encoding);
     }
 
-    // TODO: make split using iterator pattern instead of lambda so we can move it to cpp
-    template <typename StringIterator, typename Lambda, typename CharacterType>
-    size_t split(CharacterType separator, Lambda&& lambda, SplitOptions options)
+    [[nodiscard]] constexpr StringView sliceStartLengthBytes(size_t start, size_t length) const
     {
-        if (isEmpty())
-            return 0;
-        StringIterator it            = getIterator<StringIterator>();
-        StringIterator itBackup      = it;
-        size_t         numSplits     = 0;
-        bool           continueSplit = true;
-        while (continueSplit)
+        if (start + length > sizeInBytes())
         {
-            continueSplit        = it.advanceUntilMatches(separator);
-            StringView component = StringView::fromIterators(itBackup, it);
-            if (options.has(SplitOptions::SkipSeparator))
-            {
-                (void)it.stepForward(); // we already checked in advanceUntilMatches
-                continueSplit = !it.isAtEnd();
-            }
-            // directory
-            if (!component.isEmpty() || !options.has(SplitOptions::SkipEmpty))
-            {
-                numSplits++;
-                lambda(component);
-            }
-            itBackup = it;
+            SC_RELEASE_ASSERT(start + length > sizeInBytes());
+            return StringView(textUtf8, 0, false, encoding);
         }
-        return numSplits;
+        return StringView(textUtf8 + start, length, hasNullTerm and (start + length == sizeInBytes()), encoding);
     }
 
     /// If the current view is an integer number, returns true
-    template <typename StringIterator>
-    [[nodiscard]] constexpr bool isIntegerNumber() const
-    {
-        auto it = getIterator<StringIterator>();
-        (void)it.advanceIfMatchesAny({'-', '+'}); // optional
-        bool matchedAtLeastOneDigit = false;
-        while (it.advanceIfMatchesRange('0', '9'))
-            matchedAtLeastOneDigit = true;
-        return matchedAtLeastOneDigit and it.isAtEnd();
-    }
+    [[nodiscard]] bool isIntegerNumber() const;
 
     /// If the current view is a floating number, returns true
-    template <typename StringIterator>
-    [[nodiscard]] constexpr bool isFloatingNumber() const
-    {
-        // TODO: Floating point exponential notation
-        auto it = getIterator<StringIterator>();
-        (void)it.advanceIfMatchesAny({'-', '+'}); // optional
-        bool matchedAtLeastOneDigit = false;
-        while (it.advanceIfMatchesRange('0', '9'))
-            matchedAtLeastOneDigit = true;
-        if (it.advanceIfMatches('.')) // optional
-            while (it.advanceIfMatchesRange('0', '9'))
-                matchedAtLeastOneDigit = true;
-        return matchedAtLeastOneDigit and it.isAtEnd();
-    }
+    [[nodiscard]] bool isFloatingNumber() const;
 
     /// Parses int32, returning false if it fails
     [[nodiscard]] bool parseInt32(int32_t& value) const;
@@ -405,6 +320,26 @@ struct SC_EXPORT_SYMBOL SC::StringView
 
     /// Parses double, returning false if it fails
     [[nodiscard]] bool parseDouble(double& value) const;
+};
+
+struct SC::StringViewTokenizer
+{
+    StringCodePoint splittingCharacter = 0;
+    size_t          numSplitsNonEmpty  = 0;
+    size_t          numSplitsTotal     = 0;
+    StringView      component;
+
+    enum Options
+    {
+        IncludeEmpty,
+        SkipEmpty
+    };
+    StringViewTokenizer(StringView current) : current(current) {}
+    [[nodiscard]] bool   tokenizeNext(Span<const StringCodePoint> separators, Options options);
+    StringViewTokenizer& countTokens(Span<const StringCodePoint> separators);
+
+  private:
+    StringView current;
 };
 
 #if SC_PLATFORM_WINDOWS

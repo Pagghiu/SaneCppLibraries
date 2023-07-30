@@ -52,7 +52,7 @@ struct SC::SystemDebug::Internal
 
         if (theFile.startsWithChar('\\'))
         {
-            theFile = theFile.sliceStart(2); // Eat one slash
+            theFile = theFile.sliceStart(1); // Eat one slash
         }
         HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_DUP_HANDLE, FALSE, processId);
         if (processHandle == nullptr)

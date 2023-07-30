@@ -340,7 +340,7 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(fd.close());
 
             StringView sv(buffer, sizeof(buffer), false, StringEncoding::Ascii);
-            SC_TEST_EXPECT(sv.compareASCII("test") == StringComparison::Equals);
+            SC_TEST_EXPECT(sv.compare("test") == StringView::Comparison::Equals);
             SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
             SC_TEST_EXPECT(fs.removeFile(fileName));
             SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory));

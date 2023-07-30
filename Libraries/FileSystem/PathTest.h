@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Foundation/String.h"
 #include "../Testing/Test.h"
 #include "Path.h"
 
@@ -36,9 +37,9 @@ struct SC::PathTest : public SC::TestCase
             SC_TEST_EXPECT(Path::Posix::basename("/a/basename//") == "basename");
             SC_TEST_EXPECT(Path::Posix::basename("/a/basename.html", ".html") == "basename");
         }
-        if (test_section("PathParsedView::parsePosix"))
+        if (test_section("Path::ParsedView::parsePosix"))
         {
-            PathParsedView path;
+            Path::ParsedView path;
             SC_TEST_EXPECT(path.parsePosix("/123/456"));
             SC_TEST_EXPECT(path.root == "/");
             SC_TEST_EXPECT(path.directory == "/123");
@@ -64,9 +65,9 @@ struct SC::PathTest : public SC::TestCase
             SC_TEST_EXPECT(path.endsWithSeparator == true);
         }
 
-        if (test_section("PathParsedView::parseWindows"))
+        if (test_section("Path::ParsedView::parseWindows"))
         {
-            PathParsedView path;
+            Path::ParsedView path;
             SC_TEST_EXPECT(!path.parseWindows("\\"));
             SC_TEST_EXPECT(!path.parseWindows(""));
             SC_TEST_EXPECT(!path.parseWindows(":"));
@@ -168,15 +169,11 @@ struct SC::PathTest : public SC::TestCase
 
         if (test_section("Path::parse"))
         {
-#if SC_PLATFORM_WINDOWS
-            PathParsedView view;
-            SC_TEST_EXPECT(Path::parse("C:\\dir\\base.ext", view));
+            Path::ParsedView view;
+            SC_TEST_EXPECT(Path::parse("C:\\dir\\base.ext", view, Path::AsWindows));
             SC_TEST_EXPECT(view.directory == "C:\\dir");
-#else
-            PathParsedView view;
-            SC_TEST_EXPECT(Path::parse("/usr/dir/base.ext", view));
+            SC_TEST_EXPECT(Path::parse("/usr/dir/base.ext", view, Path::AsPosix));
             SC_TEST_EXPECT(view.directory == "/usr/dir");
-#endif
         }
     }
 };

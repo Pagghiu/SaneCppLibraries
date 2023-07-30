@@ -289,13 +289,13 @@ struct SC::FileSystemWatcher::Internal
                 if (path.startsWith(watcher->path->view())) // TODO: This works only if encodings are the same
                 {
                     internal.notification.basePath = watcher->path->view();
-                    StringView relativePath = path.sliceStart<StringIteratorASCII>(watcher->path->view().sizeASCII());
+                    StringView relativePath        = path.sliceStartBytes(watcher->path->view().sizeInBytes());
 
                     // TODO: Refactor into a 'trimEnd'
-                    while (relativePath.sizeASCII() > 1 and relativePath.startsWithChar('/'))
+                    while (relativePath.sizeInBytes() > 1 and relativePath.startsWithChar('/'))
                     {
                         // Remove initial '/'
-                        relativePath = relativePath.sliceStart<StringIteratorASCII>(1);
+                        relativePath = relativePath.sliceStart(1);
                     }
                     internal.notification.relativePath = relativePath;
 

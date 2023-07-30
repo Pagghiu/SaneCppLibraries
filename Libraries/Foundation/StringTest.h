@@ -29,7 +29,7 @@ struct SC::StringTest : public SC::TestCase
             SC_TEST_EXPECT(str != String("ASD"));
             // SC_TEST_EXPECT(str < "Zest Ztring");
         }
-        if (test_section("compareASCII"))
+        if (test_section("compare"))
         {
             StringView sv[3] = {
                 StringView("3"),
@@ -41,7 +41,7 @@ struct SC::StringTest : public SC::TestCase
             SC_TEST_EXPECT(sv[1] == "2");
             SC_TEST_EXPECT(sv[2] == "3");
             bubbleSort(sv, sv + 3,
-                       [](StringView a, StringView b) { return a.compareASCII(b) == StringComparison::Bigger; });
+                       [](StringView a, StringView b) { return a.compare(b) == StringView::Comparison::Bigger; });
             SC_TEST_EXPECT(sv[0] == "3");
             SC_TEST_EXPECT(sv[1] == "2");
             SC_TEST_EXPECT(sv[2] == "1");

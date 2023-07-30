@@ -17,25 +17,16 @@ struct PluginTest;
 
 struct SC::PluginTest : public SC::TestCase
 {
-    SmallString<255>   testPluginsPath;
-    [[nodiscard]] bool setupPluginPath()
+    SmallString<255> testPluginsPath;
+
+    [[nodiscard]] static bool setupPluginPath(String& outputPath)
     {
-        const StringView testPath = Path::dirname(StringView(__FILE__));
-#if SC_MSVC
-        if (testPath.startsWithChar('\\'))
-        {
-            // For some reason on MSVC __FILE__ returns paths on network drives with a single starting slash
-            (void)Path::join(testPluginsPath, {""_a8, testPath, "PluginTestDirectory"_a8});
-        }
-        else
-        {
-            (void)Path::join(testPluginsPath, {testPath, "PluginTestDirectory"_a8});
-        }
-#else
-        (void)Path::join(testPluginsPath, {testPath, "PluginTestDirectory"_a8});
-#endif
+        SC_TRY_IF(Path::extractDirectoryFromFILE(__FILE__, outputPath));
+        SC_TRY_IF(StringBuilder(outputPath).append(Path::SeparatorStringView()));
+        SC_TRY_IF(StringBuilder(outputPath).append("PluginTestDirectory"));
         return true;
     }
+
     PluginTest(SC::TestReport& report) : TestCase(report, "PluginTest")
     {
         using namespace SC;
@@ -64,7 +55,7 @@ struct SC::PluginTest : public SC::TestCase
         }
         if (test_section("PluginScanner/PluginCompiler/PluginRegistry"))
         {
-            SC_TEST_EXPECT(setupPluginPath());
+            SC_TEST_EXPECT(setupPluginPath(testPluginsPath));
 
             // Scan for definitions
             SmallVector<PluginDefinition, 5> definitions;

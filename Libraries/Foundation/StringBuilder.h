@@ -10,7 +10,18 @@ namespace SC
 struct String;
 struct StringBuilder
 {
-    constexpr StringBuilder(String& backingString) : backingString(backingString) {}
+    enum Flags
+    {
+        Clear,
+        DoNotClear
+    };
+    constexpr StringBuilder(String& backingString, Flags f = DoNotClear) : backingString(backingString)
+    {
+        if (f == Clear)
+        {
+            clear();
+        }
+    }
 
     template <typename... Types>
     [[nodiscard]] bool format(StringView fmt, Types&&... args)

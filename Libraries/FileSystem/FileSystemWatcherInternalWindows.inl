@@ -227,10 +227,10 @@ struct SC::FileSystemWatcher::Internal
 
         Notification notification;
         notification.basePath = entry.path->view();
-        while (notification.basePath.sizeASCII() > 1 and notification.basePath.endsWithChar('\\'))
+        while (notification.basePath.sizeInBytes() > 1 and notification.basePath.endsWithChar('\\'))
         {
             notification.basePath =
-                notification.basePath.sliceStartEnd<StringIteratorASCII>(0, notification.basePath.sizeASCII() - 1);
+                notification.basePath.sliceStartEndBytes(0, notification.basePath.sizeInBytes() - 1);
         }
 
         do
