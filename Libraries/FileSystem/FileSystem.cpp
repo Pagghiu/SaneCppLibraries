@@ -32,7 +32,7 @@ SC::ReturnCode SC::FileSystem::changeDirectory(StringView currentWorkingDirector
 bool SC::FileSystem::convert(const StringView file, String& destination, StringView* encodedPath)
 {
     StringConverter converter(destination);
-    if (Path::isAbsolute(file))
+    if (Path::isAbsolute(file, Path::AsNative))
     {
         if (encodedPath != nullptr)
         {

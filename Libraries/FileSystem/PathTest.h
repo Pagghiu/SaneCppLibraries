@@ -175,5 +175,36 @@ struct SC::PathTest : public SC::TestCase
             SC_TEST_EXPECT(Path::parse("/usr/dir/base.ext", view, Path::AsPosix));
             SC_TEST_EXPECT(view.directory == "/usr/dir");
         }
+
+        if (test_section("Path::normalize"))
+        {
+            String                       path;
+            SmallVector<StringView, 256> cmp;
+            SC_TEST_EXPECT(Path::normalize("///", cmp, &path, Path::AsPosix) and path == "/");
+            SC_TEST_EXPECT(Path::normalize("\\\\", cmp, &path, Path::AsWindows) and path == "\\\\");
+            SC_TEST_EXPECT(Path::normalize("/a/b/c/../d/e//", cmp, &path, Path::AsPosix) and path == "/a/b/d/e");
+            SC_TEST_EXPECT(Path::normalize("a\\b\\..\\c\\d\\..\\e", cmp, &path, Path::AsPosix) and path == "a/c/e");
+            SC_TEST_EXPECT(Path::normalize("..\\a\\b\\c", cmp, &path, Path::AsWindows) and path == "..\\a\\b\\c");
+            SC_TEST_EXPECT(Path::normalize("C:\\Users\\SC\\..\\Documents\\", cmp, &path, Path::AsWindows) and
+                           path == "C:\\Users\\Documents");
+            SC_TEST_EXPECT(Path::normalize("\\\\Users\\SC\\..\\Documents", cmp, &path, Path::AsWindows) and
+                           path == "\\\\Users\\Documents");
+            SC_TEST_EXPECT(Path::normalize("/a/b/../c/./d/", cmp, &path, Path::AsPosix) and path == "/a/c/d");
+        }
+
+        if (test_section("Path::relativeFromTo"))
+        {
+            String path;
+            SC_TEST_EXPECT(not Path::relativeFromTo("/a", "", path, Path::AsPosix));
+            SC_TEST_EXPECT(not Path::relativeFromTo("", "/a", path, Path::AsPosix));
+            SC_TEST_EXPECT(not Path::relativeFromTo("", "", path, Path::AsPosix));
+            SC_TEST_EXPECT(Path::relativeFromTo("/", "/a/b/c//", path, Path::AsPosix) and path == "a/b/c");
+            SC_TEST_EXPECT(Path::relativeFromTo("/a/b/1/2/3", "/a/b/d/e", path, Path::AsPosix) and
+                           path == "../../../d/e");
+            SC_TEST_EXPECT(Path::relativeFromTo("C:\\a\\b", "C:\\a\\c", path, Path::AsWindows) and path == "..\\c");
+            SC_TEST_EXPECT(not Path::relativeFromTo("/a", "b/c", path, Path::AsPosix));
+            SC_TEST_EXPECT(not Path::relativeFromTo("a", "/b/c", path, Path::AsPosix));
+            SC_TEST_EXPECT(Path::relativeFromTo("/a/b", "/a/b", path, Path::AsPosix) and path == ".");
+        }
     }
 };

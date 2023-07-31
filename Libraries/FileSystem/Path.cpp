@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "Path.h"
-#include "../Foundation/StringBuilder.h" // join
+#include "../Foundation/StringBuilder.h"
 
 struct SC::Path::Internal
 {
@@ -308,13 +308,14 @@ SC::StringView SC::Path::basename(StringView input, StringView suffix)
     return Internal::basename<Separator>(input, suffix);
 }
 
-bool SC::Path::isAbsolute(StringView input)
+bool SC::Path::isAbsolute(StringView input, Type type)
 {
-#if SC_PLATFORM_WINDOWS
-    return Windows::isAbsolute(input);
-#else
-    return Posix::isAbsolute(input);
-#endif
+    switch (type)
+    {
+    case AsPosix: return Posix::isAbsolute(input);
+    case AsWindows: return Windows::isAbsolute(input);
+    }
+    SC_UNREACHABLE();
 }
 
 SC::StringView SC::Path::Windows::dirname(StringView input) { return Internal::dirname<Separator>(input); }
@@ -343,18 +344,16 @@ SC::StringView SC::Path::Posix::basename(StringView input, StringView suffix)
 
 bool SC::Path::Posix::isAbsolute(StringView input) { return input.startsWithChar('/'); }
 
-bool SC::Path::join(String& output, Span<const StringView> inputs, char separator)
+bool SC::Path::join(String& output, Span<const StringView> inputs, StringView separator)
 {
-    // TODO: This will bring unnecessary conversions...
-    StringView    sep(&separator, sizeof(separator), false, StringEncoding::Ascii);
-    StringBuilder sb(output);
+    StringBuilder sb(output, StringBuilder::Clear);
     const size_t  numElements = inputs.sizeInElements();
     for (size_t idx = 0; idx < numElements; ++idx)
     {
         SC_TRY_IF(sb.append(inputs.data()[idx]));
         if (idx + 1 != numElements)
         {
-            SC_TRY_IF(sb.append(sep));
+            SC_TRY_IF(sb.append(separator));
         }
     }
     return true;
@@ -377,3 +376,144 @@ bool SC::Path::extractDirectoryFromFILE(StringView fileLocation, String& outputP
     return true;
 }
 
+bool SC::Path::normalize(StringView view, Vector<StringView>& components, String* output, Type type)
+{
+    components.clear();
+    if (view.isEmpty())
+        return false;
+    auto newView = removeTrailingSeparator(view);
+    if (not newView.isEmpty())
+    {
+        view = newView;
+    }
+    else
+    {
+        switch (type)
+        {
+        case AsWindows: view = "\\\\"; break;
+        case AsPosix: view = "/"; break;
+        }
+    }
+    bool normalizationHappened = false;
+
+    StringViewTokenizer tokenizer(view);
+    // Need to IncludeEmpty in order to preserve starting /
+    while (tokenizer.tokenizeNext({'/', '\\'}, StringViewTokenizer::IncludeEmpty))
+    {
+        const auto component = tokenizer.component;
+
+        constexpr StringView utf16ddot = L"..";
+        constexpr StringView utf8ddot  = "..";
+        constexpr StringView utf16dot  = L".";
+        constexpr StringView utf8dot   = ".";
+        if (component == (component.getEncoding() == StringEncoding::Utf16 ? utf16ddot : utf8ddot))
+        {
+            if (tokenizer.numSplitsTotal > 1)
+            {
+                if (not components.pop_back())
+                {
+                    // Should we just return empty string here?
+                    return false;
+                }
+                normalizationHappened = true;
+            }
+        }
+        else if (component == (component.getEncoding() == StringEncoding::Utf16 ? utf16dot : utf8dot))
+        {
+            normalizationHappened = true;
+        }
+        else
+        {
+            SC_TRY_IF(components.push_back(component));
+        }
+    }
+
+    if (output != nullptr)
+    {
+        if (normalizationHappened)
+        {
+            return join(*output, components.toSpanConst(),
+                        type == AsPosix ? Posix::SeparatorStringView() : Windows::SeparatorStringView());
+        }
+        else
+        {
+            return output->assign(view);
+        }
+    }
+    return true;
+}
+
+bool SC::Path::relativeFromTo(StringView source, StringView destination, String& output, Type type)
+{
+    Path::ParsedView pathViewSource, pathViewDestination;
+    SC_TRY_IF(Path::parse(source, pathViewSource, type));
+    SC_TRY_IF(Path::parse(destination, pathViewDestination, type));
+
+    if (pathViewSource.root.isEmpty() or pathViewDestination.root.isEmpty())
+    {
+        return false; // Relative paths are not supported
+    }
+    size_t commonOverlappingPoints;
+    if (source.fullyOverlaps(destination, commonOverlappingPoints))
+    {
+        return output.assign(".");
+    }
+    if (commonOverlappingPoints == 0)
+    {
+        return false; // no common part
+    }
+
+    const auto remainingSource = source.sliceStart(commonOverlappingPoints);
+    const auto slicedDest      = destination.sliceStart(commonOverlappingPoints);
+    auto       numSplits       = StringViewTokenizer(remainingSource).countTokens({'/', '\\'}).numSplitsNonEmpty;
+
+    StringBuilder builder(output, StringBuilder::Clear);
+    while (numSplits > 0)
+    {
+        numSplits -= 1;
+        SC_TRY_IF(builder.append(".."));
+        switch (type)
+        {
+        case AsWindows: SC_TRY_IF(builder.append(Windows::SeparatorStringView())); break;
+        case AsPosix: SC_TRY_IF(builder.append(Posix::SeparatorStringView())); break;
+        }
+    }
+    SC_TRY_IF(builder.append(Path::removeTrailingSeparator(slicedDest)));
+    return true;
+}
+
+SC::StringView SC::Path::removeTrailingSeparator(StringView path)
+{
+    return path.trimEndingChar('/').trimEndingChar('\\');
+}
+
+bool SC::Path::endsWithSeparator(StringView path) { return path.endsWithChar('/') or path.endsWithChar('\\'); }
+
+bool SC::Path::appendTrailingSeparator(String& path, Type type)
+{
+    if (not endsWithSeparator(path.view()))
+    {
+        StringBuilder builder(path, StringBuilder::DoNotClear);
+        switch (type)
+        {
+        case AsWindows: SC_TRY_IF(builder.append(Windows::SeparatorStringView())); break;
+        case AsPosix: SC_TRY_IF(builder.append(Posix::SeparatorStringView())); break;
+        }
+    }
+    return true;
+}
+
+bool SC::Path::append(String& output, Span<const StringView> paths, Type type)
+{
+    StringBuilder builder(output, StringBuilder::DoNotClear);
+    for (auto path : paths)
+    {
+        if (isAbsolute(path, type))
+        {
+            return false;
+        }
+        SC_TRY_IF(appendTrailingSeparator(output, type));
+        SC_TRY_IF(builder.append(path));
+    }
+    return true;
+}

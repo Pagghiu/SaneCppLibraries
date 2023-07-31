@@ -10,6 +10,8 @@ namespace SC
 {
 struct Path;
 struct String;
+template <typename T>
+struct Vector;
 } // namespace SC
 
 struct SC::Path
@@ -49,7 +51,8 @@ struct SC::Path
         [[nodiscard]] bool parsePosix(StringView input);
     };
 
-    [[nodiscard]] static bool join(String& output, Span<const StringView> inputs, char separator = Separator);
+    [[nodiscard]] static bool join(String& output, Span<const StringView> inputs,
+                                   StringView separator = SeparatorStringView());
     /// Splits a StringView of type "name.ext" into "name" and "ext"
     /// @param[in] input        An input path coded as UTF8 sequence (ex. "name.ext")
     /// @param[out] name         Output string holding name ("name" in "name.ext")
@@ -68,7 +71,7 @@ struct SC::Path
     /// Return the base name of a path. Suffix is stripped if existing. Trailing spearators are ignored.
     [[nodiscard]] static StringView basename(StringView input, StringView suffix);
     /// Returns true if path is an absolute native path (depending on platform)
-    [[nodiscard]] static bool isAbsolute(StringView input);
+    [[nodiscard]] static bool isAbsolute(StringView input, Type type);
 
     struct Windows
     {
@@ -104,6 +107,19 @@ struct SC::Path
     [[nodiscard]] static constexpr StringView SeparatorStringView() { return "/"_a8; }
 #endif
     [[nodiscard]] static bool extractDirectoryFromFILE(StringView fileLocation, String& outputPath);
+
+    [[nodiscard]] static bool normalize(StringView view, Vector<StringView>& components, String* output, Type type);
+
+    [[nodiscard]] static bool relativeFromTo(StringView source, StringView destination, String& output, Type type);
+
+    [[nodiscard]] static bool append(String& output, Span<const StringView> paths, Type type);
+
+    [[nodiscard]] static bool endsWithSeparator(StringView path);
+
+    [[nodiscard]] static bool appendTrailingSeparator(String& path, Type type);
+
+    [[nodiscard]] static StringView removeTrailingSeparator(StringView path);
+
   private:
     struct Internal;
 };

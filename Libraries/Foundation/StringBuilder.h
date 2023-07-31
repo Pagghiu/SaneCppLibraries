@@ -3,7 +3,6 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "String.h"
-#include "StringFormat.h"
 
 namespace SC
 {

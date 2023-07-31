@@ -224,6 +224,7 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(not StringAlgorithms::matchWildcard("*?1", "112"));
             SC_TEST_EXPECT(StringAlgorithms::matchWildcard("1*", "12123"));
             SC_TEST_EXPECT(StringAlgorithms::matchWildcard("*/myString", "myString/myString/myString"));
+            SC_TEST_EXPECT(StringAlgorithms::matchWildcard("**/myString", "myString/myString/myString"));
             SC_TEST_EXPECT(not StringAlgorithms::matchWildcard("*/String", "myString/myString/myString"));
             SC_TEST_EXPECT(StringAlgorithms::matchWildcard("*/Directory/File.cpp", "/Root/Directory/File.cpp"));
         }
