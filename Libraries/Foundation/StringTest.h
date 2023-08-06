@@ -65,5 +65,13 @@ struct SC::StringTest : public SC::TestCase
             SC_TEST_EXPECT(not SegmentHeader::getSegmentHeader(normal.data.items)->options.isSmallVector);
             SC_TEST_EXPECT(not SegmentHeader::getSegmentHeader(normal.data.items)->options.isFollowedBySmallVector);
         }
+        if (test_section("HexString"))
+        {
+            char bytes[4] = {0x12, 0x34, 0x56, 0x78};
+
+            String        s;
+            StringBuilder b(s);
+            SC_TEST_EXPECT(b.appendHex({bytes, sizeof(bytes)}) and s.view() == "12345678");
+        }
     }
 };

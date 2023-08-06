@@ -264,4 +264,20 @@ bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf
     return backingString.pushNullTerm();
 }
 
+bool StringBuilder::appendHex(SpanVoid<const void> data)
+{
+    const unsigned char* bytes = data.castTo<const unsigned char>().data();
+    if (backingString.encoding == StringEncoding::Utf16)
+        return false; // TODO: Support appendHex for UTF16
+    const auto oldSize = backingString.data.size();
+    SC_TRY_IF(backingString.data.resizeWithoutInitializing(backingString.data.size() + data.sizeInBytes() * 2));
+    const auto sizeInBytes = data.sizeInBytes();
+    for (size_t i = 0; i < sizeInBytes; i++)
+    {
+        backingString.data[oldSize + i * 2]     = "0123456789ABCDEF"[bytes[i] >> 4];
+        backingString.data[oldSize + i * 2 + 1] = "0123456789ABCDEF"[bytes[i] & 0x0F];
+    }
+    return backingString.pushNullTerm();
+}
+
 } // namespace SC

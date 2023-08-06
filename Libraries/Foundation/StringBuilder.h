@@ -54,6 +54,8 @@ struct StringBuilder
 
     [[nodiscard]] bool appendReplaceAll(StringView source, StringView occurencesOf, StringView with);
 
+    [[nodiscard]] bool appendHex(SpanVoid<const void> data);
+
   private:
     void clear() { backingString.data.clearWithoutInitializing(); }
 
