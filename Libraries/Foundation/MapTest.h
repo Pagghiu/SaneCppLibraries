@@ -44,11 +44,11 @@ struct SC::MapTest : public SC::TestCase
             Map<String, String, Array<MapItem<String, String>, 2>> map;
             SC_TEST_EXPECT(map.insertIfNotExists({"Ciao"_a8, "Fra"_a8}));
             SC_TEST_EXPECT(map.insertIfNotExists({"Bella"_a8, "Bro"_a8}));
-            auto result1 = map.get("Ciao"_a8);
-            SC_TEST_EXPECT(result1.releaseValue() == "Fra");
+            String* result1 = map.get("Ciao"_a8);
+            SC_TEST_EXPECT(result1 and result1->view() == "Fra");
             auto result2 = map.get("Fail"_a8);
-            SC_TEST_EXPECT(result2.isError());
-            SC_TEST_EXPECT(getTestString(map, "Bella").releaseValue() == "Bro"_a8);
+            SC_TEST_EXPECT(result2 == nullptr);
+            SC_TEST_EXPECT(*map.get("Bella") == "Bro"_a8);
         }
         if (test_section("StrongID"))
         {
@@ -61,19 +61,12 @@ struct SC::MapTest : public SC::TestCase
             const Key::ID key1 = Key::ID::generateUniqueKey(map);
             SC_TEST_EXPECT(map.insertIfNotExists({key1, "key1"_a8}));
             auto res = map.insertValueUniqueKey("key2"_a8);
-            SC_TEST_EXPECT(res.isValid());
-            const Key::ID key2 = res.releaseValue();
+            SC_TEST_EXPECT(res);
+            const Key::ID key2 = *res;
             const Key::ID key3 = Key::ID::generateUniqueKey(map);
-            SC_TEST_EXPECT(map.get(key1).releaseValue().view() == "key1"_a8);
-            SC_TEST_EXPECT(map.get(key2).releaseValue().view() == "key2"_a8);
-            SC_TEST_EXPECT(map.get(key3).isError());
+            SC_TEST_EXPECT(map.get(key1)->view() == "key1"_a8);
+            SC_TEST_EXPECT(map.get(key2)->view() == "key2"_a8);
+            SC_TEST_EXPECT(not map.get(key3));
         }
-    }
-
-    template <typename T>
-    static Result<String> getTestString(const T& map, StringView key)
-    {
-        SC_TRY(String result, map.get(key));
-        return result;
     }
 };

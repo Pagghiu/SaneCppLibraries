@@ -456,13 +456,15 @@ SC::ReturnCode SC::PluginRegistry::init(Vector<PluginDefinition>&& definitions)
 const SC::PluginDynamicLibrary* SC::PluginRegistry::findPlugin(const StringView identifier)
 {
     auto result = libraries.get(identifier);
-    return result.isValid() ? &(result.releaseValue()) : nullptr;
+    return result ? result : nullptr;
 }
 
 SC::ReturnCode SC::PluginRegistry::loadPlugin(const StringView identifier, const PluginCompiler& compiler,
                                               StringView executablePath, LoadMode loadMode)
 {
-    SC_TRY(SC::PluginDynamicLibrary & lib, libraries.get(identifier));
+    PluginDynamicLibrary* res = libraries.get(identifier);
+    SC_TRY_IF(res != nullptr);
+    PluginDynamicLibrary& lib = *res;
     if (loadMode == LoadMode::Reload or not lib.dynamicLibrary.isValid())
     {
         // TODO: Shield against circular dependencies
@@ -483,7 +485,9 @@ SC::ReturnCode SC::PluginRegistry::loadPlugin(const StringView identifier, const
 
 SC::ReturnCode SC::PluginRegistry::unloadPlugin(const StringView identifier)
 {
-    SC_TRY(SC::PluginDynamicLibrary & lib, libraries.get(identifier));
+    PluginDynamicLibrary* res = libraries.get(identifier);
+    SC_TRY_IF(res != nullptr);
+    PluginDynamicLibrary& lib = *res;
     if (lib.dynamicLibrary.isValid())
     {
         for (const auto& kv : libraries.getItems())
@@ -503,8 +507,10 @@ SC::ReturnCode SC::PluginRegistry::unloadPlugin(const StringView identifier)
 
 SC::ReturnCode SC::PluginRegistry::removeAllBuildProducts(const StringView identifier)
 {
-    SC_TRY(SC::PluginDynamicLibrary & lib, libraries.get(identifier));
-    FileSystem fs;
+    PluginDynamicLibrary* res = libraries.get(identifier);
+    SC_TRY_IF(res != nullptr);
+    PluginDynamicLibrary& lib = *res;
+    FileSystem            fs;
     SC_TRY_IF(fs.init(lib.definition.directory.view()));
     StringNative<255> buffer;
     StringBuilder     fmt(buffer);

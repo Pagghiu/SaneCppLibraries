@@ -2,7 +2,6 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "Result.h"
 #include "Vector.h"
 
 namespace SC
@@ -27,7 +26,15 @@ struct SC::Map
 
     Container items;
 
+    [[nodiscard]] auto size() const { return items.size(); }
+    [[nodiscard]] auto isEmpty() const { return items.isEmpty(); }
+
     [[nodiscard]] const Container& getItems() const { return items; }
+
+    [[nodiscard]] Item*       begin() { return items.begin(); }
+    [[nodiscard]] const Item* begin() const { return items.begin(); }
+    [[nodiscard]] Item*       end() { return items.end(); }
+    [[nodiscard]] const Item* end() const { return items.end(); }
 
     template <typename ComparableToKey>
     [[nodiscard]] bool remove(const ComparableToKey& key)
@@ -71,13 +78,13 @@ struct SC::Map
         return nullptr;
     }
 
-    [[nodiscard]] Result<Key&> insertValueUniqueKey(Value&& value)
+    [[nodiscard]] Key* insertValueUniqueKey(Value&& value)
     {
         if (items.push_back({Key::generateUniqueKey(*this), forward<Value>(value)}))
         {
-            return items.back().key;
+            return &items.back().key;
         }
-        return ReturnCode{"insert error"_a8};
+        return nullptr;
     }
 
     template <typename ComparableToKey>
@@ -122,29 +129,29 @@ struct SC::Map
     }
 
     template <typename ComparableToKey>
-    [[nodiscard]] Result<const Value&> get(const ComparableToKey& key) const
+    [[nodiscard]] const Value* get(const ComparableToKey& key) const
     {
         for (auto& item : items)
         {
             if (item.key == key)
             {
-                return item.value;
+                return &item.value;
             }
         }
-        return ReturnCode("Missing key"_a8);
+        return nullptr;
     }
 
     template <typename ComparableToKey>
-    [[nodiscard]] Result<Value&> get(const ComparableToKey& key)
+    [[nodiscard]] Value* get(const ComparableToKey& key)
     {
         for (auto& item : items)
         {
             if (item.key == key)
             {
-                return item.value;
+                return &item.value;
             }
         }
-        return ReturnCode("Missing key"_a8);
+        return nullptr;
     }
 
     template <typename ComparableToKey>
