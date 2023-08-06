@@ -15,9 +15,13 @@ struct ProcessDescriptor;
 
 struct ProcessDescriptorTraits
 {
-    using Handle                    = void*;      // HANDLE
-    static constexpr Handle Invalid = (Handle)-1; // INVALID_HANDLE_VALUE
-    static ReturnCode       releaseHandle(Handle& handle);
+    using Handle = void*; // HANDLE
+#ifdef __clang__
+    static constexpr void* Invalid = __builtin_constant_p(-1) ? (void*)-1 : (void*)-1; // INVALID_HANDLE_VALUE
+#else
+    static constexpr void* Invalid = (void*)-1; // INVALID_HANDLE_VALUE
+#endif
+    static ReturnCode releaseHandle(Handle& handle);
 };
 
 #else

@@ -17,9 +17,11 @@ void  SC::memoryRelease(void* allocatedMemory) { return free(allocatedMemory); }
 #error "SC_ENABLE_STD_CPP_LIBRARY must be defined to either 0 or 1"
 #endif
 
-#if SC_MSVC
+#if SC_MSVC || SC_CLANG_CL
+#if SC_ADDRESS_SANITIZER == 0
 void* operator new(size_t len) { return malloc(len); }
 void* operator new[](size_t len) { return malloc(len); }
+#endif
 #else
 void* operator new(SC::size_t len) { return malloc(len); }
 void* operator new[](SC::size_t len) { return malloc(len); }
@@ -47,6 +49,7 @@ extern "C" void __cxa_guard_abort(SC::uint64_t* guard_object) { SC_UNUSED(guard_
 #endif
 #endif
 
+#if SC_ADDRESS_SANITIZER == 0
 void operator delete(void* p) noexcept
 {
     if (p != 0)
@@ -57,6 +60,7 @@ void operator delete[](void* p) noexcept
     if (p != 0)
         SC_LIKELY { free(p); }
 }
+#endif
 
 // system includes
 #include <float.h>  // FLT_MAX / DBL_MAX

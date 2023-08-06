@@ -45,7 +45,7 @@ struct StringIteratorSkipTable
     {
         for (auto c : chars)
         {
-            matches[c] = true;
+            matches[static_cast<int>(c)] = true;
         }
     }
 };

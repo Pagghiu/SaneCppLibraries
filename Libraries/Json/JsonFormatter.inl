@@ -11,7 +11,7 @@
 
 SC::JsonFormatter::JsonFormatter(Vector<State>& state, StringFormatOutput& output) : state(state), output(output)
 {
-#if SC_MSVC
+#if SC_MSVC || SC_CLANG_CL
     strcpy_s(floatFormat, "%.2f");
 #else
     strcpy(floatFormat, "%.2f");

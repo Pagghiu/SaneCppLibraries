@@ -33,7 +33,7 @@ typedef struct _SYSTEM_HANDLE_INFORMATION
     SYSTEM_HANDLE Handles[1];
 } SYSTEM_HANDLE_INFORMATION, *PSYSTEM_HANDLE_INFORMATION;
 
-constexpr DWORD                    STATUS_INFO_LENGTH_MISMATCH = 0xc0000004;
+constexpr NTSTATUS                 STATUS_INFO_LENGTH_MISMATCH = 0xc0000004;
 constexpr SYSTEM_INFORMATION_CLASS SystemHandleInformation     = (SYSTEM_INFORMATION_CLASS)0x10;
 constexpr OBJECT_INFORMATION_CLASS ObjectNameInformation       = (OBJECT_INFORMATION_CLASS)1;
 
@@ -106,8 +106,8 @@ struct SC::SystemDebug::Internal
             {
                 continue;
             }
-            BOOL res = DuplicateHandle(processHandle, (HANDLE)handle.Handle, currentProcess, &dupHandle, 0, FALSE,
-                                       DUPLICATE_SAME_ACCESS);
+            BOOL res = DuplicateHandle(processHandle, (HANDLE)(ULONG_PTR)handle.Handle, currentProcess, &dupHandle, 0,
+                                       FALSE, DUPLICATE_SAME_ACCESS);
             if (res == FALSE)
             {
                 continue;
@@ -302,7 +302,7 @@ SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*
     SC_TRY_IF(converter.convertNullTerminateFastPath(symbolName, symbolZeroTerminated));
     HMODULE module;
     memcpy(&module, &handle, sizeof(HMODULE));
-    symbol = ::GetProcAddress(module, symbolZeroTerminated.bytesIncludingTerminator());
+    symbol = reinterpret_cast<void*>(::GetProcAddress(module, symbolZeroTerminated.bytesIncludingTerminator()));
     return symbol != nullptr;
 }
 

@@ -263,21 +263,21 @@ struct SC::AsyncWrite : public Async
 
 struct SC::AsyncTimeoutResult : public AsyncResult
 {
-    AsyncTimeoutResult(Async& async, void* userData) : async(*async.asTimeout()), AsyncResult(userData) {}
+    AsyncTimeoutResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asTimeout()) {}
 
     AsyncTimeout& async;
 };
 
 struct SC::AsyncWakeUpResult : public AsyncResult
 {
-    AsyncWakeUpResult(Async& async, void* userData) : async(*async.asWakeUp()), AsyncResult(userData) {}
+    AsyncWakeUpResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asWakeUp()) {}
 
     AsyncWakeUp& async;
 };
 
 struct SC::AsyncProcessExitResult : public AsyncResult
 {
-    AsyncProcessExitResult(Async& async, void* userData) : async(*async.asProcessExit()), AsyncResult(userData) {}
+    AsyncProcessExitResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asProcessExit()) {}
 
     AsyncProcessExit&             async;
     ProcessDescriptor::ExitStatus exitStatus;
@@ -285,7 +285,7 @@ struct SC::AsyncProcessExitResult : public AsyncResult
 
 struct SC::AsyncAcceptResult : public AsyncResult
 {
-    AsyncAcceptResult(Async& async, void* userData) : async(*async.asAccept()), AsyncResult(userData) {}
+    AsyncAcceptResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asAccept()) {}
 
     AsyncAccept&     async;
     SocketDescriptor acceptedClient;
@@ -293,28 +293,28 @@ struct SC::AsyncAcceptResult : public AsyncResult
 
 struct SC::AsyncConnectResult : public AsyncResult
 {
-    AsyncConnectResult(Async& async, void* userData) : async(*async.asConnect()), AsyncResult(userData) {}
+    AsyncConnectResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asConnect()) {}
 
     AsyncConnect& async;
 };
 
 struct SC::AsyncSendResult : public AsyncResult
 {
-    AsyncSendResult(Async& async, void* userData) : async(*async.asSend()), AsyncResult(userData) {}
+    AsyncSendResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asSend()) {}
 
     AsyncSend& async;
 };
 
 struct SC::AsyncReceiveResult : public AsyncResult
 {
-    AsyncReceiveResult(Async& async, void* userData) : async(*async.asReceive()), AsyncResult(userData) {}
+    AsyncReceiveResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asReceive()) {}
 
     AsyncReceive& async;
 };
 
 struct SC::AsyncReadResult : public AsyncResult
 {
-    AsyncReadResult(Async& async, void* userData) : async(*async.asRead()), AsyncResult(userData) {}
+    AsyncReadResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asRead()) {}
 
     AsyncRead& async;
     size_t     readBytes = 0;
@@ -322,7 +322,7 @@ struct SC::AsyncReadResult : public AsyncResult
 
 struct SC::AsyncWriteResult : public AsyncResult
 {
-    AsyncWriteResult(Async& async, void* userData) : async(*async.asWrite()), AsyncResult(userData) {}
+    AsyncWriteResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asWrite()) {}
 
     AsyncWrite& async;
     size_t      writtenBytes = 0;
