@@ -190,6 +190,7 @@ struct SC::Vector
         return items[index];
     }
 
+    [[nodiscard]] bool push_front(const T& element) { return insertCopy(0, &element, 1); }
     [[nodiscard]] bool push_back(const T& element) { return SegmentOperationsT::push_back(items, element); }
     [[nodiscard]] bool push_back(T&& element) { return SegmentOperationsT::push_back(items, forward<T>(element)); }
     [[nodiscard]] bool push_back(std::initializer_list<T> src) { return appendCopy(src.begin(), src.size()); }
@@ -373,7 +374,8 @@ struct SC::Vector
         return atLeastOneRemoved;
     }
 
-    [[nodiscard]] bool remove(const T& value)
+    template <typename ComparableToValue>
+    [[nodiscard]] bool remove(const ComparableToValue& value)
     {
         size_t index;
         if (contains(value, &index))

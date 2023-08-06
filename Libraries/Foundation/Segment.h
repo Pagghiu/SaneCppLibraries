@@ -186,6 +186,8 @@ struct SC::SegmentItems : public SegmentHeader
         SC_UNUSED(newSize);
         static_assert(sizeof(T) == sizeof(U), "What?");
         // TODO: add code to handle memcpy destination overlapping source
+        const size_t numElementsToMove = numElements - position;
+        memmove(oldItems + position + otherSize, oldItems + position, numElementsToMove * sizeof(T));
         memcpy(oldItems + position, other, otherSize * sizeof(T));
     }
 
@@ -603,7 +605,8 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
 
     Segment(std::initializer_list<T> ilist)
     {
-        const auto sz = min(static_cast<int>(ilist.size()), N);
+        Segment::capacityBytes = sizeof(T) * N;
+        const auto sz          = min(static_cast<int>(ilist.size()), N);
         Parent::copyConstruct(items, 0, static_cast<size_t>(sz), ilist.begin());
         Parent::setSize(static_cast<size_t>(sz));
     }
@@ -843,9 +846,10 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
         return true;
     }
 
-    [[nodiscard]] bool contains(const T& value, size_t* foundIndex = nullptr) const
+    template <typename ComparableToValue>
+    [[nodiscard]] bool contains(const ComparableToValue& value, size_t* foundIndex = nullptr) const
     {
-        T* oldItems = items;
+        auto oldItems = items;
         return SegmentItems<T>::findIf(
             oldItems, 0, Segment::size(), [&](const T& element) { return element == value; }, foundIndex);
     }
@@ -853,13 +857,13 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
     template <typename Lambda>
     [[nodiscard]] bool find(Lambda&& lambda, size_t* foundIndex = nullptr) const
     {
-        T* oldItems = items;
+        auto oldItems = items;
         return SegmentItems<T>::findIf(oldItems, 0, Segment::size(), forward<Lambda>(lambda), foundIndex);
     }
 
     [[nodiscard]] bool removeAt(size_t index)
     {
-        T* oldItems = items;
+        auto* oldItems = items;
         return SegmentItems<T>::removeAt(oldItems, index);
     }
 
