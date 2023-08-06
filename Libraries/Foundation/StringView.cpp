@@ -282,9 +282,11 @@ bool SC::StringView::isFloatingNumber() const
         });
 }
 
+[[nodiscard]] bool SC::StringViewTokenizer::isFinished() const { return current.isEmpty(); }
+
 bool SC::StringViewTokenizer::tokenizeNext(Span<const StringCodePoint> separators, Options options)
 {
-    if (current.isEmpty())
+    if (isFinished())
     {
         return false;
     }
@@ -292,11 +294,13 @@ bool SC::StringViewTokenizer::tokenizeNext(Span<const StringCodePoint> separator
     current.withIterator(
         [&](auto iterator)
         {
+            auto originalTextStart = originalText.getIterator<decltype(iterator)>();
             do
             {
                 auto componentStart = iterator;
                 (void)iterator.advanceUntilMatchesAny(separators, splittingCharacter);
                 component = StringView::fromIterators(componentStart, iterator);
+                processed = StringView::fromIterators(originalTextStart, iterator);
                 (void)iterator.stepForward();
                 current = StringView::fromIteratorUntilEnd(iterator);
                 numSplitsTotal++;

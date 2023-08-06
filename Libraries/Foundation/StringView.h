@@ -328,17 +328,21 @@ struct SC::StringViewTokenizer
     size_t          numSplitsNonEmpty  = 0;
     size_t          numSplitsTotal     = 0;
     StringView      component;
+    StringView      processed;
 
     enum Options
     {
         IncludeEmpty,
         SkipEmpty
     };
-    StringViewTokenizer(StringView current) : current(current) {}
+    StringViewTokenizer(StringView text) : originalText(text), current(text) {}
     [[nodiscard]] bool   tokenizeNext(Span<const StringCodePoint> separators, Options options);
     StringViewTokenizer& countTokens(Span<const StringCodePoint> separators);
 
+    [[nodiscard]] bool isFinished() const;
+
   private:
+    StringView originalText;
     StringView current;
 };
 
