@@ -212,6 +212,8 @@
 		7BA892AD297E06040093152B /* StringConverter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringConverter.cpp; path = ../../../../Libraries/Foundation/StringConverter.cpp; sourceTree = "<group>"; };
 		7BA8BF852A2539D400A410F8 /* ReflectionAuto.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ReflectionAuto.h; path = ../../../../Libraries/Reflection/ReflectionAuto.h; sourceTree = "<group>"; };
 		7BB1C6BA2A767B10001AF3AE /* AlgorithmMinMax.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AlgorithmMinMax.h; path = ../../../../Libraries/Foundation/AlgorithmMinMax.h; sourceTree = "<group>"; };
+		7BB1C6BB2A76F2DE001AF3AE /* Set.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Set.h; path = ../../../../Libraries/Foundation/Set.h; sourceTree = "<group>"; };
+		7BB1C6BC2A76F309001AF3AE /* SetTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SetTest.h; path = ../../../../Libraries/Foundation/SetTest.h; sourceTree = "<group>"; };
 		7BBF439D2A215A4F00762DBF /* JsonTokenizer.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = JsonTokenizer.inl; path = ../../../../Libraries/Json/JsonTokenizer.inl; sourceTree = "<group>"; };
 		7BBF439E2A215A4F00762DBF /* JsonTokenizer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = JsonTokenizer.h; path = ../../../../Libraries/Json/JsonTokenizer.h; sourceTree = "<group>"; };
 		7BBF439F2A215A4F00762DBF /* JsonTokenizerTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = JsonTokenizerTest.h; path = ../../../../Libraries/Json/JsonTokenizerTest.h; sourceTree = "<group>"; };
@@ -369,6 +371,8 @@
 				7B515FD729243086006996AA /* Result.h */,
 				7B515FC729243086006996AA /* ResultTest.h */,
 				7B515FCA29243086006996AA /* Segment.h */,
+				7BB1C6BB2A76F2DE001AF3AE /* Set.h */,
+				7BB1C6BC2A76F309001AF3AE /* SetTest.h */,
 				7B515FE129243087006996AA /* SmallVector.h */,
 				7B515FF129243087006996AA /* SmallVectorTest.h */,
 				7B515FF029243087006996AA /* Span.h */,

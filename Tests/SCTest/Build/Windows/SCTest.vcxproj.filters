@@ -451,6 +451,12 @@
     <ClInclude Include="..\..\..\..\Libraries\Hashing\Hashing.h">
       <Filter>Hashing</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Set.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\SetTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalPosix.inl">

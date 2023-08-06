@@ -11,6 +11,7 @@
 #include "../../Libraries/Foundation/OpaqueTest.h"
 #include "../../Libraries/Foundation/OptionalTest.h"
 #include "../../Libraries/Foundation/ResultTest.h"
+#include "../../Libraries/Foundation/SetTest.h"
 #include "../../Libraries/Foundation/SmallVectorTest.h"
 #include "../../Libraries/Foundation/StringFormatTest.h"
 #include "../../Libraries/Foundation/StringTest.h"
@@ -93,6 +94,7 @@ int main(int argc, const char* argv[])
     { OpaqueTest                    test(report); }
     { OptionalTest                  test(report); }
     { ResultTest                    test(report); }
+    { SetTest                       test(report); }
     { SmallVectorTest               test(report); }
     { StringFormatTest              test(report); }
     { StringTest                    test(report); }

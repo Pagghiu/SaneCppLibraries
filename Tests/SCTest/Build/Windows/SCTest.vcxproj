@@ -365,6 +365,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\ArrayTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Set.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\SetTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringViewAlgorithms.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StrongID.h" />
     <ClInclude Include="..\..\..\..\Libraries\Hashing\HashingTest.h" />
