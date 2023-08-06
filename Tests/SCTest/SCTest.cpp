@@ -27,6 +27,9 @@
 #include "../../Libraries/FileSystem/FileSystemWatcherTest.h"
 #include "../../Libraries/FileSystem/PathTest.h"
 
+// Hashing
+#include "../../Libraries/Hashing/HashingTest.h"
+
 // JSON
 #include "../../Libraries/Json/JsonFormatterTest.h"
 #include "../../Libraries/Json/JsonTokenizerTest.h"
@@ -105,6 +108,9 @@ int main(int argc, const char* argv[])
     { FileSystemWalkerTest          test(report); }
     { FileSystemWatcherTest         test(report); }
     { PathTest                      test(report); }
+
+    // Hashing tests
+    { HashingTest                   test(report); }
 
     // JSON tests
     { JsonFormatterTest             test(report); }

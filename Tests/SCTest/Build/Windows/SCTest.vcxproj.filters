@@ -46,6 +46,9 @@
     <Filter Include="Plugin\TestPluginParent">
       <UniqueIdentifier>{690c696f-623b-4075-854b-b5c8b2e1dc2d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Hashing">
+      <UniqueIdentifier>{37125cfa-3ea9-451d-87c9-acc1dd1525c0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\SCTest.cpp">
@@ -121,6 +124,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginChild\AdditionalFile.cpp">
       <Filter>Plugin\TestPluginChild</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Hashing\Hashing.cpp">
+      <Filter>Hashing</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -438,6 +444,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\AlgorithmMinMax.h">
       <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Hashing\HashingTest.h">
+      <Filter>Hashing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Hashing\Hashing.h">
+      <Filter>Hashing</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -328,6 +328,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Hashing\Hashing.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Json\Json.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Plugin\Plugin.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginChild\AdditionalFile.cpp" />
@@ -366,6 +367,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Assert.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringViewAlgorithms.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StrongID.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Hashing\HashingTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Hashing\Hashing.h" />
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonFormatter.h" />
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonFormatterTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonTokenizer.h" />
