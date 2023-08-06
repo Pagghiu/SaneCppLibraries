@@ -106,7 +106,8 @@ struct SC::Path
     static constexpr char Separator = '/';
     [[nodiscard]] static constexpr StringView SeparatorStringView() { return "/"_a8; }
 #endif
-    [[nodiscard]] static bool extractDirectoryFromFILE(StringView fileLocation, String& outputPath);
+    [[nodiscard]] static bool extractDirectoryFromFILE(StringView fileLocation, String& outputPath,
+                                                       Vector<StringView>& components);
 
     [[nodiscard]] static bool normalize(StringView view, Vector<StringView>& components, String* output, Type type);
 

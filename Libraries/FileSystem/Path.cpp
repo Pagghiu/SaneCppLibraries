@@ -359,20 +359,21 @@ bool SC::Path::join(String& output, Span<const StringView> inputs, StringView se
     return true;
 }
 
-bool SC::Path::extractDirectoryFromFILE(StringView fileLocation, String& outputPath)
+bool SC::Path::extractDirectoryFromFILE(StringView fileLocation, String& outputPath, Vector<StringView>& components)
 {
-    const StringView testPath = Path::dirname(fileLocation);
 #if SC_MSVC
-    if (testPath.startsWithChar('\\'))
+#else
+    SC_TRY_IF(Path::isAbsolute(fileLocation, Path::AsNative));
+#endif
+    const StringView dirLocation = Path::dirname(fileLocation);
+    SC_TRY_IF(Path::normalize(dirLocation, components, nullptr, Type::AsNative));
+    if (fileLocation.startsWithChar('\\'))
     {
         // For some reason on MSVC __FILE__ returns paths on network drives with a single starting slash
-        SC_TRY_IF(Path::join(outputPath, {""_a8, testPath}));
+        SC_TRY_IF(components.push_front("\\"_a8));
     }
-    else
-#endif
-    {
-        SC_TRY_IF(outputPath.assign(testPath));
-    }
+    outputPath.data.clear();
+    SC_TRY_IF(Path::append(outputPath, components.toSpanConst(), Type::AsNative));
     return true;
 }
 
@@ -397,28 +398,44 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
     bool normalizationHappened = false;
 
     StringViewTokenizer tokenizer(view);
+    auto                isDoubleDot = [](StringView it) -> bool
+    {
+        constexpr StringView utf16ddot = L"..";
+        constexpr StringView utf8ddot  = "..";
+        return it == (it.getEncoding() == StringEncoding::Utf16 ? utf16ddot : utf8ddot);
+    };
+    auto isDot = [&](StringView it) -> bool
+    {
+        constexpr StringView utf16dot = L".";
+        constexpr StringView utf8dot  = ".";
+        return it == (it.getEncoding() == StringEncoding::Utf16 ? utf16dot : utf8dot);
+    };
     // Need to IncludeEmpty in order to preserve starting /
     while (tokenizer.tokenizeNext({'/', '\\'}, StringViewTokenizer::IncludeEmpty))
     {
         const auto component = tokenizer.component;
 
-        constexpr StringView utf16ddot = L"..";
-        constexpr StringView utf8ddot  = "..";
-        constexpr StringView utf16dot  = L".";
-        constexpr StringView utf8dot   = ".";
-        if (component == (component.getEncoding() == StringEncoding::Utf16 ? utf16ddot : utf8ddot))
+        if (tokenizer.splittingCharacter == '\\' and type == Type::AsPosix)
         {
-            if (tokenizer.numSplitsTotal > 1)
-            {
-                if (not components.pop_back())
-                {
-                    // Should we just return empty string here?
-                    return false;
-                }
-                normalizationHappened = true;
-            }
+            normalizationHappened = true;
         }
-        else if (component == (component.getEncoding() == StringEncoding::Utf16 ? utf16dot : utf8dot))
+        else if (tokenizer.splittingCharacter == '/' and type == Type::AsWindows)
+        {
+            normalizationHappened = true;
+        }
+        if (isDoubleDot(component))
+        {
+            if (components.isEmpty() or isDoubleDot(components.back()))
+            {
+                SC_TRY_IF(components.push_back(component));
+            }
+            else
+            {
+                (void)components.pop_back();
+            }
+            normalizationHappened = true;
+        }
+        else if (isDot(component))
         {
             normalizationHappened = true;
         }
@@ -506,7 +523,7 @@ bool SC::Path::appendTrailingSeparator(String& path, Type type)
 bool SC::Path::append(String& output, Span<const StringView> paths, Type type)
 {
     StringBuilder builder(output, StringBuilder::DoNotClear);
-    for (auto path : paths)
+    for (auto& path : paths)
     {
         if (isAbsolute(path, type))
         {

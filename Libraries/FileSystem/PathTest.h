@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Foundation/SmallVector.h"
 #include "../Foundation/String.h"
 #include "../Testing/Test.h"
 #include "Path.h"
@@ -190,6 +191,8 @@ struct SC::PathTest : public SC::TestCase
             SC_TEST_EXPECT(Path::normalize("\\\\Users\\SC\\..\\Documents", cmp, &path, Path::AsWindows) and
                            path == "\\\\Users\\Documents");
             SC_TEST_EXPECT(Path::normalize("/a/b/../c/./d/", cmp, &path, Path::AsPosix) and path == "/a/c/d");
+            SC_TEST_EXPECT(Path::normalize("..\\../../../Libraries/Plugin/PluginTest.h", cmp, &path, Path::AsPosix) and
+                           path == "../../../../Libraries/Plugin/PluginTest.h");
         }
 
         if (test_section("Path::relativeFromTo"))
