@@ -2,6 +2,22 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 
+#define SC_RUN_SPECIFIC_TEST 0
+
+#if SC_RUN_SPECIFIC_TEST
+
+namespace SC
+{
+struct TestReport;
+void runSpecificTests(TestReport& report)
+{
+    // clang-format off
+    // clang-format on
+}
+} // namespace SC
+
+#else
+
 // Foundation
 #include "../../Libraries/Foundation/ArrayTest.h"
 #include "../../Libraries/Foundation/FunctionTest.h"
@@ -64,6 +80,8 @@
 // Async
 #include "../../Libraries/Async/EventLoopTest.h"
 
+#endif
+
 #include "../../Libraries/Foundation/SmallVector.h"
 #include "../../Libraries/System/System.h"
 #include "../../Libraries/Testing/Test.h"
@@ -84,6 +102,9 @@ int main(int argc, const char* argv[])
     report.executableFile           = directories.executableFile.view();
     report.debugBreakOnFailedTest   = true;
     // clang-format off
+#if SC_RUN_SPECIFIC_TEST
+    runSpecificTests(report);
+#else
 
     // Foundation tests
     { ArrayTest                     test(report); }
@@ -148,6 +169,7 @@ int main(int argc, const char* argv[])
     { EventLoopTest                 test(report); }
 
     // clang-format on
+#endif
 
     return report.getTestReturnCode();
 }
