@@ -65,9 +65,9 @@ struct SC::Path
     [[nodiscard]] static bool parse(StringView input, Path::ParsedView& pathView, Type type);
 
     /// Return the directory name of a path. Trailing spearators are ignored.
-    [[nodiscard]] static StringView dirname(StringView input);
+    [[nodiscard]] static StringView dirname(StringView input, int repeat = 0);
     /// Return the base name of a path. Trailing spearators are ignored.
-    [[nodiscard]] static StringView basename(StringView input);
+    [[nodiscard]] static StringView basename(StringView input, Type type);
     /// Return the base name of a path. Suffix is stripped if existing. Trailing spearators are ignored.
     [[nodiscard]] static StringView basename(StringView input, StringView suffix);
     /// Returns true if path is an absolute native path (depending on platform)
@@ -78,7 +78,7 @@ struct SC::Path
         static const char                         Separator = '\\';
         [[nodiscard]] static constexpr StringView SeparatorStringView() { return "\\"_a8; };
         /// Return the directory name of a path. Trailing spearators are ignored.
-        [[nodiscard]] static StringView dirname(StringView input);
+        [[nodiscard]] static StringView dirname(StringView input, int repeat = 0);
         /// Return the base name of a path. Trailing spearators are ignored.
         [[nodiscard]] static StringView basename(StringView input);
         /// Return the base name of a path. Suffix is stripped if existing. Trailing spearators are ignored.
@@ -91,7 +91,7 @@ struct SC::Path
         static const char                         Separator = '/';
         [[nodiscard]] static constexpr StringView SeparatorStringView() { return "/"_a8; }
         /// Return the directory name of a path. Trailing spearators are ignored.
-        [[nodiscard]] static StringView dirname(StringView input);
+        [[nodiscard]] static StringView dirname(StringView input, int repeat = 0);
         /// Return the base name of a path. Trailing spearators are ignored.
         [[nodiscard]] static StringView basename(StringView input);
         /// Return the base name of a path. Suffix is stripped if existing. Trailing spearators are ignored.
@@ -120,6 +120,8 @@ struct SC::Path
     [[nodiscard]] static bool appendTrailingSeparator(String& path, Type type);
 
     [[nodiscard]] static StringView removeTrailingSeparator(StringView path);
+
+    [[nodiscard]] static StringView removeStartingSeparator(StringView path);
 
   private:
     struct Internal;

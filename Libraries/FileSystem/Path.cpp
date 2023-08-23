@@ -88,8 +88,7 @@ struct SC::Path::Internal
     template <typename StringIterator, char separator>
     static bool rootIsFollowedByOnlySeparators(const StringView input, const StringView root)
     {
-        // TODO: This doesn't work with UTF16
-        SC_RELEASE_ASSERT(input.getEncoding() != StringEncoding::Utf16);
+        SC_RELEASE_ASSERT(root.sizeInBytes() == 0 or (input.getEncoding() == root.getEncoding()));
         StringView remaining = input.sliceStartEndBytes(root.sizeInBytes(), input.sizeInBytes());
 
         auto it = remaining.getIterator<StringIterator>();
@@ -141,12 +140,16 @@ struct SC::Path::Internal
     }
 
     template <char separator>
-    static SC::StringView dirname(StringView input)
+    static SC::StringView dirname(StringView input, int repeat)
     {
-        if (input.getEncoding() == StringEncoding::Utf16)
-            return dirnameTemplate<StringIteratorUTF16, separator>(input);
-        else
-            return dirnameTemplate<StringIteratorASCII, separator>(input);
+        do
+        {
+            if (input.getEncoding() == StringEncoding::Utf16)
+                input = dirnameTemplate<StringIteratorUTF16, separator>(input);
+            else
+                input = dirnameTemplate<StringIteratorASCII, separator>(input);
+        } while (repeat-- > 0);
+        return input;
     }
 
     template <typename StringIterator, char separator>
@@ -299,9 +302,17 @@ bool SC::Path::ParsedView::parsePosix(StringView input)
     return true;
 }
 
-SC::StringView SC::Path::dirname(StringView input) { return Internal::dirname<Separator>(input); }
+SC::StringView SC::Path::dirname(StringView input, int repeat) { return Internal::dirname<Separator>(input, repeat); }
 
-SC::StringView SC::Path::basename(StringView input) { return Internal::basename<Separator>(input); }
+SC::StringView SC::Path::basename(StringView input, Type type)
+{
+    switch (type)
+    {
+    case AsWindows: return Internal::basename<Windows::Separator>(input);
+    case AsPosix: return Internal::basename<Posix::Separator>(input);
+    }
+    SC_UNREACHABLE();
+}
 
 SC::StringView SC::Path::basename(StringView input, StringView suffix)
 {
@@ -318,7 +329,10 @@ bool SC::Path::isAbsolute(StringView input, Type type)
     SC_UNREACHABLE();
 }
 
-SC::StringView SC::Path::Windows::dirname(StringView input) { return Internal::dirname<Separator>(input); }
+SC::StringView SC::Path::Windows::dirname(StringView input, int repeat)
+{
+    return Internal::dirname<Separator>(input, repeat);
+}
 
 SC::StringView SC::Path::Windows::basename(StringView input) { return Internal::basename<Separator>(input); }
 
@@ -333,7 +347,10 @@ bool SC::Path::Windows::isAbsolute(StringView input)
     return not root.isEmpty();
 }
 
-SC::StringView SC::Path::Posix::dirname(StringView input) { return Internal::dirname<Separator>(input); }
+SC::StringView SC::Path::Posix::dirname(StringView input, int repeat)
+{
+    return Internal::dirname<Separator>(input, repeat);
+}
 
 SC::StringView SC::Path::Posix::basename(StringView input) { return Internal::basename<Separator>(input); }
 
@@ -449,8 +466,19 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
     {
         if (normalizationHappened)
         {
-            return join(*output, components.toSpanConst(),
-                        type == AsPosix ? Posix::SeparatorStringView() : Windows::SeparatorStringView());
+            auto res = join(*output, components.toSpanConst(),
+                            type == AsPosix ? Posix::SeparatorStringView() : Windows::SeparatorStringView());
+            SC_TRY_IF(res);
+            if (view.startsWith("\\\\"))
+            {
+                // TODO: This is not very good, find a better way
+                String        other = output->encoding;
+                StringBuilder sb(other);
+                SC_TRY_IF(sb.append("\\\\"))
+                SC_TRY_IF(sb.append(output->view().sliceStart(2)));
+                *output = move(other);
+            }
+            return res;
         }
         else
         {
@@ -462,13 +490,28 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
 
 bool SC::Path::relativeFromTo(StringView source, StringView destination, String& output, Type type)
 {
-    Path::ParsedView pathViewSource, pathViewDestination;
-    SC_TRY_IF(Path::parse(source, pathViewSource, type));
-    SC_TRY_IF(Path::parse(destination, pathViewDestination, type));
-
-    if (pathViewSource.root.isEmpty() or pathViewDestination.root.isEmpty())
+    bool skipRelativeCheck = false;
+    if (type == AsPosix)
     {
-        return false; // Relative paths are not supported
+        if (source.startsWith("\\\\"))
+        {
+            source            = source.sliceStart(2);
+            skipRelativeCheck = true;
+        }
+        if (destination.startsWith("\\\\"))
+        {
+            destination       = destination.sliceStart(2);
+            skipRelativeCheck = true;
+        }
+    }
+
+    if (!skipRelativeCheck)
+    {
+        Path::ParsedView pathViewSource, pathViewDestination;
+        SC_TRY_IF(Path::parse(source, pathViewSource, type));
+        SC_TRY_IF(Path::parse(destination, pathViewDestination, type));
+        if (pathViewSource.root.isEmpty() or pathViewDestination.root.isEmpty())
+            return false; // Relative paths are not supported
     }
     size_t commonOverlappingPoints;
     if (source.fullyOverlaps(destination, commonOverlappingPoints))
@@ -502,6 +545,11 @@ bool SC::Path::relativeFromTo(StringView source, StringView destination, String&
 SC::StringView SC::Path::removeTrailingSeparator(StringView path)
 {
     return path.trimEndingChar('/').trimEndingChar('\\');
+}
+
+SC::StringView SC::Path::removeStartingSeparator(StringView path)
+{
+    return path.trimStartingChar('/').trimStartingChar('\\');
 }
 
 bool SC::Path::endsWithSeparator(StringView path) { return path.endsWithChar('/') or path.endsWithChar('\\'); }

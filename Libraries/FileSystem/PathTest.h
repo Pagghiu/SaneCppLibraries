@@ -193,6 +193,8 @@ struct SC::PathTest : public SC::TestCase
             SC_TEST_EXPECT(Path::normalize("/a/b/../c/./d/", cmp, &path, Path::AsPosix) and path == "/a/c/d");
             SC_TEST_EXPECT(Path::normalize("..\\../../../Libraries/Plugin/PluginTest.h", cmp, &path, Path::AsPosix) and
                            path == "../../../../Libraries/Plugin/PluginTest.h");
+            SC_TEST_EXPECT(Path::normalize("\\\\Mac\\Some\\Dir", cmp, &path, Path::AsPosix) and
+                           path == "\\\\Mac/Some/Dir");
         }
 
         if (test_section("Path::relativeFromTo"))
