@@ -195,7 +195,7 @@ SC::ReturnCode SC::PluginScanner::scanDirectory(const StringView directory, Vect
                 {
                     if (pluginDefinition.identity.identifier.isEmpty())
                     {
-                        const StringView identifier          = Path::basename(pluginDefinition.directory.view());
+                        const StringView identifier = Path::basename(pluginDefinition.directory.view(), Path::AsNative);
                         pluginDefinition.identity.identifier = identifier;
                         pluginDefinition.pluginFileIndex     = pluginDefinition.files.size() - 1;
                     }
@@ -284,12 +284,8 @@ SC::ReturnCode SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
 
 SC::ReturnCode SC::PluginCompiler::compileFile(StringView sourceFile, StringView objectFile) const
 {
-    Process    process;
-    StringView includePath = StringView(__FILE__);
-    for (int i = 0; i < 4; ++i)
-    {
-        includePath = Path::dirname(includePath);
-    }
+    Process process;
+
     StringNative<256> includes = StringEncoding::Native;
     StringBuilder     includeBuilder(includes);
 #if SC_PLATFORM_WINDOWS
@@ -298,21 +294,14 @@ SC::ReturnCode SC::PluginCompiler::compileFile(StringView sourceFile, StringView
     SC_TRY_IF(destBuilder.append(L"/Fo:"));
     SC_TRY_IF(destBuilder.append(objectFile));
     SC_TRY_IF(includeBuilder.append(L"/I\""));
-#if SC_MSVC
-    if (includePath.startsWithChar('\\'))
-    {
-        // For some reason on MSVC __FILE__ returns paths on network drives with a single starting slash
-        SC_TRY_IF(includeBuilder.append(L"\\"));
-    }
-#endif
-    SC_TRY_IF(includeBuilder.append(includePath));
+    SC_TRY_IF(includeBuilder.append(includePath.view()));
     SC_TRY_IF(includeBuilder.append(L"\""));
     SC_TRY_IF(process.launch(compilerPath.view(), includes.view(), destFile.view(), L"/std:c++14",
                              L"/DSC_DISABLE_CONFIG=1", L"/GR-", L"/WX", L"/W4", L"/permissive-", L"/sdl-", L"/GS-",
                              L"/Zi", L"/DSC_PLUGIN_LIBRARY=1", L"/EHsc-", L"/c", sourceFile));
 #else
     SC_TRY_IF(includeBuilder.append("-I"));
-    SC_TRY_IF(includeBuilder.append(includePath));
+    SC_TRY_IF(includeBuilder.append(includePath.view()));
     SC_TRY_IF(process.launch("clang", "-DSC_DISABLE_CONFIG=1", "-DSC_PLUGIN_LIBRARY=1", "-nostdinc++", "-nostdinc",
                              "-fno-stack-protector", "-std=c++14", includes.view(), "-fno-exceptions", "-fno-rtti",
                              "-g", "-c", "-fpic", sourceFile, "-o", objectFile));

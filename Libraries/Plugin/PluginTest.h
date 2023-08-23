@@ -19,16 +19,6 @@ struct SC::PluginTest : public SC::TestCase
 {
     SmallString<255> testPluginsPath;
 
-    [[nodiscard]] static bool setupPluginPath(String& outputPath)
-    {
-        Vector<StringView> components;
-        // This is failing on Clang-CL as __FILE__ is the path passed to the compiler
-        // (relative or absolute depending on the build system), while on MSVC it's always absolute
-        SC_TRY_IF(Path::extractDirectoryFromFILE(__FILE__, outputPath, components));
-        SC_TRY_IF(Path::append(outputPath, {"PluginTestDirectory"}, Path::Type::AsNative));
-        return true;
-    }
-
     PluginTest(SC::TestReport& report) : TestCase(report, "PluginTest")
     {
         using namespace SC;
@@ -57,7 +47,8 @@ struct SC::PluginTest : public SC::TestCase
         }
         if (test_section("PluginScanner/PluginCompiler/PluginRegistry"))
         {
-            SC_TEST_EXPECT(setupPluginPath(testPluginsPath));
+            SC_TEST_EXPECT(Path::join(testPluginsPath,
+                                      {report.libraryRootDirectory, "Libraries", "Plugin", "PluginTestDirectory"}));
 
             // Scan for definitions
             SmallVector<PluginDefinition, 5> definitions;
@@ -79,6 +70,7 @@ struct SC::PluginTest : public SC::TestCase
             // Init compiler
             PluginCompiler compiler;
             SC_TEST_EXPECT(PluginCompiler::findBestCompiler(compiler));
+            SC_TEST_EXPECT(compiler.includePath.assign(Path::dirname(report.libraryRootDirectory)));
 
             // Setup registry
             PluginRegistry registry;

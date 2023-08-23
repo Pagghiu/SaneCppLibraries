@@ -73,6 +73,7 @@ struct SC::PluginCompiler
     Type              type         = Type::ClangCompiler;
     StringNative<256> compilerPath = StringEncoding::Native;
     StringNative<256> linkerPath   = StringEncoding::Native;
+    StringNative<256> includePath  = StringEncoding::Native;
 
     [[nodiscard]] ReturnCode        compileFile(StringView sourceFile, StringView objectFile) const;
     [[nodiscard]] static ReturnCode findBestCompiler(PluginCompiler& compiler);

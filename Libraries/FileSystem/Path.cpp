@@ -376,21 +376,21 @@ bool SC::Path::join(String& output, Span<const StringView> inputs, StringView se
     return true;
 }
 
-bool SC::Path::extractDirectoryFromFILE(StringView fileLocation, String& outputPath, Vector<StringView>& components)
+bool SC::Path::normalizeUNCAndTrimQuotes(StringView fileLocation, Vector<StringView>& components, String& outputPath,
+                                         Type type)
 {
+    // The macro escaping Library Path from defines adds escaped double quotes
+    fileLocation = fileLocation.trimStartingChar('"').trimEndingChar('"');
 #if SC_MSVC
-#else
-    SC_TRY_IF(Path::isAbsolute(fileLocation, Path::AsNative));
-#endif
-    const StringView dirLocation = Path::dirname(fileLocation);
-    SC_TRY_IF(Path::normalize(dirLocation, components, nullptr, Type::AsNative));
-    if (fileLocation.startsWithChar('\\'))
+    SmallString<256> fixUncPathsOnMSVC;
+    if (fileLocation.startsWithChar('\\') and not fileLocation.startsWith("\\\\"))
     {
-        // For some reason on MSVC __FILE__ returns paths on network drives with a single starting slash
-        SC_TRY_IF(components.push_front("\\"_a8));
+        // On MSVC __FILE__ when building on UNC paths reports a single starting backslash...
+        SC_TRY_IF(StringBuilder(fixUncPathsOnMSVC).format("\\{}", fileLocation));
+        fileLocation = fixUncPathsOnMSVC.view();
     }
-    outputPath.data.clear();
-    SC_TRY_IF(Path::append(outputPath, components.toSpanConst(), Type::AsNative));
+#endif
+    SC_TRY_IF(Path::normalize(fileLocation, components, &outputPath, type));
     return true;
 }
 

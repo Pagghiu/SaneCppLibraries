@@ -15,12 +15,8 @@
 #define SC_PLUGIN_EXPORT
 #endif
 
-//
-// SC_PLUGIN_LINKER_DEFINITIONS
-//
 #if SC_PLUGIN_LIBRARY
-#if SC_MSVC
-#define SC_PLUGIN_LINKER_DEFINITIONS                                                                                   \
+#define SC_PLUGIN_LINKER_OPERATORS                                                                                     \
     void* operator new(SC::size_t len)                                                                                 \
     {                                                                                                                  \
         return SC::memoryAllocate(len);                                                                                \
@@ -36,6 +32,17 @@
             SC::memoryRelease(p);                                                                                      \
         }                                                                                                              \
     }                                                                                                                  \
+    void operator delete(void* p) noexcept                                                                             \
+    {                                                                                                                  \
+        if (p != 0)                                                                                                    \
+        {                                                                                                              \
+            SC::memoryRelease(p);                                                                                      \
+        }                                                                                                              \
+    }
+
+#if SC_MSVC
+#define SC_PLUGIN_LINKER_DEFINITIONS                                                                                   \
+    SC_PLUGIN_LINKER_OPERATORS                                                                                         \
     extern "C" void __CxxFrameHandler4()                                                                               \
     {                                                                                                                  \
     }                                                                                                                  \
@@ -52,6 +59,7 @@
 // See: https://nullprogram.com/blog/2023/02/15/
 // TODO: Check if we can link libc without a sysroot on macOS to get rid of these
 #define SC_PLUGIN_LINKER_DEFINITIONS                                                                                   \
+    SC_PLUGIN_LINKER_OPERATORS                                                                                         \
     extern "C" void bzero(void* s, SC::size_t n)                                                                       \
     {                                                                                                                  \
         unsigned char* p = reinterpret_cast<unsigned char*>(s);                                                        \

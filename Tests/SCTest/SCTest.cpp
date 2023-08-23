@@ -86,6 +86,8 @@ void runSpecificTests(TestReport& report)
 #include "../../Libraries/System/System.h"
 #include "../../Libraries/Testing/Test.h"
 
+#define SC_TEST_LIBRARY_PATH SC_MACRO_TO_LITERAL(SC_MACRO_ESCAPE(SC_LIBRARY_PATH))
+
 int main(int argc, const char* argv[])
 {
     SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> globalConsoleConversionBuffer;
@@ -96,11 +98,19 @@ int main(int argc, const char* argv[])
     SystemFunctions functions;
     if (not functions.initNetworking())
         return -3;
-    Console    console(globalConsoleConversionBuffer);
-    TestReport report(console, argc, argv);
+    Console              console(globalConsoleConversionBuffer);
+    SC::SmallString<255> correctedPath;
+    TestReport           report(console, argc, argv);
     report.applicationRootDirectory = directories.applicationRootDirectory.view();
     report.executableFile           = directories.executableFile.view();
-    report.debugBreakOnFailedTest   = true;
+    {
+        SmallVector<StringView, 50> components;
+        (void)Path::normalizeUNCAndTrimQuotes(SC_TEST_LIBRARY_PATH, components, correctedPath, Path::AsNative);
+        // If you hit this assertion you must figure out a way to derive location of Libraries
+        SC_RELEASE_ASSERT(Path::isAbsolute(correctedPath.view(), SC::Path::AsNative));
+    }
+    report.libraryRootDirectory   = correctedPath.view();
+    report.debugBreakOnFailedTest = true;
     // clang-format off
 #if SC_RUN_SPECIFIC_TEST
     runSpecificTests(report);

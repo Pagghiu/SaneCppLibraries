@@ -20,6 +20,7 @@ struct TestReport
     StringView testToRun;
     StringView sectionToRun;
     StringView applicationRootDirectory;
+    StringView libraryRootDirectory;
     StringView executableFile;
     Console&   console;
 
@@ -56,3 +57,8 @@ struct TestCase
     recordExpectation(StringView(#e##_a8), (e))                                                                        \
         ? (void)0                                                                                                      \
         : (TestCase::report.debugBreakOnFailedTest ? SC_BREAK_DEBUGGER : (void)0)
+
+#define SC_MACRO_ESCAPE(input)          __SC_MACRO_ESCAPE_HELPER(input)
+#define __SC_MACRO_ESCAPE_HELPER(input) #input
+#define __SC_MACRO_TO_LITERAL(string)   #string
+#define SC_MACRO_TO_LITERAL(string)     __SC_MACRO_TO_LITERAL(string)
