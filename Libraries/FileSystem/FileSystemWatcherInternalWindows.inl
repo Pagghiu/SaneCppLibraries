@@ -140,12 +140,12 @@ struct SC::FileSystemWatcher::Internal
         StringView encodedPath;
         SC_TRY_IF(converter.convertNullTerminateFastPath(entry->path->view(), encodedPath));
         FolderWatcherInternal& opaque = entry->internal.get();
-        opaque.fileHandle             = CreateFile(encodedPath.getNullTerminatedNative(),                            //
-                                                   FILE_LIST_DIRECTORY,                                              //
-                                                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,           //
-                                                   nullptr,                                                          //
-                                                   OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, //
-                                                   nullptr);
+        opaque.fileHandle             = CreateFileW(encodedPath.getNullTerminatedNative(),                            //
+                                                    FILE_LIST_DIRECTORY,                                              //
+                                                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,           //
+                                                    nullptr,                                                          //
+                                                    OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, //
+                                                    nullptr);
         SC_TRY_IF(opaque.fileHandle != INVALID_HANDLE_VALUE);
 
         if (threadingRunner)

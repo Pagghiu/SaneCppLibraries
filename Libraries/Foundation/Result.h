@@ -15,6 +15,11 @@ struct [[nodiscard]] ReturnCode
     constexpr ReturnCode(const char* message) = delete;
     constexpr ReturnCode(const StringView message) : message(message) {}
     constexpr ReturnCode(const ReturnCode& other) : message(other.message) {}
+    constexpr ReturnCode& operator=(const ReturnCode& other)
+    {
+        message = other.message;
+        return *this;
+    }
          operator bool() const { return message.isEmpty(); }
     bool isError() const { return not message.isEmpty(); }
 };

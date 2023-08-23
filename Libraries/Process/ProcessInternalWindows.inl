@@ -40,8 +40,8 @@ SC::ReturnCode SC::Process::waitForExitSync()
 // https://learn.microsoft.com/en-us/windows/win32/procthread/creating-a-child-process-with-redirected-input-and-output
 SC::ReturnCode SC::Process::launch(ProcessOptions options)
 {
-    STARTUPINFO startupInfo;
-    const bool  someRedirection = standardInput.isValid() || standardOutput.isValid() || standardError.isValid();
+    STARTUPINFOW startupInfo;
+    const bool   someRedirection = standardInput.isValid() || standardOutput.isValid() || standardError.isValid();
 
     // On Windows to inherit flags they must be flagged as inheritable AND CreateProcess bInheritHandles must be true
     // TODO: This is not thread-safe in regard to handle inheritance, check out Microsoft Article on the topic
