@@ -18,6 +18,9 @@ void runSpecificTests(TestReport& report)
 
 #else
 
+// Build
+#include "../../Libraries/Build/BuildTest.h"
+
 // Foundation
 #include "../../Libraries/Foundation/ArrayTest.h"
 #include "../../Libraries/Foundation/FunctionTest.h"
@@ -177,6 +180,9 @@ int main(int argc, const char* argv[])
 
     // Async tests
     { EventLoopTest                 test(report); }
+
+    // Build tests
+    { BuildTest                     test(report); }
 
     // clang-format on
 #endif

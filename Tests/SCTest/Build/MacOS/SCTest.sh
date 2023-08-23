@@ -44,6 +44,7 @@ time g++-13 -std=c++14 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -framework CoreServices \
 -o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest \
 Libraries/Async/EventLoop.cpp               \
+Libraries/Build/Build.cpp                   \
 Libraries/File/FileDescriptor.cpp           \
 Libraries/FileSystem/FileSystem.cpp         \
 Libraries/FileSystem/FileSystemWalker.cpp   \

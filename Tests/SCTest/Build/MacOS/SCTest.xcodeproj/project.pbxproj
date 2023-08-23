@@ -38,6 +38,7 @@
 		7BC56BDC29946C9200EED472 /* FileSystemWalker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BC56BD729946AD100EED472 /* FileSystemWalker.cpp */; };
 		7BCACB892A44F745003D1658 /* TestPluginParent.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE94E412A4245C900AC61EF /* TestPluginParent.cpp */; };
 		7BCACB8A2A44F745003D1658 /* TestPluginChild.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE94E452A4245DB00AC61EF /* TestPluginChild.cpp */; };
+		7BDCB7EB2A5CC2920004437D /* Build.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BDCB7EA2A5CC2920004437D /* Build.cpp */; };
 		7BE5C81029A26E3E00CBCAD1 /* Process.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */; };
 		7BE5C81329A2707E00CBCAD1 /* FileDescriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */; };
 /* End PBXBuildFile section */
@@ -165,6 +166,9 @@
 		7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SCTestXCTest.mm; path = ../../SCTestXCTest.mm; sourceTree = "<group>"; };
 		7B59307629B128C300876ABB /* ThreadingTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ThreadingTest.h; path = ../../../../Libraries/Threading/ThreadingTest.h; sourceTree = "<group>"; };
 		7B5A353328E8640B00B2F589 /* SCTestXCTest.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SCTestXCTest.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7B66564B2A817EA700E0B739 /* TaggedMap.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TaggedMap.h; path = ../../../../Libraries/Build/TaggedMap.h; sourceTree = "<group>"; };
+		7B6656512A81866500E0B739 /* WriterVisualStudio.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = WriterVisualStudio.inl; path = ../../../../Libraries/Build/WriterVisualStudio.inl; sourceTree = "<group>"; };
+		7B6656522A81866500E0B739 /* WriterXCode.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = WriterXCode.inl; path = ../../../../Libraries/Build/WriterXCode.inl; sourceTree = "<group>"; };
 		7B67008C29C28DF600174AB8 /* IntrusiveDoubleLinkedList.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = IntrusiveDoubleLinkedList.h; path = ../../../../Libraries/Foundation/IntrusiveDoubleLinkedList.h; sourceTree = "<group>"; };
 		7B67008D29C28DF600174AB8 /* IntrusiveDoubleLinkedListTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = IntrusiveDoubleLinkedListTest.h; path = ../../../../Libraries/Foundation/IntrusiveDoubleLinkedListTest.h; sourceTree = "<group>"; };
 		7B6A1E9F29B2B07F00DDCF40 /* TimeTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TimeTest.h; path = ../../../../Libraries/System/TimeTest.h; sourceTree = "<group>"; };
@@ -192,9 +196,12 @@
 		7B8DDDC12A2012B300D62F03 /* JsonFormatter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = JsonFormatter.h; path = ../../../../Libraries/Json/JsonFormatter.h; sourceTree = "<group>"; };
 		7B8DDDC32A2012B300D62F03 /* JsonFormatter.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = JsonFormatter.inl; path = ../../../../Libraries/Json/JsonFormatter.inl; sourceTree = "<group>"; };
 		7B8DDDC42A2012B300D62F03 /* Json.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Json.cpp; path = ../../../../Libraries/Json/Json.cpp; sourceTree = "<group>"; };
+		7B8E9E2B2A4A02ED009D4F5A /* Build.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Build.h; path = ../../../../Libraries/Build/Build.h; sourceTree = "<group>"; };
+		7B8E9E2C2A4A02ED009D4F5A /* BuildTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = BuildTest.h; path = ../../../../Libraries/Build/BuildTest.h; sourceTree = "<group>"; };
 		7B8E9E2D2A4A2744009D4F5A /* StrongID.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StrongID.h; path = ../../../../Libraries/Foundation/StrongID.h; sourceTree = "<group>"; };
 		7B91CBEE29B17F470013E95E /* Opaque.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Opaque.h; path = ../../../../Libraries/Foundation/Opaque.h; sourceTree = "<group>"; };
 		7B91CBEF29B17F470013E95E /* OpaqueTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OpaqueTest.h; path = ../../../../Libraries/Foundation/OpaqueTest.h; sourceTree = "<group>"; };
+		7B98DCDF2A843657009AC468 /* WriteInternal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = WriteInternal.h; path = ../../../../Libraries/Build/WriteInternal.h; sourceTree = "<group>"; };
 		7B9C4FBD29F1C0B100504902 /* FileSystemWatcherInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWatcherInternalEmscripten.inl; path = ../../../../Libraries/FileSystem/FileSystemWatcherInternalEmscripten.inl; sourceTree = "<group>"; };
 		7B9C4FBE29F1C0B100504902 /* FileSystemWatcherTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FileSystemWatcherTest.h; path = ../../../../Libraries/FileSystem/FileSystemWatcherTest.h; sourceTree = "<group>"; };
 		7B9C4FBF29F1C0B100504902 /* UtilityWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = UtilityWindows.inl; path = ../../../../Libraries/FileSystem/UtilityWindows.inl; sourceTree = "<group>"; };
@@ -226,6 +233,7 @@
 		7BD8E37929BE8357004AB23D /* EventLoopInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalApple.inl; path = ../../../../Libraries/Async/EventLoopInternalApple.inl; sourceTree = "<group>"; };
 		7BD8E37A29BE8357004AB23D /* EventLoopInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalWindows.inl; path = ../../../../Libraries/Async/EventLoopInternalWindows.inl; sourceTree = "<group>"; };
 		7BD8E37B29BE8357004AB23D /* EventLoopInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalEmscripten.inl; path = ../../../../Libraries/Async/EventLoopInternalEmscripten.inl; sourceTree = "<group>"; };
+		7BDCB7EA2A5CC2920004437D /* Build.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Build.cpp; path = ../../../../Libraries/Build/Build.cpp; sourceTree = "<group>"; };
 		7BE50C9729AEB4CC00BE6C25 /* FileDescriptorInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileDescriptorInternalPosix.inl; path = ../../../../Libraries/File/FileDescriptorInternalPosix.inl; sourceTree = "<group>"; };
 		7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Process.cpp; path = ../../../../Libraries/Process/Process.cpp; sourceTree = "<group>"; };
 		7BE5C80E29A26E3E00CBCAD1 /* Process.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Process.h; path = ../../../../Libraries/Process/Process.h; sourceTree = "<group>"; };
@@ -406,6 +414,7 @@
 			isa = PBXGroup;
 			children = (
 				7BA7D47829B5473100811076 /* Async */,
+				7B8E9E2A2A4A02D6009D4F5A /* Build */,
 				7B7C3BFB2A7C43FE00FAD351 /* Hashing */,
 				7B44ADC12A10EE9600FAAADC /* File */,
 				7B0C2999297CA7C10071C5B4 /* FileSystem */,
@@ -531,6 +540,20 @@
 				7B8BF9AF29F3BADC0055BC3A /* SocketDescriptorTest.h */,
 			);
 			name = Socket;
+			sourceTree = "<group>";
+		};
+		7B8E9E2A2A4A02D6009D4F5A /* Build */ = {
+			isa = PBXGroup;
+			children = (
+				7BDCB7EA2A5CC2920004437D /* Build.cpp */,
+				7B8E9E2B2A4A02ED009D4F5A /* Build.h */,
+				7B8E9E2C2A4A02ED009D4F5A /* BuildTest.h */,
+				7B66564B2A817EA700E0B739 /* TaggedMap.h */,
+				7B98DCDF2A843657009AC468 /* WriteInternal.h */,
+				7B6656512A81866500E0B739 /* WriterVisualStudio.inl */,
+				7B6656522A81866500E0B739 /* WriterXCode.inl */,
+			);
+			name = Build;
 			sourceTree = "<group>";
 		};
 		7B956A2029FF16AA007740C6 /* Process */ = {
@@ -694,6 +717,7 @@
 				7B0C299D297CA7CC0071C5B4 /* FileSystem.cpp in Sources */,
 				7B25AE002A2CB9B1008936DE /* Plugin.cpp in Sources */,
 				7B51601229243097006996AA /* StringView.cpp in Sources */,
+				7BDCB7EB2A5CC2920004437D /* Build.cpp in Sources */,
 				7B51601129243097006996AA /* StringFormat.cpp in Sources */,
 				7B872C4D29AFFC4900949BD2 /* Threading.cpp in Sources */,
 				7B51601029243097006996AA /* Test.cpp in Sources */,

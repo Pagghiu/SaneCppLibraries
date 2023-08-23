@@ -326,6 +326,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Build\Build.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Hashing\Hashing.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Json\Json.cpp" />
@@ -357,6 +358,10 @@
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopInternalWindowsAPI.h" />
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopWindows.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Build\Build.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Build\BuildTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Build\TaggedMap.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Build\WriteInternal.h" />
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.h" />
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\AlgorithmMinMax.h" />
@@ -467,6 +472,8 @@
     <None Include="..\..\..\..\Libraries\Async\EventLoopInternalApple.inl" />
     <None Include="..\..\..\..\Libraries\Async\EventLoopInternalEmscripten.inl" />
     <None Include="..\..\..\..\Libraries\Async\EventLoopInternalWindows.inl" />
+    <None Include="..\..\..\..\Libraries\Build\WriterVisualStudio.inl" />
+    <None Include="..\..\..\..\Libraries\Build\WriterXCode.inl" />
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalApple.inl" />
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalEmscripten.inl" />
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalWindows.inl" />

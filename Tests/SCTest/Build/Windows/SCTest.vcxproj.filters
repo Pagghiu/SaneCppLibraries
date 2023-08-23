@@ -46,6 +46,9 @@
     <Filter Include="Plugin\TestPluginParent">
       <UniqueIdentifier>{690c696f-623b-4075-854b-b5c8b2e1dc2d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Build">
+      <UniqueIdentifier>{80529d6e-9d07-432d-880e-a16dd124b4c1}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Hashing">
       <UniqueIdentifier>{37125cfa-3ea9-451d-87c9-acc1dd1525c0}</UniqueIdentifier>
     </Filter>
@@ -124,6 +127,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginChild\AdditionalFile.cpp">
       <Filter>Plugin\TestPluginChild</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Build\Build.cpp">
+      <Filter>Build</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Hashing\Hashing.cpp">
       <Filter>Hashing</Filter>
@@ -439,6 +445,12 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StringViewAlgorithms.h">
       <Filter>Foundation</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Build\Build.h">
+      <Filter>Build</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Build\BuildTest.h">
+      <Filter>Build</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\StrongID.h">
       <Filter>Foundation</Filter>
     </ClInclude>
@@ -456,6 +468,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\SetTest.h">
       <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Build\TaggedMap.h">
+      <Filter>Build</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Build\WriteInternal.h">
+      <Filter>Build</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -545,6 +563,12 @@
     </None>
     <None Include="..\..\..\..\Libraries\Serialization\SerializationStructuredJson.inl">
       <Filter>Serialization</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Build\WriterXCode.inl">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\..\..\..\Libraries\Build\WriterVisualStudio.inl">
+      <Filter>Build</Filter>
     </None>
   </ItemGroup>
 </Project>
