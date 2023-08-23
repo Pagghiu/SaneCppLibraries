@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/AlgorithmMinMax.h"
+#include "../Foundation/Language.h"
 #include "../Foundation/TypeList.h"
 #include "../Foundation/Types.h"
 namespace SC

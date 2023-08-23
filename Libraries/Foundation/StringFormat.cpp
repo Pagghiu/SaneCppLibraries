@@ -264,6 +264,18 @@ bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf
     return backingString.pushNullTerm();
 }
 
+[[nodiscard]] bool StringBuilder::appendReplaceMultiple(StringView source, Span<const StringView[2]> substitutions)
+{
+    String buffer, other;
+    SC_TRY_IF(buffer.assign(source));
+    for (auto it : substitutions)
+    {
+        SC_TRY_IF(StringBuilder(other, StringBuilder::Clear).appendReplaceAll(buffer.view(), it[0], it[1]));
+        swap(other, buffer);
+    }
+    return append(buffer.view());
+}
+
 bool StringBuilder::appendHex(SpanVoid<const void> data)
 {
     const unsigned char* bytes = data.castTo<const unsigned char>().data();

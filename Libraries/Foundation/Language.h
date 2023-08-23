@@ -84,6 +84,14 @@ template <typename T> constexpr T&& forward(typename RemoveReference<T>::type&& 
 }
 
 template <typename T>
+inline void swap(T& t1, T& t2)
+{
+    T temp = move(t1);
+    t1     = move(t2);
+    t2     = move(temp);
+}
+
+template <typename T>
 struct ReferenceWrapper
 {
     typename RemoveReference<T>::type* ptr;

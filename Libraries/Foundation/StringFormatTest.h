@@ -126,11 +126,18 @@ struct SC::StringFormatTest : public SC::TestCase
             String        buffer(StringEncoding::Ascii);
             StringBuilder builder(buffer);
             SC_TEST_EXPECT(builder.appendReplaceAll("123 456 123 10", "123", "1234"));
-            report.console.printLine(buffer.view());
             SC_TEST_EXPECT(buffer == "1234 456 1234 10");
             buffer = String();
             SC_TEST_EXPECT(builder.appendReplaceAll("088123", "123", "1"));
             SC_TEST_EXPECT(buffer == "0881");
+        }
+        if (test_section("appendReplaceMultiple"))
+        {
+            String        buffer(StringEncoding::Utf8);
+            StringBuilder builder(buffer);
+            SC_TEST_EXPECT(builder.appendReplaceMultiple(
+                "asd\\salve\\bas"_u8, {{"asd"_a8, "un"_a8}, {"bas"_a8, "a_tutti"_a8}, {"\\"_a8, "/"}}));
+            SC_TEST_EXPECT(buffer == "un/salve/a_tutti");
         }
     }
 };

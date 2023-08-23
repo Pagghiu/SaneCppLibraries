@@ -12,14 +12,6 @@ struct SmallerThan
     bool operator()(const T& a, const T& b) { return a < b; }
 };
 
-template <typename T>
-inline void swap(T& t1, T& t2)
-{
-    T temp = move(t1);
-    t1     = move(t2);
-    t2     = move(temp);
-}
-
 template <typename Iterator, typename Comparison = SmallerThan<typename RemovePointer<Iterator>::type>>
 void bubbleSort(Iterator first, Iterator last, Comparison comparison = Comparison())
 {
