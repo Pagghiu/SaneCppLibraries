@@ -40,19 +40,19 @@ struct SC::FileSystemTest : public SC::TestCase
             FileSystem fs;
             SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
 
-            SC_TEST_EXPECT(not fs.existsAndIsDirectory("Test"));
-            SC_TEST_EXPECT(fs.makeDirectory("Test"_a8));
-            SC_TEST_EXPECT(fs.exists("Test"));
-            SC_TEST_EXPECT(fs.existsAndIsDirectory("Test"));
-            SC_TEST_EXPECT(not fs.existsAndIsFile("Test"));
+            SC_TEST_EXPECT(not fs.existsAndIsDirectory("Test0"));
+            SC_TEST_EXPECT(fs.makeDirectory("Test0"_a8));
+            SC_TEST_EXPECT(fs.exists("Test0"));
+            SC_TEST_EXPECT(fs.existsAndIsDirectory("Test0"));
+            SC_TEST_EXPECT(not fs.existsAndIsFile("Test0"));
             SC_TEST_EXPECT(fs.makeDirectory({"Test1", "Test2"}));
             SC_TEST_EXPECT(fs.existsAndIsDirectory("Test1"));
             SC_TEST_EXPECT(fs.existsAndIsDirectory("Test2"));
-            SC_TEST_EXPECT(fs.removeEmptyDirectory("Test"_a8));
+            SC_TEST_EXPECT(fs.removeEmptyDirectory("Test0"_a8));
             SC_TEST_EXPECT(fs.removeEmptyDirectory({"Test1", "Test2"}));
-            SC_TEST_EXPECT(not fs.exists("Test"));
-            SC_TEST_EXPECT(not fs.existsAndIsFile("Test"));
-            SC_TEST_EXPECT(not fs.existsAndIsDirectory("Test"));
+            SC_TEST_EXPECT(not fs.exists("Test0"));
+            SC_TEST_EXPECT(not fs.existsAndIsFile("Test0"));
+            SC_TEST_EXPECT(not fs.existsAndIsDirectory("Test0"));
             SC_TEST_EXPECT(not fs.existsAndIsDirectory("Test1"));
             SC_TEST_EXPECT(not fs.existsAndIsDirectory("Test2"));
         }

@@ -201,6 +201,13 @@ SC::ReturnCode SC::FileSystem::removeFile(Span<const StringView> files)
     return true;
 }
 
+SC::ReturnCode SC::FileSystem::removeFileIfExists(StringView source)
+{
+    if (existsAndIsFile(source))
+        return removeFile(Span<const StringView>{source});
+    return true;
+}
+
 SC::ReturnCode SC::FileSystem::removeDirectoryRecursive(Span<const StringView> directories)
 {
     for (auto& path : directories)
@@ -256,6 +263,18 @@ SC::ReturnCode SC::FileSystem::makeDirectory(Span<const StringView> directories)
     {
         SC_TRY_IF(convert(path, fileFormatBuffer1, &encodedPath));
         SC_TRY_FORMAT_ERRNO(path, Internal::makeDirectory(encodedPath.getNullTerminatedNative()));
+    }
+    return true;
+}
+
+SC::ReturnCode SC::FileSystem::makeDirectoryIfNotExists(Span<const StringView> directories)
+{
+    for (const auto& path : directories)
+    {
+        if (not existsAndIsDirectory(path))
+        {
+            SC_TRY_IF(makeDirectory({path}));
+        }
     }
     return true;
 }

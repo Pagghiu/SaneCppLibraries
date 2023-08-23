@@ -181,8 +181,11 @@ struct SC::FileSystemWatcher::Internal
                                                   watchFlags);
         SC_TRY_MSG(fsEventStream != nullptr, "FSEventStreamCreate failed"_a8);
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
         // Add it to runLoop
         FSEventStreamScheduleWithRunLoop(fsEventStream, runLoop, kCFRunLoopDefaultMode);
+#pragma clang diagnostic pop
 
         if (not FSEventStreamStart(fsEventStream))
         {

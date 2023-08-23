@@ -115,7 +115,15 @@ struct SC::FileSystemWalker::Internal
             auto copy = currentPathString;
             currentPathString.data.clear();
             StringBuilder sb(currentPathString);
-            SC_TRY_IF(sb.appendReplaceAll(copy.view(), L"\\", L"/"));
+            if (copy.view().startsWith("\\\\"))
+            {
+                SC_TRY_IF(sb.append("\\\\"));
+                SC_TRY_IF(sb.appendReplaceAll(copy.view().sliceStart(2), L"\\", L"/"));
+            }
+            else
+            {
+                SC_TRY_IF(sb.appendReplaceAll(copy.view(), L"\\", L"/"));
+            }
         }
         entry.path  = currentPathString.view();
         entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
