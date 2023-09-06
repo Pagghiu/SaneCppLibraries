@@ -22,6 +22,7 @@ void runSpecificTests(TestReport& report)
 #include "../../Libraries/Build/BuildTest.h"
 
 // Foundation
+#include "../../Libraries/Foundation/ArenaMapTest.h"
 #include "../../Libraries/Foundation/ArrayTest.h"
 #include "../../Libraries/Foundation/FunctionTest.h"
 #include "../../Libraries/Foundation/IntrusiveDoubleLinkedListTest.h"
@@ -120,6 +121,7 @@ int main(int argc, const char* argv[])
 #else
 
     // Foundation tests
+    { ArenaMapTest                  test(report); }
     { ArrayTest                     test(report); }
     { FunctionTest                  test(report); }
     { IntrusiveDoubleLinkedListTest test(report); }

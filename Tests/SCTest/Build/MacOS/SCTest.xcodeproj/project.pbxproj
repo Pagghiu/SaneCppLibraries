@@ -230,6 +230,8 @@
 		7BC56BD829946B1800EED472 /* FileSystemWalkerInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalEmscripten.inl; path = ../../../../Libraries/FileSystem/FileSystemWalkerInternalEmscripten.inl; sourceTree = "<group>"; };
 		7BC56BD929946B1800EED472 /* FileSystemWalkerInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalPosix.inl; path = ../../../../Libraries/FileSystem/FileSystemWalkerInternalPosix.inl; sourceTree = "<group>"; };
 		7BC56BDA29946B1800EED472 /* FileSystemWalkerInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalWindows.inl; path = ../../../../Libraries/FileSystem/FileSystemWalkerInternalWindows.inl; sourceTree = "<group>"; };
+		7BC800A92AA909A7007063AC /* ArenaMap.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ArenaMap.h; path = ../../../../Libraries/Foundation/ArenaMap.h; sourceTree = "<group>"; };
+		7BC800AA2AA909A7007063AC /* ArenaMapTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ArenaMapTest.h; path = ../../../../Libraries/Foundation/ArenaMapTest.h; sourceTree = "<group>"; };
 		7BD8E37929BE8357004AB23D /* EventLoopInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalApple.inl; path = ../../../../Libraries/Async/EventLoopInternalApple.inl; sourceTree = "<group>"; };
 		7BD8E37A29BE8357004AB23D /* EventLoopInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalWindows.inl; path = ../../../../Libraries/Async/EventLoopInternalWindows.inl; sourceTree = "<group>"; };
 		7BD8E37B29BE8357004AB23D /* EventLoopInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalEmscripten.inl; path = ../../../../Libraries/Async/EventLoopInternalEmscripten.inl; sourceTree = "<group>"; };
@@ -352,6 +354,8 @@
 		7B515F932924305E006996AA /* Foundation */ = {
 			isa = PBXGroup;
 			children = (
+				7BC800A92AA909A7007063AC /* ArenaMap.h */,
+				7BC800AA2AA909A7007063AC /* ArenaMapTest.h */,
 				7BB1C6BA2A767B10001AF3AE /* AlgorithmMinMax.h */,
 				7B1FCC2429ECBDAF001D75F7 /* AlgorithmSort.h */,
 				7B515FF329243087006996AA /* Array.h */,

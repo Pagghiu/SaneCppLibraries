@@ -475,6 +475,12 @@
     <ClInclude Include="..\..\..\..\Libraries\Build\WriteInternal.h">
       <Filter>Build</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\ArenaMap.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\ArenaMapTest.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalPosix.inl">
