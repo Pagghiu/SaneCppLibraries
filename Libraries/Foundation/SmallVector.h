@@ -21,7 +21,7 @@ struct SC::SmallVector : public Vector<T>
         header->options.isSmallVector = true;
         Vector<T>::items              = buffer.items;
     }
-    SmallVector(SmallVector&& other) : Vector<T>(forward<Vector<T>>(other)) {}
+    SmallVector(SmallVector&& other) : SmallVector() { Vector<T>::operator=(forward<Vector<T>>(other)); }
     SmallVector(const SmallVector& other) : Vector<T>(other) {}
     SmallVector& operator=(SmallVector&& other)
     {

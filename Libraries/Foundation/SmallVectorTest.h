@@ -212,6 +212,21 @@ struct SC::SmallVectorTest : public SC::TestCase
             SC_TEST_EXPECT(vec2Header->options.isFollowedBySmallVector);
             checkItems(vec2, 4);
         }
+        if (test_section("move operations"))
+        {
+            struct Container
+            {
+                SmallVector<int, 3> data;
+            };
+            Container c;
+            SC_TEST_EXPECT(c.data.capacity() == 3);
+            Container c1 = move(c);
+            SC_TEST_EXPECT(c1.data.capacity() == 3);
+
+            SC_TEST_EXPECT(c1.data.reserve(5));
+            c = move(c1);
+            SC_TEST_EXPECT(c.data.capacity() == 5);
+        }
     }
 
     template <typename Container>
