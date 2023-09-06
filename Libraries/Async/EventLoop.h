@@ -143,6 +143,12 @@ struct SC::AsyncResult
 
     AsyncResult(void* userData) : userData(userData) {}
     // TODO: Add AsyncResult error
+
+    void rearm(bool value) { doRearm = value; }
+    bool isRearmed() const { return doRearm; }
+
+  private:
+    bool doRearm = false;
 };
 
 struct SC::AsyncTimeout : public Async
@@ -241,7 +247,7 @@ struct SC::AsyncRead : public Async
 
     FileDescriptor::Handle fileDescriptor;
     uint64_t               offset = 0;
-    SpanVoid<void>         readBuffer;
+    Span<char>             readBuffer;
 #if SC_PLATFORM_WINDOWS
     EventLoopWinOverlappedOpaque overlapped;
 #endif
@@ -255,7 +261,7 @@ struct SC::AsyncWrite : public Async
 
     FileDescriptor::Handle fileDescriptor;
     uint64_t               offset = 0;
-    SpanVoid<const void>   writeBuffer;
+    Span<const char>       writeBuffer;
 #if SC_PLATFORM_WINDOWS
     EventLoopWinOverlappedOpaque overlapped;
 #endif
@@ -308,7 +314,7 @@ struct SC::AsyncSendResult : public AsyncResult
 struct SC::AsyncReceiveResult : public AsyncResult
 {
     AsyncReceiveResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asReceive()) {}
-
+    Span<char>    readData;
     AsyncReceive& async;
 };
 
@@ -317,7 +323,7 @@ struct SC::AsyncReadResult : public AsyncResult
     AsyncReadResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asRead()) {}
 
     AsyncRead& async;
-    size_t     readBytes = 0;
+    Span<char> readData;
 };
 
 struct SC::AsyncWriteResult : public AsyncResult
@@ -377,11 +383,11 @@ struct SC::EventLoop
     [[nodiscard]] ReturnCode startReceive(AsyncReceive& async, const SocketDescriptor& socketDescriptor,
                                           Span<char> data, Function<void(AsyncReceiveResult&)>&& callback);
 
-    [[nodiscard]] ReturnCode startRead(AsyncRead& async, FileDescriptor::Handle fileDescriptor,
-                                       SpanVoid<void> readBuffer, Function<void(AsyncReadResult&)>&& callback);
+    [[nodiscard]] ReturnCode startRead(AsyncRead& async, FileDescriptor::Handle fileDescriptor, Span<char> readBuffer,
+                                       Function<void(AsyncReadResult&)>&& callback);
 
     [[nodiscard]] ReturnCode startWrite(AsyncWrite& async, FileDescriptor::Handle fileDescriptor,
-                                        SpanVoid<const void> writeBuffer, Function<void(AsyncWriteResult&)>&& callback);
+                                        Span<const char> writeBuffer, Function<void(AsyncWriteResult&)>&& callback);
 
     // WakeUp support
     [[nodiscard]] ReturnCode wakeUpFromExternalThread(AsyncWakeUp& wakeUp);
@@ -427,6 +433,9 @@ struct SC::EventLoop
     using InternalOpaque = OpaqueUniqueObject<OpaqueFuncs<InternalTraits>>;
     InternalOpaque internal;
 
+    void removeActiveHandle(Async& async);
+    void addActiveHandle(Async& async);
+
     // Timers
     [[nodiscard]] const TimeCounter* findEarliestTimer() const;
 
@@ -435,7 +444,7 @@ struct SC::EventLoop
     void executeTimers(KernelQueue& queue, const TimeCounter& nextTimer);
 
     // WakeUp
-    void executeWakeUps();
+    void executeWakeUps(AsyncResult& result);
 
     // Setup
     [[nodiscard]] ReturnCode queueSubmission(Async& async);

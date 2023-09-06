@@ -21,7 +21,7 @@ struct SC::EventLoop::Internal
 
     AsyncRead      wakeupPipeRead;
     PipeDescriptor wakeupPipe;
-    uint8_t        wakeupPipeReadBuf[10];
+    char           wakeupPipeReadBuf[10];
 
     ~Internal() { SC_TRUST_RESULT(close()); }
 
@@ -76,7 +76,7 @@ struct SC::EventLoop::Internal
         auto         readSpan = readOp.readBuffer;
         do
         {
-            const ssize_t res = read(readOp.fileDescriptor, readSpan.data(), readSpan.sizeInBytes());
+            const ssize_t res = ::read(readOp.fileDescriptor, readSpan.data(), readSpan.sizeInBytes());
 
             if (res >= 0 and (static_cast<size_t>(res) == readSpan.sizeInBytes()))
                 continue;
@@ -88,14 +88,13 @@ struct SC::EventLoop::Internal
                 break;
 
         } while (errno == EINTR);
-        asyncResult.async.eventLoop->executeWakeUps();
+        asyncResult.async.eventLoop->executeWakeUps(asyncResult);
     }
 
-    [[nodiscard]] ReturnCode canRunCompletionFor(Async& async, const struct kevent& event)
+    [[nodiscard]] ReturnCode canRunCompletionFor(const struct kevent& event)
     {
         if ((event.flags & EV_DELETE) != 0)
         {
-            async.eventLoop->activeHandles.remove(async);
             return false; // Do not call callback
         }
         if ((event.flags & EV_ERROR) != 0)
@@ -131,7 +130,7 @@ struct SC::EventLoop::Internal
                               static_cast<off_t>(operation.offset));
             } while ((res == -1) and (errno == EINTR));
             SC_TRY_MSG(res >= 0, "::read failed"_a8);
-            result.readBytes = static_cast<size_t>(res);
+            SC_TRY_IF(result.async.readBuffer.sliceStartLength(0, static_cast<size_t>(res), result.readData));
         }
         return true;
     }
@@ -188,8 +187,7 @@ struct SC::EventLoop::Internal
         int       errorCode;
         socklen_t errorSize = sizeof(errorCode);
         const int socketRes = ::getsockopt(async.handle, SOL_SOCKET, SO_ERROR, &errorCode, &errorSize);
-        result.async.eventLoop->activeHandles.remove(result.async);
-        result.async.eventLoop->numberOfActiveHandles -= 1;
+
         // TODO: This is making a syscall for each connected socket, we should probably aggregate them
         // And additionally it's stupid as probably WRITE will be subscribed again anyway
         // But probably this means to review the entire process of async stop
@@ -205,23 +203,16 @@ struct SC::EventLoop::Internal
     {
         Async::Send&  async = *result.async.asSend();
         const ssize_t res   = ::send(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
-        result.async.eventLoop->activeHandles.remove(result.async);
-        result.async.eventLoop->numberOfActiveHandles -= 1;
         SC_TRY_MSG(res >= 0, "error in send"_a8);
         SC_TRY_MSG(size_t(res) == async.data.sizeInBytes(), "send didn't send all data"_a8);
-        SC_TRUST_RESULT(stopSingleWatcherImmediate(result.async, async.handle, EVFILT_WRITE));
         return true;
     }
     [[nodiscard]] ReturnCode runCompletionFor(AsyncResult::Receive& result, const struct kevent&)
     {
         Async::Receive& async = *result.async.asReceive();
         const ssize_t   res   = ::recv(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
-        result.async.eventLoop->activeHandles.remove(result.async);
-        result.async.eventLoop->numberOfActiveHandles -= 1;
         SC_TRY_MSG(res >= 0, "error in recv"_a8);
-        SC_TRY_MSG(size_t(res) == async.data.sizeInBytes(), "send didn't send all data"_a8);
-        SC_TRUST_RESULT(stopSingleWatcherImmediate(result.async, async.handle, EVFILT_READ));
-        return true;
+        return async.data.sliceStartLength(0, static_cast<size_t>(res), result.readData);
     }
 
     static ReturnCode stopSingleWatcherImmediate(Async& async, SocketDescriptor::Handle handle, short filter)
@@ -468,6 +459,15 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
+    [[nodiscard]] ReturnCode rearmOrCancel(EventLoop& eventLoop, Async& async, bool rearm)
+    {
+        if (not rearm)
+        {
+            return cancelAsync(eventLoop, async);
+        }
+        return true;
+    }
+
     [[nodiscard]] ReturnCode cancelAsync(EventLoop& eventLoop, Async& async)
     {
         SC_UNUSED(eventLoop);
@@ -497,7 +497,7 @@ struct SC::EventLoop::KernelQueue
             SC_TRY_IF(stopReceiveWatcher(async, *async.asReceive()));
             break;
         }
-        eventLoop.numberOfActiveHandles -= 1;
+        eventLoop.removeActiveHandle(async);
         return true;
     }
 };

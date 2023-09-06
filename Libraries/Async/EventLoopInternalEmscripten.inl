@@ -14,7 +14,7 @@ struct SC::EventLoop::Internal
     [[nodiscard]] Async*     getAsync(const int& event) const { return nullptr; }
     [[nodiscard]] void*      getUserData(const int& event) { return nullptr; }
 
-    [[nodiscard]] ReturnCode canRunCompletionFor(Async& async, int& event) { return true; }
+    [[nodiscard]] ReturnCode canRunCompletionFor(int& event) { return true; }
     [[nodiscard]] ReturnCode runCompletionFor(AsyncResult::Timeout& result, int&) { return false; }
     [[nodiscard]] ReturnCode runCompletionFor(AsyncResult::Read& result, int&) { return true; }
     [[nodiscard]] ReturnCode runCompletionFor(AsyncResult::Write& result, int&) { return true; }
@@ -30,6 +30,7 @@ struct SC::EventLoop::KernelQueue
     int newEvents = 0;
     int events[1] = {0};
 
+    [[nodiscard]] ReturnCode rearmOrCancel(EventLoop& eventLoop, Async& async, bool rearm) { return false; }
     [[nodiscard]] ReturnCode stageAsync(EventLoop& eventLoop, Async& async) { return false; }
     [[nodiscard]] ReturnCode activateAsync(EventLoop& eventLoop, Async& async) { return false; }
     [[nodiscard]] ReturnCode cancelAsync(EventLoop& eventLoop, Async& async) { return false; }

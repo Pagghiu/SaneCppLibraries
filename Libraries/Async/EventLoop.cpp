@@ -36,8 +36,8 @@ SC::ReturnCode SC::EventLoop::startTimeout(AsyncTimeout& async, IntegerMilliseco
     return true;
 }
 
-SC::ReturnCode SC::EventLoop::startRead(AsyncRead& async, FileDescriptor::Handle fileDescriptor,
-                                        SpanVoid<void> readBuffer, Function<void(AsyncReadResult&)>&& callback)
+SC::ReturnCode SC::EventLoop::startRead(AsyncRead& async, FileDescriptor::Handle fileDescriptor, Span<char> readBuffer,
+                                        Function<void(AsyncReadResult&)>&& callback)
 {
     SC_TRY_MSG(readBuffer.sizeInBytes() > 0, "EventLoop::startRead - Zero sized read buffer"_a8);
     SC_TRY_IF(queueSubmission(async));
@@ -48,7 +48,7 @@ SC::ReturnCode SC::EventLoop::startRead(AsyncRead& async, FileDescriptor::Handle
 }
 
 SC::ReturnCode SC::EventLoop::startWrite(AsyncWrite& async, FileDescriptor::Handle fileDescriptor,
-                                         SpanVoid<const void> writeBuffer, Function<void(AsyncWriteResult&)>&& callback)
+                                         Span<const char> writeBuffer, Function<void(AsyncWriteResult&)>&& callback)
 {
     SC_TRY_MSG(writeBuffer.sizeInBytes() > 0, "EventLoop::startWrite - Zero sized write buffer"_a8);
     SC_TRY_IF(queueSubmission(async));
@@ -132,10 +132,10 @@ SC::ReturnCode SC::EventLoop::queueSubmission(Async& async)
 
 SC::ReturnCode SC::EventLoop::run()
 {
-    do
+    while (getTotalNumberOfActiveHandle() > 0 or not submissions.isEmpty())
     {
         SC_TRY_IF(runOnce());
-    } while (getTotalNumberOfActiveHandle() > 0);
+    };
     return true;
 }
 
@@ -263,9 +263,10 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
     for (decltype(KernelQueue::newEvents) idx = 0; idx < queue.newEvents; ++idx)
     {
         Async& async = *self.getAsync(queue.events[idx]);
-        if (!self.canRunCompletionFor(async, queue.events[idx]))
+        if (!self.canRunCompletionFor(queue.events[idx]))
             continue;
         void* userData = self.getUserData(queue.events[idx]);
+        bool  rearm    = false;
         switch (async.getType())
         {
         case Async::Type::Timeout: {
@@ -273,6 +274,7 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
             ReturnCode           res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
                 result.async.callback(result);
+            rearm = result.isRearmed();
             break;
         }
         case Async::Type::Read: {
@@ -280,6 +282,7 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
             ReturnCode        res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
                 result.async.callback(result);
+            rearm = result.isRearmed();
             break;
         }
         case Async::Type::Write: {
@@ -287,6 +290,7 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
             ReturnCode         res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
                 result.async.callback(result);
+            rearm = result.isRearmed();
             break;
         }
         case Async::Type::WakeUp: {
@@ -294,6 +298,7 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
             ReturnCode          res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
                 result.async.callback(result);
+            rearm = result.isRearmed();
             break;
         }
         case Async::Type::ProcessExit: {
@@ -301,6 +306,7 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
             ReturnCode               res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
                 result.async.callback(result);
+            rearm = result.isRearmed();
             break;
         }
         case Async::Type::Accept: {
@@ -308,6 +314,7 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
             ReturnCode          res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
                 result.async.callback(result);
+            rearm = result.isRearmed();
             break;
         }
         case Async::Type::Connect: {
@@ -315,6 +322,7 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
             ReturnCode           res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
                 result.async.callback(result);
+            rearm = result.isRearmed();
             break;
         }
         case Async::Type::Send: {
@@ -322,6 +330,7 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
             ReturnCode        res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
                 result.async.callback(result);
+            rearm = result.isRearmed();
             break;
         }
         case Async::Type::Receive: {
@@ -329,13 +338,14 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
             ReturnCode           res = self.runCompletionFor(result, queue.events[idx]);
             if (res and result.async.callback.isValid())
                 result.async.callback(result);
+            rearm = result.isRearmed();
             break;
         }
         }
 
         switch (async.state)
         {
-        case Async::State::Active: SC_TRY_IF(queue.activateAsync(*this, async)); break;
+        case Async::State::Active: SC_TRY_IF(queue.rearmOrCancel(*this, async, rearm)); break;
         default: break;
         }
     }
@@ -405,7 +415,7 @@ SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread(AsyncWakeUp& wakeUp)
     return true;
 }
 
-void SC::EventLoop::executeWakeUps()
+void SC::EventLoop::executeWakeUps(AsyncResult& result)
 {
     for (Async* async = activeWakeUps.front; async != nullptr; async = async->next)
     {
@@ -418,9 +428,22 @@ void SC::EventLoop::executeWakeUps()
             {
                 notifier->eventObject->signal();
             }
+            result.rearm(res.isRearmed());
             notifier->pending.exchange(false); // allow executing the notification again
         }
     }
+}
+
+void SC::EventLoop::removeActiveHandle(Async& async)
+{
+    async.eventLoop->activeHandles.remove(async);
+    async.eventLoop->numberOfActiveHandles -= 1;
+}
+
+void SC::EventLoop::addActiveHandle(Async& async)
+{
+    async.eventLoop->activeHandles.queueBack(async);
+    async.eventLoop->numberOfActiveHandles += 1;
 }
 
 SC::ReturnCode SC::EventLoop::getLoopFileDescriptor(SC::FileDescriptor::Handle& fileDescriptor) const

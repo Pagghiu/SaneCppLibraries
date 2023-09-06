@@ -2,6 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../FileSystem/FileSystem.h"
+#include "../FileSystem/Path.h"
+#include "../Foundation/String.h"
 #include "../Testing/Test.h"
 #include "../Threading/Threading.h" // EventObject
 #include "EventLoop.h"
@@ -15,7 +18,18 @@ struct SC::EventLoopTest : public SC::TestCase
 {
     EventLoopTest(SC::TestReport& report) : TestCase(report, "EventLoopTest")
     {
-        using namespace SC;
+        timeout();
+        wakeUpFromExternalThread();
+        wakeUp();
+        wakeupEventObject();
+        accept();
+        connect();
+        sendReceive();
+        readWrite();
+    }
+
+    void timeout()
+    {
         // TODO: Add EventLoop::resetTimeout
         if (test_section("timeout"))
         {
@@ -41,6 +55,10 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(timeout1Called == 1 and timeout2Called == 1);
         }
+    }
+
+    void wakeUpFromExternalThread()
+    {
         if (test_section("wakeUpFromExternalThread"))
         {
             EventLoop eventLoop;
@@ -64,6 +82,10 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(threadWasCalled == 1);
             SC_TEST_EXPECT(wakeUpSucceded == 1);
         }
+    }
+
+    void wakeUp()
+    {
         if (test_section("wakeUp"))
         {
             int       wakeUp1Called   = 0;
@@ -104,6 +126,10 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(wakeUp2Called == 0);
             SC_TEST_EXPECT(wakeUp1ThreadID == Thread::CurrentThreadID());
         }
+    }
+
+    void wakeupEventObject()
+    {
         if (test_section("wakeUp-eventObject"))
         {
             struct TestParams
@@ -141,6 +167,10 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(params.observedNotifier1Called == 1);
             SC_TEST_EXPECT(callbackThreadID == Thread::CurrentThreadID());
         }
+    }
+
+    void accept()
+    {
         if (test_section("accept"))
         {
             EventLoop eventLoop;
@@ -148,8 +178,8 @@ struct SC::EventLoopTest : public SC::TestCase
 
             constexpr uint32_t numWaitingConnections = 2;
             SocketDescriptor   server;
-            uint16_t           tcpPort = 0;
-            SC_TEST_EXPECT(listenToAvailablePort(server, "127.0.0.1", numWaitingConnections, 5050, 5060, tcpPort));
+            uint16_t           tcpPort = 5050;
+            SC_TEST_EXPECT(SocketServer(server).listen("127.0.0.1", tcpPort, numWaitingConnections));
 
             int              acceptedCount = 0;
             SocketDescriptor acceptedClient[3];
@@ -158,6 +188,7 @@ struct SC::EventLoopTest : public SC::TestCase
             {
                 SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.acceptedClient)));
                 acceptedCount++;
+                res.rearm(true);
             };
             AsyncAccept accept;
             SC_TEST_EXPECT(eventLoop.startAccept(accept, server, onAccepted));
@@ -193,15 +224,19 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(server.close());
             SC_TEST_EXPECT(eventLoop.close());
         }
+    }
+
+    void connect()
+    {
         if (test_section("connect"))
         {
             EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
             SocketDescriptor server;
-            uint16_t         tcpPort;
+            uint16_t         tcpPort        = 5050;
             StringView       connectAddress = "::1";
-            SC_TEST_EXPECT(listenToAvailablePort(server, connectAddress, 0, 5050, 5060, tcpPort));
+            SC_TEST_EXPECT(SocketServer(server).listen(connectAddress, tcpPort, 0));
 
             int              acceptedCount = 0;
             SocketDescriptor acceptedClient[3];
@@ -210,10 +245,7 @@ struct SC::EventLoopTest : public SC::TestCase
             {
                 SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.acceptedClient)));
                 acceptedCount++;
-                if (acceptedCount == 2)
-                {
-                    SC_TEST_EXPECT(res.async.eventLoop->stopAsync(res.async));
-                }
+                res.rearm(acceptedCount < 2);
             };
             AsyncAccept accept;
             SC_TEST_EXPECT(eventLoop.startAccept(accept, server, onAccepted));
@@ -243,15 +275,19 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(acceptedCount == 2);
             SC_TEST_EXPECT(connectedCount == 2);
         }
+    }
+
+    void sendReceive()
+    {
         if (test_section("send/receive"))
         {
             EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
             SocketDescriptor server;
-            uint16_t         tcpPort;
+            uint16_t         tcpPort        = 5050;
             StringView       connectAddress = "::1";
-            SC_TEST_EXPECT(listenToAvailablePort(server, connectAddress, 0, 5050, 5060, tcpPort));
+            SC_TEST_EXPECT(SocketServer(server).listen(connectAddress, tcpPort, 0));
 
             SocketDescriptor client;
             SC_TEST_EXPECT(SocketClient(client).connect(connectAddress, tcpPort));
@@ -262,7 +298,7 @@ struct SC::EventLoopTest : public SC::TestCase
 
             AsyncSend sendAsync;
 
-            const char sendBuffer[1] = {123};
+            const char sendBuffer[] = {123, 111};
 
             Span<const char> sendData = {sendBuffer, sizeof(sendBuffer)};
 
@@ -279,11 +315,14 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.runNoWait());
             SC_TEST_EXPECT(sendCount == 1);
 
-            int  receiveCount = 0;
-            auto onReceive    = [&](AsyncResult::Receive& res)
+            int  receiveCount                     = 0;
+            char receivedData[sizeof(sendBuffer)] = {0};
+            auto onReceive                        = [&](AsyncResult::Receive& res)
             {
-                SC_UNUSED(res);
+                SC_TEST_EXPECT(res.readData.sizeInBytes() == 1);
+                receivedData[receiveCount] = res.readData.data()[0];
                 receiveCount++;
+                res.rearm(size_t(receiveCount) < sizeof(sendBuffer));
             };
 
             char       receiveBuffer[1] = {0};
@@ -291,12 +330,15 @@ struct SC::EventLoopTest : public SC::TestCase
 
             AsyncReceive receiveAsync;
             SC_TEST_EXPECT(eventLoop.startReceive(receiveAsync, serverSideClient, receiveData, onReceive));
-            SC_TEST_EXPECT(eventLoop.runOnce());
-            SC_TEST_EXPECT(sendCount == 1);
-            SC_TEST_EXPECT(eventLoop.runNoWait());
-            SC_TEST_EXPECT(sendCount == 1);
-            SC_TEST_EXPECT(receiveBuffer[0] == sendBuffer[0]);
+            SC_TEST_EXPECT(receiveCount == 0); // make sure we receive after run, in case of sync results
+            SC_TEST_EXPECT(eventLoop.run());
+            SC_TEST_EXPECT(receiveCount == 2);
+            SC_TEST_EXPECT(memcmp(receivedData, sendBuffer, sizeof(sendBuffer)) == 0);
         }
+    }
+
+    void readWrite()
+    {
         if (test_section("read/write"))
         {
             EventLoop eventLoop;
@@ -310,7 +352,7 @@ struct SC::EventLoopTest : public SC::TestCase
 
             FileSystem fs;
             SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
-            SC_TEST_EXPECT(fs.makeDirectory(name));
+            SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
 
             FileDescriptor              fd;
             FileDescriptor::OpenOptions options;
@@ -321,7 +363,7 @@ struct SC::EventLoopTest : public SC::TestCase
             AsyncWrite write;
 
             auto writeLambda = [&](AsyncResult::Write& res) { SC_TEST_EXPECT(res.writtenBytes == 4); };
-            auto writeSpan   = StringView("test").toVoidSpan();
+            auto writeSpan   = StringView("test").toCharSpan();
 
             FileDescriptor::Handle handle;
             SC_TEST_EXPECT(fd.get(handle, "asd"_a8));
@@ -332,35 +374,27 @@ struct SC::EventLoopTest : public SC::TestCase
             AsyncRead read;
 
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::ReadOnly, options));
-            char           buffer[4]  = {0};
-            SpanVoid<void> readSpan   = {buffer, sizeof(buffer)};
-            auto           readLambda = [&](AsyncResult::Read& res) { SC_TEST_EXPECT(res.readBytes == 4); };
+            char       buffer[1] = {0};
+            Span<char> readSpan  = {buffer, sizeof(buffer)};
+            int        readCount = 0;
+            char       readBuffer[4];
+            auto       readLambda = [&](AsyncResult::Read& res)
+            {
+                SC_TEST_EXPECT(res.readData.sizeInBytes() == 1);
+                readBuffer[readCount++] = res.readData.data()[0];
+                res.async.offset += res.readData.sizeInBytes();
+                res.rearm(readCount < 4);
+            };
             SC_TEST_EXPECT(eventLoop.startRead(read, handle, readSpan, readLambda));
-            SC_TEST_EXPECT(eventLoop.runOnce());
+            SC_TEST_EXPECT(eventLoop.run());
             SC_TEST_EXPECT(fd.close());
 
-            StringView sv(buffer, sizeof(buffer), false, StringEncoding::Ascii);
+            StringView sv(readBuffer, sizeof(readBuffer), false, StringEncoding::Ascii);
             SC_TEST_EXPECT(sv.compare("test") == StringView::Comparison::Equals);
             SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
             SC_TEST_EXPECT(fs.removeFile(fileName));
             SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory));
             SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
         }
-    }
-
-    [[nodiscard]] ReturnCode listenToAvailablePort(SocketDescriptor& server, StringView address,
-                                                   uint32_t numWaitingConnections, const uint16_t startTcpPort,
-                                                   const uint16_t endTcpPort, uint16_t& tcpPort)
-    {
-        ReturnCode bound = false;
-        for (tcpPort = startTcpPort; tcpPort < endTcpPort; ++tcpPort)
-        {
-            bound = SocketServer(server).listen(address, tcpPort, numWaitingConnections);
-            if (bound)
-            {
-                return true;
-            }
-        }
-        return bound;
     }
 };

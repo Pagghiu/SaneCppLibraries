@@ -2,9 +2,11 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Foundation/StringBuilder.h"
 #include "../Testing/Test.h"
 #include "FileSystem.h"
 #include "FileSystemWatcher.h"
+#include "Path.h"
 
 namespace SC
 {
@@ -17,6 +19,15 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
     {
         using namespace SC;
         const StringView appDirectory = report.applicationRootDirectory;
+        initClose();
+        threadRunner(appDirectory);
+        eventLoop(appDirectory);
+        eventLoopInterrupt(appDirectory);
+        eventLoopWatchUnwatch(appDirectory);
+    }
+
+    void initClose()
+    {
         if (test_section("Init/Close"))
         {
             FileSystemWatcher::ThreadRunner runner;
@@ -25,6 +36,10 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(fileEventsWatcher.init(runner));
             SC_TEST_EXPECT(fileEventsWatcher.close());
         }
+    }
+
+    void threadRunner(const StringView appDirectory)
+    {
         if (test_section("ThreadRunner"))
         {
             // We need to sleep to avoid getting notifications of file ops from prev tests
@@ -87,6 +102,10 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(params.callbackThreadID != Thread::CurrentThreadID());
             SC_TEST_EXPECT(fs.removeFile({"test.txt"_a8}));
         }
+    }
+
+    void eventLoop(const StringView appDirectory)
+    {
         if (test_section("EventLoop"))
         {
             EventLoop eventLoop;
@@ -158,6 +177,10 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             Thread::Sleep(100);
 #endif
         }
+    }
+
+    void eventLoopInterrupt(const StringView appDirectory)
+    {
         if (test_section("EventLoop interrupt"))
         {
             EventLoop eventLoop;
@@ -185,6 +208,10 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(fileEventsWatcher.close());
             SC_TEST_EXPECT(fs.removeFile({"salve.txt", "atutti.txt"}));
         }
+    }
+
+    void eventLoopWatchUnwatch(const StringView appDirectory)
+    {
         if (test_section("EventLoop watch/unwatch"))
         {
             EventLoop eventLoop;
