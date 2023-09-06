@@ -64,7 +64,7 @@ struct SC::Build::WriterInternal
                 for (const auto& it : *res)
                 {
                     RenderItem xcodeFile;
-                    xcodeFile.name.encoding = StringEncoding::Utf8; // To unify hashes
+                    xcodeFile.name = StringEncoding::Utf8; // To unify hashes
                     SC_TRY_IF(StringBuilder(xcodeFile.name).append(Path::basename(it.view(), Path::AsPosix)));
                     if (xcodeFile.name.view().endsWith(".h"))
                     {

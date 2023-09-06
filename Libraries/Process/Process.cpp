@@ -104,9 +104,9 @@ SC::ReturnCode SC::ProcessChain::waitForExitSync()
 
 SC::ReturnCode SC::Process::formatArguments(Span<const StringView> params)
 {
-    command.data.clear();
     bool            first = true;
     StringConverter formattedCmd(command);
+    formattedCmd.clear();
     for (const StringView& svp : params)
     {
         if (not first)

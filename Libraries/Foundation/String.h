@@ -13,6 +13,12 @@ struct String;
 
 template <int N>
 struct SmallString;
+
+namespace Reflection
+{
+template <typename T>
+struct MetaClass;
+}
 } // namespace SC
 struct SC::String
 {
@@ -20,6 +26,8 @@ struct SC::String
 
     // TODO: Figure out if removing this constructor in favour of the fallible assign makes the api ugly
     String(const StringView& sv) { SC_RELEASE_ASSERT(assign(sv)); }
+
+    String(Vector<char>&& data, StringEncoding encoding) : encoding(encoding), data(move(data)) {}
 
     [[nodiscard]] bool assign(const StringView& sv);
 
@@ -38,9 +46,6 @@ struct SC::String
 
     [[nodiscard]] StringView view() const;
 
-    [[nodiscard]] bool popNulltermIfExists();
-    [[nodiscard]] bool pushNullTerm();
-
     // Operators
     [[nodiscard]] bool operator==(const String& other) const { return view() == (other.view()); }
     [[nodiscard]] bool operator!=(const String& other) const { return not operator==(other); }
@@ -48,7 +53,16 @@ struct SC::String
     [[nodiscard]] bool operator!=(const StringView other) const { return not operator==(other); }
     [[nodiscard]] bool operator<(const StringView other) const { return view() < other; }
 
-    // TODO: we should probably make these private and provide alternative abstractions to manipulate it
+    Span<const char> toSpan() const { return data.toSpanConst(); }
+
+  protected:
+    friend struct StringTest;
+    friend struct StringBuilder;
+    friend struct StringConverter;
+    friend struct FileDescriptor;
+    friend struct FileSystem;
+    template <typename T>
+    friend struct Reflection::MetaClass;
     StringEncoding encoding;
     Vector<char>   data;
 };
@@ -70,6 +84,8 @@ struct SC::SmallString : public String
         String::data.items            = buffer.items;
         SC_RELEASE_ASSERT(assign(view));
     }
+    SmallString(Vector<char>&& data, StringEncoding encoding) : String(forward<Vector<char>>(data), encoding) {}
+
     SmallString(SmallString&& other) : String(forward<String>(other)) {}
     SmallString(const SmallString& other) : String(other) {}
     SmallString& operator=(SmallString&& other)

@@ -112,9 +112,8 @@ struct SC::FileSystemWalker::Internal
         if (options.forwardSlashes)
         {
             // TODO: Probably this allocation could be avoided using StringBuilder instead of StringConverter
-            auto copy = currentPathString;
-            currentPathString.data.clear();
-            StringBuilder sb(currentPathString);
+            auto          copy = currentPathString;
+            StringBuilder sb(currentPathString, StringBuilder::Clear);
             if (copy.view().startsWith("\\\\"))
             {
                 SC_TRY_IF(sb.append("\\\\"));

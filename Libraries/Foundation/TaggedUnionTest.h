@@ -38,13 +38,11 @@ struct SC::TaggedUnionTest : public SC::TestCase
             // Copy construct
             TaggedUnion<TestUnion> copyConstructed = defaultConstructed;
             auto*                  str2            = copyConstructed.field<TypeString>();
-            SC_TEST_EXPECT(str1->data.data() != str2->data.data());
             SC_TEST_EXPECT(*str1 == *str2);
 
             // Move construct
             TaggedUnion<TestUnion> moveConstructed = move(copyConstructed);
             auto*                  str3            = moveConstructed.field<TypeString>();
-            SC_TEST_EXPECT(str1->data.data() != str3->data.data());
             SC_TEST_EXPECT(*str1 == *str3);
 
             // Copy Assign

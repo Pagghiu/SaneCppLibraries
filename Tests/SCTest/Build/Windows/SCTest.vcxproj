@@ -328,6 +328,7 @@
     <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Build\Build.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\StringBuilder.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Hashing\Hashing.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Json\Json.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Plugin\Plugin.cpp" />

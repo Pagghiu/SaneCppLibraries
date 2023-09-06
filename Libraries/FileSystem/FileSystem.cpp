@@ -152,7 +152,7 @@ SC::ReturnCode SC::FileSystem::read(StringView path, Vector<char>& data)
 {
     text.encoding = encoding;
     SC_TRY_IF(read(file, text.data));
-    return text.pushNullTerm();
+    return StringConverter::pushNullTerm(text.data, encoding);
 }
 
 SC::ReturnCode SC::FileSystem::formatError(int errorNumber, StringView item, bool isWindowsNativeError)

@@ -24,27 +24,6 @@ bool SC::String::assign(const StringView& sv)
     return res;
 }
 
-bool SC::String::popNulltermIfExists()
-{
-    const auto sizeOfZero = StringEncodingGetSize(encoding);
-    const auto dataSize   = data.size();
-    if (dataSize >= sizeOfZero)
-    {
-        return data.resizeWithoutInitializing(dataSize - sizeOfZero);
-    }
-    return true;
-}
-
-bool SC::String::pushNullTerm()
-{
-    auto numZeros = StringEncodingGetSize(encoding);
-    while (numZeros--)
-    {
-        SC_TRY_IF(data.push_back(0));
-    }
-    return true;
-}
-
 SC::StringView SC::String::view() const
 {
     if (data.isEmpty())

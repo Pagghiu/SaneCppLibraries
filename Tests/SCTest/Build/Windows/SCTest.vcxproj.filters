@@ -134,6 +134,9 @@
     <ClCompile Include="..\..\..\..\Libraries\Hashing\Hashing.cpp">
       <Filter>Hashing</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\StringBuilder.cpp">
+      <Filter>Foundation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Array.h">

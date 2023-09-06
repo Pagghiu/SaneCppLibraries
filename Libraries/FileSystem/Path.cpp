@@ -472,7 +472,7 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
             if (view.startsWith("\\\\"))
             {
                 // TODO: This is not very good, find a better way
-                String        other = output->encoding;
+                String        other = output->getEncoding();
                 StringBuilder sb(other);
                 SC_TRY_IF(sb.append("\\\\"))
                 SC_TRY_IF(sb.append(output->view().sliceStart(2)));

@@ -45,6 +45,10 @@ struct SC::StringConverter
 
     [[nodiscard]] bool setTextLengthInBytesIncludingTerminator(size_t newDataSize);
 
+    [[nodiscard]] static bool popNulltermIfExists(Vector<char>& stringData, StringEncoding encoding);
+
+    [[nodiscard]] static bool pushNullTerm(Vector<char>& stringData, StringEncoding encoding);
+
   private:
     String& text;
     /// Appends the input string null terminated

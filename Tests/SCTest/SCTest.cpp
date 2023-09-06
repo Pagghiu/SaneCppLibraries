@@ -86,6 +86,7 @@ void runSpecificTests(TestReport& report)
 
 #endif
 
+#include "../../Libraries/FileSystem/Path.h"
 #include "../../Libraries/Foundation/SmallVector.h"
 #include "../../Libraries/System/System.h"
 #include "../../Libraries/Testing/Test.h"

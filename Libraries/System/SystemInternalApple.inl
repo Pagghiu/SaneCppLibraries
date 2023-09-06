@@ -1,6 +1,7 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#include "../Foundation/SmallVector.h"
 #include "System.h"
 
 #include <mach-o/dyld.h>
@@ -20,16 +21,17 @@ OBJC_EXPORT      Class _Nullable objc_lookUpClass(const char* _Nonnull name) OBJ
 
 bool SC::SystemDirectories::init()
 {
-
-    uint32_t executable_length = 0;
+    SmallVector<char, StaticPathSize> data;
+    uint32_t                          executable_length = 0;
     _NSGetExecutablePath(NULL, &executable_length);
-    SC_TRY_IF(executableFile.assign(""_u8));
+    executableFile = String(StringEncoding::Utf8);
     if (executable_length > 1)
     {
-        SC_TRY_IF(executableFile.data.resizeWithoutInitializing(executable_length));
+        SC_TRY_IF(data.resizeWithoutInitializing(executable_length));
         // Writes also the null terminator, but assert just in case
-        _NSGetExecutablePath(executableFile.data.data(), &executable_length);
-        SC_TRY_IF(executableFile.data[executable_length - 1] == 0);
+        _NSGetExecutablePath(data.data(), &executable_length);
+        SC_TRY_IF(data[executable_length - 1] == 0);
+        executableFile = SmallString<StaticPathSize>(move(data), StringEncoding::Utf8);
     }
 
 #if 1

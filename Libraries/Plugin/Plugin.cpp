@@ -186,8 +186,7 @@ SC::ReturnCode SC::PluginScanner::scanDirectory(const StringView directory, Vect
                 SC_TRY_IF(pluginFile.absolutePath.assign(item.path));
                 SC_TRY_IF(pluginDefinition.files.push_back(move(pluginFile)));
             }
-            file.data.clear();
-            SC_TRY_IF(fs.read(item.path, file.data));
+            SC_TRY_IF(fs.read(item.path, file, StringEncoding::Ascii));
             StringView extracted;
             if (PluginDefinition::find(file.view(), extracted))
             {
@@ -237,9 +236,7 @@ SC::ReturnCode SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
             if (fswalker.get().isDirectory())
             {
                 const StringView candidate = fswalker.get().name;
-                compiler.compilerPath.data.clear();
-                compiler.linkerPath.data.clear();
-                StringBuilder compilerBuilder(compiler.compilerPath);
+                StringBuilder    compilerBuilder(compiler.compilerPath, StringBuilder::Clear);
                 SC_TRY_IF(compilerBuilder.append(base));
                 SC_TRY_IF(compilerBuilder.append(L"/"));
                 SC_TRY_IF(compilerBuilder.append(candidate));

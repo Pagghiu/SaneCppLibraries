@@ -34,5 +34,5 @@ SC::ReturnCode SC::FileDescriptor::readUntilEOF(Vector<char_t>& destination)
 SC::ReturnCode SC::FileDescriptor::readUntilEOF(String& destination)
 {
     SC_TRY_IF(readUntilEOF(destination.data));
-    return destination.pushNullTerm();
+    return StringConverter::pushNullTerm(destination.data, destination.encoding);
 }

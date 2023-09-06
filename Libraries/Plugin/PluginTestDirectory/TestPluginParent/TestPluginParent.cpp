@@ -1,16 +1,18 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#include <SC/Libraries/Foundation/SmallVector.h>
 #include <SC/Libraries/Foundation/String.h>
 #include <SC/Libraries/Plugin/PluginMacros.h>
 #include <SC/Libraries/System/Console.h>
 
 struct TestPluginParent
 {
-    SC::StringNative<1024> consoleBuffer;
-    SC::Console            console;
+    SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> consoleBuffer;
 
-    TestPluginParent() : console(consoleBuffer.data) {}
+    SC::Console console;
+
+    TestPluginParent() : console(consoleBuffer) {}
 
     [[nodiscard]] bool init()
     {

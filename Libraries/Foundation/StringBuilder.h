@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "String.h"
+#include "StringConverter.h"
 
 namespace SC
 {
@@ -14,13 +15,8 @@ struct StringBuilder
         Clear,
         DoNotClear
     };
-    constexpr StringBuilder(String& backingString, Flags f = DoNotClear) : backingString(backingString)
-    {
-        if (f == Clear)
-        {
-            clear();
-        }
-    }
+    StringBuilder(Vector<char>& stringData, StringEncoding encoding, Flags f = DoNotClear);
+    StringBuilder(String& str, Flags f = DoNotClear);
 
     template <typename... Types>
     [[nodiscard]] bool format(StringView fmt, Types&&... args)
@@ -29,18 +25,12 @@ struct StringBuilder
         return append(fmt, forward<Types>(args)...);
     }
 
-    [[nodiscard]] bool format(StringView text)
-    {
-        clear();
-        return append(text);
-    }
-
     template <typename... Types>
     [[nodiscard]] bool append(StringView fmt, Types&&... args)
     {
-        SC_TRY_IF(backingString.popNulltermIfExists());
-        StringFormatOutput sfo(backingString.getEncoding());
-        sfo.redirectToBuffer(backingString.data);
+        SC_TRY_IF(StringConverter::popNulltermIfExists(stringData, encoding));
+        StringFormatOutput sfo(encoding);
+        sfo.redirectToBuffer(stringData);
         if (fmt.getEncoding() == StringEncoding::Ascii || fmt.getEncoding() == StringEncoding::Utf8)
         {
             // It's ok parsing format string '{' and '}' both for utf8 and ascii with StringIteratorASCII
@@ -49,6 +39,8 @@ struct StringBuilder
         }
         return false; // UTF16/32 format strings are not supported
     }
+
+    [[nodiscard]] bool format(StringView text);
 
     [[nodiscard]] bool append(StringView str);
 
@@ -59,8 +51,11 @@ struct StringBuilder
     [[nodiscard]] bool appendHex(SpanVoid<const void> data);
 
   private:
-    void clear() { backingString.data.clearWithoutInitializing(); }
+    StringView view() const;
 
-    String& backingString;
+    void clear();
+
+    Vector<char>&  stringData;
+    StringEncoding encoding;
 };
 } // namespace SC

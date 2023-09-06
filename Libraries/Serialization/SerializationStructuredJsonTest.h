@@ -52,13 +52,15 @@ struct SC::SerializationStructuredJsonTest : public SC::TestCase
             R"({"x":2,"y":1.50,"xy":[1,3],"myTest":"asdf","myVector":["Str1","Str2"]})"_a8;
         if (test_section("JsonWriterFast"))
         {
-            Test               test;
-            SmallString<256>   buffer;
-            StringFormatOutput output(StringEncoding::Ascii);
-            output.redirectToBuffer(buffer.data);
+            Test                   test;
+            SmallVector<char, 256> buffer;
+            StringFormatOutput     output(StringEncoding::Ascii);
+            output.redirectToBuffer(buffer);
             SerializationStructuredTemplate::SerializationJsonWriter writer(output);
             SC_TEST_EXPECT(SerializationStructuredTemplate::serialize(test, writer));
-            SC_TEST_EXPECT(buffer.view() == simpleJson);
+            (void)StringConverter::popNulltermIfExists(buffer, StringEncoding::Ascii);
+            const StringView bufferView(buffer.data(), buffer.size(), false, StringEncoding::Ascii);
+            SC_TEST_EXPECT(bufferView == simpleJson);
         }
         if (test_section("JsonReaderFast"))
         {

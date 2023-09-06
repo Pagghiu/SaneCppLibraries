@@ -1,6 +1,7 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#include <SC/Libraries/Foundation/SmallVector.h>
 #include <SC/Libraries/Foundation/String.h>
 #include <SC/Libraries/Plugin/PluginMacros.h>
 #include <SC/Libraries/System/Console.h>
@@ -8,10 +9,11 @@ SC::StringView externallyDefinedFunc();
 
 struct TestPluginChild
 {
-    SC::StringNative<1024> consoleBuffer;
-    SC::Console            console;
+    SC::SmallVector<char, 1024 * sizeof(SC::utf_char_t)> consoleBuffer;
 
-    TestPluginChild() : console(consoleBuffer.data) { console.printLine("TestPluginChild original Start"); }
+    SC::Console console;
+
+    TestPluginChild() : console(consoleBuffer) { console.printLine("TestPluginChild original Start"); }
 
     ~TestPluginChild() { console.printLine("TestPluginChild original End"); }
 

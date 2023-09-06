@@ -137,10 +137,9 @@ struct SC::FileSystem::Internal
         }
         shFileOp.fFlags = FOF_SILENT | FOF_NOCONFIRMMKDIR | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NO_UI;
         shFileOp.wFunc  = FO_COPY;
-        SC_TRY_IF(StringConverter(sourceDirectory).appendNullTerminated(L"\\*"));
+        SC_TRY_IF(StringConverter(sourceDirectory).appendNullTerminated(L"\\*\0"));
+        SC_TRY_IF(StringConverter(destinationDirectory).appendNullTerminated(L"\0"));
         // SHFileOperationW needs two null termination bytes
-        SC_TRY_IF(sourceDirectory.pushNullTerm());
-        SC_TRY_IF(destinationDirectory.pushNullTerm());
         shFileOp.pFrom = sourceDirectory.view().getNullTerminatedNative();
         shFileOp.pTo   = dest;
         const int res  = SHFileOperationW(&shFileOp);
@@ -154,7 +153,7 @@ struct SC::FileSystem::Internal
         shFileOp.fFlags = FOF_SILENT | FOF_NOCONFIRMMKDIR | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NO_UI;
         shFileOp.wFunc  = FO_DELETE;
         // SHFileOperationW needs two null termination bytes
-        SC_TRY_IF(sourceDirectory.pushNullTerm());
+        SC_TRY_IF(StringConverter(sourceDirectory).appendNullTerminated(L"\0"));
         shFileOp.pFrom = sourceDirectory.view().getNullTerminatedNative();
         const int res  = SHFileOperationW(&shFileOp);
         return res == 0;

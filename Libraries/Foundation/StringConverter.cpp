@@ -208,7 +208,7 @@ bool SC::StringConverter::convertNullTerminateFastPath(StringView input, StringV
 
 bool SC::StringConverter::appendNullTerminated(StringView input)
 {
-    SC_TRY_IF(text.popNulltermIfExists());
+    SC_TRY_IF(popNulltermIfExists(text.data, text.encoding));
     return internalAppend(input, nullptr);
 }
 
@@ -227,4 +227,25 @@ bool SC::StringConverter::setTextLengthInBytesIncludingTerminator(size_t newData
 bool SC::StringConverter::internalAppend(StringView input, StringView* encodedText)
 {
     return StringConverter::convertEncodingTo(text.getEncoding(), input, text.data, encodedText);
+}
+
+bool SC::StringConverter::popNulltermIfExists(Vector<char>& stringData, StringEncoding encoding)
+{
+    const auto sizeOfZero = StringEncodingGetSize(encoding);
+    const auto dataSize   = stringData.size();
+    if (dataSize >= sizeOfZero)
+    {
+        return stringData.resizeWithoutInitializing(dataSize - sizeOfZero);
+    }
+    return true;
+}
+
+bool SC::StringConverter::pushNullTerm(Vector<char>& stringData, StringEncoding encoding)
+{
+    auto numZeros = StringEncodingGetSize(encoding);
+    while (numZeros--)
+    {
+        SC_TRY_IF(stringData.push_back(0));
+    }
+    return true;
 }
