@@ -95,11 +95,12 @@ struct SC::SocketDescriptorTest : public SC::TestCase
             SC_TEST_EXPECT(acceptedClientSocket.isValid());
             char         buf[1] = {0};
             SocketClient acceptedClient(acceptedClientSocket);
-            SC_TEST_EXPECT(acceptedClient.read({buf, sizeof(buf)}));
+            Span<char>   readData;
+            SC_TEST_EXPECT(acceptedClient.read({buf, sizeof(buf)}, readData));
             SC_TEST_EXPECT(buf[0] == testValue and testValue != 0);
-            SC_TEST_EXPECT(not acceptedClient.readWithTimeout({buf, sizeof(buf)}, 10_ms));
+            SC_TEST_EXPECT(not acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, 10_ms));
             params.eventObject.signal();
-            SC_TEST_EXPECT(acceptedClient.readWithTimeout({buf, sizeof(buf)}, 10000_ms));
+            SC_TEST_EXPECT(acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, 10000_ms));
             SC_TEST_EXPECT(buf[0] == testValue + 1);
             SC_TEST_EXPECT(acceptedClient.close());
             SC_TEST_EXPECT(server.close());

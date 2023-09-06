@@ -145,9 +145,13 @@ SC::ReturnCode SC::SocketServer::listen(StringView interfaceAddress, uint16_t po
     SC_TRUST_RESULT(socket.get(listenSocket, "invalid listen socket"_a8));
 
     // TODO: Expose SO_REUSEADDR as an option?
-#if !SC_PLATFORM_EMSCRIPTEN
-    char value = 1;
+    int value = 1;
+#if SC_PLATFORM_WINDOWS
+    setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&value), sizeof(value));
+#elif !SC_PLATFORM_EMSCRIPTEN
     setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
+#else
+    SC_UNUSED(value);
 #endif
     if (::bind(listenSocket, &nativeAddress.handle.reinterpret_as<const struct sockaddr>(),
                nativeAddress.sizeOfHandle()) == SOCKET_ERROR)
@@ -228,7 +232,7 @@ SC::ReturnCode SC::SocketClient::write(Span<const char> data)
     return true;
 }
 
-SC::ReturnCode SC::SocketClient::read(Span<char> data)
+SC::ReturnCode SC::SocketClient::read(Span<char> data, Span<char>& readData)
 {
     SocketDescriptor::Handle nativeSocket;
     SC_TRY_IF(socket.get(nativeSocket, "Invalid socket"_a8));
@@ -237,15 +241,16 @@ SC::ReturnCode SC::SocketClient::read(Span<char> data)
 #else
     const auto sizeInBytes = data.sizeInBytes();
 #endif
-    const auto result = ::recv(nativeSocket, data.data(), sizeInBytes, 0);
-    if (result < 0)
+    const auto recvSize = ::recv(nativeSocket, data.data(), sizeInBytes, 0);
+    if (recvSize < 0)
     {
         return "recv error"_a8;
     }
+    readData = {data.data(), static_cast<size_t>(recvSize)};
     return true;
 }
 
-SC::ReturnCode SC::SocketClient::readWithTimeout(Span<char> data, IntegerMilliseconds timeout)
+SC::ReturnCode SC::SocketClient::readWithTimeout(Span<char> data, Span<char>& readData, IntegerMilliseconds timeout)
 {
     SocketDescriptor::Handle nativeSocket;
     SC_TRY_IF(socket.get(nativeSocket, "Invalid socket"_a8));
@@ -268,7 +273,7 @@ SC::ReturnCode SC::SocketClient::readWithTimeout(Span<char> data, IntegerMillise
     }
     if (FD_ISSET(nativeSocket, &fds))
     {
-        return read(data);
+        return read(data, readData);
     }
     return false;
 }

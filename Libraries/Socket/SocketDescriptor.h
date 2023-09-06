@@ -6,6 +6,7 @@
 #include "../Foundation/Opaque.h"
 #include "../Foundation/Optional.h"
 #include "../Foundation/Result.h"
+#include "../System/Time.h" // IntegerMilliseconds
 
 namespace SC
 {
@@ -139,8 +140,8 @@ struct SC::SocketClient
     [[nodiscard]] ReturnCode connect(SocketIPAddress ipAddress);
     [[nodiscard]] ReturnCode close();
     [[nodiscard]] ReturnCode write(Span<const char> data);
-    [[nodiscard]] ReturnCode read(Span<char> data);
-    [[nodiscard]] ReturnCode readWithTimeout(Span<char> data, IntegerMilliseconds timeout);
+    [[nodiscard]] ReturnCode read(Span<char> data, Span<char>& readData);
+    [[nodiscard]] ReturnCode readWithTimeout(Span<char> data, Span<char>& readData, IntegerMilliseconds timeout);
 
   private:
     SocketDescriptor& socket;
