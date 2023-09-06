@@ -28,15 +28,40 @@ struct Span
         sizeBytes = ilist.size() * sizeof(Type);
     }
 
-    constexpr const Type* begin() const { return items; }
-    constexpr const Type* end() const { return items + sizeBytes / sizeof(Type); }
-    constexpr const Type* data() const { return items; }
-    constexpr Type*       begin() { return items; }
-    constexpr Type*       end() { return items + sizeBytes / sizeof(Type); }
-    constexpr Type*       data() { return items; }
-    constexpr Size        sizeInElements() const { return sizeBytes / sizeof(Type); }
-    constexpr Size        sizeInBytes() const { return sizeBytes; }
-    constexpr void        setSizeInBytes(Size newSize) { sizeBytes = newSize; }
+    [[nodiscard]] constexpr const Type* begin() const { return items; }
+    [[nodiscard]] constexpr const Type* end() const { return items + sizeBytes / sizeof(Type); }
+    [[nodiscard]] constexpr const Type* data() const { return items; }
+
+    [[nodiscard]] constexpr Type* begin() { return items; }
+    [[nodiscard]] constexpr Type* end() { return items + sizeBytes / sizeof(Type); }
+    [[nodiscard]] constexpr Type* data() { return items; }
+
+    [[nodiscard]] constexpr Size sizeInElements() const { return sizeBytes / sizeof(Type); }
+    [[nodiscard]] constexpr Size sizeInBytes() const { return sizeBytes; }
+
+    [[nodiscard]] constexpr bool sliceStart(Size offsetInElements, Span& other) const
+    {
+        if (offsetInElements <= sizeInElements())
+        {
+            other = Span(items + offsetInElements, (sizeInElements() - offsetInElements) * sizeof(Type));
+            return true;
+        }
+        return false;
+    }
+
+    [[nodiscard]] constexpr bool sliceStartLength(Size offsetInElements, Size lengthInElements, Span& other) const
+    {
+        if (offsetInElements + lengthInElements <= sizeInElements())
+        {
+            other = Span(items + offsetInElements, lengthInElements * sizeof(Type));
+            return true;
+        }
+        return false;
+    }
+
+    [[nodiscard]] constexpr Span<const Type> asConst() const { return {items, sizeBytes}; }
+
+    [[nodiscard]] constexpr bool empty() const { return sizeBytes == 0; }
 
   private:
     Type* items;

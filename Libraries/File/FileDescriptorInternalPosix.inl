@@ -230,18 +230,14 @@ SC::ReturnCode SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRea
 {
     const ssize_t res = ::pread(handle, data.data(), data.sizeInBytes(), static_cast<off_t>(offset));
     SC_TRY_MSG(res >= 0, "pread failed"_a8);
-    actuallyRead = data;
-    actuallyRead.setSizeInBytes(static_cast<size_t>(res));
-    return true;
+    return data.sliceStartLength(0, static_cast<size_t>(res), actuallyRead);
 }
 
 SC::ReturnCode SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
 {
     const ssize_t res = ::read(handle, data.data(), data.sizeInBytes());
     SC_TRY_MSG(res >= 0, "read failed"_a8);
-    actuallyRead = data;
-    actuallyRead.setSizeInBytes(static_cast<size_t>(res));
-    return true;
+    return data.sliceStartLength(0, static_cast<size_t>(res), actuallyRead);
 }
 
 // PipeDescriptor

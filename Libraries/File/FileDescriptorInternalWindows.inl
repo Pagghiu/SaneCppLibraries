@@ -203,9 +203,7 @@ SC::ReturnCode SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRea
     const BOOL res =
         ::ReadFile(handle, data.data(), static_cast<DWORD>(data.sizeInBytes()), &numberOfReadBytes, nullptr);
     SC_TRY_MSG(res, "ReadFile failed"_a8);
-    actuallyRead = data;
-    actuallyRead.setSizeInBytes(static_cast<size_t>(numberOfReadBytes));
-    return true;
+    return data.sliceStartLength(0, static_cast<size_t>(numberOfReadBytes), actuallyRead);
 }
 
 // PipeDescriptor
