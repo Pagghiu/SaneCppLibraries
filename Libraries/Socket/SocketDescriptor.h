@@ -105,8 +105,6 @@ struct SC::SocketDescriptor : public UniqueTaggedHandleTraits<SocketDescriptorTr
                                     SocketFlags::ProtocolType    protocol    = SocketFlags::ProtocolTcp,
                                     SocketFlags::BlockingType    blocking    = SocketFlags::Blocking,
                                     SocketFlags::InheritableType inheritable = SocketFlags::NonInheritable);
-    [[nodiscard]] ReturnCode createAsyncTCPSocketIPV6();
-    [[nodiscard]] ReturnCode createAsyncTCPSocketIPV4();
     [[nodiscard]] ReturnCode isInheritable(bool& value) const;
     [[nodiscard]] ReturnCode setInheritable(bool value);
     [[nodiscard]] ReturnCode setBlocking(bool value);
@@ -123,8 +121,7 @@ struct SC::SocketServer
 {
     SocketServer(SocketDescriptor& socket) : socket(socket) {}
 
-    [[nodiscard]] ReturnCode listen(StringView interfaceAddress, uint16_t port,
-                                    uint32_t numberOfWaitingConnections = 1);
+    [[nodiscard]] ReturnCode listen(SocketIPAddress nativeAddress, uint32_t numberOfWaitingConnections = 511);
     [[nodiscard]] ReturnCode close();
     [[nodiscard]] ReturnCode accept(SocketFlags::AddressFamily addressFamily, SocketDescriptor& newClient);
 

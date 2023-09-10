@@ -52,19 +52,12 @@ struct SC::SocketDescriptorTest : public SC::TestCase
             SocketDescriptor serverSocket;
             SocketServer     server(serverSocket);
             // Look for an available port
-            constexpr int    startTcpPort = 5050;
-            uint16_t         tcpPort;
-            ReturnCode       bound         = true;
+            constexpr int    tcpPort       = 5050;
             const StringView serverAddress = "::1"; //"127.0.0.1"
-            for (tcpPort = startTcpPort; tcpPort < startTcpPort + 10; ++tcpPort)
-            {
-                bound = server.listen(serverAddress, tcpPort);
-                if (bound)
-                {
-                    break;
-                }
-            }
-            SC_TEST_EXPECT(bound);
+            SocketIPAddress  nativeAddress;
+            SC_TEST_EXPECT(nativeAddress.fromAddressPort(serverAddress, tcpPort));
+            SC_TEST_EXPECT(serverSocket.create(nativeAddress.getAddressFamily()));
+            SC_TEST_EXPECT(server.listen(nativeAddress, tcpPort));
             constexpr char testValue = 123;
             struct Params
             {

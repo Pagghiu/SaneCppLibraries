@@ -67,18 +67,6 @@ struct NetworkingInternal
     }
 };
 } // namespace SC
-SC::ReturnCode SC::SocketDescriptor::createAsyncTCPSocketIPV6()
-{
-    return create(SocketFlags::AddressFamilyIPV6, SocketFlags::SocketStream, SocketFlags::ProtocolTcp,
-                  SocketFlags::NonBlocking, SocketFlags::NonInheritable);
-}
-
-SC::ReturnCode SC::SocketDescriptor::createAsyncTCPSocketIPV4()
-{
-
-    return create(SocketFlags::AddressFamilyIPV4, SocketFlags::SocketStream, SocketFlags::ProtocolTcp,
-                  SocketFlags::NonBlocking, SocketFlags::NonInheritable);
-}
 
 SC::ReturnCode SC::SocketDescriptor::getAddressFamily(SocketFlags::AddressFamily& addressFamily) const
 {
@@ -130,17 +118,10 @@ SC::ReturnCode SC::SocketServer::close() { return socket.close(); }
 
 // TODO: Add EINTR checks for all SocketServer/SocketClient os calls.
 
-SC::ReturnCode SC::SocketServer::listen(StringView interfaceAddress, uint16_t port, uint32_t numberOfWaitingConnections)
+SC::ReturnCode SC::SocketServer::listen(SocketIPAddress nativeAddress, uint32_t numberOfWaitingConnections)
 {
     SC_TRY_IF(SystemFunctions::isNetworkingInited());
-
-    SocketIPAddress nativeAddress;
-    SC_TRY_IF(nativeAddress.fromAddressPort(interfaceAddress, port));
-    if (not socket.isValid())
-    {
-        SC_TRY_IF(socket.create(nativeAddress.getAddressFamily(), SocketFlags::SocketStream, SocketFlags::ProtocolTcp));
-    }
-
+    SC_TRY_MSG(socket.isValid(), "Invalid socket"_a8);
     SocketDescriptor::Handle listenSocket;
     SC_TRUST_RESULT(socket.get(listenSocket, "invalid listen socket"_a8));
 

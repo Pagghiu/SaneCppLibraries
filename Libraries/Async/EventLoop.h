@@ -103,6 +103,8 @@ struct SC::Async
         Write,
     };
 
+    static StringView TypeToString(Type type);
+
     enum class State : uint8_t
     {
         Free,       // not in any queue
@@ -118,6 +120,8 @@ struct SC::Async
     EventLoop* eventLoop = nullptr;
     Async*     next      = nullptr;
     Async*     prev      = nullptr;
+
+    const char* debugName = "None";
 
     State state = State::Free;
 
@@ -139,9 +143,9 @@ struct SC::AsyncResult
 
     using Type = Async::Type;
 
-    void* userData = nullptr;
-
-    AsyncResult(void* userData) : userData(userData) {}
+    void*   userData = nullptr;
+    int32_t index    = 0;
+    AsyncResult(void* userData, int32_t index) : userData(userData), index(index) {}
     // TODO: Add AsyncResult error
 
     void rearm(bool value) { doRearm = value; }
@@ -269,21 +273,27 @@ struct SC::AsyncWrite : public Async
 
 struct SC::AsyncTimeoutResult : public AsyncResult
 {
-    AsyncTimeoutResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asTimeout()) {}
+    AsyncTimeoutResult(Async& async, void* userData, int32_t index)
+        : AsyncResult(userData, index), async(*async.asTimeout())
+    {}
 
     AsyncTimeout& async;
 };
 
 struct SC::AsyncWakeUpResult : public AsyncResult
 {
-    AsyncWakeUpResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asWakeUp()) {}
+    AsyncWakeUpResult(Async& async, void* userData, int32_t index)
+        : AsyncResult(userData, index), async(*async.asWakeUp())
+    {}
 
     AsyncWakeUp& async;
 };
 
 struct SC::AsyncProcessExitResult : public AsyncResult
 {
-    AsyncProcessExitResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asProcessExit()) {}
+    AsyncProcessExitResult(Async& async, void* userData, int32_t index)
+        : AsyncResult(userData, index), async(*async.asProcessExit())
+    {}
 
     AsyncProcessExit&             async;
     ProcessDescriptor::ExitStatus exitStatus;
@@ -291,7 +301,9 @@ struct SC::AsyncProcessExitResult : public AsyncResult
 
 struct SC::AsyncAcceptResult : public AsyncResult
 {
-    AsyncAcceptResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asAccept()) {}
+    AsyncAcceptResult(Async& async, void* userData, int32_t index)
+        : AsyncResult(userData, index), async(*async.asAccept())
+    {}
 
     AsyncAccept&     async;
     SocketDescriptor acceptedClient;
@@ -299,28 +311,34 @@ struct SC::AsyncAcceptResult : public AsyncResult
 
 struct SC::AsyncConnectResult : public AsyncResult
 {
-    AsyncConnectResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asConnect()) {}
+    AsyncConnectResult(Async& async, void* userData, int32_t index)
+        : AsyncResult(userData, index), async(*async.asConnect())
+    {}
 
     AsyncConnect& async;
 };
 
 struct SC::AsyncSendResult : public AsyncResult
 {
-    AsyncSendResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asSend()) {}
+    AsyncSendResult(Async& async, void* userData, int32_t index) : AsyncResult(userData, index), async(*async.asSend())
+    {}
 
     AsyncSend& async;
 };
 
 struct SC::AsyncReceiveResult : public AsyncResult
 {
-    AsyncReceiveResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asReceive()) {}
+    AsyncReceiveResult(Async& async, void* userData, int32_t index)
+        : AsyncResult(userData, index), async(*async.asReceive())
+    {}
     Span<char>    readData;
     AsyncReceive& async;
 };
 
 struct SC::AsyncReadResult : public AsyncResult
 {
-    AsyncReadResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asRead()) {}
+    AsyncReadResult(Async& async, void* userData, int32_t index) : AsyncResult(userData, index), async(*async.asRead())
+    {}
 
     AsyncRead& async;
     Span<char> readData;
@@ -328,7 +346,9 @@ struct SC::AsyncReadResult : public AsyncResult
 
 struct SC::AsyncWriteResult : public AsyncResult
 {
-    AsyncWriteResult(Async& async, void* userData) : AsyncResult(userData), async(*async.asWrite()) {}
+    AsyncWriteResult(Async& async, void* userData, int32_t index)
+        : AsyncResult(userData, index), async(*async.asWrite())
+    {}
 
     AsyncWrite& async;
     size_t      writtenBytes = 0;
@@ -402,6 +422,11 @@ struct SC::EventLoop
 
     int getTotalNumberOfActiveHandle() const;
 
+    ReturnCode createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor);
+
+    ReturnCode associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor);
+    ReturnCode associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor);
+
   private:
     int numberOfActiveHandles = 0;
     int numberOfTimers        = 0;
@@ -451,6 +476,11 @@ struct SC::EventLoop
 
     // Phases
     [[nodiscard]] ReturnCode stageSubmissions(KernelQueue& queue);
+    [[nodiscard]] ReturnCode activateAsync(KernelQueue& queue, Async& async);
+    [[nodiscard]] ReturnCode cancelAsync(KernelQueue& queue, Async& async);
+    [[nodiscard]] ReturnCode stageAsync(KernelQueue& queue, Async& async);
+
+    static void completeAsync(KernelQueue& queue, Async& async, void* userData, int32_t eventIndex, bool& reactivate);
 
     enum class PollMode
     {

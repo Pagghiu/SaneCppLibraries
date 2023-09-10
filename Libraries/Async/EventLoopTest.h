@@ -177,9 +177,12 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.create());
 
             constexpr uint32_t numWaitingConnections = 2;
-            SocketDescriptor   server;
+            SocketDescriptor   serverSocket;
             uint16_t           tcpPort = 5050;
-            SC_TEST_EXPECT(SocketServer(server).listen("127.0.0.1", tcpPort, numWaitingConnections));
+            SocketIPAddress    nativeAddress;
+            SC_TEST_EXPECT(nativeAddress.fromAddressPort("127.0.0.1", tcpPort));
+            SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
+            SC_TEST_EXPECT(SocketServer(serverSocket).listen(nativeAddress, numWaitingConnections));
 
             int              acceptedCount = 0;
             SocketDescriptor acceptedClient[3];
@@ -191,7 +194,7 @@ struct SC::EventLoopTest : public SC::TestCase
                 res.rearm(true);
             };
             AsyncAccept accept;
-            SC_TEST_EXPECT(eventLoop.startAccept(accept, server, onAccepted));
+            SC_TEST_EXPECT(eventLoop.startAccept(accept, serverSocket, onAccepted));
 
             SocketDescriptor client1, client2;
             SC_TEST_EXPECT(SocketClient(client1).connect("127.0.0.1", tcpPort));
@@ -221,7 +224,7 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.runNoWait());
 
             SC_TEST_EXPECT(not acceptedClient[2].isValid());
-            SC_TEST_EXPECT(server.close());
+            SC_TEST_EXPECT(serverSocket.close());
             SC_TEST_EXPECT(eventLoop.close());
         }
     }
@@ -233,10 +236,13 @@ struct SC::EventLoopTest : public SC::TestCase
             EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
-            SocketDescriptor server;
+            SocketDescriptor serverSocket;
             uint16_t         tcpPort        = 5050;
             StringView       connectAddress = "::1";
-            SC_TEST_EXPECT(SocketServer(server).listen(connectAddress, tcpPort, 0));
+            SocketIPAddress  nativeAddress;
+            SC_TEST_EXPECT(nativeAddress.fromAddressPort(connectAddress, tcpPort));
+            SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
+            SC_TEST_EXPECT(SocketServer(serverSocket).listen(nativeAddress, 0));
 
             int              acceptedCount = 0;
             SocketDescriptor acceptedClient[3];
@@ -248,7 +254,7 @@ struct SC::EventLoopTest : public SC::TestCase
                 res.rearm(acceptedCount < 2);
             };
             AsyncAccept accept;
-            SC_TEST_EXPECT(eventLoop.startAccept(accept, server, onAccepted));
+            SC_TEST_EXPECT(eventLoop.startAccept(accept, serverSocket, onAccepted));
 
             int  connectedCount = 0;
             auto onConnected    = [&](AsyncResult::Connect& res)
@@ -263,10 +269,10 @@ struct SC::EventLoopTest : public SC::TestCase
             AsyncConnect     connect[2];
             SocketDescriptor clients[2];
 
-            SC_TEST_EXPECT(clients[0].createAsyncTCPSocketIPV6());
+            SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), clients[0]));
             SC_TEST_EXPECT(eventLoop.startConnect(connect[0], clients[0], localHost, onConnected));
 
-            SC_TEST_EXPECT(clients[1].createAsyncTCPSocketIPV6());
+            SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), clients[1]));
             SC_TEST_EXPECT(eventLoop.startConnect(connect[1], clients[1], localHost, onConnected));
 
             SC_TEST_EXPECT(connectedCount == 0);
@@ -274,6 +280,23 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.run());
             SC_TEST_EXPECT(acceptedCount == 2);
             SC_TEST_EXPECT(connectedCount == 2);
+
+            int  receiveCalls = 0;
+            auto onReceive    = [&](AsyncResult::Receive& res)
+            {
+                SC_TEST_EXPECT(res.readData.data()[0] == 1);
+                receiveCalls++;
+            };
+
+            char       receiveBuffer[1] = {0};
+            Span<char> receiveData      = {receiveBuffer, sizeof(receiveBuffer)};
+
+            AsyncReceive receiveAsync;
+            SC_TEST_EXPECT(eventLoop.startReceive(receiveAsync, acceptedClient[0], receiveData, onReceive));
+            char v = 1;
+            SC_TEST_EXPECT(SocketClient(clients[0]).write({&v, 1}));
+            SC_TEST_EXPECT(eventLoop.run());
+            SC_TEST_EXPECT(receiveCalls == 1);
         }
     }
 
@@ -284,19 +307,23 @@ struct SC::EventLoopTest : public SC::TestCase
             EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
-            SocketDescriptor server;
+            SocketDescriptor serverSocket;
             uint16_t         tcpPort        = 5050;
             StringView       connectAddress = "::1";
-            SC_TEST_EXPECT(SocketServer(server).listen(connectAddress, tcpPort, 0));
+            SocketIPAddress  nativeAddress;
+            SC_TEST_EXPECT(nativeAddress.fromAddressPort(connectAddress, tcpPort));
+            SC_TEST_EXPECT(serverSocket.create(nativeAddress.getAddressFamily()));
+            SC_TEST_EXPECT(SocketServer(serverSocket).listen(nativeAddress, 0));
 
             SocketDescriptor client;
             SC_TEST_EXPECT(SocketClient(client).connect(connectAddress, tcpPort));
             SocketDescriptor serverSideClient;
-            SC_TEST_EXPECT(SocketServer(server).accept(SocketFlags::AddressFamilyIPV6, serverSideClient));
+            SC_TEST_EXPECT(SocketServer(serverSocket).accept(SocketFlags::AddressFamilyIPV6, serverSideClient));
             SC_TEST_EXPECT(client.setBlocking(false));
             SC_TEST_EXPECT(serverSideClient.setBlocking(false));
 
-            AsyncSend sendAsync;
+            SC_TEST_EXPECT(eventLoop.associateExternallyCreatedTCPSocket(client));
+            SC_TEST_EXPECT(eventLoop.associateExternallyCreatedTCPSocket(serverSideClient));
 
             const char sendBuffer[] = {123, 111};
 
@@ -309,6 +336,7 @@ struct SC::EventLoopTest : public SC::TestCase
                 sendCount++;
             };
 
+            AsyncSend sendAsync;
             SC_TEST_EXPECT(eventLoop.startSend(sendAsync, client, sendData, onSend));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(sendCount == 1);
@@ -354,38 +382,41 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
             SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
 
-            FileDescriptor              fd;
             FileDescriptor::OpenOptions options;
             options.async    = true;
             options.blocking = false;
-            SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, options));
 
-            AsyncWrite write;
+            FileDescriptor fd;
+            SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, options));
+            SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
 
             auto writeLambda = [&](AsyncResult::Write& res) { SC_TEST_EXPECT(res.writtenBytes == 4); };
             auto writeSpan   = StringView("test").toCharSpan();
 
             FileDescriptor::Handle handle;
             SC_TEST_EXPECT(fd.get(handle, "asd"_a8));
+
+            AsyncWrite write;
             SC_TEST_EXPECT(eventLoop.startWrite(write, handle, writeSpan, writeLambda));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(fd.close());
 
-            AsyncRead read;
-
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::ReadOnly, options));
-            char       buffer[1] = {0};
-            Span<char> readSpan  = {buffer, sizeof(buffer)};
-            int        readCount = 0;
-            char       readBuffer[4];
-            auto       readLambda = [&](AsyncResult::Read& res)
+            SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
+            SC_TEST_EXPECT(fd.get(handle, "asd"_a8));
+
+            int  readCount = 0;
+            char readBuffer[4];
+            auto readLambda = [&](AsyncResult::Read& res)
             {
                 SC_TEST_EXPECT(res.readData.sizeInBytes() == 1);
                 readBuffer[readCount++] = res.readData.data()[0];
                 res.async.offset += res.readData.sizeInBytes();
                 res.rearm(readCount < 4);
             };
-            SC_TEST_EXPECT(eventLoop.startRead(read, handle, readSpan, readLambda));
+            AsyncRead read;
+            char      buffer[1] = {0};
+            SC_TEST_EXPECT(eventLoop.startRead(read, handle, {buffer, sizeof(buffer)}, readLambda));
             SC_TEST_EXPECT(eventLoop.run());
             SC_TEST_EXPECT(fd.close());
 

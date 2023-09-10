@@ -14,6 +14,17 @@
 #include "EventLoopInternalApple.inl"
 #endif
 
+#define SC_ASYNC_PRINT_EVENTS 0
+#if SC_ASYNC_PRINT_EVENTS
+#include "../System/Console.h"
+extern SC::Console* gConsole;
+#define SC_LOG_MESSAGE(fmt, ...)                                                                                       \
+    if (gConsole)                                                                                                      \
+    gConsole->print(fmt, ##__VA_ARGS__)
+#else
+#define SC_LOG_MESSAGE(fmt, ...)
+#endif
+
 template <>
 void SC::OpaqueFuncs<SC::EventLoop::InternalTraits>::construct(Handle& buffer)
 {
@@ -23,6 +34,23 @@ template <>
 void SC::OpaqueFuncs<SC::EventLoop::InternalTraits>::destruct(Object& obj)
 {
     obj.~Object();
+}
+
+SC::StringView SC::Async::TypeToString(Type type)
+{
+    switch (type)
+    {
+    case Type::Timeout: return "Timeout"_a8;
+    case Type::WakeUp: return "WakeUp"_a8;
+    case Type::ProcessExit: return "ProcessExit"_a8;
+    case Type::Accept: return "Accept"_a8;
+    case Type::Connect: return "Connect"_a8;
+    case Type::Send: return "Send"_a8;
+    case Type::Receive: return "Receive"_a8;
+    case Type::Read: return "Read"_a8;
+    case Type::Write: return "Write"_a8;
+    }
+    SC_UNREACHABLE();
 }
 
 SC::ReturnCode SC::EventLoop::startTimeout(AsyncTimeout& async, IntegerMilliseconds expiration,
@@ -121,6 +149,7 @@ SC::ReturnCode SC::EventLoop::queueSubmission(Async& async)
 {
     const bool asyncStateIsFree      = async.state == Async::State::Free;
     const bool asyncIsNotOwnedByLoop = async.eventLoop == nullptr;
+    SC_LOG_MESSAGE("{} {} QUEUE\n", async.debugName, Async::TypeToString(async.getType()));
     SC_DEBUG_ASSERT(asyncStateIsFree and asyncIsNotOwnedByLoop);
     SC_TRY_MSG(asyncStateIsFree, "Trying to stage Async that is in use"_a8);
     SC_TRY_MSG(asyncIsNotOwnedByLoop, "Trying to add Async belonging to another Loop"_a8);
@@ -166,9 +195,9 @@ void SC::EventLoop::invokeExpiredTimers()
             async               = async->next;
             activeTimers.remove(*currentAsync);
             currentAsync->state = Async::State::Free;
-            AsyncResult::Timeout res(*currentAsync, nullptr);
+            AsyncResult::Timeout res(*currentAsync, nullptr, -1);
             res.async.eventLoop = nullptr; // Allow reusing it
-            currentAsync->asTimeout()->callback(static_cast<AsyncResult::Timeout&>(res));
+            currentAsync->asTimeout()->callback(res);
         }
         else
         {
@@ -198,8 +227,8 @@ SC::ReturnCode SC::EventLoop::stageSubmissions(SC::EventLoop::KernelQueue& queue
         switch (async->state)
         {
         case Async::State::Submitting: {
-            SC_TRY_IF(queue.stageAsync(*this, *async));
-            SC_TRY_IF(queue.activateAsync(*this, *async));
+            SC_TRY_IF(stageAsync(queue, *async));
+            SC_TRY_IF(activateAsync(queue, *async));
             async->state = Async::State::Active;
         }
         break;
@@ -209,7 +238,7 @@ SC::ReturnCode SC::EventLoop::stageSubmissions(SC::EventLoop::KernelQueue& queue
         }
         break;
         case Async::State::Cancelling: {
-            SC_TRY_IF(queue.cancelAsync(*this, *async));
+            SC_TRY_IF(cancelAsync(queue, *async));
         }
         break;
         case Async::State::Active: {
@@ -238,6 +267,7 @@ SC::ReturnCode SC::EventLoop::runNoWait() { return runStep(PollMode::NoWait); }
 SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
 {
     KernelQueue queue;
+    SC_LOG_MESSAGE("---------------\n");
 
     auto onErrorRestoreSubmissions = MakeDeferred(
         [this]
@@ -257,104 +287,184 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
 
     if (stagedHandles.isEmpty() and getTotalNumberOfActiveHandle() <= 0)
         return true; // happens when we do cancelAsync on the last active one
+    SC_LOG_MESSAGE("Active Requests Before Poll = {}\n", getTotalNumberOfActiveHandle());
     SC_TRY_IF(queue.pollAsync(*this, pollMode));
+    SC_LOG_MESSAGE("Active Requests After Poll = {}\n", getTotalNumberOfActiveHandle());
 
     Internal& self = internal.get();
     for (decltype(KernelQueue::newEvents) idx = 0; idx < queue.newEvents; ++idx)
     {
-        Async& async = *self.getAsync(queue.events[idx]);
-        if (!self.canRunCompletionFor(queue.events[idx]))
+        SC_LOG_MESSAGE(" Iteration = {}\n", (int)idx);
+        SC_LOG_MESSAGE(" Active Requests = {}\n", getTotalNumberOfActiveHandle());
+        if (not queue.shouldProcessCompletion(queue.events[idx]))
             continue;
-        void* userData = self.getUserData(queue.events[idx]);
-        bool  rearm    = false;
-        switch (async.getType())
-        {
-        case Async::Type::Timeout: {
-            AsyncResult::Timeout result(async, userData);
-            ReturnCode           res = self.runCompletionFor(result, queue.events[idx]);
-            if (res and result.async.callback.isValid())
-                result.async.callback(result);
-            rearm = result.isRearmed();
-            break;
-        }
-        case Async::Type::Read: {
-            AsyncResult::Read result(async, userData);
-            ReturnCode        res = self.runCompletionFor(result, queue.events[idx]);
-            if (res and result.async.callback.isValid())
-                result.async.callback(result);
-            rearm = result.isRearmed();
-            break;
-        }
-        case Async::Type::Write: {
-            AsyncResult::Write result(async, userData);
-            ReturnCode         res = self.runCompletionFor(result, queue.events[idx]);
-            if (res and result.async.callback.isValid())
-                result.async.callback(result);
-            rearm = result.isRearmed();
-            break;
-        }
-        case Async::Type::WakeUp: {
-            AsyncResult::WakeUp result(async, userData);
-            ReturnCode          res = self.runCompletionFor(result, queue.events[idx]);
-            if (res and result.async.callback.isValid())
-                result.async.callback(result);
-            rearm = result.isRearmed();
-            break;
-        }
-        case Async::Type::ProcessExit: {
-            AsyncResult::ProcessExit result(async, userData);
-            ReturnCode               res = self.runCompletionFor(result, queue.events[idx]);
-            if (res and result.async.callback.isValid())
-                result.async.callback(result);
-            rearm = result.isRearmed();
-            break;
-        }
-        case Async::Type::Accept: {
-            AsyncResult::Accept result(async, userData);
-            ReturnCode          res = self.runCompletionFor(result, queue.events[idx]);
-            if (res and result.async.callback.isValid())
-                result.async.callback(result);
-            rearm = result.isRearmed();
-            break;
-        }
-        case Async::Type::Connect: {
-            AsyncResult::Connect result(async, userData);
-            ReturnCode           res = self.runCompletionFor(result, queue.events[idx]);
-            if (res and result.async.callback.isValid())
-                result.async.callback(result);
-            rearm = result.isRearmed();
-            break;
-        }
-        case Async::Type::Send: {
-            AsyncResult::Send result(async, userData);
-            ReturnCode        res = self.runCompletionFor(result, queue.events[idx]);
-            if (res and result.async.callback.isValid())
-                result.async.callback(result);
-            rearm = result.isRearmed();
-            break;
-        }
-        case Async::Type::Receive: {
-            AsyncResult::Receive result(async, userData);
-            ReturnCode           res = self.runCompletionFor(result, queue.events[idx]);
-            if (res and result.async.callback.isValid())
-                result.async.callback(result);
-            rearm = result.isRearmed();
-            break;
-        }
-        }
+        bool   reactivate = false;
+        void*  userData   = self.getUserData(queue.events[idx]);
+        Async& async      = *self.getAsync(queue.events[idx]);
 
-        switch (async.state)
+        completeAsync(queue, async, userData, static_cast<int32_t>(idx), reactivate);
+
+        if (async.state == Async::State::Active)
         {
-        case Async::State::Active: SC_TRY_IF(queue.rearmOrCancel(*this, async, rearm)); break;
-        default: break;
+            if (reactivate)
+            {
+                SC_TRY_IF(activateAsync(queue, async));
+            }
+            else
+            {
+                SC_TRY_IF(cancelAsync(queue, async));
+            }
         }
     }
+    SC_LOG_MESSAGE("Active Requests After Completion = {}\n", getTotalNumberOfActiveHandle());
+    return true;
+}
 
+SC::ReturnCode SC::EventLoop::stageAsync(KernelQueue& queue, Async& async)
+{
+    SC_LOG_MESSAGE("{} {} SETUP\n", async.debugName, Async::TypeToString(async.getType()));
+    switch (async.getType())
+    {
+    case Async::Type::Timeout:
+        activeTimers.queueBack(async);
+        numberOfTimers += 1;
+        return true;
+    case Async::Type::WakeUp:
+        activeWakeUps.queueBack(async);
+        numberOfWakeups += 1;
+        return true;
+    case Async::Type::ProcessExit: SC_TRY_IF(queue.setupAsync(*async.asProcessExit())); break;
+    case Async::Type::Accept: SC_TRY_IF(queue.setupAsync(*async.asAccept())); break;
+    case Async::Type::Connect: SC_TRY_IF(queue.setupAsync(*async.asConnect())); break;
+    case Async::Type::Send: SC_TRY_IF(queue.setupAsync(*async.asSend())); break;
+    case Async::Type::Receive: SC_TRY_IF(queue.setupAsync(*async.asReceive())); break;
+    case Async::Type::Read: SC_TRY_IF(queue.setupAsync(*async.asRead())); break;
+    case Async::Type::Write: SC_TRY_IF(queue.setupAsync(*async.asWrite())); break;
+    }
+    return queue.pushStagedAsync(async);
+}
+
+SC::ReturnCode SC::EventLoop::activateAsync(KernelQueue& queue, Async& async)
+{
+    SC_LOG_MESSAGE("{} {} ACTIVATE\n", async.debugName, Async::TypeToString(async.getType()));
+    switch (async.getType())
+    {
+    case Async::Type::Timeout: return true;
+    case Async::Type::WakeUp: return true;
+    case Async::Type::Accept: return queue.activateAsync(*async.asAccept());
+    case Async::Type::Connect: return queue.activateAsync(*async.asConnect());
+    case Async::Type::Receive: return queue.activateAsync(*async.asReceive());
+    case Async::Type::Send: return queue.activateAsync(*async.asSend());
+    case Async::Type::Read: return queue.activateAsync(*async.asRead());
+    case Async::Type::Write: return queue.activateAsync(*async.asWrite());
+    case Async::Type::ProcessExit: return queue.activateAsync(*async.asProcessExit());
+    }
+    return false;
+}
+
+void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, void* userData, int32_t eventIndex,
+                                  bool& reactivate)
+{
+    SC_LOG_MESSAGE("{} {} COMPLETE\n", async.debugName, Async::TypeToString(async.getType()));
+    switch (async.getType())
+    {
+    case Async::Type::Timeout: {
+        AsyncResult::Timeout result(async, userData, eventIndex);
+        ReturnCode           res = queue.completeAsync(result);
+        if (res and result.async.callback.isValid())
+            result.async.callback(result);
+        reactivate = result.isRearmed();
+        break;
+    }
+    case Async::Type::Read: {
+        AsyncResult::Read result(async, userData, eventIndex);
+        ReturnCode        res = queue.completeAsync(result);
+        if (res and result.async.callback.isValid())
+            result.async.callback(result);
+        reactivate = result.isRearmed();
+        break;
+    }
+    case Async::Type::Write: {
+        AsyncResult::Write result(async, userData, eventIndex);
+        ReturnCode         res = queue.completeAsync(result);
+        if (res and result.async.callback.isValid())
+            result.async.callback(result);
+        reactivate = result.isRearmed();
+        break;
+    }
+    case Async::Type::WakeUp: {
+        AsyncResult::WakeUp result(async, userData, eventIndex);
+        ReturnCode          res = queue.completeAsync(result);
+        if (res and result.async.callback.isValid())
+            result.async.callback(result);
+        reactivate = result.isRearmed();
+        break;
+    }
+    case Async::Type::ProcessExit: {
+        AsyncResult::ProcessExit result(async, userData, eventIndex);
+        ReturnCode               res = queue.completeAsync(result);
+        if (res and result.async.callback.isValid())
+            result.async.callback(result);
+        reactivate = result.isRearmed();
+        break;
+    }
+    case Async::Type::Accept: {
+        AsyncResult::Accept result(async, userData, eventIndex);
+        ReturnCode          res = queue.completeAsync(result);
+        if (res and result.async.callback.isValid())
+            result.async.callback(result);
+        reactivate = result.isRearmed();
+        break;
+    }
+    case Async::Type::Connect: {
+        AsyncResult::Connect result(async, userData, eventIndex);
+        ReturnCode           res = queue.completeAsync(result);
+        if (res and result.async.callback.isValid())
+            result.async.callback(result);
+        reactivate = result.isRearmed();
+        break;
+    }
+    case Async::Type::Send: {
+        AsyncResult::Send result(async, userData, eventIndex);
+        ReturnCode        res = queue.completeAsync(result);
+        if (res and result.async.callback.isValid())
+            result.async.callback(result);
+        reactivate = result.isRearmed();
+        break;
+    }
+    case Async::Type::Receive: {
+        AsyncResult::Receive result(async, userData, eventIndex);
+        ReturnCode           res = queue.completeAsync(result);
+        if (res and result.async.callback.isValid())
+            result.async.callback(result);
+        reactivate = result.isRearmed();
+        break;
+    }
+    }
+}
+
+SC::ReturnCode SC::EventLoop::cancelAsync(KernelQueue& queue, Async& async)
+{
+    SC_LOG_MESSAGE("{} {} CANCEL\n", async.debugName, Async::TypeToString(async.getType()));
+    switch (async.getType())
+    {
+    case Async::Type::Timeout: numberOfTimers -= 1; return true; // SKIP removeActiveHandle
+    case Async::Type::WakeUp: numberOfWakeups -= 1; return true; // SKIP removeActiveHandle
+    case Async::Type::Read: SC_TRY_IF(queue.stopAsync(*async.asRead())); break;
+    case Async::Type::Write: SC_TRY_IF(queue.stopAsync(*async.asWrite())); break;
+    case Async::Type::ProcessExit: SC_TRY_IF(queue.stopAsync(*async.asProcessExit())); break;
+    case Async::Type::Accept: SC_TRY_IF(queue.stopAsync(*async.asAccept())); break;
+    case Async::Type::Connect: SC_TRY_IF(queue.stopAsync(*async.asConnect())); break;
+    case Async::Type::Send: SC_TRY_IF(queue.stopAsync(*async.asSend())); break;
+    case Async::Type::Receive: SC_TRY_IF(queue.stopAsync(*async.asReceive())); break;
+    }
+    removeActiveHandle(async);
     return true;
 }
 
 SC::ReturnCode SC::EventLoop::stopAsync(Async& async)
 {
+    SC_LOG_MESSAGE("{} {} STOP\n", async.debugName, Async::TypeToString(async.getType()));
     const bool asyncStateIsNotFree    = async.state != Async::State::Free;
     const bool asyncIsOwnedByThisLoop = async.eventLoop == this;
     SC_DEBUG_ASSERT(asyncStateIsNotFree and asyncIsOwnedByThisLoop);
@@ -363,10 +473,18 @@ SC::ReturnCode SC::EventLoop::stopAsync(Async& async)
     switch (async.state)
     {
     case Async::State::Active: {
-        // We don't know in which queue this is gone so we remove from all
-        activeHandles.remove(async);
-        activeTimers.remove(static_cast<Async::Timeout&>(async));
-        activeWakeUps.remove(async);
+        if (async.getType() == Async::Type::Timeout)
+        {
+            activeTimers.remove(async);
+        }
+        else if (async.getType() == Async::Type::WakeUp)
+        {
+            activeWakeUps.remove(async);
+        }
+        else
+        {
+            activeHandles.remove(async);
+        }
         async.state = Async::State::Cancelling;
         submissions.queueBack(async);
         break;
@@ -422,7 +540,7 @@ void SC::EventLoop::executeWakeUps(AsyncResult& result)
         Async::WakeUp* notifier = async->asWakeUp();
         if (notifier->pending.load() == true)
         {
-            AsyncResult::WakeUp res(*async, nullptr);
+            AsyncResult::WakeUp res(*async, nullptr, result.index);
             res.async.callback(res);
             if (notifier->eventObject)
             {
@@ -436,7 +554,10 @@ void SC::EventLoop::executeWakeUps(AsyncResult& result)
 
 void SC::EventLoop::removeActiveHandle(Async& async)
 {
-    async.eventLoop->activeHandles.remove(async);
+    if (async.state != Async::State::Cancelling)
+    {
+        async.eventLoop->activeHandles.remove(async);
+    }
     async.eventLoop->numberOfActiveHandles -= 1;
 }
 
@@ -449,6 +570,14 @@ void SC::EventLoop::addActiveHandle(Async& async)
 SC::ReturnCode SC::EventLoop::getLoopFileDescriptor(SC::FileDescriptor::Handle& fileDescriptor) const
 {
     return internal.get().loopFd.get(fileDescriptor, "EventLoop::getLoopFileDescriptor invalid handle"_a8);
+}
+
+SC::ReturnCode SC::EventLoop::createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor)
+{
+    auto res = outDescriptor.create(family, SocketFlags::SocketStream, SocketFlags::ProtocolTcp,
+                                    SocketFlags::NonBlocking, SocketFlags::NonInheritable);
+    SC_TRY_IF(res);
+    return associateExternallyCreatedTCPSocket(outDescriptor);
 }
 
 SC::ReturnCode SC::AsyncWakeUp::wakeUp() { return eventLoop->wakeUpFromExternalThread(*this); }
