@@ -22,6 +22,9 @@
 		7B51601129243097006996AA /* StringFormat.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FFC29243097006996AA /* StringFormat.cpp */; };
 		7B51601229243097006996AA /* StringView.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FFF29243097006996AA /* StringView.cpp */; };
 		7B51601329243097006996AA /* String.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B51600129243097006996AA /* String.cpp */; };
+		7B53C6512AADC16300FA1AFD /* HttpParser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B53C64A2AADC16300FA1AFD /* HttpParser.cpp */; };
+		7B53C6522AADC16300FA1AFD /* HttpServer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B53C64B2AADC16300FA1AFD /* HttpServer.cpp */; };
+		7B53C6532AADC16300FA1AFD /* HttpClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B53C64F2AADC16300FA1AFD /* HttpClient.cpp */; };
 		7B583F6A2922ECF900FBE019 /* SCTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F692922ECF900FBE019 /* SCTest.cpp */; };
 		7B583F6D2922ED2700FBE019 /* SCTestXCTest.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */; };
 		7B583FCB2922EE7300FBE019 /* SCTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F692922ECF900FBE019 /* SCTest.cpp */; };
@@ -163,6 +166,15 @@
 		7B51600E29243097006996AA /* StringBuilder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringBuilder.h; path = ../../../../Libraries/Foundation/StringBuilder.h; sourceTree = "<group>"; };
 		7B51600F29243097006996AA /* StringTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringTest.h; path = ../../../../Libraries/Foundation/StringTest.h; sourceTree = "<group>"; };
 		7B52501428E85B9100827290 /* SCTest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SCTest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7B53C6482AADC16300FA1AFD /* HttpParser.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HttpParser.h; path = ../../../../Libraries/Http/HttpParser.h; sourceTree = "<group>"; };
+		7B53C6492AADC16300FA1AFD /* HttpServerTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HttpServerTest.h; path = ../../../../Libraries/Http/HttpServerTest.h; sourceTree = "<group>"; };
+		7B53C64A2AADC16300FA1AFD /* HttpParser.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = HttpParser.cpp; path = ../../../../Libraries/Http/HttpParser.cpp; sourceTree = "<group>"; };
+		7B53C64B2AADC16300FA1AFD /* HttpServer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = HttpServer.cpp; path = ../../../../Libraries/Http/HttpServer.cpp; sourceTree = "<group>"; };
+		7B53C64C2AADC16300FA1AFD /* HttpClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HttpClient.h; path = ../../../../Libraries/Http/HttpClient.h; sourceTree = "<group>"; };
+		7B53C64D2AADC16300FA1AFD /* HttpServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HttpServer.h; path = ../../../../Libraries/Http/HttpServer.h; sourceTree = "<group>"; };
+		7B53C64E2AADC16300FA1AFD /* HttpParserTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HttpParserTest.h; path = ../../../../Libraries/Http/HttpParserTest.h; sourceTree = "<group>"; };
+		7B53C64F2AADC16300FA1AFD /* HttpClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = HttpClient.cpp; path = ../../../../Libraries/Http/HttpClient.cpp; sourceTree = "<group>"; };
+		7B53C6502AADC16300FA1AFD /* HttpClientTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HttpClientTest.h; path = ../../../../Libraries/Http/HttpClientTest.h; sourceTree = "<group>"; };
 		7B583F692922ECF900FBE019 /* SCTest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SCTest.cpp; path = ../../SCTest.cpp; sourceTree = "<group>"; };
 		7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SCTestXCTest.mm; path = ../../SCTestXCTest.mm; sourceTree = "<group>"; };
 		7B59307629B128C300876ABB /* ThreadingTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ThreadingTest.h; path = ../../../../Libraries/Threading/ThreadingTest.h; sourceTree = "<group>"; };
@@ -417,15 +429,32 @@
 			name = Foundation;
 			sourceTree = "<group>";
 		};
+		7B53C6472AADC15100FA1AFD /* Http */ = {
+			isa = PBXGroup;
+			children = (
+				7B53C64F2AADC16300FA1AFD /* HttpClient.cpp */,
+				7B53C64C2AADC16300FA1AFD /* HttpClient.h */,
+				7B53C6502AADC16300FA1AFD /* HttpClientTest.h */,
+				7B53C64A2AADC16300FA1AFD /* HttpParser.cpp */,
+				7B53C6482AADC16300FA1AFD /* HttpParser.h */,
+				7B53C64E2AADC16300FA1AFD /* HttpParserTest.h */,
+				7B53C64B2AADC16300FA1AFD /* HttpServer.cpp */,
+				7B53C64D2AADC16300FA1AFD /* HttpServer.h */,
+				7B53C6492AADC16300FA1AFD /* HttpServerTest.h */,
+			);
+			name = Http;
+			sourceTree = "<group>";
+		};
 		7B583F2E2922EC9F00FBE019 /* Libraries */ = {
 			isa = PBXGroup;
 			children = (
 				7BA7D47829B5473100811076 /* Async */,
 				7B8E9E2A2A4A02D6009D4F5A /* Build */,
-				7B7C3BFB2A7C43FE00FAD351 /* Hashing */,
 				7B44ADC12A10EE9600FAAADC /* File */,
 				7B0C2999297CA7C10071C5B4 /* FileSystem */,
 				7B515F932924305E006996AA /* Foundation */,
+				7B7C3BFB2A7C43FE00FAD351 /* Hashing */,
+				7B53C6472AADC15100FA1AFD /* Http */,
 				7B787CCB2A1980650098B120 /* Json */,
 				7B25ADFC2A2CB9A6008936DE /* Plugin */,
 				7B956A2029FF16AA007740C6 /* Process */,
@@ -723,6 +752,7 @@
 				7B515FF529243087006996AA /* Memory.cpp in Sources */,
 				7B0C299D297CA7CC0071C5B4 /* FileSystem.cpp in Sources */,
 				7B25AE002A2CB9B1008936DE /* Plugin.cpp in Sources */,
+				7B53C6532AADC16300FA1AFD /* HttpClient.cpp in Sources */,
 				7B51601229243097006996AA /* StringView.cpp in Sources */,
 				7BDCB7EB2A5CC2920004437D /* Build.cpp in Sources */,
 				7B51601129243097006996AA /* StringFormat.cpp in Sources */,
@@ -733,6 +763,7 @@
 				7BA892AA297E03B50093152B /* System.cpp in Sources */,
 				7B6B7A3A2A46D2C5007E8BE2 /* AdditionalFile.cpp in Sources */,
 				7BDFF7482AA9269F00C4184D /* StringBuilder.cpp in Sources */,
+				7B53C6512AADC16300FA1AFD /* HttpParser.cpp in Sources */,
 				7B358DDE29D88FFC002A7D1C /* FileSystemWatcher.cpp in Sources */,
 				7B583F6A2922ECF900FBE019 /* SCTest.cpp in Sources */,
 				7B4A291D29B3CD4A00F13DCB /* Time.cpp in Sources */,
@@ -745,6 +776,7 @@
 				7BC56BDB29946C9200EED472 /* FileSystemWalker.cpp in Sources */,
 				7BA7D47C29B5488200811076 /* EventLoop.cpp in Sources */,
 				7B7C3BFE2A7C443D00FAD351 /* Hashing.cpp in Sources */,
+				7B53C6522AADC16300FA1AFD /* HttpServer.cpp in Sources */,
 				7BCACB892A44F745003D1658 /* TestPluginParent.cpp in Sources */,
 				7B8DDDC52A2012B300D62F03 /* Json.cpp in Sources */,
 				7BCACB8A2A44F745003D1658 /* TestPluginChild.cpp in Sources */,

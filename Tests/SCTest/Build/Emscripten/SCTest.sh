@@ -67,6 +67,9 @@ Libraries/Foundation/StringConverter.cpp    \
 Libraries/Foundation/StringFormat.cpp       \
 Libraries/Foundation/StringView.cpp         \
 Libraries/Hashing/Hashing.cpp               \
+Libraries/Http/HttpClient.cpp               \
+Libraries/Http/HttpParser.cpp               \
+Libraries/Http/HttpServer.cpp               \
 Libraries/Json/Json.cpp                     \
 Libraries/Plugin/Plugin.cpp                 \
 Libraries/Process/Process.cpp               \

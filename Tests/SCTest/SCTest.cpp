@@ -51,6 +51,11 @@ void runSpecificTests(TestReport& report)
 // Hashing
 #include "../../Libraries/Hashing/HashingTest.h"
 
+// Http
+#include "../../Libraries/Http/HttpClientTest.h"
+#include "../../Libraries/Http/HttpServerTest.h"
+#include "../../Libraries/Http/HttpParserTest.h"
+
 // JSON
 #include "../../Libraries/Json/JsonFormatterTest.h"
 #include "../../Libraries/Json/JsonTokenizerTest.h"
@@ -150,6 +155,11 @@ int main(int argc, const char* argv[])
 
     // Hashing tests
     { HashingTest                   test(report); }
+
+    // Http tests
+    { HttpParserTest                test(report); }
+    { HttpClientTest                test(report); }
+    { HttpServerTest                test(report); }
 
     // JSON tests
     { JsonFormatterTest             test(report); }
