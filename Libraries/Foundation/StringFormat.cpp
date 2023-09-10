@@ -103,6 +103,11 @@ bool StringFormatterFor<SC::uint8_t>::format(StringFormatOutput& data, const Str
     return StringFormatterFor<SC::uint32_t>::format(data, specifier, value);
 }
 
+bool StringFormatterFor<bool>::format(StringFormatOutput& data, const StringView specifier, const bool value)
+{
+    SC_UNUSED(specifier);
+    return data.write(value ? "true"_a8 : "false"_a8);
+}
 bool StringFormatterFor<float>::format(StringFormatOutput& data, StringView specifier, const float value)
 {
     constexpr char_t formatSpecifier[] = "f";
