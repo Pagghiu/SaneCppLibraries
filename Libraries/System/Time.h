@@ -32,11 +32,11 @@ struct SC::IntegerSeconds
 
 namespace SC
 {
-constexpr inline SC::IntegerMilliseconds operator"" _ms(uint64_t ms)
+constexpr inline SC::IntegerMilliseconds operator""_ms(uint64_t ms)
 {
     return IntegerMilliseconds(static_cast<int64_t>(ms));
 }
-constexpr inline SC::IntegerSeconds operator"" _sec(uint64_t sec) { return IntegerSeconds(static_cast<int64_t>(sec)); }
+constexpr inline SC::IntegerSeconds operator""_sec(uint64_t sec) { return IntegerSeconds(static_cast<int64_t>(sec)); }
 } // namespace SC
 
 struct SC::RelativeTime

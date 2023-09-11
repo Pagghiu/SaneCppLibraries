@@ -105,7 +105,7 @@ else
 fi
 
 # Install git-lfs
-"${SC_PACKAGE_LOCAL_DIR}/git-lfs-3.3.0/install.sh" || { echo -e "${COLOR_RED}FATAL ERROR: git-lfs cannot install ${COLOR_NONE}" ; exit 1; }
+sudo "${SC_PACKAGE_LOCAL_DIR}/git-lfs-3.3.0/install.sh" || { echo -e "${COLOR_RED}FATAL ERROR: git-lfs cannot install ${COLOR_NONE}" ; exit 1; }
 
 git-lfs --version 2>&1 >/dev/null
 GIT_LFS_EXISTS=$?
@@ -185,7 +185,7 @@ fi
 # -------------------------------------------------------------------------------------------------------------------
 
 SC_PACKAGE_NAME="emsdk"
-SC_PACKAGE_VERSION="3.1.28"
+SC_PACKAGE_VERSION="3.1.45"
 SC_PACKAGE_FILE_NAME="${SC_PACKAGE_NAME}_${SC_PACKAGE_VERSION}"
 SC_PACKAGE_URL="https://github.com/emscripten-core/emsdk.git"
 SC_PACKAGE_LOCAL_TXT="${SC_BINARIES_DIR}/${SC_PACKAGE_NAME}/${SC_PACKAGE_FILE_NAME}.txt"

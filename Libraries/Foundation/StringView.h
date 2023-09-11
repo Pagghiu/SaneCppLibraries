@@ -353,11 +353,11 @@ struct SC::StringViewTokenizer
 #endif
 namespace SC
 {
-constexpr inline SC::StringView operator"" _a8(const char* txt, size_t sz)
+constexpr inline SC::StringView operator""_a8(const char* txt, size_t sz)
 {
     return SC::StringView(txt, sz, true, SC::StringEncoding::Ascii);
 }
-constexpr inline SC::StringView operator"" _u8(const char* txt, size_t sz)
+constexpr inline SC::StringView operator""_u8(const char* txt, size_t sz)
 {
     return SC::StringView(txt, sz, true, SC::StringEncoding::Utf8);
 }

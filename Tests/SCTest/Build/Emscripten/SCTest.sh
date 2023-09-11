@@ -45,7 +45,6 @@ time em++ -std=c++20 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest/SCTest.html \
 -sSTRICT=1 \
 -sENVIRONMENT=web \
--sLLD_REPORT_UNDEFINED \
 -sALLOW_MEMORY_GROWTH=1 \
 -sALLOW_TABLE_GROWTH \
 -sMALLOC=emmalloc \
