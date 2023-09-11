@@ -186,9 +186,10 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] ReturnCode pushStagedAsync(Async& async)
     {
-        // On Windows we push directly to activeHandles and not stagedHandles as we've already created kernel objects
-        // TODO: We should push to stagedHandles too and move to active after activate
-        async.eventLoop->addActiveHandle(async);
+        if (async.state != Async::State::Active)
+        {
+            async.eventLoop->addActiveHandle(async);
+        }
         return true;
     }
 
@@ -222,7 +223,7 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] static bool shouldProcessCompletion(const OVERLAPPED_ENTRY&) { return true; }
+    [[nodiscard]] static bool validateEvent(const OVERLAPPED_ENTRY&, bool&) { return true; }
 
     // TIMEOUT
     [[nodiscard]] static bool completeAsync(AsyncResult::Timeout&)

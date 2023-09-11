@@ -91,8 +91,10 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] ReturnCode pushStagedAsync(Async& async)
     {
         newEvents += 1;
-        // The handles are not active until we "poll" or "flush"
-        async.eventLoop->stagedHandles.queueBack(async);
+        if (async.state != Async::State::Active)
+        {
+            async.eventLoop->addActiveHandle(async);
+        }
         if (newEvents >= totalNumEvents)
         {
             SC_TRY_IF(flushQueue(*async.eventLoop));
@@ -156,8 +158,6 @@ struct SC::EventLoop::KernelQueue
         {
             return "EventLoop::Internal::poll() - kevent failed"_a8;
         }
-        self.activeHandles.appendBack(self.stagedHandles);
-        self.numberOfActiveHandles += newEvents;
         newEvents = static_cast<int>(res);
         if (nextTimer)
         {
@@ -180,23 +180,16 @@ struct SC::EventLoop::KernelQueue
         {
             return "EventLoop::Internal::flushQueue() - kevent failed"_a8;
         }
-        self.activeHandles.appendBack(self.stagedHandles);
-        self.numberOfActiveHandles += newEvents;
         newEvents = 0;
         return true;
     }
 
-    [[nodiscard]] static bool shouldProcessCompletion(const struct kevent& event)
+    [[nodiscard]] static ReturnCode validateEvent(const struct kevent& event, bool& continueProcessing)
     {
-        if ((event.flags & EV_DELETE) != 0)
-        {
-            return false; // Do not call callback
-        }
+        continueProcessing = (event.flags & EV_DELETE) == 0;
         if ((event.flags & EV_ERROR) != 0)
         {
-            // TODO: Handle EV_ERROR case
-            SC_RELEASE_ASSERT(false);
-            return false;
+            return "Error in processing event"_a8;
         }
         return true;
     }

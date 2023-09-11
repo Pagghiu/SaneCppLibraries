@@ -53,8 +53,8 @@ void runSpecificTests(TestReport& report)
 
 // Http
 #include "../../Libraries/Http/HttpClientTest.h"
-#include "../../Libraries/Http/HttpServerTest.h"
 #include "../../Libraries/Http/HttpParserTest.h"
+#include "../../Libraries/Http/HttpServerTest.h"
 
 // JSON
 #include "../../Libraries/Json/JsonFormatterTest.h"
@@ -95,8 +95,9 @@ void runSpecificTests(TestReport& report)
 #include "../../Libraries/Foundation/SmallVector.h"
 #include "../../Libraries/System/System.h"
 #include "../../Libraries/Testing/Test.h"
-
 #define SC_TEST_LIBRARY_PATH SC_MACRO_TO_LITERAL(SC_MACRO_ESCAPE(SC_LIBRARY_PATH))
+
+SC::Console* globalConsole;
 
 int main(int argc, const char* argv[])
 {
@@ -121,6 +122,8 @@ int main(int argc, const char* argv[])
     }
     report.libraryRootDirectory   = correctedPath.view();
     report.debugBreakOnFailedTest = true;
+
+    globalConsole = &console;
     // clang-format off
 #if SC_RUN_SPECIFIC_TEST
     runSpecificTests(report);

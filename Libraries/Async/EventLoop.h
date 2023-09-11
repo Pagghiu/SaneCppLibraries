@@ -68,6 +68,8 @@ struct EventLoopWinWaitHandle : public UniqueTaggedHandleTraits<EventLoopWinWait
 
 } // namespace SC
 
+// ASYNCS
+
 struct SC::Async
 {
     using Timeout     = AsyncTimeout;
@@ -127,32 +129,6 @@ struct SC::Async
 
   private:
     Type type = Type::Timeout;
-};
-
-struct SC::AsyncResult
-{
-    using Timeout     = AsyncTimeoutResult;
-    using WakeUp      = AsyncWakeUpResult;
-    using ProcessExit = AsyncProcessExitResult;
-    using Accept      = AsyncAcceptResult;
-    using Connect     = AsyncConnectResult;
-    using Send        = AsyncSendResult;
-    using Receive     = AsyncReceiveResult;
-    using Read        = AsyncReadResult;
-    using Write       = AsyncWriteResult;
-
-    using Type = Async::Type;
-
-    void*   userData = nullptr;
-    int32_t index    = 0;
-    AsyncResult(void* userData, int32_t index) : userData(userData), index(index) {}
-    // TODO: Add AsyncResult error
-
-    void rearm(bool value) { doRearm = value; }
-    bool isRearmed() const { return doRearm; }
-
-  private:
-    bool doRearm = false;
 };
 
 struct SC::AsyncTimeout : public Async
@@ -271,10 +247,44 @@ struct SC::AsyncWrite : public Async
 #endif
 };
 
+// RESULTS
+
+struct SC::AsyncResult
+{
+    using Timeout     = AsyncTimeoutResult;
+    using WakeUp      = AsyncWakeUpResult;
+    using ProcessExit = AsyncProcessExitResult;
+    using Accept      = AsyncAcceptResult;
+    using Connect     = AsyncConnectResult;
+    using Send        = AsyncSendResult;
+    using Receive     = AsyncReceiveResult;
+    using Read        = AsyncReadResult;
+    using Write       = AsyncWriteResult;
+
+    using Type = Async::Type;
+
+    void*   userData = nullptr;
+    int32_t index    = 0;
+    AsyncResult(void* userData, int32_t index, ReturnCode&& res)
+        : userData(userData), index(index), returnCode(forward<ReturnCode>(res))
+    {}
+
+    void rearm(bool value) { doRearm = value; }
+    bool isRearmed() const { return doRearm; }
+
+    const ReturnCode& isValid() const { return returnCode; }
+
+  protected:
+    friend struct EventLoop;
+
+    bool       doRearm = false;
+    ReturnCode returnCode;
+};
+
 struct SC::AsyncTimeoutResult : public AsyncResult
 {
-    AsyncTimeoutResult(Async& async, void* userData, int32_t index)
-        : AsyncResult(userData, index), async(*async.asTimeout())
+    AsyncTimeoutResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asTimeout())
     {}
 
     AsyncTimeout& async;
@@ -282,8 +292,8 @@ struct SC::AsyncTimeoutResult : public AsyncResult
 
 struct SC::AsyncWakeUpResult : public AsyncResult
 {
-    AsyncWakeUpResult(Async& async, void* userData, int32_t index)
-        : AsyncResult(userData, index), async(*async.asWakeUp())
+    AsyncWakeUpResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asWakeUp())
     {}
 
     AsyncWakeUp& async;
@@ -291,28 +301,46 @@ struct SC::AsyncWakeUpResult : public AsyncResult
 
 struct SC::AsyncProcessExitResult : public AsyncResult
 {
-    AsyncProcessExitResult(Async& async, void* userData, int32_t index)
-        : AsyncResult(userData, index), async(*async.asProcessExit())
+    AsyncProcessExitResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asProcessExit())
     {}
 
-    AsyncProcessExit&             async;
+    AsyncProcessExit& async;
+
+    [[nodiscard]] ReturnCode moveTo(ProcessDescriptor::ExitStatus& status)
+    {
+        status = exitStatus;
+        return AsyncResult::returnCode;
+    }
+
+  private:
+    friend struct EventLoop;
     ProcessDescriptor::ExitStatus exitStatus;
 };
 
 struct SC::AsyncAcceptResult : public AsyncResult
 {
-    AsyncAcceptResult(Async& async, void* userData, int32_t index)
-        : AsyncResult(userData, index), async(*async.asAccept())
+    AsyncAcceptResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asAccept())
     {}
 
-    AsyncAccept&     async;
+    AsyncAccept& async;
+
+    [[nodiscard]] ReturnCode moveTo(SocketDescriptor& client)
+    {
+        SC_TRY_IF(AsyncResult::returnCode);
+        return client.assign(move(acceptedClient));
+    }
+
+  private:
+    friend struct EventLoop;
     SocketDescriptor acceptedClient;
 };
 
 struct SC::AsyncConnectResult : public AsyncResult
 {
-    AsyncConnectResult(Async& async, void* userData, int32_t index)
-        : AsyncResult(userData, index), async(*async.asConnect())
+    AsyncConnectResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asConnect())
     {}
 
     AsyncConnect& async;
@@ -320,7 +348,8 @@ struct SC::AsyncConnectResult : public AsyncResult
 
 struct SC::AsyncSendResult : public AsyncResult
 {
-    AsyncSendResult(Async& async, void* userData, int32_t index) : AsyncResult(userData, index), async(*async.asSend())
+    AsyncSendResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asSend())
     {}
 
     AsyncSend& async;
@@ -328,30 +357,57 @@ struct SC::AsyncSendResult : public AsyncResult
 
 struct SC::AsyncReceiveResult : public AsyncResult
 {
-    AsyncReceiveResult(Async& async, void* userData, int32_t index)
-        : AsyncResult(userData, index), async(*async.asReceive())
+    AsyncReceiveResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asReceive())
     {}
-    Span<char>    readData;
     AsyncReceive& async;
+
+    [[nodiscard]] ReturnCode moveTo(Span<char>& data)
+    {
+        data = readData;
+        return AsyncResult::returnCode;
+    }
+
+  private:
+    friend struct EventLoop;
+    Span<char> readData;
 };
 
 struct SC::AsyncReadResult : public AsyncResult
 {
-    AsyncReadResult(Async& async, void* userData, int32_t index) : AsyncResult(userData, index), async(*async.asRead())
+    AsyncReadResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asRead())
     {}
-
     AsyncRead& async;
+
+    [[nodiscard]] ReturnCode moveTo(Span<char>& data)
+    {
+        data = readData;
+        return AsyncResult::returnCode;
+    }
+
+  private:
+    friend struct EventLoop;
     Span<char> readData;
 };
 
 struct SC::AsyncWriteResult : public AsyncResult
 {
-    AsyncWriteResult(Async& async, void* userData, int32_t index)
-        : AsyncResult(userData, index), async(*async.asWrite())
+    AsyncWriteResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asWrite())
     {}
 
     AsyncWrite& async;
-    size_t      writtenBytes = 0;
+
+    [[nodiscard]] ReturnCode moveTo(size_t& writtenSizeInBytes)
+    {
+        writtenSizeInBytes = writtenBytes;
+        return AsyncResult::returnCode;
+    }
+
+  private:
+    friend struct EventLoop;
+    size_t writtenBytes = 0;
 };
 
 // clang-format off
@@ -434,7 +490,6 @@ struct SC::EventLoop
     int numberOfExternals     = 0;
 
     IntrusiveDoubleLinkedList<Async> submissions;
-    IntrusiveDoubleLinkedList<Async> stagedHandles;
     IntrusiveDoubleLinkedList<Async> activeHandles;
     IntrusiveDoubleLinkedList<Async> activeTimers;
     IntrusiveDoubleLinkedList<Async> activeWakeUps;
@@ -472,15 +527,18 @@ struct SC::EventLoop
     void executeWakeUps(AsyncResult& result);
 
     // Setup
+    [[nodiscard]] ReturnCode validateAsync(Async& async);
     [[nodiscard]] ReturnCode queueSubmission(Async& async);
 
     // Phases
-    [[nodiscard]] ReturnCode stageSubmissions(KernelQueue& queue);
+    [[nodiscard]] ReturnCode stageSubmission(KernelQueue& queue, Async& async);
+    [[nodiscard]] ReturnCode setupAsync(KernelQueue& queue, Async& async);
     [[nodiscard]] ReturnCode activateAsync(KernelQueue& queue, Async& async);
     [[nodiscard]] ReturnCode cancelAsync(KernelQueue& queue, Async& async);
-    [[nodiscard]] ReturnCode stageAsync(KernelQueue& queue, Async& async);
 
-    static void completeAsync(KernelQueue& queue, Async& async, void* userData, int32_t eventIndex, bool& reactivate);
+    void        reportError(KernelQueue& queue, Async& async, ReturnCode&& returnCode);
+    static void completeAsync(KernelQueue& queue, Async& async, void* userData, int32_t eventIndex,
+                              ReturnCode&& returnCode, bool& reactivate);
 
     enum class PollMode
     {

@@ -10,16 +10,11 @@ namespace SC
 {
 struct HttpServerTest;
 }
-SC::Console* gConsole = nullptr;
-#define SC_LOG_MESSAGE(fmt, ...)                                                                                       \
-    if (gConsole)                                                                                                      \
-    gConsole->print(fmt, ##__VA_ARGS__)
 
 struct SC::HttpServerTest : public SC::TestCase
 {
     HttpServerTest(SC::TestReport& report) : TestCase(report, "HttpServerTest")
     {
-        gConsole = &report.console;
         if (test_section("server async"))
         {
             EventLoop eventLoop;

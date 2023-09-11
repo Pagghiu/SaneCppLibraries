@@ -22,7 +22,7 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] ReturnCode pushStagedAsync(Async& async) { return false; }
     [[nodiscard]] ReturnCode pollAsync(EventLoop& eventLoop, PollMode pollMode) { return false; }
-    [[nodiscard]] ReturnCode shouldProcessCompletion(int& event) { return true; }
+    [[nodiscard]] ReturnCode validateEvent(int& event, bool& continueProcessing) { return true; }
     template <typename T>
     [[nodiscard]] ReturnCode setupAsync(T&)
     {

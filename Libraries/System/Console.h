@@ -36,3 +36,9 @@ struct SC_EXPORT_SYMBOL Console
     Vector<char>& encodingConversionBuffer;
 };
 } // namespace SC
+extern SC::Console* globalConsole;
+#ifndef SC_LOG_MESSAGE
+#define SC_LOG_MESSAGE(fmt, ...)                                                                                       \
+    if (globalConsole)                                                                                                 \
+    globalConsole->print(fmt, ##__VA_ARGS__)
+#endif

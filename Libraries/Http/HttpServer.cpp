@@ -90,8 +90,15 @@ SC::ReturnCode SC::HttpServerAsync::startAccept()
 
 void SC::HttpServerAsync::onNewClient(AsyncAcceptResult& result)
 {
+    SocketDescriptor acceptedClient;
+    if (not result.moveTo(acceptedClient))
+    {
+        // TODO: Invoke an error
+        return;
+    }
     bool succeeded = true;
 
+    // TODO: do proper error handling
     auto key1 = requests.allocate();
     succeeded &= key1.isValid();
     auto key2 = requestClients.allocate();
@@ -101,7 +108,7 @@ void SC::HttpServerAsync::onNewClient(AsyncAcceptResult& result)
         RequestClient&   client = *requestClients.get(key2);
         RequestResponse& req    = *requests.get(key1);
         client.key              = key2;
-        client.socket           = move(result.acceptedClient);
+        client.socket           = move(acceptedClient);
 
         auto& buffer = req.request.headerBuffer;
         succeeded &= buffer.resizeWithoutInitializing(buffer.capacity());
@@ -122,39 +129,45 @@ void SC::HttpServerAsync::onReceive(AsyncReceiveResult& result)
     SC_ENABLE_OFFSETOF_WARNING
     SC_RELEASE_ASSERT(&client.asyncReceive == &result.async);
     RequestResponse& rr = *requests.get(client.key.cast_to<RequestResponse>());
-    if (not rr.request.parse(result.readData.asConst(), rr.response, *this))
+    Span<char>       readData;
+    if (not result.moveTo(readData))
     {
         // TODO: Invoke on error
+        return;
+    }
+    if (not rr.request.parse(readData.asConst(), rr.response, *this))
+    {
+        // TODO: Invoke on error
+        return;
+    }
+    if (rr.response.mustBeFlushed())
+    {
+        client.asyncSend.debugName = client.debugName.bytesIncludingTerminator();
+
+        auto outspan = rr.response.outputBuffer.toSpan().asConst();
+        auto res     = eventLoop->startSend(client.asyncSend, client.socket, outspan,
+                                            SC_FUNCTION_MEMBER(&HttpServerAsync::onAfterSend, this));
+        if (not res)
+        {
+            // TODO: Invoke on error
+            return;
+        }
     }
     else
     {
-        if (rr.response.mustBeFlushed())
-        {
-            client.asyncSend.debugName = client.debugName.bytesIncludingTerminator();
-
-            auto outspan = rr.response.outputBuffer.toSpan().asConst();
-            bool res     = eventLoop->startSend(client.asyncSend, client.socket, outspan,
-                                                SC_FUNCTION_MEMBER(&HttpServerAsync::onAfterSend, this));
-            if (not res)
-            {
-                // TODO: Invoke on error
-                res = res;
-            }
-        }
-        else
-        {
-            result.rearm(true);
-        }
+        result.rearm(true);
     }
 }
 
 void SC::HttpServerAsync::onAfterSend(AsyncSendResult& result)
 {
-    SC_DISABLE_OFFSETOF_WARNING
-    RequestClient& requestClient = SC_FIELD_OFFSET(RequestClient, asyncSend, result.async);
-    SC_ENABLE_OFFSETOF_WARNING
-    SC_UNUSED(requestClient);
-    auto* rr = requests.get(requestClient.key.cast_to<RequestResponse>());
-    rr->response.outputBuffer.clear();
+    if (result.isValid())
+    {
+        SC_DISABLE_OFFSETOF_WARNING
+        RequestClient& requestClient = SC_FIELD_OFFSET(RequestClient, asyncSend, result.async);
+        SC_ENABLE_OFFSETOF_WARNING
+        auto* rr = requests.get(requestClient.key.cast_to<RequestResponse>());
+        rr->response.outputBuffer.clear();
+    }
     // TODO: Close socket and dispose resources
 }

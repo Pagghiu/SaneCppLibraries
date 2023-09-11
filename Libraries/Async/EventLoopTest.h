@@ -26,6 +26,7 @@ struct SC::EventLoopTest : public SC::TestCase
         connect();
         sendReceive();
         readWrite();
+        errorSendReceive();
     }
 
     void timeout()
@@ -189,7 +190,7 @@ struct SC::EventLoopTest : public SC::TestCase
 
             auto onAccepted = [&](AsyncResult::Accept& res)
             {
-                SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.acceptedClient)));
+                SC_TEST_EXPECT(res.moveTo(acceptedClient[acceptedCount]));
                 acceptedCount++;
                 res.rearm(true);
             };
@@ -249,7 +250,7 @@ struct SC::EventLoopTest : public SC::TestCase
 
             auto onAccepted = [&](AsyncResult::Accept& res)
             {
-                SC_TEST_EXPECT(acceptedClient[acceptedCount].assign(move(res.acceptedClient)));
+                SC_TEST_EXPECT(res.moveTo(acceptedClient[acceptedCount]));
                 acceptedCount++;
                 res.rearm(acceptedCount < 2);
             };
@@ -260,7 +261,7 @@ struct SC::EventLoopTest : public SC::TestCase
             auto onConnected    = [&](AsyncResult::Connect& res)
             {
                 connectedCount++;
-                SC_UNUSED(res);
+                SC_TEST_EXPECT(res.isValid());
             };
             SocketIPAddress localHost;
 
@@ -284,7 +285,9 @@ struct SC::EventLoopTest : public SC::TestCase
             int  receiveCalls = 0;
             auto onReceive    = [&](AsyncResult::Receive& res)
             {
-                SC_TEST_EXPECT(res.readData.data()[0] == 1);
+                Span<char> readData;
+                SC_TEST_EXPECT(res.moveTo(readData));
+                SC_TEST_EXPECT(readData.data()[0] == 1);
                 receiveCalls++;
             };
 
@@ -300,30 +303,34 @@ struct SC::EventLoopTest : public SC::TestCase
         }
     }
 
+    void createClientServerConnections(EventLoop& eventLoop, SocketDescriptor& client,
+                                       SocketDescriptor& serverSideClient)
+    {
+        SocketDescriptor serverSocket;
+        uint16_t         tcpPort        = 5050;
+        StringView       connectAddress = "::1";
+        SocketIPAddress  nativeAddress;
+        SC_TEST_EXPECT(nativeAddress.fromAddressPort(connectAddress, tcpPort));
+        SC_TEST_EXPECT(serverSocket.create(nativeAddress.getAddressFamily()));
+        SC_TEST_EXPECT(SocketServer(serverSocket).listen(nativeAddress, 0));
+
+        SC_TEST_EXPECT(SocketClient(client).connect(connectAddress, tcpPort));
+        SC_TEST_EXPECT(SocketServer(serverSocket).accept(SocketFlags::AddressFamilyIPV6, serverSideClient));
+        SC_TEST_EXPECT(client.setBlocking(false));
+        SC_TEST_EXPECT(serverSideClient.setBlocking(false));
+
+        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedTCPSocket(client));
+        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedTCPSocket(serverSideClient));
+    }
+
     void sendReceive()
     {
         if (test_section("send/receive"))
         {
             EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
-
-            SocketDescriptor serverSocket;
-            uint16_t         tcpPort        = 5050;
-            StringView       connectAddress = "::1";
-            SocketIPAddress  nativeAddress;
-            SC_TEST_EXPECT(nativeAddress.fromAddressPort(connectAddress, tcpPort));
-            SC_TEST_EXPECT(serverSocket.create(nativeAddress.getAddressFamily()));
-            SC_TEST_EXPECT(SocketServer(serverSocket).listen(nativeAddress, 0));
-
-            SocketDescriptor client;
-            SC_TEST_EXPECT(SocketClient(client).connect(connectAddress, tcpPort));
-            SocketDescriptor serverSideClient;
-            SC_TEST_EXPECT(SocketServer(serverSocket).accept(SocketFlags::AddressFamilyIPV6, serverSideClient));
-            SC_TEST_EXPECT(client.setBlocking(false));
-            SC_TEST_EXPECT(serverSideClient.setBlocking(false));
-
-            SC_TEST_EXPECT(eventLoop.associateExternallyCreatedTCPSocket(client));
-            SC_TEST_EXPECT(eventLoop.associateExternallyCreatedTCPSocket(serverSideClient));
+            SocketDescriptor client, serverSideClient;
+            createClientServerConnections(eventLoop, client, serverSideClient);
 
             const char sendBuffer[] = {123, 111};
 
@@ -332,7 +339,7 @@ struct SC::EventLoopTest : public SC::TestCase
             int  sendCount = 0;
             auto onSend    = [&](AsyncResult::Send& res)
             {
-                SC_UNUSED(res);
+                SC_TEST_EXPECT(res.isValid());
                 sendCount++;
             };
 
@@ -347,8 +354,10 @@ struct SC::EventLoopTest : public SC::TestCase
             char receivedData[sizeof(sendBuffer)] = {0};
             auto onReceive                        = [&](AsyncResult::Receive& res)
             {
-                SC_TEST_EXPECT(res.readData.sizeInBytes() == 1);
-                receivedData[receiveCount] = res.readData.data()[0];
+                Span<char> readData;
+                SC_TEST_EXPECT(res.moveTo(readData));
+                SC_TEST_EXPECT(readData.sizeInBytes() == 1);
+                receivedData[receiveCount] = readData.data()[0];
                 receiveCount++;
                 res.rearm(size_t(receiveCount) < sizeof(sendBuffer));
             };
@@ -390,8 +399,13 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, options));
             SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
 
-            auto writeLambda = [&](AsyncResult::Write& res) { SC_TEST_EXPECT(res.writtenBytes == 4); };
-            auto writeSpan   = StringView("test").toCharSpan();
+            auto writeLambda = [&](AsyncResult::Write& res)
+            {
+                size_t writtenBytes = 0;
+                SC_TEST_EXPECT(res.moveTo(writtenBytes));
+                SC_TEST_EXPECT(writtenBytes == 4);
+            };
+            auto writeSpan = StringView("test").toCharSpan();
 
             FileDescriptor::Handle handle;
             SC_TEST_EXPECT(fd.get(handle, "asd"_a8));
@@ -409,9 +423,11 @@ struct SC::EventLoopTest : public SC::TestCase
             char readBuffer[4];
             auto readLambda = [&](AsyncResult::Read& res)
             {
-                SC_TEST_EXPECT(res.readData.sizeInBytes() == 1);
-                readBuffer[readCount++] = res.readData.data()[0];
-                res.async.offset += res.readData.sizeInBytes();
+                Span<char> readData;
+                SC_TEST_EXPECT(res.moveTo(readData));
+                SC_TEST_EXPECT(readData.sizeInBytes() == 1);
+                readBuffer[readCount++] = readData.data()[0];
+                res.async.offset += readData.sizeInBytes();
                 res.rearm(readCount < 4);
             };
             AsyncRead read;
@@ -426,6 +442,72 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(fs.removeFile(fileName));
             SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory));
             SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
+        }
+    }
+
+    void errorSendReceive()
+    {
+        if (test_section("error send/receive"))
+        {
+            EventLoop eventLoop;
+            SC_TEST_EXPECT(eventLoop.create());
+            SocketDescriptor client, serverSideClient;
+            createClientServerConnections(eventLoop, client, serverSideClient);
+
+            // Setup send side on serverSideClient
+            AsyncSend asyncSend;
+            asyncSend.debugName = "server";
+            char sendBuffer[1]  = {1};
+            int  numOnSend      = 0;
+            auto onSend         = [&](AsyncSendResult& result)
+            {
+                numOnSend++;
+                SC_TEST_EXPECT(not result.isValid());
+            };
+            {
+                // Extract the raw handle from socket and close it
+                // This will provoke the following failures:
+                // - Apple: after poll on macOS (where we're pushing the async handles to OS)
+                // - Windows: during Staging (precisely in Activate)
+                SocketDescriptor::Handle handle;
+                SC_TEST_EXPECT(serverSideClient.get(handle, "ASD"_a8));
+                SocketDescriptor socketToClose;
+                SC_TEST_EXPECT(socketToClose.assign(handle));
+                SC_TEST_EXPECT(socketToClose.close());
+            }
+            SC_TEST_EXPECT(eventLoop.startSend(asyncSend, serverSideClient, {sendBuffer, sizeof(sendBuffer)}, onSend));
+
+            // Setup receive side on client
+            char recvBuffer[1] = {1};
+            int  numOnReceive  = 0;
+            auto onReceive     = [&](AsyncReceiveResult& result)
+            {
+                numOnReceive++;
+                SC_TEST_EXPECT(not result.isValid());
+            };
+
+            AsyncReceive asyncRecv;
+            asyncRecv.debugName = "client";
+            SC_TEST_EXPECT(eventLoop.startReceive(asyncRecv, client, {recvBuffer, sizeof(recvBuffer)}, onReceive));
+
+            // This will fail because the receive async is not in Free state
+            SC_TEST_EXPECT(not eventLoop.startReceive(asyncRecv, client, {recvBuffer, sizeof(recvBuffer)}, onReceive));
+
+            // Just close the client to cause an error in the callback
+            SC_TEST_EXPECT(client.close());
+
+            AsyncReceive asyncErr;
+            asyncErr.debugName = "asyncErr";
+            // This will fail immediately as the socket is already closed before this call
+            SC_TEST_EXPECT(not eventLoop.startReceive(asyncErr, client, {recvBuffer, sizeof(recvBuffer)}, onReceive));
+
+            SC_TEST_EXPECT(eventLoop.run());
+
+            SC_TEST_EXPECT(not eventLoop.stopAsync(asyncSend));
+            SC_TEST_EXPECT(eventLoop.run());
+
+            SC_TEST_EXPECT(numOnSend == 1);
+            SC_TEST_EXPECT(numOnReceive == 1);
         }
     }
 };
