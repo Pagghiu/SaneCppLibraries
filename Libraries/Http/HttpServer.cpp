@@ -76,19 +76,20 @@ SC::ReturnCode SC::HttpServerAsync::start(EventLoop& loop, uint32_t maxConnectio
     SC_TRY_IF(nativeAddress.fromAddressPort(address, port));
     SC_TRY_IF(eventLoop->createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
     SC_TRY_IF(SocketServer(serverSocket).listen(nativeAddress));
-    SC_TRY_IF(startAccept());
+    SC_TRY_IF(startSocketAccept());
     return true;
 }
 
 SC::ReturnCode SC::HttpServerAsync::stop() { return eventLoop->stopAsync(asyncAccept); }
 
-SC::ReturnCode SC::HttpServerAsync::startAccept()
+SC::ReturnCode SC::HttpServerAsync::startSocketAccept()
 {
     asyncAccept.debugName = "HttpServerAsync";
-    return eventLoop->startAccept(asyncAccept, serverSocket, SC_FUNCTION_MEMBER(&HttpServerAsync::onNewClient, this));
+    return eventLoop->startSocketAccept(asyncAccept, serverSocket,
+                                        SC_FUNCTION_MEMBER(&HttpServerAsync::onNewClient, this));
 }
 
-void SC::HttpServerAsync::onNewClient(AsyncAcceptResult& result)
+void SC::HttpServerAsync::onNewClient(AsyncSocketAcceptResult& result)
 {
     SocketDescriptor acceptedClient;
     if (not result.moveTo(acceptedClient))
@@ -115,14 +116,14 @@ void SC::HttpServerAsync::onNewClient(AsyncAcceptResult& result)
         (void)StringBuilder(client.debugName)
             .format("HttpServerAsync::client [{}:{}]", (int)key1.generation.generation, (int)key1.index);
         client.asyncReceive.debugName = client.debugName.bytesIncludingTerminator();
-        succeeded &= eventLoop->startReceive(client.asyncReceive, client.socket, buffer.toSpan(),
-                                             SC_FUNCTION_MEMBER(&HttpServerAsync::onReceive, this));
+        succeeded &= eventLoop->startSocketReceive(client.asyncReceive, client.socket, buffer.toSpan(),
+                                                   SC_FUNCTION_MEMBER(&HttpServerAsync::onReceive, this));
         SC_RELEASE_ASSERT(succeeded);
     }
-    result.rearm(true);
+    result.reactivateRequest(true);
 }
 
-void SC::HttpServerAsync::onReceive(AsyncReceiveResult& result)
+void SC::HttpServerAsync::onReceive(AsyncSocketReceiveResult& result)
 {
     SC_DISABLE_OFFSETOF_WARNING
     RequestClient& client = SC_FIELD_OFFSET(RequestClient, asyncReceive, result.async);
@@ -145,8 +146,8 @@ void SC::HttpServerAsync::onReceive(AsyncReceiveResult& result)
         client.asyncSend.debugName = client.debugName.bytesIncludingTerminator();
 
         auto outspan = rr.response.outputBuffer.toSpan().asConst();
-        auto res     = eventLoop->startSend(client.asyncSend, client.socket, outspan,
-                                            SC_FUNCTION_MEMBER(&HttpServerAsync::onAfterSend, this));
+        auto res     = eventLoop->startSocketSend(client.asyncSend, client.socket, outspan,
+                                                  SC_FUNCTION_MEMBER(&HttpServerAsync::onAfterSend, this));
         if (not res)
         {
             // TODO: Invoke on error
@@ -155,11 +156,11 @@ void SC::HttpServerAsync::onReceive(AsyncReceiveResult& result)
     }
     else
     {
-        result.rearm(true);
+        result.reactivateRequest(true);
     }
 }
 
-void SC::HttpServerAsync::onAfterSend(AsyncSendResult& result)
+void SC::HttpServerAsync::onAfterSend(AsyncSocketSendResult& result)
 {
     if (result.isValid())
     {

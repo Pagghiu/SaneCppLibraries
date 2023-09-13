@@ -19,9 +19,9 @@ struct SC::HttpClient
     ReturnCode setCustomDebugName(const StringView debugName) { return customDebugName.assign(debugName); }
 
   private:
-    void onConnected(AsyncConnectResult& result);
-    void onAfterSend(AsyncSendResult& result);
-    void onAfterRead(AsyncReceiveResult& result);
+    void onConnected(AsyncSocketConnectResult& result);
+    void onAfterSend(AsyncSocketSendResult& result);
+    void onAfterRead(AsyncSocketReceiveResult& result);
 
     Function<void(HttpClient&)> callback;
     SmallVector<char, 1024>     content;
@@ -29,9 +29,9 @@ struct SC::HttpClient
     String customDebugName;
 
     // TODO: can we find a way to putt all asyncs in a single tagged union when they're not used in parallel?
-    AsyncConnect     connectAsync;
-    AsyncSend        sendAsync;
-    AsyncReceive     receiveAsync;
-    SocketDescriptor clientSocket;
-    EventLoop*       eventLoop = nullptr;
+    AsyncSocketConnect connectAsync;
+    AsyncSocketSend    sendAsync;
+    AsyncSocketReceive receiveAsync;
+    SocketDescriptor   clientSocket;
+    EventLoop*         eventLoop = nullptr;
 };

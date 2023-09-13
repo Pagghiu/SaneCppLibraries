@@ -289,8 +289,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(fs1.write("salve.txt", "content NEW YEAH"));
             SC_TEST_EXPECT(fs2.write("atutti.txt", "content NEW YEAH"));
             // TODO: we need to add a EventLoop::runNoWait as with no registered handle runOnce will block forever
-            AsyncTimeout timeout;
-            SC_TEST_EXPECT(eventLoop.startTimeout(timeout, 50_ms, [](AsyncResult&) {}));
+            AsyncLoopTimeout timeout;
+            SC_TEST_EXPECT(eventLoop.startLoopTimeout(timeout, 50_ms, [](AsyncResult&) {}));
 
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(params.changes1 == 2);

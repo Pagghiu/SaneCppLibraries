@@ -23,25 +23,25 @@ struct Async;
 struct AsyncResult;
 
 // Operations
-struct AsyncTimeout;
-struct AsyncWakeUp;
+struct AsyncLoopTimeout;
+struct AsyncLoopWakeUp;
 struct AsyncProcessExit;
-struct AsyncAccept;
-struct AsyncConnect;
-struct AsyncSend;
-struct AsyncReceive;
-struct AsyncRead;
-struct AsyncWrite;
+struct AsyncSocketAccept;
+struct AsyncSocketConnect;
+struct AsyncSocketSend;
+struct AsyncSocketReceive;
+struct AsyncFileRead;
+struct AsyncFileWrite;
 
-struct AsyncTimeoutResult;
-struct AsyncWakeUpResult;
+struct AsyncLoopTimeoutResult;
+struct AsyncLoopWakeUpResult;
 struct AsyncProcessExitResult;
-struct AsyncAcceptResult;
-struct AsyncConnectResult;
-struct AsyncSendResult;
-struct AsyncReceiveResult;
-struct AsyncReadResult;
-struct AsyncWriteResult;
+struct AsyncSocketAcceptResult;
+struct AsyncSocketConnectResult;
+struct AsyncSocketSendResult;
+struct AsyncSocketReceiveResult;
+struct AsyncFileReadResult;
+struct AsyncFileWriteResult;
 
 } // namespace SC
 
@@ -72,37 +72,37 @@ struct EventLoopWinWaitHandle : public UniqueTaggedHandleTraits<EventLoopWinWait
 
 struct SC::Async
 {
-    using Timeout     = AsyncTimeout;
-    using WakeUp      = AsyncWakeUp;
-    using ProcessExit = AsyncProcessExit;
-    using Accept      = AsyncAccept;
-    using Connect     = AsyncConnect;
-    using Send        = AsyncSend;
-    using Receive     = AsyncReceive;
-    using Read        = AsyncRead;
-    using Write       = AsyncWrite;
+    using LoopTimeout   = AsyncLoopTimeout;
+    using LoopWakeUp    = AsyncLoopWakeUp;
+    using ProcessExit   = AsyncProcessExit;
+    using SocketAccept  = AsyncSocketAccept;
+    using SocketConnect = AsyncSocketConnect;
+    using SocketSend    = AsyncSocketSend;
+    using SocketReceive = AsyncSocketReceive;
+    using FileRead      = AsyncFileRead;
+    using FileWrite     = AsyncFileWrite;
 
-    AsyncTimeout*     asTimeout();
-    AsyncWakeUp*      asWakeUp();
-    AsyncProcessExit* asProcessExit();
-    AsyncAccept*      asAccept();
-    AsyncConnect*     asConnect();
-    AsyncSend*        asSend();
-    AsyncReceive*     asReceive();
-    AsyncRead*        asRead();
-    AsyncWrite*       asWrite();
+    AsyncLoopTimeout*   asLoopTimeout();
+    AsyncLoopWakeUp*    asLoopWakeUp();
+    AsyncProcessExit*   asProcessExit();
+    AsyncSocketAccept*  asSocketAccept();
+    AsyncSocketConnect* asSocketConnect();
+    AsyncSocketSend*    asSocketSend();
+    AsyncSocketReceive* asSocketReceive();
+    AsyncFileRead*      asFileRead();
+    AsyncFileWrite*     asFileWrite();
 
     enum class Type : uint8_t
     {
-        Timeout,
-        WakeUp,
+        LoopTimeout,
+        LoopWakeUp,
         ProcessExit,
-        Accept,
-        Connect,
-        Send,
-        Receive,
-        Read,
-        Write,
+        SocketAccept,
+        SocketConnect,
+        SocketSend,
+        SocketReceive,
+        FileRead,
+        FileWrite,
     };
 
     static StringView TypeToString(Type type);
@@ -128,24 +128,24 @@ struct SC::Async
     State state = State::Free;
 
   private:
-    Type type = Type::Timeout;
+    Type type = Type::LoopTimeout;
 };
 
-struct SC::AsyncTimeout : public Async
+struct SC::AsyncLoopTimeout : public Async
 {
-    AsyncTimeout() : Async(Type::Timeout) {}
+    AsyncLoopTimeout() : Async(Type::LoopTimeout) {}
 
-    Function<void(AsyncTimeoutResult&)> callback;
+    Function<void(AsyncLoopTimeoutResult&)> callback;
 
     IntegerMilliseconds timeout; // not needed, but keeping just for debugging
     TimeCounter         expirationTime;
 };
 
-struct SC::AsyncWakeUp : public Async
+struct SC::AsyncLoopWakeUp : public Async
 {
-    AsyncWakeUp() : Async(Type::WakeUp) {}
+    AsyncLoopWakeUp() : Async(Type::LoopWakeUp) {}
 
-    Function<void(AsyncWakeUpResult&)> callback;
+    Function<void(AsyncLoopWakeUpResult&)> callback;
 
     [[nodiscard]] ReturnCode wakeUp();
 
@@ -166,11 +166,11 @@ struct SC::AsyncProcessExit : public Async
 #endif
 };
 
-struct SC::AsyncAccept : public Async
+struct SC::AsyncSocketAccept : public Async
 {
-    AsyncAccept() : Async(Type::Accept) {}
+    AsyncSocketAccept() : Async(Type::SocketAccept) {}
 
-    Function<void(AsyncAcceptResult&)> callback;
+    Function<void(AsyncSocketAcceptResult&)> callback;
 
     SocketDescriptor::Handle   handle        = SocketDescriptor::Invalid;
     SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
@@ -181,11 +181,11 @@ struct SC::AsyncAccept : public Async
 #endif
 };
 
-struct SC::AsyncConnect : public Async
+struct SC::AsyncSocketConnect : public Async
 {
-    AsyncConnect() : Async(Type::Connect) {}
+    AsyncSocketConnect() : Async(Type::SocketConnect) {}
 
-    Function<void(AsyncConnectResult&)> callback;
+    Function<void(AsyncSocketConnectResult&)> callback;
 
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
     SocketIPAddress          ipAddress;
@@ -194,11 +194,11 @@ struct SC::AsyncConnect : public Async
 #endif
 };
 
-struct SC::AsyncSend : public Async
+struct SC::AsyncSocketSend : public Async
 {
-    AsyncSend() : Async(Type::Send) {}
+    AsyncSocketSend() : Async(Type::SocketSend) {}
 
-    Function<void(AsyncSendResult&)> callback;
+    Function<void(AsyncSocketSendResult&)> callback;
 
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
     Span<const char>         data;
@@ -207,11 +207,11 @@ struct SC::AsyncSend : public Async
 #endif
 };
 
-struct SC::AsyncReceive : public Async
+struct SC::AsyncSocketReceive : public Async
 {
-    AsyncReceive() : Async(Type::Receive) {}
+    AsyncSocketReceive() : Async(Type::SocketReceive) {}
 
-    Function<void(AsyncReceiveResult&)> callback;
+    Function<void(AsyncSocketReceiveResult&)> callback;
 
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
     Span<char>               data;
@@ -220,10 +220,10 @@ struct SC::AsyncReceive : public Async
 #endif
 };
 
-struct SC::AsyncRead : public Async
+struct SC::AsyncFileRead : public Async
 {
-    Function<void(AsyncReadResult&)> callback;
-    AsyncRead() : Async(Type::Read) {}
+    Function<void(AsyncFileReadResult&)> callback;
+    AsyncFileRead() : Async(Type::FileRead) {}
 
     FileDescriptor::Handle fileDescriptor;
     uint64_t               offset = 0;
@@ -233,11 +233,11 @@ struct SC::AsyncRead : public Async
 #endif
 };
 
-struct SC::AsyncWrite : public Async
+struct SC::AsyncFileWrite : public Async
 {
-    AsyncWrite() : Async(Type::Write) {}
+    AsyncFileWrite() : Async(Type::FileWrite) {}
 
-    Function<void(AsyncWriteResult&)> callback;
+    Function<void(AsyncFileWriteResult&)> callback;
 
     FileDescriptor::Handle fileDescriptor;
     uint64_t               offset = 0;
@@ -251,52 +251,53 @@ struct SC::AsyncWrite : public Async
 
 struct SC::AsyncResult
 {
-    using Timeout     = AsyncTimeoutResult;
-    using WakeUp      = AsyncWakeUpResult;
-    using ProcessExit = AsyncProcessExitResult;
-    using Accept      = AsyncAcceptResult;
-    using Connect     = AsyncConnectResult;
-    using Send        = AsyncSendResult;
-    using Receive     = AsyncReceiveResult;
-    using Read        = AsyncReadResult;
-    using Write       = AsyncWriteResult;
+    using LoopTimeout   = AsyncLoopTimeoutResult;
+    using LoopWakeUp    = AsyncLoopWakeUpResult;
+    using ProcessExit   = AsyncProcessExitResult;
+    using SocketAccept  = AsyncSocketAcceptResult;
+    using SocketConnect = AsyncSocketConnectResult;
+    using SocketSend    = AsyncSocketSendResult;
+    using SocketReceive = AsyncSocketReceiveResult;
+    using FileRead      = AsyncFileReadResult;
+    using FileWrite     = AsyncFileWriteResult;
 
     using Type = Async::Type;
 
     void*   userData = nullptr;
     int32_t index    = 0;
+
     AsyncResult(void* userData, int32_t index, ReturnCode&& res)
         : userData(userData), index(index), returnCode(forward<ReturnCode>(res))
     {}
 
-    void rearm(bool value) { doRearm = value; }
-    bool isRearmed() const { return doRearm; }
+    void reactivateRequest(bool value) { shouldBeReactivated = value; }
 
     const ReturnCode& isValid() const { return returnCode; }
 
   protected:
     friend struct EventLoop;
 
-    bool       doRearm = false;
+    bool shouldBeReactivated = false;
+
     ReturnCode returnCode;
 };
 
-struct SC::AsyncTimeoutResult : public AsyncResult
+struct SC::AsyncLoopTimeoutResult : public AsyncResult
 {
-    AsyncTimeoutResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asTimeout())
+    AsyncLoopTimeoutResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asLoopTimeout())
     {}
 
-    AsyncTimeout& async;
+    AsyncLoopTimeout& async;
 };
 
-struct SC::AsyncWakeUpResult : public AsyncResult
+struct SC::AsyncLoopWakeUpResult : public AsyncResult
 {
-    AsyncWakeUpResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asWakeUp())
+    AsyncLoopWakeUpResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asLoopWakeUp())
     {}
 
-    AsyncWakeUp& async;
+    AsyncLoopWakeUp& async;
 };
 
 struct SC::AsyncProcessExitResult : public AsyncResult
@@ -318,13 +319,13 @@ struct SC::AsyncProcessExitResult : public AsyncResult
     ProcessDescriptor::ExitStatus exitStatus;
 };
 
-struct SC::AsyncAcceptResult : public AsyncResult
+struct SC::AsyncSocketAcceptResult : public AsyncResult
 {
-    AsyncAcceptResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asAccept())
+    AsyncSocketAcceptResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asSocketAccept())
     {}
 
-    AsyncAccept& async;
+    AsyncSocketAccept& async;
 
     [[nodiscard]] ReturnCode moveTo(SocketDescriptor& client)
     {
@@ -337,30 +338,30 @@ struct SC::AsyncAcceptResult : public AsyncResult
     SocketDescriptor acceptedClient;
 };
 
-struct SC::AsyncConnectResult : public AsyncResult
+struct SC::AsyncSocketConnectResult : public AsyncResult
 {
-    AsyncConnectResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asConnect())
+    AsyncSocketConnectResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asSocketConnect())
     {}
 
-    AsyncConnect& async;
+    AsyncSocketConnect& async;
 };
 
-struct SC::AsyncSendResult : public AsyncResult
+struct SC::AsyncSocketSendResult : public AsyncResult
 {
-    AsyncSendResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asSend())
+    AsyncSocketSendResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asSocketSend())
     {}
 
-    AsyncSend& async;
+    AsyncSocketSend& async;
 };
 
-struct SC::AsyncReceiveResult : public AsyncResult
+struct SC::AsyncSocketReceiveResult : public AsyncResult
 {
-    AsyncReceiveResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asReceive())
+    AsyncSocketReceiveResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asSocketReceive())
     {}
-    AsyncReceive& async;
+    AsyncSocketReceive& async;
 
     [[nodiscard]] ReturnCode moveTo(Span<char>& data)
     {
@@ -373,12 +374,12 @@ struct SC::AsyncReceiveResult : public AsyncResult
     Span<char> readData;
 };
 
-struct SC::AsyncReadResult : public AsyncResult
+struct SC::AsyncFileReadResult : public AsyncResult
 {
-    AsyncReadResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asRead())
+    AsyncFileReadResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asFileRead())
     {}
-    AsyncRead& async;
+    AsyncFileRead& async;
 
     [[nodiscard]] ReturnCode moveTo(Span<char>& data)
     {
@@ -391,13 +392,13 @@ struct SC::AsyncReadResult : public AsyncResult
     Span<char> readData;
 };
 
-struct SC::AsyncWriteResult : public AsyncResult
+struct SC::AsyncFileWriteResult : public AsyncResult
 {
-    AsyncWriteResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asWrite())
+    AsyncFileWriteResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
+        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asFileWrite())
     {}
 
-    AsyncWrite& async;
+    AsyncFileWrite& async;
 
     [[nodiscard]] ReturnCode moveTo(size_t& writtenSizeInBytes)
     {
@@ -411,77 +412,118 @@ struct SC::AsyncWriteResult : public AsyncResult
 };
 
 // clang-format off
-inline SC::AsyncTimeout*    SC::Async::asTimeout()  { return type == Type::Timeout ? static_cast<AsyncTimeout*>(this) : nullptr;}
-inline SC::AsyncWakeUp*     SC::Async::asWakeUp()   { return type == Type::WakeUp ? static_cast<AsyncWakeUp*>(this) : nullptr;}
-inline SC::AsyncProcessExit* SC::Async::asProcessExit() { return type == Type::ProcessExit ? static_cast<AsyncProcessExit*>(this) : nullptr;}
-inline SC::AsyncAccept*     SC::Async::asAccept()   { return type == Type::Accept ? static_cast<AsyncAccept*>(this) : nullptr;}
-inline SC::AsyncConnect*    SC::Async::asConnect()  { return type == Type::Connect ? static_cast<AsyncConnect*>(this) : nullptr;}
-inline SC::AsyncSend*       SC::Async::asSend()     { return type == Type::Send ? static_cast<AsyncSend*>(this) : nullptr; }
-inline SC::AsyncReceive*    SC::Async::asReceive()  { return type == Type::Receive ? static_cast<AsyncReceive*>(this) : nullptr;}
-inline SC::AsyncRead*       SC::Async::asRead()     { return type == Type::Read ? static_cast<AsyncRead*>(this) : nullptr; }
-inline SC::AsyncWrite*      SC::Async::asWrite()    { return type == Type::Write ? static_cast<AsyncWrite*>(this) : nullptr; }
+inline SC::AsyncLoopTimeout*    SC::Async::asLoopTimeout()  { return type == Type::LoopTimeout ? static_cast<AsyncLoopTimeout*>(this) : nullptr;}
+inline SC::AsyncLoopWakeUp*     SC::Async::asLoopWakeUp()   { return type == Type::LoopWakeUp ? static_cast<AsyncLoopWakeUp*>(this) : nullptr;}
+inline SC::AsyncProcessExit*    SC::Async::asProcessExit()  { return type == Type::ProcessExit ? static_cast<AsyncProcessExit*>(this) : nullptr;}
+inline SC::AsyncSocketAccept*   SC::Async::asSocketAccept() { return type == Type::SocketAccept ? static_cast<AsyncSocketAccept*>(this) : nullptr;}
+inline SC::AsyncSocketConnect*  SC::Async::asSocketConnect(){ return type == Type::SocketConnect ? static_cast<AsyncSocketConnect*>(this) : nullptr;}
+inline SC::AsyncSocketSend*     SC::Async::asSocketSend()   { return type == Type::SocketSend ? static_cast<AsyncSocketSend*>(this) : nullptr; }
+inline SC::AsyncSocketReceive*  SC::Async::asSocketReceive(){ return type == Type::SocketReceive ? static_cast<AsyncSocketReceive*>(this) : nullptr;}
+inline SC::AsyncFileRead*       SC::Async::asFileRead()     { return type == Type::FileRead ? static_cast<AsyncFileRead*>(this) : nullptr; }
+inline SC::AsyncFileWrite*      SC::Async::asFileWrite()    { return type == Type::FileWrite ? static_cast<AsyncFileWrite*>(this) : nullptr; }
 // clang-format on
 
 struct SC::EventLoop
 {
     // Creation
+    /// Creates the event loop kernel object
     [[nodiscard]] ReturnCode create();
+
+    /// Closes the event loop kernel object
     [[nodiscard]] ReturnCode close();
 
     // Execution
+    /// Runs until there are no more active handles left.
     [[nodiscard]] ReturnCode run();
+    /// Runs just a single step. Ensures forward progress. If there are no events it blocks.
     [[nodiscard]] ReturnCode runOnce();
+    /// Runs just a single step without forward progress. If there are no events returns immediately.
     [[nodiscard]] ReturnCode runNoWait();
 
     // Stop any async operation
     [[nodiscard]] ReturnCode stopAsync(Async& async);
 
-    // Start specific async operation
-    [[nodiscard]] ReturnCode startTimeout(AsyncTimeout& async, IntegerMilliseconds expiration,
-                                          Function<void(AsyncTimeoutResult&)>&& callback);
+    // Start specific async operation request.
+    // Every async operation takes a callback as parameter that is invoked when the request is fullfilled.
+    // If the function returns a valid (non error) Return code, then the user callback will be called both
+    // in case of success and in case of any error.
+    // If the function returns an invalid Return code, then the user callback will not be called.
+    // The memory address of all Async* objects must be stable for the entire duration of a started async request,
+    // that means they can be freed / moved after the user callback is executed.
 
-    [[nodiscard]] ReturnCode startWakeUp(AsyncWakeUp& async, Function<void(AsyncWakeUpResult&)>&& callback,
-                                         EventObject* eventObject = nullptr);
+    /// Starts a Timeout that is invoked after expiration (relative) time has passed.
+    [[nodiscard]] ReturnCode startLoopTimeout(AsyncLoopTimeout& async, IntegerMilliseconds expiration,
+                                              Function<void(AsyncLoopTimeoutResult&)>&& callback);
 
+    /// Starts a wake up request, that will be fullfilled when an external thread calls wakeUpFromExternalThread.
+    /// EventObject is optional and allows the external thread to wait until the user callback has completed execution.
+    [[nodiscard]] ReturnCode startLoopWakeUp(AsyncLoopWakeUp& async, Function<void(AsyncLoopWakeUpResult&)>&& callback,
+                                             EventObject* eventObject = nullptr);
+
+    /// Starts a process exit notification request, that will be fullfilled when the given process is exited.
     [[nodiscard]] ReturnCode startProcessExit(AsyncProcessExit&                         async,
                                               Function<void(AsyncProcessExitResult&)>&& callback,
                                               ProcessDescriptor::Handle                 process);
 
-    [[nodiscard]] ReturnCode startAccept(AsyncAccept& async, const SocketDescriptor& socketDescriptor,
-                                         Function<void(AsyncAcceptResult&)>&& callback);
+    /// Starts a socket accept operation, that will return a new socket connected to the given listening endpoint.
+    /// SocketDescriptor must be created with async flags (createAsyncTCPSocket) and already bound and listening.
+    [[nodiscard]] ReturnCode startSocketAccept(AsyncSocketAccept& async, const SocketDescriptor& socketDescriptor,
+                                               Function<void(AsyncSocketAcceptResult&)>&& callback);
 
-    [[nodiscard]] ReturnCode startConnect(AsyncConnect& async, const SocketDescriptor& socketDescriptor,
-                                          SocketIPAddress ipAddress, Function<void(AsyncConnectResult&)>&& callback);
+    /// Starts a socket connect operation. Callback will be called when the given socket is connected to ipAddress.
+    [[nodiscard]] ReturnCode startSocketConnect(AsyncSocketConnect& async, const SocketDescriptor& socketDescriptor,
+                                                SocketIPAddress                             ipAddress,
+                                                Function<void(AsyncSocketConnectResult&)>&& callback);
 
-    [[nodiscard]] ReturnCode startSend(AsyncSend& async, const SocketDescriptor& socketDescriptor,
-                                       Span<const char> data, Function<void(AsyncSendResult&)>&& callback);
+    /// Starts a socket send operation. Callback will be called when the given socket is ready to send more data.
+    [[nodiscard]] ReturnCode startSocketSend(AsyncSocketSend& async, const SocketDescriptor& socketDescriptor,
+                                             Span<const char> data, Function<void(AsyncSocketSendResult&)>&& callback);
 
-    [[nodiscard]] ReturnCode startReceive(AsyncReceive& async, const SocketDescriptor& socketDescriptor,
-                                          Span<char> data, Function<void(AsyncReceiveResult&)>&& callback);
+    /// Starts a socket receive operation. Callback will be called when some data is read from socket.
+    [[nodiscard]] ReturnCode startSocketReceive(AsyncSocketReceive& async, const SocketDescriptor& socketDescriptor,
+                                                Span<char> data, Function<void(AsyncSocketReceiveResult&)>&& callback);
 
-    [[nodiscard]] ReturnCode startRead(AsyncRead& async, FileDescriptor::Handle fileDescriptor, Span<char> readBuffer,
-                                       Function<void(AsyncReadResult&)>&& callback);
+    /// Starts a socket close operation. Callback will be called when some data is read from socket.
+    [[nodiscard]] ReturnCode startSocketReceive(AsyncSocketReceive& async, const SocketDescriptor& socketDescriptor,
+                                                Span<char> data, Function<void(AsyncSocketReceiveResult&)>&& callback);
 
-    [[nodiscard]] ReturnCode startWrite(AsyncWrite& async, FileDescriptor::Handle fileDescriptor,
-                                        Span<const char> writeBuffer, Function<void(AsyncWriteResult&)>&& callback);
+    /// Starts a file receive operation, that will return when some data is read from file.
+    [[nodiscard]] ReturnCode startFileRead(AsyncFileRead& async, FileDescriptor::Handle fileDescriptor,
+                                           Span<char> readBuffer, Function<void(AsyncFileReadResult&)>&& callback);
 
-    // WakeUp support
-    [[nodiscard]] ReturnCode wakeUpFromExternalThread(AsyncWakeUp& wakeUp);
+    /// Starts a file receive operation, that will return when the file is ready to receive more bytes to write.
+    [[nodiscard]] ReturnCode startFileWrite(AsyncFileWrite& async, FileDescriptor::Handle fileDescriptor,
+                                            Span<const char>                        writeBuffer,
+                                            Function<void(AsyncFileWriteResult&)>&& callback);
 
+    /// Wake up the event loop from a thread different than the one where run() is called (and potentially blocked).
+    /// The parameter is an AsyncLoopWakeUp that must have been previously started (with startLoopWakeUp).
+    [[nodiscard]] ReturnCode wakeUpFromExternalThread(AsyncLoopWakeUp& wakeUp);
+
+    /// Wake up the event loop from a thread different than the one where run() is called (and potentially blocked)
     [[nodiscard]] ReturnCode wakeUpFromExternalThread();
 
-    // Access Internals
-    [[nodiscard]] ReturnCode getLoopFileDescriptor(FileDescriptor::Handle& fileDescriptor) const;
-
-    void increaseActiveCount();
-    void decreaseActiveCount();
-
-    int getTotalNumberOfActiveHandle() const;
-
+    /// Helper to creates a TCP socket with Async flags of the given family (IPV4 / IPV6).
+    /// It also automatically registers the socket with the eventLoop (associateExternallyCreatedTCPSocket)
     ReturnCode createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor);
 
+    /// Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventloop.
     ReturnCode associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor);
+
+    /// Associates a File descriptor created externally with the eventloop.
     ReturnCode associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor);
+
+    // Advanced usages
+
+    /// Returns handle to the kernel level IO queue object.
+    /// Used by external systems calling OS async function themselves (FileSystemWatcher on windows for example)
+    [[nodiscard]] ReturnCode getLoopFileDescriptor(FileDescriptor::Handle& fileDescriptor) const;
+
+    /// Manually increases active handles count for external system calling OS async function themselves.
+    void increaseActiveCount();
+
+    /// Manually decreases active handles count for external system calling OS async function themselves.
+    void decreaseActiveCount();
 
   private:
     int numberOfActiveHandles = 0;
@@ -513,6 +555,8 @@ struct SC::EventLoop
     using InternalOpaque = OpaqueUniqueObject<OpaqueFuncs<InternalTraits>>;
     InternalOpaque internal;
 
+    int getTotalNumberOfActiveHandle() const;
+
     void removeActiveHandle(Async& async);
     void addActiveHandle(Async& async);
 
@@ -523,7 +567,7 @@ struct SC::EventLoop
     void updateTime();
     void executeTimers(KernelQueue& queue, const TimeCounter& nextTimer);
 
-    // WakeUp
+    // LoopWakeUp
     void executeWakeUps(AsyncResult& result);
 
     // Setup

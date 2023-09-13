@@ -209,7 +209,7 @@ struct SC::FileSystemWatcher::Internal
         threadingRunner->shouldStop.exchange(false);
     }
 
-    void onEventLoopNotification(AsyncResult::Timeout& result)
+    void onEventLoopNotification(AsyncResult::LoopTimeout& result)
     {
         // Comes from completion key passed to CreateIoCompletionPort
         FolderWatcher& entry = *reinterpret_cast<FolderWatcher*>(result.userData);

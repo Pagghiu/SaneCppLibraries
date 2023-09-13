@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 
-#include "../Async/EventLoop.h" // AsyncWakeUp
+#include "../Async/EventLoop.h" // AsyncLoopWakeUp
 #include "../Foundation/Function.h"
 #include "../Foundation/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Opaque.h"
@@ -84,12 +84,12 @@ struct SC::FileSystemWatcher
         EventLoop& eventLoop;
 
 #if SC_PLATFORM_APPLE
-        AsyncWakeUp eventLoopAsync = {};
-        EventObject eventObject    = {};
+        AsyncLoopWakeUp eventLoopAsync = {};
+        EventObject     eventObject    = {};
 #elif SC_PLATFORM_WINDOWS
         // Convention for overlapped notifications
-        // TODO: Create a dedicated enum type for OVERLAPPED notifications instead of using Timeout
-        AsyncTimeout eventLoopAsync = {};
+        // TODO: Create a dedicated enum type for OVERLAPPED notifications instead of using LoopTimeout
+        AsyncLoopTimeout eventLoopAsync = {};
 #endif
     };
 

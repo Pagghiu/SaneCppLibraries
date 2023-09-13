@@ -73,17 +73,17 @@ struct SC::HttpServerAsync : public HttpServer
     {
         ArenaMap<RequestClient>::Key key;
 
-        SocketDescriptor socket;
-        SmallString<50>  debugName;
-        AsyncReceive     asyncReceive;
-        AsyncSend        asyncSend;
+        SocketDescriptor   socket;
+        SmallString<50>    debugName;
+        AsyncSocketReceive asyncReceive;
+        AsyncSocketSend    asyncSend;
     };
     ArenaMap<RequestClient> requestClients;
     SocketDescriptor        serverSocket;
 
-    uint32_t    maxHeaderSize = 8 * 1024;
-    EventLoop*  eventLoop     = nullptr;
-    AsyncAccept asyncAccept;
+    uint32_t          maxHeaderSize = 8 * 1024;
+    EventLoop*        eventLoop     = nullptr;
+    AsyncSocketAccept asyncAccept;
 
     HttpServerAsync() {}
 
@@ -94,9 +94,9 @@ struct SC::HttpServerAsync : public HttpServer
     [[nodiscard]] ReturnCode stop();
 
   private:
-    [[nodiscard]] ReturnCode startAccept();
+    [[nodiscard]] ReturnCode startSocketAccept();
 
-    void onNewClient(AsyncAcceptResult& result);
-    void onReceive(AsyncReceiveResult& result);
-    void onAfterSend(AsyncSendResult& result);
+    void onNewClient(AsyncSocketAcceptResult& result);
+    void onReceive(AsyncSocketReceiveResult& result);
+    void onAfterSend(AsyncSocketSendResult& result);
 };

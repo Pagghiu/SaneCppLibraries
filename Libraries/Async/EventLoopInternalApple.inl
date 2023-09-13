@@ -16,7 +16,7 @@ struct SC::EventLoop::Internal
 {
     FileDescriptor loopFd;
 
-    AsyncRead      wakeupPipeRead;
+    AsyncFileRead  wakeupPipeRead;
     PipeDescriptor wakeupPipe;
     char           wakeupPipeReadBuf[10];
 
@@ -50,8 +50,8 @@ struct SC::EventLoop::Internal
         FileDescriptor::Handle wakeUpPipeDescriptor;
         SC_TRY_IF(wakeupPipe.readPipe.get(wakeUpPipeDescriptor,
                                           "EventLoop::Internal::createWakeup() - Async read handle invalid"_a8));
-        SC_TRY_IF(
-            loop.startRead(wakeupPipeRead, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)}, {}));
+        SC_TRY_IF(loop.startFileRead(wakeupPipeRead, wakeUpPipeDescriptor,
+                                     {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)}, {}));
         SC_TRY_IF(loop.runNoWait()); // We want to register the read handle before everything else
         loop.decreaseActiveCount();  // we don't want the read to keep the queue up
         return true;
@@ -195,27 +195,27 @@ struct SC::EventLoop::KernelQueue
     }
 
     // TIMEOUT
-    [[nodiscard]] static bool completeAsync(AsyncResult::Timeout& result)
+    [[nodiscard]] static bool completeAsync(AsyncResult::LoopTimeout& result)
     {
         SC_UNUSED(result);
-        SC_RELEASE_ASSERT(false and "Async::Type::Timeout cannot be argument of completion");
+        SC_RELEASE_ASSERT(false and "Async::Type::LoopTimeout cannot be argument of completion");
         return false;
     }
 
     // WAKEUP
-    [[nodiscard]] static bool completeAsync(AsyncResult::WakeUp& result)
+    [[nodiscard]] static bool completeAsync(AsyncResult::LoopWakeUp& result)
     {
         SC_UNUSED(result);
-        SC_RELEASE_ASSERT(false and "Async::Type::WakeUp cannot be argument of completion");
+        SC_RELEASE_ASSERT(false and "Async::Type::LoopWakeUp cannot be argument of completion");
         return false;
     }
 
-    static void completeAsyncWakeUpFromFakeRead(AsyncResult::Read& result)
+    static void completeAsyncLoopWakeUpFromFakeRead(AsyncResult::FileRead& result)
     {
         Async& async = result.async;
         // TODO: Investigate usage of MACHPORT to avoid executing this additional read syscall
-        Async::Read& readOp   = *async.asRead();
-        auto         readSpan = readOp.readBuffer;
+        Async::FileRead& readOp   = *async.asFileRead();
+        auto             readSpan = readOp.readBuffer;
         do
         {
             const ssize_t res = ::read(readOp.fileDescriptor, readSpan.data(), readSpan.sizeInBytes());
@@ -233,35 +233,35 @@ struct SC::EventLoop::KernelQueue
         result.async.eventLoop->executeWakeUps(result);
     }
 
-    // ACCEPT
-    [[nodiscard]] bool setupAsync(Async::Accept& async)
+    // Socket ACCEPT
+    [[nodiscard]] bool setupAsync(Async::SocketAccept& async)
     {
         return setEventWatcher(async, async.handle, EVFILT_READ, EV_ADD | EV_ENABLE);
     }
-    [[nodiscard]] static bool activateAsync(Async::Accept&) { return true; }
+    [[nodiscard]] static bool activateAsync(Async::SocketAccept&) { return true; }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::Accept& result)
+    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::SocketAccept& result)
     {
-        Async::Accept&   async = *result.async.asAccept();
-        SocketDescriptor serverSocket;
+        Async::SocketAccept& async = *result.async.asSocketAccept();
+        SocketDescriptor     serverSocket;
         SC_TRY_IF(serverSocket.assign(async.handle));
         auto detach = MakeDeferred([&] { serverSocket.detach(); });
         result.acceptedClient.detach();
         return SocketServer(serverSocket).accept(async.addressFamily, result.acceptedClient);
     }
 
-    [[nodiscard]] static ReturnCode stopAsync(Async::Accept& async)
+    [[nodiscard]] static ReturnCode stopAsync(Async::SocketAccept& async)
     {
         return Internal::stopSingleWatcherImmediate(async, async.handle, EVFILT_READ);
     }
 
-    // CONNECT
-    [[nodiscard]] bool setupAsync(Async::Connect& async)
+    // Socket CONNECT
+    [[nodiscard]] bool setupAsync(Async::SocketConnect& async)
     {
         return setEventWatcher(async, async.handle, EVFILT_WRITE, EV_ADD | EV_ENABLE);
     }
 
-    [[nodiscard]] static ReturnCode activateAsync(Async::Connect& async)
+    [[nodiscard]] static ReturnCode activateAsync(Async::SocketConnect& async)
     {
         SocketDescriptor client;
         SC_TRY_IF(client.assign(async.handle));
@@ -279,9 +279,9 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::Connect& result)
+    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::SocketConnect& result)
     {
-        Async::Connect& async = *result.async.asConnect();
+        Async::SocketConnect& async = *result.async.asSocketConnect();
 
         int       errorCode;
         socklen_t errorSize = sizeof(errorCode);
@@ -299,73 +299,73 @@ struct SC::EventLoop::KernelQueue
         return "connect getsockopt failed"_a8;
     }
 
-    [[nodiscard]] static ReturnCode stopAsync(Async::Connect& async)
+    [[nodiscard]] static ReturnCode stopAsync(Async::SocketConnect& async)
     {
         return Internal::stopSingleWatcherImmediate(async, async.handle, EVFILT_WRITE);
     }
 
-    // SEND
-    [[nodiscard]] ReturnCode setupAsync(Async::Send& async)
+    // Socket SEND
+    [[nodiscard]] ReturnCode setupAsync(Async::SocketSend& async)
     {
         return setEventWatcher(async, async.handle, EVFILT_WRITE, EV_ADD | EV_ENABLE);
     }
 
-    [[nodiscard]] static bool activateAsync(Async::Send&) { return true; }
+    [[nodiscard]] static bool activateAsync(Async::SocketSend&) { return true; }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::Send& result)
+    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::SocketSend& result)
     {
-        Async::Send&  async = *result.async.asSend();
-        const ssize_t res   = ::send(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
+        Async::SocketSend& async = *result.async.asSocketSend();
+        const ssize_t      res   = ::send(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
         SC_TRY_MSG(res >= 0, "error in send"_a8);
         SC_TRY_MSG(size_t(res) == async.data.sizeInBytes(), "send didn't send all data"_a8);
         return true;
     }
 
-    [[nodiscard]] ReturnCode stopAsync(Async::Send& async)
+    [[nodiscard]] ReturnCode stopAsync(Async::SocketSend& async)
     {
         return Internal::stopSingleWatcherImmediate(async, async.handle, EVFILT_WRITE);
     }
 
-    // RECEIVE
-    [[nodiscard]] ReturnCode setupAsync(Async::Receive& async)
+    // Socket RECEIVE
+    [[nodiscard]] ReturnCode setupAsync(Async::SocketReceive& async)
     {
         return setEventWatcher(async, async.handle, EVFILT_READ, EV_ADD | EV_ENABLE);
     }
 
-    [[nodiscard]] static bool activateAsync(Async::Receive&) { return true; }
+    [[nodiscard]] static bool activateAsync(Async::SocketReceive&) { return true; }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::Receive& result)
+    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::SocketReceive& result)
     {
-        Async::Receive& async = *result.async.asReceive();
-        const ssize_t   res   = ::recv(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
+        Async::SocketReceive& async = *result.async.asSocketReceive();
+        const ssize_t         res   = ::recv(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
         SC_TRY_MSG(res >= 0, "error in recv"_a8);
         return async.data.sliceStartLength(0, static_cast<size_t>(res), result.readData);
     }
 
-    [[nodiscard]] static ReturnCode stopAsync(Async::Receive& async)
+    [[nodiscard]] static ReturnCode stopAsync(Async::SocketReceive& async)
     {
         return Internal::stopSingleWatcherImmediate(async, async.handle, EVFILT_READ);
     }
 
-    // READ
-    [[nodiscard]] bool setupAsync(Async::Read& async)
+    // File READ
+    [[nodiscard]] bool setupAsync(Async::FileRead& async)
     {
         return setEventWatcher(async, async.fileDescriptor, EVFILT_READ, EV_ADD);
     }
 
-    [[nodiscard]] static bool activateAsync(Async::Read&) { return true; }
+    [[nodiscard]] static bool activateAsync(Async::FileRead&) { return true; }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::Read& result)
+    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::FileRead& result)
     {
         if (&result.async == &result.async.eventLoop->internal.get().wakeupPipeRead)
         {
-            completeAsyncWakeUpFromFakeRead(result);
+            completeAsyncLoopWakeUpFromFakeRead(result);
         }
         else
         {
-            Async::Read& operation = *result.async.asRead();
-            auto         span      = operation.readBuffer;
-            ssize_t      res;
+            Async::FileRead& operation = *result.async.asFileRead();
+            auto             span      = operation.readBuffer;
+            ssize_t          res;
             do
             {
                 res = ::pread(operation.fileDescriptor, span.data(), span.sizeInBytes(),
@@ -377,24 +377,24 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] static ReturnCode stopAsync(Async::Read& async)
+    [[nodiscard]] static ReturnCode stopAsync(Async::FileRead& async)
     {
         return Internal::stopSingleWatcherImmediate(async, async.fileDescriptor, EVFILT_READ);
     }
 
-    // WRITE
-    [[nodiscard]] bool setupAsync(Async::Write& async)
+    // File WRITE
+    [[nodiscard]] bool setupAsync(Async::FileWrite& async)
     {
         return setEventWatcher(async, async.fileDescriptor, EVFILT_WRITE, EV_ADD);
     }
 
-    [[nodiscard]] static bool activateAsync(Async::Write&) { return true; }
+    [[nodiscard]] static bool activateAsync(Async::FileWrite&) { return true; }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::Write& result)
+    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::FileWrite& result)
     {
-        AsyncWrite& async = *result.async.asWrite();
-        auto        span  = async.writeBuffer;
-        ssize_t     res;
+        AsyncFileWrite& async = *result.async.asFileWrite();
+        auto            span  = async.writeBuffer;
+        ssize_t         res;
         do
         {
             res = ::pwrite(async.fileDescriptor, span.data(), span.sizeInBytes(), static_cast<off_t>(async.offset));
@@ -404,7 +404,7 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] static ReturnCode stopAsync(Async::Write& async)
+    [[nodiscard]] static ReturnCode stopAsync(Async::FileWrite& async)
     {
         return Internal::stopSingleWatcherImmediate(async, async.fileDescriptor, EVFILT_WRITE);
     }

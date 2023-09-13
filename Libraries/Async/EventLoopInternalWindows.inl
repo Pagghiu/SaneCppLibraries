@@ -37,7 +37,7 @@ SC::ReturnCode SC::EventLoopWinWaitTraits::releaseHandle(Handle& waitHandle)
 struct SC::EventLoop::Internal
 {
     FileDescriptor         loopFd;
-    AsyncWakeUp            wakeUpAsync;
+    AsyncLoopWakeUp        wakeUpAsync;
     NTSetInformationFile   pNtSetInformationFile = nullptr;
     LPFN_CONNECTEX         pConnectEx            = nullptr;
     LPFN_ACCEPTEX          pAcceptEx             = nullptr;
@@ -226,7 +226,7 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] static bool validateEvent(const OVERLAPPED_ENTRY&, bool&) { return true; }
 
     // TIMEOUT
-    [[nodiscard]] static bool completeAsync(AsyncResult::Timeout&)
+    [[nodiscard]] static bool completeAsync(AsyncResult::LoopTimeout&)
     {
         // This is used for overlapped notifications (like FileSystemWatcher)
         // It would be probably better to create a dedicated enum type for Overlapped Notifications
@@ -234,28 +234,28 @@ struct SC::EventLoop::KernelQueue
     }
 
     // WAKEUP
-    [[nodiscard]] static bool completeAsync(AsyncResult::WakeUp& result)
+    [[nodiscard]] static bool completeAsync(AsyncResult::LoopWakeUp& result)
     {
         result.async.eventLoop->executeWakeUps(result);
         return true;
     }
 
     // ACCEPT
-    [[nodiscard]] static ReturnCode setupAsync(Async::Accept& async)
+    [[nodiscard]] static ReturnCode setupAsync(Async::SocketAccept& async)
     {
         SC_TRY_IF(SystemFunctions::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return true;
     }
 
-    [[nodiscard]] static ReturnCode activateAsync(Async::Accept& operation)
+    [[nodiscard]] static ReturnCode activateAsync(Async::SocketAccept& operation)
     {
         EventLoop& eventLoop    = *operation.eventLoop;
         SOCKET     clientSocket = ::WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0,
                                                WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT);
         SC_TRY_MSG(clientSocket != INVALID_SOCKET, "WSASocketW failed"_a8);
         auto deferDeleteSocket = MakeDeferred([&] { closesocket(clientSocket); });
-        static_assert(sizeof(AsyncAccept::acceptBuffer) == sizeof(struct sockaddr_storage) * 2 + 32,
+        static_assert(sizeof(AsyncSocketAccept::acceptBuffer) == sizeof(struct sockaddr_storage) * 2 + 32,
                       "Check acceptBuffer size");
 
         EventLoopWinOverlapped& overlapped      = operation.overlapped.get();
@@ -276,9 +276,9 @@ struct SC::EventLoop::KernelQueue
         return operation.clientSocket.assign(clientSocket);
     }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::Accept& result)
+    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::SocketAccept& result)
     {
-        Async::Accept& operation = *result.async.asAccept();
+        Async::SocketAccept& operation = *result.async.asSocketAccept();
         SC_TRY_IF(Internal::checkWSAResult(operation.handle, operation.overlapped.get().overlapped));
         SOCKET clientSocket;
         SC_TRY_IF(operation.clientSocket.get(clientSocket, "clientSocket error"_a8));
@@ -292,7 +292,7 @@ struct SC::EventLoop::KernelQueue
         return result.acceptedClient.assign(move(operation.clientSocket));
     }
 
-    [[nodiscard]] ReturnCode stopAsync(Async::Accept& asyncAccept)
+    [[nodiscard]] ReturnCode stopAsync(Async::SocketAccept& asyncAccept)
     {
         HANDLE listenHandle = reinterpret_cast<HANDLE>(asyncAccept.handle);
         // This will cause one more event loop run with GetOverlappedIO failing
@@ -318,14 +318,14 @@ struct SC::EventLoop::KernelQueue
     }
 
     // CONNECT
-    [[nodiscard]] static ReturnCode setupAsync(Async::Connect& async)
+    [[nodiscard]] static ReturnCode setupAsync(Async::SocketConnect& async)
     {
         SC_TRY_IF(SystemFunctions::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return true;
     }
 
-    [[nodiscard]] static ReturnCode activateAsync(Async::Connect& asyncConnect)
+    [[nodiscard]] static ReturnCode activateAsync(Async::SocketConnect& asyncConnect)
     {
         EventLoop& eventLoop  = *asyncConnect.eventLoop;
         auto&      overlapped = asyncConnect.overlapped.get();
@@ -367,28 +367,28 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::Connect& result)
+    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::SocketConnect& result)
     {
-        Async::Connect& operation = *result.async.asConnect();
+        Async::SocketConnect& operation = *result.async.asSocketConnect();
         SC_TRY_IF(Internal::checkWSAResult(operation.handle, operation.overlapped.get().overlapped));
         return true;
     }
 
-    [[nodiscard]] static ReturnCode stopAsync(Async::Connect& async)
+    [[nodiscard]] static ReturnCode stopAsync(Async::SocketConnect& async)
     {
         SC_UNUSED(async);
         return true;
     }
 
     // SEND
-    [[nodiscard]] static ReturnCode setupAsync(Async::Send& async)
+    [[nodiscard]] static ReturnCode setupAsync(Async::SocketSend& async)
     {
         SC_TRY_IF(SystemFunctions::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return true;
     }
 
-    [[nodiscard]] static ReturnCode activateAsync(Async::Send& async)
+    [[nodiscard]] static ReturnCode activateAsync(Async::SocketSend& async)
     {
         auto&  overlapped = async.overlapped.get();
         WSABUF buffer;
@@ -402,29 +402,29 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::Send& result)
+    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::SocketSend& result)
     {
-        Async::Send& operation   = *result.async.asSend();
-        size_t       transferred = 0;
+        Async::SocketSend& operation   = *result.async.asSocketSend();
+        size_t             transferred = 0;
         SC_TRY_IF(Internal::checkWSAResult(operation.handle, operation.overlapped.get().overlapped, &transferred));
         return true;
     }
 
-    [[nodiscard]] ReturnCode stopAsync(Async::Send& async)
+    [[nodiscard]] ReturnCode stopAsync(Async::SocketSend& async)
     {
         SC_UNUSED(async);
         return true;
     }
 
     // RECEIVE
-    [[nodiscard]] static ReturnCode setupAsync(Async::Receive& async)
+    [[nodiscard]] static ReturnCode setupAsync(Async::SocketReceive& async)
     {
         SC_TRY_IF(SystemFunctions::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return true;
     }
 
-    [[nodiscard]] static ReturnCode activateAsync(Async::Receive& async)
+    [[nodiscard]] static ReturnCode activateAsync(Async::SocketReceive& async)
     {
         auto&  overlapped = async.overlapped.get();
         WSABUF buffer;
@@ -438,29 +438,29 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::Receive& result)
+    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::SocketReceive& result)
     {
-        Async::Receive& operation   = *result.async.asReceive();
-        size_t          transferred = 0;
+        Async::SocketReceive& operation   = *result.async.asSocketReceive();
+        size_t                transferred = 0;
         SC_TRY_IF(Internal::checkWSAResult(operation.handle, operation.overlapped.get().overlapped, &transferred));
         SC_TRY_IF(operation.data.sliceStartLength(0, transferred, result.readData));
         return true;
     }
 
-    [[nodiscard]] ReturnCode stopAsync(Async::Receive& async)
+    [[nodiscard]] ReturnCode stopAsync(Async::SocketReceive& async)
     {
         SC_UNUSED(async);
         return true;
     }
 
     // READ
-    [[nodiscard]] static ReturnCode setupAsync(Async::Read& async)
+    [[nodiscard]] static ReturnCode setupAsync(Async::FileRead& async)
     {
         async.overlapped.get().userData = &async;
         return true;
     }
 
-    [[nodiscard]] static ReturnCode activateAsync(Async::Read& operation)
+    [[nodiscard]] static ReturnCode activateAsync(Async::FileRead& operation)
     {
         auto& overlapped                 = operation.overlapped.get();
         overlapped.overlapped.Offset     = static_cast<DWORD>(operation.offset & 0xffffffff);
@@ -476,12 +476,12 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::Read& result)
+    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::FileRead& result)
     {
-        Async::Read& operation   = *result.async.asRead();
-        OVERLAPPED&  overlapped  = operation.overlapped.get().overlapped;
-        DWORD        transferred = 0;
-        BOOL         res         = ::GetOverlappedResult(operation.fileDescriptor, &overlapped, &transferred, FALSE);
+        Async::FileRead& operation   = *result.async.asFileRead();
+        OVERLAPPED&      overlapped  = operation.overlapped.get().overlapped;
+        DWORD            transferred = 0;
+        BOOL             res = ::GetOverlappedResult(operation.fileDescriptor, &overlapped, &transferred, FALSE);
         if (res == FALSE)
         {
             // TODO: report error
@@ -491,20 +491,20 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] static ReturnCode stopAsync(Async::Read& async)
+    [[nodiscard]] static ReturnCode stopAsync(Async::FileRead& async)
     {
         SC_UNUSED(async);
         return true;
     }
 
     // WRITE
-    [[nodiscard]] static ReturnCode setupAsync(Async::Write& async)
+    [[nodiscard]] static ReturnCode setupAsync(Async::FileWrite& async)
     {
         async.overlapped.get().userData = &async;
         return true;
     }
 
-    [[nodiscard]] static ReturnCode activateAsync(Async::Write& async)
+    [[nodiscard]] static ReturnCode activateAsync(Async::FileWrite& async)
     {
         auto& overlapped                 = async.overlapped.get();
         overlapped.overlapped.Offset     = static_cast<DWORD>(async.offset & 0xffffffff);
@@ -521,12 +521,12 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::Write& result)
+    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::FileWrite& result)
     {
-        Async::Write& operation   = *result.async.asWrite();
-        OVERLAPPED&   overlapped  = operation.overlapped.get().overlapped;
-        DWORD         transferred = 0;
-        BOOL          res         = ::GetOverlappedResult(operation.fileDescriptor, &overlapped, &transferred, FALSE);
+        Async::FileWrite& operation   = *result.async.asFileWrite();
+        OVERLAPPED&       overlapped  = operation.overlapped.get().overlapped;
+        DWORD             transferred = 0;
+        BOOL              res = ::GetOverlappedResult(operation.fileDescriptor, &overlapped, &transferred, FALSE);
         if (res == FALSE)
         {
             // TODO: report error
@@ -536,7 +536,7 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    [[nodiscard]] static ReturnCode stopAsync(Async::Write& async)
+    [[nodiscard]] static ReturnCode stopAsync(Async::FileWrite& async)
     {
         SC_UNUSED(async);
         return true;
