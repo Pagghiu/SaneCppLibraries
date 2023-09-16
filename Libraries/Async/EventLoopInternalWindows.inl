@@ -111,17 +111,13 @@ struct SC::EventLoop::Internal
         // No need to register it with EventLoop as we're calling PostQueuedCompletionStatus manually
         // As a consequence we don't need to do loop.decreseActiveCount()
         wakeUpAsync.eventLoop = &loop;
+        wakeUpAsync.state     = Async::State::Active;
         return true;
     }
 
     [[nodiscard]] static Async* getAsync(OVERLAPPED_ENTRY& event)
     {
         return EventLoopWinOverlapped::getUserDataFromOverlapped<Async>(event.lpOverlapped);
-    }
-
-    [[nodiscard]] static void* getUserData(OVERLAPPED_ENTRY& event)
-    {
-        return reinterpret_cast<void*>(event.lpCompletionKey);
     }
 
     [[nodiscard]] static ReturnCode checkWSAResult(SOCKET handle, OVERLAPPED& overlapped, size_t* size = nullptr)
@@ -184,12 +180,9 @@ struct SC::EventLoop::KernelQueue
     OVERLAPPED_ENTRY     events[totalNumEvents];
     ULONG                newEvents = 0;
 
-    [[nodiscard]] ReturnCode pushStagedAsync(Async& async)
+    [[nodiscard]] ReturnCode pushNewSubmission(Async& async)
     {
-        if (async.state != Async::State::Active)
-        {
-            async.eventLoop->addActiveHandle(async);
-        }
+        async.eventLoop->addActiveHandle(async);
         return true;
     }
 
@@ -226,12 +219,7 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] static bool validateEvent(const OVERLAPPED_ENTRY&, bool&) { return true; }
 
     // TIMEOUT
-    [[nodiscard]] static bool completeAsync(AsyncResult::LoopTimeout&)
-    {
-        // This is used for overlapped notifications (like FileSystemWatcher)
-        // It would be probably better to create a dedicated enum type for Overlapped Notifications
-        return true;
-    }
+    [[nodiscard]] static bool completeAsync(AsyncResult::LoopTimeout&) { SC_UNREACHABLE(); }
 
     // WAKEUP
     [[nodiscard]] static bool completeAsync(AsyncResult::LoopWakeUp& result)
@@ -240,7 +228,7 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    // ACCEPT
+    // Socket ACCEPT
     [[nodiscard]] static ReturnCode setupAsync(Async::SocketAccept& async)
     {
         SC_TRY_IF(SystemFunctions::isNetworkingInited());
@@ -317,7 +305,7 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    // CONNECT
+    // Socket CONNECT
     [[nodiscard]] static ReturnCode setupAsync(Async::SocketConnect& async)
     {
         SC_TRY_IF(SystemFunctions::isNetworkingInited());
@@ -380,7 +368,7 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    // SEND
+    // Socket SEND
     [[nodiscard]] static ReturnCode setupAsync(Async::SocketSend& async)
     {
         SC_TRY_IF(SystemFunctions::isNetworkingInited());
@@ -416,7 +404,7 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    // RECEIVE
+    // Socket RECEIVE
     [[nodiscard]] static ReturnCode setupAsync(Async::SocketReceive& async)
     {
         SC_TRY_IF(SystemFunctions::isNetworkingInited());
@@ -453,7 +441,7 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    // READ
+    // File READ
     [[nodiscard]] static ReturnCode setupAsync(Async::FileRead& async)
     {
         async.overlapped.get().userData = &async;
@@ -497,7 +485,7 @@ struct SC::EventLoop::KernelQueue
         return true;
     }
 
-    // WRITE
+    // File WRITE
     [[nodiscard]] static ReturnCode setupAsync(Async::FileWrite& async)
     {
         async.overlapped.get().userData = &async;
@@ -593,6 +581,17 @@ struct SC::EventLoop::KernelQueue
     }
 
     [[nodiscard]] static ReturnCode stopAsync(Async::ProcessExit& async) { return async.waitHandle.close(); }
+
+    // Windows Poll
+    [[nodiscard]] static ReturnCode setupAsync(Async::WindowsPoll& async)
+    {
+        async.overlapped.get().userData = &async;
+        return true;
+    }
+
+    [[nodiscard]] static ReturnCode activateAsync(Async::WindowsPoll&) { return true; }
+    [[nodiscard]] static ReturnCode completeAsync(AsyncResult::WindowsPoll&) { return true; }
+    [[nodiscard]] static ReturnCode stopAsync(Async::WindowsPoll&) { return true; }
 };
 
 template <>

@@ -12,7 +12,6 @@ struct SC::EventLoop::Internal
     [[nodiscard]] ReturnCode createEventLoop() { return true; }
     [[nodiscard]] ReturnCode createWakeup(EventLoop&) { return true; }
     [[nodiscard]] Async*     getAsync(const int& event) const { return nullptr; }
-    [[nodiscard]] void*      getUserData(const int& event) { return nullptr; }
 };
 
 struct SC::EventLoop::KernelQueue
@@ -20,7 +19,7 @@ struct SC::EventLoop::KernelQueue
     int newEvents = 0;
     int events[1] = {0};
 
-    [[nodiscard]] ReturnCode pushStagedAsync(Async& async) { return false; }
+    [[nodiscard]] ReturnCode pushNewSubmission(Async& async) { return false; }
     [[nodiscard]] ReturnCode pollAsync(EventLoop& eventLoop, PollMode pollMode) { return false; }
     [[nodiscard]] ReturnCode validateEvent(int& event, bool& continueProcessing) { return true; }
     template <typename T>

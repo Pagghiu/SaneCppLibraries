@@ -44,6 +44,9 @@ SC::StringView SC::Async::TypeToString(Type type)
     case Type::SocketReceive: return "SocketReceive"_a8;
     case Type::FileRead: return "FileRead"_a8;
     case Type::FileWrite: return "FileWrite"_a8;
+#if SC_PLATFORM_WINDOWS
+    case Type::WindowsPoll: return "WindowsPoll"_a8;
+#endif
     }
     SC_UNREACHABLE();
 }
@@ -84,6 +87,18 @@ SC::ReturnCode SC::EventLoop::startFileWrite(AsyncFileWrite& async, FileDescript
     async.writeBuffer    = writeBuffer;
     return true;
 }
+
+#if SC_PLATFORM_WINDOWS
+SC::ReturnCode SC::EventLoop::startWindowsPoll(AsyncWindowsPoll& async, FileDescriptor::Handle fileDescriptor,
+                                               Function<void(AsyncWindowsPollResult&)>&& callback)
+{
+    SC_TRY_IF(validateAsync(async));
+    SC_TRY_IF(queueSubmission(async));
+    async.callback       = callback;
+    async.fileDescriptor = fileDescriptor;
+    return true;
+}
+#endif
 
 SC::ReturnCode SC::EventLoop::startSocketAccept(AsyncSocketAccept& async, const SocketDescriptor& socketDescriptor,
                                                 Function<void(AsyncSocketAcceptResult&)>&& callback)
@@ -204,7 +219,7 @@ void SC::EventLoop::invokeExpiredTimers()
             activeTimers.remove(*currentAsync);
             currentAsync->state          = Async::State::Free;
             ReturnCode               res = true;
-            AsyncResult::LoopTimeout result(*currentAsync, nullptr, -1, move(res));
+            AsyncResult::LoopTimeout result(*currentAsync, -1, move(res));
             result.async.eventLoop = nullptr; // Allow reusing it
             currentAsync->asLoopTimeout()->callback(result);
         }
@@ -284,10 +299,18 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
     }
 
     if (getTotalNumberOfActiveHandle() <= 0)
-        return true; // happens when we do cancelAsync on the last active one
-    SC_LOG_MESSAGE("Active Requests Before Poll = {}\n", getTotalNumberOfActiveHandle());
-    SC_TRY_IF(queue.pollAsync(*this, pollMode));
-    SC_LOG_MESSAGE("Active Requests After Poll = {}\n", getTotalNumberOfActiveHandle());
+    {
+        // happens when we do cancelAsync on the last active async for example
+        return true;
+    }
+
+    if (getTotalNumberOfActiveHandle() > 0)
+    {
+        // We may have some completions queued (for SocketClose for example) but no active handles
+        SC_LOG_MESSAGE("Active Requests Before Poll = {}\n", getTotalNumberOfActiveHandle());
+        SC_TRY_IF(queue.pollAsync(*this, pollMode));
+        SC_LOG_MESSAGE("Active Requests After Poll = {}\n", getTotalNumberOfActiveHandle());
+    }
 
     Internal& self = internal.get();
     for (decltype(KernelQueue::newEvents) idx = 0; idx < queue.newEvents; ++idx)
@@ -308,14 +331,15 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
         }
 
         if (not continueProcessing)
+        {
             continue;
+        }
 
-        bool  reactivate = false;
-        void* userData   = self.getUserData(queue.events[idx]);
-        completeAsync(queue, async, userData, static_cast<int32_t>(idx), move(result), reactivate);
-
+        // If the async was not stopped with stopAsync
         if (async.state == Async::State::Active)
         {
+            bool reactivate = false;
+            completeAsync(queue, async, static_cast<int32_t>(idx), move(result), reactivate);
             if (reactivate)
             {
                 result = activateAsync(queue, async);
@@ -329,6 +353,11 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
                 reportError(queue, async, move(result));
                 continue;
             }
+        }
+        else if (async.state == Async::State::Cancelling)
+        {
+            async.state     = Async::State::Free;
+            async.eventLoop = nullptr; // Allow reusing it
         }
     }
     SC_LOG_MESSAGE("Active Requests After Completion = {}\n", getTotalNumberOfActiveHandle());
@@ -355,6 +384,9 @@ SC::ReturnCode SC::EventLoop::setupAsync(KernelQueue& queue, Async& async)
     case Async::Type::SocketReceive: SC_TRY_IF(queue.setupAsync(*async.asSocketReceive())); break;
     case Async::Type::FileRead: SC_TRY_IF(queue.setupAsync(*async.asFileRead())); break;
     case Async::Type::FileWrite: SC_TRY_IF(queue.setupAsync(*async.asFileWrite())); break;
+#if SC_PLATFORM_WINDOWS
+    case Async::Type::WindowsPoll: SC_TRY_IF(queue.setupAsync(*async.asWindowsPoll())); break;
+#endif
     }
     return true;
 }
@@ -375,10 +407,13 @@ SC::ReturnCode SC::EventLoop::activateAsync(KernelQueue& queue, Async& async)
     case Async::Type::FileRead: SC_TRY_IF(queue.activateAsync(*async.asFileRead())); break;
     case Async::Type::FileWrite: SC_TRY_IF(queue.activateAsync(*async.asFileWrite())); break;
     case Async::Type::ProcessExit: SC_TRY_IF(queue.activateAsync(*async.asProcessExit())); break;
+#if SC_PLATFORM_WINDOWS
+    case Async::Type::WindowsPoll: SC_TRY_IF(queue.activateAsync(*async.asWindowsPoll())); break;
+#endif
     }
     if (async.state == Async::State::Submitting)
     {
-        return queue.pushStagedAsync(async);
+        return queue.pushNewSubmission(async);
     }
     return true;
 }
@@ -391,12 +426,12 @@ void SC::EventLoop::reportError(KernelQueue& queue, Async& async, ReturnCode&& r
     {
         removeActiveHandle(async);
     }
-    completeAsync(queue, async, nullptr, -1, forward<ReturnCode>(returnCode), reactivate);
+    completeAsync(queue, async, -1, forward<ReturnCode>(returnCode), reactivate);
     async.state = Async::State::Free;
 }
 
-void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, void* userData, int32_t eventIndex,
-                                  ReturnCode&& returnCode, bool& reactivate)
+void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, int32_t eventIndex, ReturnCode&& returnCode,
+                                  bool& reactivate)
 {
     if (returnCode)
     {
@@ -410,7 +445,7 @@ void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, void* userDa
     switch (async.getType())
     {
     case Async::Type::LoopTimeout: {
-        AsyncResult::LoopTimeout result(async, userData, eventIndex, forward<ReturnCode>(returnCode));
+        AsyncResult::LoopTimeout result(async, eventIndex, forward<ReturnCode>(returnCode));
         if (result.returnCode)
             result.returnCode = queue.completeAsync(result);
         if (result.async.callback.isValid())
@@ -419,7 +454,7 @@ void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, void* userDa
         break;
     }
     case Async::Type::FileRead: {
-        AsyncResult::FileRead result(async, userData, eventIndex, forward<ReturnCode>(returnCode));
+        AsyncResult::FileRead result(async, eventIndex, forward<ReturnCode>(returnCode));
         if (result.returnCode)
             result.returnCode = queue.completeAsync(result);
         if (result.async.callback.isValid())
@@ -428,7 +463,7 @@ void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, void* userDa
         break;
     }
     case Async::Type::FileWrite: {
-        AsyncResult::FileWrite result(async, userData, eventIndex, forward<ReturnCode>(returnCode));
+        AsyncResult::FileWrite result(async, eventIndex, forward<ReturnCode>(returnCode));
         if (result.returnCode)
             result.returnCode = queue.completeAsync(result);
         if (result.async.callback.isValid())
@@ -437,7 +472,7 @@ void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, void* userDa
         break;
     }
     case Async::Type::LoopWakeUp: {
-        AsyncResult::LoopWakeUp result(async, userData, eventIndex, forward<ReturnCode>(returnCode));
+        AsyncResult::LoopWakeUp result(async, eventIndex, forward<ReturnCode>(returnCode));
         if (result.returnCode)
             result.returnCode = queue.completeAsync(result);
         if (result.async.callback.isValid())
@@ -446,7 +481,7 @@ void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, void* userDa
         break;
     }
     case Async::Type::ProcessExit: {
-        AsyncResult::ProcessExit result(async, userData, eventIndex, forward<ReturnCode>(returnCode));
+        AsyncResult::ProcessExit result(async, eventIndex, forward<ReturnCode>(returnCode));
         if (result.returnCode)
             result.returnCode = queue.completeAsync(result);
         if (result.async.callback.isValid())
@@ -455,7 +490,7 @@ void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, void* userDa
         break;
     }
     case Async::Type::SocketAccept: {
-        AsyncResult::SocketAccept result(async, userData, eventIndex, forward<ReturnCode>(returnCode));
+        AsyncResult::SocketAccept result(async, eventIndex, forward<ReturnCode>(returnCode));
         if (result.returnCode)
             result.returnCode = queue.completeAsync(result);
         if (result.async.callback.isValid())
@@ -464,7 +499,7 @@ void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, void* userDa
         break;
     }
     case Async::Type::SocketConnect: {
-        AsyncResult::SocketConnect result(async, userData, eventIndex, forward<ReturnCode>(returnCode));
+        AsyncResult::SocketConnect result(async, eventIndex, forward<ReturnCode>(returnCode));
         if (result.returnCode)
             result.returnCode = queue.completeAsync(result);
         if (result.async.callback.isValid())
@@ -473,7 +508,7 @@ void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, void* userDa
         break;
     }
     case Async::Type::SocketSend: {
-        AsyncResult::SocketSend result(async, userData, eventIndex, forward<ReturnCode>(returnCode));
+        AsyncResult::SocketSend result(async, eventIndex, forward<ReturnCode>(returnCode));
         if (result.returnCode)
             result.returnCode = queue.completeAsync(result);
         if (result.async.callback.isValid())
@@ -482,7 +517,7 @@ void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, void* userDa
         break;
     }
     case Async::Type::SocketReceive: {
-        AsyncResult::SocketReceive result(async, userData, eventIndex, forward<ReturnCode>(returnCode));
+        AsyncResult::SocketReceive result(async, eventIndex, forward<ReturnCode>(returnCode));
         if (result.returnCode)
             result.returnCode = queue.completeAsync(result);
         if (result.async.callback.isValid())
@@ -490,6 +525,17 @@ void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, void* userDa
         reactivate = result.shouldBeReactivated;
         break;
     }
+#if SC_PLATFORM_WINDOWS
+    case Async::Type::WindowsPoll: {
+        AsyncResult::WindowsPoll result(async, eventIndex, forward<ReturnCode>(returnCode));
+        if (result.returnCode)
+            result.returnCode = queue.completeAsync(result);
+        if (result.async.callback.isValid())
+            result.async.callback(result);
+        reactivate = result.shouldBeReactivated;
+        break;
+    }
+#endif
     }
 }
 
@@ -507,6 +553,9 @@ SC::ReturnCode SC::EventLoop::cancelAsync(KernelQueue& queue, Async& async)
     case Async::Type::SocketConnect: SC_TRY_IF(queue.stopAsync(*async.asSocketConnect())); break;
     case Async::Type::SocketSend: SC_TRY_IF(queue.stopAsync(*async.asSocketSend())); break;
     case Async::Type::SocketReceive: SC_TRY_IF(queue.stopAsync(*async.asSocketReceive())); break;
+#if SC_PLATFORM_WINDOWS
+    case Async::Type::WindowsPoll: SC_TRY_IF(queue.stopAsync(*async.asWindowsPoll())); break;
+#endif
     }
     if (async.state == Async::State::Active)
     {
@@ -593,7 +642,7 @@ void SC::EventLoop::executeWakeUps(AsyncResult& result)
         if (notifier->pending.load() == true)
         {
             ReturnCode              res = true;
-            AsyncResult::LoopWakeUp asyncResult(*async, nullptr, result.index, move(res));
+            AsyncResult::LoopWakeUp asyncResult(*async, result.index, move(res));
             asyncResult.async.callback(asyncResult);
             if (notifier->eventObject)
             {
@@ -608,7 +657,6 @@ void SC::EventLoop::executeWakeUps(AsyncResult& result)
 void SC::EventLoop::removeActiveHandle(Async& async)
 {
     SC_RELEASE_ASSERT(async.state == Async::State::Active)
-    async.eventLoop->activeHandles.remove(async);
     async.state = Async::State::Free;
     async.eventLoop->numberOfActiveHandles -= 1;
 }
@@ -617,7 +665,6 @@ void SC::EventLoop::addActiveHandle(Async& async)
 {
     SC_RELEASE_ASSERT(async.state == Async::State::Submitting);
     async.state = Async::State::Active;
-    async.eventLoop->activeHandles.queueBack(async);
     async.eventLoop->numberOfActiveHandles += 1;
 }
 

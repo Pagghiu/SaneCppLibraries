@@ -57,8 +57,12 @@ struct SC::FileSystemWatcher
     struct FolderWatcherSizes
     {
         static constexpr int MaxChangesBufferSize = 1024;
-
-        static constexpr int Windows = MaxChangesBufferSize + sizeof(void*) * 5 + sizeof(uint64_t);
+#if SC_PLATFORM_WINDOWS
+        static constexpr int Windows =
+            MaxChangesBufferSize + sizeof(void*) + sizeof(FileDescriptor) + sizeof(AsyncWindowsPoll);
+#else
+        static constexpr int Windows = 0;
+#endif
         static constexpr int Apple   = sizeof(void*);
         static constexpr int Default = sizeof(void*);
     };
@@ -86,10 +90,6 @@ struct SC::FileSystemWatcher
 #if SC_PLATFORM_APPLE
         AsyncLoopWakeUp eventLoopAsync = {};
         EventObject     eventObject    = {};
-#elif SC_PLATFORM_WINDOWS
-        // Convention for overlapped notifications
-        // TODO: Create a dedicated enum type for OVERLAPPED notifications instead of using LoopTimeout
-        AsyncLoopTimeout eventLoopAsync = {};
 #endif
     };
 

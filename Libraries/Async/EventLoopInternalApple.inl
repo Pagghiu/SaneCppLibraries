@@ -59,8 +59,6 @@ struct SC::EventLoop::Internal
 
     [[nodiscard]] static Async* getAsync(const struct kevent& event) { return static_cast<Async*>(event.udata); }
 
-    [[nodiscard]] static void* getUserData(const struct kevent&) { return nullptr; }
-
     [[nodiscard]] static ReturnCode stopSingleWatcherImmediate(Async& async, SocketDescriptor::Handle handle,
                                                                short filter)
     {
@@ -88,13 +86,10 @@ struct SC::EventLoop::KernelQueue
 
     KernelQueue() { memset(events, 0, sizeof(events)); }
 
-    [[nodiscard]] ReturnCode pushStagedAsync(Async& async)
+    [[nodiscard]] ReturnCode pushNewSubmission(Async& async)
     {
+        async.eventLoop->addActiveHandle(async);
         newEvents += 1;
-        if (async.state != Async::State::Active)
-        {
-            async.eventLoop->addActiveHandle(async);
-        }
         if (newEvents >= totalNumEvents)
         {
             SC_TRY_IF(flushQueue(*async.eventLoop));
@@ -189,7 +184,7 @@ struct SC::EventLoop::KernelQueue
         continueProcessing = (event.flags & EV_DELETE) == 0;
         if ((event.flags & EV_ERROR) != 0)
         {
-            return "Error in processing event"_a8;
+            return "Error in processing event (kqueue EV_ERROR)"_a8;
         }
         return true;
     }

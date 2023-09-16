@@ -3,17 +3,6 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "HttpServer.h"
 #include "../Foundation/StringBuilder.h"
-namespace SC
-{
-template <int offset, typename T, typename R>
-inline T& fieldOffset(R& object)
-{
-    return *reinterpret_cast<T*>(reinterpret_cast<char*>(&object) - offset);
-}
-} // namespace SC
-
-#define SC_FIELD_OFFSET(Class, Field, Value)                                                                           \
-    fieldOffset<SC_OFFSETOF(Class, Field), Class, decltype(Class::Field)>(Value);
 
 SC::ReturnCode SC::HttpServer::Response::end(StringView sv)
 {

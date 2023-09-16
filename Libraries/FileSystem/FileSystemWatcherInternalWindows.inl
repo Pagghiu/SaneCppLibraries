@@ -12,10 +12,12 @@
 
 struct SC::FileSystemWatcher::FolderWatcherInternal
 {
-    EventLoopWinOverlapped overlapped;
+    AsyncWindowsPoll asyncPoll;
+    uint8_t          changesBuffer[FolderWatcherSizes::MaxChangesBufferSize];
+    FolderWatcher*   parentEntry = nullptr; // We could in theory use SC_FIELD_OFFSET somehow to obtain it...
+    FileDescriptor   fileHandle;
 
-    HANDLE  fileHandle = INVALID_HANDLE_VALUE;
-    uint8_t changesBuffer[FolderWatcherSizes::MaxChangesBufferSize];
+    OVERLAPPED& getOverlapped() { return asyncPoll.overlapped.get().overlapped; }
 };
 
 struct SC::FileSystemWatcher::ThreadRunnerInternal
@@ -49,7 +51,6 @@ struct SC::FileSystemWatcher::Internal
     {
         self            = &parent;
         eventLoopRunner = &runner;
-        eventLoopRunner->eventLoopAsync.callback.bind<Internal, &Internal::onEventLoopNotification>(this);
         return true;
     }
 
@@ -80,25 +81,20 @@ struct SC::FileSystemWatcher::Internal
     void signalWatcherEvent(FolderWatcher& watcher)
     {
         auto& opaque = watcher.internal.get();
-        ::SetEvent(opaque.overlapped.overlapped.hEvent);
+        ::SetEvent(opaque.getOverlapped().hEvent);
     }
 
     void closeWatcherEvent(FolderWatcher& watcher)
     {
         auto& opaque = watcher.internal.get();
-        ::CloseHandle(opaque.overlapped.overlapped.hEvent);
-        opaque.overlapped.overlapped.hEvent = INVALID_HANDLE_VALUE;
+        ::CloseHandle(opaque.getOverlapped().hEvent);
+        opaque.getOverlapped().hEvent = INVALID_HANDLE_VALUE;
     }
 
     void closeFileHandle(FolderWatcher& watcher)
     {
         auto& opaque = watcher.internal.get();
-        if (opaque.fileHandle != INVALID_HANDLE_VALUE)
-        {
-            ::CancelIo(opaque.fileHandle);
-            ::CloseHandle(opaque.fileHandle);
-            opaque.fileHandle = INVALID_HANDLE_VALUE;
-        }
+        SC_TRUST_RESULT(opaque.fileHandle.close());
     }
 
     [[nodiscard]] ReturnCode stopWatching(FolderWatcher& folderWatcher)
@@ -112,7 +108,7 @@ struct SC::FileSystemWatcher::Internal
         }
         else
         {
-            eventLoopRunner->eventLoop.decreaseActiveCount();
+            SC_TRUST_RESULT(eventLoopRunner->eventLoop.stopAsync(folderWatcher.internal.get().asyncPoll));
         }
         closeFileHandle(folderWatcher);
         return true;
@@ -139,47 +135,45 @@ struct SC::FileSystemWatcher::Internal
         }
         StringView encodedPath;
         SC_TRY_IF(converter.convertNullTerminateFastPath(entry->path->view(), encodedPath));
+        HANDLE newHandle = ::CreateFileW(encodedPath.getNullTerminatedNative(),                            //
+                                         FILE_LIST_DIRECTORY,                                              //
+                                         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,           //
+                                         nullptr,                                                          //
+                                         OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, //
+                                         nullptr);
+
+        SC_TRY_IF(newHandle != INVALID_HANDLE_VALUE);
         FolderWatcherInternal& opaque = entry->internal.get();
-        opaque.fileHandle             = CreateFileW(encodedPath.getNullTerminatedNative(),                            //
-                                                    FILE_LIST_DIRECTORY,                                              //
-                                                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,           //
-                                                    nullptr,                                                          //
-                                                    OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, //
-                                                    nullptr);
-        SC_TRY_IF(opaque.fileHandle != INVALID_HANDLE_VALUE);
+        SC_TRY_IF(opaque.fileHandle.assign(newHandle));
+
+        opaque.parentEntry = entry;
 
         if (threadingRunner)
         {
-            opaque.overlapped.overlapped.hEvent                   = CreateEvent(nullptr, FALSE, 0, nullptr);
-            threadingRunner->hEvents[threadingRunner->numEntries] = opaque.overlapped.overlapped.hEvent;
+            opaque.getOverlapped().hEvent                         = ::CreateEventW(nullptr, FALSE, 0, nullptr);
+            threadingRunner->hEvents[threadingRunner->numEntries] = opaque.getOverlapped().hEvent;
             threadingRunner->entries[threadingRunner->numEntries] = entry;
             threadingRunner->numEntries++;
         }
         else
         {
-            // TODO: wrap this into a method
-            opaque.overlapped.userData                = &eventLoopRunner->eventLoopAsync;
-            eventLoopRunner->eventLoopAsync.eventLoop = &eventLoopRunner->eventLoop;
-            // 3rd parameter (lpCompletionKey) will get reported in AsyncResult::userData in the callback
-            HANDLE res = CreateIoCompletionPort(opaque.fileHandle, loopFDS, reinterpret_cast<ULONG_PTR>(entry), 0);
-            if (res == NULL)
-            {
-                // TODO: Parse error properly
-                return "CreateIoCompletionPort error"_a8;
-            }
-            eventLoopRunner->eventLoop.increaseActiveCount();
+            SC_TRY_IF(eventLoopRunner->eventLoop.associateExternallyCreatedFileDescriptor(opaque.fileHandle));
+            auto res = eventLoopRunner->eventLoop.startWindowsPoll(
+                opaque.asyncPoll, newHandle,
+                SC_FUNCTION_MEMBER(&FileSystemWatcher::Internal::onEventLoopNotification, this));
+            SC_TRY_IF(res);
         }
 
-        BOOL success = ReadDirectoryChangesW(opaque.fileHandle,                 //
-                                             opaque.changesBuffer,              //
-                                             sizeof(opaque.changesBuffer),      //
-                                             TRUE,                              // watchSubtree
-                                             FILE_NOTIFY_CHANGE_FILE_NAME |     //
-                                                 FILE_NOTIFY_CHANGE_DIR_NAME |  //
-                                                 FILE_NOTIFY_CHANGE_LAST_WRITE, //
-                                             nullptr,                           // lpBytesReturned
-                                             &opaque.overlapped.overlapped,     // lpOverlapped
-                                             nullptr);                          // lpCompletionRoutine
+        BOOL success = ::ReadDirectoryChangesW(newHandle,                         //
+                                               opaque.changesBuffer,              //
+                                               sizeof(opaque.changesBuffer),      //
+                                               TRUE,                              // watchSubtree
+                                               FILE_NOTIFY_CHANGE_FILE_NAME |     //
+                                                   FILE_NOTIFY_CHANGE_DIR_NAME |  //
+                                                   FILE_NOTIFY_CHANGE_LAST_WRITE, //
+                                               nullptr,                           // lpBytesReturned
+                                               &opaque.getOverlapped(),           // lpOverlapped
+                                               nullptr);                          // lpCompletionRoutine
         SC_TRY_MSG(success == TRUE, "ReadDirectoryChangesW"_a8);
 
         if (threadingRunner and not threadingRunner->thread.wasStarted())
@@ -195,29 +189,30 @@ struct SC::FileSystemWatcher::Internal
         ThreadRunnerInternal& runner = *threadingRunner;
         while (not runner.shouldStop.load())
         {
-            const DWORD result = WaitForMultipleObjects(runner.numEntries, runner.hEvents, TRUE, INFINITE);
+            const DWORD result = ::WaitForMultipleObjects(runner.numEntries, runner.hEvents, TRUE, INFINITE);
             if (result != WAIT_FAILED and not runner.shouldStop.load())
             {
                 const DWORD            index  = result - WAIT_OBJECT_0;
                 FolderWatcher&         entry  = *runner.entries[index];
                 FolderWatcherInternal& opaque = entry.internal.get();
                 DWORD                  transferredBytes;
-                GetOverlappedResult(opaque.fileHandle, &opaque.overlapped.overlapped, &transferredBytes, FALSE);
-                notifyEntry(entry);
+                HANDLE                 handle;
+                if (opaque.fileHandle.get(handle, "Invalid fs handle"_a8))
+                {
+                    ::GetOverlappedResult(handle, &opaque.getOverlapped(), &transferredBytes, FALSE);
+                    notifyEntry(entry);
+                }
             }
         }
         threadingRunner->shouldStop.exchange(false);
     }
 
-    void onEventLoopNotification(AsyncResult::LoopTimeout& result)
+    void onEventLoopNotification(AsyncResult::WindowsPoll& result)
     {
-        // Comes from completion key passed to CreateIoCompletionPort
-        FolderWatcher& entry = *reinterpret_cast<FolderWatcher*>(result.userData);
-        // We get called after closing the handle
-        if (entry.internal.get().fileHandle != INVALID_HANDLE_VALUE)
-        {
-            notifyEntry(entry);
-        }
+        FolderWatcherInternal& fwi = SC_FIELD_OFFSET(FolderWatcherInternal, asyncPoll, result.async);
+        SC_DEBUG_ASSERT(fwi.fileHandle.isValid())
+        notifyEntry(*fwi.parentEntry);
+        result.reactivateRequest(true);
     }
 
     static void notifyEntry(FolderWatcher& entry)
@@ -249,19 +244,23 @@ struct SC::FileSystemWatcher::Internal
             *reinterpret_cast<uint8_t**>(&event) += event->NextEntryOffset;
         } while (event->NextEntryOffset);
 
-        memset(&opaque.overlapped.overlapped, 0, sizeof(opaque.overlapped.overlapped));
-        BOOL success = ReadDirectoryChangesW(opaque.fileHandle,                 //
-                                             opaque.changesBuffer,              //
-                                             sizeof(opaque.changesBuffer),      //
-                                             TRUE,                              // watchSubtree
-                                             FILE_NOTIFY_CHANGE_FILE_NAME |     //
-                                                 FILE_NOTIFY_CHANGE_DIR_NAME |  //
-                                                 FILE_NOTIFY_CHANGE_LAST_WRITE, //
-                                             nullptr,                           // lpBytesReturned
-                                             &opaque.overlapped.overlapped,     // lpOverlapped
-                                             nullptr);                          // lpCompletionRoutine
-        // TODO: Handle ReadDirectoryChangesW error
-        (void)success;
+        memset(&opaque.getOverlapped(), 0, sizeof(opaque.getOverlapped()));
+        HANDLE handle;
+        if (opaque.fileHandle.get(handle, "Invalid fs handle"_a8))
+        {
+            BOOL success = ::ReadDirectoryChangesW(handle,                            //
+                                                   opaque.changesBuffer,              //
+                                                   sizeof(opaque.changesBuffer),      //
+                                                   TRUE,                              // watchSubtree
+                                                   FILE_NOTIFY_CHANGE_FILE_NAME |     //
+                                                       FILE_NOTIFY_CHANGE_DIR_NAME |  //
+                                                       FILE_NOTIFY_CHANGE_LAST_WRITE, //
+                                                   nullptr,                           // lpBytesReturned
+                                                   &opaque.getOverlapped(),           // lpOverlapped
+                                                   nullptr);                          // lpCompletionRoutine
+            // TODO: Handle ReadDirectoryChangesW error
+            (void)success;
+        }
     }
 };
 

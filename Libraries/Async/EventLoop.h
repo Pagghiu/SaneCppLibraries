@@ -13,6 +13,17 @@
 #include "../File/FileDescriptor.h"
 #include "../Process/ProcessDescriptor.h"
 #include "../Socket/SocketDescriptor.h"
+namespace SC
+{
+template <int offset, typename T, typename R>
+inline T& fieldOffset(R& object)
+{
+    return *reinterpret_cast<T*>(reinterpret_cast<char*>(&object) - offset);
+}
+} // namespace SC
+
+#define SC_FIELD_OFFSET(Class, Field, Value)                                                                           \
+    fieldOffset<SC_OFFSETOF(Class, Field), Class, decltype(Class::Field)>(Value);
 
 namespace SC
 {
@@ -32,6 +43,9 @@ struct AsyncSocketSend;
 struct AsyncSocketReceive;
 struct AsyncFileRead;
 struct AsyncFileWrite;
+#if SC_PLATFORM_WINDOWS
+struct AsyncWindowsPoll;
+#endif
 
 struct AsyncLoopTimeoutResult;
 struct AsyncLoopWakeUpResult;
@@ -43,6 +57,9 @@ struct AsyncSocketReceiveResult;
 struct AsyncFileReadResult;
 struct AsyncFileWriteResult;
 
+#if SC_PLATFORM_WINDOWS
+struct AsyncWindowsPollResult;
+#endif
 } // namespace SC
 
 namespace SC
@@ -81,6 +98,9 @@ struct SC::Async
     using SocketReceive = AsyncSocketReceive;
     using FileRead      = AsyncFileRead;
     using FileWrite     = AsyncFileWrite;
+#if SC_PLATFORM_WINDOWS
+    using WindowsPoll = AsyncWindowsPoll;
+#endif
 
     AsyncLoopTimeout*   asLoopTimeout();
     AsyncLoopWakeUp*    asLoopWakeUp();
@@ -91,6 +111,9 @@ struct SC::Async
     AsyncSocketReceive* asSocketReceive();
     AsyncFileRead*      asFileRead();
     AsyncFileWrite*     asFileWrite();
+#if SC_PLATFORM_WINDOWS
+    AsyncWindowsPoll* asWindowsPoll();
+#endif
 
     enum class Type : uint8_t
     {
@@ -103,6 +126,9 @@ struct SC::Async
         SocketReceive,
         FileRead,
         FileWrite,
+#if SC_PLATFORM_WINDOWS
+        WindowsPoll,
+#endif
     };
 
     static StringView TypeToString(Type type);
@@ -247,6 +273,18 @@ struct SC::AsyncFileWrite : public Async
 #endif
 };
 
+#if SC_PLATFORM_WINDOWS
+struct SC::AsyncWindowsPoll : public Async
+{
+    AsyncWindowsPoll() : Async(Type::WindowsPoll) {}
+
+    Function<void(AsyncWindowsPollResult&)> callback;
+
+    FileDescriptor::Handle       fileDescriptor;
+    EventLoopWinOverlappedOpaque overlapped;
+};
+#endif
+
 // RESULTS
 
 struct SC::AsyncResult
@@ -260,15 +298,15 @@ struct SC::AsyncResult
     using SocketReceive = AsyncSocketReceiveResult;
     using FileRead      = AsyncFileReadResult;
     using FileWrite     = AsyncFileWriteResult;
+#if SC_PLATFORM_WINDOWS
+    using WindowsPoll = AsyncWindowsPollResult;
+#endif
 
     using Type = Async::Type;
 
-    void*   userData = nullptr;
-    int32_t index    = 0;
+    int32_t index = 0;
 
-    AsyncResult(void* userData, int32_t index, ReturnCode&& res)
-        : userData(userData), index(index), returnCode(forward<ReturnCode>(res))
-    {}
+    AsyncResult(int32_t index, ReturnCode&& res) : index(index), returnCode(forward<ReturnCode>(res)) {}
 
     void reactivateRequest(bool value) { shouldBeReactivated = value; }
 
@@ -284,8 +322,8 @@ struct SC::AsyncResult
 
 struct SC::AsyncLoopTimeoutResult : public AsyncResult
 {
-    AsyncLoopTimeoutResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asLoopTimeout())
+    AsyncLoopTimeoutResult(Async& async, int32_t index, ReturnCode&& res)
+        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asLoopTimeout())
     {}
 
     AsyncLoopTimeout& async;
@@ -293,8 +331,8 @@ struct SC::AsyncLoopTimeoutResult : public AsyncResult
 
 struct SC::AsyncLoopWakeUpResult : public AsyncResult
 {
-    AsyncLoopWakeUpResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asLoopWakeUp())
+    AsyncLoopWakeUpResult(Async& async, int32_t index, ReturnCode&& res)
+        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asLoopWakeUp())
     {}
 
     AsyncLoopWakeUp& async;
@@ -302,8 +340,8 @@ struct SC::AsyncLoopWakeUpResult : public AsyncResult
 
 struct SC::AsyncProcessExitResult : public AsyncResult
 {
-    AsyncProcessExitResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asProcessExit())
+    AsyncProcessExitResult(Async& async, int32_t index, ReturnCode&& res)
+        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asProcessExit())
     {}
 
     AsyncProcessExit& async;
@@ -321,8 +359,8 @@ struct SC::AsyncProcessExitResult : public AsyncResult
 
 struct SC::AsyncSocketAcceptResult : public AsyncResult
 {
-    AsyncSocketAcceptResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asSocketAccept())
+    AsyncSocketAcceptResult(Async& async, int32_t index, ReturnCode&& res)
+        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asSocketAccept())
     {}
 
     AsyncSocketAccept& async;
@@ -340,8 +378,8 @@ struct SC::AsyncSocketAcceptResult : public AsyncResult
 
 struct SC::AsyncSocketConnectResult : public AsyncResult
 {
-    AsyncSocketConnectResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asSocketConnect())
+    AsyncSocketConnectResult(Async& async, int32_t index, ReturnCode&& res)
+        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asSocketConnect())
     {}
 
     AsyncSocketConnect& async;
@@ -349,8 +387,8 @@ struct SC::AsyncSocketConnectResult : public AsyncResult
 
 struct SC::AsyncSocketSendResult : public AsyncResult
 {
-    AsyncSocketSendResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asSocketSend())
+    AsyncSocketSendResult(Async& async, int32_t index, ReturnCode&& res)
+        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asSocketSend())
     {}
 
     AsyncSocketSend& async;
@@ -358,8 +396,8 @@ struct SC::AsyncSocketSendResult : public AsyncResult
 
 struct SC::AsyncSocketReceiveResult : public AsyncResult
 {
-    AsyncSocketReceiveResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asSocketReceive())
+    AsyncSocketReceiveResult(Async& async, int32_t index, ReturnCode&& res)
+        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asSocketReceive())
     {}
     AsyncSocketReceive& async;
 
@@ -376,8 +414,8 @@ struct SC::AsyncSocketReceiveResult : public AsyncResult
 
 struct SC::AsyncFileReadResult : public AsyncResult
 {
-    AsyncFileReadResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asFileRead())
+    AsyncFileReadResult(Async& async, int32_t index, ReturnCode&& res)
+        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asFileRead())
     {}
     AsyncFileRead& async;
 
@@ -394,8 +432,8 @@ struct SC::AsyncFileReadResult : public AsyncResult
 
 struct SC::AsyncFileWriteResult : public AsyncResult
 {
-    AsyncFileWriteResult(Async& async, void* userData, int32_t index, ReturnCode&& res)
-        : AsyncResult(userData, index, forward<ReturnCode>(res)), async(*async.asFileWrite())
+    AsyncFileWriteResult(Async& async, int32_t index, ReturnCode&& res)
+        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asFileWrite())
     {}
 
     AsyncFileWrite& async;
@@ -411,6 +449,16 @@ struct SC::AsyncFileWriteResult : public AsyncResult
     size_t writtenBytes = 0;
 };
 
+#if SC_PLATFORM_WINDOWS
+struct SC::AsyncWindowsPollResult : public AsyncResult
+{
+    AsyncWindowsPollResult(Async& async, int32_t index, ReturnCode&& res)
+        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asWindowsPoll())
+    {}
+
+    AsyncWindowsPoll& async;
+};
+#endif
 // clang-format off
 inline SC::AsyncLoopTimeout*    SC::Async::asLoopTimeout()  { return type == Type::LoopTimeout ? static_cast<AsyncLoopTimeout*>(this) : nullptr;}
 inline SC::AsyncLoopWakeUp*     SC::Async::asLoopWakeUp()   { return type == Type::LoopWakeUp ? static_cast<AsyncLoopWakeUp*>(this) : nullptr;}
@@ -421,6 +469,9 @@ inline SC::AsyncSocketSend*     SC::Async::asSocketSend()   { return type == Typ
 inline SC::AsyncSocketReceive*  SC::Async::asSocketReceive(){ return type == Type::SocketReceive ? static_cast<AsyncSocketReceive*>(this) : nullptr;}
 inline SC::AsyncFileRead*       SC::Async::asFileRead()     { return type == Type::FileRead ? static_cast<AsyncFileRead*>(this) : nullptr; }
 inline SC::AsyncFileWrite*      SC::Async::asFileWrite()    { return type == Type::FileWrite ? static_cast<AsyncFileWrite*>(this) : nullptr; }
+#if SC_PLATFORM_WINDOWS
+inline SC::AsyncWindowsPoll*    SC::Async::asWindowsPoll()  { return type == Type::WindowsPoll ? static_cast<AsyncWindowsPoll*>(this) : nullptr; }
+#endif
 // clang-format on
 
 struct SC::EventLoop
@@ -483,10 +534,6 @@ struct SC::EventLoop
     [[nodiscard]] ReturnCode startSocketReceive(AsyncSocketReceive& async, const SocketDescriptor& socketDescriptor,
                                                 Span<char> data, Function<void(AsyncSocketReceiveResult&)>&& callback);
 
-    /// Starts a socket close operation. Callback will be called when some data is read from socket.
-    [[nodiscard]] ReturnCode startSocketReceive(AsyncSocketReceive& async, const SocketDescriptor& socketDescriptor,
-                                                Span<char> data, Function<void(AsyncSocketReceiveResult&)>&& callback);
-
     /// Starts a file receive operation, that will return when some data is read from file.
     [[nodiscard]] ReturnCode startFileRead(AsyncFileRead& async, FileDescriptor::Handle fileDescriptor,
                                            Span<char> readBuffer, Function<void(AsyncFileReadResult&)>&& callback);
@@ -496,6 +543,10 @@ struct SC::EventLoop
                                             Span<const char>                        writeBuffer,
                                             Function<void(AsyncFileWriteResult&)>&& callback);
 
+#if SC_PLATFORM_WINDOWS
+    [[nodiscard]] ReturnCode startWindowsPoll(AsyncWindowsPoll& async, FileDescriptor::Handle fileDescriptor,
+                                              Function<void(AsyncWindowsPollResult&)>&& callback);
+#endif
     /// Wake up the event loop from a thread different than the one where run() is called (and potentially blocked).
     /// The parameter is an AsyncLoopWakeUp that must have been previously started (with startLoopWakeUp).
     [[nodiscard]] ReturnCode wakeUpFromExternalThread(AsyncLoopWakeUp& wakeUp);
@@ -532,7 +583,6 @@ struct SC::EventLoop
     int numberOfExternals     = 0;
 
     IntrusiveDoubleLinkedList<Async> submissions;
-    IntrusiveDoubleLinkedList<Async> activeHandles;
     IntrusiveDoubleLinkedList<Async> activeTimers;
     IntrusiveDoubleLinkedList<Async> activeWakeUps;
 
@@ -581,8 +631,8 @@ struct SC::EventLoop
     [[nodiscard]] ReturnCode cancelAsync(KernelQueue& queue, Async& async);
 
     void        reportError(KernelQueue& queue, Async& async, ReturnCode&& returnCode);
-    static void completeAsync(KernelQueue& queue, Async& async, void* userData, int32_t eventIndex,
-                              ReturnCode&& returnCode, bool& reactivate);
+    static void completeAsync(KernelQueue& queue, Async& async, int32_t eventIndex, ReturnCode&& returnCode,
+                              bool& reactivate);
 
     enum class PollMode
     {

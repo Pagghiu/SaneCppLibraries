@@ -304,7 +304,7 @@ struct SC::EventLoopTest : public SC::TestCase
     }
 
     void createAndAssociateAsyncClientServerConnections(EventLoop& eventLoop, SocketDescriptor& client,
-                                       SocketDescriptor& serverSideClient)
+                                                        SocketDescriptor& serverSideClient)
     {
         SocketDescriptor serverSocket;
         uint16_t         tcpPort        = 5050;
