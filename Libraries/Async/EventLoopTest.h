@@ -28,6 +28,7 @@ struct SC::EventLoopTest : public SC::TestCase
         socketSendReceiveError();
         socketClose();
         fileReadWrite();
+        fileClose();
     }
 
     void loopTimeout()
@@ -473,10 +474,55 @@ struct SC::EventLoopTest : public SC::TestCase
 
             StringView sv(readBuffer, sizeof(readBuffer), false, StringEncoding::Ascii);
             SC_TEST_EXPECT(sv.compare("test") == StringView::Comparison::Equals);
+
             SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
             SC_TEST_EXPECT(fs.removeFile(fileName));
             SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory));
             SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
+        }
+    }
+
+    void fileClose()
+    {
+        if (test_section("file close"))
+        {
+            EventLoop eventLoop;
+            SC_TEST_EXPECT(eventLoop.create());
+            StringNative<255> filePath = StringEncoding::Native;
+            StringNative<255> dirPath  = StringEncoding::Native;
+            const StringView  name     = "AsyncTest";
+            const StringView  fileName = "test.txt";
+            SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory, name}));
+            SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
+
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+            SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
+            SC_TEST_EXPECT(fs.write(filePath.view(), "test"_a8));
+
+            FileDescriptor::OpenOptions options;
+            options.async    = true;
+            options.blocking = false;
+
+            FileDescriptor fd;
+            SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, options));
+            SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
+
+            FileDescriptor::Handle handle;
+            SC_TEST_EXPECT(fd.get(handle, "handle"_a8));
+            AsyncFileClose asyncClose;
+            auto           res = eventLoop.startFileClose(
+                asyncClose, handle, [this](AsyncFileCloseResult& result) { SC_TEST_EXPECT(result.isValid()); });
+            SC_TEST_EXPECT(res);
+            SC_TEST_EXPECT(eventLoop.run());
+            SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
+            SC_TEST_EXPECT(fs.removeFile(fileName));
+            SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory));
+            SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
+            // fd.close() will fail as the file was already closed but it also throws a Win32 exception that will
+            // stop the debugger by default. Opting for a .detach()
+            // SC_TEST_EXPECT(not fd.close());
+            fd.detach();
         }
     }
 

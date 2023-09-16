@@ -44,6 +44,7 @@ struct AsyncSocketReceive;
 struct AsyncSocketClose;
 struct AsyncFileRead;
 struct AsyncFileWrite;
+struct AsyncFileClose;
 #if SC_PLATFORM_WINDOWS
 struct AsyncWindowsPoll;
 #endif
@@ -58,6 +59,7 @@ struct AsyncSocketReceiveResult;
 struct AsyncSocketCloseResult;
 struct AsyncFileReadResult;
 struct AsyncFileWriteResult;
+struct AsyncFileCloseResult;
 #if SC_PLATFORM_WINDOWS
 struct AsyncWindowsPollResult;
 #endif
@@ -100,6 +102,7 @@ struct SC::Async
     using SocketClose   = AsyncSocketClose;
     using FileRead      = AsyncFileRead;
     using FileWrite     = AsyncFileWrite;
+    using FileClose     = AsyncFileClose;
 #if SC_PLATFORM_WINDOWS
     using WindowsPoll = AsyncWindowsPoll;
 #endif
@@ -114,6 +117,7 @@ struct SC::Async
     AsyncSocketClose*   asSocketClose();
     AsyncFileRead*      asFileRead();
     AsyncFileWrite*     asFileWrite();
+    AsyncFileClose*     asFileClose();
 #if SC_PLATFORM_WINDOWS
     AsyncWindowsPoll* asWindowsPoll();
 #endif
@@ -130,6 +134,7 @@ struct SC::Async
         SocketClose,
         FileRead,
         FileWrite,
+        FileClose,
 #if SC_PLATFORM_WINDOWS
         WindowsPoll,
 #endif
@@ -158,6 +163,7 @@ struct SC::Async
     friend struct AsyncSocketClose;
     friend struct AsyncFileRead;
     friend struct AsyncFileWrite;
+    friend struct AsyncFileClose;
     friend struct AsyncProcessExit;
 #if SC_PLATFORM_WINDOWS
     friend struct AsyncWindowsPoll;
@@ -313,6 +319,19 @@ struct SC::AsyncFileWrite : public Async
 #endif
 };
 
+struct SC::AsyncFileClose : public Async
+{
+    AsyncFileClose() : Async(Type::FileClose) {}
+
+    Function<void(AsyncFileCloseResult&)> callback;
+
+    FileDescriptor::Handle fileDescriptor;
+
+  private:
+    friend struct EventLoop;
+    int code = 0;
+};
+
 #if SC_PLATFORM_WINDOWS
 struct SC::AsyncWindowsPoll : public Async
 {
@@ -339,6 +358,7 @@ struct SC::AsyncResult
     using SocketClose   = AsyncSocketCloseResult;
     using FileRead      = AsyncFileReadResult;
     using FileWrite     = AsyncFileWriteResult;
+    using FileClose     = AsyncFileCloseResult;
 #if SC_PLATFORM_WINDOWS
     using WindowsPoll = AsyncWindowsPollResult;
 #endif
@@ -500,6 +520,25 @@ struct SC::AsyncFileWriteResult : public AsyncResult
     size_t writtenBytes = 0;
 };
 
+struct SC::AsyncFileCloseResult : public AsyncResult
+{
+    AsyncFileCloseResult(Async& async, ReturnCode&& res)
+        : AsyncResult(forward<ReturnCode>(res)), async(*async.asFileClose())
+    {}
+
+    AsyncFileClose& async;
+
+    [[nodiscard]] ReturnCode moveTo(size_t& writtenSizeInBytes)
+    {
+        writtenSizeInBytes = writtenBytes;
+        return AsyncResult::returnCode;
+    }
+
+  private:
+    friend struct EventLoop;
+    size_t writtenBytes = 0;
+};
+
 #if SC_PLATFORM_WINDOWS
 struct SC::AsyncWindowsPollResult : public AsyncResult
 {
@@ -521,6 +560,7 @@ inline SC::AsyncSocketReceive*  SC::Async::asSocketReceive(){ return type == Typ
 inline SC::AsyncSocketClose*    SC::Async::asSocketClose()  { return type == Type::SocketClose ? static_cast<AsyncSocketClose*>(this) : nullptr;}
 inline SC::AsyncFileRead*       SC::Async::asFileRead()     { return type == Type::FileRead ? static_cast<AsyncFileRead*>(this) : nullptr; }
 inline SC::AsyncFileWrite*      SC::Async::asFileWrite()    { return type == Type::FileWrite ? static_cast<AsyncFileWrite*>(this) : nullptr; }
+inline SC::AsyncFileClose*      SC::Async::asFileClose()    { return type == Type::FileClose ? static_cast<AsyncFileClose*>(this) : nullptr; }
 #if SC_PLATFORM_WINDOWS
 inline SC::AsyncWindowsPoll*    SC::Async::asWindowsPoll()  { return type == Type::WindowsPoll ? static_cast<AsyncWindowsPoll*>(this) : nullptr; }
 #endif
@@ -598,6 +638,9 @@ struct SC::EventLoop
     [[nodiscard]] ReturnCode startFileWrite(AsyncFileWrite& async, FileDescriptor::Handle fileDescriptor,
                                             Span<const char>                        writeBuffer,
                                             Function<void(AsyncFileWriteResult&)>&& callback);
+
+    [[nodiscard]] ReturnCode startFileClose(AsyncFileClose& async, FileDescriptor::Handle fileDescriptor,
+                                            Function<void(AsyncFileCloseResult&)>&& callback);
 
 #if SC_PLATFORM_WINDOWS
     [[nodiscard]] ReturnCode startWindowsPoll(AsyncWindowsPoll& async, FileDescriptor::Handle fileDescriptor,

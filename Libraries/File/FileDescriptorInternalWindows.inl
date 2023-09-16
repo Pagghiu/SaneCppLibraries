@@ -14,7 +14,16 @@
 
 SC::ReturnCode SC::FileDescriptorTraits::releaseHandle(Handle& handle)
 {
-    if (::CloseHandle(handle) == FALSE)
+    BOOL res;
+    __try
+    {
+        res = ::CloseHandle(handle);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        res = FALSE;
+    }
+    if (res == FALSE)
     {
         return "FileDescriptorTraits::releaseHandle - CloseHandle failed"_a8;
     }

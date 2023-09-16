@@ -184,7 +184,8 @@ struct SC::EventLoop::KernelQueue
     {
         switch (async.getType())
         {
-        case Async::Type::SocketClose: {
+        case Async::Type::SocketClose:
+        case Async::Type::FileClose: {
             async.eventLoop->scheduleManualCompletion(async);
             break;
         }
@@ -550,6 +551,18 @@ struct SC::EventLoop::KernelQueue
         SC_UNUSED(async);
         return true;
     }
+
+    // File CLOSE
+    [[nodiscard]] ReturnCode setupAsync(Async::FileClose& async)
+    {
+        async.code = ::CloseHandle(async.fileDescriptor) == FALSE ? -1 : 0;
+        SC_TRY_MSG(async.code == 0, "Close returned error"_a8);
+        return true;
+    }
+
+    [[nodiscard]] static bool activateAsync(Async::FileClose&) { return true; }
+    [[nodiscard]] static bool completeAsync(AsyncResult::FileClose&) { return true; }
+    [[nodiscard]] static bool stopAsync(Async::FileClose&) { return true; }
 
     // PROCESS
     [[nodiscard]] static ReturnCode setupAsync(Async::ProcessExit& async)

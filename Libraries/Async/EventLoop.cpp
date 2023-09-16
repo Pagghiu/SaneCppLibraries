@@ -45,6 +45,7 @@ SC::StringView SC::Async::TypeToString(Type type)
     case Type::SocketClose: return "SocketClose"_a8;
     case Type::FileRead: return "FileRead"_a8;
     case Type::FileWrite: return "FileWrite"_a8;
+    case Type::FileClose: return "FileClose"_a8;
 #if SC_PLATFORM_WINDOWS
     case Type::WindowsPoll: return "WindowsPoll"_a8;
 #endif
@@ -86,6 +87,16 @@ SC::ReturnCode SC::EventLoop::startFileWrite(AsyncFileWrite& async, FileDescript
     async.callback       = callback;
     async.fileDescriptor = fileDescriptor;
     async.writeBuffer    = writeBuffer;
+    return true;
+}
+
+SC::ReturnCode SC::EventLoop::startFileClose(AsyncFileClose& async, FileDescriptor::Handle fileDescriptor,
+                                             Function<void(AsyncFileCloseResult&)>&& callback)
+{
+    SC_TRY_IF(validateAsync(async));
+    SC_TRY_IF(queueSubmission(async));
+    async.callback       = callback;
+    async.fileDescriptor = fileDescriptor;
     return true;
 }
 
@@ -402,6 +413,7 @@ SC::ReturnCode SC::EventLoop::setupAsync(KernelQueue& queue, Async& async)
     case Async::Type::SocketClose: SC_TRY_IF(queue.setupAsync(*async.asSocketClose())); break;
     case Async::Type::FileRead: SC_TRY_IF(queue.setupAsync(*async.asFileRead())); break;
     case Async::Type::FileWrite: SC_TRY_IF(queue.setupAsync(*async.asFileWrite())); break;
+    case Async::Type::FileClose: SC_TRY_IF(queue.setupAsync(*async.asFileClose())); break;
 #if SC_PLATFORM_WINDOWS
     case Async::Type::WindowsPoll: SC_TRY_IF(queue.setupAsync(*async.asWindowsPoll())); break;
 #endif
@@ -425,6 +437,7 @@ SC::ReturnCode SC::EventLoop::activateAsync(KernelQueue& queue, Async& async)
     case Async::Type::SocketClose: SC_TRY_IF(queue.activateAsync(*async.asSocketClose())); break;
     case Async::Type::FileRead: SC_TRY_IF(queue.activateAsync(*async.asFileRead())); break;
     case Async::Type::FileWrite: SC_TRY_IF(queue.activateAsync(*async.asFileWrite())); break;
+    case Async::Type::FileClose: SC_TRY_IF(queue.activateAsync(*async.asFileClose())); break;
     case Async::Type::ProcessExit: SC_TRY_IF(queue.activateAsync(*async.asProcessExit())); break;
 #if SC_PLATFORM_WINDOWS
     case Async::Type::WindowsPoll: SC_TRY_IF(queue.activateAsync(*async.asWindowsPoll())); break;
@@ -482,6 +495,15 @@ void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, ReturnCode&&
     }
     case Async::Type::FileWrite: {
         AsyncResult::FileWrite result(async, forward<ReturnCode>(returnCode));
+        if (result.returnCode)
+            result.returnCode = queue.completeAsync(result);
+        if (result.async.callback.isValid())
+            result.async.callback(result);
+        reactivate = result.shouldBeReactivated;
+        break;
+    }
+    case Async::Type::FileClose: {
+        AsyncResult::FileClose result(async, forward<ReturnCode>(returnCode));
         if (result.returnCode)
             result.returnCode = queue.completeAsync(result);
         if (result.async.callback.isValid())
@@ -575,6 +597,7 @@ SC::ReturnCode SC::EventLoop::cancelAsync(KernelQueue& queue, Async& async)
     case Async::Type::LoopWakeUp: numberOfWakeups -= 1; return true;
     case Async::Type::FileRead: SC_TRY_IF(queue.stopAsync(*async.asFileRead())); break;
     case Async::Type::FileWrite: SC_TRY_IF(queue.stopAsync(*async.asFileWrite())); break;
+    case Async::Type::FileClose: SC_TRY_IF(queue.stopAsync(*async.asFileClose())); break;
     case Async::Type::ProcessExit: SC_TRY_IF(queue.stopAsync(*async.asProcessExit())); break;
     case Async::Type::SocketAccept: SC_TRY_IF(queue.stopAsync(*async.asSocketAccept())); break;
     case Async::Type::SocketConnect: SC_TRY_IF(queue.stopAsync(*async.asSocketConnect())); break;
