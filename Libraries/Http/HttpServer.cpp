@@ -73,7 +73,7 @@ SC::ReturnCode SC::HttpServerAsync::stop() { return eventLoop->stopAsync(asyncAc
 
 SC::ReturnCode SC::HttpServerAsync::startSocketAccept()
 {
-    asyncAccept.debugName = "HttpServerAsync";
+    asyncAccept.setDebugName("HttpServerAsync");
     return eventLoop->startSocketAccept(asyncAccept, serverSocket,
                                         SC_FUNCTION_MEMBER(&HttpServerAsync::onNewClient, this));
 }
@@ -104,7 +104,7 @@ void SC::HttpServerAsync::onNewClient(AsyncSocketAcceptResult& result)
         succeeded &= buffer.resizeWithoutInitializing(buffer.capacity());
         (void)StringBuilder(client.debugName)
             .format("HttpServerAsync::client [{}:{}]", (int)key1.generation.generation, (int)key1.index);
-        client.asyncReceive.debugName = client.debugName.bytesIncludingTerminator();
+        client.asyncReceive.setDebugName(client.debugName.bytesIncludingTerminator());
         succeeded &= eventLoop->startSocketReceive(client.asyncReceive, client.socket, buffer.toSpan(),
                                                    SC_FUNCTION_MEMBER(&HttpServerAsync::onReceive, this));
         SC_RELEASE_ASSERT(succeeded);
@@ -132,7 +132,7 @@ void SC::HttpServerAsync::onReceive(AsyncSocketReceiveResult& result)
     }
     if (rr.response.mustBeFlushed())
     {
-        client.asyncSend.debugName = client.debugName.bytesIncludingTerminator();
+        client.asyncSend.setDebugName(client.debugName.bytesIncludingTerminator());
 
         auto outspan = rr.response.outputBuffer.toSpan().asConst();
         auto res     = eventLoop->startSocketSend(client.asyncSend, client.socket, outspan,

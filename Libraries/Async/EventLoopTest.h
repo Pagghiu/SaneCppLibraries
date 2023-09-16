@@ -26,6 +26,7 @@ struct SC::EventLoopTest : public SC::TestCase
         socketConnect();
         socketSendReceive();
         socketSendReceiveError();
+        socketClose();
         fileReadWrite();
     }
 
@@ -101,13 +102,13 @@ struct SC::EventLoopTest : public SC::TestCase
             {
                 wakeUp1ThreadID = Thread::CurrentThreadID();
                 wakeUp1Called++;
-                SC_TEST_EXPECT(res.async.eventLoop->stopAsync(res.async));
+                SC_TEST_EXPECT(res.async.getEventLoop()->stopAsync(res.async));
             };
             SC_TEST_EXPECT(eventLoop.startLoopWakeUp(wakeUp1, lambda1));
             auto lambda2 = [&](AsyncResult::LoopWakeUp& res)
             {
                 wakeUp2Called++;
-                SC_TEST_EXPECT(res.async.eventLoop->stopAsync(res.async));
+                SC_TEST_EXPECT(res.async.getEventLoop()->stopAsync(res.async));
             };
             SC_TEST_EXPECT(eventLoop.startLoopWakeUp(wakeUp2, lambda2));
             Thread     newThread1;
@@ -374,6 +375,40 @@ struct SC::EventLoopTest : public SC::TestCase
         }
     }
 
+    void socketClose()
+    {
+        if (test_section("socket close"))
+        {
+            EventLoop eventLoop;
+            SC_TEST_EXPECT(eventLoop.create());
+            SocketDescriptor client, serverSideClient;
+            createAndAssociateAsyncClientServerConnections(eventLoop, client, serverSideClient);
+
+            AsyncSocketClose asyncClose1;
+
+            int  numCalledClose1 = 0;
+            auto onClose1        = [&](AsyncSocketCloseResult& result)
+            {
+                numCalledClose1++;
+                SC_TEST_EXPECT(result.isValid());
+            };
+            SC_TEST_EXPECT(eventLoop.startSocketClose(asyncClose1, client, onClose1));
+
+            AsyncSocketClose asyncClose2;
+
+            int  numCalledClose2 = 0;
+            auto onClose2        = [&](AsyncSocketCloseResult& result)
+            {
+                numCalledClose2++;
+                SC_TEST_EXPECT(result.isValid());
+            };
+            SC_TEST_EXPECT(eventLoop.startSocketClose(asyncClose2, serverSideClient, onClose2));
+            SC_TEST_EXPECT(eventLoop.run());
+            SC_TEST_EXPECT(numCalledClose1 == 1);
+            SC_TEST_EXPECT(numCalledClose2 == 1);
+        }
+    }
+
     void fileReadWrite()
     {
         if (test_section("file read/write"))
@@ -456,10 +491,10 @@ struct SC::EventLoopTest : public SC::TestCase
 
             // Setup send side on serverSideClient
             AsyncSocketSend asyncSend;
-            asyncSend.debugName = "server";
-            char sendBuffer[1]  = {1};
-            int  numOnSend      = 0;
-            auto onSend         = [&](AsyncSocketSendResult& result)
+            asyncSend.setDebugName("server");
+            char sendBuffer[1] = {1};
+            int  numOnSend     = 0;
+            auto onSend        = [&](AsyncSocketSendResult& result)
             {
                 numOnSend++;
                 SC_TEST_EXPECT(not result.isValid());
@@ -488,7 +523,7 @@ struct SC::EventLoopTest : public SC::TestCase
             };
 
             AsyncSocketReceive asyncRecv;
-            asyncRecv.debugName = "client";
+            asyncRecv.setDebugName("client");
             SC_TEST_EXPECT(
                 eventLoop.startSocketReceive(asyncRecv, client, {recvBuffer, sizeof(recvBuffer)}, onReceive));
 
@@ -500,7 +535,7 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(client.close());
 
             AsyncSocketReceive asyncErr;
-            asyncErr.debugName = "asyncErr";
+            asyncErr.setDebugName("asyncErr");
             // This will fail immediately as the socket is already closed before this call
             SC_TEST_EXPECT(
                 not eventLoop.startSocketReceive(asyncErr, client, {recvBuffer, sizeof(recvBuffer)}, onReceive));

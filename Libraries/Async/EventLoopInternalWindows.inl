@@ -182,7 +182,17 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] ReturnCode pushNewSubmission(Async& async)
     {
-        async.eventLoop->addActiveHandle(async);
+        switch (async.getType())
+        {
+        case Async::Type::SocketClose: {
+            async.eventLoop->scheduleManualCompletion(async);
+            break;
+        }
+        default: {
+            async.eventLoop->addActiveHandle(async);
+            break;
+        }
+        }
         return true;
     }
 
@@ -440,6 +450,17 @@ struct SC::EventLoop::KernelQueue
         SC_UNUSED(async);
         return true;
     }
+
+    // Socket Close
+    [[nodiscard]] static ReturnCode setupAsync(Async::SocketClose& async)
+    {
+        async.code = ::closesocket(async.handle);
+        SC_TRY_MSG(async.code == 0, "Close returned error"_a8);
+        return true;
+    }
+    [[nodiscard]] static bool activateAsync(Async::SocketClose&) { return true; }
+    [[nodiscard]] static bool completeAsync(AsyncResult::SocketClose&) { return true; }
+    [[nodiscard]] static bool stopAsync(Async::SocketClose&) { return true; }
 
     // File READ
     [[nodiscard]] static ReturnCode setupAsync(Async::FileRead& async)

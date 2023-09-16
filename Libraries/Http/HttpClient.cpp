@@ -17,7 +17,8 @@ SC::ReturnCode SC::HttpClient::start(EventLoop& loop, StringView ipAddress, uint
 
     StringBuilder sb(content, StringEncoding::Ascii, StringBuilder::Clear);
     SC_TRY_IF(sb.append(requestContent));
-    connectAsync.debugName = customDebugName.isEmpty() ? "HttpClient" : customDebugName.bytesIncludingTerminator();
+    const char* dbgName = customDebugName.isEmpty() ? "HttpClient" : customDebugName.bytesIncludingTerminator();
+    connectAsync.setDebugName(dbgName);
     SC_TRY_IF((eventLoop->startSocketConnect(connectAsync, clientSocket, localHost,
                                              SC_FUNCTION_MEMBER(&HttpClient::onConnected, this))));
     return true;
@@ -31,8 +32,9 @@ SC::StringView SC::HttpClient::getResponse() const
 void SC::HttpClient::onConnected(AsyncSocketConnectResult& result)
 {
     SC_UNUSED(result);
-    sendAsync.debugName =
+    const char* dbgName =
         customDebugName.isEmpty() ? "HttpClient::clientSocket" : customDebugName.bytesIncludingTerminator();
+    sendAsync.setDebugName(dbgName);
 
     auto res = eventLoop->startSocketSend(sendAsync, clientSocket, content.toSpanConst(),
                                           SC_FUNCTION_MEMBER(&HttpClient::onAfterSend, this));
@@ -47,8 +49,9 @@ void SC::HttpClient::onAfterSend(AsyncSocketSendResult& result)
     SC_UNUSED(result);
     SC_RELEASE_ASSERT(content.resizeWithoutInitializing(content.capacity()));
 
-    receiveAsync.debugName =
+    const char* dbgName =
         customDebugName.isEmpty() ? "HttpClient::clientSocket" : customDebugName.bytesIncludingTerminator();
+    receiveAsync.setDebugName(dbgName);
 
     auto res = eventLoop->startSocketReceive(receiveAsync, clientSocket, content.toSpan(),
                                              SC_FUNCTION_MEMBER(&HttpClient::onAfterRead, this));

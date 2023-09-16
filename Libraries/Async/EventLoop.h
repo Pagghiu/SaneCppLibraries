@@ -41,6 +41,7 @@ struct AsyncSocketAccept;
 struct AsyncSocketConnect;
 struct AsyncSocketSend;
 struct AsyncSocketReceive;
+struct AsyncSocketClose;
 struct AsyncFileRead;
 struct AsyncFileWrite;
 #if SC_PLATFORM_WINDOWS
@@ -54,9 +55,9 @@ struct AsyncSocketAcceptResult;
 struct AsyncSocketConnectResult;
 struct AsyncSocketSendResult;
 struct AsyncSocketReceiveResult;
+struct AsyncSocketCloseResult;
 struct AsyncFileReadResult;
 struct AsyncFileWriteResult;
-
 #if SC_PLATFORM_WINDOWS
 struct AsyncWindowsPollResult;
 #endif
@@ -96,6 +97,7 @@ struct SC::Async
     using SocketConnect = AsyncSocketConnect;
     using SocketSend    = AsyncSocketSend;
     using SocketReceive = AsyncSocketReceive;
+    using SocketClose   = AsyncSocketClose;
     using FileRead      = AsyncFileRead;
     using FileWrite     = AsyncFileWrite;
 #if SC_PLATFORM_WINDOWS
@@ -109,6 +111,7 @@ struct SC::Async
     AsyncSocketConnect* asSocketConnect();
     AsyncSocketSend*    asSocketSend();
     AsyncSocketReceive* asSocketReceive();
+    AsyncSocketClose*   asSocketClose();
     AsyncFileRead*      asFileRead();
     AsyncFileWrite*     asFileWrite();
 #if SC_PLATFORM_WINDOWS
@@ -124,6 +127,7 @@ struct SC::Async
         SocketConnect,
         SocketSend,
         SocketReceive,
+        SocketClose,
         FileRead,
         FileWrite,
 #if SC_PLATFORM_WINDOWS
@@ -133,6 +137,33 @@ struct SC::Async
 
     static StringView TypeToString(Type type);
 
+    Type       getType() const { return type; }
+    EventLoop* getEventLoop() const { return eventLoop; }
+
+    Async* next = nullptr;
+    Async* prev = nullptr;
+
+#if SC_DEBUG
+    void setDebugName(const char* newDebugName) { debugName = newDebugName; }
+#else
+    void setDebugName(const char* newDebugName) { SC_UNUSED(newDebugName); }
+#endif
+  private:
+    friend struct AsyncLoopTimeout;
+    friend struct AsyncLoopWakeUp;
+    friend struct AsyncSocketAccept;
+    friend struct AsyncSocketConnect;
+    friend struct AsyncSocketSend;
+    friend struct AsyncSocketReceive;
+    friend struct AsyncSocketClose;
+    friend struct AsyncFileRead;
+    friend struct AsyncFileWrite;
+    friend struct AsyncProcessExit;
+#if SC_PLATFORM_WINDOWS
+    friend struct AsyncWindowsPoll;
+#endif
+
+    EventLoop* eventLoop = nullptr;
     enum class State : uint8_t
     {
         Free,       // not in any queue
@@ -141,20 +172,15 @@ struct SC::Async
         Cancelling  // when in cancellation queue
     };
 
-    Async(Type type) : type(type) {}
+    friend struct EventLoop;
+    Async(Type type) : type(type), state(State::Free), eventIndex(-1) {}
 
-    Type getType() const { return type; }
-
-    EventLoop* eventLoop = nullptr;
-    Async*     next      = nullptr;
-    Async*     prev      = nullptr;
-
+#if SC_DEBUG
     const char* debugName = "None";
-
-    State state = State::Free;
-
-  private:
-    Type type = Type::LoopTimeout;
+#endif
+    State   state;
+    Type    type;
+    int32_t eventIndex;
 };
 
 struct SC::AsyncLoopTimeout : public Async
@@ -246,6 +272,20 @@ struct SC::AsyncSocketReceive : public Async
 #endif
 };
 
+struct SC::AsyncSocketClose : public Async
+{
+    AsyncSocketClose() : Async(Type::SocketClose) {}
+
+    Function<void(AsyncSocketCloseResult&)> callback;
+
+    SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
+
+  private:
+    friend struct EventLoop;
+    friend struct AsyncSocketCloseResult;
+    int code = 0;
+};
+
 struct SC::AsyncFileRead : public Async
 {
     Function<void(AsyncFileReadResult&)> callback;
@@ -296,6 +336,7 @@ struct SC::AsyncResult
     using SocketConnect = AsyncSocketConnectResult;
     using SocketSend    = AsyncSocketSendResult;
     using SocketReceive = AsyncSocketReceiveResult;
+    using SocketClose   = AsyncSocketCloseResult;
     using FileRead      = AsyncFileReadResult;
     using FileWrite     = AsyncFileWriteResult;
 #if SC_PLATFORM_WINDOWS
@@ -304,9 +345,7 @@ struct SC::AsyncResult
 
     using Type = Async::Type;
 
-    int32_t index = 0;
-
-    AsyncResult(int32_t index, ReturnCode&& res) : index(index), returnCode(forward<ReturnCode>(res)) {}
+    AsyncResult(ReturnCode&& res) : returnCode(forward<ReturnCode>(res)) {}
 
     void reactivateRequest(bool value) { shouldBeReactivated = value; }
 
@@ -315,15 +354,14 @@ struct SC::AsyncResult
   protected:
     friend struct EventLoop;
 
-    bool shouldBeReactivated = false;
-
+    bool       shouldBeReactivated = false;
     ReturnCode returnCode;
 };
 
 struct SC::AsyncLoopTimeoutResult : public AsyncResult
 {
-    AsyncLoopTimeoutResult(Async& async, int32_t index, ReturnCode&& res)
-        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asLoopTimeout())
+    AsyncLoopTimeoutResult(Async& async, ReturnCode&& res)
+        : AsyncResult(forward<ReturnCode>(res)), async(*async.asLoopTimeout())
     {}
 
     AsyncLoopTimeout& async;
@@ -331,8 +369,8 @@ struct SC::AsyncLoopTimeoutResult : public AsyncResult
 
 struct SC::AsyncLoopWakeUpResult : public AsyncResult
 {
-    AsyncLoopWakeUpResult(Async& async, int32_t index, ReturnCode&& res)
-        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asLoopWakeUp())
+    AsyncLoopWakeUpResult(Async& async, ReturnCode&& res)
+        : AsyncResult(forward<ReturnCode>(res)), async(*async.asLoopWakeUp())
     {}
 
     AsyncLoopWakeUp& async;
@@ -340,8 +378,8 @@ struct SC::AsyncLoopWakeUpResult : public AsyncResult
 
 struct SC::AsyncProcessExitResult : public AsyncResult
 {
-    AsyncProcessExitResult(Async& async, int32_t index, ReturnCode&& res)
-        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asProcessExit())
+    AsyncProcessExitResult(Async& async, ReturnCode&& res)
+        : AsyncResult(forward<ReturnCode>(res)), async(*async.asProcessExit())
     {}
 
     AsyncProcessExit& async;
@@ -359,8 +397,8 @@ struct SC::AsyncProcessExitResult : public AsyncResult
 
 struct SC::AsyncSocketAcceptResult : public AsyncResult
 {
-    AsyncSocketAcceptResult(Async& async, int32_t index, ReturnCode&& res)
-        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asSocketAccept())
+    AsyncSocketAcceptResult(Async& async, ReturnCode&& res)
+        : AsyncResult(forward<ReturnCode>(res)), async(*async.asSocketAccept())
     {}
 
     AsyncSocketAccept& async;
@@ -378,8 +416,8 @@ struct SC::AsyncSocketAcceptResult : public AsyncResult
 
 struct SC::AsyncSocketConnectResult : public AsyncResult
 {
-    AsyncSocketConnectResult(Async& async, int32_t index, ReturnCode&& res)
-        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asSocketConnect())
+    AsyncSocketConnectResult(Async& async, ReturnCode&& res)
+        : AsyncResult(forward<ReturnCode>(res)), async(*async.asSocketConnect())
     {}
 
     AsyncSocketConnect& async;
@@ -387,8 +425,8 @@ struct SC::AsyncSocketConnectResult : public AsyncResult
 
 struct SC::AsyncSocketSendResult : public AsyncResult
 {
-    AsyncSocketSendResult(Async& async, int32_t index, ReturnCode&& res)
-        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asSocketSend())
+    AsyncSocketSendResult(Async& async, ReturnCode&& res)
+        : AsyncResult(forward<ReturnCode>(res)), async(*async.asSocketSend())
     {}
 
     AsyncSocketSend& async;
@@ -396,8 +434,8 @@ struct SC::AsyncSocketSendResult : public AsyncResult
 
 struct SC::AsyncSocketReceiveResult : public AsyncResult
 {
-    AsyncSocketReceiveResult(Async& async, int32_t index, ReturnCode&& res)
-        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asSocketReceive())
+    AsyncSocketReceiveResult(Async& async, ReturnCode&& res)
+        : AsyncResult(forward<ReturnCode>(res)), async(*async.asSocketReceive())
     {}
     AsyncSocketReceive& async;
 
@@ -412,10 +450,23 @@ struct SC::AsyncSocketReceiveResult : public AsyncResult
     Span<char> readData;
 };
 
+struct SC::AsyncSocketCloseResult : public AsyncResult
+{
+    AsyncSocketCloseResult(Async& async, ReturnCode&& res)
+        : AsyncResult(forward<ReturnCode>(res)), async(*async.asSocketClose())
+    {}
+    AsyncSocketClose& async;
+
+    auto getResult() const { return async.code; }
+
+  private:
+    friend struct EventLoop;
+};
+
 struct SC::AsyncFileReadResult : public AsyncResult
 {
-    AsyncFileReadResult(Async& async, int32_t index, ReturnCode&& res)
-        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asFileRead())
+    AsyncFileReadResult(Async& async, ReturnCode&& res)
+        : AsyncResult(forward<ReturnCode>(res)), async(*async.asFileRead())
     {}
     AsyncFileRead& async;
 
@@ -432,8 +483,8 @@ struct SC::AsyncFileReadResult : public AsyncResult
 
 struct SC::AsyncFileWriteResult : public AsyncResult
 {
-    AsyncFileWriteResult(Async& async, int32_t index, ReturnCode&& res)
-        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asFileWrite())
+    AsyncFileWriteResult(Async& async, ReturnCode&& res)
+        : AsyncResult(forward<ReturnCode>(res)), async(*async.asFileWrite())
     {}
 
     AsyncFileWrite& async;
@@ -452,8 +503,8 @@ struct SC::AsyncFileWriteResult : public AsyncResult
 #if SC_PLATFORM_WINDOWS
 struct SC::AsyncWindowsPollResult : public AsyncResult
 {
-    AsyncWindowsPollResult(Async& async, int32_t index, ReturnCode&& res)
-        : AsyncResult(index, forward<ReturnCode>(res)), async(*async.asWindowsPoll())
+    AsyncWindowsPollResult(Async& async, ReturnCode&& res)
+        : AsyncResult(forward<ReturnCode>(res)), async(*async.asWindowsPoll())
     {}
 
     AsyncWindowsPoll& async;
@@ -467,6 +518,7 @@ inline SC::AsyncSocketAccept*   SC::Async::asSocketAccept() { return type == Typ
 inline SC::AsyncSocketConnect*  SC::Async::asSocketConnect(){ return type == Type::SocketConnect ? static_cast<AsyncSocketConnect*>(this) : nullptr;}
 inline SC::AsyncSocketSend*     SC::Async::asSocketSend()   { return type == Type::SocketSend ? static_cast<AsyncSocketSend*>(this) : nullptr; }
 inline SC::AsyncSocketReceive*  SC::Async::asSocketReceive(){ return type == Type::SocketReceive ? static_cast<AsyncSocketReceive*>(this) : nullptr;}
+inline SC::AsyncSocketClose*    SC::Async::asSocketClose()  { return type == Type::SocketClose ? static_cast<AsyncSocketClose*>(this) : nullptr;}
 inline SC::AsyncFileRead*       SC::Async::asFileRead()     { return type == Type::FileRead ? static_cast<AsyncFileRead*>(this) : nullptr; }
 inline SC::AsyncFileWrite*      SC::Async::asFileWrite()    { return type == Type::FileWrite ? static_cast<AsyncFileWrite*>(this) : nullptr; }
 #if SC_PLATFORM_WINDOWS
@@ -534,6 +586,10 @@ struct SC::EventLoop
     [[nodiscard]] ReturnCode startSocketReceive(AsyncSocketReceive& async, const SocketDescriptor& socketDescriptor,
                                                 Span<char> data, Function<void(AsyncSocketReceiveResult&)>&& callback);
 
+    /// Starts a socket close operation. Callback will be called when the socket has been fully closed.
+    [[nodiscard]] ReturnCode startSocketClose(AsyncSocketClose& async, const SocketDescriptor& socketDescriptor,
+                                              Function<void(AsyncSocketCloseResult&)>&& callback);
+
     /// Starts a file receive operation, that will return when some data is read from file.
     [[nodiscard]] ReturnCode startFileRead(AsyncFileRead& async, FileDescriptor::Handle fileDescriptor,
                                            Span<char> readBuffer, Function<void(AsyncFileReadResult&)>&& callback);
@@ -585,6 +641,7 @@ struct SC::EventLoop
     IntrusiveDoubleLinkedList<Async> submissions;
     IntrusiveDoubleLinkedList<Async> activeTimers;
     IntrusiveDoubleLinkedList<Async> activeWakeUps;
+    IntrusiveDoubleLinkedList<Async> manualCompletions;
 
     TimeCounter loopTime;
 
@@ -609,6 +666,7 @@ struct SC::EventLoop
 
     void removeActiveHandle(Async& async);
     void addActiveHandle(Async& async);
+    void scheduleManualCompletion(Async& async);
 
     // Timers
     [[nodiscard]] const TimeCounter* findEarliestTimer() const;
@@ -630,14 +688,15 @@ struct SC::EventLoop
     [[nodiscard]] ReturnCode activateAsync(KernelQueue& queue, Async& async);
     [[nodiscard]] ReturnCode cancelAsync(KernelQueue& queue, Async& async);
 
-    void        reportError(KernelQueue& queue, Async& async, ReturnCode&& returnCode);
-    static void completeAsync(KernelQueue& queue, Async& async, int32_t eventIndex, ReturnCode&& returnCode,
-                              bool& reactivate);
+    void reportError(KernelQueue& queue, Async& async, ReturnCode&& returnCode);
+    void completeAsync(KernelQueue& queue, Async& async, ReturnCode&& returnCode, bool& reactivate);
+    void completeAndEventuallyReactivate(KernelQueue& queue, Async& async, ReturnCode&& returnCode);
 
     enum class PollMode
     {
         NoWait,
         ForcedForwardProgress
     };
-    [[nodiscard]] ReturnCode runStep(PollMode pollMode);
+
+    ReturnCode runStep(PollMode pollMode);
 };

@@ -88,11 +88,21 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] ReturnCode pushNewSubmission(Async& async)
     {
-        async.eventLoop->addActiveHandle(async);
-        newEvents += 1;
-        if (newEvents >= totalNumEvents)
+        switch (async.getType())
         {
-            SC_TRY_IF(flushQueue(*async.eventLoop));
+        case Async::Type::SocketClose: {
+            async.eventLoop->scheduleManualCompletion(async);
+            break;
+        }
+        default: {
+            async.eventLoop->addActiveHandle(async);
+            newEvents += 1;
+            if (newEvents >= totalNumEvents)
+            {
+                SC_TRY_IF(flushQueue(*async.eventLoop));
+            }
+            break;
+        }
         }
         return true;
     }
@@ -342,6 +352,17 @@ struct SC::EventLoop::KernelQueue
         return Internal::stopSingleWatcherImmediate(async, async.handle, EVFILT_READ);
     }
 
+    // Socket CLOSE
+    [[nodiscard]] static ReturnCode setupAsync(Async::SocketClose& async)
+    {
+        async.code = ::close(async.handle);
+        SC_TRY_MSG(async.code == 0, "Close returned error"_a8);
+        return true;
+    }
+    [[nodiscard]] static bool activateAsync(Async::SocketClose&) { return true; }
+    [[nodiscard]] static bool completeAsync(AsyncResult::SocketClose&) { return true; }
+    [[nodiscard]] static bool stopAsync(Async::SocketClose&) { return true; }
+
     // File READ
     [[nodiscard]] bool setupAsync(Async::FileRead& async)
     {
@@ -414,7 +435,8 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] ReturnCode completeAsync(AsyncResult::ProcessExit& result)
     {
-        const struct kevent event = events[result.index];
+        SC_TRY_MSG(result.async.eventIndex >= 0, "Invalid event Index"_a8);
+        const struct kevent event = events[result.async.eventIndex];
         if ((event.fflags & (NOTE_EXIT | NOTE_EXITSTATUS)) > 0)
         {
             const uint32_t data = static_cast<uint32_t>(event.data);
