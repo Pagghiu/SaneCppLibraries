@@ -96,7 +96,7 @@ struct SC::HttpServerAsync : public HttpServer
   private:
     [[nodiscard]] ReturnCode startSocketAccept();
 
-    void onNewClient(AsyncSocketAcceptResult& result);
-    void onReceive(AsyncSocketReceiveResult& result);
-    void onAfterSend(AsyncSocketSendResult& result);
+    void onNewClient(AsyncSocketAccept::Result& result);
+    void onReceive(AsyncSocketReceive::Result& result);
+    void onAfterSend(AsyncSocketSend::Result& result);
 };

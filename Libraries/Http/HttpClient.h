@@ -19,9 +19,9 @@ struct SC::HttpClient
     ReturnCode setCustomDebugName(const StringView debugName) { return customDebugName.assign(debugName); }
 
   private:
-    void onConnected(AsyncSocketConnectResult& result);
-    void onAfterSend(AsyncSocketSendResult& result);
-    void onAfterRead(AsyncSocketReceiveResult& result);
+    void onConnected(AsyncSocketConnect::Result& result);
+    void onAfterSend(AsyncSocketSend::Result& result);
+    void onAfterRead(AsyncSocketReceive::Result& result);
 
     Function<void(HttpClient&)> callback;
     SmallVector<char, 1024>     content;

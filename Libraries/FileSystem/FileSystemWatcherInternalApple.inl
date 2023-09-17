@@ -44,10 +44,9 @@ struct SC::FileSystemWatcher::Internal
     {
         self            = &parent;
         eventLoopRunner = &runner;
-        Function<void(AsyncLoopWakeUpResult&)> cb;
-        cb.bind<Internal, &Internal::onMainLoop>(this);
-        return eventLoopRunner->eventLoop.startLoopWakeUp(eventLoopRunner->eventLoopAsync, move(cb),
-                                                          &eventLoopRunner->eventObject);
+        auto& async     = eventLoopRunner->eventLoopAsync;
+        async.callback.bind<Internal, &Internal::onMainLoop>(this);
+        return async.start(eventLoopRunner->eventLoop, &eventLoopRunner->eventObject);
     }
 
     [[nodiscard]] ReturnCode initThread()
@@ -334,7 +333,7 @@ struct SC::FileSystemWatcher::Internal
         }
     }
 
-    void onMainLoop(AsyncLoopWakeUpResult& result)
+    void onMainLoop(AsyncLoopWakeUp::Result& result)
     {
         watcher->notifyCallback(notification);
         result.reactivateRequest(true);

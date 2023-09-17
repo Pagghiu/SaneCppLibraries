@@ -17,7 +17,7 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
     FolderWatcher*   parentEntry = nullptr; // We could in theory use SC_FIELD_OFFSET somehow to obtain it...
     FileDescriptor   fileHandle;
 
-    OVERLAPPED& getOverlapped() { return asyncPoll.overlapped.get().overlapped; }
+    OVERLAPPED& getOverlapped() { return asyncPoll.getOverlappedOpaque().get().overlapped; }
 };
 
 struct SC::FileSystemWatcher::ThreadRunnerInternal
@@ -108,7 +108,7 @@ struct SC::FileSystemWatcher::Internal
         }
         else
         {
-            SC_TRUST_RESULT(eventLoopRunner->eventLoop.stopAsync(folderWatcher.internal.get().asyncPoll));
+            SC_TRUST_RESULT(folderWatcher.internal.get().asyncPoll.stop());
         }
         closeFileHandle(folderWatcher);
         return true;
@@ -158,9 +158,8 @@ struct SC::FileSystemWatcher::Internal
         else
         {
             SC_TRY_IF(eventLoopRunner->eventLoop.associateExternallyCreatedFileDescriptor(opaque.fileHandle));
-            auto res = eventLoopRunner->eventLoop.startWindowsPoll(
-                opaque.asyncPoll, newHandle,
-                SC_FUNCTION_MEMBER(&FileSystemWatcher::Internal::onEventLoopNotification, this));
+            opaque.asyncPoll.callback.bind<Internal, &Internal::onEventLoopNotification>(this);
+            auto res = opaque.asyncPoll.start(eventLoopRunner->eventLoop, newHandle);
             SC_TRY_IF(res);
         }
 
@@ -207,7 +206,7 @@ struct SC::FileSystemWatcher::Internal
         threadingRunner->shouldStop.exchange(false);
     }
 
-    void onEventLoopNotification(AsyncResult::WindowsPoll& result)
+    void onEventLoopNotification(AsyncWindowsPoll::Result& result)
     {
         FolderWatcherInternal& fwi = SC_FIELD_OFFSET(FolderWatcherInternal, asyncPoll, result.async);
         SC_DEBUG_ASSERT(fwi.fileHandle.isValid())

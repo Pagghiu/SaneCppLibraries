@@ -19,9 +19,8 @@ SC::ReturnCode SC::HttpClient::start(EventLoop& loop, StringView ipAddress, uint
     SC_TRY_IF(sb.append(requestContent));
     const char* dbgName = customDebugName.isEmpty() ? "HttpClient" : customDebugName.bytesIncludingTerminator();
     connectAsync.setDebugName(dbgName);
-    SC_TRY_IF((eventLoop->startSocketConnect(connectAsync, clientSocket, localHost,
-                                             SC_FUNCTION_MEMBER(&HttpClient::onConnected, this))));
-    return true;
+    connectAsync.callback.bind<HttpClient, &HttpClient::onConnected>(this);
+    return connectAsync.start(*eventLoop, clientSocket, localHost);
 }
 
 SC::StringView SC::HttpClient::getResponse() const
@@ -29,22 +28,22 @@ SC::StringView SC::HttpClient::getResponse() const
     return StringView(content.data(), content.size(), false, StringEncoding::Ascii);
 }
 
-void SC::HttpClient::onConnected(AsyncSocketConnectResult& result)
+void SC::HttpClient::onConnected(AsyncSocketConnect::Result& result)
 {
     SC_UNUSED(result);
     const char* dbgName =
         customDebugName.isEmpty() ? "HttpClient::clientSocket" : customDebugName.bytesIncludingTerminator();
     sendAsync.setDebugName(dbgName);
 
-    auto res = eventLoop->startSocketSend(sendAsync, clientSocket, content.toSpanConst(),
-                                          SC_FUNCTION_MEMBER(&HttpClient::onAfterSend, this));
+    sendAsync.callback.bind<HttpClient, &HttpClient::onAfterSend>(this);
+    auto res = sendAsync.start(*eventLoop, clientSocket, content.toSpanConst());
     if (not res)
     {
         // TODO: raise error
     }
 }
 
-void SC::HttpClient::onAfterSend(AsyncSocketSendResult& result)
+void SC::HttpClient::onAfterSend(AsyncSocketSend::Result& result)
 {
     SC_UNUSED(result);
     SC_RELEASE_ASSERT(content.resizeWithoutInitializing(content.capacity()));
@@ -53,15 +52,15 @@ void SC::HttpClient::onAfterSend(AsyncSocketSendResult& result)
         customDebugName.isEmpty() ? "HttpClient::clientSocket" : customDebugName.bytesIncludingTerminator();
     receiveAsync.setDebugName(dbgName);
 
-    auto res = eventLoop->startSocketReceive(receiveAsync, clientSocket, content.toSpan(),
-                                             SC_FUNCTION_MEMBER(&HttpClient::onAfterRead, this));
+    receiveAsync.callback.bind<HttpClient, &HttpClient::onAfterRead>(this);
+    auto res = receiveAsync.start(*eventLoop, clientSocket, content.toSpan());
     if (not res)
     {
         // TODO: raise error
     }
 }
 
-void SC::HttpClient::onAfterRead(AsyncSocketReceiveResult& result)
+void SC::HttpClient::onAfterRead(AsyncSocketReceive::Result& result)
 {
     SC_UNUSED(result);
     SC_RELEASE_ASSERT(SocketClient(clientSocket).close());
