@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/StringBuilder.h"
+#include "../Foundation/Strings/StringBuilder.h"
 #include "../Testing/Test.h"
 #include "HttpClient.h"
 #include "HttpServer.h"

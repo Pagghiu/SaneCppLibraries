@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "System.h"
 
-#include "../Foundation/StringConverter.h"
+#include "../Foundation/Strings/StringConverter.h"
 #include "../System/Console.h"
 
 #include <dlfcn.h>    // dlopen

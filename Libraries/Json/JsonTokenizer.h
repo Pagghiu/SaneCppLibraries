@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Result.h"
-#include "../Foundation/StringView.h"
+#include "../Foundation/Objects/Result.h"
+#include "../Foundation/Strings/StringView.h"
 
 namespace SC
 {

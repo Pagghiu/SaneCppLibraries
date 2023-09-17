@@ -4,7 +4,7 @@
 //
 // Path - Parse filesystem paths for windows and posix
 #pragma once
-#include "../Foundation/StringView.h"
+#include "../Foundation/Strings/StringView.h"
 
 namespace SC
 {

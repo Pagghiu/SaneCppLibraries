@@ -3,8 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 
 #include "../Async/EventLoop.h"
-#include "../Foundation/String.h"
-#include "../Foundation/StringConverter.h"
+#include "../Foundation/Strings/String.h"
+#include "../Foundation/Strings/StringConverter.h"
 #include "../Threading/Threading.h"
 #include <CoreServices/CoreServices.h> // FSEvents
 

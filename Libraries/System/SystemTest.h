@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Limits.h"
+#include "../Foundation/Language/Limits.h"
 #include "../Testing/Test.h"
 #include "System.h"
 

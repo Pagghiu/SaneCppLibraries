@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Opaque.h"
-#include "../Foundation/Optional.h"
-#include "../Foundation/Result.h"
+#include "../Foundation/Objects/Opaque.h"
+#include "../Foundation/Objects/Optional.h"
+#include "../Foundation/Objects/Result.h"
 
 namespace SC
 {

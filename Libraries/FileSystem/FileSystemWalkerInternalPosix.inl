@@ -3,8 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 // clang-format off
 #include "FileSystemWalker.h"
-#include "../Foundation/StringConverter.h"
-#include "../Foundation/SmallVector.h"
+#include "../Foundation/Strings/StringConverter.h"
+#include "../Foundation/Containers/SmallVector.h"
 
 // clang-format on
 #include <dirent.h>

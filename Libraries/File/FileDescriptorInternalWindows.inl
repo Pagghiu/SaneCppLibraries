@@ -5,9 +5,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include "../Foundation/String.h"
-#include "../Foundation/StringConverter.h"
-#include "../Foundation/Vector.h"
+#include "../Foundation/Containers/Vector.h"
+#include "../Foundation/Strings/String.h"
+#include "../Foundation/Strings/StringConverter.h"
 #include "FileDescriptor.h"
 
 // FileDescriptor

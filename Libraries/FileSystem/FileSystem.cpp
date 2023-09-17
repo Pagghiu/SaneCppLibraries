@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "FileSystem.h"
-#include "../Foundation/StringConverter.h"
+#include "../Foundation/Strings/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
 #include "FileSystemInternalWindows.inl"

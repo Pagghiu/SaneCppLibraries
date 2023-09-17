@@ -5,8 +5,8 @@
 #include "WriterVisualStudio.inl"
 #include "WriterXCode.inl"
 
-#include "../Foundation/SmallVector.h"
-#include "../Foundation/StringViewAlgorithms.h"
+#include "../Foundation/Containers/SmallVector.h"
+#include "../Foundation/Strings/StringViewAlgorithms.h"
 
 bool SC::Build::Project::setRootDirectory(StringView file)
 {

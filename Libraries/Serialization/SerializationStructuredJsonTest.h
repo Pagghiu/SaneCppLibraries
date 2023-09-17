@@ -5,8 +5,8 @@
 #include "SerializationStructuredJson.h"
 #include "SerializationStructuredReadWrite.h"
 
-#include "../Foundation/SmallVector.h"
-#include "../Foundation/StringBuilder.h"
+#include "../Foundation/Containers/SmallVector.h"
+#include "../Foundation/Strings/StringBuilder.h"
 #include "../Testing/Test.h"
 
 namespace SC

@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Result.h"
+#include "../Foundation/Objects/Result.h"
 
 namespace SC
 {

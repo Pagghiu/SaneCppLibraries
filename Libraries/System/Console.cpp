@@ -3,9 +3,9 @@
 // All Rights Reserved. Reproduction is not allowed.
 
 #include "Console.h"
-#include "../Foundation/Limits.h"
-#include "../Foundation/Platform.h"
-#include "../Foundation/StringConverter.h"
+#include "../Foundation/Language/Limits.h"
+#include "../Foundation/Language/Platform.h"
+#include "../Foundation/Strings/StringConverter.h"
 
 #include <stdio.h>  // stdout
 #include <string.h> // strlen

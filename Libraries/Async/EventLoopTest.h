@@ -4,7 +4,7 @@
 #pragma once
 #include "../FileSystem/FileSystem.h"
 #include "../FileSystem/Path.h"
-#include "../Foundation/String.h"
+#include "../Foundation/Strings/String.h"
 #include "../Testing/Test.h"
 #include "../Threading/Threading.h" // EventObject
 #include "EventLoop.h"

@@ -1,8 +1,8 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 #pragma once
-#include "../Foundation/AlgorithmSort.h"
-#include "../Foundation/StringViewAlgorithms.h"
+#include "../Foundation/Algorithms/AlgorithmSort.h"
+#include "../Foundation/Strings/StringViewAlgorithms.h"
 #include "Build.h"
 
 namespace SC

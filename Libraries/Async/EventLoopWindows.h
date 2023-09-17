@@ -7,7 +7,7 @@
 #include <stddef.h> // offsetof
 
 #include "../File/FileDescriptor.h"
-#include "../Foundation/Opaque.h"
+#include "../Foundation/Objects/Opaque.h"
 
 namespace SC
 {

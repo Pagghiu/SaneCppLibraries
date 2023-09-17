@@ -9,8 +9,8 @@
 // Original Code License: Public Domain
 //------------------------------------------------------------------------
 #pragma once
-#include "../Foundation/Language.h"
-#include "../Foundation/TypeList.h"
+#include "../Foundation/Language/Language.h"
+#include "../Foundation/Objects/TypeList.h"
 
 namespace SC
 {

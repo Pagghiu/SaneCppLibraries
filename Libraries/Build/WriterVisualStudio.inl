@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../FileSystem/Path.h"
-#include "../Foundation/StringBuilder.h"
+#include "../Foundation/Strings/StringBuilder.h"
 #include "../Hashing/Hashing.h"
 #include "Build.h"
 #include "WriteInternal.h"

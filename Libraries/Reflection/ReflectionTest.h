@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Array.h"
-#include "../Foundation/StringBuilder.h"
-#include "../Foundation/Vector.h"
+#include "../Foundation/Containers/Array.h"
+#include "../Foundation/Containers/Vector.h"
+#include "../Foundation/Strings/StringBuilder.h"
 #include "../Testing/Test.h"
 #include "ReflectionFlatSchemaCompiler.h"
 #include "ReflectionSC.h"

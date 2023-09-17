@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Optional.h"
-#include "../Foundation/String.h"
+#include "../Foundation/Objects/Optional.h"
+#include "../Foundation/Strings/String.h"
 #include "../System/Time.h"
 
 namespace SC

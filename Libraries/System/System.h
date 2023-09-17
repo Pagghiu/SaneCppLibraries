@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Opaque.h"
-#include "../Foundation/String.h"
+#include "../Foundation/Objects/Opaque.h"
+#include "../Foundation/Strings/String.h"
 
 namespace SC
 {

@@ -4,8 +4,8 @@
 #pragma once
 #include "../FileSystem/FileSystem.h"
 #include "../FileSystem/Path.h"
-#include "../Foundation/SmallVector.h"
-#include "../Foundation/StringBuilder.h"
+#include "../Foundation/Containers/SmallVector.h"
+#include "../Foundation/Strings/StringBuilder.h"
 #include "../Testing/Test.h"
 #include "Build.h"
 

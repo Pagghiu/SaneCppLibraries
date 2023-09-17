@@ -2,13 +2,13 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/ArenaMap.h"
-#include "../Foundation/Function.h"
+#include "../Foundation/Containers/ArenaMap.h"
+#include "../Foundation/Objects/Function.h"
 #include "HttpParser.h"
 
 #include "../Async/EventLoop.h"
-#include "../Foundation/SmallVector.h"
-#include "../Foundation/String.h"
+#include "../Foundation/Containers/SmallVector.h"
+#include "../Foundation/Strings/String.h"
 #include "../Socket/SocketDescriptor.h"
 
 namespace SC

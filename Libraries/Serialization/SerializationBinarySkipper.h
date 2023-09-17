@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Result.h"
-#include "../Foundation/Span.h"
-#include "../Foundation/Vector.h"
+#include "../Foundation/Containers/Vector.h"
+#include "../Foundation/Objects/Result.h"
+#include "../Foundation/Objects/Span.h"
 #include "../Reflection/Reflection.h"
 
 namespace SC

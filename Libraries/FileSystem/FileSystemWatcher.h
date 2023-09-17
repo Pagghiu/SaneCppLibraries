@@ -4,11 +4,11 @@
 #pragma once
 
 #include "../Async/EventLoop.h" // AsyncLoopWakeUp
-#include "../Foundation/Function.h"
-#include "../Foundation/IntrusiveDoubleLinkedList.h"
-#include "../Foundation/Opaque.h"
-#include "../Foundation/Result.h"
-#include "../Foundation/StringView.h"
+#include "../Foundation/Containers/IntrusiveDoubleLinkedList.h"
+#include "../Foundation/Objects/Function.h"
+#include "../Foundation/Objects/Opaque.h"
+#include "../Foundation/Objects/Result.h"
+#include "../Foundation/Strings/StringView.h"
 #include "../Threading/Threading.h" // EventObject
 
 // Header

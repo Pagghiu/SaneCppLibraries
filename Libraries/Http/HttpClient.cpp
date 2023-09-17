@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "HttpClient.h"
 
-#include "../Foundation/StringBuilder.h"
+#include "../Foundation/Strings/StringBuilder.h"
 
 SC::ReturnCode SC::HttpClient::start(EventLoop& loop, StringView ipAddress, uint16_t port, StringView requestContent,
                                      Function<void(HttpClient&)>&& cb)

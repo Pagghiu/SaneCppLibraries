@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "HttpServer.h"
-#include "../Foundation/StringBuilder.h"
+#include "../Foundation/Strings/StringBuilder.h"
 
 SC::ReturnCode SC::HttpServer::Response::end(StringView sv)
 {

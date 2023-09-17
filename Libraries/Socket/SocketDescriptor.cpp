@@ -1,8 +1,8 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../Foundation/StringBuilder.h"
-#include "../Foundation/StringConverter.h"
+#include "../Foundation/Strings/StringBuilder.h"
+#include "../Foundation/Strings/StringConverter.h"
 #include "../System/System.h"
 #include "../System/Time.h"
 

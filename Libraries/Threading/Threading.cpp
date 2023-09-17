@@ -3,8 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "Threading.h"
 
-#include "../Foundation/String.h"
-#include "../Foundation/StringConverter.h"
+#include "../Foundation/Strings/String.h"
+#include "../Foundation/Strings/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
 #include "ThreadingInternalWindows.inl"

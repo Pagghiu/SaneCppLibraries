@@ -4,10 +4,10 @@
 #pragma once
 
 #include "../File/FileDescriptor.h"
-#include "../Foundation/Function.h"
-#include "../Foundation/IntrusiveDoubleLinkedList.h"
-#include "../Foundation/Optional.h"
-#include "../Foundation/String.h"
+#include "../Foundation/Containers/IntrusiveDoubleLinkedList.h"
+#include "../Foundation/Objects/Function.h"
+#include "../Foundation/Objects/Optional.h"
+#include "../Foundation/Strings/String.h"
 #include "ProcessDescriptor.h"
 
 namespace SC

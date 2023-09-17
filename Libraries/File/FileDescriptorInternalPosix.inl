@@ -1,9 +1,9 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../Foundation/String.h"
-#include "../Foundation/StringConverter.h"
-#include "../Foundation/Vector.h"
+#include "../Foundation/Containers/Vector.h"
+#include "../Foundation/Strings/String.h"
+#include "../Foundation/Strings/StringConverter.h"
 #include "FileDescriptor.h"
 
 #include <errno.h>  // errno

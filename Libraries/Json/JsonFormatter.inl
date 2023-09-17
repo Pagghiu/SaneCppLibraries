@@ -1,9 +1,9 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../Foundation/StringFormat.h"
-#include "../Foundation/StringView.h"
-#include "../Foundation/Vector.h"
+#include "../Foundation/Containers/Vector.h"
+#include "../Foundation/Strings/StringFormat.h"
+#include "../Foundation/Strings/StringView.h"
 #include "JsonFormatter.h"
 
 #include <stdio.h> // snprintf

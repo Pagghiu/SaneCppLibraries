@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../FileSystem/Path.h"
-#include "../Foundation/SmallVector.h"
-#include "../Foundation/StringBuilder.h"
-#include "../Foundation/StringConverter.h"
+#include "../Foundation/Containers/SmallVector.h"
+#include "../Foundation/Strings/StringBuilder.h"
+#include "../Foundation/Strings/StringConverter.h"
 #include "../Threading/Atomic.h"
 #include "System.h"
 

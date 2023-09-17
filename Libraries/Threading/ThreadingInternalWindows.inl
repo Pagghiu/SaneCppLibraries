@@ -4,7 +4,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include "../Foundation/StringView.h"
+#include "../Foundation/Strings/StringView.h"
 #include "Threading.h"
 
 SC::Mutex::Mutex() { InitializeCriticalSection(&mutex.reinterpret_as<CRITICAL_SECTION>()); }

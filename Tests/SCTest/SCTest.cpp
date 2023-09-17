@@ -22,22 +22,22 @@ void runSpecificTests(TestReport& report)
 #include "../../Libraries/Build/BuildTest.h"
 
 // Foundation
-#include "../../Libraries/Foundation/ArenaMapTest.h"
-#include "../../Libraries/Foundation/ArrayTest.h"
-#include "../../Libraries/Foundation/FunctionTest.h"
-#include "../../Libraries/Foundation/IntrusiveDoubleLinkedListTest.h"
-#include "../../Libraries/Foundation/MapTest.h"
-#include "../../Libraries/Foundation/MemoryTest.h"
-#include "../../Libraries/Foundation/OpaqueTest.h"
-#include "../../Libraries/Foundation/OptionalTest.h"
-#include "../../Libraries/Foundation/ResultTest.h"
-#include "../../Libraries/Foundation/SetTest.h"
-#include "../../Libraries/Foundation/SmallVectorTest.h"
-#include "../../Libraries/Foundation/StringFormatTest.h"
-#include "../../Libraries/Foundation/StringTest.h"
-#include "../../Libraries/Foundation/StringViewTest.h"
-#include "../../Libraries/Foundation/TaggedUnionTest.h"
-#include "../../Libraries/Foundation/VectorTest.h"
+#include "../../Libraries/Foundation/Containers/ArenaMapTest.h"
+#include "../../Libraries/Foundation/Containers/ArrayTest.h"
+#include "../../Libraries/Foundation/Containers/IntrusiveDoubleLinkedListTest.h"
+#include "../../Libraries/Foundation/Containers/MapTest.h"
+#include "../../Libraries/Foundation/Containers/SetTest.h"
+#include "../../Libraries/Foundation/Containers/SmallVectorTest.h"
+#include "../../Libraries/Foundation/Containers/VectorTest.h"
+#include "../../Libraries/Foundation/Language/MemoryTest.h"
+#include "../../Libraries/Foundation/Objects/FunctionTest.h"
+#include "../../Libraries/Foundation/Objects/OpaqueTest.h"
+#include "../../Libraries/Foundation/Objects/OptionalTest.h"
+#include "../../Libraries/Foundation/Objects/ResultTest.h"
+#include "../../Libraries/Foundation/Objects/TaggedUnionTest.h"
+#include "../../Libraries/Foundation/Strings/StringFormatTest.h"
+#include "../../Libraries/Foundation/Strings/StringTest.h"
+#include "../../Libraries/Foundation/Strings/StringViewTest.h"
 
 // File
 #include "../../Libraries/File/FileDescriptorTest.h"
@@ -92,7 +92,7 @@ void runSpecificTests(TestReport& report)
 #endif
 
 #include "../../Libraries/FileSystem/Path.h"
-#include "../../Libraries/Foundation/SmallVector.h"
+#include "../../Libraries/Foundation/Containers/SmallVector.h"
 #include "../../Libraries/System/System.h"
 #include "../../Libraries/Testing/Test.h"
 #define SC_TEST_LIBRARY_PATH SC_MACRO_TO_LITERAL(SC_MACRO_ESCAPE(SC_LIBRARY_PATH))

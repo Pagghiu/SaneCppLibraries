@@ -2,11 +2,11 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Array.h"
-#include "../Foundation/String.h"
-#include "../Foundation/StringBuilder.h"
-#include "../Foundation/StringView.h"
-#include "../Foundation/Vector.h"
+#include "../Foundation/Containers/Array.h"
+#include "../Foundation/Containers/Vector.h"
+#include "../Foundation/Strings/String.h"
+#include "../Foundation/Strings/StringBuilder.h"
+#include "../Foundation/Strings/StringView.h"
 #include "../Reflection/Reflection.h"
 #include "../System/Console.h"
 #include "../Testing/Test.h"

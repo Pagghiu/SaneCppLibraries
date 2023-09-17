@@ -3,9 +3,9 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../File/FileDescriptor.h"
-#include "../Foundation/Opaque.h"
-#include "../Foundation/Result.h"
-#include "../Foundation/StringView.h"
+#include "../Foundation/Objects/Opaque.h"
+#include "../Foundation/Objects/Result.h"
+#include "../Foundation/Strings/StringView.h"
 
 namespace SC
 {

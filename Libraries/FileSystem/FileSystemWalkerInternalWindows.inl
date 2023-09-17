@@ -4,10 +4,10 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include "../Foundation/SmallVector.h"
-#include "../Foundation/String.h"
-#include "../Foundation/StringBuilder.h"
-#include "../Foundation/StringConverter.h"
+#include "../Foundation/Containers/SmallVector.h"
+#include "../Foundation/Strings/String.h"
+#include "../Foundation/Strings/StringBuilder.h"
+#include "../Foundation/Strings/StringConverter.h"
 
 #include "FileSystemWalker.h"
 

@@ -2,7 +2,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include "../Foundation/String.h"
+#include "../Foundation/Strings/String.h"
 
 namespace SC
 {

@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/SmallVector.h"
-#include "../Foundation/String.h"
+#include "../Foundation/Containers/SmallVector.h"
+#include "../Foundation/Strings/String.h"
 #include "../Testing/Test.h"
 #include "JsonFormatter.h"
 
