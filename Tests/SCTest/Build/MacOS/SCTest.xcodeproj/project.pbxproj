@@ -219,6 +219,7 @@
 		7B8DDDC12A2012B300D62F03 /* JsonFormatter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = JsonFormatter.h; path = ../../../../Libraries/Json/JsonFormatter.h; sourceTree = "<group>"; };
 		7B8DDDC32A2012B300D62F03 /* JsonFormatter.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = JsonFormatter.inl; path = ../../../../Libraries/Json/JsonFormatter.inl; sourceTree = "<group>"; };
 		7B8DDDC42A2012B300D62F03 /* Json.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Json.cpp; path = ../../../../Libraries/Json/Json.cpp; sourceTree = "<group>"; };
+		7B8E29762AB90B5500E8CE5C /* StringConverterTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StringConverterTest.h; sourceTree = "<group>"; };
 		7B8E9E2B2A4A02ED009D4F5A /* Build.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Build.h; path = ../../../../Libraries/Build/Build.h; sourceTree = "<group>"; };
 		7B8E9E2C2A4A02ED009D4F5A /* BuildTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = BuildTest.h; path = ../../../../Libraries/Build/BuildTest.h; sourceTree = "<group>"; };
 		7B98DCDF2A843657009AC468 /* WriteInternal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = WriteInternal.h; path = ../../../../Libraries/Build/WriteInternal.h; sourceTree = "<group>"; };
@@ -371,6 +372,7 @@
 				7B319D002AB750C900F7E761 /* StringBuilder.h */,
 				7B319CFF2AB750C900F7E761 /* StringConverter.cpp */,
 				7B319CFB2AB750C900F7E761 /* StringConverter.h */,
+				7B8E29762AB90B5500E8CE5C /* StringConverterTest.h */,
 				7B319CF72AB750C900F7E761 /* StringFormat.cpp */,
 				7B319CF32AB750C900F7E761 /* StringFormat.h */,
 				7B319CF42AB750C900F7E761 /* StringFormatTest.h */,

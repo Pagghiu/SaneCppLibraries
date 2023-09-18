@@ -127,12 +127,6 @@ bool StringFormatterFor<SC::char_t>::format(StringFormatOutput& data, const Stri
     return data.write(StringView(&value, sizeof(value), false, StringEncoding::Ascii));
 }
 
-bool StringFormatterFor<wchar_t>::format(StringFormatOutput& data, const StringView specifier, const wchar_t value)
-{
-    SC_UNUSED(specifier);
-    return data.write(StringView({&value, sizeof(value)}, false, StringEncoding::Utf16));
-}
-
 bool StringFormatterFor<const SC::char_t*>::format(StringFormatOutput& data, const StringView specifier,
                                                    const SC::char_t* value)
 {
@@ -140,12 +134,20 @@ bool StringFormatterFor<const SC::char_t*>::format(StringFormatOutput& data, con
     return data.write(StringView(value, strlen(value), true, StringEncoding::Ascii));
 }
 
+#if SC_PLATFORM_WINDOWS
+bool StringFormatterFor<wchar_t>::format(StringFormatOutput& data, const StringView specifier, const wchar_t value)
+{
+    SC_UNUSED(specifier);
+    return data.write(StringView({&value, sizeof(value)}, false));
+}
+
 bool StringFormatterFor<const wchar_t*>::format(StringFormatOutput& data, const StringView specifier,
                                                 const wchar_t* value)
 {
     SC_UNUSED(specifier);
-    return data.write(StringView({value, wcslen(value) * sizeof(wchar_t)}, true, StringEncoding::Utf16));
+    return data.write(StringView({value, wcslen(value) * sizeof(wchar_t)}, true));
 }
+#endif
 
 bool StringFormatterFor<SC::StringView>::format(StringFormatOutput& data, const StringView specifier,
                                                 const SC::StringView value)

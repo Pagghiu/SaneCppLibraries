@@ -104,8 +104,8 @@ struct SC::FileSystemWalker::Internal
             }
         }
 
-        entry.name = StringView(dirEnumerator.cFileName, wcsnlen_s(dirEnumerator.cFileName, MAX_PATH) * sizeof(wchar_t),
-                                true, StringEncoding::Utf16);
+        entry.name =
+            StringView(dirEnumerator.cFileName, wcsnlen_s(dirEnumerator.cFileName, MAX_PATH) * sizeof(wchar_t), true);
         SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
         SC_TRY_IF(currentPath.appendNullTerminated(options.forwardSlashes ? L"/" : L"\\"));
         SC_TRY_IF(currentPath.appendNullTerminated(entry.name));

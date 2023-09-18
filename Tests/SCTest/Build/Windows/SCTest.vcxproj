@@ -412,6 +412,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\String.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringBuilder.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringConverter.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringConverterTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringFormat.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringFormatTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringIterator.h" />

@@ -17,8 +17,8 @@ struct SC_EXPORT_SYMBOL SC::StringView
   private:
     union
     {
-        const char*    textUtf8;
-        const wchar_t* textUtf16;
+        const char*    text;
+        const wchar_t* textWide;
     };
     size_t         textSizeInBytes;
     StringEncoding encoding;
@@ -62,69 +62,71 @@ struct SC_EXPORT_SYMBOL SC::StringView
     template <typename Type>
     constexpr StringIteratorASCII getIterator(identity<Type>) const
     {
-        return StringIteratorASCII(textUtf8, textUtf8 + textSizeInBytes / sizeof(char));
+        return StringIteratorASCII(text, text + textSizeInBytes);
     }
     constexpr StringIteratorUTF8 getIterator(identity<StringIteratorUTF8>) const
     {
-        return StringIteratorUTF8(textUtf8, textUtf8 + textSizeInBytes / sizeof(char));
+        return StringIteratorUTF8(text, text + textSizeInBytes);
     }
     constexpr StringIteratorUTF16 getIterator(identity<StringIteratorUTF16>) const
     {
-        return StringIteratorUTF16(textUtf16, textUtf16 + textSizeInBytes / sizeof(wchar_t));
+        return StringIteratorUTF16(text, text + textSizeInBytes);
     }
 
   public:
-    constexpr StringView() : textUtf8(nullptr), textSizeInBytes(0), encoding(StringEncoding::Ascii), hasNullTerm(false)
-    {}
+    constexpr StringView() : text(nullptr), textSizeInBytes(0), encoding(StringEncoding::Ascii), hasNullTerm(false) {}
     constexpr StringView(Span<char> textSpan, bool nullTerm, StringEncoding encoding)
-        : textUtf8(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(encoding), hasNullTerm(nullTerm)
+        : text(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(encoding), hasNullTerm(nullTerm)
     {}
     constexpr StringView(Span<const char> textSpan, bool nullTerm, StringEncoding encoding)
-        : textUtf8(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(encoding), hasNullTerm(nullTerm)
+        : text(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(encoding), hasNullTerm(nullTerm)
     {}
     constexpr StringView(const char_t* text, size_t bytes, bool nullTerm, StringEncoding encoding)
-        : textUtf8(text), textSizeInBytes(bytes), encoding(encoding), hasNullTerm(nullTerm)
-    {}
-    constexpr StringView(const wchar_t* text, size_t bytes, bool nullTerm, StringEncoding encoding)
-        : textUtf16(text), textSizeInBytes(bytes), encoding(encoding), hasNullTerm(nullTerm)
-    {}
-    constexpr StringView(Span<const wchar_t> textSpan, bool nullTerm, StringEncoding encoding)
-        : textUtf16(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(encoding), hasNullTerm(nullTerm)
+        : text(text), textSizeInBytes(bytes), encoding(encoding), hasNullTerm(nullTerm)
     {}
 
     template <size_t N>
     constexpr StringView(const char (&text)[N])
-        : textUtf8(text), textSizeInBytes(N - 1), encoding(StringEncoding::Ascii), hasNullTerm(true)
-    {}
-    template <size_t N>
-    constexpr StringView(const wchar_t (&text)[N])
-        : textUtf16(text), textSizeInBytes((N - 1) * sizeof(wchar_t)), encoding(StringEncoding::Utf16),
-          hasNullTerm(true)
+        : text(text), textSizeInBytes(N - 1), encoding(StringEncoding::Ascii), hasNullTerm(true)
     {}
 
+#if SC_PLATFORM_WINDOWS
+    template <size_t N>
+    constexpr StringView(const wchar_t (&text)[N])
+        : textWide(text), textSizeInBytes((N - 1) * sizeof(wchar_t)), encoding(StringEncoding::Wide), hasNullTerm(true)
+    {}
+
+    constexpr StringView(const wchar_t* text, size_t bytes, bool nullTerm)
+        : textWide(text), textSizeInBytes(bytes), encoding(StringEncoding::Wide), hasNullTerm(nullTerm)
+    {}
+    constexpr StringView(Span<const wchar_t> textSpan, bool nullTerm)
+        : textWide(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(StringEncoding::Wide),
+          hasNullTerm(nullTerm)
+    {}
+#endif
     [[nodiscard]] constexpr StringEncoding getEncoding() const { return encoding; }
-    [[nodiscard]] constexpr const char_t*  bytesWithoutTerminator() const { return textUtf8; }
+    [[nodiscard]] constexpr const char_t*  bytesWithoutTerminator() const { return text; }
     [[nodiscard]] constexpr const char_t*  bytesIncludingTerminator() const
     {
         SC_RELEASE_ASSERT(hasNullTerm);
-        return textUtf8;
+        return text;
     }
 #if SC_PLATFORM_WINDOWS
     [[nodiscard]] const wchar_t* getNullTerminatedNative() const
     {
         SC_RELEASE_ASSERT(hasNullTerm && (encoding == StringEncoding::Utf16));
-        return reinterpret_cast<const wchar_t*>(textUtf8);
+        return reinterpret_cast<const wchar_t*>(text);
     }
 #else
     [[nodiscard]] const char_t* getNullTerminatedNative() const
     {
         SC_RELEASE_ASSERT(hasNullTerm && (encoding == StringEncoding::Utf8 || encoding == StringEncoding::Ascii));
-        return textUtf8;
+        return text;
     }
 #endif
 
-    constexpr SpanVoid<const void> toVoidSpan() const { return {textUtf8, textSizeInBytes}; }
-    constexpr Span<const char>     toCharSpan() const { return {textUtf8, textSizeInBytes}; }
+    constexpr SpanVoid<const void> toVoidSpan() const { return {text, textSizeInBytes}; }
+    constexpr Span<const char>     toCharSpan() const { return {text, textSizeInBytes}; }
 
     enum class Comparison
     {
@@ -152,8 +154,8 @@ struct SC_EXPORT_SYMBOL SC::StringView
                 return false;
             if (__builtin_is_constant_evaluated())
             {
-                auto it1 = textUtf8;
-                auto it2 = other.textUtf8;
+                auto it1 = text;
+                auto it2 = other.text;
                 auto sz  = textSizeInBytes;
                 for (size_t idx = 0; idx < sz; ++idx)
                     if (it1[idx] != it2[idx])
@@ -161,7 +163,7 @@ struct SC_EXPORT_SYMBOL SC::StringView
             }
             else
             {
-                return memcmp(textUtf8, other.textUtf8, textSizeInBytes) == 0;
+                return memcmp(text, other.text, textSizeInBytes) == 0;
             }
         }
         size_t commonOverlappingPoints = 0;
@@ -181,7 +183,7 @@ struct SC_EXPORT_SYMBOL SC::StringView
     }
 
     [[nodiscard]] bool           operator!=(StringView other) const { return not operator==(other); }
-    [[nodiscard]] constexpr bool isEmpty() const { return textUtf8 == nullptr || textSizeInBytes == 0; }
+    [[nodiscard]] constexpr bool isEmpty() const { return text == nullptr || textSizeInBytes == 0; }
     [[nodiscard]] constexpr bool isNullTerminated() const { return hasNullTerm; }
 
     [[nodiscard]] constexpr size_t sizeInBytes() const { return textSizeInBytes; }
@@ -285,7 +287,7 @@ struct SC_EXPORT_SYMBOL SC::StringView
         if (start < sizeInBytes())
             return sliceStartLengthBytes(start, sizeInBytes() - start);
         SC_RELEASE_ASSERT(start < sizeInBytes());
-        return StringView(textUtf8, 0, false, encoding);
+        return StringView(text, 0, false, encoding);
     }
 
     [[nodiscard]] constexpr StringView sliceStartEndBytes(size_t start, size_t end) const
@@ -293,7 +295,7 @@ struct SC_EXPORT_SYMBOL SC::StringView
         if (end >= start)
             return sliceStartLengthBytes(start, end - start);
         SC_RELEASE_ASSERT(end >= start);
-        return StringView(textUtf8, 0, false, encoding);
+        return StringView(text, 0, false, encoding);
     }
 
     [[nodiscard]] constexpr StringView sliceStartLengthBytes(size_t start, size_t length) const
@@ -301,9 +303,9 @@ struct SC_EXPORT_SYMBOL SC::StringView
         if (start + length > sizeInBytes())
         {
             SC_RELEASE_ASSERT(start + length > sizeInBytes());
-            return StringView(textUtf8, 0, false, encoding);
+            return StringView(text, 0, false, encoding);
         }
-        return StringView(textUtf8 + start, length, hasNullTerm and (start + length == sizeInBytes()), encoding);
+        return StringView(text + start, length, hasNullTerm and (start + length == sizeInBytes()), encoding);
     }
 
     /// If the current view is an integer number, returns true

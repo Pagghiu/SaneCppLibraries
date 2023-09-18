@@ -15,7 +15,8 @@ enum class StringEncoding : uint8_t
     Utf8  = 1,
     Utf16 = 2,
 #if SC_PLATFORM_WINDOWS
-    Native = Utf16
+    Native = Utf16,
+    Wide   = Utf16
 #else
     Native = Utf8
 #endif
@@ -51,12 +52,12 @@ struct StringIteratorSkipTable
 };
 
 // Invariants: start <= end and it >= start and it <= end
-template <typename TypeUnit, typename CharIterator>
+template <typename CharIterator>
 struct StringIterator
 {
     static constexpr StringEncoding getEncoding() { return CharIterator::getEncoding(); }
 
-    using CodeUnit  = TypeUnit;
+    using CodeUnit  = char;
     using CodePoint = StringCodePoint;
 
     [[nodiscard]] constexpr bool isAtEnd() const { return it == end; }
@@ -424,7 +425,7 @@ struct StringIterator
     const CodeUnit* end;
 };
 
-struct StringIteratorASCII : public StringIterator<char, StringIteratorASCII>
+struct StringIteratorASCII : public StringIterator<StringIteratorASCII>
 {
     [[nodiscard]] constexpr bool advanceUntilMatches(CodePoint c)
     {
@@ -452,7 +453,7 @@ struct StringIteratorASCII : public StringIterator<char, StringIteratorASCII>
 
   private:
     using StringIterator::StringIterator;
-    using Parent = StringIterator<char, StringIteratorASCII>;
+    using Parent = StringIterator<StringIteratorASCII>;
     friend Parent;
     friend struct StringView;
 
@@ -464,38 +465,41 @@ struct StringIteratorASCII : public StringIterator<char, StringIteratorASCII>
     [[nodiscard]] static constexpr bool        isValidASCII(CodePoint c) { return c <= 127; }
 };
 
-struct StringIteratorUTF16 : public StringIterator<wchar_t, StringIteratorUTF16>
+struct StringIteratorUTF16 : public StringIterator<StringIteratorUTF16>
 {
   private:
     using StringIterator::StringIterator;
-    using Parent = StringIterator<wchar_t, StringIteratorUTF16>;
+    using Parent = StringIterator<StringIteratorUTF16>;
     friend Parent;
     friend struct StringView;
 
     [[nodiscard]] static constexpr StringEncoding getEncoding() { return StringEncoding::Utf16; }
 
-    [[nodiscard]] static constexpr const wchar_t* getNextOf(const wchar_t* src)
+    [[nodiscard]] static const char* getNextOf(const char* bytes)
     {
+        const uint16_t* src = reinterpret_cast<const uint16_t*>(bytes);
         if ((src[0] & 0x80) == 0)
         {
-            return src + 1; // Single-byte character
+            return reinterpret_cast<const char*>(src + 1); // Single-byte character
         }
-        return src + 2; // Multi-byte character
+        return reinterpret_cast<const char*>(src + 2); // Multi-byte character
     }
 
-    [[nodiscard]] static constexpr const wchar_t* getPreviousOf(const wchar_t* src)
+    [[nodiscard]] static const char* getPreviousOf(const char* bytes)
     {
-        src = src - 1;
+        const uint16_t* src = reinterpret_cast<const uint16_t*>(bytes);
+        src                 = src - 1;
         if (src[0] >= 0xDC00 and src[0] <= 0xDFFF)
         {
             src = src - 1;
         }
-        return src;
+        return reinterpret_cast<const char*>(src);
     }
 
-    [[nodiscard]] static constexpr uint32_t decode(const wchar_t* src)
+    [[nodiscard]] static uint32_t decode(const char* bytes)
     {
-        const uint32_t character = static_cast<uint32_t>(src[0]);
+        const uint16_t* src       = reinterpret_cast<const uint16_t*>(bytes);
+        const uint32_t  character = static_cast<uint32_t>(src[0]);
         if (character >= 0xD800 and character <= 0xDFFF)
         {
             const uint32_t nextCharacter = static_cast<uint32_t>(src[1]);
@@ -508,10 +512,10 @@ struct StringIteratorUTF16 : public StringIterator<wchar_t, StringIteratorUTF16>
     }
 };
 
-struct StringIteratorUTF8 : public StringIterator<char, StringIteratorUTF8>
+struct StringIteratorUTF8 : public StringIterator<StringIteratorUTF8>
 {
   private:
-    using Parent = StringIterator<char, StringIteratorUTF8>;
+    using Parent = StringIterator<StringIteratorUTF8>;
     friend Parent;
     friend struct StringView;
     using StringIterator::StringIterator;

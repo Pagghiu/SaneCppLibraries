@@ -417,15 +417,23 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
     StringViewTokenizer tokenizer(view);
     auto                isDoubleDot = [](StringView it) -> bool
     {
+        constexpr StringView utf8ddot = "..";
+#if SC_PLATFORM_WINDOWS
         constexpr StringView utf16ddot = L"..";
-        constexpr StringView utf8ddot  = "..";
         return it == (it.getEncoding() == StringEncoding::Utf16 ? utf16ddot : utf8ddot);
+#else
+        return it == utf8ddot;
+#endif
     };
     auto isDot = [&](StringView it) -> bool
     {
+        constexpr StringView utf8dot = ".";
+#if SC_PLATFORM_WINDOWS
         constexpr StringView utf16dot = L".";
-        constexpr StringView utf8dot  = ".";
         return it == (it.getEncoding() == StringEncoding::Utf16 ? utf16dot : utf8dot);
+#else
+        return it == utf8dot;
+#endif
     };
     // Need to IncludeEmpty in order to preserve starting /
     while (tokenizer.tokenizeNext({'/', '\\'}, StringViewTokenizer::IncludeEmpty))

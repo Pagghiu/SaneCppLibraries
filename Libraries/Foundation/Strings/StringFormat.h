@@ -57,10 +57,12 @@ template <> struct StringFormatterFor<SC::int8_t>   {static bool format(StringFo
 template <> struct StringFormatterFor<SC::uint8_t>  {static bool format(StringFormatOutput&, const StringView, const SC::uint8_t);};
 template <> struct StringFormatterFor<SC::char_t>   {static bool format(StringFormatOutput&, const StringView, const SC::char_t);};
 template <> struct StringFormatterFor<bool>         {static bool format(StringFormatOutput&, const StringView, const bool);};
-template <> struct StringFormatterFor<wchar_t>      {static bool format(StringFormatOutput&, const StringView, const wchar_t);};
 template <> struct StringFormatterFor<StringView>   {static bool format(StringFormatOutput&, const StringView, const StringView);};
 template <> struct StringFormatterFor<const SC::char_t*> {static bool format(StringFormatOutput&, const StringView, const SC::char_t*);};
+#if SC_PLATFORM_WINDOWS
+template <> struct StringFormatterFor<wchar_t>      {static bool format(StringFormatOutput&, const StringView, const wchar_t);};
 template <> struct StringFormatterFor<const wchar_t*> {static bool format(StringFormatOutput&, const StringView, const wchar_t*);};
+#endif
 // clang-format on
 
 template <typename RangeIterator>

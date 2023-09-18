@@ -16,8 +16,7 @@ struct UtilityWindows
             errorNumber, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), reinterpret_cast<LPWSTR>(&messageBuffer), 0, NULL);
         auto deferFree = MakeDeferred([&]() { LocalFree(messageBuffer); });
 
-        const StringView sv =
-            StringView(Span<const wchar_t>(messageBuffer, size * sizeof(wchar_t)), true, StringEncoding::Utf16);
+        const StringView sv = StringView(Span<const wchar_t>(messageBuffer, size * sizeof(wchar_t)), true);
         if (not buffer.assign(sv))
         {
             return "UtilityWindows::formatWindowsError - returned error"_a8;

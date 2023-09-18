@@ -532,6 +532,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringViewTest.h">
       <Filter>Foundation\Strings</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringConverterTest.h">
+      <Filter>Foundation\Strings</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalPosix.inl">

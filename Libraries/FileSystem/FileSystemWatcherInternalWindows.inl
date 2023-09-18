@@ -230,7 +230,7 @@ struct SC::FileSystemWatcher::Internal
         do
         {
             const Span<const wchar_t> span(event->FileName, event->FileNameLength);
-            const StringView          path(span, false, StringEncoding::Utf16);
+            const StringView          path(span, false);
 
             notification.relativePath = path;
             switch (event->Action)

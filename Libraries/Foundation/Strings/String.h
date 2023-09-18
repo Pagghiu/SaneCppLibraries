@@ -38,9 +38,17 @@ struct SC::String
     //  - if string is not empty    --> data.size() > 2
     [[nodiscard]] const char_t* bytesIncludingTerminator() const { return data.data(); }
 #if SC_PLATFORM_WINDOWS
-    [[nodiscard]] wchar_t* nativeWritableBytesIncludingTerminator() { return reinterpret_cast<wchar_t*>(data.data()); }
+    [[nodiscard]] wchar_t* nativeWritableBytesIncludingTerminator()
+    {
+        SC_RELEASE_ASSERT(encoding == StringEncoding::Utf16);
+        return reinterpret_cast<wchar_t*>(data.data());
+    }
 #else
-    [[nodiscard]] char_t* nativeWritableBytesIncludingTerminator() { return data.data(); }
+    [[nodiscard]] char_t* nativeWritableBytesIncludingTerminator()
+    {
+        SC_RELEASE_ASSERT(encoding < StringEncoding::Utf16);
+        return data.data();
+    }
 #endif
     [[nodiscard]] bool isEmpty() const { return data.isEmpty(); }
 

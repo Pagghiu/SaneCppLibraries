@@ -153,8 +153,7 @@ struct SC::SystemDebug::Internal
                       nameLengthInBytes / sizeof(WCHAR));
             nameBuffer[nameLengthInBytes / sizeof(WCHAR)] = L'\0';
 
-            SC::StringView handleName =
-                SC::StringView(nameBuffer.data(), nameLengthInBytes, true, SC::StringEncoding::Utf16);
+            StringView handleName = StringView(nameBuffer.data(), nameLengthInBytes, true);
             if (handleName.endsWith(theFile))
             {
                 CloseHandle(dupHandle);
@@ -329,8 +328,8 @@ bool SC::SystemDirectories::init()
     SC_TRY_IF(buffer.resizeWithoutInitializing(numChars + 1));
     SC_TRY_IF(buffer[numChars] == 0);
 
-    StringView utf16executable = StringView(Span<const wchar_t>(buffer.data(), (buffer.size() - 1) * sizeof(wchar_t)),
-                                            true, StringEncoding::Utf16);
+    StringView utf16executable =
+        StringView(Span<const wchar_t>(buffer.data(), (buffer.size() - 1) * sizeof(wchar_t)), true);
 
     // TODO: SystemDirectories::init - We must also convert to utf8 because dirname will not work on non utf8 or ascii
     // text assigning directly the SmallString inside StringNative will copy as is instad of converting utf16 to utf8

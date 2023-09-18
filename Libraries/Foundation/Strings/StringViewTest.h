@@ -98,8 +98,13 @@ struct SC::StringViewTest : public SC::TestCase
             StringView test;
             for (int i = 0; i < 2; ++i)
             {
+#if SC_PLATFORM_WINDOWS
                 if (i == 0)
                     test = StringView(L"Ciao_123");
+#else
+                if (i == 0)
+                    test = StringView("Ciao_123");
+#endif
                 if (i == 1)
                     test = "Ciao_123"_a8;
                 if (i == 2)
@@ -108,9 +113,11 @@ struct SC::StringViewTest : public SC::TestCase
                 SC_TEST_EXPECT(test.endsWithChar('3'));
                 SC_TEST_EXPECT(test.startsWith("Ciao"));
                 SC_TEST_EXPECT(test.startsWith("Ciao"_u8));
+#if SC_PLATFORM_WINDOWS
                 SC_TEST_EXPECT(test.startsWith(L"Ciao"));
-                SC_TEST_EXPECT(test.endsWith("123"));
                 SC_TEST_EXPECT(test.endsWith(L"123"));
+#endif
+                SC_TEST_EXPECT(test.endsWith("123"));
                 SC_TEST_EXPECT(test.endsWith("123"_u8));
                 SC_TEST_EXPECT(not test.startsWithChar('D'));
                 SC_TEST_EXPECT(not test.endsWithChar('4'));

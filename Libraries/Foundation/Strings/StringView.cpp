@@ -14,14 +14,14 @@ bool SC::StringView::parseInt32(int32_t& value) const
 
     if (hasNullTerm)
     {
-        value = atoi(textUtf8);
+        value = atoi(text);
     }
     else
     {
         char_t buffer[12]; // 10 digits + sign + nullterm
         if (textSizeInBytes >= sizeof(buffer))
             return false;
-        memcpy(buffer, textUtf8, textSizeInBytes);
+        memcpy(buffer, text, textSizeInBytes);
         buffer[textSizeInBytes] = 0;
 
         value = atoi(buffer);
@@ -56,13 +56,13 @@ bool SC::StringView::parseDouble(double& value) const
 {
     if (hasNullTerm)
     {
-        value = atof(textUtf8);
+        value = atof(text);
     }
     else
     {
         char         buffer[255];
         const size_t bufferSize = min(textSizeInBytes, static_cast<decltype(textSizeInBytes)>(sizeof(buffer) - 1));
-        memcpy(buffer, textUtf8, bufferSize);
+        memcpy(buffer, text, bufferSize);
         buffer[bufferSize] = 0;
         value              = atof(buffer);
     }
@@ -93,7 +93,7 @@ SC::StringView::Comparison SC::StringView::compare(StringView other) const
 {
     if (hasCompatibleEncoding(other))
     {
-        const int res = memcmp(textUtf8, other.textUtf8, min(textSizeInBytes, other.textSizeInBytes));
+        const int res = memcmp(text, other.text, min(textSizeInBytes, other.textSizeInBytes));
         if (res < 0)
             return Comparison::Smaller;
         else if (res == 0)
@@ -141,7 +141,7 @@ bool SC::StringView::startsWith(const StringView str) const
     {
         if (str.textSizeInBytes <= textSizeInBytes)
         {
-            const StringView ours(textUtf8, str.textSizeInBytes, false, encoding);
+            const StringView ours(text, str.textSizeInBytes, false, encoding);
             return str == ours;
         }
         return false;
@@ -155,8 +155,7 @@ bool SC::StringView::endsWith(const StringView str) const
     {
         if (str.sizeInBytes() <= sizeInBytes())
         {
-            const StringView ours(textUtf8 + textSizeInBytes - str.textSizeInBytes, str.textSizeInBytes, false,
-                                  encoding);
+            const StringView ours(text + textSizeInBytes - str.textSizeInBytes, str.textSizeInBytes, false, encoding);
             return str == ours;
         }
         return false;
