@@ -12,7 +12,10 @@
             "args": [],
             "cwd": "${fileDirname}",
             "preLaunchTask": "Build SCTest Debug",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "preRunCommands": [
+                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+            ],
         },
         {
             "name": "(lldb) Debug SCTest GCC",
@@ -22,7 +25,10 @@
             "args": [],
             "cwd": "${fileDirname}",
             "preLaunchTask": "Build SCTest GCC Debug",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "preRunCommands": [
+                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+            ],
         }
     ]
 }

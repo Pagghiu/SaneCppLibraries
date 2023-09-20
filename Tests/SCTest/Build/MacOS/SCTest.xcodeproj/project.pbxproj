@@ -246,6 +246,7 @@
 		7BC56BD829946B1800EED472 /* FileSystemWalkerInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalEmscripten.inl; path = ../../../../Libraries/FileSystem/FileSystemWalkerInternalEmscripten.inl; sourceTree = "<group>"; };
 		7BC56BD929946B1800EED472 /* FileSystemWalkerInternalPosix.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalPosix.inl; path = ../../../../Libraries/FileSystem/FileSystemWalkerInternalPosix.inl; sourceTree = "<group>"; };
 		7BC56BDA29946B1800EED472 /* FileSystemWalkerInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = FileSystemWalkerInternalWindows.inl; path = ../../../../Libraries/FileSystem/FileSystemWalkerInternalWindows.inl; sourceTree = "<group>"; };
+		7BD3FE4C2ABA598100BCC1EF /* DebugVisualizersTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = DebugVisualizersTest.h; path = ../../../../Support/DebugVisualizers/DebugVisualizersTest.h; sourceTree = "<group>"; };
 		7BD8E37929BE8357004AB23D /* EventLoopInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalApple.inl; path = ../../../../Libraries/Async/EventLoopInternalApple.inl; sourceTree = "<group>"; };
 		7BD8E37A29BE8357004AB23D /* EventLoopInternalWindows.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalWindows.inl; path = ../../../../Libraries/Async/EventLoopInternalWindows.inl; sourceTree = "<group>"; };
 		7BD8E37B29BE8357004AB23D /* EventLoopInternalEmscripten.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = EventLoopInternalEmscripten.inl; path = ../../../../Libraries/Async/EventLoopInternalEmscripten.inl; sourceTree = "<group>"; };
@@ -685,6 +686,22 @@
 			name = TestPluginParent;
 			sourceTree = "<group>";
 		};
+		7BD3FE492ABA596500BCC1EF /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				7BD3FE4B2ABA597000BCC1EF /* DebugVisualizers */,
+			);
+			name = Support;
+			sourceTree = "<group>";
+		};
+		7BD3FE4B2ABA597000BCC1EF /* DebugVisualizers */ = {
+			isa = PBXGroup;
+			children = (
+				7BD3FE4C2ABA598100BCC1EF /* DebugVisualizersTest.h */,
+			);
+			name = DebugVisualizers;
+			sourceTree = "<group>";
+		};
 		7BF4DF5D28DE7A5E008CBB53 = {
 			isa = PBXGroup;
 			children = (
@@ -692,6 +709,7 @@
 				7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */,
 				7B583F692922ECF900FBE019 /* SCTest.cpp */,
 				7B583F2E2922EC9F00FBE019 /* Libraries */,
+				7BD3FE492ABA596500BCC1EF /* Support */,
 				7BF4DF6728DE7A5E008CBB53 /* Products */,
 				7B9F61822995BDA20011F4D4 /* Frameworks */,
 			);

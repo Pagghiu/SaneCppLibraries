@@ -426,6 +426,23 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         SC_WARNING_RESTORE;
         return true;
     }
+
+    [[nodiscard]] bool writeNatvisFiles(StringBuilder& builder, Vector<RenderItem>& files)
+    {
+        SC_WARNING_DISABLE_UNUSED_RESULT;
+        builder.append("  <ItemGroup>\n");
+        for (auto& it : files)
+        {
+            if (it.type == WriterInternal::RenderItem::DebugVisualizerfile)
+            {
+                builder.append("    <Natvis Include=\"{}\" />\n", it.path);
+            }
+        }
+        builder.append("  </ItemGroup>\n");
+        SC_WARNING_RESTORE;
+        return true;
+    }
+
     [[nodiscard]] bool prepare(StringView destinationDirectory, const Project& project, Renderer& renderer)
     {
         SC_TRY_IF(fillVisualStudioFiles(destinationDirectory, project, renderer.renderItems));
@@ -466,6 +483,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         SC_TRY_IF(writeSourceFiles(builder, project, renderer.renderItems));
         SC_TRY_IF(writeHeaderFiles(builder, renderer.renderItems));
         SC_TRY_IF(writeInlineFiles(builder, renderer.renderItems));
+        SC_TRY_IF(writeNatvisFiles(builder, renderer.renderItems));
 
         builder.append("  <Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.targets\" />\n"
                        "  <ImportGroup Label=\"ExtensionTargets\">\n"
@@ -597,6 +615,20 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                 builder.appendReplaceAll(dir, "/", "\\");
                 builder.append("</Filter>\n");
                 builder.append("    </None>\n");
+            }
+        }
+        builder.append("  </ItemGroup>\n");
+        builder.append("  <ItemGroup>\n");
+        for (auto& it : renderer.renderItems)
+        {
+            const StringView dir = Path::removeStartingSeparator(Path::Posix::dirname(it.referencePath.view()));
+            if (it.type == WriterInternal::RenderItem::DebugVisualizerfile)
+            {
+                builder.append("    <Natvis Include=\"{}\">\n", it.path);
+                builder.append("      <Filter>");
+                builder.appendReplaceAll(dir, "/", "\\");
+                builder.append("</Filter>\n");
+                builder.append("    </Natvis>\n");
             }
         }
         builder.append("  </ItemGroup>\n");

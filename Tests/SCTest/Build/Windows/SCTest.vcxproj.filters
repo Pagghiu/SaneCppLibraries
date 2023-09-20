@@ -631,4 +631,7 @@
       <Filter>Build</Filter>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\..\..\..\Support\MSVC\SCLib.natvis" />
+  </ItemGroup>
 </Project>

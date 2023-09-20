@@ -515,6 +515,9 @@
     <None Include="..\..\..\..\Libraries\Threading\ThreadingInternalPosix.inl" />
     <None Include="..\..\..\..\Libraries\Threading\ThreadingInternalWindows.inl" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\..\..\..\Support\MSVC\SCLib.natvis" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

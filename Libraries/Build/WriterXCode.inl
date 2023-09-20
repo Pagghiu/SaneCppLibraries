@@ -702,11 +702,8 @@ struct SC::Build::ProjectWriter::WriterXCode
         return true;
     }
 
-    [[nodiscard]] bool write(StringBuilder& builder, StringView destinationDirectory)
+    [[nodiscard]] bool writeProject(StringBuilder& builder, const Project& project, Renderer& renderer)
     {
-        const Project& project = definition.workspaces[0].projects[0];
-        Renderer       renderer;
-        SC_TRY_IF(prepare(destinationDirectory, project, renderer));
         SC_WARNING_DISABLE_UNUSED_RESULT;
         builder.append(R"delimiter(// !$*UTF8*$!
 {
@@ -735,6 +732,120 @@ struct SC::Build::ProjectWriter::WriterXCode
     rootObject = 7B00740A2A73143F00660B94 /* Project object */;
 }
 )delimiter");
+        SC_WARNING_RESTORE;
+        return true;
+    }
+
+    [[nodiscard]] ReturnCode writeScheme(StringBuilder& builder, const Project& project, Renderer& renderer,
+                                         StringView destinationDirectory, StringView filename)
+    {
+        SC_UNUSED(destinationDirectory);
+        SC_WARNING_DISABLE_UNUSED_RESULT;
+        String output;
+        for (auto& item : renderer.renderItems)
+        {
+            if (item.type == WriterInternal::RenderItem::DebugVisualizerfile)
+            {
+                if (output.isEmpty())
+                {
+                    Path::join(output, {"$(SRCROOT)", item.path.view()});
+                }
+                else
+                {
+                    return "XCode: only a single lldbinit file is supported"_a8;
+                }
+            }
+        }
+        StringView lldbinit = output.view();
+        // TODO: De-hardcode this thing
+        builder.append(R"delimiter(<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "1430"
+   version = "1.3">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "YES">
+      <BuildActionEntries>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "{}"
+               BuildableName = "{}"
+               BlueprintName = "{}"
+               ReferencedContainer = "container:{}.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES">
+      <Testables>
+      </Testables>
+   </TestAction>
+   <LaunchAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      customLLDBInitFile = "{}"
+      enableAddressSanitizer = "YES"
+      enableASanStackUseAfterReturn = "YES"
+      enableUBSanitizer = "YES"
+      launchStyle = "0"
+      useCustomWorkingDirectory = "NO"
+      ignoresPersistentStateOnLaunch = "NO"
+      debugDocumentVersioning = "YES"
+      debugServiceExtension = "internal"
+      allowLocationSimulation = "YES"
+      viewDebuggingEnabled = "No">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "{}"
+            BuildableName = "{}"
+            BlueprintName = "{}"
+            ReferencedContainer = "container:{}.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+   </LaunchAction>
+   <ProfileAction
+      buildConfiguration = "Release"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      savedToolIdentifier = ""
+      useCustomWorkingDirectory = "NO"
+      debugDocumentVersioning = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "{}"
+            BuildableName = "{}"
+            BlueprintName = "{}"
+            ReferencedContainer = "container:{}.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+   </ProfileAction>
+   <AnalyzeAction
+      buildConfiguration = "Debug">
+   </AnalyzeAction>
+   <ArchiveAction
+      buildConfiguration = "Release"
+      revealArchiveInOrganizer = "YES">
+   </ArchiveAction>
+</Scheme>
+
+)delimiter",
+                       "7B00740A2A73143F00660B94", project.name.view(), project.name.view(), filename, lldbinit, //
+                       "7B00740A2A73143F00660B94", project.name.view(), project.name.view(), filename,           //
+                       "7B00740A2A73143F00660B94", project.name.view(), project.name.view(), filename);
         SC_WARNING_RESTORE;
         return true;
     }

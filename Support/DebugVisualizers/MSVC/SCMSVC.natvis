@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="SC::Vector&lt;*&gt;">
+    <DisplayString>{{ size={reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->sizeBytes / sizeof(*items)}, capacity={reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->capacityBytes / sizeof(*items)} }}</DisplayString>
+    <Expand>
+      <Item Name="[size]">reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->sizeBytes / sizeof(*items)</Item>
+      <Item Name="[capacity]">reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->capacityBytes / sizeof(*items)</Item>
+      <ArrayItems>
+        <Size>reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->sizeBytes / sizeof(*items)</Size>
+        <ValuePointer>items</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="SC::SmallVector&lt;*&gt;">
+    <DisplayString>{{ size={reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->sizeBytes / sizeof(*items)}, capacity={reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->capacityBytes / sizeof(*items)} }}</DisplayString>
+    <Expand>
+      <Item Name="[size]">reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->sizeBytes / sizeof(*items)</Item>
+      <Item Name="[capacity]">reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->capacityBytes / sizeof(*items)</Item>
+      <ArrayItems>
+        <Size>reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->sizeBytes / sizeof(*items)</Size>
+        <ValuePointer>items</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="SC::String">
+    <DisplayString Condition="encoding==StringEncoding::Utf16">{data.items,su}</DisplayString>
+    <DisplayString>{data.items,s8}</DisplayString>
+    <StringView Condition="encoding==StringEncoding::Utf16">data.items,su</StringView>
+    <StringView>data.items,s8</StringView>
+  </Type>
+  <Type Name="SC::SmallString&lt;*&gt;">
+    <DisplayString Condition="encoding==StringEncoding::Utf16">{data.items,su}</DisplayString>
+    <DisplayString>{data.items,s8}</DisplayString>
+    <StringView Condition="encoding==StringEncoding::Utf16">data.items,su</StringView>
+    <StringView>data.items,s8</StringView>
+  </Type>
+  <Type Name="SC::StringView">
+    <DisplayString Condition="encoding==StringEncoding::Utf16">{text,[textSizeInBytes/2]su}</DisplayString>
+    <DisplayString>{text,[textSizeInBytes]s8}</DisplayString>
+    <StringView Condition="encoding==StringEncoding::Utf16">text,[textSizeInBytes/2]su</StringView>
+    <StringView>text,[textSizeInBytes]s8</StringView>
+  </Type>
+</AutoVisualizer>

@@ -69,7 +69,15 @@ struct SC::BuildTest : public SC::TestCase
         project.addFiles("Libraries", "**.h");               // recursively add all cpp files
         project.addFiles("Libraries", "**.inl");             // recursively add all cpp files
         project.removeFiles("Libraries/UserInterface", "*"); // Exclude anything in UserInterface
-
+        project.addFiles("Support/DebugVisualizers", "*.h"); // add all header files
+        if (parameters.generator == Build::Generator::VisualStudio2022)
+        {
+            project.addFiles("Support/DebugVisualizers/MSVC", "*.natvis");
+        }
+        else
+        {
+            project.addFiles("Support/DebugVisualizers/LLDB", ".lldbinit");
+        }
         // Adding to workspace and definition
         workspace.projects.push_back(move(project));
         definition.workspaces.push_back(move(workspace));

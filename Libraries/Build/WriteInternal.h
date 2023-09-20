@@ -24,7 +24,8 @@ struct SC::Build::WriterInternal
             InlineFile,
             CppFile,
             Framework,
-            Configuration
+            Configuration,
+            DebugVisualizerfile
         };
         Type   type = Unknown;
         String name;
@@ -63,33 +64,38 @@ struct SC::Build::WriterInternal
             {
                 for (const auto& it : *res)
                 {
-                    RenderItem xcodeFile;
-                    xcodeFile.name = StringEncoding::Utf8; // To unify hashes
-                    SC_TRY_IF(StringBuilder(xcodeFile.name).append(Path::basename(it.view(), Path::AsPosix)));
-                    if (xcodeFile.name.view().endsWith(".h"))
+                    RenderItem renderItem;
+                    renderItem.name = StringEncoding::Utf8; // To unify hashes
+                    SC_TRY_IF(StringBuilder(renderItem.name).append(Path::basename(it.view(), Path::AsPosix)));
+                    auto nameView = renderItem.name.view();
+                    if (nameView.endsWith(".h"))
                     {
-                        xcodeFile.type = RenderItem::HeaderFile;
+                        renderItem.type = RenderItem::HeaderFile;
                     }
-                    else if (xcodeFile.name.view().endsWith(".cpp"))
+                    else if (nameView.endsWith(".cpp"))
                     {
-                        xcodeFile.type = RenderItem::CppFile;
+                        renderItem.type = RenderItem::CppFile;
                     }
-                    else if (xcodeFile.name.view().endsWith(".inl"))
+                    else if (nameView.endsWith(".inl"))
                     {
-                        xcodeFile.type = RenderItem::InlineFile;
+                        renderItem.type = RenderItem::InlineFile;
+                    }
+                    else if (nameView.endsWith(".natvis") or nameView.endsWith(".lldbinit"))
+                    {
+                        renderItem.type = RenderItem::DebugVisualizerfile;
                     }
                     SC_TRY_IF(
-                        Path::relativeFromTo(destinationDirectory, it.view(), xcodeFile.path, Path::Type::AsPosix));
-                    SC_TRY_IF(Path::relativeFromTo(project.rootDirectory.view(), it.view(), xcodeFile.referencePath,
+                        Path::relativeFromTo(destinationDirectory, it.view(), renderItem.path, Path::Type::AsPosix));
+                    SC_TRY_IF(Path::relativeFromTo(project.rootDirectory.view(), it.view(), renderItem.referencePath,
                                                    Path::Type::AsPosix));
                     if (file.operation == Project::File::Add)
                     {
-                        SC_TRY_IF(outputFiles.push_back(move(xcodeFile)));
+                        SC_TRY_IF(outputFiles.push_back(move(renderItem)));
                     }
                     else
                     {
                         (void)(outputFiles.removeAll([&](const auto& it)
-                                                     { return it.referencePath == xcodeFile.referencePath; }));
+                                                     { return it.referencePath == renderItem.referencePath; }));
                     }
                 }
             }

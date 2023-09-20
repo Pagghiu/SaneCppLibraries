@@ -363,4 +363,9 @@ constexpr inline SC::StringView operator""_u8(const char* txt, size_t sz)
 {
     return SC::StringView(txt, sz, true, SC::StringEncoding::Utf8);
 }
+constexpr inline SC::StringView operator""_u16(const char* txt, size_t sz)
+{
+    const bool isNullTerminated = sz > 0 and sz % 2 == 1 and txt[sz - 1] == 0;
+    return SC::StringView(txt, isNullTerminated ? sz - 1 : sz, isNullTerminated, SC::StringEncoding::Utf16);
+}
 } // namespace SC

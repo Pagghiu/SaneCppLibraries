@@ -25,8 +25,9 @@ struct SC::StringConverter
                                                     NullTermination nullTerminate = AddZeroTerminator);
 
     /// Converts text to null terminated utf16 sequence. Uses the passed in buffer if necessary.
-    static bool convertEncodingToUTF16(StringView text, Vector<char>& buffer, StringView* encodedText = nullptr,
-                                       NullTermination nullTerminate = AddZeroTerminator);
+    [[nodiscard]] static bool convertEncodingToUTF16(StringView text, Vector<char>& buffer,
+                                                     StringView*     encodedText   = nullptr,
+                                                     NullTermination nullTerminate = AddZeroTerminator);
 
     /// Converts to one of the supported encoding
     [[nodiscard]] static bool convertEncodingTo(StringEncoding encoding, StringView text, Vector<char>& buffer,

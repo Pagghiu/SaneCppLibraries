@@ -90,6 +90,8 @@ void runSpecificTests(TestReport& report)
 // Async
 #include "../../Libraries/Async/EventLoopTest.h"
 
+#include "../../Support/DebugVisualizers/DebugVisualizersTest.h"
+
 #endif
 
 #include "../../Libraries/FileSystem/Path.h"
@@ -198,6 +200,9 @@ int main(int argc, const char* argv[])
 
     // Async tests
     { EventLoopTest                 test(report); }
+
+    // DebugVisualizers tests
+    { DebugVisualizersTest          test(report); }
 
     // Build tests
     { BuildTest                     test(report); }

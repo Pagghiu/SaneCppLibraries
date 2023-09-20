@@ -103,6 +103,11 @@ SC::ReturnCode SC::Build::DefinitionCompiler::fillPathsList(StringView path, con
     bool doRecurse = false;
     for (const auto& it : filters)
     {
+        if (it.mask.view().containsChar('/'))
+        {
+            doRecurse = true;
+            break;
+        }
         if (it.mask.view().containsString("**"))
         {
             doRecurse = true;
@@ -222,15 +227,33 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
     switch (parameters.generator)
     {
     case Generator::XCode14: {
-        String        buffer1;
-        StringBuilder sb1(buffer1);
-        WriterXCode   writer(definition, definitionCompiler);
-        SC_TRY_IF(writer.write(sb1, normalizedDirectory.view()));
-        SC_TRY_IF(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj", filename));
-        SC_TRY_IF(fs.makeDirectoryIfNotExists({prjName.view()}));
-        SC_TRY_IF(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/project.pbxproj", filename));
-        SC_TRY_IF(fs.removeFileIfExists(prjName.view()));
-        SC_TRY_IF(fs.write(prjName.view(), buffer1.view()));
+        String                buffer;
+        WriterXCode           writer(definition, definitionCompiler);
+        const Project&        project = definition.workspaces[0].projects[0];
+        WriterXCode::Renderer renderer;
+        SC_TRY_IF(writer.prepare(normalizedDirectory.view(), project, renderer));
+        {
+            StringBuilder sb(buffer, StringBuilder::Clear);
+            SC_TRY_IF(writer.writeProject(sb, project, renderer));
+            SC_TRY_IF(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj", filename));
+            SC_TRY_IF(fs.makeDirectoryIfNotExists({prjName.view()}));
+            SC_TRY_IF(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/project.pbxproj", filename));
+            SC_TRY_IF(fs.removeFileIfExists(prjName.view()));
+            SC_TRY_IF(fs.write(prjName.view(), buffer.view()));
+        }
+        {
+            StringBuilder sb(buffer, StringBuilder::Clear);
+            SC_TRY_IF(writer.writeScheme(sb, project, renderer, normalizedDirectory.view(), filename));
+            SC_TRY_IF(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/xcshareddata", filename));
+            SC_TRY_IF(fs.makeDirectoryIfNotExists({prjName.view()}));
+            SC_TRY_IF(
+                StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/xcshareddata/xcschemes", filename));
+            SC_TRY_IF(fs.makeDirectoryIfNotExists({prjName.view()}));
+            SC_TRY_IF(StringBuilder(prjName, StringBuilder::Clear)
+                          .format("{}.xcodeproj/xcshareddata/xcschemes/{}.xcscheme", filename, filename));
+            SC_TRY_IF(fs.removeFileIfExists(prjName.view()));
+            SC_TRY_IF(fs.write(prjName.view(), buffer.view()));
+        }
         break;
     }
     case Generator::VisualStudio2022: {
