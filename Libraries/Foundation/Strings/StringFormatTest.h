@@ -121,6 +121,15 @@ struct SC::StringFormatTest : public SC::TestCase
             SC_TEST_EXPECT(builder.format("__{}__", String()));
             SC_TEST_EXPECT(buffer == "____");
         }
+        if (test_section("format positional args"))
+        {
+            String        buffer(StringEncoding::Ascii);
+            StringBuilder builder(buffer);
+            SC_TEST_EXPECT(builder.format("{1}_{0}_{1}", 1, 0));
+            SC_TEST_EXPECT(buffer == "0_1_0");
+            SC_TEST_EXPECT(builder.format("{0:.2}_{1}_{0:.4}", 1.2222, "salve"));
+            SC_TEST_EXPECT(buffer == "1.22_salve_1.2222");
+        }
         if (test_section("appendReplaceAll"))
         {
             String        buffer(StringEncoding::Ascii);

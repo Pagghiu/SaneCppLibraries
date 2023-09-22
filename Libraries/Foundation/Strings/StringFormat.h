@@ -64,15 +64,24 @@ template <> struct StringFormatterFor<wchar_t>      {static bool format(StringFo
 template <> struct StringFormatterFor<const wchar_t*> {static bool format(StringFormatOutput&, const StringView, const wchar_t*);};
 #endif
 // clang-format on
+template <int N>
+struct StringFormatterFor<char[N]>
+{
+    static bool format(StringFormatOutput& data, const StringView specifier, const char* str)
+    {
+        return StringFormatterFor<StringView>::format(data, specifier,
+                                                      StringView(str, N - 1, true, StringEncoding::Ascii));
+    }
+};
 
 template <typename RangeIterator>
 struct StringFormat
 {
     template <typename... Types>
-    [[nodiscard]] static bool format(StringFormatOutput& data, StringView fmt, Types... args)
+    [[nodiscard]] static bool format(StringFormatOutput& data, StringView fmt, Types&&... args)
     {
         data.onFormatBegin();
-        if (recursiveFormat(data, fmt.getEncoding(), fmt.getIterator<RangeIterator>(), args...))
+        if (executeFormat(data, fmt.getIterator<RangeIterator>(), forward<Types>(args)...))
             SC_LIKELY { return data.onFormatSucceded(); }
         else
         {
@@ -82,39 +91,63 @@ struct StringFormat
     }
 
   private:
-    template <typename First, typename... Types>
-    [[nodiscard]] static bool formatArgumentAndRecurse(StringFormatOutput& data, StringEncoding encoding,
-                                                       RangeIterator it, First first, Types... args)
+    template <int Total, int N, typename T, typename... Rest>
+    static bool formatArgument(StringFormatOutput& data, StringView specifier, int position, T&& arg, Rest&&... rest)
     {
-        const auto startOfSpecifier = it;
-        if (it.advanceUntilMatches('}')) // We have an already matched '{' when arriving here
+        if (position == Total - N)
         {
-            auto specifier = startOfSpecifier.sliceFromStartUntil(it);
-            if (specifier.advanceUntilMatches(':'))
-                (void)specifier.stepForward();
-            (void)it.stepForward();
-            const bool formattedSuccessfully =
-                StringFormatterFor<First>::format(data, StringView::fromIteratorUntilEnd(specifier), first);
-            return formattedSuccessfully && recursiveFormat(data, encoding, it, args...);
+            using First = typename RemoveConst<typename RemoveReference<T>::type>::type;
+            return StringFormatterFor<First>::format(data, specifier, arg);
         }
-        return false;
+        else
+        {
+            return formatArgument<Total, N - 1>(data, specifier, position, forward<Rest>(rest)...);
+        }
     }
 
-    [[nodiscard]] static bool formatArgumentAndRecurse(StringFormatOutput& data, StringEncoding encoding,
-                                                       RangeIterator it)
+    template <int Total, int N, typename... Args>
+    static typename EnableIf<sizeof...(Args) == 0, bool>::type formatArgument(StringFormatOutput&, StringView, int,
+                                                                              Args...)
     {
-        SC_UNUSED(data);
-        SC_UNUSED(encoding);
-        SC_UNUSED(it);
         return false;
     }
 
     template <typename... Types>
-    [[nodiscard]] static bool recursiveFormat(StringFormatOutput& data, StringEncoding encoding, RangeIterator it,
-                                              Types... args)
+    [[nodiscard]] static bool parsePosition(StringFormatOutput& data, RangeIterator& it, int32_t& parsedPosition,
+                                            Types&&... args)
     {
-        auto                              start = it;
-        typename RangeIterator::CodePoint matchedChar;
+        const auto startOfSpecifier = it;
+        if (it.advanceUntilMatches('}')) // We have an already matched '{' when arriving here
+        {
+            auto specifier         = startOfSpecifier.sliceFromStartUntil(it);
+            auto specifierPosition = specifier;
+            if (specifier.advanceUntilMatches(':'))
+            {
+                specifierPosition = startOfSpecifier.sliceFromStartUntil(specifier);
+                (void)specifier.stepForward(); // eat '{'
+            }
+            (void)specifierPosition.stepForward(); // eat '{'
+            (void)it.stepForward();                // eat '}'
+            const StringView positionString  = StringView::fromIteratorUntilEnd(specifierPosition);
+            const StringView specifierString = StringView::fromIteratorUntilEnd(specifier);
+            if (not positionString.isEmpty())
+            {
+                SC_TRY_IF(positionString.parseInt32(parsedPosition));
+            }
+            constexpr auto maxArgs = sizeof...(args);
+            return formatArgument<maxArgs, maxArgs>(data, specifierString, parsedPosition, forward<Types>(args)...);
+        }
+        return false;
+    }
+
+    template <typename... Types>
+    [[nodiscard]] static bool executeFormat(StringFormatOutput& data, RangeIterator it, Types&&... args)
+    {
+        StringCodePoint matchedChar;
+
+        auto    start       = it;
+        int32_t position    = 0;
+        int32_t maxPosition = 0;
         while (true)
         {
             if (it.advanceUntilMatchesAny({'{', '}'}, matchedChar)) // match start or end of specifier
@@ -123,20 +156,30 @@ struct StringFormat
                     SC_UNLIKELY // if it's the same matched, let's escape it
                     {
                         (void)it.stepForward(); // we want to make sure we insert the escaped '{' or '}'
-                        // SC_TRY_IF(data.write(StringView(startingPoint.sliceUntil(it), false, encoding)));
                         SC_TRY_IF(data.write(StringView::fromIterators(start, it)));
                         (void)it.stepForward(); // we don't want to insert the additional '{' or '}' needed for escaping
                         start = it;
-                        continue; // or return recursiveFormat(data, it, args...); as alternative to while(true)
                     }
                 else if (matchedChar == '{') // it's a '{' not followed by itself, so let's parse specifier
                 {
-                    SC_TRY_IF(data.write(StringView::fromIterators(start, it)));  // write everything before '{'
-                    return formatArgumentAndRecurse(data, encoding, it, args...); // try parse '}' and eventually format
+                    SC_TRY_IF(data.write(StringView::fromIterators(start, it))); // write everything before '{'
+                    // try parse '}' and eventually format
+                    int32_t parsedPosition = position;
+                    SC_TRY_IF(parsePosition(data, it, parsedPosition, forward<Types>(args)...));
+                    start = it;
+                    position += 1;
+                    maxPosition = max(maxPosition, parsedPosition + 1);
                 }
-                return false; // arriving here means end of string with as single, unescaped '}'
+                else
+                {
+                    return false; // arriving here means end of string with as single, unescaped '}'
+                }
             }
-            return writeIfLastArg<sizeof...(Types) == 0>(data, start); // avoids 'conditional expression is constant'
+            else
+            {
+                SC_TRY_IF(data.write(StringView::fromIterators(start, it))); // write everything before '{'
+                return maxPosition == static_cast<int32_t>(sizeof...(args)); // check right number of args
+            }
         }
     }
 
