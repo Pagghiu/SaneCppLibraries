@@ -57,8 +57,8 @@ struct SC::Build::WriterInternal
         String renderedFile;
         for (const auto& file : project.files)
         {
-            SC_TRY_IF(Path::join(renderedFile, {project.rootDirectory.view(), file.base.view(), file.mask.view()},
-                                 Path::Posix::SeparatorStringView()));
+            SC_TRY(Path::join(renderedFile, {project.rootDirectory.view(), file.base.view(), file.mask.view()},
+                              Path::Posix::SeparatorStringView()));
             const auto* res = definitionCompiler.resolvedPaths.get(renderedFile.view());
             if (res)
             {
@@ -66,7 +66,7 @@ struct SC::Build::WriterInternal
                 {
                     RenderItem renderItem;
                     renderItem.name = StringEncoding::Utf8; // To unify hashes
-                    SC_TRY_IF(StringBuilder(renderItem.name).append(Path::basename(it.view(), Path::AsPosix)));
+                    SC_TRY(StringBuilder(renderItem.name).append(Path::basename(it.view(), Path::AsPosix)));
                     auto nameView = renderItem.name.view();
                     if (nameView.endsWith(".h"))
                     {
@@ -84,13 +84,12 @@ struct SC::Build::WriterInternal
                     {
                         renderItem.type = RenderItem::DebugVisualizerfile;
                     }
-                    SC_TRY_IF(
-                        Path::relativeFromTo(destinationDirectory, it.view(), renderItem.path, Path::Type::AsPosix));
-                    SC_TRY_IF(Path::relativeFromTo(project.rootDirectory.view(), it.view(), renderItem.referencePath,
-                                                   Path::Type::AsPosix));
+                    SC_TRY(Path::relativeFromTo(destinationDirectory, it.view(), renderItem.path, Path::Type::AsPosix));
+                    SC_TRY(Path::relativeFromTo(project.rootDirectory.view(), it.view(), renderItem.referencePath,
+                                                Path::Type::AsPosix));
                     if (file.operation == Project::File::Add)
                     {
-                        SC_TRY_IF(outputFiles.push_back(move(renderItem)));
+                        SC_TRY(outputFiles.push_back(move(renderItem)));
                     }
                     else
                     {

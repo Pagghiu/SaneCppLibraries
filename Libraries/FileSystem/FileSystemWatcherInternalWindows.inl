@@ -68,12 +68,12 @@ struct SC::FileSystemWatcher::Internal
                         ::SetEvent(threadingRunner->hEvents[idx]);
                     }
                 } while (threadingRunner->shouldStop.load());
-                SC_TRY_IF(threadingRunner->thread.join());
+                SC_TRY(threadingRunner->thread.join());
             }
         }
         for (FolderWatcher* entry = self->watchers.front; entry != nullptr; entry = entry->next)
         {
-            SC_TRY_IF(stopWatching(*entry));
+            SC_TRY(stopWatching(*entry));
         }
         return true;
     }
@@ -125,7 +125,7 @@ struct SC::FileSystemWatcher::Internal
         FileDescriptor::Handle loopFDS = FileDescriptor::Invalid;
         if (eventLoopRunner)
         {
-            SC_TRY_IF(eventLoopRunner->eventLoop.getLoopFileDescriptor(loopFDS));
+            SC_TRY(eventLoopRunner->eventLoop.getLoopFileDescriptor(loopFDS));
         }
         // TODO: we should probably check if we are leaking on some partial failure codepath...some RAII would help
         if (threadingRunner)
@@ -134,7 +134,7 @@ struct SC::FileSystemWatcher::Internal
                        "startWatching exceeded MaxWatchablePaths"_a8);
         }
         StringView encodedPath;
-        SC_TRY_IF(converter.convertNullTerminateFastPath(entry->path->view(), encodedPath));
+        SC_TRY(converter.convertNullTerminateFastPath(entry->path->view(), encodedPath));
         HANDLE newHandle = ::CreateFileW(encodedPath.getNullTerminatedNative(),                            //
                                          FILE_LIST_DIRECTORY,                                              //
                                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,           //
@@ -142,9 +142,9 @@ struct SC::FileSystemWatcher::Internal
                                          OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, //
                                          nullptr);
 
-        SC_TRY_IF(newHandle != INVALID_HANDLE_VALUE);
+        SC_TRY(newHandle != INVALID_HANDLE_VALUE);
         FolderWatcherInternal& opaque = entry->internal.get();
-        SC_TRY_IF(opaque.fileHandle.assign(newHandle));
+        SC_TRY(opaque.fileHandle.assign(newHandle));
 
         opaque.parentEntry = entry;
 
@@ -157,10 +157,10 @@ struct SC::FileSystemWatcher::Internal
         }
         else
         {
-            SC_TRY_IF(eventLoopRunner->eventLoop.associateExternallyCreatedFileDescriptor(opaque.fileHandle));
+            SC_TRY(eventLoopRunner->eventLoop.associateExternallyCreatedFileDescriptor(opaque.fileHandle));
             opaque.asyncPoll.callback.bind<Internal, &Internal::onEventLoopNotification>(this);
             auto res = opaque.asyncPoll.start(eventLoopRunner->eventLoop, newHandle);
-            SC_TRY_IF(res);
+            SC_TRY(res);
         }
 
         BOOL success = ::ReadDirectoryChangesW(newHandle,                         //
@@ -178,7 +178,7 @@ struct SC::FileSystemWatcher::Internal
         if (threadingRunner and not threadingRunner->thread.wasStarted())
         {
             threadingRunner->shouldStop.exchange(false);
-            SC_TRY_IF(threadingRunner->thread.start("FileSystemWatcher::init", &threadingRunner->threadFunction))
+            SC_TRY(threadingRunner->thread.start("FileSystemWatcher::init", &threadingRunner->threadFunction))
         }
         return true;
     }
@@ -266,9 +266,9 @@ struct SC::FileSystemWatcher::Internal
 SC::ReturnCode SC::FileSystemWatcher::Notification::getFullPath(String& buffer, StringView& outStringView) const
 {
     StringBuilder builder(buffer);
-    SC_TRY_IF(builder.append(basePath));
-    SC_TRY_IF(builder.append("\\"_a8));
-    SC_TRY_IF(builder.append(relativePath));
+    SC_TRY(builder.append(basePath));
+    SC_TRY(builder.append("\\"_a8));
+    SC_TRY(builder.append(relativePath));
     outStringView = buffer.view();
     return true;
 }

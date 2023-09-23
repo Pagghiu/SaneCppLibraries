@@ -24,7 +24,7 @@ SC::ReturnCode SC::FileSystem::changeDirectory(StringView currentWorkingDirector
 {
     StringConverter converter(currentDirectory);
     converter.clear();
-    SC_TRY_IF(converter.appendNullTerminated(currentWorkingDirectory));
+    SC_TRY(converter.appendNullTerminated(currentWorkingDirectory));
     // TODO: Assert if path is not absolute
     return existsAndIsDirectory(".");
 }
@@ -44,13 +44,13 @@ bool SC::FileSystem::convert(const StringView file, String& destination, StringV
     if (currentDirectory.isEmpty())
         return false;
     converter.clear();
-    SC_TRY_IF(converter.appendNullTerminated(currentDirectory.view()));
+    SC_TRY(converter.appendNullTerminated(currentDirectory.view()));
 #if SC_PLATFORM_WINDOWS
-    SC_TRY_IF(converter.appendNullTerminated(L"\\"));
+    SC_TRY(converter.appendNullTerminated(L"\\"));
 #else
-    SC_TRY_IF(converter.appendNullTerminated("/"));
+    SC_TRY(converter.appendNullTerminated("/"));
 #endif
-    SC_TRY_IF(converter.appendNullTerminated(file));
+    SC_TRY(converter.appendNullTerminated(file));
     if (encodedPath != nullptr)
     {
         *encodedPath = destination.view();
@@ -101,7 +101,7 @@ bool SC::FileSystem::convert(const StringView file, String& destination, StringV
 SC::ReturnCode SC::FileSystem::write(StringView path, SpanVoid<const void> data)
 {
     StringView encodedPath;
-    SC_TRY_IF(convert(path, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
     FILE* handle = nullptr;
     SC_TRY_FORMAT_ERRNO(path, Internal::openFileWrite(encodedPath.getNullTerminatedNative(), handle));
     const size_t res = fwrite(data.data(), 1, data.sizeInBytes(), handle);
@@ -123,7 +123,7 @@ SC::ReturnCode SC::FileSystem::write(StringView path, SpanVoid<const void> data)
 SC::ReturnCode SC::FileSystem::read(StringView path, Vector<char>& data)
 {
     StringView encodedPath;
-    SC_TRY_IF(convert(path, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
     FILE* handle;
     SC_TRY_FORMAT_ERRNO(path, Internal::openFileRead(encodedPath.getNullTerminatedNative(), handle));
     SC_TRY_FORMAT_LIBC(fseek(handle, 0, SEEK_END));
@@ -131,7 +131,7 @@ SC::ReturnCode SC::FileSystem::read(StringView path, Vector<char>& data)
     SC_TRY_FORMAT_LIBC(fileSizeRes);
     SC_TRY_FORMAT_LIBC(fseek(handle, 0, SEEK_SET));
     const size_t fileSize = static_cast<size_t>(fileSizeRes);
-    SC_TRY_IF(data.resizeWithoutInitializing(fileSize));
+    SC_TRY(data.resizeWithoutInitializing(fileSize));
 
     const auto readBytes = fread(data.data(), 1, fileSize, handle);
     if (ferror(handle) != 0)
@@ -151,7 +151,7 @@ SC::ReturnCode SC::FileSystem::read(StringView path, Vector<char>& data)
 [[nodiscard]] SC::ReturnCode SC::FileSystem::read(StringView file, String& text, StringEncoding encoding)
 {
     text.encoding = encoding;
-    SC_TRY_IF(read(file, text.data));
+    SC_TRY(read(file, text.data));
     return StringConverter::pushNullTerm(text.data, encoding);
 }
 
@@ -184,9 +184,9 @@ SC::ReturnCode SC::FileSystem::formatError(int errorNumber, StringView item, boo
         }
     }
     StringConverter errorMessage(errorMessageBuffer);
-    SC_TRY_IF(errorMessage.appendNullTerminated(" for \""));
-    SC_TRY_IF(errorMessage.appendNullTerminated(item));
-    SC_TRY_IF(errorMessage.appendNullTerminated("\""));
+    SC_TRY(errorMessage.appendNullTerminated(" for \""));
+    SC_TRY(errorMessage.appendNullTerminated(item));
+    SC_TRY(errorMessage.appendNullTerminated("\""));
     return errorMessageBuffer.view();
 }
 
@@ -195,7 +195,7 @@ SC::ReturnCode SC::FileSystem::removeFile(Span<const StringView> files)
     StringView encodedPath;
     for (auto& path : files)
     {
-        SC_TRY_IF(convert(path, fileFormatBuffer1, &encodedPath));
+        SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
         SC_TRY_FORMAT_ERRNO(path, Internal::removeFile(encodedPath.getNullTerminatedNative()));
     }
     return true;
@@ -212,7 +212,7 @@ SC::ReturnCode SC::FileSystem::removeDirectoryRecursive(Span<const StringView> d
 {
     for (auto& path : directories)
     {
-        SC_TRY_IF(convert(path, fileFormatBuffer1)); // force write
+        SC_TRY(convert(path, fileFormatBuffer1)); // force write
         SC_TRY_FORMAT_ERRNO(path, Internal::removeDirectoryRecursive(fileFormatBuffer1));
     }
     return true;
@@ -225,8 +225,8 @@ SC::ReturnCode SC::FileSystem::copyFile(Span<const CopyOperation> sourceDestinat
     StringView encodedPath1, encodedPath2;
     for (const CopyOperation& op : sourceDestination)
     {
-        SC_TRY_IF(convert(op.source, fileFormatBuffer1, &encodedPath1));
-        SC_TRY_IF(convert(op.destination, fileFormatBuffer2, &encodedPath2));
+        SC_TRY(convert(op.source, fileFormatBuffer1, &encodedPath1));
+        SC_TRY(convert(op.destination, fileFormatBuffer2, &encodedPath2));
         SC_TRY_FORMAT_NATIVE(op.source, Internal::copyFile(encodedPath1, encodedPath2, op.copyFlags));
     }
     return true;
@@ -238,8 +238,8 @@ SC::ReturnCode SC::FileSystem::copyDirectory(Span<const CopyOperation> sourceDes
         return false;
     for (const CopyOperation& op : sourceDestination)
     {
-        SC_TRY_IF(convert(op.source, fileFormatBuffer1));      // force write
-        SC_TRY_IF(convert(op.destination, fileFormatBuffer2)); // force write
+        SC_TRY(convert(op.source, fileFormatBuffer1));      // force write
+        SC_TRY(convert(op.destination, fileFormatBuffer2)); // force write
         SC_TRY_FORMAT_NATIVE(op.source, Internal::copyDirectory(fileFormatBuffer1, fileFormatBuffer2, op.copyFlags));
     }
     return true;
@@ -250,7 +250,7 @@ SC::ReturnCode SC::FileSystem::removeEmptyDirectory(Span<const StringView> direc
     StringView encodedPath;
     for (StringView path : directories)
     {
-        SC_TRY_IF(convert(path, fileFormatBuffer1, &encodedPath));
+        SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
         SC_TRY_FORMAT_ERRNO(path, Internal::removeEmptyDirectory(encodedPath.getNullTerminatedNative()));
     }
     return true;
@@ -261,7 +261,7 @@ SC::ReturnCode SC::FileSystem::makeDirectory(Span<const StringView> directories)
     StringView encodedPath;
     for (auto& path : directories)
     {
-        SC_TRY_IF(convert(path, fileFormatBuffer1, &encodedPath));
+        SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
         SC_TRY_FORMAT_ERRNO(path, Internal::makeDirectory(encodedPath.getNullTerminatedNative()));
     }
     return true;
@@ -273,7 +273,7 @@ SC::ReturnCode SC::FileSystem::makeDirectoryIfNotExists(Span<const StringView> d
     {
         if (not existsAndIsDirectory(path))
         {
-            SC_TRY_IF(makeDirectory({path}));
+            SC_TRY(makeDirectory({path}));
         }
     }
     return true;
@@ -282,21 +282,21 @@ SC::ReturnCode SC::FileSystem::makeDirectoryIfNotExists(Span<const StringView> d
 [[nodiscard]] bool SC::FileSystem::exists(StringView fileOrDirectory)
 {
     StringView encodedPath;
-    SC_TRY_IF(convert(fileOrDirectory, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(fileOrDirectory, fileFormatBuffer1, &encodedPath));
     return Internal::exists(encodedPath.getNullTerminatedNative());
 }
 
 bool SC::FileSystem::existsAndIsDirectory(StringView directory)
 {
     StringView encodedPath;
-    SC_TRY_IF(convert(directory, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(directory, fileFormatBuffer1, &encodedPath));
     return Internal::existsAndIsDirectory(encodedPath.getNullTerminatedNative());
 }
 
 [[nodiscard]] bool SC::FileSystem::existsAndIsFile(StringView file)
 {
     StringView encodedPath;
-    SC_TRY_IF(convert(file, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
     return Internal::existsAndIsFile(encodedPath.getNullTerminatedNative());
 }
 
@@ -317,7 +317,7 @@ SC::Optional<SC::FileSystem::FileTime> SC::FileSystem::getFileTime(StringView fi
 SC::ReturnCode SC::FileSystem::setLastModifiedTime(StringView file, AbsoluteTime time)
 {
     StringView encodedPath;
-    SC_TRY_IF(convert(file, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
     return Internal::setLastModifiedTime(encodedPath.getNullTerminatedNative(), time);
 }
 

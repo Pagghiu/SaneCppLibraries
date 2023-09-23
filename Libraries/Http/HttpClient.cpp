@@ -12,11 +12,11 @@ SC::ReturnCode SC::HttpClient::start(EventLoop& loop, StringView ipAddress, uint
     callback  = move(cb);
 
     SocketIPAddress localHost;
-    SC_TRY_IF(localHost.fromAddressPort(ipAddress, port));
-    SC_TRY_IF(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
+    SC_TRY(localHost.fromAddressPort(ipAddress, port));
+    SC_TRY(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
 
     StringBuilder sb(content, StringEncoding::Ascii, StringBuilder::Clear);
-    SC_TRY_IF(sb.append(requestContent));
+    SC_TRY(sb.append(requestContent));
     const char* dbgName = customDebugName.isEmpty() ? "HttpClient" : customDebugName.bytesIncludingTerminator();
     connectAsync.setDebugName(dbgName);
     connectAsync.callback.bind<HttpClient, &HttpClient::onConnected>(this);

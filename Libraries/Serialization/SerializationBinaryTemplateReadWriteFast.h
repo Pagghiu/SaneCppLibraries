@@ -79,7 +79,7 @@ struct SerializerVector
         uint64_t     sizeInBytes = static_cast<uint64_t>(object.size() * itemSize);
         if (not SerializerReadWriteFast<BinaryStream, uint64_t>::serialize(sizeInBytes, stream))
             return false;
-        SC_TRY_IF(object.resize(sizeInBytes / itemSize));
+        SC_TRY(object.resize(sizeInBytes / itemSize));
 
         if (Reflection::MetaTypeInfo<T>::IsPacked)
         {

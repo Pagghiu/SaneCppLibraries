@@ -22,8 +22,8 @@ bool SC::StringConverter::convertSameEncoding(StringView text, Vector<char>& buf
         const bool forceCopy = encodedText == nullptr;
         if (forceCopy)
         {
-            SC_TRY_IF(buffer.appendCopy(text.bytesIncludingTerminator(),
-                                        nullTerminate ? text.sizeInBytesIncludingTerminator() : text.sizeInBytes()));
+            SC_TRY(buffer.appendCopy(text.bytesIncludingTerminator(),
+                                     nullTerminate ? text.sizeInBytesIncludingTerminator() : text.sizeInBytes()));
         }
         else
         {
@@ -42,13 +42,13 @@ bool SC::StringConverter::convertSameEncoding(StringView text, Vector<char>& buf
         if (nullTerminate)
         {
             const auto numZeros = StringEncodingGetSize(text.getEncoding());
-            SC_TRY_IF(buffer.reserve(buffer.size() + text.sizeInBytes() + numZeros));
-            SC_TRY_IF(buffer.appendCopy(text.bytesWithoutTerminator(), text.sizeInBytes()));
+            SC_TRY(buffer.reserve(buffer.size() + text.sizeInBytes() + numZeros));
+            SC_TRY(buffer.appendCopy(text.bytesWithoutTerminator(), text.sizeInBytes()));
             if (encodedText)
             {
                 *encodedText = StringView(buffer.data(), buffer.size(), true, text.getEncoding());
             }
-            SC_TRY_IF(buffer.resize(buffer.size() + numZeros, 0)); // null terminator
+            SC_TRY(buffer.resize(buffer.size() + numZeros, 0)); // null terminator
         }
         else if (encodedText)
         {
@@ -115,8 +115,7 @@ bool SC::StringConverter::convertEncodingToUTF8(StringView text, Vector<char>& b
             return false;
         }
         const auto oldSize = buffer.size();
-        SC_TRY_IF(
-            buffer.resizeWithoutInitializing(oldSize + (static_cast<size_t>(numChars) + (nullTerminate ? 1 : 0))));
+        SC_TRY(buffer.resizeWithoutInitializing(oldSize + (static_cast<size_t>(numChars) + (nullTerminate ? 1 : 0))));
 #if SC_PLATFORM_WINDOWS
         WideCharToMultiByte(CP_UTF8, 0, source, sourceSizeInBytes / sizeof(uint16_t),
                             reinterpret_cast<char_t*>(buffer.data() + oldSize), numChars, nullptr, 0);
@@ -168,8 +167,8 @@ bool SC::StringConverter::convertEncodingToUTF16(StringView text, Vector<char>& 
             return false;
         }
         const auto oldSize = buffer.size();
-        SC_TRY_IF(buffer.resizeWithoutInitializing(
-            oldSize + (static_cast<size_t>(numWChars) + (nullTerminate ? 1 : 0)) * destinationCharSize));
+        SC_TRY(buffer.resizeWithoutInitializing(oldSize + (static_cast<size_t>(numWChars) + (nullTerminate ? 1 : 0)) *
+                                                              destinationCharSize));
 #if SC_PLATFORM_WINDOWS
         MultiByteToWideChar(CP_UTF8, 0, text.bytesWithoutTerminator(), static_cast<int>(text.sizeInBytes()),
                             reinterpret_cast<wchar_t*>(buffer.data() + oldSize), numWChars);
@@ -200,13 +199,13 @@ void SC::StringConverter::clear() { text.data.clearWithoutInitializing(); }
 bool SC::StringConverter::convertNullTerminateFastPath(StringView input, StringView& encodedText)
 {
     text.data.clearWithoutInitializing();
-    SC_TRY_IF(internalAppend(input, &encodedText));
+    SC_TRY(internalAppend(input, &encodedText));
     return true;
 }
 
 bool SC::StringConverter::appendNullTerminated(StringView input)
 {
-    SC_TRY_IF(popNulltermIfExists(text.data, text.encoding));
+    SC_TRY(popNulltermIfExists(text.data, text.encoding));
     return internalAppend(input, nullptr);
 }
 
@@ -243,7 +242,7 @@ bool SC::StringConverter::pushNullTerm(Vector<char>& stringData, StringEncoding 
     auto numZeros = StringEncodingGetSize(encoding);
     while (numZeros--)
     {
-        SC_TRY_IF(stringData.push_back(0));
+        SC_TRY(stringData.push_back(0));
     }
     return true;
 }

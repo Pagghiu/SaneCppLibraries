@@ -68,7 +68,7 @@ struct SC::FileSystemWatcher::Internal
         // the CFRunLoop allocated into that thread
         Action initFunction;
         initFunction.bind<Internal, &Internal::threadInit>(this);
-        SC_TRY_IF(pollingThread.start("FileSystemWatcher::init", &pollingFunction, &initFunction));
+        SC_TRY(pollingThread.start("FileSystemWatcher::init", &pollingFunction, &initFunction));
         return true;
     }
 
@@ -86,7 +86,7 @@ struct SC::FileSystemWatcher::Internal
             wakeUpFSEventThread();
 
             // Wait for thread to finish
-            SC_TRY_IF(pollingThread.join());
+            SC_TRY(pollingThread.join());
             releaseResources();
         }
         return true;
@@ -122,7 +122,7 @@ struct SC::FileSystemWatcher::Internal
 
     [[nodiscard]] ReturnCode threadCreateFSEvent()
     {
-        SC_TRY_IF(runLoop);
+        SC_TRY(runLoop);
         CFArrayRef   pathsArray   = nullptr;
         CFStringRef* watchedPaths = (CFStringRef*)malloc(sizeof(CFStringRef) * ThreadRunnerSizes::MaxWatchablePaths);
         SC_TRY_MSG(watchedPaths != nullptr, "Cannot allocate paths"_a8);
@@ -142,7 +142,7 @@ struct SC::FileSystemWatcher::Internal
             StringNative<1024> buffer;
             StringConverter    converter(buffer);
             StringView         encodedPath;
-            SC_TRY_IF(converter.convertNullTerminateFastPath(it->path->view(), encodedPath));
+            SC_TRY(converter.convertNullTerminateFastPath(it->path->view(), encodedPath));
             watchedPaths[numAllocatedPaths] =
                 CFStringCreateWithFileSystemRepresentation(nullptr, encodedPath.getNullTerminatedNative());
             if (not watchedPaths[numAllocatedPaths])
@@ -216,7 +216,7 @@ struct SC::FileSystemWatcher::Internal
     {
         if (not pollingThread.wasStarted())
         {
-            SC_TRY_IF(initThread());
+            SC_TRY(initThread());
         }
         wakeUpFSEventThread();
         return signalReturnCode;

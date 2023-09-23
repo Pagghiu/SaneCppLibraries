@@ -93,7 +93,7 @@ struct SC::FileSystem::Internal
     [[nodiscard]] static bool formatError(int errorNumber, String& buffer)
     {
         buffer.encoding = StringEncoding::Utf16;
-        SC_TRY_IF(buffer.data.resizeWithoutInitializing(buffer.data.capacity()));
+        SC_TRY(buffer.data.resizeWithoutInitializing(buffer.data.capacity()));
         const int res = _wcserror_s(buffer.nativeWritableBytesIncludingTerminator(),
                                     buffer.sizeInBytesIncludingTerminator() / sizeof(wchar_t), errorNumber);
         if (res == 0)
@@ -137,8 +137,8 @@ struct SC::FileSystem::Internal
         }
         shFileOp.fFlags = FOF_SILENT | FOF_NOCONFIRMMKDIR | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NO_UI;
         shFileOp.wFunc  = FO_COPY;
-        SC_TRY_IF(StringConverter(sourceDirectory).appendNullTerminated(L"\\*\0"));
-        SC_TRY_IF(StringConverter(destinationDirectory).appendNullTerminated(L"\0"));
+        SC_TRY(StringConverter(sourceDirectory).appendNullTerminated(L"\\*\0"));
+        SC_TRY(StringConverter(destinationDirectory).appendNullTerminated(L"\0"));
         // SHFileOperationW needs two null termination bytes
         shFileOp.pFrom = sourceDirectory.view().getNullTerminatedNative();
         shFileOp.pTo   = dest;
@@ -153,7 +153,7 @@ struct SC::FileSystem::Internal
         shFileOp.fFlags = FOF_SILENT | FOF_NOCONFIRMMKDIR | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NO_UI;
         shFileOp.wFunc  = FO_DELETE;
         // SHFileOperationW needs two null termination bytes
-        SC_TRY_IF(StringConverter(sourceDirectory).appendNullTerminated(L"\0"));
+        SC_TRY(StringConverter(sourceDirectory).appendNullTerminated(L"\0"));
         shFileOp.pFrom = sourceDirectory.view().getNullTerminatedNative();
         const int res  = SHFileOperationW(&shFileOp);
         return res == 0;

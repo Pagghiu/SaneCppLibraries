@@ -239,11 +239,9 @@ struct Configuration
         preset = newPreset;
         switch (preset)
         {
-        case Configuration::Preset::Debug:
-            SC_TRY_IF(compile.set<Compile::optimizationLevel>(Optimization::Debug));
-            break;
+        case Configuration::Preset::Debug: SC_TRY(compile.set<Compile::optimizationLevel>(Optimization::Debug)); break;
         case Configuration::Preset::Release:
-            SC_TRY_IF(compile.set<Compile::optimizationLevel>(Optimization::Release));
+            SC_TRY(compile.set<Compile::optimizationLevel>(Optimization::Release));
             break;
         case Configuration::Preset::None: break;
         }

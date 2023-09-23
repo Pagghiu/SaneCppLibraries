@@ -252,7 +252,7 @@ struct AsyncSocketAcceptResult : public AsyncResult<AsyncSocketAccept>
 
     [[nodiscard]] ReturnCode moveTo(SocketDescriptor& client)
     {
-        SC_TRY_IF(AsyncResultBase::returnCode);
+        SC_TRY(AsyncResultBase::returnCode);
         return client.assign(move(acceptedClient));
     }
 

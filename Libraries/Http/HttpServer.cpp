@@ -16,8 +16,8 @@ SC::ReturnCode SC::HttpServer::Response::end(StringView sv)
                                "\r\n"_a8;
 
     StringBuilder sb(outputBuffer, StringEncoding::Ascii, StringBuilder::Clear);
-    SC_TRY_IF(sb.format(headers, sv.sizeInBytes()));
-    SC_TRY_IF(sb.append(sv));
+    SC_TRY(sb.format(headers, sv.sizeInBytes()));
+    SC_TRY(sb.append(sv));
     ended = true;
     return outputBuffer.pop_back(); // pop null terminator
 }
@@ -29,7 +29,7 @@ SC::ReturnCode SC::HttpServer::Request::parse(Span<const char> readData, Respons
         parsedSuccessfully = false;
         return "Header size exceeded limit"_a8;
     }
-    SC_TRY_IF(headerBuffer.push_back(readData));
+    SC_TRY(headerBuffer.push_back(readData));
     size_t readBytes;
     while (parsedSuccessfully and not readData.empty())
     {
@@ -59,13 +59,13 @@ SC::ReturnCode SC::HttpServer::Request::parse(Span<const char> readData, Respons
 SC::ReturnCode SC::HttpServerAsync::start(EventLoop& loop, uint32_t maxConnections, StringView address, uint16_t port)
 {
     eventLoop = &loop;
-    SC_TRY_IF(requestClients.resize(maxConnections));
-    SC_TRY_IF(requests.resize(maxConnections));
+    SC_TRY(requestClients.resize(maxConnections));
+    SC_TRY(requests.resize(maxConnections));
     SocketIPAddress nativeAddress;
-    SC_TRY_IF(nativeAddress.fromAddressPort(address, port));
-    SC_TRY_IF(eventLoop->createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
-    SC_TRY_IF(SocketServer(serverSocket).listen(nativeAddress));
-    SC_TRY_IF(startSocketAccept());
+    SC_TRY(nativeAddress.fromAddressPort(address, port));
+    SC_TRY(eventLoop->createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
+    SC_TRY(SocketServer(serverSocket).listen(nativeAddress));
+    SC_TRY(startSocketAccept());
     return true;
 }
 

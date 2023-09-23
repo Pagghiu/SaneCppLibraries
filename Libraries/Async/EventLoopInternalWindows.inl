@@ -102,7 +102,7 @@ struct SC::EventLoop::Internal
             // TODO: Better CreateIoCompletionPort error handling
             return "EventLoop::Internal::createEventLoop() - CreateIoCompletionPort"_a8;
         }
-        SC_TRY_IF(loopFd.assign(newQueue));
+        SC_TRY(loopFd.assign(newQueue));
         return true;
     }
 
@@ -143,7 +143,7 @@ SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
 {
     Internal&              self = internal.get();
     FileDescriptor::Handle loopNativeDescriptor;
-    SC_TRY_IF(self.loopFd.get(loopNativeDescriptor, "watchInputs - Invalid Handle"_a8));
+    SC_TRY(self.loopFd.get(loopNativeDescriptor, "watchInputs - Invalid Handle"_a8));
 
     if (PostQueuedCompletionStatus(loopNativeDescriptor, 0, 0, &self.wakeUpOverlapped.overlapped) == FALSE)
     {
@@ -155,9 +155,9 @@ SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
 SC::ReturnCode SC::EventLoop::associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor)
 {
     HANDLE loopHandle;
-    SC_TRY_IF(internal.get().loopFd.get(loopHandle, "loop handle"_a8));
+    SC_TRY(internal.get().loopFd.get(loopHandle, "loop handle"_a8));
     SOCKET socket;
-    SC_TRY_IF(outDescriptor.get(socket, "Invalid handle"_a8));
+    SC_TRY(outDescriptor.get(socket, "Invalid handle"_a8));
     HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(socket), loopHandle, 0, 0);
     SC_TRY_MSG(iocp == loopHandle, "associateExternallyCreatedTCPSocket CreateIoCompletionPort failed"_a8);
     return true;
@@ -166,9 +166,9 @@ SC::ReturnCode SC::EventLoop::associateExternallyCreatedTCPSocket(SocketDescript
 SC::ReturnCode SC::EventLoop::associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor)
 {
     HANDLE loopHandle;
-    SC_TRY_IF(internal.get().loopFd.get(loopHandle, "loop handle"_a8));
+    SC_TRY(internal.get().loopFd.get(loopHandle, "loop handle"_a8));
     HANDLE handle;
-    SC_TRY_IF(outDescriptor.get(handle, "Invalid handle"_a8));
+    SC_TRY(outDescriptor.get(handle, "Invalid handle"_a8));
     HANDLE iocp = ::CreateIoCompletionPort(handle, loopHandle, 0, 0);
     SC_TRY_MSG(iocp == loopHandle, "associateExternallyCreatedFileDescriptor CreateIoCompletionPort failed"_a8);
     return true;
@@ -206,8 +206,7 @@ struct SC::EventLoop::KernelQueue
     {
         const TimeCounter*     nextTimer = self.findEarliestTimer();
         FileDescriptor::Handle loopNativeDescriptor;
-        SC_TRY_IF(
-            self.internal.get().loopFd.get(loopNativeDescriptor, "EventLoop::Internal::poll() - Invalid Handle"_a8));
+        SC_TRY(self.internal.get().loopFd.get(loopNativeDescriptor, "EventLoop::Internal::poll() - Invalid Handle"_a8));
         IntegerMilliseconds timeout;
         if (nextTimer)
         {
@@ -281,7 +280,7 @@ struct SC::EventLoop::KernelQueue
     // Socket ACCEPT
     [[nodiscard]] static ReturnCode setupAsync(AsyncSocketAccept& async)
     {
-        SC_TRY_IF(SystemFunctions::isNetworkingInited());
+        SC_TRY(SystemFunctions::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return true;
     }
@@ -299,7 +298,7 @@ struct SC::EventLoop::KernelQueue
         EventLoopWinOverlapped& overlapped      = operation.overlapped.get();
         DWORD                   sync_bytes_read = 0;
 
-        SC_TRY_IF(eventLoop.internal.get().ensureAcceptFunction(operation.handle));
+        SC_TRY(eventLoop.internal.get().ensureAcceptFunction(operation.handle));
         BOOL res;
         res = eventLoop.internal.get().pAcceptEx(
             operation.handle, clientSocket, operation.acceptBuffer, 0, sizeof(struct sockaddr_storage) + 16,
@@ -317,14 +316,14 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] static ReturnCode completeAsync(AsyncSocketAccept::Result& result)
     {
         AsyncSocketAccept& operation = result.async;
-        SC_TRY_IF(Internal::checkWSAResult(operation.handle, operation.overlapped.get().overlapped));
+        SC_TRY(Internal::checkWSAResult(operation.handle, operation.overlapped.get().overlapped));
         SOCKET clientSocket;
-        SC_TRY_IF(operation.clientSocket.get(clientSocket, "clientSocket error"_a8));
+        SC_TRY(operation.clientSocket.get(clientSocket, "clientSocket error"_a8));
         const int socketOpRes = ::setsockopt(clientSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
                                              reinterpret_cast<char*>(&operation.handle), sizeof(operation.handle));
         SC_TRY_MSG(socketOpRes == 0, "setsockopt SO_UPDATE_ACCEPT_CONTEXT failed"_a8);
         HANDLE loopHandle;
-        SC_TRY_IF(result.async.eventLoop->internal.get().loopFd.get(loopHandle, "loop handle"_a8));
+        SC_TRY(result.async.eventLoop->internal.get().loopFd.get(loopHandle, "loop handle"_a8));
         HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(clientSocket), loopHandle, 0, 0);
         SC_TRY_MSG(iocp == loopHandle, "completeAsync ACCEPT CreateIoCompletionPort failed"_a8);
         return result.acceptedClient.assign(move(operation.clientSocket));
@@ -334,7 +333,7 @@ struct SC::EventLoop::KernelQueue
     {
         HANDLE listenHandle = reinterpret_cast<HANDLE>(asyncAccept.handle);
         // This will cause one more event loop run with GetOverlappedIO failing
-        SC_TRY_IF(asyncAccept.clientSocket.close());
+        SC_TRY(asyncAccept.clientSocket.close());
         struct FILE_COMPLETION_INFORMATION file_completion_info;
         file_completion_info.Key  = NULL;
         file_completion_info.Port = NULL;
@@ -358,7 +357,7 @@ struct SC::EventLoop::KernelQueue
     // Socket CONNECT
     [[nodiscard]] static ReturnCode setupAsync(AsyncSocketConnect& async)
     {
-        SC_TRY_IF(SystemFunctions::isNetworkingInited());
+        SC_TRY(SystemFunctions::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return true;
     }
@@ -390,7 +389,7 @@ struct SC::EventLoop::KernelQueue
         {
             return "bind failed"_a8;
         }
-        SC_TRY_IF(eventLoop.internal.get().ensureConnectFunction(asyncConnect.handle));
+        SC_TRY(eventLoop.internal.get().ensureConnectFunction(asyncConnect.handle));
 
         const struct sockaddr* sockAddr    = &asyncConnect.ipAddress.handle.reinterpret_as<const struct sockaddr>();
         const int              sockAddrLen = asyncConnect.ipAddress.sizeOfHandle();
@@ -408,7 +407,7 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] static ReturnCode completeAsync(AsyncSocketConnect::Result& result)
     {
         AsyncSocketConnect& operation = result.async;
-        SC_TRY_IF(Internal::checkWSAResult(operation.handle, operation.overlapped.get().overlapped));
+        SC_TRY(Internal::checkWSAResult(operation.handle, operation.overlapped.get().overlapped));
         return true;
     }
 
@@ -421,7 +420,7 @@ struct SC::EventLoop::KernelQueue
     // Socket SEND
     [[nodiscard]] static ReturnCode setupAsync(AsyncSocketSend& async)
     {
-        SC_TRY_IF(SystemFunctions::isNetworkingInited());
+        SC_TRY(SystemFunctions::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return true;
     }
@@ -444,7 +443,7 @@ struct SC::EventLoop::KernelQueue
     {
         AsyncSocketSend& operation   = result.async;
         size_t           transferred = 0;
-        SC_TRY_IF(Internal::checkWSAResult(operation.handle, operation.overlapped.get().overlapped, &transferred));
+        SC_TRY(Internal::checkWSAResult(operation.handle, operation.overlapped.get().overlapped, &transferred));
         return true;
     }
 
@@ -457,7 +456,7 @@ struct SC::EventLoop::KernelQueue
     // Socket RECEIVE
     [[nodiscard]] static ReturnCode setupAsync(AsyncSocketReceive& async)
     {
-        SC_TRY_IF(SystemFunctions::isNetworkingInited());
+        SC_TRY(SystemFunctions::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return true;
     }
@@ -480,8 +479,8 @@ struct SC::EventLoop::KernelQueue
     {
         AsyncSocketReceive& operation   = result.async;
         size_t              transferred = 0;
-        SC_TRY_IF(Internal::checkWSAResult(operation.handle, operation.overlapped.get().overlapped, &transferred));
-        SC_TRY_IF(operation.data.sliceStartLength(0, transferred, result.readData));
+        SC_TRY(Internal::checkWSAResult(operation.handle, operation.overlapped.get().overlapped, &transferred));
+        SC_TRY(operation.data.sliceStartLength(0, transferred, result.readData));
         return true;
     }
 
@@ -536,7 +535,7 @@ struct SC::EventLoop::KernelQueue
             // TODO: report error
             return "GetOverlappedResult error"_a8;
         }
-        SC_TRY_IF(result.async.readBuffer.sliceStartLength(0, static_cast<size_t>(transferred), result.readData));
+        SC_TRY(result.async.readBuffer.sliceStartLength(0, static_cast<size_t>(transferred), result.readData));
         return true;
     }
 
@@ -642,7 +641,7 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] static ReturnCode completeAsync(AsyncProcessExit::Result& result)
     {
         AsyncProcessExit& processExit = result.async;
-        SC_TRY_IF(processExit.waitHandle.close());
+        SC_TRY(processExit.waitHandle.close());
         DWORD processStatus;
         if (GetExitCodeProcess(processExit.handle, &processStatus) == FALSE)
         {

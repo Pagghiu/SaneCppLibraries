@@ -27,10 +27,10 @@ bool SC::SystemDirectories::init()
     executableFile = String(StringEncoding::Utf8);
     if (executable_length > 1)
     {
-        SC_TRY_IF(data.resizeWithoutInitializing(executable_length));
+        SC_TRY(data.resizeWithoutInitializing(executable_length));
         // Writes also the null terminator, but assert just in case
         _NSGetExecutablePath(data.data(), &executable_length);
-        SC_TRY_IF(data[executable_length - 1] == 0);
+        SC_TRY(data[executable_length - 1] == 0);
         executableFile = SmallString<StaticPathSize>(move(data), StringEncoding::Utf8);
     }
 

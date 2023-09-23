@@ -78,7 +78,7 @@ struct SerializerReadVersioned
     [[nodiscard]] static constexpr bool readVersioned(T& object, BinaryStream& stream, VersionSchema& schema)
     {
         typedef SerializerReadVersionedMemberIterator<BinaryStream, T> VersionedMemberIterator;
-        SC_TRY_IF(schema.current().type == Reflection::MetaType::TypeStruct);
+        SC_TRY(schema.current().type == Reflection::MetaType::TypeStruct);
         const uint32_t numMembers      = static_cast<uint32_t>(schema.current().numSubAtoms);
         const auto     structTypeIndex = schema.sourceTypeIndex;
         for (uint32_t idx = 0; idx < numMembers; ++idx)
@@ -89,13 +89,13 @@ struct SerializerReadVersioned
             Reflection::MetaClass<T>::visitObject(visitor, object);
             if (visitor.consumed)
             {
-                SC_TRY_IF(visitor.consumedWithSuccess);
+                SC_TRY(visitor.consumedWithSuccess);
             }
             else
             {
-                SC_TRY_IF(schema.options.allowDropEccessStructMembers)
+                SC_TRY(schema.options.allowDropEccessStructMembers)
                 // We must consume it anyway, discarding its content
-                SC_TRY_IF(schema.skipCurrent(stream));
+                SC_TRY(schema.skipCurrent(stream));
             }
         }
         return true;
@@ -119,11 +119,11 @@ struct SerializerReadVersionedItems
             const size_t sourceNumBytes = schema.current().sizeInBytes * numSourceItems;
             const size_t destNumBytes   = numDestinationItems * sizeof(T);
             const size_t minBytes       = min(destNumBytes, sourceNumBytes);
-            SC_TRY_IF(stream.serialize({object, minBytes}));
+            SC_TRY(stream.serialize({object, minBytes}));
             if (sourceNumBytes > destNumBytes)
             {
                 // We must consume these excess bytes anyway, discarding their content
-                SC_TRY_IF(schema.options.allowDropEccessArrayItems);
+                SC_TRY(schema.options.allowDropEccessArrayItems);
                 return stream.advance(sourceNumBytes - minBytes);
             }
             return true;
@@ -139,12 +139,12 @@ struct SerializerReadVersionedItems
         if (numSourceItems > numDestinationItems)
         {
             // We must consume these excess items anyway, discarding their content
-            SC_TRY_IF(schema.options.allowDropEccessArrayItems);
+            SC_TRY(schema.options.allowDropEccessArrayItems);
 
             for (uint32_t idx = 0; idx < numSourceItems - numDestinationItems; ++idx)
             {
                 schema.sourceTypeIndex = arrayItemTypeIndex;
-                SC_TRY_IF(schema.skipCurrent(stream));
+                SC_TRY(schema.skipCurrent(stream));
             }
         }
         return true;
@@ -169,7 +169,7 @@ struct SerializerReadVersioned<BinaryStream, SC::Vector<T>>
                                                       VersionSchema& schema)
     {
         uint64_t sizeInBytes = 0;
-        SC_TRY_IF(stream.serialize({&sizeInBytes, sizeof(sizeInBytes)}));
+        SC_TRY(stream.serialize({&sizeInBytes, sizeof(sizeInBytes)}));
         schema.advance();
         const bool isPacked =
             Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
@@ -177,11 +177,11 @@ struct SerializerReadVersioned<BinaryStream, SC::Vector<T>>
         const uint32_t numSourceItems = static_cast<uint32_t>(sizeInBytes / sourceItemSize);
         if (isPacked)
         {
-            SC_TRY_IF(object.resizeWithoutInitializing(numSourceItems));
+            SC_TRY(object.resizeWithoutInitializing(numSourceItems));
         }
         else
         {
-            SC_TRY_IF(object.resize(numSourceItems));
+            SC_TRY(object.resize(numSourceItems));
         }
         return SerializerReadVersionedItems<BinaryStream, T>::readVersioned(object.data(), stream, schema,
                                                                             numSourceItems, numSourceItems);
@@ -195,7 +195,7 @@ struct SerializerReadVersioned<BinaryStream, SC::Array<T, N>>
                                                       VersionSchema& schema)
     {
         uint64_t sizeInBytes = 0;
-        SC_TRY_IF(stream.serialize({&sizeInBytes, sizeof(sizeInBytes)}));
+        SC_TRY(stream.serialize({&sizeInBytes, sizeof(sizeInBytes)}));
         schema.advance();
         const bool isPacked =
             Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
@@ -205,11 +205,11 @@ struct SerializerReadVersioned<BinaryStream, SC::Array<T, N>>
         const uint32_t numDestinationItems = static_cast<uint32_t>(N);
         if (isPacked)
         {
-            SC_TRY_IF(object.resizeWithoutInitializing(min(numSourceItems, numDestinationItems)));
+            SC_TRY(object.resizeWithoutInitializing(min(numSourceItems, numDestinationItems)));
         }
         else
         {
-            SC_TRY_IF(object.resize(min(numSourceItems, numDestinationItems)));
+            SC_TRY(object.resize(min(numSourceItems, numDestinationItems)));
         }
         return SerializerReadVersionedItems<BinaryStream, T>::readVersioned(object.data(), stream, schema,
                                                                             numSourceItems, numDestinationItems);
@@ -223,7 +223,7 @@ struct SerializerReadVersioned<BinaryStream, T, typename SC::EnableIf<Reflection
     [[nodiscard]] static bool readCastValue(T& destination, BinaryStream& stream)
     {
         ValueType value;
-        SC_TRY_IF(stream.serialize({&value, sizeof(ValueType)}));
+        SC_TRY(stream.serialize({&value, sizeof(ValueType)}));
         destination = static_cast<T>(value);
         return true;
     }

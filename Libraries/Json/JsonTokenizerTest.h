@@ -20,10 +20,10 @@ struct SC::JsonTokenizerTest : public SC::TestCase
     {
         auto                 it = text.getIterator<It>();
         JsonTokenizer::Token token;
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::ObjectStart);
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::ObjectEnd);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.type == JsonTokenizer::Token::ObjectStart);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.type == JsonTokenizer::Token::ObjectEnd);
         return true;
     }
 
@@ -31,41 +31,41 @@ struct SC::JsonTokenizerTest : public SC::TestCase
     {
         auto                 it = text.getIterator<It>();
         JsonTokenizer::Token token;
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::ObjectStart);
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::String);
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::Colon);
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::Number);
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::ObjectEnd);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.type == JsonTokenizer::Token::ObjectStart);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.type == JsonTokenizer::Token::String);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.type == JsonTokenizer::Token::Colon);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.type == JsonTokenizer::Token::Number);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.type == JsonTokenizer::Token::ObjectEnd);
         return true;
     }
     static constexpr bool testTokenizeObjectWithTwoFields(StringView text)
     {
         auto                 it = text.getIterator<It>();
         JsonTokenizer::Token token;
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::ObjectStart);
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::String);
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::Colon);
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::Number);
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::Comma);
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::String);
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::Colon);
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::Number);
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.type == JsonTokenizer::Token::ObjectStart);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.type == JsonTokenizer::Token::String);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.type == JsonTokenizer::Token::Colon);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.type == JsonTokenizer::Token::Number);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.type == JsonTokenizer::Token::Comma);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.type == JsonTokenizer::Token::String);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.type == JsonTokenizer::Token::Colon);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.type == JsonTokenizer::Token::Number);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
 
-        SC_TRY_IF(token.type == JsonTokenizer::Token::ObjectEnd);
+        SC_TRY(token.type == JsonTokenizer::Token::ObjectEnd);
         return true;
     }
     [[nodiscard]] static constexpr JsonTokenizer::Token scanToken(StringView text)

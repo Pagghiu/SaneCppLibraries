@@ -89,13 +89,13 @@ struct SC::ResultTest : public SC::TestCase
 
     Result<int> nestedFail1(bool fail)
     {
-        SC_TRY(int value, nestedFail2(fail));
+        SC_TRY_UNWRAP(int value, nestedFail2(fail));
         return value + 1;
     }
 
     Result<int> nestedFail2(bool fail)
     {
-        SC_TRY(auto value, getString(fail));
+        SC_TRY_UNWRAP(auto value, getString(fail));
         return static_cast<int>(value.size());
     }
 };

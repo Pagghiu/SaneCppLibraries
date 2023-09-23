@@ -54,7 +54,7 @@ struct SC::Process
     template <typename... StringView>
     [[nodiscard]] ReturnCode launch(StringView&&... args)
     {
-        SC_TRY_IF(formatArguments({forward<StringView>(args)...}));
+        SC_TRY(formatArguments({forward<StringView>(args)...}));
         return launch();
     }
     [[nodiscard]] ReturnCode launch(ProcessOptions options = {});

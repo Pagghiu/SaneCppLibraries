@@ -46,7 +46,7 @@ SC::ReturnCode SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFa
                                             SocketFlags::BlockingType    blocking,
                                             SocketFlags::InheritableType inheritable)
 {
-    SC_TRY_IF(SystemFunctions::isNetworkingInited());
+    SC_TRY(SystemFunctions::isNetworkingInited());
     SC_TRUST_RESULT(close());
 
     int typeWithAdditions = SocketFlags::toNative(socketType);
@@ -69,13 +69,13 @@ SC::ReturnCode SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFa
 #if !defined(SOCK_CLOEXEC)
     if (inheritable == SocketFlags::NonInheritable)
     {
-        SC_TRY_IF(setInheritable(false));
+        SC_TRY(setInheritable(false));
     }
 #endif // !defined(SOCK_CLOEXEC)
 #if !defined(SOCK_NONBLOCK)
     if (blocking == SocketFlags::NonBlocking)
     {
-        SC_TRY_IF(setBlocking(false));
+        SC_TRY(setBlocking(false));
     }
 #endif // !defined(SOCK_NONBLOCK)
 

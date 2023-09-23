@@ -66,7 +66,7 @@ struct BinarySkipper
 
         if (isPacked)
         {
-            SC_TRY_IF(sourceObject.advance(structSourceProperty.sizeInBytes));
+            SC_TRY(sourceObject.advance(structSourceProperty.sizeInBytes));
         }
         else
         {
@@ -75,7 +75,7 @@ struct BinarySkipper
                 sourceTypeIndex = structSourceTypeIndex + idx + 1;
                 if (sourceProperties.data()[sourceTypeIndex].getLinkIndex() >= 0)
                     sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
-                SC_TRY_IF(skip());
+                SC_TRY(skip());
             }
         }
         return true;
@@ -90,7 +90,7 @@ struct BinarySkipper
         uint64_t sourceNumBytes = arraySourceProperty.sizeInBytes;
         if (arraySourceProperty.type == Reflection::MetaType::TypeVector)
         {
-            SC_TRY_IF(sourceObject.serialize(SpanVoid<void>(&sourceNumBytes, sizeof(uint64_t))));
+            SC_TRY(sourceObject.serialize(SpanVoid<void>(&sourceNumBytes, sizeof(uint64_t))));
         }
 
         const bool isPacked = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
@@ -108,7 +108,7 @@ struct BinarySkipper
                 sourceTypeIndex = itemSourceTypeIndex;
                 if (sourceProperties.data()[sourceTypeIndex].getLinkIndex() >= 0)
                     sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
-                SC_TRY_IF(skip());
+                SC_TRY(skip());
             }
             return true;
         }

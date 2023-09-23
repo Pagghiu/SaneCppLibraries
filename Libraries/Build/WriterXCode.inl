@@ -25,43 +25,43 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     [[nodiscard]] bool prepare(StringView destinationDirectory, const Project& project, Renderer& renderer)
     {
-        SC_TRY_IF(fillXCodeFiles(destinationDirectory, project, renderer.renderItems));
-        SC_TRY_IF(fillXCodeFrameworks(project, renderer.renderItems));
-        SC_TRY_IF(fillXCodeConfigurations(project, renderer.renderItems));
-        SC_TRY_IF(fillFileGroups(renderer.rootGroup, renderer.renderItems));
-        SC_TRY_IF(fillProductGroup(project, renderer.rootGroup));
-        SC_TRY_IF(fillFrameworkGroup(project, renderer.rootGroup, renderer.renderItems));
+        SC_TRY(fillXCodeFiles(destinationDirectory, project, renderer.renderItems));
+        SC_TRY(fillXCodeFrameworks(project, renderer.renderItems));
+        SC_TRY(fillXCodeConfigurations(project, renderer.renderItems));
+        SC_TRY(fillFileGroups(renderer.rootGroup, renderer.renderItems));
+        SC_TRY(fillProductGroup(project, renderer.rootGroup));
+        SC_TRY(fillFrameworkGroup(project, renderer.rootGroup, renderer.renderItems));
         return true;
     }
 
     [[nodiscard]] bool computeReferenceHash(StringView name, String& hash)
     {
-        SC_TRY_IF(hashing.setType(Hashing::TypeSHA1));
-        SC_TRY_IF(hashing.update("reference_"_a8.toVoidSpan()));
-        SC_TRY_IF(hashing.update(name.toVoidSpan()));
+        SC_TRY(hashing.setType(Hashing::TypeSHA1));
+        SC_TRY(hashing.update("reference_"_a8.toVoidSpan()));
+        SC_TRY(hashing.update(name.toVoidSpan()));
         Hashing::Result res;
-        SC_TRY_IF(hashing.finalize(res));
+        SC_TRY(hashing.finalize(res));
         SmallString<64> tmpHash = StringEncoding::Ascii;
-        SC_TRY_IF(StringBuilder(tmpHash).appendHex(res.toSpanVoid()));
+        SC_TRY(StringBuilder(tmpHash).appendHex(res.toSpanVoid()));
         return hash.assign(tmpHash.view().sliceStartLength(0, 24));
     }
 
     [[nodiscard]] bool computeBuildHash(StringView name, String& hash)
     {
-        SC_TRY_IF(hashing.setType(Hashing::TypeSHA1));
-        SC_TRY_IF(hashing.update("build_"_a8.toVoidSpan()));
-        SC_TRY_IF(hashing.update(name.toVoidSpan()));
+        SC_TRY(hashing.setType(Hashing::TypeSHA1));
+        SC_TRY(hashing.update("build_"_a8.toVoidSpan()));
+        SC_TRY(hashing.update(name.toVoidSpan()));
         Hashing::Result res;
-        SC_TRY_IF(hashing.finalize(res));
+        SC_TRY(hashing.finalize(res));
         SmallString<64> tmpHash = StringEncoding::Ascii;
-        SC_TRY_IF(StringBuilder(tmpHash).appendHex(res.toSpanVoid()));
+        SC_TRY(StringBuilder(tmpHash).appendHex(res.toSpanVoid()));
         return hash.assign(tmpHash.view().sliceStartLength(0, 24));
     }
 
     [[nodiscard]] bool fillFileGroups(RenderGroup& group, const Vector<RenderItem>& xcodeFiles)
     {
-        SC_TRY_IF(group.referenceHash.assign("7B0074092A73143F00660B94"));
-        SC_TRY_IF(group.name.assign("/"));
+        SC_TRY(group.referenceHash.assign("7B0074092A73143F00660B94"));
+        SC_TRY(group.name.assign("/"));
         for (const auto& file : xcodeFiles)
         {
             StringViewTokenizer tokenizer(file.referencePath.view());
@@ -75,11 +75,11 @@ struct SC::Build::ProjectWriter::WriterXCode
                     if (tokenizer.isFinished())
                     {
                         // for the leafs we hash just the name
-                        SC_TRY_IF(computeReferenceHash(tokenizer.component, current->referenceHash));
+                        SC_TRY(computeReferenceHash(tokenizer.component, current->referenceHash));
                     }
                     else
                     {
-                        SC_TRY_IF(computeReferenceHash(tokenizer.processed, current->referenceHash));
+                        SC_TRY(computeReferenceHash(tokenizer.processed, current->referenceHash));
                     }
                 }
             }
@@ -90,31 +90,31 @@ struct SC::Build::ProjectWriter::WriterXCode
     [[nodiscard]] bool fillProductGroup(const Project& project, RenderGroup& group)
     {
         auto products = group.children.getOrCreate("Products"_a8);
-        SC_TRY_IF(products != nullptr);
-        SC_TRY_IF(products->name.assign("Products"));
-        SC_TRY_IF(products->referenceHash.assign("7B0074132A73143F00660B94"));
+        SC_TRY(products != nullptr);
+        SC_TRY(products->name.assign("Products"));
+        SC_TRY(products->referenceHash.assign("7B0074132A73143F00660B94"));
         auto test = products->children.getOrCreate(project.targetName.view());
-        SC_TRY_IF(test != nullptr);
-        SC_TRY_IF(test->name.assign(project.targetName.view()));
-        SC_TRY_IF(test->referenceHash.assign("7B0074122A73143F00660B94"));
+        SC_TRY(test != nullptr);
+        SC_TRY(test->name.assign(project.targetName.view()));
+        SC_TRY(test->referenceHash.assign("7B0074122A73143F00660B94"));
         return true;
     }
 
     [[nodiscard]] bool fillFrameworkGroup(const Project&, RenderGroup& group, Vector<RenderItem>& xcodeFiles)
     {
         auto frameworksGroup = group.children.getOrCreate("Frameworks"_a8);
-        SC_TRY_IF(frameworksGroup != nullptr);
-        SC_TRY_IF(frameworksGroup->name.assign("Frameworks"));
-        SC_TRY_IF(frameworksGroup->referenceHash.assign("7B3D0EF12A74DEEF00AE03EE"));
+        SC_TRY(frameworksGroup != nullptr);
+        SC_TRY(frameworksGroup->name.assign("Frameworks"));
+        SC_TRY(frameworksGroup->referenceHash.assign("7B3D0EF12A74DEEF00AE03EE"));
 
         for (auto it : xcodeFiles)
         {
             if (it.type == RenderItem::Framework)
             {
                 auto framework = frameworksGroup->children.getOrCreate(it.name);
-                SC_TRY_IF(framework != nullptr);
-                SC_TRY_IF(framework->name.assign(it.name.view()));
-                SC_TRY_IF(framework->referenceHash.assign(it.referenceHash.view()));
+                SC_TRY(framework != nullptr);
+                SC_TRY(framework->name.assign(it.name.view()));
+                SC_TRY(framework->referenceHash.assign(it.referenceHash.view()));
             }
         }
         return true;
@@ -124,31 +124,31 @@ struct SC::Build::ProjectWriter::WriterXCode
     {
         if (parentGroup.name == "/")
         {
-            SC_TRY_IF(builder.append("        {} = {{\n", parentGroup.referenceHash));
+            SC_TRY(builder.append("        {} = {{\n", parentGroup.referenceHash));
         }
         else
         {
-            SC_TRY_IF(builder.append("        {} /* {} */ = {{\n", parentGroup.referenceHash, parentGroup.name));
+            SC_TRY(builder.append("        {} /* {} */ = {{\n", parentGroup.referenceHash, parentGroup.name));
         }
 
-        SC_TRY_IF(builder.append("            isa = PBXGroup;\n"));
-        SC_TRY_IF(builder.append("            children = (\n"));
+        SC_TRY(builder.append("            isa = PBXGroup;\n"));
+        SC_TRY(builder.append("            children = (\n"));
         for (const auto& group : parentGroup.children)
         {
-            SC_TRY_IF(builder.append("                {} /* {} */,\n", group.value.referenceHash, group.value.name));
+            SC_TRY(builder.append("                {} /* {} */,\n", group.value.referenceHash, group.value.name));
         }
-        SC_TRY_IF(builder.append("            );\n"));
+        SC_TRY(builder.append("            );\n"));
         if (parentGroup.name != "/")
         {
-            SC_TRY_IF(builder.append("            name = {};\n", parentGroup.name));
+            SC_TRY(builder.append("            name = {};\n", parentGroup.name));
         }
-        SC_TRY_IF(builder.append("            sourceTree = \"<group>\";\n"));
-        SC_TRY_IF(builder.append("        };\n"));
+        SC_TRY(builder.append("            sourceTree = \"<group>\";\n"));
+        SC_TRY(builder.append("        };\n"));
         for (const auto& group : parentGroup.children)
         {
             if (not group.value.children.isEmpty())
             {
-                SC_TRY_IF(printGroupRecursive(builder, group.value));
+                SC_TRY(printGroupRecursive(builder, group.value));
             }
         }
         return true;
@@ -262,8 +262,8 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
             if (it.type == RenderItem::Framework)
             {
-                SC_TRY_IF(builder.append("\n                {} /* {} in Frameworks */,", it.buildHash.view(),
-                                         it.name.view()));
+                SC_TRY(builder.append("\n                {} /* {} in Frameworks */,", it.buildHash.view(),
+                                      it.name.view()));
             }
         }
         builder.append(R"delimiter(
@@ -379,12 +379,12 @@ struct SC::Build::ProjectWriter::WriterXCode
         auto includes = project.compile.get<Compile::includePaths>();
         if (includes and not includes->isEmpty())
         {
-            SC_TRY_IF(builder.append("\n                       HEADER_SEARCH_PATHS = ("));
+            SC_TRY(builder.append("\n                       HEADER_SEARCH_PATHS = ("));
             for (auto it : *includes)
             {
-                SC_TRY_IF(builder.append("\n                       \"{}\",", it.view())); // TODO: Escape double quotes
+                SC_TRY(builder.append("\n                       \"{}\",", it.view())); // TODO: Escape double quotes
             }
-            SC_TRY_IF(builder.append("\n                       );"));
+            SC_TRY(builder.append("\n                       );"));
         }
         return true;
     }
@@ -396,13 +396,13 @@ struct SC::Build::ProjectWriter::WriterXCode
         if ((defines and not defines->isEmpty()) or (configDefines and not configDefines->isEmpty()))
         {
             opened = true;
-            SC_TRY_IF(builder.append("\n                       GCC_PREPROCESSOR_DEFINITIONS = ("));
+            SC_TRY(builder.append("\n                       GCC_PREPROCESSOR_DEFINITIONS = ("));
         }
         if (defines)
         {
             for (auto& it : *defines)
             {
-                SC_TRY_IF(builder.append("\n                       \"{}\",", it.view())); // TODO: Escape double quotes
+                SC_TRY(builder.append("\n                       \"{}\",", it.view())); // TODO: Escape double quotes
             }
         }
 
@@ -410,13 +410,13 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
             for (auto it : *configDefines)
             {
-                SC_TRY_IF(builder.append("\n                       \"{}\",", it.view())); // TODO: Escape double quotes
+                SC_TRY(builder.append("\n                       \"{}\",", it.view())); // TODO: Escape double quotes
             }
         }
         if (opened)
         {
-            SC_TRY_IF(builder.append("\n                       \"$(inherited)\","));
-            SC_TRY_IF(builder.append("\n                       );"));
+            SC_TRY(builder.append("\n                       \"$(inherited)\","));
+            SC_TRY(builder.append("\n                       );"));
         }
 
         return true;
@@ -506,7 +506,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         writeCommonOptions(builder);
 
         const Configuration* configuration = project.getConfiguration(xcodeObject.name.view());
-        SC_TRY_IF(configuration != nullptr);
+        SC_TRY(configuration != nullptr);
         builder.append("\n                       CONFIGURATION_BUILD_DIR = \"");
         builder.appendReplaceMultiple(configuration->outputPath.view(), {{"$(SC_GENERATOR)", "xcode13"}});
         builder.append("\";");
@@ -584,7 +584,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
             if (configuration.type == RenderItem::Configuration)
             {
-                SC_TRY_IF(writeConfiguration(builder, project, configuration));
+                SC_TRY(writeConfiguration(builder, project, configuration));
             }
         }
 
@@ -662,11 +662,11 @@ struct SC::Build::ProjectWriter::WriterXCode
     [[nodiscard]] bool fillXCodeFiles(StringView destinationDirectory, const Project& project,
                                       Vector<RenderItem>& outputFiles)
     {
-        SC_TRY_IF(WriterInternal::fillFiles(definitionCompiler, destinationDirectory, project, outputFiles));
+        SC_TRY(WriterInternal::fillFiles(definitionCompiler, destinationDirectory, project, outputFiles));
         for (auto& it : outputFiles)
         {
-            SC_TRY_IF(computeReferenceHash(it.name.view(), it.referenceHash));
-            SC_TRY_IF(computeBuildHash(it.name.view(), it.buildHash));
+            SC_TRY(computeReferenceHash(it.name.view(), it.referenceHash));
+            SC_TRY(computeBuildHash(it.name.view(), it.buildHash));
         }
         return true;
     }
@@ -674,16 +674,16 @@ struct SC::Build::ProjectWriter::WriterXCode
     [[nodiscard]] bool fillXCodeFrameworks(const Project& project, Vector<RenderItem>& xcodeObjects)
     {
         auto frameworks = project.link.get<Link::libraryFrameworks>();
-        SC_TRY_IF(frameworks != nullptr);
+        SC_TRY(frameworks != nullptr);
         for (auto it : *frameworks)
         {
             RenderItem xcodeFile;
             xcodeFile.name = Path::basename(it.view(), Path::AsPosix);
             xcodeFile.type = RenderItem::Framework;
-            SC_TRY_IF(Path::join(xcodeFile.path, {"System/Library/Frameworks", xcodeFile.name.view()}, "/"));
-            SC_TRY_IF(computeBuildHash(xcodeFile.name.view(), xcodeFile.buildHash));
-            SC_TRY_IF(computeReferenceHash(xcodeFile.name.view(), xcodeFile.referenceHash));
-            SC_TRY_IF(xcodeObjects.push_back(move(xcodeFile)));
+            SC_TRY(Path::join(xcodeFile.path, {"System/Library/Frameworks", xcodeFile.name.view()}, "/"));
+            SC_TRY(computeBuildHash(xcodeFile.name.view(), xcodeFile.buildHash));
+            SC_TRY(computeReferenceHash(xcodeFile.name.view(), xcodeFile.referenceHash));
+            SC_TRY(xcodeObjects.push_back(move(xcodeFile)));
         }
         return true;
     }
@@ -694,10 +694,10 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
             RenderItem xcodeObject;
             xcodeObject.type = RenderItem::Configuration;
-            SC_TRY_IF(xcodeObject.name.assign(configuration.name.view()));
-            SC_TRY_IF(computeReferenceHash(configuration.name.view(), xcodeObject.referenceHash));
-            SC_TRY_IF(computeBuildHash(configuration.name.view(), xcodeObject.buildHash));
-            SC_TRY_IF(xcodeObjects.push_back(move(xcodeObject)));
+            SC_TRY(xcodeObject.name.assign(configuration.name.view()));
+            SC_TRY(computeReferenceHash(configuration.name.view(), xcodeObject.referenceHash));
+            SC_TRY(computeBuildHash(configuration.name.view(), xcodeObject.buildHash));
+            SC_TRY(xcodeObjects.push_back(move(xcodeObject)));
         }
         return true;
     }

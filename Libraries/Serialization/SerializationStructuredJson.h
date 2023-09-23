@@ -38,7 +38,7 @@ struct SC::SerializationStructuredTemplate::SerializationJsonWriter
     template <typename Container>
     [[nodiscard]] bool startArray(uint32_t index, Container& container, uint32_t& size)
     {
-        SC_TRY_IF(eventuallyAddComma(index));
+        SC_TRY(eventuallyAddComma(index));
         size = static_cast<uint32_t>(container.size());
         return output.write("["_a8);
     }
@@ -60,7 +60,7 @@ struct SC::SerializationStructuredTemplate::SerializationJsonWriter
     template <typename T>
     [[nodiscard]] bool serialize(uint32_t index, T value)
     {
-        SC_TRY_IF(eventuallyAddComma(index));
+        SC_TRY(eventuallyAddComma(index));
         return StringFormatterFor<T>::format(output, StringView(), value);
     }
 
@@ -90,9 +90,9 @@ struct SC::SerializationStructuredTemplate::SerializationJsonReader
     template <typename Container>
     [[nodiscard]] bool startArray(uint32_t index, Container& container, uint32_t& size)
     {
-        SC_TRY_IF(eventuallyExpectComma(index));
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(iterator, token));
-        SC_TRY_IF(token.type == JsonTokenizer::Token::ArrayStart);
+        SC_TRY(eventuallyExpectComma(index));
+        SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
+        SC_TRY(token.type == JsonTokenizer::Token::ArrayStart);
         return endArrayItem(container, size);
     }
 
@@ -100,11 +100,11 @@ struct SC::SerializationStructuredTemplate::SerializationJsonReader
     [[nodiscard]] bool endArrayItem(Container& container, uint32_t& size)
     {
         auto iteratorBackup = iterator;
-        SC_TRY_IF(JsonTokenizer::tokenizeNext(iterator, token));
+        SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
         if (token.type != JsonTokenizer::Token::ArrayEnd)
         {
             size += 1;
-            SC_TRY_IF(container.resize(size));
+            SC_TRY(container.resize(size));
         }
         iterator = iteratorBackup;
         return true;

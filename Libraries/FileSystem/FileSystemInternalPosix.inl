@@ -103,7 +103,7 @@ struct SC::FileSystem::Internal
     [[nodiscard]] static bool formatError(int errorNumber, String& buffer)
     {
         buffer.encoding = StringEncoding::Utf8;
-        SC_TRY_IF(buffer.data.resizeWithoutInitializing(buffer.data.capacity()));
+        SC_TRY(buffer.data.resizeWithoutInitializing(buffer.data.capacity()));
         const int res = strerror_r(errorNumber, buffer.nativeWritableBytesIncludingTerminator(),
                                    buffer.sizeInBytesIncludingTerminator());
         if (res == 0)

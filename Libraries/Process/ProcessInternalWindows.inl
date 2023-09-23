@@ -26,7 +26,7 @@ struct SC::Process::Internal
 SC::ReturnCode SC::Process::waitForExitSync()
 {
     HANDLE hProcess;
-    SC_TRY_IF(handle.get(hProcess, ReturnCode("ProcesEntry::waitProcessExit - Invalid handle"_a8)));
+    SC_TRY(handle.get(hProcess, ReturnCode("ProcesEntry::waitProcessExit - Invalid handle"_a8)));
     WaitForSingleObject(hProcess, INFINITE);
     DWORD processStatus;
     if (GetExitCodeProcess(hProcess, &processStatus))
@@ -58,15 +58,15 @@ SC::ReturnCode SC::Process::launch(ProcessOptions options)
 
     if (standardInput.isValid())
     {
-        SC_TRY_IF(standardInput.get(startupInfo.hStdInput, false));
+        SC_TRY(standardInput.get(startupInfo.hStdInput, false));
     }
     if (standardOutput.isValid())
     {
-        SC_TRY_IF(standardOutput.get(startupInfo.hStdOutput, false));
+        SC_TRY(standardOutput.get(startupInfo.hStdOutput, false));
     }
     if (standardError.isValid())
     {
-        SC_TRY_IF(standardError.get(startupInfo.hStdError, false));
+        SC_TRY(standardError.get(startupInfo.hStdError, false));
     }
     if (someRedirection)
     {
@@ -98,9 +98,9 @@ SC::ReturnCode SC::Process::launch(ProcessOptions options)
     CloseHandle(processInfo.hThread);
 
     SC_TRY_ASSIGN(processID.pid, processInfo.dwProcessId, "processInfo.dwProcessId exceeds processID.pid"_a8);
-    SC_TRY_IF(handle.assign(processInfo.hProcess));
-    SC_TRY_IF(standardInput.close());
-    SC_TRY_IF(standardOutput.close());
-    SC_TRY_IF(standardError.close());
+    SC_TRY(handle.assign(processInfo.hProcess));
+    SC_TRY(standardInput.close());
+    SC_TRY(standardOutput.close());
+    SC_TRY(standardError.close());
     return true;
 }

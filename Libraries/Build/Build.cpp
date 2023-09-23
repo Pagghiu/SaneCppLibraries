@@ -19,13 +19,13 @@ bool SC::Build::Project::addPresetConfiguration(Configuration::Preset preset, St
     Configuration configuration;
     if (configurationName.isEmpty())
     {
-        SC_TRY_IF(configuration.name.assign(Configuration::PresetToString(preset)));
+        SC_TRY(configuration.name.assign(Configuration::PresetToString(preset)));
     }
     else
     {
-        SC_TRY_IF(configuration.name.assign(configurationName));
+        SC_TRY(configuration.name.assign(configurationName));
     }
-    SC_TRY_IF(configuration.applyPreset(preset));
+    SC_TRY(configuration.applyPreset(preset));
     return configurations.push_back(configuration);
 }
 
@@ -72,7 +72,7 @@ SC::ReturnCode SC::Build::Workspace::validate() const
 {
     for (const auto& project : projects)
     {
-        SC_TRY_IF(project.validate());
+        SC_TRY(project.validate());
     }
     return true;
 }
@@ -81,7 +81,7 @@ SC::ReturnCode SC::Build::DefinitionCompiler::validate()
 {
     for (const auto& workspace : definition.workspaces)
     {
-        SC_TRY_IF(workspace.validate());
+        SC_TRY(workspace.validate());
     }
     return true;
 }
@@ -89,10 +89,10 @@ SC::ReturnCode SC::Build::DefinitionCompiler::validate()
 SC::ReturnCode SC::Build::DefinitionCompiler::build()
 {
     Map<String, Set<Project::File>> uniquePaths;
-    SC_TRY_IF(collectUniqueRootPaths(uniquePaths));
+    SC_TRY(collectUniqueRootPaths(uniquePaths));
     for (auto& it : uniquePaths)
     {
-        SC_TRY_IF(fillPathsList(it.key.view(), it.value, resolvedPaths));
+        SC_TRY(fillPathsList(it.key.view(), it.value, resolvedPaths));
     }
     return true;
 }
@@ -120,14 +120,14 @@ SC::ReturnCode SC::Build::DefinitionCompiler::fillPathsList(StringView path, con
     {
         Project::File file;
         file.operation = filter.operation;
-        SC_TRY_IF(file.mask.assign(path));
-        SC_TRY_IF(Path::append(file.mask, {filter.mask.view()}, Path::AsPosix));
-        SC_TRY_IF(renderedFilters.push_back(move(file)));
+        SC_TRY(file.mask.assign(path));
+        SC_TRY(Path::append(file.mask, {filter.mask.view()}, Path::AsPosix));
+        SC_TRY(renderedFilters.push_back(move(file)));
     }
 
     FileSystemWalker walker;
     walker.options.forwardSlashes = true;
-    SC_TRY_IF(walker.init(path));
+    SC_TRY(walker.init(path));
 
     while (walker.enumerateNext())
     {
@@ -135,7 +135,7 @@ SC::ReturnCode SC::Build::DefinitionCompiler::fillPathsList(StringView path, con
         if (doRecurse and item.isDirectory())
         {
             // TODO: Check if it's possible to optimize entire subdirectory out in some cases
-            SC_TRY_IF(walker.recurseSubdirectory());
+            SC_TRY(walker.recurseSubdirectory());
         }
         else
         {
@@ -143,7 +143,7 @@ SC::ReturnCode SC::Build::DefinitionCompiler::fillPathsList(StringView path, con
             {
                 if (StringAlgorithms::matchWildcard(filter.mask.view(), item.path))
                 {
-                    SC_TRY_IF(filtersToFiles.getOrCreate(filter.mask)->push_back(item.path));
+                    SC_TRY(filtersToFiles.getOrCreate(filter.mask)->push_back(item.path));
                 }
             }
         }
@@ -161,8 +161,8 @@ SC::ReturnCode SC::Build::DefinitionCompiler::collectUniqueRootPaths(Map<String,
         {
             for (const Project::File& file : project.files)
             {
-                SC_TRY_IF(buffer.assign(project.rootDirectory.view()));
-                SC_TRY_IF(Path::append(buffer, file.base.view(), Path::AsPosix));
+                SC_TRY(buffer.assign(project.rootDirectory.view()));
+                SC_TRY(Path::append(buffer, file.base.view(), Path::AsPosix));
                 // Some example cases:
                 // 1. /SC/Tests/SCTest
                 // 2. /SC/Libraries
@@ -177,7 +177,7 @@ SC::ReturnCode SC::Build::DefinitionCompiler::collectUniqueRootPaths(Map<String,
                     if (it.key.view().fullyOverlaps(buffer.view(), commonOverlap))
                     {
                         // they are the same (Case 4. after 2. has been inserted)
-                        SC_TRY_IF(it.value.insert(file));
+                        SC_TRY(it.value.insert(file));
                         shouldInsert = false;
                         break;
                     }
@@ -193,10 +193,10 @@ SC::ReturnCode SC::Build::DefinitionCompiler::collectUniqueRootPaths(Map<String,
                                 // Case .3 after 2 (can be merged)
                                 Project::File mergedFile;
                                 mergedFile.operation = file.operation;
-                                SC_TRY_IF(mergedFile.base.assign(it.value.begin()->base.view()));
-                                SC_TRY_IF(mergedFile.mask.assign(Path::removeStartingSeparator(overlapNew)));
-                                SC_TRY_IF(Path::append(mergedFile.mask, {file.mask.view()}, Path::AsPosix));
-                                SC_TRY_IF(it.value.insert(mergedFile));
+                                SC_TRY(mergedFile.base.assign(it.value.begin()->base.view()));
+                                SC_TRY(mergedFile.mask.assign(Path::removeStartingSeparator(overlapNew)));
+                                SC_TRY(Path::append(mergedFile.mask, {file.mask.view()}, Path::AsPosix));
+                                SC_TRY(it.value.insert(mergedFile));
                                 shouldInsert = false;
                                 break;
                             }
@@ -206,7 +206,7 @@ SC::ReturnCode SC::Build::DefinitionCompiler::collectUniqueRootPaths(Map<String,
                 if (shouldInsert)
                 {
                     auto* value = paths.getOrCreate(buffer);
-                    SC_TRY_IF(value != nullptr and value->insert(file));
+                    SC_TRY(value != nullptr and value->insert(file));
                 }
             }
         }
@@ -219,10 +219,10 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
     String normalizedDirectory = StringEncoding::Utf8;
     {
         Vector<StringView> components;
-        SC_TRY_IF(Path::normalize(destinationDirectory, components, &normalizedDirectory, Path::Type::AsPosix));
+        SC_TRY(Path::normalize(destinationDirectory, components, &normalizedDirectory, Path::Type::AsPosix));
     }
     FileSystem fs;
-    SC_TRY_IF(fs.init(normalizedDirectory.view()));
+    SC_TRY(fs.init(normalizedDirectory.view()));
     String prjName;
     switch (parameters.generator)
     {
@@ -231,60 +231,60 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
         WriterXCode           writer(definition, definitionCompiler);
         const Project&        project = definition.workspaces[0].projects[0];
         WriterXCode::Renderer renderer;
-        SC_TRY_IF(writer.prepare(normalizedDirectory.view(), project, renderer));
+        SC_TRY(writer.prepare(normalizedDirectory.view(), project, renderer));
         {
             StringBuilder sb(buffer, StringBuilder::Clear);
-            SC_TRY_IF(writer.writeProject(sb, project, renderer));
-            SC_TRY_IF(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj", filename));
-            SC_TRY_IF(fs.makeDirectoryIfNotExists({prjName.view()}));
-            SC_TRY_IF(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/project.pbxproj", filename));
-            SC_TRY_IF(fs.removeFileIfExists(prjName.view()));
-            SC_TRY_IF(fs.write(prjName.view(), buffer.view()));
+            SC_TRY(writer.writeProject(sb, project, renderer));
+            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj", filename));
+            SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
+            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/project.pbxproj", filename));
+            SC_TRY(fs.removeFileIfExists(prjName.view()));
+            SC_TRY(fs.write(prjName.view(), buffer.view()));
         }
         {
             StringBuilder sb(buffer, StringBuilder::Clear);
-            SC_TRY_IF(writer.writeScheme(sb, project, renderer, normalizedDirectory.view(), filename));
-            SC_TRY_IF(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/xcshareddata", filename));
-            SC_TRY_IF(fs.makeDirectoryIfNotExists({prjName.view()}));
-            SC_TRY_IF(
+            SC_TRY(writer.writeScheme(sb, project, renderer, normalizedDirectory.view(), filename));
+            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/xcshareddata", filename));
+            SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
+            SC_TRY(
                 StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/xcshareddata/xcschemes", filename));
-            SC_TRY_IF(fs.makeDirectoryIfNotExists({prjName.view()}));
-            SC_TRY_IF(StringBuilder(prjName, StringBuilder::Clear)
-                          .format("{}.xcodeproj/xcshareddata/xcschemes/{}.xcscheme", filename, filename));
-            SC_TRY_IF(fs.removeFileIfExists(prjName.view()));
-            SC_TRY_IF(fs.write(prjName.view(), buffer.view()));
+            SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
+            SC_TRY(StringBuilder(prjName, StringBuilder::Clear)
+                       .format("{}.xcodeproj/xcshareddata/xcschemes/{}.xcscheme", filename, filename));
+            SC_TRY(fs.removeFileIfExists(prjName.view()));
+            SC_TRY(fs.write(prjName.view(), buffer.view()));
         }
         break;
     }
     case Generator::VisualStudio2022: {
         String buffer1;
-        SC_TRY_IF(StringBuilder(prjName, StringBuilder::Clear).format("{}.vcxproj", filename));
+        SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.vcxproj", filename));
         WriterVisualStudio           writer(definition, definitionCompiler);
         WriterVisualStudio::Renderer renderer;
         const Project&               project = definition.workspaces[0].projects[0];
-        SC_TRY_IF(writer.prepare(normalizedDirectory.view(), project, renderer));
-        SC_TRY_IF(writer.generateGuidFor(project.name.view(), writer.hashing, writer.projectGuid));
+        SC_TRY(writer.prepare(normalizedDirectory.view(), project, renderer));
+        SC_TRY(writer.generateGuidFor(project.name.view(), writer.hashing, writer.projectGuid));
         {
             StringBuilder sb1(buffer1, StringBuilder::Clear);
-            SC_TRY_IF(writer.writeProject(sb1, project, renderer));
-            SC_TRY_IF(fs.removeFileIfExists(prjName.view()));
-            SC_TRY_IF(fs.write(prjName.view(), buffer1.view()));
+            SC_TRY(writer.writeProject(sb1, project, renderer));
+            SC_TRY(fs.removeFileIfExists(prjName.view()));
+            SC_TRY(fs.write(prjName.view(), buffer1.view()));
         }
         {
             StringBuilder sb1(buffer1, StringBuilder::Clear);
-            SC_TRY_IF(writer.writeFilters(sb1, renderer));
+            SC_TRY(writer.writeFilters(sb1, renderer));
             String prjFilterName;
-            SC_TRY_IF(StringBuilder(prjFilterName, StringBuilder::Clear).format("{}.vcxproj.filters", filename));
-            SC_TRY_IF(fs.removeFileIfExists(prjFilterName.view()));
-            SC_TRY_IF(fs.write(prjFilterName.view(), buffer1.view()));
+            SC_TRY(StringBuilder(prjFilterName, StringBuilder::Clear).format("{}.vcxproj.filters", filename));
+            SC_TRY(fs.removeFileIfExists(prjFilterName.view()));
+            SC_TRY(fs.write(prjFilterName.view(), buffer1.view()));
         }
         {
             StringBuilder sb1(buffer1, StringBuilder::Clear);
-            SC_TRY_IF(writer.writeSolution(sb1, prjName.view(), project));
+            SC_TRY(writer.writeSolution(sb1, prjName.view(), project));
             String slnName;
-            SC_TRY_IF(StringBuilder(slnName, StringBuilder::Clear).format("{}.sln", filename));
-            SC_TRY_IF(fs.removeFileIfExists(slnName.view()));
-            SC_TRY_IF(fs.write(slnName.view(), buffer1.view()));
+            SC_TRY(StringBuilder(slnName, StringBuilder::Clear).format("{}.sln", filename));
+            SC_TRY(fs.removeFileIfExists(slnName.view()));
+            SC_TRY(fs.write(slnName.view(), buffer1.view()));
         }
         break;
     }

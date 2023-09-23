@@ -22,17 +22,17 @@ SC::ReturnCode SC::ProcessChain::launch(ProcessChainOptions options)
 
     if (options.pipeSTDIN)
     {
-        SC_TRY_IF(processes.front->redirectStdInTo(inputPipe));
+        SC_TRY(processes.front->redirectStdInTo(inputPipe));
     }
 
     if (options.pipeSTDOUT)
     {
-        SC_TRY_IF(processes.back->redirectStdOutTo(outputPipe));
+        SC_TRY(processes.back->redirectStdOutTo(outputPipe));
     }
 
     if (options.pipeSTDERR)
     {
-        SC_TRY_IF(processes.back->redirectStdErrTo(errorPipe));
+        SC_TRY(processes.back->redirectStdErrTo(errorPipe));
     }
 
     for (Process* process = processes.front; process != nullptr; process = process->next)
@@ -45,9 +45,9 @@ SC::ReturnCode SC::ProcessChain::launch(ProcessChainOptions options)
             return error.returnCode;
         }
     }
-    SC_TRY_IF(inputPipe.readPipe.close());
-    SC_TRY_IF(outputPipe.writePipe.close());
-    SC_TRY_IF(errorPipe.writePipe.close());
+    SC_TRY(inputPipe.readPipe.close());
+    SC_TRY(outputPipe.writePipe.close());
+    SC_TRY(errorPipe.writePipe.close());
     return true;
 }
 
@@ -58,11 +58,11 @@ SC::ReturnCode SC::ProcessChain::pipe(Process& process, std::initializer_list<co
     if (not processes.isEmpty())
     {
         PipeDescriptor chainPipe;
-        SC_TRY_IF(chainPipe.createPipe(PipeDescriptor::ReadInheritable, PipeDescriptor::WriteInheritable));
-        SC_TRY_IF(processes.back->standardOutput.assign(move(chainPipe.writePipe)));
-        SC_TRY_IF(process.standardInput.assign(move(chainPipe.readPipe)));
+        SC_TRY(chainPipe.createPipe(PipeDescriptor::ReadInheritable, PipeDescriptor::WriteInheritable));
+        SC_TRY(processes.back->standardOutput.assign(move(chainPipe.writePipe)));
+        SC_TRY(process.standardInput.assign(move(chainPipe.readPipe)));
     }
-    SC_TRY_IF(process.formatArguments(Span<const StringView>(cmd)));
+    SC_TRY(process.formatArguments(Span<const StringView>(cmd)));
     process.parent = this;
     processes.queueBack(process);
     return true;
@@ -92,13 +92,13 @@ SC::ReturnCode SC::ProcessChain::waitForExitSync()
 {
     for (Process* process = processes.front; process != nullptr; process = process->next)
     {
-        SC_TRY_IF(process->waitForExitSync());
+        SC_TRY(process->waitForExitSync());
         process->parent = nullptr;
     }
     processes.clear();
-    SC_TRY_IF(inputPipe.writePipe.close());
-    SC_TRY_IF(outputPipe.readPipe.close());
-    SC_TRY_IF(errorPipe.readPipe.close());
+    SC_TRY(inputPipe.writePipe.close());
+    SC_TRY(outputPipe.readPipe.close());
+    SC_TRY(errorPipe.readPipe.close());
     return error.returnCode;
 }
 
@@ -111,19 +111,19 @@ SC::ReturnCode SC::Process::formatArguments(Span<const StringView> params)
     {
         if (not first)
         {
-            SC_TRY_IF(formattedCmd.appendNullTerminated(" "));
+            SC_TRY(formattedCmd.appendNullTerminated(" "));
         }
         first = false;
         if (svp.containsChar(' '))
         {
             // has space, must escape it
-            SC_TRY_IF(formattedCmd.appendNullTerminated("\""));
-            SC_TRY_IF(formattedCmd.appendNullTerminated(svp));
-            SC_TRY_IF(formattedCmd.appendNullTerminated("\""));
+            SC_TRY(formattedCmd.appendNullTerminated("\""));
+            SC_TRY(formattedCmd.appendNullTerminated(svp));
+            SC_TRY(formattedCmd.appendNullTerminated("\""));
         }
         else
         {
-            SC_TRY_IF(formattedCmd.appendNullTerminated(svp));
+            SC_TRY(formattedCmd.appendNullTerminated(svp));
         }
     }
     return true;
@@ -131,18 +131,18 @@ SC::ReturnCode SC::Process::formatArguments(Span<const StringView> params)
 
 SC::ReturnCode SC::Process::redirectStdOutTo(PipeDescriptor& pipe)
 {
-    SC_TRY_IF(pipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteInheritable));
+    SC_TRY(pipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteInheritable));
     return standardOutput.assign(move(pipe.writePipe));
 }
 
 SC::ReturnCode SC::Process::redirectStdErrTo(PipeDescriptor& pipe)
 {
-    SC_TRY_IF(pipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteInheritable));
+    SC_TRY(pipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteInheritable));
     return standardError.assign(move(pipe.writePipe));
 }
 
 SC::ReturnCode SC::Process::redirectStdInTo(PipeDescriptor& pipe)
 {
-    SC_TRY_IF(pipe.createPipe(PipeDescriptor::ReadInheritable, PipeDescriptor::WriteNonInheritable));
+    SC_TRY(pipe.createPipe(PipeDescriptor::ReadInheritable, PipeDescriptor::WriteNonInheritable));
     return standardInput.assign(move(pipe.readPipe));
 }

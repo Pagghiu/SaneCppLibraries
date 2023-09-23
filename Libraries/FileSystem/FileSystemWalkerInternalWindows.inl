@@ -58,12 +58,12 @@ struct SC::FileSystemWalker::Internal
         StringConverter currentPath(currentPathString);
         currentPath.clear();
         StackEntry entry;
-        SC_TRY_IF(currentPath.appendNullTerminated(directory));
+        SC_TRY(currentPath.appendNullTerminated(directory));
         entry.textLengthInBytes = currentPathString.view().sizeInBytesIncludingTerminator();
-        SC_TRY_IF(currentPath.appendNullTerminated(L"\\*.*"));
-        SC_TRY_IF(entry.init(currentPathString.view().getNullTerminatedNative(), dirEnumerator));
-        SC_TRY_IF(recurseStack.push_back(entry));
-        SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
+        SC_TRY(currentPath.appendNullTerminated(L"\\*.*"));
+        SC_TRY(entry.init(currentPathString.view().getNullTerminatedNative(), dirEnumerator));
+        SC_TRY(recurseStack.push_back(entry));
+        SC_TRY(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
         expectDotDirectories = true;
         return true;
     }
@@ -79,12 +79,11 @@ struct SC::FileSystemWalker::Internal
                 if (not FindNextFileW(parent.fileDescriptor, &dirEnumerator))
                 {
                     recurseStack.back().close();
-                    SC_TRY_IF(recurseStack.pop_back());
+                    SC_TRY(recurseStack.pop_back());
                     if (recurseStack.isEmpty())
                         return "Iteration Finished"_a8;
                     parent = recurseStack.back();
-                    SC_TRY_IF(
-                        currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
+                    SC_TRY(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
                     continue;
                 }
             }
@@ -106,9 +105,9 @@ struct SC::FileSystemWalker::Internal
 
         entry.name =
             StringView(dirEnumerator.cFileName, wcsnlen_s(dirEnumerator.cFileName, MAX_PATH) * sizeof(wchar_t), true);
-        SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
-        SC_TRY_IF(currentPath.appendNullTerminated(options.forwardSlashes ? L"/" : L"\\"));
-        SC_TRY_IF(currentPath.appendNullTerminated(entry.name));
+        SC_TRY(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
+        SC_TRY(currentPath.appendNullTerminated(options.forwardSlashes ? L"/" : L"\\"));
+        SC_TRY(currentPath.appendNullTerminated(entry.name));
         if (options.forwardSlashes)
         {
             // TODO: Probably this allocation could be avoided using StringBuilder instead of StringConverter
@@ -116,12 +115,12 @@ struct SC::FileSystemWalker::Internal
             StringBuilder sb(currentPathString, StringBuilder::Clear);
             if (copy.view().startsWith("\\\\"))
             {
-                SC_TRY_IF(sb.append("\\\\"));
-                SC_TRY_IF(sb.appendReplaceAll(copy.view().sliceStart(2), L"\\", L"/"));
+                SC_TRY(sb.append("\\\\"));
+                SC_TRY(sb.appendReplaceAll(copy.view().sliceStart(2), L"\\", L"/"));
             }
             else
             {
-                SC_TRY_IF(sb.appendReplaceAll(copy.view(), L"\\", L"/"));
+                SC_TRY(sb.appendReplaceAll(copy.view(), L"\\", L"/"));
             }
         }
         entry.path  = currentPathString.view();
@@ -131,7 +130,7 @@ struct SC::FileSystemWalker::Internal
             entry.type = Type::Directory;
             if (options.recursive)
             {
-                SC_TRY_IF(recurseSubdirectory(entry));
+                SC_TRY(recurseSubdirectory(entry));
             }
         }
         else
@@ -145,13 +144,13 @@ struct SC::FileSystemWalker::Internal
     {
         StringConverter currentPath(currentPathString);
         StackEntry      newParent;
-        SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
-        SC_TRY_IF(currentPath.appendNullTerminated(L"\\"));
-        SC_TRY_IF(currentPath.appendNullTerminated(entry.name));
+        SC_TRY(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
+        SC_TRY(currentPath.appendNullTerminated(L"\\"));
+        SC_TRY(currentPath.appendNullTerminated(entry.name));
         newParent.textLengthInBytes = currentPathString.view().sizeInBytesIncludingTerminator();
-        SC_TRY_IF(currentPath.appendNullTerminated(L"\\*.*"));
-        SC_TRY_IF(newParent.init(currentPathString.view().getNullTerminatedNative(), dirEnumerator));
-        SC_TRY_IF(recurseStack.push_back(newParent));
+        SC_TRY(currentPath.appendNullTerminated(L"\\*.*"));
+        SC_TRY(newParent.init(currentPathString.view().getNullTerminatedNative(), dirEnumerator));
+        SC_TRY(recurseStack.push_back(newParent));
         expectDotDirectories = true;
         return true;
     }

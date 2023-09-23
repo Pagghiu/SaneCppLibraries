@@ -55,7 +55,7 @@ SC::ReturnCode SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFa
                                             SocketFlags::BlockingType    blocking,
                                             SocketFlags::InheritableType inheritable)
 {
-    SC_TRY_IF(SystemFunctions::isNetworkingInited());
+    SC_TRY(SystemFunctions::isNetworkingInited());
     SC_TRUST_RESULT(close());
 
     DWORD flags = WSA_FLAG_OVERLAPPED;
@@ -69,6 +69,6 @@ SC::ReturnCode SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFa
     {
         return "WSASocketW failed"_a8;
     }
-    SC_TRY_IF(setBlocking(blocking == SocketFlags::Blocking));
+    SC_TRY(setBlocking(blocking == SocketFlags::Blocking));
     return isValid();
 }

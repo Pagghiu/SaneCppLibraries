@@ -20,25 +20,25 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
 
     [[nodiscard]] static bool generateGuidFor(const StringView name, Hashing& hashing, String& projectGuid)
     {
-        SC_TRY_IF(hashing.setType(Hashing::TypeSHA1));
-        SC_TRY_IF(hashing.update(name.toVoidSpan()));
-        SC_TRY_IF(hashing.update("_Guid"_a8.toVoidSpan()));
+        SC_TRY(hashing.setType(Hashing::TypeSHA1));
+        SC_TRY(hashing.update(name.toVoidSpan()));
+        SC_TRY(hashing.update("_Guid"_a8.toVoidSpan()));
         Hashing::Result res;
-        SC_TRY_IF(hashing.finalize(res));
+        SC_TRY(hashing.finalize(res));
         String hexString;
-        SC_TRY_IF(StringBuilder(hexString).appendHex(res.toSpanVoid()));
+        SC_TRY(StringBuilder(hexString).appendHex(res.toSpanVoid()));
         StringBuilder guidBuilder(projectGuid);
-        SC_TRY_IF(guidBuilder.append("{"));
-        SC_TRY_IF(guidBuilder.append(hexString.view().sliceStartEnd(0, 8)));
-        SC_TRY_IF(guidBuilder.append("-"));
-        SC_TRY_IF(guidBuilder.append(hexString.view().sliceStartEnd(8, 12)));
-        SC_TRY_IF(guidBuilder.append("-"));
-        SC_TRY_IF(guidBuilder.append(hexString.view().sliceStartEnd(12, 16)));
-        SC_TRY_IF(guidBuilder.append("-"));
-        SC_TRY_IF(guidBuilder.append(hexString.view().sliceStartEnd(16, 20)));
-        SC_TRY_IF(guidBuilder.append("-"));
-        SC_TRY_IF(guidBuilder.append(hexString.view().sliceStartEnd(20, 32)));
-        SC_TRY_IF(guidBuilder.append("}"));
+        SC_TRY(guidBuilder.append("{"));
+        SC_TRY(guidBuilder.append(hexString.view().sliceStartEnd(0, 8)));
+        SC_TRY(guidBuilder.append("-"));
+        SC_TRY(guidBuilder.append(hexString.view().sliceStartEnd(8, 12)));
+        SC_TRY(guidBuilder.append("-"));
+        SC_TRY(guidBuilder.append(hexString.view().sliceStartEnd(12, 16)));
+        SC_TRY(guidBuilder.append("-"));
+        SC_TRY(guidBuilder.append(hexString.view().sliceStartEnd(16, 20)));
+        SC_TRY(guidBuilder.append("-"));
+        SC_TRY(guidBuilder.append(hexString.view().sliceStartEnd(20, 32)));
+        SC_TRY(guidBuilder.append("}"));
         return true;
     }
 
@@ -60,20 +60,20 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             switch (config.architecture)
             {
             case Architecture::Any:
-                SC_TRY_IF(lambda(builder, project, config, "ARM64"));
-                SC_TRY_IF(lambda(builder, project, config, "Win32"));
-                SC_TRY_IF(lambda(builder, project, config, "x64"));
+                SC_TRY(lambda(builder, project, config, "ARM64"));
+                SC_TRY(lambda(builder, project, config, "Win32"));
+                SC_TRY(lambda(builder, project, config, "x64"));
                 break;
             case Architecture::Intel32: {
-                SC_TRY_IF(lambda(builder, project, config, "Win32"));
+                SC_TRY(lambda(builder, project, config, "Win32"));
                 break;
             }
             case Architecture::Intel64: {
-                SC_TRY_IF(lambda(builder, project, config, "x64"));
+                SC_TRY(lambda(builder, project, config, "x64"));
                 break;
             }
             case Architecture::Arm64: {
-                SC_TRY_IF(lambda(builder, project, config, "ARM64"));
+                SC_TRY(lambda(builder, project, config, "ARM64"));
                 break;
             }
             case Architecture::Wasm: {
@@ -445,13 +445,13 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
 
     [[nodiscard]] bool prepare(StringView destinationDirectory, const Project& project, Renderer& renderer)
     {
-        SC_TRY_IF(fillVisualStudioFiles(destinationDirectory, project, renderer.renderItems));
+        SC_TRY(fillVisualStudioFiles(destinationDirectory, project, renderer.renderItems));
         return true;
     }
     [[nodiscard]] bool fillVisualStudioFiles(StringView destinationDirectory, const Project& project,
                                              Vector<RenderItem>& outputFiles)
     {
-        SC_TRY_IF(WriterInternal::fillFiles(definitionCompiler, destinationDirectory, project, outputFiles));
+        SC_TRY(WriterInternal::fillFiles(definitionCompiler, destinationDirectory, project, outputFiles));
         return true;
     }
 
@@ -463,13 +463,13 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append(
             "<Project DefaultTargets=\"Build\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\n");
         builder.append("  <ItemGroup Label=\"ProjectConfigurations\">\n");
-        SC_TRY_IF(writeConfigurations(builder, project));
+        SC_TRY(writeConfigurations(builder, project));
         builder.append("  </ItemGroup>\n");
 
-        SC_TRY_IF(writeGlobals(builder, project));
+        SC_TRY(writeGlobals(builder, project));
         builder.append("  <Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.Default.props\" />\n");
-        SC_TRY_IF(writeConfigurationsProperties(builder, project));
-        SC_TRY_IF(writePropertySheets(builder, project));
+        SC_TRY(writeConfigurationsProperties(builder, project));
+        SC_TRY(writePropertySheets(builder, project));
         builder.append("  <PropertyGroup Label=\"UserMacros\" />\n");
 
         builder.append("  <Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.props\" />\n"
@@ -478,12 +478,12 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                        "  <ImportGroup Label=\"Shared\">\n"
                        "  </ImportGroup>\n");
 
-        SC_TRY_IF(writePropertyGroups(builder, project));
-        SC_TRY_IF(writeItemDefinitionGroups(builder, project));
-        SC_TRY_IF(writeSourceFiles(builder, project, renderer.renderItems));
-        SC_TRY_IF(writeHeaderFiles(builder, renderer.renderItems));
-        SC_TRY_IF(writeInlineFiles(builder, renderer.renderItems));
-        SC_TRY_IF(writeNatvisFiles(builder, renderer.renderItems));
+        SC_TRY(writePropertyGroups(builder, project));
+        SC_TRY(writeItemDefinitionGroups(builder, project));
+        SC_TRY(writeSourceFiles(builder, project, renderer.renderItems));
+        SC_TRY(writeHeaderFiles(builder, renderer.renderItems));
+        SC_TRY(writeInlineFiles(builder, renderer.renderItems));
+        SC_TRY(writeNatvisFiles(builder, renderer.renderItems));
 
         builder.append("  <Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.targets\" />\n"
                        "  <ImportGroup Label=\"ExtensionTargets\">\n"
@@ -552,8 +552,8 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     // Filters
     [[nodiscard]] bool fillFileGroups(RenderGroup& group, const Vector<RenderItem>& xcodeFiles)
     {
-        SC_TRY_IF(group.referenceHash.assign("None"));
-        SC_TRY_IF(group.name.assign("/"));
+        SC_TRY(group.referenceHash.assign("None"));
+        SC_TRY(group.name.assign("/"));
         for (const auto& file : xcodeFiles)
         {
             StringViewTokenizer tokenizer(file.referencePath.view());
@@ -566,7 +566,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                 if (current->name.isEmpty())
                 {
                     current->name = Path::removeStartingSeparator(tokenizer.processed);
-                    SC_TRY_IF(generateGuidFor(tokenizer.processed, hashing, current->referenceHash));
+                    SC_TRY(generateGuidFor(tokenizer.processed, hashing, current->referenceHash));
                 }
             }
         }
@@ -649,7 +649,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         }
         for (auto& it : folder.children)
         {
-            SC_TRY_IF(writeFiltersFolder(builder, it.value));
+            SC_TRY(writeFiltersFolder(builder, it.value));
         }
         SC_WARNING_RESTORE;
         return true;
@@ -658,7 +658,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     [[nodiscard]] bool writeFilters(StringBuilder& builder, Renderer& renderer)
     {
         SC_WARNING_DISABLE_UNUSED_RESULT;
-        SC_TRY_IF(fillFileGroups(renderer.rootGroup, renderer.renderItems));
+        SC_TRY(fillFileGroups(renderer.rootGroup, renderer.renderItems));
         builder.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
         builder.append(
             "<Project ToolsVersion=\"4.0\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\n");

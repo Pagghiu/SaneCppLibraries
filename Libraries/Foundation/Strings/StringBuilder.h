@@ -28,7 +28,7 @@ struct StringBuilder
     template <typename... Types>
     [[nodiscard]] bool append(StringView fmt, Types&&... args)
     {
-        SC_TRY_IF(StringConverter::popNulltermIfExists(stringData, encoding));
+        SC_TRY(StringConverter::popNulltermIfExists(stringData, encoding));
         StringFormatOutput sfo(encoding);
         sfo.redirectToBuffer(stringData);
         if (fmt.getEncoding() == StringEncoding::Ascii || fmt.getEncoding() == StringEncoding::Utf8)

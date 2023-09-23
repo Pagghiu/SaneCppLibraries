@@ -13,7 +13,7 @@
 
 SC::ReturnCode SC::PipeDescriptor::close()
 {
-    SC_TRY_IF(readPipe.close());
+    SC_TRY(readPipe.close());
     return writePipe.close();
 }
 
@@ -22,17 +22,17 @@ SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode) { return
 SC::ReturnCode SC::FileDescriptor::readUntilEOF(Vector<char_t>& destination)
 {
     char buffer[1024];
-    SC_TRY_IF(isValid());
+    SC_TRY(isValid());
     ReadResult readResult;
     while (not readResult.isEOF)
     {
-        SC_TRY(readResult, readAppend(destination, {buffer, sizeof(buffer)}));
+        SC_TRY_UNWRAP(readResult, readAppend(destination, {buffer, sizeof(buffer)}));
     }
     return true;
 }
 
 SC::ReturnCode SC::FileDescriptor::readUntilEOF(String& destination)
 {
-    SC_TRY_IF(readUntilEOF(destination.data));
+    SC_TRY(readUntilEOF(destination.data));
     return StringConverter::pushNullTerm(destination.data, destination.encoding);
 }

@@ -367,10 +367,10 @@ bool SC::Path::join(String& output, Span<const StringView> inputs, StringView se
     const size_t  numElements = inputs.sizeInElements();
     for (size_t idx = 0; idx < numElements; ++idx)
     {
-        SC_TRY_IF(sb.append(inputs.data()[idx]));
+        SC_TRY(sb.append(inputs.data()[idx]));
         if (idx + 1 != numElements)
         {
-            SC_TRY_IF(sb.append(separator));
+            SC_TRY(sb.append(separator));
         }
     }
     return true;
@@ -386,11 +386,11 @@ bool SC::Path::normalizeUNCAndTrimQuotes(StringView fileLocation, Vector<StringV
     if (fileLocation.startsWithChar('\\') and not fileLocation.startsWith("\\\\"))
     {
         // On MSVC __FILE__ when building on UNC paths reports a single starting backslash...
-        SC_TRY_IF(StringBuilder(fixUncPathsOnMSVC).format("\\{}", fileLocation));
+        SC_TRY(StringBuilder(fixUncPathsOnMSVC).format("\\{}", fileLocation));
         fileLocation = fixUncPathsOnMSVC.view();
     }
 #endif
-    SC_TRY_IF(Path::normalize(fileLocation, components, &outputPath, type));
+    SC_TRY(Path::normalize(fileLocation, components, &outputPath, type));
     return true;
 }
 
@@ -452,7 +452,7 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
         {
             if (components.isEmpty() or isDoubleDot(components.back()))
             {
-                SC_TRY_IF(components.push_back(component));
+                SC_TRY(components.push_back(component));
             }
             else
             {
@@ -466,7 +466,7 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
         }
         else
         {
-            SC_TRY_IF(components.push_back(component));
+            SC_TRY(components.push_back(component));
         }
     }
 
@@ -476,14 +476,14 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
         {
             auto res = join(*output, components.toSpanConst(),
                             type == AsPosix ? Posix::SeparatorStringView() : Windows::SeparatorStringView());
-            SC_TRY_IF(res);
+            SC_TRY(res);
             if (view.startsWith("\\\\"))
             {
                 // TODO: This is not very good, find a better way
                 String        other = output->getEncoding();
                 StringBuilder sb(other);
-                SC_TRY_IF(sb.append("\\\\"))
-                SC_TRY_IF(sb.append(output->view().sliceStart(2)));
+                SC_TRY(sb.append("\\\\"))
+                SC_TRY(sb.append(output->view().sliceStart(2)));
                 *output = move(other);
             }
             return res;
@@ -516,8 +516,8 @@ bool SC::Path::relativeFromTo(StringView source, StringView destination, String&
     if (!skipRelativeCheck)
     {
         Path::ParsedView pathViewSource, pathViewDestination;
-        SC_TRY_IF(Path::parse(source, pathViewSource, type));
-        SC_TRY_IF(Path::parse(destination, pathViewDestination, type));
+        SC_TRY(Path::parse(source, pathViewSource, type));
+        SC_TRY(Path::parse(destination, pathViewDestination, type));
         if (pathViewSource.root.isEmpty() or pathViewDestination.root.isEmpty())
             return false; // Relative paths are not supported
     }
@@ -539,14 +539,14 @@ bool SC::Path::relativeFromTo(StringView source, StringView destination, String&
     while (numSplits > 0)
     {
         numSplits -= 1;
-        SC_TRY_IF(builder.append(".."));
+        SC_TRY(builder.append(".."));
         switch (type)
         {
-        case AsWindows: SC_TRY_IF(builder.append(Windows::SeparatorStringView())); break;
-        case AsPosix: SC_TRY_IF(builder.append(Posix::SeparatorStringView())); break;
+        case AsWindows: SC_TRY(builder.append(Windows::SeparatorStringView())); break;
+        case AsPosix: SC_TRY(builder.append(Posix::SeparatorStringView())); break;
         }
     }
-    SC_TRY_IF(builder.append(Path::removeTrailingSeparator(slicedDest)));
+    SC_TRY(builder.append(Path::removeTrailingSeparator(slicedDest)));
     return true;
 }
 
@@ -569,8 +569,8 @@ bool SC::Path::appendTrailingSeparator(String& path, Type type)
         StringBuilder builder(path, StringBuilder::DoNotClear);
         switch (type)
         {
-        case AsWindows: SC_TRY_IF(builder.append(Windows::SeparatorStringView())); break;
-        case AsPosix: SC_TRY_IF(builder.append(Posix::SeparatorStringView())); break;
+        case AsWindows: SC_TRY(builder.append(Windows::SeparatorStringView())); break;
+        case AsPosix: SC_TRY(builder.append(Posix::SeparatorStringView())); break;
         }
     }
     return true;
@@ -585,8 +585,8 @@ bool SC::Path::append(String& output, Span<const StringView> paths, Type type)
         {
             return false;
         }
-        SC_TRY_IF(appendTrailingSeparator(output, type));
-        SC_TRY_IF(builder.append(path));
+        SC_TRY(appendTrailingSeparator(output, type));
+        SC_TRY(builder.append(path));
     }
     return true;
 }

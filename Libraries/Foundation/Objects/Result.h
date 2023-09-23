@@ -119,7 +119,7 @@ struct [[nodiscard]] SC::Result
         return value;
     }
 };
-#define SC_TRY_IF(expression)                                                                                          \
+#define SC_TRY(expression)                                                                                             \
     {                                                                                                                  \
         if (auto _exprResConv = (expression))                                                                          \
             SC_LIKELY                                                                                                  \
@@ -138,7 +138,7 @@ struct [[nodiscard]] SC::Result
             return SC::ReturnCode(failedMessage);                                                                      \
         }
 
-#define SC__TRY_IMPL2(assignment, expression, Counter)                                                                 \
+#define __SC__TRY_UNWRAP_IMPL2(assignment, expression, Counter)                                                        \
     auto _temporary_result##Counter = (expression);                                                                    \
     if (_temporary_result##Counter.isError())                                                                          \
         SC_UNLIKELY                                                                                                    \
@@ -146,23 +146,23 @@ struct [[nodiscard]] SC::Result
             return _temporary_result##Counter.releaseError();                                                          \
         }                                                                                                              \
     assignment = _temporary_result##Counter.releaseValue()
-#define SC__TRY_IMPL1(assignment, expression, Counter) SC__TRY_IMPL2(assignment, expression, Counter)
-#define SC_TRY(assignment, expression)                 SC__TRY_IMPL1(assignment, expression, __COUNTER__)
+#define __SC__TRY_UNWRAP_IMPL1(assignment, expression, Counter) __SC__TRY_UNWRAP_IMPL2(assignment, expression, Counter)
+#define SC_TRY_UNWRAP(assignment, expression)                   __SC__TRY_UNWRAP_IMPL1(assignment, expression, __COUNTER__)
 
-#define SC__MUST_IMPL2(assignment, expression, Counter)                                                                \
+#define __SC__MUST_IMPL2(assignment, expression, Counter)                                                              \
     auto _temporary_result##Counter = (expression);                                                                    \
     SC_DEBUG_ASSERT(not _temporary_result##Counter.isError());                                                         \
     assignment = _temporary_result##Counter.releaseValue()
 
-#define SC__MUST_IMPL1(assignment, expression, Counter) SC__MUST_IMPL2(assignment, expression, Counter)
+#define __SC__MUST_IMPL1(assignment, expression, Counter) __SC__MUST_IMPL2(assignment, expression, Counter)
 
-#define SC_MUST(assignment, expression) SC__MUST_IMPL1(assignment, expression, __COUNTER__)
+#define SC_MUST(assignment, expression) __SC__MUST_IMPL1(assignment, expression, __COUNTER__)
 #define SC_TRUST_RESULT(expression)     (void)expression
 
 #define SC_TRY_ASSIGN(destination, source, errorCode)                                                                  \
     {                                                                                                                  \
         constexpr auto maxValue = static_cast<decltype(destination)>(MaxValue());                                      \
-        if (processInfo.dwProcessId <= maxValue)                                                                       \
+        if (source <= maxValue)                                                                                        \
         {                                                                                                              \
             destination = static_cast<decltype(destination)>(source);                                                  \
         }                                                                                                              \

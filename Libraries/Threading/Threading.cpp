@@ -59,9 +59,9 @@ SC::ReturnCode SC::Thread::start(StringView name, Action* func, Action* syncFunc
     self.syncCallback = syncFunc;
 
     StringNative<128> nameNative = StringEncoding::Native;
-    SC_TRY_IF(StringConverter(nameNative).convertNullTerminateFastPath(name, self.nameNullTerminated));
+    SC_TRY(StringConverter(nameNative).convertNullTerminateFastPath(name, self.nameNullTerminated));
     OpaqueThread opaqueThread;
-    SC_TRY_IF(Internal::createThread(self, opaqueThread, self.threadHandle, &CreateParams::threadFunc));
+    SC_TRY(Internal::createThread(self, opaqueThread, self.threadHandle, &CreateParams::threadFunc));
     thread.assign(move(opaqueThread));
     self.event.wait();
     return true;
@@ -70,8 +70,8 @@ SC::ReturnCode SC::Thread::start(StringView name, Action* func, Action* syncFunc
 SC::ReturnCode SC::Thread::join()
 {
     OpaqueThread* threadNative;
-    SC_TRY_IF(thread.get(threadNative));
-    SC_TRY_IF(Internal::joinThread(threadNative));
+    SC_TRY(thread.get(threadNative));
+    SC_TRY(Internal::joinThread(threadNative));
     thread.clear();
     return true;
 }
@@ -79,8 +79,8 @@ SC::ReturnCode SC::Thread::join()
 SC::ReturnCode SC::Thread::detach()
 {
     OpaqueThread* threadNative;
-    SC_TRY_IF(thread.get(threadNative));
-    SC_TRY_IF(Internal::detachThread(threadNative));
+    SC_TRY(thread.get(threadNative));
+    SC_TRY(Internal::detachThread(threadNative));
     thread.clear();
     return true;
 }

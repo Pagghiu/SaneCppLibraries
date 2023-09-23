@@ -67,11 +67,11 @@ struct SC::FileSystemWalker::Internal
     {
         StringConverter currentPath(currentPathString);
         currentPath.clear();
-        SC_TRY_IF(currentPath.appendNullTerminated(directory));
+        SC_TRY(currentPath.appendNullTerminated(directory));
         StackEntry entry;
         entry.textLengthInBytes = currentPathString.view().sizeInBytesIncludingTerminator();
-        SC_TRY_IF(entry.init(open(currentPathString.view().getNullTerminatedNative(), O_DIRECTORY)));
-        SC_TRY_IF(recurseStack.push_back(move(entry)));
+        SC_TRY(entry.init(open(currentPathString.view().getNullTerminatedNative(), O_DIRECTORY)));
+        SC_TRY(recurseStack.push_back(move(entry)));
         return true;
     }
 
@@ -88,14 +88,14 @@ struct SC::FileSystemWalker::Internal
             if (item == nullptr)
             {
                 recurseStack.back().close();
-                SC_TRY_IF(recurseStack.pop_back());
+                SC_TRY(recurseStack.pop_back());
                 if (recurseStack.isEmpty())
                 {
                     entry.parentFileDescriptor.detach();
                     return "Iteration Finished"_a8;
                 }
                 parent = recurseStack.back();
-                SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(parent.textLengthInBytes));
+                SC_TRY(currentPath.setTextLengthInBytesIncludingTerminator(parent.textLengthInBytes));
                 continue;
             }
             if (not(parent.gotDot1 and parent.gotDot2))
@@ -113,19 +113,19 @@ struct SC::FileSystemWalker::Internal
             }
         }
         entry.name = StringView(item->d_name, item->d_namlen, true, StringEncoding::Utf8);
-        SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
-        SC_TRY_IF(currentPath.appendNullTerminated("/"_u8));
-        SC_TRY_IF(currentPath.appendNullTerminated(entry.name));
+        SC_TRY(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
+        SC_TRY(currentPath.appendNullTerminated("/"_u8));
+        SC_TRY(currentPath.appendNullTerminated(entry.name));
         entry.path  = currentPathString.view();
         entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
         entry.parentFileDescriptor.detach();
-        SC_TRY_IF(entry.parentFileDescriptor.assign(parent.fileDescriptor));
+        SC_TRY(entry.parentFileDescriptor.assign(parent.fileDescriptor));
         if (item->d_type == DT_DIR)
         {
             entry.type = Type::Directory;
             if (opts.recursive)
             {
-                SC_TRY_IF(recurseSubdirectory(entry));
+                SC_TRY(recurseSubdirectory(entry));
             }
         }
         else
@@ -139,14 +139,14 @@ struct SC::FileSystemWalker::Internal
     {
         StringConverter currentPath(currentPathString);
         StackEntry      newParent;
-        SC_TRY_IF(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
-        SC_TRY_IF(currentPath.appendNullTerminated("/"_u8));
-        SC_TRY_IF(currentPath.appendNullTerminated(entry.name));
+        SC_TRY(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
+        SC_TRY(currentPath.appendNullTerminated("/"_u8));
+        SC_TRY(currentPath.appendNullTerminated(entry.name));
         newParent.textLengthInBytes = currentPathString.view().sizeInBytesIncludingTerminator();
         FileDescriptor::Handle handle;
-        SC_TRY_IF(entry.parentFileDescriptor.get(handle, ReturnCode("recurseSubdirectory - InvalidHandle"_a8)));
-        SC_TRY_IF(newParent.init(openat(handle, entry.name.bytesIncludingTerminator(), O_DIRECTORY)));
-        SC_TRY_IF(recurseStack.push_back(newParent))
+        SC_TRY(entry.parentFileDescriptor.get(handle, ReturnCode("recurseSubdirectory - InvalidHandle"_a8)));
+        SC_TRY(newParent.init(openat(handle, entry.name.bytesIncludingTerminator(), O_DIRECTORY)));
+        SC_TRY(recurseStack.push_back(newParent))
         return true;
     }
 };

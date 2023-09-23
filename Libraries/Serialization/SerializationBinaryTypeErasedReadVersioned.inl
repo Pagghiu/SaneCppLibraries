@@ -22,7 +22,7 @@ template <typename SourceType, typename SinkType>
 [[nodiscard]] static bool tryWritingPrimitiveValueToSink(SourceType sourceValue, SpanVoid<void>& sinkObject)
 {
     SinkType sourceConverted = static_cast<SinkType>(sourceValue);
-    SC_TRY_IF(copySourceSink(SpanVoid<const void>(&sourceConverted, sizeof(sourceConverted)), sinkObject));
+    SC_TRY(copySourceSink(SpanVoid<const void>(&sourceConverted, sizeof(sourceConverted)), sinkObject));
     return true;
 }
 
@@ -32,7 +32,7 @@ template <typename T>
                                                 SpanVoid<void>&                   sinkObject)
 {
     T sourceValue;
-    SC_TRY_IF(sourceObject->serialize(SpanVoid<void>{&sourceValue, sizeof(T)}));
+    SC_TRY(sourceObject->serialize(SpanVoid<void>{&sourceValue, sizeof(T)}));
     SpanVoid<const void> span(&sourceValue, sizeof(T));
     switch (sinkProperty.type)
     {
@@ -102,7 +102,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::read()
         {
             if (sinkObject.sizeInBytes() >= sourceProperty.sizeInBytes)
             {
-                SC_TRY_IF(sourceObject->serialize(SpanVoid<void>{sinkObject.data(), sourceProperty.sizeInBytes}));
+                SC_TRY(sourceObject->serialize(SpanVoid<void>{sinkObject.data(), sourceProperty.sizeInBytes}));
                 return true;
             }
         }
@@ -155,17 +155,17 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readStruct()
         {
             // Member with same order ordinal has been found
             sinkTypeIndex = structSinkTypeIndex + findIdx + 1;
-            SC_TRY_IF(structSinkObject.viewAtBytes(sinkProperties.data()[sinkTypeIndex].offsetInBytes,
-                                                   sinkProperties.data()[sinkTypeIndex].sizeInBytes, sinkObject));
+            SC_TRY(structSinkObject.viewAtBytes(sinkProperties.data()[sinkTypeIndex].offsetInBytes,
+                                                sinkProperties.data()[sinkTypeIndex].sizeInBytes, sinkObject));
             if (sinkProperties.data()[sinkTypeIndex].getLinkIndex() >= 0)
                 sinkTypeIndex = static_cast<uint32_t>(sinkProperties.data()[sinkTypeIndex].getLinkIndex());
-            SC_TRY_IF(read());
+            SC_TRY(read());
         }
         else
         {
-            SC_TRY_IF(options.allowDropEccessStructMembers)
+            SC_TRY(options.allowDropEccessStructMembers)
             // We must consume it anyway, discarding its content
-            SC_TRY_IF(skipCurrent());
+            SC_TRY(skipCurrent());
         }
     }
     return true;
@@ -187,7 +187,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
     uint64_t sourceNumBytes = arraySourceProperty.sizeInBytes;
     if (arraySourceProperty.type == Reflection::MetaType::TypeVector)
     {
-        SC_TRY_IF(sourceObject->serialize(SpanVoid<void>{&sourceNumBytes, sizeof(uint64_t)}));
+        SC_TRY(sourceObject->serialize(SpanVoid<void>{&sourceNumBytes, sizeof(uint64_t)}));
     }
 
     const bool isPrimitive = sourceProperties.data()[sourceTypeIndex].isPrimitiveType();
@@ -202,25 +202,25 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
     SpanVoid<void> arraySinkStart;
     if (arraySinkProperty.type == Reflection::MetaType::TypeArray)
     {
-        SC_TRY_IF(arraySinkObject.viewAtBytes(0, arraySinkProperty.sizeInBytes, arraySinkStart));
+        SC_TRY(arraySinkObject.viewAtBytes(0, arraySinkProperty.sizeInBytes, arraySinkStart));
     }
     else
     {
         const auto numWantedBytes = sourceNumBytes / sourceItemSize * sinkItemSize;
-        SC_TRY_IF(arrayAccess.resize(arraySinkTypeIndex, arraySinkObject, arraySinkProperty, numWantedBytes,
-                                     isPacked ? ArrayAccess::Initialize::No : ArrayAccess::Initialize::Yes,
-                                     options.allowDropEccessArrayItems ? ArrayAccess::DropEccessItems::Yes
-                                                                       : ArrayAccess::DropEccessItems::No));
-        SC_TRY_IF(arrayAccess.getSegmentSpan(arraySinkTypeIndex, arraySinkProperty, arraySinkObject, arraySinkStart));
+        SC_TRY(arrayAccess.resize(arraySinkTypeIndex, arraySinkObject, arraySinkProperty, numWantedBytes,
+                                  isPacked ? ArrayAccess::Initialize::No : ArrayAccess::Initialize::Yes,
+                                  options.allowDropEccessArrayItems ? ArrayAccess::DropEccessItems::Yes
+                                                                    : ArrayAccess::DropEccessItems::No));
+        SC_TRY(arrayAccess.getSegmentSpan(arraySinkTypeIndex, arraySinkProperty, arraySinkObject, arraySinkStart));
     }
     if (isPacked)
     {
         const auto minBytes = min(static_cast<uint64_t>(arraySinkStart.sizeInBytes()), sourceNumBytes);
-        SC_TRY_IF(sourceObject->serialize(SpanVoid<void>{arraySinkStart.data(), static_cast<size_t>(minBytes)}));
+        SC_TRY(sourceObject->serialize(SpanVoid<void>{arraySinkStart.data(), static_cast<size_t>(minBytes)}));
         if (sourceNumBytes > static_cast<uint64_t>(arraySinkStart.sizeInBytes()))
         {
             // We must consume these excess bytes anyway, discarding their content
-            SC_TRY_IF(options.allowDropEccessArrayItems);
+            SC_TRY(options.allowDropEccessArrayItems);
             return sourceObject->advance(sourceNumBytes - minBytes);
         }
     }
@@ -239,17 +239,17 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
         {
             sinkTypeIndex   = itemSinkTypeIndex;
             sourceTypeIndex = itemSourceTypeIndex;
-            SC_TRY_IF(arraySinkStart.viewAtBytes(idx * sinkItemSize, sinkItemSize, sinkObject));
-            SC_TRY_IF(read());
+            SC_TRY(arraySinkStart.viewAtBytes(idx * sinkItemSize, sinkItemSize, sinkObject));
+            SC_TRY(read());
         }
         if (sourceNumElements > sinkNumElements)
         {
             // We must consume these excess items anyway, discarding their content
-            SC_TRY_IF(options.allowDropEccessArrayItems);
+            SC_TRY(options.allowDropEccessArrayItems);
             for (uint32_t idx = 0; idx < sourceNumElements - sinkNumElements; ++idx)
             {
                 sourceTypeIndex = itemSourceTypeIndex;
-                SC_TRY_IF(skipCurrent());
+                SC_TRY(skipCurrent());
             }
         }
     }

@@ -24,7 +24,7 @@ struct SC::Process::Internal
     static ReturnCode duplicateAndReplace(FileDescriptor& handle, FileDescriptor::Handle fds)
     {
         FileDescriptor::Handle nativeFd;
-        SC_TRY_IF(handle.get(nativeFd, "duplicateAndReplace - Invalid Handle"_a8));
+        SC_TRY(handle.get(nativeFd, "duplicateAndReplace - Invalid Handle"_a8));
         if (::dup2(nativeFd, fds) == -1)
         {
             return ReturnCode("dup2 failed"_a8);
@@ -63,21 +63,21 @@ SC::ReturnCode SC::Process::waitForExitSync()
 template <typename Lambda>
 SC::ReturnCode SC::Process::spawn(Lambda&& lambda)
 {
-    SC_TRY_IF(fork());
+    SC_TRY(fork());
     if (isChild())
     {
         auto exitDeferred = MakeDeferred([&] { _exit(127); });
         if (standardInput.isValid())
         {
-            SC_TRY_IF(Internal::duplicateAndReplace(standardInput, Internal::getStandardInputFDS()));
+            SC_TRY(Internal::duplicateAndReplace(standardInput, Internal::getStandardInputFDS()));
         }
         if (standardOutput.isValid())
         {
-            SC_TRY_IF(Internal::duplicateAndReplace(standardOutput, Internal::getStandardOutputFDS()));
+            SC_TRY(Internal::duplicateAndReplace(standardOutput, Internal::getStandardOutputFDS()));
         }
         if (standardError.isValid())
         {
-            SC_TRY_IF(Internal::duplicateAndReplace(standardError, Internal::getStandardErrorFDS()));
+            SC_TRY(Internal::duplicateAndReplace(standardError, Internal::getStandardErrorFDS()));
         }
         // As std handles have been duplicated / redirected, we can close all of them.
         // We explicitly close them because some may have not been marked as CLOEXEC.
@@ -89,17 +89,17 @@ SC::ReturnCode SC::Process::spawn(Lambda&& lambda)
         // still valid between the fork() and the exec() call to do anything needed
         // (like the duplication / redirect we're doing here) without risk of leaking
         // any FD to the newly executed child process.
-        SC_TRY_IF(standardInput.close());
-        SC_TRY_IF(standardOutput.close());
-        SC_TRY_IF(standardError.close());
+        SC_TRY(standardInput.close());
+        SC_TRY(standardOutput.close());
+        SC_TRY(standardError.close());
         lambda();
     }
     else
     {
-        SC_TRY_IF(handle.assign(processID.pid));
-        SC_TRY_IF(standardInput.close());
-        SC_TRY_IF(standardOutput.close());
-        SC_TRY_IF(standardError.close());
+        SC_TRY(handle.assign(processID.pid));
+        SC_TRY(standardInput.close());
+        SC_TRY(standardOutput.close());
+        SC_TRY(standardError.close());
         return true;
     }
     // The exit(127) inside isChild makes this unreachable

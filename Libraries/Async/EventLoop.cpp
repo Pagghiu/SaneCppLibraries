@@ -76,8 +76,8 @@ SC::ReturnCode SC::Async::stop()
 
 SC::ReturnCode SC::AsyncLoopTimeout::start(EventLoop& loop, IntegerMilliseconds expiration)
 {
-    SC_TRY_IF(validateAsync());
-    SC_TRY_IF(queueSubmission(loop));
+    SC_TRY(validateAsync());
+    SC_TRY(queueSubmission(loop));
     updateTime();
     expirationTime = loop.getLoopTime().offsetBy(expiration);
     timeout        = expiration;
@@ -86,33 +86,33 @@ SC::ReturnCode SC::AsyncLoopTimeout::start(EventLoop& loop, IntegerMilliseconds 
 
 SC::ReturnCode SC::AsyncLoopWakeUp::start(EventLoop& loop, EventObject* eo)
 {
-    SC_TRY_IF(queueSubmission(loop));
+    SC_TRY(queueSubmission(loop));
     eventObject = eo;
     return true;
 }
 
 SC::ReturnCode SC::AsyncProcessExit::start(EventLoop& loop, ProcessDescriptor::Handle process)
 {
-    SC_TRY_IF(queueSubmission(loop));
+    SC_TRY(queueSubmission(loop));
     handle = process;
     return true;
 }
 
 SC::ReturnCode SC::AsyncSocketAccept::start(EventLoop& loop, const SocketDescriptor& socketDescriptor)
 {
-    SC_TRY_IF(validateAsync());
-    SC_TRY_IF(socketDescriptor.get(handle, "Invalid handle"_a8));
-    SC_TRY_IF(socketDescriptor.getAddressFamily(addressFamily));
-    SC_TRY_IF(queueSubmission(loop));
+    SC_TRY(validateAsync());
+    SC_TRY(socketDescriptor.get(handle, "Invalid handle"_a8));
+    SC_TRY(socketDescriptor.getAddressFamily(addressFamily));
+    SC_TRY(queueSubmission(loop));
     return true;
 }
 
 SC::ReturnCode SC::AsyncSocketConnect::start(EventLoop& loop, const SocketDescriptor& socketDescriptor,
                                              SocketIPAddress socketIpAddress)
 {
-    SC_TRY_IF(validateAsync());
-    SC_TRY_IF(socketDescriptor.get(handle, "Invalid handle"_a8));
-    SC_TRY_IF(queueSubmission(loop));
+    SC_TRY(validateAsync());
+    SC_TRY(socketDescriptor.get(handle, "Invalid handle"_a8));
+    SC_TRY(queueSubmission(loop));
     ipAddress = socketIpAddress;
     return true;
 }
@@ -121,9 +121,9 @@ SC::ReturnCode SC::AsyncSocketSend::start(EventLoop& loop, const SocketDescripto
                                           Span<const char> dataToSend)
 {
 
-    SC_TRY_IF(validateAsync());
-    SC_TRY_IF(socketDescriptor.get(handle, "Invalid handle"_a8));
-    SC_TRY_IF(queueSubmission(loop));
+    SC_TRY(validateAsync());
+    SC_TRY(socketDescriptor.get(handle, "Invalid handle"_a8));
+    SC_TRY(queueSubmission(loop));
     data = dataToSend;
     return true;
 }
@@ -131,26 +131,26 @@ SC::ReturnCode SC::AsyncSocketSend::start(EventLoop& loop, const SocketDescripto
 SC::ReturnCode SC::AsyncSocketReceive::start(EventLoop& loop, const SocketDescriptor& socketDescriptor,
                                              Span<char> receiveData)
 {
-    SC_TRY_IF(validateAsync());
-    SC_TRY_IF(socketDescriptor.get(handle, "Invalid handle"_a8));
-    SC_TRY_IF(queueSubmission(loop));
+    SC_TRY(validateAsync());
+    SC_TRY(socketDescriptor.get(handle, "Invalid handle"_a8));
+    SC_TRY(queueSubmission(loop));
     data = receiveData;
     return true;
 }
 
 SC::ReturnCode SC::AsyncSocketClose::start(EventLoop& loop, const SocketDescriptor& socketDescriptor)
 {
-    SC_TRY_IF(validateAsync());
-    SC_TRY_IF(socketDescriptor.get(handle, "Invalid handle"_a8));
-    SC_TRY_IF(queueSubmission(loop));
+    SC_TRY(validateAsync());
+    SC_TRY(socketDescriptor.get(handle, "Invalid handle"_a8));
+    SC_TRY(queueSubmission(loop));
     return true;
 }
 
 SC::ReturnCode SC::AsyncFileRead::start(EventLoop& loop, FileDescriptor::Handle fd, Span<char> rb)
 {
     SC_TRY_MSG(rb.sizeInBytes() > 0, "EventLoop::startFileRead - Zero sized read buffer"_a8);
-    SC_TRY_IF(validateAsync());
-    SC_TRY_IF(queueSubmission(loop));
+    SC_TRY(validateAsync());
+    SC_TRY(queueSubmission(loop));
     fileDescriptor = fd;
     readBuffer     = rb;
     return true;
@@ -159,8 +159,8 @@ SC::ReturnCode SC::AsyncFileRead::start(EventLoop& loop, FileDescriptor::Handle 
 SC::ReturnCode SC::AsyncFileWrite::start(EventLoop& loop, FileDescriptor::Handle fd, Span<const char> wb)
 {
     SC_TRY_MSG(wb.sizeInBytes() > 0, "EventLoop::startFileWrite - Zero sized write buffer"_a8);
-    SC_TRY_IF(validateAsync());
-    SC_TRY_IF(queueSubmission(loop));
+    SC_TRY(validateAsync());
+    SC_TRY(queueSubmission(loop));
     fileDescriptor = fd;
     writeBuffer    = wb;
     return true;
@@ -168,8 +168,8 @@ SC::ReturnCode SC::AsyncFileWrite::start(EventLoop& loop, FileDescriptor::Handle
 
 SC::ReturnCode SC::AsyncFileClose::start(EventLoop& loop, FileDescriptor::Handle fd)
 {
-    SC_TRY_IF(validateAsync());
-    SC_TRY_IF(queueSubmission(loop));
+    SC_TRY(validateAsync());
+    SC_TRY(queueSubmission(loop));
     fileDescriptor = fd;
     return true;
 }
@@ -177,8 +177,8 @@ SC::ReturnCode SC::AsyncFileClose::start(EventLoop& loop, FileDescriptor::Handle
 #if SC_PLATFORM_WINDOWS
 SC::ReturnCode SC::AsyncWindowsPoll::start(EventLoop& loop, FileDescriptor::Handle fd)
 {
-    SC_TRY_IF(validateAsync());
-    SC_TRY_IF(queueSubmission(loop));
+    SC_TRY(validateAsync());
+    SC_TRY(queueSubmission(loop));
     fileDescriptor = fd;
     return true;
 }
@@ -196,7 +196,7 @@ SC::ReturnCode SC::EventLoop::run()
 {
     while (getTotalNumberOfActiveHandle() > 0 or not submissions.isEmpty())
     {
-        SC_TRY_IF(runOnce());
+        SC_TRY(runOnce());
     };
     return true;
 }
@@ -243,8 +243,8 @@ void SC::EventLoop::invokeExpiredTimers()
 SC::ReturnCode SC::EventLoop::create()
 {
     Internal& self = internal.get();
-    SC_TRY_IF(self.createEventLoop());
-    SC_TRY_IF(self.createWakeup(*this));
+    SC_TRY(self.createEventLoop());
+    SC_TRY(self.createWakeup(*this));
     return true;
 }
 
@@ -259,8 +259,8 @@ SC::ReturnCode SC::EventLoop::stageSubmission(KernelQueue& queue, Async& async)
     switch (async.state)
     {
     case Async::State::Submitting: {
-        SC_TRY_IF(setupAsync(queue, async));
-        SC_TRY_IF(activateAsync(queue, async));
+        SC_TRY(setupAsync(queue, async));
+        SC_TRY(activateAsync(queue, async));
     }
     break;
     case Async::State::Free: {
@@ -269,7 +269,7 @@ SC::ReturnCode SC::EventLoop::stageSubmission(KernelQueue& queue, Async& async)
     }
     break;
     case Async::State::Cancelling: {
-        SC_TRY_IF(cancelAsync(queue, async));
+        SC_TRY(cancelAsync(queue, async));
     }
     break;
     case Async::State::Active: {
@@ -337,7 +337,7 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
     {
         // We may have some manualCompletions queued (for SocketClose for example) but no active handles
         SC_LOG_MESSAGE("Active Requests Before Poll = {}\n", getTotalNumberOfActiveHandle());
-        SC_TRY_IF(queue.pollAsync(*this, pollMode));
+        SC_TRY(queue.pollAsync(*this, pollMode));
         SC_LOG_MESSAGE("Active Requests After Poll = {}\n", getTotalNumberOfActiveHandle());
     }
 
@@ -385,19 +385,19 @@ SC::ReturnCode SC::Async::applyOnAsync(Async& async, Lambda&& lambda)
 {
     switch (async.type)
     {
-    case Async::Type::LoopTimeout: SC_TRY_IF(lambda(*static_cast<AsyncLoopTimeout*>(&async))); break;
-    case Async::Type::LoopWakeUp: SC_TRY_IF(lambda(*static_cast<AsyncLoopWakeUp*>(&async))); break;
-    case Async::Type::ProcessExit: SC_TRY_IF(lambda(*static_cast<AsyncProcessExit*>(&async))); break;
-    case Async::Type::SocketAccept: SC_TRY_IF(lambda(*static_cast<AsyncSocketAccept*>(&async))); break;
-    case Async::Type::SocketConnect: SC_TRY_IF(lambda(*static_cast<AsyncSocketConnect*>(&async))); break;
-    case Async::Type::SocketSend: SC_TRY_IF(lambda(*static_cast<AsyncSocketSend*>(&async))); break;
-    case Async::Type::SocketReceive: SC_TRY_IF(lambda(*static_cast<AsyncSocketReceive*>(&async))); break;
-    case Async::Type::SocketClose: SC_TRY_IF(lambda(*static_cast<AsyncSocketClose*>(&async))); break;
-    case Async::Type::FileRead: SC_TRY_IF(lambda(*static_cast<AsyncFileRead*>(&async))); break;
-    case Async::Type::FileWrite: SC_TRY_IF(lambda(*static_cast<AsyncFileWrite*>(&async))); break;
-    case Async::Type::FileClose: SC_TRY_IF(lambda(*static_cast<AsyncFileClose*>(&async))); break;
+    case Async::Type::LoopTimeout: SC_TRY(lambda(*static_cast<AsyncLoopTimeout*>(&async))); break;
+    case Async::Type::LoopWakeUp: SC_TRY(lambda(*static_cast<AsyncLoopWakeUp*>(&async))); break;
+    case Async::Type::ProcessExit: SC_TRY(lambda(*static_cast<AsyncProcessExit*>(&async))); break;
+    case Async::Type::SocketAccept: SC_TRY(lambda(*static_cast<AsyncSocketAccept*>(&async))); break;
+    case Async::Type::SocketConnect: SC_TRY(lambda(*static_cast<AsyncSocketConnect*>(&async))); break;
+    case Async::Type::SocketSend: SC_TRY(lambda(*static_cast<AsyncSocketSend*>(&async))); break;
+    case Async::Type::SocketReceive: SC_TRY(lambda(*static_cast<AsyncSocketReceive*>(&async))); break;
+    case Async::Type::SocketClose: SC_TRY(lambda(*static_cast<AsyncSocketClose*>(&async))); break;
+    case Async::Type::FileRead: SC_TRY(lambda(*static_cast<AsyncFileRead*>(&async))); break;
+    case Async::Type::FileWrite: SC_TRY(lambda(*static_cast<AsyncFileWrite*>(&async))); break;
+    case Async::Type::FileClose: SC_TRY(lambda(*static_cast<AsyncFileClose*>(&async))); break;
 #if SC_PLATFORM_WINDOWS
-    case Async::Type::WindowsPoll: SC_TRY_IF(lambda(*static_cast<AsyncWindowsPoll*>(&async))); break;
+    case Async::Type::WindowsPoll: SC_TRY(lambda(*static_cast<AsyncWindowsPoll*>(&async))); break;
 #endif
     }
     return true;
@@ -414,7 +414,7 @@ SC::ReturnCode SC::EventLoop::activateAsync(KernelQueue& queue, Async& async)
     SC_LOG_MESSAGE("{} {} ACTIVATE\n", async.debugName, Async::TypeToString(async.type));
     // Submitting (first time) or Active (for reactivations)
     SC_DEBUG_ASSERT(async.state == Async::State::Active or async.state == Async::State::Submitting);
-    SC_TRY_IF(Async::applyOnAsync(async, [&](auto& p) { return queue.activateAsync(p); }));
+    SC_TRY(Async::applyOnAsync(async, [&](auto& p) { return queue.activateAsync(p); }));
     if (async.state == Async::State::Submitting)
     {
         return queue.pushNewSubmission(async);
@@ -463,7 +463,7 @@ void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, ReturnCode&&
 SC::ReturnCode SC::EventLoop::cancelAsync(KernelQueue& queue, Async& async)
 {
     SC_LOG_MESSAGE("{} {} CANCEL\n", async.debugName, Async::TypeToString(async.type));
-    SC_TRY_IF(Async::applyOnAsync(async, [&](auto& p) { return queue.stopAsync(p); }))
+    SC_TRY(Async::applyOnAsync(async, [&](auto& p) { return queue.stopAsync(p); }))
     if (async.state == Async::State::Active)
     {
         removeActiveHandle(async);
@@ -538,7 +538,7 @@ SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
     {
         // This executes if current thread is lucky enough to atomically exchange pending from false to true.
         // This effectively allows coalescing calls from different threads into a single notification.
-        SC_TRY_IF(wakeUpFromExternalThread());
+        SC_TRY(wakeUpFromExternalThread());
     }
     return true;
 }
@@ -594,7 +594,7 @@ SC::ReturnCode SC::EventLoop::createAsyncTCPSocket(SocketFlags::AddressFamily fa
 {
     auto res = outDescriptor.create(family, SocketFlags::SocketStream, SocketFlags::ProtocolTcp,
                                     SocketFlags::NonBlocking, SocketFlags::NonInheritable);
-    SC_TRY_IF(res);
+    SC_TRY(res);
     return associateExternallyCreatedTCPSocket(outDescriptor);
 }
 

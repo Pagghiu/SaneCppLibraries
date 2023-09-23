@@ -876,7 +876,7 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
         while (SegmentItems<T>::findIf(items, prevIndex, SegmentItems<T>::size() - prevIndex, forward<Lambda>(criteria),
                                        &index))
         {
-            SC_TRY_IF(removeAt(index));
+            SC_TRY(removeAt(index));
             prevIndex         = index;
             atLeastOneRemoved = true;
         }

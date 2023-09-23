@@ -35,7 +35,7 @@ SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOpti
     StringNative<1024> buffer = StringEncoding::Native;
     StringConverter    convert(buffer);
     StringView         filePath;
-    SC_TRY_IF(convert.convertNullTerminateFastPath(path, filePath));
+    SC_TRY(convert.convertNullTerminateFastPath(path, filePath));
     const wchar_t* wpath        = filePath.getNullTerminatedNative();
     const bool     isThreeChars = filePath.sizeInBytes() >= 3 * sizeof(utf_char_t);
     if (not isThreeChars or (wpath[0] != L'\\' and wpath[1] != L':'))
@@ -124,7 +124,7 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
                                                                           Span<char>    fallbackBuffer)
 {
     FileDescriptor::Handle fileDescriptor;
-    SC_TRY_IF(get(fileDescriptor, "FileDescriptor::readAppend - Invalid Handle"_a8));
+    SC_TRY(get(fileDescriptor, "FileDescriptor::readAppend - Invalid Handle"_a8));
 
     const bool useVector = output.capacity() > output.size();
 
@@ -187,7 +187,7 @@ SC::ReturnCode SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
 
 SC::ReturnCode SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
 {
-    SC_TRY_IF(seek(SeekStart, offset));
+    SC_TRY(seek(SeekStart, offset));
     return write(data);
 }
 
@@ -202,7 +202,7 @@ SC::ReturnCode SC::FileDescriptor::write(Span<const char> data)
 
 SC::ReturnCode SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, uint64_t offset)
 {
-    SC_TRY_IF(seek(SeekStart, offset));
+    SC_TRY(seek(SeekStart, offset));
     return read(data, actuallyRead, offset);
 }
 
@@ -233,8 +233,8 @@ SC::ReturnCode SC::PipeDescriptor::createPipe(InheritableReadFlag readFlag, Inhe
     {
         return "PipeDescriptor::createPipe - ::CreatePipe failed"_a8;
     }
-    SC_TRY_IF(readPipe.assign(pipeRead));
-    SC_TRY_IF(writePipe.assign(pipeWrite));
+    SC_TRY(readPipe.assign(pipeRead));
+    SC_TRY(writePipe.assign(pipeWrite));
 
     if (security.bInheritHandle)
     {

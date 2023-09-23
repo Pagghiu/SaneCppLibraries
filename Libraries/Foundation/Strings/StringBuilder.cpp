@@ -30,7 +30,7 @@ bool StringBuilder::append(StringView str)
 {
     if (str.isEmpty())
         return true;
-    SC_TRY_IF(StringConverter::popNulltermIfExists(stringData, encoding));
+    SC_TRY(StringConverter::popNulltermIfExists(stringData, encoding));
     return StringConverter::convertEncodingTo(encoding, str, stringData);
 }
 
@@ -49,7 +49,7 @@ bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf
     {
         return append(source);
     }
-    SC_TRY_IF(StringConverter::popNulltermIfExists(stringData, encoding));
+    SC_TRY(StringConverter::popNulltermIfExists(stringData, encoding));
     StringView current             = source;
     const auto occurrencesIterator = occurrencesOf.getIterator<StringIteratorASCII>();
     bool       res;
@@ -58,25 +58,25 @@ bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf
         auto sourceIt    = current.getIterator<StringIteratorASCII>();
         res              = sourceIt.advanceBeforeFinding(occurrencesIterator);
         StringView soFar = StringView::fromIteratorFromStart(sourceIt);
-        SC_TRY_IF(stringData.appendCopy(soFar.bytesWithoutTerminator(), soFar.sizeInBytes()));
+        SC_TRY(stringData.appendCopy(soFar.bytesWithoutTerminator(), soFar.sizeInBytes()));
         if (res)
         {
-            SC_TRY_IF(stringData.appendCopy(with.bytesWithoutTerminator(), with.sizeInBytes()));
+            SC_TRY(stringData.appendCopy(with.bytesWithoutTerminator(), with.sizeInBytes()));
             res     = sourceIt.advanceByLengthOf(occurrencesIterator);
             current = StringView::fromIteratorUntilEnd(sourceIt);
         }
     } while (res);
-    SC_TRY_IF(stringData.appendCopy(current.bytesWithoutTerminator(), current.sizeInBytes()));
+    SC_TRY(stringData.appendCopy(current.bytesWithoutTerminator(), current.sizeInBytes()));
     return StringConverter::pushNullTerm(stringData, encoding);
 }
 
 [[nodiscard]] bool StringBuilder::appendReplaceMultiple(StringView source, Span<const StringView[2]> substitutions)
 {
     String buffer, other;
-    SC_TRY_IF(buffer.assign(source));
+    SC_TRY(buffer.assign(source));
     for (auto it : substitutions)
     {
-        SC_TRY_IF(StringBuilder(other, StringBuilder::Clear).appendReplaceAll(buffer.view(), it[0], it[1]));
+        SC_TRY(StringBuilder(other, StringBuilder::Clear).appendReplaceAll(buffer.view(), it[0], it[1]));
         swap(other, buffer);
     }
     return append(buffer.view());
@@ -88,7 +88,7 @@ bool StringBuilder::appendHex(SpanVoid<const void> data)
     if (encoding == StringEncoding::Utf16)
         return false; // TODO: Support appendHex for UTF16
     const auto oldSize = stringData.size();
-    SC_TRY_IF(stringData.resizeWithoutInitializing(stringData.size() + data.sizeInBytes() * 2));
+    SC_TRY(stringData.resizeWithoutInitializing(stringData.size() + data.sizeInBytes() * 2));
     const auto sizeInBytes = data.sizeInBytes();
     for (size_t i = 0; i < sizeInBytes; i++)
     {

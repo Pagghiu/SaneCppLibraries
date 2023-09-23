@@ -35,24 +35,24 @@ struct SC::EventLoop::Internal
             // TODO: Better kqueue error handling
             return "EventLoop::Internal::createEventLoop() - kqueue failed"_a8;
         }
-        SC_TRY_IF(loopFd.assign(newQueue));
+        SC_TRY(loopFd.assign(newQueue));
         return true;
     }
 
     [[nodiscard]] ReturnCode createWakeup(EventLoop& loop)
     {
         // Create
-        SC_TRY_IF(wakeupPipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteNonInheritable));
-        SC_TRY_IF(wakeupPipe.readPipe.setBlocking(false));
-        SC_TRY_IF(wakeupPipe.writePipe.setBlocking(false));
+        SC_TRY(wakeupPipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteNonInheritable));
+        SC_TRY(wakeupPipe.readPipe.setBlocking(false));
+        SC_TRY(wakeupPipe.writePipe.setBlocking(false));
 
         // Register
         FileDescriptor::Handle wakeUpPipeDescriptor;
-        SC_TRY_IF(wakeupPipe.readPipe.get(wakeUpPipeDescriptor,
-                                          "EventLoop::Internal::createWakeup() - Async read handle invalid"_a8));
-        SC_TRY_IF(wakeupPipeRead.start(loop, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)}));
-        SC_TRY_IF(loop.runNoWait()); // We want to register the read handle before everything else
-        loop.decreaseActiveCount();  // we don't want the read to keep the queue up
+        SC_TRY(wakeupPipe.readPipe.get(wakeUpPipeDescriptor,
+                                       "EventLoop::Internal::createWakeup() - Async read handle invalid"_a8));
+        SC_TRY(wakeupPipeRead.start(loop, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)}));
+        SC_TRY(loop.runNoWait());   // We want to register the read handle before everything else
+        loop.decreaseActiveCount(); // we don't want the read to keep the queue up
         return true;
     }
 
@@ -103,7 +103,7 @@ struct SC::EventLoop::KernelQueue
             newEvents += 1;
             if (newEvents >= totalNumEvents)
             {
-                SC_TRY_IF(flushQueue(*async.eventLoop));
+                SC_TRY(flushQueue(*async.eventLoop));
             }
             break;
         }
@@ -141,7 +141,7 @@ struct SC::EventLoop::KernelQueue
     {
         const TimeCounter* nextTimer = pollMode == PollMode::ForcedForwardProgress ? self.findEarliestTimer() : nullptr;
         FileDescriptor::Handle loopHandle;
-        SC_TRY_IF(self.internal.get().loopFd.get(loopHandle, "pollAsync() - Invalid Handle"_a8));
+        SC_TRY(self.internal.get().loopFd.get(loopHandle, "pollAsync() - Invalid Handle"_a8));
 
         struct timespec specTimeout;
         // when nextTimer is null, specTimeout is initialized to 0, so that PollMode::NoWait
@@ -178,7 +178,7 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] ReturnCode flushQueue(EventLoop& self)
     {
         FileDescriptor::Handle loopHandle;
-        SC_TRY_IF(self.internal.get().loopFd.get(loopHandle, "flushQueue() - Invalid Handle"_a8));
+        SC_TRY(self.internal.get().loopFd.get(loopHandle, "flushQueue() - Invalid Handle"_a8));
 
         int res;
         do
@@ -286,7 +286,7 @@ struct SC::EventLoop::KernelQueue
     {
         AsyncSocketAccept& async = result.async;
         SocketDescriptor   serverSocket;
-        SC_TRY_IF(serverSocket.assign(async.handle));
+        SC_TRY(serverSocket.assign(async.handle));
         auto detach = MakeDeferred([&] { serverSocket.detach(); });
         result.acceptedClient.detach();
         return SocketServer(serverSocket).accept(async.addressFamily, result.acceptedClient);
@@ -306,7 +306,7 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] static ReturnCode activateAsync(AsyncSocketConnect& async)
     {
         SocketDescriptor client;
-        SC_TRY_IF(client.assign(async.handle));
+        SC_TRY(client.assign(async.handle));
         auto detach = MakeDeferred([&] { client.detach(); });
         auto res    = SocketClient(client).connect(async.ipAddress);
         // we expect connect to fail with
@@ -424,7 +424,7 @@ struct SC::EventLoop::KernelQueue
                               static_cast<off_t>(result.async.offset));
             } while ((res == -1) and (errno == EINTR));
             SC_TRY_MSG(res >= 0, "::read failed"_a8);
-            SC_TRY_IF(result.async.readBuffer.sliceStartLength(0, static_cast<size_t>(res), result.readData));
+            SC_TRY(result.async.readBuffer.sliceStartLength(0, static_cast<size_t>(res), result.readData));
         }
         return true;
     }
@@ -510,7 +510,7 @@ SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
     const void* fakeBuffer;
     int         asyncFd;
     ssize_t     writtenBytes;
-    SC_TRY_IF(self.wakeupPipe.writePipe.get(asyncFd, "writePipe handle"_a8));
+    SC_TRY(self.wakeupPipe.writePipe.get(asyncFd, "writePipe handle"_a8));
     fakeBuffer = "";
     do
     {

@@ -367,7 +367,7 @@ struct SC::Vector
         bool   atLeastOneRemoved = false;
         while (SegmentItems<T>::findIf(items, prevIndex, size() - prevIndex, forward<Lambda>(criteria), &index))
         {
-            SC_TRY_IF(removeAt(index));
+            SC_TRY(removeAt(index));
             prevIndex         = index;
             atLeastOneRemoved = true;
         }

@@ -48,7 +48,7 @@ struct SC::SystemDebug::Internal
     [[nodiscard]] static bool unlockFileFromProcess(SC::StringView theFile, DWORD processId)
     {
         SC::Vector<WCHAR> nameBuffer;
-        SC_TRY_IF(nameBuffer.resizeWithoutInitializing(USHRT_MAX));
+        SC_TRY(nameBuffer.resizeWithoutInitializing(USHRT_MAX));
 
         if (theFile.startsWithChar('\\'))
         {
@@ -208,7 +208,7 @@ SC::ReturnCode SC::SystemDebug::unlockFileFromAllProcesses(SC::StringView fileNa
                         if (GetProcessTimes(hProcess, &ftCreate, &ftExit, &ftKernel, &ftUser) &&
                             CompareFileTime(&rgpi[i].Process.ProcessStartTime, &ftCreate) == 0)
                         {
-                            SC_TRY_IF(Internal::unlockFileFromProcess(fileName, rgpi[i].Process.dwProcessId));
+                            SC_TRY(Internal::unlockFileFromProcess(fileName, rgpi[i].Process.dwProcessId));
                         }
                         CloseHandle(hProcess);
                     }
@@ -278,11 +278,11 @@ SC::ReturnCode SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle)
 
 SC::ReturnCode SC::SystemDynamicLibrary::load(StringView fullPath)
 {
-    SC_TRY_IF(close());
+    SC_TRY(close());
     SmallString<1024> string = StringEncoding::Native;
     StringConverter   converter(string);
     StringView        fullPathZeroTerminated;
-    SC_TRY_IF(converter.convertNullTerminateFastPath(fullPath, fullPathZeroTerminated));
+    SC_TRY(converter.convertNullTerminateFastPath(fullPath, fullPathZeroTerminated));
     HMODULE module = ::LoadLibraryW(fullPathZeroTerminated.getNullTerminatedNative());
     if (module == nullptr)
     {
@@ -298,7 +298,7 @@ SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*
     SmallString<1024> string = StringEncoding::Ascii;
     StringConverter   converter(string);
     StringView        symbolZeroTerminated;
-    SC_TRY_IF(converter.convertNullTerminateFastPath(symbolName, symbolZeroTerminated));
+    SC_TRY(converter.convertNullTerminateFastPath(symbolName, symbolZeroTerminated));
     HMODULE module;
     memcpy(&module, &handle, sizeof(HMODULE));
     symbol = reinterpret_cast<void*>(::GetProcAddress(module, symbolZeroTerminated.bytesIncludingTerminator()));
@@ -316,7 +316,7 @@ bool SC::SystemDirectories::init()
     int    tries = 0;
     do
     {
-        SC_TRY_IF(buffer.resizeWithoutInitializing(buffer.size() + MAX_PATH));
+        SC_TRY(buffer.resizeWithoutInitializing(buffer.size() + MAX_PATH));
         // Is returned null terminated
         numChars = GetModuleFileNameW(0L, buffer.data(), static_cast<DWORD>(buffer.size()));
         if (tries++ >= 10)
@@ -325,8 +325,8 @@ bool SC::SystemDirectories::init()
         }
     } while (numChars == buffer.size() && GetLastError() == ERROR_INSUFFICIENT_BUFFER);
 
-    SC_TRY_IF(buffer.resizeWithoutInitializing(numChars + 1));
-    SC_TRY_IF(buffer[numChars] == 0);
+    SC_TRY(buffer.resizeWithoutInitializing(numChars + 1));
+    SC_TRY(buffer[numChars] == 0);
 
     StringView utf16executable =
         StringView(Span<const wchar_t>(buffer.data(), (buffer.size() - 1) * sizeof(wchar_t)), true);
@@ -335,7 +335,7 @@ bool SC::SystemDirectories::init()
     // text assigning directly the SmallString inside StringNative will copy as is instad of converting utf16 to utf8
     executableFile = ""_u8;
     StringBuilder builder(executableFile);
-    SC_TRY_IF(builder.append(utf16executable));
+    SC_TRY(builder.append(utf16executable));
     applicationRootDirectory = Path::Windows::dirname(executableFile.view());
     return true;
 }

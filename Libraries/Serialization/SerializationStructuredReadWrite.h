@@ -25,7 +25,7 @@ struct SerializerReadWriteFastMemberIterator
     {
         SC_UNUSED(order);
         const StringView fieldName = StringView(name, N - 1, true, StringEncoding::Ascii);
-        SC_TRY_IF(stream.startObjectField(index++, fieldName));
+        SC_TRY(stream.startObjectField(index++, fieldName));
         return SerializationReadWrite<SerializerStream, R>::serialize(0, field, stream);
     }
 };
@@ -59,27 +59,27 @@ struct SerializationReadWrite
 {
     [[nodiscard]] static constexpr bool serialize(uint32_t index, T& object, SerializerStream& stream)
     {
-        SC_TRY_IF(stream.startObject(index));
+        SC_TRY(stream.startObject(index));
         using FastIterator = SerializerReadWriteFastMemberIterator<SerializerStream, T>;
-        SC_TRY_IF(Reflection::MetaClass<T>::visitObject(FastIterator{stream}, object));
+        SC_TRY(Reflection::MetaClass<T>::visitObject(FastIterator{stream}, object));
         return stream.endObject();
     }
 
     [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, T& object, SerializerStream& stream)
     {
-        SC_TRY_IF(stream.startObject(index));
+        SC_TRY(stream.startObject(index));
         StringView fieldToFind;
         uint32_t   fieldIndex = 0;
         bool       hasMore    = false;
-        SC_TRY_IF(stream.getNextField(fieldIndex, fieldToFind, hasMore));
+        SC_TRY(stream.getNextField(fieldIndex, fieldToFind, hasMore));
         // TODO: Figure out maybe a simple way to allow clearing fields that have not been consumed
         while (hasMore)
         {
             using VersionedIterator = SerializerReadVersionedMemberIterator<SerializerStream, T>;
             VersionedIterator iterator{stream, fieldToFind, fieldIndex};
             Reflection::MetaClass<T>::visitObject(iterator, object);
-            SC_TRY_IF(not iterator.consumed or iterator.consumedWithSuccess);
-            SC_TRY_IF(stream.getNextField(++fieldIndex, fieldToFind, hasMore));
+            SC_TRY(not iterator.consumed or iterator.consumedWithSuccess);
+            SC_TRY(stream.getNextField(++fieldIndex, fieldToFind, hasMore));
         }
         return stream.endObject();
     }
@@ -90,7 +90,7 @@ struct SerializationReadWrite<SerializerStream, T[N]>
 {
     [[nodiscard]] static constexpr bool serialize(uint32_t index, T (&object)[N], SerializerStream& stream)
     {
-        SC_TRY_IF(stream.startArray(index));
+        SC_TRY(stream.startArray(index));
         uint32_t arrayIndex = 0;
         for (auto& item : object)
         {
@@ -124,12 +124,12 @@ struct SerializerStructuredReaderVector
     [[nodiscard]] static constexpr bool serialize(uint32_t index, Container& object, SerializerStream& stream)
     {
         uint32_t arraySize = 0;
-        SC_TRY_IF(stream.startArray(index, object, arraySize));
+        SC_TRY(stream.startArray(index, object, arraySize));
         for (uint32_t idx = 0; idx < arraySize; ++idx)
         {
             if (not SerializationReadWrite<SerializerStream, T>::serialize(idx, object[idx], stream))
                 return false;
-            SC_TRY_IF(stream.endArrayItem(object, arraySize));
+            SC_TRY(stream.endArrayItem(object, arraySize));
         }
         return stream.endArray();
     }
@@ -167,16 +167,16 @@ struct SerializationReadWrite<SerializerStream, T, typename SC::EnableIf<Reflect
 template <typename SerializerStream, typename T>
 [[nodiscard]] constexpr bool serialize(T& object, SerializerStream& stream)
 {
-    SC_TRY_IF(stream.onSerializationStart());
-    SC_TRY_IF((SerializationReadWrite<SerializerStream, T>::serialize(0, object, stream)));
+    SC_TRY(stream.onSerializationStart());
+    SC_TRY((SerializationReadWrite<SerializerStream, T>::serialize(0, object, stream)));
     return stream.onSerializationEnd();
 }
 
 template <typename SerializerStream, typename T>
 [[nodiscard]] constexpr bool loadVersioned(T& object, SerializerStream& stream)
 {
-    SC_TRY_IF(stream.onSerializationStart());
-    SC_TRY_IF((SerializationReadWrite<SerializerStream, T>::loadVersioned(0, object, stream)));
+    SC_TRY(stream.onSerializationStart());
+    SC_TRY((SerializationReadWrite<SerializerStream, T>::loadVersioned(0, object, stream)));
     return stream.onSerializationEnd();
 }
 } // namespace SerializationStructuredTemplate

@@ -132,7 +132,7 @@ struct StringFormat
             const StringView specifierString = StringView::fromIteratorUntilEnd(specifier);
             if (not positionString.isEmpty())
             {
-                SC_TRY_IF(positionString.parseInt32(parsedPosition));
+                SC_TRY(positionString.parseInt32(parsedPosition));
             }
             constexpr auto maxArgs = sizeof...(args);
             return formatArgument<maxArgs, maxArgs>(data, specifierString, parsedPosition, forward<Types>(args)...);
@@ -156,16 +156,16 @@ struct StringFormat
                     SC_UNLIKELY // if it's the same matched, let's escape it
                     {
                         (void)it.stepForward(); // we want to make sure we insert the escaped '{' or '}'
-                        SC_TRY_IF(data.write(StringView::fromIterators(start, it)));
+                        SC_TRY(data.write(StringView::fromIterators(start, it)));
                         (void)it.stepForward(); // we don't want to insert the additional '{' or '}' needed for escaping
                         start = it;
                     }
                 else if (matchedChar == '{') // it's a '{' not followed by itself, so let's parse specifier
                 {
-                    SC_TRY_IF(data.write(StringView::fromIterators(start, it))); // write everything before '{'
+                    SC_TRY(data.write(StringView::fromIterators(start, it))); // write everything before '{'
                     // try parse '}' and eventually format
                     int32_t parsedPosition = position;
-                    SC_TRY_IF(parsePosition(data, it, parsedPosition, forward<Types>(args)...));
+                    SC_TRY(parsePosition(data, it, parsedPosition, forward<Types>(args)...));
                     start = it;
                     position += 1;
                     maxPosition = max(maxPosition, parsedPosition + 1);
@@ -177,7 +177,7 @@ struct StringFormat
             }
             else
             {
-                SC_TRY_IF(data.write(StringView::fromIterators(start, it))); // write everything before '{'
+                SC_TRY(data.write(StringView::fromIterators(start, it)));    // write everything before '{'
                 return maxPosition == static_cast<int32_t>(sizeof...(args)); // check right number of args
             }
         }

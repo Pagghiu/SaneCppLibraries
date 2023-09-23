@@ -22,11 +22,11 @@ SC::ReturnCode SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle)
 
 SC::ReturnCode SC::SystemDynamicLibrary::load(StringView fullPath)
 {
-    SC_TRY_IF(close());
+    SC_TRY(close());
     SmallString<1024> string = StringEncoding::Native;
     StringConverter   converter(string);
     StringView        fullPathZeroTerminated;
-    SC_TRY_IF(converter.convertNullTerminateFastPath(fullPath, fullPathZeroTerminated));
+    SC_TRY(converter.convertNullTerminateFastPath(fullPath, fullPathZeroTerminated));
     handle = ::dlopen(fullPathZeroTerminated.getNullTerminatedNative(), RTLD_LAZY);
     if (handle == nullptr)
     {
@@ -41,7 +41,7 @@ SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*
     SmallString<1024> string = StringEncoding::Native;
     StringConverter   converter(string);
     StringView        symbolZeroTerminated;
-    SC_TRY_IF(converter.convertNullTerminateFastPath(symbolName, symbolZeroTerminated));
+    SC_TRY(converter.convertNullTerminateFastPath(symbolName, symbolZeroTerminated));
     symbol = ::dlsym(handle, symbolZeroTerminated.getNullTerminatedNative());
     return symbol != nullptr;
 }

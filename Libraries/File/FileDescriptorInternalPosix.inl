@@ -63,7 +63,7 @@ struct SC::FileDescriptorPosixHelpers
     {
         static_assert(flag == FD_CLOEXEC, "hasFileDescriptorFlags invalid value");
         int flags = 0;
-        SC_TRY_IF(getFileFlags(F_GETFD, fileDescriptor, flags));
+        SC_TRY(getFileFlags(F_GETFD, fileDescriptor, flags));
         hasFlag = (flags & flag) != 0;
         return true;
     }
@@ -72,7 +72,7 @@ struct SC::FileDescriptorPosixHelpers
     {
         static_assert(flag == O_NONBLOCK, "hasFileStatusFlags invalid value");
         int flags = 0;
-        SC_TRY_IF(getFileFlags(F_GETFL, fileDescriptor, flags));
+        SC_TRY(getFileFlags(F_GETFL, fileDescriptor, flags));
         hasFlag = (flags & flag) != 0;
         return true;
     }
@@ -109,7 +109,7 @@ SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOpti
     StringNative<1024> buffer = StringEncoding::Native;
     StringConverter    convert(buffer);
     StringView         filePath;
-    SC_TRY_IF(convert.convertNullTerminateFastPath(path, filePath));
+    SC_TRY(convert.convertNullTerminateFastPath(path, filePath));
     if (not filePath.startsWithChar('/'))
         return "Path must be absolute"_a8;
     int flags = 0;
@@ -154,7 +154,7 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
     ssize_t                numReadBytes;
     const bool             useVector = output.capacity() > output.size();
     FileDescriptor::Handle fileDescriptor;
-    SC_TRY_IF(get(fileDescriptor, "FileDescriptor::readAppend - Invalid Handle"_a8));
+    SC_TRY(get(fileDescriptor, "FileDescriptor::readAppend - Invalid Handle"_a8));
     if (useVector)
     {
         do

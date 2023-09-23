@@ -77,7 +77,7 @@ SC::ReturnCode SC::HttpParser::parse(Span<const char> data, size_t& readBytes, S
         globalLength = 0;
         do
         {
-            SC_TRY_IF((process<&HttpParser::parseMethod, Result::Method>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseMethod, Result::Method>(data, readBytes, parsedData)));
             SC_CO_RETURN(topLevelCoroutine, true);
         } while (state == State::Parsing);
         //------------------------
@@ -90,7 +90,7 @@ SC::ReturnCode SC::HttpParser::parse(Span<const char> data, size_t& readBytes, S
         matchIndex   = 0;
         do
         {
-            SC_TRY_IF((process<&HttpParser::parseUrl, Result::Url>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseUrl, Result::Url>(data, readBytes, parsedData)));
             SC_CO_RETURN(topLevelCoroutine, true);
         } while (state == State::Parsing);
         //------------------------
@@ -103,7 +103,7 @@ SC::ReturnCode SC::HttpParser::parse(Span<const char> data, size_t& readBytes, S
         matchIndex   = 0;
         do
         {
-            SC_TRY_IF((process<&HttpParser::parseVersion<false>, Result::Version>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseVersion<false>, Result::Version>(data, readBytes, parsedData)));
             SC_CO_RETURN(topLevelCoroutine, true);
         } while (state == State::Parsing);
     }
@@ -116,7 +116,7 @@ SC::ReturnCode SC::HttpParser::parse(Span<const char> data, size_t& readBytes, S
         matchIndex   = 0;
         do
         {
-            SC_TRY_IF((process<&HttpParser::parseVersion<true>, Result::Version>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseVersion<true>, Result::Version>(data, readBytes, parsedData)));
             SC_CO_RETURN(topLevelCoroutine, true);
         } while (state == State::Parsing);
 
@@ -127,7 +127,7 @@ SC::ReturnCode SC::HttpParser::parse(Span<const char> data, size_t& readBytes, S
         matchIndex   = 0;
         do
         {
-            SC_TRY_IF((process<&HttpParser::parseStatusCode, Result::StatusCode>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseStatusCode, Result::StatusCode>(data, readBytes, parsedData)));
             statusCode = static_cast<uint32_t>(number);
             SC_CO_RETURN(topLevelCoroutine, true);
         } while (state == State::Parsing);
@@ -141,7 +141,7 @@ SC::ReturnCode SC::HttpParser::parse(Span<const char> data, size_t& readBytes, S
         matchIndex   = 0;
         do
         {
-            SC_TRY_IF((process<&HttpParser::parseHeaderValue, Result::StatusString>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseHeaderValue, Result::StatusString>(data, readBytes, parsedData)));
             SC_CO_RETURN(topLevelCoroutine, true);
         } while (state == State::Parsing);
     }
@@ -162,7 +162,7 @@ SC::ReturnCode SC::HttpParser::parse(Span<const char> data, size_t& readBytes, S
             matchIndex   = 0;
             do
             {
-                SC_TRY_IF((process<&HttpParser::parseHeadersEnd, Result::HeadersEnd>(data, readBytes, parsedData)));
+                SC_TRY((process<&HttpParser::parseHeadersEnd, Result::HeadersEnd>(data, readBytes, parsedData)));
                 SC_CO_RETURN(topLevelCoroutine, true);
             } while (state == State::Parsing);
             if (type == Type::Request)
@@ -192,7 +192,7 @@ SC::ReturnCode SC::HttpParser::parse(Span<const char> data, size_t& readBytes, S
                         }
                         readBytes = tokenLength - oldLength;
                     }
-                    SC_TRY_IF(data.sliceStartLength(0, readBytes, parsedData));
+                    SC_TRY(data.sliceStartLength(0, readBytes, parsedData));
                     if (tokenLength == contentLength)
                     {
                         state = State::Result;
@@ -218,7 +218,7 @@ SC::ReturnCode SC::HttpParser::parse(Span<const char> data, size_t& readBytes, S
             matchIndex   = 0;
             do
             {
-                SC_TRY_IF((process<&HttpParser::parseHeaderName, Result::HeaderName>(data, readBytes, parsedData)));
+                SC_TRY((process<&HttpParser::parseHeaderName, Result::HeaderName>(data, readBytes, parsedData)));
                 SC_CO_RETURN(topLevelCoroutine, true);
             } while (state == State::Parsing);
 
@@ -234,8 +234,7 @@ SC::ReturnCode SC::HttpParser::parse(Span<const char> data, size_t& readBytes, S
                 matchIndex   = 0;
                 do
                 {
-                    SC_TRY_IF(
-                        (process<&HttpParser::parseNumberValue, Result::HeaderValue>(data, readBytes, parsedData)));
+                    SC_TRY((process<&HttpParser::parseNumberValue, Result::HeaderValue>(data, readBytes, parsedData)));
                     contentLength = static_cast<uint32_t>(number);
                     SC_CO_RETURN(topLevelCoroutine, true);
                 } while (state == State::Parsing);
@@ -252,8 +251,7 @@ SC::ReturnCode SC::HttpParser::parse(Span<const char> data, size_t& readBytes, S
                 matchIndex   = 0;
                 do
                 {
-                    SC_TRY_IF(
-                        (process<&HttpParser::parseHeaderValue, Result::HeaderValue>(data, readBytes, parsedData)));
+                    SC_TRY((process<&HttpParser::parseHeaderValue, Result::HeaderValue>(data, readBytes, parsedData)));
                     SC_CO_RETURN(topLevelCoroutine, true);
                 } while (state == State::Parsing);
             }
@@ -282,7 +280,7 @@ SC::ReturnCode SC::HttpParser::process(Span<const char>& data, size_t& readBytes
     for (auto c : data)
     {
         tokenLength++;
-        SC_TRY_IF((this->*Func)(c)); // can modify start or length with spaces
+        SC_TRY((this->*Func)(c)); // can modify start or length with spaces
         readBytes++;
         if (state == State::Result)
         {
@@ -294,13 +292,13 @@ SC::ReturnCode SC::HttpParser::process(Span<const char>& data, size_t& readBytes
     const auto lengthDelta = tokenLength - initialLength;
     if (state == State::Result)
     {
-        SC_TRY_IF(data.sliceStartLength(startDelta, lengthDelta, parsedData));
-        SC_TRY_IF(data.sliceStart(readBytes, data));
+        SC_TRY(data.sliceStartLength(startDelta, lengthDelta, parsedData));
+        SC_TRY(data.sliceStart(readBytes, data));
         crReset(nestedParserCoroutine);
     }
     else
     {
-        SC_TRY_IF(data.sliceStartLength(startDelta, lengthDelta, parsedData));
+        SC_TRY(data.sliceStartLength(startDelta, lengthDelta, parsedData));
     }
     return true;
 }
@@ -311,11 +309,11 @@ bool SC::HttpParser::parseMethod(char currentChar)
     if (currentChar == 'G' or currentChar == 'g')
     {
         SC_CO_RETURN(nestedParserCoroutine, true);
-        SC_TRY_IF(currentChar == 'E' or currentChar == 'e');
+        SC_TRY(currentChar == 'E' or currentChar == 'e');
         SC_CO_RETURN(nestedParserCoroutine, true);
-        SC_TRY_IF(currentChar == 'T' or currentChar == 't');
+        SC_TRY(currentChar == 'T' or currentChar == 't');
         SC_CO_RETURN(nestedParserCoroutine, true);
-        SC_TRY_IF(currentChar == ' ');
+        SC_TRY(currentChar == ' ');
         tokenLength--;
         method = Method::HttpGET;
     }
@@ -325,20 +323,20 @@ bool SC::HttpParser::parseMethod(char currentChar)
         if (currentChar == 'U' or currentChar == 'u')
         {
             SC_CO_RETURN(nestedParserCoroutine, true);
-            SC_TRY_IF(currentChar == 'T' or currentChar == 't');
+            SC_TRY(currentChar == 'T' or currentChar == 't');
             SC_CO_RETURN(nestedParserCoroutine, true);
-            SC_TRY_IF(currentChar == ' ');
+            SC_TRY(currentChar == ' ');
             tokenLength--;
             method = Method::HttpPUT;
         }
         else if (currentChar == 'O' or currentChar == 'o')
         {
             SC_CO_RETURN(nestedParserCoroutine, true);
-            SC_TRY_IF(currentChar == 'S' or currentChar == 's');
+            SC_TRY(currentChar == 'S' or currentChar == 's');
             SC_CO_RETURN(nestedParserCoroutine, true);
-            SC_TRY_IF(currentChar == 'T' or currentChar == 't');
+            SC_TRY(currentChar == 'T' or currentChar == 't');
             SC_CO_RETURN(nestedParserCoroutine, true);
-            SC_TRY_IF(currentChar == ' ');
+            SC_TRY(currentChar == ' ');
             tokenLength--;
             method = Method::HttpPOST;
         }
@@ -378,33 +376,33 @@ template <bool spaces>
 bool SC::HttpParser::parseVersion(char currentChar)
 {
     SC_CO_BEGIN(nestedParserCoroutine);
-    SC_TRY_IF(currentChar == 'H' or currentChar == 'h');
+    SC_TRY(currentChar == 'H' or currentChar == 'h');
     SC_CO_RETURN(nestedParserCoroutine, true);
-    SC_TRY_IF(currentChar == 'T' or currentChar == 't');
+    SC_TRY(currentChar == 'T' or currentChar == 't');
     SC_CO_RETURN(nestedParserCoroutine, true);
-    SC_TRY_IF(currentChar == 'T' or currentChar == 't');
+    SC_TRY(currentChar == 'T' or currentChar == 't');
     SC_CO_RETURN(nestedParserCoroutine, true);
-    SC_TRY_IF(currentChar == 'P' or currentChar == 'p');
+    SC_TRY(currentChar == 'P' or currentChar == 'p');
     SC_CO_RETURN(nestedParserCoroutine, true);
-    SC_TRY_IF(currentChar == '/' or currentChar == '/');
+    SC_TRY(currentChar == '/' or currentChar == '/');
     SC_CO_RETURN(nestedParserCoroutine, true);
-    SC_TRY_IF(currentChar == '1' or currentChar == '1');
+    SC_TRY(currentChar == '1' or currentChar == '1');
     SC_CO_RETURN(nestedParserCoroutine, true);
-    SC_TRY_IF(currentChar == '.' or currentChar == '.');
+    SC_TRY(currentChar == '.' or currentChar == '.');
     SC_CO_RETURN(nestedParserCoroutine, true);
-    SC_TRY_IF(currentChar == '1' or currentChar == '1');
+    SC_TRY(currentChar == '1' or currentChar == '1');
     SC_CO_RETURN(nestedParserCoroutine, true);
     if (spaces)
     {
-        SC_TRY_IF(currentChar == ' ');
+        SC_TRY(currentChar == ' ');
         tokenLength--;
     }
     else
     {
-        SC_TRY_IF(currentChar == '\r');
+        SC_TRY(currentChar == '\r');
         tokenLength--;
         SC_CO_RETURN(nestedParserCoroutine, true);
-        SC_TRY_IF(currentChar == '\n');
+        SC_TRY(currentChar == '\n');
         tokenLength--;
     }
     state = State::Result;

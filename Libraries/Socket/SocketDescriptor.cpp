@@ -30,7 +30,7 @@ struct NetworkingInternal
     {
         SmallString<64> buffer = StringEncoding::Ascii;
         StringView      ipNullTerm;
-        SC_TRY_IF(StringConverter(buffer).convertNullTerminateFastPath(ipAddress, ipNullTerm));
+        SC_TRY(StringConverter(buffer).convertNullTerminateFastPath(ipAddress, ipNullTerm));
         memset(&inaddr, 0, sizeof(inaddr));
         inaddr.sin_port   = htons(port);
         inaddr.sin_family = SocketFlags::toNative(SocketFlags::AddressFamilyIPV4);
@@ -50,7 +50,7 @@ struct NetworkingInternal
     {
         SmallString<64> buffer = StringEncoding::Ascii;
         StringView      ipNullTerm;
-        SC_TRY_IF(StringConverter(buffer).convertNullTerminateFastPath(ipAddress, ipNullTerm));
+        SC_TRY(StringConverter(buffer).convertNullTerminateFastPath(ipAddress, ipNullTerm));
         memset(&inaddr, 0, sizeof(inaddr));
         inaddr.sin6_port   = htons(port);
         inaddr.sin6_family = SocketFlags::toNative(SocketFlags::AddressFamilyIPV6);
@@ -120,7 +120,7 @@ SC::ReturnCode SC::SocketServer::close() { return socket.close(); }
 
 SC::ReturnCode SC::SocketServer::listen(SocketIPAddress nativeAddress, uint32_t numberOfWaitingConnections)
 {
-    SC_TRY_IF(SystemFunctions::isNetworkingInited());
+    SC_TRY(SystemFunctions::isNetworkingInited());
     SC_TRY_MSG(socket.isValid(), "Invalid socket"_a8);
     SocketDescriptor::Handle listenSocket;
     SC_TRUST_RESULT(socket.get(listenSocket, "invalid listen socket"_a8));
@@ -152,7 +152,7 @@ SC::ReturnCode SC::SocketServer::accept(SocketFlags::AddressFamily addressFamily
 {
     SC_TRY_MSG(not newClient.isValid(), "destination socket already in use"_a8);
     SocketDescriptor::Handle listenDescriptor;
-    SC_TRY_IF(socket.get(listenDescriptor, "Invalid socket"_a8));
+    SC_TRY(socket.get(listenDescriptor, "Invalid socket"_a8));
     SocketIPAddress          nativeAddress(addressFamily);
     socklen_t                nativeSize = nativeAddress.sizeOfHandle();
     SocketDescriptor::Handle acceptedClient =
@@ -164,17 +164,17 @@ SC::ReturnCode SC::SocketServer::accept(SocketFlags::AddressFamily addressFamily
 SC::ReturnCode SC::SocketClient::connect(StringView address, uint16_t port)
 {
     SocketIPAddress nativeAddress;
-    SC_TRY_IF(nativeAddress.fromAddressPort(address, port));
+    SC_TRY(nativeAddress.fromAddressPort(address, port));
     if (not socket.isValid())
     {
-        SC_TRY_IF(socket.create(nativeAddress.getAddressFamily(), SocketFlags::SocketStream, SocketFlags::ProtocolTcp));
+        SC_TRY(socket.create(nativeAddress.getAddressFamily(), SocketFlags::SocketStream, SocketFlags::ProtocolTcp));
     }
     return connect(nativeAddress);
 }
 
 SC::ReturnCode SC::SocketClient::connect(SocketIPAddress ipAddress)
 {
-    SC_TRY_IF(SystemFunctions::isNetworkingInited());
+    SC_TRY(SystemFunctions::isNetworkingInited());
     SocketDescriptor::Handle openedSocket;
     SC_TRUST_RESULT(socket.get(openedSocket, "invalid connect socket"_a8));
     socklen_t nativeSize = ipAddress.sizeOfHandle();
@@ -195,7 +195,7 @@ SC::ReturnCode SC::SocketClient::close() { return socket.close(); }
 SC::ReturnCode SC::SocketClient::write(Span<const char> data)
 {
     SocketDescriptor::Handle nativeSocket;
-    SC_TRY_IF(socket.get(nativeSocket, "Invalid socket"_a8));
+    SC_TRY(socket.get(nativeSocket, "Invalid socket"_a8));
 #if SC_PLATFORM_WINDOWS
     const int sizeInBytes = static_cast<int>(data.sizeInBytes());
 #else
@@ -216,7 +216,7 @@ SC::ReturnCode SC::SocketClient::write(Span<const char> data)
 SC::ReturnCode SC::SocketClient::read(Span<char> data, Span<char>& readData)
 {
     SocketDescriptor::Handle nativeSocket;
-    SC_TRY_IF(socket.get(nativeSocket, "Invalid socket"_a8));
+    SC_TRY(socket.get(nativeSocket, "Invalid socket"_a8));
 #if SC_PLATFORM_WINDOWS
     const int sizeInBytes = static_cast<int>(data.sizeInBytes());
 #else
@@ -234,7 +234,7 @@ SC::ReturnCode SC::SocketClient::read(Span<char> data, Span<char>& readData)
 SC::ReturnCode SC::SocketClient::readWithTimeout(Span<char> data, Span<char>& readData, IntegerMilliseconds timeout)
 {
     SocketDescriptor::Handle nativeSocket;
-    SC_TRY_IF(socket.get(nativeSocket, "Invalid socket"_a8));
+    SC_TRY(socket.get(nativeSocket, "Invalid socket"_a8));
     fd_set fds;
     FD_ZERO(&fds);
     FD_SET(nativeSocket, &fds);
