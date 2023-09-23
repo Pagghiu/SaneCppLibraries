@@ -69,6 +69,7 @@ Libraries/Hashing/Hashing.cpp                     \
 Libraries/Http/HttpClient.cpp                     \
 Libraries/Http/HttpParser.cpp                     \
 Libraries/Http/HttpServer.cpp                     \
+Libraries/Http/HttpURLParser.cpp                  \
 Libraries/Json/Json.cpp                           \
 Libraries/Plugin/Plugin.cpp                       \
 Libraries/Process/Process.cpp                     \

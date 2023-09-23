@@ -32,6 +32,7 @@
 		7B583FCB2922EE7300FBE019 /* SCTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B583F692922ECF900FBE019 /* SCTest.cpp */; };
 		7B6B7A3A2A46D2C5007E8BE2 /* AdditionalFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B6B7A392A46D2C5007E8BE2 /* AdditionalFile.cpp */; };
 		7B7C3BFE2A7C443D00FAD351 /* Hashing.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B7C3BFC2A7C443D00FAD351 /* Hashing.cpp */; };
+		7B84796D2ABF48700052020A /* HttpURLParser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B84796A2ABF48680052020A /* HttpURLParser.cpp */; };
 		7B872C4D29AFFC4900949BD2 /* Threading.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B872C4A29AFFC4900949BD2 /* Threading.cpp */; };
 		7B8BF9B129F3BADC0055BC3A /* SocketDescriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B8BF9AC29F3BADC0055BC3A /* SocketDescriptor.cpp */; };
 		7B8DDDC52A2012B300D62F03 /* Json.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B8DDDC42A2012B300D62F03 /* Json.cpp */; };
@@ -208,6 +209,9 @@
 		7B7C3BFC2A7C443D00FAD351 /* Hashing.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Hashing.cpp; path = ../../../../Libraries/Hashing/Hashing.cpp; sourceTree = "<group>"; };
 		7B7C3BFD2A7C443D00FAD351 /* Hashing.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Hashing.h; path = ../../../../Libraries/Hashing/Hashing.h; sourceTree = "<group>"; };
 		7B7C3BFF2A7C444700FAD351 /* HashingTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HashingTest.h; path = ../../../../Libraries/Hashing/HashingTest.h; sourceTree = "<group>"; };
+		7B84796A2ABF48680052020A /* HttpURLParser.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = HttpURLParser.cpp; path = ../../../../Libraries/Http/HttpURLParser.cpp; sourceTree = "<group>"; };
+		7B84796B2ABF48680052020A /* HttpURLParserTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HttpURLParserTest.h; path = ../../../../Libraries/Http/HttpURLParserTest.h; sourceTree = "<group>"; };
+		7B84796C2ABF48680052020A /* HttpURLParser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HttpURLParser.h; path = ../../../../Libraries/Http/HttpURLParser.h; sourceTree = "<group>"; };
 		7B872C4629AFF1D900949BD2 /* SystemInternalApple.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SystemInternalApple.inl; path = ../../../../Libraries/System/SystemInternalApple.inl; sourceTree = "<group>"; };
 		7B872C4829AFFC4900949BD2 /* ThreadingInternalPosix.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = ThreadingInternalPosix.inl; path = ../../../../Libraries/Threading/ThreadingInternalPosix.inl; sourceTree = "<group>"; };
 		7B872C4929AFFC4900949BD2 /* ThreadingInternalWindows.inl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = ThreadingInternalWindows.inl; path = ../../../../Libraries/Threading/ThreadingInternalWindows.inl; sourceTree = "<group>"; };
@@ -488,6 +492,9 @@
 				7B53C64B2AADC16300FA1AFD /* HttpServer.cpp */,
 				7B53C64D2AADC16300FA1AFD /* HttpServer.h */,
 				7B53C6492AADC16300FA1AFD /* HttpServerTest.h */,
+				7B84796A2ABF48680052020A /* HttpURLParser.cpp */,
+				7B84796C2ABF48680052020A /* HttpURLParser.h */,
+				7B84796B2ABF48680052020A /* HttpURLParserTest.h */,
 			);
 			name = Http;
 			sourceTree = "<group>";
@@ -815,6 +822,7 @@
 			files = (
 				7B319D322AB750C900F7E761 /* Memory.cpp in Sources */,
 				7B0C299D297CA7CC0071C5B4 /* FileSystem.cpp in Sources */,
+				7B84796D2ABF48700052020A /* HttpURLParser.cpp in Sources */,
 				7B319D2D2AB750C900F7E761 /* StringFormat.cpp in Sources */,
 				7B25AE002A2CB9B1008936DE /* Plugin.cpp in Sources */,
 				7B53C6532AADC16300FA1AFD /* HttpClient.cpp in Sources */,

@@ -164,6 +164,9 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\StringView.cpp">
       <Filter>Foundation\Strings</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Http\HttpURLParser.cpp">
+      <Filter>Http</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Libraries\System\Console.h">
@@ -535,6 +538,12 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringConverterTest.h">
       <Filter>Foundation\Strings</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Http\HttpURLParser.h">
+      <Filter>Http</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Http\HttpURLParserTest.h">
+      <Filter>Http</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalPosix.inl">
@@ -632,6 +641,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="..\..\..\..\Support\MSVC\SCLib.natvis" />
+    <Natvis Include="..\..\..\..\Support\DebugVisualizers\MSVC\SCMSVC.natvis" />
   </ItemGroup>
 </Project>

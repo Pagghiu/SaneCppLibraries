@@ -56,6 +56,7 @@ void runSpecificTests(TestReport& report)
 #include "../../Libraries/Http/HttpClientTest.h"
 #include "../../Libraries/Http/HttpParserTest.h"
 #include "../../Libraries/Http/HttpServerTest.h"
+#include "../../Libraries/Http/HttpURLParserTest.h"
 
 // JSON
 #include "../../Libraries/Json/JsonFormatterTest.h"
@@ -167,6 +168,7 @@ int main(int argc, const char* argv[])
     { HttpParserTest                test(report); }
     { HttpClientTest                test(report); }
     { HttpServerTest                test(report); }
+    { HttpURLParserTest             test(report); }
 
     // JSON tests
     { JsonFormatterTest             test(report); }

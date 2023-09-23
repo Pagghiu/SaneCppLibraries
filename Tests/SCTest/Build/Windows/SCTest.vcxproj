@@ -338,6 +338,7 @@
     <ClCompile Include="..\..\..\..\Libraries\Http\HttpClient.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Http\HttpParser.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Http\HttpServer.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Http\HttpURLParser.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Json\Json.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Plugin\Plugin.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginChild\AdditionalFile.cpp" />
@@ -428,6 +429,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Http\HttpParserTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Http\HttpServer.h" />
     <ClInclude Include="..\..\..\..\Libraries\Http\HttpServerTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Http\HttpURLParser.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Http\HttpURLParserTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonFormatter.h" />
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonFormatterTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Json\JsonTokenizer.h" />
@@ -516,7 +519,7 @@
     <None Include="..\..\..\..\Libraries\Threading\ThreadingInternalWindows.inl" />
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="..\..\..\..\Support\MSVC\SCLib.natvis" />
+    <Natvis Include="..\..\..\..\Support\DebugVisualizers\MSVC\SCMSVC.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
