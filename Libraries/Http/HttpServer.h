@@ -26,23 +26,7 @@ struct SC::HttpServer
         uint32_t start  = 0;
         uint32_t length = 0;
     };
-    struct Response
-    {
-        bool                   ended = false;
-        SmallVector<char, 255> outputBuffer;
-
-        size_t     highwaterMark = 255;
-        ReturnCode writeHead(int code)
-        {
-            ended = false;
-            SC_UNUSED(code);
-            return true;
-        }
-
-        bool mustBeFlushed() const { return ended or outputBuffer.size() > highwaterMark; }
-
-        ReturnCode end(StringView sv);
-    };
+    struct ClientChannel;
     struct Request
     {
         bool       headersEndReceived = false;
@@ -51,24 +35,44 @@ struct SC::HttpServer
 
         SmallVector<char, 255>  headerBuffer;
         SmallVector<Header, 16> headerOffsets;
-
-        [[nodiscard]] ReturnCode parse(Span<const char> readData, Response& res, HttpServer& server);
     };
 
-    HttpServer() {}
+    struct Response
+    {
+        bool                   ended = false;
+        SmallVector<char, 255> outputBuffer;
+        size_t                 highwaterMark = 255;
+
+        [[nodiscard]] ReturnCode startResponse(int code);
+        [[nodiscard]] ReturnCode addHeader(StringView headerName, StringView headerValue);
+        [[nodiscard]] bool       mustBeFlushed() const { return ended or outputBuffer.size() > highwaterMark; }
+
+        [[nodiscard]] ReturnCode end(StringView sv);
+    };
 
     uint32_t maxHeaderSize = 8 * 1024;
-    struct RequestResponse
+    struct ClientChannel
     {
         Request  request;
         Response response;
     };
-    ArenaMap<RequestResponse>           requests;
-    Function<void(Request&, Response&)> onClient;
+    ArenaMap<ClientChannel>        requests;
+    Function<void(ClientChannel&)> onClient;
+
+  protected:
+    [[nodiscard]] ReturnCode parse(Span<const char> readData, ClientChannel& res);
 };
 
 struct SC::HttpServerAsync : public HttpServer
 {
+    HttpServerAsync() {}
+    HttpServerAsync(const HttpServerAsync&)            = delete;
+    HttpServerAsync& operator=(const HttpServerAsync&) = delete;
+
+    [[nodiscard]] ReturnCode start(EventLoop& loop, uint32_t maxConnections, StringView address, uint16_t port);
+    [[nodiscard]] ReturnCode stop();
+
+  private:
     struct RequestClient
     {
         ArenaMap<RequestClient>::Key key;
@@ -82,19 +86,7 @@ struct SC::HttpServerAsync : public HttpServer
     SocketDescriptor        serverSocket;
 
     uint32_t          maxHeaderSize = 8 * 1024;
-    EventLoop*        eventLoop     = nullptr;
     AsyncSocketAccept asyncAccept;
-
-    HttpServerAsync() {}
-
-    HttpServerAsync(const HttpServerAsync&)            = delete;
-    HttpServerAsync& operator=(const HttpServerAsync&) = delete;
-
-    [[nodiscard]] ReturnCode start(EventLoop& loop, uint32_t maxConnections, StringView address, uint16_t port);
-    [[nodiscard]] ReturnCode stop();
-
-  private:
-    [[nodiscard]] ReturnCode startSocketAccept();
 
     void onNewClient(AsyncSocketAccept::Result& result);
     void onReceive(AsyncSocketReceive::Result& result);

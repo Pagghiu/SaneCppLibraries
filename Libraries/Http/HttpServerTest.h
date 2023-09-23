@@ -17,21 +17,27 @@ struct SC::HttpServerTest : public SC::TestCase
     {
         if (test_section("server async"))
         {
-            EventLoop eventLoop;
+            constexpr int wantedNumTries = 2;
+            int           numTries       = 0;
+            EventLoop     eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
             HttpServerAsync server;
             SC_TEST_EXPECT(server.start(eventLoop, 10, "127.0.0.1", 8080));
-            int           numTries       = 0;
-            constexpr int wantedNumTries = 2;
-            server.onClient = [this, &numTries, &server](HttpServer::Request& req, HttpServer::Response& res)
+            server.onClient = [this, &numTries, &server](HttpServer::ClientChannel& client)
             {
-                SC_TEST_EXPECT(req.headersEndReceived);
+                SC_TEST_EXPECT(client.request.headersEndReceived);
                 numTries++;
                 if (numTries == wantedNumTries)
                 {
                     SC_TEST_EXPECT(server.stop());
                 }
-                SC_TEST_EXPECT(res.writeHead(200));
+                auto& res = client.response;
+                SC_TEST_EXPECT(res.startResponse(200));
+                SC_TEST_EXPECT(res.addHeader("Connection", "Closed"));
+                SC_TEST_EXPECT(res.addHeader("Content-Type", "text/html"));
+                SC_TEST_EXPECT(res.addHeader("Server", "SC"));
+                SC_TEST_EXPECT(res.addHeader("Date", "Mon, 27 Aug 2023 16:37:00 GMT"));
+                SC_TEST_EXPECT(res.addHeader("Last-Modified", "Wed, 27 Aug 2023 16:37:00 GMT"));
                 String        str;
                 StringBuilder sb(str);
                 const char    sampleHtml[] = "<html>\r\n"
@@ -41,7 +47,7 @@ struct SC::HttpServerTest : public SC::TestCase
                                              "</body>\r\n"
                                              "</html>\r\n";
                 SC_TEST_EXPECT(sb.format(sampleHtml, numTries));
-                SC_TEST_EXPECT(res.end(str.view()));
+                SC_TEST_EXPECT(client.response.end(str.view()));
             };
             HttpClient       client[3];
             const StringView req = "GET /asd HTTP/1.1\r\n"
@@ -54,10 +60,9 @@ struct SC::HttpServerTest : public SC::TestCase
                 StringBuilder sb(buffer, StringBuilder::Clear);
                 SC_TEST_EXPECT(sb.format("HttpClient [{}]", i));
                 SC_TEST_EXPECT(client[i].setCustomDebugName(buffer.view()));
-                SC_TEST_EXPECT(
-                    client[i].start(eventLoop, "127.0.0.1", 8080, req,
-                                    [this](HttpClient& result)
-                                    { SC_TEST_EXPECT(result.getResponse().containsString("This is a title")); }));
+                client[i].callback = [this](HttpClient& result)
+                { SC_TEST_EXPECT(result.getResponse().containsString("This is a title")); };
+                SC_TEST_EXPECT(client[i].start(eventLoop, "127.0.0.1", 8080, req));
             }
             SC_TEST_EXPECT(eventLoop.run());
             SC_TEST_EXPECT(numTries == wantedNumTries);

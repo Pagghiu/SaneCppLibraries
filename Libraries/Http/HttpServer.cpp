@@ -4,51 +4,66 @@
 #include "HttpServer.h"
 #include "../Foundation/Strings/StringBuilder.h"
 
+SC::ReturnCode SC::HttpServer::Response::startResponse(int code)
+{
+    StringBuilder sb(outputBuffer, StringEncoding::Ascii, StringBuilder::Clear);
+    SC_TRY(sb.format("HTTP/1.1 "));
+    switch (code)
+    {
+    case 200: SC_TRY(sb.append("{} OK\r\n", code)); break;
+    case 404: SC_TRY(sb.append("{} Not Found\r\n", code)); break;
+    }
+    ended = false;
+    return true;
+}
+
+SC::ReturnCode SC::HttpServer::Response::addHeader(StringView headerName, StringView headerValue)
+{
+    StringBuilder sb(outputBuffer, StringEncoding::Ascii);
+    SC_TRY(sb.append(headerName));
+    SC_TRY(sb.append(": "));
+    SC_TRY(sb.append(headerValue));
+    SC_TRY(sb.append("\r\n"));
+    return true;
+}
+
 SC::ReturnCode SC::HttpServer::Response::end(StringView sv)
 {
-    const StringView headers = "HTTP/1.1 200 OK\r\n"
-                               "Date: Mon, 27 Aug 2023 16:37:00 GMT\r\n"
-                               "Server: SC\r\n"
-                               "Last-Modified: Wed, 27 Aug 2023 16:37:00 GMT\r\n"
-                               "Content-Length: {}\r\n"
-                               "Content-Type: text/html\r\n"
-                               "Connection: Closed\r\n"
-                               "\r\n"_a8;
-
-    StringBuilder sb(outputBuffer, StringEncoding::Ascii, StringBuilder::Clear);
-    SC_TRY(sb.format(headers, sv.sizeInBytes()));
+    StringBuilder sb(outputBuffer, StringEncoding::Ascii);
+    SC_TRY(sb.append("Content-Length: {}\r\n\r\n", sv.sizeInBytes()));
     SC_TRY(sb.append(sv));
     ended = true;
     return outputBuffer.pop_back(); // pop null terminator
 }
 
-SC::ReturnCode SC::HttpServer::Request::parse(Span<const char> readData, Response& res, HttpServer& server)
+SC::ReturnCode SC::HttpServer::parse(Span<const char> readData, ClientChannel& client)
 {
-    if (headerBuffer.size() > server.maxHeaderSize)
+    bool& parsedSuccessfully = client.request.parsedSuccessfully;
+    if (client.request.headerBuffer.size() > maxHeaderSize)
     {
         parsedSuccessfully = false;
         return "Header size exceeded limit"_a8;
     }
-    SC_TRY(headerBuffer.push_back(readData));
+    SC_TRY(client.request.headerBuffer.push_back(readData));
     size_t readBytes;
-    while (parsedSuccessfully and not readData.empty())
+    while (client.request.parsedSuccessfully and not readData.empty())
     {
         Span<const char> parsedData;
-        parsedSuccessfully &= parser.parse(readData.asConst(), readBytes, parsedData);
+        parsedSuccessfully &= client.request.parser.parse(readData.asConst(), readBytes, parsedData);
         parsedSuccessfully &= readData.sliceStart(readBytes, readData);
-        if (parser.state == HttpParser::State::Finished)
+        if (client.request.parser.state == HttpParser::State::Finished)
             break;
-        if (parser.state == HttpParser::State::Result)
+        if (client.request.parser.state == HttpParser::State::Result)
         {
             Header header;
-            header.result = parser.result;
-            header.start  = static_cast<uint32_t>(parser.tokenStart);
-            header.length = static_cast<uint32_t>(parser.tokenLength);
-            parsedSuccessfully &= headerOffsets.push_back(header);
-            if (parser.result == HttpParser::Result::HeadersEnd)
+            header.result = client.request.parser.result;
+            header.start  = static_cast<uint32_t>(client.request.parser.tokenStart);
+            header.length = static_cast<uint32_t>(client.request.parser.tokenLength);
+            parsedSuccessfully &= client.request.headerOffsets.push_back(header);
+            if (client.request.parser.result == HttpParser::Result::HeadersEnd)
             {
-                headersEndReceived = true;
-                server.onClient(*this, res);
+                client.request.headersEndReceived = true;
+                onClient(client);
                 break;
             }
         }
@@ -56,27 +71,21 @@ SC::ReturnCode SC::HttpServer::Request::parse(Span<const char> readData, Respons
     return parsedSuccessfully;
 }
 
-SC::ReturnCode SC::HttpServerAsync::start(EventLoop& loop, uint32_t maxConnections, StringView address, uint16_t port)
+SC::ReturnCode SC::HttpServerAsync::start(EventLoop& eventLoop, uint32_t maxConnections, StringView address,
+                                          uint16_t port)
 {
-    eventLoop = &loop;
     SC_TRY(requestClients.resize(maxConnections));
     SC_TRY(requests.resize(maxConnections));
     SocketIPAddress nativeAddress;
     SC_TRY(nativeAddress.fromAddressPort(address, port));
-    SC_TRY(eventLoop->createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
+    SC_TRY(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
     SC_TRY(SocketServer(serverSocket).listen(nativeAddress));
-    SC_TRY(startSocketAccept());
-    return true;
+    asyncAccept.setDebugName("HttpServerAsync");
+    asyncAccept.callback.bind<HttpServerAsync, &HttpServerAsync::onNewClient>(this);
+    return asyncAccept.start(eventLoop, serverSocket);
 }
 
 SC::ReturnCode SC::HttpServerAsync::stop() { return asyncAccept.stop(); }
-
-SC::ReturnCode SC::HttpServerAsync::startSocketAccept()
-{
-    asyncAccept.setDebugName("HttpServerAsync");
-    asyncAccept.callback.bind<HttpServerAsync, &HttpServerAsync::onNewClient>(this);
-    return asyncAccept.start(*eventLoop, serverSocket);
-}
 
 void SC::HttpServerAsync::onNewClient(AsyncSocketAccept::Result& result)
 {
@@ -95,10 +104,10 @@ void SC::HttpServerAsync::onNewClient(AsyncSocketAccept::Result& result)
     succeeded &= key2.isValid() and key1 == key2;
     if (succeeded)
     {
-        RequestClient&   client = *requestClients.get(key2);
-        RequestResponse& req    = *requests.get(key1);
-        client.key              = key2;
-        client.socket           = move(acceptedClient);
+        RequestClient& client = *requestClients.get(key2);
+        ClientChannel& req    = *requests.get(key1);
+        client.key            = key2;
+        client.socket         = move(acceptedClient);
 
         auto& buffer = req.request.headerBuffer;
         succeeded &= buffer.resizeWithoutInitializing(buffer.capacity());
@@ -106,7 +115,7 @@ void SC::HttpServerAsync::onNewClient(AsyncSocketAccept::Result& result)
             .format("HttpServerAsync::client [{}:{}]", (int)key1.generation.generation, (int)key1.index);
         client.asyncReceive.setDebugName(client.debugName.bytesIncludingTerminator());
         client.asyncReceive.callback.bind<HttpServerAsync, &HttpServerAsync::onReceive>(this);
-        succeeded &= client.asyncReceive.start(*eventLoop, client.socket, buffer.toSpan());
+        succeeded &= client.asyncReceive.start(*asyncAccept.getEventLoop(), client.socket, buffer.toSpan());
         SC_RELEASE_ASSERT(succeeded);
     }
     result.reactivateRequest(true);
@@ -115,28 +124,28 @@ void SC::HttpServerAsync::onNewClient(AsyncSocketAccept::Result& result)
 void SC::HttpServerAsync::onReceive(AsyncSocketReceive::Result& result)
 {
     SC_DISABLE_OFFSETOF_WARNING
-    RequestClient& client = SC_FIELD_OFFSET(RequestClient, asyncReceive, result.async);
+    RequestClient& requestClient = SC_FIELD_OFFSET(RequestClient, asyncReceive, result.async);
     SC_ENABLE_OFFSETOF_WARNING
-    SC_RELEASE_ASSERT(&client.asyncReceive == &result.async);
-    RequestResponse& rr = *requests.get(client.key.cast_to<RequestResponse>());
-    Span<char>       readData;
+    SC_RELEASE_ASSERT(&requestClient.asyncReceive == &result.async);
+    ClientChannel& client = *requests.get(requestClient.key.cast_to<ClientChannel>());
+    Span<char>     readData;
     if (not result.moveTo(readData))
     {
         // TODO: Invoke on error
         return;
     }
-    if (not rr.request.parse(readData.asConst(), rr.response, *this))
+    if (not HttpServer::parse(readData.asConst(), client))
     {
         // TODO: Invoke on error
         return;
     }
-    if (rr.response.mustBeFlushed())
+    if (client.response.mustBeFlushed())
     {
-        client.asyncSend.setDebugName(client.debugName.bytesIncludingTerminator());
+        requestClient.asyncSend.setDebugName(requestClient.debugName.bytesIncludingTerminator());
 
-        auto outspan = rr.response.outputBuffer.toSpan().asConst();
-        client.asyncSend.callback.bind<HttpServerAsync, &HttpServerAsync::onAfterSend>(this);
-        auto res = client.asyncSend.start(*eventLoop, client.socket, outspan);
+        auto outspan = client.response.outputBuffer.toSpan().asConst();
+        requestClient.asyncSend.callback.bind<HttpServerAsync, &HttpServerAsync::onAfterSend>(this);
+        auto res = requestClient.asyncSend.start(*asyncAccept.getEventLoop(), requestClient.socket, outspan);
         if (not res)
         {
             // TODO: Invoke on error
@@ -156,8 +165,8 @@ void SC::HttpServerAsync::onAfterSend(AsyncSocketSend::Result& result)
         SC_DISABLE_OFFSETOF_WARNING
         RequestClient& requestClient = SC_FIELD_OFFSET(RequestClient, asyncSend, result.async);
         SC_ENABLE_OFFSETOF_WARNING
-        auto* rr = requests.get(requestClient.key.cast_to<RequestResponse>());
-        rr->response.outputBuffer.clear();
+        auto clientKey = requestClient.key.cast_to<ClientChannel>();
+        requests.get(clientKey)->response.outputBuffer.clear();
     }
     // TODO: Close socket and dispose resources
 }

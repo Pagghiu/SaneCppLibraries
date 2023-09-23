@@ -12,8 +12,9 @@ struct HttpClient;
 
 struct SC::HttpClient
 {
-    [[nodiscard]] ReturnCode start(EventLoop& loop, StringView ipAddress, uint16_t port, StringView requestContent,
-                                   Function<void(HttpClient&)>&& cb);
+    [[nodiscard]] ReturnCode start(EventLoop& loop, StringView ipAddress, uint16_t port, StringView requestContent);
+
+    Delegate<HttpClient&> callback;
 
     StringView getResponse() const;
     ReturnCode setCustomDebugName(const StringView debugName) { return customDebugName.assign(debugName); }
@@ -23,8 +24,7 @@ struct SC::HttpClient
     void onAfterSend(AsyncSocketSend::Result& result);
     void onAfterRead(AsyncSocketReceive::Result& result);
 
-    Function<void(HttpClient&)> callback;
-    SmallVector<char, 1024>     content;
+    SmallVector<char, 1024> content;
 
     String customDebugName;
 

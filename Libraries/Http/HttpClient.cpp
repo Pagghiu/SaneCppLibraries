@@ -5,11 +5,9 @@
 
 #include "../Foundation/Strings/StringBuilder.h"
 
-SC::ReturnCode SC::HttpClient::start(EventLoop& loop, StringView ipAddress, uint16_t port, StringView requestContent,
-                                     Function<void(HttpClient&)>&& cb)
+SC::ReturnCode SC::HttpClient::start(EventLoop& loop, StringView ipAddress, uint16_t port, StringView requestContent)
 {
     eventLoop = &loop;
-    callback  = move(cb);
 
     SocketIPAddress localHost;
     SC_TRY(localHost.fromAddressPort(ipAddress, port));
