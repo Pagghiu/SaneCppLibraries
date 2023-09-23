@@ -115,6 +115,7 @@ namespace SC
 {
 struct SocketClient;
 struct SocketServer;
+struct DNSResolver;
 } // namespace SC
 
 struct SC::SocketServer
@@ -142,4 +143,9 @@ struct SC::SocketClient
 
   private:
     SocketDescriptor& socket;
+};
+
+struct SC::DNSResolver
+{
+    [[nodiscard]] static ReturnCode resolve(StringView host, String& ipAddress);
 };

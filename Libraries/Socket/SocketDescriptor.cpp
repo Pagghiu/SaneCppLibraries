@@ -1,10 +1,10 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../Foundation/Strings/StringBuilder.h"
 #include "../Foundation/Strings/StringConverter.h"
 #include "../System/System.h"
 #include "../System/Time.h"
+#include <string.h> // strlen
 
 #if SC_PLATFORM_WINDOWS
 
@@ -316,4 +316,51 @@ int SC::SocketFlags::toNative(ProtocolType family)
     case ProtocolUdp: return IPPROTO_UDP;
     }
     SC_UNREACHABLE();
+}
+
+SC::ReturnCode SC::DNSResolver::resolve(StringView host, String& ipAddress)
+{
+    struct addrinfo hints, *res, *p;
+    int             status;
+
+    // Setup hints structure
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family   = AF_UNSPEC;   // Use either IPv4 or IPv6
+    hints.ai_socktype = SOCK_STREAM; // Use SOCK_STREAM for TCP
+
+    StringConverter converter(ipAddress);
+
+    StringView nullTerminated;
+    SC_TRY(converter.convertNullTerminateFastPath(host, nullTerminated));
+    // Get address information
+    if ((status = getaddrinfo(nullTerminated.bytesIncludingTerminator(), NULL, &hints, &res)) != 0)
+    {
+        return "DNSResolver::resolve: getaddrinfo error"_a8;
+    }
+
+    // Loop through results and print IP addresses
+    for (p = res; p != NULL; p = p->ai_next)
+    {
+        void* addr;
+        char  ipstr[INET6_ADDRSTRLEN];
+
+        if (p->ai_family == AF_INET)
+        {
+            struct sockaddr_in* ipv4 = (struct sockaddr_in*)p->ai_addr;
+            addr                     = &(ipv4->sin_addr);
+        }
+        else
+        {
+            struct sockaddr_in6* ipv6 = (struct sockaddr_in6*)p->ai_addr;
+            addr                      = &(ipv6->sin6_addr);
+        }
+
+        // Convert IP address to a readable string
+        inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr);
+        StringView ipView(ipstr, ::strlen(ipstr), true, StringEncoding::Ascii);
+        SC_TRY(ipAddress.assign(ipView));
+    }
+
+    freeaddrinfo(res); // Free the linked list
+    return true;
 }
