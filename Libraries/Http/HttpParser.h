@@ -54,13 +54,13 @@ struct SC::HttpParser
     };
     Type type = Type::Request;
 
-    ReturnCode parse(Span<const char> data, size_t& readBytes, Span<const char>& parsedData);
+    [[nodiscard]] ReturnCode parse(Span<const char> data, size_t& readBytes, Span<const char>& parsedData);
     enum class HeaderType
     {
         ContentLength = 0
     };
 
-    bool matchesHeader(HeaderType headerName) const;
+    [[nodiscard]] bool matchesHeader(HeaderType headerName) const;
 
   private:
     size_t globalStart           = 0;
@@ -76,17 +76,17 @@ struct SC::HttpParser
     bool     matchingHeaderValid[numMatches] = {false};
     uint64_t number                          = 0;
 
-    bool parseHeaderName(char currentChar);
-    bool parseHeaderValue(char currentChar);
-    bool parseStatusCode(char currentChar);
-    bool parseNumberValue(char currentChar);
-    bool parseHeadersEnd(char currentChar);
-    bool parseMethod(char currentChar);
-    bool parseUrl(char currentChar);
+    [[nodiscard]] bool parseHeaderName(char currentChar);
+    [[nodiscard]] bool parseHeaderValue(char currentChar);
+    [[nodiscard]] bool parseStatusCode(char currentChar);
+    [[nodiscard]] bool parseNumberValue(char currentChar);
+    [[nodiscard]] bool parseHeadersEnd(char currentChar);
+    [[nodiscard]] bool parseMethod(char currentChar);
+    [[nodiscard]] bool parseUrl(char currentChar);
 
     template <bool spaces>
-    bool parseVersion(char currentChar);
+    [[nodiscard]] bool parseVersion(char currentChar);
 
     template <bool (HttpParser::*Func)(char), Result currentResult>
-    ReturnCode process(Span<const char>& data, size_t& readBytes, Span<const char>& parsedData);
+    [[nodiscard]] ReturnCode process(Span<const char>& data, size_t& readBytes, Span<const char>& parsedData);
 };

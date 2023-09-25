@@ -29,12 +29,16 @@ struct SC::HttpServer
     struct ClientChannel;
     struct Request
     {
-        bool       headersEndReceived = false;
-        bool       parsedSuccessfully = true;
+        bool headersEndReceived = false;
+        bool parsedSuccessfully = true;
+
         HttpParser parser;
+        StringView url;
 
         SmallVector<char, 255>  headerBuffer;
         SmallVector<Header, 16> headerOffsets;
+
+        [[nodiscard]] bool find(HttpParser::Result result, StringView& res) const;
     };
 
     struct Response

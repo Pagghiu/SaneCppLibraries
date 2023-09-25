@@ -2,19 +2,33 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "HttpClient.h"
+#include "../Socket/SocketDescriptor.h" // DNSResolver
+#include "HttpURLParser.h"
 
 #include "../Foundation/Strings/StringBuilder.h"
 
-SC::ReturnCode SC::HttpClient::start(EventLoop& loop, StringView ipAddress, uint16_t port, StringView requestContent)
+SC::ReturnCode SC::HttpClient::get(EventLoop& loop, StringView url)
 {
     eventLoop = &loop;
 
+    SmallString<256> ipAddress;
+    uint16_t         port;
+    HttpURLParser    parser;
+    SC_TRY(parser.parse(url));
+    SC_TRY_MSG(parser.protocol == "http", "Invalid protocol"_a8);
+    // TODO: Make DNS Resolution asynchronous
+    SC_TRY(DNSResolver::resolve(parser.hostname, ipAddress))
+    port = parser.port;
     SocketIPAddress localHost;
-    SC_TRY(localHost.fromAddressPort(ipAddress, port));
+    SC_TRY(localHost.fromAddressPort(ipAddress.view(), port));
     SC_TRY(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
 
     StringBuilder sb(content, StringEncoding::Ascii, StringBuilder::Clear);
-    SC_TRY(sb.append(requestContent));
+
+    SC_TRY(sb.append("GET {} HTTP/1.1\r\n"
+                     "User-agent: {}\r\n"
+                     "Host: {}\r\n\r\n",
+                     parser.path, "SC", "127.0.0.1"));
     const char* dbgName = customDebugName.isEmpty() ? "HttpClient" : customDebugName.bytesIncludingTerminator();
     connectAsync.setDebugName(dbgName);
     connectAsync.callback.bind<HttpClient, &HttpClient::onConnected>(this);

@@ -4,6 +4,20 @@
 #include "HttpServer.h"
 #include "../Foundation/Strings/StringBuilder.h"
 
+// HttpServer::Request
+bool SC::HttpServer::Request::find(HttpParser::Result result, StringView& res) const
+{
+    size_t found;
+    if (headerOffsets.find([result](const auto& it) { return it.result == result; }, &found))
+    {
+        const Header& header = headerOffsets[found];
+        res = StringView(headerBuffer.data() + header.start, header.length, false, StringEncoding::Ascii);
+        return true;
+    }
+    return false;
+}
+
+// HttpServer::Response
 SC::ReturnCode SC::HttpServer::Response::startResponse(int code)
 {
     StringBuilder sb(outputBuffer, StringEncoding::Ascii, StringBuilder::Clear);
@@ -12,6 +26,7 @@ SC::ReturnCode SC::HttpServer::Response::startResponse(int code)
     {
     case 200: SC_TRY(sb.append("{} OK\r\n", code)); break;
     case 404: SC_TRY(sb.append("{} Not Found\r\n", code)); break;
+    case 405: SC_TRY(sb.append("{} Not Allowed\r\n", code)); break;
     }
     ended = false;
     return true;
@@ -36,6 +51,8 @@ SC::ReturnCode SC::HttpServer::Response::end(StringView sv)
     return outputBuffer.pop_back(); // pop null terminator
 }
 
+// HttpServer
+
 SC::ReturnCode SC::HttpServer::parse(Span<const char> readData, ClientChannel& client)
 {
     bool& parsedSuccessfully = client.request.parsedSuccessfully;
@@ -48,21 +65,23 @@ SC::ReturnCode SC::HttpServer::parse(Span<const char> readData, ClientChannel& c
     size_t readBytes;
     while (client.request.parsedSuccessfully and not readData.empty())
     {
+        HttpParser&      parser = client.request.parser;
         Span<const char> parsedData;
-        parsedSuccessfully &= client.request.parser.parse(readData.asConst(), readBytes, parsedData);
+        parsedSuccessfully &= parser.parse(readData.asConst(), readBytes, parsedData);
         parsedSuccessfully &= readData.sliceStart(readBytes, readData);
-        if (client.request.parser.state == HttpParser::State::Finished)
+        if (parser.state == HttpParser::State::Finished)
             break;
-        if (client.request.parser.state == HttpParser::State::Result)
+        if (parser.state == HttpParser::State::Result)
         {
             Header header;
-            header.result = client.request.parser.result;
-            header.start  = static_cast<uint32_t>(client.request.parser.tokenStart);
-            header.length = static_cast<uint32_t>(client.request.parser.tokenLength);
+            header.result = parser.result;
+            header.start  = static_cast<uint32_t>(parser.tokenStart);
+            header.length = static_cast<uint32_t>(parser.tokenLength);
             parsedSuccessfully &= client.request.headerOffsets.push_back(header);
-            if (client.request.parser.result == HttpParser::Result::HeadersEnd)
+            if (parser.result == HttpParser::Result::HeadersEnd)
             {
                 client.request.headersEndReceived = true;
+                SC_TRY(client.request.find(HttpParser::Result::Url, client.request.url));
                 onClient(client);
                 break;
             }
@@ -71,6 +90,7 @@ SC::ReturnCode SC::HttpServer::parse(Span<const char> readData, ClientChannel& c
     return parsedSuccessfully;
 }
 
+// HttpServerAsync
 SC::ReturnCode SC::HttpServerAsync::start(EventLoop& eventLoop, uint32_t maxConnections, StringView address,
                                           uint16_t port)
 {

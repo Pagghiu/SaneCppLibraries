@@ -12,12 +12,15 @@ struct HttpClient;
 
 struct SC::HttpClient
 {
-    [[nodiscard]] ReturnCode start(EventLoop& loop, StringView ipAddress, uint16_t port, StringView requestContent);
+    [[nodiscard]] ReturnCode get(EventLoop& loop, StringView url);
 
     Delegate<HttpClient&> callback;
 
-    StringView getResponse() const;
-    ReturnCode setCustomDebugName(const StringView debugName) { return customDebugName.assign(debugName); }
+    [[nodiscard]] StringView getResponse() const;
+    [[nodiscard]] ReturnCode setCustomDebugName(const StringView debugName)
+    {
+        return customDebugName.assign(debugName);
+    }
 
   private:
     void onConnected(AsyncSocketConnect::Result& result);

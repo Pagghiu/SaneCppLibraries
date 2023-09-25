@@ -86,6 +86,7 @@ SC::ReturnCode SC::HttpURLParser::parseHost()
 
     return validateHost();
 }
+
 SC::ReturnCode SC::HttpURLParser::validateProtocol()
 {
     // TODO: Expand supported protocols
