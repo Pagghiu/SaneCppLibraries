@@ -2,6 +2,10 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../../Libraries/Foundation/Containers/ArenaMap.h"
+#include "../../Libraries/Foundation/Containers/Map.h"
+#include "../../Libraries/Foundation/Containers/Set.h"
+#include "../../Libraries/Foundation/Containers/SmallVector.h"
 #include "../../Libraries/Foundation/Language/Memory.h"
 #include "../../Libraries/Foundation/Strings/String.h"
 #include "../../Libraries/Testing/Test.h"
@@ -42,6 +46,25 @@ struct SC::DebugVisualizersTest : public SC::TestCase
         (void)smallVector.push_back(4.4f);
         report.console.print("{}\n", smallVector[0]);
         SmallString<10> ss = "asd"_a8;
-        report.console.printLine(ss.view());
+
+        Map<String, int> map;
+        (void)map.insertIfNotExists({"one"_a8, 1});
+        (void)map.insertIfNotExists({"two"_a8, 2});
+        (void)map.insertIfNotExists({"three"_a8, 3});
+
+        Set<StringView> set;
+        (void)set.insert("3");
+        (void)set.insert("3");
+        (void)set.insert("3");
+        (void)set.insert("2");
+        (void)set.insert("1");
+
+        ArenaMap<String> arenaMap;
+        (void)arenaMap.resize(10);
+        (void)arenaMap.insert("one"_a8);
+        auto k2 = arenaMap.insert("two"_a8);
+        (void)arenaMap.insert("three"_a8);
+        (void)arenaMap.remove(k2);
+        (void)k2;
     }
 };
