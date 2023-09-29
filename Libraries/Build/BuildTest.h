@@ -36,7 +36,7 @@ struct SC::BuildTest : public SC::TestCase
         // Configurations
         project.addPresetConfiguration(Configuration::Preset::Debug);
         project.addPresetConfiguration(Configuration::Preset::Release, "Release");
-        project.compile.addDefines({"SC_LIBRARY_PATH=$(PROJECT_DIR)/../../.."});
+        project.compile.addDefines({"SC_LIBRARY_PATH=$(PROJECT_DIR)/../../..", "SC_ENABLE_CONFIG_FILE=1"});
         project.getConfiguration("Debug")->compile.addDefines({"DEBUG=1"});
         // TODO: These includes must be relative to rootDirectory
         project.compile.addIncludes({

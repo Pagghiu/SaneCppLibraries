@@ -2,12 +2,11 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Language/Compiler.h"
 #include "../Language/Types.h"
 
 extern "C"
 {
-#if SC_MSVC || SC_CLANG_CL
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
     void* __cdecl memmove(void* dst, const void* src, size_t n);
     void* __cdecl memcpy(void* dst, const void* src, size_t n);
     int __cdecl memcmp(const void* s1, const void* s2, size_t n);

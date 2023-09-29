@@ -72,7 +72,7 @@ template <typename T>
 static constexpr Nm ClNm()
 {
     // clang-format off
-#if SC_CLANG || SC_GCC
+#if SC_COMPILER_CLANG || SC_COMPILER_GCC
     const char* name = __PRETTY_FUNCTION__;
     constexpr char separating_char = '=';
     constexpr uint32_t  skip_chars = 2;

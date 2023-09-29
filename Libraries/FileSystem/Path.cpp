@@ -381,7 +381,7 @@ bool SC::Path::normalizeUNCAndTrimQuotes(StringView fileLocation, Vector<StringV
 {
     // The macro escaping Library Path from defines adds escaped double quotes
     fileLocation = fileLocation.trimStartingChar('"').trimEndingChar('"');
-#if SC_MSVC
+#if SC_COMPILER_MSVC
     SmallString<256> fixUncPathsOnMSVC;
     if (fileLocation.startsWithChar('\\') and not fileLocation.startsWith("\\\\"))
     {

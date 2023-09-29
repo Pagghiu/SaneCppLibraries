@@ -15,48 +15,48 @@ extern "C"
     __int32 __iso_volatile_load32(const volatile __int32*);
     void    _ReadWriteBarrier(void);
 
-#ifndef SC_MSVC_DISABLE_DEPRECATED_WARNING
+#ifndef SC_COMPILER_MSVC_DISABLE_DEPRECATED_WARNING
 #ifdef __clang__
-#define SC_MSVC_DISABLE_DEPRECATED_WARNING                                                                             \
+#define SC_COMPILER_MSVC_DISABLE_DEPRECATED_WARNING                                                                    \
     _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wdeprecated-declarations\"")
 #elif defined(__CUDACC__) || defined(__INTEL_COMPILER)
-#define SC_MSVC_DISABLE_DEPRECATED_WARNING                                                                             \
+#define SC_COMPILER_MSVC_DISABLE_DEPRECATED_WARNING                                                                    \
     __pragma(warning(push)) __pragma(warning(disable : 4996)) // was declared deprecated
 #else                                                         // vvv MSVC vvv
-#define SC_MSVC_DISABLE_DEPRECATED_WARNING                                                                             \
+#define SC_COMPILER_MSVC_DISABLE_DEPRECATED_WARNING                                                                    \
     _Pragma("warning(push)") _Pragma("warning(disable : 4996)") // was declared deprecated
 #endif                                                          // ^^^ MSVC ^^^
-#endif                                                          // SC_MSVC_DISABLE_DEPRECATED_WARNING
+#endif                                                          // SC_COMPILER_MSVC_DISABLE_DEPRECATED_WARNING
 
-#ifndef SC_MSVC_RESTORE_DEPRECATED_WARNING
+#ifndef SC_COMPILER_MSVC_RESTORE_DEPRECATED_WARNING
 #ifdef __clang__
-#define SC_MSVC_RESTORE_DEPRECATED_WARNING _Pragma("clang diagnostic pop")
+#define SC_COMPILER_MSVC_RESTORE_DEPRECATED_WARNING _Pragma("clang diagnostic pop")
 #elif defined(__CUDACC__) || defined(__INTEL_COMPILER)
-#define SC_MSVC_RESTORE_DEPRECATED_WARNING __pragma(warning(pop))
+#define SC_COMPILER_MSVC_RESTORE_DEPRECATED_WARNING __pragma(warning(pop))
 #else
-#define SC_MSVC_RESTORE_DEPRECATED_WARNING _Pragma("warning(pop)")
+#define SC_COMPILER_MSVC_RESTORE_DEPRECATED_WARNING _Pragma("warning(pop)")
 #endif
 #endif
 
-#define SC_MSVC_COMPILER_BARRIER()                                                                                     \
-    SC_MSVC_DISABLE_DEPRECATED_WARNING _ReadWriteBarrier() SC_MSVC_RESTORE_DEPRECATED_WARNING
+#define SC_COMPILER_MSVC_COMPILER_BARRIER()                                                                            \
+    SC_COMPILER_MSVC_DISABLE_DEPRECATED_WARNING _ReadWriteBarrier() SC_COMPILER_MSVC_RESTORE_DEPRECATED_WARNING
 
 #if defined(_M_ARM) || defined(_M_ARM64) || defined(_M_ARM64EC)
-#define SC_MSVC_MEMORY_BARRIER()          __dmb(0xB)
-#define SC_MSVC_COMPILER_MEMORY_BARRIER() SC_MSVC_MEMORY_BARRIER()
+#define SC_COMPILER_MSVC_MEMORY_BARRIER()          __dmb(0xB)
+#define SC_COMPILER_MSVC_COMPILER_MEMORY_BARRIER() SC_COMPILER_MSVC_MEMORY_BARRIER()
 #elif defined(_M_IX86) || defined(_M_X64)
-#define SC_MSVC_COMPILER_MEMORY_BARRIER() SC_MSVC_COMPILER_BARRIER()
+#define SC_COMPILER_MSVC_COMPILER_MEMORY_BARRIER() SC_COMPILER_MSVC_COMPILER_BARRIER()
 #else
 #error Unsupported hardware
 #endif
 
-#define SC_MSVC_ATOMIC_LOAD_VERIFY_MEMORY_ORDER(_Order_var)                                                            \
+#define SC_COMPILER_MSVC_ATOMIC_LOAD_VERIFY_MEMORY_ORDER(_Order_var)                                                   \
     switch (_Order_var)                                                                                                \
     {                                                                                                                  \
     case memory_order_relaxed: break;                                                                                  \
     case memory_order_consume:                                                                                         \
     case memory_order_acquire:                                                                                         \
-    case memory_order_seq_cst: SC_MSVC_COMPILER_MEMORY_BARRIER(); break;                                               \
+    case memory_order_seq_cst: SC_COMPILER_MSVC_COMPILER_MEMORY_BARRIER(); break;                                      \
     case memory_order_release:                                                                                         \
     case memory_order_acq_rel:                                                                                         \
     default: break;                                                                                                    \
@@ -112,7 +112,7 @@ struct Atomic<int32_t>
         int32_t res;
 #if _MSC_VER
         res = __iso_volatile_load32(reinterpret_cast<volatile const int*>(&value));
-        SC_MSVC_COMPILER_MEMORY_BARRIER();
+        SC_COMPILER_MSVC_COMPILER_MEMORY_BARRIER();
 #else
         __atomic_load(&value, &res, __ATOMIC_SEQ_CST);
 #endif
@@ -124,7 +124,7 @@ struct Atomic<int32_t>
         int32_t res;
 #if _MSC_VER
         res = __iso_volatile_load32(reinterpret_cast<volatile const int*>(&value));
-        SC_MSVC_ATOMIC_LOAD_VERIFY_MEMORY_ORDER(mem);
+        SC_COMPILER_MSVC_ATOMIC_LOAD_VERIFY_MEMORY_ORDER(mem);
 #else
         __atomic_load(&value, &res, mem);
 #endif
@@ -155,7 +155,7 @@ struct Atomic<bool>
     {
 #if _MSC_VER
         char res = __iso_volatile_load8(reinterpret_cast<volatile const char*>(&value));
-        SC_MSVC_COMPILER_MEMORY_BARRIER();
+        SC_COMPILER_MSVC_COMPILER_MEMORY_BARRIER();
         return reinterpret_cast<bool&>(res);
 #else
         bool res;
@@ -168,7 +168,7 @@ struct Atomic<bool>
     {
 #if _MSC_VER
         char res = __iso_volatile_load8(reinterpret_cast<volatile const char*>(&value));
-        SC_MSVC_ATOMIC_LOAD_VERIFY_MEMORY_ORDER(mem);
+        SC_COMPILER_MSVC_ATOMIC_LOAD_VERIFY_MEMORY_ORDER(mem);
         return reinterpret_cast<bool&>(res);
 #else
         bool res;
@@ -183,9 +183,9 @@ struct Atomic<bool>
 
 } // namespace SC
 
-#undef SC_MSVC_ATOMIC_LOAD_VERIFY_MEMORY_ORDER
-#undef SC_MSVC_DISABLE_DEPRECATED_WARNING
-#undef SC_MSVC_RESTORE_DEPRECATED_WARNING
-#undef SC_MSVC_COMPILER_BARRIER
-#undef SC_MSVC_MEMORY_BARRIER
-#undef SC_MSVC_COMPILER_MEMORY_BARRIER
+#undef SC_COMPILER_MSVC_ATOMIC_LOAD_VERIFY_MEMORY_ORDER
+#undef SC_COMPILER_MSVC_DISABLE_DEPRECATED_WARNING
+#undef SC_COMPILER_MSVC_RESTORE_DEPRECATED_WARNING
+#undef SC_COMPILER_MSVC_COMPILER_BARRIER
+#undef SC_COMPILER_MSVC_MEMORY_BARRIER
+#undef SC_COMPILER_MSVC_COMPILER_MEMORY_BARRIER

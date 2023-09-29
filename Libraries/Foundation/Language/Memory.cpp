@@ -13,11 +13,7 @@ void* SC::memoryReallocate(void* memory, SC::size_t numBytes) { return realloc(m
 void* SC::memoryAllocate(SC::size_t numBytes) { return malloc(numBytes); }
 void  SC::memoryRelease(void* allocatedMemory) { return free(allocatedMemory); }
 
-#ifndef SC_ENABLE_STD_CPP_LIBRARY
-#error "SC_ENABLE_STD_CPP_LIBRARY must be defined to either 0 or 1"
-#endif
-
-#if SC_MSVC || SC_CLANG_CL
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #if SC_ADDRESS_SANITIZER == 0
 void* operator new(size_t len) { return malloc(len); }
 void* operator new[](size_t len) { return malloc(len); }
@@ -65,7 +61,7 @@ void operator delete[](void* p) noexcept
 // system includes
 #include <float.h>  // FLT_MAX / DBL_MAX
 #include <stdlib.h> // *_MAX (integer)
-#if SC_MSVC || SC_CLANG_CL
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #include <BaseTsd.h>
 #include <stdint.h>
 typedef SSIZE_T ssize_t;

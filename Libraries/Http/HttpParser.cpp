@@ -4,7 +4,7 @@
 #include "HttpParser.h"
 
 // https://www.chiark.greenend.org.uk/~sgtatham/coroutines.html
-#if SC_MSVC
+#if SC_COMPILER_MSVC
 #define SC_CAT(x, y)  SC_CAT2(x, y)
 #define SC_CAT2(x, y) x##y
 // https://developercommunity.visualstudio.com/t/-line-cannot-be-used-as-an-argument-for-constexpr/195665

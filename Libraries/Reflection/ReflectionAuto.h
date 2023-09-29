@@ -48,7 +48,7 @@ struct IntegerSequence
     static constexpr size_t size() noexcept { return sizeof...(Values); }
 };
 
-#if SC_GCC
+#if SC_COMPILER_GCC
 template <class IntegerType, IntegerType N>
 using MakeIntegerSequence = IntegerSequence<IntegerType, __integer_pack(N)...>;
 #else

@@ -9,7 +9,7 @@
 // SC_PLUGIN_EXPORT
 //
 
-#if SC_MSVC
+#if SC_COMPILER_MSVC
 #define SC_PLUGIN_EXPORT __declspec(dllexport)
 #else
 #define SC_PLUGIN_EXPORT
@@ -40,7 +40,7 @@
         }                                                                                                              \
     }
 
-#if SC_MSVC
+#if SC_COMPILER_MSVC
 #define SC_PLUGIN_LINKER_DEFINITIONS                                                                                   \
     SC_PLUGIN_LINKER_OPERATORS                                                                                         \
     extern "C" void __CxxFrameHandler4()                                                                               \

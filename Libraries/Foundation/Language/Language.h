@@ -2,7 +2,6 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Language/Compiler.h"
 #include "../Language/Types.h"
 
 namespace SC
@@ -126,7 +125,7 @@ struct PlacementNew
 {
 };
 } // namespace SC
-#if SC_MSVC
+#if SC_COMPILER_MSVC
 inline void* operator new(size_t, void* p, SC::PlacementNew) noexcept { return p; }
 inline void  operator delete(void*, SC::PlacementNew) noexcept {}
 #else
@@ -145,7 +144,7 @@ inline void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { retu
 #endif
 #else
 
-#if SC_MSVC
+#if SC_COMPILER_MSVC
 #define SC_CPLUSPLUS _MSVC_LANG
 #else
 #define SC_CPLUSPLUS __cplusplus
@@ -199,7 +198,7 @@ inline void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { retu
 #define SC_CONSTEXPR_DESTRUCTOR
 #endif
 
-#if (!SC_MSVC) || SC_CPP_AT_LEAST_20
+#if (!SC_COMPILER_MSVC) || SC_CPP_AT_LEAST_20
 #define SC_LIKELY   [[likely]]
 #define SC_UNLIKELY [[unlikely]]
 #else

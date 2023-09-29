@@ -34,7 +34,7 @@ bool formatSprintf(StringFormatOutput& data, const char (&formatSpecifier)[FORMA
     return validResult && data.write(StringView(buffer, static_cast<size_t>(numCharsExcludingTerminator), true,
                                                 StringEncoding::Ascii));
 }
-#if SC_MSVC || SC_CLANG_CL
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #else
 
 bool StringFormatterFor<SC::size_t>::format(StringFormatOutput& data, const StringView specifier,

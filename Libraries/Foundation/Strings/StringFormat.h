@@ -39,7 +39,7 @@ struct StringFormatOutput
 // clang-format off
 template <> struct StringFormatterFor<float>        {static bool format(StringFormatOutput&, const StringView, const float);};
 template <> struct StringFormatterFor<double>       {static bool format(StringFormatOutput&, const StringView, const double);};
-#if SC_MSVC || SC_CLANG_CL
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #if SC_PLATFORM_64_BIT == 0
 template <> struct StringFormatterFor<SC::ssize_t> { static bool format(StringFormatOutput&, const StringView, const SC::ssize_t); };
 #endif
