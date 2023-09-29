@@ -87,7 +87,7 @@ void SC::Console::printNullTerminatedASCII(const StringView str)
 #endif
 }
 
-void SC::printAssertion(const char_t* expression, const char_t* filename, const char_t* functionName, int lineNumber)
+void SC::printAssertion(const char* expression, const char* filename, const char* functionName, int lineNumber)
 {
     // Here we're explicitly avoiding usage of StringFormat to avoid dynamic allocation
     Console::printNullTerminatedASCII("Assertion failed: ("_a8);
@@ -97,7 +97,7 @@ void SC::printAssertion(const char_t* expression, const char_t* filename, const 
     Console::printNullTerminatedASCII("\nFunction: "_a8);
     Console::printNullTerminatedASCII(StringView(functionName, strlen(functionName), true, StringEncoding::Ascii));
     Console::printNullTerminatedASCII("\nLine: "_a8);
-    char_t    buffer[50];
+    char      buffer[50];
     const int numCharsExcludingTerminator = snprintf(buffer, sizeof(buffer), "%d", lineNumber);
     Console::printNullTerminatedASCII(
         StringView(buffer, static_cast<size_t>(numCharsExcludingTerminator), true, StringEncoding::Ascii));

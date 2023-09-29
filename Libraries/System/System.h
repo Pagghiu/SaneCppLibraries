@@ -52,7 +52,7 @@ struct SC::SystemDebug
 
 struct SC::SystemDirectories
 {
-    static const int StaticPathSize = 1024 * sizeof(utf_char_t);
+    static const int StaticPathSize = 1024 * sizeof(native_char_t);
 
     SmallString<StaticPathSize> executableFile; // Full path (native encoding) to executable file including extension
     SmallString<StaticPathSize> applicationRootDirectory; // Full path to (native encoding) Application directory

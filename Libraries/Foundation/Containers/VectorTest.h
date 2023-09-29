@@ -68,8 +68,8 @@ struct SC::VectorTestReport
 
 struct SC::VectorTestClass
 {
-    char_t* data;
-    VectorTestClass(const char_t* initData)
+    char* data;
+    VectorTestClass(const char* initData)
     {
         copyString(initData);
         SC::VectorTestReport::get();
@@ -149,10 +149,10 @@ struct SC::VectorTestClass
         }
         return idx;
     }
-    void copyString(const char_t* initData)
+    void copyString(const char* initData)
     {
         const size_t numBytes = dataLength(initData) + 1;
-        data                  = static_cast<char_t*>(memoryAllocate(numBytes));
+        data                  = static_cast<char*>(memoryAllocate(numBytes));
         memcpy(data, initData, numBytes);
     }
 };

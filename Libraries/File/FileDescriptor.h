@@ -83,7 +83,7 @@ struct SC::FileDescriptor : public SC::UniqueTaggedHandleTraits<SC::FileDescript
     [[nodiscard]] ReturnCode seek(SeekMode seekMode, uint64_t offset);
 
     // TODO: Maybe readUntilEOF and readAppend should go into some other class
-    [[nodiscard]] ReturnCode readUntilEOF(Vector<char_t>& destination);
+    [[nodiscard]] ReturnCode readUntilEOF(Vector<char>& destination);
     [[nodiscard]] ReturnCode readUntilEOF(String& destination);
 
     struct ReadResult

@@ -118,7 +118,7 @@ bool SC::StringConverter::convertEncodingToUTF8(StringView text, Vector<char>& b
         SC_TRY(buffer.resizeWithoutInitializing(oldSize + (static_cast<size_t>(numChars) + (nullTerminate ? 1 : 0))));
 #if SC_PLATFORM_WINDOWS
         WideCharToMultiByte(CP_UTF8, 0, source, sourceSizeInBytes / sizeof(uint16_t),
-                            reinterpret_cast<char_t*>(buffer.data() + oldSize), numChars, nullptr, 0);
+                            reinterpret_cast<char*>(buffer.data() + oldSize), numChars, nullptr, 0);
 #elif SC_PLATFORM_APPLE
         CFStringGetBytes(tmpStr, charRange, kCFStringEncodingUTF8, 0, false,
                          reinterpret_cast<UInt8*>(buffer.data() + oldSize), numChars, NULL);

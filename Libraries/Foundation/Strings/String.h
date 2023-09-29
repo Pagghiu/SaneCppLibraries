@@ -36,7 +36,7 @@ struct SC::String
     [[nodiscard]] size_t         sizeInBytesIncludingTerminator() const { return data.size(); }
     //  - if string is empty        --> data.size() == 0
     //  - if string is not empty    --> data.size() > 2
-    [[nodiscard]] const char_t* bytesIncludingTerminator() const { return data.data(); }
+    [[nodiscard]] const char* bytesIncludingTerminator() const { return data.data(); }
 #if SC_PLATFORM_WINDOWS
     [[nodiscard]] wchar_t* nativeWritableBytesIncludingTerminator()
     {
@@ -44,7 +44,7 @@ struct SC::String
         return reinterpret_cast<wchar_t*>(data.data());
     }
 #else
-    [[nodiscard]] char_t* nativeWritableBytesIncludingTerminator()
+    [[nodiscard]] char* nativeWritableBytesIncludingTerminator()
     {
         SC_RELEASE_ASSERT(encoding < StringEncoding::Utf16);
         return data.data();
@@ -137,5 +137,5 @@ struct SC::StringFormatterFor<SC::String>
 namespace SC
 {
 template <int N>
-using StringNative = SmallString<N * sizeof(utf_char_t)>;
+using StringNative = SmallString<N * sizeof(native_char_t)>;
 } // namespace SC

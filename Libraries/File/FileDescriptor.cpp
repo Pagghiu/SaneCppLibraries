@@ -19,7 +19,7 @@ SC::ReturnCode SC::PipeDescriptor::close()
 
 SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode) { return open(path, mode, OpenOptions()); }
 
-SC::ReturnCode SC::FileDescriptor::readUntilEOF(Vector<char_t>& destination)
+SC::ReturnCode SC::FileDescriptor::readUntilEOF(Vector<char>& destination)
 {
     char buffer[1024];
     SC_TRY(isValid());

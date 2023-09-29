@@ -58,7 +58,7 @@ struct SC_EXPORT_SYMBOL SC::VectorAllocator
             {
                 // If we were folloed by a small vector, we check if that small vector has enough memory
                 SegmentHeader* followingHeader = static_cast<SegmentHeader*>(
-                    static_cast<void*>(static_cast<char_t*>(pself) + SIZE_OF_VECTOR_T)); // vector
+                    static_cast<void*>(static_cast<char*>(pself) + SIZE_OF_VECTOR_T)); // vector
                 if (followingHeader->options.isSmallVector && followingHeader->capacityBytes >= numNewBytes)
                 {
                     return followingHeader;
@@ -102,12 +102,12 @@ struct SC_EXPORT_SYMBOL SC::VectorAllocator
     static T* getItems(SegmentHeader* header)
     {
         return static_cast<T*>(
-            static_cast<void*>(static_cast<char_t*>(static_cast<void*>(header)) + sizeof(SegmentHeader)));
+            static_cast<void*>(static_cast<char*>(static_cast<void*>(header)) + sizeof(SegmentHeader)));
     }
     template <typename T>
     static const T* getItems(const SegmentHeader* header)
     {
-        return static_cast<T*>(static_cast<const void*>(static_cast<const char_t*>(static_cast<const void*>(header)) +
+        return static_cast<T*>(static_cast<const void*>(static_cast<const char*>(static_cast<const void*>(header)) +
                                                         sizeof(SegmentHeader)));
     }
 };
@@ -425,7 +425,7 @@ struct SC::Vector
             if (otherWasFollowedBySmallVector)
             {
                 // Other.items should become nullptr, but if it was followed by small vector, restore its link
-                other.items = static_cast<T*>(static_cast<void*>(static_cast<char_t*>(static_cast<void*>(&other)) +
+                other.items = static_cast<T*>(static_cast<void*>(static_cast<char*>(static_cast<void*>(&other)) +
                                                                  alignof(SegmentHeader) + sizeof(SegmentHeader)));
             }
             else

@@ -14,7 +14,7 @@ namespace SC
 #else
 [[noreturn]] SC_ALWAYS_INLINE void SC_UNREACHABLE() { __builtin_unreachable(); }
 #endif
-void printAssertion(const char_t* expression, const char_t* filename, const char_t* functionName, int lineNumber);
+void printAssertion(const char* expression, const char* filename, const char* functionName, int lineNumber);
 [[nodiscard]] bool printBacktrace();
 SC_NO_RETURN(void exit(int code));
 

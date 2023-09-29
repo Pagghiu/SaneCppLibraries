@@ -81,7 +81,7 @@ struct SC_EXPORT_SYMBOL SC::StringView
     constexpr StringView(Span<const char> textSpan, bool nullTerm, StringEncoding encoding)
         : text(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(encoding), hasNullTerm(nullTerm)
     {}
-    constexpr StringView(const char_t* text, size_t bytes, bool nullTerm, StringEncoding encoding)
+    constexpr StringView(const char* text, size_t bytes, bool nullTerm, StringEncoding encoding)
         : text(text), textSizeInBytes(bytes), encoding(encoding), hasNullTerm(nullTerm)
     {}
 
@@ -105,8 +105,8 @@ struct SC_EXPORT_SYMBOL SC::StringView
     {}
 #endif
     [[nodiscard]] constexpr StringEncoding getEncoding() const { return encoding; }
-    [[nodiscard]] constexpr const char_t*  bytesWithoutTerminator() const { return text; }
-    [[nodiscard]] constexpr const char_t*  bytesIncludingTerminator() const
+    [[nodiscard]] constexpr const char*    bytesWithoutTerminator() const { return text; }
+    [[nodiscard]] constexpr const char*    bytesIncludingTerminator() const
     {
         SC_RELEASE_ASSERT(hasNullTerm);
         return text;
@@ -118,7 +118,7 @@ struct SC_EXPORT_SYMBOL SC::StringView
         return reinterpret_cast<const wchar_t*>(text);
     }
 #else
-    [[nodiscard]] const char_t* getNullTerminatedNative() const
+    [[nodiscard]] const char* getNullTerminatedNative() const
     {
         SC_RELEASE_ASSERT(hasNullTerm && (encoding == StringEncoding::Utf8 || encoding == StringEncoding::Ascii));
         return text;

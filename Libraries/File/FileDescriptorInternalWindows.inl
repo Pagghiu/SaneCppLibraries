@@ -37,7 +37,7 @@ SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOpti
     StringView         filePath;
     SC_TRY(convert.convertNullTerminateFastPath(path, filePath));
     const wchar_t* wpath        = filePath.getNullTerminatedNative();
-    const bool     isThreeChars = filePath.sizeInBytes() >= 3 * sizeof(utf_char_t);
+    const bool     isThreeChars = filePath.sizeInBytes() >= 3 * sizeof(native_char_t);
     if (not isThreeChars or (wpath[0] != L'\\' and wpath[1] != L':'))
     {
         return "Path must be absolute"_a8;

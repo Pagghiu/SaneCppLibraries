@@ -18,7 +18,7 @@ bool SC::StringView::parseInt32(int32_t& value) const
     }
     else
     {
-        char_t buffer[12]; // 10 digits + sign + nullterm
+        char buffer[12]; // 10 digits + sign + nullterm
         if (textSizeInBytes >= sizeof(buffer))
             return false;
         memcpy(buffer, text, textSizeInBytes);

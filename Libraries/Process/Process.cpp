@@ -78,12 +78,12 @@ SC::ReturnCode SC::ProcessChain::readStdErrUntilEOFSync(String& destination)
     return errorPipe.readPipe.readUntilEOF(destination);
 }
 
-SC::ReturnCode SC::ProcessChain::readStdOutUntilEOFSync(Vector<char_t>& destination)
+SC::ReturnCode SC::ProcessChain::readStdOutUntilEOFSync(Vector<char>& destination)
 {
     return outputPipe.readPipe.readUntilEOF(destination);
 }
 
-SC::ReturnCode SC::ProcessChain::readStdErrUntilEOFSync(Vector<char_t>& destination)
+SC::ReturnCode SC::ProcessChain::readStdErrUntilEOFSync(Vector<char>& destination)
 {
     return errorPipe.readPipe.readUntilEOF(destination);
 }

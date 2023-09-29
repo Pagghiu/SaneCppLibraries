@@ -97,8 +97,8 @@ struct SC::ProcessChain
     [[nodiscard]] ReturnCode waitForExitSync();
     [[nodiscard]] ReturnCode readStdOutUntilEOFSync(String& destination);
     [[nodiscard]] ReturnCode readStdErrUntilEOFSync(String& destination);
-    [[nodiscard]] ReturnCode readStdOutUntilEOFSync(Vector<char_t>& destination);
-    [[nodiscard]] ReturnCode readStdErrUntilEOFSync(Vector<char_t>& destination);
+    [[nodiscard]] ReturnCode readStdOutUntilEOFSync(Vector<char>& destination);
+    [[nodiscard]] ReturnCode readStdErrUntilEOFSync(Vector<char>& destination);
 
   private:
     Delegate<const Error&> onError;

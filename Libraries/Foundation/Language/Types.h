@@ -7,8 +7,7 @@
 namespace SC
 {
 #if SC_PLATFORM_WINDOWS
-using utf_char_t = wchar_t;
-using char_t     = char;
+using native_char_t = wchar_t;
 
 using uint8_t  = unsigned char;
 using uint16_t = unsigned short;
@@ -29,8 +28,7 @@ using size_t  = unsigned int;
 using ssize_t = long;
 #endif
 #else
-using utf_char_t = char;
-using char_t     = char;
+using native_char_t = char;
 
 using uint8_t  = unsigned char;
 using uint16_t = unsigned short;

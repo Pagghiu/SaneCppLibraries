@@ -33,7 +33,7 @@ struct SC::Function<R(Args...)>
     union
     {
         const void* classInstance;
-        char_t      lambdaMemory[LAMBDA_SIZE];
+        char        lambdaMemory[LAMBDA_SIZE];
     };
     void sendLambdaSignal(FunctionErasedOperation operation, const void** other) const
     {

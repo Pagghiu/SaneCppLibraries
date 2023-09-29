@@ -59,7 +59,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
             auto lambda = [&](const FileSystemWatcher::Notification& notification)
             {
-                constexpr utf_char_t nativeSep = Path::Separator;
+                constexpr native_char_t nativeSep = Path::Separator;
 
                 StringNative<1024> fullPathBuffer = StringEncoding::Native;
                 StringNative<1024> expectedBuffer = StringEncoding::Native;
@@ -126,7 +126,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
             auto lambda = [&](const FileSystemWatcher::Notification& notification)
             {
-                constexpr utf_char_t nativeSep = Path::Separator;
+                constexpr native_char_t nativeSep = Path::Separator;
 
                 StringNative<255>  dirBuffer      = StringEncoding::Native;
                 StringNative<1024> fullPathBuffer = StringEncoding::Native;

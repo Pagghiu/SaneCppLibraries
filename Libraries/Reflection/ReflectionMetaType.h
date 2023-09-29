@@ -53,7 +53,7 @@ template <> struct IsPrimitive<int32_t>  : true_type  {};
 template <> struct IsPrimitive<int64_t>  : true_type  {};
 template <> struct IsPrimitive<float>    : true_type  {};
 template <> struct IsPrimitive<double>   : true_type  {};
-template <> struct IsPrimitive<char_t>   : true_type  {};
+template <> struct IsPrimitive<char>   : true_type  {};
 // clang-format on
 
 template <typename T, typename SFINAESelector = void>
