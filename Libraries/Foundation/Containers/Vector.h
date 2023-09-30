@@ -57,8 +57,8 @@ struct SC_COMPILER_EXPORT SC::VectorAllocator
             if (oldHeader->options.isFollowedBySmallVector)
             {
                 // If we were folloed by a small vector, we check if that small vector has enough memory
-                SegmentHeader* followingHeader = static_cast<SegmentHeader*>(
-                    static_cast<void*>(static_cast<char*>(pself) + SIZE_OF_VECTOR_T)); // vector
+                SegmentHeader* followingHeader =
+                    reinterpret_cast<SegmentHeader*>(static_cast<char*>(pself) + SIZE_OF_VECTOR_T); // vector
                 if (followingHeader->options.isSmallVector && followingHeader->capacityBytes >= numNewBytes)
                 {
                     return followingHeader;
@@ -101,14 +101,12 @@ struct SC_COMPILER_EXPORT SC::VectorAllocator
     template <typename T>
     static T* getItems(SegmentHeader* header)
     {
-        return static_cast<T*>(
-            static_cast<void*>(static_cast<char*>(static_cast<void*>(header)) + sizeof(SegmentHeader)));
+        return reinterpret_cast<T*>(reinterpret_cast<char*>(header) + sizeof(SegmentHeader));
     }
     template <typename T>
     static const T* getItems(const SegmentHeader* header)
     {
-        return static_cast<T*>(static_cast<const void*>(static_cast<const char*>(static_cast<const void*>(header)) +
-                                                        sizeof(SegmentHeader)));
+        return reinterpret_cast<T*>(reinterpret_cast<const char*>(header) + sizeof(SegmentHeader));
     }
 };
 
@@ -407,7 +405,6 @@ struct SC::Vector
         }
         else
         {
-            //
             const bool otherWasFollowedBySmallVector =
                 otherHeader != nullptr && otherHeader->options.isFollowedBySmallVector;
             if (otherHeader != nullptr)
@@ -425,8 +422,8 @@ struct SC::Vector
             if (otherWasFollowedBySmallVector)
             {
                 // Other.items should become nullptr, but if it was followed by small vector, restore its link
-                other.items = static_cast<T*>(static_cast<void*>(static_cast<char*>(static_cast<void*>(&other)) +
-                                                                 alignof(SegmentHeader) + sizeof(SegmentHeader)));
+                other.items = reinterpret_cast<T*>(reinterpret_cast<char*>(&other) + alignof(SegmentHeader) +
+                                                   sizeof(SegmentHeader));
             }
             else
             {

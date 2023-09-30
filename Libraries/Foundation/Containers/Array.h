@@ -32,14 +32,12 @@ struct SC::ArrayAllocator
     template <typename T>
     static T* getItems(SegmentHeader* header)
     {
-        return static_cast<T*>(
-            static_cast<void*>(static_cast<char*>(static_cast<void*>(header)) + sizeof(SegmentHeader)));
+        return reinterpret_cast<T*>(reinterpret_cast<char*>(header) + sizeof(SegmentHeader));
     }
     template <typename T>
     static const T* getItems(const SegmentHeader* header)
     {
-        return static_cast<T*>(static_cast<const void*>(static_cast<const char*>(static_cast<const void*>(header)) +
-                                                        sizeof(SegmentHeader)));
+        return reinterpret_cast<const T*>(reinterpret_cast<const char*>(header) + sizeof(SegmentHeader));
     }
 };
 

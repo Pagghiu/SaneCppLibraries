@@ -41,7 +41,7 @@ struct SC::SegmentHeader
 
     [[nodiscard]] static SegmentHeader* getSegmentHeader(void* oldItems)
     {
-        return static_cast<SegmentHeader*>(static_cast<void*>(static_cast<uint8_t*>(oldItems) - sizeof(SegmentHeader)));
+        return reinterpret_cast<SegmentHeader*>(static_cast<uint8_t*>(oldItems) - sizeof(SegmentHeader));
     }
 };
 
@@ -55,14 +55,13 @@ struct SC::SegmentItems : public SegmentHeader
 
     [[nodiscard]] static SegmentItems* getSegment(T* oldItems)
     {
-        return static_cast<SegmentItems*>(
-            static_cast<void*>(static_cast<uint8_t*>(static_cast<void*>(oldItems)) - sizeof(SegmentHeader)));
+        return reinterpret_cast<SegmentItems*>(reinterpret_cast<uint8_t*>(oldItems) - sizeof(SegmentHeader));
     }
 
     [[nodiscard]] static const SegmentItems* getSegment(const T* oldItems)
     {
-        return static_cast<const SegmentItems*>(static_cast<const void*>(
-            static_cast<const uint8_t*>(static_cast<const void*>(oldItems)) - sizeof(SegmentHeader)));
+        return reinterpret_cast<const SegmentItems*>(reinterpret_cast<const uint8_t*>(oldItems) -
+                                                     sizeof(SegmentHeader));
     }
 
     void setSize(size_t newSize) { sizeBytes = static_cast<HeaderBytesType>(newSize * sizeof(T)); }
