@@ -5,8 +5,8 @@
 
 #include "../File/FileDescriptor.h"
 #include "../Foundation/Containers/IntrusiveDoubleLinkedList.h"
-#include "../Foundation/Objects/Function.h"
-#include "../Foundation/Objects/Optional.h"
+#include "../Foundation/Language/Function.h"
+#include "../Foundation/Language/Optional.h"
 #include "../Foundation/Strings/String.h"
 #include "ProcessDescriptor.h"
 

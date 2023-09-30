@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Base/InitializerList.h"
-#include "../Objects/MetaProgramming.h" // SameConstnessAs
+#include "../Language/MetaProgramming.h" // SameConstnessAs
 
 namespace SC
 {

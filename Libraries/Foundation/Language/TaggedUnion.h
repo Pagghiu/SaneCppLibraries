@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Algorithms/AlgorithmMinMax.h"
-#include "../Objects/TypeList.h"
+#include "../Language/TypeList.h"
 
 namespace SC
 {

@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Objects/Span.h"
+#include "../Language/Span.h"
 #include "StringIterator.h"
 
 namespace SC

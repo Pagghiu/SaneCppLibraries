@@ -5,9 +5,9 @@
 
 #include "../Async/EventLoop.h" // AsyncLoopWakeUp
 #include "../Foundation/Containers/IntrusiveDoubleLinkedList.h"
-#include "../Foundation/Objects/Function.h"
-#include "../Foundation/Objects/Opaque.h"
-#include "../Foundation/Objects/Result.h"
+#include "../Foundation/Language/Function.h"
+#include "../Foundation/Language/Opaque.h"
+#include "../Foundation/Language/Result.h"
 #include "../Foundation/Strings/StringView.h"
 #include "../Threading/Threading.h" // EventObject
 

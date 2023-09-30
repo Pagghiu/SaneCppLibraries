@@ -4,7 +4,7 @@
 #pragma once
 #include "../../Testing/Test.h"
 #include "../Containers/Array.h"
-#include "../Objects/StrongID.h"
+#include "../Language/StrongID.h"
 #include "../Strings/String.h"
 #include "Map.h"
 

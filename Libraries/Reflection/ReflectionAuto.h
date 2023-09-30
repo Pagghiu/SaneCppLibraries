@@ -10,7 +10,7 @@
 //------------------------------------------------------------------------
 #pragma once
 #include "../Foundation/Base/Compiler.h"
-#include "../Foundation/Objects/TypeList.h"
+#include "../Foundation/Language/TypeList.h"
 
 namespace SC
 {

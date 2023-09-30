@@ -3,8 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/Containers/Vector.h"
-#include "../Foundation/Objects/Result.h"
-#include "../Foundation/Objects/Span.h"
+#include "../Foundation/Language/Result.h"
+#include "../Foundation/Language/Span.h"
 #include "../Reflection/Reflection.h"
 
 namespace SC

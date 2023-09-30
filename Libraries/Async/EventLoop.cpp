@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "EventLoop.h"
-#include "../Foundation/Objects/Optional.h"
-#include "../Foundation/Objects/Result.h"
+#include "../Foundation/Language/Optional.h"
+#include "../Foundation/Language/Result.h"
 #include "../Threading/Threading.h" // EventObject
 
 #if SC_PLATFORM_WINDOWS

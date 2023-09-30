@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Objects/MetaProgramming.h" // ReturnType<T>
+#include "../Language/MetaProgramming.h" // ReturnType<T>
 
 namespace SC
 {

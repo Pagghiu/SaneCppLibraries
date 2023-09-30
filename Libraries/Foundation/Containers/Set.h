@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Containers/Vector.h"
-#include "../Objects/Result.h"
+#include "../Language/Result.h"
 
 namespace SC
 {

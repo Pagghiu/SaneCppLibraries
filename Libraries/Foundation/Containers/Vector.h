@@ -6,7 +6,7 @@
 #include "../Base/Limits.h"
 #include "../Base/Memory.h"
 #include "../Base/Types.h"
-#include "../Objects/Result.h"
+#include "../Language/Result.h"
 #include "Segment.h"
 
 namespace SC

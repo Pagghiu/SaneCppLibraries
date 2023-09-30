@@ -391,7 +391,7 @@
 			path = ../../../../Libraries/Foundation/Strings;
 			sourceTree = "<group>";
 		};
-		7B319D022AB750C900F7E761 /* Objects */ = {
+		7B319D022AB750C900F7E761 /* Language */ = {
 			isa = PBXGroup;
 			children = (
 				7B319D102AB750C900F7E761 /* Function.h */,
@@ -409,8 +409,8 @@
 				7B319D0B2AB750C900F7E761 /* TypeList.h */,
 				7B319D042AB750C900F7E761 /* UniquePtr.h */,
 			);
-			name = Objects;
-			path = ../../../../Libraries/Foundation/Objects;
+			name = Language;
+			path = ../../../../Libraries/Foundation/Language;
 			sourceTree = "<group>";
 		};
 		7B319D112AB750C900F7E761 /* Base */ = {
@@ -472,7 +472,7 @@
 				7B319CEF2AB750C900F7E761 /* Algorithms */,
 				7B319D112AB750C900F7E761 /* Base */,
 				7B319D1D2AB750C900F7E761 /* Containers */,
-				7B319D022AB750C900F7E761 /* Objects */,
+				7B319D022AB750C900F7E761 /* Language */,
 				7B319CF22AB750C900F7E761 /* Strings */,
 			);
 			name = Foundation;

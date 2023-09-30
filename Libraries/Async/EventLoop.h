@@ -4,8 +4,8 @@
 #pragma once
 
 #include "../Foundation/Containers/IntrusiveDoubleLinkedList.h"
-#include "../Foundation/Objects/Function.h"
-#include "../Foundation/Objects/Span.h"
+#include "../Foundation/Language/Function.h"
+#include "../Foundation/Language/Span.h"
 #include "../System/Time.h"
 #include "../Threading/Atomic.h"
 

@@ -4,7 +4,7 @@
 #pragma once
 #include "../Foundation/Containers/Array.h"
 #include "../Foundation/Containers/Vector.h"
-#include "../Foundation/Objects/Result.h"
+#include "../Foundation/Language/Result.h"
 #include "../Reflection/ReflectionSC.h"
 
 namespace SC

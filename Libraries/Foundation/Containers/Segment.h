@@ -6,8 +6,8 @@
 #include "../Base/InitializerList.h"
 #include "../Base/Limits.h"
 #include "../Base/Types.h"
-#include "../Objects/MetaProgramming.h" // EnableIf, IsTriviallyCoypable
-#include "../Objects/Span.h"
+#include "../Language/MetaProgramming.h" // EnableIf, IsTriviallyCoypable
+#include "../Language/Span.h"
 
 namespace SC
 {

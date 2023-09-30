@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Objects/Result.h"
+#include "../Language/Result.h"
 #include "StringIterator.h"
 #include "StringView.h"
 

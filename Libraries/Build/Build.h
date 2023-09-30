@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/Containers/Set.h"
-#include "../Foundation/Objects/TaggedUnion.h"
+#include "../Foundation/Language/TaggedUnion.h"
 #include "../Foundation/Strings/String.h"
 #include "TaggedMap.h"
 

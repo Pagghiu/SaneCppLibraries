@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Objects/MetaProgramming.h" // Conditional
+#include "../Language/MetaProgramming.h" // Conditional
 
 namespace SC
 {

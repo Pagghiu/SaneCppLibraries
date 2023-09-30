@@ -61,14 +61,14 @@
     <Filter Include="Foundation\Containers">
       <UniqueIdentifier>{33eaebdc-adfb-470c-8d0a-f6db05188894}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Foundation\Objects">
-      <UniqueIdentifier>{c28f6091-c046-4251-b46a-b10957046f9f}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Foundation\Strings">
       <UniqueIdentifier>{80ff5903-3b21-4c71-afe8-7c515c7e1976}</UniqueIdentifier>
     </Filter>
     <Filter Include="Foundation\Base">
       <UniqueIdentifier>{abccab4e-d1a7-41d3-a424-5f27375a06db}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Foundation\Language">
+      <UniqueIdentifier>{c28f6091-c046-4251-b46a-b10957046f9f}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -463,44 +463,44 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Types.h">
       <Filter>Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\Function.h">
-      <Filter>Foundation\Objects</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Function.h">
+      <Filter>Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\FunctionTest.h">
-      <Filter>Foundation\Objects</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\FunctionTest.h">
+      <Filter>Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\Opaque.h">
-      <Filter>Foundation\Objects</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Opaque.h">
+      <Filter>Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\OpaqueTest.h">
-      <Filter>Foundation\Objects</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\OpaqueTest.h">
+      <Filter>Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\Optional.h">
-      <Filter>Foundation\Objects</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Optional.h">
+      <Filter>Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\OptionalTest.h">
-      <Filter>Foundation\Objects</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\OptionalTest.h">
+      <Filter>Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\Result.h">
-      <Filter>Foundation\Objects</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Result.h">
+      <Filter>Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\Span.h">
-      <Filter>Foundation\Objects</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Span.h">
+      <Filter>Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\StrongID.h">
-      <Filter>Foundation\Objects</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\StrongID.h">
+      <Filter>Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\TaggedUnion.h">
-      <Filter>Foundation\Objects</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\TaggedUnion.h">
+      <Filter>Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\TaggedUnionTest.h">
-      <Filter>Foundation\Objects</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\TaggedUnionTest.h">
+      <Filter>Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\TypeList.h">
-      <Filter>Foundation\Objects</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\TypeList.h">
+      <Filter>Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\UniquePtr.h">
-      <Filter>Foundation\Objects</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\UniquePtr.h">
+      <Filter>Foundation\Language</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\String.h">
       <Filter>Foundation\Strings</Filter>
@@ -542,8 +542,8 @@
       <Filter>Http</Filter>
     </ClInclude>
     <ClInclude Include="..\..\SCConfig.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\MetaProgramming.h">
-      <Filter>Foundation\Objects</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\MetaProgramming.h">
+      <Filter>Foundation\Language</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

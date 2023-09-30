@@ -4,7 +4,7 @@
 #pragma once
 #include "../Base/Assert.h" //Assert::unreachable
 #include "../Base/Types.h"
-#include "../Objects/Span.h"
+#include "../Language/Span.h"
 
 namespace SC
 {
