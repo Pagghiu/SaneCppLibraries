@@ -134,7 +134,7 @@ struct SC::ProcessTest : public SC::TestCase
             SC_TEST_EXPECT(process.launch("where", "where.exe"));
 #endif
             ProcessDescriptor::Handle processHandle;
-            SC_TEST_EXPECT(process.handle.get(processHandle, false));
+            SC_TEST_EXPECT(process.handle.get(processHandle, ReturnCode::Error("Invalid Handle")));
             ProcessDescriptor::ExitStatus exitStatus;
             AsyncProcessExit              async;
             async.callback = [&](AsyncProcessExit::Result& res) { SC_TEST_EXPECT(res.moveTo(exitStatus)); };

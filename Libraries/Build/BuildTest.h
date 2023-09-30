@@ -83,7 +83,7 @@ struct SC::BuildTest : public SC::TestCase
         definition.workspaces.push_back(move(workspace));
 
         SC_COMPILER_WARNING_POP;
-        return true;
+        return ReturnCode(true);
     }
 
     BuildTest(SC::TestReport& report) : TestCase(report, "BuildTest")

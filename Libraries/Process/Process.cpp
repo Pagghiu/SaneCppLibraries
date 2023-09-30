@@ -14,11 +14,11 @@
 
 SC::ReturnCode SC::ProcessChain::launch(ProcessChainOptions options)
 {
-    if (error.returnCode.isError())
+    if (not error.returnCode)
         return error.returnCode;
 
     if (processes.isEmpty())
-        return false;
+        return ReturnCode(false);
 
     if (options.pipeSTDIN)
     {
@@ -38,7 +38,7 @@ SC::ReturnCode SC::ProcessChain::launch(ProcessChainOptions options)
     for (Process* process = processes.front; process != nullptr; process = process->next)
     {
         error.returnCode = process->launch();
-        if (error.returnCode.isError())
+        if (not error.returnCode)
         {
             // TODO: Decide what to do with the queue
             onError(error);
@@ -48,12 +48,12 @@ SC::ReturnCode SC::ProcessChain::launch(ProcessChainOptions options)
     SC_TRY(inputPipe.readPipe.close());
     SC_TRY(outputPipe.writePipe.close());
     SC_TRY(errorPipe.writePipe.close());
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::ProcessChain::pipe(Process& process, std::initializer_list<const StringView> cmd)
 {
-    SC_TRY_MSG(process.parent == nullptr, "Process::pipe - already in use"_a8);
+    SC_TRY_MSG(process.parent == nullptr, "Process::pipe - already in use");
 
     if (not processes.isEmpty())
     {
@@ -65,7 +65,7 @@ SC::ReturnCode SC::ProcessChain::pipe(Process& process, std::initializer_list<co
     SC_TRY(process.formatArguments(Span<const StringView>(cmd)));
     process.parent = this;
     processes.queueBack(process);
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::ProcessChain::readStdOutUntilEOFSync(String& destination)
@@ -126,7 +126,7 @@ SC::ReturnCode SC::Process::formatArguments(Span<const StringView> params)
             SC_TRY(formattedCmd.appendNullTerminated(svp));
         }
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::Process::redirectStdOutTo(PipeDescriptor& pipe)

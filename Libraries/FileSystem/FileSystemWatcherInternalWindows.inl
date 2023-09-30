@@ -44,14 +44,14 @@ struct SC::FileSystemWatcher::Internal
         self            = &parent;
         threadingRunner = &runner.get();
         threadingRunner->threadFunction.bind<Internal, &Internal::threadRun>(this);
-        return true;
+        return ReturnCode(true);
     }
 
     [[nodiscard]] ReturnCode init(FileSystemWatcher& parent, EventLoopRunner& runner)
     {
         self            = &parent;
         eventLoopRunner = &runner;
-        return true;
+        return ReturnCode(true);
     }
 
     [[nodiscard]] ReturnCode close()
@@ -75,7 +75,7 @@ struct SC::FileSystemWatcher::Internal
         {
             SC_TRY(stopWatching(*entry));
         }
-        return true;
+        return ReturnCode(true);
     }
 
     void signalWatcherEvent(FolderWatcher& watcher)
@@ -111,7 +111,7 @@ struct SC::FileSystemWatcher::Internal
             SC_TRUST_RESULT(folderWatcher.internal.get().asyncPoll.stop());
         }
         closeFileHandle(folderWatcher);
-        return true;
+        return ReturnCode(true);
     }
 
     [[nodiscard]] ReturnCode startWatching(FolderWatcher* entry)
@@ -131,7 +131,7 @@ struct SC::FileSystemWatcher::Internal
         if (threadingRunner)
         {
             SC_TRY_MSG(threadingRunner->numEntries < ThreadRunnerSizes::MaxWatchablePaths,
-                       "startWatching exceeded MaxWatchablePaths"_a8);
+                       "startWatching exceeded MaxWatchablePaths");
         }
         StringView encodedPath;
         SC_TRY(converter.convertNullTerminateFastPath(entry->path->view(), encodedPath));
@@ -173,14 +173,14 @@ struct SC::FileSystemWatcher::Internal
                                                nullptr,                           // lpBytesReturned
                                                &opaque.getOverlapped(),           // lpOverlapped
                                                nullptr);                          // lpCompletionRoutine
-        SC_TRY_MSG(success == TRUE, "ReadDirectoryChangesW"_a8);
+        SC_TRY_MSG(success == TRUE, "ReadDirectoryChangesW");
 
         if (threadingRunner and not threadingRunner->thread.wasStarted())
         {
             threadingRunner->shouldStop.exchange(false);
             SC_TRY(threadingRunner->thread.start("FileSystemWatcher::init", &threadingRunner->threadFunction))
         }
-        return true;
+        return ReturnCode(true);
     }
 
     void threadRun()
@@ -196,7 +196,7 @@ struct SC::FileSystemWatcher::Internal
                 FolderWatcherInternal& opaque = entry.internal.get();
                 DWORD                  transferredBytes;
                 HANDLE                 handle;
-                if (opaque.fileHandle.get(handle, "Invalid fs handle"_a8))
+                if (opaque.fileHandle.get(handle, ReturnCode::Error("Invalid fs handle")))
                 {
                     ::GetOverlappedResult(handle, &opaque.getOverlapped(), &transferredBytes, FALSE);
                     notifyEntry(entry);
@@ -245,7 +245,7 @@ struct SC::FileSystemWatcher::Internal
 
         memset(&opaque.getOverlapped(), 0, sizeof(opaque.getOverlapped()));
         HANDLE handle;
-        if (opaque.fileHandle.get(handle, "Invalid fs handle"_a8))
+        if (opaque.fileHandle.get(handle, ReturnCode::Error("Invalid fs handle")))
         {
             BOOL success = ::ReadDirectoryChangesW(handle,                            //
                                                    opaque.changesBuffer,              //
@@ -267,8 +267,8 @@ SC::ReturnCode SC::FileSystemWatcher::Notification::getFullPath(String& buffer, 
 {
     StringBuilder builder(buffer);
     SC_TRY(builder.append(basePath));
-    SC_TRY(builder.append("\\"_a8));
+    SC_TRY(builder.append("\\"));
     SC_TRY(builder.append(relativePath));
     outStringView = buffer.view();
-    return true;
+    return ReturnCode(true);
 }

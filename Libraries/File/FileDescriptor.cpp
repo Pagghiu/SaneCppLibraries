@@ -28,11 +28,11 @@ SC::ReturnCode SC::FileDescriptor::readUntilEOF(Vector<char>& destination)
     {
         SC_TRY(readAppend(destination, {buffer, sizeof(buffer)}, readResult));
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::FileDescriptor::readUntilEOF(String& destination)
 {
     SC_TRY(readUntilEOF(destination.data));
-    return StringConverter::pushNullTerm(destination.data, destination.encoding);
+    return ReturnCode(StringConverter::pushNullTerm(destination.data, destination.encoding));
 }

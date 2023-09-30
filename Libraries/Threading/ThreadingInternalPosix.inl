@@ -31,9 +31,9 @@ struct SC::Thread::Internal
         threadHandle  = opaqueThread.reinterpret_as<pthread_t>();
         if (res != 0)
         {
-            return "Thread::create - pthread_create failed"_a8;
+            return ReturnCode::Error("Thread::create - pthread_create failed");
         }
-        return true;
+        return ReturnCode(true);
     }
 
     static void setThreadName(pthread_t& threadHandle, const StringView& nameNullTerminated)
@@ -49,9 +49,9 @@ struct SC::Thread::Internal
         int res = pthread_join(threadNative->reinterpret_as<pthread_t>(), 0);
         if (res != 0)
         {
-            return "phread_join error"_a8;
+            return ReturnCode::Error("phread_join error");
         }
-        return true;
+        return ReturnCode(true);
     }
 
     [[nodiscard]] static ReturnCode detachThread(OpaqueThread* threadNative)
@@ -59,9 +59,9 @@ struct SC::Thread::Internal
         int res = pthread_detach(threadNative->reinterpret_as<pthread_t>());
         if (res != 0)
         {
-            return "pthread_detach error"_a8;
+            return ReturnCode::Error("pthread_detach error");
         }
-        return true;
+        return ReturnCode(true);
     }
 };
 

@@ -64,8 +64,8 @@ bool SC::Build::Project::removeFiles(StringView subdirectory, StringView filter)
 
 SC::ReturnCode SC::Build::Project::validate() const
 {
-    SC_TRY_MSG(not name.isEmpty(), "Project needs name"_a8);
-    return true;
+    SC_TRY_MSG(not name.isEmpty(), "Project needs name");
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::Build::Workspace::validate() const
@@ -74,7 +74,7 @@ SC::ReturnCode SC::Build::Workspace::validate() const
     {
         SC_TRY(project.validate());
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::Build::DefinitionCompiler::validate()
@@ -83,7 +83,7 @@ SC::ReturnCode SC::Build::DefinitionCompiler::validate()
     {
         SC_TRY(workspace.validate());
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::Build::DefinitionCompiler::build()
@@ -94,7 +94,7 @@ SC::ReturnCode SC::Build::DefinitionCompiler::build()
     {
         SC_TRY(fillPathsList(it.key.view(), it.value, resolvedPaths));
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::Build::DefinitionCompiler::fillPathsList(StringView path, const VectorSet<Project::File>& filters,
@@ -211,7 +211,7 @@ SC::ReturnCode SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<S
             }
         }
     }
-    return true;
+    return ReturnCode(true);
 }
 
 bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView filename)
@@ -290,5 +290,5 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
     }
     }
 
-    return true;
+    return ReturnCode(true);
 }

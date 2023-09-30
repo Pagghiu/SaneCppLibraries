@@ -73,9 +73,9 @@ struct SC::SocketDescriptorTest : public SC::TestCase
             constexpr char testValue = 123;
             struct Params
             {
-                ReturnCode  connectRes = false;
-                ReturnCode  writeRes   = false;
-                ReturnCode  closeRes   = false;
+                ReturnCode  connectRes = ReturnCode(false);
+                ReturnCode  writeRes   = ReturnCode(false);
+                ReturnCode  closeRes   = ReturnCode(false);
                 EventObject eventObject;
             } params;
             Action func = [&]()

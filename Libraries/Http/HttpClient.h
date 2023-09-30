@@ -19,7 +19,7 @@ struct SC::HttpClient
     [[nodiscard]] StringView getResponse() const;
     [[nodiscard]] ReturnCode setCustomDebugName(const StringView debugName)
     {
-        return customDebugName.assign(debugName);
+        return ReturnCode(customDebugName.assign(debugName));
     }
 
   private:

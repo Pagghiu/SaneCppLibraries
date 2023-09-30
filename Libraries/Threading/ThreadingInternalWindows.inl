@@ -37,11 +37,11 @@ struct SC::Thread::Internal
             CreateThread(0, 512 * 1024, threadFunc, &self, CREATE_SUSPENDED, &threadID);
         if (opaqueThread.reinterpret_as<HANDLE>() == nullptr)
         {
-            return "Thread::create - CreateThread failed"_a8;
+            return ReturnCode::Error("Thread::create - CreateThread failed");
         }
         threadHandle = opaqueThread.reinterpret_as<HANDLE>();
         ResumeThread(threadHandle);
-        return true;
+        return ReturnCode(true);
     }
 
     static void setThreadName(HANDLE& threadHandle, const StringView& nameNullTerminated)
@@ -53,13 +53,13 @@ struct SC::Thread::Internal
     {
         WaitForSingleObject(threadNative->reinterpret_as<HANDLE>(), INFINITE);
         CloseHandle(threadNative->reinterpret_as<HANDLE>());
-        return true;
+        return ReturnCode(true);
     }
 
     [[nodiscard]] static ReturnCode detachThread(OpaqueThread* threadNative)
     {
         CloseHandle(threadNative->reinterpret_as<HANDLE>());
-        return true;
+        return ReturnCode(true);
     }
 };
 

@@ -35,7 +35,7 @@ SC::ReturnCode SC::PluginDefinition::getDynamicLibraryAbsolutePath(String& fullD
 #else
     SC_TRY(builder.append(".dylib"));
 #endif
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::PluginDefinition::getDynamicLibraryPDBAbsolutePath(String& fullDynamicPath) const
@@ -47,7 +47,7 @@ SC::ReturnCode SC::PluginDefinition::getDynamicLibraryPDBAbsolutePath(String& fu
 #else
     SC_TRY(builder.append(".dSYM"));
 #endif
-    return true;
+    return ReturnCode(true);
 }
 
 bool SC::PluginDefinition::parse(StringView text, PluginDefinition& pluginDefinition)
@@ -269,14 +269,14 @@ SC::ReturnCode SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
     }
     if (not found)
     {
-        return "Visual Studio Compiler not found"_a8;
+        return ReturnCode::Error("Visual Studio Compiler not found");
     }
 #else
     compiler.type         = Type::ClangCompiler;
     compiler.compilerPath = "clang"_a8;
     compiler.linkerPath   = "clang"_a8;
 #endif
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::PluginCompiler::compileFile(StringView sourceFile, StringView objectFile) const
@@ -305,7 +305,7 @@ SC::ReturnCode SC::PluginCompiler::compileFile(StringView sourceFile, StringView
 #endif
     SC_TRY(process.waitForExitSync());
     auto res = process.exitStatus.status.get();
-    return res and *res == 0;
+    return ReturnCode(res and *res == 0);
 }
 
 SC::ReturnCode SC::PluginCompiler::compile(const PluginDefinition& plugin) const
@@ -321,7 +321,7 @@ SC::ReturnCode SC::PluginCompiler::compile(const PluginDefinition& plugin) const
         SC_TRY(builder.append(".o"));
         SC_TRY(compileFile(file.absolutePath.view(), destFile.view()));
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::PluginCompiler::link(const PluginDefinition& definition, StringView executablePath) const
@@ -382,7 +382,7 @@ SC::ReturnCode SC::PluginCompiler::link(const PluginDefinition& definition, Stri
     SC_TRY(process.launch());
     SC_TRY(process.waitForExitSync());
     auto res = process.exitStatus.status.get();
-    return res and *res == 0;
+    return ReturnCode(res and *res == 0);
 }
 
 SC::ReturnCode SC::PluginDynamicLibrary::unload()
@@ -401,12 +401,12 @@ SC::ReturnCode SC::PluginDynamicLibrary::unload()
         }
     }
 #endif
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, StringView executablePath)
 {
-    SC_TRY_MSG(not dynamicLibrary.isValid(), "Dynamic Library must be unloaded first"_a8);
+    SC_TRY_MSG(not dynamicLibrary.isValid(), "Dynamic Library must be unloaded first");
     SC_TRY(compiler.compile(definition));
 #if SC_PLATFORM_WINDOWS
     Thread::Sleep(400); // Sometimes file is locked...
@@ -420,10 +420,10 @@ SC::ReturnCode SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, St
     SC_TRY(dynamicLibrary.load(buffer.view()));
 
     SC_TRY(StringBuilder(buffer).format("{}Init", definition.identity.identifier.view()));
-    SC_TRY_MSG(dynamicLibrary.getSymbol(buffer.view(), pluginInit), "Missing #PluginName#Init"_a8);
+    SC_TRY_MSG(dynamicLibrary.getSymbol(buffer.view(), pluginInit), "Missing #PluginName#Init");
     SC_TRY(StringBuilder(buffer).format("{}Close", definition.identity.identifier.view()));
-    SC_TRY_MSG(dynamicLibrary.getSymbol(buffer.view(), pluginClose), "Missing #PluginName#Close"_a8);
-    return true;
+    SC_TRY_MSG(dynamicLibrary.getSymbol(buffer.view(), pluginClose), "Missing #PluginName#Close");
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::PluginRegistry::init(Vector<PluginDefinition>&& definitions)
@@ -435,7 +435,7 @@ SC::ReturnCode SC::PluginRegistry::init(Vector<PluginDefinition>&& definitions)
         SC_TRY(libraries.insertIfNotExists({pdl.definition.identity.identifier, move(pdl)}));
     }
     definitions.clear();
-    return true;
+    return ReturnCode(true);
 }
 
 const SC::PluginDynamicLibrary* SC::PluginRegistry::findPlugin(const StringView identifier)
@@ -462,10 +462,10 @@ SC::ReturnCode SC::PluginRegistry::loadPlugin(const StringView identifier, const
             SC_TRY(unloadPlugin(identifier));
         }
         SC_TRY(lib.load(compiler, executablePath));
-        SC_TRY_MSG(lib.pluginInit(lib.instance), "PluginInit failed"_a8); // TODO: Return actual failure strings
-        return true;
+        SC_TRY_MSG(lib.pluginInit(lib.instance), "PluginInit failed"); // TODO: Return actual failure strings
+        return ReturnCode(true);
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::PluginRegistry::unloadPlugin(const StringView identifier)
@@ -512,7 +512,7 @@ SC::ReturnCode SC::PluginRegistry::removeAllBuildProducts(const StringView ident
     {
         Thread::Sleep(10); // It looks like FreeLibrary needs some time to avoid getting access denied
         numTries--;
-        SC_TRY_MSG(numTries >= 0, "PluginRegistry: Cannot remove dll"_a8);
+        SC_TRY_MSG(numTries >= 0, "PluginRegistry: Cannot remove dll");
     }
 #else
     SC_TRY(fmt.format("{}.dylib", identifier));
@@ -528,5 +528,5 @@ SC::ReturnCode SC::PluginRegistry::removeAllBuildProducts(const StringView ident
         SC_TRY(builder.append(".o"));
         SC_TRY(fs.removeFile(destFile.view()));
     }
-    return true;
+    return ReturnCode(true);
 }

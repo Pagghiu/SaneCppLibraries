@@ -16,7 +16,7 @@ SC::ReturnCode SC::SocketDescriptorTraits::releaseHandle(Handle& handle)
 {
     const int res = ::closesocket(handle);
     handle        = SocketDescriptor::Invalid;
-    return res != -1;
+    return ReturnCode(res != -1);
 }
 
 SC::ReturnCode SC::SocketDescriptor::setInheritable(bool inheritable)
@@ -24,9 +24,9 @@ SC::ReturnCode SC::SocketDescriptor::setInheritable(bool inheritable)
     if (::SetHandleInformation(reinterpret_cast<HANDLE>(handle), HANDLE_FLAG_INHERIT, inheritable ? TRUE : FALSE) ==
         FALSE)
     {
-        "SetHandleInformation failed"_a8;
+        "SetHandleInformation failed";
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::SocketDescriptor::setBlocking(bool blocking)
@@ -34,9 +34,9 @@ SC::ReturnCode SC::SocketDescriptor::setBlocking(bool blocking)
     ULONG enable = blocking ? 0 : 1;
     if (::ioctlsocket(handle, FIONBIO, &enable) == SOCKET_ERROR)
     {
-        return "ioctlsocket failed"_a8;
+        return ReturnCode::Error("ioctlsocket failed");
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::SocketDescriptor::isInheritable(bool& hasValue) const
@@ -44,10 +44,10 @@ SC::ReturnCode SC::SocketDescriptor::isInheritable(bool& hasValue) const
     DWORD flags;
     if (::GetHandleInformation(reinterpret_cast<HANDLE>(handle), &flags) == FALSE)
     {
-        return "GetHandleInformation failed"_a8;
+        return ReturnCode::Error("GetHandleInformation failed");
     }
     hasValue = (flags & HANDLE_FLAG_INHERIT) != 0;
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily,
@@ -67,8 +67,8 @@ SC::ReturnCode SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFa
                           SocketFlags::toNative(protocol), nullptr, 0, flags);
     if (!isValid())
     {
-        return "WSASocketW failed"_a8;
+        return ReturnCode::Error("WSASocketW failed");
     }
     SC_TRY(setBlocking(blocking == SocketFlags::Blocking));
-    return isValid();
+    return ReturnCode(isValid());
 }

@@ -25,25 +25,25 @@ static constexpr SC::ReturnCode getErrorCode(int errorCode)
 {
     switch (errorCode)
     {
-    case EACCES: return "EACCES"_a8;
-    case EDQUOT: return "EDQUOT"_a8;
-    case EEXIST: return "EEXIST"_a8;
-    case EFAULT: return "EFAULT"_a8;
-    case EIO: return "EIO"_a8;
-    case ELOOP: return "ELOOP"_a8;
-    case EMLINK: return "EMLINK"_a8;
-    case ENAMETOOLONG: return "ENAMETOOLONG"_a8;
-    case ENOENT: return "ENOENT"_a8;
-    case ENOSPC: return "ENOSPC"_a8;
-    case ENOTDIR: return "ENOTDIR"_a8;
-    case EROFS: return "EROFS"_a8;
-    case EBADF: return "EBADF"_a8;
-    case EPERM: return "EPERM"_a8;
-    case ENOMEM: return "ENOMEM"_a8;
-    case ENOTSUP: return "ENOTSUP"_a8;
-    case EINVAL: return "EINVAL"_a8;
+    case EACCES: return ReturnCode::Error("EACCES");
+    case EDQUOT: return ReturnCode::Error("EDQUOT");
+    case EEXIST: return ReturnCode::Error("EEXIST");
+    case EFAULT: return ReturnCode::Error("EFAULT");
+    case EIO: return ReturnCode::Error("EIO");
+    case ELOOP: return ReturnCode::Error("ELOOP");
+    case EMLINK: return ReturnCode::Error("EMLINK");
+    case ENAMETOOLONG: return ReturnCode::Error("ENAMETOOLONG");
+    case ENOENT: return ReturnCode::Error("ENOENT");
+    case ENOSPC: return ReturnCode::Error("ENOSPC");
+    case ENOTDIR: return ReturnCode::Error("ENOTDIR");
+    case EROFS: return ReturnCode::Error("EROFS");
+    case EBADF: return ReturnCode::Error("EBADF");
+    case EPERM: return ReturnCode::Error("EPERM");
+    case ENOMEM: return ReturnCode::Error("ENOMEM");
+    case ENOTSUP: return ReturnCode::Error("ENOTSUP");
+    case EINVAL: return ReturnCode::Error("EINVAL");
     }
-    return "Unknown"_a8;
+    return ReturnCode::Error("Unknown");
 }
 } // namespace SC
 struct SC::FileSystem::Internal
@@ -204,9 +204,9 @@ struct SC::FileSystem::Internal
         {
             time.modifiedTime = AbsoluteTime(
                 static_cast<int64_t>(::round(st.st_mtimespec.tv_nsec / 1.0e6) + st.st_mtimespec.tv_sec * 1000));
-            return true;
+            return ReturnCode(true);
         }
-        return false;
+        return ReturnCode(false);
     }
 
     [[nodiscard]] static ReturnCode setLastModifiedTime(const char* file, AbsoluteTime time)
@@ -218,9 +218,9 @@ struct SC::FileSystem::Internal
 
         if (::utimensat(AT_FDCWD, file, times, 0) == 0)
         {
-            return true;
+            return ReturnCode(true);
         }
-        return false;
+        return ReturnCode(false);
     }
 
 #undef SC_TRY_LIBC

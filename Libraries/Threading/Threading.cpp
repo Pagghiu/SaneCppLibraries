@@ -53,7 +53,7 @@ SC::Thread::~Thread() { SC_ASSERT_DEBUG(not thread.hasValue() && "Forgot to call
 SC::ReturnCode SC::Thread::start(StringView name, Action* func, Action* syncFunc)
 {
     if (thread.hasValue())
-        return "Error thread already started"_a8;
+        return ReturnCode::Error("Error thread already started");
     CreateParams self(this);
     self.callback     = func;
     self.syncCallback = syncFunc;
@@ -64,7 +64,7 @@ SC::ReturnCode SC::Thread::start(StringView name, Action* func, Action* syncFunc
     SC_TRY(Internal::createThread(self, opaqueThread, self.threadHandle, &CreateParams::threadFunc));
     thread.assign(move(opaqueThread));
     self.event.wait();
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::Thread::join()
@@ -73,7 +73,7 @@ SC::ReturnCode SC::Thread::join()
     SC_TRY(thread.get(threadNative));
     SC_TRY(Internal::joinThread(threadNative));
     thread.clear();
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::Thread::detach()
@@ -82,7 +82,7 @@ SC::ReturnCode SC::Thread::detach()
     SC_TRY(thread.get(threadNative));
     SC_TRY(Internal::detachThread(threadNative));
     thread.clear();
-    return true;
+    return ReturnCode(true);
 }
 
 bool SC::Thread::wasStarted() const { return thread.hasValue(); }

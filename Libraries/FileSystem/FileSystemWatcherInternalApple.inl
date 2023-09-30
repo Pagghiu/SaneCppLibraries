@@ -23,7 +23,7 @@ struct SC::FileSystemWatcher::Internal
     FSEventStreamRef   fsEventStream = nullptr;
     Thread             pollingThread;
     Action             pollingFunction;
-    ReturnCode         signalReturnCode = false;
+    ReturnCode         signalReturnCode = ReturnCode(false);
     EventObject        refreshSignalFinished;
     Mutex              mutex;
     EventLoopRunner*   eventLoopRunner = nullptr;
@@ -37,7 +37,7 @@ struct SC::FileSystemWatcher::Internal
     {
         SC_COMPILER_UNUSED(runner);
         self = &parent;
-        return true;
+        return ReturnCode(true);
     }
 
     [[nodiscard]] ReturnCode init(FileSystemWatcher& parent, EventLoopRunner& runner)
@@ -59,7 +59,7 @@ struct SC::FileSystemWatcher::Internal
         signalContext.info    = this;
         signalContext.perform = &Internal::threadExecuteRefresh;
         refreshSignal         = CFRunLoopSourceCreate(nullptr, 0, &signalContext);
-        SC_TRY_MSG(refreshSignal != nullptr, "CFRunLoopSourceCreate failed"_a8);
+        SC_TRY_MSG(refreshSignal != nullptr, "CFRunLoopSourceCreate failed");
 
         // Create and start the thread
         pollingFunction.bind<Internal, &Internal::threadRun>(this);
@@ -69,7 +69,7 @@ struct SC::FileSystemWatcher::Internal
         Action initFunction;
         initFunction.bind<Internal, &Internal::threadInit>(this);
         SC_TRY(pollingThread.start("FileSystemWatcher::init", &pollingFunction, &initFunction));
-        return true;
+        return ReturnCode(true);
     }
 
     [[nodiscard]] ReturnCode close()
@@ -89,7 +89,7 @@ struct SC::FileSystemWatcher::Internal
             SC_TRY(pollingThread.join());
             releaseResources();
         }
-        return true;
+        return ReturnCode(true);
     }
 
     void wakeUpFSEventThread()
@@ -125,7 +125,7 @@ struct SC::FileSystemWatcher::Internal
         SC_TRY(runLoop);
         CFArrayRef   pathsArray   = nullptr;
         CFStringRef* watchedPaths = (CFStringRef*)malloc(sizeof(CFStringRef) * ThreadRunnerSizes::MaxWatchablePaths);
-        SC_TRY_MSG(watchedPaths != nullptr, "Cannot allocate paths"_a8);
+        SC_TRY_MSG(watchedPaths != nullptr, "Cannot allocate paths");
         // TODO: Loop to convert paths
         auto   deferFreeMalloc   = MakeDeferred([&] { free(watchedPaths); });
         size_t numAllocatedPaths = 0;
@@ -146,20 +146,20 @@ struct SC::FileSystemWatcher::Internal
             watchedPaths[numAllocatedPaths] =
                 CFStringCreateWithFileSystemRepresentation(nullptr, encodedPath.getNullTerminatedNative());
             if (not watchedPaths[numAllocatedPaths])
-                return "CFStringCreateWithFileSystemRepresentation failed"_a8;
+                return ReturnCode::Error("CFStringCreateWithFileSystemRepresentation failed");
             numAllocatedPaths++;
             SC_TRY_MSG(numAllocatedPaths <= ThreadRunnerSizes::MaxWatchablePaths,
-                       "Exceeded max size of 1024 paths to watch"_a8);
+                       "Exceeded max size of 1024 paths to watch");
         }
         if (numAllocatedPaths == 0)
         {
-            return true;
+            return ReturnCode(true);
         }
         pathsArray = CFArrayCreate(nullptr, reinterpret_cast<const void**>(watchedPaths),
                                    static_cast<CFIndex>(numAllocatedPaths), nullptr);
         if (not pathsArray)
         {
-            return "CFArrayCreate failed"_a8;
+            return ReturnCode::Error("CFArrayCreate failed");
         }
         deferDeletePaths.disarm();
         deferFreeMalloc.disarm();
@@ -178,7 +178,7 @@ struct SC::FileSystemWatcher::Internal
                                                   kFSEventStreamEventIdSinceNow, //
                                                   watchLatency,                  //
                                                   watchFlags);
-        SC_TRY_MSG(fsEventStream != nullptr, "FSEventStreamCreate failed"_a8);
+        SC_TRY_MSG(fsEventStream != nullptr, "FSEventStreamCreate failed");
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -190,9 +190,9 @@ struct SC::FileSystemWatcher::Internal
         {
             FSEventStreamInvalidate(fsEventStream);
             FSEventStreamRelease(fsEventStream);
-            return "FSEventStreamStart failed"_a8;
+            return ReturnCode::Error("FSEventStreamStart failed");
         }
-        return true;
+        return ReturnCode(true);
     }
 
     void threadDestroyFSEvent()
@@ -362,5 +362,5 @@ struct SC::FileSystemWatcher::Internal
 SC::ReturnCode SC::FileSystemWatcher::Notification::getFullPath(String&, StringView& view) const
 {
     view = fullPath;
-    return true;
+    return ReturnCode(true);
 }

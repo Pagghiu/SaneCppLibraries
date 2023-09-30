@@ -108,26 +108,26 @@ struct UniqueTaggedHandleTraits
     [[nodiscard]] CloseReturnType assign(UniqueTaggedHandleTraits&& other)
     {
         if (other.handle == handle)
-            return false;
+            return CloseReturnType(false);
         if (close())
         {
             handle = other.handle;
             other.detach();
-            return true;
+            return CloseReturnType(true);
         }
-        return false;
+        return CloseReturnType(false);
     }
 
     [[nodiscard]] CloseReturnType assign(const Handle& externalHandle)
     {
         if (handle == externalHandle)
-            return false;
+            return CloseReturnType(false);
         if (close())
         {
             handle = externalHandle;
-            return true;
+            return CloseReturnType(true);
         }
-        return false;
+        return CloseReturnType(false);
     }
 
     UniqueTaggedHandleTraits& operator=(UniqueTaggedHandleTraits&& other)
@@ -145,7 +145,7 @@ struct UniqueTaggedHandleTraits
         if (isValid())
         {
             outHandle = handle;
-            return true;
+            return CloseReturnType(true);
         }
         return invalidReturnType;
     }
@@ -158,7 +158,7 @@ struct UniqueTaggedHandleTraits
             detach();
             return Traits::releaseHandle(handleCopy);
         }
-        return true;
+        return CloseReturnType(true);
     }
 
   protected:

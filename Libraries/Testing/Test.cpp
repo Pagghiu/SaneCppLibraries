@@ -136,7 +136,9 @@ bool SC::TestCase::recordExpectation(StringView expression, bool status, StringV
 
 bool SC::TestCase::recordExpectation(StringView expression, ReturnCode status)
 {
-    return recordExpectation(expression, status, status.message);
+    return recordExpectation(
+        expression, status,
+        StringView(status.message, status.message ? ::strlen(status.message) : 0, true, StringEncoding::Ascii));
 }
 
 bool SC::TestCase::test_section(StringView sectionName)

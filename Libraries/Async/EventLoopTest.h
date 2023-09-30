@@ -114,8 +114,8 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(wakeUp2.start(eventLoop));
             Thread     newThread1;
             Thread     newThread2;
-            ReturnCode loopRes1 = false;
-            ReturnCode loopRes2 = false;
+            ReturnCode loopRes1 = ReturnCode(false);
+            ReturnCode loopRes2 = ReturnCode(false);
             Action     action1  = [&] { loopRes1 = wakeUp1.wakeUp(); };
             Action     action2  = [&] { loopRes2 = wakeUp1.wakeUp(); };
             SC_TEST_EXPECT(newThread1.start("test1", &action1));
@@ -155,7 +155,7 @@ struct SC::EventLoopTest : public SC::TestCase
             };
             SC_TEST_EXPECT(wakeUp.start(eventLoop, &params.eventObject));
             Thread     newThread1;
-            ReturnCode loopRes1     = false;
+            ReturnCode loopRes1     = ReturnCode(false);
             Action     threadLambda = [&]
             {
                 loopRes1 = wakeUp.wakeUp();
@@ -439,7 +439,7 @@ struct SC::EventLoopTest : public SC::TestCase
             auto writeSpan = StringView("test").toCharSpan();
 
             FileDescriptor::Handle handle;
-            SC_TEST_EXPECT(fd.get(handle, "asd"_a8));
+            SC_TEST_EXPECT(fd.get(handle, ReturnCode::Error("asd")));
 
             AsyncFileWrite asyncWriteFile;
             asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
@@ -454,7 +454,7 @@ struct SC::EventLoopTest : public SC::TestCase
 
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::ReadOnly, options));
             SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
-            SC_TEST_EXPECT(fd.get(handle, "asd"_a8));
+            SC_TEST_EXPECT(fd.get(handle, ReturnCode::Error("asd")));
 
             int           readCount = 0;
             char          readBuffer[4];
@@ -499,7 +499,7 @@ struct SC::EventLoopTest : public SC::TestCase
             FileSystem fs;
             SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
             SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
-            SC_TEST_EXPECT(fs.write(filePath.view(), "test"_a8));
+            SC_TEST_EXPECT(fs.write(filePath.view(), "test"));
 
             FileDescriptor::OpenOptions options;
             options.async    = true;
@@ -510,7 +510,7 @@ struct SC::EventLoopTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
 
             FileDescriptor::Handle handle;
-            SC_TEST_EXPECT(fd.get(handle, "handle"_a8));
+            SC_TEST_EXPECT(fd.get(handle, ReturnCode::Error("handle")));
             AsyncFileClose asyncClose;
             asyncClose.callback = [this](auto& result) { SC_TEST_EXPECT(result.isValid()); };
             auto res            = asyncClose.start(eventLoop, handle);
@@ -547,7 +547,7 @@ struct SC::EventLoopTest : public SC::TestCase
                 // - Apple: after poll on macOS (where we're pushing the async handles to OS)
                 // - Windows: during Staging (precisely in Activate)
                 SocketDescriptor::Handle handle;
-                SC_TEST_EXPECT(serverSideClient.get(handle, "ASD"_a8));
+                SC_TEST_EXPECT(serverSideClient.get(handle, ReturnCode::Error("ASD")));
                 SocketDescriptor socketToClose;
                 SC_TEST_EXPECT(socketToClose.assign(handle));
                 SC_TEST_EXPECT(socketToClose.close());

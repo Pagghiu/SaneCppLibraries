@@ -14,7 +14,7 @@ SC::ReturnCode SC::SocketDescriptorTraits::releaseHandle(Handle& handle)
 {
     ::close(handle);
     handle = Invalid;
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::SocketDescriptor::setInheritable(bool inheritable)
@@ -85,5 +85,5 @@ SC::ReturnCode SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFa
         setsockopt(handle, SOL_SOCKET, SO_NOSIGPIPE, &active, sizeof(active));
     }
 #endif // defined(SO_NOSIGPIPE)
-    return isValid();
+    return ReturnCode(isValid());
 }

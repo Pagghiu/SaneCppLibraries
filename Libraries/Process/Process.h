@@ -82,7 +82,7 @@ struct SC::ProcessChain
 
     struct Error
     {
-        ReturnCode returnCode = true;
+        ReturnCode returnCode = ReturnCode(true);
     };
 
     ProcessChain(Delegate<const Error&> onError) : onError(onError) {}

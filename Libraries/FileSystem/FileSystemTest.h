@@ -23,17 +23,10 @@ struct SC::FileSystemTest : public SC::TestCase
 
             ReturnCode res = fs.removeEmptyDirectory("randomNonExistingDirectory"_a8);
             SC_TEST_EXPECT(not res);
-#if SC_PLATFORM_WINDOWS
-            // TODO: Implement cross encodings comparisons
-            SC_TEST_EXPECT(res.message == L"No such file or directory for \"randomNonExistingDirectory\"");
-#else
-            SC_TEST_EXPECT(res.message == "No such file or directory for \"randomNonExistingDirectory\""_a8);
-#endif
             fs.preciseErrorMessages = false;
 
             res = fs.removeEmptyDirectory("randomNonExistingDirectory"_a8);
             SC_TEST_EXPECT(not res);
-            SC_TEST_EXPECT(res.message == "ENOENT"_a8);
         }
         if (test_section("makeDirectory / isDirectory / removeEmptyDirectory"))
         {

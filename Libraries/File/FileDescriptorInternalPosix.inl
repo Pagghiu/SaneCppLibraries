@@ -25,9 +25,9 @@ struct SC::FileDescriptorPosixHelpers
         } while (outFlags == -1 and errno == EINTR);
         if (outFlags == -1)
         {
-            return "fcntl getFlag failed"_a8;
+            return ReturnCode::Error("fcntl getFlag failed");
         }
-        return true;
+        return ReturnCode(true);
     }
     static ReturnCode setFileFlags(int flagRead, int flagWrite, const int fileDescriptor, const bool setFlag,
                                    const int flag)
@@ -39,7 +39,7 @@ struct SC::FileDescriptorPosixHelpers
         } while (oldFlags == -1 and errno == EINTR);
         if (oldFlags == -1)
         {
-            return "fcntl getFlag failed"_a8;
+            return ReturnCode::Error("fcntl getFlag failed");
         }
         const int newFlags = setFlag ? oldFlags | flag : oldFlags & (~flag);
         if (newFlags != oldFlags)
@@ -51,10 +51,10 @@ struct SC::FileDescriptorPosixHelpers
             } while (res == -1 and errno == EINTR);
             if (res != 0)
             {
-                return "fcntl setFlag failed"_a8;
+                return ReturnCode::Error("fcntl setFlag failed");
             }
         }
-        return true;
+        return ReturnCode(true);
     }
 
   public:
@@ -65,7 +65,7 @@ struct SC::FileDescriptorPosixHelpers
         int flags = 0;
         SC_TRY(getFileFlags(F_GETFD, fileDescriptor, flags));
         hasFlag = (flags & flag) != 0;
-        return true;
+        return ReturnCode(true);
     }
     template <int flag>
     static ReturnCode hasFileStatusFlags(int fileDescriptor, bool& hasFlag)
@@ -74,7 +74,7 @@ struct SC::FileDescriptorPosixHelpers
         int flags = 0;
         SC_TRY(getFileFlags(F_GETFL, fileDescriptor, flags));
         hasFlag = (flags & flag) != 0;
-        return true;
+        return ReturnCode(true);
     }
     template <int flag>
     static ReturnCode setFileDescriptorFlags(int fileDescriptor, bool setFlag)
@@ -99,9 +99,9 @@ SC::ReturnCode SC::FileDescriptorTraits::releaseHandle(Handle& handle)
 {
     if (::close(handle) != 0)
     {
-        return "FileDescriptorTraits::releaseHandle - close failed"_a8;
+        return ReturnCode::Error("FileDescriptorTraits::releaseHandle - close failed");
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOptions options)
@@ -111,7 +111,7 @@ SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOpti
     StringView         filePath;
     SC_TRY(convert.convertNullTerminateFastPath(path, filePath));
     if (not filePath.startsWithChar('/'))
-        return "Path must be absolute"_a8;
+        return ReturnCode::Error("Path must be absolute");
     int flags = 0;
     switch (mode)
     {
@@ -127,7 +127,7 @@ SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOpti
     }
     const int access         = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
     const int fileDescriptor = ::open(filePath.getNullTerminatedNative(), flags, access);
-    SC_TRY_MSG(fileDescriptor != -1, "open failed"_a8);
+    SC_TRY_MSG(fileDescriptor != -1, "open failed");
     return assign(fileDescriptor);
 }
 
@@ -153,7 +153,7 @@ SC::ReturnCode SC::FileDescriptor::readAppend(Vector<char>& output, Span<char> f
     ssize_t                numReadBytes;
     const bool             useVector = output.capacity() > output.size();
     FileDescriptor::Handle fileDescriptor;
-    SC_TRY(get(fileDescriptor, "FileDescriptor::readAppend - Invalid Handle"_a8));
+    SC_TRY(get(fileDescriptor, ReturnCode::Error("FileDescriptor::readAppend - Invalid Handle")));
     if (useVector)
     {
         do
@@ -163,8 +163,7 @@ SC::ReturnCode SC::FileDescriptor::readAppend(Vector<char>& output, Span<char> f
     }
     else
     {
-        SC_TRY_MSG(fallbackBuffer.sizeInBytes() != 0,
-                   "FileDescriptor::readAppend - buffer must be bigger than zero"_a8);
+        SC_TRY_MSG(fallbackBuffer.sizeInBytes() != 0, "FileDescriptor::readAppend - buffer must be bigger than zero");
         do
         {
             numReadBytes = ::read(fileDescriptor, fallbackBuffer.data(), fallbackBuffer.sizeInBytes());
@@ -175,27 +174,27 @@ SC::ReturnCode SC::FileDescriptor::readAppend(Vector<char>& output, Span<char> f
         if (useVector)
         {
             SC_TRY_MSG(output.resizeWithoutInitializing(output.size() + static_cast<size_t>(numReadBytes)),
-                       "FileDescriptor::readAppend - resize failed"_a8);
+                       "FileDescriptor::readAppend - resize failed");
         }
         else
         {
             SC_TRY_MSG(
                 output.appendCopy(fallbackBuffer.data(), static_cast<size_t>(numReadBytes)),
-                "FileDescriptor::readAppend - appendCopy failed. Bytes have been read from stream and will get lost"_a8);
+                "FileDescriptor::readAppend - appendCopy failed. Bytes have been read from stream and will get lost");
         }
         result = ReadResult{static_cast<size_t>(numReadBytes), false};
-        return true;
+        return ReturnCode(true);
     }
     else if (numReadBytes == 0)
     {
         // EOF
         result = ReadResult{0, true};
-        return true;
+        return ReturnCode(true);
     }
     else
     {
         // TODO: Parse read result errno
-        return ReturnCode("read failed"_a8);
+        return ReturnCode::Error("read failed");
     }
 }
 
@@ -209,36 +208,36 @@ SC::ReturnCode SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
     case SeekMode::SeekCurrent: flags = SEEK_CUR; break;
     }
     const off_t res = ::lseek(handle, static_cast<off_t>(offset), flags);
-    SC_TRY_MSG(res >= 0, "lseek failed"_a8);
-    return static_cast<uint64_t>(res) == offset;
+    SC_TRY_MSG(res >= 0, "lseek failed");
+    return ReturnCode(static_cast<uint64_t>(res) == offset);
 }
 
 SC::ReturnCode SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
 {
     const ssize_t res = ::pwrite(handle, data.data(), data.sizeInBytes(), static_cast<off_t>(offset));
-    SC_TRY_MSG(res >= 0, "pwrite failed"_a8);
-    return static_cast<size_t>(res) == data.sizeInBytes();
+    SC_TRY_MSG(res >= 0, "pwrite failed");
+    return ReturnCode(static_cast<size_t>(res) == data.sizeInBytes());
 }
 
 SC::ReturnCode SC::FileDescriptor::write(Span<const char> data)
 {
     const ssize_t res = ::write(handle, data.data(), data.sizeInBytes());
-    SC_TRY_MSG(res >= 0, "write failed"_a8);
-    return static_cast<size_t>(res) == data.sizeInBytes();
+    SC_TRY_MSG(res >= 0, "write failed");
+    return ReturnCode(static_cast<size_t>(res) == data.sizeInBytes());
 }
 
 SC::ReturnCode SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, uint64_t offset)
 {
     const ssize_t res = ::pread(handle, data.data(), data.sizeInBytes(), static_cast<off_t>(offset));
-    SC_TRY_MSG(res >= 0, "pread failed"_a8);
-    return data.sliceStartLength(0, static_cast<size_t>(res), actuallyRead);
+    SC_TRY_MSG(res >= 0, "pread failed");
+    return ReturnCode(data.sliceStartLength(0, static_cast<size_t>(res), actuallyRead));
 }
 
 SC::ReturnCode SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
 {
     const ssize_t res = ::read(handle, data.data(), data.sizeInBytes());
-    SC_TRY_MSG(res >= 0, "read failed"_a8);
-    return data.sliceStartLength(0, static_cast<size_t>(res), actuallyRead);
+    SC_TRY_MSG(res >= 0, "read failed");
+    return ReturnCode(data.sliceStartLength(0, static_cast<size_t>(res), actuallyRead));
 }
 
 // PipeDescriptor
@@ -249,19 +248,19 @@ SC::ReturnCode SC::PipeDescriptor::createPipe(InheritableReadFlag readFlag, Inhe
     // TODO: Use pipe2 to set cloexec flags immediately
     if (::pipe(pipes) != 0)
     {
-        return ReturnCode("PipeDescriptor::createPipe - pipe failed"_a8);
+        return ReturnCode::Error("PipeDescriptor::createPipe - pipe failed");
     }
-    SC_TRY_MSG(readPipe.assign(pipes[0]), "Cannot assign read pipe"_a8);
-    SC_TRY_MSG(writePipe.assign(pipes[1]), "Cannot assign write pipe"_a8);
+    SC_TRY_MSG(readPipe.assign(pipes[0]), "Cannot assign read pipe");
+    SC_TRY_MSG(writePipe.assign(pipes[1]), "Cannot assign write pipe");
     // On Posix by default descriptors are inheritable
     // https://devblogs.microsoft.com/oldnewthing/20111216-00/?p=8873
     if (readFlag == ReadNonInheritable)
     {
-        SC_TRY_MSG(readPipe.setInheritable(false), "Cannot set close on exec on read pipe"_a8);
+        SC_TRY_MSG(readPipe.setInheritable(false), "Cannot set close on exec on read pipe");
     }
     if (writeFlag == WriteNonInheritable)
     {
-        SC_TRY_MSG(writePipe.setInheritable(false), "Cannot set close on exec on write pipe"_a8);
+        SC_TRY_MSG(writePipe.setInheritable(false), "Cannot set close on exec on write pipe");
     }
-    return true;
+    return ReturnCode(true);
 }

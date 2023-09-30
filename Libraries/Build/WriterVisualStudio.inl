@@ -77,11 +77,11 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                 break;
             }
             case Architecture::Wasm: {
-                return "Visual Studio: Unsupported Wasm configuration"_a8;
+                return ReturnCode::Error("Visual Studio: Unsupported Wasm configuration");
             }
             }
         }
-        return true;
+        return ReturnCode(true);
     }
 
     [[nodiscard]] ReturnCode writeConfigurations(StringBuilder& builder, const Project& project)
@@ -96,14 +96,17 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     {
         // TODO: Generate GUID
         // c701ae36-fa88-4674-a16f-298fa8444aa5
-        return builder.append("  <PropertyGroup Label=\"Globals\">\n"
-                              "    <VCProjectVersion>16.0</VCProjectVersion>\n"
-                              "    <Keyword>Win32Proj</Keyword>\n"
-                              "    <ProjectGuid>{}</ProjectGuid>\n"
-                              "    <RootNamespace>{}</RootNamespace>\n"
-                              "    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>\n"
-                              "  </PropertyGroup>\n",
-                              projectGuid, project.name);
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        builder.append("  <PropertyGroup Label=\"Globals\">\n"
+                       "    <VCProjectVersion>16.0</VCProjectVersion>\n"
+                       "    <Keyword>Win32Proj</Keyword>\n"
+                       "    <ProjectGuid>{}</ProjectGuid>\n"
+                       "    <RootNamespace>{}</RootNamespace>\n"
+                       "    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>\n"
+                       "  </PropertyGroup>\n",
+                       projectGuid, project.name);
+        SC_COMPILER_WARNING_POP;
+        return ReturnCode(true);
     }
 
     [[nodiscard]] bool writeConfigurationProperty(StringBuilder& builder, const Configuration& configuration,
@@ -147,7 +150,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
 #endif
         builder.append("  </PropertyGroup>\n");
         SC_COMPILER_WARNING_POP;
-        return true;
+        return ReturnCode(true);
     }
 
     [[nodiscard]] bool writeConfigurationsProperties(StringBuilder& builder, const Project& project)
@@ -490,7 +493,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                        "  </ImportGroup>\n"
                        "</Project>\n");
         SC_COMPILER_WARNING_POP;
-        return true;
+        return ReturnCode(true);
     }
 
     // Solution

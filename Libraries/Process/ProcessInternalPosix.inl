@@ -12,7 +12,7 @@
 SC::ReturnCode SC::ProcessDescriptorTraits::releaseHandle(pid_t& handle)
 {
     handle = Invalid;
-    return true;
+    return ReturnCode(true);
 }
 
 struct SC::Process::Internal
@@ -24,12 +24,12 @@ struct SC::Process::Internal
     static ReturnCode duplicateAndReplace(FileDescriptor& handle, FileDescriptor::Handle fds)
     {
         FileDescriptor::Handle nativeFd;
-        SC_TRY(handle.get(nativeFd, "duplicateAndReplace - Invalid Handle"_a8));
+        SC_TRY(handle.get(nativeFd, ReturnCode::Error("duplicateAndReplace - Invalid Handle")));
         if (::dup2(nativeFd, fds) == -1)
         {
-            return ReturnCode("dup2 failed"_a8);
+            return ReturnCode::Error("dup2 failed");
         }
-        return true;
+        return ReturnCode(true);
     }
 };
 
@@ -38,9 +38,9 @@ SC::ReturnCode SC::Process::fork()
     processID.pid = ::fork();
     if (processID.pid < 0)
     {
-        return ReturnCode("fork failed"_a8);
+        return ReturnCode::Error("fork failed");
     }
-    return true;
+    return ReturnCode(true);
 }
 
 bool SC::Process::isChild() const { return processID.pid == 0; }
@@ -57,7 +57,7 @@ SC::ReturnCode SC::Process::waitForExitSync()
     {
         exitStatus.status = WEXITSTATUS(status);
     }
-    return true;
+    return ReturnCode(true);
 }
 
 template <typename Lambda>
@@ -100,7 +100,7 @@ SC::ReturnCode SC::Process::spawn(Lambda&& lambda)
         SC_TRY(standardInput.close());
         SC_TRY(standardOutput.close());
         SC_TRY(standardError.close());
-        return true;
+        return ReturnCode(true);
     }
     // The exit(127) inside isChild makes this unreachable
     Assert::unreachable();

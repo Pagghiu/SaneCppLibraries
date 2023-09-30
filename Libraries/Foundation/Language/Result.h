@@ -2,24 +2,26 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Strings/StringView.h"
-
+#include "../Base/Compiler.h" //forward
 namespace SC
 {
 struct [[nodiscard]] ReturnCode
 {
-    StringView message;
-    constexpr ReturnCode(bool result) : message(result ? ""_a8 : "Unspecified Error"_a8) {}
-    constexpr ReturnCode(const char* message) = delete;
-    constexpr ReturnCode(const StringView message) : message(message) {}
-    constexpr ReturnCode(const ReturnCode& other) : message(other.message) {}
-    constexpr ReturnCode& operator=(const ReturnCode& other)
+    const char* message;
+    explicit constexpr ReturnCode(bool result) : message(result ? nullptr : "Unspecified Error") {}
+
+    template <int SIZE>
+    static constexpr ReturnCode Error(const char (&msg)[SIZE])
     {
-        message = other.message;
-        return *this;
+        return ReturnCode(msg);
     }
-         operator bool() const { return message.isEmpty(); }
-    bool isError() const { return not message.isEmpty(); }
+
+    static constexpr ReturnCode FromStableCharPointer(const char* msg) { return ReturnCode(msg); }
+
+    constexpr operator bool() const { return message == nullptr; }
+
+  private:
+    explicit constexpr ReturnCode(const char* message) : message(message) {}
 };
 template <typename F>
 struct Deferred
@@ -47,7 +49,7 @@ Deferred<F> MakeDeferred(F&& f)
 
 #define SC_TRY(expression)                                                                                             \
     {                                                                                                                  \
-        if (auto _exprResConv = (expression))                                                                          \
+        if (auto _exprResConv = SC::ReturnCode(expression))                                                            \
             SC_LANGUAGE_LIKELY                                                                                         \
             {                                                                                                          \
                 (void)0;                                                                                               \
@@ -61,7 +63,7 @@ Deferred<F> MakeDeferred(F&& f)
     if (not(expression))                                                                                               \
         SC_LANGUAGE_UNLIKELY                                                                                           \
         {                                                                                                              \
-            return SC::ReturnCode(failedMessage);                                                                      \
+            return SC::ReturnCode::Error(failedMessage);                                                               \
         }
 
 #define SC_TRUST_RESULT(expression) SC_ASSERT_RELEASE(expression)

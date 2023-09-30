@@ -164,7 +164,7 @@ struct SC::SystemDebug::Internal
                                     0, FALSE, DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS))
                 {
                     CloseHandle(newHandle);
-                    return true;
+                    return ReturnCode(true);
                 }
             }
         }
@@ -177,8 +177,8 @@ struct SC::SystemDebug::Internal
 SC::ReturnCode SC::SystemDebug::unlockFileFromAllProcesses(SC::StringView fileName)
 {
     using namespace SC;
-    SC_TRY_MSG(fileName.isNullTerminated(), "Filename must be null terminated"_a8);
-    SC_TRY_MSG(fileName.getEncoding() == SC::StringEncoding::Utf16, "Filename must be UTF16"_a8);
+    SC_TRY_MSG(fileName.isNullTerminated(), "Filename must be null terminated");
+    SC_TRY_MSG(fileName.getEncoding() == SC::StringEncoding::Utf16, "Filename must be UTF16");
     DWORD dwSession;
     WCHAR szSessionKey[CCH_RM_SESSION_KEY + 1] = {0};
 
@@ -217,7 +217,7 @@ SC::ReturnCode SC::SystemDebug::unlockFileFromAllProcesses(SC::StringView fileNa
         }
         RmEndSession(dwSession);
     }
-    return true;
+    return ReturnCode(true);
 }
 
 bool SC::SystemDebug::isDebuggerConnected() { return ::IsDebuggerPresent() == TRUE; }
@@ -225,8 +225,8 @@ bool SC::SystemDebug::isDebuggerConnected() { return ::IsDebuggerPresent() == TR
 SC::ReturnCode SC::SystemDebug::deleteForcefullyUnlockedFile(SC::StringView fileName)
 {
     using namespace SC;
-    SC_TRY_MSG(fileName.isNullTerminated(), "Filename must be null terminated"_a8);
-    SC_TRY_MSG(fileName.getEncoding() == SC::StringEncoding::Utf16, "Filename must be UTF16"_a8);
+    SC_TRY_MSG(fileName.isNullTerminated(), "Filename must be null terminated");
+    SC_TRY_MSG(fileName.getEncoding() == SC::StringEncoding::Utf16, "Filename must be UTF16");
     HANDLE fd = CreateFileW(fileName.getNullTerminatedNative(), // File path
                             GENERIC_READ | GENERIC_WRITE,       // Desired access
                             FILE_SHARE_DELETE,                  // Share mode (0 for exclusive access)
@@ -235,8 +235,8 @@ SC::ReturnCode SC::SystemDebug::deleteForcefullyUnlockedFile(SC::StringView file
                             FILE_FLAG_DELETE_ON_CLOSE,          // File attributes and flags
                             NULL                                // Template file handle
     );
-    SC_TRY_MSG(fd != INVALID_HANDLE_VALUE, "deleteForcefullyUnlockedFile CreateFileW failed"_a8);
-    return ::CloseHandle(fd) == TRUE;
+    SC_TRY_MSG(fd != INVALID_HANDLE_VALUE, "deleteForcefullyUnlockedFile CreateFileW failed");
+    return ReturnCode(::CloseHandle(fd) == TRUE);
 }
 
 SC::ReturnCode SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle)
@@ -249,9 +249,9 @@ SC::ReturnCode SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle)
         memcpy(&module, &handle, sizeof(HMODULE));
         handle         = nullptr;
         const BOOL res = ::FreeLibrary(module);
-        return res == TRUE;
+        return ReturnCode(res == TRUE);
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::SystemDynamicLibrary::load(StringView fullPath)
@@ -264,15 +264,15 @@ SC::ReturnCode SC::SystemDynamicLibrary::load(StringView fullPath)
     HMODULE module = ::LoadLibraryW(fullPathZeroTerminated.getNullTerminatedNative());
     if (module == nullptr)
     {
-        return "LoadLibraryW failed"_a8;
+        return ReturnCode::Error("LoadLibraryW failed");
     }
     memcpy(&handle, &module, sizeof(HMODULE));
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const
 {
-    SC_TRY_MSG(isValid(), "Invalid GetProcAddress handle"_a8);
+    SC_TRY_MSG(isValid(), "Invalid GetProcAddress handle");
     SmallString<1024> string = StringEncoding::Ascii;
     StringConverter   converter(string);
     StringView        symbolZeroTerminated;
@@ -280,7 +280,7 @@ SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*
     HMODULE module;
     memcpy(&module, &handle, sizeof(HMODULE));
     symbol = reinterpret_cast<void*>(::GetProcAddress(module, symbolZeroTerminated.bytesIncludingTerminator()));
-    return symbol != nullptr;
+    return ReturnCode(symbol != nullptr);
 }
 
 bool SC::SystemDirectories::init()
@@ -315,7 +315,7 @@ bool SC::SystemDirectories::init()
     StringBuilder builder(executableFile);
     SC_TRY(builder.append(utf16executable));
     applicationRootDirectory = Path::Windows::dirname(executableFile.view());
-    return true;
+    return ReturnCode(true);
 }
 
 struct SC::SystemFunctions::Internal
@@ -338,16 +338,16 @@ SC::ReturnCode SC::SystemFunctions::initNetworking()
         WSADATA wsa;
         if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
         {
-            return "WSAStartup failed"_a8;
+            return ReturnCode::Error("WSAStartup failed");
         }
         Internal::get().networkingInited.exchange(true);
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::SystemFunctions::shutdownNetworking()
 {
     WSACleanup();
     Internal::get().networkingInited.exchange(false);
-    return true;
+    return ReturnCode(true);
 }

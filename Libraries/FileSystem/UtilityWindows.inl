@@ -19,9 +19,9 @@ struct UtilityWindows
         const StringView sv = StringView(Span<const wchar_t>(messageBuffer, size * sizeof(wchar_t)), true);
         if (not buffer.assign(sv))
         {
-            return "UtilityWindows::formatWindowsError - returned error"_a8;
+            return ReturnCode::Error("UtilityWindows::formatWindowsError - returned error");
         }
-        return true;
+        return ReturnCode(true);
     }
 };
 

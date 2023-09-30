@@ -69,6 +69,6 @@ struct SC::FileSystemWalker
     InternalOpaque internal;
 
     Entry      currentEntry;
-    ReturnCode errorResult   = true;
+    ReturnCode errorResult   = ReturnCode(true);
     bool       errorsChecked = false;
 };

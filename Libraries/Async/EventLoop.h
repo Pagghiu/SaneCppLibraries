@@ -92,7 +92,7 @@ struct SC::Async
         WindowsPoll,
 #endif
     };
-    [[nodiscard]] static StringView TypeToString(Type type);
+    [[nodiscard]] static const char* TypeToString(Type type);
 
     /// Call only from derived async time
     Async(Type type) : state(State::Free), type(type), eventIndex(-1) {}

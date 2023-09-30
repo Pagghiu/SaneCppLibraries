@@ -22,7 +22,7 @@ SC::ReturnCode SC::HttpURLParser::parse(StringView url)
     SC_TRY(parseHost());
     if (not hasPath)
     {
-        return true;
+        return ReturnCode(true);
     }
     // path + hash
     start              = it;
@@ -33,7 +33,7 @@ SC::ReturnCode SC::HttpURLParser::parse(StringView url)
     {
         hash = StringView::fromIteratorUntilEnd(it);
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::HttpURLParser::parsePath()
@@ -93,27 +93,27 @@ SC::ReturnCode SC::HttpURLParser::validateProtocol()
     if (protocol == "http")
     {
         port = 80;
-        return true;
+        return ReturnCode(true);
     }
     else if (protocol == "https")
     {
         port = 443;
-        return true;
+        return ReturnCode(true);
     }
 
-    return false;
+    return ReturnCode(false);
 }
 
 SC::ReturnCode SC::HttpURLParser::validatePath()
 {
     // TODO: Improve validatePath
-    return not pathname.containsChar(' ');
+    return ReturnCode(not pathname.containsChar(' '));
 }
 
 SC::ReturnCode SC::HttpURLParser::validateHost()
 {
     // TODO: Improve validateHost
-    return not host.isEmpty() and (host.containsChar('.') or hostname == "localhost");
+    return ReturnCode(not host.isEmpty() and (host.containsChar('.') or hostname == "localhost"));
 }
 
 SC::ReturnCode SC::HttpURLParser::parseUserPassword(StringView userPassowrd)
@@ -123,5 +123,5 @@ SC::ReturnCode SC::HttpURLParser::parseUserPassword(StringView userPassowrd)
     username = tokenizer.component;
     SC_TRY(tokenizer.tokenizeNext({}, StringViewTokenizer::Options::SkipEmpty));
     password = tokenizer.component;
-    return true;
+    return ReturnCode(true);
 }

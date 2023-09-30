@@ -15,14 +15,14 @@
 namespace SC
 {
 
-static constexpr const SC::StringView getErrorCode(int errorCode)
+static constexpr const SC::ReturnCode getErrorCode(int errorCode)
 {
     switch (errorCode)
     {
-    case EEXIST: return "EEXIST"_a8;
-    case ENOENT: return "ENOENT"_a8;
+    case EEXIST: return ReturnCode::Error("EEXIST");
+    case ENOENT: return ReturnCode::Error("ENOENT");
     }
-    return "Unknown"_a8;
+    return ReturnCode::Error("Unknown");
 }
 } // namespace SC
 
@@ -128,11 +128,11 @@ struct SC::FileSystem::Internal
         {
             if (existsAndIsDirectory(dest))
             {
-                return "Directory already exists"_a8;
+                return ReturnCode::Error("Directory already exists");
             }
             else if (existsAndIsFile(dest))
             {
-                return "A file already exists at the location"_a8;
+                return ReturnCode::Error("A file already exists at the location");
             }
         }
         shFileOp.fFlags = FOF_SILENT | FOF_NOCONFIRMMKDIR | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NO_UI;
@@ -143,7 +143,7 @@ struct SC::FileSystem::Internal
         shFileOp.pFrom = sourceDirectory.view().getNullTerminatedNative();
         shFileOp.pTo   = dest;
         const int res  = SHFileOperationW(&shFileOp);
-        return res == 0;
+        return ReturnCode(res == 0);
     }
 
     [[nodiscard]] static ReturnCode removeDirectoryRecursive(String& sourceDirectory)
@@ -156,7 +156,7 @@ struct SC::FileSystem::Internal
         SC_TRY(StringConverter(sourceDirectory).appendNullTerminated(L"\0"));
         shFileOp.pFrom = sourceDirectory.view().getNullTerminatedNative();
         const int res  = SHFileOperationW(&shFileOp);
-        return res == 0;
+        return ReturnCode(res == 0);
     }
 
     [[nodiscard]] static ReturnCode getFileTime(const wchar_t* file, FileTime& time)
@@ -164,7 +164,7 @@ struct SC::FileSystem::Internal
         HANDLE hFile =
             CreateFileW(file, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         FileDescriptor deferFileClose = hFile;
-        SC_TRY_MSG(deferFileClose.isValid(), "getFileTime: Invalid file"_a8);
+        SC_TRY_MSG(deferFileClose.isValid(), "getFileTime: Invalid file");
         FILETIME creationTime, lastAccessTime, modifiedTime;
         if (GetFileTime(hFile, &creationTime, &lastAccessTime, &modifiedTime))
         {
@@ -173,9 +173,9 @@ struct SC::FileSystem::Internal
             fileTimeValue.HighPart = modifiedTime.dwHighDateTime;
             fileTimeValue.QuadPart -= 116444736000000000ULL;
             time.modifiedTime = AbsoluteTime(fileTimeValue.QuadPart / 10000ULL);
-            return true;
+            return ReturnCode(true);
         }
-        return false;
+        return ReturnCode(false);
     }
 
     [[nodiscard]] static ReturnCode setLastModifiedTime(const wchar_t* file, AbsoluteTime time)
@@ -183,12 +183,12 @@ struct SC::FileSystem::Internal
         HANDLE         hFile          = CreateFileW(file, FILE_WRITE_ATTRIBUTES, FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
                                                     FILE_ATTRIBUTE_NORMAL, NULL);
         FileDescriptor deferFileClose = hFile;
-        SC_TRY_MSG(deferFileClose.isValid(), "setLastModifiedTime: Invalid file"_a8);
+        SC_TRY_MSG(deferFileClose.isValid(), "setLastModifiedTime: Invalid file");
 
         FILETIME creationTime, lastAccessTime;
         if (!GetFileTime(hFile, &creationTime, &lastAccessTime, NULL))
         {
-            return false;
+            return ReturnCode(false);
         }
 
         FILETIME       modifiedTime;
@@ -198,10 +198,10 @@ struct SC::FileSystem::Internal
         modifiedTime.dwHighDateTime = fileTimeValue.HighPart;
         if (!SetFileTime(hFile, &creationTime, &lastAccessTime, &modifiedTime))
         {
-            return false;
+            return ReturnCode(false);
         }
 
-        return true;
+        return ReturnCode(true);
     }
 #undef SC_TRY_LIBC
 };

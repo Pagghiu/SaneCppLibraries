@@ -15,7 +15,7 @@ SC::ReturnCode SC::HttpClient::get(EventLoop& loop, StringView url)
     uint16_t         port;
     HttpURLParser    parser;
     SC_TRY(parser.parse(url));
-    SC_TRY_MSG(parser.protocol == "http", "Invalid protocol"_a8);
+    SC_TRY_MSG(parser.protocol == "http", "Invalid protocol");
     // TODO: Make DNS Resolution asynchronous
     SC_TRY(DNSResolver::resolve(parser.hostname, ipAddress))
     port = parser.port;

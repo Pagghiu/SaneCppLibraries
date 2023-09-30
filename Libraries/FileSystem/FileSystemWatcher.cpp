@@ -19,7 +19,7 @@ SC::ReturnCode SC::FileSystemWatcher::close() { return internal.get().close(); }
 SC::ReturnCode SC::FileSystemWatcher::watch(FolderWatcher& watcher, String& path,
                                             Function<void(const Notification&)>&& notifyCallback)
 {
-    SC_TRY_MSG(watcher.parent == nullptr, "Watcher belongs to other FileSystemWatcher"_a8);
+    SC_TRY_MSG(watcher.parent == nullptr, "Watcher belongs to other FileSystemWatcher");
     watcher.parent         = this;
     watcher.path           = &path;
     watcher.notifyCallback = move(notifyCallback);
@@ -29,7 +29,7 @@ SC::ReturnCode SC::FileSystemWatcher::watch(FolderWatcher& watcher, String& path
 
 SC::ReturnCode SC::FileSystemWatcher::FolderWatcher::unwatch()
 {
-    SC_TRY_MSG(parent != nullptr, "FolderWatcher already unwatched"_a8);
+    SC_TRY_MSG(parent != nullptr, "FolderWatcher already unwatched");
     return parent->internal.get().stopWatching(*this);
 }
 

@@ -26,7 +26,7 @@ SC::ReturnCode SC::FileSystem::changeDirectory(StringView currentWorkingDirector
     converter.clear();
     SC_TRY(converter.appendNullTerminated(currentWorkingDirectory));
     // TODO: Assert if path is not absolute
-    return existsAndIsDirectory(".");
+    return ReturnCode(existsAndIsDirectory("."));
 }
 
 bool SC::FileSystem::convert(const StringView file, String& destination, StringView* encodedPath)
@@ -73,7 +73,7 @@ bool SC::FileSystem::convert(const StringView file, String& destination, StringV
         {                                                                                                              \
             if (IsSame<decltype(tempRes), ReturnCode>::value)                                                          \
             {                                                                                                          \
-                return tempRes;                                                                                        \
+                return ReturnCode(tempRes);                                                                            \
             }                                                                                                          \
             else                                                                                                       \
             {                                                                                                          \
@@ -89,7 +89,7 @@ bool SC::FileSystem::convert(const StringView file, String& destination, StringV
         {                                                                                                              \
             if (IsSame<decltype(tempRes), ReturnCode>::value)                                                          \
             {                                                                                                          \
-                return tempRes;                                                                                        \
+                return ReturnCode(tempRes);                                                                            \
             }                                                                                                          \
             else                                                                                                       \
             {                                                                                                          \
@@ -110,7 +110,7 @@ SC::ReturnCode SC::FileSystem::write(StringView path, SpanVoid<const void> data)
         return formatError(errno, path, false);
     }
     fclose(handle);
-    return res == data.sizeInBytes();
+    return ReturnCode(res == data.sizeInBytes());
 }
 
 #define SC_TRY_FORMAT_LIBC(func)                                                                                       \
@@ -139,7 +139,7 @@ SC::ReturnCode SC::FileSystem::read(StringView path, Vector<char>& data)
         return formatError(errno, path, false);
     }
     fclose(handle);
-    return readBytes == fileSize;
+    return ReturnCode(readBytes == fileSize);
 }
 #undef SC_TRY_FORMAT_LIBC
 
@@ -152,7 +152,7 @@ SC::ReturnCode SC::FileSystem::read(StringView path, Vector<char>& data)
 {
     text.encoding = encoding;
     SC_TRY(read(file, text.data));
-    return StringConverter::pushNullTerm(text.data, encoding);
+    return ReturnCode(StringConverter::pushNullTerm(text.data, encoding));
 }
 
 SC::ReturnCode SC::FileSystem::formatError(int errorNumber, StringView item, bool isWindowsNativeError)
@@ -162,11 +162,11 @@ SC::ReturnCode SC::FileSystem::formatError(int errorNumber, StringView item, boo
     {
         if (not preciseErrorMessages)
         {
-            return "Windows Error"_a8;
+            return ReturnCode::Error("Windows Error");
         }
         if (not UtilityWindows::formatWindowsError(errorNumber, errorMessageBuffer))
         {
-            return "SC::FileSystem::formatError - Cannot format error"_a8;
+            return ReturnCode::Error("SC::FileSystem::formatError - Cannot format error");
         }
     }
     else
@@ -177,17 +177,16 @@ SC::ReturnCode SC::FileSystem::formatError(int errorNumber, StringView item, boo
         {
             return getErrorCode(errorNumber);
         }
-
         if (not Internal::formatError(errorNumber, errorMessageBuffer))
         {
-            return "SC::FileSystem::formatError - Cannot format error"_a8;
+            return ReturnCode::Error("SC::FileSystem::formatError - Cannot format error");
         }
     }
     StringConverter errorMessage(errorMessageBuffer);
     SC_TRY(errorMessage.appendNullTerminated(" for \""));
     SC_TRY(errorMessage.appendNullTerminated(item));
     SC_TRY(errorMessage.appendNullTerminated("\""));
-    return errorMessageBuffer.view();
+    return ReturnCode::FromStableCharPointer(errorMessageBuffer.view().bytesIncludingTerminator());
 }
 
 SC::ReturnCode SC::FileSystem::removeFile(Span<const StringView> files)
@@ -198,14 +197,14 @@ SC::ReturnCode SC::FileSystem::removeFile(Span<const StringView> files)
         SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
         SC_TRY_FORMAT_ERRNO(path, Internal::removeFile(encodedPath.getNullTerminatedNative()));
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::FileSystem::removeFileIfExists(StringView source)
 {
     if (existsAndIsFile(source))
         return removeFile(Span<const StringView>{source});
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::FileSystem::removeDirectoryRecursive(Span<const StringView> directories)
@@ -215,13 +214,13 @@ SC::ReturnCode SC::FileSystem::removeDirectoryRecursive(Span<const StringView> d
         SC_TRY(convert(path, fileFormatBuffer1)); // force write
         SC_TRY_FORMAT_ERRNO(path, Internal::removeDirectoryRecursive(fileFormatBuffer1));
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::FileSystem::copyFile(Span<const CopyOperation> sourceDestination)
 {
     if (currentDirectory.isEmpty())
-        return false;
+        return ReturnCode(false);
     StringView encodedPath1, encodedPath2;
     for (const CopyOperation& op : sourceDestination)
     {
@@ -229,20 +228,20 @@ SC::ReturnCode SC::FileSystem::copyFile(Span<const CopyOperation> sourceDestinat
         SC_TRY(convert(op.destination, fileFormatBuffer2, &encodedPath2));
         SC_TRY_FORMAT_NATIVE(op.source, Internal::copyFile(encodedPath1, encodedPath2, op.copyFlags));
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::FileSystem::copyDirectory(Span<const CopyOperation> sourceDestination)
 {
     if (currentDirectory.isEmpty())
-        return false;
+        return ReturnCode(false);
     for (const CopyOperation& op : sourceDestination)
     {
         SC_TRY(convert(op.source, fileFormatBuffer1));      // force write
         SC_TRY(convert(op.destination, fileFormatBuffer2)); // force write
         SC_TRY_FORMAT_NATIVE(op.source, Internal::copyDirectory(fileFormatBuffer1, fileFormatBuffer2, op.copyFlags));
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::FileSystem::removeEmptyDirectory(Span<const StringView> directories)
@@ -253,7 +252,7 @@ SC::ReturnCode SC::FileSystem::removeEmptyDirectory(Span<const StringView> direc
         SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
         SC_TRY_FORMAT_ERRNO(path, Internal::removeEmptyDirectory(encodedPath.getNullTerminatedNative()));
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::FileSystem::makeDirectory(Span<const StringView> directories)
@@ -264,7 +263,7 @@ SC::ReturnCode SC::FileSystem::makeDirectory(Span<const StringView> directories)
         SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
         SC_TRY_FORMAT_ERRNO(path, Internal::makeDirectory(encodedPath.getNullTerminatedNative()));
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::FileSystem::makeDirectoryIfNotExists(Span<const StringView> directories)
@@ -276,7 +275,7 @@ SC::ReturnCode SC::FileSystem::makeDirectoryIfNotExists(Span<const StringView> d
             SC_TRY(makeDirectory({path}));
         }
     }
-    return true;
+    return ReturnCode(true);
 }
 
 [[nodiscard]] bool SC::FileSystem::exists(StringView fileOrDirectory)

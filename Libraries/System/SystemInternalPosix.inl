@@ -13,9 +13,9 @@ SC::ReturnCode SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle)
     if (handle)
     {
         const int res = ::dlclose(handle);
-        return res == 0;
+        return ReturnCode(res == 0);
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::SystemDynamicLibrary::load(StringView fullPath)
@@ -28,18 +28,18 @@ SC::ReturnCode SC::SystemDynamicLibrary::load(StringView fullPath)
     handle = ::dlopen(fullPathZeroTerminated.getNullTerminatedNative(), RTLD_LAZY);
     if (handle == nullptr)
     {
-        return "dlopen failed"_a8;
+        return ReturnCode::Error("dlopen failed");
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const
 {
-    SC_TRY_MSG(isValid(), "Invalid dlsym handle"_a8);
+    SC_TRY_MSG(isValid(), "Invalid dlsym handle");
     SmallString<1024> string = StringEncoding::Native;
     StringConverter   converter(string);
     StringView        symbolZeroTerminated;
     SC_TRY(converter.convertNullTerminateFastPath(symbolName, symbolZeroTerminated));
     symbol = ::dlsym(handle, symbolZeroTerminated.getNullTerminatedNative());
-    return symbol != nullptr;
+    return ReturnCode(symbol != nullptr);
 }

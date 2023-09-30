@@ -40,7 +40,7 @@ struct SC::FileSystemWalker::Internal
             {
                 return getErrorCode(errno);
             }
-            return true;
+            return ReturnCode(true);
         }
         void close()
         {
@@ -72,14 +72,14 @@ struct SC::FileSystemWalker::Internal
         entry.textLengthInBytes = currentPathString.view().sizeInBytesIncludingTerminator();
         SC_TRY(entry.init(open(currentPathString.view().getNullTerminatedNative(), O_DIRECTORY)));
         SC_TRY(recurseStack.push_back(move(entry)));
-        return true;
+        return ReturnCode(true);
     }
 
     ReturnCode enumerateNext(Entry& entry, const Options& opts)
     {
         StringConverter currentPath(currentPathString);
         if (recurseStack.isEmpty())
-            return "Forgot to call init"_a8;
+            return ReturnCode::Error("Forgot to call init");
         StackEntry&    parent = recurseStack.back();
         struct dirent* item;
         for (;;)
@@ -92,7 +92,7 @@ struct SC::FileSystemWalker::Internal
                 if (recurseStack.isEmpty())
                 {
                     entry.parentFileDescriptor.detach();
-                    return "Iteration Finished"_a8;
+                    return ReturnCode::Error("Iteration Finished");
                 }
                 parent = recurseStack.back();
                 SC_TRY(currentPath.setTextLengthInBytesIncludingTerminator(parent.textLengthInBytes));
@@ -132,7 +132,7 @@ struct SC::FileSystemWalker::Internal
         {
             entry.type = Type::File;
         }
-        return true;
+        return ReturnCode(true);
     }
 
     [[nodiscard]] ReturnCode recurseSubdirectory(Entry& entry)
@@ -144,9 +144,9 @@ struct SC::FileSystemWalker::Internal
         SC_TRY(currentPath.appendNullTerminated(entry.name));
         newParent.textLengthInBytes = currentPathString.view().sizeInBytesIncludingTerminator();
         FileDescriptor::Handle handle;
-        SC_TRY(entry.parentFileDescriptor.get(handle, ReturnCode("recurseSubdirectory - InvalidHandle"_a8)));
+        SC_TRY(entry.parentFileDescriptor.get(handle, ReturnCode::Error("recurseSubdirectory - InvalidHandle")));
         SC_TRY(newParent.init(openat(handle, entry.name.bytesIncludingTerminator(), O_DIRECTORY)));
         SC_TRY(recurseStack.push_back(newParent))
-        return true;
+        return ReturnCode(true);
     }
 };

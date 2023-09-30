@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "FileSystemWalker.h"
+#include <string.h> //strlen
 #if SC_PLATFORM_WINDOWS
 #include "FileSystemWalkerInternalWindows.inl"
 #elif SC_PLATFORM_EMSCRIPTEN
@@ -30,7 +31,8 @@ SC::FileSystemWalker::~FileSystemWalker() {}
     ReturnCode res = internal.get().enumerateNext(currentEntry, options);
     if (not res)
     {
-        if (res.message != "Iteration Finished"_a8)
+        const StringView message(res.message, ::strlen(res.message), true, StringEncoding::Ascii);
+        if (message != "Iteration Finished"_a8)
         {
             errorResult   = res;
             errorsChecked = false;
@@ -43,7 +45,7 @@ SC::FileSystemWalker::~FileSystemWalker() {}
 {
     if (options.recursive)
     {
-        errorResult   = "Cannot recurseSubdirectory() with recursive==true"_a8;
+        errorResult   = ReturnCode::Error("Cannot recurseSubdirectory() with recursive==true");
         errorsChecked = false;
         return errorResult;
     }

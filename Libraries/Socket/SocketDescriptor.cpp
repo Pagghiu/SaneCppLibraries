@@ -37,13 +37,13 @@ struct NetworkingInternal
         const auto res    = ::inet_pton(inaddr.sin_family, ipNullTerm.bytesIncludingTerminator(), &inaddr.sin_addr);
         if (res == 0)
         {
-            return "inet_pton Invalid IPV4 Address"_a8;
+            return ReturnCode::Error("inet_pton Invalid IPV4 Address");
         }
         else if (res == -1)
         {
-            return "inet_pton IPV4 failed"_a8;
+            return ReturnCode::Error("inet_pton IPV4 failed");
         }
-        return true;
+        return ReturnCode(true);
     }
 
     [[nodiscard]] static ReturnCode parseIPV6(StringView ipAddress, uint16_t port, struct sockaddr_in6& inaddr)
@@ -57,13 +57,13 @@ struct NetworkingInternal
         const auto res     = ::inet_pton(inaddr.sin6_family, ipNullTerm.bytesIncludingTerminator(), &inaddr.sin6_addr);
         if (res == 0)
         {
-            return "inet_pton Invalid IPV6 Address"_a8;
+            return ReturnCode::Error("inet_pton Invalid IPV6 Address");
         }
         else if (res == -1)
         {
-            return "inet_pton IPV6 failed"_a8;
+            return ReturnCode::Error("inet_pton IPV6 failed");
         }
-        return true;
+        return ReturnCode(true);
     }
 };
 } // namespace SC
@@ -76,10 +76,10 @@ SC::ReturnCode SC::SocketDescriptor::getAddressFamily(SocketFlags::AddressFamily
 
     if (::getsockname(handle, reinterpret_cast<struct sockaddr*>(&socketInfo), &socketInfoLen) == SOCKET_ERROR)
     {
-        return "getsockname failed"_a8;
+        return ReturnCode::Error("getsockname failed");
     }
     addressFamily = SocketFlags::AddressFamilyFromInt(socketInfo.sin6_family);
-    return true;
+    return ReturnCode(true);
 }
 
 SC::uint32_t SC::SocketIPAddress::sizeOfHandle() const
@@ -111,7 +111,7 @@ SC::ReturnCode SC::SocketIPAddress::fromAddressPort(StringView interfaceAddress,
     {
         addressFamily = SocketFlags::AddressFamilyIPV4;
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::SocketServer::close() { return socket.close(); }
@@ -121,9 +121,9 @@ SC::ReturnCode SC::SocketServer::close() { return socket.close(); }
 SC::ReturnCode SC::SocketServer::listen(SocketIPAddress nativeAddress, uint32_t numberOfWaitingConnections)
 {
     SC_TRY(SystemFunctions::isNetworkingInited());
-    SC_TRY_MSG(socket.isValid(), "Invalid socket"_a8);
+    SC_TRY_MSG(socket.isValid(), "Invalid socket");
     SocketDescriptor::Handle listenSocket;
-    SC_TRUST_RESULT(socket.get(listenSocket, "invalid listen socket"_a8));
+    SC_TRUST_RESULT(socket.get(listenSocket, ReturnCode::Error("invalid listen socket")));
 
     // TODO: Expose SO_REUSEADDR as an option?
     int value = 1;
@@ -138,26 +138,26 @@ SC::ReturnCode SC::SocketServer::listen(SocketIPAddress nativeAddress, uint32_t 
                nativeAddress.sizeOfHandle()) == SOCKET_ERROR)
     {
         SC_TRUST_RESULT(socket.close());
-        return "Could not bind socket to port"_a8;
+        return ReturnCode::Error("Could not bind socket to port");
     }
     if (::listen(listenSocket, static_cast<int>(numberOfWaitingConnections)) == SOCKET_ERROR)
     {
         SC_TRUST_RESULT(socket.close());
-        return "Could not listen"_a8;
+        return ReturnCode::Error("Could not listen");
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::SocketServer::accept(SocketFlags::AddressFamily addressFamily, SocketDescriptor& newClient)
 {
-    SC_TRY_MSG(not newClient.isValid(), "destination socket already in use"_a8);
+    SC_TRY_MSG(not newClient.isValid(), "destination socket already in use");
     SocketDescriptor::Handle listenDescriptor;
-    SC_TRY(socket.get(listenDescriptor, "Invalid socket"_a8));
+    SC_TRY(socket.get(listenDescriptor, ReturnCode::Error("Invalid socket")));
     SocketIPAddress          nativeAddress(addressFamily);
     socklen_t                nativeSize = nativeAddress.sizeOfHandle();
     SocketDescriptor::Handle acceptedClient =
         ::accept(listenDescriptor, &nativeAddress.handle.reinterpret_as<struct sockaddr>(), &nativeSize);
-    SC_TRY_MSG(acceptedClient != SocketDescriptor::Invalid, "accept failed"_a8);
+    SC_TRY_MSG(acceptedClient != SocketDescriptor::Invalid, "accept failed");
     return newClient.assign(acceptedClient);
 }
 
@@ -176,7 +176,7 @@ SC::ReturnCode SC::SocketClient::connect(SocketIPAddress ipAddress)
 {
     SC_TRY(SystemFunctions::isNetworkingInited());
     SocketDescriptor::Handle openedSocket;
-    SC_TRUST_RESULT(socket.get(openedSocket, "invalid connect socket"_a8));
+    SC_TRUST_RESULT(socket.get(openedSocket, ReturnCode::Error("invalid connect socket")));
     socklen_t nativeSize = ipAddress.sizeOfHandle();
     int       res;
     do
@@ -185,9 +185,9 @@ SC::ReturnCode SC::SocketClient::connect(SocketIPAddress ipAddress)
     } while (res == SOCKET_ERROR and errno == EINTR);
     if (res == SOCKET_ERROR)
     {
-        return "connect failed"_a8;
+        return ReturnCode::Error("connect failed");
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::SocketClient::close() { return socket.close(); }
@@ -195,7 +195,7 @@ SC::ReturnCode SC::SocketClient::close() { return socket.close(); }
 SC::ReturnCode SC::SocketClient::write(Span<const char> data)
 {
     SocketDescriptor::Handle nativeSocket;
-    SC_TRY(socket.get(nativeSocket, "Invalid socket"_a8));
+    SC_TRY(socket.get(nativeSocket, ReturnCode::Error("Invalid socket")));
 #if SC_PLATFORM_WINDOWS
     const int sizeInBytes = static_cast<int>(data.sizeInBytes());
 #else
@@ -204,19 +204,19 @@ SC::ReturnCode SC::SocketClient::write(Span<const char> data)
     const auto written = ::send(nativeSocket, data.data(), sizeInBytes, 0);
     if (written < 0)
     {
-        return "send error"_a8;
+        return ReturnCode::Error("send error");
     }
     if (static_cast<decltype(data.sizeInBytes())>(written) != data.sizeInBytes())
     {
-        return "send error"_a8;
+        return ReturnCode::Error("send error");
     }
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::SocketClient::read(Span<char> data, Span<char>& readData)
 {
     SocketDescriptor::Handle nativeSocket;
-    SC_TRY(socket.get(nativeSocket, "Invalid socket"_a8));
+    SC_TRY(socket.get(nativeSocket, ReturnCode::Error("Invalid socket")));
 #if SC_PLATFORM_WINDOWS
     const int sizeInBytes = static_cast<int>(data.sizeInBytes());
 #else
@@ -225,16 +225,16 @@ SC::ReturnCode SC::SocketClient::read(Span<char> data, Span<char>& readData)
     const auto recvSize = ::recv(nativeSocket, data.data(), sizeInBytes, 0);
     if (recvSize < 0)
     {
-        return "recv error"_a8;
+        return ReturnCode::Error("recv error");
     }
     readData = {data.data(), static_cast<size_t>(recvSize)};
-    return true;
+    return ReturnCode(true);
 }
 
 SC::ReturnCode SC::SocketClient::readWithTimeout(Span<char> data, Span<char>& readData, IntegerMilliseconds timeout)
 {
     SocketDescriptor::Handle nativeSocket;
-    SC_TRY(socket.get(nativeSocket, "Invalid socket"_a8));
+    SC_TRY(socket.get(nativeSocket, ReturnCode::Error("Invalid socket")));
     fd_set fds;
     FD_ZERO(&fds);
     FD_SET(nativeSocket, &fds);
@@ -250,13 +250,13 @@ SC::ReturnCode SC::SocketClient::readWithTimeout(Span<char> data, Span<char>& re
     const auto result = select(maxFd + 1, &fds, nullptr, nullptr, &tv);
     if (result == SOCKET_ERROR)
     {
-        return "select failed"_a8;
+        return ReturnCode::Error("select failed");
     }
     if (FD_ISSET(nativeSocket, &fds))
     {
         return read(data, readData);
     }
-    return false;
+    return ReturnCode(false);
 }
 
 SC::SocketFlags::AddressFamily SC::SocketFlags::AddressFamilyFromInt(int value)
@@ -335,7 +335,7 @@ SC::ReturnCode SC::DNSResolver::resolve(StringView host, String& ipAddress)
     // Get address information
     if ((status = getaddrinfo(nullTerminated.bytesIncludingTerminator(), NULL, &hints, &res)) != 0)
     {
-        return "DNSResolver::resolve: getaddrinfo error"_a8;
+        return ReturnCode::Error("DNSResolver::resolve: getaddrinfo error");
     }
 
     // Loop through results and print IP addresses
@@ -362,5 +362,5 @@ SC::ReturnCode SC::DNSResolver::resolve(StringView host, String& ipAddress)
     }
 
     freeaddrinfo(res); // Free the linked list
-    return true;
+    return ReturnCode(true);
 }
