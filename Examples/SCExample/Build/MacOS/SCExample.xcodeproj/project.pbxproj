@@ -18,7 +18,7 @@
 		7B895A8B295B9F0E001E2406 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B895A8A295B9F0E001E2406 /* Cocoa.framework */; platformFilters = (macos, ); };
 		7B895A8E295B9F1F001E2406 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B23DC30295B9D7400002529 /* MetalKit.framework */; };
 		7B9F611E2995AC430011F4D4 /* PlatformApple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B9F61172995AC430011F4D4 /* PlatformApple.mm */; };
-		7B9F61412995AD5B0011F4D4 /* Memory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C90A62972F28C001D97A2 /* Memory.cpp */; };
+		7B9F61412995AD5B0011F4D4 /* Base.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C90A62972F28C001D97A2 /* Base.cpp */; };
 		7B9F61422995AD6E0011F4D4 /* PlatformApplication.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B9F611D2995AC430011F4D4 /* PlatformApplication.cpp */; };
 		7BA622D62972B83B002BEDD9 /* DependencyStb.c in Sources */ = {isa = PBXBuildFile; fileRef = 7BA622D52972B83B002BEDD9 /* DependencyStb.c */; };
 		7BA622DA2972BB2F002BEDD9 /* DependencySokol.m in Sources */ = {isa = PBXBuildFile; fileRef = 7BA622D92972BB2F002BEDD9 /* DependencySokol.m */; };
@@ -90,7 +90,7 @@
 		7B0C90A32972F28C001D97A2 /* MemoryTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MemoryTest.h; path = ../../../../Libraries/Foundation/MemoryTest.h; sourceTree = "<group>"; };
 		7B0C90A42972F28C001D97A2 /* SerializationBinarySkipper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationBinarySkipper.h; path = ../../../../Libraries/Serialization/SerializationBinarySkipper.h; sourceTree = "<group>"; };
 		7B0C90A52972F28C001D97A2 /* SmallVector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SmallVector.h; path = ../../../../Libraries/Foundation/SmallVector.h; sourceTree = "<group>"; };
-		7B0C90A62972F28C001D97A2 /* Memory.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Memory.cpp; path = ../../../../Libraries/Foundation/Memory.cpp; sourceTree = "<group>"; };
+		7B0C90A62972F28C001D97A2 /* Base.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Base.cpp; path = ../../../../Libraries/Foundation/Base.cpp; sourceTree = "<group>"; };
 		7B0C90A72972F28C001D97A2 /* Assert.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Assert.h; path = ../../../../Libraries/Foundation/Assert.h; sourceTree = "<group>"; };
 		7B0C90A82972F28C001D97A2 /* SerializationBinaryTypeErasedTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationBinaryTypeErasedTest.h; path = ../../../../Libraries/Serialization/SerializationBinaryTypeErasedTest.h; sourceTree = "<group>"; };
 		7B0C90A92972F28C001D97A2 /* Function.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Function.h; path = ../../../../Libraries/Foundation/Function.h; sourceTree = "<group>"; };
@@ -211,7 +211,7 @@
 				7B0C90A22972F28C001D97A2 /* Limits.h */,
 				7B0C90952972F28C001D97A2 /* Map.h */,
 				7B0C909A2972F28C001D97A2 /* MapTest.h */,
-				7B0C90A62972F28C001D97A2 /* Memory.cpp */,
+				7B0C90A62972F28C001D97A2 /* Base.cpp */,
 				7B0C90AB2972F28C001D97A2 /* Memory.h */,
 				7B0C90A32972F28C001D97A2 /* MemoryTest.h */,
 				7B14821529EDCED200477EF4 /* Opaque.h */,
@@ -446,7 +446,7 @@
 				7B9F61422995AD6E0011F4D4 /* PlatformApplication.cpp in Sources */,
 				7B9F611E2995AC430011F4D4 /* PlatformApple.mm in Sources */,
 				7BDDBF11296990B3004F4755 /* DependencyFreetype.c in Sources */,
-				7B9F61412995AD5B0011F4D4 /* Memory.cpp in Sources */,
+				7B9F61412995AD5B0011F4D4 /* Base.cpp in Sources */,
 				7B23DC28295B9C1800002529 /* SCExample.cpp in Sources */,
 				7B23DC2A295B9C3A00002529 /* DependencyImgui.cpp in Sources */,
 				7B80694A296AB65900473478 /* DependencyNanosvg.c in Sources */,

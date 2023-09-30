@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Language/Assert.h" //Assert::unreachable
-#include "../Language/Types.h"
+#include "../Base/Assert.h" //Assert::unreachable
+#include "../Base/Types.h"
 #include "../Objects/Span.h"
 
 namespace SC

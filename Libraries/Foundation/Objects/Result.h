@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Language/Assert.h"
-#include "../Language/Language.h"
+#include "../Base/Assert.h"
+#include "../Base/Language.h"
 #include "../Strings/StringView.h"
 
 namespace SC

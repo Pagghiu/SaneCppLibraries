@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Language/Assert.h"
+#include "../Base/Assert.h"
 
 namespace SC
 {

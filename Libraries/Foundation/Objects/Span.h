@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Language/InitializerList.h"
-#include "../Language/Language.h" // SameConstnessAs
+#include "../Base/InitializerList.h"
+#include "../Base/Language.h" // SameConstnessAs
 
 namespace SC
 {

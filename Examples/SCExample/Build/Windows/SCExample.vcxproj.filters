@@ -22,7 +22,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\SCExample.cpp">
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp">
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\Base.cpp">
       <Filter>Libraries</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\UserInterface\PlatformApplication.cpp">

@@ -3,8 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../../Testing/Test.h"
-#include "../Language/Assert.h"
-#include "../Language/Memory.h"
+#include "../Base/Assert.h"
+#include "../Base/Memory.h"
 
 namespace SC
 {

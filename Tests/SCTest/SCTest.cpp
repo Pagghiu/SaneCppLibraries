@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 
-#define SC_RUN_SPECIFIC_TEST 0
+#define SC_RUN_SPECIFIC_TEST 1
 
 #if SC_RUN_SPECIFIC_TEST
 
@@ -11,6 +11,7 @@ namespace SC
 struct TestReport;
 void runSpecificTests(TestReport& report)
 {
+    (void)report;
     // clang-format off
     // clang-format on
 }
@@ -22,6 +23,7 @@ void runSpecificTests(TestReport& report)
 #include "../../Libraries/Build/BuildTest.h"
 
 // Foundation
+#include "../../Libraries/Foundation/Base/MemoryTest.h"
 #include "../../Libraries/Foundation/Containers/ArenaMapTest.h"
 #include "../../Libraries/Foundation/Containers/ArrayTest.h"
 #include "../../Libraries/Foundation/Containers/IntrusiveDoubleLinkedListTest.h"
@@ -29,7 +31,6 @@ void runSpecificTests(TestReport& report)
 #include "../../Libraries/Foundation/Containers/SetTest.h"
 #include "../../Libraries/Foundation/Containers/SmallVectorTest.h"
 #include "../../Libraries/Foundation/Containers/VectorTest.h"
-#include "../../Libraries/Foundation/Language/MemoryTest.h"
 #include "../../Libraries/Foundation/Objects/FunctionTest.h"
 #include "../../Libraries/Foundation/Objects/OpaqueTest.h"
 #include "../../Libraries/Foundation/Objects/OptionalTest.h"

@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Language/Language.h"
+#include "../Base/Language.h"
 
 namespace SC
 {

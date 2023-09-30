@@ -3,8 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 
 #include "Console.h"
-#include "../Foundation/Language/Limits.h"
-#include "../Foundation/Language/Platform.h"
+#include "../Foundation/Base/Limits.h"
+#include "../Foundation/Base/Platform.h"
 #include "../Foundation/Strings/StringConverter.h"
 
 #include <stdio.h>  // stdout

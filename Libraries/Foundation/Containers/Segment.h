@@ -2,11 +2,11 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Language/Assert.h"
-#include "../Language/InitializerList.h"
-#include "../Language/Language.h"
-#include "../Language/Limits.h"
-#include "../Language/Types.h"
+#include "../Base/Assert.h"
+#include "../Base/InitializerList.h"
+#include "../Base/Language.h"
+#include "../Base/Limits.h"
+#include "../Base/Types.h"
 #include "../Objects/Span.h"
 
 namespace SC

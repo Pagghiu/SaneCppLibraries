@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include <time.h>
 
-#include "../Foundation/Language/Limits.h"
+#include "../Foundation/Base/Limits.h"
 #include "Time.h"
 
 #if SC_PLATFORM_WINDOWS

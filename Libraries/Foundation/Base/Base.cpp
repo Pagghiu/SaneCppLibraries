@@ -1,10 +1,10 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../Language/Memory.h"
-#include "../Language/Assert.h"
-#include "../Language/Language.h"
-#include "../Language/Limits.h"
+#include "../Base/Memory.h"
+#include "../Base/Assert.h"
+#include "../Base/Language.h"
+#include "../Base/Limits.h"
 
 // system includes
 #include <float.h>  // FLT_MAX / DBL_MAX

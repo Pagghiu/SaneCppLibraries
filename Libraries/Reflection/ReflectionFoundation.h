@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Language/Compiler.h"
+#include "../Foundation/Base/Compiler.h"
 namespace SC
 {
 namespace Reflection

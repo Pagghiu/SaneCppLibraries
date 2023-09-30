@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Language/Types.h"
+#include "../Base/Types.h"
 namespace SC
 {
 template <typename TagType, typename IDType = int32_t, IDType InvalidValue = -1>

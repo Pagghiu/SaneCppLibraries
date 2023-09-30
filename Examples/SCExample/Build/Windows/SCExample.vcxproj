@@ -230,7 +230,7 @@
     <ClCompile Include="..\..\..\..\Dependencies\sokol\DependencySokol.c" />
     <ClCompile Include="..\..\..\..\Dependencies\stb\DependencyStb.c" />
     <ClCompile Include="..\..\..\..\Libraries\UserInterface\PlatformApplication.cpp" />
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Memory.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\Base.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\UserInterface\PlatformWindows.cpp" />
     <ClCompile Include="..\..\SCExample.cpp" />
   </ItemGroup>

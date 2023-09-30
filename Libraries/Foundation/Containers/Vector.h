@@ -2,10 +2,10 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Language/Assert.h"
-#include "../Language/Limits.h"
-#include "../Language/Memory.h"
-#include "../Language/Types.h"
+#include "../Base/Assert.h"
+#include "../Base/Limits.h"
+#include "../Base/Memory.h"
+#include "../Base/Types.h"
 #include "../Objects/Result.h"
 #include "Segment.h"
 

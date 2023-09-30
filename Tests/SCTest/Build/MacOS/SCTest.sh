@@ -50,7 +50,7 @@ Libraries/FileSystem/FileSystem.cpp               \
 Libraries/FileSystem/FileSystemWalker.cpp         \
 Libraries/FileSystem/FileSystemWatcher.cpp        \
 Libraries/FileSystem/Path.cpp                     \
-Libraries/Foundation/Language/Memory.cpp          \
+Libraries/Foundation/Base/Base.cpp                \
 Libraries/Foundation/Strings/String.cpp           \
 Libraries/Foundation/Strings/StringBuilder.cpp    \
 Libraries/Foundation/Strings/StringConverter.cpp  \

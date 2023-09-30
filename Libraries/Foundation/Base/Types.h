@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Language/Compiler.h"
-#include "../Language/Platform.h"
+#include "../Base/Compiler.h"
+#include "../Base/Platform.h"
 namespace SC
 {
 #if SC_PLATFORM_WINDOWS

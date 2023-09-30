@@ -64,11 +64,11 @@
     <Filter Include="Foundation\Objects">
       <UniqueIdentifier>{c28f6091-c046-4251-b46a-b10957046f9f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Foundation\Language">
-      <UniqueIdentifier>{abccab4e-d1a7-41d3-a424-5f27375a06db}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Foundation\Strings">
       <UniqueIdentifier>{80ff5903-3b21-4c71-afe8-7c515c7e1976}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Foundation\Base">
+      <UniqueIdentifier>{abccab4e-d1a7-41d3-a424-5f27375a06db}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -146,8 +146,8 @@
     <ClCompile Include="..\..\..\..\Libraries\Http\HttpServer.cpp">
       <Filter>Http</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Language\Memory.cpp">
-      <Filter>Foundation\Language</Filter>
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\Base\Base.cpp">
+      <Filter>Foundation\Base</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\String.cpp">
       <Filter>Foundation\Strings</Filter>
@@ -433,35 +433,35 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\VectorTest.h">
       <Filter>Foundation\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Assert.h">
-      <Filter>Foundation\Language</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Assert.h">
+      <Filter>Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Compiler.h">
-      <Filter>Foundation\Language</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Compiler.h">
+      <Filter>Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\InitializerList.h">
-      <Filter>Foundation\Language</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\InitializerList.h">
+      <Filter>Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Language.h">
-      <Filter>Foundation\Language</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Language.h">
+      <Filter>Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\LibC.h">
-      <Filter>Foundation\Language</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\LibC.h">
+      <Filter>Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Limits.h">
-      <Filter>Foundation\Language</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Limits.h">
+      <Filter>Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Memory.h">
-      <Filter>Foundation\Language</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Memory.h">
+      <Filter>Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\MemoryTest.h">
-      <Filter>Foundation\Language</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\MemoryTest.h">
+      <Filter>Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Platform.h">
-      <Filter>Foundation\Language</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Platform.h">
+      <Filter>Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Types.h">
-      <Filter>Foundation\Language</Filter>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Types.h">
+      <Filter>Foundation\Base</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\Function.h">
       <Filter>Foundation\Objects</Filter>

@@ -2,10 +2,10 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Language/Assert.h"
-#include "../Language/Language.h" // RemoveReference
-#include "../Language/LibC.h"     // memset
-#include "../Language/Types.h"
+#include "../Base/Assert.h"
+#include "../Base/Language.h" // RemoveReference
+#include "../Base/LibC.h"     // memset
+#include "../Base/Types.h"
 
 namespace SC
 {

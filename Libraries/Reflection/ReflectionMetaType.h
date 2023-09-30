@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Language/Language.h"
-#include "../Foundation/Language/Types.h"
+#include "../Foundation/Base/Language.h"
+#include "../Foundation/Base/Types.h"
 
 namespace SC
 {

@@ -2,10 +2,10 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Language/Compiler.h" // SC_BREAK_DEBUGGER
-#include "../Language/Language.h" // SC_UNLIKELY
-#include "../Language/LibC.h"     // exit
-#include "../Language/Platform.h" // SC_DEBUG
+#include "../Base/Compiler.h" // SC_BREAK_DEBUGGER
+#include "../Base/Language.h" // SC_UNLIKELY
+#include "../Base/LibC.h"     // exit
+#include "../Base/Platform.h" // SC_DEBUG
 
 namespace SC
 {

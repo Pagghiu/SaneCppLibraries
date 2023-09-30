@@ -17,7 +17,7 @@
 		7B319D2F2AB750C900F7E761 /* StringBuilder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B319CF92AB750C900F7E761 /* StringBuilder.cpp */; };
 		7B319D302AB750C900F7E761 /* StringView.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B319CFE2AB750C900F7E761 /* StringView.cpp */; };
 		7B319D312AB750C900F7E761 /* StringConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B319CFF2AB750C900F7E761 /* StringConverter.cpp */; };
-		7B319D322AB750C900F7E761 /* Memory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B319D122AB750C900F7E761 /* Memory.cpp */; };
+		7B319D322AB750C900F7E761 /* Base.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B319D122AB750C900F7E761 /* Base.cpp */; };
 		7B358DDE29D88FFC002A7D1C /* FileSystemWatcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B358DDC29D88E93002A7D1C /* FileSystemWatcher.cpp */; };
 		7B358DE029D8F063002A7D1C /* CoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B358DDF29D8F063002A7D1C /* CoreServices.framework */; };
 		7B3AAB732A27E0CE00F814A2 /* Serialization.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B3AAB722A27E06F00F814A2 /* Serialization.cpp */; };
@@ -123,7 +123,7 @@
 		7B319D0E2AB750C900F7E761 /* OptionalTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OptionalTest.h; sourceTree = "<group>"; };
 		7B319D0F2AB750C900F7E761 /* FunctionTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FunctionTest.h; sourceTree = "<group>"; };
 		7B319D102AB750C900F7E761 /* Function.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Function.h; sourceTree = "<group>"; };
-		7B319D122AB750C900F7E761 /* Memory.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Memory.cpp; sourceTree = "<group>"; };
+		7B319D122AB750C900F7E761 /* Base.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Base.cpp; sourceTree = "<group>"; };
 		7B319D132AB750C900F7E761 /* Compiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Compiler.h; sourceTree = "<group>"; };
 		7B319D142AB750C900F7E761 /* Types.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Types.h; sourceTree = "<group>"; };
 		7B319D152AB750C900F7E761 /* Limits.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Limits.h; sourceTree = "<group>"; };
@@ -414,23 +414,23 @@
 			path = ../../../../Libraries/Foundation/Objects;
 			sourceTree = "<group>";
 		};
-		7B319D112AB750C900F7E761 /* Language */ = {
+		7B319D112AB750C900F7E761 /* Base */ = {
 			isa = PBXGroup;
 			children = (
 				7B319D1B2AB750C900F7E761 /* Assert.h */,
+				7B319D122AB750C900F7E761 /* Base.cpp */,
 				7B319D132AB750C900F7E761 /* Compiler.h */,
 				7B319D172AB750C900F7E761 /* InitializerList.h */,
 				7B319D162AB750C900F7E761 /* Language.h */,
 				7B319D1A2AB750C900F7E761 /* LibC.h */,
 				7B319D152AB750C900F7E761 /* Limits.h */,
-				7B319D122AB750C900F7E761 /* Memory.cpp */,
 				7B319D192AB750C900F7E761 /* Memory.h */,
 				7B319D182AB750C900F7E761 /* MemoryTest.h */,
 				7B319D1C2AB750C900F7E761 /* Platform.h */,
 				7B319D142AB750C900F7E761 /* Types.h */,
 			);
-			name = Language;
-			path = ../../../../Libraries/Foundation/Language;
+			name = Base;
+			path = ../../../../Libraries/Foundation/Base;
 			sourceTree = "<group>";
 		};
 		7B319D1D2AB750C900F7E761 /* Containers */ = {
@@ -473,7 +473,7 @@
 			children = (
 				7B319CEF2AB750C900F7E761 /* Algorithms */,
 				7B319D1D2AB750C900F7E761 /* Containers */,
-				7B319D112AB750C900F7E761 /* Language */,
+				7B319D112AB750C900F7E761 /* Base */,
 				7B319D022AB750C900F7E761 /* Objects */,
 				7B319CF22AB750C900F7E761 /* Strings */,
 			);
@@ -820,7 +820,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7B319D322AB750C900F7E761 /* Memory.cpp in Sources */,
+				7B319D322AB750C900F7E761 /* Base.cpp in Sources */,
 				7B0C299D297CA7CC0071C5B4 /* FileSystem.cpp in Sources */,
 				7B84796D2ABF48700052020A /* HttpURLParser.cpp in Sources */,
 				7B319D2D2AB750C900F7E761 /* StringFormat.cpp in Sources */,
