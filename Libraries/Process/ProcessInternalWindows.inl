@@ -97,7 +97,7 @@ SC::ReturnCode SC::Process::launch(ProcessOptions options)
     }
     CloseHandle(processInfo.hThread);
 
-    SC_TRY_ASSIGN(processID.pid, processInfo.dwProcessId, "processInfo.dwProcessId exceeds processID.pid"_a8);
+    processID.pid = processInfo.dwProcessId;
     SC_TRY(handle.assign(processInfo.hProcess));
     SC_TRY(standardInput.close());
     SC_TRY(standardOutput.close());

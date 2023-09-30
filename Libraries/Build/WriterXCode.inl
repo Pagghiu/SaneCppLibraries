@@ -489,7 +489,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                        MACOSX_DEPLOYMENT_TARGET = 13.0;
                        MTL_ENABLE_DEBUG_INFO = NO;
                        MTL_FAST_MATH = YES;
-                       DEAD_CODE_STRIPPING = YES;
+                       DEAD_CODE_STRIPPING = NO;
                        SDKROOT = macosx;)delimiter");
     }
 

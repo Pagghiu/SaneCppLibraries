@@ -113,7 +113,6 @@
 		7B319D042AB750C900F7E761 /* UniquePtr.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = UniquePtr.h; sourceTree = "<group>"; };
 		7B319D052AB750C900F7E761 /* OpaqueTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OpaqueTest.h; sourceTree = "<group>"; };
 		7B319D062AB750C900F7E761 /* Result.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Result.h; sourceTree = "<group>"; };
-		7B319D072AB750C900F7E761 /* ResultTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ResultTest.h; sourceTree = "<group>"; };
 		7B319D082AB750C900F7E761 /* Optional.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Optional.h; sourceTree = "<group>"; };
 		7B319D092AB750C900F7E761 /* Opaque.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Opaque.h; sourceTree = "<group>"; };
 		7B319D0A2AB750C900F7E761 /* TaggedUnion.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TaggedUnion.h; sourceTree = "<group>"; };
@@ -402,7 +401,6 @@
 				7B319D082AB750C900F7E761 /* Optional.h */,
 				7B319D0E2AB750C900F7E761 /* OptionalTest.h */,
 				7B319D062AB750C900F7E761 /* Result.h */,
-				7B319D072AB750C900F7E761 /* ResultTest.h */,
 				7B319D0D2AB750C900F7E761 /* Span.h */,
 				7B319D0C2AB750C900F7E761 /* StrongID.h */,
 				7B319D0A2AB750C900F7E761 /* TaggedUnion.h */,
@@ -472,8 +470,8 @@
 			isa = PBXGroup;
 			children = (
 				7B319CEF2AB750C900F7E761 /* Algorithms */,
-				7B319D1D2AB750C900F7E761 /* Containers */,
 				7B319D112AB750C900F7E761 /* Base */,
+				7B319D1D2AB750C900F7E761 /* Containers */,
 				7B319D022AB750C900F7E761 /* Objects */,
 				7B319CF22AB750C900F7E761 /* Strings */,
 			);
@@ -918,7 +916,6 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				MARKETING_VERSION = 1.0;
@@ -933,7 +930,6 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				MARKETING_VERSION = 1.0;
@@ -984,7 +980,6 @@
 				CLANG_WARN__EXIT_TIME_DESTRUCTORS = YES;
 				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/../../../../_Build/Output/macOS-13-arm64_x86_64-Xcode-$(CONFIGURATION)";
 				COPY_PHASE_STRIP = NO;
-				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_DYNAMIC_NO_PIC = NO;
@@ -1066,7 +1061,6 @@
 				CLANG_WARN__EXIT_TIME_DESTRUCTORS = YES;
 				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/../../../../_Build/Output/macOS-13-arm64_x86_64-Xcode-$(CONFIGURATION)";
 				COPY_PHASE_STRIP = YES;
-				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

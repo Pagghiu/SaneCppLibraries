@@ -3,7 +3,6 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/Objects/Opaque.h"
-#include "../Foundation/Objects/Optional.h"
 #include "../Foundation/Objects/Result.h"
 
 namespace SC
@@ -92,7 +91,7 @@ struct SC::FileDescriptor : public SC::UniqueTaggedHandleTraits<SC::FileDescript
         bool   isEOF        = false;
     };
 
-    [[nodiscard]] Result<ReadResult> readAppend(Vector<char>& output, Span<char> fallbackBuffer);
+    [[nodiscard]] ReturnCode readAppend(Vector<char>& output, Span<char> fallbackBuffer, ReadResult& result);
 
   private:
     struct Internal;

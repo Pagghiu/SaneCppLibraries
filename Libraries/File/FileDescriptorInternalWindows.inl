@@ -120,8 +120,7 @@ struct SC::FileDescriptor::Internal
     }
 };
 
-SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector<char>& output,
-                                                                          Span<char>    fallbackBuffer)
+SC::ReturnCode SC::FileDescriptor::readAppend(Vector<char>& output, Span<char> fallbackBuffer, ReadResult& result)
 {
     FileDescriptor::Handle fileDescriptor;
     SC_TRY(get(fileDescriptor, "FileDescriptor::readAppend - Invalid Handle"_a8));
@@ -160,12 +159,14 @@ SC::Result<SC::FileDescriptor::ReadResult> SC::FileDescriptor::readAppend(Vector
                 output.appendCopy(fallbackBuffer.data(), static_cast<size_t>(numReadBytes)),
                 "FileDescriptor::readAppend - appendCopy failed. Bytes have been read from stream and will get lost"_a8);
         }
-        return ReadResult{static_cast<size_t>(numReadBytes), false};
+        result = ReadResult{static_cast<size_t>(numReadBytes), false};
+        return true;
     }
     else
     {
         // EOF
-        return ReadResult{0, true};
+        result = ReadResult{0, true};
+        return true;
     }
 }
 

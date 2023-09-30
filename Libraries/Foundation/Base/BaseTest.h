@@ -40,6 +40,5 @@ struct SC::BaseTest : public SC::TestCase
             frames                = Assert::captureBacktrace(2, nullptr, maxVal * sizeof(void*), &hash);
             SC_TEST_EXPECT(frames == 0);
         }
-        
     }
 };

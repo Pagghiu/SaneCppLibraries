@@ -3,9 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../../Foundation/Algorithms/AlgorithmMinMax.h"
-#include "../../Foundation/Base/Language.h"
-#include "../../Foundation/Base/Types.h"
 #include "../../Foundation/Objects/TypeList.h"
+
 namespace SC
 {
 template <typename Tag>

@@ -15,11 +15,11 @@ class initializer_list
     constexpr initializer_list(const _Ep* __b, size_t __s) noexcept : __begin_(__b), __size_(__s) {}
 
   public:
-    typedef _Ep    value_type;
-    typedef size_t size_type;
+    using value_type = _Ep;
+    using size_type  = size_t;
 
-    typedef const _Ep* iterator;
-    typedef const _Ep* const_iterator;
+    using iterator       = const _Ep*;
+    using const_iterator = const _Ep*;
 
     constexpr initializer_list() noexcept : __begin_(nullptr), __size_(0) {}
     constexpr initializer_list(const _Ep* _First_arg, const _Ep* _Last_arg) noexcept

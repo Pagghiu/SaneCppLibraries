@@ -15,7 +15,7 @@
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #include <BaseTsd.h>
 #include <stdint.h>
-typedef SSIZE_T ssize_t;
+using ssize_t = SSIZE_T;
 #endif
 
 #if SC_PLATFORM_EMSCRIPTEN

@@ -8,28 +8,28 @@ namespace SC
 {
 // clang-format off
 template <bool B, class T = void> struct EnableIf {};
-template <class T> struct EnableIf<true, T> { typedef T type; };
+template <class T> struct EnableIf<true, T> { using type = T; };
 template <bool B, class T = void> using EnableIfT = typename EnableIf<B, T>::type;
 
 template <typename T, typename U>   struct IsSame       { static constexpr bool value = false; };
 template <typename T>               struct IsSame<T, T> { static constexpr bool value = true;  };
 
-template <class T> struct RemoveReference       { typedef T type; };
-template <class T> struct RemoveReference<T&>   { typedef T type; };
-template <class T> struct RemoveReference<T&&>  { typedef T type; };
+template <class T> struct RemoveReference       { using type = T; };
+template <class T> struct RemoveReference<T&>   { using type = T; };
+template <class T> struct RemoveReference<T&&>  { using type = T; };
 
-template <class T> struct RemovePointer       { typedef T type; };
-template <class T> struct RemovePointer<T*>   { typedef T type; };
-template <class T> struct RemovePointer<T**>  { typedef T type; };
+template <class T> struct RemovePointer       { using type = T; };
+template <class T> struct RemovePointer<T*>   { using type = T; };
+template <class T> struct RemovePointer<T**>  { using type = T; };
 
-template <class T> struct AddReference      { typedef T& type; };
-template <class T> struct AddReference<T&>  { typedef T  type; };
-template <class T> struct AddReference<T&&> { typedef T  type; };
+template <class T> struct AddReference      { using type = T&; };
+template <class T> struct AddReference<T&>  { using type = T ; };
+template <class T> struct AddReference<T&&> { using type = T ; };
 
 template <class T> struct AddPointer      { using type = typename RemoveReference<T>::type*; };
 
-template <class T> struct RemoveConst           { typedef T type;};
-template <class T> struct RemoveConst<const T>  { typedef T type; };
+template <class T> struct RemoveConst           { using type = T;};
+template <class T> struct RemoveConst<const T>  { using type = T; };
 
 template <typename T> struct ReturnType;
 template <typename R, typename... Args> struct ReturnType<R(Args...)> { using type = R; };
@@ -51,8 +51,8 @@ struct IntegralConstant
 using true_type  = IntegralConstant<bool, true>;
 using false_type = IntegralConstant<bool, false>;
 
-template <typename T> struct IsConst            : public false_type { typedef T type; };
-template <typename T> struct IsConst<const T>   : public true_type  { typedef T type; };
+template <typename T> struct IsConst            : public false_type { using type = T; };
+template <typename T> struct IsConst<const T>   : public true_type  { using type = T; };
 
 template <typename T> struct IsTriviallyCopyable  : public IntegralConstant<bool, __is_trivially_copyable(T)> { };
 

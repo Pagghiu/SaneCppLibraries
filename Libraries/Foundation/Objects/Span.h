@@ -11,9 +11,13 @@ template <typename Type>
 struct SpanVoid;
 
 template <typename Type>
-struct Span
+struct Span;
+} // namespace SC
+
+template <typename Type>
+struct SC::Span
 {
-    typedef SC::size_t Size;
+    using Size = size_t;
 
     constexpr Span() : items(nullptr), sizeBytes(0) {}
     constexpr Span(Type* items, Size sizeInBytes) : items(items), sizeBytes(sizeInBytes) {}
@@ -71,7 +75,7 @@ struct Span
 };
 
 template <typename Type>
-struct SpanVoid
+struct SC::SpanVoid
 {
     typedef typename SameConstnessAs<Type, uint8_t>::type ByteType;
 
@@ -106,5 +110,3 @@ struct SpanVoid
     Type* items;
     Size  size;
 };
-
-} // namespace SC

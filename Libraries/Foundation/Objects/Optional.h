@@ -17,7 +17,7 @@ template <typename Value>
 struct [[nodiscard]] SC::Optional
 {
     // We cannot have a reference in union, so we use ReferenceWrapper
-    typedef typename Conditional<IsReference<Value>::value, ReferenceWrapper<Value>, Value>::type ValueType;
+    using ValueType = typename Conditional<IsReference<Value>::value, ReferenceWrapper<Value>, Value>::type;
 
   private:
     union

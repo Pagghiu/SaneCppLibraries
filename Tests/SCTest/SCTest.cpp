@@ -34,7 +34,6 @@ void runSpecificTests(TestReport& report)
 #include "../../Libraries/Foundation/Objects/FunctionTest.h"
 #include "../../Libraries/Foundation/Objects/OpaqueTest.h"
 #include "../../Libraries/Foundation/Objects/OptionalTest.h"
-#include "../../Libraries/Foundation/Objects/ResultTest.h"
 #include "../../Libraries/Foundation/Objects/TaggedUnionTest.h"
 #include "../../Libraries/Foundation/Strings/StringConverterTest.h"
 #include "../../Libraries/Foundation/Strings/StringFormatTest.h"
@@ -142,7 +141,6 @@ int main(int argc, const char* argv[])
     { MapTest                       test(report); }
     { OpaqueTest                    test(report); }
     { OptionalTest                  test(report); }
-    { ResultTest                    test(report); }
     { SetTest                       test(report); }
     { SmallVectorTest               test(report); }
     { StringConverterTest           test(report); }

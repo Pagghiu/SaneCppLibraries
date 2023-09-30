@@ -68,11 +68,12 @@ struct SC::JsonTokenizerTest : public SC::TestCase
         SC_TRY(token.type == JsonTokenizer::Token::ObjectEnd);
         return true;
     }
+
     [[nodiscard]] static constexpr JsonTokenizer::Token scanToken(StringView text)
     {
         auto                 it = text.getIterator<It>();
         JsonTokenizer::Token token;
-        SC_TRUST_RESULT(JsonTokenizer::scanToken(it, token));
+        (void)JsonTokenizer::scanToken(it, token);
         return token;
     }
 

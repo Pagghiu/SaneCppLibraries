@@ -2,10 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Base/Assert.h"
 #include "../Base/Language.h" // RemoveReference
-#include "../Base/LibC.h"     // memset
-#include "../Base/Types.h"
 
 namespace SC
 {
@@ -65,7 +62,7 @@ struct SC::Function<R(Args...)>
         bind(forward<typename RemoveReference<Lambda>::type>(lambda));
     }
 
-    typedef R (*FreeFunction)(Args...);
+    using FreeFunction = R (*)(Args...);
 
     ~Function() { sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr); }
 

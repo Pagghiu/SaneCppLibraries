@@ -484,9 +484,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\Result.h">
       <Filter>Foundation\Objects</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\ResultTest.h">
-      <Filter>Foundation\Objects</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\Span.h">
       <Filter>Foundation\Objects</Filter>
     </ClInclude>
@@ -544,6 +541,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Http\HttpURLParserTest.h">
       <Filter>Http</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\SCConfig.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalPosix.inl">

@@ -26,7 +26,7 @@ SC::ReturnCode SC::FileDescriptor::readUntilEOF(Vector<char>& destination)
     ReadResult readResult;
     while (not readResult.isEOF)
     {
-        SC_TRY_UNWRAP(readResult, readAppend(destination, {buffer, sizeof(buffer)}));
+        SC_TRY(readAppend(destination, {buffer, sizeof(buffer)}, readResult));
     }
     return true;
 }

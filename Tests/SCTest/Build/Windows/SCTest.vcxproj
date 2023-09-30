@@ -403,7 +403,6 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\Optional.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\OptionalTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\Result.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\ResultTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\Span.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\StrongID.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\TaggedUnion.h" />
