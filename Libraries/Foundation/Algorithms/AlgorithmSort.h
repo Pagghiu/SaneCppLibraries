@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Base/Language.h" // RemovePointer
+#include "../Base/Compiler.h" // RemovePointer
 
 namespace SC
 {

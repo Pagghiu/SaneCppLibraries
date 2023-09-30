@@ -82,7 +82,7 @@
 		7B0C90972972F28C001D97A2 /* SerializationBinaryTypeErasedCompiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationBinaryTypeErasedCompiler.h; path = ../../../../Libraries/Serialization/SerializationBinaryTypeErasedCompiler.h; sourceTree = "<group>"; };
 		7B0C90992972F28C001D97A2 /* SerializationBinaryTestSuite.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationBinaryTestSuite.h; path = ../../../../Libraries/Serialization/SerializationBinaryTestSuite.h; sourceTree = "<group>"; };
 		7B0C909A2972F28C001D97A2 /* MapTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MapTest.h; path = ../../../../Libraries/Foundation/MapTest.h; sourceTree = "<group>"; };
-		7B0C909B2972F28C001D97A2 /* Language.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Language.h; path = ../../../../Libraries/Foundation/Language.h; sourceTree = "<group>"; };
+		7B0C909B2972F28C001D97A2 /* Compiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Compiler.h; path = ../../../../Libraries/Foundation/Compiler.h; sourceTree = "<group>"; };
 		7B0C909C2972F28C001D97A2 /* StringIterator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StringIterator.h; path = ../../../../Libraries/Foundation/StringIterator.h; sourceTree = "<group>"; };
 		7B0C909D2972F28C001D97A2 /* ReflectionClassInfo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionClassInfo.h; path = ../../../../Libraries/Reflection/ReflectionClassInfo.h; sourceTree = "<group>"; };
 		7B0C90A02972F28C001D97A2 /* ResultTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ResultTest.h; path = ../../../../Libraries/Foundation/ResultTest.h; sourceTree = "<group>"; };
@@ -206,7 +206,7 @@
 				7B0C908D2972F28C001D97A2 /* InitializerList.h */,
 				7B14821C29EDCED200477EF4 /* IntrusiveDoubleLinkedList.h */,
 				7B14821D29EDCED200477EF4 /* IntrusiveDoubleLinkedListTest.h */,
-				7B0C909B2972F28C001D97A2 /* Language.h */,
+				7B0C909B2972F28C001D97A2 /* Compiler.h */,
 				7B0C90802972F28C001D97A2 /* LibC.h */,
 				7B0C90A22972F28C001D97A2 /* Limits.h */,
 				7B0C90952972F28C001D97A2 /* Map.h */,

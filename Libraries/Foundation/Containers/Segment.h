@@ -4,9 +4,9 @@
 #pragma once
 #include "../Base/Assert.h"
 #include "../Base/InitializerList.h"
-#include "../Base/Language.h"
 #include "../Base/Limits.h"
 #include "../Base/Types.h"
+#include "../Objects/MetaProgramming.h" // EnableIf, IsTriviallyCoypable
 #include "../Objects/Span.h"
 
 namespace SC

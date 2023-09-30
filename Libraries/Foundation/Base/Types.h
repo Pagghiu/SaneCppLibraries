@@ -48,3 +48,17 @@ using ssize_t = signed long;
 #endif
 #endif
 } // namespace SC
+
+// clang-format off
+namespace SC
+{
+template <typename T, size_t N> constexpr size_t SizeOfArray(const T (&)[N]) { return N; }
+struct PlacementNew {};
+} // namespace SC
+#if SC_COMPILER_MSVC
+inline void* operator new(size_t, void* p, SC::PlacementNew) noexcept { return p; }
+inline void  operator delete(void*, SC::PlacementNew) noexcept {}
+#else
+inline void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { return p; }
+#endif
+// clang-format on

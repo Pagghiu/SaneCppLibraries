@@ -389,7 +389,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Assert.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Compiler.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\InitializerList.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Language.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\MetaProgramming.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\LibC.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Limits.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Memory.h" />

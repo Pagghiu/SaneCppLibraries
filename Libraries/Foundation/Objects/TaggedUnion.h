@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../../Foundation/Algorithms/AlgorithmMinMax.h"
-#include "../../Foundation/Objects/TypeList.h"
+#include "../Algorithms/AlgorithmMinMax.h"
+#include "../Objects/TypeList.h"
 
 namespace SC
 {

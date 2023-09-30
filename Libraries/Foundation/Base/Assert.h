@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Base/Compiler.h" // SC_COMPILER_DEBUG_BREAK
-#include "../Base/Language.h" // SC_LANGUAGE_UNLIKELY
+#include "../Base/Compiler.h" // SC_LANGUAGE_UNLIKELY
 #include "../Base/LibC.h"     // exit
 #include "../Base/Platform.h" // SC_CONFIGURATION_DEBUG
 

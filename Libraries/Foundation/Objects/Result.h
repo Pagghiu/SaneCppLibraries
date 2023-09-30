@@ -21,6 +21,28 @@ struct [[nodiscard]] ReturnCode
          operator bool() const { return message.isEmpty(); }
     bool isError() const { return not message.isEmpty(); }
 };
+template <typename F>
+struct Deferred
+{
+    Deferred(F&& f) : f(forward<F>(f)) {}
+    ~Deferred()
+    {
+        if (armed)
+            f();
+    }
+    void disarm() { armed = false; }
+
+  private:
+    F    f;
+    bool armed = true;
+};
+
+template <typename F>
+Deferred<F> MakeDeferred(F&& f)
+{
+    return Deferred<F>(forward<F>(f));
+}
+
 } // namespace SC
 
 #define SC_TRY(expression)                                                                                             \

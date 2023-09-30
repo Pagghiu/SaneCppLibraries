@@ -442,7 +442,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\InitializerList.h">
       <Filter>Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Language.h">
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Compiler.h">
       <Filter>Foundation\Base</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\LibC.h">
@@ -542,6 +542,9 @@
       <Filter>Http</Filter>
     </ClInclude>
     <ClInclude Include="..\..\SCConfig.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\MetaProgramming.h">
+      <Filter>Foundation\Objects</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalPosix.inl">

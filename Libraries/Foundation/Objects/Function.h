@@ -2,7 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Base/Language.h" // RemoveReference
+#include "../Base/LibC.h"               // memset
+#include "../Objects/MetaProgramming.h" // RemoveReference, AddPointer, IsSame
 
 namespace SC
 {

@@ -119,7 +119,7 @@
 		7B9F615C2995AE0F0011F4D4 /* System.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = System.h; path = ../../../../Libraries/System/System.h; sourceTree = "<group>"; };
 		7B9F615E2995AE0F0011F4D4 /* StringConverter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StringConverter.h; path = ../../../../Libraries/Foundation/StringConverter.h; sourceTree = "<group>"; };
 		7B9F615F2995AE0F0011F4D4 /* StringView.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = StringView.cpp; path = ../../../../Libraries/Foundation/StringView.cpp; sourceTree = "<group>"; };
-		7B9F61602995AE0F0011F4D4 /* Language.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Language.h; path = ../../../../Libraries/Foundation/Language.h; sourceTree = "<group>"; };
+		7B9F61602995AE0F0011F4D4 /* Compiler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Compiler.h; path = ../../../../Libraries/Foundation/Compiler.h; sourceTree = "<group>"; };
 		7B9F61612995AE0F0011F4D4 /* SmallVector.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SmallVector.h; path = ../../../../Libraries/Foundation/SmallVector.h; sourceTree = "<group>"; };
 		7B9F61622995AE0F0011F4D4 /* Memory.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Memory.h; path = ../../../../Libraries/Foundation/Memory.h; sourceTree = "<group>"; };
 		7B9F61632995AE0F0011F4D4 /* LibC.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = LibC.h; path = ../../../../Libraries/Foundation/LibC.h; sourceTree = "<group>"; };
@@ -254,7 +254,7 @@
 				7B9F61552995AE0F0011F4D4 /* InitializerList.h */,
 				7B14822629EDCF3400477EF4 /* IntrusiveDoubleLinkedList.h */,
 				7B14822229EDCF3400477EF4 /* IntrusiveDoubleLinkedListTest.h */,
-				7B9F61602995AE0F0011F4D4 /* Language.h */,
+				7B9F61602995AE0F0011F4D4 /* Compiler.h */,
 				7B9F61632995AE0F0011F4D4 /* LibC.h */,
 				7B9F614C2995AE0F0011F4D4 /* Limits.h */,
 				7B9F61792995AE100011F4D4 /* Map.h */,
