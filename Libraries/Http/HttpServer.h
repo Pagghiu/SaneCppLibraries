@@ -89,7 +89,6 @@ struct SC::HttpServerAsync : public HttpServer
     ArenaMap<RequestClient> requestClients;
     SocketDescriptor        serverSocket;
 
-    uint32_t          maxHeaderSize = 8 * 1024;
     AsyncSocketAccept asyncAccept;
 
     void onNewClient(AsyncSocketAccept::Result& result);

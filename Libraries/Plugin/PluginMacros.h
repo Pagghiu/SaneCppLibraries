@@ -19,24 +19,24 @@
 #define SC_PLUGIN_LINKER_OPERATORS                                                                                     \
     void* operator new(SC::size_t len)                                                                                 \
     {                                                                                                                  \
-        return SC::memoryAllocate(len);                                                                                \
+        return SC::Memory::allocate(len);                                                                              \
     }                                                                                                                  \
     void* operator new[](SC::size_t len)                                                                               \
     {                                                                                                                  \
-        return SC::memoryAllocate(len);                                                                                \
+        return SC::Memory::allocate(len);                                                                              \
     }                                                                                                                  \
     void operator delete(void* p, SC::uint64_t) noexcept                                                               \
     {                                                                                                                  \
         if (p != 0)                                                                                                    \
         {                                                                                                              \
-            SC::memoryRelease(p);                                                                                      \
+            SC::Memory::release(p);                                                                                    \
         }                                                                                                              \
     }                                                                                                                  \
     void operator delete(void* p) noexcept                                                                             \
     {                                                                                                                  \
         if (p != 0)                                                                                                    \
         {                                                                                                              \
-            SC::memoryRelease(p);                                                                                      \
+            SC::Memory::release(p);                                                                                    \
         }                                                                                                              \
     }
 

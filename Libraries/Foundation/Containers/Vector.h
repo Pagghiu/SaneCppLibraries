@@ -28,7 +28,7 @@ struct SC_EXPORT_SYMBOL SC::VectorAllocator
         SegmentHeader* newHeader;
         if (oldHeader->options.isSmallVector)
         {
-            newHeader = static_cast<SegmentHeader*>(memoryAllocate(sizeof(SegmentHeader) + newSize));
+            newHeader = static_cast<SegmentHeader*>(Memory::allocate(sizeof(SegmentHeader) + newSize));
             memcpy(newHeader, oldHeader,
                    sizeof(SegmentHeader) + min(newSize, static_cast<decltype(newSize)>(oldHeader->sizeBytes)));
             newHeader->initDefaults();
@@ -37,7 +37,7 @@ struct SC_EXPORT_SYMBOL SC::VectorAllocator
         }
         else
         {
-            newHeader = static_cast<SegmentHeader*>(memoryReallocate(oldHeader, sizeof(SegmentHeader) + newSize));
+            newHeader = static_cast<SegmentHeader*>(Memory::reallocate(oldHeader, sizeof(SegmentHeader) + newSize));
         }
         if (newHeader)
         {
@@ -73,7 +73,7 @@ struct SC_EXPORT_SYMBOL SC::VectorAllocator
                 }
             }
         }
-        SegmentHeader* newHeader = static_cast<SegmentHeader*>(memoryAllocate(sizeof(SegmentHeader) + numNewBytes));
+        SegmentHeader* newHeader = static_cast<SegmentHeader*>(Memory::allocate(sizeof(SegmentHeader) + numNewBytes));
         if (newHeader)
         {
             newHeader->capacityBytes = static_cast<SegmentHeader::HeaderBytesType>(numNewBytes);
@@ -90,7 +90,7 @@ struct SC_EXPORT_SYMBOL SC::VectorAllocator
     {
         if (not oldHeader->options.isSmallVector)
         {
-            memoryRelease(oldHeader);
+            Memory::release(oldHeader);
         }
         else
         {

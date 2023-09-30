@@ -103,7 +103,7 @@ SC::ReturnCode SC::Process::spawn(Lambda&& lambda)
         return true;
     }
     // The exit(127) inside isChild makes this unreachable
-    SC_UNREACHABLE();
+    Assert::unreachable();
 }
 
 SC::ReturnCode SC::Process::launch(ProcessOptions options)

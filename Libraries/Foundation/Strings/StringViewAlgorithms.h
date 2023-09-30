@@ -19,7 +19,7 @@ struct StringAlgorithms
         case StringEncoding::Utf8: return func(string.getIterator<StringIteratorUTF8>());
         case StringEncoding::Utf16: return func(string.getIterator<StringIteratorUTF16>());
         }
-        SC_UNREACHABLE();
+        Assert::unreachable();
     }
 
     template <typename Func>

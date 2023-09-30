@@ -209,7 +209,7 @@ struct SC::FileSystemWatcher::Internal
     void onEventLoopNotification(AsyncWindowsPoll::Result& result)
     {
         FolderWatcherInternal& fwi = SC_FIELD_OFFSET(FolderWatcherInternal, asyncPoll, result.async);
-        SC_DEBUG_ASSERT(fwi.fileHandle.isValid())
+        SC_DEBUG_ASSERT(fwi.fileHandle.isValid());
         notifyEntry(*fwi.parentEntry);
         result.reactivateRequest(true);
     }

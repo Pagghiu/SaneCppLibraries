@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Language/Assert.h" //SC_UNREACHABLE
+#include "../Language/Assert.h" //Assert::unreachable
 #include "../Language/Types.h"
 #include "../Objects/Span.h"
 
@@ -36,7 +36,7 @@ constexpr uint32_t StringEncodingGetSize(StringEncoding encoding)
     case StringEncoding::Ascii: return 1;
     case StringEncoding::Utf8: return 1;
     }
-    SC_UNREACHABLE();
+    Assert::unreachable();
 }
 
 struct StringIteratorSkipTable

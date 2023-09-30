@@ -99,7 +99,7 @@ struct SC::VectorTestClass
         if (this != &other)
         {
             if (data != nullptr)
-                memoryRelease(data);
+                Memory::release(data);
             data = nullptr;
             if (other.data != nullptr)
                 copyString(other.data);
@@ -113,7 +113,7 @@ struct SC::VectorTestClass
         if (this != &other)
         {
             if (data != nullptr)
-                memoryRelease(data);
+                Memory::release(data);
             data       = other.data;
             other.data = nullptr;
         }
@@ -136,7 +136,7 @@ struct SC::VectorTestClass
     ~VectorTestClass()
     {
         VectorTestReport::get().push(VectorTestReport::DESTRUCTOR);
-        memoryRelease(data);
+        Memory::release(data);
     }
 
   private:
@@ -152,7 +152,7 @@ struct SC::VectorTestClass
     void copyString(const char* initData)
     {
         const size_t numBytes = dataLength(initData) + 1;
-        data                  = static_cast<char*>(memoryAllocate(numBytes));
+        data                  = static_cast<char*>(Memory::allocate(numBytes));
         memcpy(data, initData, numBytes);
     }
 };

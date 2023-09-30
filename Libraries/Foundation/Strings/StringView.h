@@ -50,7 +50,7 @@ struct SC_EXPORT_SYMBOL SC::StringView
         case StringEncoding::Utf8: return equalsIterator(it, other.getIterator<StringIteratorUTF8>(), points);
         case StringEncoding::Utf16: return equalsIterator(it, other.getIterator<StringIteratorUTF16>(), points);
         }
-        SC_UNREACHABLE();
+        Assert::unreachable();
     }
 
     template <typename T>
@@ -179,7 +179,7 @@ struct SC_EXPORT_SYMBOL SC::StringView
         case StringEncoding::Utf8: return equalsIterator<StringIteratorUTF8>(other, commonOverlappingPoints);
         case StringEncoding::Utf16: return equalsIterator<StringIteratorUTF16>(other, commonOverlappingPoints);
         }
-        SC_UNREACHABLE();
+        Assert::unreachable();
     }
 
     [[nodiscard]] bool           operator!=(StringView other) const { return not operator==(other); }
@@ -203,7 +203,7 @@ struct SC_EXPORT_SYMBOL SC::StringView
         case StringEncoding::Utf8: return func(getIterator<StringIteratorUTF8>());
         case StringEncoding::Utf16: return func(getIterator<StringIteratorUTF16>());
         }
-        SC_UNREACHABLE();
+        Assert::unreachable();
     }
 
     [[nodiscard]] bool endsWithChar(StringCodePoint c) const;

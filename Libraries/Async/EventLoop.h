@@ -95,7 +95,7 @@ struct SC::Async
     [[nodiscard]] static StringView TypeToString(Type type);
 
     /// Call only from derived async time
-    Async(Type type) : type(type), state(State::Free), eventIndex(-1) {}
+    Async(Type type) : state(State::Free), type(type), eventIndex(-1) {}
 
     /// Stops the async operation
     [[nodiscard]] ReturnCode stop();

@@ -35,7 +35,7 @@ struct Platform
         case Linux: return "Linux";
         case Wasm: return "Wasm";
         }
-        SC_UNREACHABLE();
+        Assert::unreachable();
     }
 };
 
@@ -60,7 +60,7 @@ struct Architecture
         case Arm64: return "Arm64";
         case Wasm: return "Wasm";
         }
-        SC_UNREACHABLE();
+        Assert::unreachable();
     }
 };
 
@@ -79,7 +79,7 @@ struct Generator
         case XCode14: return "XCode14";
         case VisualStudio2022: return "VisualStudio2022";
         }
-        SC_UNREACHABLE();
+        Assert::unreachable();
     }
 };
 
@@ -98,7 +98,7 @@ struct Optimization
         case Debug: return "Debug"_a8;
         case Release: return "Release"_a8;
         }
-        SC_UNREACHABLE();
+        Assert::unreachable();
     }
 };
 
@@ -133,7 +133,7 @@ struct Compile
         case enableExceptions: return {"enableExceptions", "Description enableExceptions"};
         case enableStdCpp: return {"enableStdCpp", "Description enableStdCpp"};
         }
-        SC_UNREACHABLE();
+        Assert::unreachable();
     }
 
     using FieldsTypes = TypeList<TaggedField<Type, includePaths, Vector<String>>,          //
@@ -181,7 +181,7 @@ struct Link
         case enableASAN: return "enableASAN";
         case enableStdCpp: return "enableStdCpp";
         }
-        SC_UNREACHABLE();
+        Assert::unreachable();
     }
 
     using FieldsTypes = TypeList<TaggedField<Type, libraryPaths, Vector<String>>,      //
@@ -231,7 +231,7 @@ struct Configuration
         case Configuration::Preset::Release: return "Release";
         case Configuration::Preset::None: return "None";
         }
-        SC_UNREACHABLE();
+        Assert::unreachable();
     }
 
     [[nodiscard]] bool applyPreset(Preset newPreset)
@@ -275,7 +275,7 @@ struct TargetType
         case DynamicLibrary: return "DynamicLibrary";
         case StaticLibrary: return "StaticLibrary";
         }
-        SC_UNREACHABLE();
+        Assert::unreachable();
     }
 };
 

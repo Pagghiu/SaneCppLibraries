@@ -22,9 +22,9 @@ struct SC::ConsoleTest : public SC::TestCase
 
         Console console(consoleConversionBuffer);
 
-        if (test_section("printAssertion"))
+        if (test_section("Assert::print"))
         {
-            printAssertion("a!=b", "FileName.cpp", "Function", 12);
+            Assert::print("a!=b", "FileName.cpp", "Function", 12);
         }
         if (test_section("print"))
         {

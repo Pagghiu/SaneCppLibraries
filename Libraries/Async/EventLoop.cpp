@@ -50,7 +50,7 @@ SC::StringView SC::Async::TypeToString(Type type)
     case Type::WindowsPoll: return "WindowsPoll"_a8;
 #endif
     }
-    SC_UNREACHABLE();
+    Assert::unreachable();
 }
 
 SC::ReturnCode SC::Async::validateAsync()
@@ -566,7 +566,7 @@ void SC::EventLoop::executeWakeUps(AsyncResultBase& result)
 
 void SC::EventLoop::removeActiveHandle(Async& async)
 {
-    SC_RELEASE_ASSERT(async.state == Async::State::Active)
+    SC_RELEASE_ASSERT(async.state == Async::State::Active);
     async.state = Async::State::Free;
     async.eventLoop->numberOfActiveHandles -= 1;
 }

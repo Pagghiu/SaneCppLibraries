@@ -269,7 +269,7 @@ bool SC::Path::parse(StringView input, Path::ParsedView& pathView, Type type)
     case AsWindows: return pathView.parseWindows(input);
     case AsPosix: return pathView.parsePosix(input);
     }
-    SC_UNREACHABLE();
+    Assert::unreachable();
 }
 
 bool SC::Path::ParsedView::parseWindows(StringView input)
@@ -311,7 +311,7 @@ SC::StringView SC::Path::basename(StringView input, Type type)
     case AsWindows: return Internal::basename<Windows::Separator>(input);
     case AsPosix: return Internal::basename<Posix::Separator>(input);
     }
-    SC_UNREACHABLE();
+    Assert::unreachable();
 }
 
 SC::StringView SC::Path::basename(StringView input, StringView suffix)
@@ -326,7 +326,7 @@ bool SC::Path::isAbsolute(StringView input, Type type)
     case AsPosix: return Posix::isAbsolute(input);
     case AsWindows: return Windows::isAbsolute(input);
     }
-    SC_UNREACHABLE();
+    Assert::unreachable();
 }
 
 SC::StringView SC::Path::Windows::dirname(StringView input, int repeat)

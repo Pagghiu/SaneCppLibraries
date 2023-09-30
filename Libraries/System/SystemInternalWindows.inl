@@ -239,28 +239,6 @@ SC::ReturnCode SC::SystemDebug::deleteForcefullyUnlockedFile(SC::StringView file
     return ::CloseHandle(fd) == TRUE;
 }
 
-bool SC::SystemDebug::printBacktrace() { return true; }
-
-bool SC::SystemDebug::printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeInBytes)
-{
-    SC_UNUSED(backtraceBufferSizeInBytes);
-    if (!backtraceBuffer)
-        return false;
-    return true;
-}
-
-SC::size_t SC::SystemDebug::captureBacktrace(size_t framesToSkip, void** backtraceBuffer,
-                                             size_t backtraceBufferSizeInBytes, uint32_t* hash)
-{
-    SC_UNUSED(framesToSkip);
-    SC_UNUSED(backtraceBufferSizeInBytes);
-    if (hash)
-        *hash = 1;
-    if (backtraceBuffer == nullptr)
-        return 0;
-    return 1;
-}
-
 SC::ReturnCode SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle)
 {
     if (handle)

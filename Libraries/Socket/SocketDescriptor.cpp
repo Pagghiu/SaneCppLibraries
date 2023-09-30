@@ -89,7 +89,7 @@ SC::uint32_t SC::SocketIPAddress::sizeOfHandle() const
     case SocketFlags::AddressFamilyIPV4: return sizeof(sockaddr_in);
     case SocketFlags::AddressFamilyIPV6: return sizeof(sockaddr_in6);
     }
-    SC_UNREACHABLE();
+    Assert::unreachable();
 }
 
 SC::ReturnCode SC::SocketIPAddress::fromAddressPort(StringView interfaceAddress, uint16_t port)
@@ -266,7 +266,7 @@ SC::SocketFlags::AddressFamily SC::SocketFlags::AddressFamilyFromInt(int value)
     case AF_INET: return SocketFlags::AddressFamilyIPV4;
     case AF_INET6: return SocketFlags::AddressFamilyIPV6;
     }
-    SC_UNREACHABLE();
+    Assert::unreachable();
 }
 
 unsigned char SC::SocketFlags::toNative(SocketFlags::AddressFamily type)
@@ -276,7 +276,7 @@ unsigned char SC::SocketFlags::toNative(SocketFlags::AddressFamily type)
     case SocketFlags::AddressFamilyIPV4: return AF_INET;
     case SocketFlags::AddressFamilyIPV6: return AF_INET6;
     }
-    SC_UNREACHABLE();
+    Assert::unreachable();
 }
 
 SC::SocketFlags::SocketType SC::SocketFlags::SocketTypeFromInt(int value)
@@ -286,7 +286,7 @@ SC::SocketFlags::SocketType SC::SocketFlags::SocketTypeFromInt(int value)
     case SOCK_STREAM: return SocketStream;
     case SOCK_DGRAM: return SocketDgram;
     }
-    SC_UNREACHABLE();
+    Assert::unreachable();
 }
 int SC::SocketFlags::toNative(SocketType type)
 {
@@ -295,7 +295,7 @@ int SC::SocketFlags::toNative(SocketType type)
     case SocketStream: return SOCK_STREAM;
     case SocketDgram: return SOCK_DGRAM;
     }
-    SC_UNREACHABLE();
+    Assert::unreachable();
 }
 
 SC::SocketFlags::ProtocolType SC::SocketFlags::ProtocolTypeFromInt(int value)
@@ -305,7 +305,7 @@ SC::SocketFlags::ProtocolType SC::SocketFlags::ProtocolTypeFromInt(int value)
     case IPPROTO_TCP: return ProtocolTcp;
     case IPPROTO_UDP: return ProtocolUdp;
     }
-    SC_UNREACHABLE();
+    Assert::unreachable();
 }
 
 int SC::SocketFlags::toNative(ProtocolType family)
@@ -315,7 +315,7 @@ int SC::SocketFlags::toNative(ProtocolType family)
     case ProtocolTcp: return IPPROTO_TCP;
     case ProtocolUdp: return IPPROTO_UDP;
     }
-    SC_UNREACHABLE();
+    Assert::unreachable();
 }
 
 SC::ReturnCode SC::DNSResolver::resolve(StringView host, String& ipAddress)
