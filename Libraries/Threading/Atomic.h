@@ -15,7 +15,6 @@ extern "C"
     __int32 __iso_volatile_load32(const volatile __int32*);
     void    _ReadWriteBarrier(void);
 
-#ifndef SC_COMPILER_MSVC_DISABLE_DEPRECATED_WARNING
 #ifdef __clang__
 #define SC_COMPILER_MSVC_DISABLE_DEPRECATED_WARNING                                                                    \
     _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wdeprecated-declarations\"")
@@ -26,16 +25,13 @@ extern "C"
 #define SC_COMPILER_MSVC_DISABLE_DEPRECATED_WARNING                                                                    \
     _Pragma("warning(push)") _Pragma("warning(disable : 4996)") // was declared deprecated
 #endif                                                          // ^^^ MSVC ^^^
-#endif                                                          // SC_COMPILER_MSVC_DISABLE_DEPRECATED_WARNING
 
-#ifndef SC_COMPILER_MSVC_RESTORE_DEPRECATED_WARNING
 #ifdef __clang__
 #define SC_COMPILER_MSVC_RESTORE_DEPRECATED_WARNING _Pragma("clang diagnostic pop")
 #elif defined(__CUDACC__) || defined(__INTEL_COMPILER)
 #define SC_COMPILER_MSVC_RESTORE_DEPRECATED_WARNING __pragma(warning(pop))
 #else
 #define SC_COMPILER_MSVC_RESTORE_DEPRECATED_WARNING _Pragma("warning(pop)")
-#endif
 #endif
 
 #define SC_COMPILER_MSVC_COMPILER_BARRIER()                                                                            \

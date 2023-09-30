@@ -1,16 +1,16 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../Base/Memory.h"
 #include "../Base/Assert.h"
 #include "../Base/Language.h"
 #include "../Base/Limits.h"
+#include "../Base/Memory.h"
 
 // system includes
 #include <float.h>  // FLT_MAX / DBL_MAX
 #include <stdio.h>  // stdout
 #include <stdlib.h> // malloc, free, *_MAX (integer)
-#include <string.h> // ::strlen
+#include <string.h> // strlen
 
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #include <BaseTsd.h>
@@ -57,7 +57,7 @@ bool SC::Assert::printBacktrace() { return true; }
 
 bool SC::Assert::printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeInBytes)
 {
-    SC_UNUSED(backtraceBufferSizeInBytes);
+    SC_COMPILER_UNUSED(backtraceBufferSizeInBytes);
     if (!backtraceBuffer)
         return false;
     return true;
@@ -66,8 +66,8 @@ bool SC::Assert::printBacktrace(void** backtraceBuffer, size_t backtraceBufferSi
 SC::size_t SC::Assert::captureBacktrace(size_t framesToSkip, void** backtraceBuffer, size_t backtraceBufferSizeInBytes,
                                         uint32_t* hash)
 {
-    SC_UNUSED(framesToSkip);
-    SC_UNUSED(backtraceBufferSizeInBytes);
+    SC_COMPILER_UNUSED(framesToSkip);
+    SC_COMPILER_UNUSED(backtraceBufferSizeInBytes);
     if (hash)
         *hash = 1;
     if (backtraceBuffer == nullptr)
@@ -167,22 +167,22 @@ void  SC::Memory::release(void* allocatedMemory) { return ::free(allocatedMemory
 //--------------------------------------------------------------------
 // Standard C++ Library support
 //--------------------------------------------------------------------
-#if not SC_ENABLE_STD_CPP_LIBRARY and (not SC_COMPILER_MSVC or not SC_COMPILER_CLANG_CL)
+#if not SC_COMPILER_ENABLE_STD_CPP and (not SC_COMPILER_MSVC or not SC_COMPILER_CLANG_CL)
 
-#if SC_ADDRESS_SANITIZER == 0
+#if SC_COMPILER_ASAN == 0
 void operator delete(void* p) noexcept
 {
     if (p != 0)
-        SC_LIKELY { free(p); }
+        SC_LANGUAGE_LIKELY { ::free(p); }
 }
 void operator delete[](void* p) noexcept
 {
     if (p != 0)
-        SC_LIKELY { free(p); }
+        SC_LANGUAGE_LIKELY { ::free(p); }
 }
 #endif
 
-#if not((SC_COMPILER_MSVC or SC_COMPILER_CLANG_CL) and SC_ADDRESS_SANITIZER)
+#if not((SC_COMPILER_MSVC or SC_COMPILER_CLANG_CL) and SC_COMPILER_ASAN)
 void* operator new(size_t len) { return ::malloc(len); }
 void* operator new[](size_t len) { return ::malloc(len); }
 #endif
@@ -201,7 +201,7 @@ extern "C" int __cxa_guard_acquire(uint64_t* guard_object)
 }
 
 extern "C" void __cxa_guard_release(uint64_t* guard_object) { *reinterpret_cast<uint8_t*>(guard_object) = 1; }
-extern "C" void __cxa_guard_abort(uint64_t* guard_object) { SC_UNUSED(guard_object); }
+extern "C" void __cxa_guard_abort(uint64_t* guard_object) { SC_COMPILER_UNUSED(guard_object); }
 #endif
 
 //--------------------------------------------------------------------

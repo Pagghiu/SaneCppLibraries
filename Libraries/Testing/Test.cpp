@@ -105,7 +105,7 @@ SC::TestCase::~TestCase()
 
 bool SC::TestCase::recordExpectation(StringView expression, bool status, StringView detailedError)
 {
-    SC_DEBUG_ASSERT(expression.isNullTerminated());
+    SC_ASSERT_DEBUG(expression.isNullTerminated());
     if (status)
     {
         numTestsSucceeded++;
@@ -144,7 +144,7 @@ bool SC::TestCase::test_section(StringView sectionName)
     numSectionTestsFailed = 0;
     if (report.isTestEnabled(testName) && report.isSectionEnabled(sectionName))
     {
-        SC_DEBUG_ASSERT(sectionName.isNullTerminated());
+        SC_ASSERT_DEBUG(sectionName.isNullTerminated());
         if (not report.currentSection.isEmpty())
         {
             report.printSectionResult(*this);
@@ -177,7 +177,7 @@ void SC::TestReport::testCaseFinished(TestCase& testCase)
 {
     if (abortOnFirstFailedTest && testCase.numTestsFailed > 0)
     {
-#if SC_RELEASE
+#if SC_CONFIGURATION_RELEASE
         ::exit(-1);
 #endif
     }

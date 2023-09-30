@@ -132,7 +132,7 @@ SC::ReturnCode SC::SocketServer::listen(SocketIPAddress nativeAddress, uint32_t 
 #elif !SC_PLATFORM_EMSCRIPTEN
     setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
 #else
-    SC_UNUSED(value);
+    SC_COMPILER_UNUSED(value);
 #endif
     if (::bind(listenSocket, &nativeAddress.handle.reinterpret_as<const struct sockaddr>(),
                nativeAddress.sizeOfHandle()) == SOCKET_ERROR)

@@ -188,7 +188,7 @@ SC::ReturnCode SC::HttpParser::parse(Span<const char> data, size_t& readBytes, S
                         tokenLength += data.sizeInBytes();
                         if (tokenLength > contentLength)
                         {
-                            tokenLength = contentLength;
+                            tokenLength = static_cast<size_t>(contentLength);
                         }
                         readBytes = tokenLength - oldLength;
                     }

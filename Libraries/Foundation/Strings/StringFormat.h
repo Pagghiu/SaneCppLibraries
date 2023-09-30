@@ -82,7 +82,7 @@ struct StringFormat
     {
         data.onFormatBegin();
         if (executeFormat(data, fmt.getIterator<RangeIterator>(), forward<Types>(args)...))
-            SC_LIKELY { return data.onFormatSucceded(); }
+            SC_LANGUAGE_LIKELY { return data.onFormatSucceded(); }
         else
         {
             data.onFormatFailed();
@@ -153,7 +153,7 @@ struct StringFormat
             if (it.advanceUntilMatchesAny({'{', '}'}, matchedChar)) // match start or end of specifier
             {
                 if (it.isFollowedBy(matchedChar))
-                    SC_UNLIKELY // if it's the same matched, let's escape it
+                    SC_LANGUAGE_UNLIKELY // if it's the same matched, let's escape it
                     {
                         (void)it.stepForward(); // we want to make sure we insert the escaped '{' or '}'
                         SC_TRY(data.write(StringView::fromIterators(start, it)));

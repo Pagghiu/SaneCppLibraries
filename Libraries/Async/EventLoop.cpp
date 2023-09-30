@@ -206,7 +206,7 @@ const SC::TimeCounter* SC::EventLoop::findEarliestTimer() const
     const TimeCounter* earliestTime = nullptr;
     for (Async* async = activeTimers.front; async != nullptr; async = async->next)
     {
-        SC_DEBUG_ASSERT(async->type == Async::Type::LoopTimeout);
+        SC_ASSERT_DEBUG(async->type == Async::Type::LoopTimeout);
         const auto& expirationTime = static_cast<AsyncLoopTimeout*>(async)->expirationTime;
         if (earliestTime == nullptr or earliestTime->isLaterThanOrEqualTo(expirationTime))
         {
@@ -220,7 +220,7 @@ void SC::EventLoop::invokeExpiredTimers()
 {
     for (Async* async = activeTimers.front; async != nullptr;)
     {
-        SC_DEBUG_ASSERT(async->type == Async::Type::LoopTimeout);
+        SC_ASSERT_DEBUG(async->type == Async::Type::LoopTimeout);
         const auto& expirationTime = static_cast<AsyncLoopTimeout*>(async)->expirationTime;
         if (loopTime.isLaterThanOrEqualTo(expirationTime))
         {
@@ -265,7 +265,7 @@ SC::ReturnCode SC::EventLoop::stageSubmission(KernelQueue& queue, Async& async)
     break;
     case Async::State::Free: {
         // TODO: Stop the completion, it has been cancelled before being submitted
-        SC_RELEASE_ASSERT(false);
+        SC_ASSERT_RELEASE(false);
     }
     break;
     case Async::State::Cancelling: {
@@ -273,7 +273,7 @@ SC::ReturnCode SC::EventLoop::stageSubmission(KernelQueue& queue, Async& async)
     }
     break;
     case Async::State::Active: {
-        SC_DEBUG_ASSERT(false);
+        SC_ASSERT_DEBUG(false);
         return "EventLoop::processSubmissions() got Active handle"_a8;
     }
     break;
@@ -296,7 +296,7 @@ SC::ReturnCode SC::EventLoop::runNoWait() { return runStep(PollMode::NoWait); }
 
 void SC::EventLoop::completeAndEventuallyReactivate(KernelQueue& queue, Async& async, ReturnCode&& returnCode)
 {
-    SC_RELEASE_ASSERT(async.state == Async::State::Active);
+    SC_ASSERT_RELEASE(async.state == Async::State::Active);
     bool reactivate = false;
     completeAsync(queue, async, move(returnCode), reactivate);
     if (reactivate)
@@ -413,7 +413,7 @@ SC::ReturnCode SC::EventLoop::activateAsync(KernelQueue& queue, Async& async)
 {
     SC_LOG_MESSAGE("{} {} ACTIVATE\n", async.debugName, Async::TypeToString(async.type));
     // Submitting (first time) or Active (for reactivations)
-    SC_DEBUG_ASSERT(async.state == Async::State::Active or async.state == Async::State::Submitting);
+    SC_ASSERT_DEBUG(async.state == Async::State::Active or async.state == Async::State::Submitting);
     SC_TRY(Async::applyOnAsync(async, [&](auto& p) { return queue.activateAsync(p); }));
     if (async.state == Async::State::Submitting)
     {
@@ -532,7 +532,7 @@ SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
 {
     SC_TRY_MSG(async.eventLoop == this,
                "EventLoop::wakeUpFromExternalThread - Wakeup belonging to different EventLoop"_a8);
-    SC_DEBUG_ASSERT(async.type == Async::Type::LoopWakeUp);
+    SC_ASSERT_DEBUG(async.type == Async::Type::LoopWakeUp);
     AsyncLoopWakeUp& notifier = *static_cast<AsyncLoopWakeUp*>(&async);
     if (not notifier.pending.exchange(true))
     {
@@ -547,7 +547,7 @@ void SC::EventLoop::executeWakeUps(AsyncResultBase& result)
 {
     for (Async* async = activeWakeUps.front; async != nullptr; async = async->next)
     {
-        SC_DEBUG_ASSERT(async->type == Async::Type::LoopWakeUp);
+        SC_ASSERT_DEBUG(async->type == Async::Type::LoopWakeUp);
         AsyncLoopWakeUp* notifier = static_cast<AsyncLoopWakeUp*>(async);
         if (notifier->pending.load() == true)
         {
@@ -566,21 +566,21 @@ void SC::EventLoop::executeWakeUps(AsyncResultBase& result)
 
 void SC::EventLoop::removeActiveHandle(Async& async)
 {
-    SC_RELEASE_ASSERT(async.state == Async::State::Active);
+    SC_ASSERT_RELEASE(async.state == Async::State::Active);
     async.state = Async::State::Free;
     async.eventLoop->numberOfActiveHandles -= 1;
 }
 
 void SC::EventLoop::addActiveHandle(Async& async)
 {
-    SC_RELEASE_ASSERT(async.state == Async::State::Submitting);
+    SC_ASSERT_RELEASE(async.state == Async::State::Submitting);
     async.state = Async::State::Active;
     async.eventLoop->numberOfActiveHandles += 1;
 }
 
 void SC::EventLoop::scheduleManualCompletion(Async& async)
 {
-    SC_RELEASE_ASSERT(async.state == Async::State::Submitting);
+    SC_ASSERT_RELEASE(async.state == Async::State::Submitting);
     async.eventLoop->manualCompletions.queueBack(async);
     async.state = Async::State::Active;
 }

@@ -69,7 +69,7 @@ SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOpti
     HANDLE fileDescriptor         = CreateFileW(filePath.getNullTerminatedNative(), accessMode, shareMode, &security,
                                                 createDisposition, attributes, nullptr);
     DWORD  lastErr                = ::GetLastError();
-    SC_UNUSED(lastErr);
+    SC_COMPILER_UNUSED(lastErr);
     SC_TRY_MSG(fileDescriptor != INVALID_HANDLE_VALUE, "CreateFileW failed"_a8);
     return assign(fileDescriptor);
 }
@@ -77,7 +77,7 @@ SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOpti
 SC::ReturnCode SC::FileDescriptor::setBlocking(bool blocking)
 {
     // TODO: IMPLEMENT
-    SC_UNUSED(blocking);
+    SC_COMPILER_UNUSED(blocking);
     return false;
 }
 

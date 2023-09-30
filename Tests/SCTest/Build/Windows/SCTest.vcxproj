@@ -185,7 +185,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <ExceptionHandling>false</ExceptionHandling>
@@ -199,7 +199,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <ExceptionHandling>false</ExceptionHandling>
@@ -215,7 +215,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <ExceptionHandling>false</ExceptionHandling>
@@ -231,7 +231,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -246,7 +246,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>__SANITIZE_ADDRESS__;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>__SANITIZE_ADDRESS__;_DEBUG;_CONSOLE;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -263,7 +263,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -277,7 +277,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -294,7 +294,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -312,7 +312,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -393,7 +393,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\LibC.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Limits.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Memory.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\MemoryTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\BaseTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Platform.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Types.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Objects\Function.h" />
@@ -484,6 +484,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\Threading.h" />
     <ClInclude Include="..\..\..\..\Libraries\Threading\ThreadingTest.h" />
+    <ClInclude Include="..\..\SCConfig.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\Async\EventLoopInternalApple.inl" />

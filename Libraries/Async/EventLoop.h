@@ -23,7 +23,7 @@ inline T& fieldOffset(R& object)
 } // namespace SC
 
 #define SC_FIELD_OFFSET(Class, Field, Value)                                                                           \
-    fieldOffset<SC_OFFSETOF(Class, Field), Class, decltype(Class::Field)>(Value);
+    fieldOffset<SC_COMPILER_OFFSETOF(Class, Field), Class, decltype(Class::Field)>(Value);
 
 namespace SC
 {
@@ -67,10 +67,10 @@ struct SC::Async
     Async* next = nullptr;
     Async* prev = nullptr;
 
-#if SC_DEBUG
+#if SC_CONFIGURATION_DEBUG
     void setDebugName(const char* newDebugName) { debugName = newDebugName; }
 #else
-    void setDebugName(const char* newDebugName) { SC_UNUSED(newDebugName); }
+    void setDebugName(const char* newDebugName) { SC_COMPILER_UNUSED(newDebugName); }
 #endif
 
     [[nodiscard]] EventLoop* getEventLoop() const { return eventLoop; }
@@ -121,7 +121,7 @@ struct SC::Async
     template <typename Lambda>
     [[nodiscard]] static ReturnCode applyOnAsync(Async& async, Lambda&& lambda);
 
-#if SC_DEBUG
+#if SC_CONFIGURATION_DEBUG
     const char* debugName = "None";
 #endif
     State   state;

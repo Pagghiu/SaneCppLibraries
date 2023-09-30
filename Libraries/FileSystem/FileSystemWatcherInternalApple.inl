@@ -35,7 +35,7 @@ struct SC::FileSystemWatcher::Internal
 
     [[nodiscard]] ReturnCode init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
-        SC_UNUSED(runner);
+        SC_COMPILER_UNUSED(runner);
         self = &parent;
         return true;
     }
@@ -229,8 +229,8 @@ struct SC::FileSystemWatcher::Internal
                                    const FSEventStreamEventFlags* eventFlags, //
                                    const FSEventStreamEventId*    eventIds)
     {
-        SC_UNUSED(streamRef);
-        SC_UNUSED(eventIds);
+        SC_COMPILER_UNUSED(streamRef);
+        SC_COMPILER_UNUSED(eventIds);
         Internal&    internal = *reinterpret_cast<Internal*>(info);
         const char** paths    = reinterpret_cast<const char**>(eventPaths);
         for (size_t idx = 0; idx < numEvents; ++idx)

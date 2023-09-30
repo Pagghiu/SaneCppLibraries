@@ -128,7 +128,7 @@
 		7B9F61682995AE100011F4D4 /* StringTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StringTest.h; path = ../../../../Libraries/Foundation/StringTest.h; sourceTree = "<group>"; };
 		7B9F61692995AE100011F4D4 /* String.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = String.h; path = ../../../../Libraries/Foundation/String.h; sourceTree = "<group>"; };
 		7B9F616A2995AE100011F4D4 /* ArrayTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ArrayTest.h; path = ../../../../Libraries/Foundation/ArrayTest.h; sourceTree = "<group>"; };
-		7B9F616C2995AE100011F4D4 /* MemoryTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MemoryTest.h; path = ../../../../Libraries/Foundation/MemoryTest.h; sourceTree = "<group>"; };
+		7B9F616C2995AE100011F4D4 /* BaseTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = BaseTest.h; path = ../../../../Libraries/Foundation/BaseTest.h; sourceTree = "<group>"; };
 		7B9F616D2995AE100011F4D4 /* StringBuilder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StringBuilder.h; path = ../../../../Libraries/Foundation/StringBuilder.h; sourceTree = "<group>"; };
 		7B9F616E2995AE100011F4D4 /* Path.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Path.cpp; path = ../../../../Libraries/FileSystem/Path.cpp; sourceTree = "<group>"; };
 		7B9F616F2995AE100011F4D4 /* Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Test.h; path = ../../../../Libraries/Testing/Test.h; sourceTree = "<group>"; };
@@ -261,7 +261,7 @@
 				7B9F61662995AE0F0011F4D4 /* MapTest.h */,
 				7B9F614B2995AE0F0011F4D4 /* Base.cpp */,
 				7B9F61622995AE0F0011F4D4 /* Memory.h */,
-				7B9F616C2995AE100011F4D4 /* MemoryTest.h */,
+				7B9F616C2995AE100011F4D4 /* BaseTest.h */,
 				7B14822529EDCF3400477EF4 /* Opaque.h */,
 				7B14822429EDCF3400477EF4 /* OpaqueTest.h */,
 				7B14822329EDCF3400477EF4 /* Optional.h */,

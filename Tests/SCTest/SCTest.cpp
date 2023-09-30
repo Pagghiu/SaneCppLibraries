@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 
-#define SC_RUN_SPECIFIC_TEST 1
+#define SC_RUN_SPECIFIC_TEST 0
 
 #if SC_RUN_SPECIFIC_TEST
 
@@ -23,7 +23,7 @@ void runSpecificTests(TestReport& report)
 #include "../../Libraries/Build/BuildTest.h"
 
 // Foundation
-#include "../../Libraries/Foundation/Base/MemoryTest.h"
+#include "../../Libraries/Foundation/Base/BaseTest.h"
 #include "../../Libraries/Foundation/Containers/ArenaMapTest.h"
 #include "../../Libraries/Foundation/Containers/ArrayTest.h"
 #include "../../Libraries/Foundation/Containers/IntrusiveDoubleLinkedListTest.h"
@@ -100,7 +100,6 @@ void runSpecificTests(TestReport& report)
 #include "../../Libraries/Foundation/Containers/SmallVector.h"
 #include "../../Libraries/System/System.h"
 #include "../../Libraries/Testing/Test.h"
-#define SC_TEST_LIBRARY_PATH SC_MACRO_TO_LITERAL(SC_MACRO_ESCAPE(SC_LIBRARY_PATH))
 
 SC::Console* globalConsole;
 
@@ -121,9 +120,9 @@ int main(int argc, const char* argv[])
     report.executableFile           = directories.executableFile.view();
     {
         SmallVector<StringView, 50> components;
-        (void)Path::normalizeUNCAndTrimQuotes(SC_TEST_LIBRARY_PATH, components, correctedPath, Path::AsNative);
+        (void)Path::normalizeUNCAndTrimQuotes(SC_COMPILER_LIBRARY_PATH, components, correctedPath, Path::AsNative);
         // If you hit this assertion you must figure out a way to derive location of Libraries
-        SC_RELEASE_ASSERT(Path::isAbsolute(correctedPath.view(), SC::Path::AsNative));
+        SC_ASSERT_RELEASE(Path::isAbsolute(correctedPath.view(), SC::Path::AsNative));
     }
     report.libraryRootDirectory   = correctedPath.view();
     report.debugBreakOnFailedTest = true;
@@ -137,10 +136,10 @@ int main(int argc, const char* argv[])
     // Foundation tests
     { ArenaMapTest                  test(report); }
     { ArrayTest                     test(report); }
+    { BaseTest                      test(report); }
     { FunctionTest                  test(report); }
     { IntrusiveDoubleLinkedListTest test(report); }
     { MapTest                       test(report); }
-    { MemoryTest                    test(report); }
     { OpaqueTest                    test(report); }
     { OptionalTest                  test(report); }
     { ResultTest                    test(report); }

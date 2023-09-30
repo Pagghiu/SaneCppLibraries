@@ -42,7 +42,7 @@ SC::StringView SC::HttpClient::getResponse() const
 
 void SC::HttpClient::onConnected(AsyncSocketConnect::Result& result)
 {
-    SC_UNUSED(result);
+    SC_COMPILER_UNUSED(result);
     const char* dbgName =
         customDebugName.isEmpty() ? "HttpClient::clientSocket" : customDebugName.bytesIncludingTerminator();
     sendAsync.setDebugName(dbgName);
@@ -57,8 +57,8 @@ void SC::HttpClient::onConnected(AsyncSocketConnect::Result& result)
 
 void SC::HttpClient::onAfterSend(AsyncSocketSend::Result& result)
 {
-    SC_UNUSED(result);
-    SC_RELEASE_ASSERT(content.resizeWithoutInitializing(content.capacity()));
+    SC_COMPILER_UNUSED(result);
+    SC_ASSERT_RELEASE(content.resizeWithoutInitializing(content.capacity()));
 
     const char* dbgName =
         customDebugName.isEmpty() ? "HttpClient::clientSocket" : customDebugName.bytesIncludingTerminator();
@@ -74,7 +74,7 @@ void SC::HttpClient::onAfterSend(AsyncSocketSend::Result& result)
 
 void SC::HttpClient::onAfterRead(AsyncSocketReceive::Result& result)
 {
-    SC_UNUSED(result);
-    SC_RELEASE_ASSERT(SocketClient(clientSocket).close());
+    SC_COMPILER_UNUSED(result);
+    SC_ASSERT_RELEASE(SocketClient(clientSocket).close());
     callback(*this);
 }

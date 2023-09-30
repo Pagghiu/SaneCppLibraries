@@ -138,7 +138,7 @@ struct SC::SegmentItems : public SegmentHeader
     static typename EnableIf<IsTriviallyCopyable<Q>::value, void>::type //
     moveAndDestroy(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN)
     {
-        SC_UNUSED(oldSize);
+        SC_COMPILER_UNUSED(oldSize);
         // TODO: add code to handle memcpy destination overlapping source
         memcpy(newItems, oldItems, keepFirstN * sizeof(T));
     }
@@ -148,7 +148,7 @@ struct SC::SegmentItems : public SegmentHeader
     copyReplaceTrivialOrNot(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
                             const size_t numToDestroy, U* other, size_t otherSize)
     {
-        SC_UNUSED(otherSize);
+        SC_COMPILER_UNUSED(otherSize);
         copyAssignElements(oldItems, 0, numToAssign, other);
         copyConstruct(oldItems, numToAssign, numToCopyConstruct, other + numToAssign);
         destroyElements(oldItems, numToAssign + numToCopyConstruct, numToDestroy);
@@ -159,9 +159,9 @@ struct SC::SegmentItems : public SegmentHeader
     copyReplaceTrivialOrNot(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
                             const size_t numToDestroy, U* other, size_t otherSize)
     {
-        SC_UNUSED(numToAssign);
-        SC_UNUSED(numToCopyConstruct);
-        SC_UNUSED(numToDestroy);
+        SC_COMPILER_UNUSED(numToAssign);
+        SC_COMPILER_UNUSED(numToCopyConstruct);
+        SC_COMPILER_UNUSED(numToDestroy);
         // TODO: add code to handle memcpy destination overlapping source
         memcpy(oldItems, other, otherSize * sizeof(T));
     }
@@ -182,8 +182,8 @@ struct SC::SegmentItems : public SegmentHeader
     insertItemsTrivialOrNot(T*& oldItems, size_t position, const size_t numElements, const size_t newSize, U* other,
                             size_t otherSize)
     {
-        SC_UNUSED(numElements);
-        SC_UNUSED(newSize);
+        SC_COMPILER_UNUSED(numElements);
+        SC_COMPILER_UNUSED(newSize);
         static_assert(sizeof(T) == sizeof(U), "What?");
         // TODO: add code to handle memcpy destination overlapping source
         const size_t numElementsToMove = numElements - position;
@@ -222,7 +222,7 @@ struct SC::SegmentOperations
         if (numElements == numCapacity)
         {
             if (!ensureCapacity(oldItems, numElements + 1, numElements))
-                SC_UNLIKELY { return false; }
+                SC_LANGUAGE_UNLIKELY { return false; }
         }
         SegmentItems<T>::copyConstruct(oldItems, numElements, 1, &element);
         SegmentItems<T>::getSegment(oldItems)->sizeBytes += sizeof(T);
@@ -238,7 +238,7 @@ struct SC::SegmentOperations
         if (numElements == numCapacity)
         {
             if (!ensureCapacity(oldItems, numElements + 1, numElements))
-                SC_UNLIKELY { return false; }
+                SC_LANGUAGE_UNLIKELY { return false; }
         }
         SegmentItems<T>::moveConstruct(oldItems, numElements, 1, &element);
         SegmentItems<T>::getSegment(oldItems)->sizeBytes += sizeof(T);
@@ -393,7 +393,7 @@ struct SC::SegmentOperations
         const bool       isNull     = oldItems == nullptr;
         SegmentItems<T>* oldSegment = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
         const auto       oldSize    = isNull ? 0 : oldSegment->size();
-        SC_DEBUG_ASSERT(oldSize >= keepFirstN);
+        SC_ASSERT_DEBUG(oldSize >= keepFirstN);
         SegmentItems<T>* newSegment = nullptr;
         constexpr size_t maxSizeT   = SC::MaxValue();
         if (newCapacity <= maxSizeT / sizeof(T))
@@ -464,7 +464,7 @@ struct SC::SegmentOperations
         {
             const auto keepFirstN = min(oldSize, newSize);
             if (!ensureCapacity(oldItems, newSize, keepFirstN))
-                SC_UNLIKELY { return false; }
+                SC_LANGUAGE_UNLIKELY { return false; }
             if (initialize)
             {
                 SegmentItems<T>::copyConstructSingle(oldItems, keepFirstN, newSize - keepFirstN, *defaultValue);
@@ -507,7 +507,7 @@ struct SC::SegmentOperations
                     return true; // Array allocator returning the same memory
                 }
                 else if (newSegment == nullptr)
-                    SC_UNLIKELY { return false; }
+                    SC_LANGUAGE_UNLIKELY { return false; }
                 newSegment->sizeBytes = oldSegment->sizeBytes;
                 SegmentItems<T>::moveConstruct(Allocator::template getItems<T>(newSegment), 0, numElements,
                                                Allocator::template getItems<T>(oldSegment));
@@ -618,28 +618,28 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
     [[nodiscard]] T& front()
     {
         const size_t numElements = Parent::size();
-        SC_RELEASE_ASSERT(numElements > 0);
+        SC_ASSERT_RELEASE(numElements > 0);
         return items[0];
     }
 
     [[nodiscard]] const T& front() const
     {
         const size_t numElements = Parent::size();
-        SC_RELEASE_ASSERT(numElements > 0);
+        SC_ASSERT_RELEASE(numElements > 0);
         return items[0];
     }
 
     [[nodiscard]] T& back()
     {
         const size_t numElements = Parent::size();
-        SC_RELEASE_ASSERT(numElements > 0);
+        SC_ASSERT_RELEASE(numElements > 0);
         return items[numElements - 1];
     }
 
     [[nodiscard]] const T& back() const
     {
         const size_t numElements = Parent::size();
-        SC_RELEASE_ASSERT(numElements > 0);
+        SC_ASSERT_RELEASE(numElements > 0);
         return items[numElements - 1];
     }
     Segment(const Segment& other)
@@ -663,7 +663,7 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
             T*         tItems = Segment::items;
             const bool res    = Segment::operations::copy(tItems, other.items, other.size());
             (void)res;
-            SC_DEBUG_ASSERT(res);
+            SC_ASSERT_DEBUG(res);
         }
         return *this;
     }
@@ -706,7 +706,7 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
             T*         items = items;
             const bool res   = copy(items, other.data(), other.size());
             (void)res;
-            SC_DEBUG_ASSERT(res);
+            SC_ASSERT_DEBUG(res);
         }
         return *this;
     }
@@ -751,13 +751,13 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
 
     [[nodiscard]] T& operator[](size_t index)
     {
-        SC_DEBUG_ASSERT(index < Segment::size());
+        SC_ASSERT_DEBUG(index < Segment::size());
         return items[index];
     }
 
     [[nodiscard]] const T& operator[](size_t index) const
     {
-        SC_DEBUG_ASSERT(index < Segment::size());
+        SC_ASSERT_DEBUG(index < Segment::size());
         return items[index];
     }
 

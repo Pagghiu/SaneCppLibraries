@@ -109,8 +109,8 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     [[nodiscard]] bool writeConfigurationProperty(StringBuilder& builder, const Configuration& configuration,
                                                   StringView architecture)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
-        SC_UNUSED(builder);
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        SC_COMPILER_UNUSED(builder);
         const bool       isDebug = configuration.compile.hasValue<Compile::optimizationLevel>(Optimization::Debug);
         const StringView platformToolset =
             configuration.visualStudio.platformToolset.isEmpty() ? "v143" : configuration.visualStudio.platformToolset;
@@ -146,24 +146,24 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         }
 #endif
         builder.append("  </PropertyGroup>\n");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     [[nodiscard]] bool writeConfigurationsProperties(StringBuilder& builder, const Project& project)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         return forArchitecture(
             builder, project,
             [this](StringBuilder& builder, const Project&, const Configuration& configuration, StringView platform)
             { return writeConfigurationProperty(builder, configuration, platform); });
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
     }
 
     [[nodiscard]] bool writePropertySheet(StringBuilder& builder, const Configuration& configuration,
                                           StringView architecture)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(
             "  <ImportGroup Label=\"PropertySheets\" Condition=\"'$(Configuration)|$(Platform)'=='{}|{}'\">\n"
             "    <Import Project=\"$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props\" "
@@ -171,24 +171,24 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             "Label=\"LocalAppDataPlatform\" />\n"
             "  </ImportGroup>\n",
             configuration.name.view(), architecture);
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     [[nodiscard]] bool writePropertySheets(StringBuilder& builder, const Project& project)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         return forArchitecture(
             builder, project,
             [this](StringBuilder& builder, const Project&, const Configuration& configuration, StringView platform)
             { return writePropertySheet(builder, configuration, platform); });
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
     }
 
     [[nodiscard]] bool writePropertyGroup(StringBuilder& builder, const Project& project,
                                           const Configuration& configuration, StringView architecture)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("  <PropertyGroup Condition=\"'$(Configuration)|$(Platform)'=='{}|{}'\">\n",
                        configuration.name.view(), architecture);
         if (not project.targetName.view().isEmpty())
@@ -268,24 +268,24 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         }
         builder.append("  </PropertyGroup>\n");
 
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     [[nodiscard]] bool writePropertyGroups(StringBuilder& builder, const Project& project)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         return forArchitecture(builder, project,
                                [this](StringBuilder& builder, const Project& project,
                                       const Configuration& configuration, StringView platform)
                                { return writePropertyGroup(builder, project, configuration, platform); });
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
     }
 
     [[nodiscard]] bool writeItemDefinitionGroup(StringBuilder& builder, const Project& project,
                                                 const Configuration& configuration, StringView architecture)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("  <ItemDefinitionGroup Condition=\"'$(Configuration)|$(Platform)'=='{}|{}'\">\n",
                        configuration.name.view(), architecture);
         builder.append("    <ClCompile>\n");
@@ -361,18 +361,18 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("    </Link>\n");
         builder.append("  </ItemDefinitionGroup>\n");
 
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     [[nodiscard]] bool writeItemDefinitionGroups(StringBuilder& builder, const Project& project)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         return forArchitecture(builder, project,
                                [this](StringBuilder& builder, const Project& project,
                                       const Configuration& configuration, StringView platform)
                                { return writeItemDefinitionGroup(builder, project, configuration, platform); });
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
     }
     using RenderItem  = WriterInternal::RenderItem;
     using RenderGroup = WriterInternal::RenderGroup;
@@ -380,8 +380,8 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
 
     [[nodiscard]] bool writeSourceFiles(StringBuilder& builder, const Project& project, Vector<RenderItem>& files)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
-        SC_UNUSED(project);
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        SC_COMPILER_UNUSED(project);
         builder.append("  <ItemGroup>\n");
         for (auto& it : files)
         {
@@ -391,13 +391,13 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             }
         }
         builder.append("  </ItemGroup>\n");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     [[nodiscard]] bool writeHeaderFiles(StringBuilder& builder, Vector<RenderItem>& files)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("  <ItemGroup>\n");
         for (auto& it : files)
         {
@@ -407,13 +407,13 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             }
         }
         builder.append("  </ItemGroup>\n");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     [[nodiscard]] bool writeInlineFiles(StringBuilder& builder, Vector<RenderItem>& files)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("  <ItemGroup>\n");
         for (auto& it : files)
         {
@@ -423,13 +423,13 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             }
         }
         builder.append("  </ItemGroup>\n");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     [[nodiscard]] bool writeNatvisFiles(StringBuilder& builder, Vector<RenderItem>& files)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("  <ItemGroup>\n");
         for (auto& it : files)
         {
@@ -439,7 +439,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             }
         }
         builder.append("  </ItemGroup>\n");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
@@ -458,7 +458,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     // Project
     [[nodiscard]] ReturnCode writeProject(StringBuilder& builder, const Project& project, Renderer& renderer)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
         builder.append(
             "<Project DefaultTargets=\"Build\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\n");
@@ -489,15 +489,15 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                        "  <ImportGroup Label=\"ExtensionTargets\">\n"
                        "  </ImportGroup>\n"
                        "</Project>\n");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     // Solution
     [[nodiscard]] bool writeSolution(StringBuilder& builder, StringView prjName, const Project& project)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
-        SC_UNUSED(builder);
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        SC_COMPILER_UNUSED(builder);
         builder.append("Microsoft Visual Studio Solution File, Format Version 12.00\n"
                        "# Visual Studio Version 17\n"
                        "VisualStudioVersion = 17.4.32916.344\n"
@@ -515,7 +515,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             [](StringBuilder& builder, const Project& project, const Configuration& configuration, StringView platform)
 
             {
-                SC_UNUSED(project);
+                SC_COMPILER_UNUSED(project);
                 builder.append("        {}|{} = {}|{}\n", configuration.name, platform, configuration.name, platform);
                 return true;
             });
@@ -528,7 +528,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                                StringView platform)
 
                         {
-                            SC_UNUSED(project);
+                            SC_COMPILER_UNUSED(project);
                             builder.append("        {}.{}|{}.ActiveCfg = {}|{}\n", projectGuid, configuration.name,
                                            platform, configuration.name, platform);
                             builder.append("        {}.{}|{}.Build.0 = {}|{}\n", projectGuid, configuration.name,
@@ -545,7 +545,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                        "    EndGlobalSection\n");
 
         builder.append("EndGlobal");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
@@ -575,7 +575,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
 
     [[nodiscard]] bool writeFileFilters(StringBuilder& builder, Renderer& renderer)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("  <ItemGroup>\n");
         for (auto& it : renderer.renderItems)
         {
@@ -632,13 +632,13 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             }
         }
         builder.append("  </ItemGroup>\n");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     [[nodiscard]] bool writeFiltersFolder(StringBuilder& builder, const RenderGroup& folder)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         for (auto& it : folder.children)
         {
             builder.append("    <Filter Include=\"");
@@ -651,13 +651,13 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             SC_TRY(writeFiltersFolder(builder, it.value));
         }
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     [[nodiscard]] bool writeFilters(StringBuilder& builder, Renderer& renderer)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         SC_TRY(fillFileGroups(renderer.rootGroup, renderer.renderItems));
         builder.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
         builder.append(
@@ -667,7 +667,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("  </ItemGroup>\n");
         writeFileFilters(builder, renderer);
         builder.append("</Project>");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 };

@@ -12,7 +12,7 @@ struct StringViewTokenizer;
 
 } // namespace SC
 
-struct SC_EXPORT_SYMBOL SC::StringView
+struct SC_COMPILER_EXPORT SC::StringView
 {
   private:
     union
@@ -108,19 +108,19 @@ struct SC_EXPORT_SYMBOL SC::StringView
     [[nodiscard]] constexpr const char*    bytesWithoutTerminator() const { return text; }
     [[nodiscard]] constexpr const char*    bytesIncludingTerminator() const
     {
-        SC_RELEASE_ASSERT(hasNullTerm);
+        SC_ASSERT_RELEASE(hasNullTerm);
         return text;
     }
 #if SC_PLATFORM_WINDOWS
     [[nodiscard]] const wchar_t* getNullTerminatedNative() const
     {
-        SC_RELEASE_ASSERT(hasNullTerm && (encoding == StringEncoding::Utf16));
+        SC_ASSERT_RELEASE(hasNullTerm && (encoding == StringEncoding::Utf16));
         return reinterpret_cast<const wchar_t*>(text);
     }
 #else
     [[nodiscard]] const char* getNullTerminatedNative() const
     {
-        SC_RELEASE_ASSERT(hasNullTerm && (encoding == StringEncoding::Utf8 || encoding == StringEncoding::Ascii));
+        SC_ASSERT_RELEASE(hasNullTerm && (encoding == StringEncoding::Utf8 || encoding == StringEncoding::Ascii));
         return text;
     }
 #endif
@@ -190,7 +190,7 @@ struct SC_EXPORT_SYMBOL SC::StringView
 
     [[nodiscard]] constexpr size_t sizeInBytesIncludingTerminator() const
     {
-        SC_RELEASE_ASSERT(hasNullTerm);
+        SC_ASSERT_RELEASE(hasNullTerm);
         return textSizeInBytes > 0 ? textSizeInBytes + StringEncodingGetSize(encoding) : 0;
     }
 
@@ -286,7 +286,7 @@ struct SC_EXPORT_SYMBOL SC::StringView
     {
         if (start < sizeInBytes())
             return sliceStartLengthBytes(start, sizeInBytes() - start);
-        SC_RELEASE_ASSERT(start < sizeInBytes());
+        SC_ASSERT_RELEASE(start < sizeInBytes());
         return StringView(text, 0, false, encoding);
     }
 
@@ -294,7 +294,7 @@ struct SC_EXPORT_SYMBOL SC::StringView
     {
         if (end >= start)
             return sliceStartLengthBytes(start, end - start);
-        SC_RELEASE_ASSERT(end >= start);
+        SC_ASSERT_RELEASE(end >= start);
         return StringView(text, 0, false, encoding);
     }
 
@@ -302,7 +302,7 @@ struct SC_EXPORT_SYMBOL SC::StringView
     {
         if (start + length > sizeInBytes())
         {
-            SC_RELEASE_ASSERT(start + length > sizeInBytes());
+            SC_ASSERT_RELEASE(start + length > sizeInBytes());
             return StringView(text, 0, false, encoding);
         }
         return StringView(text + start, length, hasNullTerm and (start + length == sizeInBytes()), encoding);

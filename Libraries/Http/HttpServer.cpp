@@ -136,17 +136,17 @@ void SC::HttpServerAsync::onNewClient(AsyncSocketAccept::Result& result)
         client.asyncReceive.setDebugName(client.debugName.bytesIncludingTerminator());
         client.asyncReceive.callback.bind<HttpServerAsync, &HttpServerAsync::onReceive>(this);
         succeeded &= client.asyncReceive.start(*asyncAccept.getEventLoop(), client.socket, buffer.toSpan());
-        SC_RELEASE_ASSERT(succeeded);
+        SC_ASSERT_RELEASE(succeeded);
     }
     result.reactivateRequest(true);
 }
 
 void SC::HttpServerAsync::onReceive(AsyncSocketReceive::Result& result)
 {
-    SC_DISABLE_OFFSETOF_WARNING
+    SC_COMPILER_WARNING_PUSH_OFFSETOF
     RequestClient& requestClient = SC_FIELD_OFFSET(RequestClient, asyncReceive, result.async);
-    SC_ENABLE_OFFSETOF_WARNING
-    SC_RELEASE_ASSERT(&requestClient.asyncReceive == &result.async);
+    SC_COMPILER_WARNING_POP
+    SC_ASSERT_RELEASE(&requestClient.asyncReceive == &result.async);
     ClientChannel& client = *requests.get(requestClient.key.cast_to<ClientChannel>());
     Span<char>     readData;
     if (not result.moveTo(readData))
@@ -182,9 +182,9 @@ void SC::HttpServerAsync::onAfterSend(AsyncSocketSend::Result& result)
 {
     if (result.isValid())
     {
-        SC_DISABLE_OFFSETOF_WARNING
+        SC_COMPILER_WARNING_PUSH_OFFSETOF
         RequestClient& requestClient = SC_FIELD_OFFSET(RequestClient, asyncSend, result.async);
-        SC_ENABLE_OFFSETOF_WARNING
+        SC_COMPILER_WARNING_POP
         auto clientKey = requestClient.key.cast_to<ClientChannel>();
         requests.get(clientKey)->response.outputBuffer.clear();
     }

@@ -106,7 +106,7 @@ static constexpr Nm ClNm()
 template <typename T>
 struct TypeToString
 {
-#if SC_CPP_AT_LEAST_17
+#if SC_LANGUAGE_CPP_AT_LEAST_17
 private:
     // In C++ 17 we trim the long string producted by ClassName<T> to reduce executable size
     [[nodiscard]] static constexpr auto TrimClassName()

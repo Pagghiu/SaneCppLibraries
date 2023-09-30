@@ -221,7 +221,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
         {
             // We must consume these excess bytes anyway, discarding their content
             SC_TRY(options.allowDropEccessArrayItems);
-            return sourceObject->advance(sourceNumBytes - minBytes);
+            return sourceObject->advance(static_cast<size_t>(sourceNumBytes - minBytes));
         }
     }
     else
@@ -239,7 +239,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
         {
             sinkTypeIndex   = itemSinkTypeIndex;
             sourceTypeIndex = itemSourceTypeIndex;
-            SC_TRY(arraySinkStart.viewAtBytes(idx * sinkItemSize, sinkItemSize, sinkObject));
+            SC_TRY(arraySinkStart.viewAtBytes(static_cast<size_t>(idx * sinkItemSize), sinkItemSize, sinkObject));
             SC_TRY(read());
         }
         if (sourceNumElements > sinkNumElements)

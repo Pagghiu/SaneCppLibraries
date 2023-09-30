@@ -20,7 +20,7 @@ struct SC::BuildTest : public SC::TestCase
                                               StringView rootDirectory)
     {
         using namespace Build;
-        SC_WARNING_DISABLE_UNUSED_RESULT; // Doing some optimistic coding here, ignoring all failures
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT; // Doing some optimistic coding here, ignoring all failures
 
         // Workspace overrides
         Workspace workspace;
@@ -36,13 +36,13 @@ struct SC::BuildTest : public SC::TestCase
         // Configurations
         project.addPresetConfiguration(Configuration::Preset::Debug);
         project.addPresetConfiguration(Configuration::Preset::Release, "Release");
-        project.compile.addDefines({"SC_LIBRARY_PATH=$(PROJECT_DIR)/../../..", "SC_ENABLE_CONFIG_FILE=1"});
+        project.compile.addDefines({"SC_LIBRARY_PATH=$(PROJECT_DIR)/../../..", "SC_COMPILER_ENABLE_CONFIG=1"});
         project.getConfiguration("Debug")->compile.addDefines({"DEBUG=1"});
         // TODO: These includes must be relative to rootDirectory
         project.compile.addIncludes({
             "../../../..",           // Libraries
             "../../../../..",        // SC (for plugin
-            "../../../Tests/SCTest", // For SCConfig.h
+            "../../../Tests/SCTest", // For SCConfig.h (enabled by SC_COMPILER_ENABLE_CONFIG == 1)
         });
         if (parameters.platforms.contains(Build::Platform::MacOS))
         {
@@ -82,7 +82,7 @@ struct SC::BuildTest : public SC::TestCase
         workspace.projects.push_back(move(project));
         definition.workspaces.push_back(move(workspace));
 
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 

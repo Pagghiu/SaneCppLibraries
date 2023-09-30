@@ -31,7 +31,7 @@ void SC::Console::print(const StringView str)
     {
         WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), str.bytesWithoutTerminator(),
                       static_cast<DWORD>(str.sizeInBytes()), nullptr, nullptr);
-#if SC_DEBUG
+#if SC_CONFIGURATION_DEBUG
         if (str.isNullTerminated())
         {
             OutputDebugStringA(str.bytesIncludingTerminator());
@@ -58,7 +58,7 @@ void SC::Console::print(const StringView str)
         {
             WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), encodedPath.getNullTerminatedNative(),
                           static_cast<DWORD>(encodedPath.sizeInBytes() / sizeof(wchar_t)), nullptr, nullptr);
-#if SC_DEBUG
+#if SC_CONFIGURATION_DEBUG
             OutputDebugStringW(encodedPath.getNullTerminatedNative());
 #endif
         }

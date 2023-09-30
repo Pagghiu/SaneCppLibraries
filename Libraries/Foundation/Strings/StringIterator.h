@@ -242,7 +242,7 @@ struct StringIterator
 
     [[nodiscard]] constexpr bool advanceIfMatchesRange(CodePoint first, CodePoint last)
     {
-        SC_RELEASE_ASSERT(first <= last);
+        SC_ASSERT_RELEASE(first <= last);
         if (it != end)
         {
             const auto decoded = CharIterator::decode(it);
@@ -355,7 +355,7 @@ struct StringIterator
 
     constexpr StringIterator sliceFromStartUntil(StringIterator otherPoint) const
     {
-        SC_RELEASE_ASSERT(it <= otherPoint.it);
+        SC_ASSERT_RELEASE(it <= otherPoint.it);
         return StringIterator(it, otherPoint.it);
     }
 
@@ -436,7 +436,7 @@ struct StringIteratorASCII : public StringIterator<StringIteratorASCII>
         else
         {
             if (not isValidASCII(c))
-                SC_UNLIKELY
+                SC_LANGUAGE_UNLIKELY
                 {
                     it = end;
                     return false;

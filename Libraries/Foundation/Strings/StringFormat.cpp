@@ -35,6 +35,13 @@ bool formatSprintf(StringFormatOutput& data, const char (&formatSpecifier)[FORMA
                                                 StringEncoding::Ascii));
 }
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
+#if SC_PLATFORM_64_BIT == 0
+bool StringFormatterFor<ssize_t>::format(StringFormatOutput& data, const StringView specifier, const long value)
+{
+    constexpr char formatSpecifier[] = "d";
+    return formatSprintf(data, formatSpecifier, specifier, value);
+}
+#endif
 #else
 
 bool StringFormatterFor<SC::size_t>::format(StringFormatOutput& data, const StringView specifier,
@@ -105,7 +112,7 @@ bool StringFormatterFor<SC::uint8_t>::format(StringFormatOutput& data, const Str
 
 bool StringFormatterFor<bool>::format(StringFormatOutput& data, const StringView specifier, const bool value)
 {
-    SC_UNUSED(specifier);
+    SC_COMPILER_UNUSED(specifier);
     return data.write(value ? "true"_a8 : "false"_a8);
 }
 bool StringFormatterFor<float>::format(StringFormatOutput& data, StringView specifier, const float value)
@@ -122,27 +129,27 @@ bool StringFormatterFor<double>::format(StringFormatOutput& data, const StringVi
 
 bool StringFormatterFor<char>::format(StringFormatOutput& data, const StringView specifier, const char value)
 {
-    SC_UNUSED(specifier);
+    SC_COMPILER_UNUSED(specifier);
     return data.write(StringView(&value, sizeof(value), false, StringEncoding::Ascii));
 }
 
 bool StringFormatterFor<const char*>::format(StringFormatOutput& data, const StringView specifier, const char* value)
 {
-    SC_UNUSED(specifier);
+    SC_COMPILER_UNUSED(specifier);
     return data.write(StringView(value, strlen(value), true, StringEncoding::Ascii));
 }
 
 #if SC_PLATFORM_WINDOWS
 bool StringFormatterFor<wchar_t>::format(StringFormatOutput& data, const StringView specifier, const wchar_t value)
 {
-    SC_UNUSED(specifier);
+    SC_COMPILER_UNUSED(specifier);
     return data.write(StringView({&value, sizeof(value)}, false));
 }
 
 bool StringFormatterFor<const wchar_t*>::format(StringFormatOutput& data, const StringView specifier,
                                                 const wchar_t* value)
 {
-    SC_UNUSED(specifier);
+    SC_COMPILER_UNUSED(specifier);
     return data.write(StringView({value, wcslen(value) * sizeof(wchar_t)}, true));
 }
 #endif
@@ -150,7 +157,7 @@ bool StringFormatterFor<const wchar_t*>::format(StringFormatOutput& data, const 
 bool StringFormatterFor<SC::StringView>::format(StringFormatOutput& data, const StringView specifier,
                                                 const SC::StringView value)
 {
-    SC_UNUSED(specifier);
+    SC_COMPILER_UNUSED(specifier);
     return data.write(value);
 }
 
@@ -179,7 +186,7 @@ bool StringFormatOutput::write(StringView text)
     }
     else
     {
-        SC_DEBUG_ASSERT("StringFormatOutput::write - Forgot to set buffer or console" && 0);
+        SC_ASSERT_DEBUG("StringFormatOutput::write - Forgot to set buffer or console" && 0);
         return false;
     }
 }

@@ -14,17 +14,17 @@ struct StrongID
 
     explicit constexpr StrongID(IDType value) : identifier(value) {}
 
-    [[nodiscard]] constexpr SC_ALWAYS_INLINE bool operator==(StrongID other) const
+    [[nodiscard]] constexpr SC_COMPILER_FORCE_INLINE bool operator==(StrongID other) const
     {
         return identifier == other.identifier;
     }
 
-    [[nodiscard]] constexpr SC_ALWAYS_INLINE bool operator!=(StrongID other) const
+    [[nodiscard]] constexpr SC_COMPILER_FORCE_INLINE bool operator!=(StrongID other) const
     {
         return identifier != other.identifier;
     }
 
-    [[nodiscard]] constexpr SC_ALWAYS_INLINE bool isValid() const { return identifier != InvalidValue; }
+    [[nodiscard]] constexpr SC_COMPILER_FORCE_INLINE bool isValid() const { return identifier != InvalidValue; }
 
     template <typename Container>
     [[nodiscard]] constexpr static StrongID generateUniqueKey(const Container& container)

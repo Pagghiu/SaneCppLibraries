@@ -71,10 +71,10 @@ struct MetaClass<TestNamespace::SimpleStructure> : MetaStruct<MetaClass<TestName
     template <typename MemberVisitor>
     static constexpr bool visit(MemberVisitor&& visitor)
     {
-        return                                               //
-            visitor(0, "f1", &T::f1, SC_OFFSETOF(T, f1)) and //
-            visitor(1, "f2", &T::f2, SC_OFFSETOF(T, f2)) and //
-            visitor(2, "arrayOfInt", &T::arrayOfInt, SC_OFFSETOF(T, arrayOfInt));
+        return                                                        //
+            visitor(0, "f1", &T::f1, SC_COMPILER_OFFSETOF(T, f1)) and //
+            visitor(1, "f2", &T::f2, SC_COMPILER_OFFSETOF(T, f2)) and //
+            visitor(2, "arrayOfInt", &T::arrayOfInt, SC_COMPILER_OFFSETOF(T, arrayOfInt));
     }
 };
 
@@ -85,8 +85,8 @@ struct MetaClass<TestNamespace::IntermediateStructure> : MetaStruct<MetaClass<Te
     static constexpr bool visit(MemberVisitor&& visitor)
     {
         return //
-            visitor(1, "vectorOfInt", &T::vectorOfInt, SC_OFFSETOF(T, vectorOfInt)) and
-            visitor(0, "simpleStructure", &T::simpleStructure, SC_OFFSETOF(T, simpleStructure));
+            visitor(1, "vectorOfInt", &T::vectorOfInt, SC_COMPILER_OFFSETOF(T, vectorOfInt)) and
+            visitor(0, "simpleStructure", &T::simpleStructure, SC_COMPILER_OFFSETOF(T, simpleStructure));
     }
 };
 
@@ -96,13 +96,14 @@ struct MetaClass<TestNamespace::ComplexStructure> : MetaStruct<MetaClass<TestNam
     template <typename MemberVisitor>
     static constexpr bool visit(MemberVisitor&& visitor)
     {
-        return                                                                                                        //
-            visitor(0, "f1", &T::f1, SC_OFFSETOF(T, f1)) and                                                          //
-            visitor(1, "simpleStructure", &T::simpleStructure, SC_OFFSETOF(T, simpleStructure)) and                   //
-            visitor(2, "simpleStructure2", &T::simpleStructure2, SC_OFFSETOF(T, simpleStructure2)) and                //
-            visitor(3, "f4", &T::f4, SC_OFFSETOF(T, f4)) and                                                          //
-            visitor(4, "intermediateStructure", &T::intermediateStructure, SC_OFFSETOF(T, intermediateStructure)) and //
-            visitor(5, "vectorOfStructs", &T::vectorOfStructs, SC_OFFSETOF(T, vectorOfStructs));
+        return                                                                                                  //
+            visitor(0, "f1", &T::f1, SC_COMPILER_OFFSETOF(T, f1)) and                                           //
+            visitor(1, "simpleStructure", &T::simpleStructure, SC_COMPILER_OFFSETOF(T, simpleStructure)) and    //
+            visitor(2, "simpleStructure2", &T::simpleStructure2, SC_COMPILER_OFFSETOF(T, simpleStructure2)) and //
+            visitor(3, "f4", &T::f4, SC_COMPILER_OFFSETOF(T, f4)) and                                           //
+            visitor(4, "intermediateStructure", &T::intermediateStructure,
+                    SC_COMPILER_OFFSETOF(T, intermediateStructure)) and //
+            visitor(5, "vectorOfStructs", &T::vectorOfStructs, SC_COMPILER_OFFSETOF(T, vectorOfStructs));
     }
 };
 } // namespace Reflection

@@ -167,7 +167,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadWriteFast::writeArrayVecto
         for (uint64_t idx = 0; idx < numElements; ++idx)
         {
             sourceTypeIndex = itemTypeIndex;
-            SC_TRY(arraySpan.viewAtBytes(idx * itemSize, itemSize, sourceObject));
+            SC_TRY(arraySpan.viewAtBytes(static_cast<size_t>(idx * itemSize), itemSize, sourceObject));
             SC_TRY(write());
         }
     }
@@ -261,7 +261,7 @@ bool SC::SerializationBinaryTypeErased::SimpleBinaryReader::readArrayVector()
         for (uint64_t idx = 0; idx < sinkNumElements; ++idx)
         {
             sinkTypeIndex = itemSinkTypeIndex;
-            SC_TRY(arraySinkStart.viewAtBytes(idx * sinkItemSize, sinkItemSize, sinkObject));
+            SC_TRY(arraySinkStart.viewAtBytes(static_cast<size_t>(idx * sinkItemSize), sinkItemSize, sinkObject));
             SC_TRY(read());
         }
     }

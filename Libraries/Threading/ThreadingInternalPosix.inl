@@ -38,7 +38,7 @@ struct SC::Thread::Internal
 
     static void setThreadName(pthread_t& threadHandle, const StringView& nameNullTerminated)
     {
-        SC_UNUSED(threadHandle);
+        SC_COMPILER_UNUSED(threadHandle);
 #if !SC_PLATFORM_EMSCRIPTEN
         pthread_setname_np(nameNullTerminated.getNullTerminatedNative());
 #endif

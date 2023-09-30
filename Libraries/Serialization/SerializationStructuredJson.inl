@@ -107,7 +107,7 @@ bool SC::SerializationStructuredTemplate::SerializationJsonReader::eventuallyExp
 
 bool SC::SerializationStructuredTemplate::SerializationJsonReader::serialize(uint32_t index, String& text)
 {
-    SC_UNUSED(text);
+    SC_COMPILER_UNUSED(text);
     SC_TRY(eventuallyExpectComma(index));
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
     SC_TRY(token.type == JsonTokenizer::Token::String);
@@ -147,7 +147,7 @@ bool SC::SerializationStructuredTemplate::SerializationJsonReader::getNextField(
 
 bool SC::SerializationStructuredTemplate::SerializationJsonReader::serialize(uint32_t index, float& value)
 {
-    SC_UNUSED(value);
+    SC_COMPILER_UNUSED(value);
     SC_TRY(eventuallyExpectComma(index));
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
     SC_TRY(token.type == JsonTokenizer::Token::Number);
@@ -156,7 +156,7 @@ bool SC::SerializationStructuredTemplate::SerializationJsonReader::serialize(uin
 
 bool SC::SerializationStructuredTemplate::SerializationJsonReader::serialize(uint32_t index, int32_t& value)
 {
-    SC_UNUSED(value);
+    SC_COMPILER_UNUSED(value);
     SC_TRY(eventuallyExpectComma(index));
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
     SC_TRY(token.type == JsonTokenizer::Token::Number);

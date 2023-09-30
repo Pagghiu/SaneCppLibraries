@@ -368,7 +368,7 @@ SC::ReturnCode SC::PluginCompiler::link(const PluginDefinition& definition, Stri
         SC_TRY(args.push_back(obj.view()));
     }
     SC_TRY(args.push_back(outFile.view()));
-    SC_UNUSED(executablePath);
+    SC_COMPILER_UNUSED(executablePath);
 #else
     SC_TRY(args.push_back({"clang", "-bundle_loader", executablePath, "-bundle", "-fpic", "-nostdlib++", "-nostdlib"}));
     SC_TRY(objectFiles.reserve(definition.files.size()));
@@ -485,7 +485,7 @@ SC::ReturnCode SC::PluginRegistry::unloadPlugin(const StringView identifier)
         }
         auto closeResult = lib.pluginClose(lib.instance);
         lib.instance     = nullptr;
-        SC_UNUSED(closeResult); // TODO: Print / Return some warning
+        SC_COMPILER_UNUSED(closeResult); // TODO: Print / Return some warning
     }
     return lib.unload();
 }

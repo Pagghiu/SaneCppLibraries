@@ -25,7 +25,7 @@ struct SC::String
     String(StringEncoding encoding = StringEncoding::Utf8) : encoding(encoding) {}
 
     // TODO: Figure out if removing this constructor in favour of the fallible assign makes the api ugly
-    String(const StringView& sv) { SC_RELEASE_ASSERT(assign(sv)); }
+    String(const StringView& sv) { SC_ASSERT_RELEASE(assign(sv)); }
 
     String(Vector<char>&& data, StringEncoding encoding) : encoding(encoding), data(move(data)) {}
 
@@ -40,13 +40,13 @@ struct SC::String
 #if SC_PLATFORM_WINDOWS
     [[nodiscard]] wchar_t* nativeWritableBytesIncludingTerminator()
     {
-        SC_RELEASE_ASSERT(encoding == StringEncoding::Utf16);
+        SC_ASSERT_RELEASE(encoding == StringEncoding::Utf16);
         return reinterpret_cast<wchar_t*>(data.data());
     }
 #else
     [[nodiscard]] char* nativeWritableBytesIncludingTerminator()
     {
-        SC_RELEASE_ASSERT(encoding < StringEncoding::Utf16);
+        SC_ASSERT_RELEASE(encoding < StringEncoding::Utf16);
         return data.data();
     }
 #endif
@@ -91,7 +91,7 @@ struct SC::SmallString : public String
         SegmentHeader* header         = SegmentHeader::getSegmentHeader(buffer.items);
         header->options.isSmallVector = true;
         String::data.items            = buffer.items;
-        SC_RELEASE_ASSERT(assign(view));
+        SC_ASSERT_RELEASE(assign(view));
     }
     SmallString(Vector<char>&& data, StringEncoding encoding) : String(forward<Vector<char>>(data), encoding) {}
 
@@ -110,7 +110,7 @@ struct SC::SmallString : public String
 
     SmallString& operator=(StringView other)
     {
-        SC_RELEASE_ASSERT(assign(other));
+        SC_ASSERT_RELEASE(assign(other));
         return *this;
     }
 

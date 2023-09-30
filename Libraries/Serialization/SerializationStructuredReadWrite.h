@@ -23,7 +23,7 @@ struct SerializerReadWriteFastMemberIterator
     template <typename R, int N>
     constexpr bool operator()(int order, const char (&name)[N], R& field)
     {
-        SC_UNUSED(order);
+        SC_COMPILER_UNUSED(order);
         const StringView fieldName = StringView(name, N - 1, true, StringEncoding::Ascii);
         SC_TRY(stream.startObjectField(index++, fieldName));
         return SerializationReadWrite<SerializerStream, R>::serialize(0, field, stream);
@@ -42,7 +42,7 @@ struct SerializerReadVersionedMemberIterator
     template <typename R, int N>
     constexpr bool operator()(int order, const char (&name)[N], R& field)
     {
-        SC_UNUSED(order);
+        SC_COMPILER_UNUSED(order);
         const StringView fieldName = StringView(name, N - 1, true, StringEncoding::Ascii);
         if (fieldName == fieldToFind)
         {

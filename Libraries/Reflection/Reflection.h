@@ -4,7 +4,7 @@
 #pragma once
 
 #if SC_META_ENABLE_AUTO_REFLECTION
-#if SC_CPP_LESS_THAN_20
+#if SC_LANGUAGE_CPP_LESS_THAN_20
 #include "ReflectionAutoAggregates.h"
 #else
 #include "ReflectionAutoStructured.h"
@@ -247,7 +247,7 @@ struct MetaStruct<MetaClass<Type>>
         template <typename R, int N>
         constexpr bool operator()(int order, const char (&name)[N], R Type::*field, size_t offset) const
         {
-            SC_UNUSED(offset);
+            SC_COMPILER_UNUSED(offset);
             return builder(order, name, object.*field);
         }
     };
@@ -269,15 +269,15 @@ struct MetaStruct<MetaClass<Type>>
         template <typename MemberVisitor>                                                                              \
         static constexpr bool visit(MemberVisitor&& builder)                                                           \
         {                                                                                                              \
-            SC_DISABLE_OFFSETOF_WARNING                                                                                \
+            SC_COMPILER_WARNING_PUSH_OFFSETOF                                                                          \
             return true
 
-#define SC_META_MEMBER(MEMBER)              #MEMBER, &T::MEMBER, SC_OFFSETOF(T, MEMBER)
-#define SC_META_STRUCT_FIELD(ORDER, MEMBER) and builder(ORDER, #MEMBER, &T::MEMBER, SC_OFFSETOF(T, MEMBER))
+#define SC_META_MEMBER(MEMBER)              #MEMBER, &T::MEMBER, SC_COMPILER_OFFSETOF(T, MEMBER)
+#define SC_META_STRUCT_FIELD(ORDER, MEMBER) and builder(ORDER, #MEMBER, &T::MEMBER, SC_COMPILER_OFFSETOF(T, MEMBER))
 
 #define SC_META_STRUCT_LEAVE()                                                                                         \
     ;                                                                                                                  \
-    SC_ENABLE_OFFSETOF_WARNING                                                                                         \
+    SC_COMPILER_WARNING_POP                                                                                            \
     }                                                                                                                  \
     }                                                                                                                  \
     ;

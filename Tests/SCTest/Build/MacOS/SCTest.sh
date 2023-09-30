@@ -40,6 +40,8 @@ mkdir -p "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}"
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 time g++-13 -std=c++14 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -I${SCRIPT_DIR}/../../ \
+-DSC_LIBRARY_PATH=$(PWD)/../../../.. \
+-DSC_COMPILER_ENABLE_CONFIG=1 \
 -framework CoreFoundation \
 -framework CoreServices \
 -o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest \

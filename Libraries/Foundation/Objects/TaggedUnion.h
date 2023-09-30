@@ -105,7 +105,7 @@ struct SC::TaggedUnion
         template <int Index>
         static void visit(TaggedUnion* t1, TaggedUnion* t2)
         {
-            SC_UNUSED(t2);
+            SC_COMPILER_UNUSED(t2);
             using T = typename TypeAt<Index>::type;
             t1->fieldAt<Index>().~T();
         }

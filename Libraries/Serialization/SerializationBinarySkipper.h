@@ -96,7 +96,7 @@ struct BinarySkipper
         const bool isPacked = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
         if (isPacked)
         {
-            return sourceObject.advance(sourceNumBytes);
+            return sourceObject.advance(static_cast<size_t>(sourceNumBytes));
         }
         else
         {

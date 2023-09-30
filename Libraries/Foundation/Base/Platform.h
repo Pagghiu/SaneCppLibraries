@@ -4,11 +4,11 @@
 #pragma once
 
 #if defined(DEBUG) || defined(_DEBUG)
-#define SC_DEBUG   1
-#define SC_RELEASE 0
+#define SC_CONFIGURATION_DEBUG   1
+#define SC_CONFIGURATION_RELEASE 0
 #else
-#define SC_DEBUG   0
-#define SC_RELEASE 1
+#define SC_CONFIGURATION_DEBUG   0
+#define SC_CONFIGURATION_RELEASE 1
 #endif
 
 #if defined(__APPLE__)

@@ -27,22 +27,22 @@ struct [[nodiscard]] SC::Optional
     bool valueExists;
 
   public:
-    [[nodiscard]] bool           hasValue() const { return valueExists; }
-    SC_CONSTEXPR_CONSTRUCTOR_NEW Optional(const Value& v)
+    [[nodiscard]] bool hasValue() const { return valueExists; }
+    constexpr Optional(const Value& v)
     {
         new (&value, PlacementNew()) ValueType(v);
         valueExists = true;
     }
 
-    SC_CONSTEXPR_CONSTRUCTOR_NEW Optional(Value&& v)
+    constexpr Optional(Value&& v)
     {
         new (&value, PlacementNew()) ValueType(forward<Value>(v));
         valueExists = true;
     }
 
-    SC_CONSTEXPR_CONSTRUCTOR_NEW Optional() { valueExists = false; }
+    constexpr Optional() { valueExists = false; }
 
-    SC_CONSTEXPR_DESTRUCTOR ~Optional()
+    SC_LANGUAGE_CONSTEXPR_DESTRUCTOR ~Optional()
     {
         if (valueExists)
         {
@@ -50,7 +50,7 @@ struct [[nodiscard]] SC::Optional
         }
     }
 
-    SC_CONSTEXPR_CONSTRUCTOR_NEW Optional(Optional&& other) noexcept
+    constexpr Optional(Optional&& other) noexcept
     {
         valueExists = other.valueExists;
         if (valueExists)
@@ -60,7 +60,7 @@ struct [[nodiscard]] SC::Optional
         }
     }
 
-    SC_CONSTEXPR_CONSTRUCTOR_NEW Optional(const Optional& other)
+    constexpr Optional(const Optional& other)
     {
         valueExists = other.valueExists;
         if (valueExists)

@@ -48,7 +48,7 @@ struct SC::Thread::CreateParams
     }
 };
 
-SC::Thread::~Thread() { SC_DEBUG_ASSERT(not thread.hasValue() && "Forgot to call join() or detach()"); }
+SC::Thread::~Thread() { SC_ASSERT_DEBUG(not thread.hasValue() && "Forgot to call join() or detach()"); }
 
 SC::ReturnCode SC::Thread::start(StringView name, Action* func, Action* syncFunc)
 {

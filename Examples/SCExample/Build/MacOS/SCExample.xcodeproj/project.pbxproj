@@ -87,7 +87,7 @@
 		7B0C909D2972F28C001D97A2 /* ReflectionClassInfo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ReflectionClassInfo.h; path = ../../../../Libraries/Reflection/ReflectionClassInfo.h; sourceTree = "<group>"; };
 		7B0C90A02972F28C001D97A2 /* ResultTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ResultTest.h; path = ../../../../Libraries/Foundation/ResultTest.h; sourceTree = "<group>"; };
 		7B0C90A22972F28C001D97A2 /* Limits.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Limits.h; path = ../../../../Libraries/Foundation/Limits.h; sourceTree = "<group>"; };
-		7B0C90A32972F28C001D97A2 /* MemoryTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MemoryTest.h; path = ../../../../Libraries/Foundation/MemoryTest.h; sourceTree = "<group>"; };
+		7B0C90A32972F28C001D97A2 /* BaseTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = BaseTest.h; path = ../../../../Libraries/Foundation/BaseTest.h; sourceTree = "<group>"; };
 		7B0C90A42972F28C001D97A2 /* SerializationBinarySkipper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SerializationBinarySkipper.h; path = ../../../../Libraries/Serialization/SerializationBinarySkipper.h; sourceTree = "<group>"; };
 		7B0C90A52972F28C001D97A2 /* SmallVector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SmallVector.h; path = ../../../../Libraries/Foundation/SmallVector.h; sourceTree = "<group>"; };
 		7B0C90A62972F28C001D97A2 /* Base.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Base.cpp; path = ../../../../Libraries/Foundation/Base.cpp; sourceTree = "<group>"; };
@@ -213,7 +213,7 @@
 				7B0C909A2972F28C001D97A2 /* MapTest.h */,
 				7B0C90A62972F28C001D97A2 /* Base.cpp */,
 				7B0C90AB2972F28C001D97A2 /* Memory.h */,
-				7B0C90A32972F28C001D97A2 /* MemoryTest.h */,
+				7B0C90A32972F28C001D97A2 /* BaseTest.h */,
 				7B14821529EDCED200477EF4 /* Opaque.h */,
 				7B14821E29EDCED200477EF4 /* OpaqueTest.h */,
 				7B14821829EDCED200477EF4 /* Optional.h */,

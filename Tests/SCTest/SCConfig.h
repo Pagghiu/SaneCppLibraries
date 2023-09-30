@@ -9,5 +9,4 @@
 // Issue so far when in C++ 20:
 // - Cannot auto-deduce structs that inherit from other
 #define SC_META_ENABLE_AUTO_REFLECTION 1
-// #define SC_CPP_STANDARD_FORCE          14
-#define SC_ENABLE_STD_CPP_LIBRARY 0
+#define SC_LANGUAGE_FORCE_STANDARD_CPP 14

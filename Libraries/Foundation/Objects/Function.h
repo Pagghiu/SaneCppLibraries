@@ -119,7 +119,7 @@ struct SC::Function<R(Args...)>
         {
             Lambda& lambda = *reinterpret_cast<Lambda*>(const_cast<void**>(p));
             if (operation == FunctionErasedOperation::Execute)
-                SC_LIKELY { return lambda(*args...); }
+                SC_LANGUAGE_LIKELY { return lambda(*args...); }
             else if (operation == FunctionErasedOperation::LambdaDestruct)
                 lambda.~Lambda();
             else if (operation == FunctionErasedOperation::LambdaCopyConstruct)
@@ -143,7 +143,7 @@ struct SC::Function<R(Args...)>
     Function& bind(const Class* c)
     {
         sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
-        SC_RELEASE_ASSERT(c != nullptr);
+        SC_ASSERT_RELEASE(c != nullptr);
         classInstance = c;
         functionStub  = &MemberWrapper<Class, MemberFunction>;
         return *this;
@@ -153,7 +153,7 @@ struct SC::Function<R(Args...)>
     Function& bind(Class* c)
     {
         sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
-        SC_RELEASE_ASSERT(c != nullptr);
+        SC_ASSERT_RELEASE(c != nullptr);
         classInstance = c;
         functionStub  = &MemberWrapper<Class, MemberFunction>;
         return *this;
@@ -172,7 +172,7 @@ struct SC::Function<R(Args...)>
                            typename RemoveReference<Args>::type*... args)
     {
         if (operation == FunctionErasedOperation::Execute)
-            SC_LIKELY
+            SC_LANGUAGE_LIKELY
             {
                 Class* cls = const_cast<Class*>(static_cast<const Class*>(*p));
                 return (cls->*MemberFunction)(*args...);
@@ -190,7 +190,7 @@ struct SC::Function<R(Args...)>
                            typename RemoveReference<Args>::type*... args)
     {
         if (operation == FunctionErasedOperation::Execute)
-            SC_LIKELY
+            SC_LANGUAGE_LIKELY
             {
                 const Class* cls = static_cast<const Class*>(*p);
                 return (cls->*MemberFunction)(*args...);
@@ -207,10 +207,10 @@ struct SC::Function<R(Args...)>
     static R FunctionWrapper(FunctionErasedOperation operation, const void** other, const void* const* p,
                              typename RemoveReference<Args>::type*... args)
     {
-        SC_UNUSED(other);
-        SC_UNUSED(p);
+        SC_COMPILER_UNUSED(other);
+        SC_COMPILER_UNUSED(p);
         if (operation == FunctionErasedOperation::Execute)
-            SC_LIKELY { return FreeFunction(*args...); }
+            SC_LANGUAGE_LIKELY { return FreeFunction(*args...); }
         return R();
     }
 };
@@ -229,14 +229,14 @@ struct FunctionDeducerCreator
     template <R (Class::*MemberFunction)(Args...)>
     static Function<R(Args...)> Bind(Class* object)
     {
-        SC_RELEASE_ASSERT(object != nullptr);
+        SC_ASSERT_RELEASE(object != nullptr);
         return Function<R(Args...)>(object, &Function<R(Args...)>::template MemberWrapper<Class, MemberFunction>);
     }
 
     template <R (Class::*MemberFunction)(Args...) const>
     static Function<R(Args...)> Bind(const Class* object)
     {
-        SC_RELEASE_ASSERT(object != nullptr);
+        SC_ASSERT_RELEASE(object != nullptr);
         return Function<R(Args...)>(object, &Function<R(Args...)>::template MemberWrapper<Class, MemberFunction>);
     }
 };

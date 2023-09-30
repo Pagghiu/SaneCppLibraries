@@ -42,6 +42,8 @@ mkdir -p "_Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest"
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 time em++ -std=c++20 -nostdinc++ -fno-rtti -fno-exceptions ${GCC_DEBUG_FLAG} \
 -I${SCRIPT_DIR}/../../ \
+-DSC_LIBRARY_PATH=$(PWD)/../../../.. \
+-DSC_COMPILER_ENABLE_CONFIG=1 \
 -o _Build/Output/${GCC_DIRECTORY}-${GCC_CONFIGURATION}/SCTest/SCTest.html \
 -sSTRICT=1 \
 -sENVIRONMENT=web \

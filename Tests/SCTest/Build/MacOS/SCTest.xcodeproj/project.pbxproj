@@ -129,7 +129,7 @@
 		7B319D152AB750C900F7E761 /* Limits.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Limits.h; sourceTree = "<group>"; };
 		7B319D162AB750C900F7E761 /* Language.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Language.h; sourceTree = "<group>"; };
 		7B319D172AB750C900F7E761 /* InitializerList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InitializerList.h; sourceTree = "<group>"; };
-		7B319D182AB750C900F7E761 /* MemoryTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MemoryTest.h; sourceTree = "<group>"; };
+		7B319D182AB750C900F7E761 /* BaseTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BaseTest.h; sourceTree = "<group>"; };
 		7B319D192AB750C900F7E761 /* Memory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Memory.h; sourceTree = "<group>"; };
 		7B319D1A2AB750C900F7E761 /* LibC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LibC.h; sourceTree = "<group>"; };
 		7B319D1B2AB750C900F7E761 /* Assert.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Assert.h; sourceTree = "<group>"; };
@@ -419,13 +419,13 @@
 			children = (
 				7B319D1B2AB750C900F7E761 /* Assert.h */,
 				7B319D122AB750C900F7E761 /* Base.cpp */,
+				7B319D182AB750C900F7E761 /* BaseTest.h */,
 				7B319D132AB750C900F7E761 /* Compiler.h */,
 				7B319D172AB750C900F7E761 /* InitializerList.h */,
 				7B319D162AB750C900F7E761 /* Language.h */,
 				7B319D1A2AB750C900F7E761 /* LibC.h */,
 				7B319D152AB750C900F7E761 /* Limits.h */,
 				7B319D192AB750C900F7E761 /* Memory.h */,
-				7B319D182AB750C900F7E761 /* MemoryTest.h */,
 				7B319D1C2AB750C900F7E761 /* Platform.h */,
 				7B319D142AB750C900F7E761 /* Types.h */,
 			);
@@ -993,7 +993,7 @@
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
 					"SC_LIBRARY_PATH=$(PROJECT_DIR)/../../../..",
-					"SC_ENABLE_CONFIG_FILE=1",
+					"SC_COMPILER_ENABLE_CONFIG=1",
 				);
 				GCC_TREAT_IMPLICIT_FUNCTION_DECLARATIONS_AS_ERRORS = YES;
 				GCC_TREAT_INCOMPATIBLE_POINTER_TYPE_WARNINGS_AS_ERRORS = YES;
@@ -1073,7 +1073,7 @@
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"SC_LIBRARY_PATH=$(PROJECT_DIR)/../../../..",
-					"SC_ENABLE_CONFIG_FILE=1",
+					"SC_COMPILER_ENABLE_CONFIG=1",
 				);
 				GCC_TREAT_IMPLICIT_FUNCTION_DECLARATIONS_AS_ERRORS = YES;
 				GCC_TREAT_INCOMPATIBLE_POINTER_TYPE_WARNINGS_AS_ERRORS = YES;

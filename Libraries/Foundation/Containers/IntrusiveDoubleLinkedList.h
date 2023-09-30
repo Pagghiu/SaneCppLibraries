@@ -32,7 +32,7 @@ struct SC::IntrusiveDoubleLinkedList
             return;
         if (other.front)
         {
-            SC_DEBUG_ASSERT(other.front->prev == nullptr);
+            SC_ASSERT_DEBUG(other.front->prev == nullptr);
             queueBackUnchecked(*other.front, *other.back);
         }
         other.clear();
@@ -40,7 +40,7 @@ struct SC::IntrusiveDoubleLinkedList
 
     void queueBack(T& item)
     {
-        SC_DEBUG_ASSERT(item.next == nullptr and item.prev == nullptr);
+        SC_ASSERT_DEBUG(item.next == nullptr and item.prev == nullptr);
         queueBackUnchecked(item, item);
     }
 
@@ -54,12 +54,12 @@ struct SC::IntrusiveDoubleLinkedList
         }
         else
         {
-            SC_DEBUG_ASSERT(front == nullptr);
+            SC_ASSERT_DEBUG(front == nullptr);
             front = &item;
         }
         back = &newBack;
-        SC_DEBUG_ASSERT(back->next == nullptr);
-        SC_DEBUG_ASSERT(front->prev == nullptr);
+        SC_ASSERT_DEBUG(back->next == nullptr);
+        SC_ASSERT_DEBUG(front->prev == nullptr);
     }
 
   public:
@@ -86,7 +86,7 @@ struct SC::IntrusiveDoubleLinkedList
 
     void remove(T& item)
     {
-#if SC_DEBUG
+#if SC_CONFIGURATION_DEBUG
         bool found = false;
         auto it    = front;
         while (it)
@@ -98,7 +98,7 @@ struct SC::IntrusiveDoubleLinkedList
             }
             it = it->next;
         }
-        SC_DEBUG_ASSERT(found);
+        SC_ASSERT_DEBUG(found);
 #endif
         if (&item == front)
         {

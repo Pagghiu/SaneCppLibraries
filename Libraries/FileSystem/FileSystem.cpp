@@ -172,7 +172,7 @@ SC::ReturnCode SC::FileSystem::formatError(int errorNumber, StringView item, boo
     else
 #endif
     {
-        SC_UNUSED(isWindowsNativeError);
+        SC_COMPILER_UNUSED(isWindowsNativeError);
         if (not preciseErrorMessages)
         {
             return getErrorCode(errorNumber);

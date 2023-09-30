@@ -156,7 +156,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     [[nodiscard]] bool writePBXBuildFile(StringBuilder& builder, const Vector<RenderItem>& xcodeFiles)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(R"delimiter(
 /* Begin PBXBuildFile section */
 )delimiter");
@@ -177,7 +177,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 
         builder.append(R"delimiter(/* End PBXBuildFile section */
 )delimiter");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
@@ -202,7 +202,7 @@ struct SC::Build::ProjectWriter::WriterXCode
     [[nodiscard]] bool writePBXFileReference(StringBuilder& builder, const Project& project,
                                              const Vector<RenderItem>& xcodeFiles)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
 
         builder.append(R"delimiter(
 /* Begin PBXFileReference section */)delimiter");
@@ -245,13 +245,13 @@ struct SC::Build::ProjectWriter::WriterXCode
 
         builder.append("\n/* End PBXFileReference section */");
 
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     [[nodiscard]] bool writePBXFrameworksBuildPhase(StringBuilder& builder, const Vector<RenderItem>& xcodeObjects)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(R"delimiter(
 /* Begin PBXFrameworksBuildPhase section */
         7B00740F2A73143F00660B94 /* Frameworks */ = {
@@ -272,12 +272,12 @@ struct SC::Build::ProjectWriter::WriterXCode
         };
 /* End PBXFrameworksBuildPhase section */
 )delimiter");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
     [[nodiscard]] bool writePBXNativeTarget(StringBuilder& builder, const Project& project)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(R"delimiter(
 /* Begin PBXNativeTarget section */
         7B0074112A73143F00660B94 /* {} */ = {{
@@ -301,13 +301,13 @@ struct SC::Build::ProjectWriter::WriterXCode
 )delimiter",
                        project.targetName.view(), project.targetName.view(), project.targetName.view(),
                        project.targetName.view(), project.targetName.view());
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     [[nodiscard]] bool writePBXProject(StringBuilder& builder, const Project& project)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(R"delimiter(
 /* Begin PBXProject section */
         7B00740A2A73143F00660B94 /* Project object */ = {
@@ -345,13 +345,13 @@ struct SC::Build::ProjectWriter::WriterXCode
         };
 /* End PBXProject section */
 )delimiter");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     [[nodiscard]] bool writePBXSourcesBuildPhase(StringBuilder& builder, const Vector<RenderItem>& xcodeFiles)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(R"delimiter(
 /* Begin PBXSourcesBuildPhase section */
         7B00740E2A73143F00660B94 /* Sources */ = {
@@ -371,7 +371,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         };
 /* End PBXSourcesBuildPhase section */
 )delimiter");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
     [[nodiscard]] bool writeIncludePaths(StringBuilder& builder, const Project& project)
@@ -495,7 +495,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     [[nodiscard]] bool writeConfiguration(StringBuilder& builder, const Project& project, const RenderItem& xcodeObject)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(
             R"delimiter(
         {} /* {} */ = {{
@@ -570,14 +570,14 @@ struct SC::Build::ProjectWriter::WriterXCode
             name = {};
         }};)delimiter",
                        xcodeObject.name.view());
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     [[nodiscard]] bool writeXCBuildConfiguration(StringBuilder& builder, const Project& project,
                                                  Vector<RenderItem>& xcodeObjects)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("\n/* Begin XCBuildConfiguration section */");
 
         for (auto& configuration : xcodeObjects)
@@ -605,14 +605,14 @@ struct SC::Build::ProjectWriter::WriterXCode
             }
         }
         builder.append("\n/* End XCBuildConfiguration section */\n");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     [[nodiscard]] bool writeXCConfigurationList(StringBuilder& builder, const Project& project,
                                                 const Vector<RenderItem>& xcodeObjects)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
 
         builder.append(
             R"delimiter(
@@ -655,7 +655,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         };
 /* End XCConfigurationList section */
 )delimiter");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
@@ -704,7 +704,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     [[nodiscard]] bool writeProject(StringBuilder& builder, const Project& project, Renderer& renderer)
     {
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(R"delimiter(// !$*UTF8*$!
 {
     archiveVersion = 1;
@@ -732,15 +732,15 @@ struct SC::Build::ProjectWriter::WriterXCode
     rootObject = 7B00740A2A73143F00660B94 /* Project object */;
 }
 )delimiter");
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 
     [[nodiscard]] ReturnCode writeScheme(StringBuilder& builder, const Project& project, Renderer& renderer,
                                          StringView destinationDirectory, StringView filename)
     {
-        SC_UNUSED(destinationDirectory);
-        SC_WARNING_DISABLE_UNUSED_RESULT;
+        SC_COMPILER_UNUSED(destinationDirectory);
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         String output;
         for (auto& item : renderer.renderItems)
         {
@@ -846,7 +846,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                        "7B00740A2A73143F00660B94", project.name.view(), project.name.view(), filename, lldbinit, //
                        "7B00740A2A73143F00660B94", project.name.view(), project.name.view(), filename,           //
                        "7B00740A2A73143F00660B94", project.name.view(), project.name.view(), filename);
-        SC_WARNING_RESTORE;
+        SC_COMPILER_WARNING_POP;
         return true;
     }
 };

@@ -88,7 +88,7 @@ struct SC::Path::Internal
     template <typename StringIterator, char separator>
     static bool rootIsFollowedByOnlySeparators(const StringView input, const StringView root)
     {
-        SC_RELEASE_ASSERT(root.sizeInBytes() == 0 or (input.getEncoding() == root.getEncoding()));
+        SC_ASSERT_RELEASE(root.sizeInBytes() == 0 or (input.getEncoding() == root.getEncoding()));
         StringView remaining = input.sliceStartEndBytes(root.sizeInBytes(), input.sizeInBytes());
 
         auto it = remaining.getIterator<StringIterator>();
@@ -195,7 +195,7 @@ struct SC::Path::Internal
     template <char separator>
     static SC::StringView basename(StringView input, StringView suffix)
     {
-        SC_DEBUG_ASSERT(input.hasCompatibleEncoding(suffix));
+        SC_ASSERT_DEBUG(input.hasCompatibleEncoding(suffix));
         if (input.getEncoding() == StringEncoding::Utf16)
             return basenameTemplate<StringIteratorUTF16, separator>(input, suffix);
         else

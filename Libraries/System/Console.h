@@ -9,7 +9,7 @@
 namespace SC
 {
 struct String;
-struct SC_EXPORT_SYMBOL Console
+struct SC_COMPILER_EXPORT Console
 {
     Console(Vector<char>& encodingConversionBuffer) : encodingConversionBuffer(encodingConversionBuffer) {}
 
@@ -37,7 +37,7 @@ struct SC_EXPORT_SYMBOL Console
 };
 } // namespace SC
 extern SC::Console* globalConsole;
-#ifndef SC_LOG_MESSAGE
+#if !defined(SC_LOG_MESSAGE)
 #define SC_LOG_MESSAGE(fmt, ...)                                                                                       \
     if (globalConsole)                                                                                                 \
     globalConsole->print(fmt, ##__VA_ARGS__)

@@ -5,11 +5,10 @@
 #include "../Base/Types.h"
 namespace SC
 {
-// Garanteed alignment at least 8
 struct Memory
 {
-    SC_EXPORT_SYMBOL static void* allocate(size_t numBytes);
-    SC_EXPORT_SYMBOL static void* reallocate(void* allocatedMemory, size_t numBytes);
-    SC_EXPORT_SYMBOL static void  release(void* allocatedMemory);
+    SC_COMPILER_EXPORT static void* allocate(size_t numBytes);
+    SC_COMPILER_EXPORT static void* reallocate(void* allocatedMemory, size_t numBytes);
+    SC_COMPILER_EXPORT static void  release(void* allocatedMemory);
 };
 } // namespace SC

@@ -165,7 +165,7 @@ bool SC::StringView::endsWith(const StringView str) const
 
 bool SC::StringView::containsString(const StringView str) const
 {
-    SC_RELEASE_ASSERT(hasCompatibleEncoding(str));
+    SC_ASSERT_RELEASE(hasCompatibleEncoding(str));
     return withIterator([str](auto it) { return it.advanceAfterFinding(str.getIterator<decltype(it)>()); });
 }
 
@@ -189,9 +189,9 @@ SC::StringView SC::StringView::sliceStartEnd(size_t start, size_t end) const
     return withIterator(
         [&](auto it)
         {
-            SC_RELEASE_ASSERT(it.advanceCodePoints(start));
+            SC_ASSERT_RELEASE(it.advanceCodePoints(start));
             auto startIt = it;
-            SC_RELEASE_ASSERT(start <= end && it.advanceCodePoints(end - start));
+            SC_ASSERT_RELEASE(start <= end && it.advanceCodePoints(end - start));
             const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
             return StringView(startIt.getCurrentIt(), distance,
                               hasNullTerm and (start + distance == sizeInBytesIncludingTerminator()), encoding);
@@ -203,7 +203,7 @@ SC::StringView SC::StringView::sliceStart(size_t offset) const
     return withIterator(
         [&](auto it)
         {
-            SC_RELEASE_ASSERT(it.advanceCodePoints(offset));
+            SC_ASSERT_RELEASE(it.advanceCodePoints(offset));
             auto startIt = it;
             it.setToEnd();
             const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
@@ -219,7 +219,7 @@ SC::StringView SC::StringView::sliceEnd(size_t offset) const
         {
             auto startIt = it;
             it.setToEnd();
-            SC_RELEASE_ASSERT(it.reverseAdvanceCodePoints(offset));
+            SC_ASSERT_RELEASE(it.reverseAdvanceCodePoints(offset));
             const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
             return StringView(startIt.getCurrentIt(), distance,
                               hasNullTerm and (offset + distance == sizeInBytesIncludingTerminator()), encoding);

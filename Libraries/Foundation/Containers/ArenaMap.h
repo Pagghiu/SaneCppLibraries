@@ -73,7 +73,7 @@ struct SC::ArenaMap
     ArenaMap& operator=(const ArenaMap& other)
     {
         ArenaMap<T>::clear();
-        SC_DEBUG_ASSERT(ArenaMap<T>::items.resize(other.size()));
+        SC_ASSERT_DEBUG(ArenaMap<T>::items.resize(other.size()));
         for (size_t idx = 0; idx < other.items.size(); ++idx)
         {
             if (other.generations[idx].used)
@@ -118,12 +118,12 @@ struct SC::ArenaMap
 
         bool operator==(GenericIterator it) const
         {
-            SC_DEBUG_ASSERT(it.map == map and map != nullptr);
+            SC_ASSERT_DEBUG(it.map == map and map != nullptr);
             return it.index == index;
         }
         bool operator!=(GenericIterator it) const
         {
-            SC_DEBUG_ASSERT(it.map == map and map != nullptr);
+            SC_ASSERT_DEBUG(it.map == map and map != nullptr);
             return it.index != index;
         }
 

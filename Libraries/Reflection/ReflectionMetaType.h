@@ -75,10 +75,10 @@ struct MetaTypeInfoStruct
     template <typename R, int N>
     constexpr bool operator()(int order, const char (&name)[N], R T::*member, size_t offset)
     {
-        SC_UNUSED(order);
-        SC_UNUSED(name);
-        SC_UNUSED(member);
-        SC_UNUSED(offset);
+        SC_COMPILER_UNUSED(order);
+        SC_COMPILER_UNUSED(name);
+        SC_COMPILER_UNUSED(member);
+        SC_COMPILER_UNUSED(offset);
         if (not MetaTypeInfo<R>().IsPacked)
         {
             return false;

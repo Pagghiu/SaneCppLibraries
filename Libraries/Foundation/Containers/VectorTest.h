@@ -44,7 +44,7 @@ struct SC::VectorTestReport
 
     void push(Operation operation)
     {
-        SC_DEBUG_ASSERT(numSequences < MAX_SEQUENCES);
+        SC_ASSERT_DEBUG(numSequences < MAX_SEQUENCES);
         sequence[numSequences++] = operation;
     }
 
@@ -56,7 +56,7 @@ struct SC::VectorTestReport
 
     Operation nextOperation()
     {
-        SC_DEBUG_ASSERT(numNextSequences < numSequences);
+        SC_ASSERT_DEBUG(numNextSequences < numSequences);
         return sequence[numNextSequences++];
     }
     static SC::VectorTestReport& get()

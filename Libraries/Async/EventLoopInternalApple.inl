@@ -217,8 +217,8 @@ struct SC::EventLoop::KernelQueue
     }
     [[nodiscard]] static bool completeAsync(AsyncLoopTimeout::Result& result)
     {
-        SC_UNUSED(result);
-        SC_RELEASE_ASSERT(false and "Async::Type::LoopTimeout cannot be argument of completion");
+        SC_COMPILER_UNUSED(result);
+        SC_ASSERT_RELEASE(false and "Async::Type::LoopTimeout cannot be argument of completion");
         return false;
     }
     [[nodiscard]] static bool stopAsync(AsyncLoopTimeout& async)
@@ -242,8 +242,8 @@ struct SC::EventLoop::KernelQueue
     }
     [[nodiscard]] static bool completeAsync(AsyncLoopWakeUp::Result& result)
     {
-        SC_UNUSED(result);
-        SC_RELEASE_ASSERT(false and "Async::Type::LoopWakeUp cannot be argument of completion");
+        SC_COMPILER_UNUSED(result);
+        SC_ASSERT_RELEASE(false and "Async::Type::LoopWakeUp cannot be argument of completion");
         return false;
     }
     [[nodiscard]] static bool stopAsync(AsyncLoopWakeUp& async)

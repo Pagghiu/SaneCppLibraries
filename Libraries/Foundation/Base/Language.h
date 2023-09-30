@@ -132,100 +132,69 @@ inline void  operator delete(void*, SC::PlacementNew) noexcept {}
 inline void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { return p; }
 #endif
 
-#if defined(SC_CPP_STANDARD_FORCE)
-#if SC_CPP_STANDARD_FORCE == 14
-#define SC_CPLUSPLUS 201402L
-#elif SC_CPP_STANDARD_FORCE == 17
-#define SC_CPLUSPLUS 201703L
-#elif SC_CPP_STANDARD_FORCE == 20
-#define SC_CPLUSPLUS 202002L
+#if defined(SC_LANGUAGE_FORCE_STANDARD_CPP)
+#if SC_LANGUAGE_FORCE_STANDARD_CPP == 14
+#define SC_LANGUAGE_CPP_VERSION 201402L
+#elif SC_LANGUAGE_FORCE_STANDARD_CPP == 17
+#define SC_LANGUAGE_CPP_VERSION 201703L
+#elif SC_LANGUAGE_FORCE_STANDARD_CPP == 20
+#define SC_LANGUAGE_CPP_VERSION 202002L
 #else
-#error "SC_CPP_STANDARD_FORCE has invalid value"
+#error "SC_LANGUAGE_FORCE_STANDARD_CPP has invalid value"
 #endif
 #else
 
 #if SC_COMPILER_MSVC
-#define SC_CPLUSPLUS _MSVC_LANG
+#define SC_LANGUAGE_CPP_VERSION _MSVC_LANG
 #else
-#define SC_CPLUSPLUS __cplusplus
+#define SC_LANGUAGE_CPP_VERSION __cplusplus
 #endif
 
 #endif
 
-#if SC_CPLUSPLUS >= 202002L
+#if SC_LANGUAGE_CPP_VERSION >= 202002L
 
-#define SC_CPP_LESS_THAN_20 0
-#define SC_CPP_AT_LEAST_20  1
-#define SC_CPP_AT_LEAST_17  1
-#define SC_CPP_AT_LEAST_14  1
+#define SC_LANGUAGE_CPP_LESS_THAN_20 0
+#define SC_LANGUAGE_CPP_AT_LEAST_20  1
+#define SC_LANGUAGE_CPP_AT_LEAST_17  1
+#define SC_LANGUAGE_CPP_AT_LEAST_14  1
 
-#elif SC_CPLUSPLUS >= 201703L
+#elif SC_LANGUAGE_CPP_VERSION >= 201703L
 
-#define SC_CPP_LESS_THAN_20 1
-#define SC_CPP_AT_LEAST_20  0
-#define SC_CPP_AT_LEAST_17  1
-#define SC_CPP_AT_LEAST_14  1
+#define SC_LANGUAGE_CPP_LESS_THAN_20 1
+#define SC_LANGUAGE_CPP_AT_LEAST_20  0
+#define SC_LANGUAGE_CPP_AT_LEAST_17  1
+#define SC_LANGUAGE_CPP_AT_LEAST_14  1
 
-#elif SC_CPLUSPLUS >= 201402L
+#elif SC_LANGUAGE_CPP_VERSION >= 201402L
 
-#define SC_CPP_LESS_THAN_20 1
-#define SC_CPP_AT_LEAST_20  0
-#define SC_CPP_AT_LEAST_17  0
-#define SC_CPP_AT_LEAST_14  1
+#define SC_LANGUAGE_CPP_LESS_THAN_20 1
+#define SC_LANGUAGE_CPP_AT_LEAST_20  0
+#define SC_LANGUAGE_CPP_AT_LEAST_17  0
+#define SC_LANGUAGE_CPP_AT_LEAST_14  1
 
 #else
 
-#define SC_CPP_LESS_THAN_20 1
-#define SC_CPP_AT_LEAST_20  0
-#define SC_CPP_AT_LEAST_17  0
-#define SC_CPP_AT_LEAST_14  0
+#define SC_LANGUAGE_CPP_LESS_THAN_20 1
+#define SC_LANGUAGE_CPP_AT_LEAST_20  0
+#define SC_LANGUAGE_CPP_AT_LEAST_17  0
+#define SC_LANGUAGE_CPP_AT_LEAST_14  0
 
 #endif
 
-#undef SC_CPLUSPLUS
-
-// Using placement new in costructor is C++ 14+
-#if SC_CPP_AT_LEAST_14
-#define SC_CONSTEXPR_CONSTRUCTOR_NEW constexpr
-#else
-#define SC_CONSTEXPR_CONSTRUCTOR_NEW
-#endif
+#undef SC_LANGUAGE_CPP_VERSION
 
 // Defining a constexpr destructor is C++ 20+
-#if SC_CPP_AT_LEAST_20
-#define SC_CONSTEXPR_DESTRUCTOR constexpr
+#if SC_LANGUAGE_CPP_AT_LEAST_20
+#define SC_LANGUAGE_CONSTEXPR_DESTRUCTOR constexpr
 #else
-#define SC_CONSTEXPR_DESTRUCTOR
+#define SC_LANGUAGE_CONSTEXPR_DESTRUCTOR
 #endif
 
-#if (!SC_COMPILER_MSVC) || SC_CPP_AT_LEAST_20
-#define SC_LIKELY   [[likely]]
-#define SC_UNLIKELY [[unlikely]]
+#if (not SC_COMPILER_MSVC) or SC_LANGUAGE_CPP_AT_LEAST_20
+#define SC_LANGUAGE_LIKELY   [[likely]]
+#define SC_LANGUAGE_UNLIKELY [[unlikely]]
 #else
-#define SC_LIKELY
-#define SC_UNLIKELY
-#endif
-
-#define SC_UNUSED(param) ((void)param);
-
-#ifndef SC_WARNING_DISABLE_UNUSED_RESULT
-#ifdef __clang__
-#define SC_WARNING_DISABLE_UNUSED_RESULT                                                                               \
-    _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wunused-result\"")
-#elif defined(__GNUC__)
-#define SC_WARNING_DISABLE_UNUSED_RESULT                                                                               \
-    _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wunused-result\"")
-#else
-#define SC_WARNING_DISABLE_UNUSED_RESULT _Pragma("warning(push)") _Pragma("warning(disable : 4834)")
-#endif
-#endif
-
-#ifndef SC_WARNING_RESTORE
-#ifdef __clang__
-#define SC_WARNING_RESTORE _Pragma("clang diagnostic pop")
-#elif defined(__GNUC__)
-#define SC_WARNING_RESTORE _Pragma("GCC diagnostic pop")
-#else
-#define SC_WARNING_RESTORE _Pragma("warning(pop)")
-#endif
+#define SC_LANGUAGE_LIKELY
+#define SC_LANGUAGE_UNLIKELY
 #endif

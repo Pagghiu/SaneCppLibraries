@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/Strings/StringView.h"
-#include "../System/Console.h" // SC_BREAK_DEBUGGER
+#include "../System/Console.h" // SC_COMPILER_DEBUG_BREAK
 
 namespace SC
 {
@@ -56,9 +56,4 @@ struct TestCase
 #define SC_TEST_EXPECT(e)                                                                                              \
     recordExpectation(StringView(#e##_a8), (e))                                                                        \
         ? (void)0                                                                                                      \
-        : (TestCase::report.debugBreakOnFailedTest ? SC_BREAK_DEBUGGER : (void)0)
-
-#define SC_MACRO_ESCAPE(input)          __SC_MACRO_ESCAPE_HELPER(input)
-#define __SC_MACRO_ESCAPE_HELPER(input) #input
-#define __SC_MACRO_TO_LITERAL(string)   #string
-#define SC_MACRO_TO_LITERAL(string)     __SC_MACRO_TO_LITERAL(string)
+        : (TestCase::report.debugBreakOnFailedTest ? SC_COMPILER_DEBUG_BREAK : (void)0)

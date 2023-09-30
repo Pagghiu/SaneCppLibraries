@@ -42,19 +42,19 @@ struct [[nodiscard]] SC::Result
     bool holdsError;
 
   public:
-    SC_CONSTEXPR_CONSTRUCTOR_NEW Result(Value&& v)
+    constexpr Result(Value&& v)
     {
         new (&value, PlacementNew()) ValueType(forward<Value>(v));
         holdsError = false;
     }
 
-    SC_CONSTEXPR_CONSTRUCTOR_NEW Result(ErrorType&& e)
+    constexpr Result(ErrorType&& e)
     {
         new (&error, PlacementNew()) ErrorType(e);
         holdsError = true;
     }
 
-    SC_CONSTEXPR_DESTRUCTOR ~Result()
+    SC_LANGUAGE_CONSTEXPR_DESTRUCTOR ~Result()
     {
         if (not holdsError)
         {
@@ -66,12 +66,12 @@ struct [[nodiscard]] SC::Result
         }
     }
     constexpr Result() = delete;
-#if SC_CPP_AT_LEAST_20
+#if SC_LANGUAGE_CPP_AT_LEAST_20
     // In C++ 20 we can force this to actually _never_ copy/move :)
     constexpr Result(Result&& other)      = delete;
     constexpr Result(const Result& other) = delete;
 #else
-    SC_CONSTEXPR_CONSTRUCTOR_NEW Result(Result&& other) noexcept
+    constexpr Result(Result&& other) noexcept
     {
         holdsError = other.holdsError;
         if (holdsError)
@@ -83,7 +83,7 @@ struct [[nodiscard]] SC::Result
             new (&value, PlacementNew()) ValueType(move(other.value));
         }
     }
-    SC_CONSTEXPR_CONSTRUCTOR_NEW Result(const Result& other)
+    constexpr Result(const Result& other)
     {
         holdsError = other.holdsError;
         if (holdsError)
@@ -109,20 +109,20 @@ struct [[nodiscard]] SC::Result
 
     const ErrorType& getError() const
     {
-        SC_DEBUG_ASSERT(holdsError);
+        SC_ASSERT_DEBUG(holdsError);
         return error;
     }
 
     const Value& getValue() const
     {
-        SC_DEBUG_ASSERT(not holdsError);
+        SC_ASSERT_DEBUG(not holdsError);
         return value;
     }
 };
 #define SC_TRY(expression)                                                                                             \
     {                                                                                                                  \
         if (auto _exprResConv = (expression))                                                                          \
-            SC_LIKELY                                                                                                  \
+            SC_LANGUAGE_LIKELY                                                                                         \
             {                                                                                                          \
                 (void)0;                                                                                               \
             }                                                                                                          \
@@ -133,7 +133,7 @@ struct [[nodiscard]] SC::Result
     }
 #define SC_TRY_MSG(expression, failedMessage)                                                                          \
     if (not(expression))                                                                                               \
-        SC_UNLIKELY                                                                                                    \
+        SC_LANGUAGE_UNLIKELY                                                                                           \
         {                                                                                                              \
             return SC::ReturnCode(failedMessage);                                                                      \
         }
@@ -141,7 +141,7 @@ struct [[nodiscard]] SC::Result
 #define __SC__TRY_UNWRAP_IMPL2(assignment, expression, Counter)                                                        \
     auto _temporary_result##Counter = (expression);                                                                    \
     if (_temporary_result##Counter.isError())                                                                          \
-        SC_UNLIKELY                                                                                                    \
+        SC_LANGUAGE_UNLIKELY                                                                                           \
         {                                                                                                              \
             return _temporary_result##Counter.releaseError();                                                          \
         }                                                                                                              \
@@ -151,7 +151,7 @@ struct [[nodiscard]] SC::Result
 
 #define __SC__MUST_IMPL2(assignment, expression, Counter)                                                              \
     auto _temporary_result##Counter = (expression);                                                                    \
-    SC_DEBUG_ASSERT(not _temporary_result##Counter.isError());                                                         \
+    SC_ASSERT_DEBUG(not _temporary_result##Counter.isError());                                                         \
     assignment = _temporary_result##Counter.releaseValue()
 
 #define __SC__MUST_IMPL1(assignment, expression, Counter) __SC__MUST_IMPL2(assignment, expression, Counter)

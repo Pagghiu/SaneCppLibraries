@@ -108,7 +108,7 @@ SC::ReturnCode SC::Process::spawn(Lambda&& lambda)
 
 SC::ReturnCode SC::Process::launch(ProcessOptions options)
 {
-    SC_UNUSED(options);
+    SC_COMPILER_UNUSED(options);
     auto spawnLambda = [&]() { execl("/bin/sh", "sh", "-c", command.view().getNullTerminatedNative(), nullptr); };
     return spawn(spawnLambda);
 }

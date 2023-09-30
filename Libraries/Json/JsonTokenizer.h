@@ -37,7 +37,7 @@ struct SC::JsonTokenizer
 
         constexpr StringView getToken(StringView source) const
         {
-            SC_DEBUG_ASSERT(StringEncodingGetSize(source.getEncoding()) == 1);
+            SC_ASSERT_DEBUG(StringEncodingGetSize(source.getEncoding()) == 1);
             return source.sliceStartLengthBytes(tokenStartBytes, tokenLengthBytes); // Assuming it's utf8 or ASCII
         }
     };

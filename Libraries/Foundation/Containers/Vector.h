@@ -16,7 +16,7 @@ struct Vector;
 struct VectorAllocator;
 } // namespace SC
 
-struct SC_EXPORT_SYMBOL SC::VectorAllocator
+struct SC_COMPILER_EXPORT SC::VectorAllocator
 {
     static const size_t   SIZE_OF_VECTOR_T = 8;
     static SegmentHeader* reallocate(SegmentHeader* oldHeader, size_t newSize)
@@ -128,7 +128,7 @@ struct SC::Vector
         {
             const bool res = appendCopy(other);
             (void)res;
-            SC_DEBUG_ASSERT(res);
+            SC_ASSERT_DEBUG(res);
         }
     }
 
@@ -153,7 +153,7 @@ struct SC::Vector
         {
             const bool res = SegmentOperationsT::copy(items, other.data(), other.size());
             (void)res;
-            SC_DEBUG_ASSERT(res);
+            SC_ASSERT_DEBUG(res);
         }
         return *this;
     }
@@ -180,13 +180,13 @@ struct SC::Vector
 
     [[nodiscard]] T& operator[](size_t index)
     {
-        SC_DEBUG_ASSERT(index < size());
+        SC_ASSERT_DEBUG(index < size());
         return items[index];
     }
 
     [[nodiscard]] const T& operator[](size_t index) const
     {
-        SC_DEBUG_ASSERT(index < size());
+        SC_ASSERT_DEBUG(index < size());
         return items[index];
     }
 
@@ -224,28 +224,28 @@ struct SC::Vector
     [[nodiscard]] T& front()
     {
         const size_t numElements = size();
-        SC_RELEASE_ASSERT(numElements > 0);
+        SC_ASSERT_RELEASE(numElements > 0);
         return items[0];
     }
 
     [[nodiscard]] const T& front() const
     {
         const size_t numElements = size();
-        SC_RELEASE_ASSERT(numElements > 0);
+        SC_ASSERT_RELEASE(numElements > 0);
         return items[0];
     }
 
     [[nodiscard]] T& back()
     {
         const size_t numElements = size();
-        SC_RELEASE_ASSERT(numElements > 0);
+        SC_ASSERT_RELEASE(numElements > 0);
         return items[numElements - 1];
     }
 
     [[nodiscard]] const T& back() const
     {
         const size_t numElements = size();
-        SC_RELEASE_ASSERT(numElements > 0);
+        SC_ASSERT_RELEASE(numElements > 0);
         return items[numElements - 1];
     }
 
@@ -288,7 +288,7 @@ struct SC::Vector
     [[nodiscard]] size_t size() const
     {
         if (items == nullptr)
-            SC_UNLIKELY { return 0; }
+            SC_LANGUAGE_UNLIKELY { return 0; }
         else
         {
             return SegmentItems<T>::getSegment(items)->sizeBytes / sizeof(T);
@@ -298,7 +298,7 @@ struct SC::Vector
     [[nodiscard]] size_t capacity() const
     {
         if (items == nullptr)
-            SC_UNLIKELY { return 0; }
+            SC_LANGUAGE_UNLIKELY { return 0; }
         else
         {
             return SegmentItems<T>::getSegment(items)->capacityBytes / sizeof(T);

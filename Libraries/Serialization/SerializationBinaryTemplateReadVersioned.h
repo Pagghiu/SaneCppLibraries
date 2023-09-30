@@ -61,7 +61,7 @@ struct SerializerReadVersionedMemberIterator
     template <typename R, int N>
     constexpr bool operator()(int order, const char (&name)[N], R& field)
     {
-        SC_UNUSED(name);
+        SC_COMPILER_UNUSED(name);
         if (matchOrder == order)
         {
             consumed            = true;

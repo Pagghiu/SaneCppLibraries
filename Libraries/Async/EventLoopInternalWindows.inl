@@ -413,7 +413,7 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] static ReturnCode stopAsync(AsyncSocketConnect& async)
     {
-        SC_UNUSED(async);
+        SC_COMPILER_UNUSED(async);
         return true;
     }
 
@@ -449,7 +449,7 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] ReturnCode stopAsync(AsyncSocketSend& async)
     {
-        SC_UNUSED(async);
+        SC_COMPILER_UNUSED(async);
         return true;
     }
 
@@ -486,7 +486,7 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] ReturnCode stopAsync(AsyncSocketReceive& async)
     {
-        SC_UNUSED(async);
+        SC_COMPILER_UNUSED(async);
         return true;
     }
 
@@ -541,7 +541,7 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] static ReturnCode stopAsync(AsyncFileRead& async)
     {
-        SC_UNUSED(async);
+        SC_COMPILER_UNUSED(async);
         return true;
     }
 
@@ -586,7 +586,7 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] static ReturnCode stopAsync(AsyncFileWrite& async)
     {
-        SC_UNUSED(async);
+        SC_COMPILER_UNUSED(async);
         return true;
     }
 
@@ -612,7 +612,7 @@ struct SC::EventLoop::KernelQueue
     // This is executed on windows thread pool
     static void CALLBACK processExitCallback(void* data, BOOLEAN timeoutOccurred)
     {
-        SC_UNUSED(timeoutOccurred);
+        SC_COMPILER_UNUSED(timeoutOccurred);
         AsyncProcessExit&      async = *static_cast<AsyncProcessExit*>(data);
         FileDescriptor::Handle loopNativeDescriptor;
         SC_TRUST_RESULT(async.eventLoop->getLoopFileDescriptor(loopNativeDescriptor));
