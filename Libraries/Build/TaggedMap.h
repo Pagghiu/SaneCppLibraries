@@ -1,7 +1,7 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../Foundation/Containers/Map.h"
+#include "../Foundation/Containers/VectorMap.h"
 namespace SC
 {
 template <typename Type, typename Union>
@@ -10,7 +10,7 @@ struct TaggedMap;
 template <typename Type, typename Union>
 struct SC::TaggedMap
 {
-    Map<Type, Union> flags;
+    VectorMap<Type, Union> flags;
 
     template <Type enumType>
     [[nodiscard]] typename Union::template EnumToType<enumType>::type* getOrCreate()

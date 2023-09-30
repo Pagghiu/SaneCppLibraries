@@ -27,14 +27,14 @@ void runSpecificTests(TestReport& report)
 #include "../../Libraries/Foundation/Containers/ArenaMapTest.h"
 #include "../../Libraries/Foundation/Containers/ArrayTest.h"
 #include "../../Libraries/Foundation/Containers/IntrusiveDoubleLinkedListTest.h"
-#include "../../Libraries/Foundation/Containers/MapTest.h"
-#include "../../Libraries/Foundation/Containers/SetTest.h"
 #include "../../Libraries/Foundation/Containers/SmallVectorTest.h"
+#include "../../Libraries/Foundation/Containers/VectorMapTest.h"
+#include "../../Libraries/Foundation/Containers/VectorSetTest.h"
 #include "../../Libraries/Foundation/Containers/VectorTest.h"
-#include "../../Libraries/Foundation/Objects/FunctionTest.h"
-#include "../../Libraries/Foundation/Objects/OpaqueTest.h"
-#include "../../Libraries/Foundation/Objects/OptionalTest.h"
-#include "../../Libraries/Foundation/Objects/TaggedUnionTest.h"
+#include "../../Libraries/Foundation/Language/FunctionTest.h"
+#include "../../Libraries/Foundation/Language/OpaqueTest.h"
+#include "../../Libraries/Foundation/Language/OptionalTest.h"
+#include "../../Libraries/Foundation/Language/TaggedUnionTest.h"
 #include "../../Libraries/Foundation/Strings/StringConverterTest.h"
 #include "../../Libraries/Foundation/Strings/StringFormatTest.h"
 #include "../../Libraries/Foundation/Strings/StringTest.h"
@@ -138,10 +138,8 @@ int main(int argc, const char* argv[])
     { BaseTest                      test(report); }
     { FunctionTest                  test(report); }
     { IntrusiveDoubleLinkedListTest test(report); }
-    { MapTest                       test(report); }
     { OpaqueTest                    test(report); }
     { OptionalTest                  test(report); }
-    { SetTest                       test(report); }
     { SmallVectorTest               test(report); }
     { StringConverterTest           test(report); }
     { StringFormatTest              test(report); }
@@ -149,6 +147,8 @@ int main(int argc, const char* argv[])
     { StringViewTest                test(report); }
     { TaggedUnionTest               test(report); }
     { VectorTest                    test(report); }
+    { VectorMapTest                 test(report); }
+    { VectorSetTest                 test(report); }
 
     // File tests
     { FileDescriptorTest            test(report); }

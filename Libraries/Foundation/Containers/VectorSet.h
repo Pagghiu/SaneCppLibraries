@@ -8,11 +8,11 @@
 namespace SC
 {
 template <typename Value, typename Container>
-struct Set;
+struct VectorSet;
 } // namespace SC
 
 template <typename Value, typename Container = SC::Vector<Value>>
-struct SC::Set
+struct SC::VectorSet
 {
     Container items;
 

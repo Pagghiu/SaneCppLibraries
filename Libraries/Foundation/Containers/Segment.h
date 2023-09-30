@@ -6,7 +6,7 @@
 #include "../Base/InitializerList.h"
 #include "../Base/Limits.h"
 #include "../Base/Types.h"
-#include "../Language/MetaProgramming.h" // EnableIf, IsTriviallyCoypable
+#include "../Language/MetaProgramming.h" // EnableIf, IsTriviallyCopyable
 #include "../Language/Span.h"
 
 namespace SC

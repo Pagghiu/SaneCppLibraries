@@ -6,21 +6,21 @@
 #include "../Containers/Array.h"
 #include "../Language/StrongID.h"
 #include "../Strings/String.h"
-#include "Map.h"
+#include "VectorMap.h"
 
 namespace SC
 {
-struct MapTest;
+struct VectorMapTest;
 }
 
-struct SC::MapTest : public SC::TestCase
+struct SC::VectorMapTest : public SC::TestCase
 {
-    MapTest(SC::TestReport& report) : TestCase(report, "MapTest")
+    VectorMapTest(SC::TestReport& report) : TestCase(report, "VectorMapTest")
     {
         using namespace SC;
         if (test_section("contains"))
         {
-            Map<int, int> map;
+            VectorMap<int, int> map;
             SC_TEST_EXPECT(map.insertIfNotExists({1, 2}));
             SC_TEST_EXPECT(map.insertIfNotExists({2, 3}));
             const int* value;
@@ -31,7 +31,7 @@ struct SC::MapTest : public SC::TestCase
         }
         if (test_section("array"))
         {
-            Map<String, String, Array<MapItem<String, String>, 2>> map;
+            VectorMap<String, String, Array<VectorMapItem<String, String>, 2>> map;
             SC_TEST_EXPECT(map.insertIfNotExists({"Ciao"_a8, "Fra"_a8}));
             SC_TEST_EXPECT(map.insertIfNotExists({"Bella"_a8, "Bro"_a8}));
             SC_TEST_EXPECT(not map.insertIfNotExists({"Fail"_a8, "Fail"_a8}));
@@ -41,7 +41,7 @@ struct SC::MapTest : public SC::TestCase
         }
         if (test_section("get"))
         {
-            Map<String, String, Array<MapItem<String, String>, 2>> map;
+            VectorMap<String, String, Array<VectorMapItem<String, String>, 2>> map;
             SC_TEST_EXPECT(map.insertIfNotExists({"Ciao"_a8, "Fra"_a8}));
             SC_TEST_EXPECT(map.insertIfNotExists({"Bella"_a8, "Bro"_a8}));
             String* result1 = map.get("Ciao"_a8);
@@ -56,7 +56,7 @@ struct SC::MapTest : public SC::TestCase
             {
                 using ID = StrongID<Key>;
             };
-            Map<Key::ID, String> map;
+            VectorMap<Key::ID, String> map;
 
             const Key::ID key1 = Key::ID::generateUniqueKey(map);
             SC_TEST_EXPECT(map.insertIfNotExists({key1, "key1"_a8}));

@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Containers/Set.h"
+#include "../Foundation/Containers/VectorSet.h"
 #include "../Foundation/Language/TaggedUnion.h"
 #include "../Foundation/Strings/String.h"
 #include "TaggedMap.h"
@@ -351,7 +351,7 @@ struct Parameters
 
 struct DefinitionCompiler
 {
-    Map<String, Vector<String>> resolvedPaths;
+    VectorMap<String, Vector<String>> resolvedPaths;
 
     Build::Definition& definition;
     DefinitionCompiler(Build::Definition& definition) : definition(definition) {}
@@ -360,9 +360,9 @@ struct DefinitionCompiler
     [[nodiscard]] ReturnCode build();
 
   private:
-    [[nodiscard]] static ReturnCode fillPathsList(StringView path, const Set<Project::File>& filters,
-                                                  Map<String, Vector<String>>& filtersToFiles);
-    [[nodiscard]] ReturnCode        collectUniqueRootPaths(Map<String, Set<Project::File>>& paths);
+    [[nodiscard]] static ReturnCode fillPathsList(StringView path, const VectorSet<Project::File>& filters,
+                                                  VectorMap<String, Vector<String>>& filtersToFiles);
+    [[nodiscard]] ReturnCode        collectUniqueRootPaths(VectorMap<String, VectorSet<Project::File>>& paths);
 };
 
 struct ProjectWriter

@@ -7,22 +7,22 @@
 namespace SC
 {
 template <typename Key, typename Value, typename Container>
-struct Map;
+struct VectorMap;
 template <typename Key, typename Value>
-struct MapItem;
+struct VectorMapItem;
 } // namespace SC
 
 template <typename Key, typename Value>
-struct SC::MapItem
+struct SC::VectorMapItem
 {
     Key   key;
     Value value;
 };
 
-template <typename Key, typename Value, typename Container = SC::Vector<SC::MapItem<Key, Value>>>
-struct SC::Map
+template <typename Key, typename Value, typename Container = SC::Vector<SC::VectorMapItem<Key, Value>>>
+struct SC::VectorMap
 {
-    typedef MapItem<Key, Value> Item;
+    typedef VectorMapItem<Key, Value> Item;
 
     Container items;
 

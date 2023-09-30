@@ -4,9 +4,9 @@
 #pragma once
 #include "../../Libraries/Foundation/Base/Memory.h"
 #include "../../Libraries/Foundation/Containers/ArenaMap.h"
-#include "../../Libraries/Foundation/Containers/Map.h"
-#include "../../Libraries/Foundation/Containers/Set.h"
 #include "../../Libraries/Foundation/Containers/SmallVector.h"
+#include "../../Libraries/Foundation/Containers/VectorMap.h"
+#include "../../Libraries/Foundation/Containers/VectorSet.h"
 #include "../../Libraries/Foundation/Strings/String.h"
 #include "../../Libraries/Testing/Test.h"
 
@@ -47,12 +47,12 @@ struct SC::DebugVisualizersTest : public SC::TestCase
         report.console.print("{}\n", smallVector[0]);
         SmallString<10> ss = "asd"_a8;
 
-        Map<String, int> map;
+        VectorMap<String, int> map;
         (void)map.insertIfNotExists({"one"_a8, 1});
         (void)map.insertIfNotExists({"two"_a8, 2});
         (void)map.insertIfNotExists({"three"_a8, 3});
 
-        Set<StringView> set;
+        VectorSet<StringView> set;
         (void)set.insert("3");
         (void)set.insert("3");
         (void)set.insert("3");

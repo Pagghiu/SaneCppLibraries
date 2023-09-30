@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Containers/Map.h"
 #include "../Foundation/Containers/SmallVector.h"
+#include "../Foundation/Containers/VectorMap.h"
 #include "../Foundation/Language/Optional.h"
 #include "../Foundation/Strings/String.h"
 #include "../System/System.h"
@@ -113,5 +113,5 @@ struct SC::PluginRegistry
     [[nodiscard]] const PluginDynamicLibrary* findPlugin(const StringView identifier);
 
   private:
-    Map<PluginIdentifier, PluginDynamicLibrary> libraries;
+    VectorMap<PluginIdentifier, PluginDynamicLibrary> libraries;
 };

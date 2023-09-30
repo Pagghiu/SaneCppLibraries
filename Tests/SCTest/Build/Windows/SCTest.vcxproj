@@ -377,11 +377,11 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\ArrayTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\IntrusiveDoubleLinkedList.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\IntrusiveDoubleLinkedListTest.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\Map.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\MapTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\VectorMap.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\VectorMapTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\Segment.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\Set.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\SetTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\VectorSet.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\VectorSetTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\SmallVector.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\SmallVectorTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\Vector.h" />

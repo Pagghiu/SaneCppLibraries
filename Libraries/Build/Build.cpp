@@ -88,7 +88,7 @@ SC::ReturnCode SC::Build::DefinitionCompiler::validate()
 
 SC::ReturnCode SC::Build::DefinitionCompiler::build()
 {
-    Map<String, Set<Project::File>> uniquePaths;
+    VectorMap<String, VectorSet<Project::File>> uniquePaths;
     SC_TRY(collectUniqueRootPaths(uniquePaths));
     for (auto& it : uniquePaths)
     {
@@ -97,8 +97,8 @@ SC::ReturnCode SC::Build::DefinitionCompiler::build()
     return true;
 }
 
-SC::ReturnCode SC::Build::DefinitionCompiler::fillPathsList(StringView path, const Set<Project::File>& filters,
-                                                            Map<String, Vector<String>>& filtersToFiles)
+SC::ReturnCode SC::Build::DefinitionCompiler::fillPathsList(StringView path, const VectorSet<Project::File>& filters,
+                                                            VectorMap<String, Vector<String>>& filtersToFiles)
 {
     bool doRecurse = false;
     for (const auto& it : filters)
@@ -152,7 +152,7 @@ SC::ReturnCode SC::Build::DefinitionCompiler::fillPathsList(StringView path, con
 }
 
 // Collects root paths to build a stat map
-SC::ReturnCode SC::Build::DefinitionCompiler::collectUniqueRootPaths(Map<String, Set<Project::File>>& paths)
+SC::ReturnCode SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<String, VectorSet<Project::File>>& paths)
 {
     String buffer;
     for (const Workspace& workspace : definition.workspaces)

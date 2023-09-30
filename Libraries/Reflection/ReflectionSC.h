@@ -3,8 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/Containers/Array.h"
-#include "../Foundation/Containers/Map.h"
 #include "../Foundation/Containers/Vector.h"
+#include "../Foundation/Containers/VectorMap.h"
 #include "../Foundation/Strings/String.h"
 #include "Reflection.h"
 
@@ -78,9 +78,9 @@ namespace SC
 namespace Reflection
 {
 template <typename Key, typename Value, typename Container>
-struct MetaClass<Map<Key, Value, Container>> : MetaStruct<MetaClass<Map<Key, Value, Container>>>
+struct MetaClass<VectorMap<Key, Value, Container>> : MetaStruct<MetaClass<VectorMap<Key, Value, Container>>>
 {
-    typedef typename MetaStruct<MetaClass<SC::Map<Key, Value, Container>>>::T T;
+    typedef typename MetaStruct<MetaClass<SC::VectorMap<Key, Value, Container>>>::T T;
     template <typename MemberVisitor>
     static constexpr void visit(MemberVisitor&& builder)
     {

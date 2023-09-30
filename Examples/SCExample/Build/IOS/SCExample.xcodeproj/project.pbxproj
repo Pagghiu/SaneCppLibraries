@@ -124,7 +124,7 @@
 		7B9F61622995AE0F0011F4D4 /* Memory.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Memory.h; path = ../../../../Libraries/Foundation/Memory.h; sourceTree = "<group>"; };
 		7B9F61632995AE0F0011F4D4 /* LibC.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = LibC.h; path = ../../../../Libraries/Foundation/LibC.h; sourceTree = "<group>"; };
 		7B9F61642995AE0F0011F4D4 /* SmallVectorTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SmallVectorTest.h; path = ../../../../Libraries/Foundation/SmallVectorTest.h; sourceTree = "<group>"; };
-		7B9F61662995AE0F0011F4D4 /* MapTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MapTest.h; path = ../../../../Libraries/Foundation/MapTest.h; sourceTree = "<group>"; };
+		7B9F61662995AE0F0011F4D4 /* VectorMapTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VectorMapTest.h; path = ../../../../Libraries/Foundation/VectorMapTest.h; sourceTree = "<group>"; };
 		7B9F61682995AE100011F4D4 /* StringTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StringTest.h; path = ../../../../Libraries/Foundation/StringTest.h; sourceTree = "<group>"; };
 		7B9F61692995AE100011F4D4 /* String.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = String.h; path = ../../../../Libraries/Foundation/String.h; sourceTree = "<group>"; };
 		7B9F616A2995AE100011F4D4 /* ArrayTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ArrayTest.h; path = ../../../../Libraries/Foundation/ArrayTest.h; sourceTree = "<group>"; };
@@ -139,7 +139,7 @@
 		7B9F61762995AE100011F4D4 /* Result.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Result.h; path = ../../../../Libraries/Foundation/Result.h; sourceTree = "<group>"; };
 		7B9F61772995AE100011F4D4 /* PathTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PathTest.h; path = ../../../../Libraries/FileSystem/PathTest.h; sourceTree = "<group>"; };
 		7B9F61782995AE100011F4D4 /* Segment.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Segment.h; path = ../../../../Libraries/Foundation/Segment.h; sourceTree = "<group>"; };
-		7B9F61792995AE100011F4D4 /* Map.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Map.h; path = ../../../../Libraries/Foundation/Map.h; sourceTree = "<group>"; };
+		7B9F61792995AE100011F4D4 /* VectorMap.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VectorMap.h; path = ../../../../Libraries/Foundation/VectorMap.h; sourceTree = "<group>"; };
 		7B9F617A2995AE100011F4D4 /* StringFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StringFormat.h; path = ../../../../Libraries/Foundation/StringFormat.h; sourceTree = "<group>"; };
 		7B9F617B2995AE100011F4D4 /* StringView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StringView.h; path = ../../../../Libraries/Foundation/StringView.h; sourceTree = "<group>"; };
 		7B9F617C2995AE100011F4D4 /* Test.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Test.cpp; path = ../../../../Libraries/Testing/Test.cpp; sourceTree = "<group>"; };
@@ -257,8 +257,8 @@
 				7B9F61602995AE0F0011F4D4 /* Compiler.h */,
 				7B9F61632995AE0F0011F4D4 /* LibC.h */,
 				7B9F614C2995AE0F0011F4D4 /* Limits.h */,
-				7B9F61792995AE100011F4D4 /* Map.h */,
-				7B9F61662995AE0F0011F4D4 /* MapTest.h */,
+				7B9F61792995AE100011F4D4 /* VectorMap.h */,
+				7B9F61662995AE0F0011F4D4 /* VectorMapTest.h */,
 				7B9F614B2995AE0F0011F4D4 /* Base.cpp */,
 				7B9F61622995AE0F0011F4D4 /* Memory.h */,
 				7B9F616C2995AE100011F4D4 /* BaseTest.h */,

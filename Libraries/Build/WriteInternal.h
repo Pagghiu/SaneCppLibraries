@@ -42,7 +42,7 @@ struct SC::Build::WriterInternal
         String name;
         String referenceHash;
 
-        Map<String, RenderGroup> children;
+        VectorMap<String, RenderGroup> children;
     };
 
     struct Renderer

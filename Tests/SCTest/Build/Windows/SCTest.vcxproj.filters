@@ -406,19 +406,19 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\IntrusiveDoubleLinkedListTest.h">
       <Filter>Foundation\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\Map.h">
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\VectorMap.h">
       <Filter>Foundation\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\MapTest.h">
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\VectorMapTest.h">
       <Filter>Foundation\Containers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\Segment.h">
       <Filter>Foundation\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\Set.h">
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\VectorSet.h">
       <Filter>Foundation\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\SetTest.h">
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\VectorSetTest.h">
       <Filter>Foundation\Containers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\SmallVector.h">

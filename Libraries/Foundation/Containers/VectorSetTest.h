@@ -4,21 +4,21 @@
 #pragma once
 #include "../../Testing/Test.h"
 #include "../Strings/String.h"
-#include "Set.h"
+#include "VectorSet.h"
 
 namespace SC
 {
-struct SetTest;
+struct VectorSetTest;
 }
 
-struct SC::SetTest : public SC::TestCase
+struct SC::VectorSetTest : public SC::TestCase
 {
-    SetTest(SC::TestReport& report) : TestCase(report, "SetTest")
+    VectorSetTest(SC::TestReport& report) : TestCase(report, "VectorSetTest")
     {
         using namespace SC;
         if (test_section("simple"))
         {
-            Set<String> setOfStrings;
+            VectorSet<String> setOfStrings;
             SC_TEST_EXPECT(setOfStrings.insert("123"_a8));
             SC_TEST_EXPECT(setOfStrings.insert("123"_a8));
             SC_TEST_EXPECT(setOfStrings.contains("123"_a8));
