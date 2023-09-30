@@ -8,7 +8,7 @@ namespace SC
 {
 struct UtilityWindows
 {
-    [[nodiscard]] static ReturnCode formatWindowsError(int errorNumber, String& buffer)
+    [[nodiscard]] static Result formatWindowsError(int errorNumber, String& buffer)
     {
         LPWSTR messageBuffer = nullptr;
         size_t size          = FormatMessageW(
@@ -19,9 +19,9 @@ struct UtilityWindows
         const StringView sv = StringView(Span<const wchar_t>(messageBuffer, size * sizeof(wchar_t)), true);
         if (not buffer.assign(sv))
         {
-            return ReturnCode::Error("UtilityWindows::formatWindowsError - returned error");
+            return Result::Error("UtilityWindows::formatWindowsError - returned error");
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 };
 

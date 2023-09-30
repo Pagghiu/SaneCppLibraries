@@ -8,17 +8,17 @@
 
 #include <dlfcn.h> // dlopen
 
-SC::ReturnCode SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle)
+SC::Result SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle)
 {
     if (handle)
     {
         const int res = ::dlclose(handle);
-        return ReturnCode(res == 0);
+        return Result(res == 0);
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::SystemDynamicLibrary::load(StringView fullPath)
+SC::Result SC::SystemDynamicLibrary::load(StringView fullPath)
 {
     SC_TRY(close());
     SmallString<1024> string = StringEncoding::Native;
@@ -28,12 +28,12 @@ SC::ReturnCode SC::SystemDynamicLibrary::load(StringView fullPath)
     handle = ::dlopen(fullPathZeroTerminated.getNullTerminatedNative(), RTLD_LAZY);
     if (handle == nullptr)
     {
-        return ReturnCode::Error("dlopen failed");
+        return Result::Error("dlopen failed");
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const
+SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const
 {
     SC_TRY_MSG(isValid(), "Invalid dlsym handle");
     SmallString<1024> string = StringEncoding::Native;
@@ -41,5 +41,5 @@ SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*
     StringView        symbolZeroTerminated;
     SC_TRY(converter.convertNullTerminateFastPath(symbolName, symbolZeroTerminated));
     symbol = ::dlsym(handle, symbolZeroTerminated.getNullTerminatedNative());
-    return ReturnCode(symbol != nullptr);
+    return Result(symbol != nullptr);
 }

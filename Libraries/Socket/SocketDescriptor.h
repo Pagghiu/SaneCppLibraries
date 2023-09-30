@@ -29,7 +29,7 @@ struct SC::SocketDescriptorTraits
 {
     using Handle                    = size_t;                  // SOCKET
     static constexpr Handle Invalid = ~static_cast<Handle>(0); // INVALID_SOCKET
-    static ReturnCode       releaseHandle(Handle& handle);
+    static Result           releaseHandle(Handle& handle);
 };
 
 #else
@@ -38,7 +38,7 @@ struct SC::SocketDescriptorTraits
 {
     using Handle                    = int; // fd
     static constexpr Handle Invalid = -1;  // invalid fd
-    static ReturnCode       releaseHandle(Handle& handle);
+    static Result           releaseHandle(Handle& handle);
 };
 
 #endif
@@ -88,7 +88,7 @@ struct SC::SocketIPAddress
 
     [[nodiscard]] SocketFlags::AddressFamily getAddressFamily() { return addressFamily; }
 
-    [[nodiscard]] ReturnCode fromAddressPort(StringView interfaceAddress, uint16_t port);
+    [[nodiscard]] Result fromAddressPort(StringView interfaceAddress, uint16_t port);
 
     // TODO: maybe we should only save a binary address instead of native structs (IPV6 would need 16 bytes)
     uint32_t         sizeOfHandle() const;
@@ -100,15 +100,15 @@ struct SC::SocketIPAddress
 
 struct SC::SocketDescriptor : public UniqueTaggedHandleTraits<SocketDescriptorTraits>
 {
-    [[nodiscard]] ReturnCode create(SocketFlags::AddressFamily   addressFamily,
-                                    SocketFlags::SocketType      socketType  = SocketFlags::SocketStream,
-                                    SocketFlags::ProtocolType    protocol    = SocketFlags::ProtocolTcp,
-                                    SocketFlags::BlockingType    blocking    = SocketFlags::Blocking,
-                                    SocketFlags::InheritableType inheritable = SocketFlags::NonInheritable);
-    [[nodiscard]] ReturnCode isInheritable(bool& value) const;
-    [[nodiscard]] ReturnCode setInheritable(bool value);
-    [[nodiscard]] ReturnCode setBlocking(bool value);
-    [[nodiscard]] ReturnCode getAddressFamily(SocketFlags::AddressFamily& addressFamily) const;
+    [[nodiscard]] Result create(SocketFlags::AddressFamily   addressFamily,
+                                SocketFlags::SocketType      socketType  = SocketFlags::SocketStream,
+                                SocketFlags::ProtocolType    protocol    = SocketFlags::ProtocolTcp,
+                                SocketFlags::BlockingType    blocking    = SocketFlags::Blocking,
+                                SocketFlags::InheritableType inheritable = SocketFlags::NonInheritable);
+    [[nodiscard]] Result isInheritable(bool& value) const;
+    [[nodiscard]] Result setInheritable(bool value);
+    [[nodiscard]] Result setBlocking(bool value);
+    [[nodiscard]] Result getAddressFamily(SocketFlags::AddressFamily& addressFamily) const;
 };
 
 namespace SC
@@ -122,9 +122,9 @@ struct SC::SocketServer
 {
     SocketServer(SocketDescriptor& socket) : socket(socket) {}
 
-    [[nodiscard]] ReturnCode listen(SocketIPAddress nativeAddress, uint32_t numberOfWaitingConnections = 511);
-    [[nodiscard]] ReturnCode close();
-    [[nodiscard]] ReturnCode accept(SocketFlags::AddressFamily addressFamily, SocketDescriptor& newClient);
+    [[nodiscard]] Result listen(SocketIPAddress nativeAddress, uint32_t numberOfWaitingConnections = 511);
+    [[nodiscard]] Result close();
+    [[nodiscard]] Result accept(SocketFlags::AddressFamily addressFamily, SocketDescriptor& newClient);
 
   private:
     SocketDescriptor& socket;
@@ -134,12 +134,12 @@ struct SC::SocketClient
 {
     SocketClient(SocketDescriptor& socket) : socket(socket) {}
 
-    [[nodiscard]] ReturnCode connect(StringView address, uint16_t port);
-    [[nodiscard]] ReturnCode connect(SocketIPAddress ipAddress);
-    [[nodiscard]] ReturnCode close();
-    [[nodiscard]] ReturnCode write(Span<const char> data);
-    [[nodiscard]] ReturnCode read(Span<char> data, Span<char>& readData);
-    [[nodiscard]] ReturnCode readWithTimeout(Span<char> data, Span<char>& readData, IntegerMilliseconds timeout);
+    [[nodiscard]] Result connect(StringView address, uint16_t port);
+    [[nodiscard]] Result connect(SocketIPAddress ipAddress);
+    [[nodiscard]] Result close();
+    [[nodiscard]] Result write(Span<const char> data);
+    [[nodiscard]] Result read(Span<char> data, Span<char>& readData);
+    [[nodiscard]] Result readWithTimeout(Span<char> data, Span<char>& readData, IntegerMilliseconds timeout);
 
   private:
     SocketDescriptor& socket;
@@ -147,5 +147,5 @@ struct SC::SocketClient
 
 struct SC::DNSResolver
 {
-    [[nodiscard]] static ReturnCode resolve(StringView host, String& ipAddress);
+    [[nodiscard]] static Result resolve(StringView host, String& ipAddress);
 };

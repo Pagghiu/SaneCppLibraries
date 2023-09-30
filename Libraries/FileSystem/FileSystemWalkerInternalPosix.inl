@@ -28,7 +28,7 @@ struct SC::FileSystemWalker::Internal
         bool   gotDot1           = false;
         bool   gotDot2           = false;
 
-        ReturnCode init(int fd)
+        Result init(int fd)
         {
             fileDescriptor = fd;
             if (fileDescriptor == -1)
@@ -40,7 +40,7 @@ struct SC::FileSystemWalker::Internal
             {
                 return getErrorCode(errno);
             }
-            return ReturnCode(true);
+            return Result(true);
         }
         void close()
         {
@@ -63,7 +63,7 @@ struct SC::FileSystemWalker::Internal
         }
     }
 
-    [[nodiscard]] ReturnCode init(StringView directory)
+    [[nodiscard]] Result init(StringView directory)
     {
         StringConverter currentPath(currentPathString);
         currentPath.clear();
@@ -72,14 +72,14 @@ struct SC::FileSystemWalker::Internal
         entry.textLengthInBytes = currentPathString.view().sizeInBytesIncludingTerminator();
         SC_TRY(entry.init(open(currentPathString.view().getNullTerminatedNative(), O_DIRECTORY)));
         SC_TRY(recurseStack.push_back(move(entry)));
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    ReturnCode enumerateNext(Entry& entry, const Options& opts)
+    Result enumerateNext(Entry& entry, const Options& opts)
     {
         StringConverter currentPath(currentPathString);
         if (recurseStack.isEmpty())
-            return ReturnCode::Error("Forgot to call init");
+            return Result::Error("Forgot to call init");
         StackEntry&    parent = recurseStack.back();
         struct dirent* item;
         for (;;)
@@ -92,7 +92,7 @@ struct SC::FileSystemWalker::Internal
                 if (recurseStack.isEmpty())
                 {
                     entry.parentFileDescriptor.detach();
-                    return ReturnCode::Error("Iteration Finished");
+                    return Result::Error("Iteration Finished");
                 }
                 parent = recurseStack.back();
                 SC_TRY(currentPath.setTextLengthInBytesIncludingTerminator(parent.textLengthInBytes));
@@ -132,10 +132,10 @@ struct SC::FileSystemWalker::Internal
         {
             entry.type = Type::File;
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] ReturnCode recurseSubdirectory(Entry& entry)
+    [[nodiscard]] Result recurseSubdirectory(Entry& entry)
     {
         StringConverter currentPath(currentPathString);
         StackEntry      newParent;
@@ -144,9 +144,9 @@ struct SC::FileSystemWalker::Internal
         SC_TRY(currentPath.appendNullTerminated(entry.name));
         newParent.textLengthInBytes = currentPathString.view().sizeInBytesIncludingTerminator();
         FileDescriptor::Handle handle;
-        SC_TRY(entry.parentFileDescriptor.get(handle, ReturnCode::Error("recurseSubdirectory - InvalidHandle")));
+        SC_TRY(entry.parentFileDescriptor.get(handle, Result::Error("recurseSubdirectory - InvalidHandle")));
         SC_TRY(newParent.init(openat(handle, entry.name.bytesIncludingTerminator(), O_DIRECTORY)));
         SC_TRY(recurseStack.push_back(newParent))
-        return ReturnCode(true);
+        return Result(true);
     }
 };

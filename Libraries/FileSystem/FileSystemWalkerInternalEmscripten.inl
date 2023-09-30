@@ -8,9 +8,9 @@ struct SC::FileSystemWalker::Internal
     Internal() {}
     ~Internal() {}
 
-    [[nodiscard]] ReturnCode init(StringView directory) { return ReturnCode(true); }
+    [[nodiscard]] Result init(StringView directory) { return Result(true); }
 
-    [[nodiscard]] ReturnCode enumerateNext(Entry& entry, const Options& options) { return ReturnCode(true); }
+    [[nodiscard]] Result enumerateNext(Entry& entry, const Options& options) { return Result(true); }
 
-    [[nodiscard]] ReturnCode recurseSubdirectory(Entry& entry) { return ReturnCode(true); }
+    [[nodiscard]] Result recurseSubdirectory(Entry& entry) { return Result(true); }
 };

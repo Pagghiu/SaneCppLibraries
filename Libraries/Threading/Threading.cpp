@@ -50,10 +50,10 @@ struct SC::Thread::CreateParams
 
 SC::Thread::~Thread() { SC_ASSERT_DEBUG(not thread.hasValue() && "Forgot to call join() or detach()"); }
 
-SC::ReturnCode SC::Thread::start(StringView name, Action* func, Action* syncFunc)
+SC::Result SC::Thread::start(StringView name, Action* func, Action* syncFunc)
 {
     if (thread.hasValue())
-        return ReturnCode::Error("Error thread already started");
+        return Result::Error("Error thread already started");
     CreateParams self(this);
     self.callback     = func;
     self.syncCallback = syncFunc;
@@ -64,25 +64,25 @@ SC::ReturnCode SC::Thread::start(StringView name, Action* func, Action* syncFunc
     SC_TRY(Internal::createThread(self, opaqueThread, self.threadHandle, &CreateParams::threadFunc));
     thread.assign(move(opaqueThread));
     self.event.wait();
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::Thread::join()
+SC::Result SC::Thread::join()
 {
     OpaqueThread* threadNative;
     SC_TRY(thread.get(threadNative));
     SC_TRY(Internal::joinThread(threadNative));
     thread.clear();
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::Thread::detach()
+SC::Result SC::Thread::detach()
 {
     OpaqueThread* threadNative;
     SC_TRY(thread.get(threadNative));
     SC_TRY(Internal::detachThread(threadNative));
     thread.clear();
-    return ReturnCode(true);
+    return Result(true);
 }
 
 bool SC::Thread::wasStarted() const { return thread.hasValue(); }

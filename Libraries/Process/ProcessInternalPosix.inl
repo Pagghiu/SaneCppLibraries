@@ -9,10 +9,10 @@
 #include <sys/wait.h> // waitpid
 #include <unistd.h>   // pipe fork execl _exit
 
-SC::ReturnCode SC::ProcessDescriptorTraits::releaseHandle(pid_t& handle)
+SC::Result SC::ProcessDescriptorTraits::releaseHandle(pid_t& handle)
 {
     handle = Invalid;
-    return ReturnCode(true);
+    return Result(true);
 }
 
 struct SC::Process::Internal
@@ -21,31 +21,31 @@ struct SC::Process::Internal
     static FileDescriptor::Handle getStandardOutputFDS() { return fileno(stdout); };
     static FileDescriptor::Handle getStandardErrorFDS() { return fileno(stderr); };
 
-    static ReturnCode duplicateAndReplace(FileDescriptor& handle, FileDescriptor::Handle fds)
+    static Result duplicateAndReplace(FileDescriptor& handle, FileDescriptor::Handle fds)
     {
         FileDescriptor::Handle nativeFd;
-        SC_TRY(handle.get(nativeFd, ReturnCode::Error("duplicateAndReplace - Invalid Handle")));
+        SC_TRY(handle.get(nativeFd, Result::Error("duplicateAndReplace - Invalid Handle")));
         if (::dup2(nativeFd, fds) == -1)
         {
-            return ReturnCode::Error("dup2 failed");
+            return Result::Error("dup2 failed");
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 };
 
-SC::ReturnCode SC::Process::fork()
+SC::Result SC::Process::fork()
 {
     processID.pid = ::fork();
     if (processID.pid < 0)
     {
-        return ReturnCode::Error("fork failed");
+        return Result::Error("fork failed");
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
 bool SC::Process::isChild() const { return processID.pid == 0; }
 
-SC::ReturnCode SC::Process::waitForExitSync()
+SC::Result SC::Process::waitForExitSync()
 {
     int   status = -1;
     pid_t waitPid;
@@ -57,11 +57,11 @@ SC::ReturnCode SC::Process::waitForExitSync()
     {
         exitStatus.status = WEXITSTATUS(status);
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
 template <typename Lambda>
-SC::ReturnCode SC::Process::spawn(Lambda&& lambda)
+SC::Result SC::Process::spawn(Lambda&& lambda)
 {
     SC_TRY(fork());
     if (isChild())
@@ -100,13 +100,13 @@ SC::ReturnCode SC::Process::spawn(Lambda&& lambda)
         SC_TRY(standardInput.close());
         SC_TRY(standardOutput.close());
         SC_TRY(standardError.close());
-        return ReturnCode(true);
+        return Result(true);
     }
     // The exit(127) inside isChild makes this unreachable
     Assert::unreachable();
 }
 
-SC::ReturnCode SC::Process::launch(ProcessOptions options)
+SC::Result SC::Process::launch(ProcessOptions options)
 {
     SC_COMPILER_UNUSED(options);
     auto spawnLambda = [&]() { execl("/bin/sh", "sh", "-c", command.view().getNullTerminatedNative(), nullptr); };

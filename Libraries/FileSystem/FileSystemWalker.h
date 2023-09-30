@@ -40,17 +40,17 @@ struct SC::FileSystemWalker
 
     const Entry& get() const { return currentEntry; }
 
-    [[nodiscard]] ReturnCode checkErrors()
+    [[nodiscard]] Result checkErrors()
     {
         errorsChecked = true;
         return errorResult;
     }
-    [[nodiscard]] ReturnCode init(StringView directory);
+    [[nodiscard]] Result init(StringView directory);
 
     /// Returned string is only valid until next enumerateNext call and/or another init call
-    [[nodiscard]] ReturnCode enumerateNext();
+    [[nodiscard]] Result enumerateNext();
 
-    [[nodiscard]] ReturnCode recurseSubdirectory();
+    [[nodiscard]] Result recurseSubdirectory();
 
   private:
     struct Internal;
@@ -68,7 +68,7 @@ struct SC::FileSystemWalker
     using InternalOpaque = OpaqueUniqueObject<OpaqueFuncs<InternalTraits>>;
     InternalOpaque internal;
 
-    Entry      currentEntry;
-    ReturnCode errorResult   = ReturnCode(true);
-    bool       errorsChecked = false;
+    Entry  currentEntry;
+    Result errorResult   = Result(true);
+    bool   errorsChecked = false;
 };

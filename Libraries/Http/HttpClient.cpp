@@ -7,7 +7,7 @@
 
 #include "../Foundation/Strings/StringBuilder.h"
 
-SC::ReturnCode SC::HttpClient::get(EventLoop& loop, StringView url)
+SC::Result SC::HttpClient::get(EventLoop& loop, StringView url)
 {
     eventLoop = &loop;
 

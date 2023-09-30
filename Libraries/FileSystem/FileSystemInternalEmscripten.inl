@@ -8,7 +8,7 @@
 
 namespace SC
 {
-static constexpr SC::ReturnCode getErrorCode(int errorCode) { return ReturnCode::Error("Unknown"); }
+static constexpr SC::Result getErrorCode(int errorCode) { return Result::Error("Unknown"); }
 } // namespace SC
 
 struct SC::FileSystem::Internal
@@ -44,10 +44,7 @@ struct SC::FileSystem::Internal
 
     static bool removeDirectoryRecursive(String& directory) { return false; }
 
-    [[nodiscard]] static ReturnCode getFileTime(const char* file, FileTime& time) { return ReturnCode(false); }
+    [[nodiscard]] static Result getFileTime(const char* file, FileTime& time) { return Result(false); }
 
-    [[nodiscard]] static ReturnCode setLastModifiedTime(const char* file, AbsoluteTime time)
-    {
-        return ReturnCode(false);
-    }
+    [[nodiscard]] static Result setLastModifiedTime(const char* file, AbsoluteTime time) { return Result(false); }
 };

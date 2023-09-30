@@ -19,8 +19,8 @@ struct SC::FileSystem
     bool localizedErrorMessages = false;
     bool preciseErrorMessages   = false;
 
-    ReturnCode init(StringView currentWorkingDirectory);
-    ReturnCode changeDirectory(StringView currentWorkingDirectory);
+    Result init(StringView currentWorkingDirectory);
+    Result changeDirectory(StringView currentWorkingDirectory);
 
     struct CopyFlags
     {
@@ -51,37 +51,37 @@ struct SC::FileSystem
         StringView destination;
         CopyFlags  copyFlags;
     };
-    [[nodiscard]] ReturnCode copyFile(Span<const CopyOperation> sourceDestination);
-    [[nodiscard]] ReturnCode copyFile(StringView source, StringView destination, CopyFlags copyFlags = CopyFlags())
+    [[nodiscard]] Result copyFile(Span<const CopyOperation> sourceDestination);
+    [[nodiscard]] Result copyFile(StringView source, StringView destination, CopyFlags copyFlags = CopyFlags())
     {
         return copyFile(CopyOperation{source, destination, copyFlags});
     }
-    [[nodiscard]] ReturnCode copyDirectory(Span<const CopyOperation> sourceDestination);
-    [[nodiscard]] ReturnCode copyDirectory(StringView source, StringView destination, CopyFlags copyFlags = CopyFlags())
+    [[nodiscard]] Result copyDirectory(Span<const CopyOperation> sourceDestination);
+    [[nodiscard]] Result copyDirectory(StringView source, StringView destination, CopyFlags copyFlags = CopyFlags())
     {
         return copyDirectory(CopyOperation{source, destination, copyFlags});
     }
-    [[nodiscard]] ReturnCode removeFile(Span<const StringView> files);
-    [[nodiscard]] ReturnCode removeFile(StringView source) { return removeFile(Span<const StringView>{source}); }
-    [[nodiscard]] ReturnCode removeFileIfExists(StringView source);
-    [[nodiscard]] ReturnCode removeDirectoryRecursive(Span<const StringView> directories);
-    [[nodiscard]] ReturnCode removeEmptyDirectory(Span<const StringView> directories);
-    [[nodiscard]] ReturnCode makeDirectory(Span<const StringView> directories);
-    [[nodiscard]] ReturnCode makeDirectoryIfNotExists(Span<const StringView> directories);
-    [[nodiscard]] bool       exists(StringView fileOrDirectory);
-    [[nodiscard]] bool       existsAndIsDirectory(StringView directory);
-    [[nodiscard]] bool       existsAndIsFile(StringView file);
-    [[nodiscard]] ReturnCode write(StringView file, SpanVoid<const void> data);
-    [[nodiscard]] ReturnCode read(StringView file, Vector<char>& data);
-    [[nodiscard]] ReturnCode write(StringView file, StringView text);
-    [[nodiscard]] ReturnCode read(StringView file, String& data, StringEncoding encoding);
+    [[nodiscard]] Result removeFile(Span<const StringView> files);
+    [[nodiscard]] Result removeFile(StringView source) { return removeFile(Span<const StringView>{source}); }
+    [[nodiscard]] Result removeFileIfExists(StringView source);
+    [[nodiscard]] Result removeDirectoryRecursive(Span<const StringView> directories);
+    [[nodiscard]] Result removeEmptyDirectory(Span<const StringView> directories);
+    [[nodiscard]] Result makeDirectory(Span<const StringView> directories);
+    [[nodiscard]] Result makeDirectoryIfNotExists(Span<const StringView> directories);
+    [[nodiscard]] bool   exists(StringView fileOrDirectory);
+    [[nodiscard]] bool   existsAndIsDirectory(StringView directory);
+    [[nodiscard]] bool   existsAndIsFile(StringView file);
+    [[nodiscard]] Result write(StringView file, SpanVoid<const void> data);
+    [[nodiscard]] Result read(StringView file, Vector<char>& data);
+    [[nodiscard]] Result write(StringView file, StringView text);
+    [[nodiscard]] Result read(StringView file, String& data, StringEncoding encoding);
 
     struct FileTime
     {
         AbsoluteTime modifiedTime = 0;
     };
     [[nodiscard]] Optional<FileTime> getFileTime(StringView file);
-    [[nodiscard]] ReturnCode         setLastModifiedTime(StringView file, AbsoluteTime time);
+    [[nodiscard]] Result             setLastModifiedTime(StringView file, AbsoluteTime time);
 
   private:
     [[nodiscard]] bool convert(const StringView file, String& destination, StringView* encodedPath = nullptr);
@@ -90,6 +90,6 @@ struct SC::FileSystem
     StringNative<128> fileFormatBuffer2  = StringEncoding::Native;
     StringNative<128> errorMessageBuffer = StringEncoding::Native;
 
-    ReturnCode formatError(int errorNumber, StringView item, bool isWindowsNativeError);
+    Result formatError(int errorNumber, StringView item, bool isWindowsNativeError);
     struct Internal;
 };

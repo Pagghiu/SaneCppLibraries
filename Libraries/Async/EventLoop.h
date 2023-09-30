@@ -51,7 +51,7 @@ struct EventLoopWinWaitTraits
 {
     using Handle                    = FileDescriptor::Handle;  // fd
     static constexpr Handle Invalid = FileDescriptor::Invalid; // invalid fd
-    static ReturnCode       releaseHandle(Handle& waitHandle);
+    static Result           releaseHandle(Handle& waitHandle);
 };
 
 struct EventLoopWinWaitHandle : public UniqueTaggedHandleTraits<EventLoopWinWaitTraits>
@@ -98,11 +98,11 @@ struct SC::Async
     Async(Type type) : state(State::Free), type(type), eventIndex(-1) {}
 
     /// Stops the async operation
-    [[nodiscard]] ReturnCode stop();
+    [[nodiscard]] Result stop();
 
   protected:
-    [[nodiscard]] ReturnCode validateAsync();
-    [[nodiscard]] ReturnCode queueSubmission(EventLoop& eventLoop);
+    [[nodiscard]] Result validateAsync();
+    [[nodiscard]] Result queueSubmission(EventLoop& eventLoop);
 
     void       updateTime();
     EventLoop* eventLoop = nullptr;
@@ -119,7 +119,7 @@ struct SC::Async
     friend struct EventLoop;
 
     template <typename Lambda>
-    [[nodiscard]] static ReturnCode applyOnAsync(Async& async, Lambda&& lambda);
+    [[nodiscard]] static Result applyOnAsync(Async& async, Lambda&& lambda);
 
 #if SC_CONFIGURATION_DEBUG
     const char* debugName = "None";
@@ -133,24 +133,24 @@ struct SC::AsyncResultBase
 {
     using Type = Async::Type;
 
-    AsyncResultBase(ReturnCode&& res) : returnCode(move(res)) {}
+    AsyncResultBase(Result&& res) : returnCode(move(res)) {}
 
     void reactivateRequest(bool value) { shouldBeReactivated = value; }
 
-    [[nodiscard]] const ReturnCode& isValid() const { return returnCode; }
+    [[nodiscard]] const Result& isValid() const { return returnCode; }
 
   protected:
     friend struct EventLoop;
 
-    bool       shouldBeReactivated = false;
-    ReturnCode returnCode;
+    bool   shouldBeReactivated = false;
+    Result returnCode;
 };
 
 template <typename T>
 struct SC::AsyncResult : public AsyncResultBase
 {
     T& async;
-    AsyncResult(T& async, ReturnCode&& res) : AsyncResultBase(move(res)), async(async) {}
+    AsyncResult(T& async, Result&& res) : AsyncResultBase(move(res)), async(async) {}
 };
 
 namespace SC
@@ -172,7 +172,7 @@ struct AsyncLoopTimeout : public Async
     AsyncLoopTimeout() : Async(Type::LoopTimeout) {}
 
     /// Starts a Timeout that is invoked after expiration (relative) time has passed.
-    [[nodiscard]] ReturnCode start(EventLoop& loop, IntegerMilliseconds expiration);
+    [[nodiscard]] SC::Result start(EventLoop& loop, IntegerMilliseconds expiration);
 
     [[nodiscard]] auto getTimeout() const { return timeout; }
 
@@ -195,9 +195,9 @@ struct AsyncLoopWakeUp : public Async
 
     /// Starts a wake up request, that will be fullfilled when an external thread calls wakeUpFromExternalThread.
     /// EventObject is optional and allows the external thread to wait until the user callback has completed execution.
-    [[nodiscard]] ReturnCode start(EventLoop& eventLoop, EventObject* eventObject = nullptr);
+    [[nodiscard]] SC::Result start(EventLoop& eventLoop, EventObject* eventObject = nullptr);
 
-    [[nodiscard]] ReturnCode wakeUp();
+    [[nodiscard]] SC::Result wakeUp();
 
     Function<void(Result&)> callback;
 
@@ -211,9 +211,9 @@ struct AsyncLoopWakeUp : public Async
 struct AsyncProcessExit;
 struct AsyncProcessExitResult : public AsyncResult<AsyncProcessExit>
 {
-    AsyncProcessExitResult(AsyncProcessExit& async, ReturnCode&& res) : AsyncResult(async, move(res)) {}
+    AsyncProcessExitResult(AsyncProcessExit& async, Result&& res) : AsyncResult(async, move(res)) {}
 
-    [[nodiscard]] ReturnCode moveTo(ProcessDescriptor::ExitStatus& status)
+    [[nodiscard]] Result moveTo(ProcessDescriptor::ExitStatus& status)
     {
         status = exitStatus;
         return AsyncResultBase::returnCode;
@@ -232,7 +232,7 @@ struct AsyncProcessExit : public Async
     AsyncProcessExit() : Async(Type::ProcessExit) {}
 
     /// Starts a process exit notification request, that will be fullfilled when the given process is exited.
-    [[nodiscard]] ReturnCode start(EventLoop& eventLoop, ProcessDescriptor::Handle process);
+    [[nodiscard]] SC::Result start(EventLoop& eventLoop, ProcessDescriptor::Handle process);
 
     Function<void(Result&)> callback;
 
@@ -248,9 +248,9 @@ struct AsyncProcessExit : public Async
 struct AsyncSocketAccept;
 struct AsyncSocketAcceptResult : public AsyncResult<AsyncSocketAccept>
 {
-    AsyncSocketAcceptResult(AsyncSocketAccept& async, ReturnCode&& res) : AsyncResult(async, move(res)) {}
+    AsyncSocketAcceptResult(AsyncSocketAccept& async, Result&& res) : AsyncResult(async, move(res)) {}
 
-    [[nodiscard]] ReturnCode moveTo(SocketDescriptor& client)
+    [[nodiscard]] Result moveTo(SocketDescriptor& client)
     {
         SC_TRY(AsyncResultBase::returnCode);
         return client.assign(move(acceptedClient));
@@ -269,7 +269,7 @@ struct AsyncSocketAccept : public Async
 
     /// Starts a socket accept operation, that will return a new socket connected to the given listening endpoint.
     /// SocketDescriptor must be created with async flags (createAsyncTCPSocket) and already bound and listening.
-    [[nodiscard]] ReturnCode start(EventLoop& eventLoop, const SocketDescriptor& socketDescriptor);
+    [[nodiscard]] SC::Result start(EventLoop& eventLoop, const SocketDescriptor& socketDescriptor);
 
     Function<void(Result&)> callback;
 
@@ -293,7 +293,7 @@ struct AsyncSocketConnect : public Async
     AsyncSocketConnect() : Async(Type::SocketConnect) {}
 
     /// Starts a socket connect operation. Callback will be called when the given socket is connected to ipAddress.
-    [[nodiscard]] ReturnCode start(EventLoop& loop, const SocketDescriptor& socketDescriptor,
+    [[nodiscard]] SC::Result start(EventLoop& loop, const SocketDescriptor& socketDescriptor,
                                    SocketIPAddress ipAddress);
 
     Function<void(Result&)> callback;
@@ -316,7 +316,7 @@ struct AsyncSocketSend : public Async
     AsyncSocketSend() : Async(Type::SocketSend) {}
 
     /// Starts a socket send operation. Callback will be called when the given socket is ready to send more data.
-    [[nodiscard]] ReturnCode start(EventLoop& loop, const SocketDescriptor& socketDescriptor, Span<const char> data);
+    [[nodiscard]] SC::Result start(EventLoop& loop, const SocketDescriptor& socketDescriptor, Span<const char> data);
 
     Function<void(Result&)> callback;
 
@@ -333,9 +333,9 @@ struct AsyncSocketSend : public Async
 struct AsyncSocketReceive;
 struct AsyncSocketReceiveResult : public AsyncResult<AsyncSocketReceive>
 {
-    AsyncSocketReceiveResult(AsyncSocketReceive& async, ReturnCode&& res) : AsyncResult(async, move(res)) {}
+    AsyncSocketReceiveResult(AsyncSocketReceive& async, Result&& res) : AsyncResult(async, move(res)) {}
 
-    [[nodiscard]] ReturnCode moveTo(Span<char>& outData)
+    [[nodiscard]] Result moveTo(Span<char>& outData)
     {
         outData = readData;
         return AsyncResultBase::returnCode;
@@ -353,7 +353,7 @@ struct AsyncSocketReceive : public Async
     AsyncSocketReceive() : Async(Type::SocketReceive) {}
 
     /// Starts a socket receive operation. Callback will be called when some data is read from socket.
-    [[nodiscard]] ReturnCode start(EventLoop& eventLoop, const SocketDescriptor& socketDescriptor, Span<char> data);
+    [[nodiscard]] SC::Result start(EventLoop& eventLoop, const SocketDescriptor& socketDescriptor, Span<char> data);
 
     Function<void(Result&)> callback;
 
@@ -376,7 +376,7 @@ struct AsyncSocketClose : public Async
     AsyncSocketClose() : Async(Type::SocketClose) {}
 
     /// Starts a socket close operation. Callback will be called when the socket has been fully closed.
-    [[nodiscard]] ReturnCode start(EventLoop& eventLoop, const SocketDescriptor& socketDescriptor);
+    [[nodiscard]] SC::Result start(EventLoop& eventLoop, const SocketDescriptor& socketDescriptor);
 
     int                     code = 0;
     Function<void(Result&)> callback;
@@ -390,9 +390,9 @@ struct AsyncSocketClose : public Async
 struct AsyncFileRead;
 struct AsyncFileReadResult : public AsyncResult<AsyncFileRead>
 {
-    AsyncFileReadResult(AsyncFileRead& async, ReturnCode&& res) : AsyncResult(async, move(res)) {}
+    AsyncFileReadResult(AsyncFileRead& async, Result&& res) : AsyncResult(async, move(res)) {}
 
-    [[nodiscard]] ReturnCode moveTo(Span<char>& data)
+    [[nodiscard]] Result moveTo(Span<char>& data)
     {
         data = readData;
         return AsyncResultBase::returnCode;
@@ -408,7 +408,7 @@ struct AsyncFileRead : public Async
     using Result = AsyncFileReadResult;
     AsyncFileRead() : Async(Type::FileRead) {}
     /// Starts a file receive operation, that will return when some data is read from file.
-    [[nodiscard]] ReturnCode start(EventLoop& loop, FileDescriptor::Handle fileDescriptor, Span<char> readBuffer);
+    [[nodiscard]] SC::Result start(EventLoop& loop, FileDescriptor::Handle fileDescriptor, Span<char> readBuffer);
 
     uint64_t offset = 0;
 
@@ -427,9 +427,9 @@ struct AsyncFileRead : public Async
 struct AsyncFileWrite;
 struct AsyncFileWriteResult : public AsyncResult<AsyncFileWrite>
 {
-    AsyncFileWriteResult(AsyncFileWrite& async, ReturnCode&& res) : AsyncResult(async, move(res)) {}
+    AsyncFileWriteResult(AsyncFileWrite& async, Result&& res) : AsyncResult(async, move(res)) {}
 
-    [[nodiscard]] ReturnCode moveTo(size_t& writtenSizeInBytes)
+    [[nodiscard]] Result moveTo(size_t& writtenSizeInBytes)
     {
         writtenSizeInBytes = writtenBytes;
         return AsyncResultBase::returnCode;
@@ -446,7 +446,7 @@ struct AsyncFileWrite : public Async
     AsyncFileWrite() : Async(Type::FileWrite) {}
 
     /// Starts a file receive operation, that will return when the file is ready to receive more bytes to write.
-    [[nodiscard]] ReturnCode start(EventLoop& eventLoop, FileDescriptor::Handle fileDescriptor,
+    [[nodiscard]] SC::Result start(EventLoop& eventLoop, FileDescriptor::Handle fileDescriptor,
                                    Span<const char> writeBuffer);
 
     uint64_t offset = 0;
@@ -469,7 +469,7 @@ struct AsyncFileClose : public Async
     using Result = AsyncFileCloseResult;
     AsyncFileClose() : Async(Type::FileClose) {}
 
-    [[nodiscard]] ReturnCode start(EventLoop& eventLoop, FileDescriptor::Handle fileDescriptor);
+    [[nodiscard]] SC::Result start(EventLoop& eventLoop, FileDescriptor::Handle fileDescriptor);
 
     int                     code = 0;
     Function<void(Result&)> callback;
@@ -489,7 +489,7 @@ struct AsyncWindowsPoll : public Async
     AsyncWindowsPoll() : Async(Type::WindowsPoll) {}
 
     /// Starts a windows poll operation, monitoring the given file descriptor with GetOverlappedResult
-    [[nodiscard]] ReturnCode start(EventLoop& loop, FileDescriptor::Handle fileDescriptor);
+    [[nodiscard]] SC::Result start(EventLoop& loop, FileDescriptor::Handle fileDescriptor);
 
     [[nodiscard]] auto& getOverlappedOpaque() { return overlapped; }
 
@@ -508,40 +508,40 @@ struct AsyncWindowsPoll : public Async
 struct SC::EventLoop
 {
     /// Creates the event loop kernel object
-    [[nodiscard]] ReturnCode create();
+    [[nodiscard]] Result create();
 
     /// Closes the event loop kernel object
-    [[nodiscard]] ReturnCode close();
+    [[nodiscard]] Result close();
 
     /// Runs until there are no more active handles left.
-    [[nodiscard]] ReturnCode run();
+    [[nodiscard]] Result run();
 
     /// Runs just a single step. Ensures forward progress. If there are no events it blocks.
-    [[nodiscard]] ReturnCode runOnce();
+    [[nodiscard]] Result runOnce();
 
     /// Runs just a single step without forward progress. If there are no events returns immediately.
-    [[nodiscard]] ReturnCode runNoWait();
+    [[nodiscard]] Result runNoWait();
 
     /// Wake up the event loop from a thread different than the one where run() is called (and potentially blocked).
     /// The parameter is an AsyncLoopWakeUp that must have been previously started (with AsyncLoopWakeUp::start).
-    [[nodiscard]] ReturnCode wakeUpFromExternalThread(AsyncLoopWakeUp& wakeUp);
+    [[nodiscard]] Result wakeUpFromExternalThread(AsyncLoopWakeUp& wakeUp);
 
     /// Wake up the event loop from a thread different than the one where run() is called (and potentially blocked)
-    [[nodiscard]] ReturnCode wakeUpFromExternalThread();
+    [[nodiscard]] Result wakeUpFromExternalThread();
 
     /// Helper to creates a TCP socket with Async flags of the given family (IPV4 / IPV6).
     /// It also automatically registers the socket with the eventLoop (associateExternallyCreatedTCPSocket)
-    [[nodiscard]] ReturnCode createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor);
+    [[nodiscard]] Result createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor);
 
     /// Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventloop.
-    [[nodiscard]] ReturnCode associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor);
+    [[nodiscard]] Result associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor);
 
     /// Associates a File descriptor created externally with the eventloop.
-    [[nodiscard]] ReturnCode associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor);
+    [[nodiscard]] Result associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor);
 
     /// Returns handle to the kernel level IO queue object.
     /// Used by external systems calling OS async function themselves (FileSystemWatcher on windows for example)
-    [[nodiscard]] ReturnCode getLoopFileDescriptor(FileDescriptor::Handle& fileDescriptor) const;
+    [[nodiscard]] Result getLoopFileDescriptor(FileDescriptor::Handle& fileDescriptor) const;
 
     /// Get Loop time
     [[nodiscard]] TimeCounter getLoopTime() const { return loopTime; }
@@ -591,23 +591,23 @@ struct SC::EventLoop
     void updateTime();
     void executeTimers(KernelQueue& queue, const TimeCounter& nextTimer);
 
-    [[nodiscard]] ReturnCode stopAsync(Async& async);
+    [[nodiscard]] Result stopAsync(Async& async);
 
     // LoopWakeUp
     void executeWakeUps(AsyncResultBase& result);
 
     // Setup
-    [[nodiscard]] ReturnCode queueSubmission(Async& async);
+    [[nodiscard]] Result queueSubmission(Async& async);
 
     // Phases
-    [[nodiscard]] ReturnCode stageSubmission(KernelQueue& queue, Async& async);
-    [[nodiscard]] ReturnCode setupAsync(KernelQueue& queue, Async& async);
-    [[nodiscard]] ReturnCode activateAsync(KernelQueue& queue, Async& async);
-    [[nodiscard]] ReturnCode cancelAsync(KernelQueue& queue, Async& async);
+    [[nodiscard]] Result stageSubmission(KernelQueue& queue, Async& async);
+    [[nodiscard]] Result setupAsync(KernelQueue& queue, Async& async);
+    [[nodiscard]] Result activateAsync(KernelQueue& queue, Async& async);
+    [[nodiscard]] Result cancelAsync(KernelQueue& queue, Async& async);
 
-    void reportError(KernelQueue& queue, Async& async, ReturnCode&& returnCode);
-    void completeAsync(KernelQueue& queue, Async& async, ReturnCode&& returnCode, bool& reactivate);
-    void completeAndEventuallyReactivate(KernelQueue& queue, Async& async, ReturnCode&& returnCode);
+    void reportError(KernelQueue& queue, Async& async, Result&& returnCode);
+    void completeAsync(KernelQueue& queue, Async& async, Result&& returnCode, bool& reactivate);
+    void completeAndEventuallyReactivate(KernelQueue& queue, Async& async, Result&& returnCode);
 
     enum class PollMode
     {
@@ -615,7 +615,7 @@ struct SC::EventLoop
         ForcedForwardProgress
     };
 
-    [[nodiscard]] ReturnCode runStep(PollMode pollMode);
+    [[nodiscard]] Result runStep(PollMode pollMode);
 
     friend struct Async;
 };

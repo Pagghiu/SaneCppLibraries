@@ -16,8 +16,8 @@ struct BuildTest;
 
 struct SC::BuildTest : public SC::TestCase
 {
-    [[nodiscard]] static ReturnCode testBuild(Build::Definition& definition, Build::Parameters& parameters,
-                                              StringView rootDirectory)
+    [[nodiscard]] static Result testBuild(Build::Definition& definition, Build::Parameters& parameters,
+                                          StringView rootDirectory)
     {
         using namespace Build;
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT; // Doing some optimistic coding here, ignoring all failures
@@ -83,7 +83,7 @@ struct SC::BuildTest : public SC::TestCase
         definition.workspaces.push_back(move(workspace));
 
         SC_COMPILER_WARNING_POP;
-        return ReturnCode(true);
+        return Result(true);
     }
 
     BuildTest(SC::TestReport& report) : TestCase(report, "BuildTest")

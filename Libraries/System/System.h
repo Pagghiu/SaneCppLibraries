@@ -18,28 +18,28 @@ struct SC::SystemDynamicLibraryTraits
 {
     using Handle                    = void*;   // HANDLE
     static constexpr Handle Invalid = nullptr; // INVALID_HANDLE_VALUE
-    static ReturnCode       releaseHandle(Handle& handle);
+    static Result           releaseHandle(Handle& handle);
 };
 
 struct SC::SystemDynamicLibrary : public SC::UniqueTaggedHandleTraits<SC::SystemDynamicLibraryTraits>
 {
-    ReturnCode load(StringView fullPath);
+    Result load(StringView fullPath);
     template <typename R, typename... Args>
-    ReturnCode getSymbol(StringView symbolName, R (*&symbol)(Args...)) const
+    Result getSymbol(StringView symbolName, R (*&symbol)(Args...)) const
     {
         return loadSymbol(symbolName, reinterpret_cast<void*&>(symbol));
     }
 
   private:
-    ReturnCode loadSymbol(StringView symbolName, void*& symbol) const;
+    Result loadSymbol(StringView symbolName, void*& symbol) const;
 };
 
 struct SC::SystemDebug
 {
     // Support deleting locked PDB files
-    [[nodiscard]] static bool       isDebuggerConnected();
-    [[nodiscard]] static ReturnCode unlockFileFromAllProcesses(StringView fileName);
-    [[nodiscard]] static ReturnCode deleteForcefullyUnlockedFile(StringView fileName);
+    [[nodiscard]] static bool   isDebuggerConnected();
+    [[nodiscard]] static Result unlockFileFromAllProcesses(StringView fileName);
+    [[nodiscard]] static Result deleteForcefullyUnlockedFile(StringView fileName);
 
   private:
     struct Internal;
@@ -60,8 +60,8 @@ struct SC::SystemFunctions
     SystemFunctions() = default;
     ~SystemFunctions();
 
-    [[nodiscard]] ReturnCode  initNetworking();
-    [[nodiscard]] ReturnCode  shutdownNetworking();
+    [[nodiscard]] Result      initNetworking();
+    [[nodiscard]] Result      shutdownNetworking();
     [[nodiscard]] static bool isNetworkingInited();
 
   private:

@@ -323,7 +323,7 @@ struct Project
 
     [[nodiscard]] bool removeFiles(StringView subdirectory, StringView filter);
 
-    [[nodiscard]] ReturnCode validate() const;
+    [[nodiscard]] Result validate() const;
 };
 
 struct Workspace
@@ -334,7 +334,7 @@ struct Workspace
     CompileFlags compile;
     LinkFlags    link;
 
-    [[nodiscard]] ReturnCode validate() const;
+    [[nodiscard]] Result validate() const;
 };
 
 struct Definition
@@ -356,13 +356,13 @@ struct DefinitionCompiler
     Build::Definition& definition;
     DefinitionCompiler(Build::Definition& definition) : definition(definition) {}
 
-    [[nodiscard]] ReturnCode validate();
-    [[nodiscard]] ReturnCode build();
+    [[nodiscard]] Result validate();
+    [[nodiscard]] Result build();
 
   private:
-    [[nodiscard]] static ReturnCode fillPathsList(StringView path, const VectorSet<Project::File>& filters,
-                                                  VectorMap<String, Vector<String>>& filtersToFiles);
-    [[nodiscard]] ReturnCode        collectUniqueRootPaths(VectorMap<String, VectorSet<Project::File>>& paths);
+    [[nodiscard]] static Result fillPathsList(StringView path, const VectorSet<Project::File>& filters,
+                                              VectorMap<String, Vector<String>>& filtersToFiles);
+    [[nodiscard]] Result        collectUniqueRootPaths(VectorMap<String, VectorSet<Project::File>>& paths);
 };
 
 struct ProjectWriter

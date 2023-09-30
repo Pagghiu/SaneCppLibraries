@@ -47,11 +47,11 @@ struct SC::HttpServer
         SmallVector<char, 255> outputBuffer;
         size_t                 highwaterMark = 255;
 
-        [[nodiscard]] ReturnCode startResponse(int code);
-        [[nodiscard]] ReturnCode addHeader(StringView headerName, StringView headerValue);
-        [[nodiscard]] bool       mustBeFlushed() const { return ended or outputBuffer.size() > highwaterMark; }
+        [[nodiscard]] Result startResponse(int code);
+        [[nodiscard]] Result addHeader(StringView headerName, StringView headerValue);
+        [[nodiscard]] bool   mustBeFlushed() const { return ended or outputBuffer.size() > highwaterMark; }
 
-        [[nodiscard]] ReturnCode end(StringView sv);
+        [[nodiscard]] Result end(StringView sv);
     };
 
     uint32_t maxHeaderSize = 8 * 1024;
@@ -64,7 +64,7 @@ struct SC::HttpServer
     Function<void(ClientChannel&)> onClient;
 
   protected:
-    [[nodiscard]] ReturnCode parse(Span<const char> readData, ClientChannel& res);
+    [[nodiscard]] Result parse(Span<const char> readData, ClientChannel& res);
 };
 
 struct SC::HttpServerAsync : public HttpServer
@@ -73,8 +73,8 @@ struct SC::HttpServerAsync : public HttpServer
     HttpServerAsync(const HttpServerAsync&)            = delete;
     HttpServerAsync& operator=(const HttpServerAsync&) = delete;
 
-    [[nodiscard]] ReturnCode start(EventLoop& loop, uint32_t maxConnections, StringView address, uint16_t port);
-    [[nodiscard]] ReturnCode stop();
+    [[nodiscard]] Result start(EventLoop& loop, uint32_t maxConnections, StringView address, uint16_t port);
+    [[nodiscard]] Result stop();
 
   private:
     struct RequestClient

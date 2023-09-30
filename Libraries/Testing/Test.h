@@ -40,7 +40,7 @@ struct TestCase
     TestCase(TestReport& report, StringView testName);
     ~TestCase();
     bool recordExpectation(StringView expression, bool status, StringView detailedError = StringView());
-    bool recordExpectation(StringView expression, ReturnCode status);
+    bool recordExpectation(StringView expression, Result status);
 
     [[nodiscard]] bool test_section(StringView sectionName);
 

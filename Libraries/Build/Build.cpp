@@ -62,31 +62,31 @@ bool SC::Build::Project::removeFiles(StringView subdirectory, StringView filter)
     return files.push_back({Project::File::Remove, subdirectory, filter});
 }
 
-SC::ReturnCode SC::Build::Project::validate() const
+SC::Result SC::Build::Project::validate() const
 {
     SC_TRY_MSG(not name.isEmpty(), "Project needs name");
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::Build::Workspace::validate() const
+SC::Result SC::Build::Workspace::validate() const
 {
     for (const auto& project : projects)
     {
         SC_TRY(project.validate());
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::Build::DefinitionCompiler::validate()
+SC::Result SC::Build::DefinitionCompiler::validate()
 {
     for (const auto& workspace : definition.workspaces)
     {
         SC_TRY(workspace.validate());
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::Build::DefinitionCompiler::build()
+SC::Result SC::Build::DefinitionCompiler::build()
 {
     VectorMap<String, VectorSet<Project::File>> uniquePaths;
     SC_TRY(collectUniqueRootPaths(uniquePaths));
@@ -94,11 +94,11 @@ SC::ReturnCode SC::Build::DefinitionCompiler::build()
     {
         SC_TRY(fillPathsList(it.key.view(), it.value, resolvedPaths));
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::Build::DefinitionCompiler::fillPathsList(StringView path, const VectorSet<Project::File>& filters,
-                                                            VectorMap<String, Vector<String>>& filtersToFiles)
+SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const VectorSet<Project::File>& filters,
+                                                        VectorMap<String, Vector<String>>& filtersToFiles)
 {
     bool doRecurse = false;
     for (const auto& it : filters)
@@ -152,7 +152,7 @@ SC::ReturnCode SC::Build::DefinitionCompiler::fillPathsList(StringView path, con
 }
 
 // Collects root paths to build a stat map
-SC::ReturnCode SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<String, VectorSet<Project::File>>& paths)
+SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<String, VectorSet<Project::File>>& paths)
 {
     String buffer;
     for (const Workspace& workspace : definition.workspaces)
@@ -211,7 +211,7 @@ SC::ReturnCode SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<S
             }
         }
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
 bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView filename)
@@ -290,5 +290,5 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
     }
     }
 
-    return ReturnCode(true);
+    return Result(true);
 }

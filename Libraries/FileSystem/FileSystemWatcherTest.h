@@ -92,8 +92,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             FileSystemWatcher::FolderWatcher watcher;
             // We save the results and expect them after the wait to avoid Thread Sanitizer issues
             // due to the SC_TEST_EXPECT calls inside the labmda that runs in the thread
-            const ReturnCode res        = fileEventsWatcher.watch(watcher, path, move(lambda));
-            const bool       fsWriteRes = fs.write("test.txt", "content");
+            const Result res        = fileEventsWatcher.watch(watcher, path, move(lambda));
+            const bool   fsWriteRes = fs.write("test.txt", "content");
             params.eventObject.wait();
             SC_TEST_EXPECT(fsWriteRes);
             SC_TEST_EXPECT(res);

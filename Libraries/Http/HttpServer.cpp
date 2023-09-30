@@ -18,7 +18,7 @@ bool SC::HttpServer::Request::find(HttpParser::Result result, StringView& res) c
 }
 
 // HttpServer::Response
-SC::ReturnCode SC::HttpServer::Response::startResponse(int code)
+SC::Result SC::HttpServer::Response::startResponse(int code)
 {
     StringBuilder sb(outputBuffer, StringEncoding::Ascii, StringBuilder::Clear);
     SC_TRY(sb.format("HTTP/1.1 "));
@@ -29,37 +29,37 @@ SC::ReturnCode SC::HttpServer::Response::startResponse(int code)
     case 405: SC_TRY(sb.append("{} Not Allowed\r\n", code)); break;
     }
     ended = false;
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::HttpServer::Response::addHeader(StringView headerName, StringView headerValue)
+SC::Result SC::HttpServer::Response::addHeader(StringView headerName, StringView headerValue)
 {
     StringBuilder sb(outputBuffer, StringEncoding::Ascii);
     SC_TRY(sb.append(headerName));
     SC_TRY(sb.append(": "));
     SC_TRY(sb.append(headerValue));
     SC_TRY(sb.append("\r\n"));
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::HttpServer::Response::end(StringView sv)
+SC::Result SC::HttpServer::Response::end(StringView sv)
 {
     StringBuilder sb(outputBuffer, StringEncoding::Ascii);
     SC_TRY(sb.append("Content-Length: {}\r\n\r\n", sv.sizeInBytes()));
     SC_TRY(sb.append(sv));
     ended = true;
-    return ReturnCode(outputBuffer.pop_back()); // pop null terminator
+    return Result(outputBuffer.pop_back()); // pop null terminator
 }
 
 // HttpServer
 
-SC::ReturnCode SC::HttpServer::parse(Span<const char> readData, ClientChannel& client)
+SC::Result SC::HttpServer::parse(Span<const char> readData, ClientChannel& client)
 {
     bool& parsedSuccessfully = client.request.parsedSuccessfully;
     if (client.request.headerBuffer.size() > maxHeaderSize)
     {
         parsedSuccessfully = false;
-        return ReturnCode::Error("Header size exceeded limit");
+        return Result::Error("Header size exceeded limit");
     }
     SC_TRY(client.request.headerBuffer.push_back(readData));
     size_t readBytes;
@@ -87,12 +87,11 @@ SC::ReturnCode SC::HttpServer::parse(Span<const char> readData, ClientChannel& c
             }
         }
     }
-    return ReturnCode(parsedSuccessfully);
+    return Result(parsedSuccessfully);
 }
 
 // HttpServerAsync
-SC::ReturnCode SC::HttpServerAsync::start(EventLoop& eventLoop, uint32_t maxConnections, StringView address,
-                                          uint16_t port)
+SC::Result SC::HttpServerAsync::start(EventLoop& eventLoop, uint32_t maxConnections, StringView address, uint16_t port)
 {
     SC_TRY(requestClients.resize(maxConnections));
     SC_TRY(requests.resize(maxConnections));
@@ -105,7 +104,7 @@ SC::ReturnCode SC::HttpServerAsync::start(EventLoop& eventLoop, uint32_t maxConn
     return asyncAccept.start(eventLoop, serverSocket);
 }
 
-SC::ReturnCode SC::HttpServerAsync::stop() { return asyncAccept.stop(); }
+SC::Result SC::HttpServerAsync::stop() { return asyncAccept.stop(); }
 
 void SC::HttpServerAsync::onNewClient(AsyncSocketAccept::Result& result)
 {

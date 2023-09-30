@@ -21,7 +21,7 @@ struct SC::FileSystemTest : public SC::TestCase
             SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
             fs.preciseErrorMessages = true;
 
-            ReturnCode res = fs.removeEmptyDirectory("randomNonExistingDirectory"_a8);
+            Result res = fs.removeEmptyDirectory("randomNonExistingDirectory"_a8);
             SC_TEST_EXPECT(not res);
             fs.preciseErrorMessages = false;
 

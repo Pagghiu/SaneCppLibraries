@@ -51,19 +51,19 @@ struct SC::PluginDefinition
     [[nodiscard]] static bool parse(StringView text, PluginDefinition& pluginDefinition);
     [[nodiscard]] static bool parseLine(StringIteratorASCII& iterator, StringView& key, StringView& value);
 
-    [[nodiscard]] ReturnCode getDynamicLibraryAbsolutePath(String& fullDynamicPath) const;
-    [[nodiscard]] ReturnCode getDynamicLibraryPDBAbsolutePath(String& fullDynamicPath) const;
+    [[nodiscard]] Result getDynamicLibraryAbsolutePath(String& fullDynamicPath) const;
+    [[nodiscard]] Result getDynamicLibraryPDBAbsolutePath(String& fullDynamicPath) const;
 };
 
 struct SC::PluginScanner
 {
-    [[nodiscard]] static ReturnCode scanDirectory(const StringView directory, Vector<PluginDefinition>& definitions);
+    [[nodiscard]] static Result scanDirectory(const StringView directory, Vector<PluginDefinition>& definitions);
 };
 
 struct SC::PluginCompiler
 {
-    ReturnCode compile(const PluginDefinition& definition) const;
-    ReturnCode link(const PluginDefinition& definition, StringView executablePath) const;
+    Result compile(const PluginDefinition& definition) const;
+    Result link(const PluginDefinition& definition, StringView executablePath) const;
     enum class Type
     {
         ClangCompiler,
@@ -75,8 +75,8 @@ struct SC::PluginCompiler
     StringNative<256> linkerPath   = StringEncoding::Native;
     StringNative<256> includePath  = StringEncoding::Native;
 
-    [[nodiscard]] ReturnCode        compileFile(StringView sourceFile, StringView objectFile) const;
-    [[nodiscard]] static ReturnCode findBestCompiler(PluginCompiler& compiler);
+    [[nodiscard]] Result        compileFile(StringView sourceFile, StringView objectFile) const;
+    [[nodiscard]] static Result findBestCompiler(PluginCompiler& compiler);
 
   private:
     struct Internal;
@@ -92,23 +92,23 @@ struct SC::PluginDynamicLibrary
 
   private:
     friend struct PluginRegistry;
-    [[nodiscard]] ReturnCode load(const PluginCompiler& compiler, StringView executablePath);
-    [[nodiscard]] ReturnCode unload();
+    [[nodiscard]] Result load(const PluginCompiler& compiler, StringView executablePath);
+    [[nodiscard]] Result unload();
 };
 
 struct SC::PluginRegistry
 {
-    [[nodiscard]] ReturnCode init(Vector<PluginDefinition>&& definitions);
+    [[nodiscard]] Result init(Vector<PluginDefinition>&& definitions);
 
     enum class LoadMode
     {
         Default = 0,
         Reload  = 1,
     };
-    [[nodiscard]] ReturnCode loadPlugin(const StringView identifier, const PluginCompiler& compiler,
-                                        StringView executablePath, LoadMode loadMode = LoadMode::Default);
-    [[nodiscard]] ReturnCode unloadPlugin(const StringView identifier);
-    [[nodiscard]] ReturnCode removeAllBuildProducts(const StringView identifier);
+    [[nodiscard]] Result loadPlugin(const StringView identifier, const PluginCompiler& compiler,
+                                    StringView executablePath, LoadMode loadMode = LoadMode::Default);
+    [[nodiscard]] Result unloadPlugin(const StringView identifier);
+    [[nodiscard]] Result removeAllBuildProducts(const StringView identifier);
 
     [[nodiscard]] const PluginDynamicLibrary* findPlugin(const StringView identifier);
 

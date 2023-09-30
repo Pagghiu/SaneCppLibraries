@@ -22,24 +22,24 @@ struct SC::EventLoop::Internal
 
     ~Internal() { SC_TRUST_RESULT(close()); }
 
-    [[nodiscard]] ReturnCode close()
+    [[nodiscard]] Result close()
     {
-        return ReturnCode(wakeupPipe.readPipe.close() and wakeupPipe.writePipe.close() and loopFd.close());
+        return Result(wakeupPipe.readPipe.close() and wakeupPipe.writePipe.close() and loopFd.close());
     }
 
-    [[nodiscard]] ReturnCode createEventLoop()
+    [[nodiscard]] Result createEventLoop()
     {
         const int newQueue = kqueue();
         if (newQueue == -1)
         {
             // TODO: Better kqueue error handling
-            return ReturnCode::Error("EventLoop::Internal::createEventLoop() - kqueue failed");
+            return Result::Error("EventLoop::Internal::createEventLoop() - kqueue failed");
         }
         SC_TRY(loopFd.assign(newQueue));
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] ReturnCode createWakeup(EventLoop& loop)
+    [[nodiscard]] Result createWakeup(EventLoop& loop)
     {
         // Create
         SC_TRY(wakeupPipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteNonInheritable));
@@ -49,30 +49,28 @@ struct SC::EventLoop::Internal
         // Register
         FileDescriptor::Handle wakeUpPipeDescriptor;
         SC_TRY(wakeupPipe.readPipe.get(
-            wakeUpPipeDescriptor,
-            ReturnCode::Error("EventLoop::Internal::createWakeup() - Async read handle invalid")));
+            wakeUpPipeDescriptor, Result::Error("EventLoop::Internal::createWakeup() - Async read handle invalid")));
         SC_TRY(wakeupPipeRead.start(loop, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)}));
         SC_TRY(loop.runNoWait());   // We want to register the read handle before everything else
         loop.decreaseActiveCount(); // we don't want the read to keep the queue up
-        return ReturnCode(true);
+        return Result(true);
     }
 
     [[nodiscard]] static Async* getAsync(const struct kevent& event) { return static_cast<Async*>(event.udata); }
 
-    [[nodiscard]] static ReturnCode stopSingleWatcherImmediate(Async& async, SocketDescriptor::Handle handle,
-                                                               short filter)
+    [[nodiscard]] static Result stopSingleWatcherImmediate(Async& async, SocketDescriptor::Handle handle, short filter)
     {
         FileDescriptor::Handle loopNativeDescriptor;
         SC_TRUST_RESULT(async.eventLoop->internal.get().loopFd.get(
-            loopNativeDescriptor, ReturnCode::Error("EventLoop::Internal::pollAsync() - Invalid Handle")));
+            loopNativeDescriptor, Result::Error("EventLoop::Internal::pollAsync() - Invalid Handle")));
         struct kevent kev;
         EV_SET(&kev, handle, filter, EV_DELETE, 0, 0, nullptr);
         const int res = kevent(loopNativeDescriptor, &kev, 1, 0, 0, nullptr);
         if (res == 0 or (errno == EBADF or errno == ENOENT))
         {
-            return ReturnCode(true);
+            return Result(true);
         }
-        return ReturnCode::Error("kevent EV_DELETE failed");
+        return Result::Error("kevent EV_DELETE failed");
     }
 };
 
@@ -86,7 +84,7 @@ struct SC::EventLoop::KernelQueue
 
     KernelQueue() { memset(events, 0, sizeof(events)); }
 
-    [[nodiscard]] ReturnCode pushNewSubmission(Async& async)
+    [[nodiscard]] Result pushNewSubmission(Async& async)
     {
         switch (async.type)
         {
@@ -109,7 +107,7 @@ struct SC::EventLoop::KernelQueue
             break;
         }
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 
     [[nodiscard]] bool setEventWatcher(Async& async, int fileDescriptor, short filter, short operation,
@@ -138,11 +136,11 @@ struct SC::EventLoop::KernelQueue
         return specTimeout;
     }
 
-    [[nodiscard]] ReturnCode pollAsync(EventLoop& self, PollMode pollMode)
+    [[nodiscard]] Result pollAsync(EventLoop& self, PollMode pollMode)
     {
         const TimeCounter* nextTimer = pollMode == PollMode::ForcedForwardProgress ? self.findEarliestTimer() : nullptr;
         FileDescriptor::Handle loopHandle;
-        SC_TRY(self.internal.get().loopFd.get(loopHandle, ReturnCode::Error("pollAsync() - Invalid Handle")));
+        SC_TRY(self.internal.get().loopFd.get(loopHandle, Result::Error("pollAsync() - Invalid Handle")));
 
         struct timespec specTimeout;
         // when nextTimer is null, specTimeout is initialized to 0, so that PollMode::NoWait
@@ -166,20 +164,20 @@ struct SC::EventLoop::KernelQueue
         } while (true);
         if (res == -1)
         {
-            return ReturnCode::Error("EventLoop::Internal::poll() - kevent failed");
+            return Result::Error("EventLoop::Internal::poll() - kevent failed");
         }
         newEvents = static_cast<int>(res);
         if (nextTimer)
         {
             self.executeTimers(*this, *nextTimer);
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] ReturnCode flushQueue(EventLoop& self)
+    [[nodiscard]] Result flushQueue(EventLoop& self)
     {
         FileDescriptor::Handle loopHandle;
-        SC_TRY(self.internal.get().loopFd.get(loopHandle, ReturnCode::Error("flushQueue() - Invalid Handle")));
+        SC_TRY(self.internal.get().loopFd.get(loopHandle, Result::Error("flushQueue() - Invalid Handle")));
 
         int res;
         do
@@ -188,20 +186,20 @@ struct SC::EventLoop::KernelQueue
         } while (res == -1 && errno == EINTR);
         if (res != 0)
         {
-            return ReturnCode::Error("EventLoop::Internal::flushQueue() - kevent failed");
+            return Result::Error("EventLoop::Internal::flushQueue() - kevent failed");
         }
         newEvents = 0;
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] static ReturnCode validateEvent(const struct kevent& event, bool& continueProcessing)
+    [[nodiscard]] static Result validateEvent(const struct kevent& event, bool& continueProcessing)
     {
         continueProcessing = (event.flags & EV_DELETE) == 0;
         if ((event.flags & EV_ERROR) != 0)
         {
-            return ReturnCode::Error("Error in processing event (kqueue EV_ERROR)");
+            return Result::Error("Error in processing event (kqueue EV_ERROR)");
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 
     // TIMEOUT
@@ -283,7 +281,7 @@ struct SC::EventLoop::KernelQueue
     }
     [[nodiscard]] static bool activateAsync(AsyncSocketAccept&) { return true; }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncSocketAccept::Result& result)
+    [[nodiscard]] static Result completeAsync(AsyncSocketAccept::Result& result)
     {
         AsyncSocketAccept& async = result.async;
         SocketDescriptor   serverSocket;
@@ -293,7 +291,7 @@ struct SC::EventLoop::KernelQueue
         return SocketServer(serverSocket).accept(async.addressFamily, result.acceptedClient);
     }
 
-    [[nodiscard]] static ReturnCode stopAsync(AsyncSocketAccept& async)
+    [[nodiscard]] static Result stopAsync(AsyncSocketAccept& async)
     {
         return Internal::stopSingleWatcherImmediate(async, async.handle, EVFILT_READ);
     }
@@ -304,7 +302,7 @@ struct SC::EventLoop::KernelQueue
         return setEventWatcher(async, async.handle, EVFILT_WRITE, EV_ADD | EV_ENABLE);
     }
 
-    [[nodiscard]] static ReturnCode activateAsync(AsyncSocketConnect& async)
+    [[nodiscard]] static Result activateAsync(AsyncSocketConnect& async)
     {
         SocketDescriptor client;
         SC_TRY(client.assign(async.handle));
@@ -313,16 +311,16 @@ struct SC::EventLoop::KernelQueue
         // we expect connect to fail with
         if (res)
         {
-            return ReturnCode::Error("connect failed (succeded?)");
+            return Result::Error("connect failed (succeded?)");
         }
         if (errno != EAGAIN and errno != EINPROGRESS)
         {
-            return ReturnCode::Error("connect failed (socket is in blocking mode)");
+            return Result::Error("connect failed (socket is in blocking mode)");
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncSocketConnect::Result& result)
+    [[nodiscard]] static Result completeAsync(AsyncSocketConnect::Result& result)
     {
         AsyncSocketConnect& async = result.async;
 
@@ -337,65 +335,65 @@ struct SC::EventLoop::KernelQueue
         if (socketRes == 0)
         {
             SC_TRY_MSG(errorCode == 0, "connect SO_ERROR");
-            return ReturnCode(true);
+            return Result(true);
         }
-        return ReturnCode::Error("connect getsockopt failed");
+        return Result::Error("connect getsockopt failed");
     }
 
-    [[nodiscard]] static ReturnCode stopAsync(AsyncSocketConnect& async)
+    [[nodiscard]] static Result stopAsync(AsyncSocketConnect& async)
     {
         return Internal::stopSingleWatcherImmediate(async, async.handle, EVFILT_WRITE);
     }
 
     // Socket SEND
-    [[nodiscard]] ReturnCode setupAsync(AsyncSocketSend& async)
+    [[nodiscard]] Result setupAsync(AsyncSocketSend& async)
     {
-        return ReturnCode(setEventWatcher(async, async.handle, EVFILT_WRITE, EV_ADD | EV_ENABLE));
+        return Result(setEventWatcher(async, async.handle, EVFILT_WRITE, EV_ADD | EV_ENABLE));
     }
 
     [[nodiscard]] static bool activateAsync(AsyncSocketSend&) { return true; }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncSocketSend::Result& result)
+    [[nodiscard]] static Result completeAsync(AsyncSocketSend::Result& result)
     {
         AsyncSocketSend& async = result.async;
         const ssize_t    res   = ::send(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
         SC_TRY_MSG(res >= 0, "error in send");
         SC_TRY_MSG(size_t(res) == async.data.sizeInBytes(), "send didn't send all data");
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] ReturnCode stopAsync(AsyncSocketSend& async)
+    [[nodiscard]] Result stopAsync(AsyncSocketSend& async)
     {
         return Internal::stopSingleWatcherImmediate(async, async.handle, EVFILT_WRITE);
     }
 
     // Socket RECEIVE
-    [[nodiscard]] ReturnCode setupAsync(AsyncSocketReceive& async)
+    [[nodiscard]] Result setupAsync(AsyncSocketReceive& async)
     {
-        return ReturnCode(setEventWatcher(async, async.handle, EVFILT_READ, EV_ADD | EV_ENABLE));
+        return Result(setEventWatcher(async, async.handle, EVFILT_READ, EV_ADD | EV_ENABLE));
     }
 
     [[nodiscard]] static bool activateAsync(AsyncSocketReceive&) { return true; }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncSocketReceive::Result& result)
+    [[nodiscard]] static Result completeAsync(AsyncSocketReceive::Result& result)
     {
         AsyncSocketReceive& async = result.async;
         const ssize_t       res   = ::recv(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
         SC_TRY_MSG(res >= 0, "error in recv");
-        return ReturnCode(async.data.sliceStartLength(0, static_cast<size_t>(res), result.readData));
+        return Result(async.data.sliceStartLength(0, static_cast<size_t>(res), result.readData));
     }
 
-    [[nodiscard]] static ReturnCode stopAsync(AsyncSocketReceive& async)
+    [[nodiscard]] static Result stopAsync(AsyncSocketReceive& async)
     {
         return Internal::stopSingleWatcherImmediate(async, async.handle, EVFILT_READ);
     }
 
     // Socket CLOSE
-    [[nodiscard]] static ReturnCode setupAsync(AsyncSocketClose& async)
+    [[nodiscard]] static Result setupAsync(AsyncSocketClose& async)
     {
         async.code = ::close(async.handle);
         SC_TRY_MSG(async.code == 0, "Close returned error");
-        return ReturnCode(true);
+        return Result(true);
     }
     [[nodiscard]] static bool activateAsync(AsyncSocketClose&) { return true; }
     [[nodiscard]] static bool completeAsync(AsyncSocketClose::Result&) { return true; }
@@ -409,7 +407,7 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] static bool activateAsync(AsyncFileRead&) { return true; }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncFileRead::Result& result)
+    [[nodiscard]] static Result completeAsync(AsyncFileRead::Result& result)
     {
         if (&result.async == &result.async.eventLoop->internal.get().wakeupPipeRead)
         {
@@ -427,10 +425,10 @@ struct SC::EventLoop::KernelQueue
             SC_TRY_MSG(res >= 0, "::read failed");
             SC_TRY(result.async.readBuffer.sliceStartLength(0, static_cast<size_t>(res), result.readData));
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] static ReturnCode stopAsync(AsyncFileRead& async)
+    [[nodiscard]] static Result stopAsync(AsyncFileRead& async)
     {
         return Internal::stopSingleWatcherImmediate(async, async.fileDescriptor, EVFILT_READ);
     }
@@ -443,7 +441,7 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] static bool activateAsync(AsyncFileWrite&) { return true; }
 
-    [[nodiscard]] static ReturnCode completeAsync(AsyncFileWrite::Result& result)
+    [[nodiscard]] static Result completeAsync(AsyncFileWrite::Result& result)
     {
         AsyncFileWrite& async = result.async;
         auto            span  = async.writeBuffer;
@@ -454,20 +452,20 @@ struct SC::EventLoop::KernelQueue
         } while ((res == -1) and (errno == EINTR));
         SC_TRY_MSG(res >= 0, "::write failed");
         result.writtenBytes = static_cast<size_t>(res);
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] static ReturnCode stopAsync(AsyncFileWrite& async)
+    [[nodiscard]] static Result stopAsync(AsyncFileWrite& async)
     {
         return Internal::stopSingleWatcherImmediate(async, async.fileDescriptor, EVFILT_WRITE);
     }
 
     // File Close
-    [[nodiscard]] ReturnCode setupAsync(AsyncFileClose& async)
+    [[nodiscard]] Result setupAsync(AsyncFileClose& async)
     {
         async.code = ::close(async.fileDescriptor);
         SC_TRY_MSG(async.code == 0, "Close returned error");
-        return ReturnCode(true);
+        return Result(true);
     }
 
     [[nodiscard]] static bool activateAsync(AsyncFileClose&) { return true; }
@@ -482,7 +480,7 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] static bool activateAsync(AsyncProcessExit&) { return true; }
 
-    [[nodiscard]] ReturnCode completeAsync(AsyncProcessExit::Result& result)
+    [[nodiscard]] Result completeAsync(AsyncProcessExit::Result& result)
     {
         SC_TRY_MSG(result.async.eventIndex >= 0, "Invalid event Index");
         const struct kevent event = events[result.async.eventIndex];
@@ -493,25 +491,25 @@ struct SC::EventLoop::KernelQueue
             {
                 result.exitStatus.status.assign(WEXITSTATUS(data));
             }
-            return ReturnCode(true);
+            return Result(true);
         }
-        return ReturnCode(false);
+        return Result(false);
     }
 
-    [[nodiscard]] static ReturnCode stopAsync(AsyncProcessExit& async)
+    [[nodiscard]] static Result stopAsync(AsyncProcessExit& async)
     {
         return Internal::stopSingleWatcherImmediate(async, async.handle, EVFILT_PROC);
     }
 };
 
-SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
+SC::Result SC::EventLoop::wakeUpFromExternalThread()
 {
     Internal& self = internal.get();
     // TODO: We need an atomic bool swap to wait until next run
     const void* fakeBuffer;
     int         asyncFd;
     ssize_t     writtenBytes;
-    SC_TRY(self.wakeupPipe.writePipe.get(asyncFd, ReturnCode::Error("writePipe handle")));
+    SC_TRY(self.wakeupPipe.writePipe.get(asyncFd, Result::Error("writePipe handle")));
     fakeBuffer = "";
     do
     {
@@ -520,11 +518,11 @@ SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread()
 
     if (writtenBytes != 1)
     {
-        return ReturnCode::Error("EventLoop::wakeUpFromExternalThread - Error in write");
+        return Result::Error("EventLoop::wakeUpFromExternalThread - Error in write");
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::EventLoop::associateExternallyCreatedTCPSocket(SocketDescriptor&) { return ReturnCode(true); }
+SC::Result SC::EventLoop::associateExternallyCreatedTCPSocket(SocketDescriptor&) { return Result(true); }
 
-SC::ReturnCode SC::EventLoop::associateExternallyCreatedFileDescriptor(FileDescriptor&) { return ReturnCode(true); }
+SC::Result SC::EventLoop::associateExternallyCreatedFileDescriptor(FileDescriptor&) { return Result(true); }

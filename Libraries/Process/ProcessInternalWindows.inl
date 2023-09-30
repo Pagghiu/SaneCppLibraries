@@ -10,11 +10,11 @@
 #include <stdlib.h> // _exit
 #endif
 
-SC::ReturnCode SC::ProcessDescriptorTraits::releaseHandle(HANDLE& handle)
+SC::Result SC::ProcessDescriptorTraits::releaseHandle(HANDLE& handle)
 {
     if (::CloseHandle(handle) == FALSE)
-        return ReturnCode::Error("ProcessNativeHandleClose - CloseHandle failed");
-    return ReturnCode(true);
+        return Result::Error("ProcessNativeHandleClose - CloseHandle failed");
+    return Result(true);
 }
 
 struct SC::Process::Internal
@@ -23,22 +23,22 @@ struct SC::Process::Internal
     static void exit(int code) { _exit(code); }
 };
 
-SC::ReturnCode SC::Process::waitForExitSync()
+SC::Result SC::Process::waitForExitSync()
 {
     HANDLE hProcess;
-    SC_TRY(handle.get(hProcess, ReturnCode::Error("ProcesEntry::waitProcessExit - Invalid handle")));
+    SC_TRY(handle.get(hProcess, Result::Error("ProcesEntry::waitProcessExit - Invalid handle")));
     WaitForSingleObject(hProcess, INFINITE);
     DWORD processStatus;
     if (GetExitCodeProcess(hProcess, &processStatus))
     {
         exitStatus.status = static_cast<int32_t>(processStatus);
-        return ReturnCode(true);
+        return Result(true);
     }
-    return ReturnCode::Error("Process::wait - GetExitCodeProcess failed");
+    return Result::Error("Process::wait - GetExitCodeProcess failed");
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/procthread/creating-a-child-process-with-redirected-input-and-output
-SC::ReturnCode SC::Process::launch(ProcessOptions options)
+SC::Result SC::Process::launch(ProcessOptions options)
 {
     STARTUPINFOW startupInfo;
     const bool   someRedirection = standardInput.isValid() || standardOutput.isValid() || standardError.isValid();
@@ -58,15 +58,15 @@ SC::ReturnCode SC::Process::launch(ProcessOptions options)
 
     if (standardInput.isValid())
     {
-        SC_TRY(standardInput.get(startupInfo.hStdInput, ReturnCode(false)));
+        SC_TRY(standardInput.get(startupInfo.hStdInput, Result(false)));
     }
     if (standardOutput.isValid())
     {
-        SC_TRY(standardOutput.get(startupInfo.hStdOutput, ReturnCode(false)));
+        SC_TRY(standardOutput.get(startupInfo.hStdOutput, Result(false)));
     }
     if (standardError.isValid())
     {
-        SC_TRY(standardError.get(startupInfo.hStdError, ReturnCode(false)));
+        SC_TRY(standardError.get(startupInfo.hStdError, Result(false)));
     }
     if (someRedirection)
     {
@@ -93,7 +93,7 @@ SC::ReturnCode SC::Process::launch(ProcessOptions options)
 
     if (not success)
     {
-        return ReturnCode::Error("CreateProcessW failed");
+        return Result::Error("CreateProcessW failed");
     }
     CloseHandle(processInfo.hThread);
 
@@ -102,5 +102,5 @@ SC::ReturnCode SC::Process::launch(ProcessOptions options)
     SC_TRY(standardInput.close());
     SC_TRY(standardOutput.close());
     SC_TRY(standardError.close());
-    return ReturnCode(true);
+    return Result(true);
 }

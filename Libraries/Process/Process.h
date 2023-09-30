@@ -44,31 +44,31 @@ struct SC::Process
     Process* prev = nullptr;
 
     template <typename... StringView>
-    [[nodiscard]] ReturnCode formatCommand(StringView&&... args)
+    [[nodiscard]] Result formatCommand(StringView&&... args)
     {
         return formatArguments({forward<StringView>(args)...});
     }
 
-    [[nodiscard]] ReturnCode formatArguments(Span<const StringView> cmd);
-    [[nodiscard]] ReturnCode waitForExitSync();
+    [[nodiscard]] Result formatArguments(Span<const StringView> cmd);
+    [[nodiscard]] Result waitForExitSync();
     template <typename... StringView>
-    [[nodiscard]] ReturnCode launch(StringView&&... args)
+    [[nodiscard]] Result launch(StringView&&... args)
     {
         SC_TRY(formatArguments({forward<StringView>(args)...}));
         return launch();
     }
-    [[nodiscard]] ReturnCode launch(ProcessOptions options = {});
-    [[nodiscard]] ReturnCode redirectStdOutTo(PipeDescriptor& pipe);
-    [[nodiscard]] ReturnCode redirectStdErrTo(PipeDescriptor& pipe);
-    [[nodiscard]] ReturnCode redirectStdInTo(PipeDescriptor& pipe);
+    [[nodiscard]] Result launch(ProcessOptions options = {});
+    [[nodiscard]] Result redirectStdOutTo(PipeDescriptor& pipe);
+    [[nodiscard]] Result redirectStdErrTo(PipeDescriptor& pipe);
+    [[nodiscard]] Result redirectStdInTo(PipeDescriptor& pipe);
 
   private:
     struct Internal;
 
     template <typename Lambda>
-    [[nodiscard]] ReturnCode spawn(Lambda&& lambda);
-    [[nodiscard]] ReturnCode fork();
-    [[nodiscard]] bool       isChild() const;
+    [[nodiscard]] Result spawn(Lambda&& lambda);
+    [[nodiscard]] Result fork();
+    [[nodiscard]] bool   isChild() const;
 };
 
 struct SC::ProcessChainOptions
@@ -82,23 +82,23 @@ struct SC::ProcessChain
 
     struct Error
     {
-        ReturnCode returnCode = ReturnCode(true);
+        Result returnCode = Result(true);
     };
 
     ProcessChain(Delegate<const Error&> onError) : onError(onError) {}
 
     template <typename... StringView>
-    [[nodiscard]] ReturnCode pipe(Process& p, StringView&&... args)
+    [[nodiscard]] Result pipe(Process& p, StringView&&... args)
     {
         return pipe(p, {forward<const StringView>(args)...});
     }
-    [[nodiscard]] ReturnCode pipe(Process& p, std::initializer_list<const StringView> cmd);
-    [[nodiscard]] ReturnCode launch(ProcessChainOptions options = ProcessChainOptions());
-    [[nodiscard]] ReturnCode waitForExitSync();
-    [[nodiscard]] ReturnCode readStdOutUntilEOFSync(String& destination);
-    [[nodiscard]] ReturnCode readStdErrUntilEOFSync(String& destination);
-    [[nodiscard]] ReturnCode readStdOutUntilEOFSync(Vector<char>& destination);
-    [[nodiscard]] ReturnCode readStdErrUntilEOFSync(Vector<char>& destination);
+    [[nodiscard]] Result pipe(Process& p, std::initializer_list<const StringView> cmd);
+    [[nodiscard]] Result launch(ProcessChainOptions options = ProcessChainOptions());
+    [[nodiscard]] Result waitForExitSync();
+    [[nodiscard]] Result readStdOutUntilEOFSync(String& destination);
+    [[nodiscard]] Result readStdErrUntilEOFSync(String& destination);
+    [[nodiscard]] Result readStdOutUntilEOFSync(Vector<char>& destination);
+    [[nodiscard]] Result readStdErrUntilEOFSync(Vector<char>& destination);
 
   private:
     Delegate<const Error&> onError;

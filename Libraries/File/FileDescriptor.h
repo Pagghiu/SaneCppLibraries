@@ -27,7 +27,7 @@ struct FileDescriptorTraits
 #else
     static constexpr void* Invalid = (void*)-1; // INVALID_HANDLE_VALUE
 #endif
-    static ReturnCode releaseHandle(Handle& handle);
+    static Result releaseHandle(Handle& handle);
 };
 
 #else
@@ -36,7 +36,7 @@ struct FileDescriptorTraits
 {
     using Handle                    = int; // fd
     static constexpr Handle Invalid = -1;  // invalid fd
-    static ReturnCode       releaseHandle(Handle& handle);
+    static Result           releaseHandle(Handle& handle);
 };
 
 #endif
@@ -61,18 +61,18 @@ struct SC::FileDescriptor : public SC::UniqueTaggedHandleTraits<SC::FileDescript
         bool async       = false;
     };
 
-    [[nodiscard]] ReturnCode open(StringView path, OpenMode mode);
-    [[nodiscard]] ReturnCode open(StringView path, OpenMode mode, OpenOptions options);
+    [[nodiscard]] Result open(StringView path, OpenMode mode);
+    [[nodiscard]] Result open(StringView path, OpenMode mode, OpenOptions options);
 
-    [[nodiscard]] ReturnCode setBlocking(bool blocking);
-    [[nodiscard]] ReturnCode setInheritable(bool inheritable);
-    [[nodiscard]] ReturnCode isInheritable(bool& hasValue) const;
+    [[nodiscard]] Result setBlocking(bool blocking);
+    [[nodiscard]] Result setInheritable(bool inheritable);
+    [[nodiscard]] Result isInheritable(bool& hasValue) const;
 
-    [[nodiscard]] ReturnCode read(Span<char> data, Span<char>& actuallyRead, uint64_t offset);
-    [[nodiscard]] ReturnCode read(Span<char> data, Span<char>& actuallyRead);
+    [[nodiscard]] Result read(Span<char> data, Span<char>& actuallyRead, uint64_t offset);
+    [[nodiscard]] Result read(Span<char> data, Span<char>& actuallyRead);
 
-    [[nodiscard]] ReturnCode write(Span<const char> data, uint64_t offset);
-    [[nodiscard]] ReturnCode write(Span<const char> data);
+    [[nodiscard]] Result write(Span<const char> data, uint64_t offset);
+    [[nodiscard]] Result write(Span<const char> data);
 
     enum SeekMode
     {
@@ -81,11 +81,11 @@ struct SC::FileDescriptor : public SC::UniqueTaggedHandleTraits<SC::FileDescript
         SeekCurrent,
     };
 
-    [[nodiscard]] ReturnCode seek(SeekMode seekMode, uint64_t offset);
+    [[nodiscard]] Result seek(SeekMode seekMode, uint64_t offset);
 
     // TODO: Maybe readUntilEOF and readAppend should go into some other class
-    [[nodiscard]] ReturnCode readUntilEOF(Vector<char>& destination);
-    [[nodiscard]] ReturnCode readUntilEOF(String& destination);
+    [[nodiscard]] Result readUntilEOF(Vector<char>& destination);
+    [[nodiscard]] Result readUntilEOF(String& destination);
 
     struct ReadResult
     {
@@ -93,7 +93,7 @@ struct SC::FileDescriptor : public SC::UniqueTaggedHandleTraits<SC::FileDescript
         bool   isEOF        = false;
     };
 
-    [[nodiscard]] ReturnCode readAppend(Vector<char>& output, Span<char> fallbackBuffer, ReadResult& result);
+    [[nodiscard]] Result readAppend(Vector<char>& output, Span<char> fallbackBuffer, ReadResult& result);
 
   private:
     struct Internal;
@@ -115,6 +115,6 @@ struct SC::PipeDescriptor
     FileDescriptor writePipe;
 
     /// Creates a Pipe. Default is non-inheritable / blocking
-    [[nodiscard]] ReturnCode createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag);
-    [[nodiscard]] ReturnCode close();
+    [[nodiscard]] Result createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag);
+    [[nodiscard]] Result close();
 };

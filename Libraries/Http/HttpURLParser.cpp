@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "HttpURLParser.h"
 
-SC::ReturnCode SC::HttpURLParser::parse(StringView url)
+SC::Result SC::HttpURLParser::parse(StringView url)
 {
     StringIteratorASCII it = url.getIterator<StringIteratorASCII>();
 
@@ -22,7 +22,7 @@ SC::ReturnCode SC::HttpURLParser::parse(StringView url)
     SC_TRY(parseHost());
     if (not hasPath)
     {
-        return ReturnCode(true);
+        return Result(true);
     }
     // path + hash
     start              = it;
@@ -33,10 +33,10 @@ SC::ReturnCode SC::HttpURLParser::parse(StringView url)
     {
         hash = StringView::fromIteratorUntilEnd(it);
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::HttpURLParser::parsePath()
+SC::Result SC::HttpURLParser::parsePath()
 {
     StringIteratorASCII it = path.getIterator<StringIteratorASCII>();
     if (it.advanceUntilMatches('?'))
@@ -51,7 +51,7 @@ SC::ReturnCode SC::HttpURLParser::parsePath()
     return validatePath();
 }
 
-SC::ReturnCode SC::HttpURLParser::parseHost()
+SC::Result SC::HttpURLParser::parseHost()
 {
     StringIteratorASCII it = host.getIterator<StringIteratorASCII>();
 
@@ -87,41 +87,41 @@ SC::ReturnCode SC::HttpURLParser::parseHost()
     return validateHost();
 }
 
-SC::ReturnCode SC::HttpURLParser::validateProtocol()
+SC::Result SC::HttpURLParser::validateProtocol()
 {
     // TODO: Expand supported protocols
     if (protocol == "http")
     {
         port = 80;
-        return ReturnCode(true);
+        return Result(true);
     }
     else if (protocol == "https")
     {
         port = 443;
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    return ReturnCode(false);
+    return Result(false);
 }
 
-SC::ReturnCode SC::HttpURLParser::validatePath()
+SC::Result SC::HttpURLParser::validatePath()
 {
     // TODO: Improve validatePath
-    return ReturnCode(not pathname.containsChar(' '));
+    return Result(not pathname.containsChar(' '));
 }
 
-SC::ReturnCode SC::HttpURLParser::validateHost()
+SC::Result SC::HttpURLParser::validateHost()
 {
     // TODO: Improve validateHost
-    return ReturnCode(not host.isEmpty() and (host.containsChar('.') or hostname == "localhost"));
+    return Result(not host.isEmpty() and (host.containsChar('.') or hostname == "localhost"));
 }
 
-SC::ReturnCode SC::HttpURLParser::parseUserPassword(StringView userPassowrd)
+SC::Result SC::HttpURLParser::parseUserPassword(StringView userPassowrd)
 {
     StringViewTokenizer tokenizer(userPassowrd);
     SC_TRY(tokenizer.tokenizeNext({':'}, StringViewTokenizer::Options::SkipEmpty));
     username = tokenizer.component;
     SC_TRY(tokenizer.tokenizeNext({}, StringViewTokenizer::Options::SkipEmpty));
     password = tokenizer.component;
-    return ReturnCode(true);
+    return Result(true);
 }

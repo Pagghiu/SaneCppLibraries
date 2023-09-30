@@ -24,16 +24,16 @@ struct SC::Thread::Internal
     using NativeHandle       = pthread_t;
     using CallbackReturnType = void*;
 
-    [[nodiscard]] static ReturnCode createThread(CreateParams& self, OpaqueThread& opaqueThread,
-                                                 pthread_t& threadHandle, void* (*threadFunc)(void* argument))
+    [[nodiscard]] static Result createThread(CreateParams& self, OpaqueThread& opaqueThread, pthread_t& threadHandle,
+                                             void* (*threadFunc)(void* argument))
     {
         const int res = pthread_create(&opaqueThread.reinterpret_as<pthread_t>(), 0, threadFunc, &self);
         threadHandle  = opaqueThread.reinterpret_as<pthread_t>();
         if (res != 0)
         {
-            return ReturnCode::Error("Thread::create - pthread_create failed");
+            return Result::Error("Thread::create - pthread_create failed");
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 
     static void setThreadName(pthread_t& threadHandle, const StringView& nameNullTerminated)
@@ -44,24 +44,24 @@ struct SC::Thread::Internal
 #endif
     }
 
-    [[nodiscard]] static ReturnCode joinThread(OpaqueThread* threadNative)
+    [[nodiscard]] static Result joinThread(OpaqueThread* threadNative)
     {
         int res = pthread_join(threadNative->reinterpret_as<pthread_t>(), 0);
         if (res != 0)
         {
-            return ReturnCode::Error("phread_join error");
+            return Result::Error("phread_join error");
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] static ReturnCode detachThread(OpaqueThread* threadNative)
+    [[nodiscard]] static Result detachThread(OpaqueThread* threadNative)
     {
         int res = pthread_detach(threadNative->reinterpret_as<pthread_t>());
         if (res != 0)
         {
-            return ReturnCode::Error("pthread_detach error");
+            return Result::Error("pthread_detach error");
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 };
 

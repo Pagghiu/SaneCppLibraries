@@ -3,13 +3,10 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "System.h"
 
-SC::ReturnCode SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle) { return ReturnCode(true); }
+SC::Result SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle) { return Result(true); }
 
-SC::ReturnCode SC::SystemDynamicLibrary::load(StringView fullPath) { return ReturnCode(true); }
+SC::Result SC::SystemDynamicLibrary::load(StringView fullPath) { return Result(true); }
 
-SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const
-{
-    return ReturnCode(true);
-}
+SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const { return Result(true); }
 
 bool SC::SystemDirectories::init() { return true; }

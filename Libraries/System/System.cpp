@@ -14,9 +14,9 @@
 #endif
 
 #if !SC_PLATFORM_WINDOWS
-SC::ReturnCode SC::SystemFunctions::initNetworking() { return ReturnCode(true); }
-SC::ReturnCode SC::SystemFunctions::shutdownNetworking() { return ReturnCode(true); }
-bool           SC::SystemFunctions::isNetworkingInited() { return ReturnCode(true); }
+SC::Result SC::SystemFunctions::initNetworking() { return Result(true); }
+SC::Result SC::SystemFunctions::shutdownNetworking() { return Result(true); }
+bool       SC::SystemFunctions::isNetworkingInited() { return Result(true); }
 #endif
 
 SC::SystemFunctions::~SystemFunctions() { SC_TRUST_RESULT(shutdownNetworking()); }

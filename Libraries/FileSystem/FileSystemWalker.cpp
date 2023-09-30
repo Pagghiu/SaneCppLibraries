@@ -24,11 +24,11 @@ void SC::OpaqueFuncs<SC::FileSystemWalker::InternalTraits>::destruct(Object& obj
 
 SC::FileSystemWalker::~FileSystemWalker() {}
 
-[[nodiscard]] SC::ReturnCode SC::FileSystemWalker::init(StringView directory) { return internal.get().init(directory); }
+[[nodiscard]] SC::Result SC::FileSystemWalker::init(StringView directory) { return internal.get().init(directory); }
 
-[[nodiscard]] SC::ReturnCode SC::FileSystemWalker::enumerateNext()
+[[nodiscard]] SC::Result SC::FileSystemWalker::enumerateNext()
 {
-    ReturnCode res = internal.get().enumerateNext(currentEntry, options);
+    Result res = internal.get().enumerateNext(currentEntry, options);
     if (not res)
     {
         const StringView message(res.message, ::strlen(res.message), true, StringEncoding::Ascii);
@@ -41,11 +41,11 @@ SC::FileSystemWalker::~FileSystemWalker() {}
     return res;
 }
 
-[[nodiscard]] SC::ReturnCode SC::FileSystemWalker::recurseSubdirectory()
+[[nodiscard]] SC::Result SC::FileSystemWalker::recurseSubdirectory()
 {
     if (options.recursive)
     {
-        errorResult   = ReturnCode::Error("Cannot recurseSubdirectory() with recursive==true");
+        errorResult   = Result::Error("Cannot recurseSubdirectory() with recursive==true");
         errorsChecked = false;
         return errorResult;
     }

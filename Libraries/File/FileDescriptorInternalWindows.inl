@@ -12,7 +12,7 @@
 
 // FileDescriptor
 
-SC::ReturnCode SC::FileDescriptorTraits::releaseHandle(Handle& handle)
+SC::Result SC::FileDescriptorTraits::releaseHandle(Handle& handle)
 {
     BOOL res;
     __try
@@ -25,12 +25,12 @@ SC::ReturnCode SC::FileDescriptorTraits::releaseHandle(Handle& handle)
     }
     if (res == FALSE)
     {
-        return ReturnCode::Error("FileDescriptorTraits::releaseHandle - CloseHandle failed");
+        return Result::Error("FileDescriptorTraits::releaseHandle - CloseHandle failed");
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOptions options)
+SC::Result SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOptions options)
 {
     StringNative<1024> buffer = StringEncoding::Native;
     StringConverter    convert(buffer);
@@ -40,7 +40,7 @@ SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOpti
     const bool     isThreeChars = filePath.sizeInBytes() >= 3 * sizeof(native_char_t);
     if (not isThreeChars or (wpath[0] != L'\\' and wpath[1] != L':'))
     {
-        return ReturnCode::Error("Path must be absolute");
+        return Result::Error("Path must be absolute");
     }
     DWORD accessMode        = 0;
     DWORD createDisposition = 0;
@@ -74,31 +74,31 @@ SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOpti
     return assign(fileDescriptor);
 }
 
-SC::ReturnCode SC::FileDescriptor::setBlocking(bool blocking)
+SC::Result SC::FileDescriptor::setBlocking(bool blocking)
 {
     // TODO: IMPLEMENT
     SC_COMPILER_UNUSED(blocking);
-    return ReturnCode(false);
+    return Result(false);
 }
 
-SC::ReturnCode SC::FileDescriptor::setInheritable(bool inheritable)
+SC::Result SC::FileDescriptor::setInheritable(bool inheritable)
 {
     if (::SetHandleInformation(handle, HANDLE_FLAG_INHERIT, inheritable ? TRUE : FALSE) == FALSE)
     {
-        return ReturnCode::Error("FileDescriptor::setInheritable - ::SetHandleInformation failed");
+        return Result::Error("FileDescriptor::setInheritable - ::SetHandleInformation failed");
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::FileDescriptor::isInheritable(bool& hasValue) const
+SC::Result SC::FileDescriptor::isInheritable(bool& hasValue) const
 {
     DWORD dwFlags = 0;
     if (::GetHandleInformation(handle, &dwFlags) == FALSE)
     {
-        return ReturnCode::Error("FileDescriptor::getInheritable = ::GetHandleInformation failed");
+        return Result::Error("FileDescriptor::getInheritable = ::GetHandleInformation failed");
     }
     hasValue = (dwFlags & HANDLE_FLAG_INHERIT) != 0;
-    return ReturnCode(true);
+    return Result(true);
 }
 
 struct SC::FileDescriptor::Internal
@@ -120,10 +120,10 @@ struct SC::FileDescriptor::Internal
     }
 };
 
-SC::ReturnCode SC::FileDescriptor::readAppend(Vector<char>& output, Span<char> fallbackBuffer, ReadResult& result)
+SC::Result SC::FileDescriptor::readAppend(Vector<char>& output, Span<char> fallbackBuffer, ReadResult& result)
 {
     FileDescriptor::Handle fileDescriptor;
-    SC_TRY(get(fileDescriptor, ReturnCode::Error("FileDescriptor::readAppend - Invalid Handle")));
+    SC_TRY(get(fileDescriptor, Result::Error("FileDescriptor::readAppend - Invalid Handle")));
 
     const bool useVector = output.capacity() > output.size();
 
@@ -143,7 +143,7 @@ SC::ReturnCode SC::FileDescriptor::readAppend(Vector<char>& output, Span<char> f
     if (Internal::isActualError(success, numReadBytes, fileDescriptor))
     {
         // TODO: Parse read result ERROR
-        return ReturnCode::Error("FileDescriptor::readAppend ReadFile failed");
+        return Result::Error("FileDescriptor::readAppend ReadFile failed");
     }
     else if (numReadBytes > 0)
     {
@@ -159,17 +159,17 @@ SC::ReturnCode SC::FileDescriptor::readAppend(Vector<char>& output, Span<char> f
                 "FileDescriptor::readAppend - appendCopy failed. Bytes have been read from stream and will get lost");
         }
         result = ReadResult{static_cast<size_t>(numReadBytes), false};
-        return ReturnCode(true);
+        return Result(true);
     }
     else
     {
         // EOF
         result = ReadResult{0, true};
-        return ReturnCode(true);
+        return Result(true);
     }
 }
 
-SC::ReturnCode SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
+SC::Result SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
 {
     int flags = 0;
     switch (seekMode)
@@ -182,42 +182,42 @@ SC::ReturnCode SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
     DWORD       offsetHigh = static_cast<DWORD>((offset >> 32) & 0xffffffff);
     const DWORD newPos     = ::SetFilePointer(handle, offsetLow, (LONG*)&offsetHigh, flags);
     SC_TRY_MSG(newPos != INVALID_SET_FILE_POINTER, "SetFilePointer failed");
-    return ReturnCode(static_cast<uint64_t>(newPos) == offset);
+    return Result(static_cast<uint64_t>(newPos) == offset);
 }
 
-SC::ReturnCode SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
+SC::Result SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
 {
     SC_TRY(seek(SeekStart, offset));
     return write(data);
 }
 
-SC::ReturnCode SC::FileDescriptor::write(Span<const char> data)
+SC::Result SC::FileDescriptor::write(Span<const char> data)
 {
     DWORD      numberOfWrittenBytes;
     const BOOL res =
         ::WriteFile(handle, data.data(), static_cast<DWORD>(data.sizeInBytes()), &numberOfWrittenBytes, nullptr);
     SC_TRY_MSG(res, "WriteFile failed");
-    return ReturnCode(static_cast<size_t>(numberOfWrittenBytes) == data.sizeInBytes());
+    return Result(static_cast<size_t>(numberOfWrittenBytes) == data.sizeInBytes());
 }
 
-SC::ReturnCode SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, uint64_t offset)
+SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, uint64_t offset)
 {
     SC_TRY(seek(SeekStart, offset));
     return read(data, actuallyRead, offset);
 }
 
-SC::ReturnCode SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
+SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
 {
     DWORD      numberOfReadBytes;
     const BOOL res =
         ::ReadFile(handle, data.data(), static_cast<DWORD>(data.sizeInBytes()), &numberOfReadBytes, nullptr);
     SC_TRY_MSG(res, "ReadFile failed");
-    return ReturnCode(data.sliceStartLength(0, static_cast<size_t>(numberOfReadBytes), actuallyRead));
+    return Result(data.sliceStartLength(0, static_cast<size_t>(numberOfReadBytes), actuallyRead));
 }
 
 // PipeDescriptor
 
-SC::ReturnCode SC::PipeDescriptor::createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag)
+SC::Result SC::PipeDescriptor::createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag)
 {
     // On Windows to inherit flags they must be flagged as inheritable
     // https://devblogs.microsoft.com/oldnewthing/20111216-00/?p=8873
@@ -231,7 +231,7 @@ SC::ReturnCode SC::PipeDescriptor::createPipe(InheritableReadFlag readFlag, Inhe
 
     if (CreatePipe(&pipeRead, &pipeWrite, &security, 0) == FALSE)
     {
-        return ReturnCode::Error("PipeDescriptor::createPipe - ::CreatePipe failed");
+        return Result::Error("PipeDescriptor::createPipe - ::CreatePipe failed");
     }
     SC_TRY(readPipe.assign(pipeRead));
     SC_TRY(writePipe.assign(pipeWrite));
@@ -247,5 +247,5 @@ SC::ReturnCode SC::PipeDescriptor::createPipe(InheritableReadFlag readFlag, Inhe
             SC_TRY_MSG(writePipe.setInheritable(false), "Cannot set write pipe inheritable");
         }
     }
-    return ReturnCode(true);
+    return Result(true);
 }

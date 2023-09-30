@@ -11,13 +11,13 @@
 #include "FileSystemWatcherInternalApple.inl"
 #endif
 
-SC::ReturnCode SC::FileSystemWatcher::init(EventLoopRunner& runner) { return internal.get().init(*this, runner); }
+SC::Result SC::FileSystemWatcher::init(EventLoopRunner& runner) { return internal.get().init(*this, runner); }
 
-SC::ReturnCode SC::FileSystemWatcher::init(ThreadRunner& runner) { return internal.get().init(*this, runner); }
+SC::Result SC::FileSystemWatcher::init(ThreadRunner& runner) { return internal.get().init(*this, runner); }
 
-SC::ReturnCode SC::FileSystemWatcher::close() { return internal.get().close(); }
-SC::ReturnCode SC::FileSystemWatcher::watch(FolderWatcher& watcher, String& path,
-                                            Function<void(const Notification&)>&& notifyCallback)
+SC::Result SC::FileSystemWatcher::close() { return internal.get().close(); }
+SC::Result SC::FileSystemWatcher::watch(FolderWatcher& watcher, String& path,
+                                        Function<void(const Notification&)>&& notifyCallback)
 {
     SC_TRY_MSG(watcher.parent == nullptr, "Watcher belongs to other FileSystemWatcher");
     watcher.parent         = this;
@@ -27,7 +27,7 @@ SC::ReturnCode SC::FileSystemWatcher::watch(FolderWatcher& watcher, String& path
     return internal.get().startWatching(&watcher);
 }
 
-SC::ReturnCode SC::FileSystemWatcher::FolderWatcher::unwatch()
+SC::Result SC::FileSystemWatcher::FolderWatcher::unwatch()
 {
     SC_TRY_MSG(parent != nullptr, "FolderWatcher already unwatched");
     return parent->internal.get().stopWatching(*this);

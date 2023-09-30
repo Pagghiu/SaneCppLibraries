@@ -12,14 +12,14 @@ struct HttpClient;
 
 struct SC::HttpClient
 {
-    [[nodiscard]] ReturnCode get(EventLoop& loop, StringView url);
+    [[nodiscard]] Result get(EventLoop& loop, StringView url);
 
     Delegate<HttpClient&> callback;
 
     [[nodiscard]] StringView getResponse() const;
-    [[nodiscard]] ReturnCode setCustomDebugName(const StringView debugName)
+    [[nodiscard]] Result     setCustomDebugName(const StringView debugName)
     {
-        return ReturnCode(customDebugName.assign(debugName));
+        return Result(customDebugName.assign(debugName));
     }
 
   private:

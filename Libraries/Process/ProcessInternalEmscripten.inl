@@ -7,6 +7,6 @@
 struct SC::Process::Internal
 {
 };
-SC::ReturnCode SC::ProcessDescriptorTraits::releaseHandle(int&) { return ReturnCode(true); }
-SC::ReturnCode SC::Process::launch(ProcessOptions options) { return ReturnCode(true); }
-SC::ReturnCode SC::Process::waitForExitSync() { return ReturnCode(true); }
+SC::Result SC::ProcessDescriptorTraits::releaseHandle(int&) { return Result(true); }
+SC::Result SC::Process::launch(ProcessOptions options) { return Result(true); }
+SC::Result SC::Process::waitForExitSync() { return Result(true); }

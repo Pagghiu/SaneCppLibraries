@@ -11,15 +11,15 @@
 
 #include "../Foundation/Strings/String.h"
 
-SC::ReturnCode SC::PipeDescriptor::close()
+SC::Result SC::PipeDescriptor::close()
 {
     SC_TRY(readPipe.close());
     return writePipe.close();
 }
 
-SC::ReturnCode SC::FileDescriptor::open(StringView path, OpenMode mode) { return open(path, mode, OpenOptions()); }
+SC::Result SC::FileDescriptor::open(StringView path, OpenMode mode) { return open(path, mode, OpenOptions()); }
 
-SC::ReturnCode SC::FileDescriptor::readUntilEOF(Vector<char>& destination)
+SC::Result SC::FileDescriptor::readUntilEOF(Vector<char>& destination)
 {
     char buffer[1024];
     SC_TRY(isValid());
@@ -28,11 +28,11 @@ SC::ReturnCode SC::FileDescriptor::readUntilEOF(Vector<char>& destination)
     {
         SC_TRY(readAppend(destination, {buffer, sizeof(buffer)}, readResult));
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::FileDescriptor::readUntilEOF(String& destination)
+SC::Result SC::FileDescriptor::readUntilEOF(String& destination)
 {
     SC_TRY(readUntilEOF(destination.data));
-    return ReturnCode(StringConverter::pushNullTerm(destination.data, destination.encoding));
+    return Result(StringConverter::pushNullTerm(destination.data, destination.encoding));
 }

@@ -8,10 +8,10 @@ struct SC::EventLoop::Internal
     FileDescriptor loopFd;
 
     ~Internal() { SC_TRUST_RESULT(close()); }
-    [[nodiscard]] ReturnCode close() { return loopFd.close(); }
-    [[nodiscard]] ReturnCode createEventLoop() { return ReturnCode(true); }
-    [[nodiscard]] ReturnCode createWakeup(EventLoop&) { return ReturnCode(true); }
-    [[nodiscard]] Async*     getAsync(const int& event) const { return nullptr; }
+    [[nodiscard]] Result close() { return loopFd.close(); }
+    [[nodiscard]] Result createEventLoop() { return Result(true); }
+    [[nodiscard]] Result createWakeup(EventLoop&) { return Result(true); }
+    [[nodiscard]] Async* getAsync(const int& event) const { return nullptr; }
 };
 
 struct SC::EventLoop::KernelQueue
@@ -19,37 +19,34 @@ struct SC::EventLoop::KernelQueue
     int newEvents = 0;
     int events[1] = {0};
 
-    [[nodiscard]] ReturnCode pushNewSubmission(Async& async) { return ReturnCode(false); }
-    [[nodiscard]] ReturnCode pollAsync(EventLoop& eventLoop, PollMode pollMode) { return ReturnCode(false); }
-    [[nodiscard]] ReturnCode validateEvent(int& event, bool& continueProcessing) { return ReturnCode(true); }
+    [[nodiscard]] Result pushNewSubmission(Async& async) { return Result(false); }
+    [[nodiscard]] Result pollAsync(EventLoop& eventLoop, PollMode pollMode) { return Result(false); }
+    [[nodiscard]] Result validateEvent(int& event, bool& continueProcessing) { return Result(true); }
     template <typename T>
-    [[nodiscard]] ReturnCode setupAsync(T&)
+    [[nodiscard]] Result setupAsync(T&)
     {
-        return ReturnCode(false);
+        return Result(false);
     }
     template <typename T>
-    [[nodiscard]] ReturnCode stopAsync(T&)
+    [[nodiscard]] Result stopAsync(T&)
     {
-        return ReturnCode(false);
+        return Result(false);
     }
     template <typename T>
-    [[nodiscard]] ReturnCode activateAsync(T&)
+    [[nodiscard]] Result activateAsync(T&)
     {
-        return ReturnCode(false);
+        return Result(false);
     }
     template <typename T>
-    [[nodiscard]] ReturnCode completeAsync(T&)
+    [[nodiscard]] Result completeAsync(T&)
     {
-        return ReturnCode(false);
+        return Result(false);
     }
 };
 
-SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread() { return ReturnCode(true); }
-SC::ReturnCode SC::EventLoop::associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor)
+SC::Result SC::EventLoop::wakeUpFromExternalThread() { return Result(true); }
+SC::Result SC::EventLoop::associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor) { return Result(true); }
+SC::Result SC::EventLoop::associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor)
 {
-    return ReturnCode(true);
-}
-SC::ReturnCode SC::EventLoop::associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor)
-{
-    return ReturnCode(true);
+    return Result(true);
 }

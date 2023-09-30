@@ -21,29 +21,29 @@
 
 namespace SC
 {
-static constexpr SC::ReturnCode getErrorCode(int errorCode)
+static constexpr SC::Result getErrorCode(int errorCode)
 {
     switch (errorCode)
     {
-    case EACCES: return ReturnCode::Error("EACCES");
-    case EDQUOT: return ReturnCode::Error("EDQUOT");
-    case EEXIST: return ReturnCode::Error("EEXIST");
-    case EFAULT: return ReturnCode::Error("EFAULT");
-    case EIO: return ReturnCode::Error("EIO");
-    case ELOOP: return ReturnCode::Error("ELOOP");
-    case EMLINK: return ReturnCode::Error("EMLINK");
-    case ENAMETOOLONG: return ReturnCode::Error("ENAMETOOLONG");
-    case ENOENT: return ReturnCode::Error("ENOENT");
-    case ENOSPC: return ReturnCode::Error("ENOSPC");
-    case ENOTDIR: return ReturnCode::Error("ENOTDIR");
-    case EROFS: return ReturnCode::Error("EROFS");
-    case EBADF: return ReturnCode::Error("EBADF");
-    case EPERM: return ReturnCode::Error("EPERM");
-    case ENOMEM: return ReturnCode::Error("ENOMEM");
-    case ENOTSUP: return ReturnCode::Error("ENOTSUP");
-    case EINVAL: return ReturnCode::Error("EINVAL");
+    case EACCES: return Result::Error("EACCES");
+    case EDQUOT: return Result::Error("EDQUOT");
+    case EEXIST: return Result::Error("EEXIST");
+    case EFAULT: return Result::Error("EFAULT");
+    case EIO: return Result::Error("EIO");
+    case ELOOP: return Result::Error("ELOOP");
+    case EMLINK: return Result::Error("EMLINK");
+    case ENAMETOOLONG: return Result::Error("ENAMETOOLONG");
+    case ENOENT: return Result::Error("ENOENT");
+    case ENOSPC: return Result::Error("ENOSPC");
+    case ENOTDIR: return Result::Error("ENOTDIR");
+    case EROFS: return Result::Error("EROFS");
+    case EBADF: return Result::Error("EBADF");
+    case EPERM: return Result::Error("EPERM");
+    case ENOMEM: return Result::Error("ENOMEM");
+    case ENOTSUP: return Result::Error("ENOTSUP");
+    case EINVAL: return Result::Error("EINVAL");
     }
-    return ReturnCode::Error("Unknown");
+    return Result::Error("Unknown");
 }
 } // namespace SC
 struct SC::FileSystem::Internal
@@ -197,19 +197,19 @@ struct SC::FileSystem::Internal
     }
 #endif
 
-    [[nodiscard]] static ReturnCode getFileTime(const char* file, FileTime& time)
+    [[nodiscard]] static Result getFileTime(const char* file, FileTime& time)
     {
         struct stat st;
         if (::stat(file, &st) == 0)
         {
             time.modifiedTime = AbsoluteTime(
                 static_cast<int64_t>(::round(st.st_mtimespec.tv_nsec / 1.0e6) + st.st_mtimespec.tv_sec * 1000));
-            return ReturnCode(true);
+            return Result(true);
         }
-        return ReturnCode(false);
+        return Result(false);
     }
 
-    [[nodiscard]] static ReturnCode setLastModifiedTime(const char* file, AbsoluteTime time)
+    [[nodiscard]] static Result setLastModifiedTime(const char* file, AbsoluteTime time)
     {
         struct timespec times[2];
         times[0].tv_sec  = time.getMillisecondsSinceEpoch() / 1000;
@@ -218,9 +218,9 @@ struct SC::FileSystem::Internal
 
         if (::utimensat(AT_FDCWD, file, times, 0) == 0)
         {
-            return ReturnCode(true);
+            return Result(true);
         }
-        return ReturnCode(false);
+        return Result(false);
     }
 
 #undef SC_TRY_LIBC

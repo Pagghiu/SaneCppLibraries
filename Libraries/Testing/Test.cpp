@@ -134,7 +134,7 @@ bool SC::TestCase::recordExpectation(StringView expression, bool status, StringV
     return status;
 }
 
-bool SC::TestCase::recordExpectation(StringView expression, ReturnCode status)
+bool SC::TestCase::recordExpectation(StringView expression, Result status)
 {
     return recordExpectation(
         expression, status,

@@ -53,152 +53,152 @@ const char* SC::Async::TypeToString(Type type)
     Assert::unreachable();
 }
 
-SC::ReturnCode SC::Async::validateAsync()
+SC::Result SC::Async::validateAsync()
 {
     const bool asyncStateIsFree      = state == Async::State::Free;
     const bool asyncIsNotOwnedByLoop = eventLoop == nullptr;
     SC_LOG_MESSAGE("{} {} QUEUE\n", debugName, Async::TypeToString(type));
     SC_TRY_MSG(asyncStateIsFree, "Trying to stage Async that is in use");
     SC_TRY_MSG(asyncIsNotOwnedByLoop, "Trying to add Async belonging to another Loop");
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::Async::queueSubmission(EventLoop& loop) { return loop.queueSubmission(*this); }
+SC::Result SC::Async::queueSubmission(EventLoop& loop) { return loop.queueSubmission(*this); }
 
 void SC::Async::updateTime() { eventLoop->updateTime(); }
 
-SC::ReturnCode SC::Async::stop()
+SC::Result SC::Async::stop()
 {
     if (eventLoop)
         return eventLoop->stopAsync(*this);
-    return ReturnCode::Error("stop failed. eventLoop is nullptr");
+    return SC::Result::Error("stop failed. eventLoop is nullptr");
 }
 
-SC::ReturnCode SC::AsyncLoopTimeout::start(EventLoop& loop, IntegerMilliseconds expiration)
+SC::Result SC::AsyncLoopTimeout::start(EventLoop& loop, IntegerMilliseconds expiration)
 {
     SC_TRY(validateAsync());
     SC_TRY(queueSubmission(loop));
     updateTime();
     expirationTime = loop.getLoopTime().offsetBy(expiration);
     timeout        = expiration;
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
-SC::ReturnCode SC::AsyncLoopWakeUp::start(EventLoop& loop, EventObject* eo)
+SC::Result SC::AsyncLoopWakeUp::start(EventLoop& loop, EventObject* eo)
 {
     SC_TRY(queueSubmission(loop));
     eventObject = eo;
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
-SC::ReturnCode SC::AsyncProcessExit::start(EventLoop& loop, ProcessDescriptor::Handle process)
+SC::Result SC::AsyncProcessExit::start(EventLoop& loop, ProcessDescriptor::Handle process)
 {
     SC_TRY(queueSubmission(loop));
     handle = process;
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
-SC::ReturnCode SC::AsyncSocketAccept::start(EventLoop& loop, const SocketDescriptor& socketDescriptor)
+SC::Result SC::AsyncSocketAccept::start(EventLoop& loop, const SocketDescriptor& socketDescriptor)
 {
     SC_TRY(validateAsync());
-    SC_TRY(socketDescriptor.get(handle, ReturnCode::Error("Invalid handle")));
+    SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
     SC_TRY(socketDescriptor.getAddressFamily(addressFamily));
     SC_TRY(queueSubmission(loop));
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
-SC::ReturnCode SC::AsyncSocketConnect::start(EventLoop& loop, const SocketDescriptor& socketDescriptor,
-                                             SocketIPAddress socketIpAddress)
+SC::Result SC::AsyncSocketConnect::start(EventLoop& loop, const SocketDescriptor& socketDescriptor,
+                                         SocketIPAddress socketIpAddress)
 {
     SC_TRY(validateAsync());
-    SC_TRY(socketDescriptor.get(handle, ReturnCode::Error("Invalid handle")));
+    SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
     SC_TRY(queueSubmission(loop));
     ipAddress = socketIpAddress;
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
-SC::ReturnCode SC::AsyncSocketSend::start(EventLoop& loop, const SocketDescriptor& socketDescriptor,
-                                          Span<const char> dataToSend)
+SC::Result SC::AsyncSocketSend::start(EventLoop& loop, const SocketDescriptor& socketDescriptor,
+                                      Span<const char> dataToSend)
 {
 
     SC_TRY(validateAsync());
-    SC_TRY(socketDescriptor.get(handle, ReturnCode::Error("Invalid handle")));
+    SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
     SC_TRY(queueSubmission(loop));
     data = dataToSend;
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
-SC::ReturnCode SC::AsyncSocketReceive::start(EventLoop& loop, const SocketDescriptor& socketDescriptor,
-                                             Span<char> receiveData)
+SC::Result SC::AsyncSocketReceive::start(EventLoop& loop, const SocketDescriptor& socketDescriptor,
+                                         Span<char> receiveData)
 {
     SC_TRY(validateAsync());
-    SC_TRY(socketDescriptor.get(handle, ReturnCode::Error("Invalid handle")));
+    SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
     SC_TRY(queueSubmission(loop));
     data = receiveData;
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
-SC::ReturnCode SC::AsyncSocketClose::start(EventLoop& loop, const SocketDescriptor& socketDescriptor)
+SC::Result SC::AsyncSocketClose::start(EventLoop& loop, const SocketDescriptor& socketDescriptor)
 {
     SC_TRY(validateAsync());
-    SC_TRY(socketDescriptor.get(handle, ReturnCode::Error("Invalid handle")));
+    SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
     SC_TRY(queueSubmission(loop));
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
-SC::ReturnCode SC::AsyncFileRead::start(EventLoop& loop, FileDescriptor::Handle fd, Span<char> rb)
+SC::Result SC::AsyncFileRead::start(EventLoop& loop, FileDescriptor::Handle fd, Span<char> rb)
 {
     SC_TRY_MSG(rb.sizeInBytes() > 0, "EventLoop::startFileRead - Zero sized read buffer");
     SC_TRY(validateAsync());
     SC_TRY(queueSubmission(loop));
     fileDescriptor = fd;
     readBuffer     = rb;
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
-SC::ReturnCode SC::AsyncFileWrite::start(EventLoop& loop, FileDescriptor::Handle fd, Span<const char> wb)
+SC::Result SC::AsyncFileWrite::start(EventLoop& loop, FileDescriptor::Handle fd, Span<const char> wb)
 {
     SC_TRY_MSG(wb.sizeInBytes() > 0, "EventLoop::startFileWrite - Zero sized write buffer");
     SC_TRY(validateAsync());
     SC_TRY(queueSubmission(loop));
     fileDescriptor = fd;
     writeBuffer    = wb;
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
-SC::ReturnCode SC::AsyncFileClose::start(EventLoop& loop, FileDescriptor::Handle fd)
+SC::Result SC::AsyncFileClose::start(EventLoop& loop, FileDescriptor::Handle fd)
 {
     SC_TRY(validateAsync());
     SC_TRY(queueSubmission(loop));
     fileDescriptor = fd;
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
 #if SC_PLATFORM_WINDOWS
-SC::ReturnCode SC::AsyncWindowsPoll::start(EventLoop& loop, FileDescriptor::Handle fd)
+SC::Result SC::AsyncWindowsPoll::start(EventLoop& loop, FileDescriptor::Handle fd)
 {
     SC_TRY(validateAsync());
     SC_TRY(queueSubmission(loop));
     fileDescriptor = fd;
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 #endif
 
-SC::ReturnCode SC::EventLoop::queueSubmission(Async& async)
+SC::Result SC::EventLoop::queueSubmission(Async& async)
 {
     async.state = Async::State::Submitting;
     submissions.queueBack(async);
     async.eventLoop = this;
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
-SC::ReturnCode SC::EventLoop::run()
+SC::Result SC::EventLoop::run()
 {
     while (getTotalNumberOfActiveHandle() > 0 or not submissions.isEmpty())
     {
         SC_TRY(runOnce());
     };
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
 const SC::TimeCounter* SC::EventLoop::findEarliestTimer() const
@@ -228,7 +228,7 @@ void SC::EventLoop::invokeExpiredTimers()
             async               = async->next;
             activeTimers.remove(*currentAsync);
             currentAsync->state          = Async::State::Free;
-            ReturnCode               res = ReturnCode(true);
+            Result                   res = Result(true);
             AsyncLoopTimeout::Result result(*static_cast<AsyncLoopTimeout*>(currentAsync), move(res));
             result.async.eventLoop = nullptr; // Allow reusing it
             static_cast<AsyncLoopTimeout*>(currentAsync)->callback(result);
@@ -240,21 +240,21 @@ void SC::EventLoop::invokeExpiredTimers()
     }
 }
 
-SC::ReturnCode SC::EventLoop::create()
+SC::Result SC::EventLoop::create()
 {
     Internal& self = internal.get();
     SC_TRY(self.createEventLoop());
     SC_TRY(self.createWakeup(*this));
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
-SC::ReturnCode SC::EventLoop::close()
+SC::Result SC::EventLoop::close()
 {
     Internal& self = internal.get();
     return self.close();
 }
 
-SC::ReturnCode SC::EventLoop::stageSubmission(KernelQueue& queue, Async& async)
+SC::Result SC::EventLoop::stageSubmission(KernelQueue& queue, Async& async)
 {
     switch (async.state)
     {
@@ -274,11 +274,11 @@ SC::ReturnCode SC::EventLoop::stageSubmission(KernelQueue& queue, Async& async)
     break;
     case Async::State::Active: {
         SC_ASSERT_DEBUG(false);
-        return ReturnCode::Error("EventLoop::processSubmissions() got Active handle");
+        return SC::Result::Error("EventLoop::processSubmissions() got Active handle");
     }
     break;
     }
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
 void SC::EventLoop::increaseActiveCount() { numberOfExternals += 1; }
@@ -290,11 +290,11 @@ int SC::EventLoop::getTotalNumberOfActiveHandle() const
     return numberOfActiveHandles + numberOfTimers + numberOfWakeups + numberOfExternals;
 }
 
-SC::ReturnCode SC::EventLoop::runOnce() { return runStep(PollMode::ForcedForwardProgress); }
+SC::Result SC::EventLoop::runOnce() { return runStep(PollMode::ForcedForwardProgress); }
 
-SC::ReturnCode SC::EventLoop::runNoWait() { return runStep(PollMode::NoWait); }
+SC::Result SC::EventLoop::runNoWait() { return runStep(PollMode::NoWait); }
 
-void SC::EventLoop::completeAndEventuallyReactivate(KernelQueue& queue, Async& async, ReturnCode&& returnCode)
+void SC::EventLoop::completeAndEventuallyReactivate(KernelQueue& queue, Async& async, Result&& returnCode)
 {
     SC_ASSERT_RELEASE(async.state == Async::State::Active);
     bool reactivate = false;
@@ -313,7 +313,7 @@ void SC::EventLoop::completeAndEventuallyReactivate(KernelQueue& queue, Async& a
     }
 }
 
-SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
+SC::Result SC::EventLoop::runStep(PollMode pollMode)
 {
     KernelQueue queue;
     SC_LOG_MESSAGE("---------------\n");
@@ -330,7 +330,7 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
     if (getTotalNumberOfActiveHandle() <= 0 and manualCompletions.isEmpty())
     {
         // happens when we do cancelAsync on the last active async for example
-        return ReturnCode(true);
+        return SC::Result(true);
     }
 
     if (getTotalNumberOfActiveHandle() > 0)
@@ -348,8 +348,8 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
         SC_LOG_MESSAGE(" Active Requests = {}\n", getTotalNumberOfActiveHandle());
         bool continueProcessing = true;
 
-        ReturnCode result = ReturnCode(queue.validateEvent(queue.events[idx], continueProcessing));
-        Async&     async  = *self.getAsync(queue.events[idx]);
+        Result result = Result(queue.validateEvent(queue.events[idx], continueProcessing));
+        Async& async  = *self.getAsync(queue.events[idx]);
         if (not result)
         {
             reportError(queue, async, move(result));
@@ -374,14 +374,14 @@ SC::ReturnCode SC::EventLoop::runStep(PollMode pollMode)
 
     while (Async* async = manualCompletions.dequeueFront())
     {
-        completeAndEventuallyReactivate(queue, *async, ReturnCode(true));
+        completeAndEventuallyReactivate(queue, *async, Result(true));
     }
     SC_LOG_MESSAGE("Active Requests After Completion = {}\n", getTotalNumberOfActiveHandle());
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
 template <typename Lambda>
-SC::ReturnCode SC::Async::applyOnAsync(Async& async, Lambda&& lambda)
+SC::Result SC::Async::applyOnAsync(Async& async, Lambda&& lambda)
 {
     switch (async.type)
     {
@@ -400,16 +400,16 @@ SC::ReturnCode SC::Async::applyOnAsync(Async& async, Lambda&& lambda)
     case Async::Type::WindowsPoll: SC_TRY(lambda(*static_cast<AsyncWindowsPoll*>(&async))); break;
 #endif
     }
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
-SC::ReturnCode SC::EventLoop::setupAsync(KernelQueue& queue, Async& async)
+SC::Result SC::EventLoop::setupAsync(KernelQueue& queue, Async& async)
 {
     SC_LOG_MESSAGE("{} {} SETUP\n", async.debugName, Async::TypeToString(async.type));
     return Async::applyOnAsync(async, [&](auto& p) { return queue.setupAsync(p); });
 }
 
-SC::ReturnCode SC::EventLoop::activateAsync(KernelQueue& queue, Async& async)
+SC::Result SC::EventLoop::activateAsync(KernelQueue& queue, Async& async)
 {
     SC_LOG_MESSAGE("{} {} ACTIVATE\n", async.debugName, Async::TypeToString(async.type));
     // Submitting (first time) or Active (for reactivations)
@@ -419,10 +419,10 @@ SC::ReturnCode SC::EventLoop::activateAsync(KernelQueue& queue, Async& async)
     {
         return queue.pushNewSubmission(async);
     }
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
-void SC::EventLoop::reportError(KernelQueue& queue, Async& async, ReturnCode&& returnCode)
+void SC::EventLoop::reportError(KernelQueue& queue, Async& async, Result&& returnCode)
 {
     SC_LOG_MESSAGE("{} ERROR {}\n", async.debugName, Async::TypeToString(async.type));
     bool reactivate = false;
@@ -430,11 +430,11 @@ void SC::EventLoop::reportError(KernelQueue& queue, Async& async, ReturnCode&& r
     {
         removeActiveHandle(async);
     }
-    completeAsync(queue, async, forward<ReturnCode>(returnCode), reactivate);
+    completeAsync(queue, async, forward<Result>(returnCode), reactivate);
     async.state = Async::State::Free;
 }
 
-void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, ReturnCode&& returnCode, bool& reactivate)
+void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, Result&& returnCode, bool& reactivate)
 {
     if (returnCode)
     {
@@ -449,18 +449,18 @@ void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, ReturnCode&&
                                    [&](auto& p)
                                    {
                                        using Type = typename RemoveReference<decltype(p)>::type;
-                                       typename Type::Result result(p, forward<ReturnCode>(returnCode));
+                                       typename Type::Result result(p, forward<Result>(returnCode));
                                        if (result.returnCode)
-                                           result.returnCode = ReturnCode(queue.completeAsync(result));
+                                           result.returnCode = Result(queue.completeAsync(result));
                                        if (result.async.callback.isValid())
                                            result.async.callback(result);
                                        reactivate = result.shouldBeReactivated;
-                                       return ReturnCode(true);
+                                       return SC::Result(true);
                                    });
     SC_TRUST_RESULT(res);
 }
 
-SC::ReturnCode SC::EventLoop::cancelAsync(KernelQueue& queue, Async& async)
+SC::Result SC::EventLoop::cancelAsync(KernelQueue& queue, Async& async)
 {
     SC_LOG_MESSAGE("{} {} CANCEL\n", async.debugName, Async::TypeToString(async.type));
     SC_TRY(Async::applyOnAsync(async, [&](auto& p) { return queue.stopAsync(p); }))
@@ -468,10 +468,10 @@ SC::ReturnCode SC::EventLoop::cancelAsync(KernelQueue& queue, Async& async)
     {
         removeActiveHandle(async);
     }
-    return ReturnCode(true);
+    return SC::Result(true);
 }
 
-SC::ReturnCode SC::EventLoop::stopAsync(Async& async)
+SC::Result SC::EventLoop::stopAsync(Async& async)
 {
     SC_LOG_MESSAGE("{} {} STOP\n", async.debugName, Async::TypeToString(async.type));
     const bool asyncStateIsNotFree    = async.state != Async::State::Free;
@@ -501,10 +501,10 @@ SC::ReturnCode SC::EventLoop::stopAsync(Async& async)
         submissions.remove(async);
         break;
     }
-    case Async::State::Free: return ReturnCode::Error("Trying to stop Async that is not active");
-    case Async::State::Cancelling: return ReturnCode::Error("Trying to Stop Async that is already being cancelled");
+    case Async::State::Free: return SC::Result::Error("Trying to stop Async that is not active");
+    case Async::State::Cancelling: return SC::Result::Error("Trying to Stop Async that is already being cancelled");
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
 void SC::EventLoop::updateTime() { loopTime.snap(); }
@@ -528,7 +528,7 @@ void SC::EventLoop::executeTimers(KernelQueue& queue, const TimeCounter& nextTim
     }
 }
 
-SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
+SC::Result SC::EventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
 {
     SC_TRY_MSG(async.eventLoop == this,
                "EventLoop::wakeUpFromExternalThread - Wakeup belonging to different EventLoop");
@@ -540,7 +540,7 @@ SC::ReturnCode SC::EventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
         // This effectively allows coalescing calls from different threads into a single notification.
         SC_TRY(wakeUpFromExternalThread());
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
 void SC::EventLoop::executeWakeUps(AsyncResultBase& result)
@@ -551,7 +551,7 @@ void SC::EventLoop::executeWakeUps(AsyncResultBase& result)
         AsyncLoopWakeUp* notifier = static_cast<AsyncLoopWakeUp*>(async);
         if (notifier->pending.load() == true)
         {
-            ReturnCode              res = ReturnCode(true);
+            Result                  res = Result(true);
             AsyncLoopWakeUp::Result asyncResult(*notifier, move(res));
             asyncResult.async.callback(asyncResult);
             if (notifier->eventObject)
@@ -585,13 +585,13 @@ void SC::EventLoop::scheduleManualCompletion(Async& async)
     async.state = Async::State::Active;
 }
 
-SC::ReturnCode SC::EventLoop::getLoopFileDescriptor(SC::FileDescriptor::Handle& fileDescriptor) const
+SC::Result SC::EventLoop::getLoopFileDescriptor(SC::FileDescriptor::Handle& fileDescriptor) const
 {
     return internal.get().loopFd.get(fileDescriptor,
-                                     ReturnCode::Error("EventLoop::getLoopFileDescriptor invalid handle"));
+                                     SC::Result::Error("EventLoop::getLoopFileDescriptor invalid handle"));
 }
 
-SC::ReturnCode SC::EventLoop::createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor)
+SC::Result SC::EventLoop::createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor)
 {
     auto res = outDescriptor.create(family, SocketFlags::SocketStream, SocketFlags::ProtocolTcp,
                                     SocketFlags::NonBlocking, SocketFlags::NonInheritable);
@@ -599,4 +599,4 @@ SC::ReturnCode SC::EventLoop::createAsyncTCPSocket(SocketFlags::AddressFamily fa
     return associateExternallyCreatedTCPSocket(outDescriptor);
 }
 
-SC::ReturnCode SC::AsyncLoopWakeUp::wakeUp() { return getEventLoop()->wakeUpFromExternalThread(*this); }
+SC::Result SC::AsyncLoopWakeUp::wakeUp() { return getEventLoop()->wakeUpFromExternalThread(*this); }

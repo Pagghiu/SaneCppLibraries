@@ -10,14 +10,14 @@
 #include <unistd.h> // close
 constexpr int SOCKET_ERROR = -1;
 
-SC::ReturnCode SC::SocketDescriptorTraits::releaseHandle(Handle& handle)
+SC::Result SC::SocketDescriptorTraits::releaseHandle(Handle& handle)
 {
     ::close(handle);
     handle = Invalid;
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::SocketDescriptor::setInheritable(bool inheritable)
+SC::Result SC::SocketDescriptor::setInheritable(bool inheritable)
 {
     FileDescriptor fd;
     SC_TRUST_RESULT(fd.assign(handle));
@@ -25,7 +25,7 @@ SC::ReturnCode SC::SocketDescriptor::setInheritable(bool inheritable)
     return fd.setInheritable(inheritable);
 }
 
-SC::ReturnCode SC::SocketDescriptor::setBlocking(bool blocking)
+SC::Result SC::SocketDescriptor::setBlocking(bool blocking)
 {
     FileDescriptor fd;
     SC_TRUST_RESULT(fd.assign(handle));
@@ -33,7 +33,7 @@ SC::ReturnCode SC::SocketDescriptor::setBlocking(bool blocking)
     return fd.setBlocking(blocking);
 }
 
-SC::ReturnCode SC::SocketDescriptor::isInheritable(bool& hasValue) const
+SC::Result SC::SocketDescriptor::isInheritable(bool& hasValue) const
 {
     FileDescriptor fd;
     SC_TRUST_RESULT(fd.assign(handle));
@@ -41,10 +41,9 @@ SC::ReturnCode SC::SocketDescriptor::isInheritable(bool& hasValue) const
     return fd.isInheritable(hasValue);
 }
 
-SC::ReturnCode SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily,
-                                            SocketFlags::SocketType socketType, SocketFlags::ProtocolType protocol,
-                                            SocketFlags::BlockingType    blocking,
-                                            SocketFlags::InheritableType inheritable)
+SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily, SocketFlags::SocketType socketType,
+                                        SocketFlags::ProtocolType protocol, SocketFlags::BlockingType blocking,
+                                        SocketFlags::InheritableType inheritable)
 {
     SC_TRY(SystemFunctions::isNetworkingInited());
     SC_TRUST_RESULT(close());
@@ -85,5 +84,5 @@ SC::ReturnCode SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFa
         setsockopt(handle, SOL_SOCKET, SO_NOSIGPIPE, &active, sizeof(active));
     }
 #endif // defined(SO_NOSIGPIPE)
-    return ReturnCode(isValid());
+    return Result(isValid());
 }

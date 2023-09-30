@@ -23,7 +23,7 @@ struct SC::FileSystemWatcher::Internal
     FSEventStreamRef   fsEventStream = nullptr;
     Thread             pollingThread;
     Action             pollingFunction;
-    ReturnCode         signalReturnCode = ReturnCode(false);
+    Result             signalReturnCode = Result(false);
     EventObject        refreshSignalFinished;
     Mutex              mutex;
     EventLoopRunner*   eventLoopRunner = nullptr;
@@ -33,14 +33,14 @@ struct SC::FileSystemWatcher::Internal
     FolderWatcher* watcher;
     Atomic<bool>   closing = false;
 
-    [[nodiscard]] ReturnCode init(FileSystemWatcher& parent, ThreadRunner& runner)
+    [[nodiscard]] Result init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
         SC_COMPILER_UNUSED(runner);
         self = &parent;
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] ReturnCode init(FileSystemWatcher& parent, EventLoopRunner& runner)
+    [[nodiscard]] Result init(FileSystemWatcher& parent, EventLoopRunner& runner)
     {
         self            = &parent;
         eventLoopRunner = &runner;
@@ -49,7 +49,7 @@ struct SC::FileSystemWatcher::Internal
         return async.start(eventLoopRunner->eventLoop, &eventLoopRunner->eventObject);
     }
 
-    [[nodiscard]] ReturnCode initThread()
+    [[nodiscard]] Result initThread()
     {
         closing.exchange(false);
         // Create Signal to go from Loop --> CFRunLoop
@@ -69,10 +69,10 @@ struct SC::FileSystemWatcher::Internal
         Action initFunction;
         initFunction.bind<Internal, &Internal::threadInit>(this);
         SC_TRY(pollingThread.start("FileSystemWatcher::init", &pollingFunction, &initFunction));
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] ReturnCode close()
+    [[nodiscard]] Result close()
     {
         if (pollingThread.wasStarted())
         {
@@ -89,7 +89,7 @@ struct SC::FileSystemWatcher::Internal
             SC_TRY(pollingThread.join());
             releaseResources();
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 
     void wakeUpFSEventThread()
@@ -120,7 +120,7 @@ struct SC::FileSystemWatcher::Internal
         CFRunLoopRemoveSource(copyRunLoop, refreshSignal, kCFRunLoopDefaultMode);
     }
 
-    [[nodiscard]] ReturnCode threadCreateFSEvent()
+    [[nodiscard]] Result threadCreateFSEvent()
     {
         SC_TRY(runLoop);
         CFArrayRef   pathsArray   = nullptr;
@@ -146,20 +146,20 @@ struct SC::FileSystemWatcher::Internal
             watchedPaths[numAllocatedPaths] =
                 CFStringCreateWithFileSystemRepresentation(nullptr, encodedPath.getNullTerminatedNative());
             if (not watchedPaths[numAllocatedPaths])
-                return ReturnCode::Error("CFStringCreateWithFileSystemRepresentation failed");
+                return Result::Error("CFStringCreateWithFileSystemRepresentation failed");
             numAllocatedPaths++;
             SC_TRY_MSG(numAllocatedPaths <= ThreadRunnerSizes::MaxWatchablePaths,
                        "Exceeded max size of 1024 paths to watch");
         }
         if (numAllocatedPaths == 0)
         {
-            return ReturnCode(true);
+            return Result(true);
         }
         pathsArray = CFArrayCreate(nullptr, reinterpret_cast<const void**>(watchedPaths),
                                    static_cast<CFIndex>(numAllocatedPaths), nullptr);
         if (not pathsArray)
         {
-            return ReturnCode::Error("CFArrayCreate failed");
+            return Result::Error("CFArrayCreate failed");
         }
         deferDeletePaths.disarm();
         deferFreeMalloc.disarm();
@@ -190,9 +190,9 @@ struct SC::FileSystemWatcher::Internal
         {
             FSEventStreamInvalidate(fsEventStream);
             FSEventStreamRelease(fsEventStream);
-            return ReturnCode::Error("FSEventStreamStart failed");
+            return Result::Error("FSEventStreamStart failed");
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 
     void threadDestroyFSEvent()
@@ -203,7 +203,7 @@ struct SC::FileSystemWatcher::Internal
         fsEventStream = nullptr;
     }
 
-    [[nodiscard]] ReturnCode stopWatching(FolderWatcher& folderWatcher)
+    [[nodiscard]] Result stopWatching(FolderWatcher& folderWatcher)
     {
         mutex.lock();
         folderWatcher.parent->watchers.remove(folderWatcher);
@@ -212,7 +212,7 @@ struct SC::FileSystemWatcher::Internal
         return startWatching(nullptr);
     }
 
-    [[nodiscard]] ReturnCode startWatching(FolderWatcher*)
+    [[nodiscard]] Result startWatching(FolderWatcher*)
     {
         if (not pollingThread.wasStarted())
         {
@@ -303,8 +303,8 @@ struct SC::FileSystemWatcher::Internal
 
                     if (internal.eventLoopRunner)
                     {
-                        internal.watcher     = watcher;
-                        const ReturnCode res = internal.eventLoopRunner->eventLoopAsync.wakeUp();
+                        internal.watcher = watcher;
+                        const Result res = internal.eventLoopRunner->eventLoopAsync.wakeUp();
                         internal.eventLoopRunner->eventObject.wait();
                         if (internal.closing.load())
                         {
@@ -359,8 +359,8 @@ struct SC::FileSystemWatcher::Internal
     }
 };
 
-SC::ReturnCode SC::FileSystemWatcher::Notification::getFullPath(String&, StringView& view) const
+SC::Result SC::FileSystemWatcher::Notification::getFullPath(String&, StringView& view) const
 {
     view = fullPath;
-    return ReturnCode(true);
+    return Result(true);
 }

@@ -736,8 +736,8 @@ struct SC::Build::ProjectWriter::WriterXCode
         return true;
     }
 
-    [[nodiscard]] ReturnCode writeScheme(StringBuilder& builder, const Project& project, Renderer& renderer,
-                                         StringView destinationDirectory, StringView filename)
+    [[nodiscard]] Result writeScheme(StringBuilder& builder, const Project& project, Renderer& renderer,
+                                     StringView destinationDirectory, StringView filename)
     {
         SC_COMPILER_UNUSED(destinationDirectory);
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
@@ -752,7 +752,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                 }
                 else
                 {
-                    return ReturnCode::Error("XCode: only a single lldbinit file is supported");
+                    return Result::Error("XCode: only a single lldbinit file is supported");
                 }
             }
         }
@@ -847,6 +847,6 @@ struct SC::Build::ProjectWriter::WriterXCode
                        "7B00740A2A73143F00660B94", project.name.view(), project.name.view(), filename,           //
                        "7B00740A2A73143F00660B94", project.name.view(), project.name.view(), filename);
         SC_COMPILER_WARNING_POP;
-        return ReturnCode(true);
+        return Result(true);
     }
 };

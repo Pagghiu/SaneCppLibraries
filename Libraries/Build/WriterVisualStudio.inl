@@ -53,7 +53,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     }
 
     template <typename Lambda>
-    [[nodiscard]] ReturnCode forArchitecture(StringBuilder& builder, const Project& project, Lambda lambda)
+    [[nodiscard]] Result forArchitecture(StringBuilder& builder, const Project& project, Lambda lambda)
     {
         for (const auto& config : project.configurations)
         {
@@ -77,14 +77,14 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                 break;
             }
             case Architecture::Wasm: {
-                return ReturnCode::Error("Visual Studio: Unsupported Wasm configuration");
+                return Result::Error("Visual Studio: Unsupported Wasm configuration");
             }
             }
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] ReturnCode writeConfigurations(StringBuilder& builder, const Project& project)
+    [[nodiscard]] Result writeConfigurations(StringBuilder& builder, const Project& project)
     {
         return forArchitecture(
             builder, project,
@@ -92,7 +92,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             { return writeConfiguration(builder, configuration, platform); });
     }
 
-    [[nodiscard]] ReturnCode writeGlobals(StringBuilder& builder, const Project& project)
+    [[nodiscard]] Result writeGlobals(StringBuilder& builder, const Project& project)
     {
         // TODO: Generate GUID
         // c701ae36-fa88-4674-a16f-298fa8444aa5
@@ -106,7 +106,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                        "  </PropertyGroup>\n",
                        projectGuid, project.name);
         SC_COMPILER_WARNING_POP;
-        return ReturnCode(true);
+        return Result(true);
     }
 
     [[nodiscard]] bool writeConfigurationProperty(StringBuilder& builder, const Configuration& configuration,
@@ -150,7 +150,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
 #endif
         builder.append("  </PropertyGroup>\n");
         SC_COMPILER_WARNING_POP;
-        return ReturnCode(true);
+        return Result(true);
     }
 
     [[nodiscard]] bool writeConfigurationsProperties(StringBuilder& builder, const Project& project)
@@ -459,7 +459,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     }
 
     // Project
-    [[nodiscard]] ReturnCode writeProject(StringBuilder& builder, const Project& project, Renderer& renderer)
+    [[nodiscard]] Result writeProject(StringBuilder& builder, const Project& project, Renderer& renderer)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
@@ -493,7 +493,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                        "  </ImportGroup>\n"
                        "</Project>\n");
         SC_COMPILER_WARNING_POP;
-        return ReturnCode(true);
+        return Result(true);
     }
 
     // Solution

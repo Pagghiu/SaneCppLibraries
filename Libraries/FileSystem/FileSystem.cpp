@@ -15,18 +15,15 @@
 
 #include "../FileSystem/Path.h"
 
-SC::ReturnCode SC::FileSystem::init(StringView currentWorkingDirectory)
-{
-    return changeDirectory(currentWorkingDirectory);
-}
+SC::Result SC::FileSystem::init(StringView currentWorkingDirectory) { return changeDirectory(currentWorkingDirectory); }
 
-SC::ReturnCode SC::FileSystem::changeDirectory(StringView currentWorkingDirectory)
+SC::Result SC::FileSystem::changeDirectory(StringView currentWorkingDirectory)
 {
     StringConverter converter(currentDirectory);
     converter.clear();
     SC_TRY(converter.appendNullTerminated(currentWorkingDirectory));
     // TODO: Assert if path is not absolute
-    return ReturnCode(existsAndIsDirectory("."));
+    return Result(existsAndIsDirectory("."));
 }
 
 bool SC::FileSystem::convert(const StringView file, String& destination, StringView* encodedPath)
@@ -71,9 +68,9 @@ bool SC::FileSystem::convert(const StringView file, String& destination, StringV
         auto tempRes = func;                                                                                           \
         if (not tempRes)                                                                                               \
         {                                                                                                              \
-            if (IsSame<decltype(tempRes), ReturnCode>::value)                                                          \
+            if (IsSame<decltype(tempRes), Result>::value)                                                              \
             {                                                                                                          \
-                return ReturnCode(tempRes);                                                                            \
+                return Result(tempRes);                                                                                \
             }                                                                                                          \
             else                                                                                                       \
             {                                                                                                          \
@@ -87,9 +84,9 @@ bool SC::FileSystem::convert(const StringView file, String& destination, StringV
         auto tempRes = func;                                                                                           \
         if (not tempRes)                                                                                               \
         {                                                                                                              \
-            if (IsSame<decltype(tempRes), ReturnCode>::value)                                                          \
+            if (IsSame<decltype(tempRes), Result>::value)                                                              \
             {                                                                                                          \
-                return ReturnCode(tempRes);                                                                            \
+                return Result(tempRes);                                                                                \
             }                                                                                                          \
             else                                                                                                       \
             {                                                                                                          \
@@ -98,7 +95,7 @@ bool SC::FileSystem::convert(const StringView file, String& destination, StringV
         }                                                                                                              \
     }
 #endif
-SC::ReturnCode SC::FileSystem::write(StringView path, SpanVoid<const void> data)
+SC::Result SC::FileSystem::write(StringView path, SpanVoid<const void> data)
 {
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
@@ -110,7 +107,7 @@ SC::ReturnCode SC::FileSystem::write(StringView path, SpanVoid<const void> data)
         return formatError(errno, path, false);
     }
     fclose(handle);
-    return ReturnCode(res == data.sizeInBytes());
+    return Result(res == data.sizeInBytes());
 }
 
 #define SC_TRY_FORMAT_LIBC(func)                                                                                       \
@@ -120,7 +117,7 @@ SC::ReturnCode SC::FileSystem::write(StringView path, SpanVoid<const void> data)
             return formatError(errno, path, false);                                                                    \
         }                                                                                                              \
     }
-SC::ReturnCode SC::FileSystem::read(StringView path, Vector<char>& data)
+SC::Result SC::FileSystem::read(StringView path, Vector<char>& data)
 {
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
@@ -139,34 +136,34 @@ SC::ReturnCode SC::FileSystem::read(StringView path, Vector<char>& data)
         return formatError(errno, path, false);
     }
     fclose(handle);
-    return ReturnCode(readBytes == fileSize);
+    return Result(readBytes == fileSize);
 }
 #undef SC_TRY_FORMAT_LIBC
 
-[[nodiscard]] SC::ReturnCode SC::FileSystem::write(StringView file, StringView text)
+[[nodiscard]] SC::Result SC::FileSystem::write(StringView file, StringView text)
 {
     return write(file, text.toVoidSpan());
 }
 
-[[nodiscard]] SC::ReturnCode SC::FileSystem::read(StringView file, String& text, StringEncoding encoding)
+[[nodiscard]] SC::Result SC::FileSystem::read(StringView file, String& text, StringEncoding encoding)
 {
     text.encoding = encoding;
     SC_TRY(read(file, text.data));
-    return ReturnCode(StringConverter::pushNullTerm(text.data, encoding));
+    return Result(StringConverter::pushNullTerm(text.data, encoding));
 }
 
-SC::ReturnCode SC::FileSystem::formatError(int errorNumber, StringView item, bool isWindowsNativeError)
+SC::Result SC::FileSystem::formatError(int errorNumber, StringView item, bool isWindowsNativeError)
 {
 #if SC_PLATFORM_WINDOWS
     if (isWindowsNativeError)
     {
         if (not preciseErrorMessages)
         {
-            return ReturnCode::Error("Windows Error");
+            return Result::Error("Windows Error");
         }
         if (not UtilityWindows::formatWindowsError(errorNumber, errorMessageBuffer))
         {
-            return ReturnCode::Error("SC::FileSystem::formatError - Cannot format error");
+            return Result::Error("SC::FileSystem::formatError - Cannot format error");
         }
     }
     else
@@ -179,17 +176,17 @@ SC::ReturnCode SC::FileSystem::formatError(int errorNumber, StringView item, boo
         }
         if (not Internal::formatError(errorNumber, errorMessageBuffer))
         {
-            return ReturnCode::Error("SC::FileSystem::formatError - Cannot format error");
+            return Result::Error("SC::FileSystem::formatError - Cannot format error");
         }
     }
     StringConverter errorMessage(errorMessageBuffer);
     SC_TRY(errorMessage.appendNullTerminated(" for \""));
     SC_TRY(errorMessage.appendNullTerminated(item));
     SC_TRY(errorMessage.appendNullTerminated("\""));
-    return ReturnCode::FromStableCharPointer(errorMessageBuffer.view().bytesIncludingTerminator());
+    return Result::FromStableCharPointer(errorMessageBuffer.view().bytesIncludingTerminator());
 }
 
-SC::ReturnCode SC::FileSystem::removeFile(Span<const StringView> files)
+SC::Result SC::FileSystem::removeFile(Span<const StringView> files)
 {
     StringView encodedPath;
     for (auto& path : files)
@@ -197,30 +194,30 @@ SC::ReturnCode SC::FileSystem::removeFile(Span<const StringView> files)
         SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
         SC_TRY_FORMAT_ERRNO(path, Internal::removeFile(encodedPath.getNullTerminatedNative()));
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::FileSystem::removeFileIfExists(StringView source)
+SC::Result SC::FileSystem::removeFileIfExists(StringView source)
 {
     if (existsAndIsFile(source))
         return removeFile(Span<const StringView>{source});
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::FileSystem::removeDirectoryRecursive(Span<const StringView> directories)
+SC::Result SC::FileSystem::removeDirectoryRecursive(Span<const StringView> directories)
 {
     for (auto& path : directories)
     {
         SC_TRY(convert(path, fileFormatBuffer1)); // force write
         SC_TRY_FORMAT_ERRNO(path, Internal::removeDirectoryRecursive(fileFormatBuffer1));
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::FileSystem::copyFile(Span<const CopyOperation> sourceDestination)
+SC::Result SC::FileSystem::copyFile(Span<const CopyOperation> sourceDestination)
 {
     if (currentDirectory.isEmpty())
-        return ReturnCode(false);
+        return Result(false);
     StringView encodedPath1, encodedPath2;
     for (const CopyOperation& op : sourceDestination)
     {
@@ -228,23 +225,23 @@ SC::ReturnCode SC::FileSystem::copyFile(Span<const CopyOperation> sourceDestinat
         SC_TRY(convert(op.destination, fileFormatBuffer2, &encodedPath2));
         SC_TRY_FORMAT_NATIVE(op.source, Internal::copyFile(encodedPath1, encodedPath2, op.copyFlags));
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::FileSystem::copyDirectory(Span<const CopyOperation> sourceDestination)
+SC::Result SC::FileSystem::copyDirectory(Span<const CopyOperation> sourceDestination)
 {
     if (currentDirectory.isEmpty())
-        return ReturnCode(false);
+        return Result(false);
     for (const CopyOperation& op : sourceDestination)
     {
         SC_TRY(convert(op.source, fileFormatBuffer1));      // force write
         SC_TRY(convert(op.destination, fileFormatBuffer2)); // force write
         SC_TRY_FORMAT_NATIVE(op.source, Internal::copyDirectory(fileFormatBuffer1, fileFormatBuffer2, op.copyFlags));
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::FileSystem::removeEmptyDirectory(Span<const StringView> directories)
+SC::Result SC::FileSystem::removeEmptyDirectory(Span<const StringView> directories)
 {
     StringView encodedPath;
     for (StringView path : directories)
@@ -252,10 +249,10 @@ SC::ReturnCode SC::FileSystem::removeEmptyDirectory(Span<const StringView> direc
         SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
         SC_TRY_FORMAT_ERRNO(path, Internal::removeEmptyDirectory(encodedPath.getNullTerminatedNative()));
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::FileSystem::makeDirectory(Span<const StringView> directories)
+SC::Result SC::FileSystem::makeDirectory(Span<const StringView> directories)
 {
     StringView encodedPath;
     for (auto& path : directories)
@@ -263,10 +260,10 @@ SC::ReturnCode SC::FileSystem::makeDirectory(Span<const StringView> directories)
         SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
         SC_TRY_FORMAT_ERRNO(path, Internal::makeDirectory(encodedPath.getNullTerminatedNative()));
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::FileSystem::makeDirectoryIfNotExists(Span<const StringView> directories)
+SC::Result SC::FileSystem::makeDirectoryIfNotExists(Span<const StringView> directories)
 {
     for (const auto& path : directories)
     {
@@ -275,7 +272,7 @@ SC::ReturnCode SC::FileSystem::makeDirectoryIfNotExists(Span<const StringView> d
             SC_TRY(makeDirectory({path}));
         }
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
 [[nodiscard]] bool SC::FileSystem::exists(StringView fileOrDirectory)
@@ -313,7 +310,7 @@ SC::Optional<SC::FileSystem::FileTime> SC::FileSystem::getFileTime(StringView fi
     return {};
 }
 
-SC::ReturnCode SC::FileSystem::setLastModifiedTime(StringView file, AbsoluteTime time)
+SC::Result SC::FileSystem::setLastModifiedTime(StringView file, AbsoluteTime time)
 {
     StringView encodedPath;
     SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));

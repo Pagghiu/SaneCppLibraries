@@ -12,13 +12,13 @@
 #include "ProcessInternalPosix.inl"
 #endif
 
-SC::ReturnCode SC::ProcessChain::launch(ProcessChainOptions options)
+SC::Result SC::ProcessChain::launch(ProcessChainOptions options)
 {
     if (not error.returnCode)
         return error.returnCode;
 
     if (processes.isEmpty())
-        return ReturnCode(false);
+        return Result(false);
 
     if (options.pipeSTDIN)
     {
@@ -48,10 +48,10 @@ SC::ReturnCode SC::ProcessChain::launch(ProcessChainOptions options)
     SC_TRY(inputPipe.readPipe.close());
     SC_TRY(outputPipe.writePipe.close());
     SC_TRY(errorPipe.writePipe.close());
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::ProcessChain::pipe(Process& process, std::initializer_list<const StringView> cmd)
+SC::Result SC::ProcessChain::pipe(Process& process, std::initializer_list<const StringView> cmd)
 {
     SC_TRY_MSG(process.parent == nullptr, "Process::pipe - already in use");
 
@@ -65,30 +65,30 @@ SC::ReturnCode SC::ProcessChain::pipe(Process& process, std::initializer_list<co
     SC_TRY(process.formatArguments(Span<const StringView>(cmd)));
     process.parent = this;
     processes.queueBack(process);
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::ProcessChain::readStdOutUntilEOFSync(String& destination)
+SC::Result SC::ProcessChain::readStdOutUntilEOFSync(String& destination)
 {
     return outputPipe.readPipe.readUntilEOF(destination);
 }
 
-SC::ReturnCode SC::ProcessChain::readStdErrUntilEOFSync(String& destination)
+SC::Result SC::ProcessChain::readStdErrUntilEOFSync(String& destination)
 {
     return errorPipe.readPipe.readUntilEOF(destination);
 }
 
-SC::ReturnCode SC::ProcessChain::readStdOutUntilEOFSync(Vector<char>& destination)
+SC::Result SC::ProcessChain::readStdOutUntilEOFSync(Vector<char>& destination)
 {
     return outputPipe.readPipe.readUntilEOF(destination);
 }
 
-SC::ReturnCode SC::ProcessChain::readStdErrUntilEOFSync(Vector<char>& destination)
+SC::Result SC::ProcessChain::readStdErrUntilEOFSync(Vector<char>& destination)
 {
     return errorPipe.readPipe.readUntilEOF(destination);
 }
 
-SC::ReturnCode SC::ProcessChain::waitForExitSync()
+SC::Result SC::ProcessChain::waitForExitSync()
 {
     for (Process* process = processes.front; process != nullptr; process = process->next)
     {
@@ -102,7 +102,7 @@ SC::ReturnCode SC::ProcessChain::waitForExitSync()
     return error.returnCode;
 }
 
-SC::ReturnCode SC::Process::formatArguments(Span<const StringView> params)
+SC::Result SC::Process::formatArguments(Span<const StringView> params)
 {
     bool            first = true;
     StringConverter formattedCmd(command);
@@ -126,22 +126,22 @@ SC::ReturnCode SC::Process::formatArguments(Span<const StringView> params)
             SC_TRY(formattedCmd.appendNullTerminated(svp));
         }
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::Process::redirectStdOutTo(PipeDescriptor& pipe)
+SC::Result SC::Process::redirectStdOutTo(PipeDescriptor& pipe)
 {
     SC_TRY(pipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteInheritable));
     return standardOutput.assign(move(pipe.writePipe));
 }
 
-SC::ReturnCode SC::Process::redirectStdErrTo(PipeDescriptor& pipe)
+SC::Result SC::Process::redirectStdErrTo(PipeDescriptor& pipe)
 {
     SC_TRY(pipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteInheritable));
     return standardError.assign(move(pipe.writePipe));
 }
 
-SC::ReturnCode SC::Process::redirectStdInTo(PipeDescriptor& pipe)
+SC::Result SC::Process::redirectStdInTo(PipeDescriptor& pipe)
 {
     SC_TRY(pipe.createPipe(PipeDescriptor::ReadInheritable, PipeDescriptor::WriteNonInheritable));
     return standardInput.assign(move(pipe.readPipe));

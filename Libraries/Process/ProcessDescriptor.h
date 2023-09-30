@@ -21,7 +21,7 @@ struct ProcessDescriptorTraits
 #else
     static constexpr void* Invalid = (void*)-1; // INVALID_HANDLE_VALUE
 #endif
-    static ReturnCode releaseHandle(Handle& handle);
+    static Result releaseHandle(Handle& handle);
 };
 
 #else
@@ -30,7 +30,7 @@ struct ProcessDescriptorTraits
 {
     using Handle                    = int; // pid_t
     static constexpr Handle Invalid = 0;   // invalid pid_t
-    static ReturnCode       releaseHandle(Handle& handle);
+    static Result           releaseHandle(Handle& handle);
 };
 
 #endif

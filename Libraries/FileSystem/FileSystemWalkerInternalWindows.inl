@@ -20,14 +20,14 @@ struct SC::FileSystemWalker::Internal
         bool   gotDot1           = false;
         bool   gotDot2           = false;
 
-        ReturnCode init(const wchar_t* path, WIN32_FIND_DATAW& dirEnumerator)
+        Result init(const wchar_t* path, WIN32_FIND_DATAW& dirEnumerator)
         {
             fileDescriptor = FindFirstFileW(path, &dirEnumerator);
             if (INVALID_HANDLE_VALUE == fileDescriptor)
             {
-                return ReturnCode::Error("FindFirstFileW failed");
+                return Result::Error("FindFirstFileW failed");
             }
-            return ReturnCode(true);
+            return Result(true);
         }
 
         void close()
@@ -53,7 +53,7 @@ struct SC::FileSystemWalker::Internal
         }
     }
 
-    [[nodiscard]] ReturnCode init(StringView directory)
+    [[nodiscard]] Result init(StringView directory)
     {
         StringConverter currentPath(currentPathString);
         currentPath.clear();
@@ -65,10 +65,10 @@ struct SC::FileSystemWalker::Internal
         SC_TRY(recurseStack.push_back(entry));
         SC_TRY(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
         expectDotDirectories = true;
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] ReturnCode enumerateNext(Entry& entry, const Options& options)
+    [[nodiscard]] Result enumerateNext(Entry& entry, const Options& options)
     {
         StringConverter currentPath(currentPathString);
         StackEntry&     parent = recurseStack.back();
@@ -81,7 +81,7 @@ struct SC::FileSystemWalker::Internal
                     recurseStack.back().close();
                     SC_TRY(recurseStack.pop_back());
                     if (recurseStack.isEmpty())
-                        return ReturnCode::Error("Iteration Finished");
+                        return Result::Error("Iteration Finished");
                     parent = recurseStack.back();
                     SC_TRY(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
                     continue;
@@ -137,10 +137,10 @@ struct SC::FileSystemWalker::Internal
         {
             entry.type = Type::File;
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] ReturnCode recurseSubdirectory(Entry& entry)
+    [[nodiscard]] Result recurseSubdirectory(Entry& entry)
     {
         StringConverter currentPath(currentPathString);
         StackEntry      newParent;
@@ -152,6 +152,6 @@ struct SC::FileSystemWalker::Internal
         SC_TRY(newParent.init(currentPathString.view().getNullTerminatedNative(), dirEnumerator));
         SC_TRY(recurseStack.push_back(newParent));
         expectDotDirectories = true;
-        return ReturnCode(true);
+        return Result(true);
     }
 };

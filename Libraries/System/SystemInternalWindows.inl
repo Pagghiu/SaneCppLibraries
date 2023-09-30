@@ -164,7 +164,7 @@ struct SC::SystemDebug::Internal
                                     0, FALSE, DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS))
                 {
                     CloseHandle(newHandle);
-                    return ReturnCode(true);
+                    return Result(true);
                 }
             }
         }
@@ -174,7 +174,7 @@ struct SC::SystemDebug::Internal
 
 // Find all processes that have an handle open on the given fileName and unlock it
 // https://devblogs.microsoft.com/oldnewthing/20120217-00/?p=8283
-SC::ReturnCode SC::SystemDebug::unlockFileFromAllProcesses(SC::StringView fileName)
+SC::Result SC::SystemDebug::unlockFileFromAllProcesses(SC::StringView fileName)
 {
     using namespace SC;
     SC_TRY_MSG(fileName.isNullTerminated(), "Filename must be null terminated");
@@ -217,12 +217,12 @@ SC::ReturnCode SC::SystemDebug::unlockFileFromAllProcesses(SC::StringView fileNa
         }
         RmEndSession(dwSession);
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
 bool SC::SystemDebug::isDebuggerConnected() { return ::IsDebuggerPresent() == TRUE; }
 
-SC::ReturnCode SC::SystemDebug::deleteForcefullyUnlockedFile(SC::StringView fileName)
+SC::Result SC::SystemDebug::deleteForcefullyUnlockedFile(SC::StringView fileName)
 {
     using namespace SC;
     SC_TRY_MSG(fileName.isNullTerminated(), "Filename must be null terminated");
@@ -236,10 +236,10 @@ SC::ReturnCode SC::SystemDebug::deleteForcefullyUnlockedFile(SC::StringView file
                             NULL                                // Template file handle
     );
     SC_TRY_MSG(fd != INVALID_HANDLE_VALUE, "deleteForcefullyUnlockedFile CreateFileW failed");
-    return ReturnCode(::CloseHandle(fd) == TRUE);
+    return Result(::CloseHandle(fd) == TRUE);
 }
 
-SC::ReturnCode SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle)
+SC::Result SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle)
 {
     if (handle)
     {
@@ -249,12 +249,12 @@ SC::ReturnCode SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle)
         memcpy(&module, &handle, sizeof(HMODULE));
         handle         = nullptr;
         const BOOL res = ::FreeLibrary(module);
-        return ReturnCode(res == TRUE);
+        return Result(res == TRUE);
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::SystemDynamicLibrary::load(StringView fullPath)
+SC::Result SC::SystemDynamicLibrary::load(StringView fullPath)
 {
     SC_TRY(close());
     SmallString<1024> string = StringEncoding::Native;
@@ -264,13 +264,13 @@ SC::ReturnCode SC::SystemDynamicLibrary::load(StringView fullPath)
     HMODULE module = ::LoadLibraryW(fullPathZeroTerminated.getNullTerminatedNative());
     if (module == nullptr)
     {
-        return ReturnCode::Error("LoadLibraryW failed");
+        return Result::Error("LoadLibraryW failed");
     }
     memcpy(&handle, &module, sizeof(HMODULE));
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const
+SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const
 {
     SC_TRY_MSG(isValid(), "Invalid GetProcAddress handle");
     SmallString<1024> string = StringEncoding::Ascii;
@@ -280,7 +280,7 @@ SC::ReturnCode SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*
     HMODULE module;
     memcpy(&module, &handle, sizeof(HMODULE));
     symbol = reinterpret_cast<void*>(::GetProcAddress(module, symbolZeroTerminated.bytesIncludingTerminator()));
-    return ReturnCode(symbol != nullptr);
+    return Result(symbol != nullptr);
 }
 
 bool SC::SystemDirectories::init()
@@ -315,7 +315,7 @@ bool SC::SystemDirectories::init()
     StringBuilder builder(executableFile);
     SC_TRY(builder.append(utf16executable));
     applicationRootDirectory = Path::Windows::dirname(executableFile.view());
-    return ReturnCode(true);
+    return Result(true);
 }
 
 struct SC::SystemFunctions::Internal
@@ -331,23 +331,23 @@ struct SC::SystemFunctions::Internal
 
 bool SC::SystemFunctions::isNetworkingInited() { return Internal::get().networkingInited.load(); }
 
-SC::ReturnCode SC::SystemFunctions::initNetworking()
+SC::Result SC::SystemFunctions::initNetworking()
 {
     if (isNetworkingInited() == false)
     {
         WSADATA wsa;
         if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
         {
-            return ReturnCode::Error("WSAStartup failed");
+            return Result::Error("WSAStartup failed");
         }
         Internal::get().networkingInited.exchange(true);
     }
-    return ReturnCode(true);
+    return Result(true);
 }
 
-SC::ReturnCode SC::SystemFunctions::shutdownNetworking()
+SC::Result SC::SystemFunctions::shutdownNetworking()
 {
     WSACleanup();
     Internal::get().networkingInited.exchange(false);
-    return ReturnCode(true);
+    return Result(true);
 }

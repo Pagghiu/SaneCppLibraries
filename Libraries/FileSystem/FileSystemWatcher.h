@@ -32,7 +32,7 @@ struct SC::FileSystemWatcher
         StringView relativePath;
         Operation  operation = Operation::Modified;
 
-        SC::ReturnCode getFullPath(String& bufferString, StringView& outStringView) const;
+        SC::Result getFullPath(String& bufferString, StringView& outStringView) const;
 
       private:
         friend struct Internal;
@@ -79,7 +79,7 @@ struct SC::FileSystemWatcher
 
         Function<void(const Notification&)> notifyCallback;
 
-        ReturnCode unwatch();
+        Result unwatch();
     };
     IntrusiveDoubleLinkedList<FolderWatcher> watchers;
 
@@ -93,11 +93,11 @@ struct SC::FileSystemWatcher
 #endif
     };
 
-    [[nodiscard]] ReturnCode init(ThreadRunner& runner);
-    [[nodiscard]] ReturnCode init(EventLoopRunner& runner);
-    [[nodiscard]] ReturnCode close();
-    [[nodiscard]] ReturnCode watch(FolderWatcher& watcher, String& path,
-                                   Function<void(const Notification&)>&& notifyCallback);
+    [[nodiscard]] Result init(ThreadRunner& runner);
+    [[nodiscard]] Result init(EventLoopRunner& runner);
+    [[nodiscard]] Result close();
+    [[nodiscard]] Result watch(FolderWatcher& watcher, String& path,
+                               Function<void(const Notification&)>&& notifyCallback);
 
     struct InternalSizes
     {

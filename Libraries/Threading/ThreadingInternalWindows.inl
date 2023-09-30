@@ -29,19 +29,19 @@ struct SC::Thread::Internal
     using NativeHandle       = HANDLE;
     using CallbackReturnType = DWORD;
 
-    [[nodiscard]] static ReturnCode createThread(CreateParams& self, OpaqueThread& opaqueThread, HANDLE& threadHandle,
-                                                 DWORD(WINAPI* threadFunc)(void* argument))
+    [[nodiscard]] static Result createThread(CreateParams& self, OpaqueThread& opaqueThread, HANDLE& threadHandle,
+                                             DWORD(WINAPI* threadFunc)(void* argument))
     {
         DWORD threadID;
         opaqueThread.reinterpret_as<HANDLE>() =
             CreateThread(0, 512 * 1024, threadFunc, &self, CREATE_SUSPENDED, &threadID);
         if (opaqueThread.reinterpret_as<HANDLE>() == nullptr)
         {
-            return ReturnCode::Error("Thread::create - CreateThread failed");
+            return Result::Error("Thread::create - CreateThread failed");
         }
         threadHandle = opaqueThread.reinterpret_as<HANDLE>();
         ResumeThread(threadHandle);
-        return ReturnCode(true);
+        return Result(true);
     }
 
     static void setThreadName(HANDLE& threadHandle, const StringView& nameNullTerminated)
@@ -49,17 +49,17 @@ struct SC::Thread::Internal
         SetThreadDescription(threadHandle, nameNullTerminated.getNullTerminatedNative());
     }
 
-    [[nodiscard]] static ReturnCode joinThread(OpaqueThread* threadNative)
+    [[nodiscard]] static Result joinThread(OpaqueThread* threadNative)
     {
         WaitForSingleObject(threadNative->reinterpret_as<HANDLE>(), INFINITE);
         CloseHandle(threadNative->reinterpret_as<HANDLE>());
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] static ReturnCode detachThread(OpaqueThread* threadNative)
+    [[nodiscard]] static Result detachThread(OpaqueThread* threadNative)
     {
         CloseHandle(threadNative->reinterpret_as<HANDLE>());
-        return ReturnCode(true);
+        return Result(true);
     }
 };
 

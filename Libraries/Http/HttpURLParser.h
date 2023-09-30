@@ -24,13 +24,13 @@ struct SC::HttpURLParser
     StringView search;   // ?q=val
     StringView hash;     // #hash
 
-    [[nodiscard]] ReturnCode parse(StringView url);
+    [[nodiscard]] Result parse(StringView url);
 
   private:
-    [[nodiscard]] ReturnCode parsePath();
-    [[nodiscard]] ReturnCode parseHost();
-    [[nodiscard]] ReturnCode validateProtocol();
-    [[nodiscard]] ReturnCode validatePath();
-    [[nodiscard]] ReturnCode validateHost();
-    [[nodiscard]] ReturnCode parseUserPassword(StringView userPassowrd);
+    [[nodiscard]] Result parsePath();
+    [[nodiscard]] Result parseHost();
+    [[nodiscard]] Result validateProtocol();
+    [[nodiscard]] Result validatePath();
+    [[nodiscard]] Result validateHost();
+    [[nodiscard]] Result parseUserPassword(StringView userPassowrd);
 };

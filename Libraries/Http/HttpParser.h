@@ -55,7 +55,7 @@ struct SC::HttpParser
     };
     Type type = Type::Request;
 
-    [[nodiscard]] ReturnCode parse(Span<const char> data, size_t& readBytes, Span<const char>& parsedData);
+    [[nodiscard]] SC::Result parse(Span<const char> data, size_t& readBytes, Span<const char>& parsedData);
     enum class HeaderType
     {
         ContentLength = 0
@@ -89,5 +89,5 @@ struct SC::HttpParser
     [[nodiscard]] bool parseVersion(char currentChar);
 
     template <bool (HttpParser::*Func)(char), Result currentResult>
-    [[nodiscard]] ReturnCode process(Span<const char>& data, size_t& readBytes, Span<const char>& parsedData);
+    [[nodiscard]] SC::Result process(Span<const char>& data, size_t& readBytes, Span<const char>& parsedData);
 };

@@ -98,10 +98,10 @@ struct SC::Thread
     /// Starts the new thread with given name and func
     /// @param func     Function running on thread. Must be a valid pointer to action for the entire duration of thread.
     /// @param syncFunc Function garanteed to be run before  start returns
-    [[nodiscard]] ReturnCode start(StringView threadName, Action* func, Action* syncFunc = nullptr);
-    [[nodiscard]] ReturnCode join();
-    [[nodiscard]] ReturnCode detach();
-    [[nodiscard]] bool       wasStarted() const;
+    [[nodiscard]] Result start(StringView threadName, Action* func, Action* syncFunc = nullptr);
+    [[nodiscard]] Result join();
+    [[nodiscard]] Result detach();
+    [[nodiscard]] bool   wasStarted() const;
 
     static void Sleep(uint32_t milliseconds);
 

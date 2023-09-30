@@ -39,22 +39,22 @@ struct SC::FileSystemWatcher::Internal
     EventLoopRunner*      eventLoopRunner = nullptr;
     ThreadRunnerInternal* threadingRunner = nullptr;
 
-    [[nodiscard]] ReturnCode init(FileSystemWatcher& parent, ThreadRunner& runner)
+    [[nodiscard]] Result init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
         self            = &parent;
         threadingRunner = &runner.get();
         threadingRunner->threadFunction.bind<Internal, &Internal::threadRun>(this);
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] ReturnCode init(FileSystemWatcher& parent, EventLoopRunner& runner)
+    [[nodiscard]] Result init(FileSystemWatcher& parent, EventLoopRunner& runner)
     {
         self            = &parent;
         eventLoopRunner = &runner;
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] ReturnCode close()
+    [[nodiscard]] Result close()
     {
         if (threadingRunner)
         {
@@ -75,7 +75,7 @@ struct SC::FileSystemWatcher::Internal
         {
             SC_TRY(stopWatching(*entry));
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 
     void signalWatcherEvent(FolderWatcher& watcher)
@@ -97,7 +97,7 @@ struct SC::FileSystemWatcher::Internal
         SC_TRUST_RESULT(opaque.fileHandle.close());
     }
 
-    [[nodiscard]] ReturnCode stopWatching(FolderWatcher& folderWatcher)
+    [[nodiscard]] Result stopWatching(FolderWatcher& folderWatcher)
     {
         folderWatcher.parent->watchers.remove(folderWatcher);
         folderWatcher.parent = nullptr;
@@ -111,10 +111,10 @@ struct SC::FileSystemWatcher::Internal
             SC_TRUST_RESULT(folderWatcher.internal.get().asyncPoll.stop());
         }
         closeFileHandle(folderWatcher);
-        return ReturnCode(true);
+        return Result(true);
     }
 
-    [[nodiscard]] ReturnCode startWatching(FolderWatcher* entry)
+    [[nodiscard]] Result startWatching(FolderWatcher* entry)
     {
         StringNative<1024> buffer = StringEncoding::Native; // TODO: this needs to go into caller context
         StringConverter    converter(buffer);
@@ -180,7 +180,7 @@ struct SC::FileSystemWatcher::Internal
             threadingRunner->shouldStop.exchange(false);
             SC_TRY(threadingRunner->thread.start("FileSystemWatcher::init", &threadingRunner->threadFunction))
         }
-        return ReturnCode(true);
+        return Result(true);
     }
 
     void threadRun()
@@ -196,7 +196,7 @@ struct SC::FileSystemWatcher::Internal
                 FolderWatcherInternal& opaque = entry.internal.get();
                 DWORD                  transferredBytes;
                 HANDLE                 handle;
-                if (opaque.fileHandle.get(handle, ReturnCode::Error("Invalid fs handle")))
+                if (opaque.fileHandle.get(handle, Result::Error("Invalid fs handle")))
                 {
                     ::GetOverlappedResult(handle, &opaque.getOverlapped(), &transferredBytes, FALSE);
                     notifyEntry(entry);
@@ -245,7 +245,7 @@ struct SC::FileSystemWatcher::Internal
 
         memset(&opaque.getOverlapped(), 0, sizeof(opaque.getOverlapped()));
         HANDLE handle;
-        if (opaque.fileHandle.get(handle, ReturnCode::Error("Invalid fs handle")))
+        if (opaque.fileHandle.get(handle, Result::Error("Invalid fs handle")))
         {
             BOOL success = ::ReadDirectoryChangesW(handle,                            //
                                                    opaque.changesBuffer,              //
@@ -263,12 +263,12 @@ struct SC::FileSystemWatcher::Internal
     }
 };
 
-SC::ReturnCode SC::FileSystemWatcher::Notification::getFullPath(String& buffer, StringView& outStringView) const
+SC::Result SC::FileSystemWatcher::Notification::getFullPath(String& buffer, StringView& outStringView) const
 {
     StringBuilder builder(buffer);
     SC_TRY(builder.append(basePath));
     SC_TRY(builder.append("\\"));
     SC_TRY(builder.append(relativePath));
     outStringView = buffer.view();
-    return ReturnCode(true);
+    return Result(true);
 }
