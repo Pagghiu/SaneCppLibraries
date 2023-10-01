@@ -14,7 +14,8 @@
 #include "EventLoopInternalApple.inl"
 #endif
 
-#if 0
+#define SC_ASYNC_ENABLE_LOG 0
+#if SC_ASYNC_ENABLE_LOG
 #include "../System/Console.h"
 #else
 #define SC_LOG_MESSAGE(a, ...)
@@ -30,7 +31,7 @@ void SC::OpaqueFuncs<SC::EventLoop::InternalTraits>::destruct(Object& obj)
 {
     obj.~Object();
 }
-
+#if SC_ASYNC_ENABLE_LOG
 const char* SC::Async::TypeToString(Type type)
 {
     switch (type)
@@ -52,6 +53,7 @@ const char* SC::Async::TypeToString(Type type)
     }
     Assert::unreachable();
 }
+#endif
 
 SC::Result SC::Async::validateAsync()
 {

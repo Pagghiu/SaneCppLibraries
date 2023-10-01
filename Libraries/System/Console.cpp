@@ -72,17 +72,3 @@ void SC::Console::print(const StringView str)
     fwrite(str.bytesWithoutTerminator(), sizeof(char), str.sizeInBytes(), stdout);
 #endif
 }
-
-void SC::Console::printNullTerminatedASCII(const StringView str)
-{
-    if (str.isEmpty() || str.getEncoding() != StringEncoding::Ascii)
-        return;
-
-#if SC_PLATFORM_WINDOWS
-    WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), str.bytesWithoutTerminator(), static_cast<DWORD>(str.sizeInBytes()),
-                  nullptr, nullptr);
-    OutputDebugStringA(str.bytesIncludingTerminator());
-#else
-    fwrite(str.bytesWithoutTerminator(), sizeof(char), str.sizeInBytes(), stdout);
-#endif
-}

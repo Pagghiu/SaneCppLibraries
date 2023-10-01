@@ -8,6 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		7B0C299D297CA7CC0071C5B4 /* FileSystem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C299C297CA7CC0071C5B4 /* FileSystem.cpp */; };
+		7B1088182ACA123B003762C5 /* Plugin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B25ADFD2A2CB9B1008936DE /* Plugin.cpp */; };
+		7B1088192ACA123B003762C5 /* AdditionalFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B6B7A392A46D2C5007E8BE2 /* AdditionalFile.cpp */; };
+		7B10881A2ACA123B003762C5 /* TestPluginChild.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE94E452A4245DB00AC61EF /* TestPluginChild.cpp */; };
+		7B10881B2ACA123B003762C5 /* TestPluginParent.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE94E412A4245C900AC61EF /* TestPluginParent.cpp */; };
 		7B19C9AC297AF99F001C0627 /* Path.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B19C9A9297AF95B001C0627 /* Path.cpp */; };
 		7B19C9AD297AF9A2001C0627 /* Path.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B19C9A9297AF95B001C0627 /* Path.cpp */; };
 		7B1A39FB29BA7B220087F688 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B1A39FA29BA7B220087F688 /* CoreFoundation.framework */; };
@@ -22,6 +26,33 @@
 		7B358DE029D8F063002A7D1C /* CoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B358DDF29D8F063002A7D1C /* CoreServices.framework */; };
 		7B3AAB732A27E0CE00F814A2 /* Serialization.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B3AAB722A27E06F00F814A2 /* Serialization.cpp */; };
 		7B4A291D29B3CD4A00F13DCB /* Time.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B4A291B29B3CD4A00F13DCB /* Time.cpp */; };
+		7B50F9392ACA0C6300287DC9 /* EventLoop.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA7D47B29B5488200811076 /* EventLoop.cpp */; };
+		7B50F93A2ACA0C6700287DC9 /* Build.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BDCB7EA2A5CC2920004437D /* Build.cpp */; };
+		7B50F93B2ACA0C6B00287DC9 /* FileDescriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE5C81129A2707E00CBCAD1 /* FileDescriptor.cpp */; };
+		7B50F93C2ACA0C7200287DC9 /* FileSystem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C299C297CA7CC0071C5B4 /* FileSystem.cpp */; };
+		7B50F93D2ACA0C7200287DC9 /* FileSystemWatcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B358DDC29D88E93002A7D1C /* FileSystemWatcher.cpp */; };
+		7B50F93E2ACA0C7800287DC9 /* Base.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B319D122AB750C900F7E761 /* Base.cpp */; };
+		7B50F93F2ACA0C8300287DC9 /* StringBuilder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B319CF92AB750C900F7E761 /* StringBuilder.cpp */; };
+		7B50F9402ACA0C8300287DC9 /* StringView.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B319CFE2AB750C900F7E761 /* StringView.cpp */; };
+		7B50F9412ACA0C8300287DC9 /* StringConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B319CFF2AB750C900F7E761 /* StringConverter.cpp */; };
+		7B50F9422ACA0C8300287DC9 /* StringFormat.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B319CF72AB750C900F7E761 /* StringFormat.cpp */; };
+		7B50F9432ACA0C8300287DC9 /* String.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B319CF82AB750C900F7E761 /* String.cpp */; };
+		7B50F9442ACA0C8800287DC9 /* Hashing.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B7C3BFC2A7C443D00FAD351 /* Hashing.cpp */; };
+		7B50F9452ACA0C8F00287DC9 /* HttpClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B53C64F2AADC16300FA1AFD /* HttpClient.cpp */; };
+		7B50F9462ACA0C8F00287DC9 /* HttpURLParser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B84796A2ABF48680052020A /* HttpURLParser.cpp */; };
+		7B50F9472ACA0C8F00287DC9 /* HttpParser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B53C64A2AADC16300FA1AFD /* HttpParser.cpp */; };
+		7B50F9482ACA0C8F00287DC9 /* HttpServer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B53C64B2AADC16300FA1AFD /* HttpServer.cpp */; };
+		7B50F9492ACA0C9300287DC9 /* Json.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B8DDDC42A2012B300D62F03 /* Json.cpp */; };
+		7B50F94E2ACA0C9D00287DC9 /* Process.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BE5C80D29A26E3E00CBCAD1 /* Process.cpp */; };
+		7B50F94F2ACA0CA300287DC9 /* Serialization.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B3AAB722A27E06F00F814A2 /* Serialization.cpp */; };
+		7B50F9502ACA0CA800287DC9 /* SocketDescriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B8BF9AC29F3BADC0055BC3A /* SocketDescriptor.cpp */; };
+		7B50F9512ACA0CAD00287DC9 /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FEE29243087006996AA /* Console.cpp */; };
+		7B50F9522ACA0CAD00287DC9 /* System.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BA892A9297E03540093152B /* System.cpp */; };
+		7B50F9532ACA0CAD00287DC9 /* Time.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B4A291B29B3CD4A00F13DCB /* Time.cpp */; };
+		7B50F9542ACA0CB200287DC9 /* Test.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FFB29243097006996AA /* Test.cpp */; };
+		7B50F9552ACA0CB700287DC9 /* Threading.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B872C4A29AFFC4900949BD2 /* Threading.cpp */; };
+		7B50F9562ACA0CCB00287DC9 /* CoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B358DDF29D8F063002A7D1C /* CoreServices.framework */; };
+		7B50F9572ACA0CCE00287DC9 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B1A39FA29BA7B220087F688 /* CoreFoundation.framework */; };
 		7B515FF929243087006996AA /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FEE29243087006996AA /* Console.cpp */; };
 		7B51601029243097006996AA /* Test.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B515FFB29243097006996AA /* Test.cpp */; };
 		7B53C6512AADC16300FA1AFD /* HttpParser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B53C64A2AADC16300FA1AFD /* HttpParser.cpp */; };
@@ -283,6 +314,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B50F9572ACA0CCE00287DC9 /* CoreFoundation.framework in Frameworks */,
+				7B50F9562ACA0CCB00287DC9 /* CoreServices.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -857,9 +890,38 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B50F9522ACA0CAD00287DC9 /* System.cpp in Sources */,
+				7B50F93A2ACA0C6700287DC9 /* Build.cpp in Sources */,
+				7B50F9422ACA0C8300287DC9 /* StringFormat.cpp in Sources */,
+				7B10881B2ACA123B003762C5 /* TestPluginParent.cpp in Sources */,
 				7B19C9AD297AF9A2001C0627 /* Path.cpp in Sources */,
+				7B50F9502ACA0CA800287DC9 /* SocketDescriptor.cpp in Sources */,
+				7B50F9452ACA0C8F00287DC9 /* HttpClient.cpp in Sources */,
+				7B50F9532ACA0CAD00287DC9 /* Time.cpp in Sources */,
+				7B50F94E2ACA0C9D00287DC9 /* Process.cpp in Sources */,
+				7B50F9462ACA0C8F00287DC9 /* HttpURLParser.cpp in Sources */,
+				7B50F9512ACA0CAD00287DC9 /* Console.cpp in Sources */,
+				7B50F9412ACA0C8300287DC9 /* StringConverter.cpp in Sources */,
+				7B50F9482ACA0C8F00287DC9 /* HttpServer.cpp in Sources */,
+				7B50F9472ACA0C8F00287DC9 /* HttpParser.cpp in Sources */,
 				7B583FCB2922EE7300FBE019 /* SCTest.cpp in Sources */,
+				7B50F93F2ACA0C8300287DC9 /* StringBuilder.cpp in Sources */,
+				7B50F9392ACA0C6300287DC9 /* EventLoop.cpp in Sources */,
+				7B50F9432ACA0C8300287DC9 /* String.cpp in Sources */,
+				7B50F9402ACA0C8300287DC9 /* StringView.cpp in Sources */,
+				7B1088182ACA123B003762C5 /* Plugin.cpp in Sources */,
+				7B50F93E2ACA0C7800287DC9 /* Base.cpp in Sources */,
+				7B50F93C2ACA0C7200287DC9 /* FileSystem.cpp in Sources */,
+				7B50F9492ACA0C9300287DC9 /* Json.cpp in Sources */,
+				7B50F9542ACA0CB200287DC9 /* Test.cpp in Sources */,
+				7B10881A2ACA123B003762C5 /* TestPluginChild.cpp in Sources */,
+				7B50F94F2ACA0CA300287DC9 /* Serialization.cpp in Sources */,
+				7B50F93B2ACA0C6B00287DC9 /* FileDescriptor.cpp in Sources */,
+				7B50F93D2ACA0C7200287DC9 /* FileSystemWatcher.cpp in Sources */,
 				7BC56BDC29946C9200EED472 /* FileSystemWalker.cpp in Sources */,
+				7B1088192ACA123B003762C5 /* AdditionalFile.cpp in Sources */,
+				7B50F9442ACA0C8800287DC9 /* Hashing.cpp in Sources */,
+				7B50F9552ACA0CB700287DC9 /* Threading.cpp in Sources */,
 				7B583F6D2922ED2700FBE019 /* SCTestXCTest.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -916,8 +978,17 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"SC_LIBRARY_PATH=$(PROJECT_DIR)/../../../..",
+					"SC_COMPILER_ENABLE_CONFIG=1",
+					"SC_COMPILER_ENABLE_STD_CPP=1",
+					"SC_XCTEST=1",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				MACH_O_TYPE = mh_dylib;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = sc.SCXCTest;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -930,8 +1001,16 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"SC_LIBRARY_PATH=$(PROJECT_DIR)/../../../..",
+					"SC_COMPILER_ENABLE_CONFIG=1",
+					"SC_COMPILER_ENABLE_STD_CPP=1",
+					"SC_XCTEST=1",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				MACH_O_TYPE = mh_dylib;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = sc.SCXCTest;
 				PRODUCT_NAME = "$(TARGET_NAME)";

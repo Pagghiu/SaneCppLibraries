@@ -112,11 +112,11 @@ int main(int argc, const char* argv[])
     SystemFunctions functions;
     if (not functions.initNetworking())
         return -3;
-    Console              console(globalConsoleConversionBuffer);
-    SC::SmallString<255> correctedPath;
-    TestReport           report(console, argc, argv);
+    Console    console(globalConsoleConversionBuffer);
+    TestReport report(console, argc, argv);
     report.applicationRootDirectory = directories.applicationRootDirectory.view();
     report.executableFile           = directories.executableFile.view();
+    SC::SmallString<255> correctedPath;
     {
         SmallVector<StringView, 50> components;
         (void)Path::normalizeUNCAndTrimQuotes(SC_COMPILER_LIBRARY_PATH, components, correctedPath, Path::AsNative);

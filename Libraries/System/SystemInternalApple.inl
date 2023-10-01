@@ -18,9 +18,21 @@ OBJC_EXPORT void objc_msgSend(void /* id self, SEL op, ... */) OBJC_AVAILABLE(10
 OBJC_EXPORT      Class _Nullable objc_lookUpClass(const char* _Nonnull name) OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
 #endif
 #endif
+#if SC_XCTEST
+#include "../FileSystem/Path.h"
+#include <dlfcn.h>
+#endif
 
 bool SC::SystemDirectories::init()
 {
+#if SC_XCTEST
+    Dl_info dlinfo;
+    SC_TRY(dladdr((void*)Memory::allocate, &dlinfo));
+    const StringView path(dlinfo.dli_fname, ::strlen(dlinfo.dli_fname), true, StringEncoding::Utf8);
+    SC_TRY(executableFile.assign(path));
+    SC_TRY(applicationRootDirectory.assign(Path::dirname(executableFile.view(), 3)));
+    return true;
+#else
     SmallVector<char, StaticPathSize> data;
     uint32_t                          executable_length = 0;
     _NSGetExecutablePath(NULL, &executable_length);
@@ -33,6 +45,7 @@ bool SC::SystemDirectories::init()
         SC_TRY(data[executable_length - 1] == 0);
         executableFile = SmallString<StaticPathSize>(move(data), StringEncoding::Utf8);
     }
+#endif
 
 #if 1
     CFBundleRef mainBundle = CFBundleGetMainBundle();

@@ -92,7 +92,6 @@ struct SC::Async
         WindowsPoll,
 #endif
     };
-    [[nodiscard]] static const char* TypeToString(Type type);
 
     /// Call only from derived async time
     Async(Type type) : state(State::Free), type(type), eventIndex(-1) {}
@@ -108,6 +107,7 @@ struct SC::Async
     EventLoop* eventLoop = nullptr;
 
   private:
+    [[nodiscard]] static const char* TypeToString(Type type);
     enum class State : uint8_t
     {
         Free,       // not in any queue

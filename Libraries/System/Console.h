@@ -30,8 +30,6 @@ struct SC_COMPILER_EXPORT Console
     void print(const StringView str);
     void printLine(const StringView str);
 
-    static void printNullTerminatedASCII(const StringView str);
-
   private:
     Vector<char>& encodingConversionBuffer;
 };
