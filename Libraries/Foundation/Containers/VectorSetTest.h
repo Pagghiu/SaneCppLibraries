@@ -19,17 +19,17 @@ struct SC::VectorSetTest : public SC::TestCase
         if (test_section("simple"))
         {
             VectorSet<String> setOfStrings;
-            SC_TEST_EXPECT(setOfStrings.insert("123"_a8));
-            SC_TEST_EXPECT(setOfStrings.insert("123"_a8));
-            SC_TEST_EXPECT(setOfStrings.contains("123"_a8));
-            SC_TEST_EXPECT(setOfStrings.insert("456"_a8));
-            SC_TEST_EXPECT(setOfStrings.contains("123"_a8));
-            SC_TEST_EXPECT(setOfStrings.contains("456"_a8));
+            SC_TEST_EXPECT(setOfStrings.insert("123"));
+            SC_TEST_EXPECT(setOfStrings.insert("123"));
+            SC_TEST_EXPECT(setOfStrings.contains("123"));
+            SC_TEST_EXPECT(setOfStrings.insert("456"));
+            SC_TEST_EXPECT(setOfStrings.contains("123"));
+            SC_TEST_EXPECT(setOfStrings.contains("456"));
             SC_TEST_EXPECT(setOfStrings.size() == 2);
-            SC_TEST_EXPECT(setOfStrings.remove("123"_a8));
+            SC_TEST_EXPECT(setOfStrings.remove("123"));
             SC_TEST_EXPECT(setOfStrings.size() == 1);
-            SC_TEST_EXPECT(setOfStrings.contains("456"_a8));
-            SC_TEST_EXPECT(not setOfStrings.contains("123"_a8));
+            SC_TEST_EXPECT(setOfStrings.contains("456"));
+            SC_TEST_EXPECT(not setOfStrings.contains("123"));
 
             for (auto& item : setOfStrings)
             {

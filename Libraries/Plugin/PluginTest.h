@@ -33,7 +33,7 @@ struct SC::PluginTest : public SC::TestCase
                 // Category:      Generic
                 // Dependencies:  TestPluginChild,TestPlugin02
                 // SC_END_PLUGIN
-            )"_a8;
+            )";
             PluginDefinition definition;
             StringView       extracted;
             SC_TEST_EXPECT(PluginDefinition::find(test, extracted));

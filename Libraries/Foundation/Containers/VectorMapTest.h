@@ -32,23 +32,23 @@ struct SC::VectorMapTest : public SC::TestCase
         if (test_section("array"))
         {
             VectorMap<String, String, Array<VectorMapItem<String, String>, 2>> map;
-            SC_TEST_EXPECT(map.insertIfNotExists({"Ciao"_a8, "Fra"_a8}));
-            SC_TEST_EXPECT(map.insertIfNotExists({"Bella"_a8, "Bro"_a8}));
-            SC_TEST_EXPECT(not map.insertIfNotExists({"Fail"_a8, "Fail"_a8}));
+            SC_TEST_EXPECT(map.insertIfNotExists({"Ciao", "Fra"}));
+            SC_TEST_EXPECT(map.insertIfNotExists({"Bella", "Bro"}));
+            SC_TEST_EXPECT(not map.insertIfNotExists({"Fail", "Fail"}));
             const String* value;
-            SC_TEST_EXPECT(map.contains("Ciao"_a8, value) && *value == "Fra");
-            SC_TEST_EXPECT(map.contains("Bella"_a8, value) && *value == "Bro");
+            SC_TEST_EXPECT(map.contains("Ciao", value) && *value == "Fra");
+            SC_TEST_EXPECT(map.contains("Bella", value) && *value == "Bro");
         }
         if (test_section("get"))
         {
             VectorMap<String, String, Array<VectorMapItem<String, String>, 2>> map;
-            SC_TEST_EXPECT(map.insertIfNotExists({"Ciao"_a8, "Fra"_a8}));
-            SC_TEST_EXPECT(map.insertIfNotExists({"Bella"_a8, "Bro"_a8}));
-            String* result1 = map.get("Ciao"_a8);
+            SC_TEST_EXPECT(map.insertIfNotExists({"Ciao", "Fra"}));
+            SC_TEST_EXPECT(map.insertIfNotExists({"Bella", "Bro"}));
+            String* result1 = map.get("Ciao");
             SC_TEST_EXPECT(result1 and result1->view() == "Fra");
-            auto result2 = map.get("Fail"_a8);
+            auto result2 = map.get("Fail");
             SC_TEST_EXPECT(result2 == nullptr);
-            SC_TEST_EXPECT(*map.get("Bella") == "Bro"_a8);
+            SC_TEST_EXPECT(*map.get("Bella") == "Bro");
         }
         if (test_section("StrongID"))
         {
@@ -59,13 +59,13 @@ struct SC::VectorMapTest : public SC::TestCase
             VectorMap<Key::ID, String> map;
 
             const Key::ID key1 = Key::ID::generateUniqueKey(map);
-            SC_TEST_EXPECT(map.insertIfNotExists({key1, "key1"_a8}));
-            auto res = map.insertValueUniqueKey("key2"_a8);
+            SC_TEST_EXPECT(map.insertIfNotExists({key1, "key1"}));
+            auto res = map.insertValueUniqueKey("key2");
             SC_TEST_EXPECT(res);
             const Key::ID key2 = *res;
             const Key::ID key3 = Key::ID::generateUniqueKey(map);
-            SC_TEST_EXPECT(map.get(key1)->view() == "key1"_a8);
-            SC_TEST_EXPECT(map.get(key2)->view() == "key2"_a8);
+            SC_TEST_EXPECT(map.get(key1)->view() == "key1");
+            SC_TEST_EXPECT(map.get(key2)->view() == "key2");
             SC_TEST_EXPECT(not map.get(key3));
         }
     }

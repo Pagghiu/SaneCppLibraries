@@ -24,8 +24,13 @@ struct SC::String
 {
     String(StringEncoding encoding = StringEncoding::Utf8) : encoding(encoding) {}
 
-    // TODO: Figure out if removing this constructor in favour of the fallible assign makes the api ugly
     String(const StringView& sv) { SC_ASSERT_RELEASE(assign(sv)); }
+
+    template <size_t N>
+    String(const char (&text)[N])
+    {
+        SC_ASSERT_RELEASE(assign(StringView(text, N - 1, true, StringEncoding::Ascii)));
+    }
 
     String(Vector<char>&& data, StringEncoding encoding) : encoding(encoding), data(move(data))
     {
@@ -63,6 +68,22 @@ struct SC::String
     [[nodiscard]] bool operator==(const StringView other) const { return view() == (other); }
     [[nodiscard]] bool operator!=(const StringView other) const { return not operator==(other); }
     [[nodiscard]] bool operator<(const StringView other) const { return view() < other; }
+    template <size_t N>
+    [[nodiscard]] bool operator==(const char (&other)[N]) const
+    {
+        return view() == other;
+    }
+    template <size_t N>
+    [[nodiscard]] bool operator!=(const char (&other)[N]) const
+    {
+        return view() != other;
+    }
+    template <size_t Q>
+    String& operator=(const char (&text)[Q])
+    {
+        SC_ASSERT_RELEASE(assign(StringView(text, Q - 1, true, StringEncoding::Ascii)));
+        return *this;
+    }
 
   protected:
     friend struct StringTest;
@@ -102,11 +123,20 @@ struct SC::SmallString : public String
         SC_COMPILER_WARNING_POP;
         init();
     }
+
     SmallString(StringView view) : String(view.getEncoding())
     {
         init();
         SC_ASSERT_RELEASE(assign(view));
     }
+
+    template <size_t Q>
+    SmallString(const char (&text)[Q])
+    {
+        init();
+        SC_ASSERT_RELEASE(assign(StringView(text, Q - 1, true, StringEncoding::Ascii)));
+    }
+
     SmallString(Vector<char>&& data, StringEncoding encoding) : String(encoding)
     {
         init();
@@ -154,6 +184,12 @@ struct SC::SmallString : public String
     SmallString& operator=(const String& other)
     {
         String::operator=(other);
+        return *this;
+    }
+    template <size_t Q>
+    SmallString& operator=(const char (&text)[Q])
+    {
+        SC_ASSERT_RELEASE(assign(StringView(text, Q - 1, true, StringEncoding::Ascii)));
         return *this;
     }
 

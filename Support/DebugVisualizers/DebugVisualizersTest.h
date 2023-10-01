@@ -32,11 +32,11 @@ struct SC::DebugVisualizersTest : public SC::TestCase
 
         Vector<String> vstrings;
         (void)vstrings.push_back(stringutf8);
-        (void)vstrings.push_back("SALVER"_a8);
+        (void)vstrings.push_back("SALVER");
         (void)vstrings.push_back(stringutf16);
         Vector<String> vstringsView;
         (void)vstringsView.push_back(twoFaces);
-        (void)vstringsView.push_back("SALVER"_a8);
+        (void)vstringsView.push_back("SALVER");
         (void)vstringsView.push_back(threeKanji);
         report.console.printLine(twoFaces);
         SmallVector<float, 3> smallVector;
@@ -45,12 +45,12 @@ struct SC::DebugVisualizersTest : public SC::TestCase
         (void)smallVector.push_back(3.3f);
         (void)smallVector.push_back(4.4f);
         report.console.print("{}\n", smallVector[0]);
-        SmallString<10> ss = "asd"_a8;
+        SmallString<10> ss = "asd";
 
         VectorMap<String, int> map;
-        (void)map.insertIfNotExists({"one"_a8, 1});
-        (void)map.insertIfNotExists({"two"_a8, 2});
-        (void)map.insertIfNotExists({"three"_a8, 3});
+        (void)map.insertIfNotExists({"one", 1});
+        (void)map.insertIfNotExists({"two", 2});
+        (void)map.insertIfNotExists({"three", 3});
 
         VectorSet<StringView> set;
         (void)set.insert("3");
@@ -61,9 +61,9 @@ struct SC::DebugVisualizersTest : public SC::TestCase
 
         ArenaMap<String> arenaMap;
         (void)arenaMap.resize(10);
-        (void)arenaMap.insert("one"_a8);
-        auto k2 = arenaMap.insert("two"_a8);
-        (void)arenaMap.insert("three"_a8);
+        (void)arenaMap.insert("one");
+        auto k2 = arenaMap.insert("two");
+        (void)arenaMap.insert("three");
         (void)arenaMap.remove(k2);
         (void)k2;
     }

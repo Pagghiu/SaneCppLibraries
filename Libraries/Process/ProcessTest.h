@@ -30,10 +30,10 @@ struct SC::ProcessTest : public SC::TestCase
         {
             Process process;
 #if SC_PLATFORM_APPLE
-            StringView expectedOutput = "/usr/bin/sudo\n"_a8;
+            StringView expectedOutput = "/usr/bin/sudo\n";
             SC_TEST_EXPECT(process.formatCommand("which", "sudo"));
 #else
-            StringView expectedOutput = "C:\\Windows\\System32\\where.exe\r\n"_a8;
+            StringView expectedOutput = "C:\\Windows\\System32\\where.exe\r\n";
             SC_TEST_EXPECT(process.formatCommand("where", "where.exe"));
 #endif
             PipeDescriptor outputPipe;
@@ -85,10 +85,10 @@ struct SC::ProcessTest : public SC::TestCase
             String       output(StringEncoding::Ascii);
             Process      p1;
 #if SC_PLATFORM_APPLE
-            StringView expectedOutput = "asd\n"_a8;
+            StringView expectedOutput = "asd\n";
             SC_TEST_EXPECT(chain.pipe(p1, "echo", "asd"));
 #else
-            StringView expectedOutput = "C:\\Windows\\System32\\where.exe\r\n"_a8;
+            StringView expectedOutput = "C:\\Windows\\System32\\where.exe\r\n";
             SC_TEST_EXPECT(chain.pipe(p1, "where", "where.exe"));
 #endif
             ProcessChainOptions options;
@@ -107,11 +107,11 @@ struct SC::ProcessTest : public SC::TestCase
             String       output(StringEncoding::Ascii);
             Process      p1, p2;
 #if SC_PLATFORM_APPLE
-            StringView expectedOutput = "Desktop\n"_a8;
+            StringView expectedOutput = "Desktop\n";
             SC_TEST_EXPECT(chain.pipe(p1, {"ls", "~"}));
             SC_TEST_EXPECT(chain.pipe(p2, {"grep", "Desktop"}));
 #else
-            StringView expectedOutput = "WHERE [/R dir] [/Q] [/F] [/T] pattern...\r\n"_a8;
+            StringView expectedOutput = "WHERE [/R dir] [/Q] [/F] [/T] pattern...\r\n";
             SC_TEST_EXPECT(chain.pipe(p1, {"where", "/?"}));
             SC_TEST_EXPECT(chain.pipe(p2, {"findstr", "dir]"}));
 #endif

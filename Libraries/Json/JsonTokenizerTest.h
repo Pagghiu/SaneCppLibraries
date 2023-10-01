@@ -96,7 +96,7 @@ struct SC::JsonTokenizerTest : public SC::TestCase
             static_assert(scanToken("\"\"").type == JsonTokenizer::Token::String, "Error");
             static_assert(scanToken("\"String\"").type == JsonTokenizer::Token::String, "Error");
             constexpr StringView asdString("\"ASD\"");
-            static_assert(scanToken(asdString).getToken(asdString) == "ASD"_a8, "Error");
+            static_assert(scanToken(asdString).getToken(asdString) == "ASD", "Error");
             static_assert(scanToken("\"ASD").type == JsonTokenizer::Token::Invalid, "Error");
             static_assert(scanToken("\"ASD\"\"").type == JsonTokenizer::Token::String, "Error");
             static_assert(scanToken("123").type == JsonTokenizer::Token::Number, "Error");
@@ -104,11 +104,11 @@ struct SC::JsonTokenizerTest : public SC::TestCase
         }
         if (test_section("tokenizeObject"))
         {
-            static_assert(testTokenizeObject("{}"_a8), "Invalid");
-            static_assert(testTokenizeObject(" { \n\t} "_a8), "Invalid");
-            static_assert(not testTokenizeObject(" {_} "_a8), "Invalid");
-            static_assert(testTokenizeObjectWithField("{  \"x\"\t   :   \t1.2\t  }"_a8), "Invalid");
-            static_assert(testTokenizeObjectWithTwoFields("{\"x\":1,\"y\":2}"_a8), "Invalid");
+            static_assert(testTokenizeObject("{}"), "Invalid");
+            static_assert(testTokenizeObject(" { \n\t} "), "Invalid");
+            static_assert(not testTokenizeObject(" {_} "), "Invalid");
+            static_assert(testTokenizeObjectWithField("{  \"x\"\t   :   \t1.2\t  }"), "Invalid");
+            static_assert(testTokenizeObjectWithTwoFields("{\"x\":1,\"y\":2}"), "Invalid");
         }
     }
 };

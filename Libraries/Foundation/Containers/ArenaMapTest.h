@@ -19,15 +19,15 @@ struct SC::ArenaMapTest : public SC::TestCase
         if (test_section("insert/get/remove/contains"))
         {
             ArenaMap<String> map;
-            SC_TEST_EXPECT(not map.insert("ASD"_a8).isValid());
+            SC_TEST_EXPECT(not map.insert("ASD").isValid());
             SC_TEST_EXPECT(map.resize(2));
             SC_TEST_EXPECT(map.resize(3));
             ArenaMap<String>::Key keys[3];
-            keys[0] = map.insert("ASD"_a8);
+            keys[0] = map.insert("ASD");
             SC_TEST_EXPECT(map.size() == 1);
             SC_TEST_EXPECT(not map.resize(4)); // cannot resize unless is empty
-            keys[1]   = map.insert("DSA"_a8);
-            keys[2]   = map.insert("BDA"_a8);
+            keys[1]   = map.insert("DSA");
+            keys[2]   = map.insert("BDA");
             int index = 0;
             for (const auto& it : map)
             {
@@ -39,14 +39,14 @@ struct SC::ArenaMapTest : public SC::TestCase
                 }
             }
             SC_TEST_EXPECT(map.size() == 3);
-            SC_TEST_EXPECT(not map.insert("123"_a8).isValid());
+            SC_TEST_EXPECT(not map.insert("123").isValid());
 
             SC_TEST_EXPECT(map.get(keys[0])->view() == "ASD");
             SC_TEST_EXPECT(map.get(keys[1])->view() == "DSA");
             SC_TEST_EXPECT(map.get(keys[2])->view() == "BDA");
             ArenaMap<String>::Key key;
-            SC_TEST_EXPECT(map.containsValue("BDA"_a8, &key) and key.isValid());
-            SC_TEST_EXPECT(not map.containsValue("asdasd"_a8));
+            SC_TEST_EXPECT(map.containsValue("BDA", &key) and key.isValid());
+            SC_TEST_EXPECT(not map.containsValue("asdasd"));
             SC_TEST_EXPECT(map.containsKey(keys[1]));
             SC_TEST_EXPECT(map.remove(keys[1]));
             SC_TEST_EXPECT(not map.remove(keys[1]));
@@ -63,7 +63,7 @@ struct SC::ArenaMapTest : public SC::TestCase
                 }
             }
 
-            const auto newKey = map.insert("123"_a8);
+            const auto newKey = map.insert("123");
             SC_TEST_EXPECT(map.containsKey(newKey));
             SC_TEST_EXPECT(map.get(newKey)->view() == "123");
             index = 0;
@@ -74,7 +74,7 @@ struct SC::ArenaMapTest : public SC::TestCase
                 case 0: SC_TEST_EXPECT(it == "ASD"); break;
                 case 1:
                     SC_TEST_EXPECT(it == "123");
-                    it = "456"_a8;
+                    it = "456";
                     break;
                 case 2: SC_TEST_EXPECT(it == "BDA"); break;
                 }
@@ -88,9 +88,9 @@ struct SC::ArenaMapTest : public SC::TestCase
             ArenaMap<String> map, mapCopy, mapMove;
             SC_TEST_EXPECT(map.resize(3));
             ArenaMap<String>::Key keys[3];
-            keys[0] = map.insert("ASD"_a8);
-            keys[1] = map.insert("DSA"_a8);
-            keys[2] = map.insert("BDA"_a8);
+            keys[0] = map.insert("ASD");
+            keys[1] = map.insert("DSA");
+            keys[2] = map.insert("BDA");
             mapCopy = map;
             mapMove = move(map);
 

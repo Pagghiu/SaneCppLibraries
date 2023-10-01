@@ -45,7 +45,7 @@ struct SC::JsonFormatterTest : public SC::TestCase
                 SC_TEST_EXPECT(writer.endArray());
                 SC_TEST_EXPECT(writer.writeUint32(123));
                 SC_TEST_EXPECT(writer.startArray());
-                SC_TEST_EXPECT(writer.writeString("456"_a8));
+                SC_TEST_EXPECT(writer.writeString("456"));
                 SC_TEST_EXPECT(writer.writeBoolean(false));
                 SC_TEST_EXPECT(writer.writeNull());
                 SC_TEST_EXPECT(writer.endArray());
@@ -54,7 +54,7 @@ struct SC::JsonFormatterTest : public SC::TestCase
             }
             (void)StringConverter::popNulltermIfExists(buffer, StringEncoding::Ascii);
             const StringView bufferView(buffer.data(), buffer.size(), false, StringEncoding::Ascii);
-            SC_TEST_EXPECT(bufferView == "[[],123,[\"456\",false,null],-678]"_a8);
+            SC_TEST_EXPECT(bufferView == "[[],123,[\"456\",false,null],-678]");
         }
         if (test_section("JsonFormatter::object"))
         {
@@ -90,7 +90,7 @@ struct SC::JsonFormatterTest : public SC::TestCase
             }
             (void)StringConverter::popNulltermIfExists(buffer, StringEncoding::Ascii);
             const StringView bufferView(buffer.data(), buffer.size(), false, StringEncoding::Ascii);
-            SC_TEST_EXPECT(bufferView == "{\"a\":-1,\"b\":[2,3],\"c\":[{}],\"d\":{}}"_a8);
+            SC_TEST_EXPECT(bufferView == "{\"a\":-1,\"b\":[2,3],\"c\":[{}],\"d\":{}}");
         }
     }
 };

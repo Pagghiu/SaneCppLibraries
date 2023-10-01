@@ -69,7 +69,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                 SC_TEST_EXPECT(notification.operation == FileSystemWatcher::Operation::AddRemoveRename);
                 SC_TEST_EXPECT(notification.basePath == params.appDirectory);
                 // Comparisons must use the same encoding
-                SC_TEST_EXPECT(notification.relativePath == "test.txt"_a8);
+                SC_TEST_EXPECT(notification.relativePath == "test.txt");
                 StringView fullPath;
                 SC_TEST_EXPECT(notification.getFullPath(fullPathBuffer, fullPath));
 
@@ -83,7 +83,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(fs.init(appDirectory));
             if (fs.existsAndIsFile("test.txt"))
             {
-                SC_TEST_EXPECT(fs.removeFile("test.txt"_a8));
+                SC_TEST_EXPECT(fs.removeFile("test.txt"));
                 Thread::Sleep(200);
             }
 
@@ -149,13 +149,13 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
             FileSystem fs;
             SC_TEST_EXPECT(fs.init(appDirectory));
-            if (not fs.existsAndIsDirectory("dir"_a8))
+            if (not fs.existsAndIsDirectory("dir"))
             {
-                SC_TEST_EXPECT(fs.makeDirectory({"dir"_a8}));
+                SC_TEST_EXPECT(fs.makeDirectory({"dir"}));
             }
             if (fs.existsAndIsFile("dir/test.txt"))
             {
-                SC_TEST_EXPECT(fs.removeFile("dir/test.txt"_a8));
+                SC_TEST_EXPECT(fs.removeFile("dir/test.txt"));
             }
 
             StringNative<1024> path;
@@ -169,7 +169,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(fileEventsWatcher.close());
             SC_TEST_EXPECT(params.callbackThreadID == Thread::CurrentThreadID());
             SC_TEST_EXPECT(fs.removeFile({"dir/test.txt"_a8}));
-            SC_TEST_EXPECT(fs.removeEmptyDirectory({"dir"_a8}));
+            SC_TEST_EXPECT(fs.removeEmptyDirectory({"dir"}));
 #if SC_PLATFORM_WINDOWS
             // We need sleep otherwise windows ReadDirectoryChangesW on the same directory
             // will report events for the two deletions above in the next test even
@@ -221,8 +221,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             FileSystemWatcher::EventLoopRunner runner{eventLoop};
             SC_TEST_EXPECT(fileEventsWatcher.init(runner));
             StringNative<1024> path1, path2;
-            SC_TEST_EXPECT(Path::join(path1, {appDirectory, "__test1"_a8}));
-            SC_TEST_EXPECT(Path::join(path2, {appDirectory, "__test2"_a8}));
+            SC_TEST_EXPECT(Path::join(path1, {appDirectory, "__test1"}));
+            SC_TEST_EXPECT(Path::join(path2, {appDirectory, "__test2"}));
             FileSystem fs;
             SC_TEST_EXPECT(fs.init(appDirectory));
             if (fs.existsAndIsDirectory(path1.view()))

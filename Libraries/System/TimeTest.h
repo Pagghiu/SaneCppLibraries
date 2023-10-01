@@ -24,7 +24,7 @@ struct SC::TimeTest : public SC::TestCase
 
             report.console.print("{:02}/{:02}/{} {:02}:{:02}:{:02} {}", local.dayOfMonth, local.month, local.year,
                                  local.hour, local.minutes, local.seconds,
-                                 local.isDaylightSaving ? "DAYLIGHT SAVING"_a8 : "NO DAYLIGHT SAVING"_a8);
+                                 local.isDaylightSaving ? "DAYLIGHT SAVING" : "NO DAYLIGHT SAVING");
         }
         if (test_section("TimeCounter::snap / subtract"))
         {

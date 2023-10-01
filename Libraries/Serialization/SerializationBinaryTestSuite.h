@@ -123,7 +123,7 @@ struct SC::SerializationBinaryTestSuite::VersionedStruct1
 {
     float          floatValue     = 1.5f;
     int64_t        fieldToRemove  = 12;
-    Vector<String> field2ToRemove = {"ASD1"_a8, "ASD2"_a8, "ASD3"_a8};
+    Vector<String> field2ToRemove = {"ASD1", "ASD2", "ASD3"};
     int64_t        int64Value     = -13;
 };
 
@@ -347,9 +347,9 @@ struct SC::SerializationBinaryTestSuite::SerializationTestBase : public SC::Test
         if (test_section("VectorStructComplex"))
         {
             VectorStructComplex topLevel;
-            SC_TRUST_RESULT(topLevel.vectorOfStrings.push_back("asdasdasd1"_a8));
-            SC_TRUST_RESULT(topLevel.vectorOfStrings.push_back("asdasdasd2"_a8));
-            SC_TRUST_RESULT(topLevel.vectorOfStrings.push_back("asdasdasd3"_a8));
+            SC_TRUST_RESULT(topLevel.vectorOfStrings.push_back("asdasdasd1"));
+            SC_TRUST_RESULT(topLevel.vectorOfStrings.push_back("asdasdasd2"));
+            SC_TRUST_RESULT(topLevel.vectorOfStrings.push_back("asdasdasd3"));
             BinaryWriterStream streamWriter;
             SerializerWriter   writer(streamWriter);
             SC_TEST_EXPECT(writer.serialize(topLevel));
@@ -361,9 +361,9 @@ struct SC::SerializationBinaryTestSuite::SerializationTestBase : public SC::Test
             SC_TEST_EXPECT(reader.serialize(topLevelRead));
             SC_TEST_EXPECT(streamReader.numberOfOperations == streamWriter.numberOfOperations);
             SC_TEST_EXPECT(topLevelRead.vectorOfStrings.size() == 3);
-            SC_TEST_EXPECT(topLevelRead.vectorOfStrings[0] == "asdasdasd1"_a8);
-            SC_TEST_EXPECT(topLevelRead.vectorOfStrings[1] == "asdasdasd2"_a8);
-            SC_TEST_EXPECT(topLevelRead.vectorOfStrings[2] == "asdasdasd3"_a8);
+            SC_TEST_EXPECT(topLevelRead.vectorOfStrings[0] == "asdasdasd1");
+            SC_TEST_EXPECT(topLevelRead.vectorOfStrings[1] == "asdasdasd2");
+            SC_TEST_EXPECT(topLevelRead.vectorOfStrings[2] == "asdasdasd3");
         }
     }
 

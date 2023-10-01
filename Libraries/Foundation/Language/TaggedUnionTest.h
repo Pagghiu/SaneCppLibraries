@@ -53,38 +53,38 @@ struct SC::TaggedUnionTest : public SC::TestCase
             // assign - Copy
             String strMove("MOVE");
             copyAssigned.assign<TypeString>(strMove);
-            SC_TEST_EXPECT(strMove == "MOVE"_a8); // should not be moved
-            SC_TEST_EXPECT(copyAssigned.field<TypeString>()->view() == "MOVE"_a8);
+            SC_TEST_EXPECT(strMove == "MOVE"); // should not be moved
+            SC_TEST_EXPECT(copyAssigned.field<TypeString>()->view() == "MOVE");
 
             // assign - Move
             copyAssigned.assign<TypeInt>(2);
             SC_TEST_EXPECT(*copyAssigned.field<TypeInt>() == 2);
             copyAssigned.assign<TypeString>(move(strMove));
             SC_TEST_EXPECT(strMove.isEmpty()); // should be moved
-            SC_TEST_EXPECT(copyAssigned.field<TypeString>()->view() == "MOVE"_a8);
+            SC_TEST_EXPECT(copyAssigned.field<TypeString>()->view() == "MOVE");
 
             // assign - Const Copy
             const String str("ASD");
             copyAssigned.assign<TypeString>(str);
-            SC_TEST_EXPECT(str == "ASD"_a8); // should not be moved
-            SC_TEST_EXPECT(copyAssigned.field<TypeString>()->view() == "ASD"_a8);
+            SC_TEST_EXPECT(str == "ASD"); // should not be moved
+            SC_TEST_EXPECT(copyAssigned.field<TypeString>()->view() == "ASD");
 
             // Move Assign
             TaggedUnion<TestUnion> moveAssigned;
             moveAssigned.assign<TypeInt>(2);
             moveAssigned = move(copyAssigned);
             SC_TEST_EXPECT(copyAssigned.field<TypeString>()->isEmpty());
-            SC_TEST_EXPECT(moveAssigned.field<TypeString>()->view() == "ASD"_a8);
+            SC_TEST_EXPECT(moveAssigned.field<TypeString>()->view() == "ASD");
 
             switch (moveAssigned.getType())
             {
-            case TestType::TypeString: *moveAssigned.field<TestType::TypeString>() = "yo"_a8; break;
+            case TestType::TypeString: *moveAssigned.field<TestType::TypeString>() = "yo"; break;
             case TestType::TypeInt: *moveAssigned.field<TestType::TypeInt>() = 1; break;
             }
-            SC_TEST_EXPECT(moveAssigned.field<TypeString>()->view() == "yo"_a8);
+            SC_TEST_EXPECT(moveAssigned.field<TypeString>()->view() == "yo");
             const TaggedUnion<TestUnion> constAssigned = moveAssigned;
 
-            SC_TEST_EXPECT(constAssigned.field<TypeString>()->view() == "yo"_a8);
+            SC_TEST_EXPECT(constAssigned.field<TypeString>()->view() == "yo");
         }
     }
 };
