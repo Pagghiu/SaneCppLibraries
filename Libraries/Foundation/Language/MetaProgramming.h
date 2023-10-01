@@ -56,8 +56,7 @@ template <class T> struct IsReference : IntegralConstant<bool, IsLValueReference
 
 template <bool B, class T, class F> struct Conditional { using type = T; };
 template <class T, class F>         struct Conditional<false, T, F> { using type = F; };
-template <bool B, class T, class F>
-using ConditionalT = typename Conditional<B,T,F>::type;
+template <bool B, class T, class F> using ConditionalT = typename Conditional<B,T,F>::type;
 
 template <typename SourceType, typename T> struct SameConstnessAs { using type = typename Conditional<IsConst<SourceType>::value, const T, T>::type; };
 

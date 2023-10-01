@@ -152,7 +152,7 @@ struct SizedArrayView
 template <typename MemberVisitor>
 struct AtomBase
 {
-    typedef void (*MetaClassBuildFunc)(MemberVisitor& builder);
+    using MetaClassBuildFunc = void (*)(MemberVisitor& builder);
 
     MetaProperties     properties;
     SymbolStringView   name;
@@ -188,8 +188,8 @@ struct MetaClassBuilder
     struct EmptyVTables
     {
     };
-    EmptyVTables                    vtables;
-    typedef AtomBase<MemberVisitor> Atom;
+    EmptyVTables vtables;
+    using Atom = AtomBase<MemberVisitor>;
 
     uint32_t             atomsSize;
     uint32_t             initialSize;
@@ -227,7 +227,7 @@ struct MetaStruct;
 template <typename Type>
 struct MetaStruct<MetaClass<Type>>
 {
-    typedef Type T;
+    using T = Type;
 
     [[nodiscard]] static constexpr MetaType getMetaType() { return MetaType::TypeStruct; }
 

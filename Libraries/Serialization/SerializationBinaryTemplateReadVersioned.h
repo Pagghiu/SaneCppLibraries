@@ -77,7 +77,7 @@ struct SerializerReadVersioned
 {
     [[nodiscard]] static constexpr bool readVersioned(T& object, BinaryStream& stream, VersionSchema& schema)
     {
-        typedef SerializerReadVersionedMemberIterator<BinaryStream, T> VersionedMemberIterator;
+        using VersionedMemberIterator = SerializerReadVersionedMemberIterator<BinaryStream, T>;
         SC_TRY(schema.current().type == Reflection::MetaType::TypeStruct);
         const uint32_t numMembers      = static_cast<uint32_t>(schema.current().numSubAtoms);
         const auto     structTypeIndex = schema.sourceTypeIndex;

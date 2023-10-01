@@ -113,7 +113,7 @@ struct SC_COMPILER_EXPORT SC::VectorAllocator
 template <typename T>
 struct SC::Vector
 {
-    typedef SegmentOperations<VectorAllocator, T> SegmentOperationsT;
+    using SegmentOperationsT = SegmentOperations<VectorAllocator, T>;
 
     T* items;
 

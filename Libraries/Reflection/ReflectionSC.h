@@ -38,7 +38,7 @@ struct SC::Reflection::MetaClass<SC::Array<T, N>>
     template <typename MemberVisitor>
     static constexpr void build(MemberVisitor& builder)
     {
-        typedef typename MemberVisitor::Atom Atom;
+        using Atom = typename MemberVisitor::Atom;
         // TODO: It's probably possible to add MemberVisitor as template param of MetaClass to remove this
         VectorArrayVTable<MemberVisitor, SC::Array<T, N>, T, N>::build(builder);
         auto arrayHeader                   = Atom::template create<SC::Array<T, N>>("SC::Array<T, N>");
@@ -58,7 +58,7 @@ struct SC::Reflection::MetaClass<SC::Vector<T>>
     template <typename MemberVisitor>
     static constexpr void build(MemberVisitor& builder)
     {
-        typedef typename MemberVisitor::Atom Atom;
+        using Atom = typename MemberVisitor::Atom;
         VectorArrayVTable<MemberVisitor, SC::Vector<T>, T, -1>::build(builder);
         auto vectorHeader                   = Atom::template create<SC::Vector<T>>("SC::Vector");
         vectorHeader.properties.numSubAtoms = 1;
@@ -80,7 +80,7 @@ namespace Reflection
 template <typename Key, typename Value, typename Container>
 struct MetaClass<VectorMap<Key, Value, Container>> : MetaStruct<MetaClass<VectorMap<Key, Value, Container>>>
 {
-    typedef typename MetaStruct<MetaClass<SC::VectorMap<Key, Value, Container>>>::T T;
+    using T = typename MetaStruct<MetaClass<SC::VectorMap<Key, Value, Container>>>::T;
     template <typename MemberVisitor>
     static constexpr void visit(MemberVisitor&& builder)
     {

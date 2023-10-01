@@ -24,9 +24,9 @@ struct MetaTypeListVisit
     template <typename Visitor>
     constexpr static bool visit(Visitor&& visitor)
     {
-        typedef TypeListGetT<TypeList, N - 1> R;
+        using Type = TypeListGetT<TypeList, N - 1>;
         return MetaTypeListVisit<TypeList, N - 1>::visit(forward<Visitor>(visitor)) and
-               visitor.template visit<N - 1, R>();
+               visitor.template visit<N - 1, Type>();
     }
 };
 
@@ -44,7 +44,7 @@ struct MetaTypeListVisit<TypeList, 0>
 template <class IntegerType, IntegerType... Values>
 struct IntegerSequence
 {
-    typedef IntegerType     value_type;
+    using value_type = IntegerType;
     static constexpr size_t size() noexcept { return sizeof...(Values); }
 };
 
@@ -65,7 +65,7 @@ using IndexSequence = IntegerSequence<size_t, N...>;
 template <typename T>
 struct result
 {
-    typedef T type;
+    using type = T;
 };
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic push

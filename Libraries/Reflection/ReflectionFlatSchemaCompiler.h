@@ -18,9 +18,9 @@ struct FlatSchemaCompilerResult
 template <typename MetaClassBuilder>
 struct FlatSchemaCompiler
 {
-    typedef typename MetaClassBuilder::Atom     Atom;
-    typedef typename Atom::MetaClassBuildFunc   MetaClassBuildFunc;
-    typedef decltype(MetaClassBuilder::vtables) PayloadType;
+    using Atom               = typename MetaClassBuilder::Atom;
+    using MetaClassBuildFunc = typename Atom::MetaClassBuildFunc;
+    using PayloadType        = decltype(MetaClassBuilder::vtables);
     template <uint32_t MAX_TOTAL_ATOMS>
     struct FlatSchema
     {

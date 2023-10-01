@@ -22,7 +22,7 @@ struct SC::VectorMapItem
 template <typename Key, typename Value, typename Container = SC::Vector<SC::VectorMapItem<Key, Value>>>
 struct SC::VectorMap
 {
-    typedef VectorMapItem<Key, Value> Item;
+    using Item = VectorMapItem<Key, Value>;
 
     Container items;
 

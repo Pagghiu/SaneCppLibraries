@@ -17,14 +17,14 @@ struct VectorVTable
         Yes
     };
 
-    typedef bool (*FunctionGetSegmentSpan)(MetaProperties property, SpanVoid<void> object, SpanVoid<void>& itemBegin);
-    typedef bool (*FunctionGetSegmentSpanConst)(MetaProperties property, SpanVoid<const void> object,
-                                                SpanVoid<const void>& itemBegin);
+    using FunctionGetSegmentSpan = bool (*)(MetaProperties property, SpanVoid<void> object, SpanVoid<void>& itemBegin);
+    using FunctionGetSegmentSpanConst = bool (*)(MetaProperties property, SpanVoid<const void> object,
+                                                 SpanVoid<const void>& itemBegin);
 
-    typedef bool (*FunctionResize)(SpanVoid<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
-                                   DropEccessItems dropEccessItems);
-    typedef bool (*FunctionResizeWithoutInitialize)(SpanVoid<void> object, Reflection::MetaProperties property,
-                                                    uint64_t sizeInBytes, DropEccessItems dropEccessItems);
+    using FunctionResize = bool (*)(SpanVoid<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
+                                    DropEccessItems dropEccessItems);
+    using FunctionResizeWithoutInitialize = bool (*)(SpanVoid<void> object, Reflection::MetaProperties property,
+                                                     uint64_t sizeInBytes, DropEccessItems dropEccessItems);
     FunctionGetSegmentSpan          getSegmentSpan;
     FunctionGetSegmentSpanConst     getSegmentSpanConst;
     FunctionResize                  resize;
@@ -110,7 +110,7 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
         SC_COMPILER_UNUSED(property);
         if (object.sizeInBytes() >= sizeof(void*))
         {
-            typedef typename SameConstnessAs<VoidType, Container>::type VectorType;
+            using VectorType = typename SameConstnessAs<VoidType, Container>::type;
             auto& vectorByte = *static_cast<VectorType*>(object.data());
             itemBegin        = SpanVoid<VoidType>(vectorByte.data(), vectorByte.size() * sizeof(ItemType));
             return true;
@@ -151,7 +151,7 @@ struct ArrayAccess
     [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::MetaProperties property, SpanVoid<const void> object,
                                       SpanVoid<const void>& itemBegin);
 
-    typedef Reflection::VectorVTable::DropEccessItems DropEccessItems;
+    using DropEccessItems = Reflection::VectorVTable::DropEccessItems;
     enum class Initialize
     {
         No,

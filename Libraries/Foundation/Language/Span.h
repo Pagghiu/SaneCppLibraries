@@ -77,9 +77,9 @@ struct SC::Span
 template <typename Type>
 struct SC::SpanVoid
 {
-    typedef typename SameConstnessAs<Type, uint8_t>::type ByteType;
+    using ByteType = typename SameConstnessAs<Type, uint8_t>::type;
 
-    typedef SC::size_t Size;
+    using Size = SC::size_t;
     template <typename OtherType>
     constexpr SpanVoid(Span<OtherType> other) : items(other.items), size(other.sizeBytes)
     {}

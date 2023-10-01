@@ -56,7 +56,6 @@ struct SC_COMPILER_EXPORT SC::StringView
     template <typename T>
     struct identity
     {
-        typedef T type;
     };
 
     template <typename Type>
