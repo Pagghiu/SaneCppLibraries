@@ -95,12 +95,16 @@ struct SC::SmallVectorTest : public SC::TestCase
             Vector<int> vec2;
             {
                 SmallVector<int, 3> vec;
+                SegmentHeader*      vec1Header = SegmentHeader::getSegmentHeader(vec.items);
                 addItems(vec, 4);
                 SC_TEST_EXPECT(vec.size() == 4);
 
-                vec2                      = move(vec);
-                SegmentHeader* vec1Header = SegmentHeader::getSegmentHeader(vec.items);
-                SC_TEST_EXPECT(vec1Header->options.isSmallVector);
+                vec2 = move(vec);
+                SC_TEST_EXPECT(vec.items != nullptr);
+                SegmentHeader* vec1Header2 = SegmentHeader::getSegmentHeader(vec.items);
+                SC_TEST_EXPECT(vec1Header2 == vec1Header);
+                SC_TEST_EXPECT(vec1Header2->options.isSmallVector);
+                SC_TEST_EXPECT(vec1Header2->capacityBytes == 3 * sizeof(int));
             }
             SegmentHeader* vec2Header = SegmentHeader::getSegmentHeader(vec2.items);
             SC_TEST_EXPECT(not vec2Header->options.isSmallVector);

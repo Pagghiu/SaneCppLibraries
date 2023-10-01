@@ -25,7 +25,7 @@
     {                                                                                                                  \
         return SC::Memory::allocate(len);                                                                              \
     }                                                                                                                  \
-    void operator delete(void* p, SC::uint64_t) noexcept                                                               \
+    void operator delete(void* p, SC::size_t) noexcept                                                                 \
     {                                                                                                                  \
         if (p != 0)                                                                                                    \
         {                                                                                                              \

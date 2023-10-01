@@ -17,12 +17,21 @@ struct SC::SmallVector : public Vector<T>
     Array<T, N> buffer;
     SmallVector()
     {
-        SegmentHeader* header         = SegmentHeader::getSegmentHeader(buffer.items);
-        header->options.isSmallVector = true;
-        Vector<T>::items              = buffer.items;
+        SC_COMPILER_WARNING_PUSH_OFFSETOF;
+        static_assert(SC_COMPILER_OFFSETOF(SmallVector, buffer) == alignof(SegmentHeader), "Wrong Alignment");
+        SC_COMPILER_WARNING_POP;
+        init();
     }
-    SmallVector(SmallVector&& other) : SmallVector() { Vector<T>::operator=(forward<Vector<T>>(other)); }
-    SmallVector(const SmallVector& other) : Vector<T>(other) {}
+    SmallVector(SmallVector&& other)
+    {
+        init();
+        Vector<T>::operator=(forward<Vector<T>>(other));
+    }
+    SmallVector(const SmallVector& other)
+    {
+        init();
+        Vector<T>::operator=(other);
+    }
     SmallVector& operator=(SmallVector&& other)
     {
         Vector<T>::operator=(forward<Vector<T>>(other));
@@ -34,8 +43,16 @@ struct SC::SmallVector : public Vector<T>
         return *this;
     }
 
-    SmallVector(Vector<T>&& other) : Vector<T>(forward<Vector<T>>(other)) {}
-    SmallVector(const Vector<T>& other) : Vector<T>(other) {}
+    SmallVector(Vector<T>&& other)
+    {
+        init();
+        Vector<T>::operator=(forward<Vector<T>>(other));
+    }
+    SmallVector(const Vector<T>& other)
+    {
+        init();
+        Vector<T>::operator=(other);
+    }
     SmallVector& operator=(Vector<T>&& other)
     {
         Vector<T>::operator=(forward<Vector<T>>(other));
@@ -45,5 +62,13 @@ struct SC::SmallVector : public Vector<T>
     {
         Vector<T>::operator=(other);
         return *this;
+    }
+
+  private:
+    void init()
+    {
+        SegmentHeader* header         = SegmentHeader::getSegmentHeader(buffer.items);
+        header->options.isSmallVector = true;
+        Vector<T>::items              = buffer.items;
     }
 };

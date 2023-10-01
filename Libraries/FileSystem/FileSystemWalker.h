@@ -56,7 +56,7 @@ struct SC::FileSystemWalker
     struct Internal;
     struct InternalSizes
     {
-        static constexpr int Windows = 3216;
+        static constexpr int Windows = 4272;
         static constexpr int Apple   = 2104;
         static constexpr int Default = sizeof(void*);
     };

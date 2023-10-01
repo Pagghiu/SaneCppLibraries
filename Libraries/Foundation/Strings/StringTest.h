@@ -4,7 +4,9 @@
 #pragma once
 #include "../../Testing/Test.h"
 #include "../Algorithms/AlgorithmSort.h"
+#include "../Containers/SmallVector.h"
 #include "String.h"
+#include "StringBuilder.h"
 
 namespace SC
 {
@@ -46,6 +48,26 @@ struct SC::StringTest : public SC::TestCase
             SC_TEST_EXPECT(sv[1] == "2");
             SC_TEST_EXPECT(sv[2] == "1");
         }
+        if (test_section("construction move SmallVector(heap)->Vector"))
+        {
+            String vec2;
+            {
+                SmallString<3> vec;
+                SegmentHeader* vec1Header = SegmentHeader::getSegmentHeader(vec.data.items);
+                SC_TEST_EXPECT(vec.assign("123"));
+                SC_TEST_EXPECT(vec.data.size() == 4);
+
+                vec2 = move(vec);
+                SC_TEST_EXPECT(vec.data.items != nullptr);
+                SegmentHeader* vec1Header2 = SegmentHeader::getSegmentHeader(vec.data.items);
+                SC_TEST_EXPECT(vec1Header2 == vec1Header);
+                SC_TEST_EXPECT(vec1Header2->options.isSmallVector);
+                SC_TEST_EXPECT(vec1Header2->capacityBytes == 3 * sizeof(char));
+            }
+            SegmentHeader* vec2Header = SegmentHeader::getSegmentHeader(vec2.data.items);
+            SC_TEST_EXPECT(not vec2Header->options.isSmallVector);
+            SC_TEST_EXPECT(not vec2Header->options.isFollowedBySmallVector);
+        }
         if (test_section("SmallString"))
         {
             // Test String ssignable to SmallString
@@ -64,6 +86,16 @@ struct SC::StringTest : public SC::TestCase
             SC_TEST_EXPECT(normal.view() == "ASD22"_a8);
             SC_TEST_EXPECT(not SegmentHeader::getSegmentHeader(normal.data.items)->options.isSmallVector);
             SC_TEST_EXPECT(not SegmentHeader::getSegmentHeader(normal.data.items)->options.isFollowedBySmallVector);
+        }
+        if (test_section("SmallString Vector"))
+        {
+            SmallVector<char, 5> myStuff;
+            StringView           test = "ASDF";
+            (void)myStuff.appendCopy(test.bytesIncludingTerminator(), test.sizeInBytesIncludingTerminator());
+            SmallString<5> ss = SmallString<5>(move(myStuff), test.getEncoding());
+            SC_TEST_EXPECT(ss.data.size() == 5);
+            SC_TEST_EXPECT(ss.data.capacity() == 5);
+            SC_TEST_EXPECT(SegmentHeader::getSegmentHeader(ss.data.items)->options.isSmallVector);
         }
         if (test_section("HexString"))
         {

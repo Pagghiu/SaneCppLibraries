@@ -41,7 +41,10 @@ struct SC::FileSystemWalker::Internal
     WIN32_FIND_DATAW            dirEnumerator;
     bool                        expectDotDirectories = true;
     SmallVector<StackEntry, 64> recurseStack;
-    StringNative<512>           currentPathString = StringEncoding::Native;
+
+    StringNative<512> currentPathString = StringEncoding::Native; // Holds current directory path.
+    // Must be different from currentPathString so that recurse can be used without invalidating item
+    StringNative<512> currentItemString = StringEncoding::Native; // Holds current item path.
     Internal() {}
 
     ~Internal()
@@ -123,7 +126,8 @@ struct SC::FileSystemWalker::Internal
                 SC_TRY(sb.appendReplaceAll(copy.view(), L"\\", L"/"));
             }
         }
-        entry.path  = currentPathString.view();
+        SC_TRY(currentItemString.assign(currentPathString.view()));
+        entry.path  = currentItemString.view();
         entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
         if (dirEnumerator.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
         {

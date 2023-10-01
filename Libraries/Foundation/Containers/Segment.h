@@ -43,6 +43,11 @@ struct SC::SegmentHeader
     {
         return reinterpret_cast<SegmentHeader*>(static_cast<uint8_t*>(oldItems) - sizeof(SegmentHeader));
     }
+    template <typename T>
+    [[nodiscard]] T* getItems()
+    {
+        return reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(this) + sizeof(SegmentHeader));
+    }
 };
 
 template <typename T>

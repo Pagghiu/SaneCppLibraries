@@ -73,7 +73,7 @@ struct SC::ArenaMap
     ArenaMap& operator=(const ArenaMap& other)
     {
         ArenaMap<T>::clear();
-        SC_ASSERT_DEBUG(ArenaMap<T>::items.resize(other.size()));
+        SC_ASSERT_RELEASE(ArenaMap<T>::items.resize(other.size()));
         for (size_t idx = 0; idx < other.items.size(); ++idx)
         {
             if (other.generations[idx].used)

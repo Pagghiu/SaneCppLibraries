@@ -243,7 +243,11 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
 #if SC_PLATFORM_ARM64
                 SC_TRY(compilerBuilder.append(L"/bin/Hostarm64/arm64/"));
 #else
+#if SC_PLATFORM_64_BIT
                 SC_TRY(compilerBuilder.append(L"/bin/Hostx64/x64/"));
+#else
+                SC_TRY(compilerBuilder.append(L"/bin/Hostx64/x86/"));
+#endif
 #endif
                 compiler.linkerPath = compiler.compilerPath;
                 StringBuilder linkerBuilder(compiler.linkerPath);
@@ -361,8 +365,8 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, StringVi
     SC_TRY(libNameBuilder.append(exeName));
     SC_TRY(libNameBuilder.append(L".lib"));
 
-    SC_TRY(args.push_back(
-        {linkerPath.view(), L"/DLL", L"/DEBUG", L"/NODEFAULTLIB", L"/ENTRY:DllMain", libPath.view(), libName.view()}));
+    SC_TRY(args.push_back({linkerPath.view(), L"/DLL", L"/DEBUG", L"/NODEFAULTLIB", L"/ENTRY:DllMain", "/SAFESEH:NO",
+                           libPath.view(), libName.view()}));
     for (auto& obj : objectFiles)
     {
         SC_TRY(args.push_back(obj.view()));

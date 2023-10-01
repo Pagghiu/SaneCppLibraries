@@ -37,6 +37,19 @@ SC::StringView SC::String::view() const
     }
 }
 
+bool SC::String::addZeroTerminatorIfNeeded()
+{
+    const int numZeros = static_cast<int>(StringEncodingGetSize(encoding));
+    SC_TRY(data.size() == 0 or data.size() >= static_cast<size_t>(numZeros));
+    if (data.size() >= static_cast<size_t>(numZeros))
+    {
+        for (int idx = 0; idx < numZeros; ++idx)
+        {
+            (&data.back())[-idx] = 0;
+        }
+    }
+    return true;
+}
 bool SC::StringFormatterFor<SC::String>::format(StringFormatOutput& data, const StringView specifier,
                                                 const SC::String& value)
 {

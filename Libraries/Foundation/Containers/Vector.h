@@ -121,6 +121,7 @@ struct SC::Vector
     Vector(std::initializer_list<T> ilist) : items(nullptr) { (void)appendCopy(ilist.begin(), ilist.size()); }
     Vector(const Vector& other) : items(nullptr)
     {
+        static_assert(sizeof(Vector) == sizeof(void*), "asd");
         const size_t otherSize = other.size();
         if (otherSize > 0)
         {
@@ -422,8 +423,13 @@ struct SC::Vector
             if (otherWasFollowedBySmallVector)
             {
                 // Other.items should become nullptr, but if it was followed by small vector, restore its link
-                other.items = reinterpret_cast<T*>(reinterpret_cast<char*>(&other) + alignof(SegmentHeader) +
-                                                   sizeof(SegmentHeader));
+                // The Array<> holding the small buffer MUST be placed after the vector.
+                // We should advance by sizeof(Vector<T>) that is sizeof(void*) but on 32 bit we will still have
+                // some padding, as Array<> inherits from SegmentHeader, so it shares the same alignment (that is 8
+                // bytes on all platforms).
+                otherHeader =
+                    reinterpret_cast<SegmentHeader*>(reinterpret_cast<char*>(&other) + alignof(SegmentHeader));
+                other.items = otherHeader->getItems<T>();
             }
             else
             {
