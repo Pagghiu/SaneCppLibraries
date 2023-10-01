@@ -213,7 +213,7 @@ struct SC::FileSystem::Internal
     {
         struct timespec times[2];
         times[0].tv_sec  = time.getMillisecondsSinceEpoch() / 1000;
-        times[0].tv_nsec = time.getMillisecondsSinceEpoch() * 1000 * 1000;
+        times[0].tv_nsec = (time.getMillisecondsSinceEpoch() % 1000) * 1000 * 1000;
         times[1]         = times[0];
 
         if (::utimensat(AT_FDCWD, file, times, 0) == 0)
