@@ -2,7 +2,6 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Base/LibC.h"                // memset
 #include "../Language/MetaProgramming.h" // RemoveReference, AddPointer, IsSame
 
 namespace SC
@@ -25,13 +24,13 @@ struct SC::Function<R(Args...)>
     using StubFunction = R (*)(FunctionErasedOperation operation, const void** other, const void* const*,
                                typename AddPointer<Args>::type...);
 
-    static const int LAMBDA_SIZE = sizeof(uint64_t) * 3;
+    static const int LAMBDA_SIZE = sizeof(void*) * 2;
 
     StubFunction functionStub;
     union
     {
         const void* classInstance;
-        char        lambdaMemory[LAMBDA_SIZE];
+        char        lambdaMemory[LAMBDA_SIZE] = {0};
     };
     void sendLambdaSignal(FunctionErasedOperation operation, const void** other) const
     {
@@ -44,15 +43,11 @@ struct SC::Function<R(Args...)>
   public:
     Function()
     {
+        static_assert(sizeof(Function) == sizeof(void*) * 3, "Function Size");
         functionStub = nullptr;
-        memset(lambdaMemory, 0, LAMBDA_SIZE);
     }
 
-    Function(const void* instance, StubFunction stub) : functionStub(stub)
-    {
-        memset(lambdaMemory, 0, LAMBDA_SIZE);
-        classInstance = instance;
-    }
+    Function(const void* instance, StubFunction stub) : functionStub(stub) { classInstance = instance; }
 
     // SFINAE used to avoid universal reference from "eating" also copy consttructor
     template <typename Lambda, typename = typename EnableIf<
@@ -102,11 +97,6 @@ struct SC::Function<R(Args...)>
 
     bool isValid() const { return functionStub != nullptr; }
 
-    bool operator==(const Function& other) const
-    {
-        return functionStub == other.functionStub && memcmp(lambdaMemory, other.lambdaMemory, LAMBDA_SIZE) == 0;
-    }
-
     template <typename Lambda>
     void bind(Lambda&& lambda)
     {
@@ -141,7 +131,6 @@ struct SC::Function<R(Args...)>
     Function& bind(const Class* c)
     {
         sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
-        SC_ASSERT_RELEASE(c != nullptr);
         classInstance = c;
         functionStub  = &MemberWrapper<Class, MemberFunction>;
         return *this;
@@ -151,7 +140,6 @@ struct SC::Function<R(Args...)>
     Function& bind(Class* c)
     {
         sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
-        SC_ASSERT_RELEASE(c != nullptr);
         classInstance = c;
         functionStub  = &MemberWrapper<Class, MemberFunction>;
         return *this;
@@ -227,14 +215,12 @@ struct FunctionDeducerCreator
     template <R (Class::*MemberFunction)(Args...)>
     static Function<R(Args...)> Bind(Class* object)
     {
-        SC_ASSERT_RELEASE(object != nullptr);
         return Function<R(Args...)>(object, &Function<R(Args...)>::template MemberWrapper<Class, MemberFunction>);
     }
 
     template <R (Class::*MemberFunction)(Args...) const>
     static Function<R(Args...)> Bind(const Class* object)
     {
-        SC_ASSERT_RELEASE(object != nullptr);
         return Function<R(Args...)>(object, &Function<R(Args...)>::template MemberWrapper<Class, MemberFunction>);
     }
 };
@@ -262,7 +248,7 @@ FunctionDeducerCreator<R, FunctionEmptyClass, Args...> FunctionDeducer(R(Args...
 template <typename T>
 using Delegate = Function<void(T)>;
 using Action   = Function<void()>;
-#define SC_FUNCTION_FREE(FUNCTION_PARAM) SC::FunctionDeducer(FUNCTION_PARAM).Bind<FUNCTION_PARAM>()
-#define SC_FUNCTION_MEMBER(FUNCTION_PARAM, FUNCTION_OBJECT)                                                            \
+#define SC_FUNCTION_BIND_FREE(FUNCTION_PARAM) SC::FunctionDeducer(FUNCTION_PARAM).Bind<FUNCTION_PARAM>()
+#define SC_FUNCTION_BIND(FUNCTION_PARAM, FUNCTION_OBJECT)                                                              \
     SC::FunctionDeducer(FUNCTION_PARAM).Bind<FUNCTION_PARAM>(FUNCTION_OBJECT)
 } // namespace SC

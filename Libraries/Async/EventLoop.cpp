@@ -414,7 +414,7 @@ SC::Result SC::EventLoop::activateAsync(KernelQueue& queue, Async& async)
     SC_LOG_MESSAGE("{} {} ACTIVATE\n", async.debugName, Async::TypeToString(async.type));
     // Submitting (first time) or Active (for reactivations)
     SC_ASSERT_DEBUG(async.state == Async::State::Active or async.state == Async::State::Submitting);
-    SC_TRY(Async::applyOnAsync(async, [&](auto& p) { return queue.activateAsync(p); }));
+    SC_TRY(Async::applyOnAsync(async, [&queue](auto& p) { return queue.activateAsync(p); }));
     if (async.state == Async::State::Submitting)
     {
         return queue.pushNewSubmission(async);

@@ -54,7 +54,7 @@ struct SC::FunctionTest : public SC::TestCase
 
             auto freeFunc = SC::FunctionDeducer(&TestClass::freeFunc).Bind<&TestClass::freeFunc>();
             auto setValue = SC::FunctionDeducer(&TestClass::setValue).Bind<&TestClass::setValue>(&tc);
-            auto getValue = SC_FUNCTION_MEMBER(&TestClass::getValue, &tc);
+            auto getValue = SC_FUNCTION_BIND(&TestClass::getValue, &tc);
 
             Function<int(int)> lambdaFreeFunc  = &TestClass::freeFunc;
             Function<int(int)> lambdaFreeFunc2 = lambdaFreeFunc;        // Copy Construct
@@ -62,9 +62,9 @@ struct SC::FunctionTest : public SC::TestCase
             Function<int(int)> lambdaCopy;
             Function<int(int)> lambdaMove;
             {
-                uint32_t val1 = 1;
-                uint32_t val2 = 1;
-                uint64_t val3 = 1;
+                uint8_t  val1 = 1;
+                uint16_t val2 = 1;
+                uint32_t val3 = 1;
 
                 Function<int(int)> lambda = [=](int value) -> int
                 { return static_cast<int>(val1 + val2 + val3 + static_cast<uint32_t>(value)); };

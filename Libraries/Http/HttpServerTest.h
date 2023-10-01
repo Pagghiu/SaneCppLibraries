@@ -13,17 +13,18 @@ struct HttpServerTest;
 
 struct SC::HttpServerTest : public SC::TestCase
 {
+    int numTries = 0;
     HttpServerTest(SC::TestReport& report) : TestCase(report, "HttpServerTest")
     {
         if (test_section("server async"))
         {
             constexpr int wantedNumTries = 3;
-            int           numTries       = 0;
             EventLoop     eventLoop;
+            numTries = 0;
             SC_TEST_EXPECT(eventLoop.create());
             HttpServerAsync server;
             SC_TEST_EXPECT(server.start(eventLoop, 10, "127.0.0.1", 8080));
-            server.onClient = [this, &numTries, &server](HttpServer::ClientChannel& client)
+            server.onClient = [this, &server](HttpServer::ClientChannel& client)
             {
                 auto& res = client.response;
                 SC_TEST_EXPECT(client.request.headersEndReceived);
