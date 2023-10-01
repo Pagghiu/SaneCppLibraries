@@ -95,7 +95,7 @@ bool SC::FileSystem::convert(const StringView file, String& destination, StringV
         }                                                                                                              \
     }
 #endif
-SC::Result SC::FileSystem::write(StringView path, SpanVoid<const void> data)
+SC::Result SC::FileSystem::write(StringView path, Span<const char> data)
 {
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
@@ -142,7 +142,7 @@ SC::Result SC::FileSystem::read(StringView path, Vector<char>& data)
 
 [[nodiscard]] SC::Result SC::FileSystem::write(StringView file, StringView text)
 {
-    return write(file, text.toVoidSpan());
+    return write(file, text.toCharSpan());
 }
 
 [[nodiscard]] SC::Result SC::FileSystem::read(StringView file, String& text, StringEncoding encoding)

@@ -48,7 +48,7 @@ struct StringBuilder
 
     [[nodiscard]] bool appendReplaceMultiple(StringView source, Span<const StringView[2]> substitutions);
 
-    [[nodiscard]] bool appendHex(SpanVoid<const void> data);
+    [[nodiscard]] bool appendHex(Span<const uint8_t> data);
 
   private:
     StringView view() const;

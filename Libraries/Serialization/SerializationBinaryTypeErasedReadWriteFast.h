@@ -20,7 +20,7 @@ struct SerializerReadWriteFast
         sourceNames                    = {flatSchema.names.values, flatSchema.names.size};
         arrayAccess.vectorVtable       = {flatSchema.vtables.vector.values,
                                           static_cast<size_t>(flatSchema.vtables.vector.size)};
-        sourceObject                   = SpanVoid<const void>(&object, sizeof(T));
+        sourceObject                   = Span<const uint8_t>::reinterpret_span(object);
         sourceTypeIndex                = 0;
         destination.numberOfOperations = 0;
         if (sourceProperties.sizeInBytes() == 0 || sourceProperties.data()[0].type != Reflection::MetaType::TypeStruct)
@@ -38,7 +38,7 @@ struct SerializerReadWriteFast
     Span<const Reflection::MetaProperties>   sourceProperties;
     Span<const Reflection::SymbolStringView> sourceNames;
     Serialization::BinaryBuffer&             destination;
-    SpanVoid<const void>                     sourceObject;
+    Span<const uint8_t>                      sourceObject;
     uint32_t                                 sourceTypeIndex;
     Reflection::MetaProperties               sourceProperty;
     ArrayAccess                              arrayAccess;
@@ -55,7 +55,7 @@ struct SimpleBinaryReader
 
         sinkProperties = {flatSchema.properties.values, flatSchema.properties.size};
         sinkNames      = {flatSchema.names.values, flatSchema.names.size};
-        sinkObject     = SpanVoid<void>(&object, sizeof(T));
+        sinkObject     = Span<uint8_t>(&object, sizeof(T));
         sinkTypeIndex  = 0;
 
         arrayAccess.vectorVtable = {flatSchema.vtables.vector.values,
@@ -77,7 +77,7 @@ struct SimpleBinaryReader
     Span<const Reflection::SymbolStringView> sinkNames;
     Reflection::MetaProperties               sinkProperty;
     uint32_t                                 sinkTypeIndex = 0;
-    SpanVoid<void>                           sinkObject;
+    Span<uint8_t>                            sinkObject;
     Serialization::BinaryBuffer&             source;
     ArrayAccess                              arrayAccess;
 };

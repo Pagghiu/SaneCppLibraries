@@ -19,8 +19,8 @@ struct BinaryBuffer
     size_t index              = 0;
     int    numberOfOperations = 0;
 
-    [[nodiscard]] bool serialize(SpanVoid<const void> object);
-    [[nodiscard]] bool serialize(SpanVoid<void> object);
+    [[nodiscard]] bool serialize(Span<const uint8_t> object);
+    [[nodiscard]] bool serialize(Span<uint8_t> object);
     [[nodiscard]] bool advance(size_t numBytes);
 };
 
@@ -90,7 +90,7 @@ struct BinarySkipper
         uint64_t sourceNumBytes = arraySourceProperty.sizeInBytes;
         if (arraySourceProperty.type == Reflection::MetaType::TypeVector)
         {
-            SC_TRY(sourceObject.serialize(SpanVoid<void>(&sourceNumBytes, sizeof(uint64_t))));
+            SC_TRY(sourceObject.serialize(Span<uint8_t>::reinterpret_span(sourceNumBytes)));
         }
 
         const bool isPacked = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();

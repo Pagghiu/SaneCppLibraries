@@ -8,21 +8,20 @@
 namespace SC
 {
 template <typename Type>
-struct SpanVoid;
-
-template <typename Type>
 struct Span;
 } // namespace SC
 
 template <typename Type>
 struct SC::Span
 {
-    using Size = size_t;
+    using Size     = size_t;
+    using VoidType = typename SameConstnessAs<Type, void>::type;
 
     constexpr Span() : items(nullptr), sizeBytes(0) {}
     constexpr Span(Type* items, Size sizeInBytes) : items(items), sizeBytes(sizeInBytes) {}
     constexpr Span(Type& type) : items(&type), sizeBytes(sizeof(Type)) {}
     constexpr Span(Type&& type) : items(&type), sizeBytes(sizeof(Type)) {}
+    Span(VoidType* items, Size sizeInBytes) : items(reinterpret_cast<Type*>(items)), sizeBytes(sizeInBytes) {}
 
     // Specialization for converting const char* to StringView
     constexpr Span(std::initializer_list<Type> ilist) : items(nullptr), sizeBytes(0)
@@ -67,46 +66,15 @@ struct SC::Span
 
     [[nodiscard]] constexpr bool empty() const { return sizeBytes == 0; }
 
+    template <typename T>
+    [[nodiscard]] static Span<Type> reinterpret_span(T& value)
+    {
+        return {reinterpret_cast<Type*>(&value), sizeof(T) / sizeof(Type)};
+    }
+
   private:
     Type* items;
     Size  sizeBytes;
     template <typename O>
     friend struct SpanVoid;
-};
-
-template <typename Type>
-struct SC::SpanVoid
-{
-    using ByteType = typename SameConstnessAs<Type, uint8_t>::type;
-
-    using Size = SC::size_t;
-    template <typename OtherType>
-    constexpr SpanVoid(Span<OtherType> other) : items(other.items), size(other.sizeBytes)
-    {}
-    constexpr SpanVoid() : items(nullptr), size(0) {}
-    constexpr SpanVoid(Type* items, Size sizeInBytes) : items(items), size(sizeInBytes) {}
-
-    constexpr Type*       data() { return items; }
-    constexpr const Type* data() const { return items; }
-    constexpr Size        sizeInBytes() const { return size; }
-
-    template <typename DestinationType>
-    constexpr Span<DestinationType> castTo()
-    {
-        return Span<DestinationType>(static_cast<DestinationType*>(items), sizeInBytes());
-    }
-
-    [[nodiscard]] constexpr bool viewAtBytes(Size offsetInBytes, Size lengthInBytes, SpanVoid& other)
-    {
-        if (offsetInBytes + lengthInBytes <= size)
-        {
-            other = SpanVoid(static_cast<ByteType*>(items) + offsetInBytes, lengthInBytes);
-            return true;
-        }
-        return false;
-    }
-
-  protected:
-    Type* items;
-    Size  size;
 };

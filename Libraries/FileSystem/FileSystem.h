@@ -71,7 +71,7 @@ struct SC::FileSystem
     [[nodiscard]] bool   exists(StringView fileOrDirectory);
     [[nodiscard]] bool   existsAndIsDirectory(StringView directory);
     [[nodiscard]] bool   existsAndIsFile(StringView file);
-    [[nodiscard]] Result write(StringView file, SpanVoid<const void> data);
+    [[nodiscard]] Result write(StringView file, Span<const char> data);
     [[nodiscard]] Result read(StringView file, Vector<char>& data);
     [[nodiscard]] Result write(StringView file, StringView text);
     [[nodiscard]] Result read(StringView file, String& data, StringEncoding encoding);

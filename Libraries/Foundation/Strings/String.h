@@ -64,9 +64,6 @@ struct SC::String
     [[nodiscard]] bool operator!=(const StringView other) const { return not operator==(other); }
     [[nodiscard]] bool operator<(const StringView other) const { return view() < other; }
 
-    Span<const char> toSpanConst() const { return data.toSpanConst(); }
-    Span<char>       toSpan() { return data.toSpan(); }
-
   protected:
     friend struct StringTest;
     friend struct StringBuilder;

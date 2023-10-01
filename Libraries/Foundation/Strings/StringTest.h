@@ -99,7 +99,7 @@ struct SC::StringTest : public SC::TestCase
         }
         if (test_section("HexString"))
         {
-            char bytes[4] = {0x12, 0x34, 0x56, 0x78};
+            uint8_t bytes[4] = {0x12, 0x34, 0x56, 0x78};
 
             String        s;
             StringBuilder b(s);

@@ -16,7 +16,7 @@ struct Hashing
         uint8_t hash[32] = {0};
         size_t  size     = 0;
 
-        SpanVoid<const void> toSpanVoid() const { return {hash, size}; }
+        Span<const uint8_t> toBytesSpan() const { return {hash, size}; }
     };
     enum Type
     {
@@ -33,7 +33,7 @@ struct Hashing
     Hashing& operator=(const Hashing&) = delete;
     Hashing& operator=(Hashing&&)      = delete;
 
-    [[nodiscard]] bool update(SpanVoid<const void> data);
+    [[nodiscard]] bool update(Span<const uint8_t> data);
     [[nodiscard]] bool finalize(Result& res);
     [[nodiscard]] bool setType(Type newType);
 

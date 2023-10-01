@@ -17,13 +17,13 @@ struct VectorVTable
         Yes
     };
 
-    using FunctionGetSegmentSpan = bool (*)(MetaProperties property, SpanVoid<void> object, SpanVoid<void>& itemBegin);
-    using FunctionGetSegmentSpanConst = bool (*)(MetaProperties property, SpanVoid<const void> object,
-                                                 SpanVoid<const void>& itemBegin);
+    using FunctionGetSegmentSpan = bool (*)(MetaProperties property, Span<uint8_t> object, Span<uint8_t>& itemBegin);
+    using FunctionGetSegmentSpanConst = bool (*)(MetaProperties property, Span<const uint8_t> object,
+                                                 Span<const uint8_t>& itemBegin);
 
-    using FunctionResize = bool (*)(SpanVoid<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
+    using FunctionResize = bool (*)(Span<uint8_t> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
                                     DropEccessItems dropEccessItems);
-    using FunctionResizeWithoutInitialize = bool (*)(SpanVoid<void> object, Reflection::MetaProperties property,
+    using FunctionResizeWithoutInitialize = bool (*)(Span<uint8_t> object, Reflection::MetaProperties property,
                                                      uint64_t sizeInBytes, DropEccessItems dropEccessItems);
     FunctionGetSegmentSpan          getSegmentSpan;
     FunctionGetSegmentSpanConst     getSegmentSpanConst;
@@ -62,20 +62,20 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
         VectorVTable vector;
         vector.resize = &resize;
         assignResizeWithoutInitialize(vector);
-        vector.getSegmentSpan      = &getSegmentSpan<void>;
-        vector.getSegmentSpanConst = &getSegmentSpan<const void>;
+        vector.getSegmentSpan      = &getSegmentSpan<uint8_t>;
+        vector.getSegmentSpanConst = &getSegmentSpan<const uint8_t>;
         vector.linkID              = builder.initialSize + static_cast<unsigned>(builder.atoms.size);
         (void)builder.vtables.vector.push_back(vector);
     }
 
-    static bool resize(SpanVoid<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
+    static bool resize(Span<uint8_t> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
                        VectorVTable::DropEccessItems dropEccessItems)
     {
         SC_COMPILER_UNUSED(property);
         SC_COMPILER_UNUSED(dropEccessItems);
         if (object.sizeInBytes() >= sizeof(void*))
         {
-            auto&      vectorByte = *static_cast<Container*>(object.data());
+            auto&      vectorByte = *reinterpret_cast<Container*>(object.data());
             const auto numItems   = N >= 0 ? min(sizeInBytes / sizeof(ItemType), static_cast<decltype(sizeInBytes)>(N))
                                            : sizeInBytes / sizeof(ItemType);
             return vectorByte.resize(static_cast<size_t>(numItems));
@@ -85,14 +85,14 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
             return false;
         }
     }
-    static bool resizeWithoutInitialize(SpanVoid<void> object, Reflection::MetaProperties property,
-                                        uint64_t sizeInBytes, VectorVTable::DropEccessItems dropEccessItems)
+    static bool resizeWithoutInitialize(Span<uint8_t> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
+                                        VectorVTable::DropEccessItems dropEccessItems)
     {
         SC_COMPILER_UNUSED(property);
         SC_COMPILER_UNUSED(dropEccessItems);
         if (object.sizeInBytes() >= sizeof(void*))
         {
-            auto&      vectorByte = *static_cast<Container*>(object.data());
+            auto&      vectorByte = *reinterpret_cast<Container*>(object.data());
             const auto numItems   = N >= 0 ? min(sizeInBytes / sizeof(ItemType), static_cast<decltype(sizeInBytes)>(N))
                                            : sizeInBytes / sizeof(ItemType);
             return vectorByte.resizeWithoutInitializing(static_cast<size_t>(numItems));
@@ -103,16 +103,16 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
         }
     }
 
-    template <typename VoidType>
-    [[nodiscard]] static constexpr bool getSegmentSpan(Reflection::MetaProperties property, SpanVoid<VoidType> object,
-                                                       SpanVoid<VoidType>& itemBegin)
+    template <typename ByteType>
+    [[nodiscard]] static constexpr bool getSegmentSpan(Reflection::MetaProperties property, Span<ByteType> object,
+                                                       Span<ByteType>& itemBegin)
     {
         SC_COMPILER_UNUSED(property);
         if (object.sizeInBytes() >= sizeof(void*))
         {
-            using VectorType = typename SameConstnessAs<VoidType, Container>::type;
-            auto& vectorByte = *static_cast<VectorType*>(object.data());
-            itemBegin        = SpanVoid<VoidType>(vectorByte.data(), vectorByte.size() * sizeof(ItemType));
+            using VectorType = typename SameConstnessAs<ByteType, Container>::type;
+            auto& vectorByte = *reinterpret_cast<VectorType*>(object.data());
+            itemBegin        = Span<ByteType>(vectorByte.data(), vectorByte.size() * sizeof(ItemType));
             return true;
         }
         else
@@ -146,10 +146,10 @@ struct ArrayAccess
 {
     Span<const Reflection::VectorVTable> vectorVtable;
 
-    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::MetaProperties property, SpanVoid<void> object,
-                                      SpanVoid<void>& itemBegin);
-    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::MetaProperties property, SpanVoid<const void> object,
-                                      SpanVoid<const void>& itemBegin);
+    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::MetaProperties property, Span<uint8_t> object,
+                                      Span<uint8_t>& itemBegin);
+    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::MetaProperties property, Span<const uint8_t> object,
+                                      Span<const uint8_t>& itemBegin);
 
     using DropEccessItems = Reflection::VectorVTable::DropEccessItems;
     enum class Initialize
@@ -158,7 +158,7 @@ struct ArrayAccess
         Yes
     };
 
-    bool resize(uint32_t linkID, SpanVoid<void> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
+    bool resize(uint32_t linkID, Span<uint8_t> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
                 Initialize initialize, DropEccessItems dropEccessItems);
 };
 } // namespace SerializationBinaryTypeErased

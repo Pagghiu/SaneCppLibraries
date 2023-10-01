@@ -37,12 +37,12 @@ struct SerializerReadVersionedAdapter
 
 struct BinaryWriterStream : public SC::Serialization::BinaryBuffer
 {
-    [[nodiscard]] bool serialize(SpanVoid<const void> object) { return BinaryBuffer::serialize(object); }
+    [[nodiscard]] bool serialize(Span<const uint8_t> object) { return BinaryBuffer::serialize(object); }
 };
 
 struct BinaryReaderStream : public SC::Serialization::BinaryBuffer
 {
-    [[nodiscard]] bool serialize(SpanVoid<void> object) { return BinaryBuffer::serialize(object); }
+    [[nodiscard]] bool serialize(Span<uint8_t> object) { return BinaryBuffer::serialize(object); }
 };
 } // namespace SC
 

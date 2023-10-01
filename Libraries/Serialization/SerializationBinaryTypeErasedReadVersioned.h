@@ -33,7 +33,7 @@ struct SerializerReadVersioned
         sourceProperties          = schema.sourceProperties;
         sinkProperties            = {flatSchema.properties.values, flatSchema.properties.size};
         sinkNames                 = {flatSchema.names.values, flatSchema.names.size};
-        sinkObject                = SpanVoid<void>(&object, sizeof(T));
+        sinkObject                = Span<uint8_t>(&object, sizeof(T));
         sourceObject              = &source;
         sinkTypeIndex             = 0;
         sourceTypeIndex           = 0;
@@ -55,7 +55,7 @@ struct SerializerReadVersioned
     ArrayAccess arrayAccess;
 
     Span<const Reflection::MetaProperties> sinkProperties;
-    SpanVoid<void>                         sinkObject;
+    Span<uint8_t>                          sinkObject;
     Reflection::MetaProperties             sinkProperty;
     uint32_t                               sinkTypeIndex = 0;
 

@@ -21,12 +21,12 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     [[nodiscard]] static bool generateGuidFor(const StringView name, Hashing& hashing, String& projectGuid)
     {
         SC_TRY(hashing.setType(Hashing::TypeSHA1));
-        SC_TRY(hashing.update(name.toVoidSpan()));
-        SC_TRY(hashing.update("_Guid"_a8.toVoidSpan()));
+        SC_TRY(hashing.update(name.toBytesSpan()));
+        SC_TRY(hashing.update("_Guid"_a8.toBytesSpan()));
         Hashing::Result res;
         SC_TRY(hashing.finalize(res));
         String hexString;
-        SC_TRY(StringBuilder(hexString).appendHex(res.toSpanVoid()));
+        SC_TRY(StringBuilder(hexString).appendHex(res.toBytesSpan()));
         StringBuilder guidBuilder(projectGuid);
         SC_TRY(guidBuilder.append("{"));
         SC_TRY(guidBuilder.append(hexString.view().sliceStartEnd(0, 8)));

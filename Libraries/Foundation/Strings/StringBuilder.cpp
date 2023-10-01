@@ -82,9 +82,9 @@ bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf
     return append(buffer.view());
 }
 
-bool StringBuilder::appendHex(SpanVoid<const void> data)
+bool StringBuilder::appendHex(Span<const uint8_t> data)
 {
-    const unsigned char* bytes = data.castTo<const unsigned char>().data();
+    const unsigned char* bytes = data.data();
     if (encoding == StringEncoding::Utf16)
         return false; // TODO: Support appendHex for UTF16
     const auto oldSize = stringData.size();

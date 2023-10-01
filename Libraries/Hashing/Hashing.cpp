@@ -36,7 +36,7 @@ bool SC::Hashing::setType(Type newType)
     return false;
 }
 
-bool SC::Hashing::update(SpanVoid<const void> data)
+bool SC::Hashing::update(Span<const uint8_t> data)
 {
     if (not inited)
         return false;
@@ -139,12 +139,12 @@ bool SC::Hashing::setType(Type newType)
     return true;
 }
 
-bool SC::Hashing::update(SpanVoid<const void> data)
+bool SC::Hashing::update(Span<const uint8_t> data)
 {
     if (not inited)
         return false;
     CryptoPrivate& self = *reinterpret_cast<CryptoPrivate*>(buffer);
-    if (!CryptHashData(self.hHash, data.castTo<const BYTE>().data(), static_cast<DWORD>(data.sizeInBytes()), 0))
+    if (!CryptHashData(self.hHash, data.data(), static_cast<DWORD>(data.sizeInBytes()), 0))
     {
         return false;
     }
@@ -168,7 +168,7 @@ bool SC::Hashing::finalize(Result& res)
 SC::Hashing::Hashing() {}
 SC::Hashing::~Hashing() {}
 bool SC::Hashing::setType(Type newType) { return false; }
-bool SC::Hashing::update(SpanVoid<const void> data) { return false; }
+bool SC::Hashing::update(Span<const uint8_t> data) { return false; }
 bool SC::Hashing::finalize(Result& res) { return false; }
 
 #endif

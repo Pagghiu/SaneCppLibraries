@@ -8,7 +8,7 @@ namespace SC
 namespace SerializationBinaryTypeErased
 {
 
-[[nodiscard]] static bool copySourceSink(SpanVoid<const void> source, SpanVoid<void> other)
+[[nodiscard]] static bool copySourceSink(Span<const uint8_t> source, Span<uint8_t> other)
 {
     if (other.sizeInBytes() >= source.sizeInBytes())
     {
@@ -19,21 +19,20 @@ namespace SerializationBinaryTypeErased
 }
 
 template <typename SourceType, typename SinkType>
-[[nodiscard]] static bool tryWritingPrimitiveValueToSink(SourceType sourceValue, SpanVoid<void>& sinkObject)
+[[nodiscard]] static bool tryWritingPrimitiveValueToSink(SourceType sourceValue, Span<uint8_t>& sinkObject)
 {
     SinkType sourceConverted = static_cast<SinkType>(sourceValue);
-    SC_TRY(copySourceSink(SpanVoid<const void>(&sourceConverted, sizeof(sourceConverted)), sinkObject));
+    SC_TRY(copySourceSink(Span<const uint8_t>::reinterpret_span(sourceConverted), sinkObject));
     return true;
 }
 
 template <typename T>
 [[nodiscard]] static bool tryReadPrimitiveValue(Serialization::BinaryBuffer*      sourceObject,
                                                 const Reflection::MetaProperties& sinkProperty,
-                                                SpanVoid<void>&                   sinkObject)
+                                                Span<uint8_t>&                    sinkObject)
 {
     T sourceValue;
-    SC_TRY(sourceObject->serialize(SpanVoid<void>{&sourceValue, sizeof(T)}));
-    SpanVoid<const void> span(&sourceValue, sizeof(T));
+    SC_TRY(sourceObject->serialize(Span<uint8_t>::reinterpret_span(sourceValue)));
     switch (sinkProperty.type)
     {
     case Reflection::MetaType::TypeUINT8: return tryWritingPrimitiveValueToSink<T, uint8_t>(sourceValue, sinkObject);
@@ -54,7 +53,7 @@ template <typename T>
                                                  const Reflection::MetaProperties&       sourceProperty,
                                                  Serialization::BinaryBuffer*            sourceObject,
                                                  const Reflection::MetaProperties&       sinkProperty,
-                                                 SpanVoid<void>&                         sinkObject)
+                                                 Span<uint8_t>&                          sinkObject)
 {
     switch (sourceProperty.type)
     {
@@ -102,7 +101,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::read()
         {
             if (sinkObject.sizeInBytes() >= sourceProperty.sizeInBytes)
             {
-                SC_TRY(sourceObject->serialize(SpanVoid<void>{sinkObject.data(), sourceProperty.sizeInBytes}));
+                SC_TRY(sourceObject->serialize(Span<uint8_t>{sinkObject.data(), sourceProperty.sizeInBytes}));
                 return true;
             }
         }
@@ -130,11 +129,11 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readStruct()
         return false;
     }
 
-    const auto     structSourceProperty  = sourceProperty;
-    const auto     structSourceTypeIndex = sourceTypeIndex;
-    const auto     structSinkProperty    = sinkProperty;
-    const auto     structSinkTypeIndex   = sinkTypeIndex;
-    SpanVoid<void> structSinkObject      = sinkObject;
+    const auto    structSourceProperty  = sourceProperty;
+    const auto    structSourceTypeIndex = sourceTypeIndex;
+    const auto    structSinkProperty    = sinkProperty;
+    const auto    structSinkTypeIndex   = sinkTypeIndex;
+    Span<uint8_t> structSinkObject      = sinkObject;
 
     for (uint32_t idx = 0; idx < static_cast<uint32_t>(structSourceProperty.numSubAtoms); ++idx)
     {
@@ -155,8 +154,8 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readStruct()
         {
             // Member with same order ordinal has been found
             sinkTypeIndex = structSinkTypeIndex + findIdx + 1;
-            SC_TRY(structSinkObject.viewAtBytes(sinkProperties.data()[sinkTypeIndex].offsetInBytes,
-                                                sinkProperties.data()[sinkTypeIndex].sizeInBytes, sinkObject));
+            SC_TRY(structSinkObject.sliceStartLength(sinkProperties.data()[sinkTypeIndex].offsetInBytes,
+                                                     sinkProperties.data()[sinkTypeIndex].sizeInBytes, sinkObject));
             if (sinkProperties.data()[sinkTypeIndex].getLinkIndex() >= 0)
                 sinkTypeIndex = static_cast<uint32_t>(sinkProperties.data()[sinkTypeIndex].getLinkIndex());
             SC_TRY(read());
@@ -177,17 +176,17 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
     {
         return false;
     }
-    const auto     arraySourceProperty  = sourceProperty;
-    const auto     arraySourceTypeIndex = sourceTypeIndex;
-    const auto     arraySinkTypeIndex   = sinkTypeIndex;
-    SpanVoid<void> arraySinkObject      = sinkObject;
-    const auto     arraySinkProperty    = sinkProperty;
+    const auto    arraySourceProperty  = sourceProperty;
+    const auto    arraySourceTypeIndex = sourceTypeIndex;
+    const auto    arraySinkTypeIndex   = sinkTypeIndex;
+    Span<uint8_t> arraySinkObject      = sinkObject;
+    const auto    arraySinkProperty    = sinkProperty;
 
     sourceTypeIndex         = arraySourceTypeIndex + 1;
     uint64_t sourceNumBytes = arraySourceProperty.sizeInBytes;
     if (arraySourceProperty.type == Reflection::MetaType::TypeVector)
     {
-        SC_TRY(sourceObject->serialize(SpanVoid<void>{&sourceNumBytes, sizeof(uint64_t)}));
+        SC_TRY(sourceObject->serialize(Span<uint8_t>::reinterpret_span(sourceNumBytes)));
     }
 
     const bool isPrimitive = sourceProperties.data()[sourceTypeIndex].isPrimitiveType();
@@ -199,10 +198,10 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
     const auto sourceItemSize = sourceProperties.data()[sourceTypeIndex].sizeInBytes;
     const auto sinkItemSize   = sinkProperties.data()[sinkTypeIndex].sizeInBytes;
 
-    SpanVoid<void> arraySinkStart;
+    Span<uint8_t> arraySinkStart;
     if (arraySinkProperty.type == Reflection::MetaType::TypeArray)
     {
-        SC_TRY(arraySinkObject.viewAtBytes(0, arraySinkProperty.sizeInBytes, arraySinkStart));
+        SC_TRY(arraySinkObject.sliceStartLength(0, arraySinkProperty.sizeInBytes, arraySinkStart));
     }
     else
     {
@@ -216,7 +215,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
     if (isPacked)
     {
         const auto minBytes = min(static_cast<uint64_t>(arraySinkStart.sizeInBytes()), sourceNumBytes);
-        SC_TRY(sourceObject->serialize(SpanVoid<void>{arraySinkStart.data(), static_cast<size_t>(minBytes)}));
+        SC_TRY(sourceObject->serialize(Span<uint8_t>{arraySinkStart.data(), static_cast<size_t>(minBytes)}));
         if (sourceNumBytes > static_cast<uint64_t>(arraySinkStart.sizeInBytes()))
         {
             // We must consume these excess bytes anyway, discarding their content
@@ -239,7 +238,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
         {
             sinkTypeIndex   = itemSinkTypeIndex;
             sourceTypeIndex = itemSourceTypeIndex;
-            SC_TRY(arraySinkStart.viewAtBytes(static_cast<size_t>(idx * sinkItemSize), sinkItemSize, sinkObject));
+            SC_TRY(arraySinkStart.sliceStartLength(static_cast<size_t>(idx * sinkItemSize), sinkItemSize, sinkObject));
             SC_TRY(read());
         }
         if (sourceNumElements > sinkNumElements)
