@@ -74,9 +74,10 @@ SC::Result SC::Process::launch(ProcessOptions options)
     }
 
     // In documentation it's explicitly stated that this buffer will be modified (!?)
-    LPWSTR  wideCmd = command.nativeWritableBytesIncludingTerminator();
+    LPWSTR  wideCmd = const_cast<LPWSTR>(command.view().getNullTerminatedNative());
     LPCWSTR wideDir = currentDirectory.view().isEmpty() ? nullptr : currentDirectory.view().getNullTerminatedNative();
-    LPWSTR  wideEnv = environment.view().isEmpty() ? nullptr : environment.nativeWritableBytesIncludingTerminator();
+    LPWSTR  wideEnv =
+        const_cast<LPWSTR>(environment.view().isEmpty() ? nullptr : environment.view().getNullTerminatedNative());
     PROCESS_INFORMATION processInfo;
     ZeroMemory(&processInfo, sizeof(PROCESS_INFORMATION));
     BOOL success;

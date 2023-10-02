@@ -3,7 +3,33 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "String.h"
 
-bool SC::String::assign(const StringView& sv)
+SC::String::String(StringEncoding encoding) : encoding(encoding)
+{
+    SC_COMPILER_WARNING_PUSH_OFFSETOF;
+    static_assert(alignof(SegmentHeader) == alignof(uint64_t), "alignof(segmentheader)");
+    static_assert(SC_COMPILER_OFFSETOF(SmallString<1>, buffer) - SC_COMPILER_OFFSETOF(String, data) ==
+                      alignof(SegmentHeader),
+                  "Wrong alignment");
+    SC_COMPILER_WARNING_POP;
+}
+
+SC::String::String(StringView sv) { SC_ASSERT_RELEASE(assign(sv)); }
+
+#if SC_PLATFORM_WINDOWS
+wchar_t* SC::String::nativeWritableBytesIncludingTerminator()
+{
+    SC_ASSERT_RELEASE(encoding == StringEncoding::Utf16);
+    return reinterpret_cast<wchar_t*>(data.data());
+}
+#else
+char* SC::String::nativeWritableBytesIncludingTerminator()
+{
+    SC_ASSERT_RELEASE(encoding < StringEncoding::Utf16);
+    return data.data();
+}
+#endif
+
+bool SC::String::assign(StringView sv)
 {
     const size_t length    = sv.sizeInBytes();
     encoding               = sv.getEncoding();
@@ -49,9 +75,4 @@ bool SC::String::addZeroTerminatorIfNeeded()
         }
     }
     return true;
-}
-bool SC::StringFormatterFor<SC::String>::format(StringFormatOutput& data, const StringView specifier,
-                                                const SC::String& value)
-{
-    return StringFormatterFor<SC::StringView>::format(data, specifier, value.view());
 }

@@ -2,9 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "String.h"
 #include "StringConverter.h"
-
+#include "StringFormat.h"
 namespace SC
 {
 struct String;
@@ -15,8 +14,8 @@ struct StringBuilder
         Clear,
         DoNotClear
     };
-    StringBuilder(Vector<char>& stringData, StringEncoding encoding, Flags f = DoNotClear);
-    StringBuilder(String& str, Flags f = DoNotClear);
+    StringBuilder(Vector<char>& stringData, StringEncoding encoding, Flags flags = DoNotClear);
+    StringBuilder(String& str, Flags flags = DoNotClear);
 
     template <typename... Types>
     [[nodiscard]] bool format(StringView fmt, Types&&... args)
@@ -28,9 +27,12 @@ struct StringBuilder
     template <typename... Types>
     [[nodiscard]] bool append(StringView fmt, Types&&... args)
     {
-        SC_TRY(StringConverter::popNulltermIfExists(stringData, encoding));
-        StringFormatOutput sfo(encoding);
-        sfo.redirectToBuffer(stringData);
+        if (not StringConverter::popNulltermIfExists(stringData, encoding))
+        {
+            return false;
+        }
+
+        StringFormatOutput sfo(encoding, stringData);
         if (fmt.getEncoding() == StringEncoding::Ascii || fmt.getEncoding() == StringEncoding::Utf8)
         {
             // It's ok parsing format string '{' and '}' both for utf8 and ascii with StringIteratorASCII
@@ -51,8 +53,6 @@ struct StringBuilder
     [[nodiscard]] bool appendHex(Span<const uint8_t> data);
 
   private:
-    StringView view() const;
-
     void clear();
 
     Vector<char>&  stringData;

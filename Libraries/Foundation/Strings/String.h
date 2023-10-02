@@ -4,7 +4,6 @@
 #pragma once
 #include "../Containers/Array.h"
 #include "../Containers/Vector.h"
-#include "StringFormat.h"
 #include "StringView.h"
 
 namespace SC
@@ -22,9 +21,9 @@ struct MetaClass;
 } // namespace SC
 struct SC::String
 {
-    String(StringEncoding encoding = StringEncoding::Utf8) : encoding(encoding) {}
+    String(StringEncoding encoding = StringEncoding::Utf8);
 
-    String(const StringView& sv) { SC_ASSERT_RELEASE(assign(sv)); }
+    String(StringView sv);
 
     template <size_t N>
     String(const char (&text)[N])
@@ -32,12 +31,7 @@ struct SC::String
         SC_ASSERT_RELEASE(assign(StringView(text, N - 1, true, StringEncoding::Ascii)));
     }
 
-    String(Vector<char>&& data, StringEncoding encoding) : encoding(encoding), data(move(data))
-    {
-        SC_ASSERT_RELEASE(addZeroTerminatorIfNeeded());
-    }
-
-    [[nodiscard]] bool assign(const StringView& sv);
+    [[nodiscard]] bool assign(StringView sv);
 
     // const methods
     [[nodiscard]] StringEncoding getEncoding() const { return encoding; }
@@ -45,20 +39,7 @@ struct SC::String
     //  - if string is empty        --> data.size() == 0
     //  - if string is not empty    --> data.size() > 2
     [[nodiscard]] const char* bytesIncludingTerminator() const { return data.data(); }
-#if SC_PLATFORM_WINDOWS
-    [[nodiscard]] wchar_t* nativeWritableBytesIncludingTerminator()
-    {
-        SC_ASSERT_RELEASE(encoding == StringEncoding::Utf16);
-        return reinterpret_cast<wchar_t*>(data.data());
-    }
-#else
-    [[nodiscard]] char* nativeWritableBytesIncludingTerminator()
-    {
-        SC_ASSERT_RELEASE(encoding < StringEncoding::Utf16);
-        return data.data();
-    }
-#endif
-    [[nodiscard]] bool isEmpty() const { return data.isEmpty(); }
+    [[nodiscard]] bool        isEmpty() const { return data.isEmpty(); }
 
     [[nodiscard]] StringView view() const;
 
@@ -86,13 +67,13 @@ struct SC::String
     }
 
   protected:
+    // All these friendships are made to leverage writing directly to the Vector<char>
+    // but while still keeping it an implementation detail
     friend struct StringTest;
     friend struct StringBuilder;
     friend struct StringConverter;
     friend struct FileDescriptor;
     friend struct FileSystem;
-    template <int N>
-    friend struct SmallString;
     template <typename T>
     friend struct Reflection::MetaClass;
     StringEncoding encoding;
@@ -106,6 +87,11 @@ struct SC::String
 #pragma warning(pop)
 #endif
     [[nodiscard]] bool addZeroTerminatorIfNeeded();
+#if SC_PLATFORM_WINDOWS
+    [[nodiscard]] wchar_t* nativeWritableBytesIncludingTerminator();
+#else
+    [[nodiscard]] char* nativeWritableBytesIncludingTerminator();
+#endif
 };
 
 template <int N>
@@ -113,16 +99,7 @@ struct SC::SmallString : public String
 {
     Array<char, N> buffer;
 
-    SmallString(StringEncoding encoding = StringEncoding::Utf8) : String(encoding)
-    {
-        SC_COMPILER_WARNING_PUSH_OFFSETOF;
-        static_assert(alignof(SegmentHeader) == alignof(uint64_t), "alignof(segmentheader)");
-        static_assert(SC_COMPILER_OFFSETOF(SmallString, buffer) - SC_COMPILER_OFFSETOF(String, data) ==
-                          alignof(SegmentHeader),
-                      "Wrong alignment");
-        SC_COMPILER_WARNING_POP;
-        init();
-    }
+    SmallString(StringEncoding encoding = StringEncoding::Utf8) : String(encoding) { init(); }
 
     SmallString(StringView view) : String(view.getEncoding())
     {
@@ -200,12 +177,6 @@ struct SC::SmallString : public String
         header->options.isSmallVector = true;
         String::data.items            = buffer.items;
     }
-};
-
-template <>
-struct SC::StringFormatterFor<SC::String>
-{
-    static bool format(StringFormatOutput& data, const StringView specifier, const String& value);
 };
 
 namespace SC

@@ -145,6 +145,7 @@ struct SC_COMPILER_EXPORT SC::StringView
         return getIterator(identity<StringIterator>());
     }
 
+    [[nodiscard]] constexpr bool operator!=(StringView other) const { return not operator==(other); }
     [[nodiscard]] constexpr bool operator==(StringView other) const
     {
         if (hasCompatibleEncoding(other))
@@ -181,7 +182,6 @@ struct SC_COMPILER_EXPORT SC::StringView
         Assert::unreachable();
     }
 
-    [[nodiscard]] bool           operator!=(StringView other) const { return not operator==(other); }
     [[nodiscard]] constexpr bool isEmpty() const { return text == nullptr || textSizeInBytes == 0; }
     [[nodiscard]] constexpr bool isNullTerminated() const { return hasNullTerm; }
 

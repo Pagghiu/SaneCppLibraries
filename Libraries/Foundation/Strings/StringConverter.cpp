@@ -13,6 +13,16 @@
 #include <CoreFoundation/CoreFoundation.h>
 #endif
 
+SC::StringConverter::StringConverter(String& text, Flags flags) : encoding(text.getEncoding()), data(text.data)
+{
+    if (flags == Clear)
+    {
+        internalClear();
+    }
+}
+
+SC::StringConverter::StringConverter(Vector<char>& data, StringEncoding encoding) : encoding(encoding), data(data) {}
+
 bool SC::StringConverter::convertSameEncoding(StringView text, Vector<char>& buffer, StringView* encodedText,
                                               NullTermination terminate)
 {
@@ -194,28 +204,28 @@ bool SC::StringConverter::convertEncodingTo(StringEncoding encoding, StringView 
     return false;
 }
 
-void SC::StringConverter::clear() { text.data.clearWithoutInitializing(); }
+void SC::StringConverter::internalClear() { data.clearWithoutInitializing(); }
 
 bool SC::StringConverter::convertNullTerminateFastPath(StringView input, StringView& encodedText)
 {
-    text.data.clearWithoutInitializing();
+    data.clearWithoutInitializing();
     SC_TRY(internalAppend(input, &encodedText));
     return true;
 }
 
 bool SC::StringConverter::appendNullTerminated(StringView input)
 {
-    SC_TRY(popNulltermIfExists(text.data, text.encoding));
+    SC_TRY(popNulltermIfExists(data, encoding));
     return internalAppend(input, nullptr);
 }
 
 bool SC::StringConverter::setTextLengthInBytesIncludingTerminator(size_t newDataSize)
 {
-    const auto zeroSize = StringEncodingGetSize(text.getEncoding());
+    const auto zeroSize = StringEncodingGetSize(encoding);
     if (newDataSize >= zeroSize)
     {
-        const bool res = text.data.resizeWithoutInitializing(newDataSize - zeroSize);
-        return res && text.data.resize(newDataSize, 0); // Adds the null terminator
+        const bool res = data.resizeWithoutInitializing(newDataSize - zeroSize);
+        return res && data.resize(newDataSize, 0); // Adds the null terminator
     }
     return true;
 }
@@ -223,7 +233,7 @@ bool SC::StringConverter::setTextLengthInBytesIncludingTerminator(size_t newData
 /// Appends the input string null terminated
 bool SC::StringConverter::internalAppend(StringView input, StringView* encodedText)
 {
-    return StringConverter::convertEncodingTo(text.getEncoding(), input, text.data, encodedText);
+    return StringConverter::convertEncodingTo(encoding, input, data, encodedText);
 }
 
 bool SC::StringConverter::popNulltermIfExists(Vector<char>& stringData, StringEncoding encoding)

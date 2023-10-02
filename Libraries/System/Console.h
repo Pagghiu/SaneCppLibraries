@@ -16,8 +16,7 @@ struct SC_COMPILER_EXPORT Console
     template <typename... Types>
     bool print(StringView fmt, Types&&... args)
     {
-        StringFormatOutput output(fmt.getEncoding());
-        output.redirectToConsole(*this);
+        StringFormatOutput output(fmt.getEncoding(), *this);
         if (fmt.getEncoding() == StringEncoding::Ascii || fmt.getEncoding() == StringEncoding::Utf8)
         {
             // It's ok parsing format string '{' and '}' both for utf8 and ascii with StringIteratorASCII

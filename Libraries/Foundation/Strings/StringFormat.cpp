@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "StringFormat.h"
 #include "../../System/Console.h" // TODO: Console here is a module circular dependency. Consider type-erasing with a Function
+#include "String.h"
 #include "StringBuilder.h"
 #include "StringConverter.h"
 
@@ -154,11 +155,16 @@ bool StringFormatterFor<const wchar_t*>::format(StringFormatOutput& data, const 
 }
 #endif
 
-bool StringFormatterFor<SC::StringView>::format(StringFormatOutput& data, const StringView specifier,
-                                                const SC::StringView value)
+bool StringFormatterFor<StringView>::format(StringFormatOutput& data, const StringView specifier,
+                                            const StringView value)
 {
     SC_COMPILER_UNUSED(specifier);
     return data.write(value);
+}
+
+bool StringFormatterFor<String>::format(StringFormatOutput& data, const StringView specifier, const String& value)
+{
+    return StringFormatterFor<StringView>::format(data, specifier, value.view());
 }
 
 bool StringFormatOutput::write(StringView text)
@@ -191,13 +197,13 @@ bool StringFormatOutput::write(StringView text)
     }
 }
 
-void StringFormatOutput::redirectToBuffer(Vector<char>& destination)
+StringFormatOutput::StringFormatOutput(StringEncoding encoding, Vector<char>& destination) : encoding(encoding)
 {
     data    = &destination;
     console = nullptr;
 }
 
-void StringFormatOutput::redirectToConsole(Console& newConsole)
+StringFormatOutput::StringFormatOutput(StringEncoding encoding, Console& newConsole) : encoding(encoding)
 {
     data    = nullptr;
     console = &newConsole;

@@ -2,8 +2,6 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Language/Result.h"
-#include "StringIterator.h"
 #include "StringView.h"
 
 namespace SC
@@ -11,23 +9,20 @@ namespace SC
 template <typename T>
 struct Vector;
 struct Console;
+struct String;
 template <typename T>
 struct StringFormatterFor;
 
 struct StringFormatOutput
 {
-    StringFormatOutput(StringEncoding encoding) : encoding(encoding) {}
+    StringFormatOutput(StringEncoding encoding, Vector<char>& destination);
+    StringFormatOutput(StringEncoding encoding, Console& newConsole);
 
     [[nodiscard]] bool write(StringView text);
+
+    void               onFormatBegin();
+    void               onFormatFailed();
     [[nodiscard]] bool onFormatSucceded();
-
-    void onFormatBegin();
-    void onFormatFailed();
-
-    void redirectToBuffer(Vector<char>& destination);
-    void redirectToConsole(Console& newConsole);
-
-    StringEncoding getEncoding() const { return encoding; }
 
   private:
     Vector<char>*  data    = nullptr;
@@ -41,7 +36,7 @@ template <> struct StringFormatterFor<float>        {static bool format(StringFo
 template <> struct StringFormatterFor<double>       {static bool format(StringFormatOutput&, const StringView, const double);};
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #if SC_PLATFORM_64_BIT == 0
-template <> struct StringFormatterFor<SC::ssize_t> { static bool format(StringFormatOutput&, const StringView, const SC::ssize_t); };
+template <> struct StringFormatterFor<SC::ssize_t>  {static bool format(StringFormatOutput&, const StringView, const SC::ssize_t);};
 #endif
 #else
 template <> struct StringFormatterFor<SC::size_t>   {static bool format(StringFormatOutput&, const StringView, const SC::size_t);};
@@ -55,22 +50,24 @@ template <> struct StringFormatterFor<SC::int16_t>  {static bool format(StringFo
 template <> struct StringFormatterFor<SC::uint16_t> {static bool format(StringFormatOutput&, const StringView, const SC::uint16_t);};
 template <> struct StringFormatterFor<SC::int8_t>   {static bool format(StringFormatOutput&, const StringView, const SC::int8_t);};
 template <> struct StringFormatterFor<SC::uint8_t>  {static bool format(StringFormatOutput&, const StringView, const SC::uint8_t);};
-template <> struct StringFormatterFor<char>   {static bool format(StringFormatOutput&, const StringView, const char);};
+template <> struct StringFormatterFor<char>         {static bool format(StringFormatOutput&, const StringView, const char);};
 template <> struct StringFormatterFor<bool>         {static bool format(StringFormatOutput&, const StringView, const bool);};
 template <> struct StringFormatterFor<StringView>   {static bool format(StringFormatOutput&, const StringView, const StringView);};
-template <> struct StringFormatterFor<const char*> {static bool format(StringFormatOutput&, const StringView, const char*);};
+template <> struct StringFormatterFor<String>       {static bool format(StringFormatOutput&, const StringView, const String&);};
+template <> struct StringFormatterFor<const char*>  {static bool format(StringFormatOutput&, const StringView, const char*);};
 #if SC_PLATFORM_WINDOWS
 template <> struct StringFormatterFor<wchar_t>      {static bool format(StringFormatOutput&, const StringView, const wchar_t);};
 template <> struct StringFormatterFor<const wchar_t*> {static bool format(StringFormatOutput&, const StringView, const wchar_t*);};
 #endif
+
 // clang-format on
 template <int N>
 struct StringFormatterFor<char[N]>
 {
     static bool format(StringFormatOutput& data, const StringView specifier, const char* str)
     {
-        return StringFormatterFor<StringView>::format(data, specifier,
-                                                      StringView(str, N - 1, true, StringEncoding::Ascii));
+        const StringView sv(str, N - 1, true, StringEncoding::Ascii);
+        return StringFormatterFor<StringView>::format(data, specifier, sv);
     }
 };
 
@@ -132,7 +129,10 @@ struct StringFormat
             const StringView specifierString = StringView::fromIteratorUntilEnd(specifier);
             if (not positionString.isEmpty())
             {
-                SC_TRY(positionString.parseInt32(parsedPosition));
+                if (not positionString.parseInt32(parsedPosition))
+                {
+                    return false;
+                }
             }
             constexpr auto maxArgs = sizeof...(args);
             return formatArgument<maxArgs, maxArgs>(data, specifierString, parsedPosition, forward<Types>(args)...);
@@ -156,16 +156,19 @@ struct StringFormat
                     SC_LANGUAGE_UNLIKELY // if it's the same matched, let's escape it
                     {
                         (void)it.stepForward(); // we want to make sure we insert the escaped '{' or '}'
-                        SC_TRY(data.write(StringView::fromIterators(start, it)));
+                        if (not data.write(StringView::fromIterators(start, it)))
+                            return false;
                         (void)it.stepForward(); // we don't want to insert the additional '{' or '}' needed for escaping
                         start = it;
                     }
                 else if (matchedChar == '{') // it's a '{' not followed by itself, so let's parse specifier
                 {
-                    SC_TRY(data.write(StringView::fromIterators(start, it))); // write everything before '{'
+                    if (not data.write(StringView::fromIterators(start, it))) // write everything before '{
+                        return false;
                     // try parse '}' and eventually format
                     int32_t parsedPosition = position;
-                    SC_TRY(parsePosition(data, it, parsedPosition, forward<Types>(args)...));
+                    if (not parsePosition(data, it, parsedPosition, forward<Types>(args)...))
+                        return false;
                     start = it;
                     position += 1;
                     maxPosition = max(maxPosition, parsedPosition + 1);
@@ -177,7 +180,8 @@ struct StringFormat
             }
             else
             {
-                SC_TRY(data.write(StringView::fromIterators(start, it)));    // write everything before '{'
+                if (not data.write(StringView::fromIterators(start, it))) // write everything before '{
+                    return false;
                 return maxPosition == static_cast<int32_t>(sizeof...(args)); // check right number of args
             }
         }

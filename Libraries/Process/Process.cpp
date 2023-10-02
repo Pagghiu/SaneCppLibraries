@@ -105,8 +105,7 @@ SC::Result SC::ProcessChain::waitForExitSync()
 SC::Result SC::Process::formatArguments(Span<const StringView> params)
 {
     bool            first = true;
-    StringConverter formattedCmd(command);
-    formattedCmd.clear();
+    StringConverter formattedCmd(command, StringConverter::Clear);
     for (const StringView& svp : params)
     {
         if (not first)

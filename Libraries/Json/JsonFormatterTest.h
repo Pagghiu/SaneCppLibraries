@@ -21,10 +21,9 @@ struct SC::JsonFormatterTest : public SC::TestCase
             SmallVector<JsonFormatter::State, 100> nestedStates;
 
             SmallVector<char, 256> buffer;
-            StringFormatOutput     output(StringEncoding::Ascii);
-            output.redirectToBuffer(buffer);
-            JsonFormatter   writer(nestedStates, output);
-            constexpr float fValue = 1.2f;
+            StringFormatOutput     output(StringEncoding::Ascii, buffer);
+            JsonFormatter          writer(nestedStates, output);
+            constexpr float        fValue = 1.2f;
             SC_TEST_EXPECT(writer.writeFloat(fValue));
             float value;
             (void)StringConverter::popNulltermIfExists(buffer, StringEncoding::Ascii);
@@ -36,8 +35,7 @@ struct SC::JsonFormatterTest : public SC::TestCase
             SmallVector<JsonFormatter::State, 100> nestedStates;
 
             SmallVector<char, 256> buffer;
-            StringFormatOutput     output(StringEncoding::Ascii);
-            output.redirectToBuffer(buffer);
+            StringFormatOutput     output(StringEncoding::Ascii, buffer);
             {
                 JsonFormatter writer(nestedStates, output);
                 SC_TEST_EXPECT(writer.startArray());
@@ -61,8 +59,7 @@ struct SC::JsonFormatterTest : public SC::TestCase
             SmallVector<JsonFormatter::State, 100> nestedStates;
 
             SmallVector<char, 256> buffer;
-            StringFormatOutput     output(StringEncoding::Ascii);
-            output.redirectToBuffer(buffer);
+            StringFormatOutput     output(StringEncoding::Ascii, buffer);
             {
                 JsonFormatter writer(nestedStates, output);
                 SC_TEST_EXPECT(writer.startObject());

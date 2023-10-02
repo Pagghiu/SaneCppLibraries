@@ -52,10 +52,9 @@ struct SC::SerializationStructuredJsonTest : public SC::TestCase
             R"({"x":2,"y":1.50,"xy":[1,3],"myTest":"asdf","myVector":["Str1","Str2"]})"_a8;
         if (test_section("JsonWriterFast"))
         {
-            Test                   test;
-            SmallVector<char, 256> buffer;
-            StringFormatOutput     output(StringEncoding::Ascii);
-            output.redirectToBuffer(buffer);
+            Test                                                     test;
+            SmallVector<char, 256>                                   buffer;
+            StringFormatOutput                                       output(StringEncoding::Ascii, buffer);
             SerializationStructuredTemplate::SerializationJsonWriter writer(output);
             SC_TEST_EXPECT(SerializationStructuredTemplate::serialize(test, writer));
             (void)StringConverter::popNulltermIfExists(buffer, StringEncoding::Ascii);

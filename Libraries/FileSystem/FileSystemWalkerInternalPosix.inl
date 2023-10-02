@@ -65,8 +65,7 @@ struct SC::FileSystemWalker::Internal
 
     [[nodiscard]] Result init(StringView directory)
     {
-        StringConverter currentPath(currentPathString);
-        currentPath.clear();
+        StringConverter currentPath(currentPathString, StringConverter::Clear);
         SC_TRY(currentPath.appendNullTerminated(directory));
         StackEntry entry;
         entry.textLengthInBytes = currentPathString.view().sizeInBytesIncludingTerminator();

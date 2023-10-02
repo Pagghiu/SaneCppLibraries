@@ -19,8 +19,7 @@ SC::Result SC::FileSystem::init(StringView currentWorkingDirectory) { return cha
 
 SC::Result SC::FileSystem::changeDirectory(StringView currentWorkingDirectory)
 {
-    StringConverter converter(currentDirectory);
-    converter.clear();
+    StringConverter converter(currentDirectory, StringConverter::Clear);
     SC_TRY(converter.appendNullTerminated(currentWorkingDirectory));
     // TODO: Assert if path is not absolute
     return Result(existsAndIsDirectory("."));
@@ -28,19 +27,19 @@ SC::Result SC::FileSystem::changeDirectory(StringView currentWorkingDirectory)
 
 bool SC::FileSystem::convert(const StringView file, String& destination, StringView* encodedPath)
 {
-    StringConverter converter(destination);
     if (Path::isAbsolute(file, Path::AsNative))
     {
         if (encodedPath != nullptr)
         {
+            StringConverter converter(destination);
             return converter.convertNullTerminateFastPath(file, *encodedPath);
         }
-        converter.clear();
+        StringConverter converter(destination, StringConverter::Clear);
         return converter.appendNullTerminated(file);
     }
     if (currentDirectory.isEmpty())
         return false;
-    converter.clear();
+    StringConverter converter(destination, StringConverter::Clear);
     SC_TRY(converter.appendNullTerminated(currentDirectory.view()));
 #if SC_PLATFORM_WINDOWS
     SC_TRY(converter.appendNullTerminated(L"\\"));

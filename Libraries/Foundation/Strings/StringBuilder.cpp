@@ -1,8 +1,9 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "StringBuilder.h"
-#include "StringConverter.h"
+#include "../Strings/StringBuilder.h"
+#include "../Strings/String.h"
+#include "../Strings/StringConverter.h"
 namespace SC
 {
 StringBuilder::StringBuilder(Vector<char>& stringData, StringEncoding encoding, Flags f)
@@ -37,7 +38,7 @@ bool StringBuilder::append(StringView str)
 bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf, StringView with)
 {
     if (not source.hasCompatibleEncoding(occurrencesOf) or not source.hasCompatibleEncoding(with) or
-        not source.hasCompatibleEncoding(view()))
+        not StringEncodingAreBinaryCompatible(source.getEncoding(), encoding))
     {
         return false;
     }
@@ -96,11 +97,6 @@ bool StringBuilder::appendHex(Span<const uint8_t> data)
         stringData[oldSize + i * 2 + 1] = "0123456789ABCDEF"[bytes[i] & 0x0F];
     }
     return StringConverter::pushNullTerm(stringData, encoding);
-}
-
-StringView StringBuilder::view() const
-{
-    return stringData.isEmpty() ? StringView() : StringView(stringData.data(), stringData.size(), true, encoding);
 }
 
 void StringBuilder::clear() { stringData.clearWithoutInitializing(); }
