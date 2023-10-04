@@ -192,7 +192,6 @@ struct SC::Vector
     [[nodiscard]] bool push_front(const T& element) { return insertCopy(0, &element, 1); }
     [[nodiscard]] bool push_back(const T& element) { return SegmentOperationsT::push_back(items, element); }
     [[nodiscard]] bool push_back(T&& element) { return SegmentOperationsT::push_back(items, forward<T>(element)); }
-    [[nodiscard]] bool push_back(std::initializer_list<T> src) { return appendCopy(src.begin(), src.size()); }
 
     // TODO: Check if this can be unified with the same version inside Segment
     template <typename U>
@@ -323,6 +322,9 @@ struct SC::Vector
     {
         return SegmentOperationsT::template insert<false>(items, size(), src, srcNumItems);
     }
+
+    [[nodiscard]] bool appendCopy(std::initializer_list<T> src) { return appendCopy(src.begin(), src.size()); }
+
     [[nodiscard]] bool appendCopy(const T* src, size_t srcNumItems)
     {
         return SegmentOperationsT::template insert<true>(items, size(), src, srcNumItems);

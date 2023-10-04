@@ -20,8 +20,6 @@ struct SC::Span
     constexpr Span() : items(nullptr), sizeBytes(0) {}
     constexpr Span(Type* items, SizeType sizeInBytes) : items(items), sizeBytes(sizeInBytes) {}
     constexpr Span(Type& type) : items(&type), sizeBytes(sizeof(Type)) {}
-    constexpr Span(Type&& type) : items(&type), sizeBytes(sizeof(Type)) {}
-    Span(VoidType* items, SizeType sizeInBytes) : items(reinterpret_cast<Type*>(items)), sizeBytes(sizeInBytes) {}
 
     // Specialization for converting const char* to StringView
     constexpr Span(std::initializer_list<Type> ilist) : items(nullptr), sizeBytes(0)
@@ -71,6 +69,11 @@ struct SC::Span
     [[nodiscard]] static Span<Type> reinterpret_span(T& value)
     {
         return {reinterpret_cast<Type*>(&value), sizeof(T) / sizeof(Type)};
+    }
+
+    static Span reinterpret_bytes(VoidType* items, SizeType sizeInBytes)
+    {
+        return Span(reinterpret_cast<Type*>(items), sizeInBytes);
     }
 
   private:

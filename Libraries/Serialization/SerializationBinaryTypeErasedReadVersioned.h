@@ -33,7 +33,7 @@ struct SerializerReadVersioned
         sourceProperties          = schema.sourceProperties;
         sinkProperties            = {flatSchema.properties.values, flatSchema.properties.size};
         sinkNames                 = {flatSchema.names.values, flatSchema.names.size};
-        sinkObject                = Span<uint8_t>(&object, sizeof(T));
+        sinkObject                = sinkObject.reinterpret_span(object);
         sourceObject              = &source;
         sinkTypeIndex             = 0;
         sourceTypeIndex           = 0;

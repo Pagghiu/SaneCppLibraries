@@ -32,7 +32,7 @@ template <typename T>
                                                 Span<uint8_t>&                    sinkObject)
 {
     T sourceValue;
-    SC_TRY(sourceObject->serialize(Span<uint8_t>::reinterpret_span(sourceValue)));
+    SC_TRY(sourceObject->serializeBytes(Span<uint8_t>::reinterpret_span(sourceValue)));
     switch (sinkProperty.type)
     {
     case Reflection::MetaType::TypeUINT8: return tryWritingPrimitiveValueToSink<T, uint8_t>(sourceValue, sinkObject);
@@ -101,7 +101,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::read()
         {
             if (sinkObject.sizeInBytes() >= sourceProperty.sizeInBytes)
             {
-                SC_TRY(sourceObject->serialize(Span<uint8_t>{sinkObject.data(), sourceProperty.sizeInBytes}));
+                SC_TRY(sourceObject->serializeBytes(Span<uint8_t>{sinkObject.data(), sourceProperty.sizeInBytes}));
                 return true;
             }
         }
@@ -186,7 +186,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
     uint64_t sourceNumBytes = arraySourceProperty.sizeInBytes;
     if (arraySourceProperty.type == Reflection::MetaType::TypeVector)
     {
-        SC_TRY(sourceObject->serialize(Span<uint8_t>::reinterpret_span(sourceNumBytes)));
+        SC_TRY(sourceObject->serializeBytes(Span<uint8_t>::reinterpret_span(sourceNumBytes)));
     }
 
     const bool isPrimitive = sourceProperties.data()[sourceTypeIndex].isPrimitiveType();
@@ -215,12 +215,12 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
     if (isPacked)
     {
         const auto minBytes = min(static_cast<uint64_t>(arraySinkStart.sizeInBytes()), sourceNumBytes);
-        SC_TRY(sourceObject->serialize(Span<uint8_t>{arraySinkStart.data(), static_cast<size_t>(minBytes)}));
+        SC_TRY(sourceObject->serializeBytes(Span<uint8_t>{arraySinkStart.data(), static_cast<size_t>(minBytes)}));
         if (sourceNumBytes > static_cast<uint64_t>(arraySinkStart.sizeInBytes()))
         {
             // We must consume these excess bytes anyway, discarding their content
             SC_TRY(options.allowDropEccessArrayItems);
-            return sourceObject->advance(static_cast<size_t>(sourceNumBytes - minBytes));
+            return sourceObject->advanceBytes(static_cast<size_t>(sourceNumBytes - minBytes));
         }
     }
     else

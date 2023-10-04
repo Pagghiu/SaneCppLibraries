@@ -119,12 +119,12 @@ struct SerializerReadVersionedItems
             const size_t sourceNumBytes = schema.current().sizeInBytes * numSourceItems;
             const size_t destNumBytes   = numDestinationItems * sizeof(T);
             const size_t minBytes       = min(destNumBytes, sourceNumBytes);
-            SC_TRY(stream.serialize({object, minBytes}));
+            SC_TRY(stream.serializeBytes(object, minBytes));
             if (sourceNumBytes > destNumBytes)
             {
                 // We must consume these excess bytes anyway, discarding their content
                 SC_TRY(schema.options.allowDropEccessArrayItems);
-                return stream.advance(sourceNumBytes - minBytes);
+                return stream.advanceBytes(sourceNumBytes - minBytes);
             }
             return true;
         }
@@ -169,7 +169,7 @@ struct SerializerReadVersioned<BinaryStream, SC::Vector<T>>
                                                       VersionSchema& schema)
     {
         uint64_t sizeInBytes = 0;
-        SC_TRY(stream.serialize({&sizeInBytes, sizeof(sizeInBytes)}));
+        SC_TRY(stream.serializeBytes(&sizeInBytes, sizeof(sizeInBytes)));
         schema.advance();
         const bool isPacked =
             Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
@@ -195,7 +195,7 @@ struct SerializerReadVersioned<BinaryStream, SC::Array<T, N>>
                                                       VersionSchema& schema)
     {
         uint64_t sizeInBytes = 0;
-        SC_TRY(stream.serialize({&sizeInBytes, sizeof(sizeInBytes)}));
+        SC_TRY(stream.serializeBytes(&sizeInBytes, sizeof(sizeInBytes)));
         schema.advance();
         const bool isPacked =
             Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
@@ -223,7 +223,7 @@ struct SerializerReadVersioned<BinaryStream, T, typename SC::EnableIf<Reflection
     [[nodiscard]] static bool readCastValue(T& destination, BinaryStream& stream)
     {
         ValueType value;
-        SC_TRY(stream.serialize({&value, sizeof(ValueType)}));
+        SC_TRY(stream.serializeBytes(&value, sizeof(ValueType)));
         destination = static_cast<T>(value);
         return true;
     }

@@ -112,7 +112,7 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
         {
             using VectorType = typename SameConstnessAs<ByteType, Container>::type;
             auto& vectorByte = *reinterpret_cast<VectorType*>(object.data());
-            itemBegin        = Span<ByteType>(vectorByte.data(), vectorByte.size() * sizeof(ItemType));
+            itemBegin        = itemBegin.reinterpret_bytes(vectorByte.data(), vectorByte.size() * sizeof(ItemType));
             return true;
         }
         else

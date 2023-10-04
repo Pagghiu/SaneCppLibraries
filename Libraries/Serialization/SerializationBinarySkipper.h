@@ -16,12 +16,20 @@ struct BinaryBuffer
 {
     SC::Vector<uint8_t> buffer;
 
-    size_t index              = 0;
-    int    numberOfOperations = 0;
+    size_t             index              = 0;
+    int                numberOfOperations = 0;
+    [[nodiscard]] bool serializeBytes(const void* object, size_t numBytes)
+    {
+        return serializeBytes(Span<const uint8_t>::reinterpret_bytes(object, numBytes));
+    }
+    [[nodiscard]] bool serializeBytes(void* object, size_t numBytes)
+    {
+        return serializeBytes(Span<uint8_t>::reinterpret_bytes(object, numBytes));
+    }
 
-    [[nodiscard]] bool serialize(Span<const uint8_t> object);
-    [[nodiscard]] bool serialize(Span<uint8_t> object);
-    [[nodiscard]] bool advance(size_t numBytes);
+    [[nodiscard]] bool serializeBytes(Span<const uint8_t> object);
+    [[nodiscard]] bool serializeBytes(Span<uint8_t> object);
+    [[nodiscard]] bool advanceBytes(size_t numBytes);
 };
 
 // TODO: BinarySkipper should go out of header once we replace BinaryBuffer with a streaming interface
@@ -49,7 +57,7 @@ struct BinarySkipper
         }
         else if (sourceProperty.isPrimitiveType())
         {
-            return sourceObject.advance(sourceProperty.sizeInBytes);
+            return sourceObject.advanceBytes(sourceProperty.sizeInBytes);
         }
         return false;
     }
@@ -66,7 +74,7 @@ struct BinarySkipper
 
         if (isPacked)
         {
-            SC_TRY(sourceObject.advance(structSourceProperty.sizeInBytes));
+            SC_TRY(sourceObject.advanceBytes(structSourceProperty.sizeInBytes));
         }
         else
         {
@@ -90,13 +98,13 @@ struct BinarySkipper
         uint64_t sourceNumBytes = arraySourceProperty.sizeInBytes;
         if (arraySourceProperty.type == Reflection::MetaType::TypeVector)
         {
-            SC_TRY(sourceObject.serialize(Span<uint8_t>::reinterpret_span(sourceNumBytes)));
+            SC_TRY(sourceObject.serializeBytes(Span<uint8_t>::reinterpret_span(sourceNumBytes)));
         }
 
         const bool isPacked = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
         if (isPacked)
         {
-            return sourceObject.advance(static_cast<size_t>(sourceNumBytes));
+            return sourceObject.advanceBytes(static_cast<size_t>(sourceNumBytes));
         }
         else
         {

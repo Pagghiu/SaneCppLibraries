@@ -56,13 +56,13 @@ bool SC::SerializationBinaryTypeErased::ArrayAccess::resize(uint32_t linkID, Spa
     return false;
 }
 
-bool SC::Serialization::BinaryBuffer::serialize(Span<const uint8_t> object)
+bool SC::Serialization::BinaryBuffer::serializeBytes(Span<const uint8_t> object)
 {
     numberOfOperations++;
     return buffer.appendCopy(object.data(), object.sizeInBytes());
 }
 
-bool SC::Serialization::BinaryBuffer::serialize(Span<uint8_t> object)
+bool SC::Serialization::BinaryBuffer::serializeBytes(Span<uint8_t> object)
 {
     if (index + object.sizeInBytes() > buffer.size())
         return false;
@@ -72,7 +72,7 @@ bool SC::Serialization::BinaryBuffer::serialize(Span<uint8_t> object)
     return true;
 }
 
-bool SC::Serialization::BinaryBuffer::advance(size_t numBytes)
+bool SC::Serialization::BinaryBuffer::advanceBytes(size_t numBytes)
 {
     if (index + numBytes > buffer.size())
         return false;
@@ -87,7 +87,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadWriteFast::write()
     {
         Span<const uint8_t> primitiveSpan;
         SC_TRY(sourceObject.sliceStartLength(0, sourceProperty.sizeInBytes, primitiveSpan));
-        SC_TRY(destination.serialize(primitiveSpan));
+        SC_TRY(destination.serializeBytes(primitiveSpan));
         return true;
     }
     else if (sourceProperty.type == Reflection::MetaType::TypeStruct)
@@ -114,7 +114,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadWriteFast::writeStruct()
         // Bulk Write the entire struct
         Span<const uint8_t> structSpan;
         SC_TRY(sourceObject.sliceStartLength(0, structSourceProperty.sizeInBytes, structSpan));
-        SC_TRY(destination.serialize(structSpan));
+        SC_TRY(destination.serializeBytes(structSpan));
     }
     else
     {
@@ -147,7 +147,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadWriteFast::writeArrayVecto
     {
         SC_TRY(arrayAccess.getSegmentSpan(arrayTypeIndex, arrayProperty, sourceObject, arraySpan));
         numBytes = arraySpan.sizeInBytes();
-        SC_TRY(destination.serialize(Span<const uint8_t>::reinterpret_span(numBytes)));
+        SC_TRY(destination.serializeBytes(Span<const uint8_t>::reinterpret_span(numBytes)));
     }
     sourceTypeIndex     = arrayTypeIndex + 1;
     const auto itemSize = sourceProperties.data()[sourceTypeIndex].sizeInBytes;
@@ -157,7 +157,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadWriteFast::writeArrayVecto
     const bool isPacked = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();
     if (isPacked)
     {
-        SC_TRY(destination.serialize(arraySpan));
+        SC_TRY(destination.serializeBytes(arraySpan));
     }
     else
     {
@@ -180,7 +180,7 @@ bool SC::SerializationBinaryTypeErased::SimpleBinaryReader::read()
     {
         Span<uint8_t> primitiveSpan;
         SC_TRY(sinkObject.sliceStartLength(0, sinkProperty.sizeInBytes, primitiveSpan));
-        SC_TRY(source.serialize(primitiveSpan));
+        SC_TRY(source.serializeBytes(primitiveSpan));
         return true;
     }
     else if (sinkProperty.type == Reflection::MetaType::TypeStruct)
@@ -207,7 +207,7 @@ bool SC::SerializationBinaryTypeErased::SimpleBinaryReader::readStruct()
         // Bulk read the entire struct
         Span<uint8_t> structSpan;
         SC_TRY(sinkObject.sliceStartLength(0, structSinkProperty.sizeInBytes, structSpan));
-        SC_TRY(source.serialize(structSpan));
+        SC_TRY(source.serializeBytes(structSpan));
     }
     else
     {
@@ -242,7 +242,7 @@ bool SC::SerializationBinaryTypeErased::SimpleBinaryReader::readArrayVector()
     else
     {
         uint64_t sinkNumBytes = 0;
-        SC_TRY(source.serialize(Span<uint8_t>::reinterpret_span(sinkNumBytes)));
+        SC_TRY(source.serializeBytes(Span<uint8_t>::reinterpret_span(sinkNumBytes)));
 
         SC_TRY(arrayAccess.resize(arraySinkTypeIndex, arraySinkObject, arraySinkProperty, sinkNumBytes,
                                   isBulkReadable ? ArrayAccess::Initialize::No : ArrayAccess::Initialize::Yes,
@@ -251,7 +251,7 @@ bool SC::SerializationBinaryTypeErased::SimpleBinaryReader::readArrayVector()
     }
     if (isBulkReadable)
     {
-        SC_TRY(source.serialize(arraySinkStart));
+        SC_TRY(source.serializeBytes(arraySinkStart));
     }
     else
     {
