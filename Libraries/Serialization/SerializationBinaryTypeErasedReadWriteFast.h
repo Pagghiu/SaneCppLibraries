@@ -18,9 +18,8 @@ struct SerializerReadWriteFast
         constexpr auto flatSchema      = Reflection::FlatSchemaTypeErased::compile<T>();
         sourceProperties               = {flatSchema.properties.values, flatSchema.properties.size};
         sourceNames                    = {flatSchema.names.values, flatSchema.names.size};
-        arrayAccess.vectorVtable       = {flatSchema.vtables.vector.values,
-                                          static_cast<size_t>(flatSchema.vtables.vector.size)};
-        sourceObject                   = Span<const uint8_t>::reinterpret_span(object);
+        arrayAccess.vectorVtable       = {flatSchema.vtables.vector.values, flatSchema.vtables.vector.size};
+        sourceObject                   = sourceObject.reinterpret_object(object);
         sourceTypeIndex                = 0;
         destination.numberOfOperations = 0;
         if (sourceProperties.sizeInBytes() == 0 || sourceProperties.data()[0].type != Reflection::MetaType::TypeStruct)
@@ -55,11 +54,10 @@ struct SimpleBinaryReader
 
         sinkProperties = {flatSchema.properties.values, flatSchema.properties.size};
         sinkNames      = {flatSchema.names.values, flatSchema.names.size};
-        sinkObject     = sinkObject.reinterpret_span(object);
+        sinkObject     = sinkObject.reinterpret_object(object);
         sinkTypeIndex  = 0;
 
-        arrayAccess.vectorVtable = {flatSchema.vtables.vector.values,
-                                    static_cast<size_t>(flatSchema.vtables.vector.size)};
+        arrayAccess.vectorVtable = {flatSchema.vtables.vector.values, flatSchema.vtables.vector.size};
 
         if (sinkProperties.sizeInBytes() == 0 || sinkProperties.data()[0].type != Reflection::MetaType::TypeStruct)
         {

@@ -306,8 +306,7 @@ bool SC::SystemDirectories::init()
     SC_TRY(buffer.resizeWithoutInitializing(numChars + 1));
     SC_TRY(buffer[numChars] == 0);
 
-    StringView utf16executable =
-        StringView(Span<const wchar_t>(buffer.data(), (buffer.size() - 1) * sizeof(wchar_t)), true);
+    StringView utf16executable = StringView(Span<const wchar_t>(buffer.data(), (buffer.size() - 1)), true);
 
     // TODO: SystemDirectories::init - We must also convert to utf8 because dirname will not work on non utf8 or ascii
     // text assigning directly the SmallString inside StringNative will copy as is instad of converting utf16 to utf8

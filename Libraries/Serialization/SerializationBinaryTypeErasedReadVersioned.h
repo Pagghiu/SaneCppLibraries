@@ -33,12 +33,11 @@ struct SerializerReadVersioned
         sourceProperties          = schema.sourceProperties;
         sinkProperties            = {flatSchema.properties.values, flatSchema.properties.size};
         sinkNames                 = {flatSchema.names.values, flatSchema.names.size};
-        sinkObject                = sinkObject.reinterpret_span(object);
+        sinkObject                = sinkObject.reinterpret_object(object);
         sourceObject              = &source;
         sinkTypeIndex             = 0;
         sourceTypeIndex           = 0;
-        arrayAccess.vectorVtable  = {flatSchema.vtables.vector.values,
-                                     static_cast<size_t>(flatSchema.vtables.vector.size)};
+        arrayAccess.vectorVtable  = {flatSchema.vtables.vector.values, flatSchema.vtables.vector.size};
 
         if (sourceProperties.sizeInBytes() == 0 ||
             sourceProperties.data()[0].type != Reflection::MetaType::TypeStruct || sinkProperties.sizeInBytes() == 0 ||

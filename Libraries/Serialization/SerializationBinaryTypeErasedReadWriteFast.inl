@@ -147,7 +147,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadWriteFast::writeArrayVecto
     {
         SC_TRY(arrayAccess.getSegmentSpan(arrayTypeIndex, arrayProperty, sourceObject, arraySpan));
         numBytes = arraySpan.sizeInBytes();
-        SC_TRY(destination.serializeBytes(Span<const uint8_t>::reinterpret_span(numBytes)));
+        SC_TRY(destination.serializeBytes(Span<const uint8_t>::reinterpret_object(numBytes)));
     }
     sourceTypeIndex     = arrayTypeIndex + 1;
     const auto itemSize = sourceProperties.data()[sourceTypeIndex].sizeInBytes;
@@ -242,7 +242,7 @@ bool SC::SerializationBinaryTypeErased::SimpleBinaryReader::readArrayVector()
     else
     {
         uint64_t sinkNumBytes = 0;
-        SC_TRY(source.serializeBytes(Span<uint8_t>::reinterpret_span(sinkNumBytes)));
+        SC_TRY(source.serializeBytes(Span<uint8_t>::reinterpret_object(sinkNumBytes)));
 
         SC_TRY(arrayAccess.resize(arraySinkTypeIndex, arraySinkObject, arraySinkProperty, sinkNumBytes,
                                   isBulkReadable ? ArrayAccess::Initialize::No : ArrayAccess::Initialize::Yes,

@@ -17,34 +17,45 @@ struct SC::Span
     using SizeType = size_t;
     using VoidType = typename SameConstnessAs<Type, void>::type;
 
-    constexpr Span() : items(nullptr), sizeBytes(0) {}
-    constexpr Span(Type* items, SizeType sizeInBytes) : items(items), sizeBytes(sizeInBytes) {}
-    constexpr Span(Type& type) : items(&type), sizeBytes(sizeof(Type)) {}
+    constexpr Span() : items(nullptr), sizeElements(0) {}
+    constexpr Span(Type* items, SizeType sizeInElements) : items(items), sizeElements(sizeInElements) {}
+    constexpr Span(Type& type) : items(&type), sizeElements(1) {}
 
     // Specialization for converting const char* to StringView
-    constexpr Span(std::initializer_list<Type> ilist) : items(nullptr), sizeBytes(0)
+    constexpr Span(std::initializer_list<Type> ilist) : items(nullptr), sizeElements(0)
     {
         // We need this two step initialization to avoid warnings on all compilers
-        items     = ilist.begin();
-        sizeBytes = ilist.size() * sizeof(Type);
+        items        = ilist.begin();
+        sizeElements = ilist.size();
+    }
+
+    template <typename T>
+    [[nodiscard]] static Span<Type> reinterpret_object(T& value)
+    {
+        return {reinterpret_cast<Type*>(&value), sizeof(T) / sizeof(Type)};
+    }
+
+    [[nodiscard]] static Span reinterpret_bytes(VoidType* items, SizeType sizeInBytes)
+    {
+        return Span(reinterpret_cast<Type*>(items), sizeInBytes / sizeof(Type));
     }
 
     [[nodiscard]] constexpr const Type* begin() const { return items; }
-    [[nodiscard]] constexpr const Type* end() const { return items + sizeBytes / sizeof(Type); }
+    [[nodiscard]] constexpr const Type* end() const { return items + sizeElements; }
     [[nodiscard]] constexpr const Type* data() const { return items; }
 
     [[nodiscard]] constexpr Type* begin() { return items; }
-    [[nodiscard]] constexpr Type* end() { return items + sizeBytes / sizeof(Type); }
+    [[nodiscard]] constexpr Type* end() { return items + sizeElements; }
     [[nodiscard]] constexpr Type* data() { return items; }
 
-    [[nodiscard]] constexpr SizeType sizeInElements() const { return sizeBytes / sizeof(Type); }
-    [[nodiscard]] constexpr SizeType sizeInBytes() const { return sizeBytes; }
+    [[nodiscard]] constexpr SizeType sizeInElements() const { return sizeElements; }
+    [[nodiscard]] constexpr SizeType sizeInBytes() const { return sizeElements * sizeof(Type); }
 
     [[nodiscard]] constexpr bool sliceStart(SizeType offsetInElements, Span& other) const
     {
         if (offsetInElements <= sizeInElements())
         {
-            other = Span(items + offsetInElements, (sizeInElements() - offsetInElements) * sizeof(Type));
+            other = Span(items + offsetInElements, (sizeInElements() - offsetInElements));
             return true;
         }
         return false;
@@ -55,30 +66,19 @@ struct SC::Span
     {
         if (offsetInElements + lengthInElements <= sizeInElements())
         {
-            other = Span(items + offsetInElements, lengthInElements * sizeof(Type));
+            other = Span(items + offsetInElements, lengthInElements);
             return true;
         }
         return false;
     }
 
-    [[nodiscard]] constexpr Span<const Type> asConst() const { return {items, sizeBytes}; }
+    [[nodiscard]] constexpr Span<const Type> asConst() const { return {items, sizeElements}; }
 
-    [[nodiscard]] constexpr bool empty() const { return sizeBytes == 0; }
-
-    template <typename T>
-    [[nodiscard]] static Span<Type> reinterpret_span(T& value)
-    {
-        return {reinterpret_cast<Type*>(&value), sizeof(T) / sizeof(Type)};
-    }
-
-    static Span reinterpret_bytes(VoidType* items, SizeType sizeInBytes)
-    {
-        return Span(reinterpret_cast<Type*>(items), sizeInBytes);
-    }
+    [[nodiscard]] constexpr bool empty() const { return sizeElements == 0; }
 
   private:
     Type*    items;
-    SizeType sizeBytes;
+    SizeType sizeElements;
     template <typename O>
     friend struct SpanVoid;
 };

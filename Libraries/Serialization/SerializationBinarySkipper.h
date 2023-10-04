@@ -98,7 +98,7 @@ struct BinarySkipper
         uint64_t sourceNumBytes = arraySourceProperty.sizeInBytes;
         if (arraySourceProperty.type == Reflection::MetaType::TypeVector)
         {
-            SC_TRY(sourceObject.serializeBytes(Span<uint8_t>::reinterpret_span(sourceNumBytes)));
+            SC_TRY(sourceObject.serializeBytes(Span<uint8_t>::reinterpret_object(sourceNumBytes)));
         }
 
         const bool isPacked = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrRecursivelyPacked();

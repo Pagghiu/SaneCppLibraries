@@ -144,14 +144,14 @@ bool StringFormatterFor<const char*>::format(StringFormatOutput& data, const Str
 bool StringFormatterFor<wchar_t>::format(StringFormatOutput& data, const StringView specifier, const wchar_t value)
 {
     SC_COMPILER_UNUSED(specifier);
-    return data.write(StringView({&value, sizeof(value)}, false));
+    return data.write(StringView({&value, 1}, false));
 }
 
 bool StringFormatterFor<const wchar_t*>::format(StringFormatOutput& data, const StringView specifier,
                                                 const wchar_t* value)
 {
     SC_COMPILER_UNUSED(specifier);
-    return data.write(StringView({value, wcslen(value) * sizeof(wchar_t)}, true));
+    return data.write(StringView({value, wcslen(value)}, true));
 }
 #endif
 

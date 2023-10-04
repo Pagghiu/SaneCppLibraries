@@ -159,8 +159,8 @@ struct SC::Vector
 
     ~Vector() { destroy(); }
 
-    Span<const T> toSpanConst() const { return {items, size() * sizeof(T)}; }
-    Span<T>       toSpan() { return {items, size() * sizeof(T)}; }
+    Span<const T> toSpanConst() const { return {items, size()}; }
+    Span<T>       toSpan() { return {items, size()}; }
 
     // Reinterpret Vector to hold a different type (example Vector<int32_t> to Vector<int8_t>.
     // This works because the SegmentHeader stores item size and capacity in bytes

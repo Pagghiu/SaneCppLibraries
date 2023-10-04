@@ -149,7 +149,7 @@ struct SC_COMPILER_EXPORT SC::StringView
 #endif
 
     constexpr Span<const char> toCharSpan() const { return {text, textSizeInBytes}; }
-    Span<const uint8_t>        toBytesSpan() const { return {reinterpret_cast<const uint8_t*>(text), textSizeInBytes}; }
+    Span<const uint8_t> toBytesSpan() const { return Span<const uint8_t>::reinterpret_bytes(text, textSizeInBytes); }
 
     enum class Comparison
     {
