@@ -11,7 +11,8 @@
 
 namespace SC
 {
-struct SegmentHeader;
+template <typename SizeT = SC::uint32_t>
+struct SegmentHeaderBase;
 template <typename T>
 struct SegmentItems;
 template <typename Allocator, typename T>
@@ -20,43 +21,51 @@ template <typename Allocator, typename T, int N>
 struct Segment;
 } // namespace SC
 
-struct SC::SegmentHeader
+template <typename SizeT>
+struct alignas(SC::uint64_t) SC::SegmentHeaderBase
 {
-    using HeaderBytesType = uint32_t;
-    struct Options
-    {
-        bool isSmallVector;
-        bool isFollowedBySmallVector;
-    };
+    using SizeType = SizeT;
 
-    alignas(uint64_t) Options options;
-    uint32_t sizeBytes;
-    uint32_t capacityBytes;
+    static constexpr SizeType MaxValue = (~static_cast<SizeType>(0)) >> 1;
+
+    // Options (isSmallVector etc.) are booleans but declaring them as actual bool makes MSVC add padding bytes
+    SizeType sizeBytes : sizeof(SizeType) * 8 - 1;
+    SizeType isSmallVector : 1;
+    SizeType capacityBytes : sizeof(SizeType) * 8 - 1;
+    SizeType isFollowedBySmallVector : 1;
 
     void initDefaults()
     {
-        options.isSmallVector           = false;
-        options.isFollowedBySmallVector = false;
+        static_assert(alignof(SegmentHeaderBase) == sizeof(uint64_t), "SegmentHeaderBase check alignment");
+        static_assert(sizeof(SegmentHeaderBase) == sizeof(SizeType) * 2, "SegmentHeaderBase check alignment");
+        isSmallVector           = false;
+        isFollowedBySmallVector = false;
     }
 
-    [[nodiscard]] static SegmentHeader* getSegmentHeader(void* oldItems)
+    [[nodiscard]] static SegmentHeaderBase* getSegmentHeader(void* oldItems)
     {
-        return reinterpret_cast<SegmentHeader*>(static_cast<uint8_t*>(oldItems) - sizeof(SegmentHeader));
+        return reinterpret_cast<SegmentHeaderBase*>(static_cast<uint8_t*>(oldItems) - sizeof(SegmentHeaderBase));
     }
+
     template <typename T>
     [[nodiscard]] T* getItems()
     {
-        return reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(this) + sizeof(SegmentHeader));
+        return reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(this) + sizeof(SegmentHeaderBase));
     }
 };
+
+namespace SC
+{
+using SegmentHeader = SegmentHeaderBase<uint32_t>;
+}
 
 template <typename T>
 struct SC::SegmentItems : public SegmentHeader
 {
     SegmentItems() { initDefaults(); }
-    [[nodiscard]] size_t size() const { return sizeBytes / sizeof(T); }
+    [[nodiscard]] size_t size() const { return static_cast<size_t>(sizeBytes / sizeof(T)); }
     [[nodiscard]] bool   isEmpty() const { return sizeBytes == 0; }
-    [[nodiscard]] size_t capacity() const { return capacityBytes / sizeof(T); }
+    [[nodiscard]] size_t capacity() const { return static_cast<size_t>(capacityBytes / sizeof(T)); }
 
     [[nodiscard]] static SegmentItems* getSegment(T* oldItems)
     {
@@ -69,7 +78,7 @@ struct SC::SegmentItems : public SegmentHeader
                                                      sizeof(SegmentHeader));
     }
 
-    void setSize(size_t newSize) { sizeBytes = static_cast<HeaderBytesType>(newSize * sizeof(T)); }
+    void setSize(size_t newSize) { sizeBytes = static_cast<SizeType>(newSize * sizeof(T)); }
 
     // TODO: needs specialized moveAssign for trivial types
     static void moveAssignElements(T* destination, size_t indexStart, size_t numElements, T* source)
@@ -490,7 +499,7 @@ struct SC::SegmentOperations
             }
         }
         const auto numNewBytes                           = newSize * sizeof(T);
-        SegmentItems<T>::getSegment(oldItems)->sizeBytes = static_cast<SegmentHeader::HeaderBytesType>(numNewBytes);
+        SegmentItems<T>::getSegment(oldItems)->sizeBytes = static_cast<SegmentHeader::SizeType>(numNewBytes);
         return true;
     }
 

@@ -14,14 +14,14 @@ struct Span;
 template <typename Type>
 struct SC::Span
 {
-    using Size     = size_t;
+    using SizeType = size_t;
     using VoidType = typename SameConstnessAs<Type, void>::type;
 
     constexpr Span() : items(nullptr), sizeBytes(0) {}
-    constexpr Span(Type* items, Size sizeInBytes) : items(items), sizeBytes(sizeInBytes) {}
+    constexpr Span(Type* items, SizeType sizeInBytes) : items(items), sizeBytes(sizeInBytes) {}
     constexpr Span(Type& type) : items(&type), sizeBytes(sizeof(Type)) {}
     constexpr Span(Type&& type) : items(&type), sizeBytes(sizeof(Type)) {}
-    Span(VoidType* items, Size sizeInBytes) : items(reinterpret_cast<Type*>(items)), sizeBytes(sizeInBytes) {}
+    Span(VoidType* items, SizeType sizeInBytes) : items(reinterpret_cast<Type*>(items)), sizeBytes(sizeInBytes) {}
 
     // Specialization for converting const char* to StringView
     constexpr Span(std::initializer_list<Type> ilist) : items(nullptr), sizeBytes(0)
@@ -39,10 +39,10 @@ struct SC::Span
     [[nodiscard]] constexpr Type* end() { return items + sizeBytes / sizeof(Type); }
     [[nodiscard]] constexpr Type* data() { return items; }
 
-    [[nodiscard]] constexpr Size sizeInElements() const { return sizeBytes / sizeof(Type); }
-    [[nodiscard]] constexpr Size sizeInBytes() const { return sizeBytes; }
+    [[nodiscard]] constexpr SizeType sizeInElements() const { return sizeBytes / sizeof(Type); }
+    [[nodiscard]] constexpr SizeType sizeInBytes() const { return sizeBytes; }
 
-    [[nodiscard]] constexpr bool sliceStart(Size offsetInElements, Span& other) const
+    [[nodiscard]] constexpr bool sliceStart(SizeType offsetInElements, Span& other) const
     {
         if (offsetInElements <= sizeInElements())
         {
@@ -52,7 +52,8 @@ struct SC::Span
         return false;
     }
 
-    [[nodiscard]] constexpr bool sliceStartLength(Size offsetInElements, Size lengthInElements, Span& other) const
+    [[nodiscard]] constexpr bool sliceStartLength(SizeType offsetInElements, SizeType lengthInElements,
+                                                  Span& other) const
     {
         if (offsetInElements + lengthInElements <= sizeInElements())
         {
@@ -73,8 +74,8 @@ struct SC::Span
     }
 
   private:
-    Type* items;
-    Size  sizeBytes;
+    Type*    items;
+    SizeType sizeBytes;
     template <typename O>
     friend struct SpanVoid;
 };

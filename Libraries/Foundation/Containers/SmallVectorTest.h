@@ -23,7 +23,7 @@ struct SC::SmallVectorTest : public SC::TestCase
             SC_TEST_EXPECT(vec.capacity() == 3);
             SC_TEST_EXPECT(vec.size() == 2);
             SegmentHeader* vecHeader = SegmentHeader::getSegmentHeader(vec.items);
-            SC_TEST_EXPECT(vecHeader->options.isSmallVector);
+            SC_TEST_EXPECT(vecHeader->isSmallVector);
         }
         if (test_section("resize stack heap"))
         {
@@ -31,17 +31,17 @@ struct SC::SmallVectorTest : public SC::TestCase
             SC_TEST_EXPECT(vec.resize(3));
             SegmentHeader* header;
             header = SegmentHeader::getSegmentHeader(vec.items);
-            SC_TEST_EXPECT(header->options.isSmallVector);
-            SC_TEST_EXPECT(not header->options.isFollowedBySmallVector);
+            SC_TEST_EXPECT(header->isSmallVector);
+            SC_TEST_EXPECT(not header->isFollowedBySmallVector);
             SC_TEST_EXPECT(vec.resize(4));
             header = SegmentHeader::getSegmentHeader(vec.items);
-            SC_TEST_EXPECT(not header->options.isSmallVector);
-            SC_TEST_EXPECT(header->options.isFollowedBySmallVector);
+            SC_TEST_EXPECT(not header->isSmallVector);
+            SC_TEST_EXPECT(header->isFollowedBySmallVector);
             SC_TEST_EXPECT(vec.resize(3));
             SC_TEST_EXPECT(vec.shrink_to_fit());
             header = SegmentHeader::getSegmentHeader(vec.items);
-            SC_TEST_EXPECT(header->options.isSmallVector);
-            SC_TEST_EXPECT(not header->options.isFollowedBySmallVector);
+            SC_TEST_EXPECT(header->isSmallVector);
+            SC_TEST_EXPECT(not header->isFollowedBySmallVector);
         }
         if (test_section("construction copy stack"))
         {
@@ -70,8 +70,8 @@ struct SC::SmallVectorTest : public SC::TestCase
                 vec2 = vec;
             }
             SegmentHeader* vec2Header = SegmentHeader::getSegmentHeader(vec2.items);
-            SC_TEST_EXPECT(not vec2Header->options.isSmallVector);
-            SC_TEST_EXPECT(vec2Header->options.isFollowedBySmallVector);
+            SC_TEST_EXPECT(not vec2Header->isSmallVector);
+            SC_TEST_EXPECT(vec2Header->isFollowedBySmallVector);
             SC_TEST_EXPECT(vec2.size() == 4);
             SC_TEST_EXPECT(vec2.buffer.size() == 0);
             checkItems(vec2, 4);
@@ -86,8 +86,8 @@ struct SC::SmallVectorTest : public SC::TestCase
                 vec2 = move(vec);
             }
             SegmentHeader* vec2Header = SegmentHeader::getSegmentHeader(vec2.items);
-            SC_TEST_EXPECT(not vec2Header->options.isSmallVector);
-            SC_TEST_EXPECT(not vec2Header->options.isFollowedBySmallVector);
+            SC_TEST_EXPECT(not vec2Header->isSmallVector);
+            SC_TEST_EXPECT(not vec2Header->isFollowedBySmallVector);
             checkItems(vec2, 3);
         }
         if (test_section("construction move SmallVector(heap)->Vector"))
@@ -103,12 +103,12 @@ struct SC::SmallVectorTest : public SC::TestCase
                 SC_TEST_EXPECT(vec.items != nullptr);
                 SegmentHeader* vec1Header2 = SegmentHeader::getSegmentHeader(vec.items);
                 SC_TEST_EXPECT(vec1Header2 == vec1Header);
-                SC_TEST_EXPECT(vec1Header2->options.isSmallVector);
+                SC_TEST_EXPECT(vec1Header2->isSmallVector);
                 SC_TEST_EXPECT(vec1Header2->capacityBytes == 3 * sizeof(int));
             }
             SegmentHeader* vec2Header = SegmentHeader::getSegmentHeader(vec2.items);
-            SC_TEST_EXPECT(not vec2Header->options.isSmallVector);
-            SC_TEST_EXPECT(not vec2Header->options.isFollowedBySmallVector);
+            SC_TEST_EXPECT(not vec2Header->isSmallVector);
+            SC_TEST_EXPECT(not vec2Header->isFollowedBySmallVector);
             checkItems(vec2, 4);
         }
         if (test_section("construction move Vector->SmallVector(heap)"))
@@ -122,8 +122,8 @@ struct SC::SmallVectorTest : public SC::TestCase
                 SC_TEST_EXPECT(vec.items == nullptr);
             }
             SegmentHeader* vec2Header = SegmentHeader::getSegmentHeader(vec2.items);
-            SC_TEST_EXPECT(not vec2Header->options.isSmallVector);
-            SC_TEST_EXPECT(vec2Header->options.isFollowedBySmallVector);
+            SC_TEST_EXPECT(not vec2Header->isSmallVector);
+            SC_TEST_EXPECT(vec2Header->isFollowedBySmallVector);
             checkItems(vec2, 4);
         }
         if (test_section("construction move Vector->SmallVector(stack)"))
@@ -137,8 +137,8 @@ struct SC::SmallVectorTest : public SC::TestCase
                 SC_TEST_EXPECT(vec.items == nullptr);
             }
             SegmentHeader* vec2Header = SegmentHeader::getSegmentHeader(vec2.items);
-            SC_TEST_EXPECT(not vec2Header->options.isSmallVector);
-            SC_TEST_EXPECT(vec2Header->options.isFollowedBySmallVector);
+            SC_TEST_EXPECT(not vec2Header->isSmallVector);
+            SC_TEST_EXPECT(vec2Header->isFollowedBySmallVector);
             SC_TEST_EXPECT(vec2.size() == 3);
             checkItems(vec2, 3);
         }
@@ -154,10 +154,10 @@ struct SC::SmallVectorTest : public SC::TestCase
                 SC_TEST_EXPECT(vec2.size() == 3);
                 SegmentHeader* vec1Header = SegmentHeader::getSegmentHeader(vec.items);
                 SC_TEST_EXPECT(vec1Header != nullptr);
-                SC_TEST_EXPECT(vec1Header->options.isSmallVector);
+                SC_TEST_EXPECT(vec1Header->isSmallVector);
             }
             SegmentHeader* vec2Header = SegmentHeader::getSegmentHeader(vec2.items);
-            SC_TEST_EXPECT(vec2Header->options.isSmallVector);
+            SC_TEST_EXPECT(vec2Header->isSmallVector);
             checkItems(vec2, 3);
         }
         if (test_section("construction move SmallVector(heap)->SmallVector(stack)"))
@@ -172,11 +172,11 @@ struct SC::SmallVectorTest : public SC::TestCase
                 SC_TEST_EXPECT(vec2.size() == 4);
                 SegmentHeader* vec1Header = SegmentHeader::getSegmentHeader(vec.items);
                 SC_TEST_EXPECT(vec1Header != nullptr);
-                SC_TEST_EXPECT(vec1Header->options.isSmallVector);
+                SC_TEST_EXPECT(vec1Header->isSmallVector);
             }
             SegmentHeader* vec2Header = SegmentHeader::getSegmentHeader(vec2.items);
-            SC_TEST_EXPECT(not vec2Header->options.isSmallVector);
-            SC_TEST_EXPECT(vec2Header->options.isFollowedBySmallVector);
+            SC_TEST_EXPECT(not vec2Header->isSmallVector);
+            SC_TEST_EXPECT(vec2Header->isFollowedBySmallVector);
             checkItems(vec2, 4);
         }
         if (test_section("construction move SmallVector(stack)->SmallVector(stack)"))
@@ -191,10 +191,10 @@ struct SC::SmallVectorTest : public SC::TestCase
                 SC_TEST_EXPECT(vec2.size() == 3);
                 SegmentHeader* vec1Header = SegmentHeader::getSegmentHeader(vec.items);
                 SC_TEST_EXPECT(vec1Header != nullptr);
-                SC_TEST_EXPECT(vec1Header->options.isSmallVector);
+                SC_TEST_EXPECT(vec1Header->isSmallVector);
             }
             SegmentHeader* vec2Header = SegmentHeader::getSegmentHeader(vec2.items);
-            SC_TEST_EXPECT(vec2Header->options.isSmallVector);
+            SC_TEST_EXPECT(vec2Header->isSmallVector);
             checkItems(vec2, 3);
         }
         if (test_section("construction move SmallVector(heap)->SmallVector(stack)"))
@@ -209,11 +209,11 @@ struct SC::SmallVectorTest : public SC::TestCase
                 SC_TEST_EXPECT(vec2.size() == 4);
                 SegmentHeader* vec1Header = SegmentHeader::getSegmentHeader(vec.items);
                 SC_TEST_EXPECT(vec1Header != nullptr);
-                SC_TEST_EXPECT(vec1Header->options.isSmallVector);
+                SC_TEST_EXPECT(vec1Header->isSmallVector);
             }
             SegmentHeader* vec2Header = SegmentHeader::getSegmentHeader(vec2.items);
-            SC_TEST_EXPECT(not vec2Header->options.isSmallVector);
-            SC_TEST_EXPECT(vec2Header->options.isFollowedBySmallVector);
+            SC_TEST_EXPECT(not vec2Header->isSmallVector);
+            SC_TEST_EXPECT(vec2Header->isFollowedBySmallVector);
             checkItems(vec2, 4);
         }
         if (test_section("move operations"))

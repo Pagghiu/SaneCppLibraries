@@ -21,19 +21,19 @@ struct SC_COMPILER_EXPORT SC::VectorAllocator
     static const size_t   SIZE_OF_VECTOR_T = 8;
     static SegmentHeader* reallocate(SegmentHeader* oldHeader, size_t newSize)
     {
-        if (newSize > static_cast<SegmentHeader::HeaderBytesType>(MaxValue()))
+        if (newSize > SegmentHeader::MaxValue)
         {
             return nullptr;
         }
         SegmentHeader* newHeader;
-        if (oldHeader->options.isSmallVector)
+        if (oldHeader->isSmallVector)
         {
             newHeader = static_cast<SegmentHeader*>(Memory::allocate(sizeof(SegmentHeader) + newSize));
             memcpy(newHeader, oldHeader,
                    sizeof(SegmentHeader) + min(newSize, static_cast<decltype(newSize)>(oldHeader->sizeBytes)));
             newHeader->initDefaults();
-            newHeader->capacityBytes                   = static_cast<decltype(SegmentHeader::capacityBytes)>(newSize);
-            newHeader->options.isFollowedBySmallVector = true;
+            newHeader->capacityBytes           = static_cast<decltype(SegmentHeader::capacityBytes)>(newSize);
+            newHeader->isFollowedBySmallVector = true;
         }
         else
         {
@@ -41,30 +41,30 @@ struct SC_COMPILER_EXPORT SC::VectorAllocator
         }
         if (newHeader)
         {
-            newHeader->capacityBytes = static_cast<SegmentHeader::HeaderBytesType>(newSize);
+            newHeader->capacityBytes = static_cast<SegmentHeader::SizeType>(newSize);
         }
         return newHeader;
     }
 
     static SegmentHeader* allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* pself)
     {
-        if (numNewBytes > static_cast<SegmentHeader::HeaderBytesType>(MaxValue()))
+        if (numNewBytes > SegmentHeader::MaxValue)
         {
             return nullptr;
         }
         if (oldHeader != nullptr)
         {
-            if (oldHeader->options.isFollowedBySmallVector)
+            if (oldHeader->isFollowedBySmallVector)
             {
                 // If we were folloed by a small vector, we check if that small vector has enough memory
                 SegmentHeader* followingHeader =
                     reinterpret_cast<SegmentHeader*>(static_cast<char*>(pself) + SIZE_OF_VECTOR_T); // vector
-                if (followingHeader->options.isSmallVector && followingHeader->capacityBytes >= numNewBytes)
+                if (followingHeader->isSmallVector && followingHeader->capacityBytes >= numNewBytes)
                 {
                     return followingHeader;
                 }
             }
-            else if (oldHeader->options.isSmallVector)
+            else if (oldHeader->isSmallVector)
             {
                 if (oldHeader->capacityBytes >= numNewBytes)
                 {
@@ -76,11 +76,11 @@ struct SC_COMPILER_EXPORT SC::VectorAllocator
         SegmentHeader* newHeader = static_cast<SegmentHeader*>(Memory::allocate(sizeof(SegmentHeader) + numNewBytes));
         if (newHeader)
         {
-            newHeader->capacityBytes = static_cast<SegmentHeader::HeaderBytesType>(numNewBytes);
+            newHeader->capacityBytes = static_cast<SegmentHeader::SizeType>(numNewBytes);
             newHeader->initDefaults();
-            if (oldHeader != nullptr && oldHeader->options.isSmallVector)
+            if (oldHeader != nullptr && oldHeader->isSmallVector)
             {
-                newHeader->options.isFollowedBySmallVector = true;
+                newHeader->isFollowedBySmallVector = true;
             }
         }
         return newHeader;
@@ -88,7 +88,7 @@ struct SC_COMPILER_EXPORT SC::VectorAllocator
 
     static void release(SegmentHeader* oldHeader)
     {
-        if (not oldHeader->options.isSmallVector)
+        if (not oldHeader->isSmallVector)
         {
             Memory::release(oldHeader);
         }
@@ -290,7 +290,7 @@ struct SC::Vector
             SC_LANGUAGE_UNLIKELY { return 0; }
         else
         {
-            return SegmentItems<T>::getSegment(items)->sizeBytes / sizeof(T);
+            return static_cast<size_t>(SegmentItems<T>::getSegment(items)->sizeBytes / sizeof(T));
         }
     }
 
@@ -300,7 +300,7 @@ struct SC::Vector
             SC_LANGUAGE_UNLIKELY { return 0; }
         else
         {
-            return SegmentItems<T>::getSegment(items)->capacityBytes / sizeof(T);
+            return static_cast<size_t>(SegmentItems<T>::getSegment(items)->capacityBytes / sizeof(T));
         }
     }
 
@@ -396,7 +396,7 @@ struct SC::Vector
     void moveAssign(Vector&& other)
     {
         SegmentHeader* otherHeader = other.items != nullptr ? SegmentHeader::getSegmentHeader(other.items) : nullptr;
-        const bool     otherIsSmallVector = otherHeader != nullptr && otherHeader->options.isSmallVector;
+        const bool     otherIsSmallVector = otherHeader != nullptr && otherHeader->isSmallVector;
         if (otherIsSmallVector)
         {
             // We can't "move" the small vector, so we just assign its items
@@ -406,16 +406,14 @@ struct SC::Vector
         }
         else
         {
-            const bool otherWasFollowedBySmallVector =
-                otherHeader != nullptr && otherHeader->options.isFollowedBySmallVector;
+            const bool otherWasFollowedBySmallVector = otherHeader != nullptr && otherHeader->isFollowedBySmallVector;
             if (otherHeader != nullptr)
             {
                 // Before grabbing other.items we want to remember our state of "followed by/being a small vector"
                 const SegmentHeader* oldHeader = items != nullptr ? SegmentHeader::getSegmentHeader(items) : nullptr;
                 const bool           shouldStillBeFollowedBySmallVector =
-                    oldHeader != nullptr &&
-                    (oldHeader->options.isFollowedBySmallVector || oldHeader->options.isSmallVector);
-                otherHeader->options.isFollowedBySmallVector = shouldStillBeFollowedBySmallVector;
+                    oldHeader != nullptr && (oldHeader->isFollowedBySmallVector || oldHeader->isSmallVector);
+                otherHeader->isFollowedBySmallVector = shouldStillBeFollowedBySmallVector;
             }
 
             destroy();

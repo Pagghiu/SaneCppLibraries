@@ -67,8 +67,8 @@ struct SC::SmallVector : public Vector<T>
   private:
     void init()
     {
-        SegmentHeader* header         = SegmentHeader::getSegmentHeader(buffer.items);
-        header->options.isSmallVector = true;
-        Vector<T>::items              = buffer.items;
+        SegmentHeader* header = SegmentHeader::getSegmentHeader(buffer.items);
+        header->isSmallVector = true;
+        Vector<T>::items      = buffer.items;
     }
 };

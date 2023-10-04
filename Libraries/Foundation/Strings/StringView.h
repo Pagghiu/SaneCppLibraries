@@ -20,9 +20,14 @@ struct SC_COMPILER_EXPORT SC::StringView
         const char*    text;
         const wchar_t* textWide;
     };
-    size_t         textSizeInBytes;
-    StringEncoding encoding;
-    bool           hasNullTerm;
+    using SizeType = size_t;
+
+    static constexpr SizeType NumOptionBits = 3;
+    static constexpr SizeType MaxLength     = (~static_cast<SizeType>(0)) >> NumOptionBits;
+
+    SizeType textSizeInBytes : sizeof(SizeType) * 8 - NumOptionBits;
+    SizeType hasNullTerm : 1;
+    SizeType encoding    : 2;
 
     template <typename StringIterator1, typename StringIterator2>
     static constexpr bool equalsIterator(StringIterator1 t1, StringIterator2 t2, size_t& points)
@@ -73,37 +78,55 @@ struct SC_COMPILER_EXPORT SC::StringView
     }
 
   public:
-    constexpr StringView() : text(nullptr), textSizeInBytes(0), encoding(StringEncoding::Ascii), hasNullTerm(false) {}
+    constexpr StringView()
+        : text(nullptr), textSizeInBytes(0), encoding(static_cast<SizeType>(StringEncoding::Ascii)), hasNullTerm(false)
+    {}
     constexpr StringView(Span<char> textSpan, bool nullTerm, StringEncoding encoding)
-        : text(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(encoding), hasNullTerm(nullTerm)
-    {}
+        : text(textSpan.data()), textSizeInBytes(static_cast<SizeType>(textSpan.sizeInBytes())),
+          encoding(static_cast<SizeType>(encoding)), hasNullTerm(nullTerm)
+    {
+        static_assert(sizeof(StringView) == sizeof(void*) + sizeof(SizeType), "StringView wrong size");
+        SC_ASSERT_DEBUG(textSpan.sizeInBytes() <= MaxLength);
+    }
     constexpr StringView(Span<const char> textSpan, bool nullTerm, StringEncoding encoding)
-        : text(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(encoding), hasNullTerm(nullTerm)
-    {}
-    constexpr StringView(const char* text, size_t bytes, bool nullTerm, StringEncoding encoding)
-        : text(text), textSizeInBytes(bytes), encoding(encoding), hasNullTerm(nullTerm)
-    {}
+        : text(textSpan.data()), textSizeInBytes(static_cast<SizeType>(textSpan.sizeInBytes())),
+          encoding(static_cast<SizeType>(encoding)), hasNullTerm(nullTerm)
+    {
+        SC_ASSERT_DEBUG(textSpan.sizeInBytes() <= MaxLength);
+    }
+    constexpr StringView(const char* text, size_t numBytes, bool nullTerm, StringEncoding encoding)
+        : text(text), textSizeInBytes(static_cast<SizeType>(numBytes)), encoding(static_cast<SizeType>(encoding)),
+          hasNullTerm(nullTerm)
+    {
+        SC_ASSERT_DEBUG(numBytes <= MaxLength);
+    }
 
     template <size_t N>
     constexpr StringView(const char (&text)[N])
-        : text(text), textSizeInBytes(N - 1), encoding(StringEncoding::Ascii), hasNullTerm(true)
+        : text(text), textSizeInBytes(N - 1), encoding(static_cast<SizeType>(StringEncoding::Ascii)), hasNullTerm(true)
     {}
 
 #if SC_PLATFORM_WINDOWS
     template <size_t N>
     constexpr StringView(const wchar_t (&text)[N])
-        : textWide(text), textSizeInBytes((N - 1) * sizeof(wchar_t)), encoding(StringEncoding::Wide), hasNullTerm(true)
+        : textWide(text), textSizeInBytes((N - 1) * sizeof(wchar_t)),
+          encoding(static_cast<SizeType>(StringEncoding::Wide)), hasNullTerm(true)
     {}
 
-    constexpr StringView(const wchar_t* text, size_t bytes, bool nullTerm)
-        : textWide(text), textSizeInBytes(bytes), encoding(StringEncoding::Wide), hasNullTerm(nullTerm)
-    {}
+    constexpr StringView(const wchar_t* text, size_t numBytes, bool nullTerm)
+        : textWide(text), textSizeInBytes(static_cast<SizeType>(numBytes)),
+          encoding(static_cast<SizeType>(StringEncoding::Wide)), hasNullTerm(nullTerm)
+    {
+        SC_ASSERT_DEBUG(numBytes <= MaxLength);
+    }
     constexpr StringView(Span<const wchar_t> textSpan, bool nullTerm)
-        : textWide(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(StringEncoding::Wide),
-          hasNullTerm(nullTerm)
-    {}
+        : textWide(textSpan.data()), textSizeInBytes(static_cast<SizeType>(textSpan.sizeInBytes())),
+          encoding(static_cast<SizeType>(StringEncoding::Wide)), hasNullTerm(nullTerm)
+    {
+        SC_ASSERT_DEBUG(textSpan.sizeInBytes() <= MaxLength);
+    }
 #endif
-    [[nodiscard]] constexpr StringEncoding getEncoding() const { return encoding; }
+    [[nodiscard]] constexpr StringEncoding getEncoding() const { return static_cast<StringEncoding>(encoding); }
     [[nodiscard]] constexpr const char*    bytesWithoutTerminator() const { return text; }
     [[nodiscard]] constexpr const char*    bytesIncludingTerminator() const
     {
@@ -113,13 +136,14 @@ struct SC_COMPILER_EXPORT SC::StringView
 #if SC_PLATFORM_WINDOWS
     [[nodiscard]] const wchar_t* getNullTerminatedNative() const
     {
-        SC_ASSERT_RELEASE(hasNullTerm && (encoding == StringEncoding::Utf16));
+        SC_ASSERT_RELEASE(hasNullTerm && (getEncoding() == StringEncoding::Utf16));
         return reinterpret_cast<const wchar_t*>(text);
     }
 #else
     [[nodiscard]] const char* getNullTerminatedNative() const
     {
-        SC_ASSERT_RELEASE(hasNullTerm && (encoding == StringEncoding::Utf8 || encoding == StringEncoding::Ascii));
+        SC_ASSERT_RELEASE(hasNullTerm &&
+                          (getEncoding() == StringEncoding::Utf8 || getEncoding() == StringEncoding::Ascii));
         return text;
     }
 #endif
@@ -190,7 +214,7 @@ struct SC_COMPILER_EXPORT SC::StringView
     [[nodiscard]] constexpr size_t sizeInBytesIncludingTerminator() const
     {
         SC_ASSERT_RELEASE(hasNullTerm);
-        return textSizeInBytes > 0 ? textSizeInBytes + StringEncodingGetSize(encoding) : 0;
+        return textSizeInBytes > 0 ? textSizeInBytes + StringEncodingGetSize(getEncoding()) : 0;
     }
 
     template <typename Func>
@@ -215,7 +239,7 @@ struct SC_COMPILER_EXPORT SC::StringView
 
     [[nodiscard]] constexpr bool hasCompatibleEncoding(StringView str) const
     {
-        return StringEncodingAreBinaryCompatible(encoding, str.encoding);
+        return StringEncodingAreBinaryCompatible(getEncoding(), str.getEncoding());
     }
 
     /// Returns a StringView from two iterators. The from iterator will be shortened until the start of to
@@ -286,7 +310,7 @@ struct SC_COMPILER_EXPORT SC::StringView
         if (start < sizeInBytes())
             return sliceStartLengthBytes(start, sizeInBytes() - start);
         SC_ASSERT_RELEASE(start < sizeInBytes());
-        return StringView(text, 0, false, encoding);
+        return StringView(text, 0, false, getEncoding());
     }
 
     [[nodiscard]] constexpr StringView sliceStartEndBytes(size_t start, size_t end) const
@@ -294,7 +318,7 @@ struct SC_COMPILER_EXPORT SC::StringView
         if (end >= start)
             return sliceStartLengthBytes(start, end - start);
         SC_ASSERT_RELEASE(end >= start);
-        return StringView(text, 0, false, encoding);
+        return StringView(text, 0, false, getEncoding());
     }
 
     [[nodiscard]] constexpr StringView sliceStartLengthBytes(size_t start, size_t length) const
@@ -302,9 +326,9 @@ struct SC_COMPILER_EXPORT SC::StringView
         if (start + length > sizeInBytes())
         {
             SC_ASSERT_RELEASE(start + length > sizeInBytes());
-            return StringView(text, 0, false, encoding);
+            return StringView(text, 0, false, getEncoding());
         }
-        return StringView(text + start, length, hasNullTerm and (start + length == sizeInBytes()), encoding);
+        return StringView(text + start, length, hasNullTerm and (start + length == sizeInBytes()), getEncoding());
     }
 
     /// If the current view is an integer number, returns true

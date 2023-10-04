@@ -7,7 +7,7 @@
 
 bool SC::StringView::parseInt32(int32_t& value) const
 {
-    if (encoding != StringEncoding::Ascii and encoding != StringEncoding::Utf8)
+    if (getEncoding() != StringEncoding::Ascii and getEncoding() != StringEncoding::Utf8)
     {
         return false;
     }
@@ -141,7 +141,7 @@ bool SC::StringView::startsWith(const StringView str) const
     {
         if (str.textSizeInBytes <= textSizeInBytes)
         {
-            const StringView ours(text, str.textSizeInBytes, false, encoding);
+            const StringView ours(text, str.textSizeInBytes, false, getEncoding());
             return str == ours;
         }
         return false;
@@ -155,7 +155,8 @@ bool SC::StringView::endsWith(const StringView str) const
     {
         if (str.sizeInBytes() <= sizeInBytes())
         {
-            const StringView ours(text + textSizeInBytes - str.textSizeInBytes, str.textSizeInBytes, false, encoding);
+            const StringView ours(text + textSizeInBytes - str.textSizeInBytes, str.textSizeInBytes, false,
+                                  getEncoding());
             return str == ours;
         }
         return false;
@@ -194,7 +195,7 @@ SC::StringView SC::StringView::sliceStartEnd(size_t start, size_t end) const
             SC_ASSERT_RELEASE(start <= end && it.advanceCodePoints(end - start));
             const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
             return StringView(startIt.getCurrentIt(), distance,
-                              hasNullTerm and (start + distance == sizeInBytesIncludingTerminator()), encoding);
+                              hasNullTerm and (start + distance == sizeInBytesIncludingTerminator()), getEncoding());
         });
 }
 
@@ -208,7 +209,7 @@ SC::StringView SC::StringView::sliceStart(size_t offset) const
             it.setToEnd();
             const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
             return StringView(startIt.getCurrentIt(), distance,
-                              hasNullTerm and (offset + distance == sizeInBytesIncludingTerminator()), encoding);
+                              hasNullTerm and (offset + distance == sizeInBytesIncludingTerminator()), getEncoding());
         });
 }
 
@@ -222,7 +223,7 @@ SC::StringView SC::StringView::sliceEnd(size_t offset) const
             SC_ASSERT_RELEASE(it.reverseAdvanceCodePoints(offset));
             const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
             return StringView(startIt.getCurrentIt(), distance,
-                              hasNullTerm and (offset + distance == sizeInBytesIncludingTerminator()), encoding);
+                              hasNullTerm and (offset + distance == sizeInBytesIncludingTerminator()), getEncoding());
         });
 }
 

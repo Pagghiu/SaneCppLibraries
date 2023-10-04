@@ -173,9 +173,9 @@ struct SC::SmallString : public String
   private:
     void init()
     {
-        SegmentHeader* header         = SegmentHeader::getSegmentHeader(buffer.items);
-        header->options.isSmallVector = true;
-        String::data.items            = buffer.items;
+        SegmentHeader* header = SegmentHeader::getSegmentHeader(buffer.items);
+        header->isSmallVector = true;
+        String::data.items    = buffer.items;
     }
 };
 
