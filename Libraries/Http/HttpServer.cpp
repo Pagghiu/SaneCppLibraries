@@ -61,7 +61,7 @@ SC::Result SC::HttpServer::parse(Span<const char> readData, ClientChannel& clien
         parsedSuccessfully = false;
         return Result::Error("Header size exceeded limit");
     }
-    SC_TRY(client.request.headerBuffer.push_back(readData));
+    SC_TRY(client.request.headerBuffer.append(readData));
     size_t readBytes;
     while (client.request.parsedSuccessfully and not readData.empty())
     {

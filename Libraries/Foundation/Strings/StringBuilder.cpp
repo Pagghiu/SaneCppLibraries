@@ -59,15 +59,15 @@ bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf
         auto sourceIt    = current.getIterator<StringIteratorASCII>();
         res              = sourceIt.advanceBeforeFinding(occurrencesIterator);
         StringView soFar = StringView::fromIteratorFromStart(sourceIt);
-        SC_TRY(stringData.appendCopy(soFar.bytesWithoutTerminator(), soFar.sizeInBytes()));
+        SC_TRY(stringData.append(soFar.toCharSpan()));
         if (res)
         {
-            SC_TRY(stringData.appendCopy(with.bytesWithoutTerminator(), with.sizeInBytes()));
+            SC_TRY(stringData.append(with.toCharSpan()));
             res     = sourceIt.advanceByLengthOf(occurrencesIterator);
             current = StringView::fromIteratorUntilEnd(sourceIt);
         }
     } while (res);
-    SC_TRY(stringData.appendCopy(current.bytesWithoutTerminator(), current.sizeInBytes()));
+    SC_TRY(stringData.append(current.toCharSpan()));
     return StringConverter::pushNullTerm(stringData, encoding);
 }
 

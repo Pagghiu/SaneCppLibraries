@@ -360,7 +360,7 @@ struct SC::SegmentOperations
             {
                 clear(selfSegment);
             }
-            const bool res = insert<true>(oldItems, 0, other, otherSize); // appendCopy(other);
+            const bool res = insert<true>(oldItems, 0, other, otherSize); // append(other);
             return res;
         }
     }
@@ -625,8 +625,8 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
     }
     ~Segment() { Operations::destroy(this); }
 
-    Span<const T> toSpanConst() const { return {items, Parent::sizeBytes}; }
-    Span<T>       toSpan() { return {items, Parent::sizeBytes}; }
+    Span<const T> toSpanConst() const { return {items, Parent::sizeBytes / sizeof(T)}; }
+    Span<T>       toSpan() { return {items, Parent::sizeBytes / sizeof(T)}; }
 
     [[nodiscard]] T& front()
     {
@@ -659,14 +659,14 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
     {
         Segment::sizeBytes     = 0;
         Segment::capacityBytes = sizeof(T) * N;
-        (void)appendCopy(other.items, other.size());
+        (void)append(other.items, other.size());
     }
 
     Segment(Segment&& other)
     {
         Segment::sizeBytes     = 0;
         Segment::capacityBytes = sizeof(T) * N;
-        (void)appendMove(other.items, other.size());
+        (void)appendMove(other.toSpan());
     }
 
     Segment& operator=(const Segment& other)
@@ -686,7 +686,7 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
         if (&other != this)
         {
             Operations::clear(SegmentItems<T>::getSegment(items));
-            if (appendMove(other.items, other.size()))
+            if (appendMove(other.toSpan()))
             {
                 Operations::clear(SegmentItems<T>::getSegment(other.items));
             }
@@ -697,10 +697,10 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
     template <typename Allocator2, int M>
     Segment(const Segment<Allocator2, T, M>& other)
     {
-        static_assert(M <= N, "Unsafe operation, cannot report failure inside constructor, use appendCopy instead");
+        static_assert(M <= N, "Unsafe operation, cannot report failure inside constructor, use append instead");
         Segment::sizeBytes     = 0;
         Segment::capacityBytes = sizeof(T) * N;
-        (void)appendCopy(other.items, other.size());
+        (void)append(other.toSpanConst());
     }
     template <typename Allocator2, int M>
     Segment(Segment<Allocator2, T, M>&& other)
@@ -774,6 +774,8 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
         return items[index];
     }
 
+    void clear() { Operations::clear(SegmentItems<T>::getSegment(items)); }
+
     [[nodiscard]] bool reserve(size_t newCap) { return newCap <= Segment::capacity(); }
     [[nodiscard]] bool resize(size_t newSize, const T& value = T())
     {
@@ -799,46 +801,30 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
     [[nodiscard]] T*       data() { return items; }
     [[nodiscard]] const T* data() const { return items; }
 
-    [[nodiscard]] bool insertMove(size_t idx, T* src, size_t srcSize)
+    [[nodiscard]] bool insert(size_t idx, Span<const T> data)
     {
         T* oldItems = items;
-        return Operations::template insert<false>(oldItems, idx, src, srcSize);
+        return Operations::template insert<true>(oldItems, idx, data.data(), data.sizeInElements());
     }
-    [[nodiscard]] bool insertCopy(size_t idx, const T* src, size_t srcSize)
+    [[nodiscard]] bool append(Span<const T> data)
     {
         T* oldItems = items;
-        return Operations::template insert<true>(oldItems, idx, src, srcSize);
+        return Operations::template insert<true>(oldItems, Segment::size(), data.data(), data.sizeInElements());
     }
-    [[nodiscard]] bool appendMove(T* src, size_t srcNumItems)
-    {
-        T* oldItems = items;
-        return Operations::template insert<false>(oldItems, Segment::size(), src, srcNumItems);
-    }
-    [[nodiscard]] bool appendCopy(const T* src, size_t srcNumItems)
-    {
-        T* oldItems = items;
-        return Operations::template insert<true>(oldItems, Segment::size(), src, srcNumItems);
-    }
+
     template <typename U>
-    [[nodiscard]] bool appendMove(U&& src)
+    [[nodiscard]] bool append(U&& src)
     {
-        if (appendMove(src.data(), src.size()))
+        if (append({src.data(), src.size()}))
         {
             src.clear();
             return true;
         }
         return false;
     }
-    template <typename U>
-    [[nodiscard]] bool appendCopy(const U& src)
-    {
-        return appendCopy(src.data(), src.size());
-    }
-
-    [[nodiscard]] bool push_back(std::initializer_list<T> src) { return appendCopy(src.begin(), src.size()); }
 
     template <typename U>
-    [[nodiscard]] bool push_back(Span<U> src)
+    [[nodiscard]] bool append(Span<U> src)
     {
         const auto oldSize = Segment::size();
         if (reserve(src.sizeInElements()))
@@ -904,5 +890,27 @@ struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
             return removeAt(index);
         }
         return false;
+    }
+
+  private:
+    [[nodiscard]] bool appendMove(Span<T> data)
+    {
+        T* oldItems = items;
+        return Operations::template insert<false>(oldItems, Segment::size(), data.data(), data.sizeInElements());
+    }
+    template <typename U>
+    [[nodiscard]] bool appendMove(U&& src)
+    {
+        if (appendMove(src.data(), src.size()))
+        {
+            src.clear();
+            return true;
+        }
+        return false;
+    }
+    [[nodiscard]] bool insertMove(size_t idx, T* src, size_t srcSize)
+    {
+        T* oldItems = items;
+        return Operations::template insert<false>(oldItems, idx, src, srcSize);
     }
 };

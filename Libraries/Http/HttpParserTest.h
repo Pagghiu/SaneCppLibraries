@@ -42,7 +42,7 @@ struct SC::HttpParserTest : public SC::TestCase
                 position += readBytes;
                 if (parser.state == HttpParser::State::Finished)
                     break;
-                SC_TEST_EXPECT(currentField.push_back(parsedData));
+                SC_TEST_EXPECT(currentField.append(parsedData));
                 if (parser.state == HttpParser::State::Result)
                 {
                     const StringView parsed(currentField.toSpan(), false, StringEncoding::Ascii);
@@ -125,7 +125,7 @@ struct SC::HttpParserTest : public SC::TestCase
                 const auto       sv = originalString.sliceStartLengthBytes(position, length);
                 Span<const char> parsedData;
                 SC_TEST_EXPECT(parser.parse(sv.toCharSpan(), readBytes, parsedData));
-                SC_TEST_EXPECT(currentField.push_back(parsedData));
+                SC_TEST_EXPECT(currentField.append(parsedData));
                 position += readBytes;
                 if (parser.state == HttpParser::State::Finished)
                     break;

@@ -365,8 +365,8 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, StringVi
     SC_TRY(libNameBuilder.append(exeName));
     SC_TRY(libNameBuilder.append(L".lib"));
 
-    SC_TRY(args.appendCopy({linkerPath.view(), L"/DLL", L"/DEBUG", L"/NODEFAULTLIB", L"/ENTRY:DllMain", "/SAFESEH:NO",
-                            libPath.view(), libName.view()}));
+    SC_TRY(args.append({linkerPath.view(), L"/DLL", L"/DEBUG", L"/NODEFAULTLIB", L"/ENTRY:DllMain", "/SAFESEH:NO",
+                        libPath.view(), libName.view()}));
     for (auto& obj : objectFiles)
     {
         SC_TRY(args.push_back(obj.view()));
@@ -374,14 +374,13 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, StringVi
     SC_TRY(args.push_back(outFile.view()));
     SC_COMPILER_UNUSED(executablePath);
 #else
-    SC_TRY(
-        args.appendCopy({"clang", "-bundle_loader", executablePath, "-bundle", "-fpic", "-nostdlib++", "-nostdlib"}));
+    SC_TRY(args.append({"clang", "-bundle_loader", executablePath, "-bundle", "-fpic", "-nostdlib++", "-nostdlib"}));
     SC_TRY(objectFiles.reserve(definition.files.size()));
     for (auto& obj : objectFiles)
     {
         SC_TRY(args.push_back(obj.view()));
     }
-    SC_TRY(args.appendCopy({"-o", destFile.view()}));
+    SC_TRY(args.append({"-o", destFile.view()}));
 #endif
     SC_TRY(process.formatArguments(args.toSpanConst()));
     SC_TRY(process.launch());

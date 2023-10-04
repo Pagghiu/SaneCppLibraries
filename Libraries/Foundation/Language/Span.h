@@ -28,6 +28,7 @@ struct SC::Span
         items        = ilist.begin();
         sizeElements = ilist.size();
     }
+    operator Span<const Type>() const { return {items, sizeElements}; }
 
     template <typename T>
     [[nodiscard]] static Span<Type> reinterpret_object(T& value)

@@ -179,8 +179,8 @@ SC::Result SC::FileDescriptor::readAppend(Vector<char>& output, Span<char> fallb
         else
         {
             SC_TRY_MSG(
-                output.appendCopy(fallbackBuffer.data(), static_cast<size_t>(numReadBytes)),
-                "FileDescriptor::readAppend - appendCopy failed. Bytes have been read from stream and will get lost");
+                output.append({fallbackBuffer.data(), static_cast<size_t>(numReadBytes)}),
+                "FileDescriptor::readAppend - append failed. Bytes have been read from stream and will get lost");
         }
         result = ReadResult{static_cast<size_t>(numReadBytes), false};
         return Result(true);

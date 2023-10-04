@@ -182,7 +182,7 @@ bool StringFormatOutput::write(StringView text)
     {
         if (StringEncodingAreBinaryCompatible(encoding, text.getEncoding()))
         {
-            return data->appendCopy(text.bytesWithoutTerminator(), text.sizeInBytes());
+            return data->append(text.toCharSpan());
         }
         else
         {

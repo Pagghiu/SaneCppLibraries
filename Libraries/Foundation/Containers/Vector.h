@@ -118,14 +118,14 @@ struct SC::Vector
     T* items;
 
     Vector() : items(nullptr) {}
-    Vector(std::initializer_list<T> ilist) : items(nullptr) { (void)appendCopy(ilist.begin(), ilist.size()); }
+    Vector(std::initializer_list<T> ilist) : items(nullptr) { (void)append({ilist.begin(), ilist.size()}); }
     Vector(const Vector& other) : items(nullptr)
     {
         static_assert(sizeof(Vector) == sizeof(void*), "asd");
         const size_t otherSize = other.size();
         if (otherSize > 0)
         {
-            const bool res = appendCopy(other);
+            const bool res = append(other.toSpanConst());
             (void)res;
             SC_ASSERT_DEBUG(res);
         }
@@ -189,32 +189,10 @@ struct SC::Vector
         return items[index];
     }
 
-    [[nodiscard]] bool push_front(const T& element) { return insertCopy(0, &element, 1); }
+    [[nodiscard]] bool push_front(const T& element) { return insert(0, {&element, 1}); }
+    [[nodiscard]] bool push_front(T&& element) { return insertMove(0, {&element, 1}); }
     [[nodiscard]] bool push_back(const T& element) { return SegmentOperationsT::push_back(items, element); }
     [[nodiscard]] bool push_back(T&& element) { return SegmentOperationsT::push_back(items, forward<T>(element)); }
-
-    // TODO: Check if this can be unified with the same version inside Segment
-    template <typename U>
-    [[nodiscard]] bool push_back(Span<U> src)
-    {
-        const auto oldSize = size();
-        if (reserve(src.sizeInElements()))
-        {
-            for (auto& it : src)
-            {
-                if (not push_back(it))
-                {
-                    break;
-                }
-            }
-        }
-        if (oldSize + src.sizeInElements() != size())
-        {
-            SC_TRUST_RESULT(resize(oldSize));
-            return false;
-        }
-        return true;
-    }
 
     [[nodiscard]] bool pop_back() { return SegmentOperationsT::pop_back(items); }
     [[nodiscard]] bool pop_front() { return SegmentOperationsT::pop_front(items); }
@@ -310,39 +288,48 @@ struct SC::Vector
     [[nodiscard]] T*       data() { return items; }
     [[nodiscard]] const T* data() const { return items; }
 
-    [[nodiscard]] bool insertMove(size_t idx, T* src, size_t srcNumItems)
+    [[nodiscard]] bool insert(size_t idx, Span<const T> data)
     {
-        return SegmentOperationsT::template insert<false>(items, idx, src, srcNumItems);
-    }
-    [[nodiscard]] bool insertCopy(size_t idx, const T* src, size_t srcNumItems)
-    {
-        return SegmentOperationsT::template insert<true>(items, idx, src, srcNumItems);
-    }
-    [[nodiscard]] bool appendMove(T* src, size_t srcNumItems)
-    {
-        return SegmentOperationsT::template insert<false>(items, size(), src, srcNumItems);
+        return SegmentOperationsT::template insert<true>(items, idx, data.data(), data.sizeInElements());
     }
 
-    [[nodiscard]] bool appendCopy(std::initializer_list<T> src) { return appendCopy(src.begin(), src.size()); }
-
-    [[nodiscard]] bool appendCopy(const T* src, size_t srcNumItems)
+    [[nodiscard]] bool append(Span<const T> data)
     {
-        return SegmentOperationsT::template insert<true>(items, size(), src, srcNumItems);
+        return SegmentOperationsT::template insert<true>(items, size(), data.data(), data.sizeInElements());
     }
+
     template <typename U>
-    [[nodiscard]] bool appendMove(U&& src)
+    [[nodiscard]] bool append(U&& src)
     {
-        if (appendMove(src.data(), src.size()))
+        if (appendMove({src.data(), src.size()}))
         {
             src.clear();
             return true;
         }
         return false;
     }
+
+    // TODO: Check if this can be unified with the same version inside Segment
     template <typename U>
-    [[nodiscard]] bool appendCopy(const U& src)
+    [[nodiscard]] bool append(Span<U> src)
     {
-        return appendCopy(src.data(), src.size());
+        const auto oldSize = size();
+        if (reserve(src.sizeInElements()))
+        {
+            for (auto& it : src)
+            {
+                if (not push_back(it))
+                {
+                    break;
+                }
+            }
+        }
+        if (oldSize + src.sizeInElements() != size())
+        {
+            SC_TRUST_RESULT(resize(oldSize));
+            return false;
+        }
+        return true;
     }
 
     template <typename U>
@@ -395,6 +382,16 @@ struct SC::Vector
         }
         items = nullptr;
     }
+
+    [[nodiscard]] bool insertMove(size_t idx, Span<T> data)
+    {
+        return SegmentOperationsT::template insert<false>(items, idx, data.data(), data.sizeInElements());
+    }
+    [[nodiscard]] bool appendMove(Span<T> data)
+    {
+        return SegmentOperationsT::template insert<false>(items, size(), data.data(), data.sizeInElements());
+    }
+
     void moveAssign(Vector&& other)
     {
         SegmentHeader* otherHeader = other.items != nullptr ? SegmentHeader::getSegmentHeader(other.items) : nullptr;
@@ -403,7 +400,7 @@ struct SC::Vector
         {
             // We can't "move" the small vector, so we just assign its items
             clear();
-            (void)appendMove(other.items, other.size());
+            (void)appendMove({other.items, other.size()});
             other.clear();
         }
         else

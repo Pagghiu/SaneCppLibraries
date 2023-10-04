@@ -59,7 +59,7 @@ bool SC::SerializationBinaryTypeErased::ArrayAccess::resize(uint32_t linkID, Spa
 bool SC::Serialization::BinaryBuffer::serializeBytes(Span<const uint8_t> object)
 {
     numberOfOperations++;
-    return buffer.appendCopy(object.data(), object.sizeInBytes());
+    return buffer.append(object);
 }
 
 bool SC::Serialization::BinaryBuffer::serializeBytes(Span<uint8_t> object)

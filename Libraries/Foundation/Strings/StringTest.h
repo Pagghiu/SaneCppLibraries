@@ -93,7 +93,7 @@ struct SC::StringTest : public SC::TestCase
         {
             SmallVector<char, 5> myStuff;
             StringView           test = "ASDF";
-            (void)myStuff.appendCopy(test.bytesIncludingTerminator(), test.sizeInBytesIncludingTerminator());
+            (void)myStuff.append({test.bytesIncludingTerminator(), test.sizeInBytesIncludingTerminator()});
             SmallString<5> ss = SmallString<5>(move(myStuff), test.getEncoding());
             SC_TEST_EXPECT(ss.data.size() == 5);
             SC_TEST_EXPECT(ss.data.capacity() == 5);

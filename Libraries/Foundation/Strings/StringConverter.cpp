@@ -32,8 +32,8 @@ bool SC::StringConverter::convertSameEncoding(StringView text, Vector<char>& buf
         const bool forceCopy = encodedText == nullptr;
         if (forceCopy)
         {
-            SC_TRY(buffer.appendCopy(text.bytesIncludingTerminator(),
-                                     nullTerminate ? text.sizeInBytesIncludingTerminator() : text.sizeInBytes()));
+            SC_TRY(buffer.append({text.bytesIncludingTerminator(),
+                                  nullTerminate ? text.sizeInBytesIncludingTerminator() : text.sizeInBytes()}));
         }
         else
         {
@@ -53,7 +53,7 @@ bool SC::StringConverter::convertSameEncoding(StringView text, Vector<char>& buf
         {
             const auto numZeros = StringEncodingGetSize(text.getEncoding());
             SC_TRY(buffer.reserve(buffer.size() + text.sizeInBytes() + numZeros));
-            SC_TRY(buffer.appendCopy(text.bytesWithoutTerminator(), text.sizeInBytes()));
+            SC_TRY(buffer.append(text.toCharSpan()));
             if (encodedText)
             {
                 *encodedText = StringView(buffer.data(), buffer.size(), true, text.getEncoding());

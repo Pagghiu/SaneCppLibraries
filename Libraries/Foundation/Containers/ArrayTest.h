@@ -55,7 +55,7 @@ struct SC::ArrayTest : public SC::TestCase
             {
                 Vector<char> str;
                 SC_TEST_EXPECT(
-                    str.appendCopy(testString.bytesIncludingTerminator(), testString.sizeInBytesIncludingTerminator()));
+                    str.append({testString.bytesIncludingTerminator(), testString.sizeInBytesIncludingTerminator()}));
                 SC_TEST_EXPECT(arr.push_back(str));
                 SC_TEST_EXPECT(arr.push_back(str));
             }
@@ -69,7 +69,7 @@ struct SC::ArrayTest : public SC::TestCase
             Array<Vector<char>, 10> arr;
             Vector<char>            str;
             SC_TEST_EXPECT(
-                str.appendCopy(testString.bytesIncludingTerminator(), testString.sizeInBytesIncludingTerminator()));
+                str.append({testString.bytesIncludingTerminator(), testString.sizeInBytesIncludingTerminator()}));
 
             SC_TEST_EXPECT(arr.resize(2, str));
             Array<Vector<char>, 11> arr2 = arr;
@@ -79,7 +79,7 @@ struct SC::ArrayTest : public SC::TestCase
             SC_TEST_EXPECT(sv == testString);
 
             Array<Vector<char>, 2> arr3;
-            SC_TEST_EXPECT(arr3.appendCopy(arr));
+            SC_TEST_EXPECT(arr3.append(arr));
             sv = StringView(arr3.back().data(), arr3.back().size() - 1, true, StringEncoding::Ascii);
             SC_TEST_EXPECT(sv == testString);
         }

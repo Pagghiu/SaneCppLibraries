@@ -151,12 +151,12 @@ struct CompileFlags : public TaggedMap<Compile::Type, Compile::Union>
 {
     [[nodiscard]] bool addIncludes(Span<const StringView> includes)
     {
-        return getOrCreate<Compile::includePaths>()->push_back(includes);
+        return getOrCreate<Compile::includePaths>()->append(includes);
     }
 
     [[nodiscard]] bool addDefines(Span<const StringView> defines)
     {
-        return getOrCreate<Compile::preprocessorDefines>()->push_back(defines);
+        return getOrCreate<Compile::preprocessorDefines>()->append(defines);
     }
 };
 
@@ -198,12 +198,12 @@ struct LinkFlags : public TaggedMap<Link::Type, Link::Union>
 {
     [[nodiscard]] bool addLink(Span<const StringView> libraries)
     {
-        return getOrCreate<Link::libraryPaths>()->push_back(libraries);
+        return getOrCreate<Link::libraryPaths>()->append(libraries);
     }
 
     [[nodiscard]] bool addFrameworks(Span<const StringView> frameworks)
     {
-        return getOrCreate<Link::libraryFrameworks>()->push_back(frameworks);
+        return getOrCreate<Link::libraryFrameworks>()->append(frameworks);
     }
 };
 
