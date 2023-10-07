@@ -31,7 +31,7 @@ SC::Result SC::HttpClient::get(EventLoop& loop, StringView url)
                      parser.path, "SC", "127.0.0.1"));
     const char* dbgName = customDebugName.isEmpty() ? "HttpClient" : customDebugName.bytesIncludingTerminator();
     connectAsync.setDebugName(dbgName);
-    connectAsync.callback.bind<HttpClient, &HttpClient::onConnected>(this);
+    connectAsync.callback.bind<HttpClient, &HttpClient::onConnected>(*this);
     return connectAsync.start(*eventLoop, clientSocket, localHost);
 }
 
@@ -47,7 +47,7 @@ void SC::HttpClient::onConnected(AsyncSocketConnect::Result& result)
         customDebugName.isEmpty() ? "HttpClient::clientSocket" : customDebugName.bytesIncludingTerminator();
     sendAsync.setDebugName(dbgName);
 
-    sendAsync.callback.bind<HttpClient, &HttpClient::onAfterSend>(this);
+    sendAsync.callback.bind<HttpClient, &HttpClient::onAfterSend>(*this);
     auto res = sendAsync.start(*eventLoop, clientSocket, content.toSpanConst());
     if (not res)
     {
@@ -64,7 +64,7 @@ void SC::HttpClient::onAfterSend(AsyncSocketSend::Result& result)
         customDebugName.isEmpty() ? "HttpClient::clientSocket" : customDebugName.bytesIncludingTerminator();
     receiveAsync.setDebugName(dbgName);
 
-    receiveAsync.callback.bind<HttpClient, &HttpClient::onAfterRead>(this);
+    receiveAsync.callback.bind<HttpClient, &HttpClient::onAfterRead>(*this);
     auto res = receiveAsync.start(*eventLoop, clientSocket, content.toSpan());
     if (not res)
     {

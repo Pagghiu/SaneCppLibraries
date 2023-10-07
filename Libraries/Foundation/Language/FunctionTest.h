@@ -20,6 +20,7 @@ struct SC::FunctionTest : public SC::TestCase
         int  getValue() const { return data; }
 
         static int freeFunc(int value) { return value + 1; }
+        static int freeFunc2(int value) { return value - 1; }
 
       private:
         int data = 0;
@@ -35,8 +36,8 @@ struct SC::FunctionTest : public SC::TestCase
             Function<void(int)> setValue;
             Function<int(void)> getValue;
             Function<int(int)>  freeFunc;
-            setValue.bind<TestClass, &TestClass::setValue>(&tc);
-            getValue.bind<TestClass, &TestClass::getValue>(&tc);
+            setValue.bind<TestClass, &TestClass::setValue>(tc);
+            getValue.bind<TestClass, &TestClass::getValue>(tc);
             freeFunc.bind<&TestClass::freeFunc>();
             SC_TEST_EXPECT(getValue() == 0);
             setValue(3);
@@ -52,9 +53,12 @@ struct SC::FunctionTest : public SC::TestCase
         {
             TestClass tc;
 
-            auto freeFunc = SC::FunctionDeducer(&TestClass::freeFunc).Bind<&TestClass::freeFunc>();
-            auto setValue = SC::FunctionDeducer(&TestClass::setValue).Bind<&TestClass::setValue>(&tc);
-            auto getValue = SC_FUNCTION_BIND(&TestClass::getValue, &tc);
+            Function<int(int)> freeFunc = &TestClass::freeFunc2;
+            SC_TEST_EXPECT(freeFunc(2) == 1);
+            freeFunc = &TestClass::freeFunc;
+            SC_TEST_EXPECT(freeFunc(2) == 3);
+            auto setValue = Function<void(int)>::fromMember<TestClass, &TestClass::setValue>(tc);
+            auto getValue = Function<int()>::fromMember<TestClass, &TestClass::getValue>(tc);
 
             Function<int(int)> lambdaFreeFunc  = &TestClass::freeFunc;
             Function<int(int)> lambdaFreeFunc2 = lambdaFreeFunc;        // Copy Construct

@@ -8,19 +8,19 @@ namespace SC
 {
 template <typename FuncType>
 struct Function;
-enum class FunctionErasedOperation
-{
-    Execute = 0,
-    LambdaDestruct,
-    LambdaCopyConstruct,
-    LambdaMoveConstruct
-};
 } // namespace SC
 
 template <typename R, typename... Args>
 struct SC::Function<R(Args...)>
 {
   private:
+    enum class FunctionErasedOperation
+    {
+        Execute = 0,
+        LambdaDestruct,
+        LambdaCopyConstruct,
+        LambdaMoveConstruct
+    };
     using StubFunction = R (*)(FunctionErasedOperation operation, const void** other, const void* const*,
                                typename AddPointer<Args>::type...);
 
@@ -40,6 +40,9 @@ struct SC::Function<R(Args...)>
         }
     }
 
+    Function(const void* instance, StubFunction stub) : functionStub(stub) { classInstance = instance; }
+    using FreeFunction = R (*)(Args...);
+
   public:
     Function()
     {
@@ -47,9 +50,7 @@ struct SC::Function<R(Args...)>
         functionStub = nullptr;
     }
 
-    Function(const void* instance, StubFunction stub) : functionStub(stub) { classInstance = instance; }
-
-    // SFINAE used to avoid universal reference from "eating" also copy consttructor
+    // SFINAE used to avoid universal reference from "eating" also copy constructor
     template <typename Lambda, typename = typename EnableIf<
                                    not IsSame<typename RemoveReference<Lambda>::type, Function>::value, void>::type>
     Function(Lambda&& lambda)
@@ -57,8 +58,6 @@ struct SC::Function<R(Args...)>
         functionStub = nullptr;
         bind(forward<typename RemoveReference<Lambda>::type>(lambda));
     }
-
-    using FreeFunction = R (*)(Args...);
 
     ~Function() { sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr); }
 
@@ -119,30 +118,39 @@ struct SC::Function<R(Args...)>
     }
 
     template <R (*FreeFunction)(Args...)>
-    Function& bind()
+    void bind()
     {
         sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
         classInstance = nullptr;
         functionStub  = &FunctionWrapper<FreeFunction>;
-        return *this;
     }
 
     template <typename Class, R (Class::*MemberFunction)(Args...) const>
-    Function& bind(const Class* c)
+    void bind(const Class& c)
     {
         sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
-        classInstance = c;
+        classInstance = &c;
         functionStub  = &MemberWrapper<Class, MemberFunction>;
-        return *this;
     }
 
     template <typename Class, R (Class::*MemberFunction)(Args...)>
-    Function& bind(Class* c)
+    void bind(Class& c)
     {
         sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
-        classInstance = c;
+        classInstance = &c;
         functionStub  = &MemberWrapper<Class, MemberFunction>;
-        return *this;
+    }
+
+    template <typename Class, R (Class::*MemberFunction)(Args...)>
+    static Function fromMember(Class& c)
+    {
+        return Function(&c, &MemberWrapper<Class, MemberFunction>);
+    }
+
+    template <typename Class, R (Class::*MemberFunction)(Args...) const>
+    static Function fromMember(const Class& c)
+    {
+        return Function(&c, &MemberWrapper<Class, MemberFunction>);
     }
 
     [[nodiscard]] R operator()(Args... args) const
@@ -151,8 +159,6 @@ struct SC::Function<R(Args...)>
     }
 
   private:
-    template <typename R2, class Class2, typename... Args2>
-    friend struct FunctionDeducerCreator;
     template <typename Class, R (Class::*MemberFunction)(Args...)>
     static R MemberWrapper(FunctionErasedOperation operation, const void** other, const void* const* p,
                            typename RemoveReference<Args>::type*... args)
@@ -203,52 +209,7 @@ struct SC::Function<R(Args...)>
 
 namespace SC
 {
-template <typename R, class Class, typename... Args>
-struct FunctionDeducerCreator
-{
-    template <R (*FreeFunction)(Args...)>
-    static Function<R(Args...)> Bind()
-    {
-        return Function<R(Args...)>(nullptr, &Function<R(Args...)>::template FunctionWrapper<FreeFunction>);
-    }
-
-    template <R (Class::*MemberFunction)(Args...)>
-    static Function<R(Args...)> Bind(Class* object)
-    {
-        return Function<R(Args...)>(object, &Function<R(Args...)>::template MemberWrapper<Class, MemberFunction>);
-    }
-
-    template <R (Class::*MemberFunction)(Args...) const>
-    static Function<R(Args...)> Bind(const Class* object)
-    {
-        return Function<R(Args...)>(object, &Function<R(Args...)>::template MemberWrapper<Class, MemberFunction>);
-    }
-};
-
-template <typename R, class T, typename... Args>
-FunctionDeducerCreator<R, T, Args...> FunctionDeducer(R (T::*)(Args...))
-{
-    return FunctionDeducerCreator<R, T, Args...>();
-}
-
-template <typename R, class T, typename... Args>
-FunctionDeducerCreator<R, T, Args...> FunctionDeducer(R (T::*)(Args...) const)
-{
-    return FunctionDeducerCreator<R, T, Args...>();
-}
-
-class FunctionEmptyClass
-{
-};
-template <typename R, typename... Args>
-FunctionDeducerCreator<R, FunctionEmptyClass, Args...> FunctionDeducer(R(Args...))
-{
-    return FunctionDeducerCreator<R, FunctionEmptyClass, Args...>();
-}
 template <typename T>
 using Delegate = Function<void(T)>;
 using Action   = Function<void()>;
-#define SC_FUNCTION_BIND_FREE(FUNCTION_PARAM) SC::FunctionDeducer(FUNCTION_PARAM).Bind<FUNCTION_PARAM>()
-#define SC_FUNCTION_BIND(FUNCTION_PARAM, FUNCTION_OBJECT)                                                              \
-    SC::FunctionDeducer(FUNCTION_PARAM).Bind<FUNCTION_PARAM>(FUNCTION_OBJECT)
 } // namespace SC

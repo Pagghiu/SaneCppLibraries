@@ -44,7 +44,7 @@ struct SC::FileSystemWatcher::Internal
     {
         self            = &parent;
         threadingRunner = &runner.get();
-        threadingRunner->threadFunction.bind<Internal, &Internal::threadRun>(this);
+        threadingRunner->threadFunction.bind<Internal, &Internal::threadRun>(*this);
         return Result(true);
     }
 
@@ -159,7 +159,7 @@ struct SC::FileSystemWatcher::Internal
         else
         {
             SC_TRY(eventLoopRunner->eventLoop.associateExternallyCreatedFileDescriptor(opaque.fileHandle));
-            opaque.asyncPoll.callback.bind<Internal, &Internal::onEventLoopNotification>(this);
+            opaque.asyncPoll.callback.bind<Internal, &Internal::onEventLoopNotification>(*this);
             auto res = opaque.asyncPoll.start(eventLoopRunner->eventLoop, newHandle);
             SC_TRY(res);
         }

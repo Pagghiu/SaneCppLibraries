@@ -100,7 +100,7 @@ SC::Result SC::HttpServerAsync::start(EventLoop& eventLoop, uint32_t maxConnecti
     SC_TRY(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
     SC_TRY(SocketServer(serverSocket).listen(nativeAddress));
     asyncAccept.setDebugName("HttpServerAsync");
-    asyncAccept.callback.bind<HttpServerAsync, &HttpServerAsync::onNewClient>(this);
+    asyncAccept.callback.bind<HttpServerAsync, &HttpServerAsync::onNewClient>(*this);
     return asyncAccept.start(eventLoop, serverSocket);
 }
 
@@ -133,7 +133,7 @@ void SC::HttpServerAsync::onNewClient(AsyncSocketAccept::Result& result)
         (void)StringBuilder(client.debugName)
             .format("HttpServerAsync::client [{}:{}]", (int)key1.generation.generation, (int)key1.index);
         client.asyncReceive.setDebugName(client.debugName.bytesIncludingTerminator());
-        client.asyncReceive.callback.bind<HttpServerAsync, &HttpServerAsync::onReceive>(this);
+        client.asyncReceive.callback.bind<HttpServerAsync, &HttpServerAsync::onReceive>(*this);
         succeeded &= client.asyncReceive.start(*asyncAccept.getEventLoop(), client.socket, buffer.toSpan());
         SC_ASSERT_RELEASE(succeeded);
     }
@@ -163,7 +163,7 @@ void SC::HttpServerAsync::onReceive(AsyncSocketReceive::Result& result)
         requestClient.asyncSend.setDebugName(requestClient.debugName.bytesIncludingTerminator());
 
         auto outspan = client.response.outputBuffer.toSpan().asConst();
-        requestClient.asyncSend.callback.bind<HttpServerAsync, &HttpServerAsync::onAfterSend>(this);
+        requestClient.asyncSend.callback.bind<HttpServerAsync, &HttpServerAsync::onAfterSend>(*this);
         auto res = requestClient.asyncSend.start(*asyncAccept.getEventLoop(), requestClient.socket, outspan);
         if (not res)
         {

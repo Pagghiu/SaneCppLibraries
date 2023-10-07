@@ -45,7 +45,7 @@ struct SC::FileSystemWatcher::Internal
         self            = &parent;
         eventLoopRunner = &runner;
         auto& async     = eventLoopRunner->eventLoopAsync;
-        async.callback.bind<Internal, &Internal::onMainLoop>(this);
+        async.callback.bind<Internal, &Internal::onMainLoop>(*this);
         return async.start(eventLoopRunner->eventLoop, &eventLoopRunner->eventObject);
     }
 
@@ -62,12 +62,12 @@ struct SC::FileSystemWatcher::Internal
         SC_TRY_MSG(refreshSignal != nullptr, "CFRunLoopSourceCreate failed");
 
         // Create and start the thread
-        pollingFunction.bind<Internal, &Internal::threadRun>(this);
+        pollingFunction.bind<Internal, &Internal::threadRun>(*this);
 
         // Use the syncFunc that is guaranteed to run before start returns to obtain
         // the CFRunLoop allocated into that thread
         Action initFunction;
-        initFunction.bind<Internal, &Internal::threadInit>(this);
+        initFunction.bind<Internal, &Internal::threadInit>(*this);
         SC_TRY(pollingThread.start("FileSystemWatcher::init", &pollingFunction, &initFunction));
         return Result(true);
     }
