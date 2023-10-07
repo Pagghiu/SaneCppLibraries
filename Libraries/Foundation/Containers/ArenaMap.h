@@ -72,27 +72,27 @@ struct SC::ArenaMap
 
     ArenaMap& operator=(const ArenaMap& other)
     {
-        ArenaMap<T>::clear();
-        SC_ASSERT_RELEASE(ArenaMap<T>::items.resize(other.size()));
+        clear();
+        SC_ASSERT_RELEASE(items.resize(other.size()));
         for (size_t idx = 0; idx < other.items.size(); ++idx)
         {
             if (other.generations[idx].used)
             {
-                new (&ArenaMap<T>::items[idx].object, PlacementNew()) T(other.items[idx].object);
+                new (&items[idx].object, PlacementNew()) T(other.items[idx].object);
             }
         }
-        ArenaMap<T>::generations = other.generations;
-        ArenaMap<T>::numUsed     = other.numUsed;
+        generations = other.generations;
+        numUsed     = other.numUsed;
         return *this;
     }
 
     ArenaMap& operator=(ArenaMap&& other)
     {
-        ArenaMap<T>::clear();
-        ArenaMap<T>::items       = move(other.items);
-        ArenaMap<T>::generations = move(other.generations);
-        ArenaMap<T>::numUsed     = other.numUsed;
-        other.numUsed            = 0;
+        clear();
+        items         = move(other.items);
+        generations   = move(other.generations);
+        numUsed       = other.numUsed;
+        other.numUsed = 0;
         return *this;
     }
 

@@ -7,12 +7,12 @@
 
 namespace SC
 {
-struct StringView;
+struct SC_COMPILER_EXPORT StringView;
 struct StringViewTokenizer;
 
 } // namespace SC
 
-struct SC_COMPILER_EXPORT SC::StringView
+struct SC::StringView
 {
   private:
     union
@@ -26,8 +26,8 @@ struct SC_COMPILER_EXPORT SC::StringView
     static constexpr SizeType MaxLength     = (~static_cast<SizeType>(0)) >> NumOptionBits;
 
     SizeType textSizeInBytes : sizeof(SizeType) * 8 - NumOptionBits;
-    SizeType hasNullTerm : 1;
     SizeType encoding    : 2;
+    SizeType hasNullTerm : 1;
 
     template <typename StringIterator1, typename StringIterator2>
     static constexpr bool equalsIterator(StringIterator1 t1, StringIterator2 t2, size_t& points)

@@ -36,7 +36,7 @@ struct alignas(SC::uint64_t) SC::SegmentHeaderBase
 
     void initDefaults()
     {
-        static_assert(alignof(SegmentHeaderBase) == sizeof(uint64_t), "SegmentHeaderBase check alignment");
+        static_assert(alignof(SegmentHeaderBase) == alignof(uint64_t), "SegmentHeaderBase check alignment");
         static_assert(sizeof(SegmentHeaderBase) == sizeof(SizeType) * 2, "SegmentHeaderBase check alignment");
         isSmallVector           = false;
         isFollowedBySmallVector = false;
@@ -600,18 +600,26 @@ struct SC::SegmentOperations
 };
 
 template <typename Allocator, typename T, int N>
-struct alignas(SC::uint64_t) SC::Segment : public SegmentItems<T>
+struct SC::Segment : public SegmentItems<T>
 {
     static_assert(N > 0, "Array must have N > 0");
     using Parent     = SegmentItems<T>;
     using Operations = SegmentOperations<Allocator, T>;
+
+  protected:
+    template <int>
+    friend struct SmallString;
+    template <typename, int>
+    friend struct SmallVector;
     union
     {
         T items[N];
     };
 
+  public:
     Segment()
     {
+        static_assert(alignof(Segment) == alignof(uint64_t), "Segment Alignment");
         Segment::sizeBytes     = 0;
         Segment::capacityBytes = sizeof(T) * N;
     }

@@ -56,13 +56,13 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(definitions.size() == 2);
 
             // Save parent and child plugin identifiers and paths
-            const int  parentIndex            = definitions.items[0].dependencies.isEmpty() ? 0 : 1;
-            const int  childIndex             = parentIndex == 0 ? 1 : 0;
-            const auto childItem              = definitions.items[childIndex];
-            const auto parentItem             = definitions.items[parentIndex];
-            const auto identifierChildString  = childItem.identity.identifier;
-            const auto identifierParentString = parentItem.identity.identifier;
-            const auto pluginScriptPath       = childItem.files[childItem.pluginFileIndex].absolutePath;
+            const size_t parentIndex            = definitions[0].dependencies.isEmpty() ? 0 : 1;
+            const size_t childIndex             = parentIndex == 0 ? 1 : 0;
+            const auto   childItem              = definitions[childIndex];
+            const auto   parentItem             = definitions[parentIndex];
+            const auto   identifierChildString  = childItem.identity.identifier;
+            const auto   identifierParentString = parentItem.identity.identifier;
+            const auto   pluginScriptPath       = childItem.files[childItem.pluginFileIndex].absolutePath;
 
             const StringView identifierChild  = identifierChildString.view();
             const StringView identifierParent = identifierParentString.view();

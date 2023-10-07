@@ -13,12 +13,11 @@ namespace SC
 {
 template <typename T>
 struct Vector;
-struct VectorAllocator;
+struct SC_COMPILER_EXPORT VectorAllocator;
 } // namespace SC
 
-struct SC_COMPILER_EXPORT SC::VectorAllocator
+struct SC::VectorAllocator
 {
-    static const size_t   SIZE_OF_VECTOR_T = 8;
     static SegmentHeader* reallocate(SegmentHeader* oldHeader, size_t newSize)
     {
         if (newSize > SegmentHeader::MaxValue)
@@ -28,9 +27,9 @@ struct SC_COMPILER_EXPORT SC::VectorAllocator
         SegmentHeader* newHeader;
         if (oldHeader->isSmallVector)
         {
-            newHeader = static_cast<SegmentHeader*>(Memory::allocate(sizeof(SegmentHeader) + newSize));
-            memcpy(newHeader, oldHeader,
-                   sizeof(SegmentHeader) + min(newSize, static_cast<decltype(newSize)>(oldHeader->sizeBytes)));
+            newHeader          = static_cast<SegmentHeader*>(Memory::allocate(sizeof(SegmentHeader) + newSize));
+            const auto minSize = min(newSize, static_cast<decltype(newSize)>(oldHeader->sizeBytes));
+            ::memcpy(newHeader, oldHeader, minSize);
             newHeader->initDefaults();
             newHeader->capacityBytes           = static_cast<decltype(SegmentHeader::capacityBytes)>(newSize);
             newHeader->isFollowedBySmallVector = true;
@@ -58,7 +57,7 @@ struct SC_COMPILER_EXPORT SC::VectorAllocator
             {
                 // If we were folloed by a small vector, we check if that small vector has enough memory
                 SegmentHeader* followingHeader =
-                    reinterpret_cast<SegmentHeader*>(static_cast<char*>(pself) + SIZE_OF_VECTOR_T); // vector
+                    reinterpret_cast<SegmentHeader*>(static_cast<char*>(pself) + alignof(SegmentHeader));
                 if (followingHeader->isSmallVector && followingHeader->capacityBytes >= numNewBytes)
                 {
                     return followingHeader;
@@ -88,13 +87,13 @@ struct SC_COMPILER_EXPORT SC::VectorAllocator
 
     static void release(SegmentHeader* oldHeader)
     {
-        if (not oldHeader->isSmallVector)
+        if (oldHeader->isSmallVector)
         {
-            Memory::release(oldHeader);
+            oldHeader->sizeBytes = 0;
         }
         else
         {
-            oldHeader->sizeBytes = 0;
+            Memory::release(oldHeader);
         }
     }
 
@@ -113,9 +112,18 @@ struct SC_COMPILER_EXPORT SC::VectorAllocator
 template <typename T>
 struct SC::Vector
 {
-    using SegmentOperationsT = SegmentOperations<VectorAllocator, T>;
-
+  protected:
+    SegmentItems<T>* getSegmentItems() const { return SegmentItems<T>::getSegment(items); }
+    template <int N>
+    friend struct SmallString;
+    friend struct String;
+    friend struct StringTest;
+    friend struct VectorTest;
+    friend struct SmallVectorTest;
     T* items;
+
+  public:
+    using SegmentOperationsT = SegmentOperations<VectorAllocator, T>;
 
     Vector() : items(nullptr) {}
     Vector(std::initializer_list<T> ilist) : items(nullptr) { (void)append({ilist.begin(), ilist.size()}); }
@@ -161,21 +169,6 @@ struct SC::Vector
 
     Span<const T> toSpanConst() const { return {items, size()}; }
     Span<T>       toSpan() { return {items, size()}; }
-
-    // Reinterpret Vector to hold a different type (example Vector<int32_t> to Vector<int8_t>.
-    // This works because the SegmentHeader stores item size and capacity in bytes
-    template <typename Q>
-    Vector<const Q>& unsafeReinterpretAsConst() const
-    {
-        return *reinterpret_cast<Vector<const Q>*>(this);
-    }
-    // Reinterpret Vector to hold a different type (example Vector<int32_t> to Vector<int8_t>.
-    // This works because the SegmentHeader stores item size and capacity in bytes
-    template <typename Q>
-    Vector<Q>& unsafeReinterpretAs()
-    {
-        return *reinterpret_cast<Vector<Q>*>(this);
-    }
 
     [[nodiscard]] T& operator[](size_t index)
     {
@@ -227,14 +220,7 @@ struct SC::Vector
 
     [[nodiscard]] bool reserve(size_t newCapacity)
     {
-        if (newCapacity > capacity())
-        {
-            return SegmentOperationsT::ensureCapacity(items, newCapacity, size());
-        }
-        else
-        {
-            return true;
-        }
+        return newCapacity > capacity() ? SegmentOperationsT::ensureCapacity(items, newCapacity, size()) : true;
     }
 
     [[nodiscard]] bool resize(size_t newSize, const T& value = T())
@@ -251,7 +237,7 @@ struct SC::Vector
     {
         if (items != nullptr)
         {
-            SegmentOperationsT::clear(SegmentItems<T>::getSegment(items));
+            SegmentOperationsT::clear(getSegmentItems());
         }
     }
 
@@ -259,7 +245,7 @@ struct SC::Vector
 
     [[nodiscard]] bool shrink_to_fit() { return SegmentOperationsT::shrink_to_fit(items); }
 
-    [[nodiscard]] bool isEmpty() const { return (items == nullptr) || SegmentItems<T>::getSegment(items)->isEmpty(); }
+    [[nodiscard]] bool isEmpty() const { return (items == nullptr) || getSegmentItems()->isEmpty(); }
 
     [[nodiscard]] size_t size() const
     {
@@ -267,7 +253,7 @@ struct SC::Vector
             SC_LANGUAGE_UNLIKELY { return 0; }
         else
         {
-            return static_cast<size_t>(SegmentItems<T>::getSegment(items)->sizeBytes / sizeof(T));
+            return static_cast<size_t>(getSegmentItems()->sizeBytes / sizeof(T));
         }
     }
 
@@ -277,7 +263,7 @@ struct SC::Vector
             SC_LANGUAGE_UNLIKELY { return 0; }
         else
         {
-            return static_cast<size_t>(SegmentItems<T>::getSegment(items)->capacityBytes / sizeof(T));
+            return static_cast<size_t>(getSegmentItems()->capacityBytes / sizeof(T));
         }
     }
 
@@ -378,7 +364,7 @@ struct SC::Vector
     {
         if (items != nullptr)
         {
-            SegmentOperationsT::destroy(SegmentItems<T>::getSegment(items));
+            SegmentOperationsT::destroy(getSegmentItems());
         }
         items = nullptr;
     }
