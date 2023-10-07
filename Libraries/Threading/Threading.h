@@ -4,7 +4,7 @@
 #pragma once
 #include "../Foundation/Language/Function.h"
 #include "../Foundation/Language/Opaque.h"
-#include "../Foundation/Language/Optional.h"
+#include "../Foundation/Language/Optional.h" // UniqueOptional
 #include "../Foundation/Language/Result.h"
 #include "../Foundation/Strings/StringView.h"
 

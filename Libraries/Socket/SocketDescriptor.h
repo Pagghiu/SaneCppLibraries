@@ -4,7 +4,6 @@
 #pragma once
 #include "../File/FileDescriptor.h"
 #include "../Foundation/Language/Opaque.h"
-#include "../Foundation/Language/Optional.h"
 #include "../Foundation/Language/Result.h"
 #include "../System/Time.h" // IntegerMilliseconds
 

@@ -2,7 +2,6 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Language/Optional.h"
 #include "../Foundation/Strings/String.h"
 #include "../System/Time.h"
 
@@ -80,8 +79,8 @@ struct SC::FileSystem
     {
         AbsoluteTime modifiedTime = 0;
     };
-    [[nodiscard]] Optional<FileTime> getFileTime(StringView file);
-    [[nodiscard]] Result             setLastModifiedTime(StringView file, AbsoluteTime time);
+    [[nodiscard]] Result getFileTime(StringView file, FileTime& fileTime);
+    [[nodiscard]] Result setLastModifiedTime(StringView file, AbsoluteTime time);
 
   private:
     [[nodiscard]] bool convert(const StringView file, String& destination, StringView* encodedPath = nullptr);

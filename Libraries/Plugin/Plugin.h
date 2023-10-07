@@ -4,7 +4,6 @@
 #pragma once
 #include "../Foundation/Containers/SmallVector.h"
 #include "../Foundation/Containers/VectorMap.h"
-#include "../Foundation/Language/Optional.h"
 #include "../Foundation/Strings/String.h"
 #include "../System/System.h"
 

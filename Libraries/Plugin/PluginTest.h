@@ -91,8 +91,8 @@ struct SC::PluginTest : public SC::TestCase
             String     sourceContent;
             FileSystem fs;
             SC_TEST_EXPECT(fs.read(pluginScriptPath.view(), sourceContent, StringEncoding::Ascii));
-            auto scriptFileStat = fs.getFileTime(pluginScriptPath.view());
-            SC_TEST_EXPECT(scriptFileStat.hasValue());
+            FileSystem::FileTime scriptFileStat;
+            SC_TEST_EXPECT(fs.getFileTime(pluginScriptPath.view(), scriptFileStat));
             String sourceMod1;
             SC_TEST_EXPECT(StringBuilder(sourceMod1)
                                .appendReplaceAll(sourceContent.view(), //
@@ -124,7 +124,7 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierParent));
 
             // Restore last modified time to avoid triggering a rebuild as the file is included in the test project
-            SC_TEST_EXPECT(fs.setLastModifiedTime(pluginScriptPath.view(), scriptFileStat.get()->modifiedTime));
+            SC_TEST_EXPECT(fs.setLastModifiedTime(pluginScriptPath.view(), scriptFileStat.modifiedTime));
         }
     }
 };
