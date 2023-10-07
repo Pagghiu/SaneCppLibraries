@@ -4,7 +4,6 @@
 #pragma once
 
 #include "../Foundation/Language/Opaque.h"
-#include "../Foundation/Language/Optional.h"
 #include "../Foundation/Language/Result.h"
 
 namespace SC
@@ -40,6 +39,6 @@ struct SC::ProcessDescriptor : public UniqueTaggedHandleTraits<ProcessDescriptor
 {
     struct ExitStatus
     {
-        Optional<int32_t> status;
+        int32_t status = -1;
     };
 };

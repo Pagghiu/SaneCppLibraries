@@ -308,8 +308,7 @@ SC::Result SC::PluginCompiler::compileFile(StringView sourceFile, StringView obj
                           "-c", "-fpic", sourceFile, "-o", objectFile));
 #endif
     SC_TRY(process.waitForExitSync());
-    auto res = process.exitStatus.status.get();
-    return Result(res and *res == 0);
+    return Result(process.exitStatus.status == 0);
 }
 
 SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin) const
@@ -385,8 +384,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, StringVi
     SC_TRY(process.formatArguments(args.toSpanConst()));
     SC_TRY(process.launch());
     SC_TRY(process.waitForExitSync());
-    auto res = process.exitStatus.status.get();
-    return Result(res and *res == 0);
+    return Result(process.exitStatus.status == 0);
 }
 
 SC::Result SC::PluginDynamicLibrary::unload()

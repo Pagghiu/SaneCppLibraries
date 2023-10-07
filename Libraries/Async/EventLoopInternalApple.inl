@@ -489,7 +489,7 @@ struct SC::EventLoop::KernelQueue
             const uint32_t data = static_cast<uint32_t>(event.data);
             if (WIFEXITED(data) != 0)
             {
-                result.exitStatus.status.assign(WEXITSTATUS(data));
+                result.exitStatus.status = WEXITSTATUS(data);
             }
             return Result(true);
         }

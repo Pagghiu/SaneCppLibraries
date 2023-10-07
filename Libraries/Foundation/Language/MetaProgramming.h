@@ -27,9 +27,9 @@ template <class T> struct AddPointer      { using type = typename RemoveReferenc
 template <class T> struct RemoveConst           { using type = T;};
 template <class T> struct RemoveConst<const T>  { using type = T; };
 
-template <typename T> struct ReturnType;
-template <typename R, typename... Args> struct ReturnType<R(Args...)> { using type = R; };
-template <typename R, typename... Args> struct ReturnType<R(*)(Args...)> { using type = R; };
+template <typename T>                               struct ReturnType;
+template <typename R, typename... Args>             struct ReturnType<R(Args...)>       { using type = R; };
+template <typename R, typename... Args>             struct ReturnType<R(*)(Args...)>    { using type = R; };
 template <typename R, typename C, typename... Args> struct ReturnType<R(C::*)(Args...)> { using type = R; };
 
 template <class T, T v>
@@ -59,18 +59,6 @@ template <class T, class F>         struct Conditional<false, T, F> { using type
 template <bool B, class T, class F> using ConditionalT = typename Conditional<B,T,F>::type;
 
 template <typename SourceType, typename T> struct SameConstnessAs { using type = typename Conditional<IsConst<SourceType>::value, const T, T>::type; };
-
-template <typename T>
-struct ReferenceWrapper
-{
-    typename RemoveReference<T>::type* ptr;
-
-    ReferenceWrapper(typename RemoveReference<T>::type& other) : ptr(&other) {}
-    ~ReferenceWrapper() {}
-    operator const T&() const { return *ptr; }
-    operator T&() { return *ptr; }
-};
-
 // clang-format on
 
 } // namespace SC

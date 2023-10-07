@@ -13,17 +13,6 @@
 #include "../File/FileDescriptor.h"
 #include "../Process/ProcessDescriptor.h"
 #include "../Socket/SocketDescriptor.h"
-namespace SC
-{
-template <int offset, typename T, typename R>
-inline T& fieldOffset(R& object)
-{
-    return *reinterpret_cast<T*>(reinterpret_cast<char*>(&object) - offset);
-}
-} // namespace SC
-
-#define SC_FIELD_OFFSET(Class, Field, Value)                                                                           \
-    fieldOffset<SC_COMPILER_OFFSETOF(Class, Field), Class, decltype(Class::Field)>(Value);
 
 namespace SC
 {
@@ -619,3 +608,15 @@ struct SC::EventLoop
 
     friend struct Async;
 };
+
+namespace SC
+{
+template <int offset, typename T, typename R>
+inline T& fieldOffset(R& object)
+{
+    return *reinterpret_cast<T*>(reinterpret_cast<char*>(&object) - offset);
+}
+} // namespace SC
+
+#define SC_FIELD_OFFSET(Class, Field, Value)                                                                           \
+    fieldOffset<SC_COMPILER_OFFSETOF(Class, Field), Class, decltype(Class::Field)>(Value);

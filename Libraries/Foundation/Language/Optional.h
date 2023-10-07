@@ -11,6 +11,17 @@ struct Optional;
 
 template <typename Value>
 struct UniqueOptional;
+
+template <typename T>
+struct ReferenceWrapper
+{
+    typename RemoveReference<T>::type* ptr;
+
+    ReferenceWrapper(typename RemoveReference<T>::type& other) : ptr(&other) {}
+    ~ReferenceWrapper() {}
+    operator const T&() const { return *ptr; }
+    operator T&() { return *ptr; }
+};
 } // namespace SC
 
 template <typename Value>

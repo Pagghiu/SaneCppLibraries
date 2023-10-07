@@ -21,12 +21,9 @@ SC::Result SC::SocketDescriptorTraits::releaseHandle(Handle& handle)
 
 SC::Result SC::SocketDescriptor::setInheritable(bool inheritable)
 {
-    if (::SetHandleInformation(reinterpret_cast<HANDLE>(handle), HANDLE_FLAG_INHERIT, inheritable ? TRUE : FALSE) ==
-        FALSE)
-    {
-        "SetHandleInformation failed";
-    }
-    return Result(true);
+    BOOL res =
+        ::SetHandleInformation(reinterpret_cast<HANDLE>(handle), HANDLE_FLAG_INHERIT, inheritable ? TRUE : FALSE);
+    return res == FALSE ? Result::Error("SetHandleInformation failed") : Result(true);
 }
 
 SC::Result SC::SocketDescriptor::setBlocking(bool blocking)

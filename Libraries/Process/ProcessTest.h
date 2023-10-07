@@ -140,7 +140,7 @@ struct SC::ProcessTest : public SC::TestCase
             async.callback = [&](AsyncProcessExit::Result& res) { SC_TEST_EXPECT(res.moveTo(exitStatus)); };
             SC_TEST_EXPECT(async.start(eventLoop, processHandle));
             SC_TEST_EXPECT(eventLoop.runOnce());
-            SC_TEST_EXPECT(exitStatus.status.hasValue());
+            SC_TEST_EXPECT(exitStatus.status == 0);
         }
     }
 };
