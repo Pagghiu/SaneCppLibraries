@@ -55,6 +55,8 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(StringView("0").parseInt32(value) and value == 0);
             SC_TEST_EXPECT(StringView("-0").parseInt32(value) and value == 0);
             SC_TEST_EXPECT(not StringView("").parseInt32(value));
+            SC_TEST_EXPECT(not StringView("1\02\0\0\0"_u16).parseInt32(value));   // UTF16 not supported
+            SC_TEST_EXPECT(not StringView("1234567891234567").parseInt32(value)); // Too long for int32
         }
 
         if (test_section("parseFloat"))
@@ -97,13 +99,8 @@ struct SC::StringViewTest : public SC::TestCase
             StringView test;
             for (int i = 0; i < 2; ++i)
             {
-#if SC_PLATFORM_WINDOWS
                 if (i == 0)
-                    test = StringView(L"Ciao_123");
-#else
-                if (i == 0)
-                    test = StringView("Ciao_123");
-#endif
+                    test = StringView("\x43\x00\x69\x00\x61\x00\x6f\x00\x5f\x00\x31\x00\x32\x00\x33\x00\x00"_u16);
                 if (i == 1)
                     test = "Ciao_123"_a8;
                 if (i == 2)
@@ -112,10 +109,8 @@ struct SC::StringViewTest : public SC::TestCase
                 SC_TEST_EXPECT(test.endsWithChar('3'));
                 SC_TEST_EXPECT(test.startsWith("Ciao"));
                 SC_TEST_EXPECT(test.startsWith("Ciao"_u8));
-#if SC_PLATFORM_WINDOWS
-                SC_TEST_EXPECT(test.startsWith(L"Ciao"));
-                SC_TEST_EXPECT(test.endsWith(L"123"));
-#endif
+                SC_TEST_EXPECT(test.startsWith("\x43\x00\x69\x00\x61\x00\x6f\x00\x00"_u16));
+                SC_TEST_EXPECT(test.endsWith("\x31\x00\x32\x00\x33\x00\x00"_u16));
                 SC_TEST_EXPECT(test.endsWith("123"));
                 SC_TEST_EXPECT(test.endsWith("123"_u8));
                 SC_TEST_EXPECT(not test.startsWithChar('D'));
@@ -219,8 +214,43 @@ struct SC::StringViewTest : public SC::TestCase
             size_t overlapPoints = 0;
             SC_TEST_EXPECT(not asd.fullyOverlaps("123___", overlapPoints) and overlapPoints == 3);
         }
+        if (test_section("compare"))
+        {
+            // àèìòù (1 UTF16-LE sequence, 2 UTF8 sequence)
+            SC_TEST_EXPECT("\xc3\xa0\xc3\xa8\xc3\xac\xc3\xb2\xc3\xb9"_u8.compare(
+                               "\xe0\x0\xe8\x0\xec\x0\xf2\x0\xf9\x0"_u16) == StringView::Comparison::Equals);
+
+            // 日本語語語 (1 UTF16-LE sequence, 3 UTF8 sequence)
+            StringView stringutf8  = StringView("\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e\xe8\xaa\x9e\xe8\xaa\x9e"_u8);
+            StringView stringutf16 = StringView("\xE5\x65\x2C\x67\x9E\x8a\x9E\x8a\x9E\x8a\x00"_u16); // LE
+
+            SC_TEST_EXPECT(stringutf8.compare(stringutf16) == StringView::Comparison::Equals);
+            SC_TEST_EXPECT(stringutf16.compare(stringutf8) == StringView::Comparison::Equals);
+            SC_TEST_EXPECT(stringutf8 == stringutf16);
+            SC_TEST_EXPECT(stringutf16 == stringutf8);
+            // U+24B62 (2 UTF16-LE sequence, 4 UTF8 sequence)
+            SC_TEST_EXPECT("\xf0\xa4\xad\xa2"_u8.compare("\x52\xD8\x62\xDF\x00"_u16) == StringView::Comparison::Equals);
+            StringView aASCII = "A"_a8;
+            StringView bUTF8  = "B"_u8;
+            StringView aUTF8  = "A"_u8;
+            StringView cUTF16 = "C\0\0"_u16;
+            StringView aUTF16 = "A\0\0"_u16;
+            SC_TEST_EXPECT(aASCII.compare(bUTF8) == StringView::Comparison::Smaller);
+            SC_TEST_EXPECT(bUTF8.compare(aASCII) == StringView::Comparison::Bigger);
+            SC_TEST_EXPECT(bUTF8.compare(cUTF16) == StringView::Comparison::Smaller);
+            SC_TEST_EXPECT(cUTF16.compare(bUTF8) == StringView::Comparison::Bigger);
+            SC_TEST_EXPECT(cUTF16.compare(aASCII) == StringView::Comparison::Bigger);
+            SC_TEST_EXPECT(aASCII.compare(cUTF16) == StringView::Comparison::Smaller);
+            SC_TEST_EXPECT(aASCII.compare(aUTF8) == StringView::Comparison::Equals);
+            SC_TEST_EXPECT(aUTF8.compare(aASCII) == StringView::Comparison::Equals);
+            SC_TEST_EXPECT(aASCII.compare(aUTF16) == StringView::Comparison::Equals);
+            SC_TEST_EXPECT(aUTF16.compare(aASCII) == StringView::Comparison::Equals);
+            SC_TEST_EXPECT(aUTF8.compare(aUTF16) == StringView::Comparison::Equals);
+            SC_TEST_EXPECT(aUTF16.compare(aUTF8) == StringView::Comparison::Equals);
+        }
         if (test_section("wildcard"))
         {
+            SC_TEST_EXPECT(StringAlgorithms::matchWildcard("", ""));
             SC_TEST_EXPECT(StringAlgorithms::matchWildcard("1?3", "123"));
             SC_TEST_EXPECT(StringAlgorithms::matchWildcard("1*3", "12223"));
             SC_TEST_EXPECT(StringAlgorithms::matchWildcard("*2", "12"));

@@ -341,18 +341,18 @@ bool StringIteratorASCII::advanceUntilMatchesNonConstexpr(CodePoint c)
 const char* StringIteratorUTF16::getNextOf(const char* bytes)
 {
     const uint16_t* src = reinterpret_cast<const uint16_t*>(bytes);
-    if ((src[0] & 0x80) == 0)
+    if (src[0] >= 0xD800 and src[0] <= 0xDFFF) // TODO: This assumes Little endian
     {
-        return reinterpret_cast<const char*>(src + 1); // Single-byte character
+        return reinterpret_cast<const char*>(src + 2); // Multi-byte character
     }
-    return reinterpret_cast<const char*>(src + 2); // Multi-byte character
+    return reinterpret_cast<const char*>(src + 1); // Single-byte character
 }
 
 const char* StringIteratorUTF16::getPreviousOf(const char* bytes)
 {
     const uint16_t* src = reinterpret_cast<const uint16_t*>(bytes);
     src                 = src - 1;
-    if (src[0] >= 0xDC00 and src[0] <= 0xDFFF)
+    if (src[0] >= 0xD800 and src[0] <= 0xDFFF) // TODO: This assumes Little endian
     {
         src = src - 1;
     }
@@ -362,7 +362,7 @@ const char* StringIteratorUTF16::getPreviousOf(const char* bytes)
 SC::uint32_t StringIteratorUTF16::decode(const char* bytes)
 {
     const uint16_t* src       = reinterpret_cast<const uint16_t*>(bytes);
-    const uint32_t  character = static_cast<uint32_t>(src[0]);
+    const uint32_t  character = static_cast<uint32_t>(src[0]); // TODO: This assumes Little endian
     if (character >= 0xD800 and character <= 0xDFFF)
     {
         const uint32_t nextCharacter = static_cast<uint32_t>(src[1]);
@@ -429,5 +429,4 @@ SC::uint32_t StringIteratorUTF8::decode(const char* src)
     }
     return character;
 }
-
 } // namespace SC

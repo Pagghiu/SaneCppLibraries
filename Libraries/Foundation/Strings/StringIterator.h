@@ -13,7 +13,7 @@ enum class StringEncoding : uint8_t
 {
     Ascii = 0,
     Utf8  = 1,
-    Utf16 = 2,
+    Utf16 = 2, // Little Endian
 #if SC_PLATFORM_WINDOWS
     Native = Utf16,
     Wide   = Utf16

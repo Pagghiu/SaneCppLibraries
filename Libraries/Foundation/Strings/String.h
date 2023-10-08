@@ -36,8 +36,6 @@ struct SC::String
 
     [[nodiscard]] const char* bytesIncludingTerminator() const { return data.data(); }
 
-    [[nodiscard]] auto nativeWritableBytesIncludingTerminator();
-
     [[nodiscard]] bool isEmpty() const { return data.isEmpty(); }
 
     [[nodiscard]] StringView view() const;
@@ -69,6 +67,9 @@ struct SC::String
     }
 
   protected:
+    // TODO: nativeWritableBytesIncludingTerminator should be removed
+    [[nodiscard]] auto nativeWritableBytesIncludingTerminator();
+
     // All these friendships are made to leverage writing directly to the Vector<char>
     // but while still keeping it an implementation detail
     friend struct SmallStringTest;
