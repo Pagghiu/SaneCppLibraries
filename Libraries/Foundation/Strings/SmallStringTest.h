@@ -10,12 +10,12 @@
 
 namespace SC
 {
-struct StringTest;
+struct SmallStringTest;
 }
 
-struct SC::StringTest : public SC::TestCase
+struct SC::SmallStringTest : public SC::TestCase
 {
-    StringTest(SC::TestReport& report) : TestCase(report, "StringTest")
+    SmallStringTest(SC::TestReport& report) : TestCase(report, "SmallStringTest")
     {
         using namespace SC;
 

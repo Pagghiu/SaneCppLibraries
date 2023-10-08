@@ -53,10 +53,10 @@ Libraries/FileSystem/FileSystemWalker.cpp         \
 Libraries/FileSystem/FileSystemWatcher.cpp        \
 Libraries/FileSystem/Path.cpp                     \
 Libraries/Foundation/Base/Base.cpp                \
-Libraries/Foundation/Strings/String.cpp           \
 Libraries/Foundation/Strings/StringBuilder.cpp    \
 Libraries/Foundation/Strings/StringConverter.cpp  \
 Libraries/Foundation/Strings/StringFormat.cpp     \
+Libraries/Foundation/Strings/StringIterator.cpp   \
 Libraries/Foundation/Strings/StringView.cpp       \
 Libraries/Hashing/Hashing.cpp                     \
 Libraries/Http/HttpClient.cpp                     \

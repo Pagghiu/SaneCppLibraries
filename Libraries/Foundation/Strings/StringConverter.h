@@ -51,6 +51,8 @@ struct SC::StringConverter
 
     [[nodiscard]] static bool pushNullTerm(Vector<char>& stringData, StringEncoding encoding);
 
+    [[nodiscard]] static bool ensureZeroTermination(Vector<char>& data, StringEncoding encoding);
+
   private:
     void internalClear();
     // TODO: FileSystemWalker should just use a Vector<char>

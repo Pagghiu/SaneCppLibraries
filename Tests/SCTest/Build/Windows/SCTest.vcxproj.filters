@@ -149,9 +149,6 @@
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Base\Base.cpp">
       <Filter>Foundation\Base</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\String.cpp">
-      <Filter>Foundation\Strings</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\StringBuilder.cpp">
       <Filter>Foundation\Strings</Filter>
     </ClCompile>
@@ -166,6 +163,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Libraries\Http\HttpURLParser.cpp">
       <Filter>Http</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\StringIterator.cpp">
+      <Filter>Foundation\Strings</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -520,13 +520,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringIterator.h">
       <Filter>Foundation\Strings</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringTest.h">
-      <Filter>Foundation\Strings</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringView.h">
-      <Filter>Foundation\Strings</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringViewAlgorithms.h">
       <Filter>Foundation\Strings</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringViewTest.h">
@@ -544,6 +538,12 @@
     <ClInclude Include="..\..\SCConfig.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\MetaProgramming.h">
       <Filter>Foundation\Language</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\SmallString.h">
+      <Filter>Foundation\Strings</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\SmallStringTest.h">
+      <Filter>Foundation\Strings</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

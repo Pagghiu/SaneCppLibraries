@@ -2,7 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "StringConverter.h"
+#include "String.h"
+#include "StringConverter.h" // popNulltermIfExists
 #include "StringFormat.h"
 namespace SC
 {
@@ -18,29 +19,10 @@ struct StringBuilder
     StringBuilder(String& str, Flags flags = DoNotClear);
 
     template <typename... Types>
-    [[nodiscard]] bool format(StringView fmt, Types&&... args)
-    {
-        clear();
-        return append(fmt, forward<Types>(args)...);
-    }
+    [[nodiscard]] bool format(StringView fmt, Types&&... args);
 
     template <typename... Types>
-    [[nodiscard]] bool append(StringView fmt, Types&&... args)
-    {
-        if (not StringConverter::popNulltermIfExists(stringData, encoding))
-        {
-            return false;
-        }
-
-        StringFormatOutput sfo(encoding, stringData);
-        if (fmt.getEncoding() == StringEncoding::Ascii || fmt.getEncoding() == StringEncoding::Utf8)
-        {
-            // It's ok parsing format string '{' and '}' both for utf8 and ascii with StringIteratorASCII
-            // because on a valid UTF8 string, these chars are unambiguously recognizable
-            return StringFormat<StringIteratorASCII>::format(sfo, fmt, forward<Types>(args)...);
-        }
-        return false; // UTF16/32 format strings are not supported
-    }
+    [[nodiscard]] bool append(StringView fmt, Types&&... args);
 
     [[nodiscard]] bool format(StringView text);
 
@@ -59,3 +41,31 @@ struct StringBuilder
     StringEncoding encoding;
 };
 } // namespace SC
+
+//-----------------------------------------------------------------------------------------------------------------------
+// Implementations Details
+//-----------------------------------------------------------------------------------------------------------------------
+template <typename... Types>
+inline bool SC::StringBuilder::format(StringView fmt, Types&&... args)
+{
+    clear();
+    return append(fmt, forward<Types>(args)...);
+}
+
+template <typename... Types>
+inline bool SC::StringBuilder::append(StringView fmt, Types&&... args)
+{
+    if (not StringConverter::popNulltermIfExists(stringData, encoding))
+    {
+        return false;
+    }
+
+    StringFormatOutput sfo(encoding, stringData);
+    if (fmt.getEncoding() == StringEncoding::Ascii || fmt.getEncoding() == StringEncoding::Utf8)
+    {
+        // It's ok parsing format string '{' and '}' both for utf8 and ascii with StringIteratorASCII
+        // because on a valid UTF8 string, these chars are unambiguously recognizable
+        return StringFormat<StringIteratorASCII>::format(sfo, fmt, forward<Types>(args)...);
+    }
+    return false; // UTF16/32 format strings are not supported
+}

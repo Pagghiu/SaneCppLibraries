@@ -7,7 +7,7 @@
 #include "../../Libraries/Foundation/Containers/SmallVector.h"
 #include "../../Libraries/Foundation/Containers/VectorMap.h"
 #include "../../Libraries/Foundation/Containers/VectorSet.h"
-#include "../../Libraries/Foundation/Strings/String.h"
+#include "../../Libraries/Foundation/Strings/SmallString.h"
 #include "../../Libraries/Testing/Test.h"
 
 namespace SC

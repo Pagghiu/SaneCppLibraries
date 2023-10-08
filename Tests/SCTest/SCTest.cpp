@@ -35,9 +35,9 @@ void runSpecificTests(TestReport& report)
 #include "../../Libraries/Foundation/Language/OpaqueTest.h"
 #include "../../Libraries/Foundation/Language/OptionalTest.h"
 #include "../../Libraries/Foundation/Language/TaggedUnionTest.h"
+#include "../../Libraries/Foundation/Strings/SmallStringTest.h"
 #include "../../Libraries/Foundation/Strings/StringConverterTest.h"
 #include "../../Libraries/Foundation/Strings/StringFormatTest.h"
-#include "../../Libraries/Foundation/Strings/StringTest.h"
 #include "../../Libraries/Foundation/Strings/StringViewTest.h"
 
 // File
@@ -143,7 +143,7 @@ int main(int argc, const char* argv[])
     { SmallVectorTest               test(report); }
     { StringConverterTest           test(report); }
     { StringFormatTest              test(report); }
-    { StringTest                    test(report); }
+    { SmallStringTest               test(report); }
     { StringViewTest                test(report); }
     { TaggedUnionTest               test(report); }
     { VectorTest                    test(report); }

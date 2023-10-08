@@ -215,7 +215,7 @@ bool SC::StringConverter::convertNullTerminateFastPath(StringView input, StringV
 
 bool SC::StringConverter::appendNullTerminated(StringView input)
 {
-    SC_TRY(popNulltermIfExists(data, encoding));
+    SC_TRY(StringConverter::popNulltermIfExists(data, encoding));
     return internalAppend(input, nullptr);
 }
 
@@ -230,29 +230,32 @@ bool SC::StringConverter::setTextLengthInBytesIncludingTerminator(size_t newData
     return true;
 }
 
-/// Appends the input string null terminated
 bool SC::StringConverter::internalAppend(StringView input, StringView* encodedText)
 {
     return StringConverter::convertEncodingTo(encoding, input, data, encodedText);
+}
+
+bool SC::StringConverter::ensureZeroTermination(Vector<char>& data, StringEncoding encoding)
+{
+    const size_t numZeros = StringEncodingGetSize(encoding);
+    if (data.size() >= numZeros)
+    {
+        for (size_t idx = 0; idx < numZeros; ++idx)
+        {
+            (&data.back())[-static_cast<int>(idx)] = 0;
+        }
+    }
+    return true;
 }
 
 bool SC::StringConverter::popNulltermIfExists(Vector<char>& stringData, StringEncoding encoding)
 {
     const auto sizeOfZero = StringEncodingGetSize(encoding);
     const auto dataSize   = stringData.size();
-    if (dataSize >= sizeOfZero)
-    {
-        return stringData.resizeWithoutInitializing(dataSize - sizeOfZero);
-    }
-    return true;
+    return dataSize >= sizeOfZero ? stringData.resizeWithoutInitializing(dataSize - sizeOfZero) : true;
 }
 
 bool SC::StringConverter::pushNullTerm(Vector<char>& stringData, StringEncoding encoding)
 {
-    auto numZeros = StringEncodingGetSize(encoding);
-    while (numZeros--)
-    {
-        SC_TRY(stringData.push_back(0));
-    }
-    return true;
+    return stringData.resize(stringData.size() + StringEncodingGetSize(encoding), 0);
 }

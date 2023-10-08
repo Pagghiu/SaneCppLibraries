@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "HttpServer.h"
+#include "../Foundation/Strings/SmallString.h"
 #include "../Foundation/Strings/StringBuilder.h"
 
 // HttpServer::Request

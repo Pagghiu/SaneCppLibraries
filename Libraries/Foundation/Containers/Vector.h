@@ -117,7 +117,7 @@ struct SC::Vector
     template <int N>
     friend struct SmallString;
     friend struct String;
-    friend struct StringTest;
+    friend struct SmallStringTest;
     friend struct VectorTest;
     friend struct SmallVectorTest;
     T* items;

@@ -4,7 +4,6 @@
 #pragma once
 #include "../../Testing/Test.h"
 #include "StringView.h"
-#include "StringViewAlgorithms.h"
 
 namespace SC
 {
@@ -213,10 +212,10 @@ struct SC::StringViewTest : public SC::TestCase
         if (test_section("contains"))
         {
             StringView asd = "123 456"_a8;
-            SC_TEST_EXPECT(asd.containsString("123"_a8));
-            SC_TEST_EXPECT(asd.containsString("456"_a8));
-            SC_TEST_EXPECT(not asd.containsString("124"_a8));
-            SC_TEST_EXPECT(not asd.containsString("4567"_a8));
+            SC_TEST_EXPECT(asd.containsString("123"));
+            SC_TEST_EXPECT(asd.containsString("456"));
+            SC_TEST_EXPECT(not asd.containsString("124"));
+            SC_TEST_EXPECT(not asd.containsString("4567"));
             size_t overlapPoints = 0;
             SC_TEST_EXPECT(not asd.fullyOverlaps("123___", overlapPoints) and overlapPoints == 3);
         }

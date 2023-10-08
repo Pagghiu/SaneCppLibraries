@@ -329,10 +329,10 @@
     <ClCompile Include="..\..\..\..\Libraries\Build\Build.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Base\Base.cpp" />
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\String.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\StringBuilder.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\StringConverter.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\StringFormat.cpp" />
+    <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\StringIterator.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\StringView.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Hashing\Hashing.cpp" />
     <ClCompile Include="..\..\..\..\Libraries\Http\HttpClient.cpp" />
@@ -409,6 +409,8 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\TaggedUnionTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\TypeList.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\UniquePtr.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\SmallString.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\SmallStringTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\String.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringBuilder.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringConverter.h" />
@@ -416,9 +418,7 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringFormat.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringFormatTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringIterator.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringView.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringViewAlgorithms.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringViewTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Hashing\HashingTest.h" />
     <ClInclude Include="..\..\..\..\Libraries\Hashing\Hashing.h" />

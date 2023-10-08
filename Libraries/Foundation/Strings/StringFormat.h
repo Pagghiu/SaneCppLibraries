@@ -31,63 +31,24 @@ struct StringFormatOutput
     size_t         backupSize = 0;
 };
 
-// clang-format off
-template <> struct StringFormatterFor<float>        {static bool format(StringFormatOutput&, const StringView, const float);};
-template <> struct StringFormatterFor<double>       {static bool format(StringFormatOutput&, const StringView, const double);};
-#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
-#if SC_PLATFORM_64_BIT == 0
-template <> struct StringFormatterFor<SC::ssize_t>  {static bool format(StringFormatOutput&, const StringView, const SC::ssize_t);};
-#endif
-#else
-template <> struct StringFormatterFor<SC::size_t>   {static bool format(StringFormatOutput&, const StringView, const SC::size_t);};
-template <> struct StringFormatterFor<SC::ssize_t>  {static bool format(StringFormatOutput&, const StringView, const SC::ssize_t);};
-#endif
-template <> struct StringFormatterFor<SC::int64_t>  {static bool format(StringFormatOutput&, const StringView, const SC::int64_t);};
-template <> struct StringFormatterFor<SC::uint64_t> {static bool format(StringFormatOutput&, const StringView, const SC::uint64_t);};
-template <> struct StringFormatterFor<SC::int32_t>  {static bool format(StringFormatOutput&, const StringView, const SC::int32_t);};
-template <> struct StringFormatterFor<SC::uint32_t> {static bool format(StringFormatOutput&, const StringView, const SC::uint32_t);};
-template <> struct StringFormatterFor<SC::int16_t>  {static bool format(StringFormatOutput&, const StringView, const SC::int16_t);};
-template <> struct StringFormatterFor<SC::uint16_t> {static bool format(StringFormatOutput&, const StringView, const SC::uint16_t);};
-template <> struct StringFormatterFor<SC::int8_t>   {static bool format(StringFormatOutput&, const StringView, const SC::int8_t);};
-template <> struct StringFormatterFor<SC::uint8_t>  {static bool format(StringFormatOutput&, const StringView, const SC::uint8_t);};
-template <> struct StringFormatterFor<char>         {static bool format(StringFormatOutput&, const StringView, const char);};
-template <> struct StringFormatterFor<bool>         {static bool format(StringFormatOutput&, const StringView, const bool);};
-template <> struct StringFormatterFor<StringView>   {static bool format(StringFormatOutput&, const StringView, const StringView);};
-template <> struct StringFormatterFor<String>       {static bool format(StringFormatOutput&, const StringView, const String&);};
-template <> struct StringFormatterFor<const char*>  {static bool format(StringFormatOutput&, const StringView, const char*);};
-#if SC_PLATFORM_WINDOWS
-template <> struct StringFormatterFor<wchar_t>      {static bool format(StringFormatOutput&, const StringView, const wchar_t);};
-template <> struct StringFormatterFor<const wchar_t*> {static bool format(StringFormatOutput&, const StringView, const wchar_t*);};
-#endif
-
-// clang-format on
-template <int N>
-struct StringFormatterFor<char[N]>
-{
-    static bool format(StringFormatOutput& data, const StringView specifier, const char* str)
-    {
-        const StringView sv(str, N - 1, true, StringEncoding::Ascii);
-        return StringFormatterFor<StringView>::format(data, specifier, sv);
-    }
-};
-
 template <typename RangeIterator>
 struct StringFormat
 {
     template <typename... Types>
-    [[nodiscard]] static bool format(StringFormatOutput& data, StringView fmt, Types&&... args)
-    {
-        data.onFormatBegin();
-        if (executeFormat(data, fmt.getIterator<RangeIterator>(), forward<Types>(args)...))
-            SC_LANGUAGE_LIKELY { return data.onFormatSucceded(); }
-        else
-        {
-            data.onFormatFailed();
-            return false;
-        }
-    }
+    [[nodiscard]] static bool format(StringFormatOutput& data, StringView fmt, Types&&... args);
 
   private:
+    struct Implementation;
+};
+
+} // namespace SC
+
+//-----------------------------------------------------------------------------------------------------------------------
+// Implementations Details
+//-----------------------------------------------------------------------------------------------------------------------
+template <typename RangeIterator>
+struct SC::StringFormat<RangeIterator>::Implementation
+{
     template <int Total, int N, typename T, typename... Rest>
     static bool formatArgument(StringFormatOutput& data, StringView specifier, int position, T&& arg, Rest&&... rest)
     {
@@ -103,15 +64,14 @@ struct StringFormat
     }
 
     template <int Total, int N, typename... Args>
-    static typename EnableIf<sizeof...(Args) == 0, bool>::type formatArgument(StringFormatOutput&, StringView, int,
-                                                                              Args...)
+    static typename SC::EnableIf<sizeof...(Args) == 0, bool>::type formatArgument(StringFormatOutput&, StringView, int,
+                                                                                  Args...)
     {
         return false;
     }
 
     template <typename... Types>
-    [[nodiscard]] static bool parsePosition(StringFormatOutput& data, RangeIterator& it, int32_t& parsedPosition,
-                                            Types&&... args)
+    static bool parsePosition(StringFormatOutput& data, RangeIterator& it, int32_t& parsedPosition, Types&&... args)
     {
         const auto startOfSpecifier = it;
         if (it.advanceUntilMatches('}')) // We have an already matched '{' when arriving here
@@ -141,7 +101,7 @@ struct StringFormat
     }
 
     template <typename... Types>
-    [[nodiscard]] static bool executeFormat(StringFormatOutput& data, RangeIterator it, Types&&... args)
+    static bool executeFormat(StringFormatOutput& data, RangeIterator it, Types&&... args)
     {
         StringCodePoint matchedChar;
 
@@ -186,20 +146,61 @@ struct StringFormat
             }
         }
     }
-
-    template <bool sizeofTypesIsZero>
-    static typename EnableIf<sizeofTypesIsZero == true, bool>::type // sizeof...(Types) == 0
-    writeIfLastArg(StringFormatOutput& data, const RangeIterator& startingPoint)
-    {
-        return data.write(StringView::fromIteratorUntilEnd(startingPoint));
-    }
-
-    template <bool sizeofTypesIsZero>
-    static typename EnableIf<sizeofTypesIsZero == false, bool>::type // sizeof...(Types) > 0
-    writeIfLastArg(StringFormatOutput&, const RangeIterator&)
-    {
-        return false; // we have more arguments than specifiers
-    }
 };
 
+template <typename RangeIterator>
+template <typename... Types>
+bool SC::StringFormat<RangeIterator>::format(StringFormatOutput& data, StringView fmt, Types&&... args)
+{
+    data.onFormatBegin();
+    if (Implementation::executeFormat(data, fmt.getIterator<RangeIterator>(), forward<Types>(args)...))
+        SC_LANGUAGE_LIKELY { return data.onFormatSucceded(); }
+    else
+    {
+        data.onFormatFailed();
+        return false;
+    }
+}
+
+namespace SC
+{
+// clang-format off
+template <> struct StringFormatterFor<float>        {static bool format(StringFormatOutput&, const StringView, const float);};
+template <> struct StringFormatterFor<double>       {static bool format(StringFormatOutput&, const StringView, const double);};
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
+#if SC_PLATFORM_64_BIT == 0
+template <> struct StringFormatterFor<SC::ssize_t>  {static bool format(StringFormatOutput&, const StringView, const SC::ssize_t);};
+#endif
+#else
+template <> struct StringFormatterFor<SC::size_t>   {static bool format(StringFormatOutput&, const StringView, const SC::size_t);};
+template <> struct StringFormatterFor<SC::ssize_t>  {static bool format(StringFormatOutput&, const StringView, const SC::ssize_t);};
+#endif
+template <> struct StringFormatterFor<SC::int64_t>  {static bool format(StringFormatOutput&, const StringView, const SC::int64_t);};
+template <> struct StringFormatterFor<SC::uint64_t> {static bool format(StringFormatOutput&, const StringView, const SC::uint64_t);};
+template <> struct StringFormatterFor<SC::int32_t>  {static bool format(StringFormatOutput&, const StringView, const SC::int32_t);};
+template <> struct StringFormatterFor<SC::uint32_t> {static bool format(StringFormatOutput&, const StringView, const SC::uint32_t);};
+template <> struct StringFormatterFor<SC::int16_t>  {static bool format(StringFormatOutput&, const StringView, const SC::int16_t);};
+template <> struct StringFormatterFor<SC::uint16_t> {static bool format(StringFormatOutput&, const StringView, const SC::uint16_t);};
+template <> struct StringFormatterFor<SC::int8_t>   {static bool format(StringFormatOutput&, const StringView, const SC::int8_t);};
+template <> struct StringFormatterFor<SC::uint8_t>  {static bool format(StringFormatOutput&, const StringView, const SC::uint8_t);};
+template <> struct StringFormatterFor<char>         {static bool format(StringFormatOutput&, const StringView, const char);};
+template <> struct StringFormatterFor<bool>         {static bool format(StringFormatOutput&, const StringView, const bool);};
+template <> struct StringFormatterFor<StringView>   {static bool format(StringFormatOutput&, const StringView, const StringView);};
+template <> struct StringFormatterFor<String>       {static bool format(StringFormatOutput&, const StringView, const String&);};
+template <> struct StringFormatterFor<const char*>  {static bool format(StringFormatOutput&, const StringView, const char*);};
+#if SC_PLATFORM_WINDOWS
+template <> struct StringFormatterFor<wchar_t>      {static bool format(StringFormatOutput&, const StringView, const wchar_t);};
+template <> struct StringFormatterFor<const wchar_t*> {static bool format(StringFormatOutput&, const StringView, const wchar_t*);};
+#endif
+// clang-format on
+
+template <int N>
+struct StringFormatterFor<char[N]>
+{
+    static bool format(StringFormatOutput& data, const StringView specifier, const char* str)
+    {
+        const StringView sv(str, N - 1, true, StringEncoding::Ascii);
+        return StringFormatterFor<StringView>::format(data, specifier, sv);
+    }
+};
 } // namespace SC

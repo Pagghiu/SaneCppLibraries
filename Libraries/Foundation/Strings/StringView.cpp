@@ -282,6 +282,9 @@ bool SC::StringView::isFloatingNumber() const
         });
 }
 
+//-----------------------------------------------------------------------------------------------------------------------
+// StringViewTokenizer
+//-----------------------------------------------------------------------------------------------------------------------
 [[nodiscard]] bool SC::StringViewTokenizer::isFinished() const { return current.isEmpty(); }
 
 bool SC::StringViewTokenizer::tokenizeNext(Span<const StringCodePoint> separators, Options options)
@@ -323,3 +326,67 @@ SC::StringViewTokenizer& SC::StringViewTokenizer::countTokens(Span<const StringC
     while (tokenizeNext(separators, SkipEmpty)) {}
     return *this;
 }
+//-----------------------------------------------------------------------------------------------------------------------
+// StringViewAlgorithms
+//-----------------------------------------------------------------------------------------------------------------------
+
+bool SC::StringAlgorithms::matchWildcard(StringView s1, StringView s2)
+{
+    return StringView::withIterators(s1, s2, [](auto it1, auto it2) { return matchWildcardIterator(it1, it2); });
+}
+
+template <typename StringIterator1, typename StringIterator2>
+bool SC::StringAlgorithms::matchWildcardIterator(StringIterator1 pattern, StringIterator2 text)
+{
+    typename decltype(pattern)::CodePoint patternChar = 0;
+    typename decltype(text)::CodePoint    textChar    = 0;
+    StringIterator1                       lastPattern = pattern;
+    StringIterator2                       lastText    = text;
+    if (not pattern.read(patternChar))
+    {
+        // If pattern is empty, only match with an empty text
+        return text.isAtEnd();
+    }
+    while (text.advanceRead(textChar))
+    {
+        if (patternChar == '*')
+        {
+            // Skip consecutive asterisks
+            if (not pattern.advanceUntilDifferentFrom('*', &patternChar))
+            {
+                // but if pattern ends with asterisk, it matches everything
+                return true;
+            }
+            lastPattern = pattern;
+            lastText    = text;
+            (void)lastText.stepForward();
+        }
+        else if (patternChar == '?' or patternChar == textChar)
+        {
+            (void)pattern.stepForward();
+            (void)pattern.read(patternChar);
+        }
+        else if (not lastPattern.isAtStart())
+        {
+            pattern = lastPattern;
+            text    = lastText;
+            (void)pattern.read(patternChar);
+            (void)lastText.stepForward();
+        }
+        else
+        {
+            return false;
+        }
+    }
+    // Discard any trailing * and if pattern is at end
+    if (pattern.advanceUntilDifferentFrom('*'))
+    {
+        // there are some more chars in the pattern that are unmatched
+        return false;
+    }
+    else
+    {
+        // pattern is now at end and fully matched
+        return true;
+    }
+};

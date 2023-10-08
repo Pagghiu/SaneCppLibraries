@@ -8,7 +8,7 @@
 
 #include "../Async/EventLoop.h"
 #include "../Foundation/Containers/SmallVector.h"
-#include "../Foundation/Strings/String.h"
+#include "../Foundation/Strings/SmallString.h"
 #include "../Socket/SocketDescriptor.h"
 
 namespace SC

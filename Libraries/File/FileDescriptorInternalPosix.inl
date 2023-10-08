@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../Foundation/Containers/Vector.h"
-#include "../Foundation/Strings/String.h"
+#include "../Foundation/Strings/SmallString.h"
 #include "../Foundation/Strings/StringConverter.h"
 #include "FileDescriptor.h"
 

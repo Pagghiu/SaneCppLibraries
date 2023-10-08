@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "Threading.h"
 
-#include "../Foundation/Strings/String.h"
+#include "../Foundation/Strings/SmallString.h"
 #include "../Foundation/Strings/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS

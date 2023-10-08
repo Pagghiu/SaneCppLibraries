@@ -5,7 +5,6 @@
 #include "../FileSystem/FileSystemWalker.h"
 #include "../FileSystem/Path.h"
 #include "../Foundation/Strings/StringBuilder.h"
-#include "../Foundation/Strings/StringViewAlgorithms.h"
 #include "../Hashing/Hashing.h"
 #include "Build.h"
 #include "WriteInternal.h"

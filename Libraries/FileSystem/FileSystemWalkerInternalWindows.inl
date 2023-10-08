@@ -5,7 +5,7 @@
 #include <Windows.h>
 
 #include "../Foundation/Containers/SmallVector.h"
-#include "../Foundation/Strings/String.h"
+#include "../Foundation/Strings/SmallString.h"
 #include "../Foundation/Strings/StringBuilder.h"
 #include "../Foundation/Strings/StringConverter.h"
 

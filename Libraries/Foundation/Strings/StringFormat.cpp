@@ -16,8 +16,8 @@ namespace SC
 {
 
 template <size_t BUFFER_SIZE = 100, size_t FORMAT_LENGTH, typename Value>
-bool formatSprintf(StringFormatOutput& data, const char (&formatSpecifier)[FORMAT_LENGTH], StringView specifier,
-                   const Value value)
+static bool formatSprintf(StringFormatOutput& data, const char (&formatSpecifier)[FORMAT_LENGTH], StringView specifier,
+                          const Value value)
 {
     const size_t SPECIFIER_SIZE = 50;
     char         compoundSpecifier[SPECIFIER_SIZE];
@@ -116,6 +116,7 @@ bool StringFormatterFor<bool>::format(StringFormatOutput& data, const StringView
     SC_COMPILER_UNUSED(specifier);
     return data.write(value ? "true"_a8 : "false"_a8);
 }
+
 bool StringFormatterFor<float>::format(StringFormatOutput& data, StringView specifier, const float value)
 {
     constexpr char formatSpecifier[] = "f";
@@ -167,6 +168,9 @@ bool StringFormatterFor<String>::format(StringFormatOutput& data, const StringVi
     return StringFormatterFor<StringView>::format(data, specifier, value.view());
 }
 
+//-----------------------------------------------------------------------------------------------------------------------
+// StringFormatOutput
+//-----------------------------------------------------------------------------------------------------------------------
 bool StringFormatOutput::write(StringView text)
 {
     if (text.isEmpty())
