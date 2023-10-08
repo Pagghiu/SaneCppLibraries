@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Strings/String.h"
+#include "../Foundation/Strings/SmallString.h"
 #include "../Testing/Test.h"
 #include "../Threading/Threading.h"
 #include "SocketDescriptor.h"
@@ -17,6 +17,13 @@ struct SC::SocketDescriptorTest : public SC::TestCase
     SocketDescriptorTest(SC::TestReport& report) : TestCase(report, "SocketDescriptorTest")
     {
         using namespace SC;
+        if (test_section("parseAddress"))
+        {
+            SocketIPAddress address;
+            SC_TEST_EXPECT(not address.fromAddressPort("1223.22.44.1", 6666));
+            SC_TEST_EXPECT(address.fromAddressPort("127.0.0.1", 123));
+            SC_TEST_EXPECT(address.fromAddressPort("::1", 123));
+        }
         if (test_section("DNS"))
         {
             SmallString<256> ipAddress;
@@ -61,8 +68,10 @@ struct SC::SocketDescriptorTest : public SC::TestCase
         }
         if (test_section("tcp client server"))
         {
-            SocketDescriptor serverSocket;
-            SocketServer     server(serverSocket);
+            SocketDescriptor           serverSocket;
+            SocketServer               server(serverSocket);
+            SocketFlags::AddressFamily invalidFamily;
+            SC_TEST_EXPECT(not serverSocket.getAddressFamily(invalidFamily));
             // Look for an available port
             constexpr int    tcpPort       = 5050;
             const StringView serverAddress = "::1"; //"127.0.0.1"

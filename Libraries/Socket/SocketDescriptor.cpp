@@ -35,13 +35,9 @@ struct NetworkingInternal
         inaddr.sin_port   = htons(port);
         inaddr.sin_family = SocketFlags::toNative(SocketFlags::AddressFamilyIPV4);
         const auto res    = ::inet_pton(inaddr.sin_family, ipNullTerm.bytesIncludingTerminator(), &inaddr.sin_addr);
-        if (res == 0)
+        if (res == 0 or res == -1)
         {
             return Result::Error("inet_pton Invalid IPV4 Address");
-        }
-        else if (res == -1)
-        {
-            return Result::Error("inet_pton IPV4 failed");
         }
         return Result(true);
     }
@@ -55,13 +51,9 @@ struct NetworkingInternal
         inaddr.sin6_port   = htons(port);
         inaddr.sin6_family = SocketFlags::toNative(SocketFlags::AddressFamilyIPV6);
         const auto res     = ::inet_pton(inaddr.sin6_family, ipNullTerm.bytesIncludingTerminator(), &inaddr.sin6_addr);
-        if (res == 0)
+        if (res == 0 or res == -1)
         {
             return Result::Error("inet_pton Invalid IPV6 Address");
-        }
-        else if (res == -1)
-        {
-            return Result::Error("inet_pton IPV6 failed");
         }
         return Result(true);
     }
@@ -70,7 +62,6 @@ struct NetworkingInternal
 
 SC::Result SC::SocketDescriptor::getAddressFamily(SocketFlags::AddressFamily& addressFamily) const
 {
-
     struct sockaddr_in6 socketInfo;
     socklen_t           socketInfoLen = sizeof(socketInfo);
 
