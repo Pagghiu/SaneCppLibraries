@@ -75,7 +75,10 @@ struct SC::Path::Internal
         auto it = input.getIterator<StringIterator>();
         it.setToEnd();
         (void)it.reverseAdvanceUntilMatches(separator);
-        (void)it.stepForward();
+        if (it.isAtStart())
+            it.setToEnd();
+        else
+            (void)it.stepForward();
         return StringView::fromIteratorUntilEnd(it);
     }
 
@@ -218,12 +221,17 @@ struct SC::Path::Internal
         // Everything after it will be the base.
         root      = Internal::parseWindowsRoot(input);
         directory = Internal::parseDirectory<'\\'>(input, root);
-        if (root.startsWith(directory) && root.endsWithChar('\\'))
+        if (directory.isEmpty())
+            directory = Internal::parseDirectory<'/'>(input, root);
+        if (root.startsWith(directory))
         {
-            directory = root;
+            if (root.endsWithChar('\\') or root.endsWithChar('/'))
+                directory = root;
         }
-        base              = Internal::parseBase<'\\'>(input);
-        endsWithSeparator = input.endsWithChar('\\');
+        base = Internal::parseBase<'\\'>(input);
+        if (base.isEmpty())
+            base = Internal::parseBase<'/'>(input);
+        endsWithSeparator = input.endsWithChar('\\') or input.endsWithChar('/');
         return !(root.isEmpty() && directory.isEmpty());
     }
 

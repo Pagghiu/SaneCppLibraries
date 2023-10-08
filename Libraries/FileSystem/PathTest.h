@@ -138,6 +138,14 @@ struct SC::PathTest : public SC::TestCase
             SC_TEST_EXPECT(path.name == "name");
             SC_TEST_EXPECT(path.ext == "ext");
             SC_TEST_EXPECT(path.endsWithSeparator == false);
+
+            SC_TEST_EXPECT(path.parseWindows("//?/ASD/bbb/name.ext"));
+            SC_TEST_EXPECT(path.root == "//?/");
+            SC_TEST_EXPECT(path.directory == "//?/ASD/bbb");
+            SC_TEST_EXPECT(path.base == "name.ext");
+            SC_TEST_EXPECT(path.name == "name");
+            SC_TEST_EXPECT(path.ext == "ext");
+            SC_TEST_EXPECT(path.endsWithSeparator == false);
         }
 
         if (test_section("Path::parseNameExtension"))
