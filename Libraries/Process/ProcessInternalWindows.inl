@@ -94,7 +94,10 @@ SC::Result SC::Process::launch(ProcessOptions options)
 
     if (not success)
     {
-        return Result::Error("CreateProcessW failed");
+        // We are not aware of a way of knowing if the spawn failed on posix until without blocking
+        // on waitpid. For this reason we return true also on Windows implementation in case of error.
+        return Result(true);
+        // return Result::Error("CreateProcessW failed");
     }
     CloseHandle(processInfo.hThread);
 

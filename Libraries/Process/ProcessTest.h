@@ -16,6 +16,12 @@ struct SC::ProcessTest : public SC::TestCase
     ProcessTest(SC::TestReport& report) : TestCase(report, "ProcessTest")
     {
         using namespace SC;
+        if (test_section("Process error"))
+        {
+            Process process;
+            SC_TEST_EXPECT(process.launch("piadsfj", "afsdkj"));
+            SC_TEST_EXPECT(not process.waitForExitSync());
+        }
         if (test_section("Process inherit"))
         {
             Process process;
@@ -82,21 +88,25 @@ struct SC::ProcessTest : public SC::TestCase
             bool         hasError = false;
             auto         onErr    = [&](const ProcessChain::Error&) { hasError = true; };
             ProcessChain chain(onErr);
-            String       output(StringEncoding::Ascii);
             Process      p1;
 #if SC_PLATFORM_APPLE
-            StringView expectedOutput = "asd\n";
-            SC_TEST_EXPECT(chain.pipe(p1, "echo", "asd"));
+            StringView expectedOutput = "a s d\n";
+            SC_TEST_EXPECT(chain.pipe(p1, "echo", "a s d"));
 #else
             StringView expectedOutput = "C:\\Windows\\System32\\where.exe\r\n";
             SC_TEST_EXPECT(chain.pipe(p1, "where", "where.exe"));
 #endif
             ProcessChainOptions options;
             options.pipeSTDOUT = true;
+            options.pipeSTDERR = true;
             SC_TEST_EXPECT(chain.launch(options));
-            SC_TEST_EXPECT(chain.readStdOutUntilEOFSync(output));
+            String stdOut(StringEncoding::Ascii);
+            String stdErr(StringEncoding::Ascii);
+            SC_TEST_EXPECT(chain.readStdOutUntilEOFSync(stdOut));
+            SC_TEST_EXPECT(chain.readStdErrUntilEOFSync(stdErr));
             SC_TEST_EXPECT(chain.waitForExitSync());
-            SC_TEST_EXPECT(output == expectedOutput);
+            SC_TEST_EXPECT(stdOut == expectedOutput);
+            SC_TEST_EXPECT(stdErr.isEmpty());
             SC_TEST_EXPECT(not hasError);
         }
         if (test_section("ProcessChain pipe dual"))

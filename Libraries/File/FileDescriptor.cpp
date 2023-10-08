@@ -34,5 +34,7 @@ SC::Result SC::FileDescriptor::readUntilEOF(Vector<char>& destination)
 SC::Result SC::FileDescriptor::readUntilEOF(String& destination)
 {
     SC_TRY(readUntilEOF(destination.data));
+    if (destination.isEmpty())
+        return Result(true);
     return Result(StringConverter::pushNullTerm(destination.data, destination.encoding));
 }

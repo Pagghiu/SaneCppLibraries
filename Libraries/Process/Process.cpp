@@ -40,9 +40,7 @@ SC::Result SC::ProcessChain::launch(ProcessChainOptions options)
         error.returnCode = process->launch();
         if (not error.returnCode)
         {
-            // TODO: Decide what to do with the queue
             onError(error);
-            return error.returnCode;
         }
     }
     SC_TRY(inputPipe.readPipe.close());
@@ -92,7 +90,11 @@ SC::Result SC::ProcessChain::waitForExitSync()
 {
     for (Process* process = processes.front; process != nullptr; process = process->next)
     {
-        SC_TRY(process->waitForExitSync());
+        error.returnCode = process->waitForExitSync();
+        if (not error.returnCode)
+        {
+            onError(error);
+        }
         process->parent = nullptr;
     }
     processes.clear();
@@ -113,9 +115,8 @@ SC::Result SC::Process::formatArguments(Span<const StringView> params)
             SC_TRY(formattedCmd.appendNullTerminated(" "));
         }
         first = false;
-        if (svp.containsChar(' '))
+        if (svp.containsChar(' ')) // TODO: Must escape also quotes
         {
-            // has space, must escape it
             SC_TRY(formattedCmd.appendNullTerminated("\""));
             SC_TRY(formattedCmd.appendNullTerminated(svp));
             SC_TRY(formattedCmd.appendNullTerminated("\""));

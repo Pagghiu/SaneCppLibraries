@@ -56,6 +56,8 @@ SC::Result SC::Process::waitForExitSync()
     if (WIFEXITED(status) != 0)
     {
         exitStatus.status = WEXITSTATUS(status);
+        if (exitStatus.status == 127)
+            return Result::Error("Cannot run executable");
     }
     return Result(true);
 }
@@ -100,6 +102,8 @@ SC::Result SC::Process::spawn(Lambda&& lambda)
         SC_TRY(standardInput.close());
         SC_TRY(standardOutput.close());
         SC_TRY(standardError.close());
+        // We are not aware of a way of knowing if the spawn failed on posix until without blocking
+        // on waitpid. For this reason we return true also on Windows implementation in case of error.
         return Result(true);
     }
     // The exit(127) inside isChild makes this unreachable
