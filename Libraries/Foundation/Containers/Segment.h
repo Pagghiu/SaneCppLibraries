@@ -17,8 +17,6 @@ template <typename T>
 struct SegmentItems;
 template <typename Allocator, typename T>
 struct SegmentOperations;
-template <typename Allocator, typename T, int N>
-struct Segment;
 } // namespace SC
 
 template <typename SizeT>
@@ -62,10 +60,18 @@ using SegmentHeader = SegmentHeaderBase<uint32_t>;
 template <typename T>
 struct SC::SegmentItems : public SegmentHeader
 {
+    // Members
+
     SegmentItems() { initDefaults(); }
+
+    void setSize(size_t newSize) { sizeBytes = static_cast<SizeType>(newSize * sizeof(T)); }
+
     [[nodiscard]] size_t size() const { return static_cast<size_t>(sizeBytes / sizeof(T)); }
-    [[nodiscard]] bool   isEmpty() const { return sizeBytes == 0; }
     [[nodiscard]] size_t capacity() const { return static_cast<size_t>(capacityBytes / sizeof(T)); }
+
+    [[nodiscard]] bool isEmpty() const { return sizeBytes == 0; }
+
+    // Statics
 
     [[nodiscard]] static SegmentItems* getSegment(T* oldItems)
     {
@@ -78,847 +84,663 @@ struct SC::SegmentItems : public SegmentHeader
                                                      sizeof(SegmentHeader));
     }
 
-    void setSize(size_t newSize) { sizeBytes = static_cast<SizeType>(newSize * sizeof(T)); }
-
     // TODO: needs specialized moveAssign for trivial types
-    static void moveAssignElements(T* destination, size_t indexStart, size_t numElements, T* source)
-    {
-        // TODO: Should we also call destructor on moved elements?
-        for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
-            destination[idx] = move(source[idx - indexStart]);
-    }
+    static void moveAssign(T* destination, size_t indexStart, size_t numElements, T* source);
 
-    static void copyAssignElements(T* destination, size_t indexStart, size_t numElements, const T* source)
-    {
-        // TODO: Should we also call destructor on moved elements?
-        for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
-            destination[idx] = source[idx - indexStart];
-    }
+    static void copyAssign(T* destination, size_t indexStart, size_t numElements, const T* source);
 
-    static void destroyElements(T* destination, size_t indexStart, size_t numElements)
-    {
-        for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
-            destination[idx].~T();
-    }
+    static void destruct(T* destination, size_t indexStart, size_t numElements);
 
-    static void defaultConstruct(T* destination, size_t indexStart, size_t numElements)
-    {
-        for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
-            new (&destination[idx], PlacementNew()) T;
-    }
+    static void defaultConstruct(T* destination, size_t indexStart, size_t numElements);
 
-    static void copyConstructSingle(T* destination, size_t indexStart, size_t numElements, const T& sourceValue)
-    {
-        for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
-            new (&destination[idx], PlacementNew()) T(sourceValue);
-    }
+    static void copyConstructSingle(T* destination, size_t indexStart, size_t numElements, const T& sourceValue);
 
-    static void copyConstruct(T* destination, size_t indexStart, size_t numElements, const T* sourceValues)
-    {
-        for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
-            new (&destination[idx], PlacementNew()) T(sourceValues[idx - indexStart]);
-    }
+    static void copyConstructMultiple(T* destination, size_t indexStart, size_t numElements, const T* sourceValues);
 
-    static void moveConstruct(T* destination, size_t indexStart, size_t numElements, T* source)
-    {
-        // TODO: Should we also call destructor on moved elements?
-        for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
-            new (&destination[idx], PlacementNew()) T(move(source[idx - indexStart]));
-    }
-    template <typename U, bool copy>
-    static typename EnableIf<copy, void>::type copyOrMoveConstruct(T* destination, size_t indexStart,
-                                                                   size_t numElements, U* sourceValue)
-    {
-        copyConstruct(destination, indexStart, numElements, sourceValue);
-    }
+    static void moveConstruct(T* destination, size_t indexStart, size_t numElements, T* source);
 
-    template <typename U, bool copy>
-    static typename EnableIf<not copy, void>::type copyOrMoveConstruct(U* destination, size_t indexStart,
-                                                                       size_t numElements, U* sourceValue)
-    {
-        moveConstruct(destination, indexStart, numElements, sourceValue);
-    }
+    template <typename U, bool IsCopy>
+    static typename EnableIf<IsCopy, void>::type constructItems(T* destination, size_t indexStart, size_t numElements,
+                                                                U* sourceValue);
+
+    template <typename U, bool IsCopy>
+    static typename EnableIf<not IsCopy, void>::type constructItems(U* destination, size_t indexStart,
+                                                                    size_t numElements, U* sourceValue);
 
     template <typename Q = T>
     static typename EnableIf<not IsTriviallyCopyable<Q>::value, void>::type //
-    moveAndDestroy(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN)
-    {
-        moveConstruct(newItems, 0, keepFirstN, oldItems);
-        destroyElements(oldItems, keepFirstN, oldSize - keepFirstN);
-    }
+    moveItems(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN);
 
     template <typename Q = T>
     static typename EnableIf<IsTriviallyCopyable<Q>::value, void>::type //
-    moveAndDestroy(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN)
-    {
-        SC_COMPILER_UNUSED(oldSize);
-        // TODO: add code to handle memcpy destination overlapping source
-        memcpy(newItems, oldItems, keepFirstN * sizeof(T));
-    }
+    moveItems(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN);
 
     template <typename U, typename Q = T>
     static typename EnableIf<not IsTriviallyCopyable<Q>::value, void>::type //
-    copyReplaceTrivialOrNot(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
-                            const size_t numToDestroy, U* other, size_t otherSize)
-    {
-        SC_COMPILER_UNUSED(otherSize);
-        copyAssignElements(oldItems, 0, numToAssign, other);
-        copyConstruct(oldItems, numToAssign, numToCopyConstruct, other + numToAssign);
-        destroyElements(oldItems, numToAssign + numToCopyConstruct, numToDestroy);
-    }
+    copyItems(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct, const size_t numToDestroy,
+              U* other, size_t otherSize);
 
     template <typename U, typename Q = T>
     static typename EnableIf<IsTriviallyCopyable<Q>::value, void>::type //
-    copyReplaceTrivialOrNot(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
-                            const size_t numToDestroy, U* other, size_t otherSize)
-    {
-        SC_COMPILER_UNUSED(numToAssign);
-        SC_COMPILER_UNUSED(numToCopyConstruct);
-        SC_COMPILER_UNUSED(numToDestroy);
-        // TODO: add code to handle memcpy destination overlapping source
-        memcpy(oldItems, other, otherSize * sizeof(T));
-    }
+    copyItems(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct, const size_t numToDestroy,
+              U* other, size_t otherSize);
 
-    template <bool copy, typename U, typename Q = T>
+    template <bool IsCopy, typename U, typename Q = T>
     static typename EnableIf<not IsTriviallyCopyable<Q>::value, void>::type //
-    insertItemsTrivialOrNot(T*& oldItems, size_t position, const size_t numElements, const size_t newSize, U* other,
-                            size_t otherSize)
-    {
-        const size_t numElementsToMove = numElements - position;
-        // TODO: not sure if everything works with source elements coming from same buffer as dest
-        moveConstruct(oldItems, newSize - numElementsToMove, numElementsToMove, oldItems + position);
-        copyOrMoveConstruct<U, copy>(oldItems, position, otherSize, other);
-    }
+    insertItems(T*& oldItems, size_t position, const size_t numElements, const size_t newSize, U* other,
+                size_t otherSize);
 
-    template <bool copy, typename U, typename Q = T>
+    template <bool IsCopy, typename U, typename Q = T>
     static typename EnableIf<IsTriviallyCopyable<U>::value, void>::type //
-    insertItemsTrivialOrNot(T*& oldItems, size_t position, const size_t numElements, const size_t newSize, U* other,
-                            size_t otherSize)
-    {
-        SC_COMPILER_UNUSED(numElements);
-        SC_COMPILER_UNUSED(newSize);
-        static_assert(sizeof(T) == sizeof(U), "What?");
-        // TODO: add code to handle memcpy destination overlapping source
-        const size_t numElementsToMove = numElements - position;
-        memmove(oldItems + position + otherSize, oldItems + position, numElementsToMove * sizeof(T));
-        memcpy(oldItems + position, other, otherSize * sizeof(T));
-    }
+    insertItems(T*& oldItems, size_t position, const size_t numElements, const size_t newSize, U* other,
+                size_t otherSize);
 
     template <typename Lambda>
     [[nodiscard]] static bool findIf(const T* items, size_t indexStart, const size_t numElements, Lambda&& criteria,
-                                     size_t* foundIndex = nullptr)
-    {
-        for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
-        {
-            if (criteria(items[idx]))
-            {
-                if (foundIndex)
-                {
-                    *foundIndex = idx;
-                }
-                return true;
-            }
-        }
-        return false;
-    }
+                                     size_t* foundIndex = nullptr);
 };
 
 template <typename Allocator, typename T>
 struct SC::SegmentOperations
 {
-    [[nodiscard]] static bool push_back(T*& oldItems, const T& element)
-    {
-        const bool       isNull      = oldItems == nullptr;
-        SegmentItems<T>* selfSegment = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
-        const size_t     numElements = isNull ? 0 : selfSegment->size();
-        const size_t     numCapacity = isNull ? 0 : selfSegment->capacity();
-        if (numElements == numCapacity)
-        {
-            if (!ensureCapacity(oldItems, numElements + 1, numElements))
-                SC_LANGUAGE_UNLIKELY { return false; }
-        }
-        SegmentItems<T>::copyConstruct(oldItems, numElements, 1, &element);
-        SegmentItems<T>::getSegment(oldItems)->sizeBytes += sizeof(T);
-        return true;
-    }
+    [[nodiscard]] static bool push_back(T*& oldItems, const T& element);
 
-    [[nodiscard]] static bool push_back(T*& oldItems, T&& element)
-    {
-        const bool       isNull      = oldItems == nullptr;
-        SegmentItems<T>* selfSegment = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
-        const size_t     numElements = isNull ? 0 : selfSegment->size();
-        const size_t     numCapacity = isNull ? 0 : selfSegment->capacity();
-        if (numElements == numCapacity)
-        {
-            if (!ensureCapacity(oldItems, numElements + 1, numElements))
-                SC_LANGUAGE_UNLIKELY { return false; }
-        }
-        SegmentItems<T>::moveConstruct(oldItems, numElements, 1, &element);
-        SegmentItems<T>::getSegment(oldItems)->sizeBytes += sizeof(T);
-        return true;
-    }
+    [[nodiscard]] static bool push_back(T*& oldItems, T&& element);
 
     template <bool sizeOfTIsSmallerThanInt>
-    static typename EnableIf<sizeOfTIsSmallerThanInt == true, void>::type // sizeof(T) <= sizeof(int)
-    reserveInternalTrivialInitializeTemplate(T* items, const size_t oldSize, const size_t newSize,
-                                             const T& defaultValue)
-    {
-        int32_t val = 0;
-        memcpy(&val, &defaultValue, sizeof(T));
-
-        // This optimization would need to be split into another template
-        // if(sizeof(T) == 1)
-        // {
-        //     memset(items + oldSize, val, newSize - oldSize);
-        // } else
-
-        if (val == 0) // sizeof(T) > sizeof(uint8_t)
-        {
-            memset(items + oldSize, 0, sizeof(T) * (newSize - oldSize));
-        }
-        else
-        {
-            reserveInternalTrivialInitializeTemplate<false>(items, oldSize, newSize, defaultValue);
-        }
-    }
-
+    static typename EnableIf<sizeOfTIsSmallerThanInt == true, void>::type //
+    // sizeof(T) <= sizeof(int) (uses memset)
+    reserveInternal(T* items, const size_t oldSize, const size_t newSize, const T& defaultValue);
     template <bool sizeOfTIsSmallerThanInt>
-    static
-        typename EnableIf<sizeOfTIsSmallerThanInt == false, void>::type // sizeof(T) > sizeof(int) (cannot use memset)
-        reserveInternalTrivialInitializeTemplate(T* items, const size_t oldSize, const size_t newSize,
-                                                 const T& defaultValue)
-    {
-        // This should by copyAssign, but for trivial objects it's the same as copyConstruct
-        SegmentItems<T>::copyConstructSingle(items, oldSize, newSize - oldSize, defaultValue);
-    }
+    static typename EnableIf<sizeOfTIsSmallerThanInt == false, void>::type //
+    // sizeof(T) > sizeof(int) (cannot use memset)
+    reserveInternal(T* items, const size_t oldSize, const size_t newSize, const T& defaultValue);
 
-    static void reserveInternalTrivialInitialize(T* items, const size_t oldSize, const size_t newSize,
-                                                 const T& defaultValue)
-    {
-        if (newSize > oldSize)
-        {
-            constexpr bool smallerThanInt = sizeof(T) <= sizeof(int32_t);
-            reserveInternalTrivialInitializeTemplate<smallerThanInt>(items, oldSize, newSize, defaultValue);
-        }
-    }
+    static void reserveInitialize(T* items, const size_t oldSize, const size_t newSize, const T& defaultValue);
 
-    [[nodiscard]] static bool reserveInternalTrivialAllocate(T*& oldItems, size_t newSize)
-    {
-        SegmentItems<T>* newSegment = nullptr;
-        constexpr size_t maxSizeT   = SC::MaxValue();
-        if (oldItems == nullptr)
-        {
-            if (newSize <= maxSizeT / sizeof(T))
-            {
-                newSegment =
-                    static_cast<SegmentItems<T>*>(Allocator::allocate(nullptr, newSize * sizeof(T), &oldItems));
-            }
-        }
-        else if (newSize > SegmentItems<T>::getSegment(oldItems)->capacity())
-        {
-            if (newSize <= maxSizeT / sizeof(T))
-            {
-                newSegment = static_cast<SegmentItems<T>*>(
-                    Allocator::reallocate(SegmentItems<T>::getSegment(oldItems), newSize * sizeof(T)));
-            }
-        }
-        else
-        {
-            newSegment = SegmentItems<T>::getSegment(oldItems);
-        }
-
-        if (newSegment == nullptr)
-        {
-            return false;
-        }
-        oldItems = Allocator::template getItems<T>(newSegment);
-        return true;
-    }
+    [[nodiscard]] static bool reallocate(T*& oldItems, size_t newSize);
 
     template <typename U>
-    [[nodiscard]] static bool copy(T*& oldItems, U* other, size_t otherSize)
-    {
-        const bool       isNull      = oldItems == nullptr;
-        SegmentItems<T>* selfSegment = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
-        const size_t     oldCapacity = isNull ? 0 : selfSegment->capacity();
+    [[nodiscard]] static bool copy(T*& oldItems, U* other, size_t otherSize);
 
-        if (otherSize > 0 && otherSize <= oldCapacity)
-        {
-            const size_t numElements        = isNull ? 0 : selfSegment->size();
-            const size_t numToAssign        = min(numElements, otherSize);
-            const size_t numToCopyConstruct = otherSize > numElements ? otherSize - numElements : 0;
-            const size_t numToDestroy       = numElements > otherSize ? numElements - otherSize : 0;
-            SegmentItems<T>::copyReplaceTrivialOrNot(oldItems, numToAssign, numToCopyConstruct, numToDestroy, other,
-                                                     otherSize);
-            SegmentItems<T>::getSegment(oldItems)->setSize(otherSize);
-            return true;
-        }
-        else
-        {
-            // otherSize == 0 || otherSize > capacity()
-            if (selfSegment != nullptr)
-            {
-                clear(selfSegment);
-            }
-            const bool res = insert<true>(oldItems, 0, other, otherSize); // append(other);
-            return res;
-        }
-    }
+    template <bool IsCopy, typename U>
+    [[nodiscard]] static bool insert(T*& oldItems, size_t position, U* other, size_t otherSize);
 
-    template <bool copy, typename U>
-    [[nodiscard]] static bool insert(T*& oldItems, size_t position, U* other, size_t otherSize)
-    {
-        const bool       isNull      = oldItems == nullptr;
-        SegmentItems<T>* selfSegment = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
-        const size_t     numElements = isNull ? 0 : selfSegment->size();
-        if (position > numElements)
-        {
-            return false;
-        }
-        if (otherSize == 0)
-        {
-            return true;
-        }
-        constexpr size_t maxSizeT = SC::MaxValue();
-        if ((numElements > maxSizeT - otherSize) or ((numElements + otherSize) > maxSizeT / sizeof(T)))
-        {
-            return false;
-        }
-        const size_t newSize     = numElements + otherSize;
-        const size_t oldCapacity = isNull ? 0 : selfSegment->capacity();
-        if (newSize > oldCapacity)
-        {
-            if (!ensureCapacity(oldItems, newSize, numElements))
-            {
-                return false;
-            }
-        }
-        // Segment may have been reallocated
-        selfSegment = SegmentItems<T>::getSegment(oldItems);
-        SegmentItems<T>::template insertItemsTrivialOrNot<copy, U, T>(oldItems, position, numElements, newSize, other,
-                                                                      otherSize);
-        selfSegment->setSize(newSize);
-        return true;
-    }
-
-    [[nodiscard]] static bool ensureCapacity(T*& oldItems, size_t newCapacity, const size_t keepFirstN)
-    {
-        const bool       isNull     = oldItems == nullptr;
-        SegmentItems<T>* oldSegment = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
-        const auto       oldSize    = isNull ? 0 : oldSegment->size();
-        SC_ASSERT_DEBUG(oldSize >= keepFirstN);
-        SegmentItems<T>* newSegment = nullptr;
-        constexpr size_t maxSizeT   = SC::MaxValue();
-        if (newCapacity <= maxSizeT / sizeof(T))
-        {
-            newSegment =
-                static_cast<SegmentItems<T>*>(Allocator::allocate(oldSegment, newCapacity * sizeof(T), &oldItems));
-        }
-        if (newSegment == oldSegment)
-        {
-            return false; // Array returning the same as old
-        }
-        else if (newSegment == nullptr)
-        {
-            return false;
-        }
-        newSegment->setSize(oldSize);
-        if (oldSize > 0)
-        {
-            oldSegment = SegmentItems<T>::getSegment(oldItems);
-            SegmentItems<T>::moveAndDestroy(Allocator::template getItems<T>(oldSegment),
-                                            Allocator::template getItems<T>(newSegment), oldSize, keepFirstN);
-            Allocator::release(oldSegment);
-        }
-        oldItems = Allocator::template getItems<T>(newSegment);
-        return true;
-    }
+    [[nodiscard]] static bool ensureCapacity(T*& oldItems, size_t newCapacity, const size_t keepFirstN);
 
     template <bool initialize, typename Q = T>
     [[nodiscard]] static typename EnableIf<IsTriviallyCopyable<Q>::value, bool>::type //
-    resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue)
-    {
-        const auto oldSize = oldItems == nullptr ? 0 : SegmentItems<T>::getSegment(oldItems)->size();
-
-        if (!reserveInternalTrivialAllocate(oldItems, newSize))
-        {
-            return false;
-        }
-
-        SegmentItems<T>* selfSegment = SegmentItems<T>::getSegment(oldItems);
-        selfSegment->setSize(newSize);
-        if (initialize)
-        {
-            reserveInternalTrivialInitialize(Allocator::template getItems<T>(selfSegment), oldSize, newSize,
-                                             *defaultValue);
-        }
-        return true;
-    }
+    resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue);
 
     template <bool initialize, typename Q = T>
     [[nodiscard]] static typename EnableIf<not IsTriviallyCopyable<Q>::value, bool>::type //
-    resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue)
-    {
-        static_assert(initialize,
-                      "There is no logical reason to skip initializing non trivially copyable class on resize");
-        const bool       isNull     = oldItems == nullptr;
-        SegmentItems<T>* oldSegment = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
-        if (newSize == 0)
-        {
-            if (oldSegment != nullptr)
-            {
-                clear(oldSegment);
-            }
-            return true;
-        }
-        const auto oldSize     = isNull ? 0 : oldSegment->size();
-        const auto oldCapacity = isNull ? 0 : oldSegment->capacity();
-        if (newSize > oldCapacity)
-        {
-            const auto keepFirstN = min(oldSize, newSize);
-            if (!ensureCapacity(oldItems, newSize, keepFirstN))
-                SC_LANGUAGE_UNLIKELY { return false; }
-            if (initialize)
-            {
-                SegmentItems<T>::copyConstructSingle(oldItems, keepFirstN, newSize - keepFirstN, *defaultValue);
-            }
-        }
-        else
-        {
-            if (initialize)
-            {
+    resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue);
 
-                if (oldSize > newSize)
-                {
-                    SegmentItems<T>::destroyElements(oldItems, newSize, oldSize - newSize);
-                }
-                else if (oldSize < newSize)
-                {
-                    SegmentItems<T>::copyConstructSingle(oldItems, oldSize, newSize - oldSize, *defaultValue);
-                }
-            }
-        }
-        const auto numNewBytes                           = newSize * sizeof(T);
-        SegmentItems<T>::getSegment(oldItems)->sizeBytes = static_cast<SegmentHeader::SizeType>(numNewBytes);
-        return true;
-    }
+    [[nodiscard]] static bool shrink_to_fit(T*& oldItems);
 
-    [[nodiscard]] static bool shrink_to_fit(T*& oldItems)
-    {
-        const bool       isNull      = oldItems == nullptr;
-        SegmentItems<T>* oldSegment  = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
-        const size_t     numElements = isNull ? 0 : oldSegment->size();
-        if (numElements > 0)
-        {
-            const size_t selfCapacity = oldSegment->capacity();
-            if (numElements != selfCapacity)
-            {
-                auto newSegment =
-                    static_cast<SegmentItems<T>*>(Allocator::allocate(oldSegment, oldSegment->sizeBytes, &oldItems));
-                if (newSegment == oldSegment)
-                {
-                    return true; // Array allocator returning the same memory
-                }
-                else if (newSegment == nullptr)
-                    SC_LANGUAGE_UNLIKELY { return false; }
-                newSegment->sizeBytes = oldSegment->sizeBytes;
-                SegmentItems<T>::moveConstruct(Allocator::template getItems<T>(newSegment), 0, numElements,
-                                               Allocator::template getItems<T>(oldSegment));
-                Allocator::release(oldSegment);
-                oldItems = Allocator::template getItems<T>(newSegment);
-            }
-        }
-        else
-        {
-            if (oldSegment != nullptr)
-            {
-                destroy(oldSegment);
-                oldItems = nullptr;
-            }
-        }
-        return true;
-    }
+    static void clear(SegmentItems<T>* segment);
 
-    static void clear(SegmentItems<T>* segment)
-    {
-        SegmentItems<T>::destroyElements(Allocator::template getItems<T>(segment), 0, segment->size());
-        segment->sizeBytes = 0;
-    }
+    static void destroy(SegmentItems<T>* segment);
 
-    static void destroy(SegmentItems<T>* segment)
-    {
-        clear(segment);
-        Allocator::release(segment);
-    }
+    [[nodiscard]] static bool pop_back(T*& items);
 
-    [[nodiscard]] static bool pop_back(T*& items)
-    {
-        const bool       isNull  = items == nullptr;
-        SegmentItems<T>* segment = isNull ? nullptr : SegmentItems<T>::getSegment(items);
-        if (segment == nullptr)
-            return false;
-        const size_t numElements = segment->size();
-        if (numElements > 0)
-        {
-            SegmentItems<T>::destroyElements(Allocator::template getItems<T>(segment), numElements - 1, 1);
-            segment->setSize(numElements - 1);
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
+    [[nodiscard]] static bool pop_front(T*& items);
 
-    [[nodiscard]] static bool pop_front(T*& items) { return removeAt(items, 0); }
-
-    [[nodiscard]] static bool removeAt(T*& items, size_t index)
-    {
-        const bool       isNull  = items == nullptr;
-        SegmentItems<T>* segment = isNull ? nullptr : SegmentItems<T>::getSegment(items);
-        if (segment == nullptr)
-            return false;
-        const size_t numElements = segment->size();
-        if (index < numElements)
-        {
-            if (index + 1 == numElements)
-            {
-                SegmentItems<T>::destroyElements(items, index, 1);
-            }
-            else
-            {
-                SegmentItems<T>::moveAssignElements(items, index, numElements - index - 1, items + index + 1);
-            }
-            segment->setSize(numElements - 1);
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
+    [[nodiscard]] static bool removeAt(T*& items, size_t index);
 };
 
-template <typename Allocator, typename T, int N>
-struct SC::Segment : public SegmentItems<T>
+//-----------------------------------------------------------------------------------------------------------------------
+// Implementations Details
+//-----------------------------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------------------------------
+// SegmentItems<T>
+//-----------------------------------------------------------------------------------------------------------------------
+
+// TODO: needs specialized moveAssign for trivial types
+template <typename T>
+void SC::SegmentItems<T>::moveAssign(T* destination, size_t indexStart, size_t numElements, T* source)
 {
-    static_assert(N > 0, "Array must have N > 0");
-    using Parent     = SegmentItems<T>;
-    using Operations = SegmentOperations<Allocator, T>;
+    // TODO: Should we also call destructor on moved elements?
+    for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
+        destination[idx] = move(source[idx - indexStart]);
+}
 
-  protected:
-    template <int>
-    friend struct SmallString;
-    template <typename, int>
-    friend struct SmallVector;
-    union
-    {
-        T items[N];
-    };
+template <typename T>
+void SC::SegmentItems<T>::copyAssign(T* destination, size_t indexStart, size_t numElements, const T* source)
+{
+    // TODO: Should we also call destructor on moved elements?
+    for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
+        destination[idx] = source[idx - indexStart];
+}
 
-  public:
-    Segment()
-    {
-        static_assert(alignof(Segment) == alignof(uint64_t), "Segment Alignment");
-        Segment::sizeBytes     = 0;
-        Segment::capacityBytes = sizeof(T) * N;
-    }
+template <typename T>
+void SC::SegmentItems<T>::destruct(T* destination, size_t indexStart, size_t numElements)
+{
+    for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
+        destination[idx].~T();
+}
 
-    Segment(std::initializer_list<T> ilist)
-    {
-        Segment::capacityBytes = sizeof(T) * N;
-        const auto sz          = min(static_cast<int>(ilist.size()), N);
-        Parent::copyConstruct(items, 0, static_cast<size_t>(sz), ilist.begin());
-        Parent::setSize(static_cast<size_t>(sz));
-    }
-    ~Segment() { Operations::destroy(this); }
+template <typename T>
+void SC::SegmentItems<T>::defaultConstruct(T* destination, size_t indexStart, size_t numElements)
+{
+    for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
+        new (&destination[idx], PlacementNew()) T;
+}
 
-    Span<const T> toSpanConst() const { return {items, Parent::sizeBytes / sizeof(T)}; }
-    Span<T>       toSpan() { return {items, Parent::sizeBytes / sizeof(T)}; }
+template <typename T>
+void SC::SegmentItems<T>::copyConstructSingle(T* destination, size_t indexStart, size_t numElements,
+                                              const T& sourceValue)
+{
+    for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
+        new (&destination[idx], PlacementNew()) T(sourceValue);
+}
 
-    [[nodiscard]] T& front()
-    {
-        const size_t numElements = Parent::size();
-        SC_ASSERT_RELEASE(numElements > 0);
-        return items[0];
-    }
+template <typename T>
+void SC::SegmentItems<T>::copyConstructMultiple(T* destination, size_t indexStart, size_t numElements,
+                                                const T* sourceValues)
+{
+    for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
+        new (&destination[idx], PlacementNew()) T(sourceValues[idx - indexStart]);
+}
 
-    [[nodiscard]] const T& front() const
-    {
-        const size_t numElements = Parent::size();
-        SC_ASSERT_RELEASE(numElements > 0);
-        return items[0];
-    }
+template <typename T>
+void SC::SegmentItems<T>::moveConstruct(T* destination, size_t indexStart, size_t numElements, T* source)
+{
+    // TODO: Should we also call destructor on moved elements?
+    for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
+        new (&destination[idx], PlacementNew()) T(move(source[idx - indexStart]));
+}
 
-    [[nodiscard]] T& back()
-    {
-        const size_t numElements = Parent::size();
-        SC_ASSERT_RELEASE(numElements > 0);
-        return items[numElements - 1];
-    }
+template <typename T>
+template <typename U, bool IsCopy>
+typename SC::EnableIf<IsCopy, void>::type //
+SC::SegmentItems<T>::constructItems(T* destination, size_t indexStart, size_t numElements, U* sourceValue)
+{
+    copyConstructMultiple(destination, indexStart, numElements, sourceValue);
+}
 
-    [[nodiscard]] const T& back() const
-    {
-        const size_t numElements = Parent::size();
-        SC_ASSERT_RELEASE(numElements > 0);
-        return items[numElements - 1];
-    }
-    Segment(const Segment& other)
-    {
-        Segment::sizeBytes     = 0;
-        Segment::capacityBytes = sizeof(T) * N;
-        (void)append(other.items, other.size());
-    }
+template <typename T>
+template <typename U, bool IsCopy>
+typename SC::EnableIf<not IsCopy, void>::type //
+SC::SegmentItems<T>::constructItems(U* destination, size_t indexStart, size_t numElements, U* sourceValue)
+{
+    moveConstruct(destination, indexStart, numElements, sourceValue);
+}
 
-    Segment(Segment&& other)
-    {
-        Segment::sizeBytes     = 0;
-        Segment::capacityBytes = sizeof(T) * N;
-        (void)appendMove(other.toSpan());
-    }
+template <typename T>
+template <typename Q>
+typename SC::EnableIf<not SC::IsTriviallyCopyable<Q>::value, void>::type //
+SC::SegmentItems<T>::moveItems(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN)
+{
+    moveConstruct(newItems, 0, keepFirstN, oldItems);
+    destruct(oldItems, keepFirstN, oldSize - keepFirstN);
+}
 
-    Segment& operator=(const Segment& other)
+template <typename T>
+template <typename Q>
+typename SC::EnableIf<SC::IsTriviallyCopyable<Q>::value, void>::type //
+SC::SegmentItems<T>::moveItems(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN)
+{
+    SC_COMPILER_UNUSED(oldSize);
+    // TODO: add code to handle memcpy destination overlapping source
+    memcpy(newItems, oldItems, keepFirstN * sizeof(T));
+}
+
+template <typename T>
+template <typename U, typename Q>
+typename SC::EnableIf<not SC::IsTriviallyCopyable<Q>::value, void>::type //
+SC::SegmentItems<T>::copyItems(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
+                               const size_t numToDestroy, U* other, size_t otherSize)
+{
+    SC_COMPILER_UNUSED(otherSize);
+    copyAssign(oldItems, 0, numToAssign, other);
+    copyConstructMultiple(oldItems, numToAssign, numToCopyConstruct, other + numToAssign);
+    destruct(oldItems, numToAssign + numToCopyConstruct, numToDestroy);
+}
+
+template <typename T>
+template <typename U, typename Q>
+typename SC::EnableIf<SC::IsTriviallyCopyable<Q>::value, void>::type //
+SC::SegmentItems<T>::copyItems(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
+                               const size_t numToDestroy, U* other, size_t otherSize)
+{
+    SC_COMPILER_UNUSED(numToAssign);
+    SC_COMPILER_UNUSED(numToCopyConstruct);
+    SC_COMPILER_UNUSED(numToDestroy);
+    // TODO: add code to handle memcpy destination overlapping source
+    memcpy(oldItems, other, otherSize * sizeof(T));
+}
+
+template <typename T>
+template <bool IsCopy, typename U, typename Q>
+typename SC::EnableIf<not SC::IsTriviallyCopyable<Q>::value, void>::type //
+SC::SegmentItems<T>::insertItems(T*& oldItems, size_t position, const size_t numElements, const size_t newSize,
+                                 U* other, size_t otherSize)
+{
+    const size_t numElementsToMove = numElements - position;
+    // TODO: not sure if everything works with source elements coming from same buffer as dest
+    moveConstruct(oldItems, newSize - numElementsToMove, numElementsToMove, oldItems + position);
+    constructItems<U, IsCopy>(oldItems, position, otherSize, other);
+}
+
+template <typename T>
+template <bool IsCopy, typename U, typename Q>
+typename SC::EnableIf<SC::IsTriviallyCopyable<U>::value, void>::type //
+SC::SegmentItems<T>::insertItems(T*& oldItems, size_t position, const size_t numElements, const size_t newSize,
+                                 U* other, size_t otherSize)
+{
+    SC_COMPILER_UNUSED(numElements);
+    SC_COMPILER_UNUSED(newSize);
+    static_assert(sizeof(T) == sizeof(U), "What?");
+    // TODO: add code to handle memcpy destination overlapping source
+    const size_t numElementsToMove = numElements - position;
+    memmove(oldItems + position + otherSize, oldItems + position, numElementsToMove * sizeof(T));
+    memcpy(oldItems + position, other, otherSize * sizeof(T));
+}
+
+template <typename T>
+template <typename Lambda>
+bool SC::SegmentItems<T>::findIf(const T* items, size_t indexStart, const size_t numElements, Lambda&& criteria,
+                                 size_t* foundIndex)
+{
+    for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
     {
-        if (&other != this)
+        if (criteria(items[idx]))
         {
-            T*         tItems = Segment::items;
-            const bool res    = Segment::Operations::copy(tItems, other.items, other.size());
-            (void)res;
-            SC_ASSERT_DEBUG(res);
-        }
-        return *this;
-    }
-
-    Segment& operator=(Segment&& other)
-    {
-        if (&other != this)
-        {
-            Operations::clear(SegmentItems<T>::getSegment(items));
-            if (appendMove(other.toSpan()))
+            if (foundIndex)
             {
-                Operations::clear(SegmentItems<T>::getSegment(other.items));
+                *foundIndex = idx;
             }
-        }
-        return *this;
-    }
-
-    template <typename Allocator2, int M>
-    Segment(const Segment<Allocator2, T, M>& other)
-    {
-        static_assert(M <= N, "Unsafe operation, cannot report failure inside constructor, use append instead");
-        Segment::sizeBytes     = 0;
-        Segment::capacityBytes = sizeof(T) * N;
-        (void)append(other.toSpanConst());
-    }
-    template <typename Allocator2, int M>
-    Segment(Segment<Allocator2, T, M>&& other)
-    {
-        static_assert(M <= N, "Unsafe operation, cannot report failure inside constructor, use appendMove instead");
-        Segment::sizeBytes     = 0;
-        Segment::capacityBytes = sizeof(T) * N;
-        (void)appendMove(other.items, other.size());
-    }
-
-    template <typename Allocator2, int M>
-    Segment& operator=(const Segment<Allocator2, T, M>& other)
-    {
-        if (&other != this)
-        {
-            T*         items = items;
-            const bool res   = copy(items, other.data(), other.size());
-            (void)res;
-            SC_ASSERT_DEBUG(res);
-        }
-        return *this;
-    }
-
-    template <typename Allocator2, int M>
-    Segment& operator=(Segment<Allocator2, T, M>&& other)
-    {
-        if (&other != this)
-        {
-            Segment::clear();
-            if (appendMove(other.items, other.size()))
-            {
-                other.clear();
-            }
-        }
-        return *this;
-    }
-
-    [[nodiscard]] bool push_back(const T& element)
-    {
-        T* oldItems = items;
-        return Operations::push_back(oldItems, element);
-    }
-
-    [[nodiscard]] bool push_back(T&& element)
-    {
-        T* oldItems = items;
-        return Operations::push_back(oldItems, forward<T>(element));
-    }
-
-    [[nodiscard]] bool pop_back()
-    {
-        T* oldItems = items;
-        return Operations::pop_back(oldItems);
-    }
-
-    [[nodiscard]] bool pop_front()
-    {
-        T* oldItems = items;
-        return Operations::pop_front(oldItems);
-    }
-
-    [[nodiscard]] T& operator[](size_t index)
-    {
-        SC_ASSERT_DEBUG(index < Segment::size());
-        return items[index];
-    }
-
-    [[nodiscard]] const T& operator[](size_t index) const
-    {
-        SC_ASSERT_DEBUG(index < Segment::size());
-        return items[index];
-    }
-
-    void clear() { Operations::clear(SegmentItems<T>::getSegment(items)); }
-
-    [[nodiscard]] bool reserve(size_t newCap) { return newCap <= Segment::capacity(); }
-    [[nodiscard]] bool resize(size_t newSize, const T& value = T())
-    {
-        T* oldItems = items;
-        return Operations::template resizeInternal<true>(oldItems, newSize, &value);
-    }
-    [[nodiscard]] bool resizeWithoutInitializing(size_t newSize)
-    {
-        T* oldItems = items;
-        return Operations::template resizeInternal<false>(oldItems, newSize, nullptr);
-    }
-
-    [[nodiscard]] bool shrink_to_fit()
-    {
-        T* oldItems = items;
-        return Operations::shrink_to_fit(oldItems);
-    }
-
-    [[nodiscard]] T*       begin() { return items; }
-    [[nodiscard]] const T* begin() const { return items; }
-    [[nodiscard]] T*       end() { return items + Segment::size(); }
-    [[nodiscard]] const T* end() const { return items + Segment::size(); }
-    [[nodiscard]] T*       data() { return items; }
-    [[nodiscard]] const T* data() const { return items; }
-
-    [[nodiscard]] bool insert(size_t idx, Span<const T> data)
-    {
-        T* oldItems = items;
-        return Operations::template insert<true>(oldItems, idx, data.data(), data.sizeInElements());
-    }
-    [[nodiscard]] bool append(Span<const T> data)
-    {
-        T* oldItems = items;
-        return Operations::template insert<true>(oldItems, Segment::size(), data.data(), data.sizeInElements());
-    }
-
-    template <typename U>
-    [[nodiscard]] bool append(U&& src)
-    {
-        if (append({src.data(), src.size()}))
-        {
-            src.clear();
             return true;
         }
+    }
+    return false;
+}
+
+//-----------------------------------------------------------------------------------------------------------------------
+// SegmentOperations
+//-----------------------------------------------------------------------------------------------------------------------
+
+template <typename Allocator, typename T>
+bool SC::SegmentOperations<Allocator, T>::push_back(T*& oldItems, const T& element)
+{
+    const bool       isNull      = oldItems == nullptr;
+    SegmentItems<T>* selfSegment = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
+    const size_t     numElements = isNull ? 0 : selfSegment->size();
+    const size_t     numCapacity = isNull ? 0 : selfSegment->capacity();
+    if (numElements == numCapacity)
+    {
+        if (!ensureCapacity(oldItems, numElements + 1, numElements))
+            SC_LANGUAGE_UNLIKELY { return false; }
+    }
+    SegmentItems<T>::copyConstructMultiple(oldItems, numElements, 1, &element);
+    SegmentItems<T>::getSegment(oldItems)->sizeBytes += sizeof(T);
+    return true;
+}
+
+template <typename Allocator, typename T>
+bool SC::SegmentOperations<Allocator, T>::push_back(T*& oldItems, T&& element)
+{
+    const bool       isNull      = oldItems == nullptr;
+    SegmentItems<T>* selfSegment = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
+    const size_t     numElements = isNull ? 0 : selfSegment->size();
+    const size_t     numCapacity = isNull ? 0 : selfSegment->capacity();
+    if (numElements == numCapacity)
+    {
+        if (!ensureCapacity(oldItems, numElements + 1, numElements))
+            SC_LANGUAGE_UNLIKELY { return false; }
+    }
+    SegmentItems<T>::moveConstruct(oldItems, numElements, 1, &element);
+    SegmentItems<T>::getSegment(oldItems)->sizeBytes += sizeof(T);
+    return true;
+}
+
+template <typename Allocator, typename T>
+template <bool sizeOfTIsSmallerThanInt>
+typename SC::EnableIf<sizeOfTIsSmallerThanInt == true, void>::type // sizeof(T) <= sizeof(int)
+SC::SegmentOperations<Allocator, T>::reserveInternal(T* items, const size_t oldSize, const size_t newSize,
+                                                     const T& defaultValue)
+{
+    int32_t val = 0;
+    memcpy(&val, &defaultValue, sizeof(T));
+
+    // This optimization would need to be split into another template
+    // if(sizeof(T) == 1)
+    // {
+    //     memset(items + oldSize, val, newSize - oldSize);
+    // } else
+
+    if (val == 0) // sizeof(T) > sizeof(uint8_t)
+    {
+        memset(items + oldSize, 0, sizeof(T) * (newSize - oldSize));
+    }
+    else
+    {
+        reserveInternal<false>(items, oldSize, newSize, defaultValue);
+    }
+}
+
+template <typename Allocator, typename T>
+template <bool sizeOfTIsSmallerThanInt>
+typename SC::EnableIf<sizeOfTIsSmallerThanInt == false, void>::type // sizeof(T) > sizeof(int) (cannot use memset)
+SC::SegmentOperations<Allocator, T>::reserveInternal(T* items, const size_t oldSize, const size_t newSize,
+                                                     const T& defaultValue)
+{
+    // This should by copyAssign, but for trivial objects it's the same as copyConstructMultiple
+    SegmentItems<T>::copyConstructSingle(items, oldSize, newSize - oldSize, defaultValue);
+}
+
+template <typename Allocator, typename T>
+void SC::SegmentOperations<Allocator, T>::reserveInitialize(T* items, const size_t oldSize, const size_t newSize,
+                                                            const T& defaultValue)
+{
+    if (newSize > oldSize)
+    {
+        constexpr bool smallerThanInt = sizeof(T) <= sizeof(int32_t);
+        reserveInternal<smallerThanInt>(items, oldSize, newSize, defaultValue);
+    }
+}
+
+template <typename Allocator, typename T>
+bool SC::SegmentOperations<Allocator, T>::reallocate(T*& oldItems, size_t newSize)
+{
+    SegmentItems<T>* newSegment = nullptr;
+    constexpr size_t maxSizeT   = SC::MaxValue();
+    if (oldItems == nullptr)
+    {
+        if (newSize <= maxSizeT / sizeof(T))
+        {
+            newSegment = static_cast<SegmentItems<T>*>(Allocator::allocate(nullptr, newSize * sizeof(T), &oldItems));
+        }
+    }
+    else if (newSize > SegmentItems<T>::getSegment(oldItems)->capacity())
+    {
+        if (newSize <= maxSizeT / sizeof(T))
+        {
+            newSegment = static_cast<SegmentItems<T>*>(
+                Allocator::reallocate(SegmentItems<T>::getSegment(oldItems), newSize * sizeof(T)));
+        }
+    }
+    else
+    {
+        newSegment = SegmentItems<T>::getSegment(oldItems);
+    }
+
+    if (newSegment == nullptr)
+    {
+        return false;
+    }
+    oldItems = Allocator::template getItems<T>(newSegment);
+    return true;
+}
+
+template <typename Allocator, typename T>
+template <typename U>
+bool SC::SegmentOperations<Allocator, T>::copy(T*& oldItems, U* other, size_t otherSize)
+{
+    const bool       isNull      = oldItems == nullptr;
+    SegmentItems<T>* selfSegment = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
+    const size_t     oldCapacity = isNull ? 0 : selfSegment->capacity();
+
+    if (otherSize > 0 && otherSize <= oldCapacity)
+    {
+        const size_t numElements        = isNull ? 0 : selfSegment->size();
+        const size_t numToAssign        = min(numElements, otherSize);
+        const size_t numToCopyConstruct = otherSize > numElements ? otherSize - numElements : 0;
+        const size_t numToDestroy       = numElements > otherSize ? numElements - otherSize : 0;
+        SegmentItems<T>::copyItems(oldItems, numToAssign, numToCopyConstruct, numToDestroy, other, otherSize);
+        SegmentItems<T>::getSegment(oldItems)->setSize(otherSize);
+        return true;
+    }
+    else
+    {
+        // otherSize == 0 || otherSize > capacity()
+        if (selfSegment != nullptr)
+        {
+            clear(selfSegment);
+        }
+        const bool res = insert<true>(oldItems, 0, other, otherSize); // append(other);
+        return res;
+    }
+}
+
+template <typename Allocator, typename T>
+template <bool IsCopy, typename U>
+bool SC::SegmentOperations<Allocator, T>::insert(T*& oldItems, size_t position, U* other, size_t otherSize)
+{
+    const bool       isNull      = oldItems == nullptr;
+    SegmentItems<T>* selfSegment = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
+    const size_t     numElements = isNull ? 0 : selfSegment->size();
+    if (position > numElements)
+    {
+        return false;
+    }
+    if (otherSize == 0)
+    {
+        return true;
+    }
+    constexpr size_t maxSizeT = SC::MaxValue();
+    if ((numElements > maxSizeT - otherSize) or ((numElements + otherSize) > maxSizeT / sizeof(T)))
+    {
+        return false;
+    }
+    const size_t newSize     = numElements + otherSize;
+    const size_t oldCapacity = isNull ? 0 : selfSegment->capacity();
+    if (newSize > oldCapacity)
+    {
+        if (!ensureCapacity(oldItems, newSize, numElements))
+        {
+            return false;
+        }
+    }
+    // Segment may have been reallocated
+    selfSegment = SegmentItems<T>::getSegment(oldItems);
+    SegmentItems<T>::template insertItems<IsCopy, U, T>(oldItems, position, numElements, newSize, other, otherSize);
+    selfSegment->setSize(newSize);
+    return true;
+}
+
+template <typename Allocator, typename T>
+bool SC::SegmentOperations<Allocator, T>::ensureCapacity(T*& oldItems, size_t newCapacity, const size_t keepFirstN)
+{
+    const bool       isNull     = oldItems == nullptr;
+    SegmentItems<T>* oldSegment = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
+    const auto       oldSize    = isNull ? 0 : oldSegment->size();
+    SC_ASSERT_DEBUG(oldSize >= keepFirstN);
+    SegmentItems<T>* newSegment = nullptr;
+    constexpr size_t maxSizeT   = SC::MaxValue();
+    if (newCapacity <= maxSizeT / sizeof(T))
+    {
+        newSegment = static_cast<SegmentItems<T>*>(Allocator::allocate(oldSegment, newCapacity * sizeof(T), &oldItems));
+    }
+    if (newSegment == oldSegment)
+    {
+        return false; // Array returning the same as old
+    }
+    else if (newSegment == nullptr)
+    {
+        return false;
+    }
+    newSegment->setSize(oldSize);
+    if (oldSize > 0)
+    {
+        oldSegment = SegmentItems<T>::getSegment(oldItems);
+        SegmentItems<T>::moveItems(Allocator::template getItems<T>(oldSegment),
+                                   Allocator::template getItems<T>(newSegment), oldSize, keepFirstN);
+        Allocator::release(oldSegment);
+    }
+    oldItems = Allocator::template getItems<T>(newSegment);
+    return true;
+}
+
+template <typename Allocator, typename T>
+template <bool initialize, typename Q>
+typename SC::EnableIf<SC::IsTriviallyCopyable<Q>::value, bool>::type //
+SC::SegmentOperations<Allocator, T>::resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue)
+{
+    const auto oldSize = oldItems == nullptr ? 0 : SegmentItems<T>::getSegment(oldItems)->size();
+
+    if (!reallocate(oldItems, newSize))
+    {
         return false;
     }
 
-    template <typename U>
-    [[nodiscard]] bool append(Span<U> src)
+    SegmentItems<T>* selfSegment = SegmentItems<T>::getSegment(oldItems);
+    selfSegment->setSize(newSize);
+    if (initialize)
     {
-        const auto oldSize = Segment::size();
-        if (reserve(src.sizeInElements()))
+        reserveInitialize(Allocator::template getItems<T>(selfSegment), oldSize, newSize, *defaultValue);
+    }
+    return true;
+}
+
+template <typename Allocator, typename T>
+template <bool initialize, typename Q>
+typename SC::EnableIf<not SC::IsTriviallyCopyable<Q>::value, bool>::type //
+SC::SegmentOperations<Allocator, T>::resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue)
+{
+    static_assert(initialize, "There is no logical reason to skip initializing non trivially copyable class on resize");
+    const bool       isNull     = oldItems == nullptr;
+    SegmentItems<T>* oldSegment = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
+    if (newSize == 0)
+    {
+        if (oldSegment != nullptr)
         {
-            for (auto& it : src)
-            {
-                if (not push_back(it))
-                {
-                    break;
-                }
-            }
-        }
-        if (oldSize + src.sizeInElements() != Segment::size())
-        {
-            SC_TRUST_RESULT(resize(oldSize));
-            return false;
+            clear(oldSegment);
         }
         return true;
     }
-
-    template <typename ComparableToValue>
-    [[nodiscard]] bool contains(const ComparableToValue& value, size_t* foundIndex = nullptr) const
+    const auto oldSize     = isNull ? 0 : oldSegment->size();
+    const auto oldCapacity = isNull ? 0 : oldSegment->capacity();
+    if (newSize > oldCapacity)
     {
-        auto oldItems = items;
-        return SegmentItems<T>::findIf(
-            oldItems, 0, Segment::size(), [&](const T& element) { return element == value; }, foundIndex);
-    }
-
-    template <typename Lambda>
-    [[nodiscard]] bool find(Lambda&& lambda, size_t* foundIndex = nullptr) const
-    {
-        auto oldItems = items;
-        return SegmentItems<T>::findIf(oldItems, 0, Segment::size(), forward<Lambda>(lambda), foundIndex);
-    }
-
-    [[nodiscard]] bool removeAt(size_t index)
-    {
-        auto* oldItems = items;
-        return SegmentItems<T>::removeAt(oldItems, index);
-    }
-
-    template <typename Lambda>
-    [[nodiscard]] bool removeAll(Lambda&& criteria)
-    {
-        size_t index;
-        size_t prevIndex         = 0;
-        bool   atLeastOneRemoved = false;
-        while (SegmentItems<T>::findIf(items, prevIndex, SegmentItems<T>::size() - prevIndex, forward<Lambda>(criteria),
-                                       &index))
+        const auto keepFirstN = min(oldSize, newSize);
+        if (!ensureCapacity(oldItems, newSize, keepFirstN))
+            SC_LANGUAGE_UNLIKELY { return false; }
+        if (initialize)
         {
-            SC_TRY(removeAt(index));
-            prevIndex         = index;
-            atLeastOneRemoved = true;
+            SegmentItems<T>::copyConstructSingle(oldItems, keepFirstN, newSize - keepFirstN, *defaultValue);
         }
-        return atLeastOneRemoved;
     }
-
-    [[nodiscard]] bool remove(const T& value)
+    else
     {
-        size_t index;
-        if (contains(value, &index))
+        if (initialize)
         {
-            return removeAt(index);
+            if (oldSize > newSize)
+            {
+                SegmentItems<T>::destruct(oldItems, newSize, oldSize - newSize);
+            }
+            else if (oldSize < newSize)
+            {
+                SegmentItems<T>::copyConstructSingle(oldItems, oldSize, newSize - oldSize, *defaultValue);
+            }
         }
+    }
+    const auto numNewBytes                           = newSize * sizeof(T);
+    SegmentItems<T>::getSegment(oldItems)->sizeBytes = static_cast<SegmentHeader::SizeType>(numNewBytes);
+    return true;
+}
+
+template <typename Allocator, typename T>
+bool SC::SegmentOperations<Allocator, T>::shrink_to_fit(T*& oldItems)
+{
+    const bool       isNull      = oldItems == nullptr;
+    SegmentItems<T>* oldSegment  = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
+    const size_t     numElements = isNull ? 0 : oldSegment->size();
+    if (numElements > 0)
+    {
+        const size_t selfCapacity = oldSegment->capacity();
+        if (numElements != selfCapacity)
+        {
+            auto newSegment =
+                static_cast<SegmentItems<T>*>(Allocator::allocate(oldSegment, oldSegment->sizeBytes, &oldItems));
+            if (newSegment == oldSegment)
+            {
+                return true; // Array allocator returning the same memory
+            }
+            else if (newSegment == nullptr)
+                SC_LANGUAGE_UNLIKELY { return false; }
+            newSegment->sizeBytes = oldSegment->sizeBytes;
+            SegmentItems<T>::moveConstruct(Allocator::template getItems<T>(newSegment), 0, numElements,
+                                           Allocator::template getItems<T>(oldSegment));
+            Allocator::release(oldSegment);
+            oldItems = Allocator::template getItems<T>(newSegment);
+        }
+    }
+    else
+    {
+        if (oldSegment != nullptr)
+        {
+            destroy(oldSegment);
+            oldItems = nullptr;
+        }
+    }
+    return true;
+}
+
+template <typename Allocator, typename T>
+void SC::SegmentOperations<Allocator, T>::clear(SegmentItems<T>* segment)
+{
+    SegmentItems<T>::destruct(Allocator::template getItems<T>(segment), 0, segment->size());
+    segment->sizeBytes = 0;
+}
+
+template <typename Allocator, typename T>
+void SC::SegmentOperations<Allocator, T>::destroy(SegmentItems<T>* segment)
+{
+    clear(segment);
+    Allocator::release(segment);
+}
+
+template <typename Allocator, typename T>
+bool SC::SegmentOperations<Allocator, T>::pop_back(T*& items)
+{
+    const bool       isNull  = items == nullptr;
+    SegmentItems<T>* segment = isNull ? nullptr : SegmentItems<T>::getSegment(items);
+    if (segment == nullptr)
+        return false;
+    const size_t numElements = segment->size();
+    if (numElements > 0)
+    {
+        SegmentItems<T>::destruct(Allocator::template getItems<T>(segment), numElements - 1, 1);
+        segment->setSize(numElements - 1);
+        return true;
+    }
+    else
+    {
         return false;
     }
+}
 
-  private:
-    [[nodiscard]] bool appendMove(Span<T> data)
+template <typename Allocator, typename T>
+bool SC::SegmentOperations<Allocator, T>::pop_front(T*& items)
+{
+    return removeAt(items, 0);
+}
+
+template <typename Allocator, typename T>
+bool SC::SegmentOperations<Allocator, T>::removeAt(T*& items, size_t index)
+{
+    const bool       isNull  = items == nullptr;
+    SegmentItems<T>* segment = isNull ? nullptr : SegmentItems<T>::getSegment(items);
+    if (segment == nullptr)
+        return false;
+    const size_t numElements = segment->size();
+    if (index < numElements)
     {
-        T* oldItems = items;
-        return Operations::template insert<false>(oldItems, Segment::size(), data.data(), data.sizeInElements());
-    }
-    template <typename U>
-    [[nodiscard]] bool appendMove(U&& src)
-    {
-        if (appendMove(src.data(), src.size()))
+        if (index + 1 == numElements)
         {
-            src.clear();
-            return true;
+            SegmentItems<T>::destruct(items, index, 1);
         }
+        else
+        {
+            SegmentItems<T>::moveAssign(items, index, numElements - index - 1, items + index + 1);
+        }
+        segment->setSize(numElements - 1);
+        return true;
+    }
+    else
+    {
         return false;
     }
-    [[nodiscard]] bool insertMove(size_t idx, T* src, size_t srcSize)
-    {
-        T* oldItems = items;
-        return Operations::template insert<false>(oldItems, idx, src, srcSize);
-    }
-};
+}
