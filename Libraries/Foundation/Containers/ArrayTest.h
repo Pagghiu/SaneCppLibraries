@@ -79,7 +79,7 @@ struct SC::ArrayTest : public SC::TestCase
             SC_TEST_EXPECT(sv == testString);
 
             Array<Vector<char>, 2> arr3;
-            SC_TEST_EXPECT(arr3.append(arr));
+            SC_TEST_EXPECT(arr3.appendMove(arr));
             sv = StringView(arr3.back().data(), arr3.back().size() - 1, true, StringEncoding::Ascii);
             SC_TEST_EXPECT(sv == testString);
         }
@@ -101,6 +101,18 @@ struct SC::ArrayTest : public SC::TestCase
             }
             SC_TEST_EXPECT(failedComparisons == 0);
             myArr1 = move(myArr2);
+        }
+        if (test_section("append"))
+        {
+            Array<size_t, 3> v0 = {1, 2, 3};
+            Array<size_t, 6> v1 = {1, 2, 3};
+            Array<size_t, 3> v2 = {4, 5, 6};
+            SC_TEST_EXPECT(not v0.append(v2.toSpanConst()));
+            SC_TEST_EXPECT(v1.append(v2.toSpanConst()));
+            for (size_t idx = 1; idx <= 6; ++idx)
+            {
+                SC_TEST_EXPECT(v1[idx - 1] == idx);
+            }
         }
         if (test_section("sort"))
         {

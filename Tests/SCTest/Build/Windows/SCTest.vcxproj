@@ -369,7 +369,9 @@
     <ClInclude Include="..\..\..\..\Libraries\Build\WriteInternal.h" />
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.h" />
     <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherTest.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Algorithms\AlgorithmFind.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Algorithms\AlgorithmMinMax.h" />
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Algorithms\AlgorithmRemove.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Algorithms\AlgorithmSort.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\ArenaMap.h" />
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\ArenaMapTest.h" />

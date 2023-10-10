@@ -545,6 +545,12 @@
     <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\SmallStringTest.h">
       <Filter>Foundation\Strings</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Algorithms\AlgorithmFind.h">
+      <Filter>Foundation\Algorithms</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Libraries\Foundation\Algorithms\AlgorithmRemove.h">
+      <Filter>Foundation\Algorithms</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalPosix.inl">

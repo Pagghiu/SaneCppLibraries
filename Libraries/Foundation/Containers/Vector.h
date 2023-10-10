@@ -55,6 +55,8 @@ struct SC::Vector
 
     Vector(std::initializer_list<T> ilist) : items(nullptr) { (void)append({ilist.begin(), ilist.size()}); }
 
+    ~Vector() { destroy(); }
+
     Vector(const Vector& other);
 
     Vector(Vector&& other) noexcept;
@@ -63,21 +65,24 @@ struct SC::Vector
 
     Vector& operator=(const Vector& other);
 
-    ~Vector() { destroy(); }
-
     [[nodiscard]] Span<const T> toSpanConst() const { return {items, size()}; }
-    [[nodiscard]] Span<T>       toSpan() { return {items, size()}; }
+
+    [[nodiscard]] Span<T> toSpan() { return {items, size()}; }
 
     [[nodiscard]] T& operator[](size_t index);
 
     [[nodiscard]] const T& operator[](size_t index) const;
 
     [[nodiscard]] bool push_front(const T& element) { return insert(0, {&element, 1}); }
+
     [[nodiscard]] bool push_front(T&& element) { return insertMove(0, {&element, 1}); }
+
     [[nodiscard]] bool push_back(const T& element) { return Operations::push_back(items, element); }
-    [[nodiscard]] bool push_back(T&& element) { return Operations::push_back(items, forward<T>(element)); }
+
+    [[nodiscard]] bool push_back(T&& element) { return Operations::push_back(items, move(element)); }
 
     [[nodiscard]] bool pop_back() { return Operations::pop_back(items); }
+
     [[nodiscard]] bool pop_front() { return Operations::pop_front(items); }
 
     [[nodiscard]] T& front();
@@ -118,11 +123,10 @@ struct SC::Vector
     [[nodiscard]] bool append(Span<const T> data);
 
     template <typename U>
-    [[nodiscard]] bool append(U&& src);
+    [[nodiscard]] bool append(Span<const U> src);
 
-    // TODO: Check if this can be unified with the same version inside Segment
     template <typename U>
-    [[nodiscard]] bool append(Span<U> src);
+    [[nodiscard]] bool appendMove(U&& src);
 
     template <typename U>
     [[nodiscard]] bool contains(const U& value, size_t* foundIndex = nullptr) const;
@@ -139,11 +143,11 @@ struct SC::Vector
     [[nodiscard]] bool remove(const ComparableToValue& value);
 
   private:
-    void destroy();
-
     [[nodiscard]] bool insertMove(size_t idx, Span<T> data);
 
     [[nodiscard]] bool appendMove(Span<T> data);
+
+    void destroy();
 
     void moveAssign(Vector&& other);
 };
@@ -273,7 +277,7 @@ SC::Vector<T>& SC::Vector<T>::operator=(const Vector& other)
 {
     if (&other != this)
     {
-        const bool res = Operations::copy(items, other.data(), other.size());
+        const bool res = Operations::assign(items, other.data(), other.size());
         (void)res;
         SC_ASSERT_DEBUG(res);
     }
@@ -389,7 +393,7 @@ bool SC::Vector<T>::append(Span<const T> data)
 
 template <typename T>
 template <typename U>
-bool SC::Vector<T>::append(U&& src)
+bool SC::Vector<T>::appendMove(U&& src)
 {
     if (appendMove({src.data(), src.size()}))
     {
@@ -402,7 +406,7 @@ bool SC::Vector<T>::append(U&& src)
 // TODO: Check if this can be unified with the same version inside Segment
 template <typename T>
 template <typename U>
-bool SC::Vector<T>::append(Span<U> src)
+bool SC::Vector<T>::append(Span<const U> src)
 {
     const auto oldSize = size();
     if (reserve(src.sizeInElements()))
@@ -442,28 +446,14 @@ template <typename T>
 template <typename Lambda>
 bool SC::Vector<T>::removeAll(Lambda&& criteria)
 {
-    size_t index;
-    size_t prevIndex         = 0;
-    bool   atLeastOneRemoved = false;
-    while (SegmentItems<T>::findIf(items, prevIndex, size() - prevIndex, forward<Lambda>(criteria), &index))
-    {
-        SC_TRY(removeAt(index));
-        prevIndex         = index;
-        atLeastOneRemoved = true;
-    }
-    return atLeastOneRemoved;
+    return SegmentItems<T>::removeAll(items, 0, size(), forward<Lambda>(criteria));
 }
 
 template <typename T>
 template <typename ComparableToValue>
 bool SC::Vector<T>::remove(const ComparableToValue& value)
 {
-    size_t index;
-    if (contains(value, &index))
-    {
-        return removeAt(index);
-    }
-    return false;
+    return SegmentItems<T>::removeAll(items, 0, size(), [&](const auto& it) { return it == value; });
 }
 
 template <typename T>

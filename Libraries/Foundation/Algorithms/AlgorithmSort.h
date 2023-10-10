@@ -12,8 +12,8 @@ struct SmallerThan
     bool operator()(const T& a, const T& b) { return a < b; }
 };
 
-template <typename Iterator, typename Comparison = SmallerThan<typename RemovePointer<Iterator>::type>>
-void bubbleSort(Iterator first, Iterator last, Comparison comparison = Comparison())
+template <typename Iterator, typename BinaryPredicate = SmallerThan<typename RemovePointer<Iterator>::type>>
+void bubbleSort(Iterator first, Iterator last, BinaryPredicate predicate = BinaryPredicate())
 {
     if (first >= last)
     {
@@ -27,7 +27,7 @@ void bubbleSort(Iterator first, Iterator last, Comparison comparison = Compariso
         Iterator p1 = first + 1;
         while (p1 != last)
         {
-            if (comparison(*p1, *p0))
+            if (predicate(*p1, *p0))
             {
                 swap(*p1, *p0);
                 doSwap = true;

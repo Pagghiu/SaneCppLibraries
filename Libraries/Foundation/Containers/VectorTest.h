@@ -381,7 +381,7 @@ void SC::VectorTest::testClassType()
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("2")));
         SC_TEST_EXPECT(vector2.push_back(VectorTestClass("3")));
         SC_TEST_EXPECT(vector2.push_back(VectorTestClass("4")));
-        SC_TEST_EXPECT(vector1.append(move(vector2)));
+        SC_TEST_EXPECT(vector1.appendMove(move(vector2)));
         SC_TEST_EXPECT(vector1.size() == 5);
         for (size_t idx = 0; idx < 5; ++idx)
         {
@@ -397,7 +397,7 @@ void SC::VectorTest::testClassType()
         vecReport.reset();
         SC_TEST_EXPECT(vector2.push_back(VectorTestClass("1")));
         SC_TEST_EXPECT(vector2.push_front(VectorTestClass("0")));
-        SC_TEST_EXPECT(vector1.append(move(vector2)));
+        SC_TEST_EXPECT(vector1.appendMove(move(vector2)));
         SC_TEST_EXPECT(vector1.size() == 2);
         int idx = 0;
         for (const auto& it : vector1)

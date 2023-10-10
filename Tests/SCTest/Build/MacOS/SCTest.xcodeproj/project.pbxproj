@@ -234,6 +234,8 @@
 		7B6B7A392A46D2C5007E8BE2 /* AdditionalFile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = AdditionalFile.cpp; path = ../../../../Libraries/Plugin/PluginTestDirectory/TestPluginChild/AdditionalFile.cpp; sourceTree = "<group>"; };
 		7B70AA5E2A2B97330047BD29 /* SerializationStructuredJson.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SerializationStructuredJson.h; path = ../../../../Libraries/Serialization/SerializationStructuredJson.h; sourceTree = "<group>"; };
 		7B70AA5F2A2B9D250047BD29 /* SerializationStructuredJson.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SerializationStructuredJson.inl; path = ../../../../Libraries/Serialization/SerializationStructuredJson.inl; sourceTree = "<group>"; };
+		7B75CFD02AD5FBF40072F986 /* AlgorithmFind.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AlgorithmFind.h; sourceTree = "<group>"; };
+		7B75CFD12AD602150072F986 /* AlgorithmRemove.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AlgorithmRemove.h; sourceTree = "<group>"; };
 		7B7B53A22A2B254100FA751E /* SerializationStructuredReadWrite.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SerializationStructuredReadWrite.h; path = ../../../../Libraries/Serialization/SerializationStructuredReadWrite.h; sourceTree = "<group>"; };
 		7B7C3BFC2A7C443D00FAD351 /* Hashing.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Hashing.cpp; path = ../../../../Libraries/Hashing/Hashing.cpp; sourceTree = "<group>"; };
 		7B7C3BFD2A7C443D00FAD351 /* Hashing.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Hashing.h; path = ../../../../Libraries/Hashing/Hashing.h; sourceTree = "<group>"; };
@@ -393,7 +395,9 @@
 		7B319CEF2AB750C900F7E761 /* Algorithms */ = {
 			isa = PBXGroup;
 			children = (
+				7B75CFD02AD5FBF40072F986 /* AlgorithmFind.h */,
 				7B319CF02AB750C900F7E761 /* AlgorithmMinMax.h */,
+				7B75CFD12AD602150072F986 /* AlgorithmRemove.h */,
 				7B319CF12AB750C900F7E761 /* AlgorithmSort.h */,
 			);
 			name = Algorithms;

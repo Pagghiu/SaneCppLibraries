@@ -8,7 +8,7 @@
 namespace SC
 {
 template <class ForwardIt>
-static constexpr ForwardIt MaxElement(ForwardIt first, ForwardIt last)
+constexpr ForwardIt MaxElement(ForwardIt first, ForwardIt last)
 {
     if (first == last)
         return last;
@@ -24,7 +24,7 @@ static constexpr ForwardIt MaxElement(ForwardIt first, ForwardIt last)
 }
 
 template <class T>
-static constexpr T max(std::initializer_list<T> ilist)
+constexpr T max(std::initializer_list<T> ilist)
 {
     return *MaxElement(ilist.begin(), ilist.end());
 }

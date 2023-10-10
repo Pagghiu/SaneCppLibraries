@@ -2,6 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Algorithms/AlgorithmFind.h"
+#include "../Algorithms/AlgorithmRemove.h"
 #include "../Base/Assert.h"
 #include "../Base/InitializerList.h"
 #include "../Base/Limits.h"
@@ -117,12 +119,12 @@ struct SC::SegmentItems : public SegmentHeader
 
     template <typename U, typename Q = T>
     static typename EnableIf<not IsTriviallyCopyable<Q>::value, void>::type //
-    copyItems(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct, const size_t numToDestroy,
+    copyItems(T* oldItems, const size_t numToAssign, const size_t numToCopyConstruct, const size_t numToDestroy,
               U* other, size_t otherSize);
 
     template <typename U, typename Q = T>
     static typename EnableIf<IsTriviallyCopyable<Q>::value, void>::type //
-    copyItems(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct, const size_t numToDestroy,
+    copyItems(T* oldItems, const size_t numToAssign, const size_t numToCopyConstruct, const size_t numToDestroy,
               U* other, size_t otherSize);
 
     template <bool IsCopy, typename U, typename Q = T>
@@ -138,6 +140,9 @@ struct SC::SegmentItems : public SegmentHeader
     template <typename Lambda>
     [[nodiscard]] static bool findIf(const T* items, size_t indexStart, const size_t numElements, Lambda&& criteria,
                                      size_t* foundIndex = nullptr);
+
+    template <typename Lambda>
+    [[nodiscard]] static bool removeAll(T* items, size_t indexStart, const size_t numElements, Lambda&& criteria);
 };
 
 template <typename Allocator, typename T>
@@ -161,7 +166,7 @@ struct SC::SegmentOperations
     [[nodiscard]] static bool reallocate(T*& oldItems, size_t newSize);
 
     template <typename U>
-    [[nodiscard]] static bool copy(T*& oldItems, U* other, size_t otherSize);
+    [[nodiscard]] static bool assign(T*& oldItems, U* other, size_t otherSize);
 
     template <bool IsCopy, typename U>
     [[nodiscard]] static bool insert(T*& oldItems, size_t position, U* other, size_t otherSize);
@@ -182,11 +187,11 @@ struct SC::SegmentOperations
 
     static void destroy(SegmentItems<T>* segment);
 
-    [[nodiscard]] static bool pop_back(T*& items);
+    [[nodiscard]] static bool pop_back(T* items);
 
-    [[nodiscard]] static bool pop_front(T*& items);
+    [[nodiscard]] static bool pop_front(T* items);
 
-    [[nodiscard]] static bool removeAt(T*& items, size_t index);
+    [[nodiscard]] static bool removeAt(T* items, size_t index);
 };
 
 //-----------------------------------------------------------------------------------------------------------------------
@@ -196,10 +201,10 @@ struct SC::SegmentOperations
 // SegmentItems<T>
 //-----------------------------------------------------------------------------------------------------------------------
 
-// TODO: needs specialized moveAssign for trivial types
 template <typename T>
 void SC::SegmentItems<T>::moveAssign(T* destination, size_t indexStart, size_t numElements, T* source)
 {
+    // TODO: needs specialized moveAssign for trivial types
     // TODO: Should we also call destructor on moved elements?
     for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
         destination[idx] = move(source[idx - indexStart]);
@@ -208,7 +213,6 @@ void SC::SegmentItems<T>::moveAssign(T* destination, size_t indexStart, size_t n
 template <typename T>
 void SC::SegmentItems<T>::copyAssign(T* destination, size_t indexStart, size_t numElements, const T* source)
 {
-    // TODO: Should we also call destructor on moved elements?
     for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
         destination[idx] = source[idx - indexStart];
 }
@@ -289,7 +293,7 @@ SC::SegmentItems<T>::moveItems(T* oldItems, T* newItems, const size_t oldSize, c
 template <typename T>
 template <typename U, typename Q>
 typename SC::EnableIf<not SC::IsTriviallyCopyable<Q>::value, void>::type //
-SC::SegmentItems<T>::copyItems(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
+SC::SegmentItems<T>::copyItems(T* oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
                                const size_t numToDestroy, U* other, size_t otherSize)
 {
     SC_COMPILER_UNUSED(otherSize);
@@ -301,7 +305,7 @@ SC::SegmentItems<T>::copyItems(T*& oldItems, const size_t numToAssign, const siz
 template <typename T>
 template <typename U, typename Q>
 typename SC::EnableIf<SC::IsTriviallyCopyable<Q>::value, void>::type //
-SC::SegmentItems<T>::copyItems(T*& oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
+SC::SegmentItems<T>::copyItems(T* oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
                                const size_t numToDestroy, U* other, size_t otherSize)
 {
     SC_COMPILER_UNUSED(numToAssign);
@@ -343,18 +347,13 @@ template <typename Lambda>
 bool SC::SegmentItems<T>::findIf(const T* items, size_t indexStart, const size_t numElements, Lambda&& criteria,
                                  size_t* foundIndex)
 {
-    for (size_t idx = indexStart; idx < (indexStart + numElements); ++idx)
+    auto end = items + numElements;
+    auto it  = SC::find_if(items + indexStart, end, forward<Lambda>(criteria));
+    if (foundIndex)
     {
-        if (criteria(items[idx]))
-        {
-            if (foundIndex)
-            {
-                *foundIndex = idx;
-            }
-            return true;
-        }
+        *foundIndex = static_cast<size_t>(it - items);
     }
-    return false;
+    return it != end;
 }
 
 //-----------------------------------------------------------------------------------------------------------------------
@@ -476,7 +475,7 @@ bool SC::SegmentOperations<Allocator, T>::reallocate(T*& oldItems, size_t newSiz
 
 template <typename Allocator, typename T>
 template <typename U>
-bool SC::SegmentOperations<Allocator, T>::copy(T*& oldItems, U* other, size_t otherSize)
+bool SC::SegmentOperations<Allocator, T>::assign(T*& oldItems, U* other, size_t otherSize)
 {
     const bool       isNull      = oldItems == nullptr;
     SegmentItems<T>* selfSegment = isNull ? nullptr : SegmentItems<T>::getSegment(oldItems);
@@ -681,7 +680,7 @@ bool SC::SegmentOperations<Allocator, T>::shrink_to_fit(T*& oldItems)
 template <typename Allocator, typename T>
 void SC::SegmentOperations<Allocator, T>::clear(SegmentItems<T>* segment)
 {
-    SegmentItems<T>::destruct(Allocator::template getItems<T>(segment), 0, segment->size());
+    SegmentItems<T>::destruct(segment->template getItems<T>(), 0, segment->size());
     segment->sizeBytes = 0;
 }
 
@@ -693,54 +692,60 @@ void SC::SegmentOperations<Allocator, T>::destroy(SegmentItems<T>* segment)
 }
 
 template <typename Allocator, typename T>
-bool SC::SegmentOperations<Allocator, T>::pop_back(T*& items)
+bool SC::SegmentOperations<Allocator, T>::pop_back(T* items)
 {
-    const bool       isNull  = items == nullptr;
-    SegmentItems<T>* segment = isNull ? nullptr : SegmentItems<T>::getSegment(items);
-    if (segment == nullptr)
-        return false;
-    const size_t numElements = segment->size();
-    if (numElements > 0)
-    {
-        SegmentItems<T>::destruct(Allocator::template getItems<T>(segment), numElements - 1, 1);
-        segment->setSize(numElements - 1);
-        return true;
-    }
-    else
+    if (items == nullptr)
     {
         return false;
     }
+    SegmentItems<T>& segment     = *SegmentItems<T>::getSegment(items);
+    const size_t     numElements = segment.size();
+    if (numElements == 0)
+    {
+        return false;
+    }
+    SegmentItems<T>::destruct(items, numElements - 1, 1);
+    segment.setSize(numElements - 1);
+    return true;
 }
 
 template <typename Allocator, typename T>
-bool SC::SegmentOperations<Allocator, T>::pop_front(T*& items)
+bool SC::SegmentOperations<Allocator, T>::pop_front(T* items)
 {
     return removeAt(items, 0);
 }
 
 template <typename Allocator, typename T>
-bool SC::SegmentOperations<Allocator, T>::removeAt(T*& items, size_t index)
+bool SC::SegmentOperations<Allocator, T>::removeAt(T* items, size_t index)
 {
-    const bool       isNull  = items == nullptr;
-    SegmentItems<T>* segment = isNull ? nullptr : SegmentItems<T>::getSegment(items);
-    if (segment == nullptr)
-        return false;
-    const size_t numElements = segment->size();
-    if (index < numElements)
-    {
-        if (index + 1 == numElements)
-        {
-            SegmentItems<T>::destruct(items, index, 1);
-        }
-        else
-        {
-            SegmentItems<T>::moveAssign(items, index, numElements - index - 1, items + index + 1);
-        }
-        segment->setSize(numElements - 1);
-        return true;
-    }
-    else
+    if (items == nullptr)
     {
         return false;
     }
+    auto&        segment     = *SegmentItems<T>::getSegment(items);
+    const size_t numElements = segment.size();
+    if (index >= numElements or numElements == 0)
+    {
+        return false;
+    }
+    SegmentItems<T>::moveAssign(items, index, numElements - index - 1, items + index + 1);
+    SegmentItems<T>::destruct(items, numElements - 1, 1);
+    segment.setSize(numElements - 1);
+    return true;
+}
+
+template <typename T>
+template <typename Lambda>
+bool SC::SegmentItems<T>::removeAll(T* items, size_t indexStart, const size_t numElements, Lambda&& criteria)
+{
+    if (items == nullptr)
+    {
+        return false;
+    }
+    auto& segment = *SegmentItems<T>::getSegment(items);
+    auto  end     = items + numElements;
+    auto  it      = SC::remove_if(items + indexStart, end, forward<Lambda>(criteria));
+    SegmentItems<T>::destruct(it, 0, static_cast<size_t>(end - it));
+    segment.setSize(static_cast<size_t>(it - items));
+    return it != end;
 }
