@@ -5,7 +5,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-struct FILE_BASIC_INFORMATION
+struct SC_FILE_BASIC_INFORMATION
 {
     LARGE_INTEGER CreationTime;
     LARGE_INTEGER LastAccessTime;
@@ -14,13 +14,13 @@ struct FILE_BASIC_INFORMATION
     DWORD         FileAttributes;
 };
 
-struct FILE_COMPLETION_INFORMATION
+struct SC_FILE_COMPLETION_INFORMATION
 {
     HANDLE Port;
     PVOID  Key;
 };
 
-struct IO_STATUS_BLOCK
+struct SC_IO_STATUS_BLOCK
 {
     union
     {
@@ -30,13 +30,13 @@ struct IO_STATUS_BLOCK
     ULONG_PTR Information;
 };
 
-enum FILE_INFORMATION_CLASS
+enum SC_FILE_INFORMATION_CLASS
 {
     FileReplaceCompletionInformation = 0x3D
 };
 
-typedef NTSTATUS(NTAPI* NTSetInformationFile)(HANDLE fileHandle, struct IO_STATUS_BLOCK* ioStatusBlock,
-                                              void* fileInformation, ULONG length,
-                                              enum FILE_INFORMATION_CLASS fileInformationClass);
+typedef NTSTATUS(NTAPI* SC_NtSetInformationFile)(HANDLE fileHandle, struct SC_IO_STATUS_BLOCK* ioStatusBlock,
+                                                 void* fileInformation, ULONG length,
+                                                 enum SC_FILE_INFORMATION_CLASS fileInformationClass);
 
 static constexpr NTSTATUS STATUS_SUCCESS = 0;

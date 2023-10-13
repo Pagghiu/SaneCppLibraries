@@ -4,7 +4,6 @@
 #include "StringFormat.h"
 #include "../../System/Console.h" // TODO: Console here is a module circular dependency. Consider type-erasing with a Function
 #include "String.h"
-#include "StringBuilder.h"
 #include "StringConverter.h"
 
 #include <inttypes.h> // PRIu64 / PRIi64

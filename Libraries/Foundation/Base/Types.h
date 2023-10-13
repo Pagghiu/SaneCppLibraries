@@ -57,7 +57,7 @@ struct PlacementNew {};
 } // namespace SC
 #if SC_COMPILER_MSVC
 inline void* operator new(size_t, void* p, SC::PlacementNew) noexcept { return p; }
-inline void  operator delete(void*, SC::PlacementNew) noexcept {}
+inline void  operator delete(void*, void*, SC::PlacementNew) noexcept {}
 #else
 inline void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { return p; }
 #endif

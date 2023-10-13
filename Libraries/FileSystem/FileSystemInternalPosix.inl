@@ -21,7 +21,7 @@
 
 namespace SC
 {
-static constexpr SC::Result getErrorCode(int errorCode)
+SC::Result getErrorCode(int errorCode)
 {
     switch (errorCode)
     {

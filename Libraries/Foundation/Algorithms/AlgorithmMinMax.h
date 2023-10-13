@@ -22,7 +22,9 @@ constexpr ForwardIt MaxElement(ForwardIt first, ForwardIt last)
 
     return largest;
 }
-
+#ifdef max
+#undef max
+#endif
 template <class T>
 constexpr T max(std::initializer_list<T> ilist)
 {

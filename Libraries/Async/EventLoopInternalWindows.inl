@@ -36,18 +36,19 @@ SC::Result SC::EventLoopWinWaitTraits::releaseHandle(Handle& waitHandle)
 
 struct SC::EventLoop::Internal
 {
-    FileDescriptor         loopFd;
-    AsyncLoopWakeUp        wakeUpAsync;
-    NTSetInformationFile   pNtSetInformationFile = nullptr;
-    LPFN_CONNECTEX         pConnectEx            = nullptr;
-    LPFN_ACCEPTEX          pAcceptEx             = nullptr;
-    LPFN_DISCONNECTEX      pDisconnectEx         = nullptr;
-    EventLoopWinOverlapped wakeUpOverlapped;
+    FileDescriptor          loopFd;
+    AsyncLoopWakeUp         wakeUpAsync;
+    SC_NtSetInformationFile pNtSetInformationFile = nullptr;
+    LPFN_CONNECTEX          pConnectEx            = nullptr;
+    LPFN_ACCEPTEX           pAcceptEx             = nullptr;
+    LPFN_DISCONNECTEX       pDisconnectEx         = nullptr;
+    EventLoopWinOverlapped  wakeUpOverlapped;
 
     Internal()
     {
-        HMODULE ntdll         = GetModuleHandleA("ntdll.dll");
-        pNtSetInformationFile = reinterpret_cast<NTSetInformationFile>(GetProcAddress(ntdll, "NtSetInformationFile"));
+        HMODULE ntdll = GetModuleHandleA("ntdll.dll");
+        pNtSetInformationFile =
+            reinterpret_cast<SC_NtSetInformationFile>(GetProcAddress(ntdll, "NtSetInformationFile"));
 
         wakeUpOverlapped.userData = &wakeUpAsync;
     }
@@ -335,10 +336,10 @@ struct SC::EventLoop::KernelQueue
         HANDLE listenHandle = reinterpret_cast<HANDLE>(asyncAccept.handle);
         // This will cause one more event loop run with GetOverlappedIO failing
         SC_TRY(asyncAccept.clientSocket.close());
-        struct FILE_COMPLETION_INFORMATION file_completion_info;
+        struct SC_FILE_COMPLETION_INFORMATION file_completion_info;
         file_completion_info.Key  = NULL;
         file_completion_info.Port = NULL;
-        struct IO_STATUS_BLOCK status_block;
+        struct SC_IO_STATUS_BLOCK status_block;
         memset(&status_block, 0, sizeof(status_block));
 
         EventLoop& eventLoop = *asyncAccept.eventLoop;

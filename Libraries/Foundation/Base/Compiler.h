@@ -208,7 +208,12 @@ template <typename T> constexpr inline void swap(T& t1, T& t2)
     t1     = move(t2);
     t2     = move(temp);
 }
-
+#ifdef max
+#undef max
+#endif
+#ifdef min
+#undef min
+#endif
 template <typename T> constexpr T min(T t1, T t2) { return t1 < t2 ? t1 : t2; }
 template <typename T> constexpr T max(T t1, T t2) { return t1 > t2 ? t1 : t2; }
 template <typename F> struct Deferred

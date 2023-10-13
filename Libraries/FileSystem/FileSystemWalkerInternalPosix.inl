@@ -4,6 +4,7 @@
 // clang-format off
 #include "FileSystemWalker.h"
 #include "../Foundation/Strings/StringConverter.h"
+#include "../Foundation/Strings/SmallString.h"
 #include "../Foundation/Containers/SmallVector.h"
 
 // clang-format on
@@ -16,7 +17,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "FileSystemInternalPosix.inl"
+namespace SC
+{
+SC::Result getErrorCode(int errorCode); // defined in FileSystemInternalPosix.inl
+}
 
 struct SC::FileSystemWalker::Internal
 {
