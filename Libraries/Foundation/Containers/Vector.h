@@ -171,9 +171,8 @@ inline SC::SegmentHeader* SC::VectorAllocator::reallocate(SegmentHeader* oldHead
     {
         newHeader          = static_cast<SegmentHeader*>(Memory::allocate(sizeof(SegmentHeader) + newSize));
         const auto minSize = min(newSize, static_cast<decltype(newSize)>(oldHeader->sizeBytes));
-        ::memcpy(newHeader, oldHeader, minSize);
+        ::memcpy(newHeader, oldHeader, minSize + alignof(SegmentHeader));
         newHeader->initDefaults();
-        newHeader->capacityBytes           = static_cast<decltype(SegmentHeader::capacityBytes)>(newSize);
         newHeader->isFollowedBySmallVector = true;
     }
     else
