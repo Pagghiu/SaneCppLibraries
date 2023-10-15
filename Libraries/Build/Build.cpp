@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "Build.h"
-#include "WriterVisualStudio.inl"
-#include "WriterXCode.inl"
+#include "Internal/BuildWriterVisualStudio.inl"
+#include "Internal/BuildWriterXCode.inl"
 
 #include "../Foundation/Containers/SmallVector.h"
 

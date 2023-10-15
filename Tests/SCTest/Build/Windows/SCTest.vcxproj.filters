@@ -1,653 +1,763 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Foundation">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    <Filter Include="Libraries">
+      <UniqueIdentifier>{D5F3611D-D172-FB38-AE0B-89D329FB1DD6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="FileSystem">
-      <UniqueIdentifier>{0c8b9b79-9b52-4f3d-85e6-0586825ad41e}</UniqueIdentifier>
+    <Filter Include="Support">
+      <UniqueIdentifier>{7BED24A8-6636-A953-CAD9-78C725C91B94}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Reflection">
-      <UniqueIdentifier>{d0488c14-8bfd-443c-b095-ec59e957df67}</UniqueIdentifier>
+    <Filter Include="Tests">
+      <UniqueIdentifier>{07104078-F36F-2CC7-CE00-ED807A89ADA6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Serialization">
-      <UniqueIdentifier>{a96dd608-4270-4a30-ba77-903042163752}</UniqueIdentifier>
+    <Filter Include="Libraries\Async">
+      <UniqueIdentifier>{FD1B3F04-CA5E-C2AC-7C28-E8D0141F7857}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Async">
-      <UniqueIdentifier>{f8d68c02-3548-48bc-881e-4f9a019190af}</UniqueIdentifier>
+    <Filter Include="Libraries\Build">
+      <UniqueIdentifier>{E9B85FDE-E3C7-DE1F-38E1-36BC68595E91}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Threading">
-      <UniqueIdentifier>{d44e6dde-d6eb-4e7e-9b5f-78e958cb07d5}</UniqueIdentifier>
+    <Filter Include="Libraries\File">
+      <UniqueIdentifier>{C3A06DCB-C93D-6001-0BB9-81BF8640DD26}</UniqueIdentifier>
     </Filter>
-    <Filter Include="System">
-      <UniqueIdentifier>{6b6b8c15-cf55-4813-8be0-a9c16e86b3f5}</UniqueIdentifier>
+    <Filter Include="Libraries\FileSystem">
+      <UniqueIdentifier>{94DD0E4B-3206-1742-C588-3560E1942E4F}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Testing">
-      <UniqueIdentifier>{ae591710-8f56-41d2-a3a8-9b0db6a7380b}</UniqueIdentifier>
+    <Filter Include="Libraries\Foundation">
+      <UniqueIdentifier>{D5C983C8-ED4F-CE43-DAF3-84DA5A6DEE2D}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Process">
-      <UniqueIdentifier>{c61ee96b-740d-45aa-ba08-9835cb7b073a}</UniqueIdentifier>
+    <Filter Include="Libraries\Hashing">
+      <UniqueIdentifier>{FBA25793-E68E-04B0-5632-17610A99DFAF}</UniqueIdentifier>
     </Filter>
-    <Filter Include="File">
-      <UniqueIdentifier>{dea72a02-835f-46a5-abcf-6beea7cfa09f}</UniqueIdentifier>
+    <Filter Include="Libraries\Http">
+      <UniqueIdentifier>{10BD565C-8D1A-A100-296C-0AA19F4ED355}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Socket">
-      <UniqueIdentifier>{1ab7acac-33e2-4be0-8b0a-178a5edfaf9e}</UniqueIdentifier>
+    <Filter Include="Libraries\Json">
+      <UniqueIdentifier>{E348B6C0-DECF-6FAC-968A-734EA0DF580E}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Json">
-      <UniqueIdentifier>{0b853960-e20b-4906-89e7-1532a3e5ca17}</UniqueIdentifier>
+    <Filter Include="Libraries\Plugin">
+      <UniqueIdentifier>{ECBBAFE2-EABD-503F-4CE9-F4AB97CCF3D5}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Plugin">
-      <UniqueIdentifier>{a432c53e-b64a-4518-9739-b2c8c92f502d}</UniqueIdentifier>
+    <Filter Include="Libraries\Process">
+      <UniqueIdentifier>{7B9BA3C1-2EF9-4B03-D8A7-0B47FEF60D2E}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Plugin\TestPluginChild">
-      <UniqueIdentifier>{8282d14e-73c6-4975-8ad3-eb0a14c1c20a}</UniqueIdentifier>
+    <Filter Include="Libraries\Reflection">
+      <UniqueIdentifier>{AC4EEBB8-3B27-B757-5D7F-6DD1BCCF0083}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Plugin\TestPluginParent">
-      <UniqueIdentifier>{690c696f-623b-4075-854b-b5c8b2e1dc2d}</UniqueIdentifier>
+    <Filter Include="Libraries\Serialization">
+      <UniqueIdentifier>{A9F91CFF-86A4-1B08-952C-7D6C4685FAE9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Build">
-      <UniqueIdentifier>{80529d6e-9d07-432d-880e-a16dd124b4c1}</UniqueIdentifier>
+    <Filter Include="Libraries\Socket">
+      <UniqueIdentifier>{B75460A6-4497-C846-B728-7E81DD9D0F70}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Hashing">
-      <UniqueIdentifier>{37125cfa-3ea9-451d-87c9-acc1dd1525c0}</UniqueIdentifier>
+    <Filter Include="Libraries\System">
+      <UniqueIdentifier>{B88CE9B9-6D9A-B465-840D-8F17D8542D0E}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Http">
-      <UniqueIdentifier>{8eab4a85-62cc-4c52-93c9-c65e6f92317a}</UniqueIdentifier>
+    <Filter Include="Libraries\Testing">
+      <UniqueIdentifier>{43C08E51-4E65-B1BD-5A94-6E069258FCE7}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Foundation\Algorithms">
-      <UniqueIdentifier>{1527313e-621a-44f7-9bef-db888fa8d37f}</UniqueIdentifier>
+    <Filter Include="Libraries\Threading">
+      <UniqueIdentifier>{E6C1ACD4-0BE6-003F-5CA8-CA865C1EF1F3}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Foundation\Containers">
-      <UniqueIdentifier>{33eaebdc-adfb-470c-8d0a-f6db05188894}</UniqueIdentifier>
+    <Filter Include="Libraries\Async\Internal">
+      <UniqueIdentifier>{2C6760EA-46E4-2E18-568D-8F47E356FF83}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Foundation\Strings">
-      <UniqueIdentifier>{80ff5903-3b21-4c71-afe8-7c515c7e1976}</UniqueIdentifier>
+    <Filter Include="Libraries\Async\Tests">
+      <UniqueIdentifier>{6CD84B32-8A1B-BF9F-ED5B-045F073D36AB}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Foundation\Base">
-      <UniqueIdentifier>{abccab4e-d1a7-41d3-a424-5f27375a06db}</UniqueIdentifier>
+    <Filter Include="Libraries\Build\Internal">
+      <UniqueIdentifier>{6EF94CAF-0B20-10F6-F381-5B48D4A91CA4}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Foundation\Language">
-      <UniqueIdentifier>{c28f6091-c046-4251-b46a-b10957046f9f}</UniqueIdentifier>
+    <Filter Include="Libraries\Build\Tests">
+      <UniqueIdentifier>{1EEFB180-5EFB-6B95-FB31-33EF66AC9CAC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\File\Internal">
+      <UniqueIdentifier>{5B503C01-2732-04BE-C8E8-B077D04D6E21}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\File\Tests">
+      <UniqueIdentifier>{D07D2CCD-662F-04BF-456C-CF3386E6C4AE}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\FileSystem\Internal">
+      <UniqueIdentifier>{154BEB64-0D7E-4B7A-D9AF-40FDA83C01BA}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\FileSystem\Tests">
+      <UniqueIdentifier>{8A7E3F5A-1B2E-7A3C-336C-18616CE687EF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Foundation\Algorithms">
+      <UniqueIdentifier>{17859DFF-AE18-4558-A05B-806EEA2614E4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Foundation\Base">
+      <UniqueIdentifier>{5915DA4C-1C8A-CAA3-E0BC-16ABDA6039C6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Foundation\Containers">
+      <UniqueIdentifier>{79B14307-7D8C-8D90-8664-7A97D32B2A63}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Foundation\Language">
+      <UniqueIdentifier>{30678B8F-A793-DB89-85BE-5FF7549F7F4D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Foundation\Strings">
+      <UniqueIdentifier>{3486AC4D-6973-C233-B88A-3480DCC5609E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Foundation\Base\Tests">
+      <UniqueIdentifier>{20FE1AD4-533B-908F-2EAB-883E1E2C2B2B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Foundation\Containers\Tests">
+      <UniqueIdentifier>{C2DE8FD8-D7C7-CE2B-08BA-2FAF9EABC042}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Foundation\Language\Tests">
+      <UniqueIdentifier>{70014CD0-8F2A-15F2-C556-5BA3577A8BB2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Foundation\Strings\Tests">
+      <UniqueIdentifier>{DF569523-9E5F-43F0-4E1E-FEEBA1C1F435}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Hashing\Tests">
+      <UniqueIdentifier>{DB2B1FA3-0CB1-9EB3-66D4-84364219925D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Http\Tests">
+      <UniqueIdentifier>{D2C5D9B3-F478-880F-5BB2-1FEA6E11F683}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Json\Tests">
+      <UniqueIdentifier>{1699D088-B626-B81D-25A3-5A9635718335}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Plugin\Tests">
+      <UniqueIdentifier>{9A551857-C33E-49E1-49A8-66F6E625B207}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Plugin\Tests\PluginTestDirectory">
+      <UniqueIdentifier>{71B19F4B-7A92-2D43-B80B-851B8EFC71B1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Plugin\Tests\PluginTestDirectory\TestPluginChild">
+      <UniqueIdentifier>{CBFB9E0F-10C0-CDE0-5D53-D2801484789C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Plugin\Tests\PluginTestDirectory\TestPluginParent">
+      <UniqueIdentifier>{B6254C72-13CA-88E3-1DF4-05E4F13072FA}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Process\Internal">
+      <UniqueIdentifier>{19F08FA4-A014-21DF-0FF9-08E77EF0918C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Process\Tests">
+      <UniqueIdentifier>{E2EB0FF9-D03A-469F-E7CA-0218AFA24A85}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Reflection\Tests">
+      <UniqueIdentifier>{E89BDDAB-FCE6-1A68-2856-A277485BBE5B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Serialization\Internal">
+      <UniqueIdentifier>{E8FB336D-466E-946F-C562-A0CA683C0D4B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Serialization\Tests">
+      <UniqueIdentifier>{2D51444F-BFF4-F964-67C2-561F26A0F1E5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Socket\Internal">
+      <UniqueIdentifier>{E5B3A7E6-59ED-77FE-FC85-D662CCC0EA48}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Socket\Tests">
+      <UniqueIdentifier>{385A0B8B-7E56-7DD4-FD7C-27315471B700}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\System\Internal">
+      <UniqueIdentifier>{38D0A9F2-5C1F-354B-8F15-35B64055EB1C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\System\Tests">
+      <UniqueIdentifier>{22746067-512F-8D6B-537A-E869F8520735}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Threading\Internal">
+      <UniqueIdentifier>{908E6B86-02B2-DE91-7968-D5F9C7CA76B3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\Threading\Tests">
+      <UniqueIdentifier>{9F9A7218-9051-212E-DE1E-836374BB3C76}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Support\DebugVisualizers">
+      <UniqueIdentifier>{9C5E6752-91C3-9466-5A95-7197B2FF8737}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Support\DebugVisualizers\MSVC">
+      <UniqueIdentifier>{14034818-054A-15B5-927F-FC9E25C2D601}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Tests\SCTest">
+      <UniqueIdentifier>{15F89F66-7ACD-75C0-5811-1C164D98D1D5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\SCTest.cpp">
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\System\Console.cpp">
-      <Filter>System</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\FileSystem\Path.cpp">
-      <Filter>FileSystem</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWalker.cpp">
-      <Filter>FileSystem</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Async\EventLoop.cpp">
-      <Filter>Async</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Threading\Threading.cpp">
-      <Filter>Threading</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\System\Time.cpp">
-      <Filter>System</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.cpp">
-      <Filter>FileSystem</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\System\System.cpp">
-      <Filter>System</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Testing\Test.cpp">
-      <Filter>Testing</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Socket\SocketDescriptor.cpp">
-      <Filter>Socket</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Process\Process.cpp">
-      <Filter>Process</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\File\FileDescriptor.cpp">
-      <Filter>File</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\FileSystem\FileSystem.cpp">
-      <Filter>FileSystem</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Json\Json.cpp">
-      <Filter>Json</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Serialization\Serialization.cpp">
-      <Filter>Serialization</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Plugin\Plugin.cpp">
-      <Filter>Plugin</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginChild\TestPluginChild.cpp">
-      <Filter>Plugin\TestPluginChild</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginParent\TestPluginParent.cpp">
-      <Filter>Plugin\TestPluginParent</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Plugin\PluginTestDirectory\TestPluginChild\AdditionalFile.cpp">
-      <Filter>Plugin\TestPluginChild</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Build\Build.cpp">
-      <Filter>Build</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Hashing\Hashing.cpp">
-      <Filter>Hashing</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Http\HttpClient.cpp">
-      <Filter>Http</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Http\HttpParser.cpp">
-      <Filter>Http</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Http\HttpServer.cpp">
-      <Filter>Http</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Base\Base.cpp">
-      <Filter>Foundation\Base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\StringBuilder.cpp">
-      <Filter>Foundation\Strings</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\StringConverter.cpp">
-      <Filter>Foundation\Strings</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\StringFormat.cpp">
-      <Filter>Foundation\Strings</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\StringView.cpp">
-      <Filter>Foundation\Strings</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Http\HttpURLParser.cpp">
-      <Filter>Http</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Libraries\Foundation\Strings\StringIterator.cpp">
-      <Filter>Foundation\Strings</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\..\..\Libraries\System\Console.h">
-      <Filter>System</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\System\ConsoleTest.h">
-      <Filter>System</Filter>
+    <ClInclude Include="../../../../Libraries/Async/EventLoop.h">
+      <Filter>Libraries\Async</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\FileSystem\Path.h">
-      <Filter>FileSystem</Filter>
+    <ClInclude Include="../../../../Libraries/Async/Internal/EventLoopWindows.h">
+      <Filter>Libraries\Async\Internal</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\FileSystem\PathTest.h">
-      <Filter>FileSystem</Filter>
+    <ClInclude Include="../../../../Libraries/Async/Internal/EventLoopWindowsAPI.h">
+      <Filter>Libraries\Async\Internal</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystem.h">
-      <Filter>FileSystem</Filter>
+    <ClInclude Include="../../../../Libraries/Build/Build.h">
+      <Filter>Libraries\Build</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemTest.h">
-      <Filter>FileSystem</Filter>
+    <ClInclude Include="../../../../Libraries/Build/Internal/BuildWriter.h">
+      <Filter>Libraries\Build\Internal</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWalker.h">
-      <Filter>FileSystem</Filter>
+    <ClInclude Include="../../../../Libraries/Build/Internal/TaggedMap.h">
+      <Filter>Libraries\Build\Internal</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerTest.h">
-      <Filter>FileSystem</Filter>
+    <ClInclude Include="../../../../Libraries/File/FileDescriptor.h">
+      <Filter>Libraries\File</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Reflection\Reflection.h">
-      <Filter>Reflection</Filter>
+    <ClInclude Include="../../../../Libraries/FileSystem/FileSystem.h">
+      <Filter>Libraries\FileSystem</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAutoAggregates.h">
-      <Filter>Reflection</Filter>
+    <ClInclude Include="../../../../Libraries/FileSystem/FileSystemWalker.h">
+      <Filter>Libraries\FileSystem</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAutoStructured.h">
-      <Filter>Reflection</Filter>
+    <ClInclude Include="../../../../Libraries/FileSystem/FileSystemWatcher.h">
+      <Filter>Libraries\FileSystem</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionFlatSchemaCompiler.h">
-      <Filter>Reflection</Filter>
+    <ClInclude Include="../../../../Libraries/FileSystem/Path.h">
+      <Filter>Libraries\FileSystem</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionSC.h">
-      <Filter>Reflection</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Algorithms/AlgorithmFind.h">
+      <Filter>Libraries\Foundation\Algorithms</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionTest.h">
-      <Filter>Reflection</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Algorithms/AlgorithmMinMax.h">
+      <Filter>Libraries\Foundation\Algorithms</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\System\Time.h">
-      <Filter>System</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Algorithms/AlgorithmRemove.h">
+      <Filter>Libraries\Foundation\Algorithms</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\System\TimeTest.h">
-      <Filter>System</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Algorithms/AlgorithmSort.h">
+      <Filter>Libraries\Foundation\Algorithms</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Threading\Threading.h">
-      <Filter>Threading</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Base/Assert.h">
+      <Filter>Libraries\Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Async\EventLoop.h">
-      <Filter>Async</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Base/Compiler.h">
+      <Filter>Libraries\Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopTest.h">
-      <Filter>Async</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Base/InitializerList.h">
+      <Filter>Libraries\Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Threading\ThreadingTest.h">
-      <Filter>Threading</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Base/LibC.h">
+      <Filter>Libraries\Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcher.h">
-      <Filter>FileSystem</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Base/Limits.h">
+      <Filter>Libraries\Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherTest.h">
-      <Filter>FileSystem</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Base/Memory.h">
+      <Filter>Libraries\Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopWindows.h">
-      <Filter>Async</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Base/Platform.h">
+      <Filter>Libraries\Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Threading\Atomic.h">
-      <Filter>Threading</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Base/Types.h">
+      <Filter>Libraries\Foundation\Base</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Threading\AtomicTest.h">
-      <Filter>Threading</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Containers/ArenaMap.h">
+      <Filter>Libraries\Foundation\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\System\System.h">
-      <Filter>System</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Containers/Array.h">
+      <Filter>Libraries\Foundation\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\System\SystemTest.h">
-      <Filter>System</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Containers/IntrusiveDoubleLinkedList.h">
+      <Filter>Libraries\Foundation\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Testing\Test.h">
-      <Filter>Testing</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Containers/Segment.h">
+      <Filter>Libraries\Foundation\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Async\EventLoopInternalWindowsAPI.h">
-      <Filter>Async</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Containers/SmallVector.h">
+      <Filter>Libraries\Foundation\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Process\Process.h">
-      <Filter>Process</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Containers/Vector.h">
+      <Filter>Libraries\Foundation\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Process\ProcessTest.h">
-      <Filter>Process</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Containers/VectorMap.h">
+      <Filter>Libraries\Foundation\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Socket\SocketDescriptor.h">
-      <Filter>Socket</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Containers/VectorSet.h">
+      <Filter>Libraries\Foundation\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Process\ProcessDescriptor.h">
-      <Filter>Process</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Language/Function.h">
+      <Filter>Libraries\Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\File\FileDescriptor.h">
-      <Filter>File</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Language/MetaProgramming.h">
+      <Filter>Libraries\Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\File\FileDescriptorTest.h">
-      <Filter>File</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Language/Opaque.h">
+      <Filter>Libraries\Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Socket\SocketDescriptorTest.h">
-      <Filter>Socket</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Language/Optional.h">
+      <Filter>Libraries\Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Json\JsonFormatter.h">
-      <Filter>Json</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Language/Result.h">
+      <Filter>Libraries\Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Json\JsonFormatterTest.h">
-      <Filter>Json</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Language/Span.h">
+      <Filter>Libraries\Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionMetaType.h">
-      <Filter>Reflection</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Language/StrongID.h">
+      <Filter>Libraries\Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionAuto.h">
-      <Filter>Reflection</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Language/TaggedUnion.h">
+      <Filter>Libraries\Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Reflection\ReflectionFoundation.h">
-      <Filter>Reflection</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Language/TypeList.h">
+      <Filter>Libraries\Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Json\JsonTokenizer.h">
-      <Filter>Json</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Language/UniquePtr.h">
+      <Filter>Libraries\Foundation\Language</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Json\JsonTokenizerTest.h">
-      <Filter>Json</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Strings/SmallString.h">
+      <Filter>Libraries\Foundation\Strings</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinarySkipper.h">
-      <Filter>Serialization</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Strings/String.h">
+      <Filter>Libraries\Foundation\Strings</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateCompiler.h">
-      <Filter>Serialization</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Strings/StringBuilder.h">
+      <Filter>Libraries\Foundation\Strings</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateReadVersioned.h">
-      <Filter>Serialization</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Strings/StringConverter.h">
+      <Filter>Libraries\Foundation\Strings</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateReadWriteFast.h">
-      <Filter>Serialization</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Strings/StringFormat.h">
+      <Filter>Libraries\Foundation\Strings</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTemplateTest.h">
-      <Filter>Serialization</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Strings/StringIterator.h">
+      <Filter>Libraries\Foundation\Strings</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTestSuite.h">
-      <Filter>Serialization</Filter>
+    <ClInclude Include="../../../../Libraries/Foundation/Strings/StringView.h">
+      <Filter>Libraries\Foundation\Strings</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedCompiler.h">
-      <Filter>Serialization</Filter>
+    <ClInclude Include="../../../../Libraries/Hashing/Hashing.h">
+      <Filter>Libraries\Hashing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedReadVersioned.h">
-      <Filter>Serialization</Filter>
+    <ClInclude Include="../../../../Libraries/Http/HttpClient.h">
+      <Filter>Libraries\Http</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedReadWriteFast.h">
-      <Filter>Serialization</Filter>
+    <ClInclude Include="../../../../Libraries/Http/HttpParser.h">
+      <Filter>Libraries\Http</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedTest.h">
-      <Filter>Serialization</Filter>
+    <ClInclude Include="../../../../Libraries/Http/HttpServer.h">
+      <Filter>Libraries\Http</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationStructuredJson.h">
-      <Filter>Serialization</Filter>
+    <ClInclude Include="../../../../Libraries/Http/HttpURLParser.h">
+      <Filter>Libraries\Http</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationStructuredJsonTest.h">
-      <Filter>Serialization</Filter>
+    <ClInclude Include="../../../../Libraries/Json/JsonFormatter.h">
+      <Filter>Libraries\Json</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Serialization\SerializationStructuredReadWrite.h">
-      <Filter>Serialization</Filter>
+    <ClInclude Include="../../../../Libraries/Json/JsonTokenizer.h">
+      <Filter>Libraries\Json</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Plugin\Plugin.h">
-      <Filter>Plugin</Filter>
+    <ClInclude Include="../../../../Libraries/Plugin/Plugin.h">
+      <Filter>Libraries\Plugin</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Plugin\PluginTest.h">
-      <Filter>Plugin</Filter>
+    <ClInclude Include="../../../../Libraries/Plugin/PluginMacros.h">
+      <Filter>Libraries\Plugin</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Plugin\PluginMacros.h">
-      <Filter>Plugin</Filter>
+    <ClInclude Include="../../../../Libraries/Process/Process.h">
+      <Filter>Libraries\Process</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Build\Build.h">
-      <Filter>Build</Filter>
+    <ClInclude Include="../../../../Libraries/Process/ProcessDescriptor.h">
+      <Filter>Libraries\Process</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Build\BuildTest.h">
-      <Filter>Build</Filter>
+    <ClInclude Include="../../../../Libraries/Reflection/Reflection.h">
+      <Filter>Libraries\Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Hashing\HashingTest.h">
-      <Filter>Hashing</Filter>
+    <ClInclude Include="../../../../Libraries/Reflection/ReflectionAuto.h">
+      <Filter>Libraries\Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Hashing\Hashing.h">
-      <Filter>Hashing</Filter>
+    <ClInclude Include="../../../../Libraries/Reflection/ReflectionAutoAggregates.h">
+      <Filter>Libraries\Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Build\TaggedMap.h">
-      <Filter>Build</Filter>
+    <ClInclude Include="../../../../Libraries/Reflection/ReflectionAutoStructured.h">
+      <Filter>Libraries\Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Build\WriteInternal.h">
-      <Filter>Build</Filter>
+    <ClInclude Include="../../../../Libraries/Reflection/ReflectionFlatSchemaCompiler.h">
+      <Filter>Libraries\Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Http\HttpClient.h">
-      <Filter>Http</Filter>
+    <ClInclude Include="../../../../Libraries/Reflection/ReflectionFoundation.h">
+      <Filter>Libraries\Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Http\HttpClientTest.h">
-      <Filter>Http</Filter>
+    <ClInclude Include="../../../../Libraries/Reflection/ReflectionMetaType.h">
+      <Filter>Libraries\Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Http\HttpParser.h">
-      <Filter>Http</Filter>
+    <ClInclude Include="../../../../Libraries/Reflection/ReflectionSC.h">
+      <Filter>Libraries\Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Http\HttpParserTest.h">
-      <Filter>Http</Filter>
+    <ClInclude Include="../../../../Libraries/Serialization/SerializationBinarySkipper.h">
+      <Filter>Libraries\Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Http\HttpServer.h">
-      <Filter>Http</Filter>
+    <ClInclude Include="../../../../Libraries/Serialization/SerializationBinaryTemplateCompiler.h">
+      <Filter>Libraries\Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Http\HttpServerTest.h">
-      <Filter>Http</Filter>
+    <ClInclude Include="../../../../Libraries/Serialization/SerializationBinaryTemplateReadVersioned.h">
+      <Filter>Libraries\Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Algorithms\AlgorithmMinMax.h">
-      <Filter>Foundation\Algorithms</Filter>
+    <ClInclude Include="../../../../Libraries/Serialization/SerializationBinaryTemplateReadWriteFast.h">
+      <Filter>Libraries\Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Algorithms\AlgorithmSort.h">
-      <Filter>Foundation\Algorithms</Filter>
+    <ClInclude Include="../../../../Libraries/Serialization/SerializationBinaryTypeErasedCompiler.h">
+      <Filter>Libraries\Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\ArenaMap.h">
-      <Filter>Foundation\Containers</Filter>
+    <ClInclude Include="../../../../Libraries/Serialization/SerializationBinaryTypeErasedReadVersioned.h">
+      <Filter>Libraries\Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\ArenaMapTest.h">
-      <Filter>Foundation\Containers</Filter>
+    <ClInclude Include="../../../../Libraries/Serialization/SerializationBinaryTypeErasedReadWriteFast.h">
+      <Filter>Libraries\Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\Array.h">
-      <Filter>Foundation\Containers</Filter>
+    <ClInclude Include="../../../../Libraries/Serialization/SerializationStructuredJson.h">
+      <Filter>Libraries\Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\ArrayTest.h">
-      <Filter>Foundation\Containers</Filter>
+    <ClInclude Include="../../../../Libraries/Serialization/SerializationStructuredReadWrite.h">
+      <Filter>Libraries\Serialization</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\IntrusiveDoubleLinkedList.h">
-      <Filter>Foundation\Containers</Filter>
+    <ClInclude Include="../../../../Libraries/Serialization/Tests/SerializationBinaryTestSuite.h">
+      <Filter>Libraries\Serialization\Tests</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\IntrusiveDoubleLinkedListTest.h">
-      <Filter>Foundation\Containers</Filter>
+    <ClInclude Include="../../../../Libraries/Socket/SocketDescriptor.h">
+      <Filter>Libraries\Socket</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\VectorMap.h">
-      <Filter>Foundation\Containers</Filter>
+    <ClInclude Include="../../../../Libraries/System/Console.h">
+      <Filter>Libraries\System</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\VectorMapTest.h">
-      <Filter>Foundation\Containers</Filter>
+    <ClInclude Include="../../../../Libraries/System/System.h">
+      <Filter>Libraries\System</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\Segment.h">
-      <Filter>Foundation\Containers</Filter>
+    <ClInclude Include="../../../../Libraries/System/Time.h">
+      <Filter>Libraries\System</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\VectorSet.h">
-      <Filter>Foundation\Containers</Filter>
+    <ClInclude Include="../../../../Libraries/Testing/Test.h">
+      <Filter>Libraries\Testing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\VectorSetTest.h">
-      <Filter>Foundation\Containers</Filter>
+    <ClInclude Include="../../../../Libraries/Threading/Atomic.h">
+      <Filter>Libraries\Threading</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\SmallVector.h">
-      <Filter>Foundation\Containers</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\SmallVectorTest.h">
-      <Filter>Foundation\Containers</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\Vector.h">
-      <Filter>Foundation\Containers</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Containers\VectorTest.h">
-      <Filter>Foundation\Containers</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Assert.h">
-      <Filter>Foundation\Base</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Compiler.h">
-      <Filter>Foundation\Base</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\InitializerList.h">
-      <Filter>Foundation\Base</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Compiler.h">
-      <Filter>Foundation\Base</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\LibC.h">
-      <Filter>Foundation\Base</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Limits.h">
-      <Filter>Foundation\Base</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Memory.h">
-      <Filter>Foundation\Base</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\BaseTest.h">
-      <Filter>Foundation\Base</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Platform.h">
-      <Filter>Foundation\Base</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Base\Types.h">
-      <Filter>Foundation\Base</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Function.h">
-      <Filter>Foundation\Language</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\FunctionTest.h">
-      <Filter>Foundation\Language</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Opaque.h">
-      <Filter>Foundation\Language</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\OpaqueTest.h">
-      <Filter>Foundation\Language</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Optional.h">
-      <Filter>Foundation\Language</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\OptionalTest.h">
-      <Filter>Foundation\Language</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Result.h">
-      <Filter>Foundation\Language</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\Span.h">
-      <Filter>Foundation\Language</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\StrongID.h">
-      <Filter>Foundation\Language</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\TaggedUnion.h">
-      <Filter>Foundation\Language</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\TaggedUnionTest.h">
-      <Filter>Foundation\Language</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\TypeList.h">
-      <Filter>Foundation\Language</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\UniquePtr.h">
-      <Filter>Foundation\Language</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\String.h">
-      <Filter>Foundation\Strings</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringBuilder.h">
-      <Filter>Foundation\Strings</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringConverter.h">
-      <Filter>Foundation\Strings</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringFormat.h">
-      <Filter>Foundation\Strings</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringFormatTest.h">
-      <Filter>Foundation\Strings</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringIterator.h">
-      <Filter>Foundation\Strings</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringView.h">
-      <Filter>Foundation\Strings</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringViewTest.h">
-      <Filter>Foundation\Strings</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\StringConverterTest.h">
-      <Filter>Foundation\Strings</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Http\HttpURLParser.h">
-      <Filter>Http</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Http\HttpURLParserTest.h">
-      <Filter>Http</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\SCConfig.h" />
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Language\MetaProgramming.h">
-      <Filter>Foundation\Language</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\SmallString.h">
-      <Filter>Foundation\Strings</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Strings\SmallStringTest.h">
-      <Filter>Foundation\Strings</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Algorithms\AlgorithmFind.h">
-      <Filter>Foundation\Algorithms</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Libraries\Foundation\Algorithms\AlgorithmRemove.h">
-      <Filter>Foundation\Algorithms</Filter>
+    <ClInclude Include="../../../../Libraries/Threading/Threading.h">
+      <Filter>Libraries\Threading</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalPosix.inl">
-      <Filter>FileSystem</Filter>
+    <ClCompile Include="../../../../Libraries/Async/EventLoop.cpp">
+      <Filter>Libraries\Async</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Async/Tests/EventLoopTest.cpp">
+      <Filter>Libraries\Async\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Build/Build.cpp">
+      <Filter>Libraries\Build</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Build/Tests/BuildTest.cpp">
+      <Filter>Libraries\Build\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/File/FileDescriptor.cpp">
+      <Filter>Libraries\File</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/File/Tests/FileDescriptorTest.cpp">
+      <Filter>Libraries\File\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/FileSystem/FileSystem.cpp">
+      <Filter>Libraries\FileSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/FileSystem/FileSystemWalker.cpp">
+      <Filter>Libraries\FileSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/FileSystem/FileSystemWatcher.cpp">
+      <Filter>Libraries\FileSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/FileSystem/Path.cpp">
+      <Filter>Libraries\FileSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/FileSystem/Tests/FileSystemTest.cpp">
+      <Filter>Libraries\FileSystem\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/FileSystem/Tests/FileSystemWalkerTest.cpp">
+      <Filter>Libraries\FileSystem\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/FileSystem/Tests/FileSystemWatcherTest.cpp">
+      <Filter>Libraries\FileSystem\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/FileSystem/Tests/PathTest.cpp">
+      <Filter>Libraries\FileSystem\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Base/Base.cpp">
+      <Filter>Libraries\Foundation\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Base/Tests/BaseTest.cpp">
+      <Filter>Libraries\Foundation\Base\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Containers/Tests/ArenaMapTest.cpp">
+      <Filter>Libraries\Foundation\Containers\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Containers/Tests/ArrayTest.cpp">
+      <Filter>Libraries\Foundation\Containers\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Containers/Tests/IntrusiveDoubleLinkedListTest.cpp">
+      <Filter>Libraries\Foundation\Containers\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Containers/Tests/SmallVectorTest.cpp">
+      <Filter>Libraries\Foundation\Containers\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Containers/Tests/VectorMapTest.cpp">
+      <Filter>Libraries\Foundation\Containers\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Containers/Tests/VectorSetTest.cpp">
+      <Filter>Libraries\Foundation\Containers\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Containers/Tests/VectorTest.cpp">
+      <Filter>Libraries\Foundation\Containers\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Language/Tests/FunctionTest.cpp">
+      <Filter>Libraries\Foundation\Language\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Language/Tests/OpaqueTest.cpp">
+      <Filter>Libraries\Foundation\Language\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Language/Tests/OptionalTest.cpp">
+      <Filter>Libraries\Foundation\Language\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Language/Tests/TaggedUnionTest.cpp">
+      <Filter>Libraries\Foundation\Language\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Strings/StringBuilder.cpp">
+      <Filter>Libraries\Foundation\Strings</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Strings/StringConverter.cpp">
+      <Filter>Libraries\Foundation\Strings</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Strings/StringFormat.cpp">
+      <Filter>Libraries\Foundation\Strings</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Strings/StringIterator.cpp">
+      <Filter>Libraries\Foundation\Strings</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Strings/StringView.cpp">
+      <Filter>Libraries\Foundation\Strings</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Strings/Tests/SmallStringTest.cpp">
+      <Filter>Libraries\Foundation\Strings\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Strings/Tests/StringConverterTest.cpp">
+      <Filter>Libraries\Foundation\Strings\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Strings/Tests/StringFormatTest.cpp">
+      <Filter>Libraries\Foundation\Strings\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Foundation/Strings/Tests/StringViewTest.cpp">
+      <Filter>Libraries\Foundation\Strings\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Hashing/Hashing.cpp">
+      <Filter>Libraries\Hashing</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Hashing/Tests/HashingTest.cpp">
+      <Filter>Libraries\Hashing\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Http/HttpClient.cpp">
+      <Filter>Libraries\Http</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Http/HttpParser.cpp">
+      <Filter>Libraries\Http</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Http/HttpServer.cpp">
+      <Filter>Libraries\Http</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Http/HttpURLParser.cpp">
+      <Filter>Libraries\Http</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Http/Tests/HttpClientTest.cpp">
+      <Filter>Libraries\Http\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Http/Tests/HttpParserTest.cpp">
+      <Filter>Libraries\Http\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Http/Tests/HttpServerTest.cpp">
+      <Filter>Libraries\Http\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Http/Tests/HttpURLParserTest.cpp">
+      <Filter>Libraries\Http\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Json/Json.cpp">
+      <Filter>Libraries\Json</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Json/Tests/JsonFormatterTest.cpp">
+      <Filter>Libraries\Json\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Json/Tests/JsonTokenizerTest.cpp">
+      <Filter>Libraries\Json\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Plugin/Plugin.cpp">
+      <Filter>Libraries\Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Plugin/Tests/PluginTest.cpp">
+      <Filter>Libraries\Plugin\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Plugin/Tests/PluginTestDirectory/TestPluginChild/AdditionalFile.cpp">
+      <Filter>Libraries\Plugin\Tests\PluginTestDirectory\TestPluginChild</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Plugin/Tests/PluginTestDirectory/TestPluginChild/TestPluginChild.cpp">
+      <Filter>Libraries\Plugin\Tests\PluginTestDirectory\TestPluginChild</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Plugin/Tests/PluginTestDirectory/TestPluginParent/TestPluginParent.cpp">
+      <Filter>Libraries\Plugin\Tests\PluginTestDirectory\TestPluginParent</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Process/Process.cpp">
+      <Filter>Libraries\Process</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Process/Tests/ProcessTest.cpp">
+      <Filter>Libraries\Process\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Reflection/Tests/ReflectionTest.cpp">
+      <Filter>Libraries\Reflection\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Serialization/Serialization.cpp">
+      <Filter>Libraries\Serialization</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Serialization/Tests/SerializationBinaryTemplateTest.cpp">
+      <Filter>Libraries\Serialization\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Serialization/Tests/SerializationBinaryTypeErasedTest.cpp">
+      <Filter>Libraries\Serialization\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Serialization/Tests/SerializationStructuredJsonTest.cpp">
+      <Filter>Libraries\Serialization\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Socket/SocketDescriptor.cpp">
+      <Filter>Libraries\Socket</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Socket/Tests/SocketDescriptorTest.cpp">
+      <Filter>Libraries\Socket\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/System/Console.cpp">
+      <Filter>Libraries\System</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/System/System.cpp">
+      <Filter>Libraries\System</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/System/Tests/ConsoleTest.cpp">
+      <Filter>Libraries\System\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/System/Tests/SystemTest.cpp">
+      <Filter>Libraries\System\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/System/Tests/TimeTest.cpp">
+      <Filter>Libraries\System\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/System/Time.cpp">
+      <Filter>Libraries\System</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Testing/Test.cpp">
+      <Filter>Libraries\Testing</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Threading/Tests/AtomicTest.cpp">
+      <Filter>Libraries\Threading\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Threading/Tests/ThreadingTest.cpp">
+      <Filter>Libraries\Threading\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Libraries/Threading/Threading.cpp">
+      <Filter>Libraries\Threading</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Support/DebugVisualizers/DebugVisualizersTest.cpp">
+      <Filter>Support\DebugVisualizers</Filter>
+    </ClCompile>
+    <ClCompile Include="../../../../Tests/SCTest/SCTest.cpp">
+      <Filter>Tests\SCTest</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../../../Libraries/Async/Internal/EventLoopApple.inl">
+      <Filter>Libraries\Async\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemInternalWindows.inl">
-      <Filter>FileSystem</Filter>
+    <None Include="../../../../Libraries/Async/Internal/EventLoopEmscripten.inl">
+      <Filter>Libraries\Async\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerInternalEmscripten.inl">
-      <Filter>FileSystem</Filter>
+    <None Include="../../../../Libraries/Async/Internal/EventLoopWindows.inl">
+      <Filter>Libraries\Async\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerInternalPosix.inl">
-      <Filter>FileSystem</Filter>
+    <None Include="../../../../Libraries/Build/Internal/BuildWriterVisualStudio.inl">
+      <Filter>Libraries\Build\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWalkerInternalWindows.inl">
-      <Filter>FileSystem</Filter>
+    <None Include="../../../../Libraries/Build/Internal/BuildWriterXCode.inl">
+      <Filter>Libraries\Build\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\FileSystem\UtilityWindows.inl">
-      <Filter>FileSystem</Filter>
+    <None Include="../../../../Libraries/File/Internal/FileDescriptorPosix.inl">
+      <Filter>Libraries\File\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Async\EventLoopInternalApple.inl">
-      <Filter>Async</Filter>
+    <None Include="../../../../Libraries/File/Internal/FileDescriptorWindows.inl">
+      <Filter>Libraries\File\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Async\EventLoopInternalEmscripten.inl">
-      <Filter>Async</Filter>
+    <None Include="../../../../Libraries/FileSystem/Internal/FileSystemEmscripten.inl">
+      <Filter>Libraries\FileSystem\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Async\EventLoopInternalWindows.inl">
-      <Filter>Async</Filter>
+    <None Include="../../../../Libraries/FileSystem/Internal/FileSystemPosix.inl">
+      <Filter>Libraries\FileSystem\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Threading\ThreadingInternalPosix.inl">
-      <Filter>Threading</Filter>
+    <None Include="../../../../Libraries/FileSystem/Internal/FileSystemWalkerEmscripten.inl">
+      <Filter>Libraries\FileSystem\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Threading\ThreadingInternalWindows.inl">
-      <Filter>Threading</Filter>
+    <None Include="../../../../Libraries/FileSystem/Internal/FileSystemWalkerPosix.inl">
+      <Filter>Libraries\FileSystem\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalApple.inl">
-      <Filter>FileSystem</Filter>
+    <None Include="../../../../Libraries/FileSystem/Internal/FileSystemWalkerWindows.inl">
+      <Filter>Libraries\FileSystem\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalEmscripten.inl">
-      <Filter>FileSystem</Filter>
+    <None Include="../../../../Libraries/FileSystem/Internal/FileSystemWatcherApple.inl">
+      <Filter>Libraries\FileSystem\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\FileSystem\FileSystemWatcherInternalWindows.inl">
-      <Filter>FileSystem</Filter>
+    <None Include="../../../../Libraries/FileSystem/Internal/FileSystemWatcherEmscripten.inl">
+      <Filter>Libraries\FileSystem\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\System\SystemInternalEmscripten.inl">
-      <Filter>System</Filter>
+    <None Include="../../../../Libraries/FileSystem/Internal/FileSystemWatcherWindows.inl">
+      <Filter>Libraries\FileSystem\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\System\SystemInternalPosix.inl">
-      <Filter>System</Filter>
+    <None Include="../../../../Libraries/FileSystem/Internal/FileSystemWindows.inl">
+      <Filter>Libraries\FileSystem\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\System\SystemInternalWindows.inl">
-      <Filter>System</Filter>
+    <None Include="../../../../Libraries/FileSystem/Internal/UtilityWindows.inl">
+      <Filter>Libraries\FileSystem\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Process\ProcessInternalEmscripten.inl">
-      <Filter>Process</Filter>
+    <None Include="../../../../Libraries/Json/JsonFormatter.inl">
+      <Filter>Libraries\Json</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Process\ProcessInternalPosix.inl">
-      <Filter>Process</Filter>
+    <None Include="../../../../Libraries/Json/JsonTokenizer.inl">
+      <Filter>Libraries\Json</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Process\ProcessInternalWindows.inl">
-      <Filter>Process</Filter>
+    <None Include="../../../../Libraries/Process/Internal/ProcessEmscripten.inl">
+      <Filter>Libraries\Process\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Socket\SocketDescriptorInternalPosix.inl">
-      <Filter>Socket</Filter>
+    <None Include="../../../../Libraries/Process/Internal/ProcessPosix.inl">
+      <Filter>Libraries\Process\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Socket\SocketDescriptorInternalWindows.inl">
-      <Filter>Socket</Filter>
+    <None Include="../../../../Libraries/Process/Internal/ProcessWindows.inl">
+      <Filter>Libraries\Process\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\File\FileDescriptorInternalPosix.inl">
-      <Filter>File</Filter>
+    <None Include="../../../../Libraries/Serialization/Internal/SerializationBinaryTypeErasedReadVersioned.inl">
+      <Filter>Libraries\Serialization\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\File\FileDescriptorInternalWindows.inl">
-      <Filter>File</Filter>
+    <None Include="../../../../Libraries/Serialization/Internal/SerializationBinaryTypeErasedReadWriteFast.inl">
+      <Filter>Libraries\Serialization\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Json\JsonFormatter.inl">
-      <Filter>Json</Filter>
+    <None Include="../../../../Libraries/Serialization/Internal/SerializationStructuredJson.inl">
+      <Filter>Libraries\Serialization\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Json\JsonTokenizer.inl">
-      <Filter>Json</Filter>
+    <None Include="../../../../Libraries/Socket/Internal/SocketDescriptorPosix.inl">
+      <Filter>Libraries\Socket\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedReadVersioned.inl">
-      <Filter>Serialization</Filter>
+    <None Include="../../../../Libraries/Socket/Internal/SocketDescriptorWindows.inl">
+      <Filter>Libraries\Socket\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Serialization\SerializationBinaryTypeErasedReadWriteFast.inl">
-      <Filter>Serialization</Filter>
+    <None Include="../../../../Libraries/System/Internal/SystemApple.inl">
+      <Filter>Libraries\System\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Serialization\SerializationStructuredJson.inl">
-      <Filter>Serialization</Filter>
+    <None Include="../../../../Libraries/System/Internal/SystemEmscripten.inl">
+      <Filter>Libraries\System\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Build\WriterXCode.inl">
-      <Filter>Build</Filter>
+    <None Include="../../../../Libraries/System/Internal/SystemPosix.inl">
+      <Filter>Libraries\System\Internal</Filter>
     </None>
-    <None Include="..\..\..\..\Libraries\Build\WriterVisualStudio.inl">
-      <Filter>Build</Filter>
+    <None Include="../../../../Libraries/System/Internal/SystemWindows.inl">
+      <Filter>Libraries\System\Internal</Filter>
+    </None>
+    <None Include="../../../../Libraries/Threading/Internal/ThreadingPosix.inl">
+      <Filter>Libraries\Threading\Internal</Filter>
+    </None>
+    <None Include="../../../../Libraries/Threading/Internal/ThreadingWindows.inl">
+      <Filter>Libraries\Threading\Internal</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="..\..\..\..\Support\DebugVisualizers\MSVC\SCMSVC.natvis" />
+    <Natvis Include="../../../../Support/DebugVisualizers/MSVC/SCMSVC.natvis">
+      <Filter>Support\DebugVisualizers\MSVC</Filter>
+    </Natvis>
   </ItemGroup>
 </Project>

@@ -4,9 +4,9 @@
 #include "FileDescriptor.h"
 
 #if SC_PLATFORM_WINDOWS
-#include "FileDescriptorInternalWindows.inl"
+#include "Internal/FileDescriptorWindows.inl"
 #else
-#include "FileDescriptorInternalPosix.inl"
+#include "Internal/FileDescriptorPosix.inl"
 #endif
 
 #include "../Foundation/Strings/String.h"

@@ -2,6 +2,6 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 
-#include "SerializationBinaryTypeErasedReadVersioned.inl"
-#include "SerializationBinaryTypeErasedReadWriteFast.inl"
-#include "SerializationStructuredJson.inl"
+#include "Internal/SerializationBinaryTypeErasedReadVersioned.inl"
+#include "Internal/SerializationBinaryTypeErasedReadWriteFast.inl"
+#include "Internal/SerializationStructuredJson.inl"

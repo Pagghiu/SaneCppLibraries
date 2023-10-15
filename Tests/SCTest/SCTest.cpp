@@ -2,101 +2,89 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 
-#define SC_RUN_SPECIFIC_TEST 0
-
-#if SC_RUN_SPECIFIC_TEST
-
 namespace SC
 {
 struct TestReport;
-void runSpecificTests(TestReport& report)
-{
-    (void)report;
-    // clang-format off
-    // clang-format on
-}
-} // namespace SC
-
-#else
-
 // Build
-#include "../../Libraries/Build/BuildTest.h"
+void runBuildTest(TestReport& report);
 
 // Foundation
-#include "../../Libraries/Foundation/Base/BaseTest.h"
-#include "../../Libraries/Foundation/Containers/ArenaMapTest.h"
-#include "../../Libraries/Foundation/Containers/ArrayTest.h"
-#include "../../Libraries/Foundation/Containers/IntrusiveDoubleLinkedListTest.h"
-#include "../../Libraries/Foundation/Containers/SmallVectorTest.h"
-#include "../../Libraries/Foundation/Containers/VectorMapTest.h"
-#include "../../Libraries/Foundation/Containers/VectorSetTest.h"
-#include "../../Libraries/Foundation/Containers/VectorTest.h"
-#include "../../Libraries/Foundation/Language/FunctionTest.h"
-#include "../../Libraries/Foundation/Language/OpaqueTest.h"
-#include "../../Libraries/Foundation/Language/OptionalTest.h"
-#include "../../Libraries/Foundation/Language/TaggedUnionTest.h"
-#include "../../Libraries/Foundation/Strings/SmallStringTest.h"
-#include "../../Libraries/Foundation/Strings/StringConverterTest.h"
-#include "../../Libraries/Foundation/Strings/StringFormatTest.h"
-#include "../../Libraries/Foundation/Strings/StringViewTest.h"
+void runBaseTest(TestReport& report);
+void runArenaMapTest(TestReport& report);
+void runArrayTest(TestReport& report);
+void runIntrusiveDoubleLinkedListTest(TestReport& report);
+void runSmallVectorTest(TestReport& report);
+void runVectorMapTest(TestReport& report);
+void runVectorSetTest(TestReport& report);
+void runVectorTest(TestReport& report);
+void runFunctionTest(TestReport& report);
+void runOpaqueTest(TestReport& report);
+void runOptionalTest(TestReport& report);
+void runTaggedUnionTest(TestReport& report);
+void runSmallStringTest(TestReport& report);
+void runStringConverterTest(TestReport& report);
+void runStringFormatTest(TestReport& report);
+void runStringViewTest(TestReport& report);
 
 // File
-#include "../../Libraries/File/FileDescriptorTest.h"
+void runFileDescriptorTest(TestReport& report);
 
 // FileSystem
-#include "../../Libraries/FileSystem/FileSystemTest.h"
-#include "../../Libraries/FileSystem/FileSystemWalkerTest.h"
-#include "../../Libraries/FileSystem/FileSystemWatcherTest.h"
-#include "../../Libraries/FileSystem/PathTest.h"
+void runFileSystemTest(TestReport& report);
+void runFileSystemWalkerTest(TestReport& report);
+void runFileSystemWatcherTest(TestReport& report);
+void runPathTest(TestReport& report);
 
 // Hashing
-#include "../../Libraries/Hashing/HashingTest.h"
+void runHashingTest(TestReport& report);
 
 // Http
-#include "../../Libraries/Http/HttpClientTest.h"
-#include "../../Libraries/Http/HttpParserTest.h"
-#include "../../Libraries/Http/HttpServerTest.h"
-#include "../../Libraries/Http/HttpURLParserTest.h"
+void runHttpClientTest(TestReport& report);
+void runHttpParserTest(TestReport& report);
+void runHttpServerTest(TestReport& report);
+void runHttpURLParserTest(TestReport& report);
 
 // JSON
-#include "../../Libraries/Json/JsonFormatterTest.h"
-#include "../../Libraries/Json/JsonTokenizerTest.h"
+void runJsonFormatterTest(TestReport& report);
+void runJsonTokenizerTest(TestReport& report);
 
 // Plugin
-#include "../../Libraries/Plugin/PluginTest.h"
+void runPluginTest(TestReport& report);
 
 // Process
-#include "../../Libraries/Process/ProcessTest.h"
+void runProcessTest(TestReport& report);
 
 // Reflection
-#include "../../Libraries/Reflection/ReflectionTest.h"
+void runReflectionTest(TestReport& report);
 
 // Serialization
-#include "../../Libraries/Serialization/SerializationBinaryTemplateTest.h"
-#include "../../Libraries/Serialization/SerializationBinaryTypeErasedTest.h"
-#include "../../Libraries/Serialization/SerializationStructuredJsonTest.h"
+void runSerializationBinaryTemplateTest(TestReport& report);
+void runSerializationBinaryTypeErasedTest(TestReport& report);
+void runSerializationStructuredJsonTest(TestReport& report);
 
 // Socket
-#include "../../Libraries/Socket/SocketDescriptorTest.h"
+void runSocketDescriptorTest(TestReport& report);
 
 // System
-#include "../../Libraries/System/ConsoleTest.h"
-#include "../../Libraries/System/SystemTest.h"
-#include "../../Libraries/System/TimeTest.h"
+void runConsoleTest(TestReport& report);
+void runSystemTest(TestReport& report);
+void runTimeTest(TestReport& report);
 
 // Threading
-#include "../../Libraries/Threading/AtomicTest.h"
-#include "../../Libraries/Threading/ThreadingTest.h"
+void runAtomicTest(TestReport& report);
+void runThreadingTest(TestReport& report);
 
 // Async
-#include "../../Libraries/Async/EventLoopTest.h"
+void runEventLoopTest(SC::TestReport& report);
 
-#include "../../Support/DebugVisualizers/DebugVisualizersTest.h"
+// Support
+void runDebugVisualizersTest(TestReport& report);
 
-#endif
+} // namespace SC
 
 #include "../../Libraries/FileSystem/Path.h"
 #include "../../Libraries/Foundation/Containers/SmallVector.h"
+#include "../../Libraries/System/Console.h"
 #include "../../Libraries/System/System.h"
 #include "../../Libraries/Testing/Test.h"
 
@@ -127,88 +115,81 @@ int main(int argc, const char* argv[])
     report.debugBreakOnFailedTest = true;
 
     globalConsole = &console;
-    // clang-format off
-#if SC_RUN_SPECIFIC_TEST
-    runSpecificTests(report);
-#else
 
     // Foundation tests
-    { ArenaMapTest                  test(report); }
-    { ArrayTest                     test(report); }
-    { BaseTest                      test(report); }
-    { FunctionTest                  test(report); }
-    { IntrusiveDoubleLinkedListTest test(report); }
-    { OpaqueTest                    test(report); }
-    { OptionalTest                  test(report); }
-    { SmallVectorTest               test(report); }
-    { StringConverterTest           test(report); }
-    { StringFormatTest              test(report); }
-    { SmallStringTest               test(report); }
-    { StringViewTest                test(report); }
-    { TaggedUnionTest               test(report); }
-    { VectorTest                    test(report); }
-    { VectorMapTest                 test(report); }
-    { VectorSetTest                 test(report); }
+    runArenaMapTest(report);
+    runArrayTest(report);
+    runBaseTest(report);
+    runFunctionTest(report);
+    runIntrusiveDoubleLinkedListTest(report);
+    runOpaqueTest(report);
+    runOptionalTest(report);
+    runSmallVectorTest(report);
+    runStringConverterTest(report);
+    runStringFormatTest(report);
+    runSmallStringTest(report);
+    runStringViewTest(report);
+    runTaggedUnionTest(report);
+    runVectorTest(report);
+    runVectorMapTest(report);
+    runVectorSetTest(report);
 
     // File tests
-    { FileDescriptorTest            test(report); }
+    runFileDescriptorTest(report);
 
     // FileSystem tests
-    { FileSystemTest                test(report); }
-    { FileSystemWalkerTest          test(report); }
-    { FileSystemWatcherTest         test(report); }
-    { PathTest                      test(report); }
+    runFileSystemTest(report);
+    runFileSystemWalkerTest(report);
+    runFileSystemWatcherTest(report);
+    runPathTest(report);
 
     // Hashing tests
-    { HashingTest                   test(report); }
+    runHashingTest(report);
 
     // Http tests
-    { HttpParserTest                test(report); }
-    { HttpClientTest                test(report); }
-    { HttpServerTest                test(report); }
-    { HttpURLParserTest             test(report); }
+    runHttpParserTest(report);
+    runHttpClientTest(report);
+    runHttpServerTest(report);
+    runHttpURLParserTest(report);
 
     // JSON tests
-    { JsonFormatterTest             test(report); }
-    { JsonTokenizerTest             test(report); }
+    runJsonFormatterTest(report);
+    runJsonTokenizerTest(report);
 
     // Plugin tests
-    { PluginTest                    test(report); }
+    runPluginTest(report);
 
     // Process tests
-    { ProcessTest                   test(report); }
+    runProcessTest(report);
 
     // Reflection tests
-    { ReflectionTest                test(report); }
+    runReflectionTest(report);
 
     // Serialization tests
-    { SerializationBinaryTemplateTest   test(report); }
-    { SerializationBinaryTypeErasedTest test(report); }
-    { SerializationStructuredJsonTest   test(report); }
+    runSerializationBinaryTemplateTest(report);
+    runSerializationBinaryTypeErasedTest(report);
+    runSerializationStructuredJsonTest(report);
 
     // Socket tests
-    { SocketDescriptorTest          test(report); }
+    runSocketDescriptorTest(report);
 
     // System tests
-    { ConsoleTest                   test(report); }
-    { SystemTest                    test(report); }
-    { TimeTest                      test(report); }
+    runConsoleTest(report);
+    runSystemTest(report);
+    runTimeTest(report);
 
     // Threading tests
-    { AtomicTest                    test(report); }
-    { ThreadingTest                 test(report); }
+    runAtomicTest(report);
+    runThreadingTest(report);
 
     // Async tests
-    { EventLoopTest                 test(report); }
+    runEventLoopTest(report);
 
     // DebugVisualizers tests
-    { DebugVisualizersTest          test(report); }
+    runDebugVisualizersTest(report);
 
     // Build tests
-    { BuildTest                     test(report); }
-
-    // clang-format on
-#endif
+    runBuildTest(report);
 
     return report.getTestReturnCode();
 }

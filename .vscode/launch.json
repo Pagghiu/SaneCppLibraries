@@ -17,18 +17,5 @@
                 "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
             ],
         },
-        {
-            "name": "(lldb) Debug SCTest GCC",
-            "type": "lldb",
-            "request": "launch",
-            "program": "${workspaceFolder}/_Build/Output/macos-arm64-GCC12/Debug/SCTest",
-            "args": [],
-            "cwd": "${fileDirname}",
-            "preLaunchTask": "Build SCTest GCC Debug",
-            "console": "integratedTerminal",
-            "preRunCommands": [
-                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
-            ],
-        }
     ]
 }

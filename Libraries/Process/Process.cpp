@@ -5,11 +5,11 @@
 #include "../Foundation/Strings/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
-#include "ProcessInternalWindows.inl"
+#include "Internal/ProcessWindows.inl"
 #elif SC_PLATFORM_EMSCRIPTEN
-#include "ProcessInternalEmscripten.inl"
+#include "Internal/ProcessEmscripten.inl"
 #else
-#include "ProcessInternalPosix.inl"
+#include "Internal/ProcessPosix.inl"
 #endif
 
 SC::Result SC::ProcessChain::launch(ProcessChainOptions options)

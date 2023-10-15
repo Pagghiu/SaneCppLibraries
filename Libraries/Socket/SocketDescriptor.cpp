@@ -12,11 +12,11 @@
 #include <Ws2tcpip.h> // sockadd_in6
 
 using socklen_t = int;
-#include "SocketDescriptorInternalWindows.inl"
+#include "Internal/SocketDescriptorWindows.inl"
 
 #else
 
-#include "SocketDescriptorInternalPosix.inl"
+#include "Internal/SocketDescriptorPosix.inl"
 #include <arpa/inet.h>  // inet_pton
 #include <sys/select.h> // fd_set for emscripten
 

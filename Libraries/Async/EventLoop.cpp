@@ -6,11 +6,11 @@
 #include "../Threading/Threading.h" // EventObject
 
 #if SC_PLATFORM_WINDOWS
-#include "EventLoopInternalWindows.inl"
+#include "Internal/EventLoopWindows.inl"
 #elif SC_PLATFORM_EMSCRIPTEN
-#include "EventLoopInternalEmscripten.inl"
+#include "Internal/EventLoopEmscripten.inl"
 #elif SC_PLATFORM_APPLE
-#include "EventLoopInternalApple.inl"
+#include "Internal/EventLoopApple.inl"
 #endif
 
 #define SC_ASYNC_ENABLE_LOG 0

@@ -4,13 +4,13 @@
 #include "System.h"
 
 #if SC_PLATFORM_WINDOWS
-#include "SystemInternalWindows.inl"
+#include "Internal/SystemWindows.inl"
 #elif SC_PLATFORM_EMSCRIPTEN
-#include "SystemInternalEmscripten.inl"
+#include "Internal/SystemEmscripten.inl"
 #include <emscripten.h>
 #elif SC_PLATFORM_APPLE
-#include "SystemInternalApple.inl"
-#include "SystemInternalPosix.inl"
+#include "Internal/SystemApple.inl"
+#include "Internal/SystemPosix.inl"
 #endif
 
 #if !SC_PLATFORM_WINDOWS

@@ -7,9 +7,9 @@
 #include "../Foundation/Strings/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
-#include "ThreadingInternalWindows.inl"
+#include "Internal/ThreadingWindows.inl"
 #else
-#include "ThreadingInternalPosix.inl"
+#include "Internal/ThreadingPosix.inl"
 #define WINAPI
 #endif
 

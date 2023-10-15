@@ -4,11 +4,11 @@
 #include "FileSystemWalker.h"
 #include <string.h> //strlen
 #if SC_PLATFORM_WINDOWS
-#include "FileSystemWalkerInternalWindows.inl"
+#include "Internal/FileSystemWalkerWindows.inl"
 #elif SC_PLATFORM_EMSCRIPTEN
-#include "FileSystemWalkerInternalEmscripten.inl"
+#include "Internal/FileSystemWalkerEmscripten.inl"
 #else
-#include "FileSystemWalkerInternalPosix.inl"
+#include "Internal/FileSystemWalkerPosix.inl"
 #endif
 
 template <>

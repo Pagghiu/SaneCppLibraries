@@ -6,7 +6,7 @@
 #include "../Foundation/Containers/VectorSet.h"
 #include "../Foundation/Language/TaggedUnion.h"
 #include "../Foundation/Strings/String.h"
-#include "TaggedMap.h"
+#include "Internal/TaggedMap.h"
 
 namespace SC
 {

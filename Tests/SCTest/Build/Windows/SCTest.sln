@@ -1,15 +1,14 @@
-﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.4.32916.344
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SCTest", "SCTest.vcxproj", "{C701AE36-FA88-4674-A16F-298FA8444AA5}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SCTest", "SCTest.vcxproj", "{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug ASAN Clang|ARM64 = Debug ASAN Clang|ARM64
-		Debug ASAN Clang|x64 = Debug ASAN Clang|x64
-		Debug ASAN Clang|x86 = Debug ASAN Clang|x86
+		Debug Clang|ARM64 = Debug Clang|ARM64
+		Debug Clang|x64 = Debug Clang|x64
+		Debug Clang|x86 = Debug Clang|x86
 		Debug|ARM64 = Debug|ARM64
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
@@ -18,29 +17,29 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug ASAN Clang|ARM64.ActiveCfg = Debug ASAN Clang|ARM64
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug ASAN Clang|ARM64.Build.0 = Debug ASAN Clang|ARM64
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug ASAN Clang|x64.ActiveCfg = Debug ASAN Clang|x64
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug ASAN Clang|x64.Build.0 = Debug ASAN Clang|x64
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug ASAN Clang|x86.ActiveCfg = Debug ASAN Clang|Win32
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug ASAN Clang|x86.Build.0 = Debug ASAN Clang|Win32
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug|ARM64.ActiveCfg = Debug|ARM64
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug|ARM64.Build.0 = Debug|ARM64
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug|x64.ActiveCfg = Debug|x64
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug|x64.Build.0 = Debug|x64
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug|x86.ActiveCfg = Debug|Win32
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Debug|x86.Build.0 = Debug|Win32
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Release|ARM64.ActiveCfg = Release|ARM64
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Release|ARM64.Build.0 = Release|ARM64
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Release|x64.ActiveCfg = Release|x64
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Release|x64.Build.0 = Release|x64
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Release|x86.ActiveCfg = Release|Win32
-		{C701AE36-FA88-4674-A16F-298FA8444AA5}.Release|x86.Build.0 = Release|Win32
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Debug Clang|ARM64.ActiveCfg = Debug Clang|ARM64
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Debug Clang|ARM64.Build.0 = Debug Clang|ARM64
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Debug Clang|x64.ActiveCfg = Debug Clang|x64
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Debug Clang|x64.Build.0 = Debug Clang|x64
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Debug Clang|x86.ActiveCfg = Debug Clang|Win32
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Debug Clang|x86.Build.0 = Debug Clang|Win32
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Debug|ARM64.Build.0 = Debug|ARM64
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Debug|x64.ActiveCfg = Debug|x64
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Debug|x64.Build.0 = Debug|x64
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Debug|x86.ActiveCfg = Debug|Win32
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Debug|x86.Build.0 = Debug|Win32
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Release|ARM64.ActiveCfg = Release|ARM64
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Release|ARM64.Build.0 = Release|ARM64
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Release|x64.ActiveCfg = Release|x64
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Release|x64.Build.0 = Release|x64
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Release|x86.ActiveCfg = Release|Win32
+		{BC493B97-AA6D-3D17-DFE6-9B79EE26A953}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {2AC4A6F0-76E3-49A8-BFAF-FE2DBD0D9D02}
+		        SolutionGuid = {{2AC4A6F0-76E3-49A8-BFAF-FE2DBD0D9D02}}
 	EndGlobalSection
 EndGlobal

@@ -120,7 +120,7 @@
 #define SC_COMPILER_WARNING_PUSH_UNUSED_RESULT                                                                         \
     _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wunused-result\"")
 #else
-#define SC_COMPILER_WARNING_PUSH_UNUSED_RESULT _Pragma("warning(push)") _Pragma("warning(disable : 4834)")
+#define SC_COMPILER_WARNING_PUSH_UNUSED_RESULT _Pragma("warning(push)") _Pragma("warning(disable : 4834 6031)")
 #endif
 
 #if defined(SC_LANGUAGE_FORCE_STANDARD_CPP)

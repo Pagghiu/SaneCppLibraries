@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Base/Compiler.h"
+#include "../Language/MetaProgramming.h"
 
 namespace SC
 {

@@ -24,8 +24,6 @@ int        main(int argc, const char* argv[]);
     // Put teardown code here. This method is called after the invocation of each test method in the class.
 }
 
-extern "C" int  __cxa_guard_acquire(uint64_t* guard_object);
-extern "C" void __cxa_guard_release(uint64_t* guard_object);
 - (void)testA
 {
     using namespace SC;
@@ -60,8 +58,6 @@ extern "C" void __cxa_guard_release(uint64_t* guard_object);
         (void)tc.test_section("operators sadf");
     }
     (void)report.getTestReturnCode();
-    //    __cxa_guard_acquire(nullptr);
-    //    __cxa_guard_release(nullptr);
 }
 
 - (void)testMain

@@ -5,12 +5,12 @@
 #include "../Foundation/Strings/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
-#include "FileSystemInternalWindows.inl"
-#include "UtilityWindows.inl"
+#include "Internal/FileSystemWindows.inl"
+#include "Internal/UtilityWindows.inl"
 #elif SC_PLATFORM_EMSCRIPTEN
-#include "FileSystemInternalEmscripten.inl"
+#include "Internal/FileSystemEmscripten.inl"
 #else
-#include "FileSystemInternalPosix.inl"
+#include "Internal/FileSystemPosix.inl"
 #endif
 
 #include "../FileSystem/Path.h"
