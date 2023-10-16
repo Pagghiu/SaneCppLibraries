@@ -117,6 +117,32 @@ template bool StringIterator<StringIteratorUTF16>::advanceUntilMatchesAny(Span<c
                                                                           CodePoint&            matched);
 
 template <typename CharIterator>
+bool StringIterator<CharIterator>::reverseAdvanceUntilMatchesAny(Span<const CodePoint> items, CodePoint& matched)
+{
+    while (it > start)
+    {
+        it                 = getPreviousOf(it);
+        const auto decoded = CharIterator::decode(it);
+        for (auto c : items)
+        {
+            if (decoded == c)
+            {
+                matched = c;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+template bool StringIterator<StringIteratorASCII>::reverseAdvanceUntilMatchesAny(Span<const CodePoint> items,
+                                                                                 CodePoint&            matched);
+template bool StringIterator<StringIteratorUTF8>::reverseAdvanceUntilMatchesAny(Span<const CodePoint> items,
+                                                                                CodePoint&            matched);
+template bool StringIterator<StringIteratorUTF16>::reverseAdvanceUntilMatchesAny(Span<const CodePoint> items,
+                                                                                 CodePoint&            matched);
+
+template <typename CharIterator>
 bool StringIterator<CharIterator>::advanceUntilDifferentFrom(CodePoint c, CodePoint* optionalReadChar)
 {
     while (it < end)

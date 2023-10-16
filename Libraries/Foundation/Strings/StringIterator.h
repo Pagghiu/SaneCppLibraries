@@ -54,6 +54,8 @@ struct SC_COMPILER_EXPORT StringIterator
 
     [[nodiscard]] bool advanceUntilMatchesAny(Span<const CodePoint> items, CodePoint& matched);
 
+    [[nodiscard]] bool reverseAdvanceUntilMatchesAny(Span<const CodePoint> items, CodePoint& matched);
+
     /// Returns true if it finds at least one character different from c, false if iterator ends before finding it
     [[nodiscard]] bool advanceUntilDifferentFrom(CodePoint c, CodePoint* optionalReadChar = nullptr);
 
