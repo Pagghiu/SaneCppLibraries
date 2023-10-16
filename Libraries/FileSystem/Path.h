@@ -65,7 +65,7 @@ struct SC::Path
     [[nodiscard]] static bool parse(StringView input, Path::ParsedView& pathView, Type type);
 
     /// Return the directory name of a path. Trailing spearators are ignored.
-    [[nodiscard]] static StringView dirname(StringView input, int repeat = 0);
+    [[nodiscard]] static StringView dirname(StringView input, Type type, int repeat = 0);
     /// Return the base name of a path. Trailing spearators are ignored.
     [[nodiscard]] static StringView basename(StringView input, Type type);
     /// Return the base name of a path. Suffix is stripped if existing. Trailing spearators are ignored.

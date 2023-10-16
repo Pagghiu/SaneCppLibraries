@@ -133,11 +133,11 @@ struct SC::Path::Internal
             return parseDirectoryTemplate<StringIteratorASCII, separator>(input, root);
     }
 
-    template <typename StringIterator, char separator>
+    template <typename StringIterator, char separator1, char separator2>
     static SC::StringView dirnameTemplate(StringView input)
     {
         StringView dirn;
-        StringView base = basename<separator>(input, &dirn);
+        StringView base = basename<separator1, separator2>(input, &dirn);
         if (dirn.isEmpty())
         {
             return "."_a8;
@@ -145,28 +145,29 @@ struct SC::Path::Internal
         return dirn;
     }
 
-    template <char separator>
+    template <char separator1, char separator2>
     static SC::StringView dirname(StringView input, int repeat)
     {
         do
         {
             if (input.getEncoding() == StringEncoding::Utf16)
-                input = dirnameTemplate<StringIteratorUTF16, separator>(input);
+                input = dirnameTemplate<StringIteratorUTF16, separator1, separator2>(input);
             else
-                input = dirnameTemplate<StringIteratorASCII, separator>(input);
+                input = dirnameTemplate<StringIteratorASCII, separator1, separator2>(input);
         } while (repeat-- > 0);
         return input;
     }
 
-    template <typename StringIterator, char separator>
+    template <typename StringIterator, char separator1, char separator2>
     static SC::StringView basenameTemplate(StringView input, StringView* dir = nullptr)
     {
         auto it = input.getIterator<StringIterator>();
         it.setToEnd();
-        while (it.stepBackward() and it.match(separator)) {}
+        while (it.stepBackward() and it.match(separator1)) {}
         auto itEnd = it;
         (void)itEnd.stepForward();
-        if (it.reverseAdvanceUntilMatches(separator))
+        StringCodePoint matched;
+        if (it.reverseAdvanceUntilMatchesAny({separator1, separator2}, matched))
         {
             if (dir)
             {
@@ -178,19 +179,19 @@ struct SC::Path::Internal
         return input;
     }
 
-    template <char separator>
+    template <char separator1, char separator2>
     static SC::StringView basename(StringView input, StringView* dir = nullptr)
     {
         if (input.getEncoding() == StringEncoding::Utf16)
-            return basenameTemplate<StringIteratorUTF16, separator>(input, dir);
+            return basenameTemplate<StringIteratorUTF16, separator1, separator2>(input, dir);
         else
-            return basenameTemplate<StringIteratorASCII, separator>(input, dir);
+            return basenameTemplate<StringIteratorASCII, separator1, separator2>(input, dir);
     }
 
-    template <typename StringIterator, char separator>
+    template <typename StringIterator, char separator1, char separator2>
     static SC::StringView basenameTemplate(StringView input, StringView suffix)
     {
-        StringView name = basename<separator>(input);
+        StringView name = basename<separator1, separator2>(input);
         if (name.endsWith(suffix))
         {
             return name.sliceStartLengthBytes(0, name.sizeInBytes() - suffix.sizeInBytes());
@@ -198,14 +199,14 @@ struct SC::Path::Internal
         return name;
     }
 
-    template <char separator>
+    template <char separator1, char separator2>
     static SC::StringView basename(StringView input, StringView suffix)
     {
         SC_ASSERT_DEBUG(input.hasCompatibleEncoding(suffix));
         if (input.getEncoding() == StringEncoding::Utf16)
-            return basenameTemplate<StringIteratorUTF16, separator>(input, suffix);
+            return basenameTemplate<StringIteratorUTF16, separator1, separator2>(input, suffix);
         else
-            return basenameTemplate<StringIteratorASCII, separator>(input, suffix);
+            return basenameTemplate<StringIteratorASCII, separator1, separator2>(input, suffix);
     }
 
     /// Splits a Windows path of type "C:\\directory\\base" into root=C:\\ - directory=C:\\directory\\ - base=base
@@ -313,21 +314,29 @@ bool SC::Path::ParsedView::parsePosix(StringView input)
     return true;
 }
 
-SC::StringView SC::Path::dirname(StringView input, int repeat) { return Internal::dirname<Separator>(input, repeat); }
+SC::StringView SC::Path::dirname(StringView input, Type type, int repeat)
+{
+    switch (type)
+    {
+    case AsWindows: return Internal::dirname<Windows::Separator, Posix::Separator>(input, repeat);
+    case AsPosix: return Internal::dirname<Posix::Separator, Posix::Separator>(input, repeat);
+    }
+    Assert::unreachable();
+}
 
 SC::StringView SC::Path::basename(StringView input, Type type)
 {
     switch (type)
     {
-    case AsWindows: return Internal::basename<Windows::Separator>(input);
-    case AsPosix: return Internal::basename<Posix::Separator>(input);
+    case AsWindows: return Internal::basename<Windows::Separator, Posix::Separator>(input);
+    case AsPosix: return Internal::basename<Posix::Separator, Posix::Separator>(input);
     }
     Assert::unreachable();
 }
 
 SC::StringView SC::Path::basename(StringView input, StringView suffix)
 {
-    return Internal::basename<Separator>(input, suffix);
+    return Internal::basename<Windows::Separator, Posix::Separator>(input, suffix);
 }
 
 bool SC::Path::isAbsolute(StringView input, Type type)
@@ -342,14 +351,17 @@ bool SC::Path::isAbsolute(StringView input, Type type)
 
 SC::StringView SC::Path::Windows::dirname(StringView input, int repeat)
 {
-    return Internal::dirname<Separator>(input, repeat);
+    return Internal::dirname<Windows::Separator, Posix::Separator>(input, repeat);
 }
 
-SC::StringView SC::Path::Windows::basename(StringView input) { return Internal::basename<Separator>(input); }
+SC::StringView SC::Path::Windows::basename(StringView input)
+{
+    return Internal::basename<Windows::Separator, Posix::Separator>(input);
+}
 
 SC::StringView SC::Path::Windows::basename(StringView input, StringView suffix)
 {
-    return Internal::basename<Separator>(input, suffix);
+    return Internal::basename<Windows::Separator, Posix::Separator>(input, suffix);
 }
 
 bool SC::Path::Windows::isAbsolute(StringView input)
@@ -360,14 +372,17 @@ bool SC::Path::Windows::isAbsolute(StringView input)
 
 SC::StringView SC::Path::Posix::dirname(StringView input, int repeat)
 {
-    return Internal::dirname<Separator>(input, repeat);
+    return Internal::dirname<Posix::Separator, Posix::Separator>(input, repeat);
 }
 
-SC::StringView SC::Path::Posix::basename(StringView input) { return Internal::basename<Separator>(input); }
+SC::StringView SC::Path::Posix::basename(StringView input)
+{
+    return Internal::basename<Posix::Separator, Posix::Separator>(input);
+}
 
 SC::StringView SC::Path::Posix::basename(StringView input, StringView suffix)
 {
-    return Internal::basename<Separator>(input, suffix);
+    return Internal::basename<Posix::Separator, Posix::Separator>(input, suffix);
 }
 
 bool SC::Path::Posix::isAbsolute(StringView input) { return input.startsWithChar('/'); }

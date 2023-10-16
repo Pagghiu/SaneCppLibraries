@@ -69,7 +69,7 @@ struct SC::PluginTest : public SC::TestCase
             // Init compiler
             PluginCompiler compiler;
             SC_TEST_EXPECT(PluginCompiler::findBestCompiler(compiler));
-            SC_TEST_EXPECT(compiler.includePath.assign(Path::dirname(report.libraryRootDirectory)));
+            SC_TEST_EXPECT(compiler.includePath.assign(Path::dirname(report.libraryRootDirectory, Path::AsNative)));
 
             // Setup registry
             PluginRegistry registry;
