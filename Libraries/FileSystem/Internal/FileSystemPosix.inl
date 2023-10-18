@@ -177,9 +177,10 @@ struct SC::FileSystem::Internal
         return copyRes == 0;
     }
 
-    [[nodiscard]] static bool copyDirectory(String& sourceFile, String& destinationFile, FileSystem::CopyFlags options)
+    [[nodiscard]] static bool copyDirectory(String& sourceDirectory, String& destinationDirectory,
+                                            FileSystem::CopyFlags options)
     {
-        return copyFile(sourceFile.view(), destinationFile.view(), options, true); // true == isDirectory
+        return copyFile(sourceDirectory.view(), destinationDirectory.view(), options, true); // true == isDirectory
     }
 
     static bool removeDirectoryRecursive(String& directory)

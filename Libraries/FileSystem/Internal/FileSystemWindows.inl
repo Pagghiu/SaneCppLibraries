@@ -12,6 +12,13 @@
 #include "../../File/FileDescriptor.h"
 #include "../FileSystem.h"
 
+#ifndef SC_FILESYSTEM_WINDOWS_USE_SHELL_OPERATIONS
+#define SC_FILESYSTEM_WINDOWS_USE_SHELL_OPERATIONS 1
+#elif SC_FILESYSTEM_WINDOWS_USE_SHELL_OPERATIONS
+#include "../../Foundation/Containers/SmallVector.h"
+#include "../FileSystemWalker.h"
+#endif
+
 namespace SC
 {
 
@@ -116,11 +123,10 @@ struct SC::FileSystem::Internal
         return res == TRUE;
     }
 
-    // TODO: replace SHFileOperationW with something else as it's slow at first use( it loads a lot of DLLs) and ASAN
-    // complains
     [[nodiscard]] static Result copyDirectory(String& sourceDirectory, String& destinationDirectory,
                                               FileSystem::CopyFlags options)
     {
+#if SC_FILESYSTEM_WINDOWS_USE_SHELL_OPERATIONS
         SHFILEOPSTRUCTW shFileOp;
         memset(&shFileOp, 0, sizeof(shFileOp));
         const wchar_t* dest = destinationDirectory.view().getNullTerminatedNative();
@@ -144,10 +150,49 @@ struct SC::FileSystem::Internal
         shFileOp.pTo   = dest;
         const int res  = SHFileOperationW(&shFileOp);
         return Result(res == 0);
+#else
+        FileSystemWalker fsWalker;
+        StringView       sourceView = sourceDirectory.view();
+        SC_TRY(fsWalker.init(sourceView));
+        fsWalker.options.recursive        = true;
+        StringNative<512> destinationPath = StringEncoding::Native;
+        if (not existsAndIsDirectory(destinationDirectory.view().getNullTerminatedNative()))
+        {
+            SC_TRY(makeDirectory(destinationDirectory.view().getNullTerminatedNative()));
+        }
+        while (fsWalker.enumerateNext())
+        {
+            const FileSystemWalker::Entry& entry       = fsWalker.get();
+            StringView                     partialPath = entry.path.sliceStartBytes(sourceView.sizeInBytes());
+            StringConverter                destinationConvert(destinationPath, StringConverter::Clear);
+            SC_TRY(destinationConvert.appendNullTerminated(destinationDirectory.view()));
+            SC_TRY(destinationConvert.appendNullTerminated(partialPath));
+            if (entry.isDirectory())
+            {
+                if (options.overwrite)
+                {
+                    // We don't care about the result
+                    if (existsAndIsFile(destinationPath.view().getNullTerminatedNative()))
+                    {
+                        (void)removeFile(destinationPath.view().getNullTerminatedNative());
+                    }
+                }
+                (void)makeDirectory(destinationPath.view().getNullTerminatedNative());
+                SC_TRY(existsAndIsDirectory(destinationPath.view().getNullTerminatedNative()));
+            }
+            else
+            {
+                SC_TRY(copyFile(entry.path, destinationPath.view(), options));
+            }
+        }
+        SC_TRY(fsWalker.checkErrors());
+        return Result(true);
+#endif
     }
 
     [[nodiscard]] static Result removeDirectoryRecursive(String& sourceDirectory)
     {
+#if SC_FILESYSTEM_WINDOWS_USE_SHELL_OPERATIONS
         SHFILEOPSTRUCTW shFileOp;
         memset(&shFileOp, 0, sizeof(shFileOp));
         shFileOp.fFlags = FOF_SILENT | FOF_NOCONFIRMMKDIR | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NO_UI;
@@ -157,6 +202,33 @@ struct SC::FileSystem::Internal
         shFileOp.pFrom = sourceDirectory.view().getNullTerminatedNative();
         const int res  = SHFileOperationW(&shFileOp);
         return Result(res == 0);
+#else
+        FileSystemWalker fsWalker;
+        SC_TRY(fsWalker.init(sourceDirectory.view()));
+        fsWalker.options.recursive = true;
+        SmallVector<StringNative<512>, 64> emptyDirectories;
+        while (fsWalker.enumerateNext())
+        {
+            const FileSystemWalker::Entry& entry = fsWalker.get();
+            if (entry.isDirectory())
+            {
+                SC_TRY(emptyDirectories.push_back(entry.path));
+            }
+            else
+            {
+                SC_TRY(removeFile(entry.path.getNullTerminatedNative()));
+            }
+        }
+        SC_TRY(fsWalker.checkErrors());
+
+        while (not emptyDirectories.isEmpty())
+        {
+            SC_TRY(removeEmptyDirectory(emptyDirectories.back().view().getNullTerminatedNative()));
+            SC_TRY(emptyDirectories.pop_back());
+        }
+        SC_TRY(removeEmptyDirectory(sourceDirectory.view().getNullTerminatedNative()));
+        return Result(true);
+#endif
     }
 
     [[nodiscard]] static Result getFileTime(const wchar_t* file, FileTime& time)

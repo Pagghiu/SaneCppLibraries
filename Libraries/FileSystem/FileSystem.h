@@ -65,7 +65,9 @@ struct SC::FileSystem
     [[nodiscard]] Result removeFileIfExists(StringView source);
     [[nodiscard]] Result removeDirectoryRecursive(Span<const StringView> directories);
     [[nodiscard]] Result removeEmptyDirectory(Span<const StringView> directories);
+    [[nodiscard]] Result removeEmptyDirectoryRecursive(Span<const StringView> directories);
     [[nodiscard]] Result makeDirectory(Span<const StringView> directories);
+    [[nodiscard]] Result makeDirectoryRecursive(Span<const StringView> directories);
     [[nodiscard]] Result makeDirectoryIfNotExists(Span<const StringView> directories);
     [[nodiscard]] bool   exists(StringView fileOrDirectory);
     [[nodiscard]] bool   existsAndIsDirectory(StringView directory);

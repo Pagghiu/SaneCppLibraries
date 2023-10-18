@@ -251,6 +251,23 @@ SC::Result SC::FileSystem::removeEmptyDirectory(Span<const StringView> directori
     return Result(true);
 }
 
+SC::Result SC::FileSystem::removeEmptyDirectoryRecursive(Span<const StringView> directories)
+{
+    StringView encodedPath;
+    for (StringView path : directories)
+    {
+        SC_TRY(convert(path, fileFormatBuffer2, &encodedPath));
+        int dirnameLevels = 0;
+        while (Internal::removeEmptyDirectory(encodedPath.getNullTerminatedNative()))
+        {
+            encodedPath = Path::dirname(encodedPath, Path::AsNative, dirnameLevels);
+            dirnameLevels += 1;
+            SC_TRY(convert(encodedPath, fileFormatBuffer1, &encodedPath));
+        }
+    }
+    return Result(true);
+}
+
 SC::Result SC::FileSystem::makeDirectory(Span<const StringView> directories)
 {
     StringView encodedPath;
@@ -258,6 +275,36 @@ SC::Result SC::FileSystem::makeDirectory(Span<const StringView> directories)
     {
         SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
         SC_TRY_FORMAT_ERRNO(path, Internal::makeDirectory(encodedPath.getNullTerminatedNative()));
+    }
+    return Result(true);
+}
+
+SC::Result SC::FileSystem::makeDirectoryRecursive(Span<const StringView> directories)
+{
+    StringView encodedPath;
+    for (auto& path : directories)
+    {
+        SC_TRY(convert(path, fileFormatBuffer2, &encodedPath));
+        StringView dirnameDirectory = encodedPath;
+        int        levelsToCreate   = 0;
+        while (not existsAndIsDirectory(dirnameDirectory) or dirnameDirectory.isEmpty())
+        {
+            dirnameDirectory = Path::dirname(dirnameDirectory, Path::AsNative);
+            levelsToCreate++;
+        }
+        for (int idx = 0; idx < levelsToCreate; ++idx)
+        {
+            if (levelsToCreate - idx - 2 >= 0)
+            {
+                StringView partialPath = Path::dirname(encodedPath, Path::AsNative, levelsToCreate - idx - 2);
+                SC_TRY(convert(partialPath, fileFormatBuffer1, &dirnameDirectory));
+            }
+            else
+            {
+                dirnameDirectory = encodedPath;
+            }
+            SC_TRY_FORMAT_ERRNO(path, Internal::makeDirectory(dirnameDirectory.getNullTerminatedNative()));
+        }
     }
     return Result(true);
 }
