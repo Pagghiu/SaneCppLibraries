@@ -9,12 +9,12 @@
 
 struct SC::Build::ProjectWriter::WriterVisualStudio
 {
-    Definition&         definition;
-    DefinitionCompiler& definitionCompiler;
-    Hashing             hashing;
-    String              projectGuid;
+    const Definition&         definition;
+    const DefinitionCompiler& definitionCompiler;
+    Hashing                   hashing;
+    String                    projectGuid;
 
-    WriterVisualStudio(Definition& definition, DefinitionCompiler& definitionCompiler)
+    WriterVisualStudio(const Definition& definition, const DefinitionCompiler& definitionCompiler)
         : definition(definition), definitionCompiler(definitionCompiler)
     {}
 

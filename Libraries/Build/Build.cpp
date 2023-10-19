@@ -76,6 +76,22 @@ SC::Result SC::Build::Workspace::validate() const
     return Result(true);
 }
 
+SC::Result SC::Build::Definition::generate(StringView projectName, const Build::Parameters& parameters,
+                                           StringView testPath) const
+{
+    Build::DefinitionCompiler definitionCompiler(*this);
+    SC_TRY(definitionCompiler.validate());
+    SC_TRY(definitionCompiler.build());
+    Build::ProjectWriter writer(*this, definitionCompiler, parameters);
+    StringView           directory;
+    switch (parameters.generator)
+    {
+    case Build::Generator::XCode14: directory = "MacOS"; break;
+    case Build::Generator::VisualStudio2022: directory = "VisualStudio2022"; break;
+    }
+    return Result(writer.write(testPath, projectName, directory));
+}
+
 SC::Result SC::Build::DefinitionCompiler::validate()
 {
     for (const auto& workspace : definition.workspaces)
@@ -213,15 +229,21 @@ SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<Strin
     return Result(true);
 }
 
-bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView filename)
+bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView filename,
+                                     StringView projectSubdirectory)
 {
     String normalizedDirectory = StringEncoding::Utf8;
     {
         Vector<StringView> components;
         SC_TRY(Path::normalize(destinationDirectory, components, &normalizedDirectory, Path::Type::AsPosix));
+        SC_TRY(Path::append(normalizedDirectory, {projectSubdirectory}, Path::Type::AsPosix));
     }
     FileSystem fs;
+    SC_TRY(Path::isAbsolute(destinationDirectory, Path::AsNative));
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.makeDirectoryRecursive(normalizedDirectory.view()));
     SC_TRY(fs.init(normalizedDirectory.view()));
+
     String prjName;
     switch (parameters.generator)
     {

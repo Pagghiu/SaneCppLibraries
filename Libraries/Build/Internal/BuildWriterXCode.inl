@@ -11,11 +11,11 @@
 
 struct SC::Build::ProjectWriter::WriterXCode
 {
-    Definition&         definition;
-    DefinitionCompiler& definitionCompiler;
-    Hashing             hashing;
+    const Definition&         definition;
+    const DefinitionCompiler& definitionCompiler;
+    Hashing                   hashing;
 
-    WriterXCode(Definition& definition, DefinitionCompiler& definitionCompiler)
+    WriterXCode(const Definition& definition, const DefinitionCompiler& definitionCompiler)
         : definition(definition), definitionCompiler(definitionCompiler)
     {}
     using RenderItem  = WriterInternal::RenderItem;

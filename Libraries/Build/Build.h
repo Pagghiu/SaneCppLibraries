@@ -338,11 +338,6 @@ struct Workspace
     [[nodiscard]] Result validate() const;
 };
 
-struct Definition
-{
-    Vector<Workspace> workspaces;
-};
-
 struct Parameters
 {
     Array<Platform::Type, 5>     platforms     = {Platform::MacOS, Platform::iOS};
@@ -350,12 +345,18 @@ struct Parameters
     Generator::Type              generator     = Generator::XCode14;
 };
 
+struct Definition
+{
+    Vector<Workspace> workspaces;
+    Result            generate(StringView projectName, const Parameters& parameters, StringView testPath) const;
+};
+
 struct DefinitionCompiler
 {
     VectorMap<String, Vector<String>> resolvedPaths;
 
-    Build::Definition& definition;
-    DefinitionCompiler(Build::Definition& definition) : definition(definition) {}
+    const Build::Definition& definition;
+    DefinitionCompiler(const Build::Definition& definition) : definition(definition) {}
 
     [[nodiscard]] Result validate();
     [[nodiscard]] Result build();
@@ -368,15 +369,16 @@ struct DefinitionCompiler
 
 struct ProjectWriter
 {
-    Definition&         definition;
-    DefinitionCompiler& definitionCompiler;
-    Parameters&         parameters;
+    const Definition&         definition;
+    const DefinitionCompiler& definitionCompiler;
+    const Parameters&         parameters;
 
-    ProjectWriter(Definition& definition, DefinitionCompiler& definitionCompiler, Parameters& parameters)
+    ProjectWriter(const Definition& definition, const DefinitionCompiler& definitionCompiler,
+                  const Parameters& parameters)
         : definition(definition), definitionCompiler(definitionCompiler), parameters(parameters)
     {}
 
-    [[nodiscard]] bool write(StringView destinationDirectory, StringView filename);
+    [[nodiscard]] bool write(StringView destinationDirectory, StringView filename, StringView projectSubdirectory);
 
   private:
     struct WriterXCode;
