@@ -747,7 +747,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             {
                 if (output.isEmpty())
                 {
-                    Path::join(output, {"$(SRCROOT)", item.path.view()});
+                    Path::join(output, {"$(SRCROOT)", item.path.view()}, Path::Posix::SeparatorStringView());
                 }
                 else
                 {

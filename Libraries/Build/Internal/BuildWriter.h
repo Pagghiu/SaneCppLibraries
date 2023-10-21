@@ -83,10 +83,12 @@ struct SC::Build::WriterInternal
                     {
                         renderItem.type = RenderItem::DebugVisualizerfile;
                     }
-                    SC_TRY(
-                        Path::relativeFromTo(destinationDirectory, it.view(), renderItem.path, Path::Type::AsNative));
+                    SC_TRY(Path::relativeFromTo(destinationDirectory, it.view(), renderItem.path,
+                                                Path::Type::AsNative,  // input type
+                                                Path::Type::AsPosix)); // output type
                     SC_TRY(Path::relativeFromTo(project.rootDirectory.view(), it.view(), renderItem.referencePath,
-                                                Path::Type::AsNative));
+                                                Path::Type::AsNative,  // input type
+                                                Path::Type::AsPosix)); // output type
                     if (file.operation == Project::File::Add)
                     {
                         SC_TRY(outputFiles.push_back(move(renderItem)));

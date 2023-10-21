@@ -511,7 +511,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                        project.name, Path::basename(prjName, Path::AsPosix), projectGuid);
 
         builder.append("Global\n");
-        builder.append("    GlobalSection(SolutionConfigurationPlatforms) = preSolution\n");
+        builder.append("\tGlobalSection(SolutionConfigurationPlatforms) = preSolution\n");
 
         forArchitecture(
             builder, project,
@@ -519,12 +519,12 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
 
             {
                 SC_COMPILER_UNUSED(project);
-                builder.append("        {}|{} = {}|{}\n", configuration.name, platform, configuration.name, platform);
+                builder.append("\t\t{}|{} = {}|{}\n", configuration.name, platform, configuration.name, platform);
                 return true;
             });
-        builder.append("    EndGlobalSection\n");
+        builder.append("\tEndGlobalSection\n");
 
-        builder.append("    GlobalSection(ProjectConfigurationPlatforms) = postSolution\n");
+        builder.append("\tGlobalSection(ProjectConfigurationPlatforms) = postSolution\n");
 
         forArchitecture(builder, project,
                         [this](StringBuilder& builder, const Project& project, const Configuration& configuration,
@@ -532,20 +532,20 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
 
                         {
                             SC_COMPILER_UNUSED(project);
-                            builder.append("        {}.{}|{}.ActiveCfg = {}|{}\n", projectGuid, configuration.name,
+                            builder.append("\t\t{}.{}|{}.ActiveCfg = {}|{}\n", projectGuid, configuration.name,
                                            platform, configuration.name, platform);
-                            builder.append("        {}.{}|{}.Build.0 = {}|{}\n", projectGuid, configuration.name,
+                            builder.append("\t\t{}.{}|{}.Build.0 = {}|{}\n", projectGuid, configuration.name,
                                            platform, configuration.name, platform);
                             return true;
                         });
-        builder.append("    EndGlobalSection\n");
+        builder.append("\tEndGlobalSection\n");
 
-        builder.append("    GlobalSection(SolutionProperties) = preSolution\n"
-                       "        HideSolutionNode = FALSE\n"
-                       "    EndGlobalSection\n"
-                       "    GlobalSection(ExtensibilityGlobals) = postSolution\n"
-                       "        SolutionGuid = {{2AC4A6F0-76E3-49A8-BFAF-FE2DBD0D9D02}}\n"
-                       "    EndGlobalSection\n");
+        builder.append("\tGlobalSection(SolutionProperties) = preSolution\n"
+                       "\t\tHideSolutionNode = FALSE\n"
+                       "\tEndGlobalSection\n"
+                       "\tGlobalSection(ExtensibilityGlobals) = postSolution\n"
+                       "\t\tSolutionGuid = {{2AC4A6F0-76E3-49A8-BFAF-FE2DBD0D9D02}}\n"
+                       "\tEndGlobalSection\n");
 
         builder.append("EndGlobal");
         SC_COMPILER_WARNING_POP;
