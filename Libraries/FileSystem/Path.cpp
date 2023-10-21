@@ -524,10 +524,11 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
     return true;
 }
 
-bool SC::Path::relativeFromTo(StringView source, StringView destination, String& output, Type type)
+bool SC::Path::relativeFromTo(StringView source, StringView destination, String& output, Type inputType,
+                              Type outputType)
 {
     bool skipRelativeCheck = false;
-    if (type == AsPosix)
+    if (inputType == AsPosix)
     {
         if (source.startsWith("\\\\"))
         {
@@ -544,8 +545,8 @@ bool SC::Path::relativeFromTo(StringView source, StringView destination, String&
     if (!skipRelativeCheck)
     {
         Path::ParsedView pathViewSource, pathViewDestination;
-        SC_TRY(Path::parse(source, pathViewSource, type));
-        SC_TRY(Path::parse(destination, pathViewDestination, type));
+        SC_TRY(Path::parse(source, pathViewSource, inputType));
+        SC_TRY(Path::parse(destination, pathViewDestination, inputType));
         if (pathViewSource.root.isEmpty() or pathViewDestination.root.isEmpty())
             return false; // Relative paths are not supported
     }
@@ -568,7 +569,7 @@ bool SC::Path::relativeFromTo(StringView source, StringView destination, String&
     {
         numSplits -= 1;
         SC_TRY(builder.append(".."));
-        switch (type)
+        switch (outputType)
         {
         case AsWindows: SC_TRY(builder.append(Windows::SeparatorStringView())); break;
         case AsPosix: SC_TRY(builder.append(Posix::SeparatorStringView())); break;

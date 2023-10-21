@@ -111,9 +111,10 @@ struct SC::Path
 
     [[nodiscard]] static bool normalize(StringView view, Vector<StringView>& components, String* output, Type type);
 
-    [[nodiscard]] static bool relativeFromTo(StringView source, StringView destination, String& output, Type type);
+    [[nodiscard]] static bool relativeFromTo(StringView source, StringView destination, String& output, Type type,
+                                             Type outputType = AsNative);
 
-    [[nodiscard]] static bool append(String& output, Span<const StringView> paths, Type type);
+    [[nodiscard]] static bool append(String& output, Span<const StringView> paths, Type inputType);
 
     [[nodiscard]] static bool endsWithSeparator(StringView path);
 
