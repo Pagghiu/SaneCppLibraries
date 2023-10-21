@@ -68,13 +68,14 @@ struct SC::Path::Internal
         return StringView();
     }
 
-    template <typename StringIterator, char separator>
+    template <typename StringIterator, char separator1, char separator2>
     static StringView parseBaseTemplate(StringView input)
     {
         // Parse the base
         auto it = input.getIterator<StringIterator>();
         it.setToEnd();
-        (void)it.reverseAdvanceUntilMatches(separator);
+        StringCodePoint matched;
+        (void)it.reverseAdvanceUntilMatchesAny({separator1, separator2}, matched);
         if (it.isAtStart())
             it.setToEnd();
         else
@@ -82,40 +83,45 @@ struct SC::Path::Internal
         return StringView::fromIteratorUntilEnd(it);
     }
 
-    template <char separator>
+    template <char separator1, char separator2>
     static StringView parseBase(StringView input)
     {
         if (input.getEncoding() == StringEncoding::Utf16)
-            return parseBaseTemplate<StringIteratorUTF16, separator>(input);
+            return parseBaseTemplate<StringIteratorUTF16, separator1, separator2>(input);
         else
-            return parseBaseTemplate<StringIteratorASCII, separator>(input);
+            return parseBaseTemplate<StringIteratorASCII, separator1, separator2>(input);
     }
 
-    template <typename StringIterator, char separator>
+    template <typename StringIterator, char separator1, char separator2>
     static bool rootIsFollowedByOnlySeparators(const StringView input, const StringView root)
     {
-        SC_ASSERT_RELEASE(root.sizeInBytes() == 0 or (input.getEncoding() == root.getEncoding()));
+        SC_ASSERT_RELEASE(root.sizeInBytes() == 0 or input.hasCompatibleEncoding(root));
         StringView remaining = input.sliceStartEndBytes(root.sizeInBytes(), input.sizeInBytes());
 
         auto it = remaining.getIterator<StringIterator>();
-        (void)it.advanceUntilDifferentFrom(separator);
+        if (not it.advanceUntilDifferentFrom(separator1))
+        {
+            it = remaining.getIterator<StringIterator>();
+            (void)it.advanceUntilDifferentFrom(separator2);
+        }
         return it.isAtEnd();
     }
 
-    template <typename StringIterator, char separator>
+    template <typename StringIterator, char separator1, char separator2>
     static StringView parseDirectoryTemplate(const StringView input, const StringView root)
     {
         auto       it       = input.getIterator<StringIterator>();
         const auto itBackup = it;
         it.setToEnd();
-        if (it.reverseAdvanceUntilMatches(separator))
+        StringCodePoint matched;
+        if (it.reverseAdvanceUntilMatchesAny({separator1, separator2}, matched))
         {
             const StringView directory = StringView::fromIterators(itBackup, it);
             if (directory.isEmpty())
             {
                 return root;
             }
-            if (rootIsFollowedByOnlySeparators<StringIterator, separator>(input, root))
+            if (rootIsFollowedByOnlySeparators<StringIterator, separator1, separator2>(input, root))
             {
                 return input;
             }
@@ -124,13 +130,13 @@ struct SC::Path::Internal
         return StringView();
     }
 
-    template <char separator>
+    template <char separator1, char separator2>
     static StringView parseDirectory(const StringView input, const StringView root)
     {
         if (input.getEncoding() == StringEncoding::Utf16)
-            return parseDirectoryTemplate<StringIteratorUTF16, separator>(input, root);
+            return parseDirectoryTemplate<StringIteratorUTF16, separator1, separator2>(input, root);
         else
-            return parseDirectoryTemplate<StringIteratorASCII, separator>(input, root);
+            return parseDirectoryTemplate<StringIteratorASCII, separator1, separator2>(input, root);
     }
 
     template <typename StringIterator, char separator1, char separator2>
@@ -221,17 +227,13 @@ struct SC::Path::Internal
         // Parse the drive, then look for rightmost backslash separator to get directory
         // Everything after it will be the base.
         root      = Internal::parseWindowsRoot(input);
-        directory = Internal::parseDirectory<'\\'>(input, root);
-        if (directory.isEmpty())
-            directory = Internal::parseDirectory<'/'>(input, root);
+        directory = Internal::parseDirectory<'\\', '/'>(input, root);
         if (root.startsWith(directory))
         {
             if (root.endsWithChar('\\') or root.endsWithChar('/'))
                 directory = root;
         }
-        base = Internal::parseBase<'\\'>(input);
-        if (base.isEmpty())
-            base = Internal::parseBase<'/'>(input);
+        base              = Internal::parseBase<'\\', '/'>(input);
         endsWithSeparator = input.endsWithChar('\\') or input.endsWithChar('/');
         return !(root.isEmpty() && directory.isEmpty());
     }
@@ -246,8 +248,8 @@ struct SC::Path::Internal
                                          bool& endsWithSeparator)
     {
         root              = Internal::parsePosixRoot(input);
-        directory         = Internal::parseDirectory<'/'>(input, root);
-        base              = Internal::parseBase<'/'>(input);
+        directory         = Internal::parseDirectory<'/', '/'>(input, root);
+        base              = Internal::parseBase<'/', '/'>(input);
         endsWithSeparator = input.endsWithChar('/');
         return !(root.isEmpty() && directory.isEmpty());
     }

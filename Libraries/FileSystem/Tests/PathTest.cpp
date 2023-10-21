@@ -86,7 +86,7 @@ struct SC::PathTest : public SC::TestCase
 
             SC_TEST_EXPECT(path.parseWindows("C:\\\\"));
             SC_TEST_EXPECT(path.root == "C:\\");
-            SC_TEST_EXPECT(path.directory == "C:\\\\");
+            SC_TEST_EXPECT(path.directory == "C:\\");
             SC_TEST_EXPECT(path.base.isEmpty());
             SC_TEST_EXPECT(path.endsWithSeparator == true);
 
