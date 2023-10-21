@@ -385,5 +385,44 @@ struct ProjectWriter
     struct WriterVisualStudio;
 };
 
+//-----------------------------------------------------------------------------------------------------------------------
+// Implementations Details
+//-----------------------------------------------------------------------------------------------------------------------
+
+struct ConfigurePresets
+{
+    template <typename ConfigureFunction>
+    static Result generateAllPlatforms(ConfigureFunction configure, StringView projectName,
+                                       Build::Generator::Type generator, StringView targetDirectory,
+                                       StringView sourcesDirectory)
+    {
+        using namespace SC;
+        switch (generator)
+        {
+        case Build::Generator::VisualStudio2022: {
+            Build::Parameters parameters;
+            parameters.generator     = Build::Generator::VisualStudio2022;
+            parameters.platforms     = {Build::Platform::Windows};
+            parameters.architectures = {Build::Architecture::Arm64, Build::Architecture::Intel64};
+            Build::Definition definition;
+            SC_TRY(configure(definition, parameters, sourcesDirectory));
+            SC_TRY(definition.generate(projectName, parameters, targetDirectory));
+        }
+        break;
+        case Build::Generator::XCode14: {
+            Build::Parameters parameters;
+            parameters.generator     = Build::Generator::XCode14;
+            parameters.platforms     = {Build::Platform::MacOS};
+            parameters.architectures = {Build::Architecture::Arm64, Build::Architecture::Intel64};
+            Build::Definition definition;
+            SC_TRY(configure(definition, parameters, sourcesDirectory));
+            SC_TRY(definition.generate(projectName, parameters, targetDirectory));
+        }
+        break;
+        }
+        return Result(true);
+    }
+};
+
 } // namespace Build
 } // namespace SC

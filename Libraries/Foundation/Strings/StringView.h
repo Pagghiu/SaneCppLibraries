@@ -20,6 +20,8 @@ struct SC::StringView
     constexpr StringView(Span<const char> textSpan, bool nullTerm, StringEncoding encoding);
     constexpr StringView(const char* text, size_t numBytes, bool nullTerm, StringEncoding encoding);
 
+    static StringView fromNullTerminated(const char* text, StringEncoding encoding);
+
     template <size_t N>
     constexpr StringView(const char (&text)[N]);
 

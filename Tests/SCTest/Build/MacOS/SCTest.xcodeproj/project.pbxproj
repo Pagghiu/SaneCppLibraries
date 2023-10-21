@@ -59,6 +59,8 @@
 		7B6B05FA2AD1B66A001AC283 /* StringIterator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B6B05F92AD1B66A001AC283 /* StringIterator.cpp */; };
 		7B6B05FB2AD1B66A001AC283 /* StringIterator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B6B05F92AD1B66A001AC283 /* StringIterator.cpp */; };
 		7B7C3BFE2A7C443D00FAD351 /* Hashing.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B7C3BFC2A7C443D00FAD351 /* Hashing.cpp */; };
+		7B7E5D1D2AE1CFCC008154F0 /* SCBuild.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B7E5D1C2AE1CFCC008154F0 /* SCBuild.cpp */; };
+		7B7E5D1E2AE1CFCC008154F0 /* SCBuild.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B7E5D1C2AE1CFCC008154F0 /* SCBuild.cpp */; };
 		7B84796D2ABF48700052020A /* HttpURLParser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B84796A2ABF48680052020A /* HttpURLParser.cpp */; };
 		7B872C4D29AFFC4900949BD2 /* Threading.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B872C4A29AFFC4900949BD2 /* Threading.cpp */; };
 		7B8BF9B129F3BADC0055BC3A /* SocketDescriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B8BF9AC29F3BADC0055BC3A /* SocketDescriptor.cpp */; };
@@ -278,6 +280,8 @@
 		7B7B53A22A2B254100FA751E /* SerializationStructuredReadWrite.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SerializationStructuredReadWrite.h; path = ../../../../Libraries/Serialization/SerializationStructuredReadWrite.h; sourceTree = "<group>"; };
 		7B7C3BFC2A7C443D00FAD351 /* Hashing.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Hashing.cpp; path = ../../../../Libraries/Hashing/Hashing.cpp; sourceTree = "<group>"; };
 		7B7C3BFD2A7C443D00FAD351 /* Hashing.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Hashing.h; path = ../../../../Libraries/Hashing/Hashing.h; sourceTree = "<group>"; };
+		7B7E5D1C2AE1CFCC008154F0 /* SCBuild.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SCBuild.cpp; path = ../../SCBuild.cpp; sourceTree = "<group>"; };
+		7B7E5D1F2AE1CFE2008154F0 /* SCBuild.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SCBuild.h; path = ../../SCBuild.h; sourceTree = "<group>"; };
 		7B81554B2AD2BAE700994FB7 /* SmallString.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SmallString.h; sourceTree = "<group>"; };
 		7B84796A2ABF48680052020A /* HttpURLParser.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = HttpURLParser.cpp; path = ../../../../Libraries/Http/HttpURLParser.cpp; sourceTree = "<group>"; };
 		7B84796C2ABF48680052020A /* HttpURLParser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HttpURLParser.h; path = ../../../../Libraries/Http/HttpURLParser.h; sourceTree = "<group>"; };
@@ -1053,6 +1057,8 @@
 				7B5119C5293C0DF60061646E /* SCConfig.h */,
 				7B583F6C2922ED2700FBE019 /* SCTestXCTest.mm */,
 				7B583F692922ECF900FBE019 /* SCTest.cpp */,
+				7B7E5D1F2AE1CFE2008154F0 /* SCBuild.h */,
+				7B7E5D1C2AE1CFCC008154F0 /* SCBuild.cpp */,
 				7B583F2E2922EC9F00FBE019 /* Libraries */,
 				7BD3FE492ABA596500BCC1EF /* Support */,
 				7BF4DF6728DE7A5E008CBB53 /* Products */,
@@ -1201,6 +1207,7 @@
 				7B319D302AB750C900F7E761 /* StringView.cpp in Sources */,
 				7BBD59B02ADBF4F30012E9C8 /* ThreadingTest.cpp in Sources */,
 				7B319D2F2AB750C900F7E761 /* StringBuilder.cpp in Sources */,
+				7B7E5D1D2AE1CFCC008154F0 /* SCBuild.cpp in Sources */,
 				7BBD59352ADBF1260012E9C8 /* BaseTest.cpp in Sources */,
 				7BBD59AE2ADBF4F30012E9C8 /* AtomicTest.cpp in Sources */,
 				7BBD594F2ADBF1C10012E9C8 /* HashingTest.cpp in Sources */,
@@ -1313,6 +1320,7 @@
 				7B50F9552ACA0CB700287DC9 /* Threading.cpp in Sources */,
 				7BBD598D2ADBF3550012E9C8 /* SerializationStructuredJsonTest.cpp in Sources */,
 				7BBD592E2ADBF0880012E9C8 /* FileSystemWatcherTest.cpp in Sources */,
+				7B7E5D1E2AE1CFCC008154F0 /* SCBuild.cpp in Sources */,
 				7B583F6D2922ED2700FBE019 /* SCTestXCTest.mm in Sources */,
 				7BBD59702ADBF2AA0012E9C8 /* AdditionalFile.cpp in Sources */,
 				7BBD59752ADBF2B10012E9C8 /* TestPluginParent.cpp in Sources */,

@@ -425,6 +425,7 @@
     <ClCompile Include="../../../../Libraries/Threading/Threading.cpp" />
     <ClCompile Include="../../../../Support/DebugVisualizers/DebugVisualizersTest.cpp" />
     <ClCompile Include="../../../../Tests/SCTest/SCTest.cpp" />
+    <ClCompile Include="..\..\SCBuild.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../../../../Libraries/Async/EventLoop.h" />
@@ -511,6 +512,7 @@
     <ClInclude Include="../../../../Libraries/Testing/Test.h" />
     <ClInclude Include="../../../../Libraries/Threading/Atomic.h" />
     <ClInclude Include="../../../../Libraries/Threading/Threading.h" />
+    <ClInclude Include="..\..\SCBuild.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="../../../../Libraries/Async/Internal/EventLoopApple.inl" />
@@ -546,6 +548,7 @@
     <None Include="../../../../Libraries/System/Internal/SystemWindows.inl" />
     <None Include="../../../../Libraries/Threading/Internal/ThreadingPosix.inl" />
     <None Include="../../../../Libraries/Threading/Internal/ThreadingWindows.inl" />
+    <None Include="..\..\SCBuild.bat" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="../../../../Support/DebugVisualizers/MSVC/SCMSVC.natvis" />

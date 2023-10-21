@@ -4,6 +4,12 @@
 #include "StringView.h"
 
 #include <stdlib.h> //atoi
+#include <string.h> //strlen
+
+SC::StringView SC::StringView::fromNullTerminated(const char* text, StringEncoding encoding)
+{
+    return StringView(text, ::strlen(text), true, encoding);
+}
 
 bool SC::StringView::parseInt32(int32_t& value) const
 {

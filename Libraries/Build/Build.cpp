@@ -87,7 +87,7 @@ SC::Result SC::Build::Definition::generate(StringView projectName, const Build::
     switch (parameters.generator)
     {
     case Build::Generator::XCode14: directory = "MacOS"; break;
-    case Build::Generator::VisualStudio2022: directory = "VisualStudio2022"; break;
+    case Build::Generator::VisualStudio2022: directory = "Windows"; break;
     }
     return Result(writer.write(testPath, projectName, directory));
 }
