@@ -1,8 +1,8 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../../Libraries/Build/Build.h"
-#include "../../Libraries/Foundation/Strings/StringBuilder.h"
+#include "Libraries/Build/Build.h"
+#include "Libraries/Foundation/Strings/StringBuilder.h"
 
 namespace SC
 {
@@ -29,12 +29,12 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
     // Configurations
     project.addPresetConfiguration(Configuration::Preset::Debug);
     project.addPresetConfiguration(Configuration::Preset::Release, "Release");
-    project.compile.addDefines({"SC_LIBRARY_PATH=$(PROJECT_DIR)/../../../..", "SC_COMPILER_ENABLE_CONFIG=1"});
+    project.compile.addDefines({"SC_LIBRARY_PATH=$(PROJECT_DIR)/../../..", "SC_COMPILER_ENABLE_CONFIG=1"});
     project.getConfiguration("Debug")->compile.addDefines({"DEBUG=1"});
     // TODO: These includes must be relative to rootDirectory
     project.compile.addIncludes({
-        "../../../../..",           // SC (for PluginTest)
-        "../../../../Tests/SCTest", // For SCConfig.h (enabled by SC_COMPILER_ENABLE_CONFIG == 1)
+        "../../../..",           // SC Root (for PluginTest)
+        "../../../Tests/SCTest", // For SCConfig.h (enabled by SC_COMPILER_ENABLE_CONFIG == 1)
     });
     if (parameters.platforms.contains(Build::Platform::MacOS))
     {
@@ -47,7 +47,7 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
     }
     for (Configuration& config : project.configurations)
     {
-        constexpr auto buildBase = "$(PROJECT_DIR)/../../../../_Build";
+        constexpr auto buildBase = "$(PROJECT_DIR)/../..";
         constexpr auto buildDir =
             "$(PLATFORM_DISPLAY_NAME)-$(MACOSX_DEPLOYMENT_TARGET)-$(ARCHS)-$(SC_GENERATOR)-$(CONFIGURATION)";
         StringBuilder(config.outputPath).format("{}/Output/{}", buildBase, buildDir);
@@ -85,6 +85,3 @@ Result generate(Build::Generator::Type generator, StringView targetDirectory, St
 }
 } // namespace SCBuild
 } // namespace SC
-
-// Build bootstrap defines main
-#include "../../Support/Build/BuildBootstrap.cpp"

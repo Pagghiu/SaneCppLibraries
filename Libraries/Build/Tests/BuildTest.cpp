@@ -5,18 +5,12 @@
 #include "../../FileSystem/Path.h"
 #include "../../Testing/Test.h"
 
-namespace SC
-{
-struct BuildTest;
-} // namespace SC
+// Include root build file to test project generation
+#include "../../../SCBuild.cpp"
 
 namespace SC
 {
-namespace SCBuild
-{
-[[nodiscard]] Result generate(Build::Generator::Type generator, StringView targetDirectory,
-                              StringView sourcesDirectory);
-}
+struct BuildTest;
 } // namespace SC
 
 struct SC::BuildTest : public SC::TestCase

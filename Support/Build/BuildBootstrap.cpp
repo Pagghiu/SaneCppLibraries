@@ -2,13 +2,21 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 
-#if not defined(SC_LIBRARY_PATH)
 #include "../../Libraries/FileSystem/Path.h"
 #include "../../Libraries/Foundation/Containers/SmallVector.h"
 #include "../../Libraries/Foundation/Strings/SmallString.h"
 #include "../../Libraries/System/Console.h"
 #include "../../Libraries/System/Time.h"
 
+#include "../../Bindings/cpp/SC.cpp"
+namespace SC
+{
+namespace SCBuild
+{
+Result configure(Build::Definition& definition, Build::Parameters& parameters, StringView rootDirectory);
+Result generate(Build::Generator::Type generator, StringView targetDirectory, StringView sourcesDirectory);
+} // namespace SCBuild
+} // namespace SC
 int main(int argc, const char* argv[])
 {
     using namespace SC;
@@ -69,4 +77,3 @@ int main(int argc, const char* argv[])
     SC_COMPILER_WARNING_POP;
     return 0;
 }
-#endif

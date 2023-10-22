@@ -534,8 +534,8 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                             SC_COMPILER_UNUSED(project);
                             builder.append("\t\t{}.{}|{}.ActiveCfg = {}|{}\n", projectGuid, configuration.name,
                                            platform, configuration.name, platform);
-                            builder.append("\t\t{}.{}|{}.Build.0 = {}|{}\n", projectGuid, configuration.name,
-                                           platform, configuration.name, platform);
+                            builder.append("\t\t{}.{}|{}.Build.0 = {}|{}\n", projectGuid, configuration.name, platform,
+                                           configuration.name, platform);
                             return true;
                         });
         builder.append("\tEndGlobalSection\n");
