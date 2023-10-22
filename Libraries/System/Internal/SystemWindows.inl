@@ -47,6 +47,10 @@ struct SC::SystemDebug::Internal
     // Loop all system handles and remotely close file handles inside given process that end with file name
     [[nodiscard]] static bool unlockFileFromProcess(SC::StringView theFile, DWORD processId)
     {
+        Path::ParsedView theFileParsed;
+        (void)Path::parse(theFile, theFileParsed, Path::Type::AsWindows);
+        auto theFileDirectory = theFile.sliceStartBytes(theFileParsed.root.sizeInBytes());
+
         SC::Vector<WCHAR> nameBuffer;
         SC_TRY(nameBuffer.resizeWithoutInitializing(USHRT_MAX));
 
@@ -149,12 +153,17 @@ struct SC::SystemDebug::Internal
             }
 
             const size_t nameLengthInBytes = pObjectNameInfo->Name.Length;
+            if (nameLengthInBytes == 0)
+                continue;
             wcsncpy_s(nameBuffer.data(), nameBuffer.size(), pObjectNameInfo->Name.Buffer,
                       nameLengthInBytes / sizeof(WCHAR));
             nameBuffer[nameLengthInBytes / sizeof(WCHAR)] = L'\0';
 
             StringView handleName = StringView(nameBuffer.data(), nameLengthInBytes, true);
-            if (handleName.endsWith(theFile))
+            // theFile          is something like              Y:\MyDir\Sub.pdb
+            // theFileDirectory is something like                 MyDir\Sub.pdb
+            // handleName       is something like \Device\Mup\Mac\MyDir\Sub.pdb
+            if (handleName.endsWith(theFileDirectory))
             {
                 CloseHandle(dupHandle);
                 deferDeleteDupHandle.disarm();
@@ -194,7 +203,8 @@ SC::Result SC::SystemDebug::unlockFileFromAllProcesses(SC::StringView fileName)
             UINT  nProcInfoNeeded;
             UINT  nProcInfo = 10;
 
-            RM_PROCESS_INFO rgpi[10];
+            RM_PROCESS_INFO rgpi[10] = {0};
+
             dwError = RmGetList(dwSession, &nProcInfoNeeded, &nProcInfo, rgpi, &dwReason);
             if (dwError == ERROR_SUCCESS)
             {
@@ -235,7 +245,8 @@ SC::Result SC::SystemDebug::deleteForcefullyUnlockedFile(SC::StringView fileName
                             FILE_FLAG_DELETE_ON_CLOSE,          // File attributes and flags
                             NULL                                // Template file handle
     );
-    SC_TRY_MSG(fd != INVALID_HANDLE_VALUE, "deleteForcefullyUnlockedFile CreateFileW failed");
+    if (fd == INVALID_HANDLE_VALUE)
+        return Result::Error("deleteForcefullyUnlockedFile CreateFileW failed");
     return Result(::CloseHandle(fd) == TRUE);
 }
 
