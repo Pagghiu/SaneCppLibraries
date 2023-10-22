@@ -211,9 +211,10 @@ struct SC::PathTest : public SC::TestCase
             SC_TEST_EXPECT(not Path::relativeFromTo("", "/a", path, Path::AsPosix));
             SC_TEST_EXPECT(not Path::relativeFromTo("", "", path, Path::AsPosix));
             SC_TEST_EXPECT(Path::relativeFromTo("/", "/a/b/c//", path, Path::AsPosix) and path == "a/b/c");
-            SC_TEST_EXPECT(Path::relativeFromTo("/a/b/1/2/3", "/a/b/d/e", path, Path::AsPosix) and
+            SC_TEST_EXPECT(Path::relativeFromTo("/a/b/1/2/3", "/a/b/d/e", path, Path::AsPosix, Path::AsPosix) and
                            path == "../../../d/e");
-            SC_TEST_EXPECT(Path::relativeFromTo("C:\\a\\b", "C:\\a\\c", path, Path::AsWindows, Path::AsWindows) and path == "..\\c");
+            SC_TEST_EXPECT(Path::relativeFromTo("C:\\a\\b", "C:\\a\\c", path, Path::AsWindows, Path::AsWindows) and
+                           path == "..\\c");
             SC_TEST_EXPECT(not Path::relativeFromTo("/a", "b/c", path, Path::AsPosix));
             SC_TEST_EXPECT(not Path::relativeFromTo("a", "/b/c", path, Path::AsPosix));
             SC_TEST_EXPECT(Path::relativeFromTo("/a/b", "/a/b", path, Path::AsPosix) and path == ".");
