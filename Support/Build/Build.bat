@@ -19,13 +19,13 @@ echo Building SCBuild.cpp...
 @echo off
 call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" x86_amd64
 @REM /permissive- allows usage of (and, or) operators with C++14
-cl.exe /nologo /std:c++14 /permissive- /EHsc /Fe"scbuild.exe" "%SCRIPT_DIR%/Support/Build/BuildBootstrap.cpp" "%SCRIPT_DIR%/SCBuild.cpp" /link Advapi32.lib Shell32.lib
+cl.exe /nologo /std:c++14 /permissive- /EHsc /Fe"SCBuild.exe" "%SCRIPT_DIR%/Support/Build/BuildBootstrap.cpp" "%SCRIPT_DIR%/SCBuild.cpp" /link Advapi32.lib Shell32.lib
 
 if %errorlevel% neq 0 (
     echo Error: Compilation failed.
     exit /b 1
 )
 
-call scbuild.exe --target "%PROJECTS_DIR%" --sources "%SCRIPT_DIR%"
+call SCBuild.exe --target "%PROJECTS_DIR%" --sources "%SCRIPT_DIR%"
 
 endlocal

@@ -5,8 +5,14 @@
 #include "../../FileSystem/Path.h"
 #include "../../Testing/Test.h"
 
-// Include root build file to test project generation
-#include "../../../SCBuild.cpp"
+namespace SC
+{
+namespace SCBuild
+{
+// Defined in SCBuild.cpp
+Result generate(Build::Generator::Type generator, StringView targetDirectory, StringView sourcesDirectory);
+} // namespace SCBuild
+} // namespace SC
 
 namespace SC
 {

@@ -47,11 +47,18 @@ const SC::Build::Configuration* SC::Build::Project::getConfiguration(StringView 
     return nullptr;
 }
 
-bool SC::Build::Project::addFiles(StringView subdirectory, StringView filter)
+bool SC::Build::Project::addDirectory(StringView subdirectory, StringView filter)
 {
     if (subdirectory.containsChar('*') or subdirectory.containsChar('?'))
         return false;
     return files.push_back({Project::File::Add, subdirectory, filter});
+}
+
+bool SC::Build::Project::addFile(StringView singleFile)
+{
+    if (singleFile.containsChar('*') or singleFile.containsChar('?'))
+        return false;
+    return files.push_back({Project::File::Add, {}, singleFile});
 }
 
 bool SC::Build::Project::removeFiles(StringView subdirectory, StringView filter)
@@ -130,6 +137,12 @@ SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const V
         }
     }
 
+    if (filters.size() == 1 and FileSystem().existsAndIsFile(path))
+    {
+        SC_TRY(filtersToFiles.getOrCreate(path)->push_back(path));
+        return Result(true);
+    }
+
     Vector<Project::File> renderedFilters;
     for (const auto& filter : filters)
     {
@@ -177,6 +190,16 @@ SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<Strin
             for (const Project::File& file : project.files)
             {
                 SC_TRY(buffer.assign(project.rootDirectory.view()));
+                if (file.base.view().isEmpty())
+                {
+                    if (not file.mask.isEmpty())
+                    {
+                        SC_TRY(Path::append(buffer, file.mask.view(), Path::AsPosix));
+                        auto* value = paths.getOrCreate(buffer);
+                        SC_TRY(value != nullptr and value->insert(file));
+                    }
+                    continue;
+                }
                 SC_TRY(Path::append(buffer, file.base.view(), Path::AsPosix));
                 // Some example cases:
                 // 1. /SC/Tests/SCTest

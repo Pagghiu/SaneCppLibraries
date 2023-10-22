@@ -57,7 +57,7 @@ struct SC::Build::WriterInternal
         for (const auto& file : project.files)
         {
             SC_TRY(Path::join(renderedFile, {project.rootDirectory.view(), file.base.view(), file.mask.view()},
-                              Path::Posix::SeparatorStringView()));
+                              Path::Posix::SeparatorStringView(), true)); // skipEmpty == true
             const auto* res = definitionCompiler.resolvedPaths.get(renderedFile.view());
             if (res)
             {

@@ -56,19 +56,20 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
     }
 
     // File overrides (order matters regarding to add / remove)
-    project.addFiles("Tests/SCTest", "*.cpp");             // add all test cpp files
-    project.addFiles("Tests/SCTest", "*.h");               // add all test header files
-    project.addFiles("Libraries", "**.cpp");               // recursively add all cpp files
-    project.addFiles("Libraries", "**.h");                 // recursively add all header files
-    project.addFiles("Libraries", "**.inl");               // recursively add all inline files
-    project.addFiles("Support/DebugVisualizers", "*.cpp"); // add debug visualizers
+    project.addFile("SCBuild.cpp");                            // add single build files
+    project.addDirectory("Tests/SCTest", "*.cpp");             // add all .cpp from SCTest directory
+    project.addDirectory("Tests/SCTest", "*.h");               // add all .h from SCTest directory
+    project.addDirectory("Libraries", "**.cpp");               // recursively add all cpp files
+    project.addDirectory("Libraries", "**.h");                 // recursively add all header files
+    project.addDirectory("Libraries", "**.inl");               // recursively add all inline files
+    project.addDirectory("Support/DebugVisualizers", "*.cpp"); // add debug visualizers
     if (parameters.generator == Build::Generator::VisualStudio2022)
     {
-        project.addFiles("Support/DebugVisualizers/MSVC", "*.natvis");
+        project.addDirectory("Support/DebugVisualizers/MSVC", "*.natvis");
     }
     else
     {
-        project.addFiles("Support/DebugVisualizers/LLDB", ".lldbinit");
+        project.addDirectory("Support/DebugVisualizers/LLDB", "*");
     }
     // Adding to workspace and definition
     workspace.projects.push_back(move(project));

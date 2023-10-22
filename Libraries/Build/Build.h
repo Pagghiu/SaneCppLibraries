@@ -320,7 +320,8 @@ struct Project
     [[nodiscard]] Configuration*       getConfiguration(StringView configurationName);
     [[nodiscard]] const Configuration* getConfiguration(StringView configurationName) const;
 
-    [[nodiscard]] bool addFiles(StringView subdirectory, StringView filter);
+    [[nodiscard]] bool addDirectory(StringView subdirectory, StringView filter);
+    [[nodiscard]] bool addFile(StringView singleFile);
 
     [[nodiscard]] bool removeFiles(StringView subdirectory, StringView filter);
 
