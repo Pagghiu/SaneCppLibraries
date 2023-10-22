@@ -2,7 +2,6 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Base/Compiler.h" //forward
 namespace SC
 {
 struct [[nodiscard]] Result

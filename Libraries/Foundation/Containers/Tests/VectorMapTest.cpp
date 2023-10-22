@@ -4,7 +4,6 @@
 #include "../VectorMap.h"
 #include "../../../Testing/Test.h"
 #include "../../Containers/Array.h"
-#include "../../Language/StrongID.h"
 #include "../../Strings/String.h"
 
 namespace SC
