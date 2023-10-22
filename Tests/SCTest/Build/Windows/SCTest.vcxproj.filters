@@ -426,7 +426,7 @@
     <ClInclude Include="../../../../Libraries/Threading/Threading.h">
       <Filter>Libraries\Threading</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\SCBuild.h">
+    <ClInclude Include="../../SCConfig.h">
       <Filter>Tests\SCTest</Filter>
     </ClInclude>
   </ItemGroup>
@@ -653,10 +653,10 @@
     <ClCompile Include="../../../../Support/DebugVisualizers/DebugVisualizersTest.cpp">
       <Filter>Support\DebugVisualizers</Filter>
     </ClCompile>
-    <ClCompile Include="../../../../Tests/SCTest/SCTest.cpp">
+    <ClCompile Include="../../SCBuild.cpp">
       <Filter>Tests\SCTest</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\SCBuild.cpp">
+    <ClCompile Include="../../SCTest.cpp">
       <Filter>Tests\SCTest</Filter>
     </ClCompile>
   </ItemGroup>
@@ -759,9 +759,6 @@
     </None>
     <None Include="../../../../Libraries/Threading/Internal/ThreadingWindows.inl">
       <Filter>Libraries\Threading\Internal</Filter>
-    </None>
-    <None Include="..\..\SCBuild.bat">
-      <Filter>Tests\SCTest</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

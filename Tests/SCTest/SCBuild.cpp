@@ -1,35 +1,40 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#include "../../Libraries/Build/Build.h"
 #include "../../Libraries/Foundation/Strings/StringBuilder.h"
-#include "SCBuild.h"
-SC::Result SC::SCBuild::configure(Build::Definition& definition, Build::Parameters& parameters,
-                                  StringView rootDirectory)
+
+namespace SC
+{
+namespace SCBuild
+{
+static constexpr SC::StringView PROJECT_NAME = "SCTest";
+
+Result configure(Build::Definition& definition, Build::Parameters& parameters, StringView rootDirectory)
 {
     using namespace Build;
     SC_COMPILER_WARNING_PUSH_UNUSED_RESULT; // Doing some optimistic coding here, ignoring all failures
 
     // Workspace overrides
     Workspace workspace;
-    workspace.name.assign("SCUnitTest");
+    workspace.name.assign(PROJECT_NAME);
 
     // Project
     Project project;
     project.targetType = TargetType::Executable;
-    project.name.assign("SCUnitTest");
-    project.targetName.assign("SCUnitTest");
+    project.name.assign(PROJECT_NAME);
+    project.targetName.assign(PROJECT_NAME);
     project.setRootDirectory(rootDirectory);
 
     // Configurations
     project.addPresetConfiguration(Configuration::Preset::Debug);
     project.addPresetConfiguration(Configuration::Preset::Release, "Release");
-    project.compile.addDefines({"SC_LIBRARY_PATH=$(PROJECT_DIR)/../../..", "SC_COMPILER_ENABLE_CONFIG=1"});
+    project.compile.addDefines({"SC_LIBRARY_PATH=$(PROJECT_DIR)/../../../..", "SC_COMPILER_ENABLE_CONFIG=1"});
     project.getConfiguration("Debug")->compile.addDefines({"DEBUG=1"});
     // TODO: These includes must be relative to rootDirectory
     project.compile.addIncludes({
-        "../../../..",           // Libraries
-        "../../../../..",        // SC (for PluginTest)
-        "../../../Tests/SCTest", // For SCConfig.h (enabled by SC_COMPILER_ENABLE_CONFIG == 1)
+        "../../../../..",           // SC (for PluginTest)
+        "../../../../Tests/SCTest", // For SCConfig.h (enabled by SC_COMPILER_ENABLE_CONFIG == 1)
     });
     if (parameters.platforms.contains(Build::Platform::MacOS))
     {
@@ -42,7 +47,7 @@ SC::Result SC::SCBuild::configure(Build::Definition& definition, Build::Paramete
     }
     for (Configuration& config : project.configurations)
     {
-        constexpr auto buildBase = "$(PROJECT_DIR)/../../../_Build";
+        constexpr auto buildBase = "$(PROJECT_DIR)/../../../../_Build";
         constexpr auto buildDir =
             "$(PLATFORM_DISPLAY_NAME)-$(MACOSX_DEPLOYMENT_TARGET)-$(ARCHS)-$(SC_GENERATOR)-$(CONFIGURATION)";
         StringBuilder(config.outputPath).format("{}/Output/{}", buildBase, buildDir);
@@ -51,7 +56,8 @@ SC::Result SC::SCBuild::configure(Build::Definition& definition, Build::Paramete
     }
 
     // File overrides (order matters regarding to add / remove)
-    project.addFiles("Tests/SCTest", "SCTest.cpp");        // add a single cpp files
+    project.addFiles("Tests/SCTest", "*.cpp");             // add all test cpp files
+    project.addFiles("Tests/SCTest", "*.h");               // add all test header files
     project.addFiles("Libraries", "**.cpp");               // recursively add all cpp files
     project.addFiles("Libraries", "**.h");                 // recursively add all header files
     project.addFiles("Libraries", "**.inl");               // recursively add all inline files
@@ -72,10 +78,13 @@ SC::Result SC::SCBuild::configure(Build::Definition& definition, Build::Paramete
     return Result(true);
 }
 
-SC::Result SC::SCBuild::generate(Build::Generator::Type generator, StringView targetDirectory,
-                                 StringView sourcesDirectory)
+Result generate(Build::Generator::Type generator, StringView targetDirectory, StringView sourcesDirectory)
 {
-    return SC::Build::ConfigurePresets::generateAllPlatforms(configure, "SCUnitTest", generator, targetDirectory, sourcesDirectory);
+    return Build::ConfigurePresets::generateAllPlatforms(configure, PROJECT_NAME, generator, targetDirectory,
+                                                         sourcesDirectory);
 }
+} // namespace SCBuild
+} // namespace SC
 
+// Build bootstrap defines main
 #include "../../Support/Build/BuildBootstrap.cpp"

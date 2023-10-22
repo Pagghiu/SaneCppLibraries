@@ -137,64 +137,55 @@
   <ImportGroup Label="Shared">
   </ImportGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
-    <TargetName>SCTest</TargetName>
-    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
+<TargetName>SCTest</TargetName>    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)..\..\..\..\_Build\Intermediate\$(ProjectName)\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</IntDir>
-    <IncludePath>..\..\..\SCTest;..\..\..\..\..;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\..\..;..\..\..\..\Tests\SCTest;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <TargetName>SCTest</TargetName>
-    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
+<TargetName>SCTest</TargetName>    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)..\..\..\..\_Build\Intermediate\$(ProjectName)\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</IntDir>
-    <IncludePath>..\..\..\SCTest;..\..\..\..\..;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\..\..;..\..\..\..\Tests\SCTest;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <TargetName>SCTest</TargetName>
-    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
+<TargetName>SCTest</TargetName>    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)..\..\..\..\_Build\Intermediate\$(ProjectName)\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</IntDir>
-    <IncludePath>..\..\..\SCTest;..\..\..\..\..;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\..\..;..\..\..\..\Tests\SCTest;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
-    <TargetName>SCTest</TargetName>
-    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
+<TargetName>SCTest</TargetName>    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)..\..\..\..\_Build\Intermediate\$(ProjectName)\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</IntDir>
-    <IncludePath>..\..\..\SCTest;..\..\..\..\..;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\..\..;..\..\..\..\Tests\SCTest;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <TargetName>SCTest</TargetName>
-    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
+<TargetName>SCTest</TargetName>    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)..\..\..\..\_Build\Intermediate\$(ProjectName)\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</IntDir>
-    <IncludePath>..\..\..\SCTest;..\..\..\..\..;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\..\..;..\..\..\..\Tests\SCTest;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <TargetName>SCTest</TargetName>
-    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
+<TargetName>SCTest</TargetName>    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)..\..\..\..\_Build\Intermediate\$(ProjectName)\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</IntDir>
-    <IncludePath>..\..\..\SCTest;..\..\..\..\..;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\..\..;..\..\..\..\Tests\SCTest;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug Clang|ARM64'">
-    <TargetName>SCTest</TargetName>
-    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
+<TargetName>SCTest</TargetName>    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)..\..\..\..\_Build\Intermediate\$(ProjectName)\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</IntDir>
-    <IncludePath>..\..\..\SCTest;..\..\..\..\..;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\..\..;..\..\..\..\Tests\SCTest;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug Clang|Win32'">
-    <TargetName>SCTest</TargetName>
-    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
+<TargetName>SCTest</TargetName>    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)..\..\..\..\_Build\Intermediate\$(ProjectName)\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</IntDir>
-    <IncludePath>..\..\..\SCTest;..\..\..\..\..;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\..\..;..\..\..\..\Tests\SCTest;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug Clang|x64'">
-    <TargetName>SCTest</TargetName>
-    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
+<TargetName>SCTest</TargetName>    <OutDir>$(ProjectDir)..\..\..\..\_Build\Output\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)..\..\..\..\_Build\Intermediate\$(ProjectName)\$(SDKIdentifier)-$(WindowsTargetPlatformVersion)-$(PlatformTarget)-msvc2022-$(Configuration)\</IntDir>
-    <IncludePath>..\..\..\SCTest;..\..\..\..\..;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\..\..;..\..\..\..\Tests\SCTest;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>DEBUG=1;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    <PreprocessorDefinitions>DEBUG=1;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <UseFullPaths>false</UseFullPaths>
@@ -212,7 +203,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>DEBUG=1;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    <PreprocessorDefinitions>DEBUG=1;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <UseFullPaths>false</UseFullPaths>
@@ -230,7 +221,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>DEBUG=1;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    <PreprocessorDefinitions>DEBUG=1;SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <UseFullPaths>false</UseFullPaths>
@@ -248,7 +239,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    <PreprocessorDefinitions>SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <UseFullPaths>false</UseFullPaths>
@@ -265,7 +256,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    <PreprocessorDefinitions>SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <UseFullPaths>false</UseFullPaths>
@@ -282,7 +273,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    <PreprocessorDefinitions>SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <UseFullPaths>false</UseFullPaths>
@@ -299,7 +290,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    <PreprocessorDefinitions>SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <UseFullPaths>false</UseFullPaths>
@@ -317,7 +308,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    <PreprocessorDefinitions>SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <UseFullPaths>false</UseFullPaths>
@@ -335,7 +326,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    <PreprocessorDefinitions>SC_LIBRARY_PATH=$(ProjectDir)..\..\..\..;SC_COMPILER_ENABLE_CONFIG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <UseFullPaths>false</UseFullPaths>
@@ -424,8 +415,8 @@
     <ClCompile Include="../../../../Libraries/Threading/Tests/ThreadingTest.cpp" />
     <ClCompile Include="../../../../Libraries/Threading/Threading.cpp" />
     <ClCompile Include="../../../../Support/DebugVisualizers/DebugVisualizersTest.cpp" />
-    <ClCompile Include="../../../../Tests/SCTest/SCTest.cpp" />
-    <ClCompile Include="..\..\SCBuild.cpp" />
+    <ClCompile Include="../../SCBuild.cpp" />
+    <ClCompile Include="../../SCTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../../../../Libraries/Async/EventLoop.h" />
@@ -512,7 +503,7 @@
     <ClInclude Include="../../../../Libraries/Testing/Test.h" />
     <ClInclude Include="../../../../Libraries/Threading/Atomic.h" />
     <ClInclude Include="../../../../Libraries/Threading/Threading.h" />
-    <ClInclude Include="..\..\SCBuild.h" />
+    <ClInclude Include="../../SCConfig.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="../../../../Libraries/Async/Internal/EventLoopApple.inl" />
@@ -548,7 +539,6 @@
     <None Include="../../../../Libraries/System/Internal/SystemWindows.inl" />
     <None Include="../../../../Libraries/Threading/Internal/ThreadingPosix.inl" />
     <None Include="../../../../Libraries/Threading/Internal/ThreadingWindows.inl" />
-    <None Include="..\..\SCBuild.bat" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="../../../../Support/DebugVisualizers/MSVC/SCMSVC.natvis" />

@@ -1,13 +1,22 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../../../Tests/SCTest/SCBuild.h"
+#include "../../Build/Build.h"
 #include "../../FileSystem/Path.h"
 #include "../../Testing/Test.h"
 
 namespace SC
 {
 struct BuildTest;
+} // namespace SC
+
+namespace SC
+{
+namespace SCBuild
+{
+[[nodiscard]] Result generate(Build::Generator::Type generator, StringView targetDirectory,
+                              StringView sourcesDirectory);
+}
 } // namespace SC
 
 struct SC::BuildTest : public SC::TestCase

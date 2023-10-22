@@ -19,6 +19,6 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-scbuild.exe --target "%SCRIPT_DIR%/Build2" --sources "%SCRIPT_DIR%/../.."
+scbuild.exe --target "%SCRIPT_DIR%/Build" --sources "%SCRIPT_DIR%/../.."
 
 endlocal

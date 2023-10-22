@@ -30,7 +30,7 @@ bool SC::SystemDirectories::init()
     SC_TRY(dladdr((void*)Memory::allocate, &dlinfo));
     const StringView path(dlinfo.dli_fname, ::strlen(dlinfo.dli_fname), true, StringEncoding::Utf8);
     SC_TRY(executableFile.assign(path));
-    SC_TRY(applicationRootDirectory.assign(Path::dirname(executableFile.view(), 3)));
+    SC_TRY(applicationRootDirectory.assign(Path::dirname(executableFile.view(), Path::Type::AsPosix, 3)));
     return true;
 #else
     SmallVector<char, StaticPathSize> data;
