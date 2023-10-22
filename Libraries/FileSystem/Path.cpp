@@ -389,13 +389,16 @@ SC::StringView SC::Path::Posix::basename(StringView input, StringView suffix)
 
 bool SC::Path::Posix::isAbsolute(StringView input) { return input.startsWithChar('/'); }
 
-bool SC::Path::join(String& output, Span<const StringView> inputs, StringView separator)
+bool SC::Path::join(String& output, Span<const StringView> inputs, StringView separator, bool skipEmpty)
 {
     StringBuilder sb(output, StringBuilder::Clear);
     const size_t  numElements = inputs.sizeInElements();
     for (size_t idx = 0; idx < numElements; ++idx)
     {
-        SC_TRY(sb.append(inputs.data()[idx]));
+        const StringView element = inputs.data()[idx];
+        if (skipEmpty and element.isEmpty())
+            continue;
+        SC_TRY(sb.append(element));
         if (idx + 1 != numElements)
         {
             SC_TRY(sb.append(separator));

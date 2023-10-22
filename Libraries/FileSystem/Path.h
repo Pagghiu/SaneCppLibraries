@@ -52,7 +52,7 @@ struct SC::Path
     };
 
     [[nodiscard]] static bool join(String& output, Span<const StringView> inputs,
-                                   StringView separator = SeparatorStringView());
+                                   StringView separator = SeparatorStringView(), bool skipEmpty = false);
     /// Splits a StringView of type "name.ext" into "name" and "ext"
     /// @param[in] input        An input path coded as UTF8 sequence (ex. "name.ext")
     /// @param[out] name         Output string holding name ("name" in "name.ext")
