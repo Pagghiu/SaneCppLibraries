@@ -2,10 +2,10 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Language/Function.h"
-#include "../Foundation/Language/Opaque.h"
-#include "../Foundation/Language/Result.h"
-#include "../Foundation/Strings/StringView.h"
+#include "../Foundation/Function.h"
+#include "../Foundation/Opaque.h"
+#include "../Foundation/Result.h"
+#include "../Strings/StringView.h"
 #include "Internal/Optional.h" // UniqueOptional
 
 namespace SC

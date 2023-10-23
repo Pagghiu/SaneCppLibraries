@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "Test.h"
-#include "../Foundation/Base/Assert.h"
+#include "../Foundation/Assert.h"
 #include "../System/Console.h"
 #include <stdlib.h> // exit
 #include <string.h> // strlen

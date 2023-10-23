@@ -4,9 +4,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include "../../Foundation/Strings/SmallString.h"
-#include "../../Foundation/Strings/StringBuilder.h"
-#include "../../Foundation/Strings/StringConverter.h"
+#include "../../Strings/SmallString.h"
+#include "../../Strings/StringBuilder.h"
+#include "../../Strings/StringConverter.h"
 #include "../../Threading/Threading.h"
 
 #include "../../Async/Internal/EventLoopWindows.h" // EventLoopWinOverlapped

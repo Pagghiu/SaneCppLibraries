@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../Internal/Optional.h"
-#include "../../Foundation/Strings/String.h"
+#include "../../Strings/String.h"
 #include "../../Testing/Test.h"
 
 namespace SC

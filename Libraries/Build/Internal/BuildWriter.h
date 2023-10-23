@@ -1,7 +1,7 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 #pragma once
-#include "../../Foundation/Algorithms/AlgorithmSort.h"
+#include "../../Algorithms/AlgorithmBubbleSort.h"
 #include "../Build.h"
 
 namespace SC
@@ -105,9 +105,9 @@ struct SC::Build::WriterInternal
                 return false;
             }
         }
-        bubbleSort(outputFiles.begin(), outputFiles.end(),
-                   [](const RenderItem& a1, const RenderItem& a2)
-                   { return a1.path.view().compare(a2.path.view()) == StringView::Comparison::Smaller; });
+        Algorithms::bubbleSort(outputFiles.begin(), outputFiles.end(),
+                               [](const RenderItem& a1, const RenderItem& a2)
+                               { return a1.path.view().compare(a2.path.view()) == StringView::Comparison::Smaller; });
         return true;
     }
 };

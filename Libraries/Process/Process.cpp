@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "Process.h"
-#include "../Foundation/Strings/StringConverter.h"
+#include "../Strings/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/ProcessWindows.inl"

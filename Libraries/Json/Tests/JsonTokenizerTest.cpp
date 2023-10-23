@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../JsonTokenizer.h"
-#include "../../Foundation/Containers/SmallVector.h"
-#include "../../Foundation/Strings/String.h"
+#include "../../Containers/SmallVector.h"
+#include "../../Strings/String.h"
 #include "../../Testing/Test.h"
 
 namespace SC

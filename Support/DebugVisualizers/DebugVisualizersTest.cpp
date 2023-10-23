@@ -1,12 +1,12 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../../Libraries/Foundation/Base/Memory.h"
-#include "../../Libraries/Foundation/Containers/ArenaMap.h"
-#include "../../Libraries/Foundation/Containers/SmallVector.h"
-#include "../../Libraries/Foundation/Containers/VectorMap.h"
-#include "../../Libraries/Foundation/Containers/VectorSet.h"
-#include "../../Libraries/Foundation/Strings/SmallString.h"
+#include "../../Libraries/Containers/ArenaMap.h"
+#include "../../Libraries/Containers/SmallVector.h"
+#include "../../Libraries/Containers/VectorMap.h"
+#include "../../Libraries/Containers/VectorSet.h"
+#include "../../Libraries/Foundation/Memory.h"
+#include "../../Libraries/Strings/SmallString.h"
 #include "../../Libraries/Testing/Test.h"
 
 namespace SC

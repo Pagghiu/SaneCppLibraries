@@ -5,7 +5,7 @@
 #include "../../FileSystem/FileSystem.h"
 #include "../../FileSystem/FileSystemWalker.h"
 #include "../../FileSystem/Path.h"
-#include "../../Foundation/Strings/StringBuilder.h"
+#include "../../Strings/StringBuilder.h"
 #include "../../Testing/Test.h"
 #include "../../Threading/Threading.h"
 

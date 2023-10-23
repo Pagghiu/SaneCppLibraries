@@ -3,8 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../File/FileDescriptor.h"
-#include "../Foundation/Language/Opaque.h"
-#include "../Foundation/Language/Result.h"
+#include "../Foundation/Opaque.h"
+#include "../Foundation/Result.h"
 #include "../System/Time.h" // IntegerMilliseconds
 
 namespace SC

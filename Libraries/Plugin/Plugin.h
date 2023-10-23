@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Containers/SmallVector.h"
-#include "../Foundation/Containers/VectorMap.h"
-#include "../Foundation/Strings/SmallString.h"
+#include "../Containers/SmallVector.h"
+#include "../Containers/VectorMap.h"
+#include "../Strings/SmallString.h"
 #include "../System/System.h"
 
 namespace SC

@@ -2,7 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../Hashing.h"
-#include "../../Foundation/Strings/StringBuilder.h"
+#include "../../Strings/StringBuilder.h"
+#include "../../Strings/String.h"
 #include "../../System/Console.h"
 #include "../../Testing/Test.h"
 

@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../System.h"
-#include "../../Foundation/Base/Limits.h"
+#include "../../Foundation/Limits.h"
 #include "../../Testing/Test.h"
 
 namespace SC

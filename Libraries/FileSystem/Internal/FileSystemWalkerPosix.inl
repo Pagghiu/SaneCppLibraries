@@ -3,9 +3,9 @@
 // All Rights Reserved. Reproduction is not allowed.
 // clang-format off
 #include "../FileSystemWalker.h"
-#include "../../Foundation/Strings/StringConverter.h"
-#include "../../Foundation/Strings/SmallString.h"
-#include "../../Foundation/Containers/SmallVector.h"
+#include "../../Strings/StringConverter.h"
+#include "../../Strings/SmallString.h"
+#include "../../Containers/SmallVector.h"
 
 // clang-format on
 #include <dirent.h>

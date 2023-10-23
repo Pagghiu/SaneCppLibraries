@@ -82,8 +82,8 @@ void runDebugVisualizersTest(TestReport& report);
 
 } // namespace SC
 
+#include "../../Libraries/Containers/SmallVector.h"
 #include "../../Libraries/FileSystem/Path.h"
-#include "../../Libraries/Foundation/Containers/SmallVector.h"
 #include "../../Libraries/System/Console.h"
 #include "../../Libraries/System/System.h"
 #include "../../Libraries/Testing/Test.h"

@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Language/Span.h"
+#include "../Foundation/Span.h"
 namespace SC
 {
 struct Hashing

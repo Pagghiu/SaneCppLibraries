@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Base/Types.h"
+#include "../Foundation/PrimitiveTypes.h"
 
 namespace SC
 {

@@ -1,7 +1,7 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../../Foundation/Containers/VectorMap.h"
+#include "../../Containers/VectorMap.h"
 namespace SC
 {
 template <typename Type, typename Union>

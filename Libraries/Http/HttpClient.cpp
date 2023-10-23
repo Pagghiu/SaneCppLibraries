@@ -5,8 +5,8 @@
 #include "../Socket/SocketDescriptor.h" // DNSResolver
 #include "HttpURLParser.h"
 
-#include "../Foundation/Strings/SmallString.h"
-#include "../Foundation/Strings/StringBuilder.h"
+#include "../Strings/SmallString.h"
+#include "../Strings/StringBuilder.h"
 
 SC::Result SC::HttpClient::get(EventLoop& loop, StringView url)
 {

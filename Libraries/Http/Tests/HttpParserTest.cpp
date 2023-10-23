@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../HttpParser.h"
-#include "../../Foundation/Strings/StringBuilder.h"
+#include "../../Strings/StringBuilder.h"
 #include "../../Testing/Test.h"
 namespace SC
 {

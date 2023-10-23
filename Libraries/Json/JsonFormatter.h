@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Strings/StringView.h"
+#include "../Strings/StringView.h"
 
 namespace SC
 {

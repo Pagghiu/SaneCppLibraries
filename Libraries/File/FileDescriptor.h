@@ -2,10 +2,10 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Language/Opaque.h"
-#include "../Foundation/Language/Result.h"
-#include "../Foundation/Language/Span.h"
-#include "../Foundation/Strings/StringView.h"
+#include "../Foundation/Opaque.h"
+#include "../Foundation/Result.h"
+#include "../Foundation/Span.h"
+#include "../Strings/StringView.h"
 
 namespace SC
 {

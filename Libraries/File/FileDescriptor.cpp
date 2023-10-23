@@ -9,7 +9,7 @@
 #include "Internal/FileDescriptorPosix.inl"
 #endif
 
-#include "../Foundation/Strings/String.h"
+#include "../Strings/String.h"
 
 SC::Result SC::PipeDescriptor::close()
 {

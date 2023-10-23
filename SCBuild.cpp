@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "Libraries/Build/Build.h"
-#include "Libraries/Foundation/Strings/StringBuilder.h"
+#include "Libraries/Strings/StringBuilder.h"
 
 namespace SC
 {

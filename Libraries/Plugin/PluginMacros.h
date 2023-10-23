@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Base/Memory.h"
-#include "../Foundation/Base/Types.h"
+#include "../Foundation/Memory.h"
+#include "../Foundation/PrimitiveTypes.h"
 
 //
 // SC_PLUGIN_EXPORT

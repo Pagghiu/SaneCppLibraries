@@ -2,10 +2,10 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "Path.h"
-#include "../Foundation/Containers/Vector.h"
-#include "../Foundation/Language/Result.h"
-#include "../Foundation/Strings/SmallString.h"
-#include "../Foundation/Strings/StringBuilder.h"
+#include "../Containers/Vector.h"
+#include "../Foundation/Result.h"
+#include "../Strings/SmallString.h"
+#include "../Strings/StringBuilder.h"
 
 struct SC::Path::Internal
 {

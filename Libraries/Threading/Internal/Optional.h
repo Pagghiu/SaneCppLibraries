@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../../Foundation/Language/MetaProgramming.h" // Conditional
+#include "../../Foundation/TypeTraits.h" // Conditional
 
 namespace SC
 {

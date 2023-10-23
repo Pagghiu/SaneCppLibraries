@@ -3,8 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Async/EventLoop.h"
-#include "../Foundation/Containers/SmallVector.h"
-#include "../Foundation/Strings/String.h"
+#include "../Containers/SmallVector.h"
+#include "../Strings/String.h"
 namespace SC
 {
 struct HttpClient;

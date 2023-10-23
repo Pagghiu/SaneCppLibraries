@@ -3,9 +3,9 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 
-#include "../Foundation/Containers/IntrusiveDoubleLinkedList.h"
-#include "../Foundation/Language/Function.h"
-#include "../Foundation/Language/Span.h"
+#include "../Containers/IntrusiveDoubleLinkedList.h"
+#include "../Foundation/Function.h"
+#include "../Foundation/Span.h"
 #include "../System/Time.h"
 #include "../Threading/Atomic.h"
 

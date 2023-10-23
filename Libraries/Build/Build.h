@@ -2,11 +2,11 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Containers/Array.h"
-#include "../Foundation/Containers/VectorSet.h"
-#include "../Foundation/Language/Result.h"
-#include "../Foundation/Language/TaggedUnion.h"
-#include "../Foundation/Strings/String.h"
+#include "../Containers/Array.h"
+#include "../Containers/VectorSet.h"
+#include "../Foundation/Result.h"
+#include "../Foundation/TaggedUnion.h"
+#include "../Strings/String.h"
 #include "Internal/TaggedMap.h"
 
 namespace SC

@@ -15,7 +15,7 @@
 #ifndef SC_FILESYSTEM_WINDOWS_USE_SHELL_OPERATIONS
 #define SC_FILESYSTEM_WINDOWS_USE_SHELL_OPERATIONS 1
 #elif SC_FILESYSTEM_WINDOWS_USE_SHELL_OPERATIONS
-#include "../../Foundation/Containers/SmallVector.h"
+#include "../../Containers/SmallVector.h"
 #include "../FileSystemWalker.h"
 #endif
 

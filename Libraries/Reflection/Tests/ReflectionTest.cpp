@@ -1,9 +1,9 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../../Foundation/Containers/Array.h"
-#include "../../Foundation/Containers/Vector.h"
-#include "../../Foundation/Strings/StringBuilder.h"
+#include "../../Containers/Array.h"
+#include "../../Containers/Vector.h"
+#include "../../Strings/StringBuilder.h"
 #include "../../Testing/Test.h"
 #include "../ReflectionFlatSchemaCompiler.h"
 #include "../ReflectionSC.h"

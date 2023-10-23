@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "HttpServer.h"
-#include "../Foundation/Strings/SmallString.h"
-#include "../Foundation/Strings/StringBuilder.h"
+#include "../Strings/SmallString.h"
+#include "../Strings/StringBuilder.h"
 
 // HttpServer::Request
 bool SC::HttpServer::Request::find(HttpParser::Result result, StringView& res) const

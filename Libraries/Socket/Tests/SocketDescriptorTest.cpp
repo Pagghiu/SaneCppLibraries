@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../SocketDescriptor.h"
-#include "../../Foundation/Strings/SmallString.h"
+#include "../../Strings/SmallString.h"
 #include "../../Testing/Test.h"
 #include "../../Threading/Threading.h"
 

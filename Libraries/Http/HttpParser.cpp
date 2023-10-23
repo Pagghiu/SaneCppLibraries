@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "HttpParser.h"
-#include "../Foundation/Language/Span.h"
-#include "../Foundation/Strings/StringView.h"
+#include "../Foundation/Span.h"
+#include "../Strings/StringView.h"
 
 // https://www.chiark.greenend.org.uk/~sgtatham/coroutines.html
 #if SC_COMPILER_MSVC

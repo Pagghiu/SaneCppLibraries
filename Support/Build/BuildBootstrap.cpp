@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 
+#include "../../Libraries/Containers/SmallVector.h"
 #include "../../Libraries/FileSystem/Path.h"
-#include "../../Libraries/Foundation/Containers/SmallVector.h"
-#include "../../Libraries/Foundation/Strings/SmallString.h"
+#include "../../Libraries/Strings/SmallString.h"
 #include "../../Libraries/System/Console.h"
 #include "../../Libraries/System/Time.h"
 

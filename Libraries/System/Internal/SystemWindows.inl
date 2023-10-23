@@ -1,10 +1,10 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#include "../../Containers/SmallVector.h"
 #include "../../FileSystem/Path.h"
-#include "../../Foundation/Containers/SmallVector.h"
-#include "../../Foundation/Strings/StringBuilder.h"
-#include "../../Foundation/Strings/StringConverter.h"
+#include "../../Strings/StringBuilder.h"
+#include "../../Strings/StringConverter.h"
 #include "../../Threading/Atomic.h"
 #include "../System.h"
 

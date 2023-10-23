@@ -4,8 +4,8 @@
 #include "../../FileSystem/FileSystem.h"
 #include "../../FileSystem/FileSystemWalker.h"
 #include "../../FileSystem/Path.h"
-#include "../../Foundation/Strings/StringBuilder.h"
 #include "../../Hashing/Hashing.h"
+#include "../../Strings/StringBuilder.h"
 #include "../Build.h"
 #include "BuildWriter.h"
 

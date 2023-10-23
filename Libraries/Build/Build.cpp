@@ -5,7 +5,7 @@
 #include "Internal/BuildWriterVisualStudio.inl"
 #include "Internal/BuildWriterXCode.inl"
 
-#include "../Foundation/Containers/SmallVector.h"
+#include "../Containers/SmallVector.h"
 
 bool SC::Build::Project::setRootDirectory(StringView file)
 {

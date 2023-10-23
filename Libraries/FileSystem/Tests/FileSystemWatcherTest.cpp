@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../FileSystemWatcher.h"
-#include "../../Foundation/Strings/StringBuilder.h"
+#include "../../Strings/StringBuilder.h"
 #include "../../Testing/Test.h"
 #include "../FileSystem.h"
 #include "../Path.h"

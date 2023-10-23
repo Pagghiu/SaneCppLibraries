@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "EventLoop.h"
-#include "../Foundation/Language/Result.h"
+#include "../Foundation/Result.h"
 #include "../Threading/Threading.h" // EventObject
 
 #if SC_PLATFORM_WINDOWS

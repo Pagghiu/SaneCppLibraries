@@ -3,10 +3,10 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 
+#include "../Containers/IntrusiveDoubleLinkedList.h"
 #include "../File/FileDescriptor.h"
-#include "../Foundation/Containers/IntrusiveDoubleLinkedList.h"
-#include "../Foundation/Language/Function.h"
-#include "../Foundation/Strings/SmallString.h"
+#include "../Foundation/Function.h"
+#include "../Strings/SmallString.h"
 #include "ProcessDescriptor.h"
 
 namespace SC

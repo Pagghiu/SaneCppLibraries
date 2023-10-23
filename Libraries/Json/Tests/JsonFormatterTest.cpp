@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../JsonFormatter.h"
-#include "../../Foundation/Containers/SmallVector.h"
-#include "../../Foundation/Strings/String.h"
-#include "../../Foundation/Strings/StringConverter.h"
+#include "../../Containers/SmallVector.h"
+#include "../../Strings/String.h"
+#include "../../Strings/StringConverter.h"
 #include "../../Testing/Test.h"
 
 namespace SC
