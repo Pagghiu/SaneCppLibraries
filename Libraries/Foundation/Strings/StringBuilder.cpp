@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../Strings/StringBuilder.h"
+#include "../Language/Result.h"
 #include "../Strings/String.h"
 #include "../Strings/StringConverter.h"
 namespace SC

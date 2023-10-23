@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/Language/Opaque.h"
+#include "../Foundation/Language/Result.h"
 #include "../Foundation/Strings/SmallString.h"
 
 namespace SC

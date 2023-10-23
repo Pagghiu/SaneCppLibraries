@@ -185,8 +185,10 @@ struct SC::ArenaMap
             return false;
         if (newSize > Key::MaxIndex)
             return false;
-        SC_TRY(items.resize(newSize));
-        SC_TRY(generations.resize(newSize));
+        if (not items.resize(newSize))
+            return false;
+        if (not generations.resize(newSize))
+            return false;
         numUsed = 0;
         return true;
     }

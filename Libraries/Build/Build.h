@@ -4,6 +4,7 @@
 #pragma once
 #include "../Foundation/Containers/Array.h"
 #include "../Foundation/Containers/VectorSet.h"
+#include "../Foundation/Language/Result.h"
 #include "../Foundation/Language/TaggedUnion.h"
 #include "../Foundation/Strings/String.h"
 #include "Internal/TaggedMap.h"

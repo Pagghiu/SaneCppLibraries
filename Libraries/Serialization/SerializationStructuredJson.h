@@ -2,10 +2,10 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Foundation/Language/Result.h"
 #include "../Foundation/Strings/SmallString.h"
 #include "../Foundation/Strings/StringBuilder.h"
 #include "../Json/JsonTokenizer.h"
-
 namespace SC
 {
 namespace SerializationStructuredTemplate

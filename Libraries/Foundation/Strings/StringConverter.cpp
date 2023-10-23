@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 
 #include "StringConverter.h"
+#include "../Language/Result.h"
 #include "String.h"
 
 #if SC_PLATFORM_WINDOWS

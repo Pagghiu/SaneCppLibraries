@@ -6,7 +6,6 @@
 #include "../Base/Limits.h"
 #include "../Base/Memory.h"
 #include "../Base/Types.h"
-#include "../Language/Result.h"
 #include "Segment.h"
 
 namespace SC
@@ -420,7 +419,7 @@ bool SC::Vector<T>::append(Span<const U> src)
     }
     if (oldSize + src.sizeInElements() != size())
     {
-        SC_TRUST_RESULT(resize(oldSize));
+        SC_ASSERT_RELEASE(resize(oldSize));
         return false;
     }
     return true;

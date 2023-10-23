@@ -237,7 +237,7 @@ void StringFormatOutput::onFormatFailed()
 {
     if (data != nullptr)
     {
-        SC_TRUST_RESULT(data->resize(backupSize));
+        SC_ASSERT_RELEASE(data->resize(backupSize));
     }
 }
 
