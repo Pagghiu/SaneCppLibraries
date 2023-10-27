@@ -14,13 +14,33 @@
 
 #ifndef SC_FILESYSTEM_WINDOWS_USE_SHELL_OPERATIONS
 #define SC_FILESYSTEM_WINDOWS_USE_SHELL_OPERATIONS 1
-#elif SC_FILESYSTEM_WINDOWS_USE_SHELL_OPERATIONS
+#elif !SC_FILESYSTEM_WINDOWS_USE_SHELL_OPERATIONS
 #include "../../Containers/SmallVector.h"
-#include "../FileSystemWalker.h"
+#include "../../FileSystemIterator/FileSystemIterator.h"
 #endif
 
 namespace SC
 {
+struct UtilityWindows
+{
+    [[nodiscard]] static Result formatWindowsError(int errorNumber, String& buffer)
+    {
+        LPWSTR messageBuffer = nullptr;
+        size_t size          = FormatMessageW(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
+            errorNumber, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), reinterpret_cast<LPWSTR>(&messageBuffer), 0, NULL);
+        auto deferFree = MakeDeferred([&]() { LocalFree(messageBuffer); });
+
+        const StringView sv = StringView(Span<const wchar_t>(messageBuffer, size), true);
+        if (not buffer.assign(sv))
+        {
+            return Result::Error("UtilityWindows::formatWindowsError - returned error");
+        }
+        return Result(true);
+    }
+};
+
+
 
 static constexpr const SC::Result getErrorCode(int errorCode)
 {
@@ -151,8 +171,8 @@ struct SC::FileSystem::Internal
         const int res  = SHFileOperationW(&shFileOp);
         return Result(res == 0);
 #else
-        FileSystemWalker fsWalker;
-        StringView       sourceView = sourceDirectory.view();
+        FileSystemIterator fsWalker;
+        StringView         sourceView = sourceDirectory.view();
         SC_TRY(fsWalker.init(sourceView));
         fsWalker.options.recursive        = true;
         StringNative<512> destinationPath = StringEncoding::Native;
@@ -162,9 +182,10 @@ struct SC::FileSystem::Internal
         }
         while (fsWalker.enumerateNext())
         {
-            const FileSystemWalker::Entry& entry       = fsWalker.get();
-            StringView                     partialPath = entry.path.sliceStartBytes(sourceView.sizeInBytes());
-            StringConverter                destinationConvert(destinationPath, StringConverter::Clear);
+            const FileSystemIterator::Entry& entry = fsWalker.get();
+
+            const StringView partialPath = entry.path.sliceStartBytes(sourceView.sizeInBytes());
+            StringConverter  destinationConvert(destinationPath, StringConverter::Clear);
             SC_TRY(destinationConvert.appendNullTerminated(destinationDirectory.view()));
             SC_TRY(destinationConvert.appendNullTerminated(partialPath));
             if (entry.isDirectory())
@@ -203,13 +224,13 @@ struct SC::FileSystem::Internal
         const int res  = SHFileOperationW(&shFileOp);
         return Result(res == 0);
 #else
-        FileSystemWalker fsWalker;
+        FileSystemIterator fsWalker;
         SC_TRY(fsWalker.init(sourceDirectory.view()));
         fsWalker.options.recursive = true;
         SmallVector<StringNative<512>, 64> emptyDirectories;
         while (fsWalker.enumerateNext())
         {
-            const FileSystemWalker::Entry& entry = fsWalker.get();
+            const FileSystemIterator::Entry& entry = fsWalker.get();
             if (entry.isDirectory())
             {
                 SC_TRY(emptyDirectories.push_back(entry.path));
@@ -252,8 +273,9 @@ struct SC::FileSystem::Internal
 
     [[nodiscard]] static Result setLastModifiedTime(const wchar_t* file, AbsoluteTime time)
     {
-        HANDLE         hFile          = CreateFileW(file, FILE_WRITE_ATTRIBUTES, FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
-                                                    FILE_ATTRIBUTE_NORMAL, NULL);
+        HANDLE hFile = CreateFileW(file, FILE_WRITE_ATTRIBUTES, FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+                                   FILE_ATTRIBUTE_NORMAL, NULL);
+
         FileDescriptor deferFileClose = hFile;
         SC_TRY_MSG(deferFileClose.isValid(), "setLastModifiedTime: Invalid file");
 

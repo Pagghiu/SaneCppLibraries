@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../../FileSystem/FileSystem.h"
-#include "../../FileSystem/FileSystemWalker.h"
 #include "../../FileSystem/Path.h"
+#include "../../FileSystemIterator/FileSystemIterator.h"
 #include "../../Hashing/Hashing.h"
 #include "../../Strings/StringBuilder.h"
 #include "../Build.h"

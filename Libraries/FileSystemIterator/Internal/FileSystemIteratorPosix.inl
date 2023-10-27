@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 // clang-format off
-#include "../FileSystemWalker.h"
+#include "../FileSystemIterator.h"
 #include "../../Strings/StringConverter.h"
 #include "../../Strings/SmallString.h"
 #include "../../Containers/SmallVector.h"
@@ -22,7 +22,7 @@ namespace SC
 SC::Result getErrorCode(int errorCode); // defined in FileSystemInternalPosix.inl
 }
 
-struct SC::FileSystemWalker::Internal
+struct SC::FileSystemIterator::Internal
 {
     struct StackEntry
     {

@@ -4,8 +4,8 @@
 #include "Plugin.h"
 
 #include "../FileSystem/FileSystem.h"
-#include "../FileSystem/FileSystemWalker.h"
 #include "../FileSystem/Path.h"
+#include "../FileSystemIterator/FileSystemIterator.h"
 #include "../Process/Process.h"
 #include "../Strings/StringBuilder.h"
 #include "../Threading/Threading.h"
@@ -148,9 +148,9 @@ bool SC::PluginDefinition::parseLine(StringIteratorASCII& iterator, StringView& 
 
 SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Vector<PluginDefinition>& definitions)
 {
-    FileSystemWalker walker;
-    walker.options.recursive = false; // Manually recurse only first level dirs
-    SC_TRY(walker.init(directory));
+    FileSystemIterator fsIterator;
+    fsIterator.options.recursive = false; // Manually recurse only first level dirs
+    SC_TRY(fsIterator.init(directory));
     FileSystem fs;
     SC_TRY(fs.init(directory));
     bool multiplePluginDefinitions = false;
@@ -159,12 +159,12 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Vector<P
     // Both no plugin definition (identity.identifier.isEmpty()) and multiple
     // contradictory plugin definitions (multiplePluginDefinitions) will prevent creation of the Plugin Definition
     String file;
-    while (walker.enumerateNext())
+    while (fsIterator.enumerateNext())
     {
-        const auto& item = walker.get();
+        const auto& item = fsIterator.get();
         if (item.isDirectory() and item.level == 0) // only recurse first level
         {
-            SC_TRY(walker.recurseSubdirectory());
+            SC_TRY(fsIterator.recurseSubdirectory());
             const StringView pluginDirectory = item.path;
             if (definitions.isEmpty() or not definitions.back().identity.identifier.isEmpty())
             {
@@ -215,7 +215,7 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Vector<P
             SC_TRY(definitions.pop_back());
         }
     }
-    return walker.checkErrors();
+    return fsIterator.checkErrors();
 }
 
 SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
@@ -229,13 +229,13 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
     bool found = false;
     for (const StringView& base : root)
     {
-        FileSystemWalker fswalker;
-        SC_TRY(fswalker.init(base));
-        while (fswalker.enumerateNext())
+        FileSystemIterator fsfsIterator;
+        SC_TRY(fsfsIterator.init(base));
+        while (fsfsIterator.enumerateNext())
         {
-            if (fswalker.get().isDirectory())
+            if (fsfsIterator.get().isDirectory())
             {
-                const StringView candidate = fswalker.get().name;
+                const StringView candidate = fsfsIterator.get().name;
                 StringBuilder    compilerBuilder(compiler.compilerPath, StringBuilder::Clear);
                 SC_TRY(compilerBuilder.append(base));
                 SC_TRY(compilerBuilder.append(L"/"));

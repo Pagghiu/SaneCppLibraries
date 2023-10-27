@@ -31,7 +31,7 @@ void runFileDescriptorTest(TestReport& report);
 
 // FileSystem
 void runFileSystemTest(TestReport& report);
-void runFileSystemWalkerTest(TestReport& report);
+void runFileSystemIteratorTest(TestReport& report);
 void runFileSystemWatcherTest(TestReport& report);
 void runPathTest(TestReport& report);
 
@@ -139,7 +139,7 @@ int main(int argc, const char* argv[])
 
     // FileSystem tests
     runFileSystemTest(report);
-    runFileSystemWalkerTest(report);
+    runFileSystemIteratorTest(report);
     runFileSystemWatcherTest(report);
     runPathTest(report);
 

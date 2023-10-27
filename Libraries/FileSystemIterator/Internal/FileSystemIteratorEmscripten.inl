@@ -1,9 +1,9 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../FileSystemWalker.h"
+#include "../FileSystemIterator.h"
 
-struct SC::FileSystemWalker::Internal
+struct SC::FileSystemIterator::Internal
 {
     Internal() {}
     ~Internal() {}

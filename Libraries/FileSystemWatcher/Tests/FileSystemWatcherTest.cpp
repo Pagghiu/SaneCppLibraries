@@ -2,10 +2,10 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../FileSystemWatcher.h"
+#include "../../FileSystem/FileSystem.h"
+#include "../../FileSystem/Path.h"
 #include "../../Strings/StringBuilder.h"
 #include "../../Testing/Test.h"
-#include "../FileSystem.h"
-#include "../Path.h"
 
 namespace SC
 {

@@ -7,9 +7,9 @@
 #include "../Foundation/Assert.h"
 #include "../Foundation/InitializerList.h"
 #include "../Foundation/Limits.h"
-#include "../Foundation/TypeTraits.h" // EnableIf, IsTriviallyCopyable
-#include "../Foundation/Span.h"
 #include "../Foundation/PrimitiveTypes.h"
+#include "../Foundation/Span.h"
+#include "../Foundation/TypeTraits.h" // EnableIf, IsTriviallyCopyable
 
 namespace SC
 {

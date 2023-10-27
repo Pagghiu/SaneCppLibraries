@@ -115,7 +115,7 @@ struct SC::FileSystem::Internal
     }
 #if __APPLE__
     // TODO: We should add a version of copyfile/clonefile that uses the file descriptors already opened by the file
-    // walker
+    // fsIterator
     [[nodiscard]] static bool copyFile(const StringView& source, const StringView& destination,
                                        FileSystem::CopyFlags options, bool isDirectory = false)
     {

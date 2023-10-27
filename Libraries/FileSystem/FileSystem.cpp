@@ -6,7 +6,6 @@
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/FileSystemWindows.inl"
-#include "Internal/UtilityWindows.inl"
 #elif SC_PLATFORM_EMSCRIPTEN
 #include "Internal/FileSystemEmscripten.inl"
 #else

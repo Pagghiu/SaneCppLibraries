@@ -1,32 +1,32 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "FileSystemWalker.h"
+#include "FileSystemIterator.h"
 #include <string.h> //strlen
 #if SC_PLATFORM_WINDOWS
-#include "Internal/FileSystemWalkerWindows.inl"
+#include "Internal/FileSystemIteratorWindows.inl"
 #elif SC_PLATFORM_EMSCRIPTEN
-#include "Internal/FileSystemWalkerEmscripten.inl"
+#include "Internal/FileSystemIteratorEmscripten.inl"
 #else
-#include "Internal/FileSystemWalkerPosix.inl"
+#include "Internal/FileSystemIteratorPosix.inl"
 #endif
 
 template <>
-void SC::OpaqueFuncs<SC::FileSystemWalker::InternalTraits>::construct(Handle& buffer)
+void SC::OpaqueFuncs<SC::FileSystemIterator::InternalTraits>::construct(Handle& buffer)
 {
     new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object();
 }
 template <>
-void SC::OpaqueFuncs<SC::FileSystemWalker::InternalTraits>::destruct(Object& obj)
+void SC::OpaqueFuncs<SC::FileSystemIterator::InternalTraits>::destruct(Object& obj)
 {
     obj.~Object();
 }
 
-SC::FileSystemWalker::~FileSystemWalker() {}
+SC::FileSystemIterator::~FileSystemIterator() {}
 
-[[nodiscard]] SC::Result SC::FileSystemWalker::init(StringView directory) { return internal.get().init(directory); }
+[[nodiscard]] SC::Result SC::FileSystemIterator::init(StringView directory) { return internal.get().init(directory); }
 
-[[nodiscard]] SC::Result SC::FileSystemWalker::enumerateNext()
+[[nodiscard]] SC::Result SC::FileSystemIterator::enumerateNext()
 {
     Result res = internal.get().enumerateNext(currentEntry, options);
     if (not res)
@@ -41,7 +41,7 @@ SC::FileSystemWalker::~FileSystemWalker() {}
     return res;
 }
 
-[[nodiscard]] SC::Result SC::FileSystemWalker::recurseSubdirectory()
+[[nodiscard]] SC::Result SC::FileSystemIterator::recurseSubdirectory()
 {
     if (options.recursive)
     {

@@ -9,9 +9,9 @@
 #include "../../Strings/StringBuilder.h"
 #include "../../Strings/StringConverter.h"
 
-#include "../FileSystemWalker.h"
+#include "../FileSystemIterator.h"
 
-struct SC::FileSystemWalker::Internal
+struct SC::FileSystemIterator::Internal
 {
     struct StackEntry
     {

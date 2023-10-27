@@ -55,8 +55,8 @@ struct SC::StringConverter
 
   private:
     void internalClear();
-    // TODO: FileSystemWalker should just use a Vector<char>
-    friend struct FileSystemWalker;
+    // TODO: FileSystemIterator should just use a Vector<char>
+    friend struct FileSystemIterator;
     [[nodiscard]] bool        setTextLengthInBytesIncludingTerminator(size_t newDataSize);
     [[nodiscard]] static bool convertSameEncoding(StringView text, Vector<char>& buffer, StringView* encodedText,
                                                   NullTermination terminate);

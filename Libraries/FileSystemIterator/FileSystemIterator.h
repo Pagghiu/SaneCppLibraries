@@ -9,10 +9,10 @@
 
 namespace SC
 {
-struct FileSystemWalker;
+struct FileSystemIterator;
 } // namespace SC
 
-struct SC::FileSystemWalker
+struct SC::FileSystemIterator
 {
     enum class Type
     {
@@ -36,7 +36,7 @@ struct SC::FileSystemWalker
 
     Options options;
 
-    ~FileSystemWalker();
+    ~FileSystemIterator();
 
     const Entry& get() const { return currentEntry; }
 

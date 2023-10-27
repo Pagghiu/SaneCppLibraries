@@ -153,17 +153,17 @@ SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const V
         SC_TRY(renderedFilters.push_back(move(file)));
     }
 
-    FileSystemWalker walker;
-    walker.options.forwardSlashes = true;
-    SC_TRY(walker.init(path));
+    FileSystemIterator fsIterator;
+    fsIterator.options.forwardSlashes = true;
+    SC_TRY(fsIterator.init(path));
 
-    while (walker.enumerateNext())
+    while (fsIterator.enumerateNext())
     {
-        auto& item = walker.get();
+        auto& item = fsIterator.get();
         if (doRecurse and item.isDirectory())
         {
             // TODO: Check if it's possible to optimize entire subdirectory out in some cases
-            SC_TRY(walker.recurseSubdirectory());
+            SC_TRY(fsIterator.recurseSubdirectory());
         }
         else
         {
@@ -176,7 +176,7 @@ SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const V
             }
         }
     }
-    return walker.checkErrors();
+    return fsIterator.checkErrors();
 }
 
 // Collects root paths to build a stat map

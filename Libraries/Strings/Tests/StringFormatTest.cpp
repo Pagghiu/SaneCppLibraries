@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../../Testing/Test.h"
-#include "../StringBuilder.h"
 #include "../String.h"
+#include "../StringBuilder.h"
 
 namespace SC
 {
