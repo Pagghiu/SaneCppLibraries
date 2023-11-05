@@ -3,14 +3,6 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 
-#if SC_META_ENABLE_AUTO_REFLECTION
-#if SC_LANGUAGE_CPP_LESS_THAN_20
-#include "ReflectionAutoAggregates.h"
-#else
-#include "ReflectionAutoStructured.h"
-#endif
-#endif
-
 #include "../Foundation/Limits.h" // MaxValue
 #include "ReflectionFoundation.h"
 #include "ReflectionMetaType.h"

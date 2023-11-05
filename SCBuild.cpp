@@ -62,6 +62,7 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
     project.addDirectory("Libraries", "**.cpp");               // recursively add all cpp files
     project.addDirectory("Libraries", "**.h");                 // recursively add all header files
     project.addDirectory("Libraries", "**.inl");               // recursively add all inline files
+    project.addDirectory("LibrariesExtra", "**.h");            // recursively add all header files
     project.addDirectory("Support/DebugVisualizers", "*.cpp"); // add debug visualizers
     if (parameters.generator == Build::Generator::VisualStudio2022)
     {

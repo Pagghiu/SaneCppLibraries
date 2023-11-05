@@ -5,6 +5,15 @@
 #include "../../Containers/Vector.h"
 #include "../../Strings/StringBuilder.h"
 #include "../../Testing/Test.h"
+
+// TODO: Split the Auto reflection tests in ReflectionAuto
+#if SC_META_ENABLE_AUTO_REFLECTION
+#if SC_LANGUAGE_CPP_LESS_THAN_20
+#include "../../../LibrariesExtra/ReflectionAuto/ReflectionAutoAggregates.h"
+#else
+#include "../../../LibrariesExtra/ReflectionAuto/ReflectionAutoStructured.h"
+#endif
+#endif
 #include "../ReflectionFlatSchemaCompiler.h"
 #include "../ReflectionSC.h"
 
