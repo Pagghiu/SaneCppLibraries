@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Reflection/ReflectionSC.h"
+#include "../Reflection/ReflectionSC.h" // TODO: Split the SC Containers specifics in separate header
 
 namespace SC
 {

@@ -9,7 +9,7 @@
 
 namespace SC
 {
-namespace SerializationStructuredTemplate
+namespace SerializationStructured
 {
 template <typename SerializerStream, typename T, typename SFINAESelector = void>
 struct SerializationReadWrite;
@@ -179,5 +179,5 @@ template <typename SerializerStream, typename T>
     SC_TRY((SerializationReadWrite<SerializerStream, T>::loadVersioned(0, object, stream)));
     return stream.onSerializationEnd();
 }
-} // namespace SerializationStructuredTemplate
+} // namespace SerializationStructured
 } // namespace SC

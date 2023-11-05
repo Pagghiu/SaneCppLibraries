@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../SerializationStructuredJson.h"
-#include "../SerializationStructuredReadWrite.h"
+#include "../SerializationStructured.h"
 
 #include "../../Containers/SmallVector.h"
 #include "../../Strings/StringBuilder.h"
@@ -15,10 +15,11 @@ struct Test;
 
 struct SC::Test
 {
-    int            x        = 2;
-    float          y        = 1.5f;
-    int            xy[2]    = {1, 3};
-    String         myTest   = "asdf"_a8;
+    int    x      = 2;
+    float  y      = 1.5f;
+    int    xy[2]  = {1, 3};
+    String myTest = "asdf"_a8;
+
     Vector<String> myVector = {"Str1"_a8, "Str2"_a8};
 
     bool operator==(const Test& other) const
@@ -51,11 +52,12 @@ struct SC::SerializationStructuredJsonTest : public SC::TestCase
             R"({"x":2,"y":1.50,"xy":[1,3],"myTest":"asdf","myVector":["Str1","Str2"]})"_a8;
         if (test_section("JsonWriterFast"))
         {
-            Test                                                     test;
-            SmallVector<char, 256>                                   buffer;
-            StringFormatOutput                                       output(StringEncoding::Ascii, buffer);
-            SerializationStructuredTemplate::SerializationJsonWriter writer(output);
-            SC_TEST_EXPECT(SerializationStructuredTemplate::serialize(test, writer));
+            Test                   test;
+            SmallVector<char, 256> buffer;
+            StringFormatOutput     output(StringEncoding::Ascii, buffer);
+
+            SerializationStructured::SerializationJsonWriter writer(output);
+            SC_TEST_EXPECT(SerializationStructured::serialize(test, writer));
             (void)StringConverter::popNulltermIfExists(buffer, StringEncoding::Ascii);
             const StringView bufferView(buffer.data(), buffer.size(), false, StringEncoding::Ascii);
             SC_TEST_EXPECT(bufferView == simpleJson);
@@ -64,8 +66,8 @@ struct SC::SerializationStructuredJsonTest : public SC::TestCase
         {
             Test test;
             memset(&test, 0, sizeof(test));
-            SerializationStructuredTemplate::SerializationJsonReader reader(simpleJson);
-            SC_TEST_EXPECT(SerializationStructuredTemplate::serialize(test, reader));
+            SerializationStructured::SerializationJsonReader reader(simpleJson);
+            SC_TEST_EXPECT(SerializationStructured::serialize(test, reader));
             SC_TEST_EXPECT(test == Test());
         }
         if (test_section("JsonReaderVersioned"))
@@ -77,8 +79,8 @@ struct SC::SerializationStructuredJsonTest : public SC::TestCase
             test.y = 0;
             (void)test.myVector.resize(1);
             (void)test.myTest.assign("FDFSA"_a8);
-            SerializationStructuredTemplate::SerializationJsonReader reader(scrambledJson);
-            SC_TEST_EXPECT(SerializationStructuredTemplate::loadVersioned(test, reader));
+            SerializationStructured::SerializationJsonReader reader(scrambledJson);
+            SC_TEST_EXPECT(SerializationStructured::loadVersioned(test, reader));
             SC_TEST_EXPECT(test == Test());
         }
     }

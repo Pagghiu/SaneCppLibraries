@@ -16,20 +16,42 @@ struct BinaryBuffer
 {
     SC::Vector<uint8_t> buffer;
 
-    size_t             index              = 0;
-    int                numberOfOperations = 0;
+    size_t index              = 0;
+    size_t numberOfOperations = 0;
+
     [[nodiscard]] bool serializeBytes(const void* object, size_t numBytes)
     {
         return serializeBytes(Span<const uint8_t>::reinterpret_bytes(object, numBytes));
     }
+
     [[nodiscard]] bool serializeBytes(void* object, size_t numBytes)
     {
         return serializeBytes(Span<uint8_t>::reinterpret_bytes(object, numBytes));
     }
 
-    [[nodiscard]] bool serializeBytes(Span<const uint8_t> object);
-    [[nodiscard]] bool serializeBytes(Span<uint8_t> object);
-    [[nodiscard]] bool advanceBytes(size_t numBytes);
+    [[nodiscard]] bool serializeBytes(Span<const uint8_t> object)
+    {
+        numberOfOperations++;
+        return buffer.append(object);
+    }
+
+    [[nodiscard]] bool serializeBytes(Span<uint8_t> object)
+    {
+        if (index + object.sizeInBytes() > buffer.size())
+            return false;
+        numberOfOperations++;
+        memcpy(object.data(), &buffer[index], object.sizeInBytes());
+        index += object.sizeInBytes();
+        return true;
+    }
+
+    [[nodiscard]] bool advanceBytes(size_t numBytes)
+    {
+        if (index + numBytes > buffer.size())
+            return false;
+        index += numBytes;
+        return true;
+    }
 };
 
 // TODO: BinarySkipper should go out of header once we replace BinaryBuffer with a streaming interface

@@ -40,8 +40,6 @@ struct UtilityWindows
     }
 };
 
-
-
 static constexpr const SC::Result getErrorCode(int errorCode)
 {
     switch (errorCode)

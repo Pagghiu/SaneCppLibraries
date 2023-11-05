@@ -8,14 +8,14 @@
 #include "../Strings/StringBuilder.h"
 namespace SC
 {
-namespace SerializationStructuredTemplate
+namespace SerializationStructured
 {
 struct SerializationJsonWriter;
 struct SerializationJsonReader;
-} // namespace SerializationStructuredTemplate
+} // namespace SerializationStructured
 } // namespace SC
 
-struct SC::SerializationStructuredTemplate::SerializationJsonWriter
+struct SC::SerializationStructured::SerializationJsonWriter
 {
     struct Options
     {
@@ -72,7 +72,7 @@ struct SC::SerializationStructuredTemplate::SerializationJsonWriter
     Options         options;
 };
 
-struct SC::SerializationStructuredTemplate::SerializationJsonReader
+struct SC::SerializationStructured::SerializationJsonReader
 {
     StringView           iteratorText;
     StringIteratorASCII  iterator;

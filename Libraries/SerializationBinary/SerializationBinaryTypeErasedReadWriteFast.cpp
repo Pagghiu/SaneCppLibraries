@@ -1,9 +1,8 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#pragma once
-#include "../SerializationBinarySkipper.h"
-#include "../SerializationBinaryTypeErasedReadWriteFast.h"
+#include "SerializationBinaryTypeErasedReadWriteFast.h"
+#include "SerializationBinarySkipper.h"
 
 bool SC::SerializationBinaryTypeErased::ArrayAccess::getSegmentSpan(uint32_t                   linkID,
                                                                     Reflection::MetaProperties property,
@@ -54,30 +53,6 @@ bool SC::SerializationBinaryTypeErased::ArrayAccess::resize(uint32_t linkID, Spa
         }
     }
     return false;
-}
-
-bool SC::Serialization::BinaryBuffer::serializeBytes(Span<const uint8_t> object)
-{
-    numberOfOperations++;
-    return buffer.append(object);
-}
-
-bool SC::Serialization::BinaryBuffer::serializeBytes(Span<uint8_t> object)
-{
-    if (index + object.sizeInBytes() > buffer.size())
-        return false;
-    numberOfOperations++;
-    memcpy(object.data(), &buffer[index], object.sizeInBytes());
-    index += object.sizeInBytes();
-    return true;
-}
-
-bool SC::Serialization::BinaryBuffer::advanceBytes(size_t numBytes)
-{
-    if (index + numBytes > buffer.size())
-        return false;
-    index += numBytes;
-    return true;
 }
 
 bool SC::SerializationBinaryTypeErased::SerializerReadWriteFast::write()

@@ -2,7 +2,11 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+// This needs to go before the compiler
 #include "../Reflection/ReflectionSC.h"
+// Compiler must be after
+#include "SerializationBinarySkipper.h"
+#include "SerializationBinaryTypeErasedCompiler.h"
 
 namespace SC
 {

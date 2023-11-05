@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 // This needs to go before the compiler
-#include "../Reflection/ReflectionSC.h"
+#include "../Reflection/ReflectionSC.h" // TODO: Split the SC Containers specifics in separate header
 // Compiler must be after
 #include "SerializationBinarySkipper.h"
 #include "SerializationBinaryTemplateCompiler.h"

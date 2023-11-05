@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "ReflectionAuto.h"
 #include "../../Libraries/Reflection/ReflectionMetaType.h"
+#include "ReflectionAuto.h"
 
 namespace SC
 {
