@@ -68,7 +68,7 @@ SC::Result SC::HttpServer::parse(Span<const char> readData, ClientChannel& clien
     {
         HttpParser&      parser = client.request.parser;
         Span<const char> parsedData;
-        parsedSuccessfully &= parser.parse(readData.asConst(), readBytes, parsedData);
+        parsedSuccessfully &= parser.parse(readData, readBytes, parsedData);
         parsedSuccessfully &= readData.sliceStart(readBytes, readData);
         if (parser.state == HttpParser::State::Finished)
             break;
@@ -154,7 +154,7 @@ void SC::HttpServerAsync::onReceive(AsyncSocketReceive::Result& result)
         // TODO: Invoke on error
         return;
     }
-    if (not HttpServer::parse(readData.asConst(), client))
+    if (not HttpServer::parse(readData, client))
     {
         // TODO: Invoke on error
         return;
@@ -163,7 +163,7 @@ void SC::HttpServerAsync::onReceive(AsyncSocketReceive::Result& result)
     {
         requestClient.asyncSend.setDebugName(requestClient.debugName.bytesIncludingTerminator());
 
-        auto outspan = client.response.outputBuffer.toSpan().asConst();
+        auto outspan = client.response.outputBuffer.toSpan();
         requestClient.asyncSend.callback.bind<HttpServerAsync, &HttpServerAsync::onAfterSend>(*this);
         auto res = requestClient.asyncSend.start(*asyncAccept.getEventLoop(), requestClient.socket, outspan);
         if (not res)

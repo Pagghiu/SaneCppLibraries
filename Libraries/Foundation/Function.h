@@ -6,12 +6,26 @@
 
 namespace SC
 {
+//! @addtogroup group_foundation_utility
+//! @{
+
+/// @brief A function wrapper. Wraps function pointers, pointers to member functions and lambdas (smaller than
+/// `LAMBDA_SIZE`)
+///
+/// Example:
+/// @code
+/// int someFunc(float a) { return static_cast<int>(a * 2); }
+///
+/// Function<int(float)> func = &somefunc;
+/// @endcode
+/// Size of lambdas or less than LAMBDA_SIZE.
+/// If lambda is bigger than `LAMBDA_SIZE` the constructor will static assert.
+/// @tparam FuncType Type of function to be wrapped (Lambda, free function or pointer to member function)
 template <typename FuncType>
 struct Function;
-} // namespace SC
 
 template <typename R, typename... Args>
-struct SC::Function<R(Args...)>
+struct Function<R(Args...)>
 {
   private:
     enum class FunctionErasedOperation
@@ -44,13 +58,16 @@ struct SC::Function<R(Args...)>
     using FreeFunction = R (*)(Args...);
 
   public:
+    /// @brief Constructs an empty Function
     Function()
     {
         static_assert(sizeof(Function) == sizeof(void*) * 3, "Function Size");
         functionStub = nullptr;
     }
 
-    // SFINAE used to avoid universal reference from "eating" also copy constructor
+    /// Constructs a function from a lambda with a compatible size (equal or less than LAMBDA_SIZE)
+    /// If lambda is bigger than `LAMBDA_SIZE` a static assertion will be issued
+    /// SFINAE is used to avoid universal reference from "eating" also copy constructor
     template <typename Lambda, typename = typename EnableIf<
                                    not IsSame<typename RemoveReference<Lambda>::type, Function>::value, void>::type>
     Function(Lambda&& lambda)
@@ -59,8 +76,11 @@ struct SC::Function<R(Args...)>
         bind(forward<typename RemoveReference<Lambda>::type>(lambda));
     }
 
+    /// @brief Destroys the function wrapper
     ~Function() { sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr); }
 
+    /// @brief Move constructor for Function wrapper
+    /// @param other The moved from function
     Function(Function&& other)
     {
         functionStub  = other.functionStub;
@@ -70,12 +90,16 @@ struct SC::Function<R(Args...)>
         other.functionStub = nullptr;
     }
 
+    /// @brief Copy constructor for Function wrapper
+    /// @param other The function to be copied
     Function(const Function& other)
     {
         functionStub = other.functionStub;
         other.sendLambdaSignal(FunctionErasedOperation::LambdaCopyConstruct, &classInstance);
     }
 
+    /// @brief Copy assign a function to current function wrapper. Destroys existing wrapper.
+    /// @param other The function to be assigned to current function
     Function& operator=(const Function& other)
     {
         sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
@@ -84,6 +108,8 @@ struct SC::Function<R(Args...)>
         return *this;
     }
 
+    /// @brief Move assign a function to current function wrapper. Destroys existing wrapper.
+    /// @param other The function to be move-assigned to current function
     Function& operator=(Function&& other)
     {
         sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
@@ -94,11 +120,19 @@ struct SC::Function<R(Args...)>
         return *this;
     }
 
+    /// @brief Check if current wrapper is bound to a function
+    /// @return `true` if current wrapper is bound to a function
     bool isValid() const { return functionStub != nullptr; }
 
+    /// @brief Binds a Lambda to current function wrapper
+    /// @tparam Lambda type of Lambda to be wrapped in current function wrapper
+    /// @param lambda Instance of Lambda to be wrapped
     template <typename Lambda>
     void bind(Lambda&& lambda)
     {
+        sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
+        functionStub = nullptr;
+
         new (&classInstance, PlacementNew()) Lambda(forward<Lambda>(lambda));
         static_assert(sizeof(Lambda) <= sizeof(lambdaMemory), "Lambda is too big");
         functionStub = [](FunctionErasedOperation operation, const void** other, const void* const* p,
@@ -117,6 +151,8 @@ struct SC::Function<R(Args...)>
         };
     }
 
+    /// @brief Binds a free function to function wrapper
+    /// @tparam FreeFunction a regular static function to be wrapper, with a matching signature
     template <R (*FreeFunction)(Args...)>
     void bind()
     {
@@ -125,6 +161,10 @@ struct SC::Function<R(Args...)>
         functionStub  = &FunctionWrapper<FreeFunction>;
     }
 
+    /// @brief Binds a class member function to function wrapper
+    /// @tparam Class Type of the Class holding MemberFunction
+    /// @tparam MemberFunction Pointer to member function with a matching signature
+    /// @param c Reference to the instance of class where the method must be bound to
     template <typename Class, R (Class::*MemberFunction)(Args...) const>
     void bind(const Class& c)
     {
@@ -133,6 +173,10 @@ struct SC::Function<R(Args...)>
         functionStub  = &MemberWrapper<Class, MemberFunction>;
     }
 
+    /// @brief Binds a class member function to function wrapper
+    /// @tparam Class Type of the Class holding MemberFunction
+    /// @tparam MemberFunction Pointer to member function with a matching signature
+    /// @param c Reference to the instance of class where the method must be bound to
     template <typename Class, R (Class::*MemberFunction)(Args...)>
     void bind(Class& c)
     {
@@ -141,18 +185,31 @@ struct SC::Function<R(Args...)>
         functionStub  = &MemberWrapper<Class, MemberFunction>;
     }
 
+    /// @brief Binds a class member function to function wrapper
+    /// @tparam Class Type of the Class holding MemberFunction
+    /// @tparam MemberFunction Pointer to member function with a matching signature
+    /// @param c Reference to the instance of class where the method must be bound to
+    /// @return The function wrapper
     template <typename Class, R (Class::*MemberFunction)(Args...)>
     static Function fromMember(Class& c)
     {
         return Function(&c, &MemberWrapper<Class, MemberFunction>);
     }
 
+    /// @brief Binds a class member function to function wrapper
+    /// @tparam Class Type of the Class holding MemberFunction
+    /// @tparam MemberFunction Pointer to member function with a matching signature
+    /// @param c Reference to the instance of class where the method must be bound to
+    /// @return The function wrapper
     template <typename Class, R (Class::*MemberFunction)(Args...) const>
     static Function fromMember(const Class& c)
     {
         return Function(&c, &MemberWrapper<Class, MemberFunction>);
     }
 
+    /// @brief Invokes the wrapped function. If no function is bound, this is UB.
+    /// @param args Arguments to be passed to the wrapped function
+    /// @return the return value of the invoked function.
     [[nodiscard]] R operator()(Args... args) const
     {
         return (*functionStub)(FunctionErasedOperation::Execute, nullptr, &classInstance, &args...);
@@ -207,9 +264,8 @@ struct SC::Function<R(Args...)>
     }
 };
 
-namespace SC
-{
 template <typename T>
 using Delegate = Function<void(T)>;
 using Action   = Function<void()>;
+//! @}
 } // namespace SC

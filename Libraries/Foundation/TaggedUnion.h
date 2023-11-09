@@ -59,16 +59,26 @@ struct AlignedStorage<Len, TypeList<Types...>>
     };
 };
 } // namespace Internal
+
+/// @brief Associate a Type to an Enum, as required by TaggedUnion
+/// @tparam EnumType Type of the enumeration
+/// @tparam MemberType Type of member of the union
+/// @tparam enumValue Enumeration value that represents the Type
 template <typename EnumType, EnumType enumValue, typename MemberType>
 struct TaggedField
 {
-    using type                      = MemberType;
-    using enumType                  = EnumType;
+    using type     = MemberType;
+    using enumType = EnumType;
+
     static constexpr EnumType value = enumValue;
 };
 
 } // namespace SC
+//! @addtogroup group_foundation_utility
+//! @{
 
+/// @brief A type safe union associated with an enum type, where each type is associated with an enum value.
+/// @tparam Union TypeList of TaggedField
 template <typename Union>
 struct SC::TaggedUnion
 {
@@ -77,33 +87,11 @@ struct SC::TaggedUnion
     using TypeAt = TypeListGetT<typename Union::FieldsTypes, Index>;
 
   public:
-    using EnumType                 = typename TypeAt<0>::enumType;
     static constexpr auto NumTypes = Union::FieldsTypes::size;
-    template <typename T, int StartIndex = NumTypes>
-    struct TypeToEnum
-    {
-      private:
-        static constexpr auto CurrentIndex = StartIndex - 1;
-        static_assert(CurrentIndex >= 0, "Type not found!");
-        using CurrentType                  = typename TypeAt<CurrentIndex>::type;
-        static constexpr auto CurrentValue = TypeAt<CurrentIndex>::value;
-        static constexpr bool TypeFound    = IsSame<T, CurrentType>::value;
 
-      public:
-        static constexpr EnumType enumType = TypeFound ? CurrentValue : TypeToEnum<T, StartIndex - 1>::enumType;
-        using type                 = ConditionalT<TypeFound, CurrentType, typename TypeToEnum<T, StartIndex - 1>::type>;
-        static constexpr int index = TypeFound ? CurrentIndex : TypeToEnum<T, StartIndex - 1>::index;
-    };
+    using EnumType = typename TypeAt<0>::enumType;
 
-    template <typename T>
-    struct TypeToEnum<T, 0>
-    {
-        using type = typename TypeAt<0>::type;
-        static_assert(IsSame<T, type>::value, "Type doesn't exist in list of types");
-        static constexpr int      index    = 0;
-        static constexpr EnumType enumType = TypeAt<0>::value;
-    };
-
+    /// @brief Extracts type `T` corresponding to enumeration wantedEnum at compile time
     template <EnumType wantedEnum, int StartIndex = NumTypes>
     struct EnumToType
     {
@@ -224,6 +212,7 @@ struct SC::TaggedUnion
     EnumType type;
 
   public:
+    /// @brief Returns enumeration value of currently active union type
     EnumType getType() const { return type; }
 
     bool operator==(const TaggedUnion& other) const
@@ -237,43 +226,27 @@ struct SC::TaggedUnion
         new (&fieldAt<0>(), PlacementNew()) typename TypeAt<0>::type();
     }
 
-    template <EnumType wantedEnum>
-    struct Constructor
-    {
-        typename EnumToType<wantedEnum>::type object;
-    };
-
-    template <EnumType wantedEnum>
-    TaggedUnion(Constructor<wantedEnum>&& other)
-    {
-        type    = wantedEnum;
-        using T = typename EnumToType<wantedEnum>::type;
-        new (&fieldAt<EnumToType<wantedEnum>::index>(), PlacementNew()) T(forward<T>(other.object));
-    }
-
-    template <typename U>
-    TaggedUnion(EnumType wantedEnum, U&& other)
-    {
-        using T = typename RemoveConst<typename RemoveReference<U>::type>::type;
-        type    = wantedEnum;
-
-        fieldAt<TypeToEnum<T>::index>() = other;
-    }
-
+    /// @brief Destroys the TaggedUnion object
     ~TaggedUnion() { destruct(); }
 
+    /// @brief Copy constructor
+    /// @param other Another tagged union
     TaggedUnion(const TaggedUnion& other)
     {
         type = other.type;
         RuntimeEnumVisit<CopyConstruct, TaggedUnion, const TaggedUnion>::visit(this, &other, type);
     }
 
+    /// @brief Move constructor
+    /// @param other Another tagged union
     TaggedUnion(TaggedUnion&& other)
     {
         type = other.type;
         RuntimeEnumVisit<MoveConstruct, TaggedUnion, TaggedUnion>::visit(this, &other, type);
     }
 
+    /// @brief Copy assignment operator
+    /// @param other Another tagged union
     TaggedUnion& operator=(const TaggedUnion& other)
     {
         if (type == other.type)
@@ -289,6 +262,8 @@ struct SC::TaggedUnion
         return *this;
     }
 
+    /// @brief Move assignment operator
+    /// @param other Another tagged union
     TaggedUnion& operator=(TaggedUnion&& other)
     {
         if (type == other.type)
@@ -304,10 +279,13 @@ struct SC::TaggedUnion
         return *this;
     }
 
+    /// @brief Assigns a compile time known enum type with an object U
+    /// @tparam U Type of object to be assigned.
+    /// @tparam wantedType Compile time known enum type
+    /// @param other  object to be assigned (move / copy)
     template <EnumType wantedType, typename U>
     void assign(U&& other)
     {
-        using T     = typename EnumToType<wantedType>::type;
         auto& field = fieldAt<EnumToType<wantedType>::index>();
         if (type == wantedType)
         {
@@ -315,30 +293,36 @@ struct SC::TaggedUnion
         }
         else
         {
+            using T = typename EnumToType<wantedType>::type;
             destruct();
             type = wantedType;
             new (&field, PlacementNew()) T(forward<U>(other));
         }
     }
 
+    /// @brief Changes current active type in union to a different one.
+    /// @tparam wantedType Compile time know enum value associated to wanted type
+    /// @return A reference to the wanted type.
+    /// If wantedType is not the active type, a new value will be default initialized
+    /// @note Return type is made esplicit instead of using `auto` to help intellisense deducing type
     template <EnumType wantedType>
     typename TypeAt<EnumToType<wantedType>::index>::type& changeTo()
     {
         using T     = typename EnumToType<wantedType>::type;
         auto& field = fieldAt<EnumToType<wantedType>::index>();
-        if (type == wantedType)
-        {
-            return field;
-        }
-        else
+        if (type != wantedType)
         {
             destruct();
             type = wantedType;
             new (&field, PlacementNew()) T();
-            return field;
         }
+        return field;
     }
 
+    /// @brief Get a pointer to currently active field
+    /// @tparam wantedType Compile time know enum value associated to wanted type
+    /// @return A pointer to currently active field or nullptr if wantedType doesn't match currently active type.
+    /// @note Return type is made esplicit instead of using `auto` to help intellisense deducing type
     template <EnumType wantedType>
     [[nodiscard]] typename TypeAt<EnumToType<wantedType>::index>::type* field()
     {
@@ -349,6 +333,10 @@ struct SC::TaggedUnion
         return nullptr;
     }
 
+    /// @brief Get a pointer to currently active field
+    /// @tparam wantedType Compile time know enum value associated to wanted type
+    /// @return A pointer to currently active field or nullptr if wantedType doesn't match currently active type.
+    /// @note Return type is made esplicit instead of using `auto` to help intellisense deducing type
     template <EnumType wantedType>
     [[nodiscard]] const typename TypeAt<EnumToType<wantedType>::index>::type* field() const
     {
@@ -359,3 +347,4 @@ struct SC::TaggedUnion
         return nullptr;
     }
 };
+//! @}

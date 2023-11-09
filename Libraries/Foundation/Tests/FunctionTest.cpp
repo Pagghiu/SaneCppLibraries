@@ -50,8 +50,7 @@ struct SC::FunctionTest : public SC::TestCase
         }
         if (test_section("deduct"))
         {
-            TestClass tc;
-
+            TestClass          tc;
             Function<int(int)> freeFunc = &TestClass::freeFunc2;
             SC_TEST_EXPECT(freeFunc(2) == 1);
             freeFunc = &TestClass::freeFunc;

@@ -6,7 +6,19 @@
 
 namespace SC
 {
-struct MaxValue
+struct MaxValue;
+} // namespace SC
+
+//! @addtogroup group_foundation_utility
+//! @{
+
+/// @brief Object that has automatic conversions to all primitive types returning their respective automatic sizes.
+///
+/// Fox Example:
+/// @code
+/// uint64_t value = MaxValue(); // contains now maximum value for uint64_t
+/// @endcode
+struct SC::MaxValue
 {
     template <typename T>
     constexpr T SignedMaxValue() const
@@ -39,4 +51,5 @@ struct MaxValue
     constexpr operator float() const { return 3.40282347e+38F; }
     constexpr operator double() const { return 1.7976931348623157e+308; }
 };
-} // namespace SC
+
+//! @}

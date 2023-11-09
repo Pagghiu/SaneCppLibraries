@@ -41,19 +41,19 @@ enum class MetaType : uint8_t
 };
 
 // clang-format off
-template <typename T> struct IsPrimitive : false_type {};
+template <typename T> struct IsPrimitive { static constexpr bool value = false; };
 
-template <> struct IsPrimitive<uint8_t>  : true_type  {};
-template <> struct IsPrimitive<uint16_t> : true_type  {};
-template <> struct IsPrimitive<uint32_t> : true_type  {};
-template <> struct IsPrimitive<uint64_t> : true_type  {};
-template <> struct IsPrimitive<int8_t>   : true_type  {};
-template <> struct IsPrimitive<int16_t>  : true_type  {};
-template <> struct IsPrimitive<int32_t>  : true_type  {};
-template <> struct IsPrimitive<int64_t>  : true_type  {};
-template <> struct IsPrimitive<float>    : true_type  {};
-template <> struct IsPrimitive<double>   : true_type  {};
-template <> struct IsPrimitive<char>     : true_type  {};
+template <> struct IsPrimitive<uint8_t>  { static constexpr bool value = true; };
+template <> struct IsPrimitive<uint16_t> { static constexpr bool value = true; };
+template <> struct IsPrimitive<uint32_t> { static constexpr bool value = true; };
+template <> struct IsPrimitive<uint64_t> { static constexpr bool value = true; };
+template <> struct IsPrimitive<int8_t>   { static constexpr bool value = true; };
+template <> struct IsPrimitive<int16_t>  { static constexpr bool value = true; };
+template <> struct IsPrimitive<int32_t>  { static constexpr bool value = true; };
+template <> struct IsPrimitive<int64_t>  { static constexpr bool value = true; };
+template <> struct IsPrimitive<float>    { static constexpr bool value = true; };
+template <> struct IsPrimitive<double>   { static constexpr bool value = true; };
+template <> struct IsPrimitive<char>     { static constexpr bool value = true; };
 // clang-format on
 
 template <typename T, typename SFINAESelector = void>
