@@ -34,34 +34,34 @@ SC::Result SC::FileSystemWatcher::FolderWatcher::unwatch()
 }
 
 template <>
-void SC::OpaqueFuncs<SC::FileSystemWatcher::InternalTraits>::construct(Handle& buffer)
+void SC::OpaqueBuilder<SC::FileSystemWatcher::InternalOpaque::Sizes>::construct(Handle& buffer)
 {
     new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object();
 }
 template <>
-void SC::OpaqueFuncs<SC::FileSystemWatcher::InternalTraits>::destruct(Object& obj)
+void SC::OpaqueBuilder<SC::FileSystemWatcher::InternalOpaque::Sizes>::destruct(Object& obj)
 {
     obj.~Object();
 }
 
 template <>
-void SC::OpaqueFuncs<SC::FileSystemWatcher::ThreadRunnerTraits>::construct(Handle& buffer)
+void SC::OpaqueBuilder<SC::FileSystemWatcher::ThreadRunner::Sizes>::construct(Handle& buffer)
 {
     new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object();
 }
 template <>
-void SC::OpaqueFuncs<SC::FileSystemWatcher::ThreadRunnerTraits>::destruct(Object& obj)
+void SC::OpaqueBuilder<SC::FileSystemWatcher::ThreadRunner::Sizes>::destruct(Object& obj)
 {
     obj.~Object();
 }
 
 template <>
-void SC::OpaqueFuncs<SC::FileSystemWatcher::FolderWatcherTraits>::construct(Handle& buffer)
+void SC::OpaqueBuilder<SC::FileSystemWatcher::FolderWatcherOpaque::Sizes>::construct(Handle& buffer)
 {
     new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object();
 }
 template <>
-void SC::OpaqueFuncs<SC::FileSystemWatcher::FolderWatcherTraits>::destruct(Object& obj)
+void SC::OpaqueBuilder<SC::FileSystemWatcher::FolderWatcherOpaque::Sizes>::destruct(Object& obj)
 {
     obj.~Object();
 }

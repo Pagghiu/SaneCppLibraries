@@ -95,11 +95,11 @@ struct SC::FileDescriptorPosixHelpers
 
 // FileDescriptor
 
-SC::Result SC::FileDescriptorTraits::releaseHandle(Handle& handle)
+SC::Result SC::FileDescriptorDefinition::releaseHandle(Handle& handle)
 {
     if (::close(handle) != 0)
     {
-        return Result::Error("FileDescriptorTraits::releaseHandle - close failed");
+        return Result::Error("FileDescriptorDefinition::releaseHandle - close failed");
     }
     return Result(true);
 }

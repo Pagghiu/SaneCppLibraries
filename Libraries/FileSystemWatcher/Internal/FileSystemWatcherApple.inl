@@ -123,8 +123,9 @@ struct SC::FileSystemWatcher::Internal
     [[nodiscard]] Result threadCreateFSEvent()
     {
         SC_TRY(runLoop);
-        CFArrayRef   pathsArray   = nullptr;
-        CFStringRef* watchedPaths = (CFStringRef*)malloc(sizeof(CFStringRef) * ThreadRunnerSizes::MaxWatchablePaths);
+        CFArrayRef   pathsArray = nullptr;
+        CFStringRef* watchedPaths =
+            (CFStringRef*)malloc(sizeof(CFStringRef) * ThreadRunnerDefinition::MaxWatchablePaths);
         SC_TRY_MSG(watchedPaths != nullptr, "Cannot allocate paths");
         // TODO: Loop to convert paths
         auto   deferFreeMalloc   = MakeDeferred([&] { free(watchedPaths); });
@@ -148,7 +149,7 @@ struct SC::FileSystemWatcher::Internal
             if (not watchedPaths[numAllocatedPaths])
                 return Result::Error("CFStringCreateWithFileSystemRepresentation failed");
             numAllocatedPaths++;
-            SC_TRY_MSG(numAllocatedPaths <= ThreadRunnerSizes::MaxWatchablePaths,
+            SC_TRY_MSG(numAllocatedPaths <= ThreadRunnerDefinition::MaxWatchablePaths,
                        "Exceeded max size of 1024 paths to watch");
         }
         if (numAllocatedPaths == 0)

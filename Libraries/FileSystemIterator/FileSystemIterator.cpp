@@ -12,12 +12,12 @@
 #endif
 
 template <>
-void SC::OpaqueFuncs<SC::FileSystemIterator::InternalTraits>::construct(Handle& buffer)
+void SC::OpaqueBuilder<SC::FileSystemIterator::InternalOpaque::Sizes>::construct(Handle& buffer)
 {
     new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object();
 }
 template <>
-void SC::OpaqueFuncs<SC::FileSystemIterator::InternalTraits>::destruct(Object& obj)
+void SC::OpaqueBuilder<SC::FileSystemIterator::InternalOpaque::Sizes>::destruct(Object& obj)
 {
     obj.~Object();
 }

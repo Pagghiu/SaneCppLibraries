@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Opaque.h"
+#include "../Foundation/OpaqueUnique.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
 #include "../Strings/StringView.h"
@@ -19,33 +19,34 @@ struct PipeDescriptor;
 
 #if SC_PLATFORM_WINDOWS
 
-struct FileDescriptorTraits
+struct FileDescriptorDefinition
 {
     using Handle = void*; // HANDLE
+    static Result releaseHandle(Handle& handle);
 #ifdef __clang__
     static constexpr void* Invalid = __builtin_constant_p(-1) ? (void*)-1 : (void*)-1; // INVALID_HANDLE_VALUE
 #else
     static constexpr void* Invalid = (void*)-1; // INVALID_HANDLE_VALUE
 #endif
-    static Result releaseHandle(Handle& handle);
 };
 
 #else
 
-struct FileDescriptorTraits
+struct FileDescriptorDefinition
 {
-    using Handle                    = int; // fd
-    static constexpr Handle Invalid = -1;  // invalid fd
-    static Result           releaseHandle(Handle& handle);
+    using Handle = int; // fd
+    static Result releaseHandle(Handle& handle);
+
+    static constexpr Handle Invalid = -1; // invalid fd
 };
 
 #endif
 
 } // namespace SC
 
-struct SC::FileDescriptor : public SC::UniqueTaggedHandleTraits<SC::FileDescriptorTraits>
+struct SC::FileDescriptor : public SC::UniqueTaggedHandle<SC::FileDescriptorDefinition>
 {
-    using UniqueTaggedHandleTraits::UniqueTaggedHandleTraits;
+    using UniqueTaggedHandle::UniqueTaggedHandle;
     enum OpenMode
     {
         ReadOnly,

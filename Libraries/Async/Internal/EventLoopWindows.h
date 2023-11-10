@@ -7,13 +7,13 @@
 #include <stddef.h> // offsetof
 
 #include "../../File/FileDescriptor.h"
-#include "../../Foundation/Opaque.h"
+#include "../../Foundation/OpaqueUnique.h"
 
 namespace SC
 {
 struct EventLoopWinOverlapped;
 struct EventLoopWinWaitHandle;
-struct EventLoopWinWaitTraits;
+struct EventLoopWinWaitDefinition;
 } // namespace SC
 
 // We store a user pointer at a fixed offset from overlapped to allow getting back source object

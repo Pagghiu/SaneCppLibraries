@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "../System.h"
 
-SC::Result SC::SystemDynamicLibraryTraits::releaseHandle(Handle& handle) { return Result(true); }
+SC::Result SC::SystemDynamicLibraryDefinition::releaseHandle(Handle& handle) { return Result(true); }
 
 SC::Result SC::SystemDynamicLibrary::load(StringView fullPath) { return Result(true); }
 

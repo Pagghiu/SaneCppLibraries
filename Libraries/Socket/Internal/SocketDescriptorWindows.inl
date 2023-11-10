@@ -12,7 +12,7 @@ using socklen_t = int;
 #include "../../Containers/Vector.h"
 #include "../SocketDescriptor.h"
 
-SC::Result SC::SocketDescriptorTraits::releaseHandle(Handle& handle)
+SC::Result SC::SocketDescriptorDefinition::releaseHandle(Handle& handle)
 {
     const int res = ::closesocket(handle);
     handle        = SocketDescriptor::Invalid;

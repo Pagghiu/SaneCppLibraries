@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../File/FileDescriptor.h"
-#include "../Foundation/Opaque.h"
+#include "../Foundation/OpaqueUnique.h"
 #include "../Foundation/Result.h"
 #include "../System/Time.h" // IntegerMilliseconds
 
@@ -17,27 +17,29 @@ struct Vector;
 namespace SC
 {
 struct SocketDescriptor;
-struct SocketDescriptorTraits;
+struct SocketDescriptorDefinition;
 struct SocketFlags;
 struct SocketIPAddress;
 } // namespace SC
 
 #if SC_PLATFORM_WINDOWS
 
-struct SC::SocketDescriptorTraits
+struct SC::SocketDescriptorDefinition
 {
-    using Handle                    = size_t;                  // SOCKET
+    using Handle = size_t; // SOCKET
+    static Result releaseHandle(Handle& handle);
+
     static constexpr Handle Invalid = ~static_cast<Handle>(0); // INVALID_SOCKET
-    static Result           releaseHandle(Handle& handle);
 };
 
 #else
 
-struct SC::SocketDescriptorTraits
+struct SC::SocketDescriptorDefinition
 {
-    using Handle                    = int; // fd
-    static constexpr Handle Invalid = -1;  // invalid fd
-    static Result           releaseHandle(Handle& handle);
+    using Handle = int; // fd
+    static Result releaseHandle(Handle& handle);
+
+    static constexpr Handle Invalid = -1; // invalid fd
 };
 
 #endif
@@ -97,7 +99,7 @@ struct SC::SocketIPAddress
     SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
 };
 
-struct SC::SocketDescriptor : public UniqueTaggedHandleTraits<SocketDescriptorTraits>
+struct SC::SocketDescriptor : public UniqueTaggedHandle<SocketDescriptorDefinition>
 {
     [[nodiscard]] Result create(SocketFlags::AddressFamily   addressFamily,
                                 SocketFlags::SocketType      socketType  = SocketFlags::SocketStream,

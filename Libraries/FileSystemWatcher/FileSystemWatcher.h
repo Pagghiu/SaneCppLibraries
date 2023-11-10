@@ -6,7 +6,7 @@
 #include "../Async/EventLoop.h" // AsyncLoopWakeUp
 #include "../Containers/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Function.h"
-#include "../Foundation/Opaque.h"
+#include "../Foundation/OpaqueUnique.h"
 #include "../Foundation/Result.h"
 #include "../Strings/StringView.h"
 #include "../Threading/Threading.h" // EventObject
@@ -42,16 +42,19 @@ struct SC::FileSystemWatcher
     };
 
     struct ThreadRunnerInternal;
-    struct ThreadRunnerSizes
+    struct ThreadRunnerDefinition
     {
         static constexpr int MaxWatchablePaths = 1024;
         static constexpr int Windows =
             (2 * MaxWatchablePaths) * sizeof(void*) + sizeof(uint64_t) + sizeof(Thread) + sizeof(Action);
         static constexpr int Apple   = sizeof(void*);
         static constexpr int Default = sizeof(void*);
+
+        static constexpr size_t Alignment = alignof(void*);
+
+        using Object = ThreadRunnerInternal;
     };
-    using ThreadRunnerTraits = OpaqueTraits<ThreadRunnerInternal, ThreadRunnerSizes>;
-    using ThreadRunner       = OpaqueUniqueObject<OpaqueFuncs<ThreadRunnerTraits>>;
+    using ThreadRunner = OpaqueUnique<ThreadRunnerDefinition>;
 
     struct FolderWatcherInternal;
     struct FolderWatcherSizes
@@ -65,9 +68,12 @@ struct SC::FileSystemWatcher
 #endif
         static constexpr int Apple   = sizeof(void*);
         static constexpr int Default = sizeof(void*);
+
+        static constexpr size_t Alignment = alignof(void*);
+
+        using Object = FolderWatcherInternal;
     };
-    using FolderWatcherTraits = OpaqueTraits<FolderWatcherInternal, FolderWatcherSizes>;
-    using FolderWatcherOpaque = OpaqueUniqueObject<OpaqueFuncs<FolderWatcherTraits>>;
+    using FolderWatcherOpaque = OpaqueUnique<FolderWatcherSizes>;
 
     struct FolderWatcher
     {
@@ -99,14 +105,17 @@ struct SC::FileSystemWatcher
     [[nodiscard]] Result watch(FolderWatcher& watcher, String& path,
                                Function<void(const Notification&)>&& notifyCallback);
 
-    struct InternalSizes
+    struct InternalDefinition
     {
         static constexpr int Windows = 3 * sizeof(void*);
         static constexpr int Apple   = 43 * sizeof(void*) + sizeof(Mutex);
         static constexpr int Default = sizeof(void*);
+
+        static constexpr size_t Alignment = alignof(void*);
+
+        using Object = Internal;
     };
 
-    using InternalTraits = OpaqueTraits<Internal, InternalSizes>;
-    using InternalOpaque = OpaqueUniqueObject<OpaqueFuncs<InternalTraits>>;
+    using InternalOpaque = OpaqueUnique<InternalDefinition>;
     InternalOpaque internal;
 };

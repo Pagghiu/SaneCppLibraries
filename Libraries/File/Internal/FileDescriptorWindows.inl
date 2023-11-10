@@ -12,7 +12,7 @@
 
 // FileDescriptor
 
-SC::Result SC::FileDescriptorTraits::releaseHandle(Handle& handle)
+SC::Result SC::FileDescriptorDefinition::releaseHandle(Handle& handle)
 {
     BOOL res;
     __try
@@ -25,7 +25,7 @@ SC::Result SC::FileDescriptorTraits::releaseHandle(Handle& handle)
     }
     if (res == FALSE)
     {
-        return Result::Error("FileDescriptorTraits::releaseHandle - CloseHandle failed");
+        return Result::Error("FileDescriptorDefinition::releaseHandle - CloseHandle failed");
     }
     return Result(true);
 }

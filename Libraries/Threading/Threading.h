@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/Function.h"
-#include "../Foundation/Opaque.h"
+#include "../Foundation/OpaqueUnique.h"
 #include "../Foundation/Result.h"
 #include "../Strings/StringView.h"
 #include "Internal/Optional.h" // UniqueOptional

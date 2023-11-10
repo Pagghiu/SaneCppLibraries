@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 
-#include "../Foundation/Opaque.h"
+#include "../Foundation/Handles.h"
 #include "../Foundation/Result.h"
 
 namespace SC
@@ -12,7 +12,7 @@ struct ProcessDescriptor;
 
 #if SC_PLATFORM_WINDOWS
 
-struct ProcessDescriptorTraits
+struct ProcessDescriptorDefinition
 {
     using Handle = void*; // HANDLE
 #ifdef __clang__
@@ -25,17 +25,18 @@ struct ProcessDescriptorTraits
 
 #else
 
-struct ProcessDescriptorTraits
+struct ProcessDescriptorDefinition
 {
-    using Handle                    = int; // pid_t
-    static constexpr Handle Invalid = 0;   // invalid pid_t
-    static Result           releaseHandle(Handle& handle);
+    using Handle = int; // pid_t
+    static Result releaseHandle(Handle& handle);
+
+    static constexpr Handle Invalid = 0; // invalid pid_t
 };
 
 #endif
 } // namespace SC
 
-struct SC::ProcessDescriptor : public UniqueTaggedHandleTraits<ProcessDescriptorTraits>
+struct SC::ProcessDescriptor : public UniqueTaggedHandle<ProcessDescriptorDefinition>
 {
     struct ExitStatus
     {

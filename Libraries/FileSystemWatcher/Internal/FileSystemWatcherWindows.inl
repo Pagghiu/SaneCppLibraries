@@ -26,7 +26,7 @@ struct SC::FileSystemWatcher::ThreadRunnerInternal
     Thread thread;
     Action threadFunction;
 
-    static constexpr int N = ThreadRunnerSizes::MaxWatchablePaths;
+    static constexpr int N = ThreadRunnerDefinition::MaxWatchablePaths;
 
     HANDLE         hEvents[N] = {0};
     FolderWatcher* entries[N] = {nullptr};
@@ -131,7 +131,7 @@ struct SC::FileSystemWatcher::Internal
         // TODO: we should probably check if we are leaking on some partial failure codepath...some RAII would help
         if (threadingRunner)
         {
-            SC_TRY_MSG(threadingRunner->numEntries < ThreadRunnerSizes::MaxWatchablePaths,
+            SC_TRY_MSG(threadingRunner->numEntries < ThreadRunnerDefinition::MaxWatchablePaths,
                        "startWatching exceeded MaxWatchablePaths");
         }
         StringView encodedPath;

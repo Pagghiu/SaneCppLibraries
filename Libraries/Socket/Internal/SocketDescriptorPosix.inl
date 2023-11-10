@@ -10,7 +10,7 @@
 #include <unistd.h> // close
 constexpr int SOCKET_ERROR = -1;
 
-SC::Result SC::SocketDescriptorTraits::releaseHandle(Handle& handle)
+SC::Result SC::SocketDescriptorDefinition::releaseHandle(Handle& handle)
 {
     ::close(handle);
     handle = Invalid;

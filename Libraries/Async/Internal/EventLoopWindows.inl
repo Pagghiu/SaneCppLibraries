@@ -20,7 +20,7 @@
 #pragma warning(default : 4062)
 #endif
 
-SC::Result SC::EventLoopWinWaitTraits::releaseHandle(Handle& waitHandle)
+SC::Result SC::EventLoopWinWaitDefinition::releaseHandle(Handle& waitHandle)
 {
     if (waitHandle != INVALID_HANDLE_VALUE)
     {
@@ -668,22 +668,22 @@ struct SC::EventLoop::KernelQueue
 };
 
 template <>
-void SC::OpaqueFuncs<SC::EventLoopWinOverlappedTraits>::construct(Handle& buffer)
+void SC::OpaqueBuilder<SC::EventLoopWinOverlappedOpaque::Sizes>::construct(Handle& buffer)
 {
     new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object();
 }
 template <>
-void SC::OpaqueFuncs<SC::EventLoopWinOverlappedTraits>::destruct(Object& obj)
+void SC::OpaqueBuilder<SC::EventLoopWinOverlappedOpaque::Sizes>::destruct(Object& obj)
 {
     obj.~Object();
 }
 template <>
-void SC::OpaqueFuncs<SC::EventLoopWinOverlappedTraits>::moveConstruct(Handle& buffer, Object&& obj)
+void SC::OpaqueBuilder<SC::EventLoopWinOverlappedOpaque::Sizes>::moveConstruct(Handle& buffer, Object&& obj)
 {
     new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object(move(obj));
 }
 template <>
-void SC::OpaqueFuncs<SC::EventLoopWinOverlappedTraits>::moveAssign(Object& pthis, Object&& obj)
+void SC::OpaqueBuilder<SC::EventLoopWinOverlappedOpaque::Sizes>::moveAssign(Object& pthis, Object&& obj)
 {
     pthis = move(obj);
 }

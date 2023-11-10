@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Opaque.h"
+#include "../Foundation/OpaqueUnique.h"
 #include "../Foundation/Result.h"
 #include "../Strings/SmallString.h"
 
@@ -12,17 +12,18 @@ struct SystemDebug;
 struct SystemDirectories;
 struct SystemFunctions;
 struct SystemDynamicLibrary;
-struct SystemDynamicLibraryTraits;
+struct SystemDynamicLibraryDefinition;
 } // namespace SC
 
-struct SC::SystemDynamicLibraryTraits
+struct SC::SystemDynamicLibraryDefinition
 {
-    using Handle                    = void*;   // HANDLE
+    using Handle = void*; // HANDLE
+    static Result releaseHandle(Handle& handle);
+
     static constexpr Handle Invalid = nullptr; // INVALID_HANDLE_VALUE
-    static Result           releaseHandle(Handle& handle);
 };
 
-struct SC::SystemDynamicLibrary : public SC::UniqueTaggedHandleTraits<SC::SystemDynamicLibraryTraits>
+struct SC::SystemDynamicLibrary : public SC::UniqueTaggedHandle<SC::SystemDynamicLibraryDefinition>
 {
     Result load(StringView fullPath);
     template <typename R, typename... Args>

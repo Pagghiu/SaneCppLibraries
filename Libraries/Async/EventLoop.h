@@ -29,21 +29,24 @@ struct AsyncResult;
 namespace SC
 {
 struct EventLoopWinOverlapped;
-struct EventLoopWinOverlappedSizes
+struct EventLoopWinOverlappedDefinition
 {
     static constexpr int Windows = sizeof(void*) * 7;
-};
-using EventLoopWinOverlappedTraits = OpaqueTraits<EventLoopWinOverlapped, EventLoopWinOverlappedSizes>;
-using EventLoopWinOverlappedOpaque = OpaqueUniqueObject<OpaqueFuncs<EventLoopWinOverlappedTraits>>;
 
-struct EventLoopWinWaitTraits
+    static constexpr size_t Alignment = alignof(void*);
+
+    using Object = EventLoopWinOverlapped;
+};
+using EventLoopWinOverlappedOpaque = OpaqueUnique<EventLoopWinOverlappedDefinition>;
+
+struct EventLoopWinWaitDefinition
 {
     using Handle                    = FileDescriptor::Handle;  // fd
     static constexpr Handle Invalid = FileDescriptor::Invalid; // invalid fd
     static Result           releaseHandle(Handle& waitHandle);
 };
 
-struct EventLoopWinWaitHandle : public UniqueTaggedHandleTraits<EventLoopWinWaitTraits>
+struct EventLoopWinWaitHandle : public UniqueTaggedHandle<EventLoopWinWaitDefinition>
 {
 };
 
@@ -551,18 +554,21 @@ struct SC::EventLoop
     struct KernelQueue;
 
     struct Internal;
-    struct InternalSizes
+    struct InternalDefinition
     {
         static constexpr int Windows = 224;
         static constexpr int Apple   = 144;
         static constexpr int Default = sizeof(void*);
+
+        static constexpr size_t Alignment = alignof(void*);
+
+        using Object = Internal;
     };
 
   public:
-    using InternalTraits = OpaqueTraits<Internal, InternalSizes>;
+    using InternalOpaque = OpaqueUnique<InternalDefinition>;
 
   private:
-    using InternalOpaque = OpaqueUniqueObject<OpaqueFuncs<InternalTraits>>;
     InternalOpaque internal;
 
     [[nodiscard]] int getTotalNumberOfActiveHandle() const;

@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../File/FileDescriptor.h"
-#include "../Foundation/Opaque.h"
+#include "../Foundation/OpaqueUnique.h"
 #include "../Foundation/Result.h"
 #include "../Strings/StringView.h"
 
@@ -54,18 +54,21 @@ struct SC::FileSystemIterator
 
   private:
     struct Internal;
-    struct InternalSizes
+    struct InternalDefinition
     {
         static constexpr int Windows = 4272;
         static constexpr int Apple   = 2104;
         static constexpr int Default = sizeof(void*);
+
+        static constexpr size_t Alignment = alignof(void*);
+
+        using Object = Internal;
     };
 
   public:
-    using InternalTraits = OpaqueTraits<Internal, InternalSizes, alignof(uint64_t)>;
+    using InternalOpaque = OpaqueUnique<InternalDefinition>;
 
   private:
-    using InternalOpaque = OpaqueUniqueObject<OpaqueFuncs<InternalTraits>>;
     InternalOpaque internal;
 
     Entry  currentEntry;
