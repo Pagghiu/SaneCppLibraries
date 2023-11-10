@@ -37,7 +37,7 @@ struct EventLoopWinOverlappedDefinition
 
     using Object = EventLoopWinOverlapped;
 };
-using EventLoopWinOverlappedOpaque = OpaqueUnique<EventLoopWinOverlappedDefinition>;
+using EventLoopWinOverlappedOpaque = OpaqueObject<EventLoopWinOverlappedDefinition>;
 
 struct EventLoopWinWaitDefinition
 {
@@ -46,7 +46,7 @@ struct EventLoopWinWaitDefinition
     static Result           releaseHandle(Handle& waitHandle);
 };
 
-struct EventLoopWinWaitHandle : public UniqueTaggedHandle<EventLoopWinWaitDefinition>
+struct EventLoopWinWaitHandle : public UniqueHandle<EventLoopWinWaitDefinition>
 {
 };
 
@@ -566,7 +566,7 @@ struct SC::EventLoop
     };
 
   public:
-    using InternalOpaque = OpaqueUnique<InternalDefinition>;
+    using InternalOpaque = OpaqueObject<InternalDefinition>;
 
   private:
     InternalOpaque internal;

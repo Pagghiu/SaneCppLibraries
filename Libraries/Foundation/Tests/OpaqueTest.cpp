@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../../Testing/Test.h"
-#include "../OpaqueUnique.h"
+#include "../UniqueHandle.h"
 
 namespace SC
 {
@@ -30,10 +30,10 @@ struct SC::OpaqueTest : public SC::TestCase
     OpaqueTest(SC::TestReport& report) : TestCase(report, "OpaqueTest")
     {
         using namespace SC;
-        if (test_section("UniqueTaggedHandle"))
+        if (test_section("UniqueHandle"))
         {
             HandleDefinition::getDeleteCalled() = false;
-            UniqueTaggedHandle<HandleDefinition> myInt;
+            UniqueHandle<HandleDefinition> myInt;
             {
                 SC_TEST_EXPECT(not HandleDefinition::getDeleteCalled());
                 SC_TEST_EXPECT(not myInt.isValid());

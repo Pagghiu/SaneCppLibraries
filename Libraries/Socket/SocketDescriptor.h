@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../File/FileDescriptor.h"
-#include "../Foundation/OpaqueUnique.h"
+#include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Result.h"
 #include "../System/Time.h" // IntegerMilliseconds
 
@@ -92,14 +92,14 @@ struct SC::SocketIPAddress
     [[nodiscard]] Result fromAddressPort(StringView interfaceAddress, uint16_t port);
 
     // TODO: maybe we should only save a binary address instead of native structs (IPV6 would need 16 bytes)
-    uint32_t         sizeOfHandle() const;
-    OpaqueHandle<28> handle;
+    uint32_t           sizeOfHandle() const;
+    AlignedStorage<28> handle;
 
   private:
     SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
 };
 
-struct SC::SocketDescriptor : public UniqueTaggedHandle<SocketDescriptorDefinition>
+struct SC::SocketDescriptor : public UniqueHandle<SocketDescriptorDefinition>
 {
     [[nodiscard]] Result create(SocketFlags::AddressFamily   addressFamily,
                                 SocketFlags::SocketType      socketType  = SocketFlags::SocketStream,

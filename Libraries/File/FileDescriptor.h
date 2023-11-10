@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/OpaqueUnique.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
+#include "../Foundation/UniqueHandle.h"
 #include "../Strings/StringView.h"
 
 namespace SC
@@ -44,9 +44,9 @@ struct FileDescriptorDefinition
 
 } // namespace SC
 
-struct SC::FileDescriptor : public SC::UniqueTaggedHandle<SC::FileDescriptorDefinition>
+struct SC::FileDescriptor : public SC::UniqueHandle<SC::FileDescriptorDefinition>
 {
-    using UniqueTaggedHandle::UniqueTaggedHandle;
+    using UniqueHandle::UniqueHandle;
     enum OpenMode
     {
         ReadOnly,

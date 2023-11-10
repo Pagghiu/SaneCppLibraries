@@ -38,7 +38,7 @@ constexpr T max(std::initializer_list<T> ilist)
 }
 
 template <size_t Len, class... Types>
-struct AlignedStorage
+struct TaggedUnionAlignedStorage
 {
     static constexpr size_t alignment_value = max({alignof(Types)...});
 
@@ -49,7 +49,7 @@ struct AlignedStorage
 };
 
 template <size_t Len, class... Types>
-struct AlignedStorage<Len, TypeList<Types...>>
+struct TaggedUnionAlignedStorage<Len, TypeList<Types...>>
 {
     static constexpr size_t alignment_value = max({alignof(typename Types::type)...});
 
@@ -206,7 +206,7 @@ struct SC::TaggedUnion
         using T = typename TypeAt<index>::type;
         return *reinterpret_cast<const T*>(&storage);
     }
-    using Storage = typename Internal::AlignedStorage<0, typename Union::FieldsTypes>::type;
+    using Storage = typename Internal::TaggedUnionAlignedStorage<0, typename Union::FieldsTypes>::type;
 
     Storage  storage;
     EnumType type;

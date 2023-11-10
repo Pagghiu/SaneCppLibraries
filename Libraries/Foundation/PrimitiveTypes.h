@@ -73,5 +73,11 @@ inline void  operator delete(void*, void*, SC::PlacementNew) noexcept {}
 #else
 inline void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { return p; }
 #endif
+namespace SC
+{
+/// Placement New
+template<typename T> void placementNew(T& storage) { new (&storage, PlacementNew()) T(); }
+template<typename T> void placementNew(T& storage, T&& other) { new (&storage, PlacementNew()) T(forward<T>(other)); }
+}
 //! @}
 // clang-format on

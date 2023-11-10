@@ -6,79 +6,30 @@
 
 namespace SC
 {
-template <typename T, size_t E, size_t R = sizeof(T)>
-void static_assert_size()
-{
-    static_assert(R <= E, "Size mismatch");
-}
 //! @addtogroup group_foundation_utility
 //! @{
 
-/// @brief  Holds an Operating System handle of size `N` to avoid public inclusion of header where it's defined.
-///         This is a measure to lower compile time and reduce implementation details leaks.
-///         For example it's used used to wrap SocketIPAddress, a Mutex and ConditionVariable.
-/// @tparam N Size in bytes of the Operating System Handle
-/// @tparam Alignment Alignment in Bytes of the operating system Handle
-template <int N, int Alignment = alignof(void*)>
-struct OpaqueHandle
-{
-    /// @brief  Access wanted OS Handle with it's actual type.
-    ///         This is typically done in a .cpp file where the concrete type of the Handle is known
-    ///         For example it is used inside  Mutex class like:
-    /// @code
-    /// pthread_mutex_t& myMutes = handle.reinterpret_as<pthread_mutex_t>()
-    /// @endcode
-    /// @tparam T Type of the handle. It will statically check size and alignment of requested type.
-    /// @return A reference to actual OS handle
-    template <typename T>
-    T& reinterpret_as()
-    {
-        static_assert_size<T, N>();
-        static_assert(alignof(T) <= Alignment, "Increase Alignment of OpaqueHandle");
-        return *reinterpret_cast<T*>(bytes);
-    }
-
-    /// @brief  Access wanted OS Handle with it's actual type.
-    ///         This is typically done in a .cpp file where the concrete type of the Handle is known
-    ///         For example it is used inside  Mutex class like:
-    /// @code
-    /// pthread_mutex_t& myMutes = handle.reinterpret_as<pthread_mutex_t>()
-    /// @endcode
-    /// @tparam T Type of the handle. It will statically check size and alignment of requested type.
-    /// @return A reference to actual OS handle
-    template <typename T>
-    const T& reinterpret_as() const
-    {
-        static_assert_size<T, N>();
-        static_assert(alignof(T) <= Alignment, "Increase Alignment of OpaqueHandle");
-        return *reinterpret_cast<const T*>(bytes);
-    }
-
-  private:
-    alignas(Alignment) char bytes[N];
-};
-
-/// @brief Wraps an non-copyable (move-only) Operating System handle.
+/// @brief A non-copyable (move-only) OS handle that has a special value flagging its invalid state
 /// @tparam Definition A struct declaring handle type, release function and invalid handle value.
 template <typename Definition>
-struct UniqueTaggedHandle
+struct UniqueHandle
 {
     using Handle          = typename Definition::Handle;
     using CloseReturnType = typename ReturnType<decltype(Definition::releaseHandle)>::type;
 
     static constexpr Handle Invalid = Definition::Invalid;
 
-    UniqueTaggedHandle()                                           = default;
-    UniqueTaggedHandle(const UniqueTaggedHandle& v)                = delete;
-    UniqueTaggedHandle& operator=(const UniqueTaggedHandle& other) = delete;
-    UniqueTaggedHandle(UniqueTaggedHandle&& v) : handle(v.handle) { v.detach(); }
-    UniqueTaggedHandle(const Handle& externalHandle) : handle(externalHandle) {}
-    ~UniqueTaggedHandle() { (void)close(); }
+    UniqueHandle()                                     = default;
+    UniqueHandle(const UniqueHandle& v)                = delete;
+    UniqueHandle& operator=(const UniqueHandle& other) = delete;
+    UniqueHandle(UniqueHandle&& v) : handle(v.handle) { v.detach(); }
+    UniqueHandle(const Handle& externalHandle) : handle(externalHandle) {}
+    ~UniqueHandle() { (void)close(); }
 
     /// @brief Move assigns another UniqueHandle to this object, eventually closing existing handle.
     /// @param other The handle to be move-assigned
     /// @return Returns invalid result if close failed
-    [[nodiscard]] CloseReturnType assign(UniqueTaggedHandle&& other)
+    [[nodiscard]] CloseReturnType assign(UniqueHandle&& other)
     {
         if (other.handle == handle)
             return CloseReturnType(false);
@@ -106,9 +57,9 @@ struct UniqueTaggedHandle
         return CloseReturnType(false);
     }
 
-    UniqueTaggedHandle& operator=(UniqueTaggedHandle&& other)
+    UniqueHandle& operator=(UniqueHandle&& other)
     {
-        (void)(assign(forward<UniqueTaggedHandle>(other)));
+        (void)(assign(forward<UniqueHandle>(other)));
         return *this;
     }
 

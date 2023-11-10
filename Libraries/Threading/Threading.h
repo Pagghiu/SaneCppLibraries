@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/Function.h"
-#include "../Foundation/OpaqueUnique.h"
+#include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Result.h"
 #include "../Strings/StringView.h"
 #include "Internal/Optional.h" // UniqueOptional
@@ -44,7 +44,7 @@ struct SC::Mutex
     static constexpr int OpaqueMutexAlignment = alignof(long);
 #endif
     // Wrap native mutex as opaque array of bytes
-    using OpaqueMutex = OpaqueHandle<OpaqueMutexSize, OpaqueMutexAlignment>;
+    using OpaqueMutex = AlignedStorage<OpaqueMutexSize, OpaqueMutexAlignment>;
     OpaqueMutex mutex;
 };
 
@@ -77,7 +77,7 @@ struct SC::ConditionVariable
 #endif
 
     //  Wrap native condition variable as opaque array of bytes
-    using OpaqueConditionVariable = OpaqueHandle<OpaqueCVSize, OpaqueCVAlignment>;
+    using OpaqueConditionVariable = AlignedStorage<OpaqueCVSize, OpaqueCVAlignment>;
     OpaqueConditionVariable condition;
 };
 
@@ -108,7 +108,7 @@ struct SC::Thread
   private:
     struct CreateParams;
     struct Internal;
-    using OpaqueThread = OpaqueHandle<sizeof(void*), alignof(void*)>;
+    using OpaqueThread = AlignedStorage<sizeof(void*), alignof(void*)>;
     UniqueOptional<OpaqueThread> thread;
 };
 

@@ -24,12 +24,12 @@
 #endif
 
 template <>
-void SC::OpaqueBuilder<SC::EventLoop::InternalOpaque::Sizes>::construct(Handle& buffer)
+void SC::EventLoop::InternalOpaque::construct(Handle& buffer)
 {
-    new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object();
+    placementNew(buffer.reinterpret_as<Object>());
 }
 template <>
-void SC::OpaqueBuilder<SC::EventLoop::InternalOpaque::Sizes>::destruct(Object& obj)
+void SC::EventLoop::InternalOpaque::destruct(Object& obj)
 {
     obj.~Object();
 }

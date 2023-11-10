@@ -668,22 +668,22 @@ struct SC::EventLoop::KernelQueue
 };
 
 template <>
-void SC::OpaqueBuilder<SC::EventLoopWinOverlappedOpaque::Sizes>::construct(Handle& buffer)
+void SC::EventLoopWinOverlappedOpaque::construct(Handle& buffer)
 {
-    new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object();
+    placementNew(buffer.reinterpret_as<Object>());
 }
 template <>
-void SC::OpaqueBuilder<SC::EventLoopWinOverlappedOpaque::Sizes>::destruct(Object& obj)
+void SC::EventLoopWinOverlappedOpaque::destruct(Object& obj)
 {
     obj.~Object();
 }
 template <>
-void SC::OpaqueBuilder<SC::EventLoopWinOverlappedOpaque::Sizes>::moveConstruct(Handle& buffer, Object&& obj)
+void SC::EventLoopWinOverlappedOpaque::moveConstruct(Handle& buffer, Object&& obj)
 {
-    new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object(move(obj));
+    placementNew(buffer.reinterpret_as<Object>(), move(obj));
 }
 template <>
-void SC::OpaqueBuilder<SC::EventLoopWinOverlappedOpaque::Sizes>::moveAssign(Object& pthis, Object&& obj)
+void SC::EventLoopWinOverlappedOpaque::moveAssign(Object& pthis, Object&& obj)
 {
     pthis = move(obj);
 }

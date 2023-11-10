@@ -6,7 +6,7 @@
 #include "../Async/EventLoop.h" // AsyncLoopWakeUp
 #include "../Containers/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Function.h"
-#include "../Foundation/OpaqueUnique.h"
+#include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Result.h"
 #include "../Strings/StringView.h"
 #include "../Threading/Threading.h" // EventObject
@@ -54,7 +54,7 @@ struct SC::FileSystemWatcher
 
         using Object = ThreadRunnerInternal;
     };
-    using ThreadRunner = OpaqueUnique<ThreadRunnerDefinition>;
+    using ThreadRunner = OpaqueObject<ThreadRunnerDefinition>;
 
     struct FolderWatcherInternal;
     struct FolderWatcherSizes
@@ -73,7 +73,7 @@ struct SC::FileSystemWatcher
 
         using Object = FolderWatcherInternal;
     };
-    using FolderWatcherOpaque = OpaqueUnique<FolderWatcherSizes>;
+    using FolderWatcherOpaque = OpaqueObject<FolderWatcherSizes>;
 
     struct FolderWatcher
     {
@@ -116,6 +116,6 @@ struct SC::FileSystemWatcher
         using Object = Internal;
     };
 
-    using InternalOpaque = OpaqueUnique<InternalDefinition>;
+    using InternalOpaque = OpaqueObject<InternalDefinition>;
     InternalOpaque internal;
 };

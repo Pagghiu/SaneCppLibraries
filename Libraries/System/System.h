@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/OpaqueUnique.h"
 #include "../Foundation/Result.h"
+#include "../Foundation/UniqueHandle.h"
 #include "../Strings/SmallString.h"
 
 namespace SC
@@ -23,7 +23,7 @@ struct SC::SystemDynamicLibraryDefinition
     static constexpr Handle Invalid = nullptr; // INVALID_HANDLE_VALUE
 };
 
-struct SC::SystemDynamicLibrary : public SC::UniqueTaggedHandle<SC::SystemDynamicLibraryDefinition>
+struct SC::SystemDynamicLibrary : public SC::UniqueHandle<SC::SystemDynamicLibraryDefinition>
 {
     Result load(StringView fullPath);
     template <typename R, typename... Args>

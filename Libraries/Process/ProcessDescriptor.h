@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 
-#include "../Foundation/Handles.h"
+#include "../Foundation/AlignedStorage.h"
 #include "../Foundation/Result.h"
 
 namespace SC
@@ -36,7 +36,7 @@ struct ProcessDescriptorDefinition
 #endif
 } // namespace SC
 
-struct SC::ProcessDescriptor : public UniqueTaggedHandle<ProcessDescriptorDefinition>
+struct SC::ProcessDescriptor : public UniqueHandle<ProcessDescriptorDefinition>
 {
     struct ExitStatus
     {

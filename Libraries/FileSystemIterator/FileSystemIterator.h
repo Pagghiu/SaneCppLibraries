@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../File/FileDescriptor.h"
-#include "../Foundation/OpaqueUnique.h"
+#include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Result.h"
 #include "../Strings/StringView.h"
 
@@ -66,7 +66,7 @@ struct SC::FileSystemIterator
     };
 
   public:
-    using InternalOpaque = OpaqueUnique<InternalDefinition>;
+    using InternalOpaque = OpaqueObject<InternalDefinition>;
 
   private:
     InternalOpaque internal;
