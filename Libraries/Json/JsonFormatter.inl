@@ -40,7 +40,7 @@ bool SC::JsonFormatter::writeSeparator()
         }
         if (printComma)
         {
-            return output.write(","_a8);
+            return output.append(","_a8);
         }
     }
     return true;
@@ -97,7 +97,7 @@ bool SC::JsonFormatter::writeValue(int writtenChars, const char* buffer)
     }
     if (writtenChars > 0)
     {
-        if (output.write(StringView(buffer, static_cast<size_t>(writtenChars), true, StringEncoding::Ascii)))
+        if (output.append(StringView(buffer, static_cast<size_t>(writtenChars), true, StringEncoding::Ascii)))
         {
             return onAfterValue();
         }
@@ -164,7 +164,7 @@ bool SC::JsonFormatter::writeString(StringView value)
         return false;
     }
     // TODO: Escape json string
-    if (output.write("\""_a8) and output.write(value) and output.write("\""_a8))
+    if (output.append("\""_a8) and output.append(value) and output.append("\""_a8))
     {
         return onAfterValue();
     }
@@ -177,7 +177,7 @@ bool SC::JsonFormatter::startArray()
     {
         return false;
     }
-    if (output.write("["_a8))
+    if (output.append("["_a8))
     {
         return state.push_back(ArrayFirst);
     }
@@ -190,7 +190,7 @@ bool SC::JsonFormatter::endArray()
     {
         return false;
     }
-    if (output.write("]"_a8))
+    if (output.append("]"_a8))
     {
         if (state.pop_back())
         {
@@ -207,7 +207,7 @@ bool SC::JsonFormatter::startObject()
         return false;
     }
 
-    if (output.write("{"_a8))
+    if (output.append("{"_a8))
     {
         return state.push_back(ObjectFirst);
     }
@@ -220,7 +220,7 @@ bool SC::JsonFormatter::endObject()
     {
         return false;
     }
-    if (output.write("}"_a8))
+    if (output.append("}"_a8))
     {
         if (state.pop_back())
         {
@@ -238,7 +238,7 @@ bool SC::JsonFormatter::startObjectField(StringView name)
     }
     if (state.back() == Object)
     {
-        if (not output.write(","_a8))
+        if (not output.append(","_a8))
         {
             return false;
         }
@@ -248,7 +248,7 @@ bool SC::JsonFormatter::startObjectField(StringView name)
         state.back() = Object;
     }
     // TODO: Escape JSON name
-    if (output.write("\""_a8) and output.write(name) and output.write("\":"_a8))
+    if (output.append("\""_a8) and output.append(name) and output.append("\":"_a8))
     {
         return state.push_back(ObjectValue);
     }

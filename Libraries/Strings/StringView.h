@@ -12,152 +12,320 @@ struct SC_COMPILER_EXPORT StringAlgorithms;
 
 } // namespace SC
 
+//! @defgroup group_strings Strings
+//! @copybrief library_strings
+//!
+//! See @ref library_strings library page for more details.<br>
+
+//! @addtogroup group_strings
+//! @{
+
+/// @brief Non-owning view over a range of characers with UTF Encoding.
 struct SC::StringView
 {
+    /// @brief Construct an emtpy StringView
     constexpr StringView();
+
+    /// @brief Construct a StringView from a Span of bytes.
+    /// @param textSpan The span containing the text _EXCLUDING_ eventual null terminator
+    /// @param nullTerm `true` if a null terminator code point is expected to be found after Span.
+    ///                 On ASCII and UTF8 this is 1 byte, on UTF16 it must be 2 bytes.
+    /// @param encoding The encoding of the text contained in this StringView
     constexpr StringView(Span<char> textSpan, bool nullTerm, StringEncoding encoding);
+
+    /// @brief Construct a StringView from a Span of bytes.
+    /// @param textSpan The span containing the text _EXCLUDING_ eventual null terminator
+    /// @param nullTerm `true` if a null terminator code point is expected to be found after Span.
+    ///                 On ASCII and UTF8 this is 1 byte, on UTF16 it must be 2 bytes.
+    /// @param encoding The encoding of the text contained in this StringView
     constexpr StringView(Span<const char> textSpan, bool nullTerm, StringEncoding encoding);
+
+    /// @brief Construct a StringView from a C string
+    /// @param text The C-String
+    /// @param numBytes Number of bytes in the string EXCLUDING null terminator
+    /// @param nullTerm `true` if a null terminator code point is expected to be found after Span.
+    ///                 On ASCII and UTF8 this is 1 byte, on UTF16 it must be 2 bytes.
+    /// @param encoding The encoding of the text contained in this StringView
     constexpr StringView(const char* text, size_t numBytes, bool nullTerm, StringEncoding encoding);
 
+    /// @brief Constructs a StringView from a null-terminated C-String
+    /// @param text The null-terminated C-String
+    /// @param encoding The encoding of the text contained in this StringView
+    /// @return The StringView containing text with given encoding
     static StringView fromNullTerminated(const char* text, StringEncoding encoding);
 
+    /// @brief Constructs a StringView with a null terminated string terminal
+    /// @tparam N Number of characters in text string literal
+    /// @param text The Null terminated string literal
     template <size_t N>
     constexpr StringView(const char (&text)[N]);
 
-#if SC_PLATFORM_WINDOWS
+#if SC_PLATFORM_WINDOWS || DOXYGEN
+    /// @brief Constructs an UTF16 StringView with a null terminated wide-string terminal
+    /// @tparam N
+    /// @param text The Null terminated wide-string literal
     template <size_t N>
     constexpr StringView(const wchar_t (&text)[N]);
+    /// @brief Constructs an UTF16 StringView from a null-terminated wide C-String
+    /// @param text The null-terminated wide C-String
+    /// @param numBytes Number of bytes in the string EXCLUDING null terminator (that must be 2 bytes)
+    /// @param nullTerm `true` if a null terminator code point is expected to be found after Span.
+    ///                 On ASCII and UTF8 this is 1 byte, on UTF16 it must be 2 bytes.
     constexpr StringView(const wchar_t* text, size_t numBytes, bool nullTerm);
+
+    /// @brief Construct an UTF16 StringView from a Span of bytes.
+    /// @param textSpan The span containing the text _EXCLUDING_ eventual null terminator
+    /// @param nullTerm `true` if a null terminator code point is expected to be found after Span (two bytes on UTF16)
     constexpr StringView(Span<const wchar_t> textSpan, bool nullTerm);
 #endif
 
+    /// @brief Get encoding of this StringView
+    /// @return This StringView encoding
     [[nodiscard]] constexpr StringEncoding getEncoding() const { return static_cast<StringEncoding>(encoding); }
 
+    /// @brief Directly access the memory of this StringView
+    /// @return Pointer to start of StringView memory
     [[nodiscard]] constexpr const char* bytesWithoutTerminator() const { return text; }
 
+    /// @brief Directly access the memory of this null terminated-StringView.
+    /// @return Pointer to start of StringView memory
+    /// @warning This method will assert if string is not null terminated.
     [[nodiscard]] constexpr const char* bytesIncludingTerminator() const;
 
+    /// @brief Directly access the memory of this null terminated-StringView.
+    /// @return Pointer to start of StringView memory.
+    /// On Windows return type will be `wchar_t`.
+    /// On other platforms return type will be `char`.
+    /// @warning This method will assert that the string is null terminated.
+    ///          On Windows this will assert that encoding is UTF16.
+    ///          On other platforms this will assert that encoding is UTF8 or ASCII.
     auto getNullTerminatedNative() const;
 
+    /// @brief Obtain a `const char` Span from this StringView
+    /// @return Span representing this StringView
     constexpr Span<const char> toCharSpan() const { return {text, textSizeInBytes}; }
 
+    /// @brief Obtain a `const uint8_t` Span from this StringView
+    /// @return Span representing this StringView
     Span<const uint8_t> toBytesSpan() const { return Span<const uint8_t>::reinterpret_bytes(text, textSizeInBytes); }
 
+    /// @brief Result of ordering comparison done by StringView::compare
     enum class Comparison
     {
-        Smaller = -1,
-        Equals  = 0,
-        Bigger  = 1
+        Smaller = -1, ///< Current string is smaller than the other
+        Equals  = 0,  ///< Current string is equal to the other
+        Bigger  = 1   ///< Current string is bigger than the other
     };
 
+    /// @brief Ordering comparison between non-normalized StringView (operates on code points, not on utf graphemes)
+    /// @param other The string being compared to current one
+    /// @return Result of the comparison (smaller, equals or bigger)
     [[nodiscard]] Comparison compare(StringView other) const;
 
+    /// @brief Ordering operator for StringView using StringView::compare
+    /// @param other The string being compared to current one
+    /// @return `true` if current string is Comparison::Smaller than other
     [[nodiscard]] bool operator<(StringView other) const { return compare(other) == Comparison::Smaller; }
 
+    /// @brief Call given lambda with one of StringIteratorASCII, StringIteratorUTF8, StringIteratorUTF16 depending on
+    /// encoding.
+    /// @tparam Func A function/lambda with `auto operator()({StringIteratorASCII | StringIteratorUTF8 |
+    /// StringIteratorUTF16})`
+    /// @param func lambda / functor to be called
+    /// @return whatever value is returned by invoking func
     template <typename Func>
     [[nodiscard]] constexpr auto withIterator(Func&& func) const;
 
+    /// @brief Call given lambda with one of StringIteratorASCII, StringIteratorUTF8, StringIteratorUTF16 depending on
+    /// encoding.
+    /// @tparam Func Func A function/lambda with `auto operator()({StringIteratorASCII | StringIteratorUTF8 |
+    /// StringIteratorUTF16}, {StringIteratorASCII | StringIteratorUTF8 | StringIteratorUTF16})`
+    /// @param s1 StringView that will be passed as first iterator
+    /// @param s2 StringView that will be passed as second iterator
+    /// @param func the lambda / to be invoked
+    /// @return whatever value is returned by invoking func
     template <typename Func>
     [[nodiscard]] static constexpr auto withIterators(StringView s1, StringView s2, Func&& func);
 
+    /// @brief Returns a StringIterator from current StringView
+    /// @tparam StringIterator can be StringIteratorASCII, StringIteratorUTF8 or StringIteratorUTF16
+    /// @return StringIterator representing the StringView
     template <typename StringIterator>
     constexpr StringIterator getIterator() const;
 
+    /// @brief Compare this StringView with another StringView for inequality
+    /// @param other StringView to be compared with current one
+    /// @return 'true' if the two StringView are different
     [[nodiscard]] constexpr bool operator!=(StringView other) const { return not operator==(other); }
 
+    /// @brief Compare this StringView with another StringView for equality
+    /// @param other StringView to be compared with current one
+    /// @return 'true' if the two StringView are the same
     [[nodiscard]] constexpr bool operator==(StringView other) const;
 
+    /// @brief Check if this StringView is equal to other StringView (operates on code points, not on utf graphemes).
+    /// Returns the number of code points that are the same in both StringViews.
+    /// @param other The StringView to be compared to
+    /// @param commonOverlappingPoints number of equal code points in both StringView
+    /// @return `true` if the two StringViews are equal
     [[nodiscard]] constexpr bool fullyOverlaps(StringView other, size_t& commonOverlappingPoints) const;
 
+    /// @brief Check if StringView is empty
+    /// @return `true` if string is empty
     [[nodiscard]] constexpr bool isEmpty() const { return text == nullptr or textSizeInBytes == 0; }
 
+    /// @brief Check if StringView is immediately followed by a null termination character
+    /// @return `true` if StringView is immediately followed by a null termination character
     [[nodiscard]] constexpr bool isNullTerminated() const { return hasNullTerm; }
 
+    /// @brief Get size of the StringView in bytes
+    /// @return Size in bytes of StringView
     [[nodiscard]] constexpr size_t sizeInBytes() const { return textSizeInBytes; }
 
+    /// @brief Get size of the StringView in bytes, including null terminator
+    /// @return Size in bytes of StringView including null terminator (2 bytes on UTF16)
+    /// @warning This method can be called only on StringView that are null terminated.
+    ///         This means that it will Assert if this StringView::isNullTerminated returns `false`
     [[nodiscard]] constexpr size_t sizeInBytesIncludingTerminator() const;
 
-    /// Returns true if this StringView ends with c
+    /// @brief Check if StringView ends with given utf code point
+    /// @param c The utf code point to check against
+    /// @return  Returns `true` if this StringView ends with code point c
     [[nodiscard]] bool endsWithChar(StringCodePoint c) const;
 
-    /// Returns true if this StringView starts with c
+    /// @brief Check if StringView starts with given utf code point
+    /// @param c The utf code point to check against
+    /// @return  Returns `true` if this StringView starts with code point c
     [[nodiscard]] bool startsWithChar(StringCodePoint c) const;
 
-    /// Returns true if this StringView starts with str
+    /// @brief Check if StringView starts with another StringView
+    /// @param str The other StringView to check with current
+    /// @return  Returns `true` if this StringView starts with str
     [[nodiscard]] bool startsWith(const StringView str) const;
 
-    /// Returns true if this StringView ends with str
+    /// @brief Check if StringView ends with another StringView
+    /// @param str The other StringView to check with current
+    /// @return  Returns `true` if this StringView ends with str
     [[nodiscard]] bool endsWith(const StringView str) const;
 
-    /// Returns true if this StringView contains str
-    // TODO: containsString will assert if strings have non compatible encoding
+    /// @brief Check if StringView contains another StringView with compatible encoding.
+    /// @param str The other StringView to check with current
+    /// @return  Returns `true` if this StringView contains str
+    /// @warning This method will assert if strings have non compatible encoding.
+    ///          It can be checked with StringView::hasCompatibleEncoding (str) == `true`
     [[nodiscard]] bool containsString(const StringView str) const;
 
-    /// Returns true if this StringView contains c
+    /// @brief Check if StringView contains given utf code point
+    /// @param c The utf code point to check against
+    /// @return  Returns `true` if this StringView contains code point c
     [[nodiscard]] bool containsChar(StringCodePoint c) const;
 
+    /// @brief Check if current StringView has compatible encoding with str.
+    ///        This means checking if two encodings have the same utf unit size.
+    /// @param str The other StringView to check with current
+    /// @return Returns `true` if this StringView has compatible encoding with str
     [[nodiscard]] constexpr bool hasCompatibleEncoding(StringView str) const;
 
     /// Returns a StringView from two iterators. The from iterator will be shortened until the start of to
+
+    /// @brief  Returns a StringView starting at `from` and ending at `to`.
+    /// @tparam StringIterator One among StringIteratorASCII, StringIteratorUTF8 and StringIteratorUTF16
+    /// @param from Indicates where the StringView will start.
+    ///             The from iterator will be shortened until the start of to.
+    /// @param to   Indicates where the StringView will end.
+    /// @return A StringView  starting at `from` and ending at `to`.
+    /// @note If from is `>` to an empty StringView will be returned
     template <typename StringIterator>
     static StringView fromIterators(StringIterator from, StringIterator to);
 
-    /// Returns a section of a string.
-    /// @param it The index to the beginning of the specified portion of StringView. The substring includes the
-    /// characters up to iterator end.
+    /// @brief Returns a section of a string, from `it` to end of StringView.
+    /// @tparam StringIterator One among StringIteratorASCII, StringIteratorUTF8 and StringIteratorUTF16
+    /// @param it The iterator pointing at the start of the specified portion of StringView.
+    /// @return Another StringView pointing at characters from `it` up to StringView end
     template <typename StringIterator>
     static StringView fromIteratorUntilEnd(StringIterator it);
 
-    /// Returns a section of a string.
-    /// @param it The index to the beginning of the specified portion of StringView. The substring includes the
-    /// characters from iterator start up to its current position
+    /// @brief Returns a section of a string, from start of StringView to `it`.
+    /// @tparam StringIterator One among StringIteratorASCII, StringIteratorUTF8 and StringIteratorUTF16
+    /// @param it The iterator pointing at the start of the specified portion of StringView.
+    /// @return Another StringView pointing at characters from start of StringView until `it`
     template <typename StringIterator>
     static constexpr StringView fromIteratorFromStart(StringIterator it);
 
-    /// Returns a section of a string.
-    /// @param start The index to the beginning of the specified portion of StringView.
-    /// @param end The index to the end of the specified portion of StringView. The substring includes the characters up
-    /// to, but not including, the character indicated by end.
+    /// @brief Get slice `[start, end)` starting at offset `start` and ending at `end` (measured in utf code points)
+    /// @param start The initial code point where the slice starts
+    /// @param end One after the final code point where the slice ends
+    /// @return The `[start, end)` StringView slice
     [[nodiscard]] StringView sliceStartEnd(size_t start, size_t end) const;
 
-    /// Returns a section of a string.
-    /// @param start The offset from the beginning of the specified portion of StringView.
-    /// @param length The number of code points to include.
+    /// @brief Get slice `[start, start+length]` starting at offset `start` and of `length` code points
+    /// @param start The initial code point where the slice starts
+    /// @param length One after the final code point where the slice ends
+    /// @return The `[start, start+length]` StringView slice
     [[nodiscard]] StringView sliceStartLength(size_t start, size_t length) const;
 
-    /// Returns a section of a string.
-    /// @param offset The offset from the beginning of the specified portion of StringView.
+    /// @brief Get slice `[offset, end]` measured in utf code points
+    /// @param offset The initial code point where the slice starts
+    /// @return The sliced StringView `[offset, end]`
     [[nodiscard]] StringView sliceStart(size_t offset) const;
 
-    /// Returns a section of a string.
-    /// @param offset The index to the beginning of the specified portion of StringView.
+    /// @brief Get slice `[end-offset, end]` measured in utf code points
+    /// @param offset The initial code point where the slice starts
+    /// @return The sliced StringView `[end-offset, end]`
     [[nodiscard]] StringView sliceEnd(size_t offset) const;
 
-    /// Trims (removes) all code points equal to c at the end of the string
+    /// @brief Returns a shortened StringView without utf code points matching `c` at end.
+    /// @param c The utf code point to look for
+    /// @return The trimmed StringView
     [[nodiscard]] StringView trimEndingChar(StringCodePoint c) const;
 
-    /// Trims (removes) all code points equal to c at the start of the string
+    /// @brief Returns a shortened StringView without utf code points matching `c` at start.
+    /// @param c The utf code point to look for
+    /// @return The trimmed StringView
     [[nodiscard]] StringView trimStartingChar(StringCodePoint c) const;
 
+    /// @brief Returns a shortened StringView from current cutting the first `start` bytes.
+    /// @param start Offset in bytes where the slice starts.
+    /// @return A sliced StringView starting at `start` bytes offset
     [[nodiscard]] constexpr StringView sliceStartBytes(size_t start) const;
 
+    /// @brief Returns a shortened StringView taking a slice from `start` to `end` expressed in bytes.
+    /// @param start Offset in bytes where the slice will start.
+    /// @param end Offset in bytes where the slice will end.
+    /// @return A sliced StringView starting at `start` bytes offset and ending at `end` bytes offset.
     [[nodiscard]] constexpr StringView sliceStartEndBytes(size_t start, size_t end) const;
 
+    /// @brief Returns a shortened StringView taking a slice from `start` ending at `start`+`length` bytes.
+    /// @param start Offset in bytes where the slice will start.
+    /// @param length Length in bytes from `start` where the slice will end.
+    /// @return A sliced StringView starting at `start` bytes offset and ending at `start`+`length` bytes offset.
     [[nodiscard]] constexpr StringView sliceStartLengthBytes(size_t start, size_t length) const;
 
     /// If the current view is an integer number, returns true
+
+    /// @brief Check if StringView can be parsed as an integer number.
+    /// @return `true` if StringView is an integer number.
     [[nodiscard]] bool isIntegerNumber() const;
 
-    /// If the current view is a floating number, returns true
+    /// @brief Check if StringView can be parsed as an floating point number.
+    /// @return `true` if StringView is a floating point number.
     [[nodiscard]] bool isFloatingNumber() const;
 
     /// Parses int32, returning false if it fails
+
+    /// @brief Try parsing current StringView as a 32 bit integer.
+    /// @param value Will receive the parsed 32 bit integer, if function returns `true`.
+    /// @return `true` if the StringView has been successfully parsed as a 32 bit integer.
     [[nodiscard]] bool parseInt32(int32_t& value) const;
 
-    /// Parses float, returning false if it fails
+    /// @brief Try parsing current StringView as a floating point number.
+    /// @param value Will receive the parsed floating point number, if function returns `true`.
+    /// @return `true` if the StringView has been successfully parsed as a floating point number.
     [[nodiscard]] bool parseFloat(float& value) const;
 
-    /// Parses double, returning false if it fails
+    /// @brief Try parsing current StringView as a double precision floating point number.
+    /// @param value Will receive the parsed double precision floating point number, if function returns `true`.
+    /// @return `true` if the StringView has been successfully parsed as a double precision floating point number.
     [[nodiscard]] bool parseDouble(double& value) const;
 
   private:
@@ -190,6 +358,7 @@ struct SC::StringView
     constexpr bool equalsIterator(StringView other, size_t& points) const;
 };
 
+/// @brief Splits a StringView in tokens according to separators
 struct SC::StringViewTokenizer
 {
     StringCodePoint splittingCharacter = 0;
@@ -214,6 +383,7 @@ struct SC::StringViewTokenizer
     StringView current;
 };
 
+/// @brief Algorithms operating on strings (glob / wildcard)
 struct SC::StringAlgorithms
 {
     [[nodiscard]] static bool matchWildcard(StringView s1, StringView s2);
@@ -222,6 +392,8 @@ struct SC::StringAlgorithms
     template <typename StringIterator1, typename StringIterator2>
     [[nodiscard]] static bool matchWildcardIterator(StringIterator1 pattern, StringIterator2 text);
 };
+
+//! @}
 
 //-----------------------------------------------------------------------------------------------------------------------
 // Implementations Details

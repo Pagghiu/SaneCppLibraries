@@ -31,8 +31,8 @@ static bool formatSprintf(StringFormatOutput& data, const char (&formatSpecifier
     const int  numCharsExcludingTerminator = snprintf(buffer, sizeof(buffer), compoundSpecifier, value);
     const bool validResult =
         (numCharsExcludingTerminator >= 0) and (static_cast<size_t>(numCharsExcludingTerminator + 1) < BUFFER_SIZE);
-    return validResult && data.write(StringView(buffer, static_cast<size_t>(numCharsExcludingTerminator), true,
-                                                StringEncoding::Ascii));
+    return validResult && data.append(StringView(buffer, static_cast<size_t>(numCharsExcludingTerminator), true,
+                                                 StringEncoding::Ascii));
 }
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #if SC_PLATFORM_64_BIT == 0
@@ -113,7 +113,7 @@ bool StringFormatterFor<SC::uint8_t>::format(StringFormatOutput& data, const Str
 bool StringFormatterFor<bool>::format(StringFormatOutput& data, const StringView specifier, const bool value)
 {
     SC_COMPILER_UNUSED(specifier);
-    return data.write(value ? "true"_a8 : "false"_a8);
+    return data.append(value ? "true"_a8 : "false"_a8);
 }
 
 bool StringFormatterFor<float>::format(StringFormatOutput& data, StringView specifier, const float value)
@@ -131,27 +131,27 @@ bool StringFormatterFor<double>::format(StringFormatOutput& data, const StringVi
 bool StringFormatterFor<char>::format(StringFormatOutput& data, const StringView specifier, const char value)
 {
     SC_COMPILER_UNUSED(specifier);
-    return data.write(StringView(&value, sizeof(value), false, StringEncoding::Ascii));
+    return data.append(StringView(&value, sizeof(value), false, StringEncoding::Ascii));
 }
 
 bool StringFormatterFor<const char*>::format(StringFormatOutput& data, const StringView specifier, const char* value)
 {
     SC_COMPILER_UNUSED(specifier);
-    return data.write(StringView(value, strlen(value), true, StringEncoding::Ascii));
+    return data.append(StringView(value, strlen(value), true, StringEncoding::Ascii));
 }
 
 #if SC_PLATFORM_WINDOWS
 bool StringFormatterFor<wchar_t>::format(StringFormatOutput& data, const StringView specifier, const wchar_t value)
 {
     SC_COMPILER_UNUSED(specifier);
-    return data.write(StringView({&value, 1}, false));
+    return data.append(StringView({&value, 1}, false));
 }
 
 bool StringFormatterFor<const wchar_t*>::format(StringFormatOutput& data, const StringView specifier,
                                                 const wchar_t* value)
 {
     SC_COMPILER_UNUSED(specifier);
-    return data.write(StringView({value, wcslen(value)}, true));
+    return data.append(StringView({value, wcslen(value)}, true));
 }
 #endif
 
@@ -159,7 +159,7 @@ bool StringFormatterFor<StringView>::format(StringFormatOutput& data, const Stri
                                             const StringView value)
 {
     SC_COMPILER_UNUSED(specifier);
-    return data.write(value);
+    return data.append(value);
 }
 
 bool StringFormatterFor<String>::format(StringFormatOutput& data, const StringView specifier, const String& value)
@@ -170,7 +170,7 @@ bool StringFormatterFor<String>::format(StringFormatOutput& data, const StringVi
 //-----------------------------------------------------------------------------------------------------------------------
 // StringFormatOutput
 //-----------------------------------------------------------------------------------------------------------------------
-bool StringFormatOutput::write(StringView text)
+bool StringFormatOutput::append(StringView text)
 {
     if (text.isEmpty())
     {

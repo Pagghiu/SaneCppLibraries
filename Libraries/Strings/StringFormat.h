@@ -13,15 +13,35 @@ struct String;
 template <typename T>
 struct StringFormatterFor;
 
+//! @addtogroup group_strings
+//! @{
+
+/// @brief Allows pushing results of `StringFormat` to a buffer or to the console
 struct StringFormatOutput
 {
+    /// @brief Constructs a StringFormatOutput object pushing to a destination buffer
+    /// @param encoding The given encoding
+    /// @param destination The destination buffer
     StringFormatOutput(StringEncoding encoding, Vector<char>& destination);
-    StringFormatOutput(StringEncoding encoding, Console& newConsole);
 
-    [[nodiscard]] bool write(StringView text);
+    /// @brief Constructs a StringFormatOutput object pushing to a console
+    /// @param encoding The given encoding
+    /// @param destination The destination console
+    StringFormatOutput(StringEncoding encoding, Console& destination);
 
-    void               onFormatBegin();
-    void               onFormatFailed();
+    /// @brief Appends the StringView (eventually converting it) to destination vuffer
+    /// @param text The StringView to be appended to buffer or console
+    /// @return `true` if conversion succeded
+    [[nodiscard]] bool append(StringView text);
+
+    /// @brief Method to be called when format begins, so that it can be rolled back on failure
+    void onFormatBegin();
+
+    /// @brief Method to be called when format fails (will rollback buffer to length before `onFormatBegin`)
+    void onFormatFailed();
+
+    /// @brief Method to be called when format succeeds
+    /// @return `true` if null terminator has been sucessfully added
     [[nodiscard]] bool onFormatSucceded();
 
   private:
@@ -31,15 +51,24 @@ struct StringFormatOutput
     size_t         backupSize = 0;
 };
 
+/// @brief Formats String with a simple DSL embedded in the format string
+/// @tparam RangeIterator Type of the specific StringIterator used
 template <typename RangeIterator>
 struct StringFormat
 {
+    /// @brief Formats fmt StringView using simple DSL where `{}` are replaced with args
+    /// @tparam Types Types of the arguments being formatted
+    /// @param data Destination abstraction (buffer or console)
+    /// @param fmt The format string to be used
+    /// @param args Actual arguments being formatted
+    /// @return `true` if format succeded
     template <typename... Types>
     [[nodiscard]] static bool format(StringFormatOutput& data, StringView fmt, Types&&... args);
 
   private:
     struct Implementation;
 };
+//! @}
 
 } // namespace SC
 
@@ -116,14 +145,14 @@ struct SC::StringFormat<RangeIterator>::Implementation
                     SC_LANGUAGE_UNLIKELY // if it's the same matched, let's escape it
                     {
                         (void)it.stepForward(); // we want to make sure we insert the escaped '{' or '}'
-                        if (not data.write(StringView::fromIterators(start, it)))
+                        if (not data.append(StringView::fromIterators(start, it)))
                             return false;
                         (void)it.stepForward(); // we don't want to insert the additional '{' or '}' needed for escaping
                         start = it;
                     }
                 else if (matchedChar == '{') // it's a '{' not followed by itself, so let's parse specifier
                 {
-                    if (not data.write(StringView::fromIterators(start, it))) // write everything before '{
+                    if (not data.append(StringView::fromIterators(start, it))) // write everything before '{
                         return false;
                     // try parse '}' and eventually format
                     int32_t parsedPosition = position;
@@ -140,7 +169,7 @@ struct SC::StringFormat<RangeIterator>::Implementation
             }
             else
             {
-                if (not data.write(StringView::fromIterators(start, it))) // write everything before '{
+                if (not data.append(StringView::fromIterators(start, it))) // write everything before '{
                     return false;
                 return maxPosition == static_cast<int32_t>(sizeof...(args)); // check right number of args
             }

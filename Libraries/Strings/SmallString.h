@@ -8,12 +8,15 @@
 
 namespace SC
 {
-
 template <int N>
 struct SmallString;
-
 } // namespace SC
 
+//! @addtogroup group_strings
+//! @{
+
+/// @brief String with compile time configurable inline storage (small string optimization)
+/// @tparam N number of chars to reserve in inline storage
 template <int N>
 struct SC::SmallString : public String
 {
@@ -103,6 +106,7 @@ struct SC::SmallString : public String
         String::data.items    = buffer.items;
     }
 };
+//! @}
 
 namespace SC
 {

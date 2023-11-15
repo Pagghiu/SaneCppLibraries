@@ -7,24 +7,40 @@
 
 namespace SC
 {
+//! @addtogroup group_strings
+//! @{
+
+/// @brief UTF code point (32 bit)
 using StringCodePoint = uint32_t;
+
+/// @brief String Encoding (Ascii, Utf8, Utf16)
 enum class StringEncoding : uint8_t
 {
-    Ascii = 0,
-    Utf8  = 1,
-    Utf16 = 2, // Little Endian
+    Ascii = 0, ///< Encoding is ASCII
+    Utf8  = 1, ///< Encoding is UTF8
+    Utf16 = 2, ///< Encoding is UTF16-LE
 #if SC_PLATFORM_WINDOWS
-    Native = Utf16,
-    Wide   = Utf16
+    Native = Utf16, ///< Encoding is UTF16-LE
+    Wide   = Utf16  ///< Encoding is UTF16-LE
 #else
-    Native = Utf8
+    Native = Utf8 ///< Encoding is UTF8
 #endif
 };
 
-constexpr bool     StringEncodingAreBinaryCompatible(StringEncoding encoding1, StringEncoding encoding2);
+/// @brief Checks if two encodings have the same utf unit size
+/// @param encoding1 First encoding
+/// @param encoding2 Second encoding
+/// @return `true` if the two encodings have the same unit size
+constexpr bool StringEncodingAreBinaryCompatible(StringEncoding encoding1, StringEncoding encoding2);
+
+/// @brief Returns the number of bytes to represent an utf unit in the given encoding
+/// @param encoding The encoding
+/// @return number of bytes of the given encoding
 constexpr uint32_t StringEncodingGetSize(StringEncoding encoding);
 
-// Invariants: start <= end and it >= start and it <= end
+/// @brief A position inside a fixed range `[start, end)` of UTF code points.
+/// Invariants: start <= end and it >= start and it <= end
+/// @tparam CharIterator StringIteratorASCII, StringIteratorUTF8 or StringIteratorUTF16
 template <typename CharIterator>
 struct SC_COMPILER_EXPORT StringIterator
 {
@@ -33,70 +49,164 @@ struct SC_COMPILER_EXPORT StringIterator
     using CodeUnit  = char;
     using CodePoint = StringCodePoint;
 
+    /// @brief Rewind current position to start of iterator range
     constexpr void setToStart() { it = start; }
 
+    /// @brief Set current position to end of iterator range
     constexpr void setToEnd() { it = end; }
 
+    /// @brief Check if current position is at end of iterator range
+    /// @return `true` if position is at end of iterator range
     [[nodiscard]] constexpr bool isAtEnd() const { return it >= end; }
 
+    /// @brief Check if current position is at start of iterator range
+    /// @return `true` if position is at start of iterator range
     [[nodiscard]] constexpr bool isAtStart() const { return it <= start; }
 
+    /// @brief Advances position towards `end` until it matches CodePoint `c` or `position == end`
+    /// @param c The CodePoint to be searched
+    /// @return `true` if c was found, `false` if end was reached
     [[nodiscard]] constexpr bool advanceUntilMatches(CodePoint c);
 
+    /// @brief Moves position towards start until CodePoint `c` is found or `position == end`
+    /// @param c The CodePoint to be searched
+    /// @return `true` if `c` was found, `false` if `start` was reached
     [[nodiscard]] bool reverseAdvanceUntilMatches(CodePoint c);
 
+    /// @brief Advances position towards `end` until a matching range of character equal to `other[it, end)` is found.
+    /// Position pointer is advanced additional after the matching range.
+    /// @param other The range of character to be found `[it, end)`
+    /// @return `true` if other was found, `false` if end was reached
     [[nodiscard]] bool advanceAfterFinding(StringIterator other);
 
+    /// @brief Advances position towards `end` until a matching range of character equal to `other[it, end)` is found.
+    /// Position pointer is stopped before the first matching character of the range.
+    /// @param other The range of character to be found `[it, end)`
+    /// @return `true` if other was found, `false` if end was reached
     [[nodiscard]] bool advanceBeforeFinding(StringIterator other);
 
+    /// @brief Advances position by the same number of code points as other
+    /// @param other The other range of character
+    /// @return `true` if advance succeeded, `false` if `end` was reached
     [[nodiscard]] bool advanceByLengthOf(StringIterator other) { return advanceOfBytes(other.end - other.it); }
 
+    /// @brief Advances position until any CodePoint in the given Span is found
+    /// @param items A contiguous span of CodePoint to match
+    /// @param matched The matched CodePoint in the Span
+    /// @return `true` if one CodePoint was matched, `false` if `end` was reached
     [[nodiscard]] bool advanceUntilMatchesAny(Span<const CodePoint> items, CodePoint& matched);
 
+    /// @brief Moves position towards start until any CodePoint in the given Span is found
+    /// @param items A contiguous span of CodePoint to match
+    /// @param matched The matched CodePoint in the Span
+    /// @return `true` if one CodePoint was matched, `false` if `start` was reached
     [[nodiscard]] bool reverseAdvanceUntilMatchesAny(Span<const CodePoint> items, CodePoint& matched);
 
-    /// Returns true if it finds at least one character different from c, false if iterator ends before finding it
+    /// @brief Advances position until a code point different from `c` is found or `end` is reached
+    /// @param c The CodePoint to be compared
+    /// @param optionalReadChar The CodePoint that was found, different from `c`
+    /// @return `true` if it finds at least one code point different from c, `false` if iterator ends before finding it
     [[nodiscard]] bool advanceUntilDifferentFrom(CodePoint c, CodePoint* optionalReadChar = nullptr);
 
+    /// @brief Advance position only if next code point matches `c`.
+    /// @param c The CodePoint being searched
+    /// @return `true` if next code point matches `c`, `false` otherwise or if position is already at end
     [[nodiscard]] constexpr bool advanceIfMatches(CodePoint c);
 
+    /// @brief Move position by one code point towards start if previous code point matches `c`
+    /// @param c The CodePoint being searched
+    /// @return `true` if next code point matches `c`, `false` otherwise or if position is already at end
     [[nodiscard]] bool advanceBackwardIfMatches(CodePoint c);
 
+    /// @brief Advance position only if any of the code points in given Span is matched
+    /// @param items Span of points to be checked
+    /// @return `true` if next code point was sucessfully matched
     [[nodiscard]] bool advanceIfMatchesAny(Span<const CodePoint> items);
 
+    /// @brief Advance position if any code point in the range [first, last] is matched
+    /// @param first The initial CodePoint defining the range to be checked
+    /// @param last The final CodePoint defining the range to be checked
+    /// @return `true` if a code point in the given range was matched
     [[nodiscard]] bool advanceIfMatchesRange(CodePoint first, CodePoint last);
 
+    /// @brief Check if code unit at current position matches CodePoint `c`
+    /// @param c code point to match
+    /// @return `true` if code unit at current position matches `c`, `false` if there is no match or position is at
+    /// `end`
     [[nodiscard]] bool match(CodePoint c) { return it < end and CharIterator::decode(it) == c; }
 
+    /// @brief Decode code unit at current position and advance
+    /// @param c output code point read
+    /// @return `true` if position is at `end` before decoding code unit
     [[nodiscard]] constexpr bool advanceRead(CodePoint& c);
 
+    /// @brief Read code unit at current position
+    /// @param c output code point read
+    /// @return `true` if position is at `end` before decoding code unit
     [[nodiscard]] bool read(CodePoint& c);
 
+    /// @brief Move to previous position and read code unit
+    /// @param c output code point read
+    /// @return `true` if position is at `start` before decoding code unit
     [[nodiscard]] bool advanceBackwardRead(CodePoint& c);
 
+    /// @brief Move position to next code point
+    /// @return `true` if position is not at `end` before trying to move forward
     [[nodiscard]] constexpr bool stepForward();
 
+    /// @brief Move position to previous code point
+    /// @return `true` if position is not at `start` before trying to move backwards
     [[nodiscard]] constexpr bool stepBackward();
 
+    /// @brief Move position forward (towards `end`) by variable number of code points
+    /// @param numCodePoints number of code points to move forward
+    /// @return `true` if it's possible advancing `numCodePoints` before reaching `end`
     [[nodiscard]] constexpr bool advanceCodePoints(size_t numCodePoints);
 
+    /// @brief Move position backwards (towards `start`) by variable number of code pints
+    /// @param numCodePoints number of code points to move backwards
+    /// @return `true` if it's possible moving `numCodePoints` backwards before reaching `start`
     [[nodiscard]] bool reverseAdvanceCodePoints(size_t numCodePoints);
 
+    /// @brief Check if next code point is `c`
+    /// @param c the code point
+    /// @return `true` if next code point is `c`
     [[nodiscard]] constexpr bool isFollowedBy(CodePoint c);
 
+    /// @brief Check if previous code point is `c`
+    /// @param c the code point
+    /// @return `true` if previous code point is `c`
     [[nodiscard]] constexpr bool isPrecededBy(CodePoint c);
 
+    /// @brief Returns another StringIterator range, starting from `start` to `otherPoint` position
+    /// @param otherPoint The StringIterator containing the ending position to slice to
+    /// @return The new StringIterator `[start, otherPoint.position]`
     [[nodiscard]] constexpr StringIterator sliceFromStartUntil(StringIterator otherPoint) const;
 
+    /// @brief Get distance in bytes from current position to another StringIterator current position
+    /// @param other The StringIterator from which to compute distance
+    /// @return (signed) number of bytes between the two StringIterator
     [[nodiscard]] constexpr ssize_t bytesDistanceFrom(StringIterator other) const;
 
+    /// @brief Check if this Iterator ends with a given code point
+    /// @param character the code point
+    /// @return `true` if `character` exists as last code point of this StringIterator range
     [[nodiscard]] bool endsWithChar(CodePoint character) const;
 
+    /// @brief Check if this Iterator starts with a given code point
+    /// @param character the code point
+    /// @return `true` if `character` exists as first code point of this StringIterator range
     [[nodiscard]] bool startsWithChar(CodePoint character) const;
 
+    /// @brief Check if this Iterator at its end matches entirely another Iterator's range
+    /// @param other  The other iterator to match
+    /// @return `true` if this Iterator matches entire `other` Iterator at its `end`
     template <typename IteratorType>
     [[nodiscard]] bool endsWith(IteratorType other) const;
 
+    /// @brief Check if this Iterator at its start matches entirely another Iterator's range
+    /// @param other  The other iterator to match
+    /// @return `true` if this Iterator matches entire `other` at its `start`
     template <typename IteratorType>
     [[nodiscard]] bool startsWith(IteratorType other) const;
 
@@ -113,6 +223,7 @@ struct SC_COMPILER_EXPORT StringIterator
     const CodeUnit* end;
 };
 
+/// @brief A string iterator for ASCII strings
 struct SC_COMPILER_EXPORT StringIteratorASCII : public StringIterator<StringIteratorASCII>
 {
     [[nodiscard]] constexpr bool advanceUntilMatches(CodePoint c);
@@ -131,6 +242,7 @@ struct SC_COMPILER_EXPORT StringIteratorASCII : public StringIterator<StringIter
     [[nodiscard]] static constexpr CodePoint   decode(const char* src) { return static_cast<CodePoint>(*src); }
 };
 
+/// @brief A string iterator for UTF16 strings
 struct SC_COMPILER_EXPORT StringIteratorUTF16 : public StringIterator<StringIteratorUTF16>
 {
   private:
@@ -148,6 +260,7 @@ struct SC_COMPILER_EXPORT StringIteratorUTF16 : public StringIterator<StringIter
     [[nodiscard]] static uint32_t decode(const char* bytes);
 };
 
+/// @brief A string iterator for UTF8 strings
 struct SC_COMPILER_EXPORT StringIteratorUTF8 : public StringIterator<StringIteratorUTF8>
 {
   private:
@@ -165,6 +278,7 @@ struct SC_COMPILER_EXPORT StringIteratorUTF8 : public StringIterator<StringItera
     [[nodiscard]] static uint32_t decode(const char* src);
 };
 
+/// @brief Builds a constexpr bool skip table of 256 entries used in some parsers
 struct StringIteratorSkipTable
 {
     bool matches[256] = {false};
@@ -176,6 +290,7 @@ struct StringIteratorSkipTable
         }
     }
 };
+//! @}
 
 //-----------------------------------------------------------------------------------------------------------------------
 // Implementations Details

@@ -21,31 +21,31 @@ bool SC::SerializationStructured::SerializationJsonWriter::setOptions(Options op
 bool SC::SerializationStructured::SerializationJsonWriter::startObject(uint32_t index)
 {
     SC_TRY(eventuallyAddComma(index));
-    return output.write("{"_a8);
+    return output.append("{"_a8);
 }
 
-bool SC::SerializationStructured::SerializationJsonWriter::endObject() { return output.write("}"_a8); }
+bool SC::SerializationStructured::SerializationJsonWriter::endObject() { return output.append("}"_a8); }
 
 bool SC::SerializationStructured::SerializationJsonWriter::startArray(uint32_t index)
 {
     SC_TRY(eventuallyAddComma(index));
-    return output.write("["_a8);
+    return output.append("["_a8);
 }
 
-bool SC::SerializationStructured::SerializationJsonWriter::endArray() { return output.write("]"_a8); }
+bool SC::SerializationStructured::SerializationJsonWriter::endArray() { return output.append("]"_a8); }
 
 bool SC::SerializationStructured::SerializationJsonWriter::startObjectField(uint32_t index, StringView text)
 {
     SC_TRY(eventuallyAddComma(index));
     // TODO: Escape JSON string
-    return output.write("\"") and output.write(text) and output.write("\"") and output.write(":"_a8);
+    return output.append("\"") and output.append(text) and output.append("\"") and output.append(":"_a8);
 }
 
 bool SC::SerializationStructured::SerializationJsonWriter::serialize(uint32_t index, const String& value)
 {
     SC_TRY(eventuallyAddComma(index));
     // TODO: Escape JSON string
-    return output.write("\"") and output.write(value.view()) and output.write("\"");
+    return output.append("\"") and output.append(value.view()) and output.append("\"");
 }
 
 bool SC::SerializationStructured::SerializationJsonWriter::serialize(uint32_t index, float value)
@@ -62,7 +62,7 @@ bool SC::SerializationStructured::SerializationJsonWriter::serialize(uint32_t in
 
 bool SC::SerializationStructured::SerializationJsonWriter::eventuallyAddComma(uint32_t index)
 {
-    return index > 0 ? output.write(",") : true;
+    return index > 0 ? output.append(",") : true;
 }
 
 bool SC::SerializationStructured::SerializationJsonReader::startObject(uint32_t index)

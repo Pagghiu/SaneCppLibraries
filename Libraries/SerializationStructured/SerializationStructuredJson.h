@@ -41,7 +41,7 @@ struct SC::SerializationStructured::SerializationJsonWriter
     {
         SC_TRY(eventuallyAddComma(index));
         size = static_cast<uint32_t>(container.size());
-        return output.write("["_a8);
+        return output.append("["_a8);
     }
 
     [[nodiscard]] bool endArray();
