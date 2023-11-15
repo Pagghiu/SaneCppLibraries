@@ -17,25 +17,25 @@ struct SC::PathTest : public SC::TestCase
     {
         if (test_section("Path::isAbsolute"))
         {
-            SC_TEST_EXPECT(Path::Posix::isAbsolute("/dirname/basename"));           // Posix Absolute
-            SC_TEST_EXPECT(not Path::Posix::isAbsolute("./dirname/basename"));      // Posix Relative
-            SC_TEST_EXPECT(Path::Windows::isAbsolute("C:\\dirname\\basename"));     // Windows with Drive
-            SC_TEST_EXPECT(Path::Windows::isAbsolute("\\\\server\\dir"));           // Windows with Network
-            SC_TEST_EXPECT(Path::Windows::isAbsolute("\\\\?\\C:\\server\\dir"));    // Windows with Long
-            SC_TEST_EXPECT(not Path::Windows::isAbsolute("..\\dirname\\basename")); // Widnwos relative
+            SC_TEST_EXPECT(Path::isAbsolute("/dirname/basename", Path::AsPosix));           // Posix Absolute
+            SC_TEST_EXPECT(not Path::isAbsolute("./dirname/basename", Path::AsPosix));      // Posix Relative
+            SC_TEST_EXPECT(Path::isAbsolute("C:\\dirname\\basename", Path::AsWindows));     // Windows with Drive
+            SC_TEST_EXPECT(Path::isAbsolute("\\\\server\\dir", Path::AsWindows));           // Windows with Network
+            SC_TEST_EXPECT(Path::isAbsolute("\\\\?\\C:\\server\\dir", Path::AsWindows));    // Windows with Long
+            SC_TEST_EXPECT(not Path::isAbsolute("..\\dirname\\basename", Path::AsWindows)); // Widnwos relative
         }
         if (test_section("Path::dirname"))
         {
-            SC_TEST_EXPECT(Path::Posix::dirname("/dirname/basename") == "/dirname");
-            SC_TEST_EXPECT(Path::Posix::dirname("/dirname/basename//") == "/dirname");
-            SC_TEST_EXPECT(Path::Windows::dirname("C:\\dirname\\basename") == "C:\\dirname");
-            SC_TEST_EXPECT(Path::Windows::dirname("\\dirname\\basename\\\\") == "\\dirname");
+            SC_TEST_EXPECT(Path::dirname("/dirname/basename", Path::AsPosix) == "/dirname");
+            SC_TEST_EXPECT(Path::dirname("/dirname/basename//", Path::AsPosix) == "/dirname");
+            SC_TEST_EXPECT(Path::dirname("C:\\dirname\\basename", Path::AsWindows) == "C:\\dirname");
+            SC_TEST_EXPECT(Path::dirname("\\dirname\\basename\\\\", Path::AsWindows) == "\\dirname");
         }
         if (test_section("Path::basename"))
         {
-            SC_TEST_EXPECT(Path::Posix::basename("/a/basename") == "basename");
-            SC_TEST_EXPECT(Path::Posix::basename("/a/basename//") == "basename");
-            SC_TEST_EXPECT(Path::Posix::basename("/a/basename.html", ".html") == "basename");
+            SC_TEST_EXPECT(Path::basename("/a/basename", Path::AsPosix) == "basename");
+            SC_TEST_EXPECT(Path::basename("/a/basename//", Path::AsPosix) == "basename");
+            SC_TEST_EXPECT(Path::basename("/a/basename.html", ".html") == "basename");
         }
         if (test_section("Path::ParsedView::parsePosix"))
         {

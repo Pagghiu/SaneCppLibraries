@@ -324,7 +324,7 @@ bool SC::SystemDirectories::init()
     executableFile = ""_u8;
     StringBuilder builder(executableFile);
     SC_TRY(builder.append(utf16executable));
-    applicationRootDirectory = Path::Windows::dirname(executableFile.view());
+    applicationRootDirectory = Path::dirname(executableFile.view(), Path::AsWindows);
     return Result(true);
 }
 

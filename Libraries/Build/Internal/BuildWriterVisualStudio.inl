@@ -582,7 +582,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("  <ItemGroup>\n");
         for (auto& it : renderer.renderItems)
         {
-            const StringView dir = Path::removeStartingSeparator(Path::Posix::dirname(it.referencePath.view()));
+            const StringView dir = Path::removeStartingSeparator(Path::dirname(it.referencePath.view(), Path::AsPosix));
             if (it.type == WriterInternal::RenderItem::HeaderFile)
             {
                 builder.append("    <ClInclude Include=\"{}\">\n", it.path);
@@ -596,7 +596,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("  <ItemGroup>\n");
         for (auto& it : renderer.renderItems)
         {
-            const StringView dir = Path::removeStartingSeparator(Path::Posix::dirname(it.referencePath.view()));
+            const StringView dir = Path::removeStartingSeparator(Path::dirname(it.referencePath.view(), Path::AsPosix));
             if (it.type == WriterInternal::RenderItem::CppFile)
             {
                 builder.append("    <ClCompile Include=\"{}\">\n", it.path);
@@ -610,7 +610,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("  <ItemGroup>\n");
         for (auto& it : renderer.renderItems)
         {
-            const StringView dir = Path::removeStartingSeparator(Path::Posix::dirname(it.referencePath.view()));
+            const StringView dir = Path::removeStartingSeparator(Path::dirname(it.referencePath.view(), Path::AsPosix));
             if (it.type == WriterInternal::RenderItem::InlineFile)
             {
                 builder.append("    <None Include=\"{}\">\n", it.path);
@@ -624,7 +624,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("  <ItemGroup>\n");
         for (auto& it : renderer.renderItems)
         {
-            const StringView dir = Path::removeStartingSeparator(Path::Posix::dirname(it.referencePath.view()));
+            const StringView dir = Path::removeStartingSeparator(Path::dirname(it.referencePath.view(), Path::AsPosix));
             if (it.type == WriterInternal::RenderItem::DebugVisualizerfile)
             {
                 builder.append("    <Natvis Include=\"{}\">\n", it.path);

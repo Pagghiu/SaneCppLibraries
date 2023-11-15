@@ -345,49 +345,11 @@ bool SC::Path::isAbsolute(StringView input, Type type)
 {
     switch (type)
     {
-    case AsPosix: return Posix::isAbsolute(input);
-    case AsWindows: return Windows::isAbsolute(input);
+    case AsPosix: return input.startsWithChar('/');
+    case AsWindows: return not Internal::parseWindowsRoot(input).isEmpty();
     }
     Assert::unreachable();
 }
-
-SC::StringView SC::Path::Windows::dirname(StringView input, int repeat)
-{
-    return Internal::dirname<Windows::Separator, Posix::Separator>(input, repeat);
-}
-
-SC::StringView SC::Path::Windows::basename(StringView input)
-{
-    return Internal::basename<Windows::Separator, Posix::Separator>(input);
-}
-
-SC::StringView SC::Path::Windows::basename(StringView input, StringView suffix)
-{
-    return Internal::basename<Windows::Separator, Posix::Separator>(input, suffix);
-}
-
-bool SC::Path::Windows::isAbsolute(StringView input)
-{
-    StringView root = Internal::parseWindowsRoot(input);
-    return not root.isEmpty();
-}
-
-SC::StringView SC::Path::Posix::dirname(StringView input, int repeat)
-{
-    return Internal::dirname<Posix::Separator, Posix::Separator>(input, repeat);
-}
-
-SC::StringView SC::Path::Posix::basename(StringView input)
-{
-    return Internal::basename<Posix::Separator, Posix::Separator>(input);
-}
-
-SC::StringView SC::Path::Posix::basename(StringView input, StringView suffix)
-{
-    return Internal::basename<Posix::Separator, Posix::Separator>(input, suffix);
-}
-
-bool SC::Path::Posix::isAbsolute(StringView input) { return input.startsWithChar('/'); }
 
 bool SC::Path::join(String& output, Span<const StringView> inputs, StringView separator, bool skipEmpty)
 {
