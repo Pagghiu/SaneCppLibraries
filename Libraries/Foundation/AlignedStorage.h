@@ -5,11 +5,13 @@
 
 namespace SC
 {
+#if !DOXYGEN
 template <typename T, size_t E, size_t R = sizeof(T)>
 void static_assert_size()
 {
     static_assert(R <= E, "Size mismatch");
 }
+#endif
 //! @addtogroup group_foundation_utility
 //! @{
 
@@ -57,6 +59,6 @@ struct AlignedStorage
     alignas(Alignment) char bytes[N];
 };
 
-//! }@
+//! @}
 
 } // namespace SC

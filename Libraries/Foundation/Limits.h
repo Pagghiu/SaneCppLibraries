@@ -12,7 +12,7 @@ struct MaxValue;
 //! @addtogroup group_foundation_utility
 //! @{
 
-/// @brief Object that has automatic conversions to all primitive types returning their respective automatic sizes.
+/// @brief An object that can be converted to any primitive type providing its max value.
 ///
 /// Fox Example:
 /// @code

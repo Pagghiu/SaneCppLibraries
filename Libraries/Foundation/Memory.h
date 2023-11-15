@@ -5,9 +5,13 @@
 #include "../Foundation/PrimitiveTypes.h"
 namespace SC
 {
+struct Memory;
+}
 //! @addtogroup group_foundation_utility
 //! @{
-struct Memory
+
+/// @brief Centralized functions to allocate, reallocate and deallocate memory
+struct SC::Memory
 {
     /// @brief Allocates numBytes bytes of memory
     /// @param numBytes Number of bytes to allocate
@@ -25,4 +29,3 @@ struct Memory
     SC_COMPILER_EXPORT static void release(void* allocatedMemory);
 };
 //! @}
-} // namespace SC

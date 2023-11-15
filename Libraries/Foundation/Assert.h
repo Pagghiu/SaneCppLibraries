@@ -14,7 +14,7 @@ struct Assert;
 //! @addtogroup group_foundation_utility
 //! @{
 
-/// @brief Contains methods to print assertions with backgrace
+/// @brief Functions and macros to assert, exit() or abort() and capture backtraces.
 struct SC::Assert
 {
     [[noreturn]] SC_COMPILER_FORCE_INLINE static void unreachable()

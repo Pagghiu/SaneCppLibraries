@@ -9,8 +9,7 @@ namespace SC
 //! @addtogroup group_foundation_utility
 //! @{
 
-/// @brief A function wrapper. Wraps function pointers, pointers to member functions and lambdas (smaller than
-/// `LAMBDA_SIZE`)
+/// @brief Wrapper for function pointers, member functions and lambdas up to `LAMBDA_SIZE`.
 ///
 /// Example:
 /// @code

@@ -14,7 +14,7 @@ struct Span;
 //! @addtogroup group_foundation_utility
 //! @{
 
-/// @brief View over a contiguous sequence of objects, represented with a pointer and a number of elements.
+/// @brief View over a contiguous sequence of items, made of a pointer and a size.
 /// @tparam Type Any type
 template <typename Type>
 struct SC::Span

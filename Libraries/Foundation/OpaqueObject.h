@@ -55,5 +55,5 @@ struct OpaqueObject
     static void moveAssign(Object& pthis, Object&& obj);
 };
 
-//! }@
+//! @}
 } // namespace SC

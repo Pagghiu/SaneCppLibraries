@@ -7,7 +7,7 @@ namespace SC
 //! @addtogroup group_foundation_utility
 //! @{
 
-/// @brief Result is like a `bool` but uses a `const char*` ASCII string to hold a non-owning error message reason.
+/// @brief An ascii string used as boolean result. #SC_TRY macro forwards errors to caller.
 struct [[nodiscard]] Result
 {
     /// @brief If == nullptr then Result is valid. If != nullptr it's the reason of the error
@@ -38,7 +38,7 @@ struct [[nodiscard]] Result
   private:
     explicit constexpr Result(const char* message) : message(message) {}
 };
-//! }@
+//! @}
 } // namespace SC
 
 //! @addtogroup group_foundation_utility
@@ -68,4 +68,4 @@ struct [[nodiscard]] Result
 
 /// @brief Asserts that the given result is valid
 #define SC_TRUST_RESULT(expression) SC_ASSERT_RELEASE(expression)
-//! }@
+//! @}

@@ -9,7 +9,8 @@ namespace SC
 //! @addtogroup group_foundation_utility
 //! @{
 
-/// @brief A non-copyable (move-only) OS handle that has a special value flagging its invalid state
+/// @brief  Move only handle that has a special tag value flagging its invalid state.
+///         Typically used to wrap Operating System specific handles.
 /// @tparam Definition A struct declaring handle type, release function and invalid handle value.
 template <typename Definition>
 struct UniqueHandle
@@ -101,6 +102,6 @@ struct UniqueHandle
     Handle handle = Invalid;
 };
 
-//! }@
+//! @}
 
 } // namespace SC

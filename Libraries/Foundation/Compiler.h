@@ -8,7 +8,7 @@
 //! @defgroup group_foundation_compiler_macros Compiler Macros
 //! @ingroup group_foundation
 //! Compiler Macros
-/// Define compiler flags for Clang, GCC, MSVC, and Clang-CL.
+/// Preprocessor macros to detect compiler and platform features.
 
 //! @addtogroup group_foundation_compiler_macros
 //! @{
@@ -237,11 +237,6 @@ template <typename T> constexpr inline void swap(T& t1, T& t2)
 }
 //! @}
 
-//! @defgroup group_algorithms Algorithms
-//! Compiler Macros
-/// Define compiler flags for Clang, GCC, MSVC, and Clang-CL.
-
-/// Conditional removal of existing 'max' and 'min' macros.
 #ifdef max
 #undef max
 #endif
@@ -266,22 +261,29 @@ template <typename T> constexpr T max(T t1, T t2) { return t1 > t2 ? t1 : t2; }
 //! @addtogroup group_foundation_utility
 //! @{
 
-/// A deferred function call wrapper to execute it at the end of scope. In the spirit of Zig `defer` keyword.
+/// @brief Executes a function at end of current scope (in the spirit of Zig `defer` keyword).
+/// @tparam F The lanbda / function to execute
 template <typename F> struct Deferred
 {
-    Deferred(F&& f) : f(forward<F>(f)) {} ///< Constructs Deferred object with a functor F
-    ~Deferred() { if (armed) f(); } ///< Invokes the function F  upon destruction, if disarm() has not been previously called.
-    void disarm() { armed = false; }///< Disarms the Deferred object, preventing function invocation on destruction.
+    /// @brief Constructs Deferred object with a functor F
+    Deferred(F&& f) : f(forward<F>(f)) {}   
+
+    /// @brief Invokes the function F upon destruction, if disarm() has not been previously called.
+    ~Deferred() { if (armed) f(); }
+
+    /// @brief Disarms the Deferred object, preventing function invocation on destruction.
+    void disarm() { armed = false; }
 
   private:
-    F    f;///< The function to be invoked.
-    bool armed = true;///< Indicates whether the Deferred object is 'armed' for function invocation.
+    F    f;             ///< The function to be invoked.
+    bool armed = true;  ///< Indicates whether the Deferred object is 'armed' for function invocation.
 };
 
-/// Creates a Deferred object with a function for delayed invocation at end of current scope.
+/// @brief Creates a Deferred object with a function for delayed invocation at end of current scope.
+/// @param f The lambda to be invoked at end of current scope
 template <typename F> Deferred<F> MakeDeferred(F&& f) { return Deferred<F>(forward<F>(f)); }
-//! @}
 
+//! @}
 
 }
 // clang-format on

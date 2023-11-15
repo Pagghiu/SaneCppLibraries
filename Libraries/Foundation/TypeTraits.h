@@ -11,7 +11,7 @@
 
 //! @defgroup group_foundation_type_traits Type Traits
 //! @ingroup group_foundation
-//! Type Traits (MetaProgramming)
+//! Metaprogramming constructs (SC::EnableIf, SC::AddPointer, SC::RemovePointer, etc.)
 
 namespace SC
 {

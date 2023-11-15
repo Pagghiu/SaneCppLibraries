@@ -77,7 +77,7 @@ struct TaggedField
 //! @addtogroup group_foundation_utility
 //! @{
 
-/// @brief A type safe union associated with an enum type, where each type is associated with an enum value.
+/// @brief  Type safe union with an enum type, where each type has an associeted enum value.
 /// @tparam Union TypeList of TaggedField
 template <typename Union>
 struct SC::TaggedUnion
