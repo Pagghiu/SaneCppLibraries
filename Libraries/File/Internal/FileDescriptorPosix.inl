@@ -6,9 +6,10 @@
 #include "../../Strings/StringConverter.h"
 #include "../FileDescriptor.h"
 
-#include <errno.h>  // errno
-#include <fcntl.h>  // fcntl
-#include <unistd.h> // close
+#include <errno.h>    // errno
+#include <fcntl.h>    // fcntl
+#include <sys/stat.h> // fstat
+#include <unistd.h>   // close
 
 namespace SC
 {
@@ -210,6 +211,28 @@ SC::Result SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
     const off_t res = ::lseek(handle, static_cast<off_t>(offset), flags);
     SC_TRY_MSG(res >= 0, "lseek failed");
     return Result(static_cast<uint64_t>(res) == offset);
+}
+
+SC::Result SC::FileDescriptor::currentPosition(size_t& position) const
+{
+    const off_t fileSize = ::lseek(handle, 0, SEEK_CUR);
+    if (fileSize >= 0)
+    {
+        position = static_cast<size_t>(fileSize);
+        return Result(true);
+    }
+    return Result::Error("lseek failed");
+}
+
+SC::Result SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
+{
+    struct stat fileStat;
+    if (::fstat(handle, &fileStat) == 0)
+    {
+        sizeInBytes = static_cast<size_t>(fileStat.st_size);
+        return Result(true);
+    }
+    return Result::Error("fstat failed");
 }
 
 SC::Result SC::FileDescriptor::write(Span<const char> data, uint64_t offset)

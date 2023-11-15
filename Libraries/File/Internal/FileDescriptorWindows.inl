@@ -185,6 +185,28 @@ SC::Result SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
     return Result(static_cast<uint64_t>(newPos) == offset);
 }
 
+SC::Result SC::FileDescriptor::currentPosition(size_t& position) const
+{
+    LARGE_INTEGER li;
+    if (SetFilePointerEx(handle, {0, 0}, &li, FILE_CURRENT) != 0)
+    {
+        position = static_cast<size_t>(li.QuadPart);
+        return Result(true);
+    }
+    return Result::Error("SetFilePointerEx failed");
+}
+
+SC::Result SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
+{
+    LARGE_INTEGER li;
+    if (GetFileSizeEx(handle, &li) != 0)
+    {
+        sizeInBytes = static_cast<size_t>(li.QuadPart);
+        return Result(true);
+    }
+    return Result::Error("GetFileSizeEx failed");
+}
+
 SC::Result SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
 {
     SC_TRY(seek(SeekStart, offset));
