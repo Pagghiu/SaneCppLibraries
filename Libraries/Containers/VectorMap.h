@@ -11,7 +11,12 @@ struct VectorMap;
 template <typename Key, typename Value>
 struct VectorMapItem;
 template <typename TagType, typename IDType = int32_t, IDType InvalidValue = -1>
-struct StrongID
+struct StrongID;
+} // namespace SC
+//! @addtogroup group_containers
+//! @{
+template <typename TagType, typename IDType, IDType InvalidValue>
+struct SC::StrongID
 {
     IDType identifier;
 
@@ -36,7 +41,6 @@ struct StrongID
         return test;
     }
 };
-} // namespace SC
 
 template <typename Key, typename Value>
 struct SC::VectorMapItem
@@ -45,6 +49,10 @@ struct SC::VectorMapItem
     Value value;
 };
 
+/// @brief A key value map holding key value pairs in an unsorted SC::Vector
+/// @tparam Key Type of the key (must support `==` comparison)
+/// @tparam Value Value type associated with Key
+/// @tparam Container Container used for the Map
 template <typename Key, typename Value, typename Container = SC::Vector<SC::VectorMapItem<Key, Value>>>
 struct SC::VectorMap
 {
@@ -197,3 +205,4 @@ struct SC::VectorMap
         return nullptr;
     }
 };
+//! @}

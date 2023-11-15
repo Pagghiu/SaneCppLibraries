@@ -10,6 +10,12 @@ template <typename Value, typename Container>
 struct VectorSet;
 } // namespace SC
 
+//! @addtogroup group_containers
+//! @{
+
+/// @brief Simple and inefficient set built with a SC::Vector, ensuring no item duplication
+/// @tparam Value The contained value
+/// @tparam Container The underlying container used
 template <typename Value, typename Container = SC::Vector<Value>>
 struct SC::VectorSet
 {
@@ -43,3 +49,4 @@ struct SC::VectorSet
         return items.remove(value);
     }
 };
+//! @}

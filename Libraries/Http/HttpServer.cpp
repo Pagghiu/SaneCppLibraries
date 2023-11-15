@@ -131,8 +131,6 @@ void SC::HttpServerAsync::onNewClient(AsyncSocketAccept::Result& result)
 
         auto& buffer = req.request.headerBuffer;
         succeeded &= buffer.resizeWithoutInitializing(buffer.capacity());
-        (void)StringBuilder(client.debugName)
-            .format("HttpServerAsync::client [{}:{}]", (int)key1.generation.generation, (int)key1.index);
         client.asyncReceive.setDebugName(client.debugName.bytesIncludingTerminator());
         client.asyncReceive.callback.bind<HttpServerAsync, &HttpServerAsync::onReceive>(*this);
         succeeded &= client.asyncReceive.start(*asyncAccept.getEventLoop(), client.socket, buffer.toSpan());

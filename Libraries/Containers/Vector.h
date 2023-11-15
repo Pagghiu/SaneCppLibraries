@@ -14,7 +14,13 @@ template <typename T>
 struct Vector;
 struct SC_COMPILER_EXPORT VectorAllocator;
 } // namespace SC
+//! @defgroup group_containers Containers
+//! @copybrief library_containers
+//!
+//! See @ref library_containers library page for more details.<br>
 
+//! @addtogroup group_containers
+//! @{
 struct SC::VectorAllocator
 {
     static SegmentHeader* reallocate(SegmentHeader* oldHeader, size_t newSize);
@@ -35,6 +41,8 @@ struct SC::VectorAllocator
     }
 };
 
+/// @brief A contiguous sequence of heap allocated elements
+/// @tparam T Type of single vector element
 template <typename T>
 struct SC::Vector
 {
@@ -50,96 +58,215 @@ struct SC::Vector
     using Operations = SegmentOperations<VectorAllocator, T>;
 
   public:
+    /// @brief Constructs an empty Vector
     Vector() : items(nullptr) {}
 
+    /// @brief Constructs a Vector from an initializer list
+    /// @param ilist The initializer list that will be appended to this Vector
     Vector(std::initializer_list<T> ilist) : items(nullptr) { (void)append({ilist.begin(), ilist.size()}); }
 
+    /// @brief Destroys the Vector, releasing allocated memory
     ~Vector() { destroy(); }
 
+    /// @brief Copies vector into this vector
+    /// @param other The vector to be copied
     Vector(const Vector& other);
 
+    /// @brief Moves vector contents into this vector
+    /// @param other The vector being moved
     Vector(Vector&& other) noexcept;
 
+    /// @brief Move assigns another vector to this one. Contents of this vector will be freed.
+    /// @param other The vector being move assigned
+    /// @return Reference to this vector
     Vector& operator=(Vector&& other);
 
+    /// @brief Copy assigns another vector to this one. Contents of this vector will be freed.
+    /// @param other The vector being copy assigned
+    /// @return Reference to this vector
     Vector& operator=(const Vector& other);
 
+    /// @brief Returns a Span wrapping the entire of current vector
+    /// @return a Span wrapping the entire of current vector
     [[nodiscard]] Span<const T> toSpanConst() const { return {items, size()}; }
 
+    /// @brief Returns a Span wrapping the entire of current vector
+    /// @return a Span wrapping the entire of current vector
     [[nodiscard]] Span<T> toSpan() { return {items, size()}; }
 
+    /// @brief Access item at index. Bounds checked in debug.
+    /// @param index index of the item to be accessed
+    /// @return Value at index in the vector
     [[nodiscard]] T& operator[](size_t index);
 
+    /// @brief Access item at index. Bounds checked in debug.
+    /// @param index index of the item to be accessed
+    /// @return Value at index in the vector
     [[nodiscard]] const T& operator[](size_t index) const;
 
+    /// @brief Copies an element in front of the Vector, at position 0
+    /// @param element The element to be copied in front of the Vector
+    /// @return `true` if operation succeded
     [[nodiscard]] bool push_front(const T& element) { return insert(0, {&element, 1}); }
 
+    /// @brief Moves an element in front of the Vector, at position 0
+    /// @param element The element to be moved in front of the Vector
+    /// @return `true` if operation succeded
     [[nodiscard]] bool push_front(T&& element) { return insertMove(0, {&element, 1}); }
 
+    /// @brief Appends an element copying it at the end of the Vector
+    /// @param element The element to be copied at the end of the Vector
+    /// @return `true` if operation succeded
     [[nodiscard]] bool push_back(const T& element) { return Operations::push_back(items, element); }
 
+    /// @brief Appends an element moving it at the end of the Vector
+    /// @param element The element to be moved at the end of the Vector
+    /// @return `true` if operation succeded
     [[nodiscard]] bool push_back(T&& element) { return Operations::push_back(items, move(element)); }
 
+    /// @brief Removes the last element of the vector
+    /// @return `true` if the operation succeeds
     [[nodiscard]] bool pop_back() { return Operations::pop_back(items); }
 
+    /// @brief Removes the first element of the vector
+    /// @return `true` if the operation succeeds
     [[nodiscard]] bool pop_front() { return Operations::pop_front(items); }
 
+    /// @brief Access the first element of the Vector
+    /// @return A reference to the first element of the Vector
     [[nodiscard]] T& front();
 
+    /// @brief Access the first element of the Vector
+    /// @return A reference to the first element of the Vector
     [[nodiscard]] const T& front() const;
 
+    /// @brief Access the last element of the Vector
+    /// @return A reference to the last element of the Vector
     [[nodiscard]] T& back();
 
+    /// @brief Access the last element of the Vector
+    /// @return A reference to the last element of the Vector
     [[nodiscard]] const T& back() const;
 
+    /// @brief Reserves memory for newCapacity elements, allocating memory if necessary.
+    /// @param newCapacity The wanted new capacity for this Vector
+    /// @return `true` if memory reservation succeded
     [[nodiscard]] bool reserve(size_t newCapacity);
 
+    /// @brief Resizes this vector to newSize, preserving existing elements.
+    /// @param newSize The wanted new size of the vector
+    /// @param value a default value that will be used for new elements inserted.
+    /// @return `true` if resize succeded
     [[nodiscard]] bool resize(size_t newSize, const T& value = T());
 
+    /// @brief Resizes this vector to newSize, preserving existing elements. Does not initialize the items between
+    /// size() and capacity().
+    ///         Be careful, it's up to the caller to initialize such items to avoid UB.
+    /// @param newSize The wanted new size of the vector
+    /// @return `true` if resize succeded
     [[nodiscard]] bool resizeWithoutInitializing(size_t newSize);
 
+    /// @brief  Removes all elements from container, calling destructor for each of them.
+    ///         Doesn't deallocate memory (use shrink_to_fit for that)
     void clear();
 
+    /// @brief Sets size() to zero, without calling destructor on elements.
     void clearWithoutInitializing() { (void)resizeWithoutInitializing(0); }
 
+    /// @brief Reallocates the vector so that size() == capacity(). If Vector is empty, it deallocates its memory.
+    /// @return `true` if operation succeded
     [[nodiscard]] bool shrink_to_fit() { return Operations::shrink_to_fit(items); }
 
+    /// @brief Check if the vector is empty
+    /// @return `true` if vector is empty.
     [[nodiscard]] bool isEmpty() const { return (items == nullptr) || getSegmentItems()->isEmpty(); }
 
+    /// @brief Gets size of the vector
+    /// @return size of the vector
     [[nodiscard]] size_t size() const;
 
+    /// @brief Gets capacity of the vector. Capacity is always >= size.
+    /// @return capacity of the vector
     [[nodiscard]] size_t capacity() const;
 
-    [[nodiscard]] T*       begin() { return items; }
+    /// @brief Gets pointer to first element of the vector
+    /// @return pointer to first element of the vector
+    [[nodiscard]] T* begin() { return items; }
+    /// @brief Gets pointer to first element of the vector
+    /// @return pointer to first element of the vector
     [[nodiscard]] const T* begin() const { return items; }
-    [[nodiscard]] T*       end() { return items + size(); }
+    /// @brief Gets pointer to one after last element of the vector
+    /// @return pointer to one after last element of the vector
+    [[nodiscard]] T* end() { return items + size(); }
+    /// @brief Gets pointer to one after last element of the vector
+    /// @return pointer to one after last element of the vector
     [[nodiscard]] const T* end() const { return items + size(); }
-    [[nodiscard]] T*       data() { return items; }
+    /// @brief Gets pointer to first element of the vector
+    /// @return pointer to first element of the vector
+    [[nodiscard]] T* data() { return items; }
+    /// @brief Gets pointer to first element of the vector
+    /// @return pointer to first element of the vector
     [[nodiscard]] const T* data() const { return items; }
 
+    /// @brief Inserts a range of items copying them at given index
+    /// @param idx Index where to start inserting the range of items
+    /// @param data the range of items to copy
+    /// @return `true` if operation succeded
     [[nodiscard]] bool insert(size_t idx, Span<const T> data);
 
+    /// @brief Appends a range of items copying them at the end of vector
+    /// @param data the range of items to copy
+    /// @return `true` if operation succeded
     [[nodiscard]] bool append(Span<const T> data);
 
+    /// @brief Appends a range of items copying them at the end of vector
+    /// @param src the range of items to copy
+    /// @return `true` if operation succeded
     template <typename U>
     [[nodiscard]] bool append(Span<const U> src);
 
+    /// @brief Appends another vector moving its contents at the end of vector
+    /// @tparam U Type of the vector to be move appended
+    /// @param src The vector to be moved at end of vector
+    /// @return `true` if operation succeded
     template <typename U>
     [[nodiscard]] bool appendMove(U&& src);
 
+    /// @brief Check if the current vector contains a given value.
+    /// @tparam U Type of the object being searched
+    /// @param value Value being searched
+    /// @param foundIndex if passed in != `nullptr`, receives index where item was found.
+    /// Only written if function returns `true`
+    /// @return `true` if the vector contains the given value.
     template <typename U>
     [[nodiscard]] bool contains(const U& value, size_t* foundIndex = nullptr) const;
 
+    /// @brief Finds the first item in vector matching criteria given by the lambda
+    /// @tparam Lambda Type of the Lambda passed that declares a `bool operator()(const T&)` operator
+    /// @param lambda The functor or lambda called that evaluates to `true` when item is found
+    /// @param foundIndex if passed in != `nullptr`, receives index where item was found.
+    /// @return `true` if the wanted value with given criteria is found.
     template <typename Lambda>
     [[nodiscard]] bool find(Lambda&& lambda, size_t* foundIndex = nullptr) const;
 
+    /// @brief Removes an item at a given index
+    /// @param index Index where the item must be removed
+    /// @return `true` if operation succeeded (index is within bounds)
     [[nodiscard]] bool removeAt(size_t index) { return Operations::removeAt(items, index); }
 
+    /// @brief Removes all items matching criteria given by Lambda
+    /// @tparam Lambda Type of the functor/lambda with a `bool operator()(const T&)` operator
+    /// @param criteria The lambda/functor passed in
+    /// @return `true` if at least one item has been removed
     template <typename Lambda>
     [[nodiscard]] bool removeAll(Lambda&& criteria);
 
-    template <typename ComparableToValue>
-    [[nodiscard]] bool remove(const ComparableToValue& value);
+    /// @brief Removes all values equal to `value`
+    /// @tparam U Type of the Value
+    /// @param value Value to be removed
+    /// @return `true` if at least one item has been removed
+    template <typename U>
+    [[nodiscard]] bool remove(const U& value);
 
   private:
     [[nodiscard]] bool insertMove(size_t idx, Span<T> data);
@@ -150,6 +277,7 @@ struct SC::Vector
 
     void moveAssign(Vector&& other);
 };
+//! @}
 
 //-----------------------------------------------------------------------------------------------------------------------
 // Implementation details
@@ -448,8 +576,8 @@ bool SC::Vector<T>::removeAll(Lambda&& criteria)
 }
 
 template <typename T>
-template <typename ComparableToValue>
-bool SC::Vector<T>::remove(const ComparableToValue& value)
+template <typename U>
+bool SC::Vector<T>::remove(const U& value)
 {
     return SegmentItems<T>::removeAll(items, 0, size(), [&](const auto& it) { return it == value; });
 }

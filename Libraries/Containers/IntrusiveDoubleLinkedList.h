@@ -10,6 +10,11 @@ template <typename T>
 struct IntrusiveDoubleLinkedList;
 } // namespace SC
 
+//! @addtogroup group_containers
+//! @{
+
+/// @brief An Intrusive Double Linked List
+/// @tparam T The Type being linked. It must declare two pointers to itself named `next` and `prev`.
 template <typename T>
 struct SC::IntrusiveDoubleLinkedList
 {
@@ -126,3 +131,4 @@ struct SC::IntrusiveDoubleLinkedList
         item.prev = nullptr;
     }
 };
+//! @}

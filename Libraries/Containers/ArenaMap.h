@@ -14,9 +14,16 @@ template <typename T>
 struct ArenaMapKey;
 } // namespace SC
 
+//! @addtogroup group_containers
+//! @{
+
+/// @brief A sparse vector keeping objects at a stable memory location.
+///         All operations return an SC::ArenaMapKey that can be used to recover values in constant time.
+/// @tparam T Type of items kept in this Arena
 template <typename T>
 struct SC::ArenaMapKey
 {
+  private:
     struct Generation
     {
         uint32_t used       : 1;
@@ -31,7 +38,11 @@ struct SC::ArenaMapKey
     };
     Generation generation;
     uint32_t   index;
+    friend struct ArenaMap<T>;
+    template <typename U>
+    friend struct ArenaMapKey;
 
+  public:
     ArenaMapKey() { index = 0; }
 
     bool isValid() const { return generation.used != 0; }
@@ -57,6 +68,8 @@ struct SC::ArenaMapKey
     static constexpr uint32_t MaxIndex       = 0xffffffff;
 };
 
+/// @brief A sparse vector keeping objects at a stable memory location
+/// @tparam T Type of items kept in this Arena
 template <typename T>
 struct SC::ArenaMap
 {
@@ -99,7 +112,7 @@ struct SC::ArenaMap
     uint32_t getNumAllocated() const { return static_cast<uint32_t>(items.size()); }
 
     template <typename MapType>
-    struct GenericIterator
+    struct ArenaMapIterator
     {
         MapType* map   = nullptr;
         uint32_t index = 0;
@@ -116,12 +129,12 @@ struct SC::ArenaMap
             }
         }
 
-        bool operator==(GenericIterator it) const
+        bool operator==(ArenaMapIterator it) const
         {
             SC_ASSERT_DEBUG(it.map == map and map != nullptr);
             return it.index == index;
         }
-        bool operator!=(GenericIterator it) const
+        bool operator!=(ArenaMapIterator it) const
         {
             SC_ASSERT_DEBUG(it.map == map and map != nullptr);
             return it.index != index;
@@ -130,8 +143,8 @@ struct SC::ArenaMap
         auto& operator*() const { return map->items[index].object; }
         auto* operator->() const { return &map->items[index].object; }
     };
-    using ConstIterator = GenericIterator<const ArenaMap>;
-    using Iterator      = GenericIterator<ArenaMap>;
+    using ConstIterator = ArenaMapIterator<const ArenaMap>;
+    using Iterator      = ArenaMapIterator<ArenaMap>;
 
     ConstIterator cbegin() const { return begin(); }
     ConstIterator cend() const { return end(); }
@@ -282,7 +295,7 @@ struct SC::ArenaMap
         return &items[key.index].object;
     }
 
-  protected:
+  private:
     struct Item
     {
         T object;
@@ -315,3 +328,4 @@ struct SC::ArenaMap
         return {};
     }
 };
+//! @}

@@ -21,6 +21,8 @@ template <typename Allocator, typename T>
 struct SegmentOperations;
 } // namespace SC
 
+//! @addtogroup group_containers
+//! @{
 template <typename SizeT>
 struct alignas(SC::uint64_t) SC::SegmentHeaderBase
 {
@@ -193,6 +195,7 @@ struct SC::SegmentOperations
 
     [[nodiscard]] static bool removeAt(T* items, size_t index);
 };
+//! @}
 
 //-----------------------------------------------------------------------------------------------------------------------
 // Implementations Details

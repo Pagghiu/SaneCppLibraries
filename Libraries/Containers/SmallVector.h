@@ -11,6 +11,12 @@ template <typename T, int N>
 struct SmallVector;
 } // namespace SC
 
+//! @addtogroup group_containers
+//! @{
+
+/// @brief A SC::Vector that can hold up to `N` elements inline and `> N` on heap
+/// @tparam T Type of single vector element
+/// @tparam N Number of elements kept inline to avoid heap allocation
 template <typename T, int N>
 struct SC::SmallVector : public Vector<T>
 {
@@ -72,3 +78,4 @@ struct SC::SmallVector : public Vector<T>
         Vector<T>::items      = buffer.items;
     }
 };
+//! @}
