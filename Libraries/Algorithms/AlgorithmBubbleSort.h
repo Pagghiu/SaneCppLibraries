@@ -6,14 +6,33 @@
 
 namespace SC
 {
+//! @defgroup group_algorithms Algorithms
+//! @copybrief library_algorithms
+//!
+//! See @ref library_algorithms library page for more details.<br>
+
 namespace Algorithms
 {
+//! @addtogroup group_algorithms
+//! @{
+
+/// @brief Functor that evaluates to `a < b`
 template <typename T>
 struct smallerThan
 {
+    /// @brief Returns `true` if `a < b`
+    /// @param a First element to be tested for `a < b`
+    /// @param b Second element to be tested for `a < b`
+    /// @return  Returns `true` if `a < b`
     bool operator()(const T& a, const T& b) { return a < b; }
 };
 
+/// @brief Sorts a range of Iterator according to BinaryPredicate through bubble sort algorithm.
+/// @tparam Iterator A type that behaves as an iterator (can just be a pointer to element in array / vector)
+/// @tparam BinaryPredicate A predicate that takes `(a, b)` and returns `bool` (example SC::Algorithms::smallerThan)
+/// @param first Iterator pointing at first element of the range
+/// @param last Iterator pointing at last element of the array
+/// @param predicate The given BinaryPredicate
 template <typename Iterator, typename BinaryPredicate = smallerThan<typename RemovePointer<Iterator>::type>>
 void bubbleSort(Iterator first, Iterator last, BinaryPredicate predicate = BinaryPredicate())
 {
@@ -39,5 +58,6 @@ void bubbleSort(Iterator first, Iterator last, BinaryPredicate predicate = Binar
         }
     }
 }
+//! @}
 } // namespace Algorithms
 } // namespace SC
