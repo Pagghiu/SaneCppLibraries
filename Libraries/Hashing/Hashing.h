@@ -5,6 +5,15 @@
 #include "../Foundation/Span.h"
 namespace SC
 {
+//! @defgroup group_hashing Hashing
+//! @copybrief library_hashing
+//!
+//! See @ref library_hashing library page for more details.<br>
+
+//! @addtogroup group_hashing
+//! @{
+
+/// @brief Compute MD5, SHA1 or SHA256 hash for stream of data
 struct Hashing
 {
     struct Result
@@ -20,12 +29,15 @@ struct Hashing
     };
     enum Type
     {
-        TypeMD5,
-        TypeSHA1,
-        TypeSHA256
+        TypeMD5,   ///< Compute MD5 hash for the incoming stream of bytes
+        TypeSHA1,  ///< Compute SHA1 hash for the incoming stream of bytes
+        TypeSHA256 ///< Compute SHA256 hash for the incoming stream of bytes
     };
 
+    /// @brief Initializes an Hashing struct
     Hashing();
+
+    /// @brief Destroys an Hashing struct
     ~Hashing();
 
     Hashing(const Hashing&)            = delete;
@@ -33,8 +45,19 @@ struct Hashing
     Hashing& operator=(const Hashing&) = delete;
     Hashing& operator=(Hashing&&)      = delete;
 
+    /// @brief Add data to be hashed. Can be called multiple times before Hashing::finalize
+    /// @param data Data to be hashed
+    /// @return `true` if data has been hashed successfully
     [[nodiscard]] bool update(Span<const uint8_t> data);
+
+    /// @brief Finalizes hash computation that has been pushed through Hashing::update
+    /// @param[out] res Result object holding the actual Result::hash
+    /// @return `true` if the final hash has been computed successfully
     [[nodiscard]] bool finalize(Result& res);
+
+    /// @brief Set type of hash to compute
+    /// @param newType MD5, SHA1, SHA256
+    /// @return `true` if the hash type has been changed successfully
     [[nodiscard]] bool setType(Type newType);
 
   private:
@@ -48,4 +71,5 @@ struct Hashing
     bool inited = false;
     Type type   = TypeMD5;
 };
+//! @}
 } // namespace SC
