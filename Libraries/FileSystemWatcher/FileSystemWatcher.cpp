@@ -56,12 +56,12 @@ void SC::FileSystemWatcher::ThreadRunner::destruct(Object& obj)
 }
 
 template <>
-void SC::FileSystemWatcher::FolderWatcherOpaque::construct(Handle& buffer)
+void SC::OpaqueObject<SC::FileSystemWatcher::FolderWatcherSizes>::construct(Handle& buffer)
 {
     placementNew(buffer.reinterpret_as<Object>());
 }
 template <>
-void SC::FileSystemWatcher::FolderWatcherOpaque::destruct(Object& obj)
+void SC::OpaqueObject<SC::FileSystemWatcher::FolderWatcherSizes>::destruct(Object& obj)
 {
     obj.~Object();
 }
