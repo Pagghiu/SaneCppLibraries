@@ -381,8 +381,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, StringVi
     }
     SC_TRY(args.append({"-o", destFile.view()}));
 #endif
-    SC_TRY(process.formatArguments(args.toSpanConst()));
-    SC_TRY(process.launch());
+    SC_TRY(process.launch(args.toSpanConst()));
     SC_TRY(process.waitForExitSync());
     return Result(process.exitStatus.status == 0);
 }

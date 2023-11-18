@@ -38,7 +38,7 @@ SC::Result SC::Process::waitForExitSync()
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/procthread/creating-a-child-process-with-redirected-input-and-output
-SC::Result SC::Process::launch(ProcessOptions options)
+SC::Result SC::Process::launch(Options options)
 {
     STARTUPINFOW startupInfo;
     const bool   someRedirection = standardInput.isValid() || standardOutput.isValid() || standardError.isValid();

@@ -12,7 +12,7 @@
 #include "Internal/ProcessPosix.inl"
 #endif
 
-SC::Result SC::ProcessChain::launch(ProcessChainOptions options)
+SC::Result SC::ProcessChain::launch(Options options)
 {
     if (not error.returnCode)
         return error.returnCode;
@@ -49,7 +49,7 @@ SC::Result SC::ProcessChain::launch(ProcessChainOptions options)
     return Result(true);
 }
 
-SC::Result SC::ProcessChain::pipe(Process& process, std::initializer_list<const StringView> cmd)
+SC::Result SC::ProcessChain::pipe(Process& process, const Span<const StringView> cmd)
 {
     SC_TRY_MSG(process.parent == nullptr, "Process::pipe - already in use");
 

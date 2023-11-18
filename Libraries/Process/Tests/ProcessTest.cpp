@@ -33,18 +33,16 @@ struct SC::ProcessTest : public SC::TestCase
         }
         if (test_section("Process piped"))
         {
-            Process process;
-#if SC_PLATFORM_APPLE
-            StringView expectedOutput = "/usr/bin/sudo\n";
-            SC_TEST_EXPECT(process.formatCommand("which", "sudo"));
-#else
-            StringView expectedOutput = "C:\\Windows\\System32\\where.exe\r\n";
-            SC_TEST_EXPECT(process.formatCommand("where", "where.exe"));
-#endif
+            Process        process;
             PipeDescriptor outputPipe;
             SC_TEST_EXPECT(process.redirectStdOutTo(outputPipe));
-            SC_TEST_EXPECT(process.launch());
-
+#if SC_PLATFORM_APPLE
+            StringView expectedOutput = "/usr/bin/sudo\n";
+            SC_TEST_EXPECT(process.launch("which", "sudo"));
+#else
+            StringView expectedOutput = "C:\\Windows\\System32\\where.exe\r\n";
+            SC_TEST_EXPECT(process.launch("where", "where.exe"));
+#endif
             SmallString<255> output = StringEncoding::Ascii;
             SC_TEST_EXPECT(outputPipe.readPipe.readUntilEOF(output));
             SC_TEST_EXPECT(process.waitForExitSync());
@@ -95,7 +93,7 @@ struct SC::ProcessTest : public SC::TestCase
             StringView expectedOutput = "C:\\Windows\\System32\\where.exe\r\n";
             SC_TEST_EXPECT(chain.pipe(p1, "where", "where.exe"));
 #endif
-            ProcessChainOptions options;
+            ProcessChain::Options options;
             options.pipeSTDOUT = true;
             options.pipeSTDERR = true;
             SC_TEST_EXPECT(chain.launch(options));
@@ -124,7 +122,7 @@ struct SC::ProcessTest : public SC::TestCase
             SC_TEST_EXPECT(chain.pipe(p1, {"where", "/?"}));
             SC_TEST_EXPECT(chain.pipe(p2, {"findstr", "dir]"}));
 #endif
-            ProcessChainOptions options;
+            ProcessChain::Options options;
             options.pipeSTDOUT = true;
             SC_TEST_EXPECT(chain.launch(options));
             SC_TEST_EXPECT(chain.readStdOutUntilEOFSync(output));

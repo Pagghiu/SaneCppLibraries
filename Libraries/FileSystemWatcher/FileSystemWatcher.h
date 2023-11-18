@@ -17,6 +17,14 @@ struct FileSystemWatcher;
 struct String;
 } // namespace SC
 
+//! @defgroup group_file_system_watcher FileSystem Watcher
+//! @copybrief library_file_system_watcher
+//!
+//! See @ref library_file_system_watcher library page for more details.<br>
+
+//! @addtogroup group_file_system_watcher
+//! @{
+
 /// @brief Notifies about events (add, remove, rename, modified) on files and directories
 struct SC::FileSystemWatcher
 {
@@ -164,3 +172,5 @@ struct SC::FileSystemWatcher
     friend decltype(FolderWatcher::internal);
     IntrusiveDoubleLinkedList<FolderWatcher> watchers;
 };
+
+//! @}

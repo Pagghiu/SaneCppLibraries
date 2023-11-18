@@ -110,7 +110,7 @@ SC::Result SC::Process::spawn(Lambda&& lambda)
     Assert::unreachable();
 }
 
-SC::Result SC::Process::launch(ProcessOptions options)
+SC::Result SC::Process::launch(Options options)
 {
     SC_COMPILER_UNUSED(options);
     auto spawnLambda = [&]() { execl("/bin/sh", "sh", "-c", command.view().getNullTerminatedNative(), nullptr); };
