@@ -5,7 +5,7 @@
 #include "../../FileSystem/FileSystem.h"
 #include "../../FileSystem/Path.h"
 #include "../../Strings/String.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 #include "../../Threading/Threading.h" // EventObject
 
 namespace SC

@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "../HttpParser.h"
 #include "../../Strings/StringBuilder.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 namespace SC
 {
 struct HttpParserTest;

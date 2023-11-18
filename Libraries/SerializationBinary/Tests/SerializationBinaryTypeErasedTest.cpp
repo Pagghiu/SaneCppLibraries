@@ -1,7 +1,7 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 #include "../SerializationBinaryTypeErasedReadVersioned.h"
 #include "../SerializationBinaryTypeErasedReadWriteFast.h"
 #include "SerializationBinaryTestSuite.h"

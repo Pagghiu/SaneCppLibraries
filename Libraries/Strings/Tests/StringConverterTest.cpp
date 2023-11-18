@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "../StringConverter.h"
 #include "../../Containers/SmallVector.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 
 namespace SC
 {

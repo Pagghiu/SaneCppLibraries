@@ -4,7 +4,7 @@
 #include "../Path.h"
 #include "../../Containers/SmallVector.h"
 #include "../../Strings/String.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 
 namespace SC
 {

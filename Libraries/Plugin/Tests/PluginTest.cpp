@@ -6,7 +6,7 @@
 #include "../../FileSystem/Path.h"
 #include "../../FileSystemIterator/FileSystemIterator.h"
 #include "../../Strings/StringBuilder.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 #include "../../Threading/Threading.h"
 
 namespace SC

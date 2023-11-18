@@ -9,7 +9,7 @@
 #include "../../Strings/StringBuilder.h"
 #include "../../Strings/StringView.h"
 #include "../../System/Console.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 
 namespace SC
 {

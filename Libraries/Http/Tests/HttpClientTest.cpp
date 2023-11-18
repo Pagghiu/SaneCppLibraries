@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "../HttpClient.h"
 #include "../../Socket/SocketDescriptor.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 
 namespace SC
 {

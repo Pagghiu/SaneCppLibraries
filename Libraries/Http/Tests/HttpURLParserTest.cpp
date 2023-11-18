@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../HttpURLParser.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 namespace SC
 {
 struct HttpURLParserTest;

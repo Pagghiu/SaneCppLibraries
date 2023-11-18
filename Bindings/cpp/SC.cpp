@@ -26,5 +26,5 @@
 #include "../../Libraries/System/Console.cpp"
 #include "../../Libraries/System/System.cpp"
 #include "../../Libraries/System/Time.cpp"
-#include "../../Libraries/Testing/Test.cpp"
+#include "../../Libraries/Testing/Testing.cpp"
 #include "../../Libraries/Threading/Threading.cpp"

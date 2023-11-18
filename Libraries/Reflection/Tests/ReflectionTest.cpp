@@ -4,7 +4,7 @@
 #include "../../Containers/Array.h"
 #include "../../Containers/Vector.h"
 #include "../../Strings/StringBuilder.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 
 // TODO: Split the Auto reflection tests in ReflectionAuto
 #if SC_META_ENABLE_AUTO_REFLECTION

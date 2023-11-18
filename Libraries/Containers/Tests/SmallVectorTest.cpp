@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../SmallVector.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 
 namespace SC
 {

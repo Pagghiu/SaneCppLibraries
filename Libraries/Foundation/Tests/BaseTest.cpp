@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "../../Foundation/Assert.h"
 #include "../../Foundation/Memory.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 
 namespace SC
 {

@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../Time.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 #include "../../Threading/Threading.h"
 
 namespace SC

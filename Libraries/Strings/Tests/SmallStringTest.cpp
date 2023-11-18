@@ -4,7 +4,7 @@
 #include "../SmallString.h"
 #include "../../Algorithms/AlgorithmBubbleSort.h"
 #include "../../Containers/SmallVector.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 #include "../String.h"
 #include "../StringBuilder.h"
 

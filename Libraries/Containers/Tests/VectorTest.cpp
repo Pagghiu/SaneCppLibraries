@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "../../Containers/Vector.h"
 #include "../../Algorithms/AlgorithmBubbleSort.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 
 namespace SC
 {

@@ -7,7 +7,7 @@
 #include "../../Libraries/Containers/VectorSet.h"
 #include "../../Libraries/Foundation/Memory.h"
 #include "../../Libraries/Strings/SmallString.h"
-#include "../../Libraries/Testing/Test.h"
+#include "../../Libraries/Testing/Testing.h"
 
 namespace SC
 {

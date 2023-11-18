@@ -4,7 +4,7 @@
 #include "../../Containers/Array.h"
 #include "../../Algorithms/AlgorithmBubbleSort.h"
 #include "../../Containers/Vector.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 
 namespace SC
 {

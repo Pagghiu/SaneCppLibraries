@@ -4,7 +4,7 @@
 #include "../VectorMap.h"
 #include "../../Containers/Array.h"
 #include "../../Strings/String.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 
 namespace SC
 {

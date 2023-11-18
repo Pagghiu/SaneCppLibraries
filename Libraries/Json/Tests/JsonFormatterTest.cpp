@@ -5,7 +5,7 @@
 #include "../../Containers/SmallVector.h"
 #include "../../Strings/String.h"
 #include "../../Strings/StringConverter.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 
 namespace SC
 {

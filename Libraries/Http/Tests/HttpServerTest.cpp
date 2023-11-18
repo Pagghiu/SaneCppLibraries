@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "../HttpServer.h"
 #include "../../Strings/StringBuilder.h"
-#include "../../Testing/Test.h"
+#include "../../Testing/Testing.h"
 #include "../HttpClient.h"
 namespace SC
 {
