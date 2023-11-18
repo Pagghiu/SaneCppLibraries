@@ -456,7 +456,7 @@ SC::Result SC::PluginRegistry::loadPlugin(const StringView identifier, const Plu
         // TODO: Shield against circular dependencies
         for (const auto& dependency : lib.definition.dependencies)
         {
-            SC_TRY(loadPlugin(dependency.view(), compiler, executablePath, LoadMode::Default));
+            SC_TRY(loadPlugin(dependency.view(), compiler, executablePath, LoadMode::Load));
         }
         if (lib.dynamicLibrary.isValid())
         {

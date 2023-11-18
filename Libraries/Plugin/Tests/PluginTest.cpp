@@ -61,7 +61,7 @@ struct SC::PluginTest : public SC::TestCase
             const auto   parentItem             = definitions[parentIndex];
             const auto   identifierChildString  = childItem.identity.identifier;
             const auto   identifierParentString = parentItem.identity.identifier;
-            const auto   pluginScriptPath       = childItem.files[childItem.pluginFileIndex].absolutePath;
+            const auto   pluginScriptPath       = childItem.getMainPluginFile().absolutePath;
 
             const StringView identifierChild  = identifierChildString.view();
             const StringView identifierParent = identifierParentString.view();
