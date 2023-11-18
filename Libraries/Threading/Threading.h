@@ -16,12 +16,21 @@ struct Mutex;
 struct EventObject;
 } // namespace SC
 
+//! @defgroup group_threading Threading
+//! @copybrief library_threading
+//!
+//! See @ref library_threading library page for more details.<br>
+
+//! @addtogroup group_threading
+//! @{
+
+/// @brief A native OS Mutex
 struct SC::Mutex
 {
     Mutex();
     ~Mutex();
 
-    // Underlying OS primitives can't be copied or moved. If needed use new / smartptr
+    // Underlying OS primitives can't be copied or moved
     Mutex(const Mutex&)            = delete;
     Mutex(Mutex&&)                 = delete;
     Mutex& operator=(const Mutex&) = delete;
@@ -30,6 +39,8 @@ struct SC::Mutex
     void lock();
     void unlock();
 
+  private:
+    friend struct ConditionVariable;
 #if SC_PLATFORM_APPLE
     static constexpr int OpaqueMutexSize      = 56 + sizeof(long);
     static constexpr int OpaqueMutexAlignment = alignof(long);
@@ -48,12 +59,13 @@ struct SC::Mutex
     OpaqueMutex mutex;
 };
 
+/// @brief A native OS condition variable
 struct SC::ConditionVariable
 {
     ConditionVariable();
     ~ConditionVariable();
 
-    // Underlying OS primitives can't be copied or moved. If needed use new / smartptr
+    // Underlying OS primitives can't be copied or moved
     ConditionVariable(const ConditionVariable&)            = delete;
     ConditionVariable(ConditionVariable&&)                 = delete;
     ConditionVariable& operator=(const ConditionVariable&) = delete;
@@ -62,6 +74,7 @@ struct SC::ConditionVariable
     void wait(Mutex& mutex);
     void signal();
 
+  private:
 #if SC_PLATFORM_APPLE
     static constexpr int OpaqueCVSize      = 40 + sizeof(long);
     static constexpr int OpaqueCVAlignment = alignof(long);
@@ -81,6 +94,7 @@ struct SC::ConditionVariable
     OpaqueConditionVariable condition;
 };
 
+/// @brief A native OS Thread
 struct SC::Thread
 {
     Thread() = default;
@@ -94,15 +108,30 @@ struct SC::Thread
     Thread(const Thread&)            = delete;
     Thread& operator=(const Thread&) = delete;
 
+    /// @brief Returns current thread identifier
+    /// @return thread id
     static uint64_t CurrentThreadID();
+
     /// Starts the new thread with given name and func
     /// @param func     Function running on thread. Must be a valid pointer to action for the entire duration of thread.
     /// @param syncFunc Function garanteed to be run before  start returns
     [[nodiscard]] Result start(StringView threadName, Action* func, Action* syncFunc = nullptr);
-    [[nodiscard]] Result join();
-    [[nodiscard]] Result detach();
-    [[nodiscard]] bool   wasStarted() const;
 
+    /// @brief Waits for thread to finish and releases its resources
+    /// @return Valid Result if thread has finished
+    [[nodiscard]] Result join();
+
+    /// @brief Detaches the thread so that its resources are automatically released back to the system without
+    /// Thread::join
+    /// @return Valid Result if thread has been detached
+    [[nodiscard]] Result detach();
+
+    /// @brief Check if thread has been started
+    /// @return `true` if thread has been started
+    [[nodiscard]] bool wasStarted() const;
+
+    /// @brief Puts current thread to sleep
+    /// @param milliseconds Sleep for given number of milliseconds
     static void Sleep(uint32_t milliseconds);
 
   private:
@@ -112,15 +141,22 @@ struct SC::Thread
     UniqueOptional<OpaqueThread> thread;
 };
 
+/// @brief An automatically reset event object to synchonize two threads
 struct SC::EventObject
 {
     bool autoReset = true;
 
+    /// @brief Waits on a thread for EventObject::signal to be called from another thread
     void wait();
+
+    /// @brief Unblocks another thread, waiting on EventObject::wait
     void signal();
 
   private:
-    bool              isSignaled = false;
-    Mutex             mutex;
+    bool  isSignaled = false;
+    Mutex mutex;
+
     ConditionVariable cond;
 };
+
+//! @}
