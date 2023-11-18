@@ -103,7 +103,7 @@ SC::TimeCounter::TimeCounter()
 #endif
 }
 
-SC::TimeCounter& SC::TimeCounter::snap()
+void SC::TimeCounter::snap()
 {
 #if SC_PLATFORM_WINDOWS
     LARGE_INTEGER performanceCounter;
@@ -122,7 +122,6 @@ SC::TimeCounter& SC::TimeCounter::snap()
     part1                                       = ts.tv_sec;
     part2                                       = ts.tv_nsec;
 #endif
-    return *this;
 }
 
 SC::TimeCounter SC::TimeCounter::offsetBy(IntegerMilliseconds other) const

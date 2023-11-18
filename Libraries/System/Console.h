@@ -9,10 +9,22 @@
 namespace SC
 {
 struct String;
+
+//! @addtogroup group_system
+//! @{
+
+/// @brief Writes to console using SC::StringFormat.
 struct SC_COMPILER_EXPORT Console
 {
+    /// @brief Constructs a console with a conversion buffer used for string conversions (UTF8 / UTF16)
+    /// @param encodingConversionBuffer The buffer used for UTF conversions
     Console(Vector<char>& encodingConversionBuffer) : encodingConversionBuffer(encodingConversionBuffer) {}
 
+    /// @brief Prints a formatted string using SC::StringFormat
+    /// @tparam Types Types of `args`
+    /// @param fmt Format string
+    /// @param args Arguments to be formatted in the string
+    /// @return `true` if message has been printed successfully to Console
     template <typename... Types>
     bool print(StringView fmt, Types&&... args)
     {
@@ -26,12 +38,20 @@ struct SC_COMPILER_EXPORT Console
         return false; // UTF16/32 format strings are not supported
     }
 
+    /// @brief Prints a StringView to console
+    /// @param str The StringView to print
     void print(const StringView str);
+
+    /// @brief Prints a StringView to console and adds a newline at the end of it
+    /// @param str The StringView to print
     void printLine(const StringView str);
 
   private:
     Vector<char>& encodingConversionBuffer;
 };
+
+//! @}
+
 } // namespace SC
 extern SC::Console* globalConsole;
 #if !defined(SC_LOG_MESSAGE)

@@ -102,8 +102,8 @@ int main(int argc, const char* argv[])
         return -3;
     Console    console(globalConsoleConversionBuffer);
     TestReport report(console, argc, argv);
-    report.applicationRootDirectory = directories.applicationRootDirectory.view();
-    report.executableFile           = directories.executableFile.view();
+    report.applicationRootDirectory = directories.getApplicationPath();
+    report.executableFile           = directories.getExecutablePath();
     SC::SmallString<255> correctedPath;
     {
         SmallVector<StringView, 50> components;

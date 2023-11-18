@@ -80,15 +80,15 @@ struct SC::SocketFlags
     /// @brief Sets the socket type, if it's a Datagram (for UDP) or Streaming (for TCP and others)
     enum SocketType
     {
-        SocketStream,   ///< Sets the socket type as Streaming type (for TCP and others)
-        SocketDgram  ///< Sets the socket type as Streaming type (for UDP)
+        SocketStream, ///< Sets the socket type as Streaming type (for TCP and others)
+        SocketDgram   ///< Sets the socket type as Streaming type (for UDP)
     };
 
     /// @brief Sets the socket protocol type
     enum ProtocolType
     {
-        ProtocolTcp,    ///< The protocol is TCP
-        ProtocolUdp,     ///< The protocol is UDP
+        ProtocolTcp, ///< The protocol is TCP
+        ProtocolUdp, ///< The protocol is UDP
     };
 
   private:
@@ -127,7 +127,8 @@ struct SC::SocketIPAddress
     // TODO: maybe we should only save a binary address instead of native structs (IPV6 would need 16 bytes)
     uint32_t           sizeOfHandle() const;
     AlignedStorage<28> handle;
-private:
+
+  private:
     SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
 };
 

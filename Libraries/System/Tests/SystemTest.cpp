@@ -19,8 +19,8 @@ struct SC::SystemTest : public SC::TestCase
         {
             SystemDirectories directories;
             SC_TEST_EXPECT(directories.init());
-            report.console.print("executableFile=\"{}\"\n", directories.executableFile.view());
-            report.console.print("applicationRootDirectory=\"{}\"\n", directories.applicationRootDirectory.view());
+            report.console.print("executableFile=\"{}\"\n", directories.getExecutablePath());
+            report.console.print("applicationRootDirectory=\"{}\"\n", directories.getApplicationPath());
         }
     }
 };
