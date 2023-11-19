@@ -13,7 +13,6 @@ namespace SC
 {
 struct Process;
 struct ProcessChain;
-struct ProcessChainOptions;
 struct ProcessID;
 } // namespace SC
 

@@ -9,7 +9,6 @@ using socklen_t = int;
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include "../../Containers/Vector.h"
 #include "../SocketDescriptor.h"
 
 SC::Result SC::SocketDescriptorDefinition::releaseHandle(Handle& handle)

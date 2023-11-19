@@ -93,7 +93,7 @@ struct SC::SerializationStructured::SerializationJsonReader
     {
         SC_TRY(eventuallyExpectComma(index));
         SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-        SC_TRY(token.type == JsonTokenizer::Token::ArrayStart);
+        SC_TRY(token.getType() == JsonTokenizer::Token::ArrayStart);
         return endArrayItem(container, size);
     }
 
@@ -102,7 +102,7 @@ struct SC::SerializationStructured::SerializationJsonReader
     {
         auto iteratorBackup = iterator;
         SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-        if (token.type != JsonTokenizer::Token::ArrayEnd)
+        if (token.getType() != JsonTokenizer::Token::ArrayEnd)
         {
             size += 1;
             SC_TRY(container.resize(size));

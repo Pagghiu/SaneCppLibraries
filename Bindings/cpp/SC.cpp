@@ -11,7 +11,7 @@
 #include "../../Libraries/Http/HttpParser.cpp"
 #include "../../Libraries/Http/HttpServer.cpp"
 #include "../../Libraries/Http/HttpURLParser.cpp"
-#include "../../Libraries/Json/Json.cpp"
+#include "../../Libraries/Json/JsonFormatter.cpp"
 #include "../../Libraries/Plugin/Plugin.cpp"
 #include "../../Libraries/Process/Process.cpp"
 #include "../../Libraries/SerializationBinary/SerializationBinaryTypeErasedReadVersioned.cpp"

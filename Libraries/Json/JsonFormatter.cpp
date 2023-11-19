@@ -1,10 +1,10 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#include "JsonFormatter.h"
 #include "../Containers/Vector.h"
 #include "../Strings/StringFormat.h"
 #include "../Strings/StringView.h"
-#include "JsonFormatter.h"
 
 #include <stdio.h> // snprintf
 #include <string.h>
