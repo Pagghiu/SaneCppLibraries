@@ -6,7 +6,7 @@
 
 namespace SC
 {
-namespace SerializationBinaryTemplate
+namespace SerializationBinary
 {
 template <typename BinaryStream, typename T, typename SFINAESelector = void>
 struct SerializerReadWriteFast;
@@ -106,5 +106,5 @@ template <typename BinaryStream, typename T, int N>
 struct SerializerReadWriteFast<BinaryStream, SC::Array<T, N>> : public SerializerVector<BinaryStream, SC::Array<T, N>, T> { };
 // clang-format on
 
-} // namespace SerializationBinaryTemplate
+} // namespace SerializationBinary
 } // namespace SC

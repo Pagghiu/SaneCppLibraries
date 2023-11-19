@@ -13,7 +13,7 @@
 
 namespace SC
 {
-namespace SerializationBinaryTestSuite
+namespace SerializationParametricTestSuite
 {
 struct PrimitiveStruct;
 struct NestedStruct;
@@ -32,10 +32,10 @@ template <typename BinaryWriterStream, typename BinaryReaderStream, typename Ser
           typename SerializerReader>
 struct SerializationTestBase;
 
-} // namespace SerializationBinaryTestSuite
+} // namespace SerializationParametricTestSuite
 } // namespace SC
 
-struct SC::SerializationBinaryTestSuite::PrimitiveStruct
+struct SC::SerializationParametricTestSuite::PrimitiveStruct
 {
     uint8_t arrayValue[4] = {0, 1, 2, 3};
     float   floatValue    = 1.5f;
@@ -56,13 +56,13 @@ struct SC::SerializationBinaryTestSuite::PrimitiveStruct
     }
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationBinaryTestSuite::PrimitiveStruct)
+SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::PrimitiveStruct)
 SC_META_STRUCT_FIELD(0, arrayValue)
 SC_META_STRUCT_FIELD(1, floatValue)
 SC_META_STRUCT_FIELD(2, int64Value)
 SC_META_STRUCT_LEAVE()
 
-struct SC::SerializationBinaryTestSuite::NestedStruct
+struct SC::SerializationParametricTestSuite::NestedStruct
 {
     int16_t         int16Value = 244;
     PrimitiveStruct structsArray[2];
@@ -82,44 +82,44 @@ struct SC::SerializationBinaryTestSuite::NestedStruct
     }
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationBinaryTestSuite::NestedStruct)
+SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::NestedStruct)
 SC_META_STRUCT_FIELD(0, int16Value)
 SC_META_STRUCT_FIELD(1, structsArray)
 SC_META_STRUCT_FIELD(2, doubleVal)
 SC_META_STRUCT_LEAVE()
 
-struct SC::SerializationBinaryTestSuite::TopLevelStruct
+struct SC::SerializationParametricTestSuite::TopLevelStruct
 {
     NestedStruct nestedStruct;
 
     bool operator!=(const TopLevelStruct& other) const { return nestedStruct != other.nestedStruct; }
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationBinaryTestSuite::TopLevelStruct)
+SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::TopLevelStruct)
 SC_META_STRUCT_FIELD(0, nestedStruct)
 SC_META_STRUCT_LEAVE()
 
-struct SC::SerializationBinaryTestSuite::VectorStructSimple
+struct SC::SerializationParametricTestSuite::VectorStructSimple
 {
     SC::Vector<int> emptyVector;
     SC::Vector<int> vectorOfInts;
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationBinaryTestSuite::VectorStructSimple)
+SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VectorStructSimple)
 SC_META_STRUCT_FIELD(0, emptyVector)
 SC_META_STRUCT_FIELD(1, vectorOfInts)
 SC_META_STRUCT_LEAVE()
 
-struct SC::SerializationBinaryTestSuite::VectorStructComplex
+struct SC::SerializationParametricTestSuite::VectorStructComplex
 {
     SC::Vector<SC::String> vectorOfStrings;
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationBinaryTestSuite::VectorStructComplex)
+SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VectorStructComplex)
 SC_META_STRUCT_FIELD(0, vectorOfStrings)
 SC_META_STRUCT_LEAVE()
 
-struct SC::SerializationBinaryTestSuite::VersionedStruct1
+struct SC::SerializationParametricTestSuite::VersionedStruct1
 {
     float          floatValue     = 1.5f;
     int64_t        fieldToRemove  = 12;
@@ -127,14 +127,14 @@ struct SC::SerializationBinaryTestSuite::VersionedStruct1
     int64_t        int64Value     = -13;
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationBinaryTestSuite::VersionedStruct1)
+SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedStruct1)
 SC_META_STRUCT_FIELD(2, field2ToRemove)
 SC_META_STRUCT_FIELD(0, floatValue)
 SC_META_STRUCT_FIELD(1, fieldToRemove)
 SC_META_STRUCT_FIELD(3, int64Value)
 SC_META_STRUCT_LEAVE()
 
-struct SC::SerializationBinaryTestSuite::VersionedStruct2
+struct SC::SerializationParametricTestSuite::VersionedStruct2
 {
     int64_t int64Value = 55;
     float   floatValue = -2.9f;
@@ -149,47 +149,47 @@ struct SC::SerializationBinaryTestSuite::VersionedStruct2
     }
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationBinaryTestSuite::VersionedStruct2)
+SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedStruct2)
 SC_META_STRUCT_FIELD(3, int64Value)
 SC_META_STRUCT_FIELD(0, floatValue)
 SC_META_STRUCT_LEAVE()
 
-struct SC::SerializationBinaryTestSuite::VersionedPoint3D
+struct SC::SerializationParametricTestSuite::VersionedPoint3D
 {
     float x;
     float y;
     float z;
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationBinaryTestSuite::VersionedPoint3D)
+SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedPoint3D)
 SC_META_STRUCT_FIELD(0, x)
 SC_META_STRUCT_FIELD(1, y)
 SC_META_STRUCT_FIELD(2, z)
 SC_META_STRUCT_LEAVE()
 
-struct SC::SerializationBinaryTestSuite::VersionedPoint2D
+struct SC::SerializationParametricTestSuite::VersionedPoint2D
 {
     float x;
     float y;
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationBinaryTestSuite::VersionedPoint2D)
+SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedPoint2D)
 SC_META_STRUCT_FIELD(0, x)
 SC_META_STRUCT_FIELD(1, y)
 SC_META_STRUCT_LEAVE()
 
-struct SC::SerializationBinaryTestSuite::VersionedArray1
+struct SC::SerializationParametricTestSuite::VersionedArray1
 {
     Vector<VersionedPoint2D> points;
     Vector<int>              simpleInts = {1, 2, 3};
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationBinaryTestSuite::VersionedArray1)
+SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedArray1)
 SC_META_STRUCT_FIELD(0, points)
 SC_META_STRUCT_FIELD(1, simpleInts)
 SC_META_STRUCT_LEAVE()
 
-struct SC::SerializationBinaryTestSuite::VersionedArray2
+struct SC::SerializationParametricTestSuite::VersionedArray2
 {
     Array<VersionedPoint3D, 2> points;
     Array<int, 2>              simpleInts;
@@ -220,12 +220,12 @@ struct SC::SerializationBinaryTestSuite::VersionedArray2
     }
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationBinaryTestSuite::VersionedArray2)
+SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedArray2)
 SC_META_STRUCT_FIELD(0, points)
 SC_META_STRUCT_FIELD(1, simpleInts)
 SC_META_STRUCT_LEAVE()
 
-struct SC::SerializationBinaryTestSuite::ConversionStruct1
+struct SC::SerializationParametricTestSuite::ConversionStruct1
 {
     uint32_t intToFloat         = 1;
     float    floatToInt         = 1;
@@ -233,14 +233,14 @@ struct SC::SerializationBinaryTestSuite::ConversionStruct1
     int16_t  signed16ToUnsigned = 1;
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationBinaryTestSuite::ConversionStruct1)
+SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::ConversionStruct1)
 SC_META_STRUCT_FIELD(0, intToFloat)
 SC_META_STRUCT_FIELD(1, floatToInt)
 SC_META_STRUCT_FIELD(2, uint16To32)
 SC_META_STRUCT_FIELD(3, signed16ToUnsigned)
 SC_META_STRUCT_LEAVE()
 
-struct SC::SerializationBinaryTestSuite::ConversionStruct2
+struct SC::SerializationParametricTestSuite::ConversionStruct2
 {
     float    intToFloat         = 0;
     uint32_t floatToInt         = 0;
@@ -248,7 +248,7 @@ struct SC::SerializationBinaryTestSuite::ConversionStruct2
     uint16_t signed16ToUnsigned = 0;
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationBinaryTestSuite::ConversionStruct2)
+SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::ConversionStruct2)
 SC_META_STRUCT_FIELD(0, intToFloat)
 SC_META_STRUCT_FIELD(1, floatToInt)
 SC_META_STRUCT_FIELD(2, uint16To32)
@@ -257,7 +257,7 @@ SC_META_STRUCT_LEAVE()
 
 template <typename BinaryWriterStream, typename BinaryReaderStream, typename SerializerWriter,
           typename SerializerReader>
-struct SC::SerializationBinaryTestSuite::SerializationTestBase : public SC::TestCase
+struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::TestCase
 {
     // Used only for the test
     template <typename T>

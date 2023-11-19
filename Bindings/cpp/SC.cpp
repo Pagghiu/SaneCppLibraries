@@ -14,8 +14,6 @@
 #include "../../Libraries/Json/JsonFormatter.cpp"
 #include "../../Libraries/Plugin/Plugin.cpp"
 #include "../../Libraries/Process/Process.cpp"
-#include "../../Libraries/SerializationBinary/SerializationBinaryTypeErasedReadVersioned.cpp"
-#include "../../Libraries/SerializationBinary/SerializationBinaryTypeErasedReadWriteFast.cpp"
 #include "../../Libraries/SerializationStructured/SerializationStructuredJson.cpp"
 #include "../../Libraries/Socket/SocketDescriptor.cpp"
 #include "../../Libraries/Strings/StringBuilder.cpp"
@@ -28,3 +26,6 @@
 #include "../../Libraries/System/Time.cpp"
 #include "../../Libraries/Testing/Testing.cpp"
 #include "../../Libraries/Threading/Threading.cpp"
+
+#include "../../LibrariesExtra/SerializationBinaryTypeErased/SerializationBinaryTypeErasedReadVersioned.cpp"
+#include "../../LibrariesExtra/SerializationBinaryTypeErased/SerializationBinaryTypeErasedReadWriteFast.cpp"

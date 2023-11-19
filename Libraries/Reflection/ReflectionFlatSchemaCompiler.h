@@ -126,6 +126,15 @@ struct FlatSchemaCompiler
         return result;
     }
 };
+struct FlatSchemaClassBuilder : public MetaClassBuilder<FlatSchemaClassBuilder>
+{
+    using Atom = AtomBase<FlatSchemaClassBuilder>;
+    constexpr FlatSchemaClassBuilder(Atom* output = nullptr, const uint32_t capacity = 0)
+        : MetaClassBuilder(output, capacity)
+    {}
+};
+
+using FlatSchema = Reflection::FlatSchemaCompiler<FlatSchemaClassBuilder>;
 
 } // namespace Reflection
 

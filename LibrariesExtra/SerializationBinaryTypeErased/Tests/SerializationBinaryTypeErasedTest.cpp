@@ -1,17 +1,17 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../../Testing/Testing.h"
+#include "../../../Libraries/SerializationBinary/Tests/SerializationParametricTestSuite.h"
+#include "../../../Libraries/Testing/Testing.h"
 #include "../SerializationBinaryTypeErasedReadVersioned.h"
 #include "../SerializationBinaryTypeErasedReadWriteFast.h"
-#include "SerializationBinaryTestSuite.h"
 
 namespace SC
 {
 struct SerializationBinaryTypeErasedTest;
 
 }
-struct SC::SerializationBinaryTypeErasedTest : public SC::SerializationBinaryTestSuite::SerializationTestBase<
+struct SC::SerializationBinaryTypeErasedTest : public SC::SerializationParametricTestSuite::SerializationTestBase<
                                                    SC::Serialization::BinaryBuffer,                            //
                                                    SC::Serialization::BinaryBuffer,                            //
                                                    SC::SerializationBinaryTypeErased::SerializerReadWriteFast, //

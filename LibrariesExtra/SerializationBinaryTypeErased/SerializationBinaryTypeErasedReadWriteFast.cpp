@@ -2,7 +2,6 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "SerializationBinaryTypeErasedReadWriteFast.h"
-#include "SerializationBinarySkipper.h"
 
 bool SC::SerializationBinaryTypeErased::ArrayAccess::getSegmentSpan(uint32_t                   linkID,
                                                                     Reflection::MetaProperties property,

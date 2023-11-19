@@ -58,7 +58,7 @@ void runProcessTest(TestReport& report);
 void runReflectionTest(TestReport& report);
 
 // Serialization
-void runSerializationBinaryTemplateTest(TestReport& report);
+void runSerializationBinaryTest(TestReport& report);
 void runSerializationBinaryTypeErasedTest(TestReport& report);
 void runSerializationStructuredJsonTest(TestReport& report);
 
@@ -166,7 +166,7 @@ int main(int argc, const char* argv[])
     runReflectionTest(report);
 
     // Serialization tests
-    runSerializationBinaryTemplateTest(report);
+    runSerializationBinaryTest(report);
     runSerializationBinaryTypeErasedTest(report);
     runSerializationStructuredJsonTest(report);
 

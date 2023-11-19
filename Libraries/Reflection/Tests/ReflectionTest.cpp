@@ -17,21 +17,6 @@
 #include "../ReflectionFlatSchemaCompiler.h"
 #include "../ReflectionSC.h"
 
-namespace SC
-{
-namespace Reflection
-{
-struct TestClassBuilder : public MetaClassBuilder<TestClassBuilder>
-{
-    using Atom = AtomBase<TestClassBuilder>;
-    constexpr TestClassBuilder(Atom* output = nullptr, const uint32_t capacity = 0) : MetaClassBuilder(output, capacity)
-    {}
-};
-
-using FlatSchemaTest = Reflection::FlatSchemaCompiler<TestClassBuilder>;
-} // namespace Reflection
-} // namespace SC
-
 namespace TestNamespace
 {
 struct SimpleStructure
@@ -269,43 +254,43 @@ struct SC::ReflectionTest : public SC::TestCase
 
         if (test_section("Print Simple structure"))
         {
-            constexpr auto SimpleStructureFlatSchema = FlatSchemaTest::compile<TestNamespace::SimpleStructure>();
+            constexpr auto SimpleStructureFlatSchema = FlatSchema::compile<TestNamespace::SimpleStructure>();
             printFlatSchema(report.console, SimpleStructureFlatSchema.properties.values,
                             SimpleStructureFlatSchema.names.values);
         }
         if (test_section("Print Complex structure"))
         {
-            constexpr auto ComplexStructureFlatSchema = FlatSchemaTest::compile<TestNamespace::ComplexStructure>();
+            constexpr auto ComplexStructureFlatSchema = FlatSchema::compile<TestNamespace::ComplexStructure>();
             printFlatSchema(report.console, ComplexStructureFlatSchema.properties.values,
                             ComplexStructureFlatSchema.names.values);
         }
 
-        constexpr auto packedStructWithArray      = FlatSchemaTest::compile<TestNamespace::PackedStructWithArray>();
+        constexpr auto packedStructWithArray      = FlatSchema::compile<TestNamespace::PackedStructWithArray>();
         constexpr auto packedStructWithArrayFlags = packedStructWithArray.properties.values[0].getCustomUint32();
         static_assert(packedStructWithArrayFlags & MetaStructFlags::IsPacked,
                       "nestedPacked struct should be recursively packed");
 
-        constexpr auto packedStruct      = FlatSchemaTest::compile<TestNamespace::PackedStruct>();
+        constexpr auto packedStruct      = FlatSchema::compile<TestNamespace::PackedStruct>();
         constexpr auto packedStructFlags = packedStruct.properties.values[0].getCustomUint32();
         static_assert(packedStructFlags & MetaStructFlags::IsPacked,
                       "nestedPacked struct should be recursively packed");
 
-        constexpr auto unpackedStruct      = FlatSchemaTest::compile<TestNamespace::UnpackedStruct>();
+        constexpr auto unpackedStruct      = FlatSchema::compile<TestNamespace::UnpackedStruct>();
         constexpr auto unpackedStructFlags = unpackedStruct.properties.values[0].getCustomUint32();
         static_assert(not(unpackedStructFlags & MetaStructFlags::IsPacked),
                       "Unpacked struct should be recursively packed");
 
-        constexpr auto nestedUnpackedStruct      = FlatSchemaTest::compile<TestNamespace::NestedUnpackedStruct>();
+        constexpr auto nestedUnpackedStruct      = FlatSchema::compile<TestNamespace::NestedUnpackedStruct>();
         constexpr auto nestedUnpackedStructFlags = nestedUnpackedStruct.properties.values[0].getCustomUint32();
         static_assert(not(nestedUnpackedStructFlags & MetaStructFlags::IsPacked),
                       "nestedPacked struct should not be recursively packed");
 
-        constexpr auto structWithArrayPacked      = FlatSchemaTest::compile<TestNamespace::StructWithArrayPacked>();
+        constexpr auto structWithArrayPacked      = FlatSchema::compile<TestNamespace::StructWithArrayPacked>();
         constexpr auto structWithArrayPackedFlags = structWithArrayPacked.properties.values[0].getCustomUint32();
         static_assert(structWithArrayPackedFlags & MetaStructFlags::IsPacked,
                       "structWithArrayPacked struct should not be recursively packed");
 
-        constexpr auto structWithArrayUnpacked      = FlatSchemaTest::compile<TestNamespace::StructWithArrayUnpacked>();
+        constexpr auto structWithArrayUnpacked      = FlatSchema::compile<TestNamespace::StructWithArrayUnpacked>();
         constexpr auto structWithArrayUnpackedFlags = structWithArrayUnpacked.properties.values[0].getCustomUint32();
         static_assert(not(structWithArrayUnpackedFlags & MetaStructFlags::IsPacked),
                       "structWithArrayUnpacked struct should not be recursively packed");

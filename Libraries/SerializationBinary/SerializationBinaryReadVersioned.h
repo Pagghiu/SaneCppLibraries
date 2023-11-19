@@ -5,12 +5,12 @@
 // This needs to go before the compiler
 #include "../Reflection/ReflectionSC.h" // TODO: Split the SC Containers specifics in separate header
 // Compiler must be after
+#include "../Reflection/ReflectionFlatSchemaCompiler.h"
 #include "SerializationBinarySkipper.h"
-#include "SerializationBinaryTemplateCompiler.h"
 
 namespace SC
 {
-namespace SerializationBinaryTemplate
+namespace SerializationBinary
 {
 
 template <typename BinaryStream, typename T, typename SFINAESelector = void>
@@ -263,5 +263,5 @@ struct SerializerReadVersioned<BinaryStream, T, typename SC::EnableIf<Reflection
     }
 };
 
-} // namespace SerializationBinaryTemplate
+} // namespace SerializationBinary
 } // namespace SC
