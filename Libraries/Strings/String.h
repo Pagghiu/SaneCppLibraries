@@ -11,7 +11,7 @@ struct String;
 namespace Reflection
 {
 template <typename T>
-struct MetaClass;
+struct Reflect;
 }
 } // namespace SC
 
@@ -136,7 +136,7 @@ struct SC::String
     template <int>
     friend struct SmallString;
     template <typename T>
-    friend struct Reflection::MetaClass;
+    friend struct Reflection::Reflect;
     StringEncoding encoding;
 #if SC_COMPILER_MSVC
 #pragma warning(push)

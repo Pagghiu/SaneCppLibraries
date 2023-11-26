@@ -61,7 +61,7 @@ struct SerializationReadWrite
     {
         SC_TRY(stream.startObject(index));
         using FastIterator = SerializerReadWriteFastMemberIterator<SerializerStream, T>;
-        SC_TRY(Reflection::MetaClass<T>::visitObject(FastIterator{stream}, object));
+        SC_TRY(Reflection::Reflect<T>::visitObject(FastIterator{stream}, object));
         return stream.endObject();
     }
 
@@ -77,7 +77,7 @@ struct SerializationReadWrite
         {
             using VersionedIterator = SerializerReadVersionedMemberIterator<SerializerStream, T>;
             VersionedIterator iterator{stream, fieldToFind, fieldIndex};
-            Reflection::MetaClass<T>::visitObject(iterator, object);
+            Reflection::Reflect<T>::visitObject(iterator, object);
             SC_TRY(not iterator.consumed or iterator.consumedWithSuccess);
             SC_TRY(stream.getNextField(++fieldIndex, fieldToFind, hasMore));
         }

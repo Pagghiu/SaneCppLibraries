@@ -5,7 +5,7 @@
 // This needs to go before the compiler
 #include "../Reflection/ReflectionSC.h" // TODO: Split the SC Containers specifics in separate header
 // Compiler must be after
-#include "../Reflection/ReflectionFlatSchemaCompiler.h"
+#include "../Reflection/ReflectionCompiler.h"
 #include "SerializationBinarySkipper.h"
 
 namespace SC
@@ -26,17 +26,17 @@ struct VersionSchema
     };
     Options options;
 
-    Span<const Reflection::MetaProperties> sourceProperties;
+    Span<const Reflection::TypeInfo> sourceProperties;
 
     uint32_t sourceTypeIndex = 0;
 
-    constexpr Reflection::MetaProperties current() const { return sourceProperties.data()[sourceTypeIndex]; }
+    constexpr Reflection::TypeInfo current() const { return sourceProperties.data()[sourceTypeIndex]; }
 
     constexpr void advance() { sourceTypeIndex++; }
 
     constexpr void resolveLink()
     {
-        if (sourceProperties.data()[sourceTypeIndex].getLinkIndex() >= 0)
+        if (sourceProperties.data()[sourceTypeIndex].hasValidLinkIndex())
             sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
     }
 
@@ -78,15 +78,15 @@ struct SerializerReadVersioned
     [[nodiscard]] static constexpr bool readVersioned(T& object, BinaryStream& stream, VersionSchema& schema)
     {
         using VersionedMemberIterator = SerializerReadVersionedMemberIterator<BinaryStream, T>;
-        SC_TRY(schema.current().type == Reflection::MetaType::TypeStruct);
-        const uint32_t numMembers      = static_cast<uint32_t>(schema.current().numSubAtoms);
+        SC_TRY(schema.current().type == Reflection::TypeCategory::TypeStruct);
+        const uint32_t numMembers      = static_cast<uint32_t>(schema.current().getNumberOfChildren());
         const auto     structTypeIndex = schema.sourceTypeIndex;
         for (uint32_t idx = 0; idx < numMembers; ++idx)
         {
             schema.sourceTypeIndex          = structTypeIndex + idx + 1;
-            VersionedMemberIterator visitor = {schema, stream, schema.current().order};
+            VersionedMemberIterator visitor = {schema, stream, schema.current().memberInfo.order};
             schema.resolveLink();
-            Reflection::MetaClass<T>::visitObject(visitor, object);
+            Reflection::Reflect<T>::visitObject(visitor, object);
             if (visitor.consumed)
             {
                 SC_TRY(visitor.consumedWithSuccess);
@@ -113,7 +113,7 @@ struct SerializerReadVersionedItems
         const auto arrayItemTypeIndex = schema.sourceTypeIndex;
 
         const bool isPacked =
-            Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
+            Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::Reflect<T>::getCategory();
         if (isPacked)
         {
             const size_t sourceNumBytes = schema.current().sizeInBytes * numSourceItems;
@@ -158,7 +158,7 @@ struct SerializerReadVersioned<BinaryStream, T[N]>
     {
         schema.advance(); // make T current type
         return SerializerReadVersionedItems<BinaryStream, T>::readVersioned(
-            object, stream, schema, schema.current().getCustomUint32(), static_cast<uint32_t>(N));
+            object, stream, schema, schema.current().arrayInfo.numElements, static_cast<uint32_t>(N));
     }
 };
 
@@ -172,7 +172,7 @@ struct SerializerReadVersioned<BinaryStream, SC::Vector<T>>
         SC_TRY(stream.serializeBytes(&sizeInBytes, sizeof(sizeInBytes)));
         schema.advance();
         const bool isPacked =
-            Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
+            Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::Reflect<T>::getCategory();
         const size_t   sourceItemSize = schema.current().sizeInBytes;
         const uint32_t numSourceItems = static_cast<uint32_t>(sizeInBytes / sourceItemSize);
         if (isPacked)
@@ -198,7 +198,7 @@ struct SerializerReadVersioned<BinaryStream, SC::Array<T, N>>
         SC_TRY(stream.serializeBytes(&sizeInBytes, sizeof(sizeInBytes)));
         schema.advance();
         const bool isPacked =
-            Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::MetaClass<T>::getMetaType();
+            Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::Reflect<T>::getCategory();
 
         const size_t   sourceItemSize      = schema.current().sizeInBytes;
         const uint32_t numSourceItems      = static_cast<uint32_t>(sizeInBytes / sourceItemSize);
@@ -233,15 +233,15 @@ struct SerializerReadVersioned<BinaryStream, T, typename SC::EnableIf<Reflection
         // clang-format off
         switch (schema.current().type)
         {
-            case Reflection::MetaType::TypeUINT8:      return readCastValue<uint8_t>(object, stream);
-            case Reflection::MetaType::TypeUINT16:     return readCastValue<uint16_t>(object, stream);
-            case Reflection::MetaType::TypeUINT32:     return readCastValue<uint32_t>(object, stream);
-            case Reflection::MetaType::TypeUINT64:     return readCastValue<uint64_t>(object, stream);
-            case Reflection::MetaType::TypeINT8:       return readCastValue<int8_t>(object, stream);
-            case Reflection::MetaType::TypeINT16:      return readCastValue<int16_t>(object, stream);
-            case Reflection::MetaType::TypeINT32:      return readCastValue<int32_t>(object, stream);
-            case Reflection::MetaType::TypeINT64:      return readCastValue<int64_t>(object, stream);
-            case Reflection::MetaType::TypeFLOAT32:
+            case Reflection::TypeCategory::TypeUINT8:      return readCastValue<uint8_t>(object, stream);
+            case Reflection::TypeCategory::TypeUINT16:     return readCastValue<uint16_t>(object, stream);
+            case Reflection::TypeCategory::TypeUINT32:     return readCastValue<uint32_t>(object, stream);
+            case Reflection::TypeCategory::TypeUINT64:     return readCastValue<uint64_t>(object, stream);
+            case Reflection::TypeCategory::TypeINT8:       return readCastValue<int8_t>(object, stream);
+            case Reflection::TypeCategory::TypeINT16:      return readCastValue<int16_t>(object, stream);
+            case Reflection::TypeCategory::TypeINT32:      return readCastValue<int32_t>(object, stream);
+            case Reflection::TypeCategory::TypeINT64:      return readCastValue<int64_t>(object, stream);
+            case Reflection::TypeCategory::TypeFLOAT32:
             {
                 if(schema.options.allowFloatToIntTruncation || IsSame<T, float>::value || IsSame<T, double>::value)
                 {
@@ -249,7 +249,7 @@ struct SerializerReadVersioned<BinaryStream, T, typename SC::EnableIf<Reflection
                 }
                 return false;
             }
-            case Reflection::MetaType::TypeDOUBLE64:
+            case Reflection::TypeCategory::TypeDOUBLE64:
             {
                 if(schema.options.allowFloatToIntTruncation || IsSame<T, float>::value || IsSame<T, double>::value)
                 {
@@ -257,7 +257,9 @@ struct SerializerReadVersioned<BinaryStream, T, typename SC::EnableIf<Reflection
                 }
                 return false;
             }
-            default: return false;
+            default:
+                SC_ASSERT_DEBUG(false);
+            return false;
         }
         // clang-format on
     }

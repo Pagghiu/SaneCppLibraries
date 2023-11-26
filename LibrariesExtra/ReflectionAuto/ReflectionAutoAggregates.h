@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../../Libraries/Reflection/ReflectionMetaType.h"
+#include "../../Libraries/Reflection/Reflection.h"
 #include "ReflectionAuto.h"
 
 namespace SC
@@ -27,7 +27,7 @@ template <typename T>
 using TypeListFor = typename Auto::type_list<T, Auto::MakeIntegerSequence<int, EnumerateAggregates<T>(0)>>::type;
 
 template <typename T, typename MemberVisitor, int NumMembers>
-struct MetaClassLoopholeVisitor
+struct DescribeLoopholeVisitor
 {
     MemberVisitor& builder;
     size_t         currentOffset = 0;
@@ -45,25 +45,36 @@ struct MetaClassLoopholeVisitor
 };
 
 template <typename T>
-struct MetaClassAutomaticAggregates
+struct DescribeAutomaticAggregates
 {
     using TypeList = AutoAggregates::TypeListFor<T>;
-    [[nodiscard]] static constexpr MetaType getMetaType() { return MetaType::TypeStruct; }
+    [[nodiscard]] static constexpr TypeCategory getCategory() { return TypeCategory::TypeStruct; }
 
     template <typename MemberVisitor>
-    static constexpr void build(MemberVisitor& builder)
+    [[nodiscard]] static constexpr bool build(MemberVisitor& builder)
     {
-        builder.atoms.template Struct<T>();
-        visit(builder);
+        if (not builder.addType(MemberVisitor::Type::template createStruct<T>()))
+            return false;
+        if (not visit(builder))
+            return false;
+        return true;
     }
 
     template <typename MemberVisitor>
     static constexpr bool visit(MemberVisitor&& builder)
     {
-        return Auto::MetaTypeListVisit<TypeList, TypeList::size>::visit(
-            MetaClassLoopholeVisitor<T, MemberVisitor, TypeList::size>{builder});
+        return Auto::TypeListVisit<TypeList, TypeList::size>::visit(
+            DescribeLoopholeVisitor<T, MemberVisitor, TypeList::size>{builder});
     }
 
+    // Cannot be constexpr as we're reinterpret_cast-ing
+    template <typename MemberVisitor>
+    static /*constexpr*/ bool visitObject(MemberVisitor&& builder, T& object)
+    {
+        return visit(VisitObjectAdapter<MemberVisitor>{builder, object});
+    }
+
+  private:
     template <typename MemberVisitor>
     struct VisitObjectAdapter
     {
@@ -78,19 +89,12 @@ struct MetaClassAutomaticAggregates
             return builder(order, name, member);
         }
     };
-
-    // Cannot be constexpr as we're reinterpret_cast-ing
-    template <typename MemberVisitor>
-    static /*constexpr*/ bool visitObject(MemberVisitor&& builder, T& object)
-    {
-        return visit(VisitObjectAdapter<MemberVisitor>{builder, object});
-    }
 };
 
 } // namespace AutoAggregates
 
 template <typename Class>
-struct MetaClass : public AutoAggregates::MetaClassAutomaticAggregates<Class>
+struct Reflect : public AutoAggregates::DescribeAutomaticAggregates<Class>
 {
 };
 

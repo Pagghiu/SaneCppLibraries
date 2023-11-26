@@ -8,5 +8,5 @@ struct SC::Process::Internal
 {
 };
 SC::Result SC::ProcessDescriptorDefinition::releaseHandle(int&) { return Result(true); }
-SC::Result SC::Process::launch(ProcessOptions options) { return Result(true); }
+SC::Result SC::Process::launch(Options options) { return Result(true); }
 SC::Result SC::Process::waitForExitSync() { return Result(true); }

@@ -8,6 +8,9 @@
 #include "../Strings/String.h"
 #include "Reflection.h"
 
+//-----------------------------------------------------------------------------------------------------------
+// SC Types Support
+//-----------------------------------------------------------------------------------------------------------
 namespace SC
 {
 namespace Reflection
@@ -16,77 +19,96 @@ namespace Reflection
 template <typename MemberVisitor, typename Container, typename ItemType, int N>
 struct VectorArrayVTable
 {
-    static constexpr void build(MemberVisitor&) {}
+    [[nodiscard]] static constexpr bool build(MemberVisitor&) { return true; }
 };
-template <typename T>
-struct MetaTypeInfo<SC::Vector<T>>
-{
-    static constexpr bool IsPacked = false;
-};
+
 template <typename T, int N>
-struct MetaTypeInfo<SC::Array<T, N>>
+struct ExtendedTypeInfo<SC::Array<T, N>>
 {
     static constexpr bool IsPacked = false;
 };
+
+template <typename T, int N>
+struct Reflect<SC::Array<T, N>>
+{
+    static constexpr TypeCategory getCategory() { return TypeCategory::TypeVector; }
+
+    template <typename MemberVisitor>
+    [[nodiscard]] static constexpr bool build(MemberVisitor& builder)
+    {
+        using Type = typename MemberVisitor::Type;
+
+        // TODO: Figure out a way to get rid of calling VectorArrayVTable here
+        if (not VectorArrayVTable<MemberVisitor, SC::Array<T, N>, T, N>::build(builder))
+            return false;
+
+        // Add Array type
+        if (not builder.addType(
+                Type::template createArray<SC::Array<T, N>>("SC::Array<T, N>", 1, TypeInfo::ArrayInfo{N})))
+            return false;
+
+        // Add dependent item type
+        if (not builder.addType(Type::template createGeneric<T>()))
+            return false;
+        return true;
+    }
+};
+
+template <typename T>
+struct Reflect<SC::Vector<T>>
+{
+    static constexpr TypeCategory getCategory() { return TypeCategory::TypeVector; }
+
+    template <typename MemberVisitor>
+    [[nodiscard]] static constexpr bool build(MemberVisitor& builder)
+    {
+        using Type = typename MemberVisitor::Type;
+
+        // TODO: Figure out a way to get rid of calling VectorArrayVTable here
+        if (not VectorArrayVTable<MemberVisitor, SC::Vector<T>, T, -1>::build(builder))
+            return false;
+
+        // Add Vector type
+        if (not builder.addType(Type::template createArray<SC::Vector<T>>("SC::Vector", 1, TypeInfo::ArrayInfo{0})))
+            return false;
+
+        // Add dependent item type
+        if (not builder.addType(Type::template createGeneric<T>()))
+            return false;
+
+        return true;
+    }
+};
+
+template <typename T>
+struct ExtendedTypeInfo<SC::Vector<T>>
+{
+    static constexpr bool IsPacked = false;
+};
+
+template <typename Key, typename Value, typename Container>
+struct Reflect<VectorMap<Key, Value, Container>> : ReflectStruct<VectorMap<Key, Value, Container>>
+{
+    using T = typename SC::VectorMap<Key, Value, Container>;
+
+    template <typename MemberVisitor>
+    [[nodiscard]] static constexpr bool visit(MemberVisitor&& builder)
+    {
+        return builder(0, "items", &T::items, SC_COMPILER_OFFSETOF(T, items));
+    }
+};
+
+// TODO: Rethink if enumerations should not be collapsed to their underlying primitive type
+template <>
+struct Reflect<SC::StringEncoding> : Reflect<uint8_t>
+{
+    static_assert(sizeof(SC::StringEncoding) == sizeof(uint8_t), "size");
+};
+
 } // namespace Reflection
 } // namespace SC
-
-template <typename T, int N>
-struct SC::Reflection::MetaClass<SC::Array<T, N>>
-{
-    static constexpr MetaType getMetaType() { return MetaType::TypeVector; }
-    template <typename MemberVisitor>
-    static constexpr void build(MemberVisitor& builder)
-    {
-        using Atom = typename MemberVisitor::Atom;
-        // TODO: It's probably possible to add MemberVisitor as template param of MetaClass to remove this
-        VectorArrayVTable<MemberVisitor, SC::Array<T, N>, T, N>::build(builder);
-        auto arrayHeader                   = Atom::template create<SC::Array<T, N>>("SC::Array<T, N>");
-        arrayHeader.properties.numSubAtoms = 1;
-        arrayHeader.properties.setCustomUint32(N);
-        builder.atoms.push(arrayHeader);
-        builder.atoms.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), TypeToString<T>::get(),
-                            &MetaClass<T>::build});
-    }
-};
-
-template <typename T>
-struct SC::Reflection::MetaClass<SC::Vector<T>>
-{
-    static constexpr MetaType getMetaType() { return MetaType::TypeVector; }
-
-    template <typename MemberVisitor>
-    static constexpr void build(MemberVisitor& builder)
-    {
-        using Atom = typename MemberVisitor::Atom;
-        VectorArrayVTable<MemberVisitor, SC::Vector<T>, T, -1>::build(builder);
-        auto vectorHeader                   = Atom::template create<SC::Vector<T>>("SC::Vector");
-        vectorHeader.properties.numSubAtoms = 1;
-        vectorHeader.properties.setCustomUint32(sizeof(T));
-        builder.atoms.push(vectorHeader);
-        builder.atoms.push({MetaProperties(MetaClass<T>::getMetaType(), 0, 0, sizeof(T), -1), TypeToString<T>::get(),
-                            &MetaClass<T>::build});
-    }
-};
 
 SC_META_STRUCT_VISIT(SC::String)
-SC_META_STRUCT_FIELD(0, data)
+SC_META_STRUCT_FIELD(0, encoding) // TODO: Maybe encoding should be merged in data header
+SC_META_STRUCT_FIELD(1, data)
 SC_META_STRUCT_LEAVE()
-
-namespace SC
-{
-namespace Reflection
-{
-template <typename Key, typename Value, typename Container>
-struct MetaClass<VectorMap<Key, Value, Container>> : MetaStruct<MetaClass<VectorMap<Key, Value, Container>>>
-{
-    using T = typename MetaStruct<MetaClass<SC::VectorMap<Key, Value, Container>>>::T;
-    template <typename MemberVisitor>
-    static constexpr void visit(MemberVisitor&& builder)
-    {
-        builder(0, SC_META_MEMBER(items));
-    }
-};
-
-} // namespace Reflection
-} // namespace SC

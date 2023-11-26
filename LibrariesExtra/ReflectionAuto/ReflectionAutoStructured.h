@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../../Libraries/Reflection/ReflectionMetaType.h"
+#include "../../Libraries/Reflection/ReflectionCategory.h"
 #include "ReflectionAuto.h"
 
 namespace SC
@@ -347,7 +347,7 @@ template <typename T, int N = CountAggregates<T>(0), typename F = typename Decom
 using TypeListFor = typename Auto::type_list<T, Auto::MakeIntegerSequence<int, N>>::type;
 
 template <typename T, typename MemberVisitor, int NumMembers>
-struct MetaClassLoopholeVisitor
+struct DescribeLoopholeVisitor
 {
     MemberVisitor& builder;
 
@@ -361,25 +361,37 @@ struct MetaClassLoopholeVisitor
 };
 
 template <typename T>
-struct MetaClassAutomaticStructured
+struct DescribeAutomaticStructured
 {
     using TypeList = AutoStructured::TypeListFor<T>;
-    [[nodiscard]] static constexpr MetaType getMetaType() { return MetaType::TypeStruct; }
+    [[nodiscard]] static constexpr TypeCategory getCategory() { return TypeCategory::TypeStruct; }
 
     template <typename MemberVisitor>
-    static constexpr void build(MemberVisitor& builder)
+    [[nodiscard]] static constexpr bool build(MemberVisitor& builder)
     {
-        builder.atoms.template Struct<T>();
-        visit(builder);
+        if (not builder.types.writeAndAdvance(MemberVisitor::Type::template createStruct<T>()))
+            return false;
+        if (not visit(builder))
+            return false;
+        return true;
     }
 
     template <typename MemberVisitor>
     static constexpr bool visit(MemberVisitor&& builder)
     {
-        return Auto::MetaTypeListVisit<TypeList, TypeList::size>::visit(
-            MetaClassLoopholeVisitor<T, MemberVisitor, TypeList::size>{builder});
+        return Auto::TypeListVisit<TypeList, TypeList::size>::visit(
+            DescribeLoopholeVisitor<T, MemberVisitor, TypeList::size>{builder});
     }
 
+    template <typename MemberVisitor>
+    static constexpr bool visitObject(MemberVisitor&& builder, T& object)
+    {
+        constexpr auto NumMembers = AutoStructured::CountAggregates<T>(0);
+        return Reflection::AutoStructured::MemberApply<NumMembers>(object,
+                                                                   VisitObjectAdapter<MemberVisitor>{builder, object});
+    }
+
+  private:
     template <typename MemberVisitor>
     struct VisitObjectAdapter
     {
@@ -395,19 +407,11 @@ struct MetaClassAutomaticStructured
 
         constexpr bool operator()() { return true; }
     };
-
-    template <typename MemberVisitor>
-    static constexpr bool visitObject(MemberVisitor&& builder, T& object)
-    {
-        constexpr auto NumMembers = AutoStructured::CountAggregates<T>(0);
-        return Reflection::AutoStructured::MemberApply<NumMembers>(object,
-                                                                   VisitObjectAdapter<MemberVisitor>{builder, object});
-    }
 };
 } // namespace AutoStructured
 
 template <typename Class>
-struct MetaClass : public AutoStructured::MetaClassAutomaticStructured<Class>
+struct Reflect : public AutoStructured::DescribeAutomaticStructured<Class>
 {
 };
 

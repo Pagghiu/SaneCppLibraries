@@ -27,58 +27,70 @@ template <typename SourceType, typename SinkType>
 }
 
 template <typename T>
-[[nodiscard]] static bool tryReadPrimitiveValue(Serialization::BinaryBuffer*      sourceObject,
-                                                const Reflection::MetaProperties& sinkProperty,
-                                                Span<uint8_t>&                    sinkObject)
+[[nodiscard]] static bool tryReadPrimitiveValue(Serialization::BinaryBuffer* sourceObject,
+                                                const Reflection::TypeInfo& sinkProperty, Span<uint8_t>& sinkObject)
 {
     T sourceValue;
     SC_TRY(sourceObject->serializeBytes(Span<uint8_t>::reinterpret_object(sourceValue)));
     switch (sinkProperty.type)
     {
-    case Reflection::MetaType::TypeUINT8: return tryWritingPrimitiveValueToSink<T, uint8_t>(sourceValue, sinkObject);
-    case Reflection::MetaType::TypeUINT16: return tryWritingPrimitiveValueToSink<T, uint16_t>(sourceValue, sinkObject);
-    case Reflection::MetaType::TypeUINT32: return tryWritingPrimitiveValueToSink<T, uint32_t>(sourceValue, sinkObject);
-    case Reflection::MetaType::TypeUINT64: return tryWritingPrimitiveValueToSink<T, uint64_t>(sourceValue, sinkObject);
-    case Reflection::MetaType::TypeINT8: return tryWritingPrimitiveValueToSink<T, int8_t>(sourceValue, sinkObject);
-    case Reflection::MetaType::TypeINT16: return tryWritingPrimitiveValueToSink<T, int16_t>(sourceValue, sinkObject);
-    case Reflection::MetaType::TypeINT32: return tryWritingPrimitiveValueToSink<T, int32_t>(sourceValue, sinkObject);
-    case Reflection::MetaType::TypeINT64: return tryWritingPrimitiveValueToSink<T, int64_t>(sourceValue, sinkObject);
-    case Reflection::MetaType::TypeFLOAT32: return tryWritingPrimitiveValueToSink<T, float>(sourceValue, sinkObject);
-    case Reflection::MetaType::TypeDOUBLE64: return tryWritingPrimitiveValueToSink<T, double>(sourceValue, sinkObject);
+    case Reflection::TypeCategory::TypeUINT8:
+        return tryWritingPrimitiveValueToSink<T, uint8_t>(sourceValue, sinkObject);
+    case Reflection::TypeCategory::TypeUINT16:
+        return tryWritingPrimitiveValueToSink<T, uint16_t>(sourceValue, sinkObject);
+    case Reflection::TypeCategory::TypeUINT32:
+        return tryWritingPrimitiveValueToSink<T, uint32_t>(sourceValue, sinkObject);
+    case Reflection::TypeCategory::TypeUINT64:
+        return tryWritingPrimitiveValueToSink<T, uint64_t>(sourceValue, sinkObject);
+    case Reflection::TypeCategory::TypeINT8: return tryWritingPrimitiveValueToSink<T, int8_t>(sourceValue, sinkObject);
+    case Reflection::TypeCategory::TypeINT16:
+        return tryWritingPrimitiveValueToSink<T, int16_t>(sourceValue, sinkObject);
+    case Reflection::TypeCategory::TypeINT32:
+        return tryWritingPrimitiveValueToSink<T, int32_t>(sourceValue, sinkObject);
+    case Reflection::TypeCategory::TypeINT64:
+        return tryWritingPrimitiveValueToSink<T, int64_t>(sourceValue, sinkObject);
+    case Reflection::TypeCategory::TypeFLOAT32:
+        return tryWritingPrimitiveValueToSink<T, float>(sourceValue, sinkObject);
+    case Reflection::TypeCategory::TypeDOUBLE64:
+        return tryWritingPrimitiveValueToSink<T, double>(sourceValue, sinkObject);
     default: return false;
     }
 }
 
 [[nodiscard]] static bool tryPrimitiveConversion(const SerializerReadVersioned::Options& options,
-                                                 const Reflection::MetaProperties&       sourceProperty,
+                                                 const Reflection::TypeInfo&             sourceProperty,
                                                  Serialization::BinaryBuffer*            sourceObject,
-                                                 const Reflection::MetaProperties&       sinkProperty,
-                                                 Span<uint8_t>&                          sinkObject)
+                                                 const Reflection::TypeInfo& sinkProperty, Span<uint8_t>& sinkObject)
 {
     switch (sourceProperty.type)
     {
-    case Reflection::MetaType::TypeUINT8: return tryReadPrimitiveValue<uint8_t>(sourceObject, sinkProperty, sinkObject);
-    case Reflection::MetaType::TypeUINT16:
+    case Reflection::TypeCategory::TypeUINT8:
+        return tryReadPrimitiveValue<uint8_t>(sourceObject, sinkProperty, sinkObject);
+    case Reflection::TypeCategory::TypeUINT16:
         return tryReadPrimitiveValue<uint16_t>(sourceObject, sinkProperty, sinkObject);
-    case Reflection::MetaType::TypeUINT32:
+    case Reflection::TypeCategory::TypeUINT32:
         return tryReadPrimitiveValue<uint32_t>(sourceObject, sinkProperty, sinkObject);
-    case Reflection::MetaType::TypeUINT64:
+    case Reflection::TypeCategory::TypeUINT64:
         return tryReadPrimitiveValue<uint64_t>(sourceObject, sinkProperty, sinkObject);
-    case Reflection::MetaType::TypeINT8: return tryReadPrimitiveValue<int8_t>(sourceObject, sinkProperty, sinkObject);
-    case Reflection::MetaType::TypeINT16: return tryReadPrimitiveValue<int16_t>(sourceObject, sinkProperty, sinkObject);
-    case Reflection::MetaType::TypeINT32: return tryReadPrimitiveValue<int32_t>(sourceObject, sinkProperty, sinkObject);
-    case Reflection::MetaType::TypeINT64: return tryReadPrimitiveValue<int64_t>(sourceObject, sinkProperty, sinkObject);
-    case Reflection::MetaType::TypeFLOAT32: //
+    case Reflection::TypeCategory::TypeINT8:
+        return tryReadPrimitiveValue<int8_t>(sourceObject, sinkProperty, sinkObject);
+    case Reflection::TypeCategory::TypeINT16:
+        return tryReadPrimitiveValue<int16_t>(sourceObject, sinkProperty, sinkObject);
+    case Reflection::TypeCategory::TypeINT32:
+        return tryReadPrimitiveValue<int32_t>(sourceObject, sinkProperty, sinkObject);
+    case Reflection::TypeCategory::TypeINT64:
+        return tryReadPrimitiveValue<int64_t>(sourceObject, sinkProperty, sinkObject);
+    case Reflection::TypeCategory::TypeFLOAT32: //
     {
-        if (sinkProperty.type == Reflection::MetaType::TypeDOUBLE64 or options.allowFloatToIntTruncation)
+        if (sinkProperty.type == Reflection::TypeCategory::TypeDOUBLE64 or options.allowFloatToIntTruncation)
         {
             return tryReadPrimitiveValue<float>(sourceObject, sinkProperty, sinkObject);
         }
         break;
     }
-    case Reflection::MetaType::TypeDOUBLE64: //
+    case Reflection::TypeCategory::TypeDOUBLE64: //
     {
-        if (sinkProperty.type == Reflection::MetaType::TypeFLOAT32 or options.allowFloatToIntTruncation)
+        if (sinkProperty.type == Reflection::TypeCategory::TypeFLOAT32 or options.allowFloatToIntTruncation)
         {
             return tryReadPrimitiveValue<double>(sourceObject, sinkProperty, sinkObject);
         }
@@ -110,12 +122,12 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::read()
             return tryPrimitiveConversion(options, sourceProperty, sourceObject, sinkProperty, sinkObject);
         }
     }
-    else if (sourceProperty.type == Reflection::MetaType::TypeStruct)
+    else if (sourceProperty.type == Reflection::TypeCategory::TypeStruct)
     {
         return readStruct();
     }
-    else if (sourceProperty.type == Reflection::MetaType::TypeArray ||
-             sourceProperty.type == Reflection::MetaType::TypeVector)
+    else if (sourceProperty.type == Reflection::TypeCategory::TypeArray ||
+             sourceProperty.type == Reflection::TypeCategory::TypeVector)
     {
         return readArrayVector();
     }
@@ -124,7 +136,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::read()
 
 bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readStruct()
 {
-    if (sinkProperty.type != Reflection::MetaType::TypeStruct)
+    if (sinkProperty.type != Reflection::TypeCategory::TypeStruct)
     {
         return false;
     }
@@ -135,28 +147,28 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readStruct()
     const auto    structSinkTypeIndex   = sinkTypeIndex;
     Span<uint8_t> structSinkObject      = sinkObject;
 
-    for (uint32_t idx = 0; idx < static_cast<uint32_t>(structSourceProperty.numSubAtoms); ++idx)
+    for (uint32_t idx = 0; idx < static_cast<uint32_t>(structSourceProperty.getNumberOfChildren()); ++idx)
     {
         sourceTypeIndex        = structSourceTypeIndex + idx + 1;
-        const auto sourceOrder = sourceProperties.data()[sourceTypeIndex].order;
+        const auto sourceOrder = sourceProperties.data()[sourceTypeIndex].memberInfo.order;
         uint32_t   findIdx;
-        for (findIdx = 0; findIdx < static_cast<uint32_t>(structSinkProperty.numSubAtoms); ++findIdx)
+        for (findIdx = 0; findIdx < static_cast<uint32_t>(structSinkProperty.getNumberOfChildren()); ++findIdx)
         {
             const auto typeIndex = structSinkTypeIndex + findIdx + 1;
-            if (sinkProperties.data()[typeIndex].order == sourceOrder)
+            if (sinkProperties.data()[typeIndex].memberInfo.order == sourceOrder)
             {
                 break;
             }
         }
-        if (sourceProperties.data()[sourceTypeIndex].getLinkIndex() >= 0)
+        if (sourceProperties.data()[sourceTypeIndex].hasValidLinkIndex())
             sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
-        if (findIdx != static_cast<uint32_t>(structSinkProperty.numSubAtoms))
+        if (findIdx != static_cast<uint32_t>(structSinkProperty.getNumberOfChildren()))
         {
             // Member with same order ordinal has been found
             sinkTypeIndex = structSinkTypeIndex + findIdx + 1;
-            SC_TRY(structSinkObject.sliceStartLength(sinkProperties.data()[sinkTypeIndex].offsetInBytes,
+            SC_TRY(structSinkObject.sliceStartLength(sinkProperties.data()[sinkTypeIndex].memberInfo.offsetInBytes,
                                                      sinkProperties.data()[sinkTypeIndex].sizeInBytes, sinkObject));
-            if (sinkProperties.data()[sinkTypeIndex].getLinkIndex() >= 0)
+            if (sinkProperties.data()[sinkTypeIndex].hasValidLinkIndex())
                 sinkTypeIndex = static_cast<uint32_t>(sinkProperties.data()[sinkTypeIndex].getLinkIndex());
             SC_TRY(read());
         }
@@ -172,7 +184,8 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readStruct()
 
 bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector()
 {
-    if (sinkProperty.type != Reflection::MetaType::TypeArray && sinkProperty.type != Reflection::MetaType::TypeVector)
+    if (sinkProperty.type != Reflection::TypeCategory::TypeArray &&
+        sinkProperty.type != Reflection::TypeCategory::TypeVector)
     {
         return false;
     }
@@ -184,7 +197,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
 
     sourceTypeIndex         = arraySourceTypeIndex + 1;
     uint64_t sourceNumBytes = arraySourceProperty.sizeInBytes;
-    if (arraySourceProperty.type == Reflection::MetaType::TypeVector)
+    if (arraySourceProperty.type == Reflection::TypeCategory::TypeVector)
     {
         SC_TRY(sourceObject->serializeBytes(Span<uint8_t>::reinterpret_object(sourceNumBytes)));
     }
@@ -199,7 +212,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
     const auto sinkItemSize   = sinkProperties.data()[sinkTypeIndex].sizeInBytes;
 
     Span<uint8_t> arraySinkStart;
-    if (arraySinkProperty.type == Reflection::MetaType::TypeArray)
+    if (arraySinkProperty.type == Reflection::TypeCategory::TypeArray)
     {
         SC_TRY(arraySinkObject.sliceStartLength(0, arraySinkProperty.sizeInBytes, arraySinkStart));
     }
@@ -225,9 +238,9 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
     }
     else
     {
-        if (sinkProperties.data()[sinkTypeIndex].getLinkIndex() >= 0)
+        if (sinkProperties.data()[sinkTypeIndex].hasValidLinkIndex())
             sinkTypeIndex = static_cast<uint32_t>(sinkProperties.data()[sinkTypeIndex].getLinkIndex());
-        if (sinkProperties.data()[sourceTypeIndex].getLinkIndex() >= 0)
+        if (sinkProperties.data()[sourceTypeIndex].hasValidLinkIndex())
             sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
         const uint64_t sinkNumElements     = arraySinkStart.sizeInBytes() / sinkItemSize;
         const uint64_t sourceNumElements   = sourceNumBytes / sourceItemSize;

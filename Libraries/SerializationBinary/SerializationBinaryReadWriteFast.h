@@ -29,11 +29,11 @@ struct SerializerReadWriteFast
 {
     [[nodiscard]] static constexpr bool serialize(T& object, BinaryStream& stream)
     {
-        if (Reflection::MetaTypeInfo<T>::IsPacked)
+        if (Reflection::ExtendedTypeInfo<T>::IsPacked)
         {
             return stream.serializeBytes(&object, sizeof(T));
         }
-        return Reflection::MetaClass<T>::visitObject(SerializerMemberIterator<BinaryStream, T>{stream}, object);
+        return Reflection::Reflect<T>::visitObject(SerializerMemberIterator<BinaryStream, T>{stream}, object);
     }
 };
 
@@ -43,7 +43,7 @@ struct SerializerReadWriteFast<BinaryStream, T[N]>
 {
     [[nodiscard]] static constexpr bool serialize(T (&object)[N], BinaryStream& stream)
     {
-        if (Reflection::MetaTypeInfo<T>::IsPacked)
+        if (Reflection::ExtendedTypeInfo<T>::IsPacked)
         {
             return stream.serializeBytes(object, sizeof(object));
         }
@@ -81,7 +81,7 @@ struct SerializerVector
             return false;
         SC_TRY(object.resize(static_cast<size_t>(sizeInBytes / itemSize)));
 
-        if (Reflection::MetaTypeInfo<T>::IsPacked)
+        if (Reflection::ExtendedTypeInfo<T>::IsPacked)
         {
             return stream.serializeBytes(object.data(), itemSize * object.size());
         }

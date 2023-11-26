@@ -19,19 +19,19 @@ namespace Reflection
 namespace Auto
 {
 template <typename TypeList, int N>
-struct MetaTypeListVisit
+struct TypeListVisit
 {
     template <typename Visitor>
     constexpr static bool visit(Visitor&& visitor)
     {
         using Type = TypeListGetT<TypeList, N - 1>;
-        return MetaTypeListVisit<TypeList, N - 1>::visit(forward<Visitor>(visitor)) and
+        return TypeListVisit<TypeList, N - 1>::visit(forward<Visitor>(visitor)) and
                visitor.template visit<N - 1, Type>();
     }
 };
 
 template <typename TypeList>
-struct MetaTypeListVisit<TypeList, 0>
+struct TypeListVisit<TypeList, 0>
 {
     template <typename Visitor>
     constexpr static bool visit(Visitor&& visitor)

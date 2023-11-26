@@ -353,7 +353,7 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
             BinaryWriterStream streamWriter;
             SerializerWriter   writer(streamWriter);
             SC_TEST_EXPECT(writer.serialize(topLevel));
-            SC_TEST_EXPECT(streamWriter.numberOfOperations == 7);
+            SC_TEST_EXPECT(streamWriter.numberOfOperations == 10);
             BinaryReaderStream streamReader;
             SerializerReader   reader(streamReader);
             streamReader.buffer = move(streamWriter.buffer);
@@ -367,7 +367,7 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
         }
     }
 
-    template <typename FlatSchemaCompiler, typename SerializerVersioned, typename VersionSchema>
+    template <typename Compiler, typename SerializerVersioned, typename VersionSchema>
     void runVersionedTests()
     {
         if (test_section("VersionedStruct1/2"))
@@ -378,11 +378,11 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
             SC_TEST_EXPECT(writer.serialize(struct1));
             SerializerVersioned reader;
             VersionedStruct2    struct2;
-            auto                schema = FlatSchemaCompiler::template compile<VersionedStruct1>();
+            auto                schema = Compiler::template compile<VersionedStruct1>();
             BinaryReaderStream  streamReader;
             streamReader.buffer = move(streamWriter.buffer);
             VersionSchema versionSchema;
-            versionSchema.sourceProperties = {schema.properties.values, schema.properties.size};
+            versionSchema.sourceProperties = {schema.typeInfos.values, schema.typeInfos.size};
             SC_TEST_EXPECT(reader.readVersioned(struct2, streamReader, versionSchema));
             SC_TEST_EXPECT(streamReader.index == streamReader.buffer.size());
             SC_TEST_EXPECT(not(struct2 != struct1));
@@ -399,11 +399,11 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
             SC_TEST_EXPECT(streamWriter.numberOfOperations == 4);
             SerializerVersioned reader;
             VersionedArray2     array2;
-            auto                schema = FlatSchemaCompiler::template compile<VersionedArray1>();
+            auto                schema = Compiler::template compile<VersionedArray1>();
             BinaryReaderStream  streamReader;
             streamReader.buffer = move(streamWriter.buffer);
             VersionSchema versionSchema;
-            versionSchema.sourceProperties = {schema.properties.values, schema.properties.size};
+            versionSchema.sourceProperties = {schema.typeInfos.values, schema.typeInfos.size};
             SC_TEST_EXPECT(reader.readVersioned(array2, streamReader, versionSchema));
             SC_TEST_EXPECT(streamReader.index == streamReader.buffer.size());
             SC_TEST_EXPECT(array2.points.size() == 2);
@@ -419,11 +419,11 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
             SerializerWriter   writer(streamWriter);
             SC_TEST_EXPECT(writer.serialize(struct1));
             SerializerVersioned reader;
-            auto                schema = FlatSchemaCompiler::template compile<ConversionStruct1>();
+            auto                schema = Compiler::template compile<ConversionStruct1>();
             BinaryReaderStream  streamReader;
             streamReader.buffer = move(streamWriter.buffer);
             VersionSchema versionSchema;
-            versionSchema.sourceProperties = {schema.properties.values, schema.properties.size};
+            versionSchema.sourceProperties = {schema.typeInfos.values, schema.typeInfos.size};
             SC_TEST_EXPECT(reader.readVersioned(struct2, streamReader, versionSchema));
             SC_TEST_EXPECT(streamReader.index == streamReader.buffer.size());
             SC_TEST_EXPECT(struct2.intToFloat == struct1.intToFloat);

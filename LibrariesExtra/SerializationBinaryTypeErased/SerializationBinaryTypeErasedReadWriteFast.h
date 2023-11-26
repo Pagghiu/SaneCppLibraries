@@ -20,13 +20,14 @@ struct SerializerReadWriteFast
     [[nodiscard]] constexpr bool serialize(const T& object)
     {
         constexpr auto flatSchema      = Reflection::FlatSchemaTypeErased::compile<T>();
-        sourceProperties               = {flatSchema.properties.values, flatSchema.properties.size};
-        sourceNames                    = {flatSchema.names.values, flatSchema.names.size};
+        sourceProperties               = {flatSchema.typeInfos.values, flatSchema.typeInfos.size};
+        sourceNames                    = {flatSchema.typeNames.values, flatSchema.typeNames.size};
         arrayAccess.vectorVtable       = {flatSchema.vtables.vector.values, flatSchema.vtables.vector.size};
         sourceObject                   = sourceObject.reinterpret_object(object);
         sourceTypeIndex                = 0;
         destination.numberOfOperations = 0;
-        if (sourceProperties.sizeInBytes() == 0 || sourceProperties.data()[0].type != Reflection::MetaType::TypeStruct)
+        if (sourceProperties.sizeInBytes() == 0 ||
+            sourceProperties.data()[0].type != Reflection::TypeCategory::TypeStruct)
         {
             return false;
         }
@@ -38,13 +39,13 @@ struct SerializerReadWriteFast
     [[nodiscard]] bool writeStruct();
     [[nodiscard]] bool writeArrayVector();
 
-    Span<const Reflection::MetaProperties>   sourceProperties;
-    Span<const Reflection::SymbolStringView> sourceNames;
-    Serialization::BinaryBuffer&             destination;
-    Span<const uint8_t>                      sourceObject;
-    uint32_t                                 sourceTypeIndex;
-    Reflection::MetaProperties               sourceProperty;
-    ArrayAccess                              arrayAccess;
+    Span<const Reflection::TypeInfo>       sourceProperties;
+    Span<const Reflection::TypeStringView> sourceNames;
+    Serialization::BinaryBuffer&           destination;
+    Span<const uint8_t>                    sourceObject;
+    uint32_t                               sourceTypeIndex;
+    Reflection::TypeInfo                   sourceProperty;
+    ArrayAccess                            arrayAccess;
 };
 
 struct SimpleBinaryReader
@@ -56,14 +57,14 @@ struct SimpleBinaryReader
     {
         constexpr auto flatSchema = Reflection::FlatSchemaTypeErased::compile<T>();
 
-        sinkProperties = {flatSchema.properties.values, flatSchema.properties.size};
-        sinkNames      = {flatSchema.names.values, flatSchema.names.size};
+        sinkProperties = {flatSchema.typeInfos.values, flatSchema.typeInfos.size};
+        sinkNames      = {flatSchema.typeNames.values, flatSchema.typeNames.size};
         sinkObject     = sinkObject.reinterpret_object(object);
         sinkTypeIndex  = 0;
 
         arrayAccess.vectorVtable = {flatSchema.vtables.vector.values, flatSchema.vtables.vector.size};
 
-        if (sinkProperties.sizeInBytes() == 0 || sinkProperties.data()[0].type != Reflection::MetaType::TypeStruct)
+        if (sinkProperties.sizeInBytes() == 0 || sinkProperties.data()[0].type != Reflection::TypeCategory::TypeStruct)
         {
             return false;
         }
@@ -75,13 +76,13 @@ struct SimpleBinaryReader
     [[nodiscard]] bool readStruct();
     [[nodiscard]] bool readArrayVector();
 
-    Span<const Reflection::MetaProperties>   sinkProperties;
-    Span<const Reflection::SymbolStringView> sinkNames;
-    Reflection::MetaProperties               sinkProperty;
-    uint32_t                                 sinkTypeIndex = 0;
-    Span<uint8_t>                            sinkObject;
-    Serialization::BinaryBuffer&             source;
-    ArrayAccess                              arrayAccess;
+    Span<const Reflection::TypeInfo>       sinkProperties;
+    Span<const Reflection::TypeStringView> sinkNames;
+    Reflection::TypeInfo                   sinkProperty;
+    uint32_t                               sinkTypeIndex = 0;
+    Span<uint8_t>                          sinkObject;
+    Serialization::BinaryBuffer&           source;
+    ArrayAccess                            arrayAccess;
 };
 
 } // namespace SerializationBinaryTypeErased

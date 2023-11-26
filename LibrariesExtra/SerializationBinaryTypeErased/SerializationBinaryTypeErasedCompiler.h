@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../../Libraries/Reflection/Reflection.h"
-#include "../../Libraries/Reflection/ReflectionFlatSchemaCompiler.h"
+#include "../../Libraries/Reflection/ReflectionCompiler.h"
 namespace SC
 {
 namespace Reflection
@@ -17,13 +17,13 @@ struct VectorVTable
         Yes
     };
 
-    using FunctionGetSegmentSpan = bool (*)(MetaProperties property, Span<uint8_t> object, Span<uint8_t>& itemBegin);
-    using FunctionGetSegmentSpanConst = bool (*)(MetaProperties property, Span<const uint8_t> object,
+    using FunctionGetSegmentSpan      = bool (*)(TypeInfo property, Span<uint8_t> object, Span<uint8_t>& itemBegin);
+    using FunctionGetSegmentSpanConst = bool (*)(TypeInfo property, Span<const uint8_t> object,
                                                  Span<const uint8_t>& itemBegin);
 
-    using FunctionResize = bool (*)(Span<uint8_t> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
+    using FunctionResize = bool (*)(Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
                                     DropEccessItems dropEccessItems);
-    using FunctionResizeWithoutInitialize = bool (*)(Span<uint8_t> object, Reflection::MetaProperties property,
+    using FunctionResizeWithoutInitialize = bool (*)(Span<uint8_t> object, Reflection::TypeInfo property,
                                                      uint64_t sizeInBytes, DropEccessItems dropEccessItems);
     FunctionGetSegmentSpan          getSegmentSpan;
     FunctionGetSegmentSpanConst     getSegmentSpanConst;
@@ -39,36 +39,34 @@ struct VectorVTable
 template <int MAX_VTABLES>
 struct ReflectionVTables
 {
-    SizedArray<VectorVTable, MAX_VTABLES> vector;
+    ArrayWithSize<VectorVTable, MAX_VTABLES> vector;
 };
 
-struct MetaClassBuilderTypeErased : public MetaClassBuilder<MetaClassBuilderTypeErased>
+struct TypeBuilderTypeErased : public SchemaBuilder<TypeBuilderTypeErased>
 {
-    using Atom = AtomBase<MetaClassBuilderTypeErased>;
+    using Type = ReflectedType<TypeBuilderTypeErased>;
 
     static const uint32_t          MAX_VTABLES = 100;
     ReflectionVTables<MAX_VTABLES> vtables;
 
-    constexpr MetaClassBuilderTypeErased(Atom* output = nullptr, const uint32_t capacity = 0)
-        : MetaClassBuilder(output, capacity)
-    {}
+    constexpr TypeBuilderTypeErased(Type* output, const uint32_t capacity) : SchemaBuilder(output, capacity) {}
 };
 
 template <typename Container, typename ItemType, int N>
-struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
+struct VectorArrayVTable<TypeBuilderTypeErased, Container, ItemType, N>
 {
-    constexpr static void build(MetaClassBuilderTypeErased& builder)
+    [[nodiscard]] constexpr static bool build(TypeBuilderTypeErased& builder)
     {
         VectorVTable vector;
         vector.resize = &resize;
         assignResizeWithoutInitialize(vector);
         vector.getSegmentSpan      = &getSegmentSpan<uint8_t>;
         vector.getSegmentSpanConst = &getSegmentSpan<const uint8_t>;
-        vector.linkID              = builder.initialSize + static_cast<unsigned>(builder.atoms.size);
-        (void)builder.vtables.vector.push_back(vector);
+        vector.linkID              = builder.currentLinkID;
+        return builder.vtables.vector.push_back(vector);
     }
 
-    static bool resize(Span<uint8_t> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
+    static bool resize(Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
                        VectorVTable::DropEccessItems dropEccessItems)
     {
         SC_COMPILER_UNUSED(property);
@@ -85,7 +83,7 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
             return false;
         }
     }
-    static bool resizeWithoutInitialize(Span<uint8_t> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
+    static bool resizeWithoutInitialize(Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
                                         VectorVTable::DropEccessItems dropEccessItems)
     {
         SC_COMPILER_UNUSED(property);
@@ -104,7 +102,7 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
     }
 
     template <typename ByteType>
-    [[nodiscard]] static constexpr bool getSegmentSpan(Reflection::MetaProperties property, Span<ByteType> object,
+    [[nodiscard]] static constexpr bool getSegmentSpan(Reflection::TypeInfo property, Span<ByteType> object,
                                                        Span<ByteType>& itemBegin)
     {
         SC_COMPILER_UNUSED(property);
@@ -135,7 +133,7 @@ struct VectorArrayVTable<MetaClassBuilderTypeErased, Container, ItemType, N>
     }
 };
 
-using FlatSchemaTypeErased = Reflection::FlatSchemaCompiler<MetaClassBuilderTypeErased>;
+using FlatSchemaTypeErased = Reflection::Compiler<TypeBuilderTypeErased>;
 
 } // namespace Reflection
 
@@ -146,9 +144,9 @@ struct ArrayAccess
 {
     Span<const Reflection::VectorVTable> vectorVtable;
 
-    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::MetaProperties property, Span<uint8_t> object,
+    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::TypeInfo property, Span<uint8_t> object,
                                       Span<uint8_t>& itemBegin);
-    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::MetaProperties property, Span<const uint8_t> object,
+    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::TypeInfo property, Span<const uint8_t> object,
                                       Span<const uint8_t>& itemBegin);
 
     using DropEccessItems = Reflection::VectorVTable::DropEccessItems;
@@ -158,7 +156,7 @@ struct ArrayAccess
         Yes
     };
 
-    bool resize(uint32_t linkID, Span<uint8_t> object, Reflection::MetaProperties property, uint64_t sizeInBytes,
+    bool resize(uint32_t linkID, Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
                 Initialize initialize, DropEccessItems dropEccessItems);
 };
 } // namespace SerializationBinaryTypeErased

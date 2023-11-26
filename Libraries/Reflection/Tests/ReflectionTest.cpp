@@ -14,7 +14,7 @@
 #include "../../../LibrariesExtra/ReflectionAuto/ReflectionAutoStructured.h"
 #endif
 #endif
-#include "../ReflectionFlatSchemaCompiler.h"
+#include "../ReflectionCompiler.h"
 #include "../ReflectionSC.h"
 
 namespace TestNamespace
@@ -59,7 +59,7 @@ namespace Reflection
 {
 
 template <>
-struct MetaClass<TestNamespace::SimpleStructure> : MetaStruct<MetaClass<TestNamespace::SimpleStructure>>
+struct Reflect<TestNamespace::SimpleStructure> : ReflectStruct<TestNamespace::SimpleStructure>
 {
     template <typename MemberVisitor>
     static constexpr bool visit(MemberVisitor&& visitor)
@@ -72,7 +72,7 @@ struct MetaClass<TestNamespace::SimpleStructure> : MetaStruct<MetaClass<TestName
 };
 
 template <>
-struct MetaClass<TestNamespace::IntermediateStructure> : MetaStruct<MetaClass<TestNamespace::IntermediateStructure>>
+struct Reflect<TestNamespace::IntermediateStructure> : ReflectStruct<TestNamespace::IntermediateStructure>
 {
     template <typename MemberVisitor>
     static constexpr bool visit(MemberVisitor&& visitor)
@@ -84,7 +84,7 @@ struct MetaClass<TestNamespace::IntermediateStructure> : MetaStruct<MetaClass<Te
 };
 
 template <>
-struct MetaClass<TestNamespace::ComplexStructure> : MetaStruct<MetaClass<TestNamespace::ComplexStructure>>
+struct Reflect<TestNamespace::ComplexStructure> : ReflectStruct<TestNamespace::ComplexStructure>
 {
     template <typename MemberVisitor>
     static constexpr bool visit(MemberVisitor&& visitor)
@@ -123,13 +123,14 @@ struct TestNamespace::PackedStructWithArray
     float       floatValue    = 1.5f;
     SC::int64_t int64Value    = -13;
 };
-// #if !SC_META_ENABLE_AUTO_REFLECTION // TODO: This fails on MSVC
+// Fails on GCC and MSVC in C++ 14 mode
+#if !SC_META_ENABLE_AUTO_REFLECTION || !SC_LANGUAGE_CPP_AT_LEAST_20
 SC_META_STRUCT_VISIT(TestNamespace::PackedStructWithArray)
 SC_META_STRUCT_FIELD(0, arrayValue)
 SC_META_STRUCT_FIELD(1, floatValue)
 SC_META_STRUCT_FIELD(2, int64Value)
 SC_META_STRUCT_LEAVE()
-// #endif
+#endif
 
 struct TestNamespace::PackedStruct
 {
@@ -173,11 +174,12 @@ struct TestNamespace::StructWithArrayPacked
 {
     PackedStruct packedMember[3];
 };
-// #if !SC_META_ENABLE_AUTO_REFLECTION // TODO: This fails on clang
+// Fails on Clang and GCC in C++ 14 mode
+#if !SC_META_ENABLE_AUTO_REFLECTION || !SC_LANGUAGE_CPP_AT_LEAST_20
 SC_META_STRUCT_VISIT(TestNamespace::StructWithArrayPacked)
 SC_META_STRUCT_FIELD(0, packedMember);
 SC_META_STRUCT_LEAVE()
-// #endif
+#endif
 
 struct TestNamespace::StructWithArrayUnpacked
 {
@@ -192,45 +194,45 @@ SC_META_STRUCT_LEAVE()
 namespace SC
 {
 // TODO: Move printFlatSchema somewhere else
-template <int NUM_ATOMS, typename MetaProperties>
-inline void printFlatSchema(Console& console, const MetaProperties (&atom)[NUM_ATOMS],
-                            const Reflection::SymbolStringView (&names)[NUM_ATOMS])
+template <int NUM_TYPES, typename TypeInfo>
+inline void printFlatSchema(Console& console, const TypeInfo (&type)[NUM_TYPES],
+                            const Reflection::TypeStringView (&names)[NUM_TYPES])
 {
-    int atomIndex = 0;
-    while (atomIndex < NUM_ATOMS)
+    int typeIndex = 0;
+    while (typeIndex < NUM_TYPES)
     {
-        atomIndex += printAtoms(console, atomIndex, atom + atomIndex, names + atomIndex, 0) + 1;
+        typeIndex += printTypes(console, typeIndex, type + typeIndex, names + typeIndex, 0) + 1;
     }
 }
 
-template <typename MetaProperties>
-inline int printAtoms(Console& console, int currentAtomIdx, const MetaProperties* atom,
-                      const Reflection::SymbolStringView* atomName, int indentation)
+template <typename TypeInfo>
+inline int printTypes(Console& console, int currentTypeIndex, const TypeInfo* type,
+                      const Reflection::TypeStringView* typeName, int indentation)
 {
     String        buffer(StringEncoding::Ascii);
     StringBuilder builder(buffer);
-    SC_TRUST_RESULT(builder.append("[{:02}]", currentAtomIdx));
+    SC_TRUST_RESULT(builder.append("[{:02}]", currentTypeIndex));
     for (int i = 0; i < indentation; ++i)
         SC_TRUST_RESULT(builder.append("\t"));
-    SC_TRUST_RESULT(builder.append("[LinkIndex={:2}] {} ({} atoms)\n", currentAtomIdx,
-                                   StringView(atomName->data, atomName->length, false, StringEncoding::Ascii),
-                                   atom->numSubAtoms));
+    SC_TRUST_RESULT(builder.append("[LinkIndex={:2}] {} ({} types)\n", currentTypeIndex,
+                                   StringView(typeName->data, typeName->length, false, StringEncoding::Ascii),
+                                   type->getNumberOfChildren()));
     for (int i = 0; i < indentation; ++i)
         SC_TRUST_RESULT(builder.append("\t"));
     SC_TRUST_RESULT(builder.append("{\n"));
-    for (int idx = 0; idx < atom->numSubAtoms; ++idx)
+    for (int idx = 0; idx < type->getNumberOfChildren(); ++idx)
     {
-        auto& field     = atom[idx + 1];
-        auto  fieldName = atomName[idx + 1];
-        SC_TRUST_RESULT(builder.append("[{:02}]", currentAtomIdx + idx + 1));
+        auto& field     = type[idx + 1];
+        auto  fieldName = typeName[idx + 1];
+        SC_TRUST_RESULT(builder.append("[{:02}]", currentTypeIndex + idx + 1));
 
         for (int i = 0; i < indentation + 1; ++i)
             SC_TRUST_RESULT(builder.append("\t"));
 
-        SC_TRUST_RESULT(builder.append("Type={}\tOffset={}\tSize={}\tName={}", (int)field.type, field.offsetInBytes,
-                                       field.sizeInBytes,
+        SC_TRUST_RESULT(builder.append("Type={}\tOffset={}\tSize={}\tName={}", (int)field.type,
+                                       field.memberInfo.offsetInBytes, field.sizeInBytes,
                                        StringView(fieldName.data, fieldName.length, false, StringEncoding::Ascii)));
-        if (field.getLinkIndex() >= 0)
+        if (field.hasValidLinkIndex())
         {
             SC_TRUST_RESULT(builder.append("\t[LinkIndex={}]", field.getLinkIndex()));
         }
@@ -241,7 +243,7 @@ inline int printAtoms(Console& console, int currentAtomIdx, const MetaProperties
 
     SC_TRUST_RESULT(builder.append("}\n"));
     console.print(buffer.view());
-    return atom->numSubAtoms;
+    return type->getNumberOfChildren();
 }
 } // namespace SC
 
@@ -254,45 +256,41 @@ struct SC::ReflectionTest : public SC::TestCase
 
         if (test_section("Print Simple structure"))
         {
-            constexpr auto SimpleStructureFlatSchema = FlatSchema::compile<TestNamespace::SimpleStructure>();
-            printFlatSchema(report.console, SimpleStructureFlatSchema.properties.values,
-                            SimpleStructureFlatSchema.names.values);
+            constexpr auto SimpleStructureFlatSchema = Schema::compile<TestNamespace::SimpleStructure>();
+            printFlatSchema(report.console, SimpleStructureFlatSchema.typeInfos.values,
+                            SimpleStructureFlatSchema.typeNames.values);
         }
         if (test_section("Print Complex structure"))
         {
-            constexpr auto ComplexStructureFlatSchema = FlatSchema::compile<TestNamespace::ComplexStructure>();
-            printFlatSchema(report.console, ComplexStructureFlatSchema.properties.values,
-                            ComplexStructureFlatSchema.names.values);
+            constexpr auto ComplexStructureFlatSchema = Schema::compile<TestNamespace::ComplexStructure>();
+            printFlatSchema(report.console, ComplexStructureFlatSchema.typeInfos.values,
+                            ComplexStructureFlatSchema.typeNames.values);
         }
 
-        constexpr auto packedStructWithArray      = FlatSchema::compile<TestNamespace::PackedStructWithArray>();
-        constexpr auto packedStructWithArrayFlags = packedStructWithArray.properties.values[0].getCustomUint32();
-        static_assert(packedStructWithArrayFlags & MetaStructFlags::IsPacked,
-                      "nestedPacked struct should be recursively packed");
+        constexpr auto packedStructWithArray      = Schema::compile<TestNamespace::PackedStructWithArray>();
+        constexpr auto packedStructWithArrayFlags = packedStructWithArray.typeInfos.values[0].structInfo;
+        static_assert(packedStructWithArrayFlags.isPacked, "nestedPacked struct should be recursively packed");
 
-        constexpr auto packedStruct      = FlatSchema::compile<TestNamespace::PackedStruct>();
-        constexpr auto packedStructFlags = packedStruct.properties.values[0].getCustomUint32();
-        static_assert(packedStructFlags & MetaStructFlags::IsPacked,
-                      "nestedPacked struct should be recursively packed");
+        constexpr auto packedStruct      = Schema::compile<TestNamespace::PackedStruct>();
+        constexpr auto packedStructFlags = packedStruct.typeInfos.values[0].structInfo;
+        static_assert(packedStructFlags.isPacked, "nestedPacked struct should be recursively packed");
 
-        constexpr auto unpackedStruct      = FlatSchema::compile<TestNamespace::UnpackedStruct>();
-        constexpr auto unpackedStructFlags = unpackedStruct.properties.values[0].getCustomUint32();
-        static_assert(not(unpackedStructFlags & MetaStructFlags::IsPacked),
-                      "Unpacked struct should be recursively packed");
+        constexpr auto unpackedStruct      = Schema::compile<TestNamespace::UnpackedStruct>();
+        constexpr auto unpackedStructFlags = unpackedStruct.typeInfos.values[0].structInfo;
+        static_assert(not(unpackedStructFlags.isPacked), "Unpacked struct should be recursively packed");
 
-        constexpr auto nestedUnpackedStruct      = FlatSchema::compile<TestNamespace::NestedUnpackedStruct>();
-        constexpr auto nestedUnpackedStructFlags = nestedUnpackedStruct.properties.values[0].getCustomUint32();
-        static_assert(not(nestedUnpackedStructFlags & MetaStructFlags::IsPacked),
-                      "nestedPacked struct should not be recursively packed");
+        constexpr auto nestedUnpackedStruct      = Schema::compile<TestNamespace::NestedUnpackedStruct>();
+        constexpr auto nestedUnpackedStructFlags = nestedUnpackedStruct.typeInfos.values[0].structInfo;
+        static_assert(not(nestedUnpackedStructFlags.isPacked), "nestedPacked struct should not be recursively packed");
 
-        constexpr auto structWithArrayPacked      = FlatSchema::compile<TestNamespace::StructWithArrayPacked>();
-        constexpr auto structWithArrayPackedFlags = structWithArrayPacked.properties.values[0].getCustomUint32();
-        static_assert(structWithArrayPackedFlags & MetaStructFlags::IsPacked,
+        constexpr auto structWithArrayPacked      = Schema::compile<TestNamespace::StructWithArrayPacked>();
+        constexpr auto structWithArrayPackedFlags = structWithArrayPacked.typeInfos.values[0].structInfo;
+        static_assert(structWithArrayPackedFlags.isPacked,
                       "structWithArrayPacked struct should not be recursively packed");
 
-        constexpr auto structWithArrayUnpacked      = FlatSchema::compile<TestNamespace::StructWithArrayUnpacked>();
-        constexpr auto structWithArrayUnpackedFlags = structWithArrayUnpacked.properties.values[0].getCustomUint32();
-        static_assert(not(structWithArrayUnpackedFlags & MetaStructFlags::IsPacked),
+        constexpr auto structWithArrayUnpacked      = Schema::compile<TestNamespace::StructWithArrayUnpacked>();
+        constexpr auto structWithArrayUnpackedFlags = structWithArrayUnpacked.typeInfos.values[0].structInfo;
+        static_assert(not(structWithArrayUnpackedFlags.isPacked),
                       "structWithArrayUnpacked struct should not be recursively packed");
 
         constexpr auto       className        = TypeToString<TestNamespace::ComplexStructure>::get();

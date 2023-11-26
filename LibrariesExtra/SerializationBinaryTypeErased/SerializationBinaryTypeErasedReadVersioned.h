@@ -13,7 +13,7 @@ namespace SerializationBinaryTypeErased
 {
 struct VersionSchema
 {
-    Span<const Reflection::MetaProperties> sourceProperties;
+    Span<const Reflection::TypeInfo> sourceProperties;
 };
 
 struct SerializerReadVersioned
@@ -31,8 +31,8 @@ struct SerializerReadVersioned
     {
         constexpr auto flatSchema = Reflection::FlatSchemaTypeErased::compile<T>();
         sourceProperties          = schema.sourceProperties;
-        sinkProperties            = {flatSchema.properties.values, flatSchema.properties.size};
-        sinkNames                 = {flatSchema.names.values, flatSchema.names.size};
+        sinkProperties            = {flatSchema.typeInfos.values, flatSchema.typeInfos.size};
+        sinkNames                 = {flatSchema.typeNames.values, flatSchema.typeNames.size};
         sinkObject                = sinkObject.reinterpret_object(object);
         sourceObject              = &source;
         sinkTypeIndex             = 0;
@@ -40,8 +40,8 @@ struct SerializerReadVersioned
         arrayAccess.vectorVtable  = {flatSchema.vtables.vector.values, flatSchema.vtables.vector.size};
 
         if (sourceProperties.sizeInBytes() == 0 ||
-            sourceProperties.data()[0].type != Reflection::MetaType::TypeStruct || sinkProperties.sizeInBytes() == 0 ||
-            sinkProperties.data()[0].type != Reflection::MetaType::TypeStruct)
+            sourceProperties.data()[0].type != Reflection::TypeCategory::TypeStruct ||
+            sinkProperties.sizeInBytes() == 0 || sinkProperties.data()[0].type != Reflection::TypeCategory::TypeStruct)
         {
             return false;
         }
@@ -49,19 +49,19 @@ struct SerializerReadVersioned
     }
 
   private:
-    Span<const Reflection::SymbolStringView> sinkNames;
+    Span<const Reflection::TypeStringView> sinkNames;
 
     ArrayAccess arrayAccess;
 
-    Span<const Reflection::MetaProperties> sinkProperties;
-    Span<uint8_t>                          sinkObject;
-    Reflection::MetaProperties             sinkProperty;
-    uint32_t                               sinkTypeIndex = 0;
+    Span<const Reflection::TypeInfo> sinkProperties;
+    Span<uint8_t>                    sinkObject;
+    Reflection::TypeInfo             sinkProperty;
+    uint32_t                         sinkTypeIndex = 0;
 
-    Span<const Reflection::MetaProperties> sourceProperties;
-    Serialization::BinaryBuffer*           sourceObject = nullptr;
-    Reflection::MetaProperties             sourceProperty;
-    uint32_t                               sourceTypeIndex = 0;
+    Span<const Reflection::TypeInfo> sourceProperties;
+    Serialization::BinaryBuffer*     sourceObject = nullptr;
+    Reflection::TypeInfo             sourceProperty;
+    uint32_t                         sourceTypeIndex = 0;
 
     [[nodiscard]] bool read();
     [[nodiscard]] bool readStruct();

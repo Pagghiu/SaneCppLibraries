@@ -67,7 +67,7 @@ struct SC::SerializationBinaryTest : public SC::SerializationParametricTestSuite
     {
         runSameVersionTests();
 
-        runVersionedTests<SC::Reflection::FlatSchema, SerializerReadVersionedAdapter,
+        runVersionedTests<SC::Reflection::Schema, SerializerReadVersionedAdapter,
                           SC::SerializationBinary::VersionSchema>();
     }
 };
