@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../../Libraries/Reflection/ReflectionCategory.h"
+#include "../../Libraries/Reflection/Reflection.h"
 #include "ReflectionAuto.h"
 
 namespace SC

@@ -5,6 +5,7 @@
 #include "../../Containers/Vector.h"
 #include "../../Strings/StringBuilder.h"
 #include "../../Testing/Testing.h"
+#include "ReflectionTestPrint.h"
 
 // TODO: Split the Auto reflection tests in ReflectionAuto
 #if SC_META_ENABLE_AUTO_REFLECTION
@@ -64,10 +65,18 @@ struct Reflect<TestNamespace::SimpleStructure> : ReflectStruct<TestNamespace::Si
     template <typename MemberVisitor>
     static constexpr bool visit(MemberVisitor&& visitor)
     {
-        return                                                        //
-            visitor(0, "f1", &T::f1, SC_COMPILER_OFFSETOF(T, f1)) and //
-            visitor(1, "f2", &T::f2, SC_COMPILER_OFFSETOF(T, f2)) and //
-            visitor(2, "arrayOfInt", &T::arrayOfInt, SC_COMPILER_OFFSETOF(T, arrayOfInt));
+        return                                                          //
+            visitor(0, "f1", &T::f1, SC_COMPILER_OFFSETOF(T, f1)) and   //
+            visitor(1, "f2", &T::f2, SC_COMPILER_OFFSETOF(T, f2)) and   //
+            visitor(2, "f3", &T::f2, SC_COMPILER_OFFSETOF(T, f3)) and   //
+            visitor(3, "f4", &T::f2, SC_COMPILER_OFFSETOF(T, f4)) and   //
+            visitor(4, "f5", &T::f2, SC_COMPILER_OFFSETOF(T, f5)) and   //
+            visitor(5, "f6", &T::f2, SC_COMPILER_OFFSETOF(T, f6)) and   //
+            visitor(6, "f7", &T::f2, SC_COMPILER_OFFSETOF(T, f7)) and   //
+            visitor(7, "f8", &T::f2, SC_COMPILER_OFFSETOF(T, f8)) and   //
+            visitor(8, "f9", &T::f2, SC_COMPILER_OFFSETOF(T, f9)) and   //
+            visitor(9, "f10", &T::f2, SC_COMPILER_OFFSETOF(T, f10)) and //
+            visitor(10, "arrayOfInt", &T::arrayOfInt, SC_COMPILER_OFFSETOF(T, arrayOfInt));
     }
 };
 
@@ -125,11 +134,11 @@ struct TestNamespace::PackedStructWithArray
 };
 // Fails on GCC and MSVC in C++ 14 mode
 #if !SC_META_ENABLE_AUTO_REFLECTION || !SC_LANGUAGE_CPP_AT_LEAST_20
-SC_META_STRUCT_VISIT(TestNamespace::PackedStructWithArray)
-SC_META_STRUCT_FIELD(0, arrayValue)
-SC_META_STRUCT_FIELD(1, floatValue)
-SC_META_STRUCT_FIELD(2, int64Value)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(TestNamespace::PackedStructWithArray)
+SC_REFLECT_STRUCT_FIELD(0, arrayValue)
+SC_REFLECT_STRUCT_FIELD(1, floatValue)
+SC_REFLECT_STRUCT_FIELD(2, int64Value)
+SC_REFLECT_STRUCT_LEAVE()
 #endif
 
 struct TestNamespace::PackedStruct
@@ -138,11 +147,11 @@ struct TestNamespace::PackedStruct
 };
 
 #if !SC_META_ENABLE_AUTO_REFLECTION
-SC_META_STRUCT_VISIT(TestNamespace::PackedStruct)
-SC_META_STRUCT_FIELD(0, x)
-SC_META_STRUCT_FIELD(1, y)
-SC_META_STRUCT_FIELD(2, z)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(TestNamespace::PackedStruct)
+SC_REFLECT_STRUCT_FIELD(0, x)
+SC_REFLECT_STRUCT_FIELD(1, y)
+SC_REFLECT_STRUCT_FIELD(2, z)
+SC_REFLECT_STRUCT_LEAVE()
 #endif
 
 struct TestNamespace::UnpackedStruct
@@ -153,11 +162,11 @@ struct TestNamespace::UnpackedStruct
 };
 
 #if !SC_META_ENABLE_AUTO_REFLECTION
-SC_META_STRUCT_VISIT(TestNamespace::UnpackedStruct)
-SC_META_STRUCT_FIELD(0, x)
-SC_META_STRUCT_FIELD(1, y)
-SC_META_STRUCT_FIELD(2, z)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(TestNamespace::UnpackedStruct)
+SC_REFLECT_STRUCT_FIELD(0, x)
+SC_REFLECT_STRUCT_FIELD(1, y)
+SC_REFLECT_STRUCT_FIELD(2, z)
+SC_REFLECT_STRUCT_LEAVE()
 #endif
 
 struct TestNamespace::NestedUnpackedStruct
@@ -165,9 +174,9 @@ struct TestNamespace::NestedUnpackedStruct
     UnpackedStruct unpackedMember;
 };
 #if !SC_META_ENABLE_AUTO_REFLECTION
-SC_META_STRUCT_VISIT(TestNamespace::NestedUnpackedStruct)
-SC_META_STRUCT_FIELD(0, unpackedMember);
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(TestNamespace::NestedUnpackedStruct)
+SC_REFLECT_STRUCT_FIELD(0, unpackedMember);
+SC_REFLECT_STRUCT_LEAVE()
 #endif
 
 struct TestNamespace::StructWithArrayPacked
@@ -176,9 +185,9 @@ struct TestNamespace::StructWithArrayPacked
 };
 // Fails on Clang and GCC in C++ 14 mode
 #if !SC_META_ENABLE_AUTO_REFLECTION || !SC_LANGUAGE_CPP_AT_LEAST_20
-SC_META_STRUCT_VISIT(TestNamespace::StructWithArrayPacked)
-SC_META_STRUCT_FIELD(0, packedMember);
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(TestNamespace::StructWithArrayPacked)
+SC_REFLECT_STRUCT_FIELD(0, packedMember);
+SC_REFLECT_STRUCT_LEAVE()
 #endif
 
 struct TestNamespace::StructWithArrayUnpacked
@@ -186,66 +195,10 @@ struct TestNamespace::StructWithArrayUnpacked
     NestedUnpackedStruct unpackedMember[3];
 };
 #if !SC_META_ENABLE_AUTO_REFLECTION
-SC_META_STRUCT_VISIT(TestNamespace::StructWithArrayUnpacked)
-SC_META_STRUCT_FIELD(0, unpackedMember);
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(TestNamespace::StructWithArrayUnpacked)
+SC_REFLECT_STRUCT_FIELD(0, unpackedMember);
+SC_REFLECT_STRUCT_LEAVE()
 #endif
-
-namespace SC
-{
-// TODO: Move printFlatSchema somewhere else
-template <int NUM_TYPES, typename TypeInfo>
-inline void printFlatSchema(Console& console, const TypeInfo (&type)[NUM_TYPES],
-                            const Reflection::TypeStringView (&names)[NUM_TYPES])
-{
-    int typeIndex = 0;
-    while (typeIndex < NUM_TYPES)
-    {
-        typeIndex += printTypes(console, typeIndex, type + typeIndex, names + typeIndex, 0) + 1;
-    }
-}
-
-template <typename TypeInfo>
-inline int printTypes(Console& console, int currentTypeIndex, const TypeInfo* type,
-                      const Reflection::TypeStringView* typeName, int indentation)
-{
-    String        buffer(StringEncoding::Ascii);
-    StringBuilder builder(buffer);
-    SC_TRUST_RESULT(builder.append("[{:02}]", currentTypeIndex));
-    for (int i = 0; i < indentation; ++i)
-        SC_TRUST_RESULT(builder.append("\t"));
-    SC_TRUST_RESULT(builder.append("[LinkIndex={:2}] {} ({} types)\n", currentTypeIndex,
-                                   StringView(typeName->data, typeName->length, false, StringEncoding::Ascii),
-                                   type->getNumberOfChildren()));
-    for (int i = 0; i < indentation; ++i)
-        SC_TRUST_RESULT(builder.append("\t"));
-    SC_TRUST_RESULT(builder.append("{\n"));
-    for (int idx = 0; idx < type->getNumberOfChildren(); ++idx)
-    {
-        auto& field     = type[idx + 1];
-        auto  fieldName = typeName[idx + 1];
-        SC_TRUST_RESULT(builder.append("[{:02}]", currentTypeIndex + idx + 1));
-
-        for (int i = 0; i < indentation + 1; ++i)
-            SC_TRUST_RESULT(builder.append("\t"));
-
-        SC_TRUST_RESULT(builder.append("Type={}\tOffset={}\tSize={}\tName={}", (int)field.type,
-                                       field.memberInfo.offsetInBytes, field.sizeInBytes,
-                                       StringView(fieldName.data, fieldName.length, false, StringEncoding::Ascii)));
-        if (field.hasValidLinkIndex())
-        {
-            SC_TRUST_RESULT(builder.append("\t[LinkIndex={}]", field.getLinkIndex()));
-        }
-        SC_TRUST_RESULT(builder.append("\n"));
-    }
-    for (int i = 0; i < indentation; ++i)
-        SC_TRUST_RESULT(builder.append("\t"));
-
-    SC_TRUST_RESULT(builder.append("}\n"));
-    console.print(buffer.view());
-    return type->getNumberOfChildren();
-}
-} // namespace SC
 
 struct SC::ReflectionTest : public SC::TestCase
 {
@@ -300,6 +253,8 @@ struct SC::ReflectionTest : public SC::TestCase
         constexpr auto intName     = TypeToString<int>::get();
         constexpr auto intNameView = StringView(intName.data, intName.length, false, StringEncoding::Ascii);
         static_assert(intNameView == "int", "Please update SC::ClNm for your compiler");
+
+        static_assert(not ExtendedTypeInfo<String>::IsPacked, "String should not be packed");
     }
 };
 

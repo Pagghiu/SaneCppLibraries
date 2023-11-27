@@ -3,7 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 
-#include "../Foundation/Limits.h" // MaxValue
+#include "../Foundation/Limits.h"   // MaxValue
+#include "../Foundation/TypeList.h" // EnableIf
 #include "ReflectionFoundation.h"
 
 namespace SC
@@ -382,8 +383,8 @@ struct ExtendedTypeInfo
 
 // Handy Macros to avoid some typing when wrapping structs
 
-/// @brief Start describing all members of a structure
-#define SC_META_STRUCT_VISIT(StructName)                                                                               \
+/// @brief Implement a `Reflect<StructName>` typing less text
+#define SC_REFLECT_STRUCT_VISIT(StructName)                                                                            \
     template <>                                                                                                        \
     struct SC::Reflection::Reflect<StructName> : SC::Reflection::ReflectStruct<StructName>                             \
     {                                                                                                                  \
@@ -393,11 +394,12 @@ struct ExtendedTypeInfo
             SC_COMPILER_WARNING_PUSH_OFFSETOF                                                                          \
             return true
 
-/// @brief Describes a single `MEMBER` of structure, giving it an `ORDER` ordinal. Can exist after SC_META_STRUCT_VISIT
-#define SC_META_STRUCT_FIELD(ORDER, MEMBER) and builder(ORDER, #MEMBER, &T::MEMBER, SC_COMPILER_OFFSETOF(T, MEMBER))
+/// @brief Describes a single `MEMBER` of structure, giving it an `ORDER` ordinal. Can exist after
+/// `SC_REFLECT_STRUCT_VISIT`.
+#define SC_REFLECT_STRUCT_FIELD(ORDER, MEMBER) and builder(ORDER, #MEMBER, &T::MEMBER, SC_COMPILER_OFFSETOF(T, MEMBER))
 
-/// @brief Closes description created by SC_META_STRUCT_VISIT
-#define SC_META_STRUCT_LEAVE()                                                                                         \
+/// @brief Closes `Reflect<StructName>`struct opened by `SC_REFLECT_STRUCT_VISIT`
+#define SC_REFLECT_STRUCT_LEAVE()                                                                                      \
     ;                                                                                                                  \
     SC_COMPILER_WARNING_POP                                                                                            \
     }                                                                                                                  \

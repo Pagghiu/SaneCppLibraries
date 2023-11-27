@@ -56,11 +56,11 @@ struct SC::SerializationParametricTestSuite::PrimitiveStruct
     }
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::PrimitiveStruct)
-SC_META_STRUCT_FIELD(0, arrayValue)
-SC_META_STRUCT_FIELD(1, floatValue)
-SC_META_STRUCT_FIELD(2, int64Value)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::PrimitiveStruct)
+SC_REFLECT_STRUCT_FIELD(0, arrayValue)
+SC_REFLECT_STRUCT_FIELD(1, floatValue)
+SC_REFLECT_STRUCT_FIELD(2, int64Value)
+SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::SerializationParametricTestSuite::NestedStruct
 {
@@ -82,11 +82,11 @@ struct SC::SerializationParametricTestSuite::NestedStruct
     }
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::NestedStruct)
-SC_META_STRUCT_FIELD(0, int16Value)
-SC_META_STRUCT_FIELD(1, structsArray)
-SC_META_STRUCT_FIELD(2, doubleVal)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::NestedStruct)
+SC_REFLECT_STRUCT_FIELD(0, int16Value)
+SC_REFLECT_STRUCT_FIELD(1, structsArray)
+SC_REFLECT_STRUCT_FIELD(2, doubleVal)
+SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::SerializationParametricTestSuite::TopLevelStruct
 {
@@ -95,9 +95,9 @@ struct SC::SerializationParametricTestSuite::TopLevelStruct
     bool operator!=(const TopLevelStruct& other) const { return nestedStruct != other.nestedStruct; }
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::TopLevelStruct)
-SC_META_STRUCT_FIELD(0, nestedStruct)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::TopLevelStruct)
+SC_REFLECT_STRUCT_FIELD(0, nestedStruct)
+SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::SerializationParametricTestSuite::VectorStructSimple
 {
@@ -105,19 +105,19 @@ struct SC::SerializationParametricTestSuite::VectorStructSimple
     SC::Vector<int> vectorOfInts;
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VectorStructSimple)
-SC_META_STRUCT_FIELD(0, emptyVector)
-SC_META_STRUCT_FIELD(1, vectorOfInts)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VectorStructSimple)
+SC_REFLECT_STRUCT_FIELD(0, emptyVector)
+SC_REFLECT_STRUCT_FIELD(1, vectorOfInts)
+SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::SerializationParametricTestSuite::VectorStructComplex
 {
     SC::Vector<SC::String> vectorOfStrings;
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VectorStructComplex)
-SC_META_STRUCT_FIELD(0, vectorOfStrings)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VectorStructComplex)
+SC_REFLECT_STRUCT_FIELD(0, vectorOfStrings)
+SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::SerializationParametricTestSuite::VersionedStruct1
 {
@@ -127,12 +127,12 @@ struct SC::SerializationParametricTestSuite::VersionedStruct1
     int64_t        int64Value     = -13;
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedStruct1)
-SC_META_STRUCT_FIELD(2, field2ToRemove)
-SC_META_STRUCT_FIELD(0, floatValue)
-SC_META_STRUCT_FIELD(1, fieldToRemove)
-SC_META_STRUCT_FIELD(3, int64Value)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedStruct1)
+SC_REFLECT_STRUCT_FIELD(2, field2ToRemove)
+SC_REFLECT_STRUCT_FIELD(0, floatValue)
+SC_REFLECT_STRUCT_FIELD(1, fieldToRemove)
+SC_REFLECT_STRUCT_FIELD(3, int64Value)
+SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::SerializationParametricTestSuite::VersionedStruct2
 {
@@ -149,10 +149,10 @@ struct SC::SerializationParametricTestSuite::VersionedStruct2
     }
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedStruct2)
-SC_META_STRUCT_FIELD(3, int64Value)
-SC_META_STRUCT_FIELD(0, floatValue)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedStruct2)
+SC_REFLECT_STRUCT_FIELD(3, int64Value)
+SC_REFLECT_STRUCT_FIELD(0, floatValue)
+SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::SerializationParametricTestSuite::VersionedPoint3D
 {
@@ -161,11 +161,11 @@ struct SC::SerializationParametricTestSuite::VersionedPoint3D
     float z;
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedPoint3D)
-SC_META_STRUCT_FIELD(0, x)
-SC_META_STRUCT_FIELD(1, y)
-SC_META_STRUCT_FIELD(2, z)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedPoint3D)
+SC_REFLECT_STRUCT_FIELD(0, x)
+SC_REFLECT_STRUCT_FIELD(1, y)
+SC_REFLECT_STRUCT_FIELD(2, z)
+SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::SerializationParametricTestSuite::VersionedPoint2D
 {
@@ -173,10 +173,10 @@ struct SC::SerializationParametricTestSuite::VersionedPoint2D
     float y;
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedPoint2D)
-SC_META_STRUCT_FIELD(0, x)
-SC_META_STRUCT_FIELD(1, y)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedPoint2D)
+SC_REFLECT_STRUCT_FIELD(0, x)
+SC_REFLECT_STRUCT_FIELD(1, y)
+SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::SerializationParametricTestSuite::VersionedArray1
 {
@@ -184,10 +184,10 @@ struct SC::SerializationParametricTestSuite::VersionedArray1
     Vector<int>              simpleInts = {1, 2, 3};
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedArray1)
-SC_META_STRUCT_FIELD(0, points)
-SC_META_STRUCT_FIELD(1, simpleInts)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedArray1)
+SC_REFLECT_STRUCT_FIELD(0, points)
+SC_REFLECT_STRUCT_FIELD(1, simpleInts)
+SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::SerializationParametricTestSuite::VersionedArray2
 {
@@ -220,10 +220,10 @@ struct SC::SerializationParametricTestSuite::VersionedArray2
     }
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedArray2)
-SC_META_STRUCT_FIELD(0, points)
-SC_META_STRUCT_FIELD(1, simpleInts)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedArray2)
+SC_REFLECT_STRUCT_FIELD(0, points)
+SC_REFLECT_STRUCT_FIELD(1, simpleInts)
+SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::SerializationParametricTestSuite::ConversionStruct1
 {
@@ -233,12 +233,12 @@ struct SC::SerializationParametricTestSuite::ConversionStruct1
     int16_t  signed16ToUnsigned = 1;
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::ConversionStruct1)
-SC_META_STRUCT_FIELD(0, intToFloat)
-SC_META_STRUCT_FIELD(1, floatToInt)
-SC_META_STRUCT_FIELD(2, uint16To32)
-SC_META_STRUCT_FIELD(3, signed16ToUnsigned)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::ConversionStruct1)
+SC_REFLECT_STRUCT_FIELD(0, intToFloat)
+SC_REFLECT_STRUCT_FIELD(1, floatToInt)
+SC_REFLECT_STRUCT_FIELD(2, uint16To32)
+SC_REFLECT_STRUCT_FIELD(3, signed16ToUnsigned)
+SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::SerializationParametricTestSuite::ConversionStruct2
 {
@@ -248,12 +248,12 @@ struct SC::SerializationParametricTestSuite::ConversionStruct2
     uint16_t signed16ToUnsigned = 0;
 };
 
-SC_META_STRUCT_VISIT(SC::SerializationParametricTestSuite::ConversionStruct2)
-SC_META_STRUCT_FIELD(0, intToFloat)
-SC_META_STRUCT_FIELD(1, floatToInt)
-SC_META_STRUCT_FIELD(2, uint16To32)
-SC_META_STRUCT_FIELD(3, signed16ToUnsigned)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::ConversionStruct2)
+SC_REFLECT_STRUCT_FIELD(0, intToFloat)
+SC_REFLECT_STRUCT_FIELD(1, floatToInt)
+SC_REFLECT_STRUCT_FIELD(2, uint16To32)
+SC_REFLECT_STRUCT_FIELD(3, signed16ToUnsigned)
+SC_REFLECT_STRUCT_LEAVE()
 
 template <typename BinaryWriterStream, typename BinaryReaderStream, typename SerializerWriter,
           typename SerializerReader>
@@ -382,9 +382,9 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
             BinaryReaderStream  streamReader;
             streamReader.buffer = move(streamWriter.buffer);
             VersionSchema versionSchema;
-            versionSchema.sourceProperties = {schema.typeInfos.values, schema.typeInfos.size};
+            versionSchema.sourceTypes = {schema.typeInfos.values, schema.typeInfos.size};
             SC_TEST_EXPECT(reader.readVersioned(struct2, streamReader, versionSchema));
-            SC_TEST_EXPECT(streamReader.index == streamReader.buffer.size());
+            SC_TEST_EXPECT(streamReader.readPosition == streamReader.buffer.size());
             SC_TEST_EXPECT(not(struct2 != struct1));
         }
         if (test_section("VersionedArray1/2"))
@@ -403,9 +403,9 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
             BinaryReaderStream  streamReader;
             streamReader.buffer = move(streamWriter.buffer);
             VersionSchema versionSchema;
-            versionSchema.sourceProperties = {schema.typeInfos.values, schema.typeInfos.size};
+            versionSchema.sourceTypes = {schema.typeInfos.values, schema.typeInfos.size};
             SC_TEST_EXPECT(reader.readVersioned(array2, streamReader, versionSchema));
-            SC_TEST_EXPECT(streamReader.index == streamReader.buffer.size());
+            SC_TEST_EXPECT(streamReader.readPosition == streamReader.buffer.size());
             SC_TEST_EXPECT(array2.points.size() == 2);
             SC_TEST_EXPECT(array1.simpleInts.size() == 3); // It's dropping one element
             SC_TEST_EXPECT(array2.simpleInts.size() == 2); // It's dropping one element
@@ -423,9 +423,9 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
             BinaryReaderStream  streamReader;
             streamReader.buffer = move(streamWriter.buffer);
             VersionSchema versionSchema;
-            versionSchema.sourceProperties = {schema.typeInfos.values, schema.typeInfos.size};
+            versionSchema.sourceTypes = {schema.typeInfos.values, schema.typeInfos.size};
             SC_TEST_EXPECT(reader.readVersioned(struct2, streamReader, versionSchema));
-            SC_TEST_EXPECT(streamReader.index == streamReader.buffer.size());
+            SC_TEST_EXPECT(streamReader.readPosition == streamReader.buffer.size());
             SC_TEST_EXPECT(struct2.intToFloat == struct1.intToFloat);
             SC_TEST_EXPECT(struct2.floatToInt == struct1.floatToInt);
             SC_TEST_EXPECT(struct2.uint16To32 == struct1.uint16To32);

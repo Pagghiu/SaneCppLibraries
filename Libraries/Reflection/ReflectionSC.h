@@ -108,7 +108,7 @@ struct Reflect<SC::StringEncoding> : Reflect<uint8_t>
 } // namespace Reflection
 } // namespace SC
 
-SC_META_STRUCT_VISIT(SC::String)
-SC_META_STRUCT_FIELD(0, encoding) // TODO: Maybe encoding should be merged in data header
-SC_META_STRUCT_FIELD(1, data)
-SC_META_STRUCT_LEAVE()
+SC_REFLECT_STRUCT_VISIT(SC::String)
+SC_REFLECT_STRUCT_FIELD(0, encoding) // TODO: Maybe encoding should be merged in data header
+SC_REFLECT_STRUCT_FIELD(1, data)
+SC_REFLECT_STRUCT_LEAVE()
