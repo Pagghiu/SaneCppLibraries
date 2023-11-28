@@ -2,64 +2,18 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Containers/Vector.h"
-#include "../Foundation/Result.h"
-#include "../Foundation/Span.h"
 #include "../Reflection/Reflection.h"
 
 namespace SC
 {
 namespace Serialization
 {
-// TODO: BinaryBuffer needs to go with once we transition to streaming interface
-struct BinaryBuffer
-{
-    SC::Vector<uint8_t> buffer;
-
-    size_t index              = 0;
-    size_t numberOfOperations = 0;
-
-    [[nodiscard]] bool serializeBytes(const void* object, size_t numBytes)
-    {
-        return serializeBytes(Span<const uint8_t>::reinterpret_bytes(object, numBytes));
-    }
-
-    [[nodiscard]] bool serializeBytes(void* object, size_t numBytes)
-    {
-        return serializeBytes(Span<uint8_t>::reinterpret_bytes(object, numBytes));
-    }
-
-    [[nodiscard]] bool serializeBytes(Span<const uint8_t> object)
-    {
-        numberOfOperations++;
-        return buffer.append(object);
-    }
-
-    [[nodiscard]] bool serializeBytes(Span<uint8_t> object)
-    {
-        if (index + object.sizeInBytes() > buffer.size())
-            return false;
-        numberOfOperations++;
-        memcpy(object.data(), &buffer[index], object.sizeInBytes());
-        index += object.sizeInBytes();
-        return true;
-    }
-
-    [[nodiscard]] bool advanceBytes(size_t numBytes)
-    {
-        if (index + numBytes > buffer.size())
-            return false;
-        index += numBytes;
-        return true;
-    }
-};
-
 // TODO: BinarySkipper should go out of header once we replace BinaryBuffer with a streaming interface
 template <typename BinaryStream>
 struct BinarySkipper
 {
-    Span<const Reflection::TypeInfo> sourceProperties;
-    Reflection::TypeInfo             sourceProperty;
+    Span<const Reflection::TypeInfo> sourceTypes;
+    Reflection::TypeInfo             sourceType;
 
     BinarySkipper(BinaryStream& stream, uint32_t& sourceTypeIndex)
         : sourceObject(stream), sourceTypeIndex(sourceTypeIndex)
@@ -67,19 +21,19 @@ struct BinarySkipper
 
     [[nodiscard]] bool skip()
     {
-        sourceProperty = sourceProperties.data()[sourceTypeIndex];
-        if (sourceProperty.type == Reflection::TypeCategory::TypeStruct)
+        sourceType = sourceTypes.data()[sourceTypeIndex];
+        if (sourceType.type == Reflection::TypeCategory::TypeStruct)
         {
             return skipStruct();
         }
-        else if (sourceProperty.type == Reflection::TypeCategory::TypeArray ||
-                 sourceProperty.type == Reflection::TypeCategory::TypeVector)
+        else if (sourceType.type == Reflection::TypeCategory::TypeArray ||
+                 sourceType.type == Reflection::TypeCategory::TypeVector)
         {
             return skipVectorOrArray();
         }
-        else if (sourceProperty.isPrimitiveType())
+        else if (sourceType.isPrimitiveType())
         {
-            return sourceObject.advanceBytes(sourceProperty.sizeInBytes);
+            return sourceObject.advanceBytes(sourceType.sizeInBytes);
         }
         return false;
     }
@@ -90,22 +44,24 @@ struct BinarySkipper
 
     [[nodiscard]] bool skipStruct()
     {
-        const auto structSourceProperty  = sourceProperty;
+        const auto structSourceType      = sourceType;
         const auto structSourceTypeIndex = sourceTypeIndex;
-        const bool isPacked              = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrPackedStruct();
+        const bool isPacked              = sourceTypes.data()[sourceTypeIndex].isPrimitiveOrPackedStruct();
 
         if (isPacked)
         {
-            SC_TRY(sourceObject.advanceBytes(structSourceProperty.sizeInBytes));
+            if (not sourceObject.advanceBytes(structSourceType.sizeInBytes))
+                return false;
         }
         else
         {
-            for (uint32_t idx = 0; idx < static_cast<uint32_t>(structSourceProperty.getNumberOfChildren()); ++idx)
+            for (uint32_t idx = 0; idx < static_cast<uint32_t>(structSourceType.getNumberOfChildren()); ++idx)
             {
                 sourceTypeIndex = structSourceTypeIndex + idx + 1;
-                if (sourceProperties.data()[sourceTypeIndex].hasValidLinkIndex())
-                    sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
-                SC_TRY(skip());
+                if (sourceTypes.data()[sourceTypeIndex].hasValidLinkIndex())
+                    sourceTypeIndex = static_cast<uint32_t>(sourceTypes.data()[sourceTypeIndex].getLinkIndex());
+                if (not skip())
+                    return false;
             }
         }
         return true;
@@ -113,32 +69,34 @@ struct BinarySkipper
 
     [[nodiscard]] bool skipVectorOrArray()
     {
-        const auto arraySourceProperty  = sourceProperty;
+        const auto arraySourceType      = sourceType;
         const auto arraySourceTypeIndex = sourceTypeIndex;
 
         sourceTypeIndex         = arraySourceTypeIndex + 1;
-        uint64_t sourceNumBytes = arraySourceProperty.sizeInBytes;
-        if (arraySourceProperty.type == Reflection::TypeCategory::TypeVector)
+        uint64_t sourceNumBytes = arraySourceType.sizeInBytes;
+        if (arraySourceType.type == Reflection::TypeCategory::TypeVector)
         {
-            SC_TRY(sourceObject.serializeBytes(Span<uint8_t>::reinterpret_object(sourceNumBytes)));
+            if (not sourceObject.serializeBytes(Span<uint8_t>::reinterpret_object(sourceNumBytes)))
+                return false;
         }
 
-        const bool isPacked = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrPackedStruct();
+        const bool isPacked = sourceTypes.data()[sourceTypeIndex].isPrimitiveOrPackedStruct();
         if (isPacked)
         {
             return sourceObject.advanceBytes(static_cast<size_t>(sourceNumBytes));
         }
         else
         {
-            const auto sourceItemSize      = sourceProperties.data()[sourceTypeIndex].sizeInBytes;
+            const auto sourceItemSize      = sourceTypes.data()[sourceTypeIndex].sizeInBytes;
             const auto sourceNumElements   = sourceNumBytes / sourceItemSize;
             const auto itemSourceTypeIndex = sourceTypeIndex;
             for (uint64_t idx = 0; idx < sourceNumElements; ++idx)
             {
                 sourceTypeIndex = itemSourceTypeIndex;
-                if (sourceProperties.data()[sourceTypeIndex].hasValidLinkIndex())
-                    sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
-                SC_TRY(skip());
+                if (sourceTypes.data()[sourceTypeIndex].hasValidLinkIndex())
+                    sourceTypeIndex = static_cast<uint32_t>(sourceTypes.data()[sourceTypeIndex].getLinkIndex());
+                if (not skip())
+                    return false;
             }
             return true;
         }

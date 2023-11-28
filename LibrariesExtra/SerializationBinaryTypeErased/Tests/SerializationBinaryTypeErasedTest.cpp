@@ -12,10 +12,10 @@ struct SerializationBinaryTypeErasedTest;
 
 }
 struct SC::SerializationBinaryTypeErasedTest : public SC::SerializationParametricTestSuite::SerializationTestBase<
-                                                   SC::Serialization::BinaryBuffer,                            //
-                                                   SC::Serialization::BinaryBuffer,                            //
-                                                   SC::SerializationBinaryTypeErased::SerializerReadWriteFast, //
-                                                   SC::SerializationBinaryTypeErased::SimpleBinaryReader>
+                                                   SC::SerializationBinary::BinaryBuffer,                      //
+                                                   SC::SerializationBinary::BinaryBuffer,                      //
+                                                   SC::SerializationBinaryTypeErased::SerializerWriteFast, //
+                                                   SC::SerializationBinaryTypeErased::SerializerReadFast>
 {
     SerializationBinaryTypeErasedTest(SC::TestReport& report)
         : SerializationTestBase(report, "SerializationBinaryTypeErasedTest")

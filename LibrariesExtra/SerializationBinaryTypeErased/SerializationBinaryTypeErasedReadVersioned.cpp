@@ -27,7 +27,7 @@ template <typename SourceType, typename SinkType>
 }
 
 template <typename T>
-[[nodiscard]] static bool tryReadPrimitiveValue(Serialization::BinaryBuffer* sourceObject,
+[[nodiscard]] static bool tryReadPrimitiveValue(SerializationBinary::BinaryBuffer* sourceObject,
                                                 const Reflection::TypeInfo& sinkProperty, Span<uint8_t>& sinkObject)
 {
     T sourceValue;
@@ -59,7 +59,7 @@ template <typename T>
 
 [[nodiscard]] static bool tryPrimitiveConversion(const SerializerReadVersioned::Options& options,
                                                  const Reflection::TypeInfo&             sourceProperty,
-                                                 Serialization::BinaryBuffer*            sourceObject,
+                                                 SerializationBinary::BinaryBuffer*      sourceObject,
                                                  const Reflection::TypeInfo& sinkProperty, Span<uint8_t>& sinkObject)
 {
     switch (sourceProperty.type)
@@ -105,8 +105,8 @@ template <typename T>
 
 bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::read()
 {
-    sinkProperty   = sinkProperties.data()[sinkTypeIndex];
-    sourceProperty = sourceProperties.data()[sourceTypeIndex];
+    sinkProperty   = sinkTypes.data()[sinkTypeIndex];
+    sourceProperty = sourceTypes.data()[sourceTypeIndex];
     if (sourceProperty.isPrimitiveType())
     {
         if (sinkProperty.type == sourceProperty.type)
@@ -150,26 +150,26 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readStruct()
     for (uint32_t idx = 0; idx < static_cast<uint32_t>(structSourceProperty.getNumberOfChildren()); ++idx)
     {
         sourceTypeIndex        = structSourceTypeIndex + idx + 1;
-        const auto sourceOrder = sourceProperties.data()[sourceTypeIndex].memberInfo.order;
+        const auto sourceOrder = sourceTypes.data()[sourceTypeIndex].memberInfo.order;
         uint32_t   findIdx;
         for (findIdx = 0; findIdx < static_cast<uint32_t>(structSinkProperty.getNumberOfChildren()); ++findIdx)
         {
             const auto typeIndex = structSinkTypeIndex + findIdx + 1;
-            if (sinkProperties.data()[typeIndex].memberInfo.order == sourceOrder)
+            if (sinkTypes.data()[typeIndex].memberInfo.order == sourceOrder)
             {
                 break;
             }
         }
-        if (sourceProperties.data()[sourceTypeIndex].hasValidLinkIndex())
-            sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
+        if (sourceTypes.data()[sourceTypeIndex].hasValidLinkIndex())
+            sourceTypeIndex = static_cast<uint32_t>(sourceTypes.data()[sourceTypeIndex].getLinkIndex());
         if (findIdx != static_cast<uint32_t>(structSinkProperty.getNumberOfChildren()))
         {
             // Member with same order ordinal has been found
             sinkTypeIndex = structSinkTypeIndex + findIdx + 1;
-            SC_TRY(structSinkObject.sliceStartLength(sinkProperties.data()[sinkTypeIndex].memberInfo.offsetInBytes,
-                                                     sinkProperties.data()[sinkTypeIndex].sizeInBytes, sinkObject));
-            if (sinkProperties.data()[sinkTypeIndex].hasValidLinkIndex())
-                sinkTypeIndex = static_cast<uint32_t>(sinkProperties.data()[sinkTypeIndex].getLinkIndex());
+            SC_TRY(structSinkObject.sliceStartLength(sinkTypes.data()[sinkTypeIndex].memberInfo.offsetInBytes,
+                                                     sinkTypes.data()[sinkTypeIndex].sizeInBytes, sinkObject));
+            if (sinkTypes.data()[sinkTypeIndex].hasValidLinkIndex())
+                sinkTypeIndex = static_cast<uint32_t>(sinkTypes.data()[sinkTypeIndex].getLinkIndex());
             SC_TRY(read());
         }
         else
@@ -202,14 +202,14 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
         SC_TRY(sourceObject->serializeBytes(Span<uint8_t>::reinterpret_object(sourceNumBytes)));
     }
 
-    const bool isPrimitive = sourceProperties.data()[sourceTypeIndex].isPrimitiveType();
+    const bool isPrimitive = sourceTypes.data()[sourceTypeIndex].isPrimitiveType();
 
     sinkTypeIndex = arraySinkTypeIndex + 1;
 
-    const bool isSameType = sinkProperties.data()[sinkTypeIndex].type == sourceProperties.data()[sourceTypeIndex].type;
-    const bool isPacked   = isPrimitive && isSameType;
-    const auto sourceItemSize = sourceProperties.data()[sourceTypeIndex].sizeInBytes;
-    const auto sinkItemSize   = sinkProperties.data()[sinkTypeIndex].sizeInBytes;
+    const bool isSameType     = sinkTypes.data()[sinkTypeIndex].type == sourceTypes.data()[sourceTypeIndex].type;
+    const bool isPacked       = isPrimitive && isSameType;
+    const auto sourceItemSize = sourceTypes.data()[sourceTypeIndex].sizeInBytes;
+    const auto sinkItemSize   = sinkTypes.data()[sinkTypeIndex].sizeInBytes;
 
     Span<uint8_t> arraySinkStart;
     if (arraySinkProperty.type == Reflection::TypeCategory::TypeArray)
@@ -238,10 +238,10 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
     }
     else
     {
-        if (sinkProperties.data()[sinkTypeIndex].hasValidLinkIndex())
-            sinkTypeIndex = static_cast<uint32_t>(sinkProperties.data()[sinkTypeIndex].getLinkIndex());
-        if (sinkProperties.data()[sourceTypeIndex].hasValidLinkIndex())
-            sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
+        if (sinkTypes.data()[sinkTypeIndex].hasValidLinkIndex())
+            sinkTypeIndex = static_cast<uint32_t>(sinkTypes.data()[sinkTypeIndex].getLinkIndex());
+        if (sinkTypes.data()[sourceTypeIndex].hasValidLinkIndex())
+            sourceTypeIndex = static_cast<uint32_t>(sourceTypes.data()[sourceTypeIndex].getLinkIndex());
         const uint64_t sinkNumElements     = arraySinkStart.sizeInBytes() / sinkItemSize;
         const uint64_t sourceNumElements   = sourceNumBytes / sourceItemSize;
         const auto     itemSinkTypeIndex   = sinkTypeIndex;
@@ -270,7 +270,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
 
 bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::skipCurrent()
 {
-    Serialization::BinarySkipper<Serialization::BinaryBuffer> skipper(*sourceObject, sourceTypeIndex);
-    skipper.sourceProperties = sourceProperties;
+    Serialization::BinarySkipper<SerializationBinary::BinaryBuffer> skipper(*sourceObject, sourceTypeIndex);
+    skipper.sourceTypes = sourceTypes;
     return skipper.skip();
 }

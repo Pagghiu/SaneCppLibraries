@@ -52,9 +52,9 @@ bool SC::SerializationBinaryTypeErased::ArrayAccess::resize(uint32_t linkID, Spa
     return false;
 }
 
-bool SC::SerializationBinaryTypeErased::SerializerReadWriteFast::write()
+bool SC::SerializationBinaryTypeErased::SerializerWriteFast::write()
 {
-    sourceProperty = sourceProperties.data()[sourceTypeIndex];
+    sourceProperty = sourceTypes.data()[sourceTypeIndex];
     if (sourceProperty.isPrimitiveType())
     {
         Span<const uint8_t> primitiveSpan;
@@ -74,7 +74,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadWriteFast::write()
     return false;
 }
 
-bool SC::SerializationBinaryTypeErased::SerializerReadWriteFast::writeStruct()
+bool SC::SerializationBinaryTypeErased::SerializerWriteFast::writeStruct()
 {
     const auto          structSourceProperty  = sourceProperty;
     const auto          structSourceTypeIndex = sourceTypeIndex;
@@ -93,18 +93,17 @@ bool SC::SerializationBinaryTypeErased::SerializerReadWriteFast::writeStruct()
         for (uint32_t idx = 0; idx < static_cast<uint32_t>(structSourceProperty.getNumberOfChildren()); ++idx)
         {
             sourceTypeIndex = structSourceTypeIndex + idx + 1;
-            SC_TRY(structSourceRoot.sliceStartLength(sourceProperties.data()[sourceTypeIndex].memberInfo.offsetInBytes,
-                                                     sourceProperties.data()[sourceTypeIndex].sizeInBytes,
-                                                     sourceObject));
-            if (sourceProperties.data()[sourceTypeIndex].hasValidLinkIndex())
-                sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
+            SC_TRY(structSourceRoot.sliceStartLength(sourceTypes.data()[sourceTypeIndex].memberInfo.offsetInBytes,
+                                                     sourceTypes.data()[sourceTypeIndex].sizeInBytes, sourceObject));
+            if (sourceTypes.data()[sourceTypeIndex].hasValidLinkIndex())
+                sourceTypeIndex = static_cast<uint32_t>(sourceTypes.data()[sourceTypeIndex].getLinkIndex());
             SC_TRY(write());
         }
     }
     return true;
 }
 
-bool SC::SerializationBinaryTypeErased::SerializerReadWriteFast::writeArrayVector()
+bool SC::SerializationBinaryTypeErased::SerializerWriteFast::writeArrayVector()
 {
     const auto          arrayProperty  = sourceProperty;
     const auto          arrayTypeIndex = sourceTypeIndex;
@@ -122,11 +121,11 @@ bool SC::SerializationBinaryTypeErased::SerializerReadWriteFast::writeArrayVecto
         SC_TRY(destination.serializeBytes(Span<const uint8_t>::reinterpret_object(numBytes)));
     }
     sourceTypeIndex     = arrayTypeIndex + 1;
-    const auto itemSize = sourceProperties.data()[sourceTypeIndex].sizeInBytes;
-    if (sourceProperties.data()[sourceTypeIndex].hasValidLinkIndex())
-        sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
+    const auto itemSize = sourceTypes.data()[sourceTypeIndex].sizeInBytes;
+    if (sourceTypes.data()[sourceTypeIndex].hasValidLinkIndex())
+        sourceTypeIndex = static_cast<uint32_t>(sourceTypes.data()[sourceTypeIndex].getLinkIndex());
 
-    const bool isPacked = sourceProperties.data()[sourceTypeIndex].isPrimitiveOrPackedStruct();
+    const bool isPacked = sourceTypes.data()[sourceTypeIndex].isPrimitiveOrPackedStruct();
     if (isPacked)
     {
         SC_TRY(destination.serializeBytes(arraySpan));
@@ -145,9 +144,9 @@ bool SC::SerializationBinaryTypeErased::SerializerReadWriteFast::writeArrayVecto
     return true;
 }
 
-bool SC::SerializationBinaryTypeErased::SimpleBinaryReader::read()
+bool SC::SerializationBinaryTypeErased::SerializerReadFast::read()
 {
-    sinkProperty = sinkProperties.data()[sinkTypeIndex];
+    sinkProperty = sinkTypes.data()[sinkTypeIndex];
     if (sinkProperty.isPrimitiveType())
     {
         Span<uint8_t> primitiveSpan;
@@ -167,7 +166,7 @@ bool SC::SerializationBinaryTypeErased::SimpleBinaryReader::read()
     return false;
 }
 
-bool SC::SerializationBinaryTypeErased::SimpleBinaryReader::readStruct()
+bool SC::SerializationBinaryTypeErased::SerializerReadFast::readStruct()
 {
     const auto    structSinkProperty  = sinkProperty;
     const auto    structSinkTypeIndex = sinkTypeIndex;
@@ -185,26 +184,26 @@ bool SC::SerializationBinaryTypeErased::SimpleBinaryReader::readStruct()
         for (uint32_t idx = 0; idx < static_cast<uint32_t>(structSinkProperty.getNumberOfChildren()); ++idx)
         {
             sinkTypeIndex = structSinkTypeIndex + idx + 1;
-            SC_TRY(structSinkObject.sliceStartLength(sinkProperties.data()[sinkTypeIndex].memberInfo.offsetInBytes,
-                                                     sinkProperties.data()[sinkTypeIndex].sizeInBytes, sinkObject));
-            if (sinkProperties.data()[sinkTypeIndex].hasValidLinkIndex())
-                sinkTypeIndex = static_cast<uint32_t>(sinkProperties.data()[sinkTypeIndex].getLinkIndex());
+            SC_TRY(structSinkObject.sliceStartLength(sinkTypes.data()[sinkTypeIndex].memberInfo.offsetInBytes,
+                                                     sinkTypes.data()[sinkTypeIndex].sizeInBytes, sinkObject));
+            if (sinkTypes.data()[sinkTypeIndex].hasValidLinkIndex())
+                sinkTypeIndex = static_cast<uint32_t>(sinkTypes.data()[sinkTypeIndex].getLinkIndex());
             SC_TRY(read());
         }
     }
     return true;
 }
 
-bool SC::SerializationBinaryTypeErased::SimpleBinaryReader::readArrayVector()
+bool SC::SerializationBinaryTypeErased::SerializerReadFast::readArrayVector()
 {
     const auto arraySinkProperty  = sinkProperty;
     const auto arraySinkTypeIndex = sinkTypeIndex;
     sinkTypeIndex                 = arraySinkTypeIndex + 1;
     Span<uint8_t> arraySinkObject = sinkObject;
-    const auto    sinkItemSize    = sinkProperties.data()[sinkTypeIndex].sizeInBytes;
-    if (sinkProperties.data()[sinkTypeIndex].hasValidLinkIndex())
-        sinkTypeIndex = static_cast<uint32_t>(sinkProperties.data()[sinkTypeIndex].getLinkIndex());
-    const bool    isBulkReadable = sinkProperties.data()[sinkTypeIndex].isPrimitiveOrPackedStruct();
+    const auto    sinkItemSize    = sinkTypes.data()[sinkTypeIndex].sizeInBytes;
+    if (sinkTypes.data()[sinkTypeIndex].hasValidLinkIndex())
+        sinkTypeIndex = static_cast<uint32_t>(sinkTypes.data()[sinkTypeIndex].getLinkIndex());
+    const bool    isBulkReadable = sinkTypes.data()[sinkTypeIndex].isPrimitiveOrPackedStruct();
     Span<uint8_t> arraySinkStart;
     if (arraySinkProperty.type == Reflection::TypeCategory::TypeArray)
     {

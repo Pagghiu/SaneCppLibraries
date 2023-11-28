@@ -196,6 +196,12 @@
 #define SC_LANGUAGE_LIKELY
 #define SC_LANGUAGE_UNLIKELY
 #endif
+
+#if SC_LANGUAGE_CPP_AT_LEAST_17
+#define SC_LANGUAGE_IF_CONSTEXPR constexpr
+#else
+#define SC_LANGUAGE_IF_CONSTEXPR
+#endif
 //! @}
 // clang-format off
 namespace SC

@@ -26,49 +26,26 @@ struct VersionSchema
     };
     Options options;
 
-    Span<const Reflection::TypeInfo> sourceProperties;
+    Span<const Reflection::TypeInfo> sourceTypes;
 
     uint32_t sourceTypeIndex = 0;
 
-    constexpr Reflection::TypeInfo current() const { return sourceProperties.data()[sourceTypeIndex]; }
+    constexpr Reflection::TypeInfo current() const { return sourceTypes.data()[sourceTypeIndex]; }
 
     constexpr void advance() { sourceTypeIndex++; }
 
     constexpr void resolveLink()
     {
-        if (sourceProperties.data()[sourceTypeIndex].hasValidLinkIndex())
-            sourceTypeIndex = static_cast<uint32_t>(sourceProperties.data()[sourceTypeIndex].getLinkIndex());
+        if (sourceTypes.data()[sourceTypeIndex].hasValidLinkIndex())
+            sourceTypeIndex = static_cast<uint32_t>(sourceTypes.data()[sourceTypeIndex].getLinkIndex());
     }
 
     template <typename BinaryStream>
     [[nodiscard]] constexpr bool skipCurrent(BinaryStream& stream)
     {
         Serialization::BinarySkipper<BinaryStream> skipper(stream, sourceTypeIndex);
-        skipper.sourceProperties = sourceProperties;
+        skipper.sourceTypes = sourceTypes;
         return skipper.skip();
-    }
-};
-
-template <typename BinaryStream, typename T>
-struct SerializerReadVersionedMemberIterator
-{
-    VersionSchema& schema;
-    BinaryStream&  stream;
-    int            matchOrder          = 0;
-    bool           consumed            = false;
-    bool           consumedWithSuccess = false;
-
-    template <typename R, int N>
-    constexpr bool operator()(int order, const char (&name)[N], R& field)
-    {
-        SC_COMPILER_UNUSED(name);
-        if (matchOrder == order)
-        {
-            consumed            = true;
-            consumedWithSuccess = SerializerReadVersioned<BinaryStream, R>::readVersioned(field, stream, schema);
-            return false; // stop iterations
-        }
-        return true;
     }
 };
 
@@ -77,29 +54,56 @@ struct SerializerReadVersioned
 {
     [[nodiscard]] static constexpr bool readVersioned(T& object, BinaryStream& stream, VersionSchema& schema)
     {
-        using VersionedMemberIterator = SerializerReadVersionedMemberIterator<BinaryStream, T>;
-        SC_TRY(schema.current().type == Reflection::TypeCategory::TypeStruct);
+        if (schema.current().type != Reflection::TypeCategory::TypeStruct)
+            return false;
         const uint32_t numMembers      = static_cast<uint32_t>(schema.current().getNumberOfChildren());
         const auto     structTypeIndex = schema.sourceTypeIndex;
         for (uint32_t idx = 0; idx < numMembers; ++idx)
         {
-            schema.sourceTypeIndex          = structTypeIndex + idx + 1;
-            VersionedMemberIterator visitor = {schema, stream, schema.current().memberInfo.order};
+            schema.sourceTypeIndex = structTypeIndex + idx + 1;
+            MemberIterator visitor = {schema, stream, schema.current().memberInfo.order};
             schema.resolveLink();
             Reflection::Reflect<T>::visitObject(visitor, object);
             if (visitor.consumed)
             {
-                SC_TRY(visitor.consumedWithSuccess);
+                if (not visitor.consumedWithSuccess)
+                    return false;
             }
             else
             {
-                SC_TRY(schema.options.allowDropEccessStructMembers)
+                if (not schema.options.allowDropEccessStructMembers)
+                    return false;
                 // We must consume it anyway, discarding its content
-                SC_TRY(schema.skipCurrent(stream));
+                if (not schema.skipCurrent(stream))
+                    return false;
             }
         }
         return true;
     }
+
+  private:
+    struct MemberIterator
+    {
+        VersionSchema& schema;
+        BinaryStream&  stream;
+
+        int  matchOrder          = 0;
+        bool consumed            = false;
+        bool consumedWithSuccess = false;
+
+        template <typename R, int N>
+        constexpr bool operator()(int order, const char (&name)[N], R& field)
+        {
+            SC_COMPILER_UNUSED(name);
+            if (matchOrder == order)
+            {
+                consumed            = true;
+                consumedWithSuccess = SerializerReadVersioned<BinaryStream, R>::readVersioned(field, stream, schema);
+                return false; // stop iterations
+            }
+            return true;
+        }
+    };
 };
 
 template <typename BinaryStream, typename T>
@@ -119,11 +123,13 @@ struct SerializerReadVersionedItems
             const size_t sourceNumBytes = schema.current().sizeInBytes * numSourceItems;
             const size_t destNumBytes   = numDestinationItems * sizeof(T);
             const size_t minBytes       = min(destNumBytes, sourceNumBytes);
-            SC_TRY(stream.serializeBytes(object, minBytes));
+            if (not stream.serializeBytes(object, minBytes))
+                return false;
             if (sourceNumBytes > destNumBytes)
             {
                 // We must consume these excess bytes anyway, discarding their content
-                SC_TRY(schema.options.allowDropEccessArrayItems);
+                if (not schema.options.allowDropEccessArrayItems)
+                    return false;
                 return stream.advanceBytes(sourceNumBytes - minBytes);
             }
             return true;
@@ -139,12 +145,14 @@ struct SerializerReadVersionedItems
         if (numSourceItems > numDestinationItems)
         {
             // We must consume these excess items anyway, discarding their content
-            SC_TRY(schema.options.allowDropEccessArrayItems);
+            if (not schema.options.allowDropEccessArrayItems)
+                return false;
 
             for (uint32_t idx = 0; idx < numSourceItems - numDestinationItems; ++idx)
             {
                 schema.sourceTypeIndex = arrayItemTypeIndex;
-                SC_TRY(schema.skipCurrent(stream));
+                if (not schema.skipCurrent(stream))
+                    return false;
             }
         }
         return true;
@@ -195,7 +203,8 @@ struct SerializerReadVersioned<BinaryStream, SC::Array<T, N>>
                                                       VersionSchema& schema)
     {
         uint64_t sizeInBytes = 0;
-        SC_TRY(stream.serializeBytes(&sizeInBytes, sizeof(sizeInBytes)));
+        if (not stream.serializeBytes(&sizeInBytes, sizeof(sizeInBytes)))
+            return false;
         schema.advance();
         const bool isPacked =
             Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::Reflect<T>::getCategory();
@@ -205,11 +214,13 @@ struct SerializerReadVersioned<BinaryStream, SC::Array<T, N>>
         const uint32_t numDestinationItems = static_cast<uint32_t>(N);
         if (isPacked)
         {
-            SC_TRY(object.resizeWithoutInitializing(min(numSourceItems, numDestinationItems)));
+            if (not object.resizeWithoutInitializing(min(numSourceItems, numDestinationItems)))
+                return false;
         }
         else
         {
-            SC_TRY(object.resize(min(numSourceItems, numDestinationItems)));
+            if (not object.resize(min(numSourceItems, numDestinationItems)))
+                return false;
         }
         return SerializerReadVersionedItems<BinaryStream, T>::readVersioned(object.data(), stream, schema,
                                                                             numSourceItems, numDestinationItems);
@@ -223,7 +234,8 @@ struct SerializerReadVersioned<BinaryStream, T, typename SC::EnableIf<Reflection
     [[nodiscard]] static bool readCastValue(T& destination, BinaryStream& stream)
     {
         ValueType value;
-        SC_TRY(stream.serializeBytes(&value, sizeof(ValueType)));
+        if (not stream.serializeBytes(&value, sizeof(ValueType)))
+            return false;
         destination = static_cast<T>(value);
         return true;
     }
