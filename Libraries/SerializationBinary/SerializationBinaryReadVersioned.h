@@ -5,7 +5,7 @@
 // This needs to go before the compiler
 #include "../Reflection/ReflectionSC.h" // TODO: Split the SC Containers specifics in separate header
 // Compiler must be after
-#include "../Reflection/ReflectionCompiler.h"
+#include "../Reflection/ReflectionSchemaCompiler.h"
 #include "SerializationBinarySkipper.h"
 
 namespace SC
@@ -61,9 +61,9 @@ struct SerializerReadVersioned
         for (uint32_t idx = 0; idx < numMembers; ++idx)
         {
             schema.sourceTypeIndex = structTypeIndex + idx + 1;
-            MemberIterator visitor = {schema, stream, schema.current().memberInfo.order};
+            MemberIterator visitor = {schema, stream, object, schema.current().memberInfo.order};
             schema.resolveLink();
-            Reflection::Reflect<T>::visitObject(visitor, object);
+            Reflection::Reflect<T>::visit(visitor);
             if (visitor.consumed)
             {
                 if (not visitor.consumedWithSuccess)
@@ -86,19 +86,21 @@ struct SerializerReadVersioned
     {
         VersionSchema& schema;
         BinaryStream&  stream;
+        T&             object;
 
         int  matchOrder          = 0;
         bool consumed            = false;
         bool consumedWithSuccess = false;
 
         template <typename R, int N>
-        constexpr bool operator()(int order, const char (&name)[N], R& field)
+        constexpr bool operator()(int order, const char (&name)[N], R T::*field, size_t /*offset*/)
         {
             SC_COMPILER_UNUSED(name);
             if (matchOrder == order)
             {
-                consumed            = true;
-                consumedWithSuccess = SerializerReadVersioned<BinaryStream, R>::readVersioned(field, stream, schema);
+                consumed = true;
+                consumedWithSuccess =
+                    SerializerReadVersioned<BinaryStream, R>::readVersioned(object.*field, stream, schema);
                 return false; // stop iterations
             }
             return true;

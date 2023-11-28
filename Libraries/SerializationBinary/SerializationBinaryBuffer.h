@@ -20,24 +20,6 @@ struct BinaryBuffer
     size_t readPosition       = 0; ///< Current read  position in the buffer
     size_t numberOfOperations = 0; ///< How many read or write operations have been issued so far
 
-    /// @brief Write given object to buffer
-    /// @param object The source object
-    /// @param numBytes Size of source object
-    /// @return `true` if write succeeded
-    [[nodiscard]] bool serializeBytes(const void* object, size_t numBytes)
-    {
-        return serializeBytes(Span<const uint8_t>::reinterpret_bytes(object, numBytes));
-    }
-
-    /// @brief Read from buffer into given object
-    /// @param object Destination object
-    /// @param numBytes How many bytes to read from object
-    /// @return `true` if read succeeded
-    [[nodiscard]] bool serializeBytes(void* object, size_t numBytes)
-    {
-        return serializeBytes(Span<uint8_t>::reinterpret_bytes(object, numBytes));
-    }
-
     /// @brief Write span of bytes to buffer
     /// @param object Span of bytes
     /// @return `true` if write succeeded
@@ -74,20 +56,28 @@ struct BinaryBuffer
 
 struct BinaryWriterStream : public BinaryBuffer
 {
+    using BinaryBuffer::serializeBytes;
+    /// @brief Write given object to buffer
+    /// @param object The source object
+    /// @param numBytes Size of source object
+    /// @return `true` if write succeeded
     [[nodiscard]] bool serializeBytes(const void* object, size_t numBytes)
     {
-        return serializeBytes(Span<const uint8_t>::reinterpret_bytes(object, numBytes));
+        return BinaryBuffer::serializeBytes(Span<const uint8_t>::reinterpret_bytes(object, numBytes));
     }
-    [[nodiscard]] bool serializeBytes(Span<const uint8_t> object) { return BinaryBuffer::serializeBytes(object); }
 };
 
 struct BinaryReaderStream : public BinaryBuffer
 {
+    using BinaryBuffer::serializeBytes;
+    /// @brief Read from buffer into given object
+    /// @param object Destination object
+    /// @param numBytes How many bytes to read from object
+    /// @return `true` if read succeeded
     [[nodiscard]] bool serializeBytes(void* object, size_t numBytes)
     {
-        return serializeBytes(Span<uint8_t>::reinterpret_bytes(object, numBytes));
+        return BinaryBuffer::serializeBytes(Span<uint8_t>::reinterpret_bytes(object, numBytes));
     }
-    [[nodiscard]] bool serializeBytes(Span<uint8_t> object) { return BinaryBuffer::serializeBytes(object); }
 };
 } // namespace SerializationBinary
 } // namespace SC

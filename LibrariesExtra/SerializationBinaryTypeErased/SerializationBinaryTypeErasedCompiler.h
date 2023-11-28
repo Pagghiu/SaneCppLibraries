@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../../Libraries/Reflection/Reflection.h"
-#include "../../Libraries/Reflection/ReflectionCompiler.h"
+#include "../../Libraries/Reflection/ReflectionSchemaCompiler.h"
 namespace SC
 {
 namespace Reflection
@@ -42,20 +42,20 @@ struct ReflectionVTables
     ArrayWithSize<VectorVTable, MAX_VTABLES> vector;
 };
 
-struct TypeBuilderTypeErased : public SchemaBuilder<TypeBuilderTypeErased>
+struct FlatSchemaBuilderTypeErased : public SchemaBuilder<FlatSchemaBuilderTypeErased>
 {
-    using Type = ReflectedType<TypeBuilderTypeErased>;
+    using Type = SchemaType<FlatSchemaBuilderTypeErased>;
 
     static const uint32_t          MAX_VTABLES = 100;
     ReflectionVTables<MAX_VTABLES> vtables;
 
-    constexpr TypeBuilderTypeErased(Type* output, const uint32_t capacity) : SchemaBuilder(output, capacity) {}
+    constexpr FlatSchemaBuilderTypeErased(Type* output, const uint32_t capacity) : SchemaBuilder(output, capacity) {}
 };
 
 template <typename Container, typename ItemType, int N>
-struct VectorArrayVTable<TypeBuilderTypeErased, Container, ItemType, N>
+struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
 {
-    [[nodiscard]] constexpr static bool build(TypeBuilderTypeErased& builder)
+    [[nodiscard]] constexpr static bool build(FlatSchemaBuilderTypeErased& builder)
     {
         VectorVTable vector;
         vector.resize = &resize;
@@ -133,7 +133,7 @@ struct VectorArrayVTable<TypeBuilderTypeErased, Container, ItemType, N>
     }
 };
 
-using FlatSchemaTypeErased = Reflection::Compiler<TypeBuilderTypeErased>;
+using SchemaTypeErased = Reflection::SchemaCompiler<FlatSchemaBuilderTypeErased>;
 
 } // namespace Reflection
 

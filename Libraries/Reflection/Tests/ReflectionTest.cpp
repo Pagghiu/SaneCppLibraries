@@ -15,35 +15,70 @@
 #include "../../../LibrariesExtra/ReflectionAuto/ReflectionAutoStructured.h"
 #endif
 #endif
-#include "../ReflectionCompiler.h"
 #include "../ReflectionSC.h"
+#include "../ReflectionSchemaCompiler.h"
 
 namespace TestNamespace
 {
-struct SimpleStructure
+struct SimpleStructure;
+struct IntermediateStructure;
+struct ComplexStructure;
+} // namespace TestNamespace
+struct TestNamespace::SimpleStructure
 {
     // Base Types
-    SC::uint8_t  f1  = 0;
-    SC::uint16_t f2  = 1;
-    SC::uint32_t f3  = 2;
-    SC::uint64_t f4  = 3;
-    SC::int8_t   f5  = 4;
-    SC::int16_t  f6  = 5;
-    SC::int32_t  f7  = 6;
-    SC::int64_t  f8  = 7;
-    float        f9  = 8;
-    double       f10 = 9;
+    SC::uint8_t  f0 = 0;
+    SC::uint16_t f1 = 1;
+    SC::uint32_t f2 = 2;
+    SC::uint64_t f3 = 3;
+    SC::int8_t   f4 = 4;
+    SC::int16_t  f5 = 5;
+    SC::int32_t  f6 = 6;
+    SC::int64_t  f7 = 7;
+    float        f8 = 8;
+    double       f9 = 9;
 
     int arrayOfInt[3] = {1, 2, 3};
 };
 
-struct IntermediateStructure
+namespace SC
+{
+namespace Reflection
+{
+template <>
+struct Reflect<TestNamespace::SimpleStructure> : ReflectStruct<TestNamespace::SimpleStructure>
+{
+    template <typename MemberVisitor>
+    static constexpr bool visit(MemberVisitor&& visitor)
+    {
+        return visitor(0, "f0", &T::f0, SC_COMPILER_OFFSETOF(T, f0)) and //
+               visitor(1, "f1", &T::f1, SC_COMPILER_OFFSETOF(T, f1)) and //
+               visitor(2, "f2", &T::f2, SC_COMPILER_OFFSETOF(T, f2)) and //
+               visitor(3, "f3", &T::f3, SC_COMPILER_OFFSETOF(T, f3)) and //
+               visitor(4, "f4", &T::f4, SC_COMPILER_OFFSETOF(T, f4)) and //
+               visitor(5, "f5", &T::f5, SC_COMPILER_OFFSETOF(T, f5)) and //
+               visitor(6, "f6", &T::f6, SC_COMPILER_OFFSETOF(T, f6)) and //
+               visitor(7, "f7", &T::f7, SC_COMPILER_OFFSETOF(T, f7)) and //
+               visitor(8, "f8", &T::f8, SC_COMPILER_OFFSETOF(T, f8)) and //
+               visitor(9, "f9", &T::f9, SC_COMPILER_OFFSETOF(T, f9)) and //
+               visitor(10, "arrayOfInt", &T::arrayOfInt, SC_COMPILER_OFFSETOF(T, arrayOfInt));
+    }
+};
+} // namespace Reflection
+} // namespace SC
+
+struct TestNamespace::IntermediateStructure
 {
     SC::Vector<int> vectorOfInt;
     SimpleStructure simpleStructure;
 };
 
-struct ComplexStructure
+SC_REFLECT_STRUCT_VISIT(TestNamespace::IntermediateStructure)
+SC_REFLECT_STRUCT_FIELD(1, vectorOfInt)
+SC_REFLECT_STRUCT_FIELD(0, simpleStructure)
+SC_REFLECT_STRUCT_LEAVE()
+
+struct TestNamespace::ComplexStructure
 {
     SC::uint8_t                 f1 = 0;
     SimpleStructure             simpleStructure;
@@ -52,64 +87,15 @@ struct ComplexStructure
     IntermediateStructure       intermediateStructure;
     SC::Vector<SimpleStructure> vectorOfStructs;
 };
-} // namespace TestNamespace
 
-namespace SC
-{
-namespace Reflection
-{
-
-template <>
-struct Reflect<TestNamespace::SimpleStructure> : ReflectStruct<TestNamespace::SimpleStructure>
-{
-    template <typename MemberVisitor>
-    static constexpr bool visit(MemberVisitor&& visitor)
-    {
-        return                                                          //
-            visitor(0, "f1", &T::f1, SC_COMPILER_OFFSETOF(T, f1)) and   //
-            visitor(1, "f2", &T::f2, SC_COMPILER_OFFSETOF(T, f2)) and   //
-            visitor(2, "f3", &T::f2, SC_COMPILER_OFFSETOF(T, f3)) and   //
-            visitor(3, "f4", &T::f2, SC_COMPILER_OFFSETOF(T, f4)) and   //
-            visitor(4, "f5", &T::f2, SC_COMPILER_OFFSETOF(T, f5)) and   //
-            visitor(5, "f6", &T::f2, SC_COMPILER_OFFSETOF(T, f6)) and   //
-            visitor(6, "f7", &T::f2, SC_COMPILER_OFFSETOF(T, f7)) and   //
-            visitor(7, "f8", &T::f2, SC_COMPILER_OFFSETOF(T, f8)) and   //
-            visitor(8, "f9", &T::f2, SC_COMPILER_OFFSETOF(T, f9)) and   //
-            visitor(9, "f10", &T::f2, SC_COMPILER_OFFSETOF(T, f10)) and //
-            visitor(10, "arrayOfInt", &T::arrayOfInt, SC_COMPILER_OFFSETOF(T, arrayOfInt));
-    }
-};
-
-template <>
-struct Reflect<TestNamespace::IntermediateStructure> : ReflectStruct<TestNamespace::IntermediateStructure>
-{
-    template <typename MemberVisitor>
-    static constexpr bool visit(MemberVisitor&& visitor)
-    {
-        return //
-            visitor(1, "vectorOfInt", &T::vectorOfInt, SC_COMPILER_OFFSETOF(T, vectorOfInt)) and
-            visitor(0, "simpleStructure", &T::simpleStructure, SC_COMPILER_OFFSETOF(T, simpleStructure));
-    }
-};
-
-template <>
-struct Reflect<TestNamespace::ComplexStructure> : ReflectStruct<TestNamespace::ComplexStructure>
-{
-    template <typename MemberVisitor>
-    static constexpr bool visit(MemberVisitor&& visitor)
-    {
-        return                                                                                                  //
-            visitor(0, "f1", &T::f1, SC_COMPILER_OFFSETOF(T, f1)) and                                           //
-            visitor(1, "simpleStructure", &T::simpleStructure, SC_COMPILER_OFFSETOF(T, simpleStructure)) and    //
-            visitor(2, "simpleStructure2", &T::simpleStructure2, SC_COMPILER_OFFSETOF(T, simpleStructure2)) and //
-            visitor(3, "f4", &T::f4, SC_COMPILER_OFFSETOF(T, f4)) and                                           //
-            visitor(4, "intermediateStructure", &T::intermediateStructure,
-                    SC_COMPILER_OFFSETOF(T, intermediateStructure)) and //
-            visitor(5, "vectorOfStructs", &T::vectorOfStructs, SC_COMPILER_OFFSETOF(T, vectorOfStructs));
-    }
-};
-} // namespace Reflection
-} // namespace SC
+SC_REFLECT_STRUCT_VISIT(TestNamespace::ComplexStructure)
+SC_REFLECT_STRUCT_FIELD(0, f1)
+SC_REFLECT_STRUCT_FIELD(1, simpleStructure)
+SC_REFLECT_STRUCT_FIELD(2, simpleStructure2)
+SC_REFLECT_STRUCT_FIELD(3, f4)
+SC_REFLECT_STRUCT_FIELD(4, intermediateStructure)
+SC_REFLECT_STRUCT_FIELD(5, vectorOfStructs)
+SC_REFLECT_STRUCT_LEAVE()
 
 namespace SC
 {

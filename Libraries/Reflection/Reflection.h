@@ -175,62 +175,12 @@ struct Reflect;
 template <typename T, typename SFINAESelector = void>
 struct ExtendedTypeInfo;
 
-/// @brief Holds together a TypeInfo, a StringView and a type-erased builder function pointer
-/// @tparam TypeVisitor The type of member visitor that is parameter of the builder function
-template <typename TypeVisitor>
-struct ReflectedType
-{
-    using TypeBuildFunction = bool (*)(TypeVisitor& builder);
-
-    TypeInfo          typeInfo;
-    TypeStringView    typeName;
-    TypeBuildFunction typeBuild;
-
-    constexpr ReflectedType() : typeBuild(nullptr) {}
-    constexpr ReflectedType(const TypeInfo typeInfo, TypeStringView typeName, TypeBuildFunction typeBuild)
-        : typeInfo(typeInfo), typeName(typeName), typeBuild(typeBuild)
-    {}
-
-    /// @brief Create from a generic type T
-    template <typename T>
-    [[nodiscard]] static constexpr ReflectedType createGeneric()
-    {
-        return {TypeInfo(Reflect<T>::getCategory(), sizeof(T)), TypeToString<T>::get(), &Reflect<T>::build};
-    }
-
-    /// @brief Create from a Struct type T
-    template <typename T>
-    [[nodiscard]] static constexpr ReflectedType createStruct(TypeStringView name = TypeToString<T>::get())
-    {
-        TypeInfo::StructInfo structInfo;
-        structInfo.isPacked = ExtendedTypeInfo<T>::IsPacked;
-        return {TypeInfo(Reflect<T>::getCategory(), sizeof(T), structInfo), name, &Reflect<T>::build};
-    }
-
-    /// @brief Create from a struct member with given name, order and offset
-    template <typename R, typename T, int N>
-    [[nodiscard]] static constexpr ReflectedType createMember(uint8_t order, const char (&name)[N], R T::*,
-                                                              size_t offset)
-    {
-        const auto info = TypeInfo::MemberInfo(order, static_cast<SC::uint16_t>(offset));
-        return {TypeInfo(Reflect<R>::getCategory(), sizeof(R), info), TypeStringView(name, N), &Reflect<R>::build};
-    }
-
-    /// @brief Create from an array-like type
-    template <typename T>
-    [[nodiscard]] static constexpr ReflectedType createArray(TypeStringView name, uint8_t numChildren,
-                                                             TypeInfo::ArrayInfo arrayInfo)
-    {
-        return {TypeInfo(Reflect<T>::getCategory(), sizeof(T), numChildren, arrayInfo), name, &Reflect<T>::build};
-    }
-};
-
 //-----------------------------------------------------------------------------------------------------------
 // Primitive Types Support
 //-----------------------------------------------------------------------------------------------------------
 
 /// @brief Base struct for all primitive types
-struct PrimitiveType
+struct ReflectPrimitive
 {
     template <typename TypeVisitor>
     [[nodiscard]] static constexpr bool build(TypeVisitor&)
@@ -240,17 +190,17 @@ struct PrimitiveType
 };
 
 // clang-format off
-template <> struct Reflect<char>     : public PrimitiveType {static constexpr TypeCategory getCategory(){return TypeCategory::TypeUINT8;}};
-template <> struct Reflect<uint8_t>  : public PrimitiveType {static constexpr TypeCategory getCategory(){return TypeCategory::TypeUINT8;}};
-template <> struct Reflect<uint16_t> : public PrimitiveType {static constexpr TypeCategory getCategory(){return TypeCategory::TypeUINT16;}};
-template <> struct Reflect<uint32_t> : public PrimitiveType {static constexpr TypeCategory getCategory(){return TypeCategory::TypeUINT32;}};
-template <> struct Reflect<uint64_t> : public PrimitiveType {static constexpr TypeCategory getCategory(){return TypeCategory::TypeUINT64;}};
-template <> struct Reflect<int8_t>   : public PrimitiveType {static constexpr TypeCategory getCategory(){return TypeCategory::TypeINT8;}};
-template <> struct Reflect<int16_t>  : public PrimitiveType {static constexpr TypeCategory getCategory(){return TypeCategory::TypeINT16;}};
-template <> struct Reflect<int32_t>  : public PrimitiveType {static constexpr TypeCategory getCategory(){return TypeCategory::TypeINT32;}};
-template <> struct Reflect<int64_t>  : public PrimitiveType {static constexpr TypeCategory getCategory(){return TypeCategory::TypeINT64;}};
-template <> struct Reflect<float>    : public PrimitiveType {static constexpr TypeCategory getCategory(){return TypeCategory::TypeFLOAT32;}};
-template <> struct Reflect<double>   : public PrimitiveType {static constexpr TypeCategory getCategory(){return TypeCategory::TypeDOUBLE64;}};
+template <> struct Reflect<char>     : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeUINT8;}};
+template <> struct Reflect<uint8_t>  : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeUINT8;}};
+template <> struct Reflect<uint16_t> : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeUINT16;}};
+template <> struct Reflect<uint32_t> : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeUINT32;}};
+template <> struct Reflect<uint64_t> : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeUINT64;}};
+template <> struct Reflect<int8_t>   : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeINT8;}};
+template <> struct Reflect<int16_t>  : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeINT16;}};
+template <> struct Reflect<int32_t>  : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeINT32;}};
+template <> struct Reflect<int64_t>  : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeINT64;}};
+template <> struct Reflect<float>    : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeFLOAT32;}};
+template <> struct Reflect<double>   : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeDOUBLE64;}};
 
 /// @brief Checks if a given type is primitive
 template <typename T> struct IsPrimitive { static constexpr bool value = TypeInfo::isPrimitiveCategory(Reflect<T>::getCategory()); };
@@ -309,33 +259,15 @@ struct ReflectStruct
     template <typename TypeVisitor>
     [[nodiscard]] static constexpr bool build(TypeVisitor& builder)
     {
+        // Add struct type
         if (not builder.addType(TypeVisitor::Type::template createStruct<T>()))
             return false;
+
+        // Add all struct member
         if (not Reflect<Type>::visit(builder))
             return false;
         return true;
     }
-
-    template <typename TypeVisitor>
-    static constexpr bool visitObject(TypeVisitor&& builder, Type& object)
-    {
-        return Reflect<Type>::visit(VisitObjectAdapter<TypeVisitor>{builder, object});
-    }
-
-  private:
-    template <typename TypeVisitor>
-    struct VisitObjectAdapter
-    {
-        TypeVisitor& builder;
-        Type&        object;
-
-        template <typename R, int N>
-        constexpr bool operator()(int order, const char (&name)[N], R Type::*field, size_t offset) const
-        {
-            SC_COMPILER_UNUSED(offset);
-            return builder(order, name, object.*field);
-        }
-    };
 };
 
 /// @brief Visit all struct members to gather sum of their sizes (helper for IsPacked).

@@ -66,29 +66,6 @@ struct DescribeAutomaticAggregates
         return Auto::TypeListVisit<TypeList, TypeList::size>::visit(
             DescribeLoopholeVisitor<T, MemberVisitor, TypeList::size>{builder});
     }
-
-    // Cannot be constexpr as we're reinterpret_cast-ing
-    template <typename MemberVisitor>
-    static /*constexpr*/ bool visitObject(MemberVisitor&& builder, T& object)
-    {
-        return visit(VisitObjectAdapter<MemberVisitor>{builder, object});
-    }
-
-  private:
-    template <typename MemberVisitor>
-    struct VisitObjectAdapter
-    {
-        MemberVisitor& builder;
-        T&             object;
-
-        // Cannot be constexpr as we're reinterpret_cast-ing
-        template <typename R, int N>
-        /*constexpr*/ bool operator()(int order, const char (&name)[N], R T::*, size_t offset) const
-        {
-            R& member = *reinterpret_cast<R*>(reinterpret_cast<uint8_t*>(&object) + offset);
-            return builder(order, name, member);
-        }
-    };
 };
 
 } // namespace AutoAggregates

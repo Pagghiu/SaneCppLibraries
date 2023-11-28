@@ -382,31 +382,6 @@ struct DescribeAutomaticStructured
         return Auto::TypeListVisit<TypeList, TypeList::size>::visit(
             DescribeLoopholeVisitor<T, MemberVisitor, TypeList::size>{builder});
     }
-
-    template <typename MemberVisitor>
-    static constexpr bool visitObject(MemberVisitor&& builder, T& object)
-    {
-        constexpr auto NumMembers = AutoStructured::CountAggregates<T>(0);
-        return Reflection::AutoStructured::MemberApply<NumMembers>(object,
-                                                                   VisitObjectAdapter<MemberVisitor>{builder, object});
-    }
-
-  private:
-    template <typename MemberVisitor>
-    struct VisitObjectAdapter
-    {
-        MemberVisitor& builder;
-        T&             object;
-        int            order = 0;
-
-        template <typename FirstType, typename... Types>
-        constexpr bool operator()(FirstType& first, Types&... types)
-        {
-            return builder(order++, "", first) and operator()(types...);
-        }
-
-        constexpr bool operator()() { return true; }
-    };
 };
 } // namespace AutoStructured
 

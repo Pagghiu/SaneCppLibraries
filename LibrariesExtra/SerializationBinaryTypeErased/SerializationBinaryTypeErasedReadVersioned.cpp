@@ -113,7 +113,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::read()
         {
             if (sinkObject.sizeInBytes() >= sourceProperty.sizeInBytes)
             {
-                SC_TRY(sourceObject->serializeBytes(sinkObject.data(), sourceProperty.sizeInBytes));
+                SC_TRY(sourceObject->serializeBytes(Span<uint8_t>{sinkObject.data(), sourceProperty.sizeInBytes}));
                 return true;
             }
         }
@@ -228,7 +228,7 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readArrayVector
     if (isPacked)
     {
         const auto minBytes = min(static_cast<uint64_t>(arraySinkStart.sizeInBytes()), sourceNumBytes);
-        SC_TRY(sourceObject->serializeBytes(arraySinkStart.data(), static_cast<size_t>(minBytes)));
+        SC_TRY(sourceObject->serializeBytes(Span<uint8_t>{arraySinkStart.data(), static_cast<size_t>(minBytes)}));
         if (sourceNumBytes > static_cast<uint64_t>(arraySinkStart.sizeInBytes()))
         {
             // We must consume these excess bytes anyway, discarding their content

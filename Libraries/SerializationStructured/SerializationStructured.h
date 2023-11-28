@@ -18,15 +18,17 @@ template <typename SerializerStream, typename T>
 struct SerializerReadWriteFastMemberIterator
 {
     SerializerStream& stream;
-    uint32_t          index = 0;
+    T&                object;
+
+    uint32_t index = 0;
 
     template <typename R, int N>
-    constexpr bool operator()(int order, const char (&name)[N], R& field)
+    constexpr bool operator()(int order, const char (&name)[N], R T::*field, size_t /*offset*/)
     {
         SC_COMPILER_UNUSED(order);
         const StringView fieldName = StringView(name, N - 1, true, StringEncoding::Ascii);
         SC_TRY(stream.startObjectField(index++, fieldName));
-        return SerializationReadWrite<SerializerStream, R>::serialize(0, field, stream);
+        return SerializationReadWrite<SerializerStream, R>::serialize(0, object.*field, stream);
     }
 };
 
@@ -34,20 +36,23 @@ template <typename SerializerStream, typename T>
 struct SerializerReadVersionedMemberIterator
 {
     SerializerStream& stream;
-    const StringView  fieldToFind;
-    const uint32_t    index               = 0;
-    bool              consumed            = false;
-    bool              consumedWithSuccess = false;
+    T&                object;
+
+    const StringView fieldToFind;
+    const uint32_t   index = 0;
+
+    bool consumed            = false;
+    bool consumedWithSuccess = false;
 
     template <typename R, int N>
-    constexpr bool operator()(int order, const char (&name)[N], R& field)
+    constexpr bool operator()(int order, const char (&name)[N], R T::*field, size_t /*offset*/)
     {
         SC_COMPILER_UNUSED(order);
         const StringView fieldName = StringView(name, N - 1, true, StringEncoding::Ascii);
         if (fieldName == fieldToFind)
         {
             consumed            = true;
-            consumedWithSuccess = SerializationReadWrite<SerializerStream, R>::loadVersioned(0, field, stream);
+            consumedWithSuccess = SerializationReadWrite<SerializerStream, R>::loadVersioned(0, object.*field, stream);
             return false; // stop iterating members
         }
         return true;
@@ -61,7 +66,7 @@ struct SerializationReadWrite
     {
         SC_TRY(stream.startObject(index));
         using FastIterator = SerializerReadWriteFastMemberIterator<SerializerStream, T>;
-        SC_TRY(Reflection::Reflect<T>::visitObject(FastIterator{stream}, object));
+        SC_TRY(Reflection::Reflect<T>::visit(FastIterator{stream, object}));
         return stream.endObject();
     }
 
@@ -76,8 +81,8 @@ struct SerializationReadWrite
         while (hasMore)
         {
             using VersionedIterator = SerializerReadVersionedMemberIterator<SerializerStream, T>;
-            VersionedIterator iterator{stream, fieldToFind, fieldIndex};
-            Reflection::Reflect<T>::visitObject(iterator, object);
+            VersionedIterator iterator{stream, object, fieldToFind, fieldIndex};
+            Reflection::Reflect<T>::visit(iterator);
             SC_TRY(not iterator.consumed or iterator.consumedWithSuccess);
             SC_TRY(stream.getNextField(++fieldIndex, fieldToFind, hasMore));
         }

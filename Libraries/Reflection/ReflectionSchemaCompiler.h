@@ -9,28 +9,31 @@ namespace SC
 namespace Reflection
 {
 
-/// @brief Creates a schema linking a series of ReflectedType
+/// @brief Creates a schema linking a series of SchemaType
 /// @tparam SchemaBuilder The builder used to obtain Virtual Tables
 template <typename SchemaBuilder>
-struct Compiler
+struct SchemaCompiler
 {
+  private:
     using Type              = typename SchemaBuilder::Type;
     using TypeBuildFunction = typename Type::TypeBuildFunction;
     using VirtualTablesType = decltype(SchemaBuilder::vtables);
 
+    /// @brief Holds results as a maxed out array of size `MAX_TOTAL_TYPES`
     template <uint32_t MAX_TOTAL_TYPES>
-    struct FlatSchema
-    {
-        ArrayWithSize<TypeInfo, MAX_TOTAL_TYPES>       typeInfos;
-        ArrayWithSize<TypeStringView, MAX_TOTAL_TYPES> typeNames;
-        VirtualTablesType                              vtables;
-    };
-
-    template <uint32_t MAX_TOTAL_TYPES>
-    struct Result
+    struct FlatFullResult
     {
         ArrayWithSize<Type, MAX_TOTAL_TYPES> types;
         VirtualTablesType                    vtables;
+    };
+
+    /// @brief Holds only the actual `NUM_TYPES` `<=` `MAX_TOTAL_TYPES` reducing executable size.
+    template <uint32_t NUM_TYPES>
+    struct FlatTrimmedResult
+    {
+        ArrayWithSize<TypeInfo, NUM_TYPES>       typeInfos;
+        ArrayWithSize<TypeStringView, NUM_TYPES> typeNames;
+        VirtualTablesType                        vtables;
     };
 
     template <uint32_t MAX_TYPES>
@@ -58,10 +61,10 @@ struct Compiler
     }
 
     template <uint32_t MAX_LINK_BUFFER_SIZE, uint32_t MAX_TOTAL_TYPES, typename Func>
-    constexpr static Result<MAX_TOTAL_TYPES> compileAllTypesFor(Func func)
+    constexpr static FlatFullResult<MAX_TOTAL_TYPES> compileAllTypesFor(Func func)
     {
         // Collect all types
-        Result<MAX_TOTAL_TYPES> result;
+        FlatFullResult<MAX_TOTAL_TYPES> result;
 
         SchemaBuilder container(result.types.values, MAX_TOTAL_TYPES);
 
@@ -103,9 +106,14 @@ struct Compiler
         return result;
     }
 
-    // You can customize:
-    // - MAX_LINK_BUFFER_SIZE: maximum number of "complex types" (anything that is not a primitive) that can be built
-    // - MAX_TOTAL_TYPES: maximum number of types (struct members). When using constexpr it will trim it to actual size.
+  public:
+    /// @brief Returns a `constexpr` compiled trimmed flat schema for type `T`.
+    /// @tparam T The type to be compiled
+    /// @tparam MAX_LINK_BUFFER_SIZE Maximum number of "complex types" (anything that is not a primitive) that can be
+    /// built
+    /// @tparam MAX_TOTAL_TYPES Maximum number of types (struct members). When using constexpr it will trim it to actual
+    /// size.
+    /// @returns FlatTrimmedResult with only the requried compiled types.
     template <typename T, uint32_t MAX_LINK_BUFFER_SIZE = 20, uint32_t MAX_TOTAL_TYPES = 100>
     static constexpr auto compile()
     {
@@ -113,8 +121,8 @@ struct Compiler
             compileAllTypesFor<MAX_LINK_BUFFER_SIZE, MAX_TOTAL_TYPES>(&Reflect<T>::template build<SchemaBuilder>);
         static_assert(schema.types.size > 0, "Something failed in compileAllTypesFor");
 
-        // Trim the returned FlatSchema only to the effective number of types
-        FlatSchema<schema.types.size> result;
+        // Trim the returned FlatTrimmedResult only to the effective number of types
+        FlatTrimmedResult<schema.types.size> result;
         for (uint32_t i = 0; i < schema.types.size; ++i)
         {
             result.typeInfos.values[i] = schema.types.values[i].typeInfo;
@@ -127,11 +135,60 @@ struct Compiler
     }
 };
 
-/// @brief Common code for derived class to create a SchemaBuilder suitable for SC::Reflection::Compiler
+/// @brief Holds together a TypeInfo, a StringView and a type-erased builder function pointer
+/// @tparam TypeVisitor The type of member visitor that is parameter of the builder function
+template <typename TypeVisitor>
+struct SchemaType
+{
+    using TypeBuildFunction = bool (*)(TypeVisitor& builder);
+
+    TypeInfo          typeInfo;
+    TypeStringView    typeName;
+    TypeBuildFunction typeBuild;
+
+    constexpr SchemaType() : typeBuild(nullptr) {}
+    constexpr SchemaType(const TypeInfo typeInfo, TypeStringView typeName, TypeBuildFunction typeBuild)
+        : typeInfo(typeInfo), typeName(typeName), typeBuild(typeBuild)
+    {}
+
+    /// @brief Create from a generic type T
+    template <typename T>
+    [[nodiscard]] static constexpr SchemaType createGeneric()
+    {
+        return {TypeInfo(Reflect<T>::getCategory(), sizeof(T)), TypeToString<T>::get(), &Reflect<T>::build};
+    }
+
+    /// @brief Create from a Struct type T
+    template <typename T>
+    [[nodiscard]] static constexpr SchemaType createStruct(TypeStringView name = TypeToString<T>::get())
+    {
+        TypeInfo::StructInfo structInfo;
+        structInfo.isPacked = ExtendedTypeInfo<T>::IsPacked;
+        return {TypeInfo(Reflect<T>::getCategory(), sizeof(T), structInfo), name, &Reflect<T>::build};
+    }
+
+    /// @brief Create from a struct member with given name, order and offset
+    template <typename R, typename T, int N>
+    [[nodiscard]] static constexpr SchemaType createMember(uint8_t order, const char (&name)[N], R T::*, size_t offset)
+    {
+        const auto info = TypeInfo::MemberInfo(order, static_cast<SC::uint16_t>(offset));
+        return {TypeInfo(Reflect<R>::getCategory(), sizeof(R), info), TypeStringView(name, N), &Reflect<R>::build};
+    }
+
+    /// @brief Create from an array-like type
+    template <typename T>
+    [[nodiscard]] static constexpr SchemaType createArray(TypeStringView name, uint8_t numChildren,
+                                                          TypeInfo::ArrayInfo arrayInfo)
+    {
+        return {TypeInfo(Reflect<T>::getCategory(), sizeof(T), numChildren, arrayInfo), name, &Reflect<T>::build};
+    }
+};
+
+/// @brief Common code for derived class to create a SchemaBuilder suitable for SC::Reflection::SchemaCompiler
 template <typename TypeVisitor>
 struct SchemaBuilder
 {
-    using Type = ReflectedType<TypeVisitor>;
+    using Type = SchemaType<TypeVisitor>;
 
     uint32_t currentLinkID;
 
@@ -154,17 +211,17 @@ struct SchemaBuilder
 };
 
 /// @brief A schema builder that doesn't build any virtual table
-struct DefaultSchemaBuilder : public SchemaBuilder<DefaultSchemaBuilder>
+struct FlatSchemaBuilder : public SchemaBuilder<FlatSchemaBuilder>
 {
     struct EmptyVTables
     {
     };
     EmptyVTables vtables;
-    constexpr DefaultSchemaBuilder(Type* output, const uint32_t capacity) : SchemaBuilder(output, capacity) {}
+    constexpr FlatSchemaBuilder(Type* output, const uint32_t capacity) : SchemaBuilder(output, capacity) {}
 };
 
 /// @brief Default schema not building any virtual table
-using Schema = Reflection::Compiler<DefaultSchemaBuilder>;
+using Schema = Reflection::SchemaCompiler<FlatSchemaBuilder>;
 
 } // namespace Reflection
 

@@ -367,7 +367,7 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
         }
     }
 
-    template <typename Compiler, typename SerializerVersioned, typename VersionSchema>
+    template <typename SchemaCompiler, typename SerializerVersioned, typename VersionSchema>
     void runVersionedTests()
     {
         if (test_section("VersionedStruct1/2"))
@@ -378,7 +378,7 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
             SC_TEST_EXPECT(writer.serialize(struct1));
             SerializerVersioned reader;
             VersionedStruct2    struct2;
-            auto                schema = Compiler::template compile<VersionedStruct1>();
+            auto                schema = SchemaCompiler::template compile<VersionedStruct1>();
             BinaryReaderStream  streamReader;
             streamReader.buffer = move(streamWriter.buffer);
             VersionSchema versionSchema;
@@ -399,7 +399,7 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
             SC_TEST_EXPECT(streamWriter.numberOfOperations == 4);
             SerializerVersioned reader;
             VersionedArray2     array2;
-            auto                schema = Compiler::template compile<VersionedArray1>();
+            auto                schema = SchemaCompiler::template compile<VersionedArray1>();
             BinaryReaderStream  streamReader;
             streamReader.buffer = move(streamWriter.buffer);
             VersionSchema versionSchema;
@@ -419,7 +419,7 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
             SerializerWriter   writer(streamWriter);
             SC_TEST_EXPECT(writer.serialize(struct1));
             SerializerVersioned reader;
-            auto                schema = Compiler::template compile<ConversionStruct1>();
+            auto                schema = SchemaCompiler::template compile<ConversionStruct1>();
             BinaryReaderStream  streamReader;
             streamReader.buffer = move(streamWriter.buffer);
             VersionSchema versionSchema;

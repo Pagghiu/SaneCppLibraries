@@ -20,7 +20,7 @@ struct SerializerWriteFast
     template <typename T>
     [[nodiscard]] constexpr bool serialize(const T& object)
     {
-        constexpr auto flatSchema      = Reflection::FlatSchemaTypeErased::compile<T>();
+        constexpr auto flatSchema      = Reflection::SchemaTypeErased::compile<T>();
         sourceTypes                    = {flatSchema.typeInfos.values, flatSchema.typeInfos.size};
         sourceNames                    = {flatSchema.typeNames.values, flatSchema.typeNames.size};
         arrayAccess.vectorVtable       = {flatSchema.vtables.vector.values, flatSchema.vtables.vector.size};
@@ -55,7 +55,7 @@ struct SerializerReadFast
     template <typename T>
     [[nodiscard]] bool serialize(T& object)
     {
-        constexpr auto flatSchema = Reflection::FlatSchemaTypeErased::compile<T>();
+        constexpr auto flatSchema = Reflection::SchemaTypeErased::compile<T>();
 
         sinkTypes     = {flatSchema.typeInfos.values, flatSchema.typeInfos.size};
         sinkNames     = {flatSchema.typeNames.values, flatSchema.typeNames.size};

@@ -12,8 +12,8 @@ struct SerializationBinaryTypeErasedTest;
 
 }
 struct SC::SerializationBinaryTypeErasedTest : public SC::SerializationParametricTestSuite::SerializationTestBase<
-                                                   SC::SerializationBinary::BinaryBuffer,                      //
-                                                   SC::SerializationBinary::BinaryBuffer,                      //
+                                                   SC::SerializationBinary::BinaryBuffer,                  //
+                                                   SC::SerializationBinary::BinaryBuffer,                  //
                                                    SC::SerializationBinaryTypeErased::SerializerWriteFast, //
                                                    SC::SerializationBinaryTypeErased::SerializerReadFast>
 {
@@ -21,8 +21,7 @@ struct SC::SerializationBinaryTypeErasedTest : public SC::SerializationParametri
         : SerializationTestBase(report, "SerializationBinaryTypeErasedTest")
     {
         runSameVersionTests();
-        runVersionedTests<SC::Reflection::FlatSchemaTypeErased,
-                          SC::SerializationBinaryTypeErased::SerializerReadVersioned,
+        runVersionedTests<SC::Reflection::SchemaTypeErased, SC::SerializationBinaryTypeErased::SerializerReadVersioned,
                           SC::SerializationBinaryTypeErased::VersionSchema>();
     }
 };

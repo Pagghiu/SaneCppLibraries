@@ -30,7 +30,7 @@ struct SerializerReadVersioned
     template <typename T>
     [[nodiscard]] bool readVersioned(T& object, SerializationBinary::BinaryBuffer& source, VersionSchema& schema)
     {
-        constexpr auto flatSchema = Reflection::FlatSchemaTypeErased::compile<T>();
+        constexpr auto flatSchema = Reflection::SchemaTypeErased::compile<T>();
         sourceTypes               = schema.sourceTypes;
         sinkTypes                 = {flatSchema.typeInfos.values, flatSchema.typeInfos.size};
         sinkNames                 = {flatSchema.typeNames.values, flatSchema.typeNames.size};

@@ -22,18 +22,22 @@ struct SerializerReadWriteFast
         {
             return stream.serializeBytes(&object, sizeof(T));
         }
-        return Reflection::Reflect<T>::visitObject(MemberIterator{stream}, object);
+        else
+        {
+            return Reflection::Reflect<T>::visit(MemberIterator{ stream, object });
+        }
     }
 
   private:
     struct MemberIterator
     {
         BinaryStream& stream;
+        T&            object;
 
         template <typename R, int N>
-        constexpr bool operator()(int /*order*/, const char (&/*name*/)[N], R& field) const
+        constexpr bool operator()(int /*order*/, const char (&/*name*/)[N], R T::*field, size_t /*offset*/) const
         {
-            return SerializerReadWriteFast<BinaryStream, R>::serialize(field, stream);
+            return SerializerReadWriteFast<BinaryStream, R>::serialize(object.*field, stream);
         }
     };
 };
