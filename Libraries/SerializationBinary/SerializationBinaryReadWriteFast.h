@@ -24,7 +24,7 @@ struct SerializerReadWriteFast
         }
         else
         {
-            return Reflection::Reflect<T>::visit(MemberIterator{ stream, object });
+            return Reflection::Reflect<T>::visit(MemberIterator{stream, object});
         }
     }
 
@@ -35,8 +35,9 @@ struct SerializerReadWriteFast
         T&            object;
 
         template <typename R, int N>
-        constexpr bool operator()(int /*order*/, const char (&/*name*/)[N], R T::*field, size_t /*offset*/) const
+        constexpr bool operator()(int /*order*/, R T::*field, const char (&/*name*/)[N], size_t offset = 0) const
         {
+            SC_COMPILER_UNUSED(offset);
             return SerializerReadWriteFast<BinaryStream, R>::serialize(object.*field, stream);
         }
     };

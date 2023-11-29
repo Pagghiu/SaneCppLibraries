@@ -16,6 +16,7 @@ namespace SerializationBinary
 template <typename BinaryStream, typename T, typename SFINAESelector = void>
 struct SerializerReadVersioned;
 
+/// @brief Holds Schema of serialized binary data
 struct VersionSchema
 {
     struct Options
@@ -49,6 +50,7 @@ struct VersionSchema
     }
 };
 
+/// @brief De-serializes binary data with its associated schema into object `T`
 template <typename BinaryStream, typename T, typename SFINAESelector>
 struct SerializerReadVersioned
 {
@@ -93,9 +95,9 @@ struct SerializerReadVersioned
         bool consumedWithSuccess = false;
 
         template <typename R, int N>
-        constexpr bool operator()(int order, const char (&name)[N], R T::*field, size_t /*offset*/)
+        constexpr bool operator()(int order, R T::*field, const char (&)[N], size_t offset = 0)
         {
-            SC_COMPILER_UNUSED(name);
+            SC_COMPILER_UNUSED(offset);
             if (matchOrder == order)
             {
                 consumed = true;

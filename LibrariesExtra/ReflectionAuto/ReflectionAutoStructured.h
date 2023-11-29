@@ -356,7 +356,7 @@ struct DescribeLoopholeVisitor
     {
         R T::*         ptr         = nullptr;
         constexpr auto fieldOffset = AutoStructured::MemberOffsetOf<T, R, Order, NumMembers>();
-        return builder(Order, "", ptr, fieldOffset);
+        return builder(Order, ptr, "", fieldOffset);
     }
 };
 

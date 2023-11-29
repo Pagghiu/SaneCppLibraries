@@ -169,7 +169,7 @@ struct SchemaType
 
     /// @brief Create from a struct member with given name, order and offset
     template <typename R, typename T, int N>
-    [[nodiscard]] static constexpr SchemaType createMember(uint8_t order, const char (&name)[N], R T::*, size_t offset)
+    [[nodiscard]] static constexpr SchemaType createMember(uint8_t order, R T::*, const char (&name)[N], size_t offset)
     {
         const auto info = TypeInfo::MemberInfo(order, static_cast<SC::uint16_t>(offset));
         return {TypeInfo(Reflect<R>::getCategory(), sizeof(R), info), TypeStringView(name, N), &Reflect<R>::build};
@@ -197,10 +197,10 @@ struct SchemaBuilder
     constexpr SchemaBuilder(Type* output, const uint32_t capacity) : currentLinkID(0), types(output, capacity) {}
 
     template <typename R, typename T, int N>
-    [[nodiscard]] constexpr bool operator()(uint8_t order, const char (&name)[N], R T::*field, size_t offset)
+    [[nodiscard]] constexpr bool operator()(uint8_t order, R T::*field, const char (&name)[N], size_t offset = 0)
     {
         currentLinkID++;
-        return types.writeAndAdvance(Type::createMember(order, name, field, offset));
+        return types.writeAndAdvance(Type::createMember(order, field, name, offset));
     }
 
     [[nodiscard]] constexpr bool addType(Type type)

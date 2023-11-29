@@ -48,20 +48,20 @@ namespace Reflection
 template <>
 struct Reflect<TestNamespace::SimpleStructure> : ReflectStruct<TestNamespace::SimpleStructure>
 {
-    template <typename MemberVisitor>
-    static constexpr bool visit(MemberVisitor&& visitor)
+    template <typename Visitor>
+    static constexpr bool visit(Visitor&& visitor)
     {
-        return visitor(0, "f0", &T::f0, SC_COMPILER_OFFSETOF(T, f0)) and //
-               visitor(1, "f1", &T::f1, SC_COMPILER_OFFSETOF(T, f1)) and //
-               visitor(2, "f2", &T::f2, SC_COMPILER_OFFSETOF(T, f2)) and //
-               visitor(3, "f3", &T::f3, SC_COMPILER_OFFSETOF(T, f3)) and //
-               visitor(4, "f4", &T::f4, SC_COMPILER_OFFSETOF(T, f4)) and //
-               visitor(5, "f5", &T::f5, SC_COMPILER_OFFSETOF(T, f5)) and //
-               visitor(6, "f6", &T::f6, SC_COMPILER_OFFSETOF(T, f6)) and //
-               visitor(7, "f7", &T::f7, SC_COMPILER_OFFSETOF(T, f7)) and //
-               visitor(8, "f8", &T::f8, SC_COMPILER_OFFSETOF(T, f8)) and //
-               visitor(9, "f9", &T::f9, SC_COMPILER_OFFSETOF(T, f9)) and //
-               visitor(10, "arrayOfInt", &T::arrayOfInt, SC_COMPILER_OFFSETOF(T, arrayOfInt));
+        return visitor(0, &T::f0, "f0") and //
+               visitor(1, &T::f1, "f1") and //
+               visitor(2, &T::f2, "f2") and //
+               visitor(3, &T::f3, "f3") and //
+               visitor(4, &T::f4, "f4") and //
+               visitor(5, &T::f5, "f5") and //
+               visitor(6, &T::f6, "f6") and //
+               visitor(7, &T::f7, "f7") and //
+               visitor(8, &T::f8, "f8") and //
+               visitor(9, &T::f9, "f9") and //
+               visitor(10, &T::arrayOfInt, "arrayOfInt");
     }
 };
 } // namespace Reflection

@@ -64,6 +64,7 @@ struct ArrayWithSize
     }
 };
 
+/// @brief A writable span of objects
 template <typename Type>
 struct WritableRange
 {

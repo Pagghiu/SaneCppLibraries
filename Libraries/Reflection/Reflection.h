@@ -61,8 +61,8 @@ struct TypeInfo
     /// @brief Holds extended type info for members of struct
     struct MemberInfo
     {
-        uint16_t order;
-        uint16_t offsetInBytes;
+        uint16_t order;         ///< Used for versioned serialization
+        uint16_t offsetInBytes; ///< Used only by SerializationBinaryTypeErased
         constexpr MemberInfo(uint8_t order, uint16_t offsetInBytes) : order(order), offsetInBytes(offsetInBytes) {}
     };
 
@@ -289,7 +289,7 @@ struct ExtendedStructTypeInfo
     }
 
     template <typename R, int N>
-    constexpr bool operator()(int order, const char (&name)[N], R T::*member, size_t offset)
+    constexpr bool operator()(int order, R T::*member, const char (&name)[N], size_t offset = 0)
     {
         SC_COMPILER_UNUSED(order);
         SC_COMPILER_UNUSED(name);
@@ -326,9 +326,8 @@ struct ExtendedTypeInfo
             SC_COMPILER_WARNING_PUSH_OFFSETOF                                                                          \
             return true
 
-/// @brief Describes a single `MEMBER` of structure, giving it an `ORDER` ordinal. Can exist after
-/// `SC_REFLECT_STRUCT_VISIT`.
-#define SC_REFLECT_STRUCT_FIELD(ORDER, MEMBER) and builder(ORDER, #MEMBER, &T::MEMBER, SC_COMPILER_OFFSETOF(T, MEMBER))
+/// @brief Reflect a signle struct `MEMBER` , giving it an `ORDER` ordinal. Can exist after `SC_REFLECT_STRUCT_VISIT`.
+#define SC_REFLECT_STRUCT_FIELD(ORDER, MEMBER) and builder(ORDER, &T::MEMBER, #MEMBER, SC_COMPILER_OFFSETOF(T, MEMBER))
 
 /// @brief Closes `Reflect<StructName>`struct opened by `SC_REFLECT_STRUCT_VISIT`
 #define SC_REFLECT_STRUCT_LEAVE()                                                                                      \

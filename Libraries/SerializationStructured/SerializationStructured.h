@@ -23,9 +23,9 @@ struct SerializerReadWriteFastMemberIterator
     uint32_t index = 0;
 
     template <typename R, int N>
-    constexpr bool operator()(int order, const char (&name)[N], R T::*field, size_t /*offset*/)
+    constexpr bool operator()(int, R T::*field, const char (&name)[N], size_t offset = 0)
     {
-        SC_COMPILER_UNUSED(order);
+        SC_COMPILER_UNUSED(offset);
         const StringView fieldName = StringView(name, N - 1, true, StringEncoding::Ascii);
         SC_TRY(stream.startObjectField(index++, fieldName));
         return SerializationReadWrite<SerializerStream, R>::serialize(0, object.*field, stream);
@@ -45,9 +45,9 @@ struct SerializerReadVersionedMemberIterator
     bool consumedWithSuccess = false;
 
     template <typename R, int N>
-    constexpr bool operator()(int order, const char (&name)[N], R T::*field, size_t /*offset*/)
+    constexpr bool operator()(int, R T::*field, const char (&name)[N], size_t offset = 0)
     {
-        SC_COMPILER_UNUSED(order);
+        SC_COMPILER_UNUSED(offset);
         const StringView fieldName = StringView(name, N - 1, true, StringEncoding::Ascii);
         if (fieldName == fieldToFind)
         {
