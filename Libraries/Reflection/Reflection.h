@@ -289,7 +289,7 @@ struct ExtendedStructTypeInfo
     }
 
     template <typename R, int N>
-    constexpr bool operator()(int order, R T::*member, const char (&name)[N], size_t offset = 0)
+    constexpr bool operator()(int order, R T::*member, const char (&name)[N], size_t offset)
     {
         SC_COMPILER_UNUSED(order);
         SC_COMPILER_UNUSED(name);

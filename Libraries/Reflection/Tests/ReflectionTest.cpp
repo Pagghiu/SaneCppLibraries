@@ -8,7 +8,7 @@
 #include "ReflectionTestPrint.h"
 
 // TODO: Split the Auto reflection tests in ReflectionAuto
-#if SC_META_ENABLE_AUTO_REFLECTION
+#if SC_REFLECT_AUTOMATIC
 #if SC_LANGUAGE_CPP_LESS_THAN_20
 #include "../../../LibrariesExtra/ReflectionAuto/ReflectionAutoAggregates.h"
 #else
@@ -51,17 +51,17 @@ struct Reflect<TestNamespace::SimpleStructure> : ReflectStruct<TestNamespace::Si
     template <typename Visitor>
     static constexpr bool visit(Visitor&& visitor)
     {
-        return visitor(0, &T::f0, "f0") and //
-               visitor(1, &T::f1, "f1") and //
-               visitor(2, &T::f2, "f2") and //
-               visitor(3, &T::f3, "f3") and //
-               visitor(4, &T::f4, "f4") and //
-               visitor(5, &T::f5, "f5") and //
-               visitor(6, &T::f6, "f6") and //
-               visitor(7, &T::f7, "f7") and //
-               visitor(8, &T::f8, "f8") and //
-               visitor(9, &T::f9, "f9") and //
-               visitor(10, &T::arrayOfInt, "arrayOfInt");
+        return visitor(0, &T::f0, "f0", SC_COMPILER_OFFSETOF(T, f0)) and //
+               visitor(1, &T::f1, "f1", SC_COMPILER_OFFSETOF(T, f1)) and //
+               visitor(2, &T::f2, "f2", SC_COMPILER_OFFSETOF(T, f2)) and //
+               visitor(3, &T::f3, "f3", SC_COMPILER_OFFSETOF(T, f3)) and //
+               visitor(4, &T::f4, "f4", SC_COMPILER_OFFSETOF(T, f4)) and //
+               visitor(5, &T::f5, "f5", SC_COMPILER_OFFSETOF(T, f5)) and //
+               visitor(6, &T::f6, "f6", SC_COMPILER_OFFSETOF(T, f6)) and //
+               visitor(7, &T::f7, "f7", SC_COMPILER_OFFSETOF(T, f7)) and //
+               visitor(8, &T::f8, "f8", SC_COMPILER_OFFSETOF(T, f8)) and //
+               visitor(9, &T::f9, "f9", SC_COMPILER_OFFSETOF(T, f9)) and //
+               visitor(10, &T::arrayOfInt, "arrayOfInt", SC_COMPILER_OFFSETOF(T, arrayOfInt));
     }
 };
 } // namespace Reflection
@@ -119,7 +119,7 @@ struct TestNamespace::PackedStructWithArray
     SC::int64_t int64Value    = -13;
 };
 // Fails on GCC and MSVC in C++ 14 mode
-#if !SC_META_ENABLE_AUTO_REFLECTION || !SC_LANGUAGE_CPP_AT_LEAST_20
+#if !SC_REFLECT_AUTOMATIC || !SC_LANGUAGE_CPP_AT_LEAST_20
 SC_REFLECT_STRUCT_VISIT(TestNamespace::PackedStructWithArray)
 SC_REFLECT_STRUCT_FIELD(0, arrayValue)
 SC_REFLECT_STRUCT_FIELD(1, floatValue)
@@ -132,7 +132,7 @@ struct TestNamespace::PackedStruct
     float x = 0.0f, y = 0.0f, z = 0.0f;
 };
 
-#if !SC_META_ENABLE_AUTO_REFLECTION
+#if !SC_REFLECT_AUTOMATIC
 SC_REFLECT_STRUCT_VISIT(TestNamespace::PackedStruct)
 SC_REFLECT_STRUCT_FIELD(0, x)
 SC_REFLECT_STRUCT_FIELD(1, y)
@@ -147,7 +147,7 @@ struct TestNamespace::UnpackedStruct
     float       z = 3;
 };
 
-#if !SC_META_ENABLE_AUTO_REFLECTION
+#if !SC_REFLECT_AUTOMATIC
 SC_REFLECT_STRUCT_VISIT(TestNamespace::UnpackedStruct)
 SC_REFLECT_STRUCT_FIELD(0, x)
 SC_REFLECT_STRUCT_FIELD(1, y)
@@ -159,7 +159,7 @@ struct TestNamespace::NestedUnpackedStruct
 {
     UnpackedStruct unpackedMember;
 };
-#if !SC_META_ENABLE_AUTO_REFLECTION
+#if !SC_REFLECT_AUTOMATIC
 SC_REFLECT_STRUCT_VISIT(TestNamespace::NestedUnpackedStruct)
 SC_REFLECT_STRUCT_FIELD(0, unpackedMember);
 SC_REFLECT_STRUCT_LEAVE()
@@ -170,7 +170,7 @@ struct TestNamespace::StructWithArrayPacked
     PackedStruct packedMember[3];
 };
 // Fails on Clang and GCC in C++ 14 mode
-#if !SC_META_ENABLE_AUTO_REFLECTION || !SC_LANGUAGE_CPP_AT_LEAST_20
+#if !SC_REFLECT_AUTOMATIC || !SC_LANGUAGE_CPP_AT_LEAST_20
 SC_REFLECT_STRUCT_VISIT(TestNamespace::StructWithArrayPacked)
 SC_REFLECT_STRUCT_FIELD(0, packedMember);
 SC_REFLECT_STRUCT_LEAVE()
@@ -180,7 +180,7 @@ struct TestNamespace::StructWithArrayUnpacked
 {
     NestedUnpackedStruct unpackedMember[3];
 };
-#if !SC_META_ENABLE_AUTO_REFLECTION
+#if !SC_REFLECT_AUTOMATIC
 SC_REFLECT_STRUCT_VISIT(TestNamespace::StructWithArrayUnpacked)
 SC_REFLECT_STRUCT_FIELD(0, unpackedMember);
 SC_REFLECT_STRUCT_LEAVE()

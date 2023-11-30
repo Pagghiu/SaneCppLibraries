@@ -23,7 +23,7 @@ struct SerializerReadWriteFastMemberIterator
     uint32_t index = 0;
 
     template <typename R, int N>
-    constexpr bool operator()(int, R T::*field, const char (&name)[N], size_t offset = 0)
+    constexpr bool operator()(int, R T::*field, const char (&name)[N], size_t offset)
     {
         SC_COMPILER_UNUSED(offset);
         const StringView fieldName = StringView(name, N - 1, true, StringEncoding::Ascii);
@@ -45,7 +45,7 @@ struct SerializerReadVersionedMemberIterator
     bool consumedWithSuccess = false;
 
     template <typename R, int N>
-    constexpr bool operator()(int, R T::*field, const char (&name)[N], size_t offset = 0)
+    constexpr bool operator()(int, R T::*field, const char (&name)[N], size_t offset)
     {
         SC_COMPILER_UNUSED(offset);
         const StringView fieldName = StringView(name, N - 1, true, StringEncoding::Ascii);

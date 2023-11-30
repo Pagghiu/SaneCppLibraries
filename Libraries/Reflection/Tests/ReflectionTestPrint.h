@@ -29,7 +29,7 @@ const StringView typeCategoryToStringView(Reflection::TypeCategory type)
     }
     Assert::unreachable();
 }
-// TODO: Move printFlatSchema somewhere else
+
 template <int NUM_TYPES>
 inline void printFlatSchema(Console& console, const Reflection::TypeInfo (&type)[NUM_TYPES],
                             const Reflection::TypeStringView (&names)[NUM_TYPES])

@@ -95,7 +95,7 @@ struct SerializerReadVersioned
         bool consumedWithSuccess = false;
 
         template <typename R, int N>
-        constexpr bool operator()(int order, R T::*field, const char (&)[N], size_t offset = 0)
+        constexpr bool operator()(int order, R T::*field, const char (&)[N], size_t offset)
         {
             SC_COMPILER_UNUSED(offset);
             if (matchOrder == order)
