@@ -24,7 +24,7 @@ struct smallerThan
     /// @param a First element to be tested for `a < b`
     /// @param b Second element to be tested for `a < b`
     /// @return  Returns `true` if `a < b`
-    bool operator()(const T& a, const T& b) { return a < b; }
+    constexpr bool operator()(const T& a, const T& b) { return a < b; }
 };
 
 /// @brief Sorts a range of Iterator according to BinaryPredicate through bubble sort algorithm.
@@ -34,7 +34,7 @@ struct smallerThan
 /// @param last Iterator pointing at last element of the array
 /// @param predicate The given BinaryPredicate
 template <typename Iterator, typename BinaryPredicate = smallerThan<typename RemovePointer<Iterator>::type>>
-void bubbleSort(Iterator first, Iterator last, BinaryPredicate predicate = BinaryPredicate())
+constexpr void bubbleSort(Iterator first, Iterator last, BinaryPredicate predicate = BinaryPredicate())
 {
     if (first >= last)
     {

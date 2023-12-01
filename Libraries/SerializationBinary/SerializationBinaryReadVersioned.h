@@ -21,9 +21,9 @@ struct VersionSchema
 {
     struct Options
     {
-        bool allowFloatToIntTruncation    = true;
-        bool allowDropEccessArrayItems    = true;
-        bool allowDropEccessStructMembers = true;
+        bool allowFloatToIntTruncation    = true; ///< truncate a float to get an integer value
+        bool allowDropEccessArrayItems    = true; ///< drop array items in source data if destination array is smaller
+        bool allowDropEccessStructMembers = true; ///< drop fields that have no matching order in destination structure
     };
     Options options;
 

@@ -190,7 +190,7 @@ struct ReflectPrimitive
 };
 
 // clang-format off
-template <> struct Reflect<char>     : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeUINT8;}};
+template <> struct Reflect<char>     : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeINT8;}};
 template <> struct Reflect<uint8_t>  : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeUINT8;}};
 template <> struct Reflect<uint16_t> : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeUINT16;}};
 template <> struct Reflect<uint32_t> : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeUINT32;}};

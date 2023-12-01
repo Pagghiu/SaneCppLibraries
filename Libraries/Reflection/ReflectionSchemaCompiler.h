@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Algorithms/AlgorithmBubbleSort.h"
 #include "Reflection.h"
 
 namespace SC
@@ -54,6 +55,20 @@ struct SchemaCompiler
                 return false;
             if (not types.values[baseLinkID].typeInfo.setNumberOfChildren(numberOfChildren))
                 return false;
+            
+            struct OrderByMemberOffset
+            {
+                constexpr bool operator()(const Type& a, const Type& b)const
+                {
+                    return a.typeInfo.memberInfo.offsetInBytes < b.typeInfo.memberInfo.offsetInBytes;
+                }
+            };
+            if(types.values[baseLinkID].typeInfo.type == TypeCategory::TypeStruct and
+               types.values[baseLinkID].typeInfo.structInfo.isPacked)
+            {
+                // This is a little help for Binary Serialization, as packed structs end up serialzied as is
+                Algorithms::bubbleSort(types.values + baseLinkID + 1, types.values + baseLinkID + 1 + numberOfChildren, OrderByMemberOffset());
+            }
             types.size += numberOfTypes;
             return true;
         }

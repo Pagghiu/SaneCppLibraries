@@ -8,7 +8,7 @@
 
 namespace SC
 {
-const StringView typeCategoryToStringView(Reflection::TypeCategory type)
+inline const StringView typeCategoryToStringView(Reflection::TypeCategory type)
 {
     switch (type)
     {
