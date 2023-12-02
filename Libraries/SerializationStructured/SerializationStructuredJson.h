@@ -2,7 +2,6 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Result.h"
 #include "../Json/JsonTokenizer.h"
 #include "../Strings/SmallString.h"
 #include "../Strings/StringBuilder.h"
@@ -10,41 +9,47 @@ namespace SC
 {
 namespace SerializationStructured
 {
-struct SerializationJsonWriter;
-struct SerializationJsonReader;
+struct JsonWriter;
+struct JsonReader;
 } // namespace SerializationStructured
 } // namespace SC
 
-struct SC::SerializationStructured::SerializationJsonWriter
+//! @addtogroup group_serialization_structured
+//! @{
+
+/// @brief Writer interface for Serializer that generates output JSON from C++ types.
+/// Its methods are meant to be called by Serializer
+struct SC::SerializationStructured::JsonWriter
 {
+    /// @brief Formatting options
     struct Options
     {
-        uint8_t floatDigits = 2;
+        uint8_t floatDigits = 2; ///< How many digits should be used when printing floating points
     };
 
     StringFormatOutput& output;
 
-    SerializationJsonWriter(StringFormatOutput& output) : output(output) {}
+    JsonWriter(StringFormatOutput& output) : output(output) {}
 
     [[nodiscard]] bool onSerializationStart();
-
     [[nodiscard]] bool onSerializationEnd();
+
     [[nodiscard]] bool setOptions(Options opt);
 
     [[nodiscard]] bool startObject(uint32_t index);
-
     [[nodiscard]] bool endObject();
+
     [[nodiscard]] bool startArray(uint32_t index);
+    [[nodiscard]] bool endArray();
 
     template <typename Container>
     [[nodiscard]] bool startArray(uint32_t index, Container& container, uint32_t& size)
     {
-        SC_TRY(eventuallyAddComma(index));
+        if (not eventuallyAddComma(index))
+            return false;
         size = static_cast<uint32_t>(container.size());
         return output.append("["_a8);
     }
-
-    [[nodiscard]] bool endArray();
 
     template <typename Container>
     [[nodiscard]] bool endArrayItem(Container&, uint32_t&)
@@ -61,7 +66,8 @@ struct SC::SerializationStructured::SerializationJsonWriter
     template <typename T>
     [[nodiscard]] bool serialize(uint32_t index, T value)
     {
-        SC_TRY(eventuallyAddComma(index));
+        if (not eventuallyAddComma(index))
+            return false;
         return StringFormatterFor<T>::format(output, StringView(), value);
     }
 
@@ -72,28 +78,30 @@ struct SC::SerializationStructured::SerializationJsonWriter
     Options         options;
 };
 
-struct SC::SerializationStructured::SerializationJsonReader
+/// @brief Writer interface for Serializer that parses JSON into C++ types.
+/// Its methods are meant to be called by Serializer
+struct SC::SerializationStructured::JsonReader
 {
-    StringView           iteratorText;
-    StringIteratorASCII  iterator;
-    JsonTokenizer::Token token;
-
-    SerializationJsonReader(StringView text) : iteratorText(text), iterator(text.getIterator<StringIteratorASCII>()) {}
+    JsonReader(StringView text) : iteratorText(text), iterator(text.getIterator<StringIteratorASCII>()) {}
 
     [[nodiscard]] bool onSerializationStart() { return true; }
     [[nodiscard]] bool onSerializationEnd() { return true; }
-    [[nodiscard]] bool startObject(uint32_t index);
 
+    [[nodiscard]] bool startObject(uint32_t index);
     [[nodiscard]] bool endObject();
 
     [[nodiscard]] bool startArray(uint32_t index);
+    [[nodiscard]] bool endArray();
 
     template <typename Container>
     [[nodiscard]] bool startArray(uint32_t index, Container& container, uint32_t& size)
     {
-        SC_TRY(eventuallyExpectComma(index));
-        SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::ArrayStart);
+        if (not eventuallyExpectComma(index))
+            return false;
+        if (not JsonTokenizer::tokenizeNext(iterator, token))
+            return false;
+        if (token.getType() != JsonTokenizer::Token::ArrayStart)
+            return false;
         return endArrayItem(container, size);
     }
 
@@ -101,25 +109,31 @@ struct SC::SerializationStructured::SerializationJsonReader
     [[nodiscard]] bool endArrayItem(Container& container, uint32_t& size)
     {
         auto iteratorBackup = iterator;
-        SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
+        if (not JsonTokenizer::tokenizeNext(iterator, token))
+            return false;
         if (token.getType() != JsonTokenizer::Token::ArrayEnd)
         {
             size += 1;
-            SC_TRY(container.resize(size));
+            if (not container.resize(size))
+                return false;
         }
         iterator = iteratorBackup;
         return true;
     }
-
-    [[nodiscard]] bool endArray();
-
-    [[nodiscard]] bool eventuallyExpectComma(uint32_t index);
-
-    [[nodiscard]] bool serialize(uint32_t index, String& text);
 
     [[nodiscard]] bool startObjectField(uint32_t index, StringView text);
     [[nodiscard]] bool getNextField(uint32_t index, StringView& text, bool& hasMore);
 
     [[nodiscard]] bool serialize(uint32_t index, float& value);
     [[nodiscard]] bool serialize(uint32_t index, int32_t& value);
+    [[nodiscard]] bool serialize(uint32_t index, String& text);
+
+  private:
+    [[nodiscard]] bool eventuallyExpectComma(uint32_t index);
+
+    StringView           iteratorText;
+    StringIteratorASCII  iterator;
+    JsonTokenizer::Token token;
 };
+
+//! @}

@@ -2,70 +2,71 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "SerializationStructuredJson.h"
+#include "../Foundation/Result.h"
 
-bool SC::SerializationStructured::SerializationJsonWriter::onSerializationStart()
+bool SC::SerializationStructured::JsonWriter::onSerializationStart()
 {
     output.onFormatBegin();
     return setOptions(options);
 }
 
-bool SC::SerializationStructured::SerializationJsonWriter::onSerializationEnd() { return output.onFormatSucceded(); }
+bool SC::SerializationStructured::JsonWriter::onSerializationEnd() { return output.onFormatSucceded(); }
 
-bool SC::SerializationStructured::SerializationJsonWriter::setOptions(Options opt)
+bool SC::SerializationStructured::JsonWriter::setOptions(Options opt)
 {
     options = opt;
     StringBuilder builder(floatFormat);
     return builder.format(".{}", options.floatDigits);
 }
 
-bool SC::SerializationStructured::SerializationJsonWriter::startObject(uint32_t index)
+bool SC::SerializationStructured::JsonWriter::startObject(uint32_t index)
 {
     SC_TRY(eventuallyAddComma(index));
     return output.append("{"_a8);
 }
 
-bool SC::SerializationStructured::SerializationJsonWriter::endObject() { return output.append("}"_a8); }
+bool SC::SerializationStructured::JsonWriter::endObject() { return output.append("}"_a8); }
 
-bool SC::SerializationStructured::SerializationJsonWriter::startArray(uint32_t index)
+bool SC::SerializationStructured::JsonWriter::startArray(uint32_t index)
 {
     SC_TRY(eventuallyAddComma(index));
     return output.append("["_a8);
 }
 
-bool SC::SerializationStructured::SerializationJsonWriter::endArray() { return output.append("]"_a8); }
+bool SC::SerializationStructured::JsonWriter::endArray() { return output.append("]"_a8); }
 
-bool SC::SerializationStructured::SerializationJsonWriter::startObjectField(uint32_t index, StringView text)
+bool SC::SerializationStructured::JsonWriter::startObjectField(uint32_t index, StringView text)
 {
     SC_TRY(eventuallyAddComma(index));
     // TODO: Escape JSON string
     return output.append("\"") and output.append(text) and output.append("\"") and output.append(":"_a8);
 }
 
-bool SC::SerializationStructured::SerializationJsonWriter::serialize(uint32_t index, const String& value)
+bool SC::SerializationStructured::JsonWriter::serialize(uint32_t index, const String& value)
 {
     SC_TRY(eventuallyAddComma(index));
     // TODO: Escape JSON string
     return output.append("\"") and output.append(value.view()) and output.append("\"");
 }
 
-bool SC::SerializationStructured::SerializationJsonWriter::serialize(uint32_t index, float value)
+bool SC::SerializationStructured::JsonWriter::serialize(uint32_t index, float value)
 {
     SC_TRY(eventuallyAddComma(index));
     return StringFormatterFor<float>::format(output, floatFormat.view(), value);
 }
 
-bool SC::SerializationStructured::SerializationJsonWriter::serialize(uint32_t index, double value)
+bool SC::SerializationStructured::JsonWriter::serialize(uint32_t index, double value)
 {
     SC_TRY(eventuallyAddComma(index));
     return StringFormatterFor<double>::format(output, floatFormat.view(), value);
 }
 
-bool SC::SerializationStructured::SerializationJsonWriter::eventuallyAddComma(uint32_t index)
+bool SC::SerializationStructured::JsonWriter::eventuallyAddComma(uint32_t index)
 {
     return index > 0 ? output.append(",") : true;
 }
 
-bool SC::SerializationStructured::SerializationJsonReader::startObject(uint32_t index)
+bool SC::SerializationStructured::JsonReader::startObject(uint32_t index)
 {
     SC_TRY(eventuallyExpectComma(index));
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
@@ -73,26 +74,26 @@ bool SC::SerializationStructured::SerializationJsonReader::startObject(uint32_t 
     return true;
 }
 
-bool SC::SerializationStructured::SerializationJsonReader::endObject()
+bool SC::SerializationStructured::JsonReader::endObject()
 {
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
     return token.getType() == JsonTokenizer::Token::ObjectEnd;
 }
 
-bool SC::SerializationStructured::SerializationJsonReader::startArray(uint32_t index)
+bool SC::SerializationStructured::JsonReader::startArray(uint32_t index)
 {
     SC_TRY(eventuallyExpectComma(index));
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
     return token.getType() == JsonTokenizer::Token::ArrayStart;
 }
 
-bool SC::SerializationStructured::SerializationJsonReader::endArray()
+bool SC::SerializationStructured::JsonReader::endArray()
 {
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
     return token.getType() == JsonTokenizer::Token::ArrayEnd;
 }
 
-bool SC::SerializationStructured::SerializationJsonReader::eventuallyExpectComma(uint32_t index)
+bool SC::SerializationStructured::JsonReader::eventuallyExpectComma(uint32_t index)
 {
     if (index > 0)
     {
@@ -102,7 +103,7 @@ bool SC::SerializationStructured::SerializationJsonReader::eventuallyExpectComma
     return true;
 }
 
-bool SC::SerializationStructured::SerializationJsonReader::serialize(uint32_t index, String& text)
+bool SC::SerializationStructured::JsonReader::serialize(uint32_t index, String& text)
 {
     SC_COMPILER_UNUSED(text);
     SC_TRY(eventuallyExpectComma(index));
@@ -112,7 +113,7 @@ bool SC::SerializationStructured::SerializationJsonReader::serialize(uint32_t in
     return text.assign(token.getToken(iteratorText));
 }
 
-bool SC::SerializationStructured::SerializationJsonReader::startObjectField(uint32_t index, StringView text)
+bool SC::SerializationStructured::JsonReader::startObjectField(uint32_t index, StringView text)
 {
     SC_TRY(eventuallyExpectComma(index));
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
@@ -121,7 +122,7 @@ bool SC::SerializationStructured::SerializationJsonReader::startObjectField(uint
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
     return token.getType() == JsonTokenizer::Token::Colon;
 }
-bool SC::SerializationStructured::SerializationJsonReader::getNextField(uint32_t index, StringView& text, bool& hasMore)
+bool SC::SerializationStructured::JsonReader::getNextField(uint32_t index, StringView& text, bool& hasMore)
 {
     auto iteratorBackup = iterator;
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
@@ -141,7 +142,7 @@ bool SC::SerializationStructured::SerializationJsonReader::getNextField(uint32_t
     return token.getType() == JsonTokenizer::Token::Colon;
 }
 
-bool SC::SerializationStructured::SerializationJsonReader::serialize(uint32_t index, float& value)
+bool SC::SerializationStructured::JsonReader::serialize(uint32_t index, float& value)
 {
     SC_COMPILER_UNUSED(value);
     SC_TRY(eventuallyExpectComma(index));
@@ -150,7 +151,7 @@ bool SC::SerializationStructured::SerializationJsonReader::serialize(uint32_t in
     return token.getToken(iteratorText).parseFloat(value);
 }
 
-bool SC::SerializationStructured::SerializationJsonReader::serialize(uint32_t index, int32_t& value)
+bool SC::SerializationStructured::JsonReader::serialize(uint32_t index, int32_t& value)
 {
     SC_COMPILER_UNUSED(value);
     SC_TRY(eventuallyExpectComma(index));
