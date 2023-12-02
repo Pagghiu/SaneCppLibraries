@@ -53,11 +53,12 @@ inline int printTypes(StringBuilder& builder, int typeIndex, const Reflection::T
     switch (types[0].type)
     {
     case Reflection::TypeCategory::TypeStruct:
-        builder.append(" (Struct with {} members)", types[0].getNumberOfChildren());
+        builder.append(" (Struct with {} members - Packed = {})", types[0].getNumberOfChildren(),
+                       types[0].structInfo.isPacked ? "true" : "false");
         break;
     case Reflection::TypeCategory::TypeArray:
-        builder.append(" (Array of size {} with {} children)", types[0].arrayInfo.numElements,
-                       types[0].getNumberOfChildren());
+        builder.append(" (Array of size {} with {} children - Packed = {})", types[0].arrayInfo.numElements,
+                       types[0].getNumberOfChildren(), types[0].arrayInfo.isPacked ? "true" : "false");
         break;
     case Reflection::TypeCategory::TypeVector:
         builder.append(" (Vector with {} children)", types[0].getNumberOfChildren());

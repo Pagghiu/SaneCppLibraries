@@ -32,7 +32,7 @@ struct DescribeLoopholeVisitor
     MemberVisitor& builder;
     size_t         currentOffset = 0;
 
-    template <int Order, typename R>
+    template <int MemberTag, typename R>
     constexpr bool visit()
     {
         R T::*ptr = nullptr;
@@ -40,7 +40,7 @@ struct DescribeLoopholeVisitor
         currentOffset          = (currentOffset + alignof(R) - 1) & ~(alignof(R) - 1);
         const auto fieldOffset = currentOffset;
         currentOffset += sizeof(R);
-        return builder(Order, ptr, "", fieldOffset);
+        return builder(MemberTag, ptr, "", fieldOffset);
     }
 };
 

@@ -44,7 +44,7 @@ struct Reflect<SC::Array<T, N>>
 
         // Add Array type
         if (not builder.addType(
-                Type::template createArray<SC::Array<T, N>>("SC::Array<T, N>", 1, TypeInfo::ArrayInfo{N})))
+                Type::template createArray<SC::Array<T, N>>("SC::Array<T, N>", 1, TypeInfo::ArrayInfo{false, N})))
             return false;
 
         // Add dependent item type
@@ -69,7 +69,8 @@ struct Reflect<SC::Vector<T>>
             return false;
 
         // Add Vector type
-        if (not builder.addType(Type::template createArray<SC::Vector<T>>("SC::Vector", 1, TypeInfo::ArrayInfo{0})))
+        if (not builder.addType(
+                Type::template createArray<SC::Vector<T>>("SC::Vector", 1, TypeInfo::ArrayInfo{false, 0})))
             return false;
 
         // Add dependent item type

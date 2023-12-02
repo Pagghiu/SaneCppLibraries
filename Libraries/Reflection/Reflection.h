@@ -61,23 +61,26 @@ struct TypeInfo
     /// @brief Holds extended type info for members of struct
     struct MemberInfo
     {
-        uint16_t order;         ///< Used for versioned serialization
-        uint16_t offsetInBytes; ///< Used only by SerializationBinaryTypeErased
-        constexpr MemberInfo(uint8_t order, uint16_t offsetInBytes) : order(order), offsetInBytes(offsetInBytes) {}
+        uint16_t memberTag;     ///< Used for versioned serialization
+        uint16_t offsetInBytes; ///< Used for signature uniqueness and by SerializationBinaryTypeErased
+        constexpr MemberInfo(uint8_t memberTag, uint16_t offsetInBytes)
+            : memberTag(memberTag), offsetInBytes(offsetInBytes)
+        {}
     };
 
     /// @brief Holds extended type info for structs
     struct StructInfo
     {
         bool isPacked : 1; ///< Ensures no padding (recursively) for the entire span of the struct
-        constexpr StructInfo() : isPacked(false) {}
+        constexpr StructInfo(bool isPacked) : isPacked(isPacked) {}
     };
 
     /// @brief Holds extended type info for array-like types
     struct ArrayInfo
     {
-        uint32_t numElements; ///< Number of elements in the array
-        constexpr ArrayInfo(uint32_t numElements) : numElements(numElements) {}
+        uint32_t isPacked    : 1;  ///< Ensures no padding (recursively) for the entire span of the struct
+        uint32_t numElements : 31; ///< Number of elements in the array
+        constexpr ArrayInfo(bool isPacked, uint32_t numElements) : isPacked(isPacked), numElements(numElements) {}
     };
     union
     {
@@ -228,7 +231,8 @@ struct Reflect<T[N]>
         using Type = typename TypeVisitor::Type;
 
         // Add array type
-        if (not builder.addType(Type::template createArray<T[N]>("Array", 1, TypeInfo::ArrayInfo{N})))
+        constexpr bool isPacked = ExtendedTypeInfo<T>::IsPacked;
+        if (not builder.addType(Type::template createArray<T[N]>("Array", 1, TypeInfo::ArrayInfo{isPacked, N})))
             return false;
 
         // Add dependent item type
@@ -289,9 +293,9 @@ struct ExtendedStructTypeInfo
     }
 
     template <typename R, int N>
-    constexpr bool operator()(int order, R T::*member, const char (&name)[N], size_t offset)
+    constexpr bool operator()(int memberTag, R T::*member, const char (&name)[N], size_t offset)
     {
-        SC_COMPILER_UNUSED(order);
+        SC_COMPILER_UNUSED(memberTag);
         SC_COMPILER_UNUSED(name);
         SC_COMPILER_UNUSED(member);
         SC_COMPILER_UNUSED(offset);
@@ -326,8 +330,10 @@ struct ExtendedTypeInfo
             SC_COMPILER_WARNING_PUSH_OFFSETOF                                                                          \
             return true
 
-/// @brief Reflect a signle struct `MEMBER` , giving it an `ORDER` ordinal. Can exist after `SC_REFLECT_STRUCT_VISIT`.
-#define SC_REFLECT_STRUCT_FIELD(ORDER, MEMBER) and builder(ORDER, &T::MEMBER, #MEMBER, SC_COMPILER_OFFSETOF(T, MEMBER))
+/// @brief Reflect a single struct `MEMBER`, giving it an `MEMBER_TAG` integer. Can exist after
+/// `SC_REFLECT_STRUCT_VISIT`.
+#define SC_REFLECT_STRUCT_FIELD(MEMBER_TAG, MEMBER)                                                                    \
+    and builder(MEMBER_TAG, &T::MEMBER, #MEMBER, SC_COMPILER_OFFSETOF(T, MEMBER))
 
 /// @brief Closes `Reflect<StructName>`struct opened by `SC_REFLECT_STRUCT_VISIT`
 #define SC_REFLECT_STRUCT_LEAVE()                                                                                      \

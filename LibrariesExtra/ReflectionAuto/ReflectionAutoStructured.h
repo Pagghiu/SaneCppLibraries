@@ -351,12 +351,12 @@ struct DescribeLoopholeVisitor
 {
     MemberVisitor& builder;
 
-    template <int Order, typename R>
+    template <int MemberTag, typename R>
     constexpr bool visit()
     {
         R T::*         ptr         = nullptr;
-        constexpr auto fieldOffset = AutoStructured::MemberOffsetOf<T, R, Order, NumMembers>();
-        return builder(Order, ptr, "", fieldOffset);
+        constexpr auto fieldOffset = AutoStructured::MemberOffsetOf<T, R, MemberTag, NumMembers>();
+        return builder(MemberTag, ptr, "", fieldOffset);
     }
 };
 

@@ -55,19 +55,20 @@ struct SchemaCompiler
                 return false;
             if (not types.values[baseLinkID].typeInfo.setNumberOfChildren(numberOfChildren))
                 return false;
-            
+
             struct OrderByMemberOffset
             {
-                constexpr bool operator()(const Type& a, const Type& b)const
+                constexpr bool operator()(const Type& a, const Type& b) const
                 {
                     return a.typeInfo.memberInfo.offsetInBytes < b.typeInfo.memberInfo.offsetInBytes;
                 }
             };
-            if(types.values[baseLinkID].typeInfo.type == TypeCategory::TypeStruct and
-               types.values[baseLinkID].typeInfo.structInfo.isPacked)
+            if (types.values[baseLinkID].typeInfo.type == TypeCategory::TypeStruct and
+                types.values[baseLinkID].typeInfo.structInfo.isPacked)
             {
                 // This is a little help for Binary Serialization, as packed structs end up serialzied as is
-                Algorithms::bubbleSort(types.values + baseLinkID + 1, types.values + baseLinkID + 1 + numberOfChildren, OrderByMemberOffset());
+                Algorithms::bubbleSort(types.values + baseLinkID + 1, types.values + baseLinkID + 1 + numberOfChildren,
+                                       OrderByMemberOffset());
             }
             types.size += numberOfTypes;
             return true;
@@ -177,17 +178,17 @@ struct SchemaType
     template <typename T>
     [[nodiscard]] static constexpr SchemaType createStruct(TypeStringView name = TypeToString<T>::get())
     {
-        TypeInfo::StructInfo structInfo;
-        structInfo.isPacked = ExtendedTypeInfo<T>::IsPacked;
+        TypeInfo::StructInfo structInfo(ExtendedTypeInfo<T>::IsPacked);
         return {TypeInfo(Reflect<T>::getCategory(), sizeof(T), structInfo), name, &Reflect<T>::build};
     }
 
-    /// @brief Create from a struct member with given name, order and offset
+    /// @brief Create from a struct member with given name, memberTag and offset
     template <typename R, typename T, int N>
-    [[nodiscard]] static constexpr SchemaType createMember(uint8_t order, R T::*, const char (&name)[N], size_t offset)
+    [[nodiscard]] static constexpr SchemaType createMember(uint8_t memberTag, R T::*, const char (&name)[N],
+                                                           size_t offset)
     {
-        const auto info = TypeInfo::MemberInfo(order, static_cast<SC::uint16_t>(offset));
-        return {TypeInfo(Reflect<R>::getCategory(), sizeof(R), info), TypeStringView(name, N), &Reflect<R>::build};
+        const auto info = TypeInfo::MemberInfo(memberTag, static_cast<SC::uint16_t>(offset));
+        return {TypeInfo(Reflect<R>::getCategory(), sizeof(R), info), TypeStringView(name, N - 1), &Reflect<R>::build};
     }
 
     /// @brief Create from an array-like type
@@ -212,10 +213,10 @@ struct SchemaBuilder
     constexpr SchemaBuilder(Type* output, const uint32_t capacity) : currentLinkID(0), types(output, capacity) {}
 
     template <typename R, typename T, int N>
-    [[nodiscard]] constexpr bool operator()(uint8_t order, R T::*field, const char (&name)[N], size_t offset)
+    [[nodiscard]] constexpr bool operator()(uint8_t memberTag, R T::*field, const char (&name)[N], size_t offset)
     {
         currentLinkID++;
-        return types.writeAndAdvance(Type::createMember(order, field, name, offset));
+        return types.writeAndAdvance(Type::createMember(memberTag, field, name, offset));
     }
 
     [[nodiscard]] constexpr bool addType(Type type)

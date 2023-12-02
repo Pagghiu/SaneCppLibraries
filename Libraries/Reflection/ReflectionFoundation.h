@@ -105,7 +105,7 @@ struct Sv
     /// @tparam N Number of characters in the string
     /// @param data Pointer to the array of characters
     template <uint32_t N>
-    constexpr Sv(const char (&data)[N]) : data(data), length(N)
+    constexpr Sv(const char (&data)[N]) : data(data), length(N - 1)
     {}
 };
 

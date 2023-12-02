@@ -150,12 +150,12 @@ bool SC::SerializationBinaryTypeErased::SerializerReadVersioned::readStruct()
     for (uint32_t idx = 0; idx < static_cast<uint32_t>(structSourceProperty.getNumberOfChildren()); ++idx)
     {
         sourceTypeIndex        = structSourceTypeIndex + idx + 1;
-        const auto sourceOrder = sourceTypes.data()[sourceTypeIndex].memberInfo.order;
+        const auto sourceOrder = sourceTypes.data()[sourceTypeIndex].memberInfo.memberTag;
         uint32_t   findIdx;
         for (findIdx = 0; findIdx < static_cast<uint32_t>(structSinkProperty.getNumberOfChildren()); ++findIdx)
         {
             const auto typeIndex = structSinkTypeIndex + findIdx + 1;
-            if (sinkTypes.data()[typeIndex].memberInfo.order == sourceOrder)
+            if (sinkTypes.data()[typeIndex].memberInfo.memberTag == sourceOrder)
             {
                 break;
             }

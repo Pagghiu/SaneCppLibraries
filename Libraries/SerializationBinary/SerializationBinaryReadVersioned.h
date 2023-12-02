@@ -21,9 +21,10 @@ struct VersionSchema
 {
     struct Options
     {
-        bool allowFloatToIntTruncation    = true; ///< truncate a float to get an integer value
-        bool allowDropEccessArrayItems    = true; ///< drop array items in source data if destination array is smaller
-        bool allowDropEccessStructMembers = true; ///< drop fields that have no matching order in destination structure
+        bool allowFloatToIntTruncation = true; ///< truncate a float to get an integer value
+        bool allowDropEccessArrayItems = true; ///< drop array items in source data if destination array is smaller
+        bool allowDropEccessStructMembers =
+            true; ///< drop fields that have no matching memberTag in destination structure
     };
     Options options;
 
@@ -63,7 +64,7 @@ struct SerializerReadVersioned
         for (uint32_t idx = 0; idx < numMembers; ++idx)
         {
             schema.sourceTypeIndex = structTypeIndex + idx + 1;
-            MemberIterator visitor = {schema, stream, object, schema.current().memberInfo.order};
+            MemberIterator visitor = {schema, stream, object, schema.current().memberInfo.memberTag};
             schema.resolveLink();
             Reflection::Reflect<T>::visit(visitor);
             if (visitor.consumed)
@@ -90,15 +91,15 @@ struct SerializerReadVersioned
         BinaryStream&  stream;
         T&             object;
 
-        int  matchOrder          = 0;
+        int  matchMemberTag      = 0;
         bool consumed            = false;
         bool consumedWithSuccess = false;
 
         template <typename R, int N>
-        constexpr bool operator()(int order, R T::*field, const char (&)[N], size_t offset)
+        constexpr bool operator()(int memberTag, R T::*field, const char (&)[N], size_t offset)
         {
             SC_COMPILER_UNUSED(offset);
-            if (matchOrder == order)
+            if (matchMemberTag == memberTag)
             {
                 consumed = true;
                 consumedWithSuccess =
