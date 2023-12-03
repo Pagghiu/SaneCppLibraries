@@ -21,7 +21,7 @@ struct SC::PluginTest : public SC::TestCase
     PluginTest(SC::TestReport& report) : TestCase(report, "PluginTest")
     {
         using namespace SC;
-        if (test_section("PluginDefinition"))
+        if (test_section("Plugin::Definition"))
         {
             StringView test =
                 R"(
@@ -33,10 +33,10 @@ struct SC::PluginTest : public SC::TestCase
                 // Dependencies:  TestPluginChild,TestPlugin02
                 // SC_END_PLUGIN
             )";
-            PluginDefinition definition;
-            StringView       extracted;
-            SC_TEST_EXPECT(PluginDefinition::find(test, extracted));
-            SC_TEST_EXPECT(PluginDefinition::parse(extracted, definition));
+            Plugin::Definition definition;
+            StringView         extracted;
+            SC_TEST_EXPECT(Plugin::Definition::find(test, extracted));
+            SC_TEST_EXPECT(Plugin::Definition::parse(extracted, definition));
             SC_TEST_EXPECT(definition.identity.name == "Test Plugin");
             SC_TEST_EXPECT(definition.identity.version == "1");
             SC_TEST_EXPECT(definition.description == "A Simple text plugin");
@@ -44,14 +44,14 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(definition.dependencies[0] == "TestPluginChild");
             SC_TEST_EXPECT(definition.dependencies[1] == "TestPlugin02");
         }
-        if (test_section("PluginScanner/PluginCompiler/PluginRegistry"))
+        if (test_section("PluginScanner/Plugin::Compiler/Plugin::Registry"))
         {
             SC_TEST_EXPECT(Path::join(
                 testPluginsPath, {report.libraryRootDirectory, "Libraries", "Plugin", "Tests", "PluginTestDirectory"}));
 
             // Scan for definitions
-            SmallVector<PluginDefinition, 5> definitions;
-            SC_TEST_EXPECT(PluginScanner::scanDirectory(testPluginsPath.view(), definitions));
+            SmallVector<Plugin::Definition, 5> definitions;
+            SC_TEST_EXPECT(Plugin::Scanner::scanDirectory(testPluginsPath.view(), definitions));
             SC_TEST_EXPECT(definitions.size() == 2);
 
             // Save parent and child plugin identifiers and paths
@@ -67,18 +67,18 @@ struct SC::PluginTest : public SC::TestCase
             const StringView identifierParent = identifierParentString.view();
 
             // Init compiler
-            PluginCompiler compiler;
-            SC_TEST_EXPECT(PluginCompiler::findBestCompiler(compiler));
+            Plugin::Compiler compiler;
+            SC_TEST_EXPECT(Plugin::Compiler::findBestCompiler(compiler));
             SC_TEST_EXPECT(compiler.includePath.assign(Path::dirname(report.libraryRootDirectory, Path::AsNative)));
 
             // Setup registry
-            PluginRegistry registry;
+            Plugin::Registry registry;
             SC_TEST_EXPECT(registry.init(move(definitions)));
             SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, report.executableFile));
 
             // Check that plugins have been compiled and are valid
-            const PluginDynamicLibrary* pluginChild  = registry.findPlugin(identifierChild);
-            const PluginDynamicLibrary* pluginParent = registry.findPlugin(identifierParent);
+            const Plugin::DynamicLibrary* pluginChild  = registry.findPlugin(identifierChild);
+            const Plugin::DynamicLibrary* pluginParent = registry.findPlugin(identifierParent);
             SC_TEST_EXPECT(pluginChild->dynamicLibrary.isValid());
             SC_TEST_EXPECT(pluginParent->dynamicLibrary.isValid());
             using FunctionIsPluginOriginal = bool (*)();
@@ -103,7 +103,7 @@ struct SC::PluginTest : public SC::TestCase
 
             // Reload child plugin
             SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, report.executableFile,
-                                               PluginRegistry::LoadMode::Reload));
+                                               Plugin::Registry::LoadMode::Reload));
 
             // Check child plugin modified
             SC_TEST_EXPECT(pluginChild->dynamicLibrary.isValid());

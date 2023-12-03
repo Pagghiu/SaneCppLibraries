@@ -9,15 +9,18 @@
 
 namespace SC
 {
-struct PluginDefinition;
-struct PluginScanner;
-struct PluginFile;
-struct PluginIdentity;
-struct PluginDynamicLibrary;
-struct PluginCompiler;
-struct PluginRegistry;
-struct PluginNetwork;
-using PluginIdentifier = SmallString<30>;
+namespace Plugin
+{
+struct Definition;
+struct Scanner;
+struct File;
+struct Identity;
+struct DynamicLibrary;
+struct Compiler;
+struct Registry;
+struct Network;
+using Identifier = SmallString<30>;
+} // namespace Plugin
 } // namespace SC
 
 //! @defgroup group_plugin Plugin
@@ -29,42 +32,42 @@ using PluginIdentifier = SmallString<30>;
 //! @{
 
 /// @brief Holds path to a given plugin source file
-struct SC::PluginFile
+struct SC::Plugin::File
 {
     SmallString<255> absolutePath; ///< Absolute path to a plugin source file
 };
 
 /// @brief Represents the unique signature / identity of a Plugin
-struct SC::PluginIdentity
+struct SC::Plugin::Identity
 {
-    PluginIdentifier identifier; ///< Unique string identifying the plugin
-    SmallString<30>  name;       ///< Plugin name
-    SmallString<10>  version;    ///< Plugin version (x.y.z)
+    Identifier      identifier; ///< Unique string identifying the plugin
+    SmallString<30> name;       ///< Plugin name
+    SmallString<10> version;    ///< Plugin version (x.y.z)
 
-    /// @brief Compares two plugins on PluginIdentity::identifier
+    /// @brief Compares two plugins on Identity::identifier
     /// @param other Other plugin to compare
     /// @return `true` if the two plugins share the same identifier
-    bool operator==(const PluginIdentity& other) const { return identifier == other.identifier; }
+    bool operator==(const Identity& other) const { return identifier == other.identifier; }
 };
 
 /// @brief Plugin description, category, dependencies, files and directory location
-struct SC::PluginDefinition
+struct SC::Plugin::Definition
 {
-    PluginIdentity   identity;    ///< Uniquely identifier a plugin
+    Identity         identity;    ///< Uniquely identifier a plugin
     SmallString<255> description; ///< Long description of plugin
     SmallString<10>  category;    ///< Category where plugin belongs to
     SmallString<255> directory;   ///< Path to the directory holding the plugin
 
-    SmallVector<PluginIdentifier, 10> dependencies; ///< Dependencies necessary to load thisp plugin
-    SmallVector<PluginFile, 10>       files;        ///< Source files that compose this plugin
+    SmallVector<Identifier, 10> dependencies; ///< Dependencies necessary to load thisp plugin
+    SmallVector<File, 10>       files;        ///< Source files that compose this plugin
+
+    /// @brief Get main plugin file, holding plugin definition
+    /// @return File holding main plugin definition
+    File& getMainPluginFile() { return files[pluginFileIndex]; }
 
     /// @brief Get main plugin file, holding plugin definition
     /// @return PluginFile holding main plugin definition
-    PluginFile& getMainPluginFile() { return files[pluginFileIndex]; }
-
-    /// @brief Get main plugin file, holding plugin definition
-    /// @return PluginFile holding main plugin definition
-    const PluginFile& getMainPluginFile() const { return files[pluginFileIndex]; }
+    const File& getMainPluginFile() const { return files[pluginFileIndex]; }
 
     /// @brief Extracts the plugin definition (SC_BEGIN_PLUGIN / SC_END_PLUGIN) comment from a .cpp file
     /// @param[in] text Content of .cpp file where to look for plugin definition
@@ -76,7 +79,7 @@ struct SC::PluginDefinition
     /// @param[in] text An extracted plugin definition text (`extracted` of PluginDefinition::find)
     /// @param[out] pluginDefinition A valid PluginDefinition parsed from the given text
     /// @return `true` if the plugin definition can be parsed successfully
-    [[nodiscard]] static bool parse(StringView text, PluginDefinition& pluginDefinition);
+    [[nodiscard]] static bool parse(StringView text, Definition& pluginDefinition);
 
     /// @brief Gets absolute path of where compiled dynamic library will exist after plugin is compiled
     /// @param fullDynamicPath absolute path of where compiled dynamic library from plugin
@@ -90,33 +93,34 @@ struct SC::PluginDefinition
 
   private:
     [[nodiscard]] static bool parseLine(StringIteratorASCII& iterator, StringView& key, StringView& value);
-    size_t                    pluginFileIndex = 0;
-    friend struct PluginScanner;
+
+    size_t pluginFileIndex = 0;
+    friend struct Scanner;
 };
 
 /// @brief Scans a directory for PluginDefinition
-struct SC::PluginScanner
+struct SC::Plugin::Scanner
 {
     /// @brief Scans a directory for PluginDefinition
     /// @param directory Root directory holding plugins (will recurse in subdirectories)
     /// @param definitions Parsed definitions
     /// @return Valid result if the given directory is accessible and valid PluginDefinition can be parsed
-    [[nodiscard]] static Result scanDirectory(const StringView directory, Vector<PluginDefinition>& definitions);
+    [[nodiscard]] static Result scanDirectory(const StringView directory, Vector<Definition>& definitions);
 };
 
 /// @brief Compiles a plugin to a dynamic library
-struct SC::PluginCompiler
+struct SC::Plugin::Compiler
 {
-    /// @brief Compiles a PluginDefinition to an object file
-    /// @param definition A valid PluginDefinition parsed by PluginDefinition::parse
+    /// @brief Compiles a Definition to an object file
+    /// @param definition A valid Definition parsed by Definition::parse
     /// @return Valid result if all files of given definition can be compiled to valid object files
-    Result compile(const PluginDefinition& definition) const;
+    Result compile(const Definition& definition) const;
 
-    /// @brief Links a PluginDefinition into a dynamic library, with symbols from `executablePath`
-    /// @param definition A valid PluginDefinition already compiled with PluginCompiler::compile
+    /// @brief Links a Definition into a dynamic library, with symbols from `executablePath`
+    /// @param definition A valid Definition already compiled with PluginCompiler::compile
     /// @param executablePath Path to the executable loading the given plugin, exposing symbols used by Plugin
-    /// @return Valid result if the PluginDefinition can be compiled to a dynamic library linking executablePath
-    Result link(const PluginDefinition& definition, StringView executablePath) const;
+    /// @return Valid result if the Definition can be compiled to a dynamic library linking executablePath
+    Result link(const Definition& definition, StringView executablePath) const;
 
     /// @brief Compiler type (clang/gcc/msvc)
     enum class Type
@@ -140,34 +144,34 @@ struct SC::PluginCompiler
     /// @brief Look for best compiler on current system
     /// @param[out] compiler Best compiler found
     /// @return Valid Result if best compiler has been found
-    [[nodiscard]] static Result findBestCompiler(PluginCompiler& compiler);
+    [[nodiscard]] static Result findBestCompiler(Compiler& compiler);
 
   private:
     struct Internal;
 };
 
-/// @brief A plugin dynamic library loaded from a SC::PluginRegistry
-struct SC::PluginDynamicLibrary
+/// @brief A plugin dynamic library loaded from a SC::Plugin::Registry
+struct SC::Plugin::DynamicLibrary
 {
-    PluginDefinition     definition;     ///< Definition of the loaded plugin
+    Definition           definition;     ///< Definition of the loaded plugin
     SystemDynamicLibrary dynamicLibrary; ///< System handle of plugin's dynamic libray
   private:
     void* instance                      = nullptr;
     bool (*pluginInit)(void*& instance) = nullptr;
     bool (*pluginClose)(void* instance) = nullptr;
 
-    friend struct PluginRegistry;
-    [[nodiscard]] Result load(const PluginCompiler& compiler, StringView executablePath);
+    friend struct Registry;
+    [[nodiscard]] Result load(const Compiler& compiler, StringView executablePath);
     [[nodiscard]] Result unload();
 };
 
 /// @brief Holds a registry of plugins, loading and compiling them on the fly
-struct SC::PluginRegistry
+struct SC::Plugin::Registry
 {
     /// @brief Inits the Registry with found plugins
     /// @param definitions found plugin definitions
     /// @return Valid Result if the given definitions can be added to the libraries registry
-    [[nodiscard]] Result init(Vector<PluginDefinition>&& definitions);
+    [[nodiscard]] Result init(Vector<Definition>&& definitions);
 
     /// @brief Instructs loadPlugin to Load or Reload the plugin
     enum class LoadMode
@@ -182,8 +186,8 @@ struct SC::PluginRegistry
     /// @param executablePath The loader executable path holding symbols used by the plugin
     /// @param loadMode If to load or force reload of the plugin
     /// @return Valid Result if the plugin has been found, compiled, loaded and inited successfully
-    [[nodiscard]] Result loadPlugin(const StringView identifier, const PluginCompiler& compiler,
-                                    StringView executablePath, LoadMode loadMode = LoadMode::Load);
+    [[nodiscard]] Result loadPlugin(const StringView identifier, const Compiler& compiler, StringView executablePath,
+                                    LoadMode loadMode = LoadMode::Load);
 
     /// @brief Unloads an already loaded plugin by its identifier
     /// @param identifier Identifier of a plugin that must be unloaded
@@ -198,10 +202,10 @@ struct SC::PluginRegistry
     /// @brief Find a PluginDynamicLibrary in the registry with a given identifier
     /// @param identifier Identifier of the Plugin to find
     /// @return Pointer to the found PluginDynamicLibrary if found (or `nullptr`)
-    [[nodiscard]] const PluginDynamicLibrary* findPlugin(const StringView identifier);
+    [[nodiscard]] const DynamicLibrary* findPlugin(const StringView identifier);
 
   private:
-    VectorMap<PluginIdentifier, PluginDynamicLibrary> libraries;
+    VectorMap<Identifier, DynamicLibrary> libraries;
 };
 
 //! @}
