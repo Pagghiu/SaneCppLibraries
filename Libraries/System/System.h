@@ -9,7 +9,6 @@
 namespace SC
 {
 struct SystemDirectories;
-struct SystemFunctions;
 struct SystemDynamicLibrary;
 namespace detail
 {
@@ -56,7 +55,6 @@ struct SC::SystemDynamicLibrary : public SC::UniqueHandle<SC::detail::SystemDyna
     Result loadSymbol(StringView symbolName, void*& symbol) const;
 };
 
-
 /// @brief Reports location of system directories (executable / application root)
 struct SC::SystemDirectories
 {
@@ -76,32 +74,6 @@ struct SC::SystemDirectories
 
     SmallString<StaticPathSize> executableFile;
     SmallString<StaticPathSize> applicationRootDirectory;
-};
-
-/// @brief Initializes global libraries needed by the process (mainly Winsock2 WSAStartup)
-struct SC::SystemFunctions
-{
-    SystemFunctions() = default;
-    ~SystemFunctions();
-
-    /// @brief Initializes Winsock2 on Windows (WSAStartup)
-    /// @return Valid Result if Winsock2 has been successfully initialized
-    [[nodiscard]] Result initNetworking();
-
-    /// @brief Shutdowns Winsock2 on Windows (WSAStartup)
-    /// @return Valid Result if Winsock2 has been successfully shutdown
-    [[nodiscard]] Result shutdownNetworking();
-
-    /// @brief Check if initNetworking has been previously called
-    /// @return `true` if initNetworking has been previously called
-    [[nodiscard]] static bool isNetworkingInited();
-
-  private:
-    struct Internal;
-    SystemFunctions(const SystemFunctions&)            = delete;
-    SystemFunctions& operator=(const SystemFunctions&) = delete;
-    SystemFunctions(SystemFunctions&&)                 = delete;
-    SystemFunctions& operator=(SystemFunctions&&)      = delete;
 };
 
 //! @}

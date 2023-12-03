@@ -19,6 +19,7 @@ namespace SC
 struct SocketDescriptor;
 struct SocketFlags;
 struct SocketIPAddress;
+struct WindowsNetworking;
 namespace detail
 {
 struct SocketDescriptorDefinition;
@@ -258,4 +259,29 @@ struct SC::DNSResolver
     [[nodiscard]] static Result resolve(StringView host, String& ipAddress);
 };
 
+/// @brief Initializes global libraries needed by the process (mainly Winsock2 WSAStartup)
+struct SC::WindowsNetworking
+{
+    WindowsNetworking() = default;
+    ~WindowsNetworking();
+
+    /// @brief Initializes Winsock2 on Windows (WSAStartup)
+    /// @return Valid Result if Winsock2 has been successfully initialized
+    [[nodiscard]] Result initNetworking();
+
+    /// @brief Shutdowns Winsock2 on Windows (WSAStartup)
+    /// @return Valid Result if Winsock2 has been successfully shutdown
+    [[nodiscard]] Result shutdownNetworking();
+
+    /// @brief Check if initNetworking has been previously called
+    /// @return `true` if initNetworking has been previously called
+    [[nodiscard]] static bool isNetworkingInited();
+
+  private:
+    struct Internal;
+    WindowsNetworking(const WindowsNetworking&)            = delete;
+    WindowsNetworking& operator=(const WindowsNetworking&) = delete;
+    WindowsNetworking(WindowsNetworking&&)                 = delete;
+    WindowsNetworking& operator=(WindowsNetworking&&)      = delete;
+};
 //! @}

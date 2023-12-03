@@ -20,7 +20,12 @@ using socklen_t = int;
 #include <arpa/inet.h>  // inet_pton
 #include <sys/select.h> // fd_set for emscripten
 
+SC::Result SC::WindowsNetworking::initNetworking() { return Result(true); }
+SC::Result SC::WindowsNetworking::shutdownNetworking() { return Result(true); }
+bool       SC::WindowsNetworking::isNetworkingInited() { return Result(true); }
 #endif
+
+SC::WindowsNetworking::~WindowsNetworking() { SC_TRUST_RESULT(shutdownNetworking()); }
 
 namespace SC
 {
@@ -111,7 +116,7 @@ SC::Result SC::SocketServer::close() { return socket.close(); }
 
 SC::Result SC::SocketServer::listen(SocketIPAddress nativeAddress, uint32_t numberOfWaitingConnections)
 {
-    SC_TRY(SystemFunctions::isNetworkingInited());
+    SC_TRY(WindowsNetworking::isNetworkingInited());
     SC_TRY_MSG(socket.isValid(), "Invalid socket");
     SocketDescriptor::Handle listenSocket;
     SC_TRUST_RESULT(socket.get(listenSocket, Result::Error("invalid listen socket")));
@@ -165,7 +170,7 @@ SC::Result SC::SocketClient::connect(StringView address, uint16_t port)
 
 SC::Result SC::SocketClient::connect(SocketIPAddress ipAddress)
 {
-    SC_TRY(SystemFunctions::isNetworkingInited());
+    SC_TRY(WindowsNetworking::isNetworkingInited());
     SocketDescriptor::Handle openedSocket;
     SC_TRUST_RESULT(socket.get(openedSocket, Result::Error("invalid connect socket")));
     socklen_t nativeSize = ipAddress.sizeOfHandle();

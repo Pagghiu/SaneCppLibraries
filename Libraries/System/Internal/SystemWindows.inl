@@ -88,37 +88,3 @@ bool SC::SystemDirectories::init()
     applicationRootDirectory = Path::dirname(executableFile.view(), Path::AsWindows);
     return Result(true);
 }
-
-struct SC::SystemFunctions::Internal
-{
-    Atomic<bool> networkingInited = false;
-
-    static Internal& get()
-    {
-        static Internal internal;
-        return internal;
-    }
-};
-
-bool SC::SystemFunctions::isNetworkingInited() { return Internal::get().networkingInited.load(); }
-
-SC::Result SC::SystemFunctions::initNetworking()
-{
-    if (isNetworkingInited() == false)
-    {
-        WSADATA wsa;
-        if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
-        {
-            return Result::Error("WSAStartup failed");
-        }
-        Internal::get().networkingInited.exchange(true);
-    }
-    return Result(true);
-}
-
-SC::Result SC::SystemFunctions::shutdownNetworking()
-{
-    WSACleanup();
-    Internal::get().networkingInited.exchange(false);
-    return Result(true);
-}

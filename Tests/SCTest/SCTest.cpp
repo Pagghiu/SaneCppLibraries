@@ -84,6 +84,7 @@ void runDebugVisualizersTest(TestReport& report);
 
 #include "../../Libraries/Containers/SmallVector.h"
 #include "../../Libraries/FileSystem/Path.h"
+#include "../../Libraries/Socket/SocketDescriptor.h"
 #include "../../Libraries/System/Console.h"
 #include "../../Libraries/System/System.h"
 #include "../../Libraries/Testing/Testing.h"
@@ -97,8 +98,8 @@ int main(int argc, const char* argv[])
     SystemDirectories directories;
     if (not directories.init())
         return -2;
-    SystemFunctions functions;
-    if (not functions.initNetworking())
+    WindowsNetworking winsocket;
+    if (not winsocket.initNetworking())
         return -3;
     Console    console(globalConsoleConversionBuffer);
     TestReport report(console, argc, argv);

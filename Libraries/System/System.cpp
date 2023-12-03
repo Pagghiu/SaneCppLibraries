@@ -12,11 +12,3 @@
 #include "Internal/SystemApple.inl"
 #include "Internal/SystemPosix.inl"
 #endif
-
-#if !SC_PLATFORM_WINDOWS
-SC::Result SC::SystemFunctions::initNetworking() { return Result(true); }
-SC::Result SC::SystemFunctions::shutdownNetworking() { return Result(true); }
-bool       SC::SystemFunctions::isNetworkingInited() { return Result(true); }
-#endif
-
-SC::SystemFunctions::~SystemFunctions() { SC_TRUST_RESULT(shutdownNetworking()); }

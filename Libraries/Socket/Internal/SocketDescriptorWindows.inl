@@ -9,6 +9,7 @@ using socklen_t = int;
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+#include "../../Threading/Atomic.h"
 #include "../SocketDescriptor.h"
 
 SC::Result SC::detail::SocketDescriptorDefinition::releaseHandle(Handle& handle)
@@ -50,7 +51,7 @@ SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily
                                         SocketFlags::ProtocolType protocol, SocketFlags::BlockingType blocking,
                                         SocketFlags::InheritableType inheritable)
 {
-    SC_TRY(SystemFunctions::isNetworkingInited());
+    SC_TRY(WindowsNetworking::isNetworkingInited());
     SC_TRUST_RESULT(close());
 
     DWORD flags = WSA_FLAG_OVERLAPPED;
@@ -66,4 +67,38 @@ SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily
     }
     SC_TRY(setBlocking(blocking == SocketFlags::Blocking));
     return Result(isValid());
+}
+
+struct SC::WindowsNetworking::Internal
+{
+    Atomic<bool> networkingInited = false;
+
+    static Internal& get()
+    {
+        static Internal internal;
+        return internal;
+    }
+};
+
+bool SC::WindowsNetworking::isNetworkingInited() { return Internal::get().networkingInited.load(); }
+
+SC::Result SC::WindowsNetworking::initNetworking()
+{
+    if (isNetworkingInited() == false)
+    {
+        WSADATA wsa;
+        if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+        {
+            return Result::Error("WSAStartup failed");
+        }
+        Internal::get().networkingInited.exchange(true);
+    }
+    return Result(true);
+}
+
+SC::Result SC::WindowsNetworking::shutdownNetworking()
+{
+    WSACleanup();
+    Internal::get().networkingInited.exchange(false);
+    return Result(true);
 }

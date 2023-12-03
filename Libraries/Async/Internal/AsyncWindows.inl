@@ -13,7 +13,7 @@
 
 #include "AsyncWindowsAPI.h"
 
-#include "../../System/System.h" // SystemFunctions
+#include "../../System/System.h" // WindowsNetworking
 
 #if SC_COMPILER_MSVC
 // Not sure why on MSVC we don't get on Level 4 warnings for missing switch cases
@@ -283,7 +283,7 @@ struct SC::Async::EventLoop::KernelQueue
     // Socket ACCEPT
     [[nodiscard]] static Result setupAsync(Async::SocketAccept& async)
     {
-        SC_TRY(SystemFunctions::isNetworkingInited());
+        SC_TRY(WindowsNetworking::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return Result(true);
     }
@@ -360,7 +360,7 @@ struct SC::Async::EventLoop::KernelQueue
     // Socket CONNECT
     [[nodiscard]] static Result setupAsync(Async::SocketConnect& async)
     {
-        SC_TRY(SystemFunctions::isNetworkingInited());
+        SC_TRY(WindowsNetworking::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return Result(true);
     }
@@ -423,7 +423,7 @@ struct SC::Async::EventLoop::KernelQueue
     // Socket SEND
     [[nodiscard]] static Result setupAsync(Async::SocketSend& async)
     {
-        SC_TRY(SystemFunctions::isNetworkingInited());
+        SC_TRY(WindowsNetworking::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return Result(true);
     }
@@ -459,7 +459,7 @@ struct SC::Async::EventLoop::KernelQueue
     // Socket RECEIVE
     [[nodiscard]] static Result setupAsync(Async::SocketReceive& async)
     {
-        SC_TRY(SystemFunctions::isNetworkingInited());
+        SC_TRY(WindowsNetworking::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return Result(true);
     }
