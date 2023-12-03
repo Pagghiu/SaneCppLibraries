@@ -12,7 +12,7 @@ struct HttpClient;
 
 struct SC::HttpClient
 {
-    [[nodiscard]] Result get(EventLoop& loop, StringView url);
+    [[nodiscard]] Result get(Async::EventLoop& loop, StringView url);
 
     Delegate<HttpClient&> callback;
 
@@ -23,18 +23,18 @@ struct SC::HttpClient
     }
 
   private:
-    void onConnected(AsyncSocketConnect::Result& result);
-    void onAfterSend(AsyncSocketSend::Result& result);
-    void onAfterRead(AsyncSocketReceive::Result& result);
+    void onConnected(Async::SocketConnect::Result& result);
+    void onAfterSend(Async::SocketSend::Result& result);
+    void onAfterRead(Async::SocketReceive::Result& result);
 
     SmallVector<char, 1024> content;
 
     String customDebugName;
 
     // TODO: can we find a way to putt all asyncs in a single tagged union when they're not used in parallel?
-    AsyncSocketConnect connectAsync;
-    AsyncSocketSend    sendAsync;
-    AsyncSocketReceive receiveAsync;
-    SocketDescriptor   clientSocket;
-    EventLoop*         eventLoop = nullptr;
+    Async::SocketConnect connectAsync;
+    Async::SocketSend    sendAsync;
+    Async::SocketReceive receiveAsync;
+    SocketDescriptor     clientSocket;
+    Async::EventLoop*    eventLoop = nullptr;
 };

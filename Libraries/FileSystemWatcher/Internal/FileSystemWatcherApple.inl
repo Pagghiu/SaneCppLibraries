@@ -334,7 +334,7 @@ struct SC::FileSystemWatcher::Internal
         }
     }
 
-    void onMainLoop(AsyncLoopWakeUp::Result& result)
+    void onMainLoop(Async::LoopWakeUp::Result& result)
     {
         watcher->notifyCallback(notification);
         result.reactivateRequest(true);

@@ -107,7 +107,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
     {
         if (test_section("EventLoop"))
         {
-            EventLoop eventLoop;
+            Async::EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
             FileSystemWatcher fileEventsWatcher;
@@ -182,7 +182,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
     {
         if (test_section("EventLoop interrupt"))
         {
-            EventLoop eventLoop;
+            Async::EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
             FileSystemWatcher fileEventsWatcher;
@@ -213,7 +213,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
     {
         if (test_section("EventLoop watch/unwatch"))
         {
-            EventLoop eventLoop;
+            Async::EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
             FileSystemWatcher                  fileEventsWatcher;

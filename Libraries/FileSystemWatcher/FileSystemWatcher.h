@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 
-#include "../Async/Async.h" // AsyncLoopWakeUp
+#include "../Async/Async.h" // Async::LoopWakeUp
 #include "../Containers/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/OpaqueObject.h"
@@ -48,7 +48,7 @@ struct SC::FileSystemWatcher
         static constexpr int MaxChangesBufferSize = 1024;
 #if SC_PLATFORM_WINDOWS
         static constexpr int Windows =
-            MaxChangesBufferSize + sizeof(void*) + sizeof(FileDescriptor) + sizeof(AsyncWindowsPoll);
+            MaxChangesBufferSize + sizeof(void*) + sizeof(FileDescriptor) + sizeof(Async::WindowsPoll);
 #else
         static constexpr int Windows = 0;
 #endif
@@ -128,14 +128,14 @@ struct SC::FileSystemWatcher
     /// @brief Support object to allow user holding memory for needed resources for async mode
     struct EventLoopRunner
     {
-        EventLoop& eventLoop;
-        EventLoopRunner(EventLoop& eventLoop) : eventLoop(eventLoop) {}
+        Async::EventLoop& eventLoop;
+        EventLoopRunner(Async::EventLoop& eventLoop) : eventLoop(eventLoop) {}
 
       private:
         friend struct FileSystemWatcher;
 #if SC_PLATFORM_APPLE
-        AsyncLoopWakeUp eventLoopAsync = {};
-        EventObject     eventObject    = {};
+        Async::LoopWakeUp eventLoopAsync = {};
+        EventObject       eventObject    = {};
 #endif
     };
 

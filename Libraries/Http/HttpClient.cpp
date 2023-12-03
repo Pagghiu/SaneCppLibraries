@@ -8,7 +8,7 @@
 #include "../Strings/SmallString.h"
 #include "../Strings/StringBuilder.h"
 
-SC::Result SC::HttpClient::get(EventLoop& loop, StringView url)
+SC::Result SC::HttpClient::get(Async::EventLoop& loop, StringView url)
 {
     eventLoop = &loop;
 
@@ -41,7 +41,7 @@ SC::StringView SC::HttpClient::getResponse() const
     return StringView(content.data(), content.size(), false, StringEncoding::Ascii);
 }
 
-void SC::HttpClient::onConnected(AsyncSocketConnect::Result& result)
+void SC::HttpClient::onConnected(Async::SocketConnect::Result& result)
 {
     SC_COMPILER_UNUSED(result);
     const char* dbgName =
@@ -56,7 +56,7 @@ void SC::HttpClient::onConnected(AsyncSocketConnect::Result& result)
     }
 }
 
-void SC::HttpClient::onAfterSend(AsyncSocketSend::Result& result)
+void SC::HttpClient::onAfterSend(Async::SocketSend::Result& result)
 {
     SC_COMPILER_UNUSED(result);
     SC_ASSERT_RELEASE(content.resizeWithoutInitializing(content.capacity()));
@@ -73,7 +73,7 @@ void SC::HttpClient::onAfterSend(AsyncSocketSend::Result& result)
     }
 }
 
-void SC::HttpClient::onAfterRead(AsyncSocketReceive::Result& result)
+void SC::HttpClient::onAfterRead(Async::SocketReceive::Result& result)
 {
     SC_COMPILER_UNUSED(result);
     SC_ASSERT_RELEASE(SocketClient(clientSocket).close());

@@ -35,20 +35,20 @@ struct SC::AsyncTest : public SC::TestCase
         // TODO: Add EventLoop::resetTimeout
         if (test_section("loop timeout"))
         {
-            AsyncLoopTimeout timeout1, timeout2;
-            EventLoop        eventLoop;
+            Async::LoopTimeout timeout1, timeout2;
+            Async::EventLoop   eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
             int timeout1Called = 0;
             int timeout2Called = 0;
-            timeout1.callback  = [&](AsyncLoopTimeout::Result& res)
+            timeout1.callback  = [&](Async::LoopTimeout::Result& res)
             {
                 SC_TEST_EXPECT(res.async.getTimeout().ms == 1);
                 timeout1Called++;
             };
             SC_TEST_EXPECT(timeout1.start(eventLoop, 1_ms));
-            timeout2.callback = [&](AsyncLoopTimeout::Result&)
+            timeout2.callback = [&](Async::LoopTimeout::Result&)
             {
-                // TODO: investigate allowing dropping AsyncResultBase
+                // TODO: investigate allowing dropping Async::ResultBase
                 timeout2Called++;
             };
             SC_TEST_EXPECT(timeout2.start(eventLoop, 100_ms));
@@ -65,7 +65,7 @@ struct SC::AsyncTest : public SC::TestCase
     {
         if (test_section("loop wakeUpFromExternalThread"))
         {
-            EventLoop eventLoop;
+            Async::EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
             Thread newThread;
             threadWasCalled = 0;
@@ -98,19 +98,19 @@ struct SC::AsyncTest : public SC::TestCase
             wakeUp1Called   = 0;
             wakeUp2Called   = 0;
             wakeUp1ThreadID = 0;
-            EventLoop eventLoop;
+            Async::EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
-            AsyncLoopWakeUp wakeUp1;
-            AsyncLoopWakeUp wakeUp2;
+            Async::LoopWakeUp wakeUp1;
+            Async::LoopWakeUp wakeUp2;
 
-            wakeUp1.callback = [this](AsyncLoopWakeUp::Result& res)
+            wakeUp1.callback = [this](Async::LoopWakeUp::Result& res)
             {
                 wakeUp1ThreadID = Thread::CurrentThreadID();
                 wakeUp1Called++;
                 SC_TEST_EXPECT(res.async.stop());
             };
             SC_TEST_EXPECT(wakeUp1.start(eventLoop));
-            wakeUp2.callback = [&](AsyncLoopWakeUp::Result& res)
+            wakeUp2.callback = [&](Async::LoopWakeUp::Result& res)
             {
                 wakeUp2Called++;
                 SC_TEST_EXPECT(res.async.stop());
@@ -149,11 +149,11 @@ struct SC::AsyncTest : public SC::TestCase
 
             uint64_t callbackThreadID = 0;
 
-            EventLoop eventLoop;
+            Async::EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
-            AsyncLoopWakeUp wakeUp;
+            Async::LoopWakeUp wakeUp;
 
-            wakeUp.callback = [&](AsyncLoopWakeUp::Result&)
+            wakeUp.callback = [&](Async::LoopWakeUp::Result&)
             {
                 callbackThreadID = Thread::CurrentThreadID();
                 params.notifier1Called++;
@@ -182,7 +182,7 @@ struct SC::AsyncTest : public SC::TestCase
     {
         if (test_section("socket accept"))
         {
-            EventLoop eventLoop;
+            Async::EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
             constexpr uint32_t numWaitingConnections = 2;
@@ -195,8 +195,8 @@ struct SC::AsyncTest : public SC::TestCase
 
             acceptedCount = 0;
 
-            AsyncSocketAccept accept;
-            accept.callback = [this](AsyncSocketAccept::Result& res)
+            Async::SocketAccept accept;
+            accept.callback = [this](Async::SocketAccept::Result& res)
             {
                 SC_TEST_EXPECT(res.moveTo(acceptedClient[acceptedCount]));
                 acceptedCount++;
@@ -241,7 +241,7 @@ struct SC::AsyncTest : public SC::TestCase
     {
         if (test_section("socket connect"))
         {
-            EventLoop eventLoop;
+            Async::EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
             SocketDescriptor serverSocket;
@@ -254,8 +254,8 @@ struct SC::AsyncTest : public SC::TestCase
 
             acceptedCount = 0;
 
-            AsyncSocketAccept accept;
-            accept.callback = [&](AsyncSocketAccept::Result& res)
+            Async::SocketAccept accept;
+            accept.callback = [&](Async::SocketAccept::Result& res)
             {
                 SC_TEST_EXPECT(res.moveTo(acceptedClient[acceptedCount]));
                 acceptedCount++;
@@ -267,12 +267,12 @@ struct SC::AsyncTest : public SC::TestCase
 
             SC_TEST_EXPECT(localHost.fromAddressPort(connectAddress, tcpPort));
 
-            AsyncSocketConnect connect[2];
-            SocketDescriptor   clients[2];
+            Async::SocketConnect connect[2];
+            SocketDescriptor     clients[2];
 
             SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), clients[0]));
             int connectedCount  = 0;
-            connect[0].callback = [&](AsyncSocketConnect::Result& res)
+            connect[0].callback = [&](Async::SocketConnect::Result& res)
             {
                 connectedCount++;
                 SC_TEST_EXPECT(res.isValid());
@@ -292,9 +292,9 @@ struct SC::AsyncTest : public SC::TestCase
             char       receiveBuffer[1] = {0};
             Span<char> receiveData      = {receiveBuffer, sizeof(receiveBuffer)};
 
-            AsyncSocketReceive receiveAsync;
-            int                receiveCalls = 0;
-            receiveAsync.callback           = [&](AsyncSocketReceive::Result& res)
+            Async::SocketReceive receiveAsync;
+            int                  receiveCalls = 0;
+            receiveAsync.callback             = [&](Async::SocketReceive::Result& res)
             {
                 Span<char> readData;
                 SC_TEST_EXPECT(res.moveTo(readData));
@@ -309,7 +309,7 @@ struct SC::AsyncTest : public SC::TestCase
         }
     }
 
-    void createAndAssociateAsyncClientServerConnections(EventLoop& eventLoop, SocketDescriptor& client,
+    void createAndAssociateAsyncClientServerConnections(Async::EventLoop& eventLoop, SocketDescriptor& client,
                                                         SocketDescriptor& serverSideClient)
     {
         SocketDescriptor serverSocket;
@@ -333,7 +333,7 @@ struct SC::AsyncTest : public SC::TestCase
     {
         if (test_section("socket send/receive"))
         {
-            EventLoop eventLoop;
+            Async::EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
             SocketDescriptor client, serverSideClient;
             createAndAssociateAsyncClientServerConnections(eventLoop, client, serverSideClient);
@@ -342,9 +342,9 @@ struct SC::AsyncTest : public SC::TestCase
 
             Span<const char> sendData = {sendBuffer, sizeof(sendBuffer)};
 
-            int             sendCount = 0;
-            AsyncSocketSend sendAsync;
-            sendAsync.callback = [&](AsyncSocketSend::Result& res)
+            int               sendCount = 0;
+            Async::SocketSend sendAsync;
+            sendAsync.callback = [&](Async::SocketSend::Result& res)
             {
                 SC_TEST_EXPECT(res.isValid());
                 sendCount++;
@@ -359,7 +359,7 @@ struct SC::AsyncTest : public SC::TestCase
             char       receiveBuffer[1] = {0};
             Span<char> receiveData      = {receiveBuffer, sizeof(receiveBuffer)};
 
-            AsyncSocketReceive receiveAsync;
+            Async::SocketReceive receiveAsync;
 
             struct Params
             {
@@ -367,7 +367,7 @@ struct SC::AsyncTest : public SC::TestCase
                 char receivedData[sizeof(sendBuffer)] = {0};
             };
             Params params;
-            receiveAsync.callback = [this, &params](AsyncSocketReceive::Result& res)
+            receiveAsync.callback = [this, &params](Async::SocketReceive::Result& res)
             {
                 Span<char> readData;
                 SC_TEST_EXPECT(res.moveTo(readData));
@@ -388,15 +388,15 @@ struct SC::AsyncTest : public SC::TestCase
     {
         if (test_section("socket close"))
         {
-            EventLoop eventLoop;
+            Async::EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
             SocketDescriptor client, serverSideClient;
             createAndAssociateAsyncClientServerConnections(eventLoop, client, serverSideClient);
 
-            AsyncSocketClose asyncClose1;
+            Async::SocketClose asyncClose1;
 
             int numCalledClose1  = 0;
-            asyncClose1.callback = [&](AsyncSocketClose::Result& result)
+            asyncClose1.callback = [&](Async::SocketClose::Result& result)
             {
                 numCalledClose1++;
                 SC_TEST_EXPECT(result.isValid());
@@ -404,10 +404,10 @@ struct SC::AsyncTest : public SC::TestCase
 
             SC_TEST_EXPECT(asyncClose1.start(eventLoop, client));
 
-            AsyncSocketClose asyncClose2;
+            Async::SocketClose asyncClose2;
 
             int numCalledClose2  = 0;
-            asyncClose2.callback = [&](AsyncSocketClose::Result& result)
+            asyncClose2.callback = [&](Async::SocketClose::Result& result)
             {
                 numCalledClose2++;
                 SC_TEST_EXPECT(result.isValid());
@@ -423,7 +423,7 @@ struct SC::AsyncTest : public SC::TestCase
     {
         if (test_section("file read/write"))
         {
-            EventLoop eventLoop;
+            Async::EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
             StringNative<255> filePath = StringEncoding::Native;
             StringNative<255> dirPath  = StringEncoding::Native;
@@ -449,8 +449,8 @@ struct SC::AsyncTest : public SC::TestCase
             FileDescriptor::Handle handle;
             SC_TEST_EXPECT(fd.get(handle, Result::Error("asd")));
 
-            AsyncFileWrite asyncWriteFile;
-            asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
+            Async::FileWrite asyncWriteFile;
+            asyncWriteFile.callback = [&](Async::FileWrite::Result& res)
             {
                 size_t writtenBytes = 0;
                 SC_TEST_EXPECT(res.moveTo(writtenBytes));
@@ -469,9 +469,9 @@ struct SC::AsyncTest : public SC::TestCase
                 int  readCount = 0;
                 char readBuffer[4];
             };
-            Params        params;
-            AsyncFileRead asyncReadFile;
-            asyncReadFile.callback = [this, &params](AsyncFileRead::Result& res)
+            Params          params;
+            Async::FileRead asyncReadFile;
+            asyncReadFile.callback = [this, &params](Async::FileRead::Result& res)
             {
                 Span<char> readData;
                 SC_TEST_EXPECT(res.moveTo(readData));
@@ -499,7 +499,7 @@ struct SC::AsyncTest : public SC::TestCase
     {
         if (test_section("file close"))
         {
-            EventLoop eventLoop;
+            Async::EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
             StringNative<255> filePath = StringEncoding::Native;
             StringNative<255> dirPath  = StringEncoding::Native;
@@ -523,7 +523,7 @@ struct SC::AsyncTest : public SC::TestCase
 
             FileDescriptor::Handle handle;
             SC_TEST_EXPECT(fd.get(handle, Result::Error("handle")));
-            AsyncFileClose asyncClose;
+            Async::FileClose asyncClose;
             asyncClose.callback = [this](auto& result) { SC_TEST_EXPECT(result.isValid()); };
             auto res            = asyncClose.start(eventLoop, handle);
             SC_TEST_EXPECT(res);
@@ -543,13 +543,13 @@ struct SC::AsyncTest : public SC::TestCase
     {
         if (test_section("error send/receive"))
         {
-            EventLoop eventLoop;
+            Async::EventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
             SocketDescriptor client, serverSideClient;
             createAndAssociateAsyncClientServerConnections(eventLoop, client, serverSideClient);
 
             // Setup send side on serverSideClient
-            AsyncSocketSend asyncSend;
+            Async::SocketSend asyncSend;
             asyncSend.setDebugName("server");
             char sendBuffer[1] = {1};
 
@@ -565,7 +565,7 @@ struct SC::AsyncTest : public SC::TestCase
                 SC_TEST_EXPECT(socketToClose.close());
             }
             int numOnSend      = 0;
-            asyncSend.callback = [&](AsyncSocketSend::Result& result)
+            asyncSend.callback = [&](Async::SocketSend::Result& result)
             {
                 numOnSend++;
                 SC_TEST_EXPECT(not result.isValid());
@@ -575,10 +575,10 @@ struct SC::AsyncTest : public SC::TestCase
             // Setup receive side on client
             char recvBuffer[1] = {1};
 
-            int                numOnReceive = 0;
-            AsyncSocketReceive asyncRecv;
+            int                  numOnReceive = 0;
+            Async::SocketReceive asyncRecv;
             asyncRecv.setDebugName("client");
-            asyncRecv.callback = [&](AsyncSocketReceive::Result& result)
+            asyncRecv.callback = [&](Async::SocketReceive::Result& result)
             {
                 numOnReceive++;
                 SC_TEST_EXPECT(not result.isValid());
@@ -591,7 +591,7 @@ struct SC::AsyncTest : public SC::TestCase
             // Just close the client to cause an error in the callback
             SC_TEST_EXPECT(client.close());
 
-            AsyncSocketReceive asyncErr;
+            Async::SocketReceive asyncErr;
             asyncErr.setDebugName("asyncErr");
             // This will fail immediately as the socket is already closed before this call
             SC_TEST_EXPECT(not asyncErr.start(eventLoop, client, {recvBuffer, sizeof(recvBuffer)}));

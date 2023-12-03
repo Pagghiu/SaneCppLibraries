@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "../Async.h"
 
-struct SC::EventLoop::Internal
+struct SC::Async::EventLoop::Internal
 {
     FileDescriptor loopFd;
 
@@ -12,15 +12,15 @@ struct SC::EventLoop::Internal
     [[nodiscard]] Result createEventLoop() { return Result(true); }
     [[nodiscard]] Result createWakeup(EventLoop&) { return Result(true); }
 
-    [[nodiscard]] AsyncRequest* getAsyncRequest(const int& event) const { return nullptr; }
+    [[nodiscard]] Async::AsyncRequest* getAsyncRequest(const int& event) const { return nullptr; }
 };
 
-struct SC::EventLoop::KernelQueue
+struct SC::Async::EventLoop::KernelQueue
 {
     int newEvents = 0;
     int events[1] = {0};
 
-    [[nodiscard]] Result pushNewSubmission(AsyncRequest& async) { return Result(false); }
+    [[nodiscard]] Result pushNewSubmission(Async::AsyncRequest& async) { return Result(false); }
     [[nodiscard]] Result pollAsync(EventLoop& eventLoop, PollMode pollMode) { return Result(false); }
     [[nodiscard]] Result validateEvent(int& event, bool& continueProcessing) { return Result(true); }
     template <typename T>
@@ -45,9 +45,12 @@ struct SC::EventLoop::KernelQueue
     }
 };
 
-SC::Result SC::EventLoop::wakeUpFromExternalThread() { return Result(true); }
-SC::Result SC::EventLoop::associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor) { return Result(true); }
-SC::Result SC::EventLoop::associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor)
+SC::Result SC::Async::EventLoop::wakeUpFromExternalThread() { return Result(true); }
+SC::Result SC::Async::EventLoop::associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor)
+{
+    return Result(true);
+}
+SC::Result SC::Async::EventLoop::associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor)
 {
     return Result(true);
 }

@@ -73,7 +73,7 @@ struct SC::HttpServerAsync : public HttpServer
     HttpServerAsync(const HttpServerAsync&)            = delete;
     HttpServerAsync& operator=(const HttpServerAsync&) = delete;
 
-    [[nodiscard]] Result start(EventLoop& loop, uint32_t maxConnections, StringView address, uint16_t port);
+    [[nodiscard]] Result start(Async::EventLoop& loop, uint32_t maxConnections, StringView address, uint16_t port);
     [[nodiscard]] Result stop();
 
   private:
@@ -81,17 +81,17 @@ struct SC::HttpServerAsync : public HttpServer
     {
         ArenaMap<RequestClient>::Key key;
 
-        SocketDescriptor   socket;
-        SmallString<50>    debugName;
-        AsyncSocketReceive asyncReceive;
-        AsyncSocketSend    asyncSend;
+        SocketDescriptor     socket;
+        SmallString<50>      debugName;
+        Async::SocketReceive asyncReceive;
+        Async::SocketSend    asyncSend;
     };
     ArenaMap<RequestClient> requestClients;
     SocketDescriptor        serverSocket;
 
-    AsyncSocketAccept asyncAccept;
+    Async::SocketAccept asyncAccept;
 
-    void onNewClient(AsyncSocketAccept::Result& result);
-    void onReceive(AsyncSocketReceive::Result& result);
-    void onAfterSend(AsyncSocketSend::Result& result);
+    void onNewClient(Async::SocketAccept::Result& result);
+    void onReceive(Async::SocketReceive::Result& result);
+    void onAfterSend(Async::SocketSend::Result& result);
 };
