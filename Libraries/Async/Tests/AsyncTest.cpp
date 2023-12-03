@@ -1,12 +1,12 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#include "../Async.h"
 #include "../../FileSystem/FileSystem.h"
 #include "../../FileSystem/Path.h"
 #include "../../Strings/String.h"
 #include "../../Testing/Testing.h"
 #include "../../Threading/Threading.h" // EventObject
-#include "../Async.h"
 
 namespace SC
 {

@@ -11,7 +11,8 @@ struct SC::EventLoop::Internal
     [[nodiscard]] Result close() { return loopFd.close(); }
     [[nodiscard]] Result createEventLoop() { return Result(true); }
     [[nodiscard]] Result createWakeup(EventLoop&) { return Result(true); }
-    [[nodiscard]] Async* getAsync(const int& event) const { return nullptr; }
+
+    [[nodiscard]] AsyncRequest* getAsyncRequest(const int& event) const { return nullptr; }
 };
 
 struct SC::EventLoop::KernelQueue
@@ -19,7 +20,7 @@ struct SC::EventLoop::KernelQueue
     int newEvents = 0;
     int events[1] = {0};
 
-    [[nodiscard]] Result pushNewSubmission(Async& async) { return Result(false); }
+    [[nodiscard]] Result pushNewSubmission(AsyncRequest& async) { return Result(false); }
     [[nodiscard]] Result pollAsync(EventLoop& eventLoop, PollMode pollMode) { return Result(false); }
     [[nodiscard]] Result validateEvent(int& event, bool& continueProcessing) { return Result(true); }
     template <typename T>

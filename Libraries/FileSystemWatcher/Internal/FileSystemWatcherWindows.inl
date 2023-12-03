@@ -15,7 +15,7 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
 {
     AsyncWindowsPoll asyncPoll;
     uint8_t          changesBuffer[FolderWatcherSizes::MaxChangesBufferSize];
-    FolderWatcher*   parentEntry = nullptr; // We could in theory use SC_FIELD_OFFSET somehow to obtain it...
+    FolderWatcher*   parentEntry = nullptr; // We could in theory use SC_COMPILER_FIELD_OFFSET somehow to obtain it...
     FileDescriptor   fileHandle;
 
     OVERLAPPED& getOverlapped() { return asyncPoll.getOverlappedOpaque().get().overlapped; }
@@ -209,7 +209,7 @@ struct SC::FileSystemWatcher::Internal
 
     void onEventLoopNotification(AsyncWindowsPoll::Result& result)
     {
-        FolderWatcherInternal& fwi = SC_FIELD_OFFSET(FolderWatcherInternal, asyncPoll, result.async);
+        FolderWatcherInternal& fwi = SC_COMPILER_FIELD_OFFSET(FolderWatcherInternal, asyncPoll, result.async);
         SC_ASSERT_DEBUG(fwi.fileHandle.isValid());
         notifyEntry(*fwi.parentEntry);
         result.reactivateRequest(true);

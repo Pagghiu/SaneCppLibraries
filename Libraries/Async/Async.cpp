@@ -34,7 +34,7 @@ void SC::EventLoop::InternalOpaque::destruct(Object& obj)
     obj.~Object();
 }
 #if SC_ASYNC_ENABLE_LOG
-const char* SC::Async::TypeToString(Type type)
+const char* SC::AsyncRequest::TypeToString(Type type)
 {
     switch (type)
     {
@@ -57,21 +57,21 @@ const char* SC::Async::TypeToString(Type type)
 }
 #endif
 
-SC::Result SC::Async::validateAsync()
+SC::Result SC::AsyncRequest::validateAsync()
 {
-    const bool asyncStateIsFree      = state == Async::State::Free;
+    const bool asyncStateIsFree      = state == AsyncRequest::State::Free;
     const bool asyncIsNotOwnedByLoop = eventLoop == nullptr;
-    SC_LOG_MESSAGE("{} {} QUEUE\n", debugName, Async::TypeToString(type));
-    SC_TRY_MSG(asyncStateIsFree, "Trying to stage Async that is in use");
-    SC_TRY_MSG(asyncIsNotOwnedByLoop, "Trying to add Async belonging to another Loop");
+    SC_LOG_MESSAGE("{} {} QUEUE\n", debugName, AsyncRequest::TypeToString(type));
+    SC_TRY_MSG(asyncStateIsFree, "Trying to stage AsyncRequest that is in use");
+    SC_TRY_MSG(asyncIsNotOwnedByLoop, "Trying to add AsyncRequest belonging to another Loop");
     return Result(true);
 }
 
-SC::Result SC::Async::queueSubmission(EventLoop& loop) { return loop.queueSubmission(*this); }
+SC::Result SC::AsyncRequest::queueSubmission(EventLoop& loop) { return loop.queueSubmission(*this); }
 
-void SC::Async::updateTime() { eventLoop->updateTime(); }
+void SC::AsyncRequest::updateTime() { eventLoop->updateTime(); }
 
-SC::Result SC::Async::stop()
+SC::Result SC::AsyncRequest::stop()
 {
     if (eventLoop)
         return eventLoop->stopAsync(*this);
@@ -188,9 +188,9 @@ SC::Result SC::AsyncWindowsPoll::start(EventLoop& loop, FileDescriptor::Handle f
 }
 #endif
 
-SC::Result SC::EventLoop::queueSubmission(Async& async)
+SC::Result SC::EventLoop::queueSubmission(AsyncRequest& async)
 {
-    async.state = Async::State::Submitting;
+    async.state = AsyncRequest::State::Submitting;
     submissions.queueBack(async);
     async.eventLoop = this;
     return SC::Result(true);
@@ -208,9 +208,9 @@ SC::Result SC::EventLoop::run()
 const SC::Time::HighResolutionCounter* SC::EventLoop::findEarliestTimer() const
 {
     const Time::HighResolutionCounter* earliestTime = nullptr;
-    for (Async* async = activeTimers.front; async != nullptr; async = async->next)
+    for (AsyncRequest* async = activeTimers.front; async != nullptr; async = async->next)
     {
-        SC_ASSERT_DEBUG(async->type == Async::Type::LoopTimeout);
+        SC_ASSERT_DEBUG(async->type == AsyncRequest::Type::LoopTimeout);
         const auto& expirationTime = static_cast<AsyncLoopTimeout*>(async)->expirationTime;
         if (earliestTime == nullptr or earliestTime->isLaterThanOrEqualTo(expirationTime))
         {
@@ -222,16 +222,16 @@ const SC::Time::HighResolutionCounter* SC::EventLoop::findEarliestTimer() const
 
 void SC::EventLoop::invokeExpiredTimers()
 {
-    for (Async* async = activeTimers.front; async != nullptr;)
+    for (AsyncRequest* async = activeTimers.front; async != nullptr;)
     {
-        SC_ASSERT_DEBUG(async->type == Async::Type::LoopTimeout);
+        SC_ASSERT_DEBUG(async->type == AsyncRequest::Type::LoopTimeout);
         const auto& expirationTime = static_cast<AsyncLoopTimeout*>(async)->expirationTime;
         if (loopTime.isLaterThanOrEqualTo(expirationTime))
         {
-            Async* currentAsync = async;
-            async               = async->next;
+            AsyncRequest* currentAsync = async;
+            async                      = async->next;
             activeTimers.remove(*currentAsync);
-            currentAsync->state          = Async::State::Free;
+            currentAsync->state          = AsyncRequest::State::Free;
             Result                   res = Result(true);
             AsyncLoopTimeout::Result result(*static_cast<AsyncLoopTimeout*>(currentAsync), move(res));
             result.async.eventLoop = nullptr; // Allow reusing it
@@ -258,25 +258,25 @@ SC::Result SC::EventLoop::close()
     return self.close();
 }
 
-SC::Result SC::EventLoop::stageSubmission(KernelQueue& queue, Async& async)
+SC::Result SC::EventLoop::stageSubmission(KernelQueue& queue, AsyncRequest& async)
 {
     switch (async.state)
     {
-    case Async::State::Submitting: {
+    case AsyncRequest::State::Submitting: {
         SC_TRY(setupAsync(queue, async));
         SC_TRY(activateAsync(queue, async));
     }
     break;
-    case Async::State::Free: {
+    case AsyncRequest::State::Free: {
         // TODO: Stop the completion, it has been cancelled before being submitted
         SC_ASSERT_RELEASE(false);
     }
     break;
-    case Async::State::Cancelling: {
+    case AsyncRequest::State::Cancelling: {
         SC_TRY(cancelAsync(queue, async));
     }
     break;
-    case Async::State::Active: {
+    case AsyncRequest::State::Active: {
         SC_ASSERT_DEBUG(false);
         return SC::Result::Error("EventLoop::processSubmissions() got Active handle");
     }
@@ -298,9 +298,9 @@ SC::Result SC::EventLoop::runOnce() { return runStep(PollMode::ForcedForwardProg
 
 SC::Result SC::EventLoop::runNoWait() { return runStep(PollMode::NoWait); }
 
-void SC::EventLoop::completeAndEventuallyReactivate(KernelQueue& queue, Async& async, Result&& returnCode)
+void SC::EventLoop::completeAndEventuallyReactivate(KernelQueue& queue, AsyncRequest& async, Result&& returnCode)
 {
-    SC_ASSERT_RELEASE(async.state == Async::State::Active);
+    SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Active);
     bool reactivate = false;
     completeAsync(queue, async, move(returnCode), reactivate);
     if (reactivate)
@@ -322,7 +322,7 @@ SC::Result SC::EventLoop::runStep(PollMode pollMode)
     KernelQueue queue;
     SC_LOG_MESSAGE("---------------\n");
 
-    while (Async* async = submissions.dequeueFront())
+    while (AsyncRequest* async = submissions.dequeueFront())
     {
         auto res = stageSubmission(queue, *async);
         if (not res)
@@ -352,8 +352,8 @@ SC::Result SC::EventLoop::runStep(PollMode pollMode)
         SC_LOG_MESSAGE(" Active Requests = {}\n", getTotalNumberOfActiveHandle());
         bool continueProcessing = true;
 
-        Result result = Result(queue.validateEvent(queue.events[idx], continueProcessing));
-        Async& async  = *self.getAsync(queue.events[idx]);
+        Result        result = Result(queue.validateEvent(queue.events[idx], continueProcessing));
+        AsyncRequest& async  = *self.getAsyncRequest(queue.events[idx]);
         if (not result)
         {
             reportError(queue, async, move(result));
@@ -365,9 +365,9 @@ SC::Result SC::EventLoop::runStep(PollMode pollMode)
             continue;
         }
         async.eventIndex = idx;
-        if (async.state == Async::State::Cancelling)
+        if (async.state == AsyncRequest::State::Cancelling)
         {
-            async.state     = Async::State::Free;
+            async.state     = AsyncRequest::State::Free;
             async.eventLoop = nullptr;
         }
         else
@@ -376,7 +376,7 @@ SC::Result SC::EventLoop::runStep(PollMode pollMode)
         }
     }
 
-    while (Async* async = manualCompletions.dequeueFront())
+    while (AsyncRequest* async = manualCompletions.dequeueFront())
     {
         completeAndEventuallyReactivate(queue, *async, Result(true));
     }
@@ -385,111 +385,111 @@ SC::Result SC::EventLoop::runStep(PollMode pollMode)
 }
 
 template <typename Lambda>
-SC::Result SC::Async::applyOnAsync(Async& async, Lambda&& lambda)
+SC::Result SC::AsyncRequest::applyOnAsync(AsyncRequest& async, Lambda&& lambda)
 {
     switch (async.type)
     {
-    case Async::Type::LoopTimeout: SC_TRY(lambda(*static_cast<AsyncLoopTimeout*>(&async))); break;
-    case Async::Type::LoopWakeUp: SC_TRY(lambda(*static_cast<AsyncLoopWakeUp*>(&async))); break;
-    case Async::Type::ProcessExit: SC_TRY(lambda(*static_cast<AsyncProcessExit*>(&async))); break;
-    case Async::Type::SocketAccept: SC_TRY(lambda(*static_cast<AsyncSocketAccept*>(&async))); break;
-    case Async::Type::SocketConnect: SC_TRY(lambda(*static_cast<AsyncSocketConnect*>(&async))); break;
-    case Async::Type::SocketSend: SC_TRY(lambda(*static_cast<AsyncSocketSend*>(&async))); break;
-    case Async::Type::SocketReceive: SC_TRY(lambda(*static_cast<AsyncSocketReceive*>(&async))); break;
-    case Async::Type::SocketClose: SC_TRY(lambda(*static_cast<AsyncSocketClose*>(&async))); break;
-    case Async::Type::FileRead: SC_TRY(lambda(*static_cast<AsyncFileRead*>(&async))); break;
-    case Async::Type::FileWrite: SC_TRY(lambda(*static_cast<AsyncFileWrite*>(&async))); break;
-    case Async::Type::FileClose: SC_TRY(lambda(*static_cast<AsyncFileClose*>(&async))); break;
+    case AsyncRequest::Type::LoopTimeout: SC_TRY(lambda(*static_cast<AsyncLoopTimeout*>(&async))); break;
+    case AsyncRequest::Type::LoopWakeUp: SC_TRY(lambda(*static_cast<AsyncLoopWakeUp*>(&async))); break;
+    case AsyncRequest::Type::ProcessExit: SC_TRY(lambda(*static_cast<AsyncProcessExit*>(&async))); break;
+    case AsyncRequest::Type::SocketAccept: SC_TRY(lambda(*static_cast<AsyncSocketAccept*>(&async))); break;
+    case AsyncRequest::Type::SocketConnect: SC_TRY(lambda(*static_cast<AsyncSocketConnect*>(&async))); break;
+    case AsyncRequest::Type::SocketSend: SC_TRY(lambda(*static_cast<AsyncSocketSend*>(&async))); break;
+    case AsyncRequest::Type::SocketReceive: SC_TRY(lambda(*static_cast<AsyncSocketReceive*>(&async))); break;
+    case AsyncRequest::Type::SocketClose: SC_TRY(lambda(*static_cast<AsyncSocketClose*>(&async))); break;
+    case AsyncRequest::Type::FileRead: SC_TRY(lambda(*static_cast<AsyncFileRead*>(&async))); break;
+    case AsyncRequest::Type::FileWrite: SC_TRY(lambda(*static_cast<AsyncFileWrite*>(&async))); break;
+    case AsyncRequest::Type::FileClose: SC_TRY(lambda(*static_cast<AsyncFileClose*>(&async))); break;
 #if SC_PLATFORM_WINDOWS
-    case Async::Type::WindowsPoll: SC_TRY(lambda(*static_cast<AsyncWindowsPoll*>(&async))); break;
+    case AsyncRequest::Type::WindowsPoll: SC_TRY(lambda(*static_cast<AsyncWindowsPoll*>(&async))); break;
 #endif
     }
     return SC::Result(true);
 }
 
-SC::Result SC::EventLoop::setupAsync(KernelQueue& queue, Async& async)
+SC::Result SC::EventLoop::setupAsync(KernelQueue& queue, AsyncRequest& async)
 {
-    SC_LOG_MESSAGE("{} {} SETUP\n", async.debugName, Async::TypeToString(async.type));
-    return Async::applyOnAsync(async, [&](auto& p) { return queue.setupAsync(p); });
+    SC_LOG_MESSAGE("{} {} SETUP\n", async.debugName, AsyncRequest::TypeToString(async.type));
+    return AsyncRequest::applyOnAsync(async, [&](auto& p) { return queue.setupAsync(p); });
 }
 
-SC::Result SC::EventLoop::activateAsync(KernelQueue& queue, Async& async)
+SC::Result SC::EventLoop::activateAsync(KernelQueue& queue, AsyncRequest& async)
 {
-    SC_LOG_MESSAGE("{} {} ACTIVATE\n", async.debugName, Async::TypeToString(async.type));
+    SC_LOG_MESSAGE("{} {} ACTIVATE\n", async.debugName, AsyncRequest::TypeToString(async.type));
     // Submitting (first time) or Active (for reactivations)
-    SC_ASSERT_DEBUG(async.state == Async::State::Active or async.state == Async::State::Submitting);
-    SC_TRY(Async::applyOnAsync(async, [&queue](auto& p) { return queue.activateAsync(p); }));
-    if (async.state == Async::State::Submitting)
+    SC_ASSERT_DEBUG(async.state == AsyncRequest::State::Active or async.state == AsyncRequest::State::Submitting);
+    SC_TRY(AsyncRequest::applyOnAsync(async, [&queue](auto& p) { return queue.activateAsync(p); }));
+    if (async.state == AsyncRequest::State::Submitting)
     {
         return queue.pushNewSubmission(async);
     }
     return SC::Result(true);
 }
 
-void SC::EventLoop::reportError(KernelQueue& queue, Async& async, Result&& returnCode)
+void SC::EventLoop::reportError(KernelQueue& queue, AsyncRequest& async, Result&& returnCode)
 {
-    SC_LOG_MESSAGE("{} ERROR {}\n", async.debugName, Async::TypeToString(async.type));
+    SC_LOG_MESSAGE("{} ERROR {}\n", async.debugName, AsyncRequest::TypeToString(async.type));
     bool reactivate = false;
-    if (async.state == Async::State::Active)
+    if (async.state == AsyncRequest::State::Active)
     {
         removeActiveHandle(async);
     }
     completeAsync(queue, async, forward<Result>(returnCode), reactivate);
-    async.state = Async::State::Free;
+    async.state = AsyncRequest::State::Free;
 }
 
-void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, Result&& returnCode, bool& reactivate)
+void SC::EventLoop::completeAsync(KernelQueue& queue, AsyncRequest& async, Result&& returnCode, bool& reactivate)
 {
     if (returnCode)
     {
-        SC_LOG_MESSAGE("{} {} COMPLETE\n", async.debugName, Async::TypeToString(async.type));
+        SC_LOG_MESSAGE("{} {} COMPLETE\n", async.debugName, AsyncRequest::TypeToString(async.type));
     }
     else
     {
-        SC_LOG_MESSAGE("{} {} COMPLETE (Error = \"{}\")\n", async.debugName, Async::TypeToString(async.type),
+        SC_LOG_MESSAGE("{} {} COMPLETE (Error = \"{}\")\n", async.debugName, AsyncRequest::TypeToString(async.type),
                        returnCode.message);
     }
-    bool res = Async::applyOnAsync(async,
-                                   [&](auto& p)
-                                   {
-                                       using Type = typename TypeTraits::RemoveReference<decltype(p)>::type;
-                                       typename Type::Result result(p, forward<Result>(returnCode));
-                                       if (result.returnCode)
-                                           result.returnCode = Result(queue.completeAsync(result));
-                                       if (result.async.callback.isValid())
-                                           result.async.callback(result);
-                                       reactivate = result.shouldBeReactivated;
-                                       return SC::Result(true);
-                                   });
+    bool res = AsyncRequest::applyOnAsync(async,
+                                          [&](auto& p)
+                                          {
+                                              using Type = typename TypeTraits::RemoveReference<decltype(p)>::type;
+                                              typename Type::Result result(p, forward<Result>(returnCode));
+                                              if (result.returnCode)
+                                                  result.returnCode = Result(queue.completeAsync(result));
+                                              if (result.async.callback.isValid())
+                                                  result.async.callback(result);
+                                              reactivate = result.shouldBeReactivated;
+                                              return SC::Result(true);
+                                          });
     SC_TRUST_RESULT(res);
 }
 
-SC::Result SC::EventLoop::cancelAsync(KernelQueue& queue, Async& async)
+SC::Result SC::EventLoop::cancelAsync(KernelQueue& queue, AsyncRequest& async)
 {
-    SC_LOG_MESSAGE("{} {} CANCEL\n", async.debugName, Async::TypeToString(async.type));
-    SC_TRY(Async::applyOnAsync(async, [&](auto& p) { return queue.stopAsync(p); }))
-    if (async.state == Async::State::Active)
+    SC_LOG_MESSAGE("{} {} CANCEL\n", async.debugName, AsyncRequest::TypeToString(async.type));
+    SC_TRY(AsyncRequest::applyOnAsync(async, [&](auto& p) { return queue.stopAsync(p); }))
+    if (async.state == AsyncRequest::State::Active)
     {
         removeActiveHandle(async);
     }
     return SC::Result(true);
 }
 
-SC::Result SC::EventLoop::stopAsync(Async& async)
+SC::Result SC::EventLoop::stopAsync(AsyncRequest& async)
 {
-    SC_LOG_MESSAGE("{} {} STOP\n", async.debugName, Async::TypeToString(async.type));
-    const bool asyncStateIsNotFree    = async.state != Async::State::Free;
+    SC_LOG_MESSAGE("{} {} STOP\n", async.debugName, AsyncRequest::TypeToString(async.type));
+    const bool asyncStateIsNotFree    = async.state != AsyncRequest::State::Free;
     const bool asyncIsOwnedByThisLoop = async.eventLoop == this;
-    SC_TRY_MSG(asyncStateIsNotFree, "Trying to stop Async that is not active");
-    SC_TRY_MSG(asyncIsOwnedByThisLoop, "Trying to add Async belonging to another Loop");
+    SC_TRY_MSG(asyncStateIsNotFree, "Trying to stop AsyncRequest that is not active");
+    SC_TRY_MSG(asyncIsOwnedByThisLoop, "Trying to add AsyncRequest belonging to another Loop");
     switch (async.state)
     {
-    case Async::State::Active: {
-        if (async.type == Async::Type::LoopTimeout)
+    case AsyncRequest::State::Active: {
+        if (async.type == AsyncRequest::Type::LoopTimeout)
         {
             activeTimers.remove(async);
         }
-        else if (async.type == Async::Type::LoopWakeUp)
+        else if (async.type == AsyncRequest::Type::LoopWakeUp)
         {
             activeWakeUps.remove(async);
         }
@@ -497,16 +497,17 @@ SC::Result SC::EventLoop::stopAsync(Async& async)
         {
             removeActiveHandle(async);
         }
-        async.state = Async::State::Cancelling;
+        async.state = AsyncRequest::State::Cancelling;
         submissions.queueBack(async);
         break;
     }
-    case Async::State::Submitting: {
+    case AsyncRequest::State::Submitting: {
         submissions.remove(async);
         break;
     }
-    case Async::State::Free: return SC::Result::Error("Trying to stop Async that is not active");
-    case Async::State::Cancelling: return SC::Result::Error("Trying to Stop Async that is already being cancelled");
+    case AsyncRequest::State::Free: return SC::Result::Error("Trying to stop AsyncRequest that is not active");
+    case AsyncRequest::State::Cancelling:
+        return SC::Result::Error("Trying to Stop AsyncRequest that is already being cancelled");
     }
     return Result(true);
 }
@@ -536,7 +537,7 @@ SC::Result SC::EventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
 {
     SC_TRY_MSG(async.eventLoop == this,
                "EventLoop::wakeUpFromExternalThread - Wakeup belonging to different EventLoop");
-    SC_ASSERT_DEBUG(async.type == Async::Type::LoopWakeUp);
+    SC_ASSERT_DEBUG(async.type == AsyncRequest::Type::LoopWakeUp);
     AsyncLoopWakeUp& notifier = *static_cast<AsyncLoopWakeUp*>(&async);
     if (not notifier.pending.exchange(true))
     {
@@ -547,11 +548,11 @@ SC::Result SC::EventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
     return Result(true);
 }
 
-void SC::EventLoop::executeWakeUps(AsyncResultBase& result)
+void SC::EventLoop::executeWakeUps(AsyncResult& result)
 {
-    for (Async* async = activeWakeUps.front; async != nullptr; async = async->next)
+    for (AsyncRequest* async = activeWakeUps.front; async != nullptr; async = async->next)
     {
-        SC_ASSERT_DEBUG(async->type == Async::Type::LoopWakeUp);
+        SC_ASSERT_DEBUG(async->type == AsyncRequest::Type::LoopWakeUp);
         AsyncLoopWakeUp* notifier = static_cast<AsyncLoopWakeUp*>(async);
         if (notifier->pending.load() == true)
         {
@@ -568,25 +569,25 @@ void SC::EventLoop::executeWakeUps(AsyncResultBase& result)
     }
 }
 
-void SC::EventLoop::removeActiveHandle(Async& async)
+void SC::EventLoop::removeActiveHandle(AsyncRequest& async)
 {
-    SC_ASSERT_RELEASE(async.state == Async::State::Active);
-    async.state = Async::State::Free;
+    SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Active);
+    async.state = AsyncRequest::State::Free;
     async.eventLoop->numberOfActiveHandles -= 1;
 }
 
-void SC::EventLoop::addActiveHandle(Async& async)
+void SC::EventLoop::addActiveHandle(AsyncRequest& async)
 {
-    SC_ASSERT_RELEASE(async.state == Async::State::Submitting);
-    async.state = Async::State::Active;
+    SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Submitting);
+    async.state = AsyncRequest::State::Active;
     async.eventLoop->numberOfActiveHandles += 1;
 }
 
-void SC::EventLoop::scheduleManualCompletion(Async& async)
+void SC::EventLoop::scheduleManualCompletion(AsyncRequest& async)
 {
-    SC_ASSERT_RELEASE(async.state == Async::State::Submitting);
+    SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Submitting);
     async.eventLoop->manualCompletions.queueBack(async);
-    async.state = Async::State::Active;
+    async.state = AsyncRequest::State::Active;
 }
 
 SC::Result SC::EventLoop::getLoopFileDescriptor(SC::FileDescriptor::Handle& fileDescriptor) const

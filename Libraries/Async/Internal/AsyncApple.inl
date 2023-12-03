@@ -48,16 +48,21 @@ struct SC::EventLoop::Internal
         // Register
         FileDescriptor::Handle wakeUpPipeDescriptor;
         SC_TRY(wakeupPipe.readPipe.get(
-            wakeUpPipeDescriptor, Result::Error("EventLoop::Internal::createWakeup() - Async read handle invalid")));
+            wakeUpPipeDescriptor,
+            Result::Error("EventLoop::Internal::createWakeup() - AsyncRequest read handle invalid")));
         SC_TRY(wakeupPipeRead.start(loop, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)}));
         SC_TRY(loop.runNoWait());   // We want to register the read handle before everything else
         loop.decreaseActiveCount(); // we don't want the read to keep the queue up
         return Result(true);
     }
 
-    [[nodiscard]] static Async* getAsync(const struct kevent& event) { return static_cast<Async*>(event.udata); }
+    [[nodiscard]] static AsyncRequest* getAsyncRequest(const struct kevent& event)
+    {
+        return static_cast<AsyncRequest*>(event.udata);
+    }
 
-    [[nodiscard]] static Result stopSingleWatcherImmediate(Async& async, SocketDescriptor::Handle handle, short filter)
+    [[nodiscard]] static Result stopSingleWatcherImmediate(AsyncRequest& async, SocketDescriptor::Handle handle,
+                                                           short filter)
     {
         FileDescriptor::Handle loopNativeDescriptor;
         SC_TRUST_RESULT(async.eventLoop->internal.get().loopFd.get(
@@ -83,16 +88,16 @@ struct SC::EventLoop::KernelQueue
 
     KernelQueue() { memset(events, 0, sizeof(events)); }
 
-    [[nodiscard]] Result pushNewSubmission(Async& async)
+    [[nodiscard]] Result pushNewSubmission(AsyncRequest& async)
     {
         switch (async.type)
         {
-        case Async::Type::LoopTimeout:
-        case Async::Type::LoopWakeUp:
+        case AsyncRequest::Type::LoopTimeout:
+        case AsyncRequest::Type::LoopWakeUp:
             // These are not added to active queue
             break;
-        case Async::Type::SocketClose:
-        case Async::Type::FileClose: {
+        case AsyncRequest::Type::SocketClose:
+        case AsyncRequest::Type::FileClose: {
             async.eventLoop->scheduleManualCompletion(async);
             break;
         }
@@ -109,7 +114,7 @@ struct SC::EventLoop::KernelQueue
         return Result(true);
     }
 
-    [[nodiscard]] bool setEventWatcher(Async& async, int fileDescriptor, short filter, short operation,
+    [[nodiscard]] bool setEventWatcher(AsyncRequest& async, int fileDescriptor, short filter, short operation,
                                        unsigned int options = 0)
     {
         EV_SET(events + newEvents, fileDescriptor, filter, operation, options, 0, &async);
@@ -213,19 +218,19 @@ struct SC::EventLoop::KernelQueue
     }
     [[nodiscard]] static bool activateAsync(AsyncLoopTimeout& async)
     {
-        async.state = Async::State::Active;
+        async.state = AsyncRequest::State::Active;
         return true;
     }
     [[nodiscard]] static bool completeAsync(AsyncLoopTimeout::Result& result)
     {
         SC_COMPILER_UNUSED(result);
-        SC_ASSERT_RELEASE(false and "Async::Type::LoopTimeout cannot be argument of completion");
+        SC_ASSERT_RELEASE(false and "AsyncRequest::Type::LoopTimeout cannot be argument of completion");
         return false;
     }
     [[nodiscard]] static bool stopAsync(AsyncLoopTimeout& async)
     {
         async.eventLoop->numberOfTimers -= 1;
-        async.state = Async::State::Free;
+        async.state = AsyncRequest::State::Free;
         return true;
     }
 
@@ -238,19 +243,19 @@ struct SC::EventLoop::KernelQueue
     }
     [[nodiscard]] static bool activateAsync(AsyncLoopWakeUp& async)
     {
-        async.state = Async::State::Active;
+        async.state = AsyncRequest::State::Active;
         return true;
     }
     [[nodiscard]] static bool completeAsync(AsyncLoopWakeUp::Result& result)
     {
         SC_COMPILER_UNUSED(result);
-        SC_ASSERT_RELEASE(false and "Async::Type::LoopWakeUp cannot be argument of completion");
+        SC_ASSERT_RELEASE(false and "AsyncRequest::Type::LoopWakeUp cannot be argument of completion");
         return false;
     }
     [[nodiscard]] static bool stopAsync(AsyncLoopWakeUp& async)
     {
         async.eventLoop->numberOfWakeups -= 1;
-        async.state = Async::State::Free;
+        async.state = AsyncRequest::State::Free;
         return true;
     }
 

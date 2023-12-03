@@ -142,7 +142,7 @@ void SC::HttpServerAsync::onNewClient(AsyncSocketAccept::Result& result)
 void SC::HttpServerAsync::onReceive(AsyncSocketReceive::Result& result)
 {
     SC_COMPILER_WARNING_PUSH_OFFSETOF
-    RequestClient& requestClient = SC_FIELD_OFFSET(RequestClient, asyncReceive, result.async);
+    RequestClient& requestClient = SC_COMPILER_FIELD_OFFSET(RequestClient, asyncReceive, result.async);
     SC_COMPILER_WARNING_POP
     SC_ASSERT_RELEASE(&requestClient.asyncReceive == &result.async);
     ClientChannel& client = *requests.get(requestClient.key.cast_to<ClientChannel>());
@@ -181,7 +181,7 @@ void SC::HttpServerAsync::onAfterSend(AsyncSocketSend::Result& result)
     if (result.isValid())
     {
         SC_COMPILER_WARNING_PUSH_OFFSETOF
-        RequestClient& requestClient = SC_FIELD_OFFSET(RequestClient, asyncSend, result.async);
+        RequestClient& requestClient = SC_COMPILER_FIELD_OFFSET(RequestClient, asyncSend, result.async);
         SC_COMPILER_WARNING_POP
         auto clientKey = requestClient.key.cast_to<ClientChannel>();
         requests.get(clientKey)->response.outputBuffer.clear();

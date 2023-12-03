@@ -42,7 +42,7 @@ struct SC::EventLoop::Internal
     LPFN_CONNECTEX          pConnectEx            = nullptr;
     LPFN_ACCEPTEX           pAcceptEx             = nullptr;
     LPFN_DISCONNECTEX       pDisconnectEx         = nullptr;
-    AsyncWinOverlapped  wakeUpOverlapped;
+    AsyncWinOverlapped      wakeUpOverlapped;
 
     Internal()
     {
@@ -112,13 +112,13 @@ struct SC::EventLoop::Internal
         // No need to register it with EventLoop as we're calling PostQueuedCompletionStatus manually
         // As a consequence we don't need to do loop.decreseActiveCount()
         wakeUpAsync.eventLoop = &loop;
-        wakeUpAsync.state     = Async::State::Active;
+        wakeUpAsync.state     = AsyncRequest::State::Active;
         return Result(true);
     }
 
-    [[nodiscard]] static Async* getAsync(OVERLAPPED_ENTRY& event)
+    [[nodiscard]] static AsyncRequest* getAsyncRequest(OVERLAPPED_ENTRY& event)
     {
-        return AsyncWinOverlapped::getUserDataFromOverlapped<Async>(event.lpOverlapped);
+        return AsyncWinOverlapped::getUserDataFromOverlapped<AsyncRequest>(event.lpOverlapped);
     }
 
     [[nodiscard]] static Result checkWSAResult(SOCKET handle, OVERLAPPED& overlapped, size_t* size = nullptr)
@@ -181,16 +181,16 @@ struct SC::EventLoop::KernelQueue
     OVERLAPPED_ENTRY     events[totalNumEvents];
     ULONG                newEvents = 0;
 
-    [[nodiscard]] Result pushNewSubmission(Async& async)
+    [[nodiscard]] Result pushNewSubmission(AsyncRequest& async)
     {
         switch (async.type)
         {
-        case Async::Type::LoopTimeout:
-        case Async::Type::LoopWakeUp:
+        case AsyncRequest::Type::LoopTimeout:
+        case AsyncRequest::Type::LoopWakeUp:
             // These are not added to active queue
             break;
-        case Async::Type::SocketClose:
-        case Async::Type::FileClose: {
+        case AsyncRequest::Type::SocketClose:
+        case AsyncRequest::Type::FileClose: {
             async.eventLoop->scheduleManualCompletion(async);
             break;
         }
@@ -238,7 +238,7 @@ struct SC::EventLoop::KernelQueue
     // TIMEOUT
     [[nodiscard]] static bool activateAsync(AsyncLoopTimeout& async)
     {
-        async.state = Async::State::Active;
+        async.state = AsyncRequest::State::Active;
         return Result(true);
     }
     [[nodiscard]] static bool setupAsync(AsyncLoopTimeout& async)
@@ -251,7 +251,7 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] static bool stopAsync(AsyncLoopTimeout& async)
     {
         async.eventLoop->numberOfTimers -= 1;
-        async.state = Async::State::Free;
+        async.state = AsyncRequest::State::Free;
         return Result(true);
     }
 
@@ -265,7 +265,7 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] static bool activateAsync(AsyncLoopWakeUp& async)
     {
-        async.state = Async::State::Active;
+        async.state = AsyncRequest::State::Active;
         return Result(true);
     }
     [[nodiscard]] static bool completeAsync(AsyncLoopWakeUp::Result& result)
@@ -276,7 +276,7 @@ struct SC::EventLoop::KernelQueue
     [[nodiscard]] static bool stopAsync(AsyncLoopWakeUp& async)
     {
         async.eventLoop->numberOfWakeups -= 1;
-        async.state = Async::State::Free;
+        async.state = AsyncRequest::State::Free;
         return Result(true);
     }
 
@@ -299,7 +299,7 @@ struct SC::EventLoop::KernelQueue
                       "Check acceptBuffer size");
 
         AsyncWinOverlapped& overlapped      = operation.overlapped.get();
-        DWORD                   sync_bytes_read = 0;
+        DWORD               sync_bytes_read = 0;
 
         SC_TRY(eventLoop.internal.get().ensureAcceptFunction(operation.handle));
         BOOL res;

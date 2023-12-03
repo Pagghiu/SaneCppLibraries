@@ -108,6 +108,18 @@
 /// Returns offset of Class::Field in bytes
 #define SC_COMPILER_OFFSETOF(Class, Field) __builtin_offsetof(Class, Field)
 
+namespace SC
+{
+template <int offset, typename T, typename R>
+T& fieldOffset(R& object)
+{
+    return *reinterpret_cast<T*>(reinterpret_cast<char*>(&object) - offset);
+}
+} // namespace SC
+
+#define SC_COMPILER_FIELD_OFFSET(Class, Field, Value)                                                                  \
+    SC::fieldOffset<SC_COMPILER_OFFSETOF(Class, Field), Class, decltype(Class::Field)>(Value);
+
 /// Disables invalid-offsetof gcc and clang warning
 #if SC_COMPILER_CLANG
 #define SC_COMPILER_WARNING_PUSH_OFFSETOF                                                                              \
