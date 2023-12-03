@@ -218,7 +218,7 @@ struct SC::EventLoop::KernelQueue
             }
         }
         const BOOL success = GetQueuedCompletionStatusEx(
-            loopNativeDescriptor, events, static_cast<ULONG>(SizeOfArray(events)), &newEvents,
+            loopNativeDescriptor, events, static_cast<ULONG>(TypeTraits::SizeOfArray(events)), &newEvents,
             nextTimer or pollMode == PollMode::NoWait ? static_cast<ULONG>(timeout.ms) : INFINITE, FALSE);
         if (not success and GetLastError() != WAIT_TIMEOUT)
         {

@@ -83,7 +83,7 @@ struct SC::StringFormat<RangeIterator>::Implementation
     {
         if (position == Total - N)
         {
-            using First = typename RemoveConst<typename RemoveReference<T>::type>::type;
+            using First = typename TypeTraits::RemoveConst<typename TypeTraits::RemoveReference<T>::type>::type;
             return StringFormatterFor<First>::format(data, specifier, arg);
         }
         else
@@ -93,8 +93,8 @@ struct SC::StringFormat<RangeIterator>::Implementation
     }
 
     template <int Total, int N, typename... Args>
-    static typename SC::EnableIf<sizeof...(Args) == 0, bool>::type formatArgument(StringFormatOutput&, StringView, int,
-                                                                                  Args...)
+    static typename SC::TypeTraits::EnableIf<sizeof...(Args) == 0, bool>::type formatArgument(StringFormatOutput&,
+                                                                                              StringView, int, Args...)
     {
         return false;
     }

@@ -49,7 +49,7 @@ struct TaggedUnionAlignedStorage
 };
 
 template <size_t Len, class... Types>
-struct TaggedUnionAlignedStorage<Len, TypeList<Types...>>
+struct TaggedUnionAlignedStorage<Len, TypeTraits::TypeList<Types...>>
 {
     static constexpr size_t alignment_value = max({alignof(typename Types::type)...});
 
@@ -84,7 +84,7 @@ struct SC::TaggedUnion
 {
   private:
     template <int Index>
-    using TypeAt = TypeListGetT<typename Union::FieldsTypes, Index>;
+    using TypeAt = TypeTraits::TypeListGetT<typename Union::FieldsTypes, Index>;
 
   public:
     static constexpr auto NumTypes = Union::FieldsTypes::size;
@@ -99,8 +99,9 @@ struct SC::TaggedUnion
                                          ? StartIndex - 1
                                          : EnumToType<wantedEnum, StartIndex - 1>::index;
         static_assert(index >= 0, "Type not found!");
-        using type = ConditionalT<wantedEnum == TypeAt<StartIndex - 1>::value, typename TypeAt<StartIndex - 1>::type,
-                                  typename EnumToType<wantedEnum, StartIndex - 1>::type>;
+        using type =
+            TypeTraits::ConditionalT<wantedEnum == TypeAt<StartIndex - 1>::value, typename TypeAt<StartIndex - 1>::type,
+                                     typename EnumToType<wantedEnum, StartIndex - 1>::type>;
     };
 
     template <EnumType wantedEnum>

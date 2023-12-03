@@ -7,6 +7,8 @@
 
 namespace SC
 {
+namespace TypeTraits
+{
 //! @addtogroup group_foundation_type_traits
 //! @{
 
@@ -38,7 +40,7 @@ template <int N, int M, typename T, typename... TT>
 struct TypeListGet<TypeList<T, TT...>, N, M>
 {
     /// The retrieved type at the specified index.
-    using type = SC::ConditionalT<N == M, T, typename TypeListGet<TypeList<TT...>, N, M + 1>::type>;
+    using type = SC::TypeTraits::ConditionalT<N == M, T, typename TypeListGet<TypeList<TT...>, N, M + 1>::type>;
 };
 
 /// @brief Specialization of TypeListGet for an empty TypeList.
@@ -68,5 +70,5 @@ template <typename T, int N>
 using TypeListGetT = typename TypeListGet<T, N>::type;
 
 //! @}
-
+} // namespace TypeTraits
 } // namespace SC

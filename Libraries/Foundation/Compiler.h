@@ -206,10 +206,11 @@
 // clang-format off
 namespace SC
 {
-
+namespace TypeTraits
+{
 //! @addtogroup group_foundation_type_traits
 //! @{
-    
+
 /// Removes reference from a type T.
 template <class T> struct RemoveReference       { using type = T; };
 template <class T> struct RemoveReference<T&>   { using type = T; };
@@ -221,16 +222,18 @@ template <class T> struct IsLValueReference<T&> { static constexpr bool value = 
 template <class T> struct IsRValueReference     { static constexpr bool value = false; };
 template <class T> struct IsRValueReference<T&&>{ static constexpr bool value = true; };
 
+}
+
 /// Converts an lvalue to an rvalue reference.
 template <typename T> constexpr T&& move(T& value) { return static_cast<T&&>(value); }
 
 /// Forwards an lvalue or an rvalue as an rvalue reference.
-template <typename T> constexpr T&& forward(typename RemoveReference<T>::type& value) { return static_cast<T&&>(value); }
+template <typename T> constexpr T&& forward(typename TypeTraits::RemoveReference<T>::type& value) { return static_cast<T&&>(value); }
 
 /// Forwards an rvalue as an rvalue reference, with a check that it's not an lvalue reference.
-template <typename T> constexpr T&& forward(typename RemoveReference<T>::type&& value)
+template <typename T> constexpr T&& forward(typename TypeTraits::RemoveReference<T>::type&& value)
 {
-    static_assert(!IsLValueReference<T>::value, "Forward an rvalue as an lvalue is not allowed");
+    static_assert(!TypeTraits::IsLValueReference<T>::value, "Forward an rvalue as an lvalue is not allowed");
     return static_cast<T&&>(value);
 }
 

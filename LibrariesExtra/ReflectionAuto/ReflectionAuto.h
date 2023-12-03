@@ -24,7 +24,7 @@ struct TypeListVisit
     template <typename Visitor>
     constexpr static bool visit(Visitor&& visitor)
     {
-        using Type = TypeListGetT<TypeList, N - 1>;
+        using Type = TypeTraits::TypeListGetT<TypeList, N - 1>;
         return TypeListVisit<TypeList, N - 1>::visit(forward<Visitor>(visitor)) and
                visitor.template visit<N - 1, Type>();
     }
@@ -117,7 +117,7 @@ template <typename T, int... NN>
 struct type_list<T, IntegerSequence<int, NN...>>
 {
     static constexpr int size = sizeof...(NN);
-    using type                = SC::TypeList<typename decltype(loophole(tag<T, NN>{}))::type...>;
+    using type                = SC::TypeTraits::TypeList<typename decltype(loophole(tag<T, NN>{}))::type...>;
 };
 } // namespace Auto
 } // namespace Reflection

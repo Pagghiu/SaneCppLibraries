@@ -9,7 +9,7 @@
 #include "../Foundation/Limits.h"
 #include "../Foundation/PrimitiveTypes.h"
 #include "../Foundation/Span.h"
-#include "../Foundation/TypeTraits.h" // EnableIf, IsTriviallyCopyable
+#include "../Foundation/TypeTraits.h" // EnableIf, TypeTraits::IsTriviallyCopyable
 
 namespace SC
 {
@@ -104,38 +104,38 @@ struct SC::SegmentItems : public SegmentHeader
     static void moveConstruct(T* destination, size_t indexStart, size_t numElements, T* source);
 
     template <typename U, bool IsCopy>
-    static typename EnableIf<IsCopy, void>::type constructItems(T* destination, size_t indexStart, size_t numElements,
-                                                                U* sourceValue);
+    static typename TypeTraits::EnableIf<IsCopy, void>::type constructItems(T* destination, size_t indexStart,
+                                                                            size_t numElements, U* sourceValue);
 
     template <typename U, bool IsCopy>
-    static typename EnableIf<not IsCopy, void>::type constructItems(U* destination, size_t indexStart,
-                                                                    size_t numElements, U* sourceValue);
+    static typename TypeTraits::EnableIf<not IsCopy, void>::type constructItems(U* destination, size_t indexStart,
+                                                                                size_t numElements, U* sourceValue);
 
     template <typename Q = T>
-    static typename EnableIf<not IsTriviallyCopyable<Q>::value, void>::type //
+    static typename TypeTraits::EnableIf<not TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
     moveItems(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN);
 
     template <typename Q = T>
-    static typename EnableIf<IsTriviallyCopyable<Q>::value, void>::type //
+    static typename TypeTraits::EnableIf<TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
     moveItems(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN);
 
     template <typename U, typename Q = T>
-    static typename EnableIf<not IsTriviallyCopyable<Q>::value, void>::type //
+    static typename TypeTraits::EnableIf<not TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
     copyItems(T* oldItems, const size_t numToAssign, const size_t numToCopyConstruct, const size_t numToDestroy,
               U* other, size_t otherSize);
 
     template <typename U, typename Q = T>
-    static typename EnableIf<IsTriviallyCopyable<Q>::value, void>::type //
+    static typename TypeTraits::EnableIf<TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
     copyItems(T* oldItems, const size_t numToAssign, const size_t numToCopyConstruct, const size_t numToDestroy,
               U* other, size_t otherSize);
 
     template <bool IsCopy, typename U, typename Q = T>
-    static typename EnableIf<not IsTriviallyCopyable<Q>::value, void>::type //
+    static typename TypeTraits::EnableIf<not TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
     insertItems(T*& oldItems, size_t position, const size_t numElements, const size_t newSize, U* other,
                 size_t otherSize);
 
     template <bool IsCopy, typename U, typename Q = T>
-    static typename EnableIf<IsTriviallyCopyable<U>::value, void>::type //
+    static typename TypeTraits::EnableIf<TypeTraits::IsTriviallyCopyable<U>::value, void>::type //
     insertItems(T*& oldItems, size_t position, const size_t numElements, const size_t newSize, U* other,
                 size_t otherSize);
 
@@ -155,11 +155,11 @@ struct SC::SegmentOperations
     [[nodiscard]] static bool push_back(T*& oldItems, T&& element);
 
     template <bool sizeOfTIsSmallerThanInt>
-    static typename EnableIf<sizeOfTIsSmallerThanInt == true, void>::type //
+    static typename TypeTraits::EnableIf<sizeOfTIsSmallerThanInt == true, void>::type //
     // sizeof(T) <= sizeof(int) (uses memset)
     reserveInternal(T* items, const size_t oldSize, const size_t newSize, const T& defaultValue);
     template <bool sizeOfTIsSmallerThanInt>
-    static typename EnableIf<sizeOfTIsSmallerThanInt == false, void>::type //
+    static typename TypeTraits::EnableIf<sizeOfTIsSmallerThanInt == false, void>::type //
     // sizeof(T) > sizeof(int) (cannot use memset)
     reserveInternal(T* items, const size_t oldSize, const size_t newSize, const T& defaultValue);
 
@@ -176,11 +176,11 @@ struct SC::SegmentOperations
     [[nodiscard]] static bool ensureCapacity(T*& oldItems, size_t newCapacity, const size_t keepFirstN);
 
     template <bool initialize, typename Q = T>
-    [[nodiscard]] static typename EnableIf<IsTriviallyCopyable<Q>::value, bool>::type //
+    [[nodiscard]] static typename TypeTraits::EnableIf<TypeTraits::IsTriviallyCopyable<Q>::value, bool>::type //
     resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue);
 
     template <bool initialize, typename Q = T>
-    [[nodiscard]] static typename EnableIf<not IsTriviallyCopyable<Q>::value, bool>::type //
+    [[nodiscard]] static typename TypeTraits::EnableIf<not TypeTraits::IsTriviallyCopyable<Q>::value, bool>::type //
     resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue);
 
     [[nodiscard]] static bool shrink_to_fit(T*& oldItems);
@@ -260,7 +260,7 @@ void SC::SegmentItems<T>::moveConstruct(T* destination, size_t indexStart, size_
 
 template <typename T>
 template <typename U, bool IsCopy>
-typename SC::EnableIf<IsCopy, void>::type //
+typename SC::TypeTraits::EnableIf<IsCopy, void>::type //
 SC::SegmentItems<T>::constructItems(T* destination, size_t indexStart, size_t numElements, U* sourceValue)
 {
     copyConstructMultiple(destination, indexStart, numElements, sourceValue);
@@ -268,7 +268,7 @@ SC::SegmentItems<T>::constructItems(T* destination, size_t indexStart, size_t nu
 
 template <typename T>
 template <typename U, bool IsCopy>
-typename SC::EnableIf<not IsCopy, void>::type //
+typename SC::TypeTraits::EnableIf<not IsCopy, void>::type //
 SC::SegmentItems<T>::constructItems(U* destination, size_t indexStart, size_t numElements, U* sourceValue)
 {
     moveConstruct(destination, indexStart, numElements, sourceValue);
@@ -276,7 +276,7 @@ SC::SegmentItems<T>::constructItems(U* destination, size_t indexStart, size_t nu
 
 template <typename T>
 template <typename Q>
-typename SC::EnableIf<not SC::IsTriviallyCopyable<Q>::value, void>::type //
+typename SC::TypeTraits::EnableIf<not SC::TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
 SC::SegmentItems<T>::moveItems(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN)
 {
     moveConstruct(newItems, 0, keepFirstN, oldItems);
@@ -285,7 +285,7 @@ SC::SegmentItems<T>::moveItems(T* oldItems, T* newItems, const size_t oldSize, c
 
 template <typename T>
 template <typename Q>
-typename SC::EnableIf<SC::IsTriviallyCopyable<Q>::value, void>::type //
+typename SC::TypeTraits::EnableIf<SC::TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
 SC::SegmentItems<T>::moveItems(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN)
 {
     SC_COMPILER_UNUSED(oldSize);
@@ -295,7 +295,7 @@ SC::SegmentItems<T>::moveItems(T* oldItems, T* newItems, const size_t oldSize, c
 
 template <typename T>
 template <typename U, typename Q>
-typename SC::EnableIf<not SC::IsTriviallyCopyable<Q>::value, void>::type //
+typename SC::TypeTraits::EnableIf<not SC::TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
 SC::SegmentItems<T>::copyItems(T* oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
                                const size_t numToDestroy, U* other, size_t otherSize)
 {
@@ -307,7 +307,7 @@ SC::SegmentItems<T>::copyItems(T* oldItems, const size_t numToAssign, const size
 
 template <typename T>
 template <typename U, typename Q>
-typename SC::EnableIf<SC::IsTriviallyCopyable<Q>::value, void>::type //
+typename SC::TypeTraits::EnableIf<SC::TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
 SC::SegmentItems<T>::copyItems(T* oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
                                const size_t numToDestroy, U* other, size_t otherSize)
 {
@@ -320,7 +320,7 @@ SC::SegmentItems<T>::copyItems(T* oldItems, const size_t numToAssign, const size
 
 template <typename T>
 template <bool IsCopy, typename U, typename Q>
-typename SC::EnableIf<not SC::IsTriviallyCopyable<Q>::value, void>::type //
+typename SC::TypeTraits::EnableIf<not SC::TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
 SC::SegmentItems<T>::insertItems(T*& oldItems, size_t position, const size_t numElements, const size_t newSize,
                                  U* other, size_t otherSize)
 {
@@ -332,7 +332,7 @@ SC::SegmentItems<T>::insertItems(T*& oldItems, size_t position, const size_t num
 
 template <typename T>
 template <bool IsCopy, typename U, typename Q>
-typename SC::EnableIf<SC::IsTriviallyCopyable<U>::value, void>::type //
+typename SC::TypeTraits::EnableIf<SC::TypeTraits::IsTriviallyCopyable<U>::value, void>::type //
 SC::SegmentItems<T>::insertItems(T*& oldItems, size_t position, const size_t numElements, const size_t newSize,
                                  U* other, size_t otherSize)
 {
@@ -399,7 +399,7 @@ bool SC::SegmentOperations<Allocator, T>::push_back(T*& oldItems, T&& element)
 
 template <typename Allocator, typename T>
 template <bool sizeOfTIsSmallerThanInt>
-typename SC::EnableIf<sizeOfTIsSmallerThanInt == true, void>::type // sizeof(T) <= sizeof(int)
+typename SC::TypeTraits::EnableIf<sizeOfTIsSmallerThanInt == true, void>::type // sizeof(T) <= sizeof(int)
 SC::SegmentOperations<Allocator, T>::reserveInternal(T* items, const size_t oldSize, const size_t newSize,
                                                      const T& defaultValue)
 {
@@ -424,7 +424,8 @@ SC::SegmentOperations<Allocator, T>::reserveInternal(T* items, const size_t oldS
 
 template <typename Allocator, typename T>
 template <bool sizeOfTIsSmallerThanInt>
-typename SC::EnableIf<sizeOfTIsSmallerThanInt == false, void>::type // sizeof(T) > sizeof(int) (cannot use memset)
+typename SC::TypeTraits::EnableIf<sizeOfTIsSmallerThanInt == false,
+                                  void>::type // sizeof(T) > sizeof(int) (cannot use memset)
 SC::SegmentOperations<Allocator, T>::reserveInternal(T* items, const size_t oldSize, const size_t newSize,
                                                      const T& defaultValue)
 {
@@ -577,7 +578,7 @@ bool SC::SegmentOperations<Allocator, T>::ensureCapacity(T*& oldItems, size_t ne
 
 template <typename Allocator, typename T>
 template <bool initialize, typename Q>
-typename SC::EnableIf<SC::IsTriviallyCopyable<Q>::value, bool>::type //
+typename SC::TypeTraits::EnableIf<SC::TypeTraits::IsTriviallyCopyable<Q>::value, bool>::type //
 SC::SegmentOperations<Allocator, T>::resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue)
 {
     const auto oldSize = oldItems == nullptr ? 0 : SegmentItems<T>::getSegment(oldItems)->size();
@@ -598,7 +599,7 @@ SC::SegmentOperations<Allocator, T>::resizeInternal(T*& oldItems, size_t newSize
 
 template <typename Allocator, typename T>
 template <bool initialize, typename Q>
-typename SC::EnableIf<not SC::IsTriviallyCopyable<Q>::value, bool>::type //
+typename SC::TypeTraits::EnableIf<not SC::TypeTraits::IsTriviallyCopyable<Q>::value, bool>::type //
 SC::SegmentOperations<Allocator, T>::resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue)
 {
     static_assert(initialize, "There is no logical reason to skip initializing non trivially copyable class on resize");

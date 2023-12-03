@@ -150,7 +150,7 @@ struct SerializerStructuredReaderVector
 };
 
 template <typename SerializerStream, typename T>
-struct ReadWrite<SerializerStream, T, typename SC::EnableIf<Reflection::IsPrimitive<T>::value>::type>
+struct ReadWrite<SerializerStream, T, typename SC::TypeTraits::EnableIf<Reflection::IsPrimitive<T>::value>::type>
 {
     [[nodiscard]] static constexpr bool serialize(uint32_t index, T& object, SerializerStream& stream)
     {

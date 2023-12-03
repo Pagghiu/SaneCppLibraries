@@ -33,7 +33,7 @@ struct smallerThan
 /// @param first Iterator pointing at first element of the range
 /// @param last Iterator pointing at last element of the array
 /// @param predicate The given BinaryPredicate
-template <typename Iterator, typename BinaryPredicate = smallerThan<typename RemovePointer<Iterator>::type>>
+template <typename Iterator, typename BinaryPredicate = smallerThan<typename TypeTraits::RemovePointer<Iterator>::type>>
 constexpr void bubbleSort(Iterator first, Iterator last, BinaryPredicate predicate = BinaryPredicate())
 {
     if (first >= last)

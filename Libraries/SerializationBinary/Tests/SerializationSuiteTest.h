@@ -44,7 +44,7 @@ struct SC::SerializationSuiteTest::PrimitiveStruct
 
     bool operator!=(const PrimitiveStruct& other) const
     {
-        for (size_t i = 0; i < SizeOfArray(arrayValue); ++i)
+        for (size_t i = 0; i < TypeTraits::SizeOfArray(arrayValue); ++i)
         {
             if (arrayValue[i] != other.arrayValue[i])
                 return true;
@@ -74,7 +74,7 @@ struct SC::SerializationSuiteTest::NestedStruct
     {
         if (int16Value != other.int16Value)
             return true;
-        for (size_t i = 0; i < SizeOfArray(structsArray); ++i)
+        for (size_t i = 0; i < TypeTraits::SizeOfArray(structsArray); ++i)
             if (structsArray[i] != other.structsArray[i])
                 return true;
         if (doubleVal != other.doubleVal)

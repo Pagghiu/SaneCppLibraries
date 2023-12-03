@@ -211,7 +211,7 @@ template <typename T> struct IsPrimitive { static constexpr bool value = TypeInf
 // clang-format on
 
 template <typename T>
-struct ExtendedTypeInfo<T, typename SC::EnableIf<IsPrimitive<T>::value>::type>
+struct ExtendedTypeInfo<T, typename SC::TypeTraits::EnableIf<IsPrimitive<T>::value>::type>
 {
     // Primitive types are packed
     static constexpr bool IsPacked = true;

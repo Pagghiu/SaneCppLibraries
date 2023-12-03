@@ -15,9 +15,9 @@ struct UniqueOptional;
 template <typename T>
 struct ReferenceWrapper
 {
-    typename RemoveReference<T>::type* ptr;
+    typename TypeTraits::RemoveReference<T>::type* ptr;
 
-    ReferenceWrapper(typename RemoveReference<T>::type& other) : ptr(&other) {}
+    ReferenceWrapper(typename TypeTraits::RemoveReference<T>::type& other) : ptr(&other) {}
     ~ReferenceWrapper() {}
     operator const T&() const { return *ptr; }
     operator T&() { return *ptr; }
@@ -28,7 +28,8 @@ template <typename Value>
 struct [[nodiscard]] SC::Optional
 {
     // We cannot have a reference in union, so we use ReferenceWrapper
-    using ValueType = typename Conditional<IsReference<Value>::value, ReferenceWrapper<Value>, Value>::type;
+    using ValueType =
+        typename TypeTraits::Conditional<TypeTraits::IsReference<Value>::value, ReferenceWrapper<Value>, Value>::type;
 
   private:
     union

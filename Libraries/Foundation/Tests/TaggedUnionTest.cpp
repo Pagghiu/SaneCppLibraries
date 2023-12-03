@@ -17,7 +17,8 @@ enum TestType
 
 struct TestUnion
 {
-    using FieldsTypes = TypeList<TaggedField<TestType, TypeString, String>, TaggedField<TestType, TypeInt, int>>;
+    using FieldsTypes =
+        TypeTraits::TypeList<TaggedField<TestType, TypeString, String>, TaggedField<TestType, TypeInt, int>>;
 };
 } // namespace SC
 

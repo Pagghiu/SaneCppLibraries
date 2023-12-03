@@ -108,7 +108,7 @@ struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
         SC_COMPILER_UNUSED(property);
         if (object.sizeInBytes() >= sizeof(void*))
         {
-            using VectorType = typename SameConstnessAs<ByteType, Container>::type;
+            using VectorType = typename TypeTraits::SameConstnessAs<ByteType, Container>::type;
             auto& vectorByte = *reinterpret_cast<VectorType*>(object.data());
             itemBegin        = itemBegin.reinterpret_bytes(vectorByte.data(), vectorByte.size() * sizeof(ItemType));
             return true;
@@ -119,14 +119,14 @@ struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
         }
     }
     template <typename Q = ItemType>
-    [[nodiscard]] static typename EnableIf<not IsTriviallyCopyable<Q>::value, void>::type //
+    [[nodiscard]] static typename TypeTraits::EnableIf<not TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
         constexpr assignResizeWithoutInitialize(VectorVTable& vector)
     {
         SC_COMPILER_UNUSED(vector);
     }
 
     template <typename Q = ItemType>
-    [[nodiscard]] static typename EnableIf<IsTriviallyCopyable<Q>::value, void>::type //
+    [[nodiscard]] static typename TypeTraits::EnableIf<TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
         constexpr assignResizeWithoutInitialize(VectorVTable& vector)
     {
         vector.resizeWithoutInitialize = &resizeWithoutInitialize;

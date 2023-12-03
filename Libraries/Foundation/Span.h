@@ -20,7 +20,7 @@ template <typename Type>
 struct SC::Span
 {
     using SizeType = size_t;
-    using VoidType = typename SameConstnessAs<Type, void>::type;
+    using VoidType = typename TypeTraits::SameConstnessAs<Type, void>::type;
 
     /// @brief Builds an empty Span
     constexpr Span() : items(nullptr), sizeElements(0) {}

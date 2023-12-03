@@ -66,7 +66,7 @@ bool SC::FileSystem::convert(const StringView file, String& destination, StringV
         auto tempRes = func;                                                                                           \
         if (not tempRes)                                                                                               \
         {                                                                                                              \
-            if (IsSame<decltype(tempRes), Result>::value)                                                              \
+            if (TypeTraits::IsSame<decltype(tempRes), Result>::value)                                                  \
             {                                                                                                          \
                 return Result(tempRes);                                                                                \
             }                                                                                                          \
@@ -82,7 +82,7 @@ bool SC::FileSystem::convert(const StringView file, String& destination, StringV
         auto tempRes = func;                                                                                           \
         if (not tempRes)                                                                                               \
         {                                                                                                              \
-            if (IsSame<decltype(tempRes), Result>::value)                                                              \
+            if (SC::TypeTraits::IsSame<decltype(tempRes), Result>::value)                                              \
             {                                                                                                          \
                 return Result(tempRes);                                                                                \
             }                                                                                                          \

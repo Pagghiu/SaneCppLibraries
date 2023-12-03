@@ -16,7 +16,7 @@ template <typename Definition>
 struct UniqueHandle
 {
     using Handle          = typename Definition::Handle;
-    using CloseReturnType = typename ReturnType<decltype(Definition::releaseHandle)>::type;
+    using CloseReturnType = typename TypeTraits::ReturnType<decltype(Definition::releaseHandle)>::type;
 
     static constexpr Handle Invalid = Definition::Invalid;
 

@@ -70,7 +70,8 @@ struct SerializerReadWriteFast<BinaryStream, T[N]>
 
 /// @brief Primitive serializer
 template <typename BinaryStream, typename T>
-struct SerializerReadWriteFast<BinaryStream, T, typename SC::EnableIf<Reflection::IsPrimitive<T>::value>::type>
+struct SerializerReadWriteFast<BinaryStream, T,
+                               typename SC::TypeTraits::EnableIf<Reflection::IsPrimitive<T>::value>::type>
 {
     [[nodiscard]] static constexpr bool serialize(T& object, BinaryStream& stream)
     {

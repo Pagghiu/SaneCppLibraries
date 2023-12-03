@@ -235,7 +235,8 @@ struct SerializerReadVersioned<BinaryStream, SC::Array<T, N>>
 };
 
 template <typename BinaryStream, typename T>
-struct SerializerReadVersioned<BinaryStream, T, typename SC::EnableIf<Reflection::IsPrimitive<T>::value>::type>
+struct SerializerReadVersioned<BinaryStream, T,
+                               typename SC::TypeTraits::EnableIf<Reflection::IsPrimitive<T>::value>::type>
 {
     template <typename ValueType>
     [[nodiscard]] static bool readCastValue(T& destination, BinaryStream& stream)
@@ -262,7 +263,7 @@ struct SerializerReadVersioned<BinaryStream, T, typename SC::EnableIf<Reflection
             case Reflection::TypeCategory::TypeINT64:      return readCastValue<int64_t>(object, stream);
             case Reflection::TypeCategory::TypeFLOAT32:
             {
-                if(schema.options.allowFloatToIntTruncation || IsSame<T, float>::value || IsSame<T, double>::value)
+                if(schema.options.allowFloatToIntTruncation or TypeTraits::IsSame<T, float>::value or TypeTraits::IsSame<T, double>::value)
                 {
                     return readCastValue<float>(object, stream);
                 }
@@ -270,7 +271,7 @@ struct SerializerReadVersioned<BinaryStream, T, typename SC::EnableIf<Reflection
             }
             case Reflection::TypeCategory::TypeDOUBLE64:
             {
-                if(schema.options.allowFloatToIntTruncation || IsSame<T, float>::value || IsSame<T, double>::value)
+                if(schema.options.allowFloatToIntTruncation or TypeTraits::IsSame<T, float>::value or TypeTraits::IsSame<T, double>::value)
                 {
                     return readCastValue<double>(object, stream);
                 }

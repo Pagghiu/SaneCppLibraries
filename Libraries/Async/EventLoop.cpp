@@ -452,7 +452,7 @@ void SC::EventLoop::completeAsync(KernelQueue& queue, Async& async, Result&& ret
     bool res = Async::applyOnAsync(async,
                                    [&](auto& p)
                                    {
-                                       using Type = typename RemoveReference<decltype(p)>::type;
+                                       using Type = typename TypeTraits::RemoveReference<decltype(p)>::type;
                                        typename Type::Result result(p, forward<Result>(returnCode));
                                        if (result.returnCode)
                                            result.returnCode = Result(queue.completeAsync(result));

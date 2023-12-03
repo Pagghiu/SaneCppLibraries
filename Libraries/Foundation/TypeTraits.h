@@ -15,6 +15,9 @@
 
 namespace SC
 {
+/// @brief Template meta-programming helpers
+namespace TypeTraits
+{
 // clang-format off
 //! @addtogroup group_foundation_type_traits
 //! @{
@@ -74,8 +77,8 @@ template <typename U, typename T> struct SameConstnessAs { using type = typename
 template <typename T, size_t N> constexpr auto SizeOfArray(const T (&)[N]) { return N; }
 
 //! @}
-
 // clang-format on
+} // namespace TypeTraits
 } // namespace SC
 
 // Defining a constexpr destructor is C++ 20+

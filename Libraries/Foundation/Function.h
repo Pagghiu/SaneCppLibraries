@@ -35,7 +35,7 @@ struct Function<R(Args...)>
         LambdaMoveConstruct
     };
     using StubFunction = R (*)(FunctionErasedOperation operation, const void** other, const void* const*,
-                               typename AddPointer<Args>::type...);
+                               typename TypeTraits::AddPointer<Args>::type...);
 
     static const int LAMBDA_SIZE = sizeof(void*) * 2;
 
@@ -49,7 +49,7 @@ struct Function<R(Args...)>
     {
         if (functionStub)
         {
-            (*functionStub)(operation, other, &classInstance, typename AddPointer<Args>::type(nullptr)...);
+            (*functionStub)(operation, other, &classInstance, typename TypeTraits::AddPointer<Args>::type(nullptr)...);
         }
     }
 
@@ -67,12 +67,14 @@ struct Function<R(Args...)>
     /// Constructs a function from a lambda with a compatible size (equal or less than LAMBDA_SIZE)
     /// If lambda is bigger than `LAMBDA_SIZE` a static assertion will be issued
     /// SFINAE is used to avoid universal reference from "eating" also copy constructor
-    template <typename Lambda, typename = typename EnableIf<
-                                   not IsSame<typename RemoveReference<Lambda>::type, Function>::value, void>::type>
+    template <
+        typename Lambda,
+        typename = typename TypeTraits::EnableIf<
+            not TypeTraits::IsSame<typename TypeTraits::RemoveReference<Lambda>::type, Function>::value, void>::type>
     Function(Lambda&& lambda)
     {
         functionStub = nullptr;
-        bind(forward<typename RemoveReference<Lambda>::type>(lambda));
+        bind(forward<typename TypeTraits::RemoveReference<Lambda>::type>(lambda));
     }
 
     /// @brief Destroys the function wrapper
@@ -135,7 +137,7 @@ struct Function<R(Args...)>
         new (&classInstance, PlacementNew()) Lambda(forward<Lambda>(lambda));
         static_assert(sizeof(Lambda) <= sizeof(lambdaMemory), "Lambda is too big");
         functionStub = [](FunctionErasedOperation operation, const void** other, const void* const* p,
-                          typename AddPointer<Args>::type... args) -> R
+                          typename TypeTraits::AddPointer<Args>::type... args) -> R
         {
             Lambda& lambda = *reinterpret_cast<Lambda*>(const_cast<void**>(p));
             if (operation == FunctionErasedOperation::Execute)
@@ -217,7 +219,7 @@ struct Function<R(Args...)>
   private:
     template <typename Class, R (Class::*MemberFunction)(Args...)>
     static R MemberWrapper(FunctionErasedOperation operation, const void** other, const void* const* p,
-                           typename RemoveReference<Args>::type*... args)
+                           typename TypeTraits::RemoveReference<Args>::type*... args)
     {
         if (operation == FunctionErasedOperation::Execute)
             SC_LANGUAGE_LIKELY
@@ -235,7 +237,7 @@ struct Function<R(Args...)>
     }
     template <typename Class, R (Class::*MemberFunction)(Args...) const>
     static R MemberWrapper(FunctionErasedOperation operation, const void** other, const void* const* p,
-                           typename RemoveReference<Args>::type*... args)
+                           typename TypeTraits::RemoveReference<Args>::type*... args)
     {
         if (operation == FunctionErasedOperation::Execute)
             SC_LANGUAGE_LIKELY
@@ -253,7 +255,7 @@ struct Function<R(Args...)>
 
     template <R (*FreeFunction)(Args...)>
     static R FunctionWrapper(FunctionErasedOperation operation, const void** other, const void* const* p,
-                             typename RemoveReference<Args>::type*... args)
+                             typename TypeTraits::RemoveReference<Args>::type*... args)
     {
         SC_COMPILER_UNUSED(other);
         SC_COMPILER_UNUSED(p);
