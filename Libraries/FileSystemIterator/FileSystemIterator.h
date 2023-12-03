@@ -13,9 +13,7 @@ struct FileSystemIterator;
 } // namespace SC
 
 //! @defgroup group_file_system_iterator FileSystem Iterator
-//! @copybrief library_file_system_iterator
-//!
-//! See @ref library_file_system_iterator library page for more details.<br>
+//! @copybrief library_file_system_iterator (see @ref library_file_system_iterator for more details)
 
 //! @addtogroup group_file_system_iterator
 //! @{

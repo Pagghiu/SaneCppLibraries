@@ -7,6 +7,9 @@ namespace SC
 {
 namespace Reflection
 {
+//! @addtogroup group_reflection
+//! @{
+
 /// @brief A constexpr array
 /// @tparam T Item types
 /// @tparam N Maximum number of items
@@ -184,5 +187,8 @@ struct TypeToString
     }
 #endif
 };
+
+//! @}
+
 } // namespace Reflection
 } // namespace SC

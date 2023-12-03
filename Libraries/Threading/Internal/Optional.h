@@ -12,6 +12,8 @@ struct Optional;
 template <typename Value>
 struct UniqueOptional;
 
+namespace TypeTraits
+{
 template <typename T>
 struct ReferenceWrapper
 {
@@ -22,14 +24,16 @@ struct ReferenceWrapper
     operator const T&() const { return *ptr; }
     operator T&() { return *ptr; }
 };
+} // namespace TypeTraits
 } // namespace SC
 
+/// @brief A value that may or may not exist
 template <typename Value>
 struct [[nodiscard]] SC::Optional
 {
     // We cannot have a reference in union, so we use ReferenceWrapper
-    using ValueType =
-        typename TypeTraits::Conditional<TypeTraits::IsReference<Value>::value, ReferenceWrapper<Value>, Value>::type;
+    using ValueType = typename TypeTraits::Conditional<TypeTraits::IsReference<Value>::value,
+                                                       TypeTraits::ReferenceWrapper<Value>, Value>::type;
 
   private:
     union
@@ -175,6 +179,7 @@ struct [[nodiscard]] SC::Optional
     }
 };
 
+/// @brief An Optional value that can be moved but cannot be copied
 template <typename Value>
 struct [[nodiscard]] SC::UniqueOptional : public Optional<Value>
 {

@@ -13,7 +13,7 @@ struct VectorSet;
 //! @addtogroup group_containers
 //! @{
 
-/// @brief Simple and inefficient set built with a SC::Vector, ensuring no item duplication
+/// @brief Simple and inefficient set built with a Vector, ensuring no item duplication
 /// @tparam Value The contained value
 /// @tparam Container The underlying container used
 template <typename Value, typename Container = SC::Vector<Value>>
@@ -28,12 +28,14 @@ struct SC::VectorSet
     [[nodiscard]] Value*       end() { return items.end(); }
     [[nodiscard]] const Value* end() const { return items.end(); }
 
+    /// @brief Check if the given Value exists in the VectorSet
     template <typename ComparableToValue>
     [[nodiscard]] bool contains(const ComparableToValue& value)
     {
         return items.contains(value);
     }
 
+    /// @brief Inserts a value in the VectorSet (if it doesn't already exists)
     [[nodiscard]] bool insert(const Value& value)
     {
         if (items.contains(value))
@@ -43,6 +45,7 @@ struct SC::VectorSet
         return items.push_back(value);
     }
 
+    /// @brief Removes a value from the VectorSet (if it exists)
     template <typename ComparableToValue>
     [[nodiscard]] bool remove(const ComparableToValue& value)
     {

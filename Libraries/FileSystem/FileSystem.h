@@ -13,9 +13,7 @@ struct StringConverter;
 } // namespace SC
 
 //! @defgroup group_file_system FileSystem
-//! @copybrief library_file_system
-//!
-//! See @ref library_file_system library page for more details.<br>
+//! @copybrief library_file_system (see  @ref library_file_system for more details)
 
 //! @addtogroup group_file_system
 //! @{

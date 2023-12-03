@@ -287,9 +287,7 @@ struct SerializerReadVersioned<BinaryStream, T,
 } // namespace detail
 
 //! @defgroup group_serialization_binary Serialization Binary
-//! @copybrief library_serialization_binary
-//!
-//! See @ref library_serialization_binary library page for more details.<br>
+//! @copybrief library_serialization_binary (see @ref library_serialization_binary for more details)
 
 //! @addtogroup group_serialization_binary
 //! @{

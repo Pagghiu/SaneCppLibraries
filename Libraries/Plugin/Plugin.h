@@ -9,6 +9,7 @@
 
 namespace SC
 {
+/// @brief Minimal dependency based plugin system with hot-reload (see @ref library_plugin)
 namespace Plugin
 {
 struct Definition;
@@ -24,9 +25,7 @@ using Identifier = SmallString<30>;
 } // namespace SC
 
 //! @defgroup group_plugin Plugin
-//! @copybrief library_plugin
-//!
-//! See @ref library_plugin library page for more details.<br>
+//! @copybrief library_plugin (see @ref library_plugin for more details)
 
 //! @addtogroup group_plugin
 //! @{

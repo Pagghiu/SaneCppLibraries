@@ -17,9 +17,7 @@ struct ProcessID;
 } // namespace SC
 
 //! @defgroup group_process Process
-//! @copybrief library_process
-//!
-//! See @ref library_process library page for more details.<br>
+//! @copybrief library_process (see @ref library_process for more details)
 
 //! @addtogroup group_process
 //! @{

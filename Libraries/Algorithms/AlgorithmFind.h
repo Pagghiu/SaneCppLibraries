@@ -6,6 +6,7 @@
 
 namespace SC
 {
+/// @brief Simple algorithms (see @ref library_algorithms)
 namespace Algorithms
 {
 

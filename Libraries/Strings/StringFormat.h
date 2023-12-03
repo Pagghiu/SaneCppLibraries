@@ -16,7 +16,7 @@ struct StringFormatterFor;
 //! @addtogroup group_strings
 //! @{
 
-/// @brief Allows pushing results of `StringFormat` to a buffer or to the console
+/// @brief Allows pushing results of StringFormat to a buffer or to the console
 struct StringFormatOutput
 {
     /// @brief Constructs a StringFormatOutput object pushing to a destination buffer

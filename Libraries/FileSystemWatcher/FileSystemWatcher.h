@@ -18,9 +18,7 @@ struct String;
 } // namespace SC
 
 //! @defgroup group_file_system_watcher FileSystem Watcher
-//! @copybrief library_file_system_watcher
-//!
-//! See @ref library_file_system_watcher library page for more details.<br>
+//! @copybrief library_file_system_watcher (see @ref library_file_system_watcher for more details)
 
 //! @addtogroup group_file_system_watcher
 //! @{

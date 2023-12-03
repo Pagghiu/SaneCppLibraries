@@ -14,7 +14,7 @@ struct SmallVector;
 //! @addtogroup group_containers
 //! @{
 
-/// @brief A SC::Vector that can hold up to `N` elements inline and `> N` on heap
+/// @brief A Vector that can hold up to `N` elements inline and `> N` on heap
 /// @tparam T Type of single vector element
 /// @tparam N Number of elements kept inline to avoid heap allocation
 template <typename T, int N>

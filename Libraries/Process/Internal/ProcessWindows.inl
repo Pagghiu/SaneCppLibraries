@@ -10,7 +10,7 @@
 #include <stdlib.h> // _exit
 #endif
 
-SC::Result SC::ProcessDescriptorDefinition::releaseHandle(HANDLE& handle)
+SC::Result SC::detail::ProcessDescriptorDefinition::releaseHandle(HANDLE& handle)
 {
     if (::CloseHandle(handle) == FALSE)
         return Result::Error("ProcessNativeHandleClose - CloseHandle failed");

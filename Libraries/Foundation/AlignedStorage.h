@@ -15,7 +15,7 @@ void static_assert_size()
 //! @addtogroup group_foundation_utility
 //! @{
 
-/// @brief  Just a buffer of bytes aligned to given alignment.
+/// @brief  A buffer of bytes with given alignment.
 ///         Typically used in PIMPL or similar mechanisms to hide OS Specific system includes.
 ///         For example it's used used to wrap SocketIPAddress, a Mutex and ConditionVariable.
 /// @tparam N Size in bytes of the Operating System Handle

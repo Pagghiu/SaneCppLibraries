@@ -9,7 +9,7 @@
 #include <sys/wait.h> // waitpid
 #include <unistd.h>   // pipe fork execl _exit
 
-SC::Result SC::ProcessDescriptorDefinition::releaseHandle(pid_t& handle)
+SC::Result SC::detail::ProcessDescriptorDefinition::releaseHandle(pid_t& handle)
 {
     handle = Invalid;
     return Result(true);

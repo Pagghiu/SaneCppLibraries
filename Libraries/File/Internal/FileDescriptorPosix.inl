@@ -96,7 +96,7 @@ struct SC::FileDescriptorPosixHelpers
 
 // FileDescriptor
 
-SC::Result SC::FileDescriptorDefinition::releaseHandle(Handle& handle)
+SC::Result SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handle)
 {
     if (::close(handle) != 0)
     {

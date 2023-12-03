@@ -17,9 +17,7 @@ struct EventObject;
 } // namespace SC
 
 //! @defgroup group_threading Threading
-//! @copybrief library_threading
-//!
-//! See @ref library_threading library page for more details.<br>
+//! @copybrief library_threading (see @ref library_threading library page for more details)
 
 //! @addtogroup group_threading
 //! @{
@@ -94,7 +92,7 @@ struct SC::ConditionVariable
     OpaqueConditionVariable condition;
 };
 
-/// @brief A native OS Thread
+/// @brief A native OS thread
 struct SC::Thread
 {
     Thread() = default;

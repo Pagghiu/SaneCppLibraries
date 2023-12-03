@@ -7,9 +7,7 @@
 #include "../Foundation/UniqueHandle.h"
 #include "../Strings/StringView.h"
 //! @defgroup group_file File
-//! @copybrief library_file
-//!
-//! See @ref library_file library page for more details.<br>
+//! @copybrief library_file (see @ref library_file for more details)
 
 namespace SC
 {
@@ -19,15 +17,15 @@ struct Vector;
 
 struct FileDescriptor;
 struct PipeDescriptor;
+namespace detail
+{
 struct FileDescriptorDefinition;
+}
 } // namespace SC
-
-//! @addtogroup group_file
-//! @{
 
 #if SC_PLATFORM_WINDOWS
 
-struct SC::FileDescriptorDefinition
+struct SC::detail::FileDescriptorDefinition
 {
     using Handle = void*; // HANDLE
     static Result releaseHandle(Handle& handle);
@@ -40,7 +38,7 @@ struct SC::FileDescriptorDefinition
 
 #else
 /// @brief Definition used to declare FileDescriptor (as argument to UniqueHandle)
-struct SC::FileDescriptorDefinition
+struct SC::detail::FileDescriptorDefinition
 {
     using Handle = int; // fd
     static Result releaseHandle(Handle& handle);
@@ -50,8 +48,11 @@ struct SC::FileDescriptorDefinition
 
 #endif
 
+//! @addtogroup group_file
+//! @{
+
 /// @brief Wraps an OS File descriptor to read and write to and from it.
-struct SC::FileDescriptor : public SC::UniqueHandle<SC::FileDescriptorDefinition>
+struct SC::FileDescriptor : public SC::UniqueHandle<SC::detail::FileDescriptorDefinition>
 {
     using UniqueHandle::UniqueHandle;
     /// @brief Define mode for opening the file (read, write etc.)

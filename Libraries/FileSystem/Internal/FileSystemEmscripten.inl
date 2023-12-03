@@ -45,5 +45,5 @@ struct SC::FileSystem::Internal
 
     [[nodiscard]] static Result getFileTime(const char* file, FileTime& time) { return Result(false); }
 
-    [[nodiscard]] static Result setLastModifiedTime(const char* file, AbsoluteTime time) { return Result(false); }
+    [[nodiscard]] static Result setLastModifiedTime(const char* file, Time::Absolute time) { return Result(false); }
 };

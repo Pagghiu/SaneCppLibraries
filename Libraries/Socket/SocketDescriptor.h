@@ -17,23 +17,24 @@ struct Vector;
 namespace SC
 {
 struct SocketDescriptor;
-struct SocketDescriptorDefinition;
 struct SocketFlags;
 struct SocketIPAddress;
+namespace detail
+{
+struct SocketDescriptorDefinition;
+}
 } // namespace SC
 
 //! @defgroup group_socket Socket
-//! @copybrief library_socket
-//!
-//! See @ref library_socket library page for more details.<br>
+//! @copybrief library_socket (see @ref library_socket for more details)
 
 //! @addtogroup group_socket
 //! @{
 
-/// @brief Definition for SC::SocketDescriptor
+/// @brief Definition for SocketDescriptor
 #if SC_PLATFORM_WINDOWS
 
-struct SC::SocketDescriptorDefinition
+struct SC::detail::SocketDescriptorDefinition
 {
     using Handle = size_t; // SOCKET
     static Result releaseHandle(Handle& handle);
@@ -43,7 +44,7 @@ struct SC::SocketDescriptorDefinition
 
 #else
 
-struct SC::SocketDescriptorDefinition
+struct SC::detail::SocketDescriptorDefinition
 {
     using Handle = int; // fd
     static Result releaseHandle(Handle& handle);
@@ -53,7 +54,7 @@ struct SC::SocketDescriptorDefinition
 
 #endif
 
-/// @brief Flags for SC::SocketDescriptor (Blocking / Inheritable, IPVx, SocketType)
+/// @brief Flags for SocketDescriptor (Blocking / Inheritable, IPVx, SocketType)
 struct SC::SocketFlags
 {
     /// @brief Sets the socket as blocking / nonblocking mode
@@ -132,8 +133,8 @@ struct SC::SocketIPAddress
     SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
 };
 
-/// @brief An actual OS Socket Descriptor
-struct SC::SocketDescriptor : public UniqueHandle<SocketDescriptorDefinition>
+/// @brief Low-level OS socket handle
+struct SC::SocketDescriptor : public UniqueHandle<detail::SocketDescriptorDefinition>
 {
     /// @brief Creates a new Socket Descriptor of given family, type, protocol
     /// @param addressFamily Address family (IPV4 / IPV6)

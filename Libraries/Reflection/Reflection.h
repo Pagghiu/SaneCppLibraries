@@ -9,8 +9,15 @@
 
 namespace SC
 {
+/// @brief Describe C++ types at compile time for serialization (see @ref library_reflection).
 namespace Reflection
 {
+//! @defgroup group_reflection Reflection
+//! @copybrief library_reflection (see @ref library_reflection for more details)
+
+//! @addtogroup group_reflection
+//! @{
+
 /// @brief Enumeration of possible category types recognized by Reflection.
 /// @note We can use only 7 of the 8 bits here, as in TypeInfo we're stealing 1 bit for TypeInfo::hasLink
 enum class TypeCategory : uint8_t
@@ -168,6 +175,7 @@ struct TypeInfo
         return category >= TypeCategory::TypeUINT8 and category <= TypeCategory::TypeDOUBLE64;
     }
 };
+//! @}
 
 /// @brief Basic class template that must be partially specialized for each type.
 /// @tparam T The type to specialize for

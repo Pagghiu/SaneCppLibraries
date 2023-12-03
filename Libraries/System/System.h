@@ -12,18 +12,20 @@ struct SystemDebug;
 struct SystemDirectories;
 struct SystemFunctions;
 struct SystemDynamicLibrary;
+namespace detail
+{
 struct SystemDynamicLibraryDefinition;
+}
 } // namespace SC
 
 //! @defgroup group_system System
-//! @copybrief library_threading
-//!
-//! See @ref library_threading library page for more details.<br>
+//! @copybrief library_system (see @ref library_system for more details)
+
 //! @addtogroup group_system
 //! @{
 
 /// @brief Definition of native dynamic library handle for SystemDynamicLibrary
-struct SC::SystemDynamicLibraryDefinition
+struct SC::detail::SystemDynamicLibraryDefinition
 {
     using Handle = void*; // HANDLE
     static Result releaseHandle(Handle& handle);
@@ -32,7 +34,7 @@ struct SC::SystemDynamicLibraryDefinition
 };
 
 /// @brief Loads dynamic libraries to obtain and invoke functions in current process.
-struct SC::SystemDynamicLibrary : public SC::UniqueHandle<SC::SystemDynamicLibraryDefinition>
+struct SC::SystemDynamicLibrary : public SC::UniqueHandle<SC::detail::SystemDynamicLibraryDefinition>
 {
     /// @brief Loads a dynamic library at given path
     /// @param fullPath Path where dynamic library exists

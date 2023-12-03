@@ -15,9 +15,7 @@ struct Vector;
 struct SC_COMPILER_EXPORT VectorAllocator;
 } // namespace SC
 //! @defgroup group_containers Containers
-//! @copybrief library_containers
-//!
-//! See @ref library_containers library page for more details.<br>
+//! @copybrief library_containers (see @ref library_containers for more details)
 
 //! @addtogroup group_containers
 //! @{

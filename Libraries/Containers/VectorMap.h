@@ -15,6 +15,11 @@ struct StrongID;
 } // namespace SC
 //! @addtogroup group_containers
 //! @{
+
+/// @brief Strongly typed ID (cannot be assigned incorrectly to another ID)
+/// @tparam TagType An empty class used just to tag this StrongID with a strong type
+/// @tparam IDType The primitive type (typically `int` or similar) used to represent the ID
+/// @tparam InvalidValue The sentinel primitive value that represents an invalid state of the ID
 template <typename TagType, typename IDType, IDType InvalidValue>
 struct SC::StrongID
 {
@@ -28,8 +33,13 @@ struct SC::StrongID
 
     [[nodiscard]] constexpr bool operator!=(StrongID other) const { return identifier != other.identifier; }
 
+    /// @brief Check if StrongID is valid
     [[nodiscard]] constexpr bool isValid() const { return identifier != InvalidValue; }
 
+    /// @brief Generates an unique StrongID for a given container.
+    /// @tparam Container A container with a Container::contains member
+    /// @param container The instance of container
+    /// @return A StrongID that is not contained in Container
     template <typename Container>
     [[nodiscard]] constexpr static StrongID generateUniqueKey(const Container& container)
     {
@@ -42,14 +52,17 @@ struct SC::StrongID
     }
 };
 
+/// @brief The single item of VectorMap, holding a Key and Value
+/// @tparam Key The type representing Key in the map.
+/// @tparam Value The type representing Value in the map.
 template <typename Key, typename Value>
 struct SC::VectorMapItem
 {
-    Key   key;
-    Value value;
+    Key   key;   ///< Key item value
+    Value value; ///< Map item value
 };
 
-/// @brief A key value map holding key value pairs in an unsorted SC::Vector
+/// @brief A simple map holding VectorMapItem key-value pairs in an unsorted Vector
 /// @tparam Key Type of the key (must support `==` comparison)
 /// @tparam Value Value type associated with Key
 /// @tparam Container Container used for the Map
@@ -70,6 +83,9 @@ struct SC::VectorMap
     [[nodiscard]] Item*       end() { return items.end(); }
     [[nodiscard]] const Item* end() const { return items.end(); }
 
+    /// @brief Remove an item with matching key from the Map
+    /// @param key The key that must be removed
+    /// @return `true` if the item was found
     template <typename ComparableToKey>
     [[nodiscard]] bool remove(const ComparableToKey& key)
     {
@@ -84,7 +100,10 @@ struct SC::VectorMap
         }
         return false;
     }
-    /// Inserts an item if it doesn't exist already. If it exists or insertion fails returns false.
+
+    /// @brief Inserts an item if it doesn't exist already.
+    /// @param item The item to insert
+    /// @return `false` if item already exists or if insertion fails (`true` otherwise)
     [[nodiscard]] bool insertIfNotExists(Item&& item)
     {
         if (not contains(item.key))
@@ -94,7 +113,9 @@ struct SC::VectorMap
         return false;
     }
 
-    /// Inserts an item. If insertion fails returns nullptr.
+    /// @brief Insert an item, overwriting the potentially already existing one
+    /// @param item Item to insert
+    /// @return A pointer to the Value if insertion succeeds, `nullptr` if insertion fails.
     [[nodiscard]] Value* insertOverwrite(Item&& item)
     {
         for (auto& it : items)
@@ -112,6 +133,10 @@ struct SC::VectorMap
         return nullptr;
     }
 
+    /// @brief Inserts a new value, automatically generating key with Key::generateUniqueKey (works for StrongID for
+    /// example)
+    /// @param value The new value to be inserted
+    /// @return A pointer to the new Key or `nullptr` if the map is full
     [[nodiscard]] Key* insertValueUniqueKey(Value&& value)
     {
         if (items.push_back({Key::generateUniqueKey(*this), forward<Value>(value)}))
@@ -121,6 +146,7 @@ struct SC::VectorMap
         return nullptr;
     }
 
+    /// @brief Check if the given key is contained in the map
     template <typename ComparableToKey>
     [[nodiscard]] bool contains(const ComparableToKey& key) const
     {
@@ -134,6 +160,8 @@ struct SC::VectorMap
         return false;
     }
 
+    /// @brief Check if the given key is contained in the map
+    /// @param outValue A reference that will receive pointer to the found element (if found)
     template <typename ComparableToKey>
     [[nodiscard]] bool contains(const ComparableToKey& key, const Value*& outValue) const
     {
@@ -148,6 +176,8 @@ struct SC::VectorMap
         return false;
     }
 
+    /// @brief Check if the given key is contained in the map
+    /// @param outValue A reference that will receive pointer to the found element (if found)
     template <typename ComparableToKey>
     [[nodiscard]] bool contains(const ComparableToKey& key, Value*& outValue)
     {
@@ -162,6 +192,8 @@ struct SC::VectorMap
         return false;
     }
 
+    /// @brief Get the Value associated to the given key
+    /// @return A pointer to the value if it exists in the map, `nullptr` otherwise
     template <typename ComparableToKey>
     [[nodiscard]] const Value* get(const ComparableToKey& key) const
     {
@@ -175,6 +207,8 @@ struct SC::VectorMap
         return nullptr;
     }
 
+    /// @brief Get the Value associated to the given key
+    /// @return A pointer to the value if it exists in the map, `nullptr` otherwise
     template <typename ComparableToKey>
     [[nodiscard]] Value* get(const ComparableToKey& key)
     {
@@ -188,6 +222,8 @@ struct SC::VectorMap
         return nullptr;
     }
 
+    /// @brief Get the value associated to the given key, or creates a new one if needed
+    /// @return A pointer to the value or `nullptr` if the map is full
     template <typename ComparableToKey>
     [[nodiscard]] Value* getOrCreate(const ComparableToKey& key)
     {

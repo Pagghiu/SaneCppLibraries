@@ -14,16 +14,14 @@ struct Vector;
 } // namespace SC
 
 //! @defgroup group_json JSON
-//! @copybrief library_json
-//!
-//! See @ref library_json library page for more details.<br>
+//! @copybrief library_json (see @ref library_json for more details)
 
 //! @addtogroup group_json
 //! @{
 
 // TODO: This class could be deleted potentially, unless we like to allow some dynamic formatting
 
-/// @brief Outputs JSON
+/// @brief Write correctly formatted JSON
 struct SC::JsonFormatter
 {
     /// @brief Possible states for the formatter state machine
@@ -129,9 +127,10 @@ struct SC::JsonFormatter
   private:
     Options options;
     char    floatFormat[10];
-    bool    onBeforeValue();
-    bool    onAfterValue();
-    bool    writeSeparator();
+
+    bool onBeforeValue();
+    bool onAfterValue();
+    bool writeSeparator();
 
     enum RunState
     {

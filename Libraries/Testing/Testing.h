@@ -13,9 +13,7 @@ struct TestReport;
 } // namespace SC
 
 //! @defgroup group_testing Testing
-//! @copybrief library_testing
-//!
-//! See @ref library_testing library page for more details.<br>
+//! @copybrief library_testing (see @ref library_testing for more details)
 
 //! @addtogroup group_testing
 //! @{

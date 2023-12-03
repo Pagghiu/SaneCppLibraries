@@ -11,7 +11,7 @@ using socklen_t = int;
 
 #include "../SocketDescriptor.h"
 
-SC::Result SC::SocketDescriptorDefinition::releaseHandle(Handle& handle)
+SC::Result SC::detail::SocketDescriptorDefinition::releaseHandle(Handle& handle)
 {
     const int res = ::closesocket(handle);
     handle        = SocketDescriptor::Invalid;

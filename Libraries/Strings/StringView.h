@@ -13,9 +13,7 @@ struct SC_COMPILER_EXPORT StringAlgorithms;
 } // namespace SC
 
 //! @defgroup group_strings Strings
-//! @copybrief library_strings
-//!
-//! See @ref library_strings library page for more details.<br>
+//! @copybrief library_strings (see @ref library_strings for more details)
 
 //! @addtogroup group_strings
 //! @{

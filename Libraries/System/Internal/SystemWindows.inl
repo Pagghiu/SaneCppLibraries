@@ -250,7 +250,7 @@ SC::Result SC::SystemDebug::deleteForcefullyUnlockedFile(SC::StringView fileName
     return Result(::CloseHandle(fd) == TRUE);
 }
 
-SC::Result SC::SystemDynamicLibraryDefinition::releaseHandle(Handle& handle)
+SC::Result SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle& handle)
 {
     if (handle)
     {

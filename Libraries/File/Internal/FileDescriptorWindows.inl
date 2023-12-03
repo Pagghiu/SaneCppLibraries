@@ -12,7 +12,7 @@
 
 // FileDescriptor
 
-SC::Result SC::FileDescriptorDefinition::releaseHandle(Handle& handle)
+SC::Result SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handle)
 {
     BOOL res;
     __try

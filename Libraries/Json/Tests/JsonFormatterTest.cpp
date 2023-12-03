@@ -22,13 +22,14 @@ struct SC::JsonFormatterTest : public SC::TestCase
 
             SmallVector<char, 256> buffer;
             StringFormatOutput     output(StringEncoding::Ascii, buffer);
-            JsonFormatter          writer(nestedStates, output);
-            constexpr float        fValue = 1.2f;
-            SC_TEST_EXPECT(writer.writeFloat(fValue));
-            float value;
-            (void)StringConverter::popNulltermIfExists(buffer, StringEncoding::Ascii);
-            const StringView bufferView(buffer.data(), buffer.size(), false, StringEncoding::Ascii);
-            SC_TEST_EXPECT(bufferView.parseFloat(value) and value == fValue);
+
+            JsonFormatter writer(nestedStates, output);
+
+            float expectedValue = 1.2f;
+            float parsedValue   = 0.0f;
+            SC_TEST_EXPECT(writer.writeFloat(expectedValue));
+            const StringView bufferView(buffer.data(), buffer.size() - 1, false, StringEncoding::Ascii);
+            SC_TEST_EXPECT(bufferView.parseFloat(parsedValue) and parsedValue == expectedValue);
         }
         if (test_section("JsonFormatter::array"))
         {
@@ -50,8 +51,7 @@ struct SC::JsonFormatterTest : public SC::TestCase
                 SC_TEST_EXPECT(writer.writeInt64(-678));
                 SC_TEST_EXPECT(writer.endArray());
             }
-            (void)StringConverter::popNulltermIfExists(buffer, StringEncoding::Ascii);
-            const StringView bufferView(buffer.data(), buffer.size(), false, StringEncoding::Ascii);
+            const StringView bufferView(buffer.data(), buffer.size() - 1, false, StringEncoding::Ascii);
             SC_TEST_EXPECT(bufferView == "[[],123,[\"456\",false,null],-678]");
         }
         if (test_section("JsonFormatter::object"))
@@ -85,8 +85,7 @@ struct SC::JsonFormatterTest : public SC::TestCase
                 SC_TEST_EXPECT(writer.endObject());
                 SC_TEST_EXPECT(not writer.endObject());
             }
-            (void)StringConverter::popNulltermIfExists(buffer, StringEncoding::Ascii);
-            const StringView bufferView(buffer.data(), buffer.size(), false, StringEncoding::Ascii);
+            const StringView bufferView(buffer.data(), buffer.size() - 1, false, StringEncoding::Ascii);
             SC_TEST_EXPECT(bufferView == "{\"a\":-1,\"b\":[2,3],\"c\":[{}],\"d\":{}}");
         }
     }

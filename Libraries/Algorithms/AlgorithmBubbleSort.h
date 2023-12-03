@@ -7,9 +7,7 @@
 namespace SC
 {
 //! @defgroup group_algorithms Algorithms
-//! @copybrief library_algorithms
-//!
-//! See @ref library_algorithms library page for more details.<br>
+//! @copybrief library_algorithms (see @ref library_algorithms for more details)
 
 namespace Algorithms
 {

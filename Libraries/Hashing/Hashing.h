@@ -6,9 +6,7 @@
 namespace SC
 {
 //! @defgroup group_hashing Hashing
-//! @copybrief library_hashing
-//!
-//! See @ref library_hashing library page for more details.<br>
+//! @copybrief library_hashing (see  @ref library_hashing for more details)
 
 //! @addtogroup group_hashing
 //! @{

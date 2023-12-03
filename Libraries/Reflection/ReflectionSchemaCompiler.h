@@ -9,6 +9,8 @@ namespace SC
 {
 namespace Reflection
 {
+//! @addtogroup group_reflection
+//! @{
 
 /// @brief Creates a schema linking a series of SchemaType
 /// @tparam SchemaBuilder The builder used to obtain Virtual Tables
@@ -238,6 +240,7 @@ struct FlatSchemaBuilder : public SchemaBuilder<FlatSchemaBuilder>
 
 /// @brief Default schema not building any virtual table
 using Schema = Reflection::SchemaCompiler<FlatSchemaBuilder>;
+//! @}
 
 } // namespace Reflection
 

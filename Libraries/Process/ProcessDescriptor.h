@@ -9,7 +9,8 @@
 namespace SC
 {
 struct ProcessDescriptor;
-
+namespace detail
+{
 #if SC_PLATFORM_WINDOWS
 
 struct ProcessDescriptorDefinition
@@ -34,9 +35,11 @@ struct ProcessDescriptorDefinition
 };
 
 #endif
+} // namespace detail
 } // namespace SC
 
-struct SC::ProcessDescriptor : public UniqueHandle<ProcessDescriptorDefinition>
+/// @brief Wraps an OS Process descriptor
+struct SC::ProcessDescriptor : public UniqueHandle<detail::ProcessDescriptorDefinition>
 {
     struct ExitStatus
     {

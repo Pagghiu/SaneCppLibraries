@@ -8,7 +8,7 @@
 
 #include <dlfcn.h> // dlopen
 
-SC::Result SC::SystemDynamicLibraryDefinition::releaseHandle(Handle& handle)
+SC::Result SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle& handle)
 {
     if (handle)
     {

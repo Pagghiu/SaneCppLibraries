@@ -164,9 +164,7 @@ struct ReadWrite<SerializerStream, T, typename SC::TypeTraits::EnableIf<Reflecti
 } // namespace detail
 
 //! @defgroup group_serialization_structured Serialization Structured
-//! @copybrief library_serialization_structured
-//!
-//! See @ref library_serialization_structured library page for more details.<br>
+//! @copybrief library_serialization_structured (see @ref library_serialization_structured for more details)
 
 //! @addtogroup group_serialization_structured
 //! @{
