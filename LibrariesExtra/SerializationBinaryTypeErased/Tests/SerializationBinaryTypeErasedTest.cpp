@@ -1,7 +1,7 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../../../Libraries/SerializationBinary/Tests/SerializationParametricTestSuite.h"
+#include "../../../Libraries/SerializationBinary/Tests/SerializationSuiteTest.h"
 #include "../../../Libraries/Testing/Testing.h"
 #include "../SerializationBinaryTypeErasedReadVersioned.h"
 #include "../SerializationBinaryTypeErasedReadWriteFast.h"
@@ -11,18 +11,15 @@ namespace SC
 struct SerializationBinaryTypeErasedTest;
 
 }
-struct SC::SerializationBinaryTypeErasedTest : public SC::SerializationParametricTestSuite::SerializationTestBase<
-                                                   SC::SerializationBinary::BinaryBuffer,                  //
-                                                   SC::SerializationBinary::BinaryBuffer,                  //
-                                                   SC::SerializationBinaryTypeErased::SerializerWriteFast, //
-                                                   SC::SerializationBinaryTypeErased::SerializerReadFast>
+struct SC::SerializationBinaryTypeErasedTest
+    : public SC::SerializationSuiteTest::TestTemplate<SC::SerializationBinary::Buffer, SC::SerializationBinary::Buffer>
 {
     SerializationBinaryTypeErasedTest(SC::TestReport& report)
-        : SerializationTestBase(report, "SerializationBinaryTypeErasedTest")
+        : TestTemplate(report, "SerializationBinaryTypeErasedTest")
     {
-        runSameVersionTests();
-        runVersionedTests<SC::Reflection::SchemaTypeErased, SC::SerializationBinaryTypeErased::SerializerReadVersioned,
-                          SC::SerializationBinaryTypeErased::VersionSchema>();
+        runSameVersionTests<SerializationBinaryTypeErased::WriteFast, SerializationBinaryTypeErased::ReadFast>();
+        runVersionedTests<Reflection::SchemaTypeErased, SerializationBinaryTypeErased::WriteFast,
+                          SerializationBinaryTypeErased::ReadVersioned, SerializationBinaryTypeErased::VersionSchema>();
     }
 };
 

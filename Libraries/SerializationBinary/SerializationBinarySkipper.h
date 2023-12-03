@@ -6,18 +6,18 @@
 
 namespace SC
 {
-namespace Serialization
+namespace SerializationBinary
 {
-// TODO: BinarySkipper should go out of header once we replace BinaryBuffer with a streaming interface
+namespace detail
+{
+// Keeping SerializationBinary::Skipper in header just so that SerializationBinary is header only
 template <typename BinaryStream>
-struct BinarySkipper
+struct Skipper
 {
     Span<const Reflection::TypeInfo> sourceTypes;
     Reflection::TypeInfo             sourceType;
 
-    BinarySkipper(BinaryStream& stream, uint32_t& sourceTypeIndex)
-        : sourceObject(stream), sourceTypeIndex(sourceTypeIndex)
-    {}
+    Skipper(BinaryStream& stream, uint32_t& sourceTypeIndex) : sourceObject(stream), sourceTypeIndex(sourceTypeIndex) {}
 
     [[nodiscard]] bool skip()
     {
@@ -102,6 +102,6 @@ struct BinarySkipper
         }
     }
 };
-
-} // namespace Serialization
+} // namespace detail
+} // namespace SerializationBinary
 } // namespace SC

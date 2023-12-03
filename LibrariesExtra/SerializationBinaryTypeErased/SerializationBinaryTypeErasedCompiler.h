@@ -136,10 +136,10 @@ struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
 using SchemaTypeErased = Reflection::SchemaCompiler<FlatSchemaBuilderTypeErased>;
 
 } // namespace Reflection
-
 namespace SerializationBinaryTypeErased
 {
-
+namespace detail
+{
 struct ArrayAccess
 {
     Span<const Reflection::VectorVTable> vectorVtable;
@@ -159,5 +159,6 @@ struct ArrayAccess
     bool resize(uint32_t linkID, Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
                 Initialize initialize, DropEccessItems dropEccessItems);
 };
+} // namespace detail
 } // namespace SerializationBinaryTypeErased
 } // namespace SC

@@ -13,7 +13,7 @@
 
 namespace SC
 {
-namespace SerializationParametricTestSuite
+namespace SerializationSuiteTest
 {
 struct PrimitiveStruct;
 struct NestedStruct;
@@ -30,14 +30,13 @@ struct ConversionStruct1;
 struct ConversionStruct2;
 struct PackedStruct1;
 struct PackedStruct2;
-template <typename BinaryWriterStream, typename BinaryReaderStream, typename SerializerWriter,
-          typename SerializerReader>
-struct SerializationTestBase;
+template <typename SerializerWriterBuffer, typename SerializerReaderBuffer>
+struct TestTemplate;
 
-} // namespace SerializationParametricTestSuite
+} // namespace SerializationSuiteTest
 } // namespace SC
 
-struct SC::SerializationParametricTestSuite::PrimitiveStruct
+struct SC::SerializationSuiteTest::PrimitiveStruct
 {
     uint8_t arrayValue[4] = {0, 1, 2, 3};
     float   floatValue    = 1.5f;
@@ -58,13 +57,13 @@ struct SC::SerializationParametricTestSuite::PrimitiveStruct
     }
 };
 
-SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::PrimitiveStruct)
+SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::PrimitiveStruct)
 SC_REFLECT_STRUCT_FIELD(0, arrayValue)
 SC_REFLECT_STRUCT_FIELD(1, floatValue)
 SC_REFLECT_STRUCT_FIELD(2, int64Value)
 SC_REFLECT_STRUCT_LEAVE()
 
-struct SC::SerializationParametricTestSuite::NestedStruct
+struct SC::SerializationSuiteTest::NestedStruct
 {
     int16_t         int16Value = 244;
     PrimitiveStruct structsArray[2];
@@ -84,44 +83,44 @@ struct SC::SerializationParametricTestSuite::NestedStruct
     }
 };
 
-SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::NestedStruct)
+SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::NestedStruct)
 SC_REFLECT_STRUCT_FIELD(0, int16Value)
 SC_REFLECT_STRUCT_FIELD(1, structsArray)
 SC_REFLECT_STRUCT_FIELD(2, doubleVal)
 SC_REFLECT_STRUCT_LEAVE()
 
-struct SC::SerializationParametricTestSuite::TopLevelStruct
+struct SC::SerializationSuiteTest::TopLevelStruct
 {
     NestedStruct nestedStruct;
 
     bool operator!=(const TopLevelStruct& other) const { return nestedStruct != other.nestedStruct; }
 };
 
-SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::TopLevelStruct)
+SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::TopLevelStruct)
 SC_REFLECT_STRUCT_FIELD(0, nestedStruct)
 SC_REFLECT_STRUCT_LEAVE()
 
-struct SC::SerializationParametricTestSuite::VectorStructSimple
+struct SC::SerializationSuiteTest::VectorStructSimple
 {
     SC::Vector<int> emptyVector;
     SC::Vector<int> vectorOfInts;
 };
 
-SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VectorStructSimple)
+SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::VectorStructSimple)
 SC_REFLECT_STRUCT_FIELD(0, emptyVector)
 SC_REFLECT_STRUCT_FIELD(1, vectorOfInts)
 SC_REFLECT_STRUCT_LEAVE()
 
-struct SC::SerializationParametricTestSuite::VectorStructComplex
+struct SC::SerializationSuiteTest::VectorStructComplex
 {
     SC::Vector<SC::String> vectorOfStrings;
 };
 
-SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VectorStructComplex)
+SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::VectorStructComplex)
 SC_REFLECT_STRUCT_FIELD(0, vectorOfStrings)
 SC_REFLECT_STRUCT_LEAVE()
 
-struct SC::SerializationParametricTestSuite::VersionedStruct1
+struct SC::SerializationSuiteTest::VersionedStruct1
 {
     float          floatValue     = 1.5f;
     int64_t        fieldToRemove  = 12;
@@ -129,14 +128,14 @@ struct SC::SerializationParametricTestSuite::VersionedStruct1
     int64_t        int64Value     = -13;
 };
 
-SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedStruct1)
+SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::VersionedStruct1)
 SC_REFLECT_STRUCT_FIELD(2, field2ToRemove)
 SC_REFLECT_STRUCT_FIELD(0, floatValue)
 SC_REFLECT_STRUCT_FIELD(1, fieldToRemove)
 SC_REFLECT_STRUCT_FIELD(3, int64Value)
 SC_REFLECT_STRUCT_LEAVE()
 
-struct SC::SerializationParametricTestSuite::VersionedStruct2
+struct SC::SerializationSuiteTest::VersionedStruct2
 {
     int64_t int64Value = 55;
     float   floatValue = -2.9f;
@@ -151,47 +150,47 @@ struct SC::SerializationParametricTestSuite::VersionedStruct2
     }
 };
 
-SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedStruct2)
+SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::VersionedStruct2)
 SC_REFLECT_STRUCT_FIELD(3, int64Value)
 SC_REFLECT_STRUCT_FIELD(0, floatValue)
 SC_REFLECT_STRUCT_LEAVE()
 
-struct SC::SerializationParametricTestSuite::VersionedPoint3D
+struct SC::SerializationSuiteTest::VersionedPoint3D
 {
     float x;
     float y;
     float z;
 };
 
-SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedPoint3D)
+SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::VersionedPoint3D)
 SC_REFLECT_STRUCT_FIELD(0, x)
 SC_REFLECT_STRUCT_FIELD(1, y)
 SC_REFLECT_STRUCT_FIELD(2, z)
 SC_REFLECT_STRUCT_LEAVE()
 
-struct SC::SerializationParametricTestSuite::VersionedPoint2D
+struct SC::SerializationSuiteTest::VersionedPoint2D
 {
     float x;
     float y;
 };
 
-SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedPoint2D)
+SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::VersionedPoint2D)
 SC_REFLECT_STRUCT_FIELD(0, x)
 SC_REFLECT_STRUCT_FIELD(1, y)
 SC_REFLECT_STRUCT_LEAVE()
 
-struct SC::SerializationParametricTestSuite::VersionedArray1
+struct SC::SerializationSuiteTest::VersionedArray1
 {
     Vector<VersionedPoint2D> points;
     Vector<int>              simpleInts = {1, 2, 3};
 };
 
-SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedArray1)
+SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::VersionedArray1)
 SC_REFLECT_STRUCT_FIELD(0, points)
 SC_REFLECT_STRUCT_FIELD(1, simpleInts)
 SC_REFLECT_STRUCT_LEAVE()
 
-struct SC::SerializationParametricTestSuite::VersionedArray2
+struct SC::SerializationSuiteTest::VersionedArray2
 {
     Array<VersionedPoint3D, 2> points;
     Array<int, 2>              simpleInts;
@@ -222,12 +221,12 @@ struct SC::SerializationParametricTestSuite::VersionedArray2
     }
 };
 
-SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::VersionedArray2)
+SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::VersionedArray2)
 SC_REFLECT_STRUCT_FIELD(0, points)
 SC_REFLECT_STRUCT_FIELD(1, simpleInts)
 SC_REFLECT_STRUCT_LEAVE()
 
-struct SC::SerializationParametricTestSuite::ConversionStruct1
+struct SC::SerializationSuiteTest::ConversionStruct1
 {
     uint32_t intToFloat         = 1;
     float    floatToInt         = 1;
@@ -235,14 +234,14 @@ struct SC::SerializationParametricTestSuite::ConversionStruct1
     int16_t  signed16ToUnsigned = 1;
 };
 
-SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::ConversionStruct1)
+SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::ConversionStruct1)
 SC_REFLECT_STRUCT_FIELD(0, intToFloat)
 SC_REFLECT_STRUCT_FIELD(1, floatToInt)
 SC_REFLECT_STRUCT_FIELD(2, uint16To32)
 SC_REFLECT_STRUCT_FIELD(3, signed16ToUnsigned)
 SC_REFLECT_STRUCT_LEAVE()
 
-struct SC::SerializationParametricTestSuite::ConversionStruct2
+struct SC::SerializationSuiteTest::ConversionStruct2
 {
     float    intToFloat         = 0;
     uint32_t floatToInt         = 0;
@@ -250,38 +249,37 @@ struct SC::SerializationParametricTestSuite::ConversionStruct2
     uint16_t signed16ToUnsigned = 0;
 };
 
-SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::ConversionStruct2)
+SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::ConversionStruct2)
 SC_REFLECT_STRUCT_FIELD(0, intToFloat)
 SC_REFLECT_STRUCT_FIELD(1, floatToInt)
 SC_REFLECT_STRUCT_FIELD(2, uint16To32)
 SC_REFLECT_STRUCT_FIELD(3, signed16ToUnsigned)
 SC_REFLECT_STRUCT_LEAVE()
 
-struct SC::SerializationParametricTestSuite::PackedStruct1
+struct SC::SerializationSuiteTest::PackedStruct1
 {
     uint8_t field0 = 255;
     uint8_t field1 = 255;
     uint8_t field2 = 255;
 };
-SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::PackedStruct1)
+SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::PackedStruct1)
 SC_REFLECT_STRUCT_FIELD(0, field0)
 SC_REFLECT_STRUCT_FIELD(2, field2)
 SC_REFLECT_STRUCT_FIELD(1, field1)
 SC_REFLECT_STRUCT_LEAVE()
 
-struct SC::SerializationParametricTestSuite::PackedStruct2
+struct SC::SerializationSuiteTest::PackedStruct2
 {
     uint8_t field2 = 255;
     uint8_t field0 = 255;
 };
-SC_REFLECT_STRUCT_VISIT(SC::SerializationParametricTestSuite::PackedStruct2)
+SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::PackedStruct2)
 SC_REFLECT_STRUCT_FIELD(0, field0)
 SC_REFLECT_STRUCT_FIELD(2, field2)
 SC_REFLECT_STRUCT_LEAVE()
 
-template <typename BinaryWriterStream, typename BinaryReaderStream, typename SerializerWriter,
-          typename SerializerReader>
-struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::TestCase
+template <typename SerializerWriterBuffer, typename SerializerReaderBuffer>
+struct SC::SerializationSuiteTest::TestTemplate : public SC::TestCase
 {
     // Used only for the test
     template <typename T>
@@ -293,55 +291,56 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
         return alignedRead;
     }
 
-    SerializationTestBase(SC::TestReport& report, StringView name) : TestCase(report, name) {}
+    TestTemplate(SC::TestReport& report, StringView name) : TestCase(report, name) {}
 
+    template <typename SerializerWriter, typename SerializerReader>
     void runSameVersionTests()
     {
         if (test_section("Primitive Structure Write"))
         {
-            PrimitiveStruct    primitive;
-            BinaryWriterStream streamWriter;
-            SerializerWriter   writer(streamWriter);
-            SC_TEST_EXPECT(writer.serialize(primitive));
-            SC_TEST_EXPECT(streamWriter.numberOfOperations == 1);
+            PrimitiveStruct        primitive;
+            SerializerWriterBuffer writerBuffer;
+            SerializerWriter       serializerWriter;
+            SC_TEST_EXPECT(serializerWriter.serialize(primitive, writerBuffer));
+            SC_TEST_EXPECT(writerBuffer.numberOfOperations == 1);
             uint32_t index = 0;
             for (uint32_t i = 0; i < 4; ++i)
             {
-                SC_TEST_EXPECT(readPrimitive<uint8_t>(streamWriter.buffer, index) == primitive.arrayValue[i]);
+                SC_TEST_EXPECT(readPrimitive<uint8_t>(writerBuffer.buffer, index) == primitive.arrayValue[i]);
             }
-            SC_TEST_EXPECT(readPrimitive<float>(streamWriter.buffer, index) == primitive.floatValue);
-            SC_TEST_EXPECT(readPrimitive<int64_t>(streamWriter.buffer, index) == primitive.int64Value);
+            SC_TEST_EXPECT(readPrimitive<float>(writerBuffer.buffer, index) == primitive.floatValue);
+            SC_TEST_EXPECT(readPrimitive<int64_t>(writerBuffer.buffer, index) == primitive.int64Value);
         }
         if (test_section("Primitive Structure Read"))
         {
-            PrimitiveStruct    primitive;
-            BinaryWriterStream streamWriter;
-            SerializerWriter   writer(streamWriter);
-            SC_TEST_EXPECT(writer.serialize(primitive));
-            SC_TEST_EXPECT(streamWriter.numberOfOperations == 1);
-            BinaryReaderStream streamReader;
-            SerializerReader   reader(streamReader);
-            streamReader.buffer = move(streamWriter.buffer);
+            PrimitiveStruct        primitive;
+            SerializerWriterBuffer writerBuffer;
+            SerializerWriter       serializerWriter;
+            SC_TEST_EXPECT(serializerWriter.serialize(primitive, writerBuffer));
+            SC_TEST_EXPECT(writerBuffer.numberOfOperations == 1);
+            SerializerReaderBuffer reader;
+            reader.buffer = move(writerBuffer.buffer);
             PrimitiveStruct primitiveRead;
             memset(&primitiveRead, 0, sizeof(primitiveRead));
-            SC_TEST_EXPECT(reader.serialize(primitiveRead));
-            SC_TEST_EXPECT(streamReader.numberOfOperations == streamWriter.numberOfOperations);
+            SerializerReader serializerReader;
+            SC_TEST_EXPECT(serializerReader.serialize(primitiveRead, reader));
+            SC_TEST_EXPECT(reader.numberOfOperations == writerBuffer.numberOfOperations);
             SC_TEST_EXPECT(not(primitive != primitiveRead));
         }
         if (test_section("TopLevel Structure Read"))
         {
-            TopLevelStruct     topLevel;
-            BinaryWriterStream streamWriter;
-            SerializerWriter   writer(streamWriter);
-            SC_TEST_EXPECT(writer.serialize(topLevel));
-            SC_TEST_EXPECT(streamWriter.numberOfOperations == 3);
-            BinaryReaderStream streamReader;
-            SerializerReader   reader(streamReader);
-            streamReader.buffer = move(streamWriter.buffer);
+            TopLevelStruct         topLevel;
+            SerializerWriterBuffer writerBuffer;
+            SerializerWriter       serializerWriter;
+            SC_TEST_EXPECT(serializerWriter.serialize(topLevel, writerBuffer));
+            SC_TEST_EXPECT(writerBuffer.numberOfOperations == 3);
+            SerializerReaderBuffer reader;
+            reader.buffer = move(writerBuffer.buffer);
             TopLevelStruct topLevelRead;
             memset(&topLevelRead, 0, sizeof(topLevelRead));
-            SC_TEST_EXPECT(reader.serialize(topLevelRead));
-            SC_TEST_EXPECT(streamReader.numberOfOperations == streamWriter.numberOfOperations);
+            SerializerReader serializerReader;
+            SC_TEST_EXPECT(serializerReader.serialize(topLevelRead, reader));
+            SC_TEST_EXPECT(reader.numberOfOperations == writerBuffer.numberOfOperations);
             SC_TEST_EXPECT(not(topLevel != topLevelRead));
         }
         if (test_section("VectorStructSimple"))
@@ -351,16 +350,16 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
             SC_TRUST_RESULT(topLevel.vectorOfInts.push_back(2));
             SC_TRUST_RESULT(topLevel.vectorOfInts.push_back(3));
             SC_TRUST_RESULT(topLevel.vectorOfInts.push_back(4));
-            BinaryWriterStream streamWriter;
-            SerializerWriter   writer(streamWriter);
-            SC_TEST_EXPECT(writer.serialize(topLevel));
-            SC_TEST_EXPECT(streamWriter.numberOfOperations == 4);
-            BinaryReaderStream streamReader;
-            SerializerReader   reader(streamReader);
-            streamReader.buffer = move(streamWriter.buffer);
+            SerializerWriterBuffer writerBuffer;
+            SerializerWriter       serializerWriter;
+            SC_TEST_EXPECT(serializerWriter.serialize(topLevel, writerBuffer));
+            SC_TEST_EXPECT(writerBuffer.numberOfOperations == 4);
+            SerializerReaderBuffer reader;
+            reader.buffer = move(writerBuffer.buffer);
             VectorStructSimple topLevelRead;
-            SC_TEST_EXPECT(reader.serialize(topLevelRead));
-            SC_TEST_EXPECT(streamReader.numberOfOperations == streamWriter.numberOfOperations);
+            SerializerReader   serializerReader;
+            SC_TEST_EXPECT(serializerReader.serialize(topLevelRead, reader));
+            SC_TEST_EXPECT(reader.numberOfOperations == writerBuffer.numberOfOperations);
             SC_TEST_EXPECT(topLevelRead.emptyVector.size() == 0);
             SC_TEST_EXPECT(topLevelRead.vectorOfInts.size() == 4);
             for (size_t idx = 0; idx < topLevel.vectorOfInts.size(); ++idx)
@@ -374,16 +373,16 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
             SC_TRUST_RESULT(topLevel.vectorOfStrings.push_back("asdasdasd1"));
             SC_TRUST_RESULT(topLevel.vectorOfStrings.push_back("asdasdasd2"));
             SC_TRUST_RESULT(topLevel.vectorOfStrings.push_back("asdasdasd3"));
-            BinaryWriterStream streamWriter;
-            SerializerWriter   writer(streamWriter);
-            SC_TEST_EXPECT(writer.serialize(topLevel));
-            SC_TEST_EXPECT(streamWriter.numberOfOperations == 10);
-            BinaryReaderStream streamReader;
-            SerializerReader   reader(streamReader);
-            streamReader.buffer = move(streamWriter.buffer);
+            SerializerWriterBuffer writerBuffer;
+            SerializerWriter       serializerWriter;
+            SC_TEST_EXPECT(serializerWriter.serialize(topLevel, writerBuffer));
+            SC_TEST_EXPECT(writerBuffer.numberOfOperations == 10);
+            SerializerReaderBuffer reader;
+            reader.buffer = move(writerBuffer.buffer);
             VectorStructComplex topLevelRead;
-            SC_TEST_EXPECT(reader.serialize(topLevelRead));
-            SC_TEST_EXPECT(streamReader.numberOfOperations == streamWriter.numberOfOperations);
+            SerializerReader    serializerReader;
+            SC_TEST_EXPECT(serializerReader.serialize(topLevelRead, reader));
+            SC_TEST_EXPECT(reader.numberOfOperations == writerBuffer.numberOfOperations);
             SC_TEST_EXPECT(topLevelRead.vectorOfStrings.size() == 3);
             SC_TEST_EXPECT(topLevelRead.vectorOfStrings[0] == "asdasdasd1");
             SC_TEST_EXPECT(topLevelRead.vectorOfStrings[1] == "asdasdasd2");
@@ -391,24 +390,24 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
         }
     }
 
-    template <typename SchemaCompiler, typename SerializerVersioned, typename VersionSchema>
+    template <typename SchemaCompiler, typename SerializerWriter, typename SerializerVersioned, typename VersionSchema>
     void runVersionedTests()
     {
         if (test_section("VersionedStruct1/2"))
         {
-            VersionedStruct1   struct1;
-            BinaryWriterStream streamWriter;
-            SerializerWriter   writer(streamWriter);
-            SC_TEST_EXPECT(writer.serialize(struct1));
-            SerializerVersioned reader;
-            VersionedStruct2    struct2;
-            auto                schema = SchemaCompiler::template compile<VersionedStruct1>();
-            BinaryReaderStream  streamReader;
-            streamReader.buffer = move(streamWriter.buffer);
+            VersionedStruct1       struct1;
+            SerializerWriterBuffer writerBuffer;
+            SerializerWriter       serializerWriter;
+            SC_TEST_EXPECT(serializerWriter.serialize(struct1, writerBuffer));
+            SerializerVersioned    reader;
+            VersionedStruct2       struct2;
+            constexpr auto         schema = SchemaCompiler::template compile<VersionedStruct1>();
+            SerializerReaderBuffer readerBuffer;
+            readerBuffer.buffer = move(writerBuffer.buffer);
             VersionSchema versionSchema;
             versionSchema.sourceTypes = {schema.typeInfos.values, schema.typeInfos.size};
-            SC_TEST_EXPECT(reader.readVersioned(struct2, streamReader, versionSchema));
-            SC_TEST_EXPECT(streamReader.readPosition == streamReader.buffer.size());
+            SC_TEST_EXPECT(reader.readVersioned(struct2, readerBuffer, versionSchema));
+            SC_TEST_EXPECT(readerBuffer.readPosition == readerBuffer.buffer.size());
             SC_TEST_EXPECT(not(struct2 != struct1));
         }
         if (test_section("VersionedArray1/2"))
@@ -417,19 +416,19 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
             SC_TRUST_RESULT(array1.points.push_back({1.0f, 2.0f}));
             SC_TRUST_RESULT(array1.points.push_back({3.0f, 4.0f}));
             SC_TRUST_RESULT(array1.points.push_back({5.0f, 6.0f}));
-            BinaryWriterStream streamWriter;
-            SerializerWriter   writer(streamWriter);
-            SC_TEST_EXPECT(writer.serialize(array1));
-            SC_TEST_EXPECT(streamWriter.numberOfOperations == 4);
-            SerializerVersioned reader;
-            VersionedArray2     array2;
-            auto                schema = SchemaCompiler::template compile<VersionedArray1>();
-            BinaryReaderStream  streamReader;
-            streamReader.buffer = move(streamWriter.buffer);
+            SerializerWriterBuffer writerBuffer;
+            SerializerWriter       serializerWriter;
+            SC_TEST_EXPECT(serializerWriter.serialize(array1, writerBuffer));
+            SC_TEST_EXPECT(writerBuffer.numberOfOperations == 4);
+            SerializerVersioned    reader;
+            VersionedArray2        array2;
+            constexpr auto         schema = SchemaCompiler::template compile<VersionedArray1>();
+            SerializerReaderBuffer readerBuffer;
+            readerBuffer.buffer = move(writerBuffer.buffer);
             VersionSchema versionSchema;
             versionSchema.sourceTypes = {schema.typeInfos.values, schema.typeInfos.size};
-            SC_TEST_EXPECT(reader.readVersioned(array2, streamReader, versionSchema));
-            SC_TEST_EXPECT(streamReader.readPosition == streamReader.buffer.size());
+            SC_TEST_EXPECT(reader.readVersioned(array2, readerBuffer, versionSchema));
+            SC_TEST_EXPECT(readerBuffer.readPosition == readerBuffer.buffer.size());
             SC_TEST_EXPECT(array2.points.size() == 2);
             SC_TEST_EXPECT(array1.simpleInts.size() == 3); // It's dropping one element
             SC_TEST_EXPECT(array2.simpleInts.size() == 2); // It's dropping one element
@@ -437,19 +436,19 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
         }
         if (test_section("ConversionStruct1/2"))
         {
-            ConversionStruct1  struct1;
-            ConversionStruct2  struct2;
-            BinaryWriterStream streamWriter;
-            SerializerWriter   writer(streamWriter);
-            SC_TEST_EXPECT(writer.serialize(struct1));
-            SerializerVersioned reader;
-            auto                schema = SchemaCompiler::template compile<ConversionStruct1>();
-            BinaryReaderStream  streamReader;
-            streamReader.buffer = move(streamWriter.buffer);
+            ConversionStruct1      struct1;
+            ConversionStruct2      struct2;
+            SerializerWriterBuffer writerBuffer;
+            SerializerWriter       serializerWriter;
+            SC_TEST_EXPECT(serializerWriter.serialize(struct1, writerBuffer));
+            SerializerVersioned    reader;
+            constexpr auto         schema = SchemaCompiler::template compile<ConversionStruct1>();
+            SerializerReaderBuffer readerBuffer;
+            readerBuffer.buffer = move(writerBuffer.buffer);
             VersionSchema versionSchema;
             versionSchema.sourceTypes = {schema.typeInfos.values, schema.typeInfos.size};
-            SC_TEST_EXPECT(reader.readVersioned(struct2, streamReader, versionSchema));
-            SC_TEST_EXPECT(streamReader.readPosition == streamReader.buffer.size());
+            SC_TEST_EXPECT(reader.readVersioned(struct2, readerBuffer, versionSchema));
+            SC_TEST_EXPECT(readerBuffer.readPosition == readerBuffer.buffer.size());
             SC_TEST_EXPECT(struct2.intToFloat == struct1.intToFloat);
             SC_TEST_EXPECT(struct2.floatToInt == struct1.floatToInt);
             SC_TEST_EXPECT(struct2.uint16To32 == struct1.uint16To32);
@@ -461,20 +460,20 @@ struct SC::SerializationParametricTestSuite::SerializationTestBase : public SC::
             struct1.field0 = 0;
             struct1.field1 = 1;
             struct1.field2 = 2;
-            PackedStruct2      struct2;
-            BinaryWriterStream streamWriter;
-            SerializerWriter   writer(streamWriter);
-            SC_TEST_EXPECT(writer.serialize(struct1));
-            SC_TEST_EXPECT(streamWriter.numberOfOperations == 1);
-            SerializerVersioned reader;
-            auto                schema = SchemaCompiler::template compile<PackedStruct1>();
-            BinaryReaderStream  streamReader;
-            streamReader.buffer = move(streamWriter.buffer);
+            PackedStruct2          struct2;
+            SerializerWriterBuffer writerBuffer;
+            SerializerWriter       serializerWriter;
+            SC_TEST_EXPECT(serializerWriter.serialize(struct1, writerBuffer));
+            SC_TEST_EXPECT(writerBuffer.numberOfOperations == 1);
+            SerializerVersioned    reader;
+            constexpr auto         schema = SchemaCompiler::template compile<PackedStruct1>();
+            SerializerReaderBuffer readerBuffer;
+            readerBuffer.buffer = move(writerBuffer.buffer);
             VersionSchema versionSchema;
             versionSchema.sourceTypes = {schema.typeInfos.values, schema.typeInfos.size};
-            SC_TEST_EXPECT(reader.readVersioned(struct2, streamReader, versionSchema));
-            SC_TEST_EXPECT(streamReader.numberOfOperations == 2);
-            SC_TEST_EXPECT(streamReader.readPosition == streamReader.buffer.size());
+            SC_TEST_EXPECT(reader.readVersioned(struct2, readerBuffer, versionSchema));
+            SC_TEST_EXPECT(readerBuffer.numberOfOperations == 2);
+            SC_TEST_EXPECT(readerBuffer.readPosition == readerBuffer.buffer.size());
             SC_TEST_EXPECT(struct2.field0 == 0);
             SC_TEST_EXPECT(struct2.field2 == 2);
         }

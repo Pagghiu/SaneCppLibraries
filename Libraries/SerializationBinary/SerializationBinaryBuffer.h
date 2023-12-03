@@ -3,17 +3,19 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Containers/Vector.h"
-#include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
 
 namespace SC
 {
 namespace SerializationBinary
 {
-// TODO: BinaryBuffer needs to go with once we transition to streaming interface
+// Keeping SerializationBinary::Buffer in header just so that SerializationBinary is header only
 
-/// @brief A simple binary reader/writer backed by a memory buffer.
-struct BinaryBuffer
+//! @addtogroup group_serialization_binary
+//! @{
+
+/// @brief A binary serialization reader / writer backed by a memory buffer.
+struct Buffer
 {
     SC::Vector<uint8_t> buffer; ///< The underlying buffer holding serialization data
 
@@ -54,30 +56,34 @@ struct BinaryBuffer
     }
 };
 
-struct BinaryWriterStream : public BinaryBuffer
+/// @brief A binary serialization bytes writer based on SerializationBinary::Buffer
+struct BufferWriter : public Buffer
 {
-    using BinaryBuffer::serializeBytes;
+    using SerializationBinary::Buffer::serializeBytes;
     /// @brief Write given object to buffer
     /// @param object The source object
     /// @param numBytes Size of source object
     /// @return `true` if write succeeded
     [[nodiscard]] bool serializeBytes(const void* object, size_t numBytes)
     {
-        return BinaryBuffer::serializeBytes(Span<const uint8_t>::reinterpret_bytes(object, numBytes));
+        return SerializationBinary::Buffer::serializeBytes(Span<const uint8_t>::reinterpret_bytes(object, numBytes));
     }
 };
 
-struct BinaryReaderStream : public BinaryBuffer
+/// @brief A binary serialization bytes reader based on SerializationBinary::Buffer
+struct BufferReader : public Buffer
 {
-    using BinaryBuffer::serializeBytes;
+    using SerializationBinary::Buffer::serializeBytes;
     /// @brief Read from buffer into given object
     /// @param object Destination object
     /// @param numBytes How many bytes to read from object
     /// @return `true` if read succeeded
     [[nodiscard]] bool serializeBytes(void* object, size_t numBytes)
     {
-        return BinaryBuffer::serializeBytes(Span<uint8_t>::reinterpret_bytes(object, numBytes));
+        return Buffer::serializeBytes(Span<uint8_t>::reinterpret_bytes(object, numBytes));
     }
 };
+//! @}
+
 } // namespace SerializationBinary
 } // namespace SC

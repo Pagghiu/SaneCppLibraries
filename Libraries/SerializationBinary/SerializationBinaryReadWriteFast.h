@@ -6,7 +6,10 @@
 
 namespace SC
 {
+/// @brief Serializes C++ objects to a binary format (see @ref library_serialization_binary).
 namespace SerializationBinary
+{
+namespace detail
 {
 /// @brief Binary serializer using Reflect
 template <typename BinaryStream, typename T, typename SFINAESelector = void>
@@ -122,6 +125,29 @@ struct SerializerReadWriteFast<BinaryStream, SC::Vector<T>> : public SerializerV
 template <typename BinaryStream, typename T, int N>
 struct SerializerReadWriteFast<BinaryStream, SC::Array<T, N>> : public SerializerVector<BinaryStream, SC::Array<T, N>, T> { };
 // clang-format on
+} // namespace detail
+
+//! @addtogroup group_serialization_binary
+//! @{
+
+/// @brief Reads or writes object `T` from and to a buffer, assuming no versioning changes
+struct ReadWriteFast
+{
+    /// @brief Serializes or deserializes object `T` to or from stream
+    /// @tparam T Type of object to be serialized/deserialized
+    /// @tparam StreamType Any stream type ducking Binary SC::SerializationBinary::Buffer
+    /// @param value The object to be serialized / deserialized
+    /// @param stream The stream holding actual bytes for serialization / deserialization
+    /// @return `true` if the operation succeeded
+    template <typename T, typename StreamType>
+    [[nodiscard]] bool serialize(T& value, StreamType& stream)
+    {
+        using Serializer = detail::SerializerReadWriteFast<StreamType, T>;
+        return Serializer::serialize(value, stream);
+    }
+};
+
+//! @}
 
 } // namespace SerializationBinary
 } // namespace SC

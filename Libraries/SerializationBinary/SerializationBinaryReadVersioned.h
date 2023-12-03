@@ -13,24 +13,21 @@ namespace SC
 namespace SerializationBinary
 {
 
-template <typename BinaryStream, typename T, typename SFINAESelector = void>
-struct SerializerReadVersioned;
-
 /// @brief Holds Schema of serialized binary data
 struct VersionSchema
 {
+    /// @brief Controls compatibility options for versioned deserialization
     struct Options
     {
-        bool allowFloatToIntTruncation = true; ///< truncate a float to get an integer value
-        bool allowDropEccessArrayItems = true; ///< drop array items in source data if destination array is smaller
-        bool allowDropEccessStructMembers =
-            true; ///< drop fields that have no matching memberTag in destination structure
+        bool allowFloatToIntTruncation    = true; ///< allow truncating a float to get an integer value
+        bool allowDropEccessArrayItems    = true; ///< drop array items in source data if destination array is smaller
+        bool allowDropEccessStructMembers = true; ///< drop fields that have no matching memberTag in destination struct
     };
-    Options options;
+    Options options; ///< Options for versioned deserialization
 
     Span<const Reflection::TypeInfo> sourceTypes;
 
-    uint32_t sourceTypeIndex = 0;
+    uint32_t sourceTypeIndex = 0; ///< Currently active type in sourceTypes Span
 
     constexpr Reflection::TypeInfo current() const { return sourceTypes.data()[sourceTypeIndex]; }
 
@@ -45,13 +42,17 @@ struct VersionSchema
     template <typename BinaryStream>
     [[nodiscard]] constexpr bool skipCurrent(BinaryStream& stream)
     {
-        Serialization::BinarySkipper<BinaryStream> skipper(stream, sourceTypeIndex);
+        SerializationBinary::detail::Skipper<BinaryStream> skipper(stream, sourceTypeIndex);
         skipper.sourceTypes = sourceTypes;
         return skipper.skip();
     }
 };
 
-/// @brief De-serializes binary data with its associated schema into object `T`
+namespace detail
+{
+template <typename BinaryStream, typename T, typename SFINAESelector = void>
+struct SerializerReadVersioned;
+
 template <typename BinaryStream, typename T, typename SFINAESelector>
 struct SerializerReadVersioned
 {
@@ -88,8 +89,9 @@ struct SerializerReadVersioned
     struct MemberIterator
     {
         VersionSchema& schema;
-        BinaryStream&  stream;
-        T&             object;
+
+        BinaryStream& stream;
+        T&            object;
 
         int  matchMemberTag      = 0;
         bool consumed            = false;
@@ -276,11 +278,40 @@ struct SerializerReadVersioned<BinaryStream, T, typename SC::EnableIf<Reflection
             }
             default:
                 SC_ASSERT_DEBUG(false);
-            return false;
+                return false;
         }
         // clang-format on
     }
 };
+} // namespace detail
+
+//! @defgroup group_serialization_binary Serialization Binary
+//! @copybrief library_serialization_binary
+//!
+//! See @ref library_serialization_binary library page for more details.<br>
+
+//! @addtogroup group_serialization_binary
+//! @{
+
+/// @brief De-serializes binary data with its associated schema into object `T`
+struct ReadVersioned
+{
+    /// @brief Deserialize object `T` from a Binary stream with a reflection schema not matching `T` schema
+    /// @tparam T Type of object to be dserialized
+    /// @tparam StreamType Any stream type ducking Binary SC::SerializationBinary::Buffer
+    /// @param value The object to deserialize
+    /// @param stream The stream holding the bytes to be used for deserialization
+    /// @param versionSchema The schema used to serialize data in the stream
+    /// @return `true` if deserialization succeded
+    template <typename T, typename StreamType>
+    [[nodiscard]] bool readVersioned(T& value, StreamType& stream, VersionSchema& versionSchema)
+    {
+        using VersionedSerializer = detail::SerializerReadVersioned<StreamType, T>;
+        return VersionedSerializer::readVersioned(value, stream, versionSchema);
+    }
+};
+//! @}
 
 } // namespace SerializationBinary
+
 } // namespace SC

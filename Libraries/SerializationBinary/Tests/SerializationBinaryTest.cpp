@@ -4,55 +4,26 @@
 #include "../SerializationBinaryBuffer.h"
 #include "../SerializationBinaryReadVersioned.h"
 #include "../SerializationBinaryReadWriteFast.h"
-#include "SerializationParametricTestSuite.h"
+#include "SerializationSuiteTest.h"
 namespace SC
 {
 struct SerializationBinaryTest;
-} // namespace SC
-
-namespace SC
-{
-template <typename StreamType>
-struct SerializerAdapter
-{
-    StreamType& stream;
-    SerializerAdapter(StreamType& stream) : stream(stream) {}
-    template <typename T>
-    bool serialize(T& value)
-    {
-        using Serializer = SC::SerializationBinary::SerializerReadWriteFast<StreamType, T>;
-        return Serializer::serialize(value, stream);
-    }
-};
-
-struct SerializerReadVersionedAdapter
-{
-    template <typename T, typename StreamType, typename VersionSchema>
-    bool readVersioned(T& value, StreamType& stream, VersionSchema& versionSchema)
-    {
-        using VersionedSerializer = SC::SerializationBinary::SerializerReadVersioned<StreamType, T>;
-        return VersionedSerializer::readVersioned(value, stream, versionSchema);
-    }
-};
-
 } // namespace SC
 
 namespace SC
 {
 struct SerializationBinaryTest;
 }
-struct SC::SerializationBinaryTest : public SC::SerializationParametricTestSuite::SerializationTestBase<
-                                         SC::SerializationBinary::BinaryWriterStream,                        //
-                                         SC::SerializationBinary::BinaryReaderStream,                        //
-                                         SC::SerializerAdapter<SC::SerializationBinary::BinaryWriterStream>, //
-                                         SC::SerializerAdapter<SC::SerializationBinary::BinaryReaderStream>>
+struct SC::SerializationBinaryTest
+    : public SC::SerializationSuiteTest::TestTemplate<SC::SerializationBinary::BufferWriter,
+                                                      SC::SerializationBinary::BufferReader>
 {
-    SerializationBinaryTest(SC::TestReport& report) : SerializationTestBase(report, "SerializationBinaryTest")
+    SerializationBinaryTest(SC::TestReport& report) : TestTemplate(report, "SerializationBinaryTest")
     {
-        runSameVersionTests();
+        runSameVersionTests<SerializationBinary::ReadWriteFast, SerializationBinary::ReadWriteFast>();
 
-        runVersionedTests<SC::Reflection::Schema, SerializerReadVersionedAdapter,
-                          SC::SerializationBinary::VersionSchema>();
+        runVersionedTests<SC::Reflection::Schema, SerializationBinary::ReadWriteFast,
+                          SerializationBinary::ReadVersioned, SerializationBinary::VersionSchema>();
     }
 };
 
