@@ -80,7 +80,7 @@ struct SC::EventLoopTest : public SC::TestCase
                 }
             };
             SC_TEST_EXPECT(newThread.start("test", &externalThreadLambda));
-            TimeCounter start, end;
+            Time::HighResolutionCounter start, end;
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(newThread.join());
             SC_TEST_EXPECT(threadWasCalled == 1);

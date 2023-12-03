@@ -164,7 +164,7 @@ struct AsyncLoopTimeout : public Async
     AsyncLoopTimeout() : Async(Type::LoopTimeout) {}
 
     /// Starts a Timeout that is invoked after expiration (relative) time has passed.
-    [[nodiscard]] SC::Result start(EventLoop& loop, IntegerMilliseconds expiration);
+    [[nodiscard]] SC::Result start(EventLoop& loop, Time::Milliseconds expiration);
 
     [[nodiscard]] auto getTimeout() const { return timeout; }
 
@@ -172,8 +172,8 @@ struct AsyncLoopTimeout : public Async
 
   private:
     friend struct EventLoop;
-    IntegerMilliseconds timeout; // not needed, but keeping just for debugging
-    TimeCounter         expirationTime;
+    Time::Milliseconds          timeout; // not needed, but keeping just for debugging
+    Time::HighResolutionCounter expirationTime;
 };
 //------------------------------------------------------------------------------------------------------
 struct AsyncLoopWakeUp;
@@ -536,7 +536,7 @@ struct SC::EventLoop
     [[nodiscard]] Result getLoopFileDescriptor(FileDescriptor::Handle& fileDescriptor) const;
 
     /// Get Loop time
-    [[nodiscard]] TimeCounter getLoopTime() const { return loopTime; }
+    [[nodiscard]] Time::HighResolutionCounter getLoopTime() const { return loopTime; }
 
   private:
     int numberOfActiveHandles = 0;
@@ -549,7 +549,7 @@ struct SC::EventLoop
     IntrusiveDoubleLinkedList<Async> activeWakeUps;
     IntrusiveDoubleLinkedList<Async> manualCompletions;
 
-    TimeCounter loopTime;
+    Time::HighResolutionCounter loopTime;
 
     struct KernelQueue;
 
@@ -580,11 +580,11 @@ struct SC::EventLoop
     void decreaseActiveCount();
 
     // Timers
-    [[nodiscard]] const TimeCounter* findEarliestTimer() const;
+    [[nodiscard]] const Time::HighResolutionCounter* findEarliestTimer() const;
 
     void invokeExpiredTimers();
     void updateTime();
-    void executeTimers(KernelQueue& queue, const TimeCounter& nextTimer);
+    void executeTimers(KernelQueue& queue, const Time::HighResolutionCounter& nextTimer);
 
     [[nodiscard]] Result stopAsync(Async& async);
 

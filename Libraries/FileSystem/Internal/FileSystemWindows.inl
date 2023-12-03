@@ -263,13 +263,13 @@ struct SC::FileSystem::Internal
             fileTimeValue.LowPart  = modifiedTime.dwLowDateTime;
             fileTimeValue.HighPart = modifiedTime.dwHighDateTime;
             fileTimeValue.QuadPart -= 116444736000000000ULL;
-            time.modifiedTime = AbsoluteTime(fileTimeValue.QuadPart / 10000ULL);
+            time.modifiedTime = Time::Absolute(fileTimeValue.QuadPart / 10000ULL);
             return Result(true);
         }
         return Result(false);
     }
 
-    [[nodiscard]] static Result setLastModifiedTime(const wchar_t* file, AbsoluteTime time)
+    [[nodiscard]] static Result setLastModifiedTime(const wchar_t* file, Time::Absolute time)
     {
         HANDLE hFile = CreateFileW(file, FILE_WRITE_ATTRIBUTES, FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
                                    FILE_ATTRIBUTE_NORMAL, NULL);

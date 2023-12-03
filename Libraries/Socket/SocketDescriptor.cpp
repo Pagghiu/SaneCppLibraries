@@ -222,7 +222,7 @@ SC::Result SC::SocketClient::read(Span<char> data, Span<char>& readData)
     return Result(true);
 }
 
-SC::Result SC::SocketClient::readWithTimeout(Span<char> data, Span<char>& readData, IntegerMilliseconds timeout)
+SC::Result SC::SocketClient::readWithTimeout(Span<char> data, Span<char>& readData, Time::Milliseconds timeout)
 {
     SocketDescriptor::Handle nativeSocket;
     SC_TRY(socket.get(nativeSocket, Result::Error("Invalid socket")));

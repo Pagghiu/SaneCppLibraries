@@ -5,7 +5,7 @@
 #include "../File/FileDescriptor.h"
 #include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Result.h"
-#include "../System/Time.h" // IntegerMilliseconds
+#include "../System/Time.h" // Milliseconds
 
 namespace SC
 {
@@ -241,7 +241,7 @@ struct SC::SocketClient
     /// @param[out] readData A sub-Span of `data` that has the length of actually read bytes
     /// @param[in] timeout For how many millisenconds the read should wait before timing out
     /// @return Valid Result if bytes have been read successfully and timeout didn't occurr
-    [[nodiscard]] Result readWithTimeout(Span<char> data, Span<char>& readData, IntegerMilliseconds timeout);
+    [[nodiscard]] Result readWithTimeout(Span<char> data, Span<char>& readData, Time::Milliseconds timeout);
 
   private:
     SocketDescriptor& socket;

@@ -14,9 +14,9 @@
 #include <math.h> // round
 #endif
 
-struct SC::AbsoluteTime::Internal
+struct SC::Time::Absolute::Internal
 {
-    static void tmToParsed(const struct tm& result, Parsed& local)
+    static void tmToParsed(const struct tm& result, ParseResult& local)
     {
         local.year             = static_cast<decltype(local.year)>(1900 + result.tm_year);
         local.month            = static_cast<decltype(local.month)>(result.tm_mon);
@@ -30,7 +30,7 @@ struct SC::AbsoluteTime::Internal
     }
 };
 
-SC::AbsoluteTime SC::AbsoluteTime::now()
+SC::Time::Absolute SC::Time::Absolute::now()
 {
 #if SC_PLATFORM_WINDOWS
     struct _timeb t;
@@ -43,7 +43,7 @@ SC::AbsoluteTime SC::AbsoluteTime::now()
 #endif
 }
 
-bool SC::AbsoluteTime::parseLocal(Parsed& result) const
+bool SC::Time::Absolute::parseLocal(ParseResult& result) const
 {
     const time_t seconds = static_cast<time_t>(millisecondsSinceEpoch / 1000);
     struct tm    parsedTm;
@@ -62,7 +62,7 @@ bool SC::AbsoluteTime::parseLocal(Parsed& result) const
     return true;
 }
 
-bool SC::AbsoluteTime::parseUTC(Parsed& result) const
+bool SC::Time::Absolute::parseUTC(ParseResult& result) const
 {
     const time_t seconds = static_cast<time_t>(millisecondsSinceEpoch / 1000);
     struct tm    parsedTm;
@@ -81,13 +81,13 @@ bool SC::AbsoluteTime::parseUTC(Parsed& result) const
     return true;
 }
 
-SC::RelativeTime SC::AbsoluteTime::subtract(AbsoluteTime other)
+SC::Time::Relative SC::Time::Absolute::subtract(Absolute other)
 {
     const auto diff = millisecondsSinceEpoch - other.millisecondsSinceEpoch;
-    return RelativeTime::fromSeconds(diff / 1000.0);
+    return Relative::fromSeconds(diff / 1000.0);
 }
 
-SC::TimeCounter::TimeCounter()
+SC::Time::HighResolutionCounter::HighResolutionCounter()
 {
     part1 = 0;
 #if SC_PLATFORM_WINDOWS
@@ -103,7 +103,7 @@ SC::TimeCounter::TimeCounter()
 #endif
 }
 
-void SC::TimeCounter::snap()
+void SC::Time::HighResolutionCounter::snap()
 {
 #if SC_PLATFORM_WINDOWS
     LARGE_INTEGER performanceCounter;
@@ -124,9 +124,9 @@ void SC::TimeCounter::snap()
 #endif
 }
 
-SC::TimeCounter SC::TimeCounter::offsetBy(IntegerMilliseconds other) const
+SC::Time::HighResolutionCounter SC::Time::HighResolutionCounter::offsetBy(Milliseconds other) const
 {
-    TimeCounter newCounter = *this;
+    HighResolutionCounter newCounter = *this;
 #if SC_PLATFORM_WINDOWS
     newCounter.part1 += other.ms * part2 / 1000;
 #else
@@ -137,7 +137,7 @@ SC::TimeCounter SC::TimeCounter::offsetBy(IntegerMilliseconds other) const
     return newCounter;
 }
 
-bool SC::TimeCounter::isLaterThanOrEqualTo(TimeCounter other) const
+bool SC::Time::HighResolutionCounter::isLaterThanOrEqualTo(HighResolutionCounter other) const
 {
 #if SC_PLATFORM_WINDOWS
     return part1 >= other.part1;
@@ -146,20 +146,21 @@ bool SC::TimeCounter::isLaterThanOrEqualTo(TimeCounter other) const
 #endif
 }
 
-SC::RelativeTime SC::TimeCounter::subtractApproximate(TimeCounter other) const
+SC::Time::Relative SC::Time::HighResolutionCounter::subtractApproximate(HighResolutionCounter other) const
 {
-    TimeCounter res = subtractExact(other);
+    HighResolutionCounter res = subtractExact(other);
 #if SC_PLATFORM_WINDOWS
-    return RelativeTime::fromSeconds(static_cast<double>(res.part1) / res.part2);
+    return Relative::fromSeconds(static_cast<double>(res.part1) / res.part2);
 #else
     constexpr int32_t secondsToNanoseconds = 1e9;
-    return RelativeTime::fromSeconds(res.part1 + static_cast<double>(res.part2) / secondsToNanoseconds);
+    return Relative::fromSeconds(res.part1 + static_cast<double>(res.part2) / secondsToNanoseconds);
 #endif
 }
 
-[[nodiscard]] SC::TimeCounter SC::TimeCounter::subtractExact(TimeCounter other) const
+[[nodiscard]] SC::Time::HighResolutionCounter SC::Time::HighResolutionCounter::subtractExact(
+    HighResolutionCounter other) const
 {
-    TimeCounter res;
+    HighResolutionCounter res;
 #if SC_PLATFORM_WINDOWS
     res.part1 = part1 - other.part1;
     res.part2 = part2;

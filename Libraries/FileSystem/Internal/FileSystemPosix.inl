@@ -203,14 +203,14 @@ struct SC::FileSystem::Internal
         struct stat st;
         if (::stat(file, &st) == 0)
         {
-            time.modifiedTime = AbsoluteTime(
+            time.modifiedTime = Time::Absolute(
                 static_cast<int64_t>(::round(st.st_mtimespec.tv_nsec / 1.0e6) + st.st_mtimespec.tv_sec * 1000));
             return Result(true);
         }
         return Result(false);
     }
 
-    [[nodiscard]] static Result setLastModifiedTime(const char* file, AbsoluteTime time)
+    [[nodiscard]] static Result setLastModifiedTime(const char* file, Time::Absolute time)
     {
         struct timespec times[2];
         times[0].tv_sec  = time.getMillisecondsSinceEpoch() / 1000;

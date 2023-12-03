@@ -16,38 +16,37 @@ struct SC::TimeTest : public SC::TestCase
     {
         if (test_section("AbsoluteTime::parseLocal"))
         {
-            AbsoluteTime         time = AbsoluteTime::now();
-            AbsoluteTime::Parsed local;
-            SC_TEST_EXPECT(time.parseLocal(local));
+            Time::Absolute::ParseResult local;
+            SC_TEST_EXPECT(Time::Absolute::now().parseLocal(local));
             SC_TEST_EXPECT(local.year > 2022);
 
             report.console.print("{:02}/{:02}/{} {:02}:{:02}:{:02} {}", local.dayOfMonth, local.month, local.year,
                                  local.hour, local.minutes, local.seconds,
                                  local.isDaylightSaving ? "DAYLIGHT SAVING" : "NO DAYLIGHT SAVING");
         }
-        if (test_section("TimeCounter::snap / subtract"))
+        if (test_section("HighResolutionCounter::snap / subtract"))
         {
-            TimeCounter start, end;
+            Time::HighResolutionCounter start, end;
             start.snap();
             Thread::Sleep(100);
             end.snap();
-            RelativeTime elapsed = end.subtractApproximate(start);
+            Time::Relative elapsed = end.subtractApproximate(start);
             SC_TEST_EXPECT(elapsed.inRoundedUpperMilliseconds().ms < 150 and
                            elapsed.inRoundedUpperMilliseconds().ms > 50);
         }
-        if (test_section("TimeCounter::offsetBy"))
+        if (test_section("HighResolutionCounter::offsetBy"))
         {
-            TimeCounter start;
+            Time::HighResolutionCounter start;
             start.snap();
-            const TimeCounter end     = start.offsetBy(IntegerMilliseconds(321));
-            RelativeTime      elapsed = end.subtractApproximate(start);
+            const Time::HighResolutionCounter end     = start.offsetBy(Time::Milliseconds(321));
+            Time::Relative                    elapsed = end.subtractApproximate(start);
             SC_TEST_EXPECT(elapsed.inRoundedUpperMilliseconds().ms == 321);
         }
-        if (test_section("TimeCounter::isLaterOnOrEqual"))
+        if (test_section("HighResolutionCounter::isLaterOnOrEqual"))
         {
-            TimeCounter start;
+            Time::HighResolutionCounter start;
             start.snap();
-            const TimeCounter end = start.offsetBy(IntegerMilliseconds(123));
+            const Time::HighResolutionCounter end = start.offsetBy(Time::Milliseconds(123));
             SC_TEST_EXPECT(end.isLaterThanOrEqualTo(start));
             SC_TEST_EXPECT(not start.isLaterThanOrEqualTo(end));
         }

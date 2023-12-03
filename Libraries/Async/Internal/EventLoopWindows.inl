@@ -205,11 +205,12 @@ struct SC::EventLoop::KernelQueue
     // POLL
     [[nodiscard]] Result pollAsync(EventLoop& self, PollMode pollMode)
     {
-        const TimeCounter*     nextTimer = self.findEarliestTimer();
+        const Time::HighResolutionCounter* nextTimer = self.findEarliestTimer();
+
         FileDescriptor::Handle loopNativeDescriptor;
         SC_TRY(self.internal.get().loopFd.get(loopNativeDescriptor,
                                               Result::Error("EventLoop::Internal::poll() - Invalid Handle")));
-        IntegerMilliseconds timeout;
+        Time::Milliseconds timeout;
         if (nextTimer)
         {
             if (nextTimer->isLaterThanOrEqualTo(self.loopTime))

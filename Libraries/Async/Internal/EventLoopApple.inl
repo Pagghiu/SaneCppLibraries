@@ -117,16 +117,18 @@ struct SC::EventLoop::KernelQueue
     }
 
     // POLL
-    static struct timespec timerToTimespec(const TimeCounter& loopTime, const TimeCounter* nextTimer)
+    static struct timespec timerToTimespec(const Time::HighResolutionCounter& loopTime,
+                                           const Time::HighResolutionCounter* nextTimer)
     {
         struct timespec specTimeout;
         if (nextTimer)
         {
             if (nextTimer->isLaterThanOrEqualTo(loopTime))
             {
-                const TimeCounter diff = nextTimer->subtractExact(loopTime);
-                specTimeout.tv_sec     = diff.part1;
-                specTimeout.tv_nsec    = diff.part2;
+                const Time::HighResolutionCounter diff = nextTimer->subtractExact(loopTime);
+
+                specTimeout.tv_sec  = diff.part1;
+                specTimeout.tv_nsec = diff.part2;
                 return specTimeout;
             }
         }
@@ -137,7 +139,8 @@ struct SC::EventLoop::KernelQueue
 
     [[nodiscard]] Result pollAsync(EventLoop& self, PollMode pollMode)
     {
-        const TimeCounter* nextTimer = pollMode == PollMode::ForcedForwardProgress ? self.findEarliestTimer() : nullptr;
+        const Time::HighResolutionCounter* nextTimer =
+            pollMode == PollMode::ForcedForwardProgress ? self.findEarliestTimer() : nullptr;
         FileDescriptor::Handle loopHandle;
         SC_TRY(self.internal.get().loopFd.get(loopHandle, Result::Error("pollAsync() - Invalid Handle")));
 

@@ -78,7 +78,7 @@ SC::Result SC::Async::stop()
     return SC::Result::Error("stop failed. eventLoop is nullptr");
 }
 
-SC::Result SC::AsyncLoopTimeout::start(EventLoop& loop, IntegerMilliseconds expiration)
+SC::Result SC::AsyncLoopTimeout::start(EventLoop& loop, Time::Milliseconds expiration)
 {
     SC_TRY(validateAsync());
     SC_TRY(queueSubmission(loop));
@@ -205,9 +205,9 @@ SC::Result SC::EventLoop::run()
     return SC::Result(true);
 }
 
-const SC::TimeCounter* SC::EventLoop::findEarliestTimer() const
+const SC::Time::HighResolutionCounter* SC::EventLoop::findEarliestTimer() const
 {
-    const TimeCounter* earliestTime = nullptr;
+    const Time::HighResolutionCounter* earliestTime = nullptr;
     for (Async* async = activeTimers.front; async != nullptr; async = async->next)
     {
         SC_ASSERT_DEBUG(async->type == Async::Type::LoopTimeout);
@@ -513,7 +513,7 @@ SC::Result SC::EventLoop::stopAsync(Async& async)
 
 void SC::EventLoop::updateTime() { loopTime.snap(); }
 
-void SC::EventLoop::executeTimers(KernelQueue& queue, const TimeCounter& nextTimer)
+void SC::EventLoop::executeTimers(KernelQueue& queue, const Time::HighResolutionCounter& nextTimer)
 {
     const bool timeoutOccurredWithoutIO = queue.newEvents == 0;
     const bool timeoutWasAlreadyExpired = loopTime.isLaterThanOrEqualTo(nextTimer);

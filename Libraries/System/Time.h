@@ -6,81 +6,85 @@
 
 namespace SC
 {
-struct AbsoluteTime;
-struct RelativeTime;
-struct TimeCounter;
+/// @brief Absolute, relative time and high frequency counter
+namespace Time
+{
+struct Absolute;
+struct Relative;
+struct HighResolutionCounter;
 
-struct IntegerMilliseconds;
-struct IntegerSeconds;
+struct Milliseconds;
+struct Seconds;
+} // namespace Time
 } // namespace SC
 
 //! @addtogroup group_system
 //! @{
 
 /// @brief Type-safe wrapper of uint64 used to represent milliseconds
-struct SC::IntegerMilliseconds
+struct SC::Time::Milliseconds
 {
-    constexpr IntegerMilliseconds() : ms(0) {}
-    constexpr explicit IntegerMilliseconds(int64_t ms) : ms(ms){};
+    constexpr Milliseconds() : ms(0) {}
+    constexpr explicit Milliseconds(int64_t ms) : ms(ms){};
     int64_t ms;
 };
 
 /// @brief Type-safe wrapper of uint64 used to represent seconds
-struct SC::IntegerSeconds
+struct SC::Time::Seconds
 {
-    constexpr IntegerSeconds() : sec(0) {}
-    constexpr explicit IntegerSeconds(int64_t sec) : sec(sec){};
+    constexpr Seconds() : sec(0) {}
+    constexpr explicit Seconds(int64_t sec) : sec(sec){};
 
-    constexpr operator IntegerMilliseconds() { return IntegerMilliseconds(sec * 1000); }
+    constexpr operator Milliseconds() { return Milliseconds(sec * 1000); }
     int64_t   sec;
 };
 
 namespace SC
 {
-constexpr inline SC::IntegerMilliseconds operator""_ms(uint64_t ms)
+constexpr inline SC::Time::Milliseconds operator""_ms(uint64_t ms)
 {
-    return IntegerMilliseconds(static_cast<int64_t>(ms));
+    return Time::Milliseconds(static_cast<int64_t>(ms));
 }
-constexpr inline SC::IntegerSeconds operator""_sec(uint64_t sec) { return IntegerSeconds(static_cast<int64_t>(sec)); }
+constexpr inline SC::Time::Seconds operator""_sec(uint64_t sec) { return Time::Seconds(static_cast<int64_t>(sec)); }
 } // namespace SC
 
 /// @brief Interval of time represented with 64 bit double precision float
-struct SC::RelativeTime
+struct SC::Time::Relative
 {
     /// @brief how many seconds have elapsed in
-    RelativeTime() : floatingSeconds(0.0) {}
+    Relative() : floatingSeconds(0.0) {}
 
     /// @brief Construct a Relative from seconds
     /// @param seconds A double representing an interval of time in seconds
-    /// @return A RelativeTime representing the given interval in seconds
-    static RelativeTime fromSeconds(double seconds) { return RelativeTime(seconds); }
+    /// @return A Relative representing the given interval in seconds
+    static Relative fromSeconds(double seconds) { return Relative(seconds); }
 
-    /// @brief Converts current time to IntegerMilliseconds, rounding to upper integer
-    /// @return An IntegerMilliseconds struct holding the time converted to milliseconds
-    IntegerMilliseconds inRoundedUpperMilliseconds() const
+    /// @brief Converts current time to Milliseconds, rounding to upper integer
+    /// @return An Milliseconds struct holding the time converted to milliseconds
+    Milliseconds inRoundedUpperMilliseconds() const
     {
-        return IntegerMilliseconds(static_cast<int64_t>(floatingSeconds * 1000.0 + 0.5f));
+        return Milliseconds(static_cast<int64_t>(floatingSeconds * 1000.0 + 0.5f));
     }
-    IntegerSeconds inSeconds() const { return IntegerSeconds(static_cast<int64_t>(floatingSeconds)); }
+    Seconds inSeconds() const { return Seconds(static_cast<int64_t>(floatingSeconds)); }
 
   private:
-    RelativeTime(double floatingSeconds) : floatingSeconds(floatingSeconds) {}
+    Relative(double floatingSeconds) : floatingSeconds(floatingSeconds) {}
     double floatingSeconds = 0;
 };
 
 /// @brief Absolute time represented with milliseconds since epoch
-struct SC::AbsoluteTime
+struct SC::Time::Absolute
 {
-    /// @brief Construct an AbsoluteTime from milliseconds since epoch
+    /// @brief Construct an Absolute from milliseconds since epoch
     /// @param millisecondsSinceEpoch Number of milliseconds since epoch
-    AbsoluteTime(int64_t millisecondsSinceEpoch) : millisecondsSinceEpoch(millisecondsSinceEpoch) {}
+    Absolute(int64_t millisecondsSinceEpoch) : millisecondsSinceEpoch(millisecondsSinceEpoch) {}
 
-    /// @brief Obtain AbsoluteTime representing current time
-    /// @return An AbsoluteTime representing current time
-    [[nodiscard]] static AbsoluteTime now();
+    /// @brief Obtain Absolute representing current time
+    /// @return An Absolute representing current time
+    [[nodiscard]] static Absolute now();
 
-    /// @brief Holds information on a parsed absolute time
-    struct Parsed
+    /// @brief Holds information on a parsed absolute time from Absolute::parseLocal
+    struct ParseResult
     {
         uint16_t year       = 0;
         uint8_t  month      = 0;
@@ -97,17 +101,17 @@ struct SC::AbsoluteTime
     /// @brief Parses local time to a Parsed structure
     /// @param[out] result The Parsed structure holding current date / time
     /// @return `true` if time has been parsed successfully
-    [[nodiscard]] bool parseLocal(Parsed& result) const;
+    [[nodiscard]] bool parseLocal(ParseResult& result) const;
 
     /// @brief Parses UTC time to a Parsed structure
     /// @param[out] result The Parsed structure holding current date / time
     /// @return `true` if time has been parsed successfully
-    [[nodiscard]] bool parseUTC(Parsed& result) const;
+    [[nodiscard]] bool parseUTC(ParseResult& result) const;
 
-    /// @brief Obtain the RelativeTime by subtracting this AbsoluteTime with another one
-    /// @param other Another AbsoluteTime to be subtracted
-    /// @return A RelativeTime representing the time interval between the two AbsoluteTime
-    [[nodiscard]] RelativeTime subtract(AbsoluteTime other);
+    /// @brief Obtain the Relative by subtracting this Absolute with another one
+    /// @param other Another Absolute to be subtracted
+    /// @return A Relative representing the time interval between the two Absolute
+    [[nodiscard]] Relative subtract(Absolute other);
 
     /// @brief Return given time as milliseconds since epoch
     /// @return Time in milliseconds since epoch
@@ -119,32 +123,32 @@ struct SC::AbsoluteTime
 };
 
 /// @brief An high resolution time counter
-struct SC::TimeCounter
+struct SC::Time::HighResolutionCounter
 {
-    TimeCounter();
+    HighResolutionCounter();
 
-    /// @brief Sets TimeCounter to current instant
+    /// @brief Sets HighResolutionCounter to current instant
     void snap();
 
-    /// @brief Returns a TimeCounter offset by a given number of IntegerMilliseconds
-    /// @param ms How many IntegerMilliseconds the returned TimeCounter must be offset of
-    /// @return A TimeCounter that is offset by `ms`
-    [[nodiscard]] TimeCounter offsetBy(IntegerMilliseconds ms) const;
+    /// @brief Returns a HighResolutionCounter offset by a given number of Milliseconds
+    /// @param ms How many Milliseconds the returned HighResolutionCounter must be offset of
+    /// @return A HighResolutionCounter that is offset by `ms`
+    [[nodiscard]] HighResolutionCounter offsetBy(Milliseconds ms) const;
 
-    /// @brief Check if this TimeCounter is later or equal to another TimeCounter
-    /// @param other The TimeCounter to be used in the comparison
-    /// @return `true` if this TimeCounter is later or equal to another TimeCounter
-    [[nodiscard]] bool isLaterThanOrEqualTo(TimeCounter other) const;
+    /// @brief Check if this HighResolutionCounter is later or equal to another HighResolutionCounter
+    /// @param other The HighResolutionCounter to be used in the comparison
+    /// @return `true` if this HighResolutionCounter is later or equal to another HighResolutionCounter
+    [[nodiscard]] bool isLaterThanOrEqualTo(HighResolutionCounter other) const;
 
-    /// @brief Subtracts another TimeCounter from this one, returning an approximate RelativeTime
-    /// @param other The TimeCounter to be subtracted
-    /// @return A RelativeTime holding the time interval between the two TimeCounter
-    [[nodiscard]] RelativeTime subtractApproximate(TimeCounter other) const;
+    /// @brief Subtracts another HighResolutionCounter from this one, returning an approximate Relative
+    /// @param other The HighResolutionCounter to be subtracted
+    /// @return A Relative holding the time interval between the two HighResolutionCounter
+    [[nodiscard]] Relative subtractApproximate(HighResolutionCounter other) const;
 
-    /// @brief Subtracts another TimeCounter from this one, returning a precise TimeCounter
-    /// @param other The TimeCounter to be subtracted
-    /// @return A TimeCounter holding the time interval between the two TimeCounter
-    [[nodiscard]] TimeCounter subtractExact(TimeCounter other) const;
+    /// @brief Subtracts another HighResolutionCounter from this one, returning a precise HighResolutionCounter
+    /// @param other The HighResolutionCounter to be subtracted
+    /// @return A HighResolutionCounter holding the time interval between the two HighResolutionCounter
+    [[nodiscard]] HighResolutionCounter subtractExact(HighResolutionCounter other) const;
 
     int64_t part1;
     int64_t part2;

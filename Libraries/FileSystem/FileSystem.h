@@ -202,7 +202,7 @@ struct SC::FileSystem
     /// @brief A structure to describe modified time
     struct FileTime
     {
-        AbsoluteTime modifiedTime = 0; ///< Time when file was last modified
+        Time::Absolute modifiedTime = 0; ///< Time when file was last modified
     };
     /// @brief Reads a FileTime structure for a given file
     /// @param file Path to the file of interest
@@ -214,7 +214,7 @@ struct SC::FileSystem
     /// @param file Path to the file of interest
     /// @param time The new last modified time, as specified in the AbsoluteTime struct
     /// @return Valid Result if file time for the given file was successfully set
-    [[nodiscard]] Result setLastModifiedTime(StringView file, AbsoluteTime time);
+    [[nodiscard]] Result setLastModifiedTime(StringView file, Time::Absolute time);
 
   private:
     [[nodiscard]] bool convert(const StringView file, String& destination, StringView* encodedPath = nullptr);

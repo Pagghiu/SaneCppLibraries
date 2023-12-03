@@ -348,7 +348,7 @@ SC::Result SC::FileSystem::getFileTime(StringView file, FileTime& fileTime)
     return Internal::getFileTime(encodedPath.getNullTerminatedNative(), fileTime);
 }
 
-SC::Result SC::FileSystem::setLastModifiedTime(StringView file, AbsoluteTime time)
+SC::Result SC::FileSystem::setLastModifiedTime(StringView file, Time::Absolute time)
 {
     StringView encodedPath;
     SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
