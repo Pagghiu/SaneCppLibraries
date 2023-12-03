@@ -8,6 +8,7 @@ using socklen_t = int;
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#pragma comment(lib, "Ws2_32.lib")
 
 #include "../../Threading/Atomic.h"
 #include "../SocketDescriptor.h"

@@ -1,8 +1,8 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#include "../Strings/SmallString.h"
 #include "../Strings/StringConverter.h"
-#include "../System/System.h"
 #include "../System/Time.h"
 #include <string.h> // strlen
 

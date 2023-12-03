@@ -13,8 +13,6 @@
 
 #include "AsyncWindowsAPI.h"
 
-#include "../../System/System.h" // WindowsNetworking
-
 #if SC_COMPILER_MSVC
 // Not sure why on MSVC we don't get on Level 4 warnings for missing switch cases
 #pragma warning(default : 4062)

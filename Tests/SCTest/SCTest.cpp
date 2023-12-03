@@ -86,7 +86,7 @@ void runDebugVisualizersTest(TestReport& report);
 #include "../../Libraries/FileSystem/Path.h"
 #include "../../Libraries/Socket/SocketDescriptor.h"
 #include "../../Libraries/System/Console.h"
-#include "../../Libraries/System/System.h"
+#include "../../Libraries/System/SystemDirectories.h"
 #include "../../Libraries/Testing/Testing.h"
 
 SC::Console* globalConsole;

@@ -1,8 +1,50 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../../Containers/SmallVector.h"
-#include "../System.h"
+#include "SystemDirectories.h"
+#include "../Containers/SmallVector.h"
+#include "../Foundation/Result.h"
+
+#if SC_PLATFORM_WINDOWS
+#include "../FileSystem/Path.h"
+#include "../Strings/StringBuilder.h"
+
+#include <Windows.h>
+
+bool SC::SystemDirectories::init()
+{
+    // TODO: OsPaths::init() for Windows is messy. Tune the API to improve writing software like this.
+    // Reason is because it's handy counting in wchars but we can't do it with StringNative.
+    // Additionally we must convert to utf8 at the end otherwise path::dirname will not work
+    SmallVector<wchar_t, MAX_PATH> buffer;
+
+    size_t numChars;
+    int    tries = 0;
+    do
+    {
+        SC_TRY(buffer.resizeWithoutInitializing(buffer.size() + MAX_PATH));
+        // Is returned null terminated
+        numChars = GetModuleFileNameW(0L, buffer.data(), static_cast<DWORD>(buffer.size()));
+        if (tries++ >= 10)
+        {
+            return false;
+        }
+    } while (numChars == buffer.size() && GetLastError() == ERROR_INSUFFICIENT_BUFFER);
+
+    SC_TRY(buffer.resizeWithoutInitializing(numChars + 1));
+    SC_TRY(buffer[numChars] == 0);
+
+    StringView utf16executable = StringView(Span<const wchar_t>(buffer.data(), (buffer.size() - 1)), true);
+
+    // TODO: SystemDirectories::init - We must also convert to utf8 because dirname will not work on non utf8 or ascii
+    // text assigning directly the SmallString inside StringNative will copy as is instad of converting utf16 to utf8
+    executableFile = ""_u8;
+    StringBuilder builder(executableFile);
+    SC_TRY(builder.append(utf16executable));
+    applicationRootDirectory = Path::dirname(executableFile.view(), Path::AsWindows);
+    return Result(true);
+}
+#elif SC_PLATFORM_APPLE
 
 #include <mach-o/dyld.h>
 #if 1
@@ -19,7 +61,7 @@ OBJC_EXPORT      Class _Nullable objc_lookUpClass(const char* _Nonnull name) OBJ
 #endif
 #endif
 #if SC_XCTEST
-#include "../../FileSystem/Path.h"
+#include "../FileSystem/Path.h"
 #include <dlfcn.h>
 #endif
 
@@ -45,7 +87,6 @@ bool SC::SystemDirectories::init()
         SC_TRY(data[executable_length - 1] == 0);
         executableFile = SmallString<StaticPathSize>(move(data), StringEncoding::Utf8);
     }
-#endif
 
 #if 1
     CFBundleRef mainBundle = CFBundleGetMainBundle();
@@ -88,4 +129,10 @@ bool SC::SystemDirectories::init()
     ((void (*)(id, SEL))objc_msgSend)(pool, sel_getUid("release"));
     return true;
 #endif
+#endif
 }
+
+#else
+bool SC::SystemDirectories::init() { return true; }
+
+#endif
