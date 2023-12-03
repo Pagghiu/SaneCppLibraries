@@ -10,6 +10,10 @@
 #include "../Strings/StringBuilder.h"
 #include "../Threading/Threading.h"
 
+#if SC_PLATFORM_WINDOWS
+#include "Internal/DebuggerWindows.inl"
+#endif
+
 bool SC::Plugin::Definition::find(const StringView text, StringView& extracted)
 {
     auto       it           = text.getIterator<StringIteratorASCII>();
@@ -390,15 +394,15 @@ SC::Result SC::Plugin::DynamicLibrary::unload()
 {
     SC_TRY(dynamicLibrary.close());
 #if SC_PLATFORM_WINDOWS
-    if (SystemDebug::isDebuggerConnected())
+    if (Debugger::isDebuggerConnected())
     {
         SmallString<256> pdbFile = StringEncoding::Native;
         SC_TRY(definition.getDynamicLibraryPDBAbsolutePath(pdbFile));
         FileSystem fs;
         if (fs.existsAndIsFile(pdbFile.view()))
         {
-            SC_TRY(SystemDebug::unlockFileFromAllProcesses(pdbFile.view()));
-            SC_TRY(SystemDebug::deleteForcefullyUnlockedFile(pdbFile.view()))
+            SC_TRY(Debugger::unlockFileFromAllProcesses(pdbFile.view()));
+            SC_TRY(Debugger::deleteForcefullyUnlockedFile(pdbFile.view()))
         }
     }
 #endif

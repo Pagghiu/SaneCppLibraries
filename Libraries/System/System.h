@@ -8,7 +8,6 @@
 
 namespace SC
 {
-struct SystemDebug;
 struct SystemDirectories;
 struct SystemFunctions;
 struct SystemDynamicLibrary;
@@ -57,31 +56,6 @@ struct SC::SystemDynamicLibrary : public SC::UniqueHandle<SC::detail::SystemDyna
     Result loadSymbol(StringView symbolName, void*& symbol) const;
 };
 
-/// @brief Checks debugger status and unlocking / deleting locked pdb files (used by [Plugin](@ref library_plugin))
-struct SC::SystemDebug
-{
-    // Support deleting locked PDB files
-
-    /// @brief Check if debugger is connected
-    /// @return `true` if a debugger is connected to current process
-    /// @note This is only supported on windows for now
-    [[nodiscard]] static bool isDebuggerConnected();
-
-    /// @brief Unlocks a file from other OS process.
-    /// @param fileName The file to unlock
-    /// @return Valid Result if file has been successfully unlocked
-    /// @note This is only supported on windows for now
-    [[nodiscard]] static Result unlockFileFromAllProcesses(StringView fileName);
-
-    /// @brief Forcefully deletes a file previously unlocked by SystemDebug::unlockFileFromAllProcesses
-    /// @param fileName The file to delete
-    /// @return Valid Result if file has been successfully deleted
-    /// @note This is only supported on windows for now
-    [[nodiscard]] static Result deleteForcefullyUnlockedFile(StringView fileName);
-
-  private:
-    struct Internal;
-};
 
 /// @brief Reports location of system directories (executable / application root)
 struct SC::SystemDirectories
