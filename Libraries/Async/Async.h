@@ -23,36 +23,33 @@ struct Async;
 struct AsyncResultBase;
 template <typename T>
 struct AsyncResult;
-// Operations
 } // namespace SC
 
 namespace SC
 {
-struct EventLoopWinOverlapped;
-struct EventLoopWinOverlappedDefinition
+struct AsyncWinOverlapped;
+struct AsyncWinOverlappedDefinition
 {
     static constexpr int Windows = sizeof(void*) * 7;
 
     static constexpr size_t Alignment = alignof(void*);
 
-    using Object = EventLoopWinOverlapped;
+    using Object = AsyncWinOverlapped;
 };
-using EventLoopWinOverlappedOpaque = OpaqueObject<EventLoopWinOverlappedDefinition>;
+using AsyncWinOverlappedOpaque = OpaqueObject<AsyncWinOverlappedDefinition>;
 
-struct EventLoopWinWaitDefinition
+struct AsyncWinWaitDefinition
 {
     using Handle                    = FileDescriptor::Handle;  // fd
     static constexpr Handle Invalid = FileDescriptor::Invalid; // invalid fd
     static Result           releaseHandle(Handle& waitHandle);
 };
 
-struct EventLoopWinWaitHandle : public UniqueHandle<EventLoopWinWaitDefinition>
+struct AsyncWinWaitHandle : public UniqueHandle<AsyncWinWaitDefinition>
 {
 };
 
 } // namespace SC
-
-// ASYNCS
 
 struct SC::Async
 {
@@ -232,8 +229,8 @@ struct AsyncProcessExit : public Async
     friend struct EventLoop;
     ProcessDescriptor::Handle handle = ProcessDescriptor::Invalid;
 #if SC_PLATFORM_WINDOWS
-    EventLoopWinOverlappedOpaque overlapped;
-    EventLoopWinWaitHandle       waitHandle;
+    AsyncWinOverlappedOpaque overlapped;
+    AsyncWinWaitHandle       waitHandle;
 #endif
 };
 //------------------------------------------------------------------------------------------------------
@@ -270,7 +267,7 @@ struct AsyncSocketAccept : public Async
     SocketDescriptor::Handle   handle        = SocketDescriptor::Invalid;
     SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
 #if SC_PLATFORM_WINDOWS
-    EventLoopWinOverlappedOpaque overlapped;
+    AsyncWinOverlappedOpaque overlapped;
     SocketDescriptor             clientSocket;
     uint8_t                      acceptBuffer[288];
 #endif
@@ -295,7 +292,7 @@ struct AsyncSocketConnect : public Async
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
     SocketIPAddress          ipAddress;
 #if SC_PLATFORM_WINDOWS
-    EventLoopWinOverlappedOpaque overlapped;
+    AsyncWinOverlappedOpaque overlapped;
 #endif
 };
 //------------------------------------------------------------------------------------------------------
@@ -318,7 +315,7 @@ struct AsyncSocketSend : public Async
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
     Span<const char>         data;
 #if SC_PLATFORM_WINDOWS
-    EventLoopWinOverlappedOpaque overlapped;
+    AsyncWinOverlappedOpaque overlapped;
 #endif
 };
 //------------------------------------------------------------------------------------------------------
@@ -355,7 +352,7 @@ struct AsyncSocketReceive : public Async
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
     Span<char>               data;
 #if SC_PLATFORM_WINDOWS
-    EventLoopWinOverlappedOpaque overlapped;
+    AsyncWinOverlappedOpaque overlapped;
 #endif
 };
 //------------------------------------------------------------------------------------------------------
@@ -412,7 +409,7 @@ struct AsyncFileRead : public Async
     FileDescriptor::Handle fileDescriptor;
     Span<char>             readBuffer;
 #if SC_PLATFORM_WINDOWS
-    EventLoopWinOverlappedOpaque overlapped;
+    AsyncWinOverlappedOpaque overlapped;
 #endif
 };
 //------------------------------------------------------------------------------------------------------
@@ -450,7 +447,7 @@ struct AsyncFileWrite : public Async
     FileDescriptor::Handle fileDescriptor;
     Span<const char>       writeBuffer;
 #if SC_PLATFORM_WINDOWS
-    EventLoopWinOverlappedOpaque overlapped;
+    AsyncWinOverlappedOpaque overlapped;
 #endif
 };
 //------------------------------------------------------------------------------------------------------
@@ -491,7 +488,7 @@ struct AsyncWindowsPoll : public Async
     friend struct EventLoop;
 
     FileDescriptor::Handle       fileDescriptor;
-    EventLoopWinOverlappedOpaque overlapped;
+    AsyncWinOverlappedOpaque overlapped;
 };
 #endif
 } // namespace SC

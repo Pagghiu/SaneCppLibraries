@@ -75,7 +75,7 @@ void runAtomicTest(TestReport& report);
 void runThreadingTest(TestReport& report);
 
 // Async
-void runEventLoopTest(SC::TestReport& report);
+void runAsyncTest(SC::TestReport& report);
 
 // Support
 void runDebugVisualizersTest(TestReport& report);
@@ -183,7 +183,7 @@ int main(int argc, const char* argv[])
     runThreadingTest(report);
 
     // Async tests
-    runEventLoopTest(report);
+    runAsyncTest(report);
 
     // DebugVisualizers tests
     runDebugVisualizersTest(report);

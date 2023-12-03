@@ -1,16 +1,16 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "EventLoop.h"
+#include "Async.h"
 #include "../Foundation/Result.h"
 #include "../Threading/Threading.h" // EventObject
 
 #if SC_PLATFORM_WINDOWS
-#include "Internal/EventLoopWindows.inl"
+#include "Internal/AsyncWindows.inl"
 #elif SC_PLATFORM_EMSCRIPTEN
-#include "Internal/EventLoopEmscripten.inl"
+#include "Internal/AsyncEmscripten.inl"
 #elif SC_PLATFORM_APPLE
-#include "Internal/EventLoopApple.inl"
+#include "Internal/AsyncApple.inl"
 #endif
 
 #define SC_ASYNC_ENABLE_LOG 0

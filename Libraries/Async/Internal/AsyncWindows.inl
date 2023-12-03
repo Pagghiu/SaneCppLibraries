@@ -8,10 +8,10 @@
 //
 #include <Ws2tcpip.h> // sockadd_in6
 
-#include "../EventLoop.h"
-#include "EventLoopWindows.h"
+#include "../Async.h"
+#include "AsyncWindows.h"
 
-#include "EventLoopWindowsAPI.h"
+#include "AsyncWindowsAPI.h"
 
 #include "../../System/System.h" // SystemFunctions
 
@@ -20,7 +20,7 @@
 #pragma warning(default : 4062)
 #endif
 
-SC::Result SC::EventLoopWinWaitDefinition::releaseHandle(Handle& waitHandle)
+SC::Result SC::AsyncWinWaitDefinition::releaseHandle(Handle& waitHandle)
 {
     if (waitHandle != INVALID_HANDLE_VALUE)
     {
@@ -42,7 +42,7 @@ struct SC::EventLoop::Internal
     LPFN_CONNECTEX          pConnectEx            = nullptr;
     LPFN_ACCEPTEX           pAcceptEx             = nullptr;
     LPFN_DISCONNECTEX       pDisconnectEx         = nullptr;
-    EventLoopWinOverlapped  wakeUpOverlapped;
+    AsyncWinOverlapped  wakeUpOverlapped;
 
     Internal()
     {
@@ -118,7 +118,7 @@ struct SC::EventLoop::Internal
 
     [[nodiscard]] static Async* getAsync(OVERLAPPED_ENTRY& event)
     {
-        return EventLoopWinOverlapped::getUserDataFromOverlapped<Async>(event.lpOverlapped);
+        return AsyncWinOverlapped::getUserDataFromOverlapped<Async>(event.lpOverlapped);
     }
 
     [[nodiscard]] static Result checkWSAResult(SOCKET handle, OVERLAPPED& overlapped, size_t* size = nullptr)
@@ -298,7 +298,7 @@ struct SC::EventLoop::KernelQueue
         static_assert(sizeof(AsyncSocketAccept::acceptBuffer) == sizeof(struct sockaddr_storage) * 2 + 32,
                       "Check acceptBuffer size");
 
-        EventLoopWinOverlapped& overlapped      = operation.overlapped.get();
+        AsyncWinOverlapped& overlapped      = operation.overlapped.get();
         DWORD                   sync_bytes_read = 0;
 
         SC_TRY(eventLoop.internal.get().ensureAcceptFunction(operation.handle));
@@ -669,22 +669,22 @@ struct SC::EventLoop::KernelQueue
 };
 
 template <>
-void SC::EventLoopWinOverlappedOpaque::construct(Handle& buffer)
+void SC::AsyncWinOverlappedOpaque::construct(Handle& buffer)
 {
     placementNew(buffer.reinterpret_as<Object>());
 }
 template <>
-void SC::EventLoopWinOverlappedOpaque::destruct(Object& obj)
+void SC::AsyncWinOverlappedOpaque::destruct(Object& obj)
 {
     obj.~Object();
 }
 template <>
-void SC::EventLoopWinOverlappedOpaque::moveConstruct(Handle& buffer, Object&& obj)
+void SC::AsyncWinOverlappedOpaque::moveConstruct(Handle& buffer, Object&& obj)
 {
     placementNew(buffer.reinterpret_as<Object>(), move(obj));
 }
 template <>
-void SC::EventLoopWinOverlappedOpaque::moveAssign(Object& pthis, Object&& obj)
+void SC::AsyncWinOverlappedOpaque::moveAssign(Object& pthis, Object&& obj)
 {
     pthis = move(obj);
 }

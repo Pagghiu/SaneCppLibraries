@@ -6,7 +6,7 @@
 #include "../Foundation/Function.h"
 #include "HttpParser.h"
 
-#include "../Async/EventLoop.h"
+#include "../Async/Async.h"
 #include "../Containers/SmallVector.h"
 #include "../Socket/SocketDescriptor.h"
 #include "../Strings/SmallString.h"

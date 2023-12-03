@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 
-#include "../Async/EventLoop.h" // AsyncLoopWakeUp
+#include "../Async/Async.h" // AsyncLoopWakeUp
 #include "../Containers/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/OpaqueObject.h"

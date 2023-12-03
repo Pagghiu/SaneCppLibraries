@@ -21,7 +21,7 @@ int main(int argc, const char* argv[])
 {
     using namespace SC;
     SC_COMPILER_WARNING_PUSH_UNUSED_RESULT; // Doing some optimistic coding here, ignoring all failures
-    SC::Time::Absolute       started = SC::Time::Absolute::now();
+    SC::Time::Absolute     started = SC::Time::Absolute::now();
     SmallVector<char, 512> consoleBuffer;
     Console                console(consoleBuffer);
     console.printLine("SCBuild configure start...");

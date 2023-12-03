@@ -9,7 +9,7 @@
 #include "../../Strings/StringConverter.h"
 #include "../../Threading/Threading.h"
 
-#include "../../Async/Internal/EventLoopWindows.h" // EventLoopWinOverlapped
+#include "../../Async/Internal/AsyncWindows.h" // AsyncWinOverlapped
 
 struct SC::FileSystemWatcher::FolderWatcherInternal
 {

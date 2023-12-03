@@ -1,21 +1,21 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../EventLoop.h"
 #include "../../FileSystem/FileSystem.h"
 #include "../../FileSystem/Path.h"
 #include "../../Strings/String.h"
 #include "../../Testing/Testing.h"
 #include "../../Threading/Threading.h" // EventObject
+#include "../Async.h"
 
 namespace SC
 {
-struct EventLoopTest;
+struct AsyncTest;
 }
 
-struct SC::EventLoopTest : public SC::TestCase
+struct SC::AsyncTest : public SC::TestCase
 {
-    EventLoopTest(SC::TestReport& report) : TestCase(report, "EventLoopTest")
+    AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
     {
         loopTimeout();
         loopWakeUpFromExternalThread();
@@ -609,5 +609,5 @@ struct SC::EventLoopTest : public SC::TestCase
 
 namespace SC
 {
-void runEventLoopTest(SC::TestReport& report) { EventLoopTest test(report); }
+void runAsyncTest(SC::TestReport& report) { AsyncTest test(report); }
 } // namespace SC

@@ -11,26 +11,26 @@
 
 namespace SC
 {
-struct EventLoopWinOverlapped;
-struct EventLoopWinWaitHandle;
-struct EventLoopWinWaitDefinition;
+struct AsyncWinOverlapped;
+struct AsyncWinWaitHandle;
+struct AsyncWinWaitDefinition;
 } // namespace SC
 
 // We store a user pointer at a fixed offset from overlapped to allow getting back source object
 // with results from GetQueuedCompletionStatusEx.
 // We must do it because there is no void* userData pointer in the OVERLAPPED struct
-struct SC::EventLoopWinOverlapped
+struct SC::AsyncWinOverlapped
 {
     void*      userData = nullptr;
     OVERLAPPED overlapped;
 
-    EventLoopWinOverlapped() { memset(&overlapped, 0, sizeof(overlapped)); }
+    AsyncWinOverlapped() { memset(&overlapped, 0, sizeof(overlapped)); }
 
     template <typename T>
     [[nodiscard]] static T* getUserDataFromOverlapped(LPOVERLAPPED lpOverlapped)
     {
-        constexpr size_t offsetOfOverlapped = offsetof(EventLoopWinOverlapped, overlapped);
-        constexpr size_t offsetOfAsync      = offsetof(EventLoopWinOverlapped, userData);
+        constexpr size_t offsetOfOverlapped = offsetof(AsyncWinOverlapped, overlapped);
+        constexpr size_t offsetOfAsync      = offsetof(AsyncWinOverlapped, userData);
         return *reinterpret_cast<T**>(reinterpret_cast<uint8_t*>(lpOverlapped) - offsetOfOverlapped + offsetOfAsync);
     }
 };

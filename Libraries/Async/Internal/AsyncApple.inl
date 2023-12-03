@@ -9,7 +9,7 @@
 #include <sys/wait.h>  // WIFEXITED / WEXITSTATUS
 #include <unistd.h>    // read/write/pread/pwrite
 
-#include "../EventLoop.h"
+#include "../Async.h"
 
 struct SC::EventLoop::Internal
 {
