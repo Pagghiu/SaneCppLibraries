@@ -2,14 +2,14 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Algorithms/AlgorithmFind.h"
-#include "../Algorithms/AlgorithmRemove.h"
-#include "../Foundation/Assert.h"
-#include "../Foundation/InitializerList.h"
-#include "../Foundation/Limits.h"
-#include "../Foundation/PrimitiveTypes.h"
-#include "../Foundation/Span.h"
-#include "../Foundation/TypeTraits.h" // EnableIf, TypeTraits::IsTriviallyCopyable
+#include "../../Algorithms/AlgorithmFind.h"
+#include "../../Algorithms/AlgorithmRemove.h"
+#include "../../Foundation/Assert.h"
+#include "../../Foundation/InitializerList.h"
+#include "../../Foundation/Limits.h"
+#include "../../Foundation/PrimitiveTypes.h"
+#include "../../Foundation/Span.h"
+#include "../../Foundation/TypeTraits.h" // EnableIf, TypeTraits::IsTriviallyCopyable
 
 namespace SC
 {

@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "Segment.h"
+#include "Internal/Segment.h"
 
 namespace SC
 {

@@ -6,7 +6,7 @@
 #include "../Foundation/Limits.h"
 #include "../Foundation/Memory.h"
 #include "../Foundation/PrimitiveTypes.h"
-#include "Segment.h"
+#include "Internal/Segment.h"
 
 namespace SC
 {
