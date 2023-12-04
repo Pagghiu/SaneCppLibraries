@@ -7,11 +7,21 @@
 #include "../Strings/String.h"
 namespace SC
 {
-struct HttpClientAsync;
+/// @brief HTTP parser, client and server (see @ref library_http)
+namespace Http
+{
+struct ClientAsync;
+}
 } // namespace SC
 
+//! @defgroup group_http Http
+//! @copybrief library_http (see @ref library_http for more details)
+
+//! @addtogroup group_http
+//! @{
+
 /// @brief Http async client
-struct SC::HttpClientAsync
+struct SC::Http::ClientAsync
 {
     /// @brief Setups this client to execute a `GET` request on the given url
     /// @param loop The Async::EventLoop to use for monitoring network packets
@@ -19,7 +29,7 @@ struct SC::HttpClientAsync
     /// @return Valid Result if dns resolution and creation of underlying client tcp socket succeeded
     [[nodiscard]] Result get(Async::EventLoop& loop, StringView url);
 
-    Delegate<HttpClientAsync&> callback; ///< The callback that is called after `GET` operation succeeded
+    Delegate<Http::ClientAsync&> callback; ///< The callback that is called after `GET` operation succeeded
 
     /// @brief Get the response StringView sent by the server
     [[nodiscard]] StringView getResponse() const;
@@ -45,3 +55,4 @@ struct SC::HttpClientAsync
     SocketDescriptor     clientSocket;
     Async::EventLoop*    eventLoop = nullptr;
 };
+//! @}

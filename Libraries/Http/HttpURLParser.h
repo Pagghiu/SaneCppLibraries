@@ -7,11 +7,17 @@
 
 namespace SC
 {
-struct HttpURLParser;
+namespace Http
+{
+struct URLParser;
+}
 } // namespace SC
 
+//! @addtogroup group_http
+//! @{
+
 /// @brief Parse an URL splitting it into its base components
-struct SC::HttpURLParser
+struct SC::Http::URLParser
 {
     StringView protocol; // `http` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)
     StringView username; // `user` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)
@@ -37,3 +43,5 @@ struct SC::HttpURLParser
     [[nodiscard]] Result validateHost();
     [[nodiscard]] Result parseUserPassword(StringView userPassowrd);
 };
+
+//! @}

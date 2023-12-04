@@ -21,13 +21,13 @@ struct SC::HttpServerAsyncTest : public SC::TestCase
             Async::EventLoop eventLoop;
             numTries = 0;
             SC_TEST_EXPECT(eventLoop.create());
-            HttpServerAsync server;
+            Http::ServerAsync server;
             SC_TEST_EXPECT(server.start(eventLoop, 10, "127.0.0.1", 8080));
-            server.onClient = [this, &server](HttpServerAsync::ClientChannel& client)
+            server.onClient = [this, &server](Http::ServerAsync::ClientChannel& client)
             {
                 auto& res = client.response;
                 SC_TEST_EXPECT(client.request.headersEndReceived);
-                if (client.request.parser.method != HttpParser::Method::HttpGET)
+                if (client.request.parser.method != Http::Parser::Method::HttpGET)
                 {
                     SC_TEST_EXPECT(res.startResponse(405));
                     SC_TEST_EXPECT(client.response.end(""));
@@ -61,14 +61,14 @@ struct SC::HttpServerAsyncTest : public SC::TestCase
                 SC_TEST_EXPECT(sb.format(sampleHtml, numTries));
                 SC_TEST_EXPECT(client.response.end(str.view()));
             };
-            HttpClientAsync  client[3];
-            SmallString<255> buffer;
+            Http::ClientAsync client[3];
+            SmallString<255>  buffer;
             for (int i = 0; i < wantedNumTries; ++i)
             {
                 StringBuilder sb(buffer, StringBuilder::Clear);
-                SC_TEST_EXPECT(sb.format("HttpClientAsync [{}]", i));
+                SC_TEST_EXPECT(sb.format("Http::ClientAsync [{}]", i));
                 SC_TEST_EXPECT(client[i].setCustomDebugName(buffer.view()));
-                client[i].callback = [this](HttpClientAsync& result)
+                client[i].callback = [this](Http::ClientAsync& result)
                 { SC_TEST_EXPECT(result.getResponse().containsString("This is a title")); };
                 SC_TEST_EXPECT(client[i].get(eventLoop, "http://localhost:8080/index.html"));
             }

@@ -13,17 +13,23 @@
 
 namespace SC
 {
-struct HttpServerBase;
-struct HttpServerAsync;
+namespace Http
+{
+struct ServerBase;
+struct ServerAsync;
+} // namespace Http
 } // namespace SC
 
+//! @addtogroup group_http
+//! @{
+
 /// @brief Http server common logic
-struct SC::HttpServerBase
+struct SC::Http::ServerBase
 {
     /// @brief Http header
     struct Header
     {
-        HttpParser::Result result = HttpParser::Result::Method;
+        Http::Parser::Result result = Http::Parser::Result::Method;
 
         uint32_t start  = 0;
         uint32_t length = 0;
@@ -36,17 +42,17 @@ struct SC::HttpServerBase
         bool headersEndReceived = false; ///< All headers have been received
         bool parsedSuccessfully = true;  ///< Request headers have been parsed successfully
 
-        HttpParser parser; ///< The parser used to parse headers
-        StringView url;    ///< The url extracted from parsed headers
+        Http::Parser parser; ///< The parser used to parse headers
+        StringView   url;    ///< The url extracted from parsed headers
 
         SmallVector<char, 255>  headerBuffer;  ///< Buffer containing all headers
         SmallVector<Header, 16> headerOffsets; ///< Headers, defined as offsets in headerBuffer
 
-        /// @brief Finds a specific HttpParser::Result in the list of parsed header
+        /// @brief Finds a specific Http::Parser::Result in the list of parsed header
         /// @param result The result to look for (Method, Url etc.)
         /// @param res A StringView, pointing at headerBuffer containing the found result
         /// @return `true` if the result has been found
-        [[nodiscard]] bool find(HttpParser::Result result, StringView& res) const;
+        [[nodiscard]] bool find(Http::Parser::Result result, StringView& res) const;
     };
 
     struct Response
@@ -76,11 +82,11 @@ struct SC::HttpServerBase
 };
 
 /// @brief Http server using Async library
-struct SC::HttpServerAsync : public HttpServerBase
+struct SC::Http::ServerAsync : public Http::ServerBase
 {
-    HttpServerAsync() {}
-    HttpServerAsync(const HttpServerAsync&)            = delete;
-    HttpServerAsync& operator=(const HttpServerAsync&) = delete;
+    ServerAsync() {}
+    ServerAsync(const ServerAsync&)            = delete;
+    ServerAsync& operator=(const ServerAsync&) = delete;
 
     /// @brief Starts the http server on the given Async::EventLoop, address and port
     /// @param loop The event loop to be used, where to add the listening socket
@@ -113,3 +119,5 @@ struct SC::HttpServerAsync : public HttpServerBase
     void onReceive(Async::SocketReceive::Result& result);
     void onAfterSend(Async::SocketSend::Result& result);
 };
+
+//! @}

@@ -8,13 +8,13 @@
 #include "../Strings/SmallString.h"
 #include "../Strings/StringBuilder.h"
 
-SC::Result SC::HttpClientAsync::get(Async::EventLoop& loop, StringView url)
+SC::Result SC::Http::ClientAsync::get(Async::EventLoop& loop, StringView url)
 {
     eventLoop = &loop;
 
     SmallString<256> ipAddress;
     uint16_t         port;
-    HttpURLParser    parser;
+    Http::URLParser  parser;
     SC_TRY(parser.parse(url));
     SC_TRY_MSG(parser.protocol == "http", "Invalid protocol");
     // TODO: Make DNS Resolution asynchronous
@@ -30,25 +30,25 @@ SC::Result SC::HttpClientAsync::get(Async::EventLoop& loop, StringView url)
                      "User-agent: {}\r\n"
                      "Host: {}\r\n\r\n",
                      parser.path, "SC", "127.0.0.1"));
-    const char* dbgName = customDebugName.isEmpty() ? "HttpClientAsync" : customDebugName.bytesIncludingTerminator();
+    const char* dbgName = customDebugName.isEmpty() ? "Http::ClientAsync" : customDebugName.bytesIncludingTerminator();
     connectAsync.setDebugName(dbgName);
-    connectAsync.callback.bind<HttpClientAsync, &HttpClientAsync::onConnected>(*this);
+    connectAsync.callback.bind<Http::ClientAsync, &Http::ClientAsync::onConnected>(*this);
     return connectAsync.start(*eventLoop, clientSocket, localHost);
 }
 
-SC::StringView SC::HttpClientAsync::getResponse() const
+SC::StringView SC::Http::ClientAsync::getResponse() const
 {
     return StringView(content.data(), content.size(), false, StringEncoding::Ascii);
 }
 
-void SC::HttpClientAsync::onConnected(Async::SocketConnect::Result& result)
+void SC::Http::ClientAsync::onConnected(Async::SocketConnect::Result& result)
 {
     SC_COMPILER_UNUSED(result);
     const char* dbgName =
-        customDebugName.isEmpty() ? "HttpClientAsync::clientSocket" : customDebugName.bytesIncludingTerminator();
+        customDebugName.isEmpty() ? "Http::ClientAsync::clientSocket" : customDebugName.bytesIncludingTerminator();
     sendAsync.setDebugName(dbgName);
 
-    sendAsync.callback.bind<HttpClientAsync, &HttpClientAsync::onAfterSend>(*this);
+    sendAsync.callback.bind<Http::ClientAsync, &Http::ClientAsync::onAfterSend>(*this);
     auto res = sendAsync.start(*eventLoop, clientSocket, content.toSpanConst());
     if (not res)
     {
@@ -56,16 +56,16 @@ void SC::HttpClientAsync::onConnected(Async::SocketConnect::Result& result)
     }
 }
 
-void SC::HttpClientAsync::onAfterSend(Async::SocketSend::Result& result)
+void SC::Http::ClientAsync::onAfterSend(Async::SocketSend::Result& result)
 {
     SC_COMPILER_UNUSED(result);
     SC_ASSERT_RELEASE(content.resizeWithoutInitializing(content.capacity()));
 
     const char* dbgName =
-        customDebugName.isEmpty() ? "HttpClientAsync::clientSocket" : customDebugName.bytesIncludingTerminator();
+        customDebugName.isEmpty() ? "Http::ClientAsync::clientSocket" : customDebugName.bytesIncludingTerminator();
     receiveAsync.setDebugName(dbgName);
 
-    receiveAsync.callback.bind<HttpClientAsync, &HttpClientAsync::onAfterRead>(*this);
+    receiveAsync.callback.bind<Http::ClientAsync, &Http::ClientAsync::onAfterRead>(*this);
     auto res = receiveAsync.start(*eventLoop, clientSocket, content.toSpan());
     if (not res)
     {
@@ -73,7 +73,7 @@ void SC::HttpClientAsync::onAfterSend(Async::SocketSend::Result& result)
     }
 }
 
-void SC::HttpClientAsync::onAfterRead(Async::SocketReceive::Result& result)
+void SC::Http::ClientAsync::onAfterRead(Async::SocketReceive::Result& result)
 {
     SC_COMPILER_UNUSED(result);
     SC_ASSERT_RELEASE(SocketClient(clientSocket).close());
