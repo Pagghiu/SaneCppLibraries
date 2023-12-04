@@ -1,19 +1,19 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../HttpServer.h"
+#include "../HttpServerAsync.h"
 #include "../../Strings/StringBuilder.h"
 #include "../../Testing/Testing.h"
-#include "../HttpClient.h"
+#include "../HttpClientAsync.h"
 namespace SC
 {
-struct HttpServerTest;
+struct HttpServerAsyncTest;
 }
 
-struct SC::HttpServerTest : public SC::TestCase
+struct SC::HttpServerAsyncTest : public SC::TestCase
 {
     int numTries = 0;
-    HttpServerTest(SC::TestReport& report) : TestCase(report, "HttpServerTest")
+    HttpServerAsyncTest(SC::TestReport& report) : TestCase(report, "HttpServerAsyncTest")
     {
         if (test_section("server async"))
         {
@@ -23,7 +23,7 @@ struct SC::HttpServerTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.create());
             HttpServerAsync server;
             SC_TEST_EXPECT(server.start(eventLoop, 10, "127.0.0.1", 8080));
-            server.onClient = [this, &server](HttpServer::ClientChannel& client)
+            server.onClient = [this, &server](HttpServerAsync::ClientChannel& client)
             {
                 auto& res = client.response;
                 SC_TEST_EXPECT(client.request.headersEndReceived);
@@ -61,14 +61,14 @@ struct SC::HttpServerTest : public SC::TestCase
                 SC_TEST_EXPECT(sb.format(sampleHtml, numTries));
                 SC_TEST_EXPECT(client.response.end(str.view()));
             };
-            HttpClient       client[3];
+            HttpClientAsync  client[3];
             SmallString<255> buffer;
             for (int i = 0; i < wantedNumTries; ++i)
             {
                 StringBuilder sb(buffer, StringBuilder::Clear);
-                SC_TEST_EXPECT(sb.format("HttpClient [{}]", i));
+                SC_TEST_EXPECT(sb.format("HttpClientAsync [{}]", i));
                 SC_TEST_EXPECT(client[i].setCustomDebugName(buffer.view()));
-                client[i].callback = [this](HttpClient& result)
+                client[i].callback = [this](HttpClientAsync& result)
                 { SC_TEST_EXPECT(result.getResponse().containsString("This is a title")); };
                 SC_TEST_EXPECT(client[i].get(eventLoop, "http://localhost:8080/index.html"));
             }
@@ -81,5 +81,5 @@ struct SC::HttpServerTest : public SC::TestCase
 
 namespace SC
 {
-void runHttpServerTest(SC::TestReport& report) { HttpServerTest test(report); }
+void runHttpServerAsyncTest(SC::TestReport& report) { HttpServerAsyncTest test(report); }
 } // namespace SC

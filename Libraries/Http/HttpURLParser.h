@@ -10,20 +10,23 @@ namespace SC
 struct HttpURLParser;
 } // namespace SC
 
+/// @brief Parse an URL splitting it into its base components
 struct SC::HttpURLParser
 {
-    // Example: http://user:pass@site.com:80/pa/th?q=val#hash
-    StringView protocol; // http
-    StringView username; // user
-    StringView password; // pass
-    StringView hostname; // site.com
-    uint16_t   port;     // 80
-    StringView host;     // site.com:80
-    StringView pathname; // /pa/th
-    StringView path;     // /pa/th?q=val
-    StringView search;   // ?q=val
-    StringView hash;     // #hash
+    StringView protocol; // `http` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)
+    StringView username; // `user` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)
+    StringView password; // `pass` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)
+    StringView hostname; // `site.com` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)
+    uint16_t   port;     // `80` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)
+    StringView host;     // `site.com:80` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)
+    StringView pathname; // `/pa/th` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)
+    StringView path;     // `/pa/th?q=val` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)
+    StringView search;   // `?q=val` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)
+    StringView hash;     // `#hash` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)
 
+    /// @brief Parse StringView representing an URL
+    /// @param url The url to be parsed
+    /// @return Valid Result if parse was successfull
     [[nodiscard]] Result parse(StringView url);
 
   private:

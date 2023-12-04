@@ -1,12 +1,12 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "HttpServer.h"
+#include "HttpServerAsync.h"
 #include "../Strings/SmallString.h"
 #include "../Strings/StringBuilder.h"
 
-// HttpServer::Request
-bool SC::HttpServer::Request::find(HttpParser::Result result, StringView& res) const
+// HttpServerBase::Request
+bool SC::HttpServerBase::Request::find(HttpParser::Result result, StringView& res) const
 {
     size_t found;
     if (headerOffsets.find([result](const auto& it) { return it.result == result; }, &found))
@@ -18,8 +18,8 @@ bool SC::HttpServer::Request::find(HttpParser::Result result, StringView& res) c
     return false;
 }
 
-// HttpServer::Response
-SC::Result SC::HttpServer::Response::startResponse(int code)
+// HttpServerBase::Response
+SC::Result SC::HttpServerBase::Response::startResponse(int code)
 {
     StringBuilder sb(outputBuffer, StringEncoding::Ascii, StringBuilder::Clear);
     SC_TRY(sb.format("HTTP/1.1 "));
@@ -33,7 +33,7 @@ SC::Result SC::HttpServer::Response::startResponse(int code)
     return Result(true);
 }
 
-SC::Result SC::HttpServer::Response::addHeader(StringView headerName, StringView headerValue)
+SC::Result SC::HttpServerBase::Response::addHeader(StringView headerName, StringView headerValue)
 {
     StringBuilder sb(outputBuffer, StringEncoding::Ascii);
     SC_TRY(sb.append(headerName));
@@ -43,7 +43,7 @@ SC::Result SC::HttpServer::Response::addHeader(StringView headerName, StringView
     return Result(true);
 }
 
-SC::Result SC::HttpServer::Response::end(StringView sv)
+SC::Result SC::HttpServerBase::Response::end(StringView sv)
 {
     StringBuilder sb(outputBuffer, StringEncoding::Ascii);
     SC_TRY(sb.append("Content-Length: {}\r\n\r\n", sv.sizeInBytes()));
@@ -54,7 +54,7 @@ SC::Result SC::HttpServer::Response::end(StringView sv)
 
 // HttpServer
 
-SC::Result SC::HttpServer::parse(Span<const char> readData, ClientChannel& client)
+SC::Result SC::HttpServerBase::parse(Span<const char> readData, ClientChannel& client)
 {
     bool& parsedSuccessfully = client.request.parsedSuccessfully;
     if (client.request.headerBuffer.size() > maxHeaderSize)
@@ -153,7 +153,7 @@ void SC::HttpServerAsync::onReceive(Async::SocketReceive::Result& result)
         // TODO: Invoke on error
         return;
     }
-    if (not HttpServer::parse(readData, client))
+    if (not HttpServerBase::parse(readData, client))
     {
         // TODO: Invoke on error
         return;

@@ -7,17 +7,24 @@
 #include "../Strings/String.h"
 namespace SC
 {
-struct HttpClient;
+struct HttpClientAsync;
 } // namespace SC
 
-struct SC::HttpClient
+/// @brief Http async client
+struct SC::HttpClientAsync
 {
+    /// @brief Setups this client to execute a `GET` request on the given url
+    /// @param loop The Async::EventLoop to use for monitoring network packets
+    /// @param url The url to `GET`
+    /// @return Valid Result if dns resolution and creation of underlying client tcp socket succeeded
     [[nodiscard]] Result get(Async::EventLoop& loop, StringView url);
 
-    Delegate<HttpClient&> callback;
+    Delegate<HttpClientAsync&> callback; ///< The callback that is called after `GET` operation succeeded
 
+    /// @brief Get the response StringView sent by the server
     [[nodiscard]] StringView getResponse() const;
-    [[nodiscard]] Result     setCustomDebugName(const StringView debugName)
+
+    [[nodiscard]] Result setCustomDebugName(const StringView debugName)
     {
         return Result(customDebugName.assign(debugName));
     }
