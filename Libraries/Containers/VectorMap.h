@@ -161,6 +161,7 @@ struct SC::VectorMap
     }
 
     /// @brief Check if the given key is contained in the map
+    /// @param key The key to search for inside current map
     /// @param outValue A reference that will receive pointer to the found element (if found)
     template <typename ComparableToKey>
     [[nodiscard]] bool contains(const ComparableToKey& key, const Value*& outValue) const
@@ -177,6 +178,7 @@ struct SC::VectorMap
     }
 
     /// @brief Check if the given key is contained in the map
+    /// @param key The key to search for inside current map
     /// @param outValue A reference that will receive pointer to the found element (if found)
     template <typename ComparableToKey>
     [[nodiscard]] bool contains(const ComparableToKey& key, Value*& outValue)

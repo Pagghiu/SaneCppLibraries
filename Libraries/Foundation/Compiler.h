@@ -201,7 +201,7 @@ T& fieldOffset(R& object)
 
 #undef SC_LANGUAGE_CPP_VERSION
 
-#if (not SC_COMPILER_MSVC) or SC_LANGUAGE_CPP_AT_LEAST_20
+#if !SC_COMPILER_MSVC || SC_LANGUAGE_CPP_AT_LEAST_20
 #define SC_LANGUAGE_LIKELY   [[likely]]   ///<  Use `[[likely]]` if available
 #define SC_LANGUAGE_UNLIKELY [[unlikely]] ///<  Use `[[unlikely]]` if available
 #else

@@ -111,6 +111,7 @@ struct SC::Thread
     static uint64_t CurrentThreadID();
 
     /// Starts the new thread with given name and func
+    /// @param threadName Name given to the thread being started
     /// @param func     Function running on thread. Must be a valid pointer to action for the entire duration of thread.
     /// @param syncFunc Function garanteed to be run before  start returns
     [[nodiscard]] Result start(StringView threadName, Action* func, Action* syncFunc = nullptr);

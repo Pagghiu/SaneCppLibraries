@@ -2,6 +2,31 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "Build.h"
+namespace SC
+{
+namespace Build
+{
+/// @brief Writes all project files for a given Definition with some Parameters using the provided DefinitionCompiler
+struct ProjectWriter
+{
+    const Definition&         definition;
+    const DefinitionCompiler& definitionCompiler;
+    const Parameters&         parameters;
+
+    ProjectWriter(const Definition& definition, const DefinitionCompiler& definitionCompiler,
+                  const Parameters& parameters)
+        : definition(definition), definitionCompiler(definitionCompiler), parameters(parameters)
+    {}
+
+    /// @brief Write the Definition outputs at the destinationDirectory, with filename
+    [[nodiscard]] bool write(StringView destinationDirectory, StringView filename, StringView projectSubdirectory);
+
+  private:
+    struct WriterXCode;
+    struct WriterVisualStudio;
+};
+} // namespace Build
+} // namespace SC
 #include "Internal/BuildWriterVisualStudio.inl"
 #include "Internal/BuildWriterXCode.inl"
 
@@ -83,8 +108,8 @@ SC::Result SC::Build::Workspace::validate() const
     return Result(true);
 }
 
-SC::Result SC::Build::Definition::generate(StringView projectName, const Build::Parameters& parameters,
-                                           StringView testPath) const
+SC::Result SC::Build::Definition::generate(StringView projectFileName, const Build::Parameters& parameters,
+                                           StringView rootPath) const
 {
     Build::DefinitionCompiler definitionCompiler(*this);
     SC_TRY(definitionCompiler.validate());
@@ -96,7 +121,7 @@ SC::Result SC::Build::Definition::generate(StringView projectName, const Build::
     case Build::Generator::XCode14: directory = "MacOS"; break;
     case Build::Generator::VisualStudio2022: directory = "Windows"; break;
     }
-    return Result(writer.write(testPath, projectName, directory));
+    return Result(writer.write(rootPath, projectFileName, directory));
 }
 
 SC::Result SC::Build::DefinitionCompiler::validate()

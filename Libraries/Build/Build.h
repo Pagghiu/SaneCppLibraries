@@ -11,9 +11,16 @@
 
 namespace SC
 {
+/// @brief Minimal build system where builds are described in C++ (see @ref library_build)
 namespace Build
 {
+//! @defgroup group_build Build
+//! @copybrief library_build (see @ref library_build for more details)
 
+//! @addtogroup group_build
+//! @{
+
+/// @brief Build Platform (Operating System)
 struct Platform
 {
     enum Type
@@ -26,6 +33,7 @@ struct Platform
         Wasm
     };
 
+    /// @brief Get StringView from Platform::Type
     static constexpr StringView toString(Type type)
     {
         switch (type)
@@ -41,6 +49,7 @@ struct Platform
     }
 };
 
+/// @brief Build Architecture (Processor / Instruction set)
 struct Architecture
 {
     enum Type
@@ -52,6 +61,7 @@ struct Architecture
         Wasm
     };
 
+    /// @brief Get StringView from Architecture::Type
     static constexpr StringView toString(Type type)
     {
         switch (type)
@@ -66,14 +76,16 @@ struct Architecture
     }
 };
 
+/// @brief Build system generator (Xcode / Visual Studio)
 struct Generator
 {
     enum Type
     {
-        XCode14,
-        VisualStudio2022,
+        XCode14,          ///< Generate projects for XCode 14
+        VisualStudio2022, ///< Generate projects for Visual Studio 2022
     };
 
+    /// @brief Get StringView from Generator::Type
     static constexpr StringView toString(Type type)
     {
         switch (type)
@@ -85,14 +97,16 @@ struct Generator
     }
 };
 
+/// @brief Optimization level (Debug / Release)
 struct Optimization
 {
     enum Type
     {
-        Debug,
-        Release,
+        Debug,   ///< Optimizations set to debug
+        Release, ///< Optimizations set to release
     };
 
+    /// @brief Get StringView from Optimization::Type
     static constexpr StringView toString(Type type)
     {
         switch (type)
@@ -104,36 +118,39 @@ struct Optimization
     }
 };
 
+/// @brief Compilation switches (include paths, preprocessor defines, etc.)
 struct Compile
 {
     enum Type
     {
-        includePaths = 0,
-        preprocessorDefines,
-        optimizationLevel,
-        enableASAN,
-        enableRTTI,
-        enableExceptions,
-        enableStdCpp,
+        includePaths = 0,    ///< Include paths
+        preprocessorDefines, ///< Preprocessor defines
+        optimizationLevel,   ///< Optimization Level (debug / release)
+        enableASAN,          ///< Address Sanitizer
+        enableRTTI,          ///< Runtime Type Identification
+        enableExceptions,    ///< C++ Exceptions
+        enableStdCpp,        ///< C++ Standard Library
     };
 
+    /// @brief Two StringViews representing anme and description
     struct NameDescription
     {
         StringView name;
         StringView description;
     };
 
+    /// @brief Get name and description from Compile::Type
     static constexpr NameDescription typeToString(Type type)
     {
         switch (type)
         {
-        case includePaths: return {"includePaths", "Description includePaths"};
-        case preprocessorDefines: return {"preprocessorDefines", "Description preprocessorDefines"};
-        case optimizationLevel: return {"optimizationLevel", "Description optimizationLevel"};
-        case enableASAN: return {"enableASAN", "Description enableASAN"};
-        case enableRTTI: return {"enableRTTI", "Description enableRTTI"};
-        case enableExceptions: return {"enableExceptions", "Description enableExceptions"};
-        case enableStdCpp: return {"enableStdCpp", "Description enableStdCpp"};
+        case includePaths: return {"includePaths", "Includ paths"};
+        case preprocessorDefines: return {"preprocessorDefines", "Preprocessor defines"};
+        case optimizationLevel: return {"optimizationLevel", "Optimization level"};
+        case enableASAN: return {"enableASAN", "Address Sanitizer"};
+        case enableRTTI: return {"enableRTTI", "Runtime Type Identification"};
+        case enableExceptions: return {"enableExceptions", "C++ Exceptions"};
+        case enableStdCpp: return {"enableStdCpp", "C++ Standard Library"};
         }
         Assert::unreachable();
     }
@@ -149,30 +166,35 @@ struct Compile
     using Union = TaggedUnion<Compile>;
 };
 
+/// @brief Map of Compile flags (include paths, preprocessor defines etc.)
 struct CompileFlags : public TaggedMap<Compile::Type, Compile::Union>
 {
+    /// @brief Add paths to includes search paths list
     [[nodiscard]] bool addIncludes(Span<const StringView> includes)
     {
         return getOrCreate<Compile::includePaths>()->append(includes);
     }
 
+    /// @brief Add define to preprocessor definitions
     [[nodiscard]] bool addDefines(Span<const StringView> defines)
     {
         return getOrCreate<Compile::preprocessorDefines>()->append(defines);
     }
 };
 
+/// @brief Linking switches (library paths, LTO etc.)
 struct Link
 {
     enum Type
     {
-        libraryPaths,
-        libraryFrameworks,
-        enableLTO,
-        enableASAN,
-        enableStdCpp,
+        libraryPaths,      ///< Library paths
+        libraryFrameworks, ///< Frameworks paths
+        enableLTO,         ///< Link Time Optimization
+        enableASAN,        ///< Address Sanitizer
+        enableStdCpp,      ///< C++ Standard Library
     };
 
+    /// @brief Get StringView describing Link::Type
     static constexpr StringView typeToString(Type type)
     {
         switch (type)
@@ -196,35 +218,42 @@ struct Link
     using Union = TaggedUnion<Link>;
 };
 
+/// @brief Map of Link flags (library paths, LTO switch etc.)
 struct LinkFlags : public TaggedMap<Link::Type, Link::Union>
 {
-    [[nodiscard]] bool addLink(Span<const StringView> libraries)
+    /// @brief Add the given paths to the library search paths list
+    [[nodiscard]] bool addLibraryPath(Span<const StringView> libraries)
     {
         return getOrCreate<Link::libraryPaths>()->append(libraries);
     }
 
+    /// @brief Add framework to list of frameworks to link
     [[nodiscard]] bool addFrameworks(Span<const StringView> frameworks)
     {
         return getOrCreate<Link::libraryFrameworks>()->append(frameworks);
     }
 };
 
+/// @brief Holds together CompileFlags, LinkFlags for a given Architecture
 struct Configuration
 {
+    /// @brief A pre-made preset with pre-configured set of options
     enum class Preset
     {
-        None,
-        Debug,
-        Release,
+        None,    ///< Custom configuration
+        Debug,   ///< Debug configuration
+        Release, ///< Release configuration
     };
 
+    /// @brief Visual Studio platform toolset
     struct VisualStudio
     {
         StringView platformToolset;
     };
 
-    VisualStudio visualStudio;
+    VisualStudio visualStudio; ///< Customize VisualStudio platformToolset
 
+    /// @brief Convert Preset to StringView
     static constexpr StringView PresetToString(Preset preset)
     {
         switch (preset)
@@ -236,6 +265,7 @@ struct Configuration
         Assert::unreachable();
     }
 
+    /// @brief Set compile flags dpeending on the given Preset
     [[nodiscard]] bool applyPreset(Preset newPreset)
     {
         preset = newPreset;
@@ -250,25 +280,28 @@ struct Configuration
         return true;
     }
 
-    String       name;
-    CompileFlags compile;
-    LinkFlags    link;
-    String       outputPath;
-    String       intermediatesPath;
+    String       name;              ///< Configuration name
+    CompileFlags compile;           ///< Configuration compile flags
+    LinkFlags    link;              ///< Configuration link flags
+    String       outputPath;        ///< Path where build outputs should be created
+    String       intermediatesPath; ///< Path where build intermediate files will be created
 
-    Preset             preset       = Preset::None;
-    Architecture::Type architecture = Architecture::Any;
+    Preset             preset       = Preset::None;      ///< Build preset applied to this configuration
+    Architecture::Type architecture = Architecture::Any; ///< Restrict this configuration to a specific architecture
 };
 
+/// @brief Type of target artifact to build (executable, library)
 struct TargetType
 {
+    /// @brief Type of artifact
     enum Type
     {
-        Executable,
-        DynamicLibrary,
-        StaticLibrary
+        Executable,     ///< Create executable program
+        DynamicLibrary, ///< Create dynamic library
+        StaticLibrary   ///< Create static library
     };
 
+    /// @brief Convert TargetType to StringView
     static constexpr StringView typeToString(Type type)
     {
         switch (type)
@@ -281,18 +314,21 @@ struct TargetType
     }
 };
 
+/// @brief Project composed of files with their compile and link flags
 struct Project
 {
+    /// @brief Project list of files
     struct File
     {
+        /// @brief Indicates if this is an additive or subtractive files operation
         enum Operation
         {
-            Add,
-            Remove
+            Add,   ///< Add files
+            Remove ///< Remove files
         };
-        Operation operation = Add;
-        String    base;
-        String    mask;
+        Operation operation = Add; ///< Operation type (add or remove files)
+        String    base;            ///< Base path (not containing `*`)
+        String    mask;            ///< Mask suffix (can contain `*`)
 
         bool operator==(const File& other) const
         {
@@ -301,58 +337,81 @@ struct Project
         }
     };
 
-    TargetType::Type targetType = TargetType::Executable;
+    TargetType::Type targetType = TargetType::Executable; ///< Type of build artifact
 
-    String name;
-    String rootDirectory;
-    String targetName;
+    String name;          ///< Project name
+    String rootDirectory; ///< Project root directory
+    String targetName;    ///< Project target name
 
-    Vector<File> files;
-    CompileFlags compile;
-    LinkFlags    link;
+    Vector<File> files;   ///< Files that belong to the project
+    CompileFlags compile; ///< Shared CompileFlags for all files in the project
+    LinkFlags    link;    ///< Shared LinkFlags for all files in the project
 
-    Vector<Configuration> configurations;
+    Vector<Configuration> configurations; ///< Build configurations created inside the proeject
 
+    /// @brief Set root directory for this project (all relative paths will be relative to this one)
     [[nodiscard]] bool setRootDirectory(StringView file);
 
+    /// @brief Add a configuration with a given name, started by cloning options of a specific Preset
     [[nodiscard]] bool addPresetConfiguration(Configuration::Preset preset,
                                               StringView            configurationName = StringView());
 
-    [[nodiscard]] Configuration*       getConfiguration(StringView configurationName);
+    /// @brief Get Configuration with the matching `configurationName`
+    [[nodiscard]] Configuration* getConfiguration(StringView configurationName);
+    /// @brief Get Configuration with the matching `configurationName`
     [[nodiscard]] const Configuration* getConfiguration(StringView configurationName) const;
 
+    /// @brief Add all files from specific subdirectory (relative to project root) matching given filter
+    /// @param subdirectory The subdirectory to search files from, absolute or relative to project root. No `*` allowed.
+    /// @param filter The suffix filter that is appended to `subdirectory` (can contain `*`)
     [[nodiscard]] bool addDirectory(StringView subdirectory, StringView filter);
+
+    /// @brief Add a single file to the project
     [[nodiscard]] bool addFile(StringView singleFile);
 
+    /// @brief Remove files matching the given filter. Useful to remove only a specific file type after
+    /// Project::addDirectory
+    /// @param subdirectory The subdirectory to search files into, absolute or relative to project root. No `*` allowed.
+    /// @param filter The suffix filter that is appended to `subdirectory` (can contain `*`)
     [[nodiscard]] bool removeFiles(StringView subdirectory, StringView filter);
 
+    /// @brief Validates this project for it to contain a valid combination of flags
     [[nodiscard]] Result validate() const;
 };
 
+/// @brief A Workspace brings related Project together with shared compile and link flags
 struct Workspace
 {
-    String          name;
-    Vector<Project> projects;
+    String          name;     ///< Workspace name
+    Vector<Project> projects; ///< List of projects in this workspace
+    CompileFlags    compile;  ///< Global workspace compile flags for all projects
+    LinkFlags       link;     ///< Global workspace link flags for all projects
 
-    CompileFlags compile;
-    LinkFlags    link;
-
+    /// @brief Validates all projects in this workspace
     [[nodiscard]] Result validate() const;
 };
 
+/// @brief Describes a specific set of platforms, architectures and build generators to generate projects for
 struct Parameters
 {
-    Array<Platform::Type, 5>     platforms     = {Platform::MacOS, Platform::iOS};
-    Array<Architecture::Type, 5> architectures = {Architecture::Intel64, Architecture::Arm64};
-    Generator::Type              generator     = Generator::XCode14;
+    Array<Platform::Type, 5>     platforms;     ///< Platforms to generate
+    Array<Architecture::Type, 5> architectures; ///< Architectures to generate
+    Generator::Type              generator;     ///< Build system types to generate
 };
 
+/// @brief Groups multiple Workspace together
 struct Definition
 {
-    Vector<Workspace> workspaces;
-    Result            generate(StringView projectName, const Parameters& parameters, StringView testPath) const;
+    Vector<Workspace> workspaces; ///< Workspaces to be generated
+
+    /// @brief Generates projects for all workspaces, with specified parameters at given root path.
+    /// @param projectName Name of the workspace file / directory to generate
+    /// @param parameters Set of parameters with the wanted platforms, architectures and generators to generate
+    /// @param rootPath The path where workspace will be generated
+    Result generate(StringView projectName, const Parameters& parameters, StringView rootPath) const;
 };
 
+/// @brief Caches file paths by pre-resolving directory filter search masks
 struct DefinitionCompiler
 {
     VectorMap<String, Vector<String>> resolvedPaths;
@@ -368,24 +427,7 @@ struct DefinitionCompiler
                                               VectorMap<String, Vector<String>>& filtersToFiles);
     [[nodiscard]] Result        collectUniqueRootPaths(VectorMap<String, VectorSet<Project::File>>& paths);
 };
-
-struct ProjectWriter
-{
-    const Definition&         definition;
-    const DefinitionCompiler& definitionCompiler;
-    const Parameters&         parameters;
-
-    ProjectWriter(const Definition& definition, const DefinitionCompiler& definitionCompiler,
-                  const Parameters& parameters)
-        : definition(definition), definitionCompiler(definitionCompiler), parameters(parameters)
-    {}
-
-    [[nodiscard]] bool write(StringView destinationDirectory, StringView filename, StringView projectSubdirectory);
-
-  private:
-    struct WriterXCode;
-    struct WriterVisualStudio;
-};
+//! @}
 
 //-----------------------------------------------------------------------------------------------------------------------
 // Implementations Details
