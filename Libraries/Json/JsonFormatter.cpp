@@ -9,7 +9,7 @@
 #include <stdio.h> // snprintf
 #include <string.h>
 
-SC::JsonFormatter::JsonFormatter(Vector<State>& state, StringFormatOutput& output) : state(state), output(output)
+SC::Json::Formatter::Formatter(Vector<State>& state, StringFormatOutput& output) : state(state), output(output)
 {
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
     strcpy_s(floatFormat, "%.2f");
@@ -18,7 +18,7 @@ SC::JsonFormatter::JsonFormatter(Vector<State>& state, StringFormatOutput& outpu
 #endif
 }
 
-bool SC::JsonFormatter::writeSeparator()
+bool SC::Json::Formatter::writeSeparator()
 {
     if (not state.isEmpty())
     {
@@ -45,7 +45,7 @@ bool SC::JsonFormatter::writeSeparator()
     }
     return true;
 }
-bool SC::JsonFormatter::setOptions(Options opt)
+bool SC::Json::Formatter::setOptions(Options opt)
 {
     options       = opt;
     const int res = snprintf(floatFormat, sizeof(floatFormat), "%%.%df", options.floatDigits);
@@ -53,7 +53,7 @@ bool SC::JsonFormatter::setOptions(Options opt)
     return res > 0;
 }
 
-bool SC::JsonFormatter::onBeforeValue()
+bool SC::Json::Formatter::onBeforeValue()
 {
     if (runState == BeforeStart)
     {
@@ -75,7 +75,7 @@ bool SC::JsonFormatter::onBeforeValue()
     return true;
 }
 
-bool SC::JsonFormatter::onAfterValue()
+bool SC::Json::Formatter::onAfterValue()
 {
     if (state.isEmpty())
     {
@@ -89,7 +89,7 @@ bool SC::JsonFormatter::onAfterValue()
     return true;
 }
 
-bool SC::JsonFormatter::writeValue(int writtenChars, const char* buffer)
+bool SC::Json::Formatter::writeValue(int writtenChars, const char* buffer)
 {
     if (not onBeforeValue() or not writeSeparator())
     {
@@ -105,59 +105,59 @@ bool SC::JsonFormatter::writeValue(int writtenChars, const char* buffer)
     return false;
 }
 
-bool SC::JsonFormatter::writeFloat(float value)
+bool SC::Json::Formatter::writeFloat(float value)
 {
     char buffer[100];
     return writeValue(snprintf(buffer, sizeof(buffer), floatFormat, value), buffer);
 }
 
-bool SC::JsonFormatter::writeDouble(double value)
+bool SC::Json::Formatter::writeDouble(double value)
 {
     char buffer[100];
     return writeValue(snprintf(buffer, sizeof(buffer), floatFormat, value), buffer);
 }
 
-bool SC::JsonFormatter::writeInt8(int8_t value)
+bool SC::Json::Formatter::writeInt8(int8_t value)
 {
     char buffer[30];
     return writeValue(snprintf(buffer, sizeof(buffer), "%d", value), buffer);
 }
 
-bool SC::JsonFormatter::writeUint8(uint8_t value)
+bool SC::Json::Formatter::writeUint8(uint8_t value)
 {
     char buffer[30];
     return writeValue(snprintf(buffer, sizeof(buffer), "%d", value), buffer);
 }
 
-bool SC::JsonFormatter::writeInt32(int32_t value)
+bool SC::Json::Formatter::writeInt32(int32_t value)
 {
     char buffer[30];
     return writeValue(snprintf(buffer, sizeof(buffer), "%d", value), buffer);
 }
 
-bool SC::JsonFormatter::writeUint32(uint32_t value)
+bool SC::Json::Formatter::writeUint32(uint32_t value)
 {
     char buffer[30];
     return writeValue(snprintf(buffer, sizeof(buffer), "%d", value), buffer);
 }
 
-bool SC::JsonFormatter::writeInt64(int64_t value)
+bool SC::Json::Formatter::writeInt64(int64_t value)
 {
     char buffer[30];
     return writeValue(snprintf(buffer, sizeof(buffer), "%lld", value), buffer);
 }
 
-bool SC::JsonFormatter::writeUint64(uint64_t value)
+bool SC::Json::Formatter::writeUint64(uint64_t value)
 {
     char buffer[30];
     return writeValue(snprintf(buffer, sizeof(buffer), "%lld", value), buffer);
 }
 
-bool SC::JsonFormatter::writeBoolean(bool value) { return writeValue(value ? 4 : 5, value ? "true" : "false"); }
+bool SC::Json::Formatter::writeBoolean(bool value) { return writeValue(value ? 4 : 5, value ? "true" : "false"); }
 
-bool SC::JsonFormatter::writeNull() { return writeValue(4, "null"); }
+bool SC::Json::Formatter::writeNull() { return writeValue(4, "null"); }
 
-bool SC::JsonFormatter::writeString(StringView value)
+bool SC::Json::Formatter::writeString(StringView value)
 {
     if (not onBeforeValue() or not writeSeparator())
     {
@@ -171,7 +171,7 @@ bool SC::JsonFormatter::writeString(StringView value)
     return false;
 }
 
-bool SC::JsonFormatter::startArray()
+bool SC::Json::Formatter::startArray()
 {
     if (not onBeforeValue() or not writeSeparator())
     {
@@ -184,7 +184,7 @@ bool SC::JsonFormatter::startArray()
     return false;
 }
 
-bool SC::JsonFormatter::endArray()
+bool SC::Json::Formatter::endArray()
 {
     if (state.isEmpty() or ((state.back() != Array) and (state.back() != ArrayFirst)))
     {
@@ -200,7 +200,7 @@ bool SC::JsonFormatter::endArray()
     return false;
 }
 
-bool SC::JsonFormatter::startObject()
+bool SC::Json::Formatter::startObject()
 {
     if (not onBeforeValue() or not writeSeparator())
     {
@@ -214,7 +214,7 @@ bool SC::JsonFormatter::startObject()
     return false;
 }
 
-bool SC::JsonFormatter::endObject()
+bool SC::Json::Formatter::endObject()
 {
     if (state.isEmpty() or ((state.back() != Object) and (state.back() != ObjectFirst)))
     {
@@ -230,7 +230,7 @@ bool SC::JsonFormatter::endObject()
     return false;
 }
 
-bool SC::JsonFormatter::startObjectField(StringView name)
+bool SC::Json::Formatter::startObjectField(StringView name)
 {
     if (state.isEmpty() or ((state.back() != Object) and (state.back() != ObjectFirst)))
     {

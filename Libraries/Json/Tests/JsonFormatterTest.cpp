@@ -18,12 +18,12 @@ struct SC::JsonFormatterTest : public SC::TestCase
     {
         if (test_section("JsonFormatter::value"))
         {
-            SmallVector<JsonFormatter::State, 100> nestedStates;
+            SmallVector<Json::Formatter::State, 100> nestedStates;
 
             SmallVector<char, 256> buffer;
             StringFormatOutput     output(StringEncoding::Ascii, buffer);
 
-            JsonFormatter writer(nestedStates, output);
+            Json::Formatter writer(nestedStates, output);
 
             float expectedValue = 1.2f;
             float parsedValue   = 0.0f;
@@ -33,12 +33,12 @@ struct SC::JsonFormatterTest : public SC::TestCase
         }
         if (test_section("JsonFormatter::array"))
         {
-            SmallVector<JsonFormatter::State, 100> nestedStates;
+            SmallVector<Json::Formatter::State, 100> nestedStates;
 
             SmallVector<char, 256> buffer;
             StringFormatOutput     output(StringEncoding::Ascii, buffer);
             {
-                JsonFormatter writer(nestedStates, output);
+                Json::Formatter writer(nestedStates, output);
                 SC_TEST_EXPECT(writer.startArray());
                 SC_TEST_EXPECT(writer.startArray());
                 SC_TEST_EXPECT(writer.endArray());
@@ -56,12 +56,12 @@ struct SC::JsonFormatterTest : public SC::TestCase
         }
         if (test_section("JsonFormatter::object"))
         {
-            SmallVector<JsonFormatter::State, 100> nestedStates;
+            SmallVector<Json::Formatter::State, 100> nestedStates;
 
             SmallVector<char, 256> buffer;
             StringFormatOutput     output(StringEncoding::Ascii, buffer);
             {
-                JsonFormatter writer(nestedStates, output);
+                Json::Formatter writer(nestedStates, output);
                 SC_TEST_EXPECT(writer.startObject());
                 SC_TEST_EXPECT(not writer.writeUint64(123));
                 SC_TEST_EXPECT(writer.startObjectField("a"));

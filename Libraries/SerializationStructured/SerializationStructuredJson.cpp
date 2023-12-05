@@ -69,36 +69,36 @@ bool SC::SerializationStructured::JsonWriter::eventuallyAddComma(uint32_t index)
 bool SC::SerializationStructured::JsonReader::startObject(uint32_t index)
 {
     SC_TRY(eventuallyExpectComma(index));
-    SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-    SC_TRY(token.getType() == JsonTokenizer::Token::ObjectStart);
+    SC_TRY(Json::Tokenizer::tokenizeNext(iterator, token));
+    SC_TRY(token.getType() == Json::Tokenizer::Token::ObjectStart);
     return true;
 }
 
 bool SC::SerializationStructured::JsonReader::endObject()
 {
-    SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-    return token.getType() == JsonTokenizer::Token::ObjectEnd;
+    SC_TRY(Json::Tokenizer::tokenizeNext(iterator, token));
+    return token.getType() == Json::Tokenizer::Token::ObjectEnd;
 }
 
 bool SC::SerializationStructured::JsonReader::startArray(uint32_t index)
 {
     SC_TRY(eventuallyExpectComma(index));
-    SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-    return token.getType() == JsonTokenizer::Token::ArrayStart;
+    SC_TRY(Json::Tokenizer::tokenizeNext(iterator, token));
+    return token.getType() == Json::Tokenizer::Token::ArrayStart;
 }
 
 bool SC::SerializationStructured::JsonReader::endArray()
 {
-    SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-    return token.getType() == JsonTokenizer::Token::ArrayEnd;
+    SC_TRY(Json::Tokenizer::tokenizeNext(iterator, token));
+    return token.getType() == Json::Tokenizer::Token::ArrayEnd;
 }
 
 bool SC::SerializationStructured::JsonReader::eventuallyExpectComma(uint32_t index)
 {
     if (index > 0)
     {
-        SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::Comma);
+        SC_TRY(Json::Tokenizer::tokenizeNext(iterator, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::Comma);
     }
     return true;
 }
@@ -107,8 +107,8 @@ bool SC::SerializationStructured::JsonReader::serialize(uint32_t index, String& 
 {
     SC_COMPILER_UNUSED(text);
     SC_TRY(eventuallyExpectComma(index));
-    SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-    SC_TRY(token.getType() == JsonTokenizer::Token::String);
+    SC_TRY(Json::Tokenizer::tokenizeNext(iterator, token));
+    SC_TRY(token.getType() == Json::Tokenizer::Token::String);
     // TODO: Escape JSON string
     return text.assign(token.getToken(iteratorText));
 }
@@ -116,17 +116,17 @@ bool SC::SerializationStructured::JsonReader::serialize(uint32_t index, String& 
 bool SC::SerializationStructured::JsonReader::startObjectField(uint32_t index, StringView text)
 {
     SC_TRY(eventuallyExpectComma(index));
-    SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-    SC_TRY(token.getType() == JsonTokenizer::Token::String);
+    SC_TRY(Json::Tokenizer::tokenizeNext(iterator, token));
+    SC_TRY(token.getType() == Json::Tokenizer::Token::String);
     SC_TRY(text == token.getToken(iteratorText));
-    SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-    return token.getType() == JsonTokenizer::Token::Colon;
+    SC_TRY(Json::Tokenizer::tokenizeNext(iterator, token));
+    return token.getType() == Json::Tokenizer::Token::Colon;
 }
 bool SC::SerializationStructured::JsonReader::getNextField(uint32_t index, StringView& text, bool& hasMore)
 {
     auto iteratorBackup = iterator;
-    SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-    if (token.getType() == JsonTokenizer::Token::ObjectEnd)
+    SC_TRY(Json::Tokenizer::tokenizeNext(iterator, token));
+    if (token.getType() == Json::Tokenizer::Token::ObjectEnd)
     {
         iterator = iteratorBackup;
         hasMore  = false;
@@ -135,19 +135,19 @@ bool SC::SerializationStructured::JsonReader::getNextField(uint32_t index, Strin
     iterator = iteratorBackup;
     SC_TRY(eventuallyExpectComma(index));
     hasMore = true;
-    SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-    SC_TRY(token.getType() == JsonTokenizer::Token::String);
+    SC_TRY(Json::Tokenizer::tokenizeNext(iterator, token));
+    SC_TRY(token.getType() == Json::Tokenizer::Token::String);
     text = token.getToken(iteratorText);
-    SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-    return token.getType() == JsonTokenizer::Token::Colon;
+    SC_TRY(Json::Tokenizer::tokenizeNext(iterator, token));
+    return token.getType() == Json::Tokenizer::Token::Colon;
 }
 
 bool SC::SerializationStructured::JsonReader::serialize(uint32_t index, float& value)
 {
     SC_COMPILER_UNUSED(value);
     SC_TRY(eventuallyExpectComma(index));
-    SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-    SC_TRY(token.getType() == JsonTokenizer::Token::Number);
+    SC_TRY(Json::Tokenizer::tokenizeNext(iterator, token));
+    SC_TRY(token.getType() == Json::Tokenizer::Token::Number);
     return token.getToken(iteratorText).parseFloat(value);
 }
 
@@ -155,7 +155,7 @@ bool SC::SerializationStructured::JsonReader::serialize(uint32_t index, int32_t&
 {
     SC_COMPILER_UNUSED(value);
     SC_TRY(eventuallyExpectComma(index));
-    SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-    SC_TRY(token.getType() == JsonTokenizer::Token::Number);
+    SC_TRY(Json::Tokenizer::tokenizeNext(iterator, token));
+    SC_TRY(token.getType() == Json::Tokenizer::Token::Number);
     return token.getToken(iteratorText).parseInt32(value);
 }

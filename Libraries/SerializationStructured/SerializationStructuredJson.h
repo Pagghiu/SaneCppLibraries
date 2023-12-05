@@ -98,9 +98,9 @@ struct SC::SerializationStructured::JsonReader
     {
         if (not eventuallyExpectComma(index))
             return false;
-        if (not JsonTokenizer::tokenizeNext(iterator, token))
+        if (not Json::Tokenizer::tokenizeNext(iterator, token))
             return false;
-        if (token.getType() != JsonTokenizer::Token::ArrayStart)
+        if (token.getType() != Json::Tokenizer::Token::ArrayStart)
             return false;
         return endArrayItem(container, size);
     }
@@ -109,9 +109,9 @@ struct SC::SerializationStructured::JsonReader
     [[nodiscard]] bool endArrayItem(Container& container, uint32_t& size)
     {
         auto iteratorBackup = iterator;
-        if (not JsonTokenizer::tokenizeNext(iterator, token))
+        if (not Json::Tokenizer::tokenizeNext(iterator, token))
             return false;
-        if (token.getType() != JsonTokenizer::Token::ArrayEnd)
+        if (token.getType() != Json::Tokenizer::Token::ArrayEnd)
         {
             size += 1;
             if (not container.resize(size))
@@ -131,9 +131,9 @@ struct SC::SerializationStructured::JsonReader
   private:
     [[nodiscard]] bool eventuallyExpectComma(uint32_t index);
 
-    StringView           iteratorText;
-    StringIteratorASCII  iterator;
-    JsonTokenizer::Token token;
+    StringView             iteratorText;
+    StringIteratorASCII    iterator;
+    Json::Tokenizer::Token token;
 };
 
 //! @}

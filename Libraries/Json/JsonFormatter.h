@@ -6,11 +6,15 @@
 
 namespace SC
 {
-struct JsonFormatter;
 
 struct StringFormatOutput;
 template <typename T>
 struct Vector;
+/// @brief Parser and tokenizer for json
+namespace Json
+{
+struct Formatter;
+}
 } // namespace SC
 
 //! @defgroup group_json JSON
@@ -22,7 +26,7 @@ struct Vector;
 // TODO: This class could be deleted potentially, unless we like to allow some dynamic formatting
 
 /// @brief Write correctly formatted JSON
-struct SC::JsonFormatter
+struct SC::Json::Formatter
 {
     /// @brief Possible states for the formatter state machine
     enum State
@@ -36,7 +40,7 @@ struct SC::JsonFormatter
     /// @brief Construct with a buffer for holding state machine states and a output format
     /// @param state Buffer holding state machine states
     /// @param output Output interface to print resulting json to
-    JsonFormatter(Vector<State>& state, StringFormatOutput& output);
+    Formatter(Vector<State>& state, StringFormatOutput& output);
 
     /// @brief Formatting options (floating point digits)
     struct Options

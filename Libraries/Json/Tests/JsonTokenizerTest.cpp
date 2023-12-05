@@ -17,62 +17,62 @@ struct SC::JsonTokenizerTest : public SC::TestCase
 
     static constexpr bool testTokenizeObject(StringView text)
     {
-        auto                 it = text.getIterator<It>();
-        JsonTokenizer::Token token;
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::ObjectStart);
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::ObjectEnd);
+        auto                   it = text.getIterator<It>();
+        Json::Tokenizer::Token token;
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::ObjectStart);
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::ObjectEnd);
         return true;
     }
 
     static constexpr bool testTokenizeObjectWithField(StringView text)
     {
-        auto                 it = text.getIterator<It>();
-        JsonTokenizer::Token token;
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::ObjectStart);
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::String);
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::Colon);
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::Number);
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::ObjectEnd);
+        auto                   it = text.getIterator<It>();
+        Json::Tokenizer::Token token;
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::ObjectStart);
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::String);
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::Colon);
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::Number);
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::ObjectEnd);
         return true;
     }
     static constexpr bool testTokenizeObjectWithTwoFields(StringView text)
     {
-        auto                 it = text.getIterator<It>();
-        JsonTokenizer::Token token;
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::ObjectStart);
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::String);
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::Colon);
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::Number);
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::Comma);
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::String);
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::Colon);
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
-        SC_TRY(token.getType() == JsonTokenizer::Token::Number);
-        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        auto                   it = text.getIterator<It>();
+        Json::Tokenizer::Token token;
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::ObjectStart);
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::String);
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::Colon);
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::Number);
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::Comma);
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::String);
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::Colon);
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == Json::Tokenizer::Token::Number);
+        SC_TRY(Json::Tokenizer::tokenizeNext(it, token));
 
-        SC_TRY(token.getType() == JsonTokenizer::Token::ObjectEnd);
+        SC_TRY(token.getType() == Json::Tokenizer::Token::ObjectEnd);
         return true;
     }
 
-    [[nodiscard]] static constexpr JsonTokenizer::Token scanToken(StringView text)
+    [[nodiscard]] static constexpr Json::Tokenizer::Token scanToken(StringView text)
     {
-        auto                 it = text.getIterator<It>();
-        JsonTokenizer::Token token;
-        (void)JsonTokenizer::scanToken(it, token);
+        auto                   it = text.getIterator<It>();
+        Json::Tokenizer::Token token;
+        (void)Json::Tokenizer::scanToken(it, token);
         return token;
     }
 
@@ -82,46 +82,46 @@ struct SC::JsonTokenizerTest : public SC::TestCase
         {
             constexpr StringView asdString("\"ASD\"");
 
-            static_assert(scanToken("").getType() == JsonTokenizer::Token::Invalid, "Error");
-            static_assert(scanToken(" ").getType() == JsonTokenizer::Token::Invalid, "Error");
-            static_assert(scanToken("true").getType() == JsonTokenizer::Token::True, "Error");
-            static_assert(scanToken("false").getType() == JsonTokenizer::Token::False, "Error");
-            static_assert(scanToken("null").getType() == JsonTokenizer::Token::Null, "Error");
-            static_assert(scanToken("{").getType() == JsonTokenizer::Token::ObjectStart, "Error");
-            static_assert(scanToken("}").getType() == JsonTokenizer::Token::ObjectEnd, "Error");
-            static_assert(scanToken("[").getType() == JsonTokenizer::Token::ArrayStart, "Error");
-            static_assert(scanToken("]").getType() == JsonTokenizer::Token::ArrayEnd, "Error");
-            static_assert(scanToken(":").getType() == JsonTokenizer::Token::Colon, "Error");
-            static_assert(scanToken(",").getType() == JsonTokenizer::Token::Comma, "Error");
-            static_assert(scanToken("\"").getType() == JsonTokenizer::Token::Invalid, "Error");
-            static_assert(scanToken("\"\"").getType() == JsonTokenizer::Token::String, "Error");
-            static_assert(scanToken("\"String\"").getType() == JsonTokenizer::Token::String, "Error");
+            static_assert(scanToken("").getType() == Json::Tokenizer::Token::Invalid, "Error");
+            static_assert(scanToken(" ").getType() == Json::Tokenizer::Token::Invalid, "Error");
+            static_assert(scanToken("true").getType() == Json::Tokenizer::Token::True, "Error");
+            static_assert(scanToken("false").getType() == Json::Tokenizer::Token::False, "Error");
+            static_assert(scanToken("null").getType() == Json::Tokenizer::Token::Null, "Error");
+            static_assert(scanToken("{").getType() == Json::Tokenizer::Token::ObjectStart, "Error");
+            static_assert(scanToken("}").getType() == Json::Tokenizer::Token::ObjectEnd, "Error");
+            static_assert(scanToken("[").getType() == Json::Tokenizer::Token::ArrayStart, "Error");
+            static_assert(scanToken("]").getType() == Json::Tokenizer::Token::ArrayEnd, "Error");
+            static_assert(scanToken(":").getType() == Json::Tokenizer::Token::Colon, "Error");
+            static_assert(scanToken(",").getType() == Json::Tokenizer::Token::Comma, "Error");
+            static_assert(scanToken("\"").getType() == Json::Tokenizer::Token::Invalid, "Error");
+            static_assert(scanToken("\"\"").getType() == Json::Tokenizer::Token::String, "Error");
+            static_assert(scanToken("\"String\"").getType() == Json::Tokenizer::Token::String, "Error");
             static_assert(scanToken(asdString).getToken(asdString) == "ASD", "Error");
-            static_assert(scanToken("\"ASD").getType() == JsonTokenizer::Token::Invalid, "Error");
-            static_assert(scanToken("\"ASD\"\"").getType() == JsonTokenizer::Token::String, "Error");
-            static_assert(scanToken("123").getType() == JsonTokenizer::Token::Number, "Error");
-            static_assert(scanToken("adsf").getType() == JsonTokenizer::Token::Invalid,
+            static_assert(scanToken("\"ASD").getType() == Json::Tokenizer::Token::Invalid, "Error");
+            static_assert(scanToken("\"ASD\"\"").getType() == Json::Tokenizer::Token::String, "Error");
+            static_assert(scanToken("123").getType() == Json::Tokenizer::Token::Number, "Error");
+            static_assert(scanToken("adsf").getType() == Json::Tokenizer::Token::Invalid,
                           "Error"); // numbers a not validated
 
-            SC_TEST_EXPECT(scanToken("").getType() == JsonTokenizer::Token::Invalid);
-            SC_TEST_EXPECT(scanToken(" ").getType() == JsonTokenizer::Token::Invalid);
-            SC_TEST_EXPECT(scanToken("true").getType() == JsonTokenizer::Token::True);
-            SC_TEST_EXPECT(scanToken("false").getType() == JsonTokenizer::Token::False);
-            SC_TEST_EXPECT(scanToken("null").getType() == JsonTokenizer::Token::Null);
-            SC_TEST_EXPECT(scanToken("{").getType() == JsonTokenizer::Token::ObjectStart);
-            SC_TEST_EXPECT(scanToken("}").getType() == JsonTokenizer::Token::ObjectEnd);
-            SC_TEST_EXPECT(scanToken("[").getType() == JsonTokenizer::Token::ArrayStart);
-            SC_TEST_EXPECT(scanToken("]").getType() == JsonTokenizer::Token::ArrayEnd);
-            SC_TEST_EXPECT(scanToken(":").getType() == JsonTokenizer::Token::Colon);
-            SC_TEST_EXPECT(scanToken(",").getType() == JsonTokenizer::Token::Comma);
-            SC_TEST_EXPECT(scanToken("\"").getType() == JsonTokenizer::Token::Invalid);
-            SC_TEST_EXPECT(scanToken("\"\"").getType() == JsonTokenizer::Token::String);
-            SC_TEST_EXPECT(scanToken("\"String\"").getType() == JsonTokenizer::Token::String);
+            SC_TEST_EXPECT(scanToken("").getType() == Json::Tokenizer::Token::Invalid);
+            SC_TEST_EXPECT(scanToken(" ").getType() == Json::Tokenizer::Token::Invalid);
+            SC_TEST_EXPECT(scanToken("true").getType() == Json::Tokenizer::Token::True);
+            SC_TEST_EXPECT(scanToken("false").getType() == Json::Tokenizer::Token::False);
+            SC_TEST_EXPECT(scanToken("null").getType() == Json::Tokenizer::Token::Null);
+            SC_TEST_EXPECT(scanToken("{").getType() == Json::Tokenizer::Token::ObjectStart);
+            SC_TEST_EXPECT(scanToken("}").getType() == Json::Tokenizer::Token::ObjectEnd);
+            SC_TEST_EXPECT(scanToken("[").getType() == Json::Tokenizer::Token::ArrayStart);
+            SC_TEST_EXPECT(scanToken("]").getType() == Json::Tokenizer::Token::ArrayEnd);
+            SC_TEST_EXPECT(scanToken(":").getType() == Json::Tokenizer::Token::Colon);
+            SC_TEST_EXPECT(scanToken(",").getType() == Json::Tokenizer::Token::Comma);
+            SC_TEST_EXPECT(scanToken("\"").getType() == Json::Tokenizer::Token::Invalid);
+            SC_TEST_EXPECT(scanToken("\"\"").getType() == Json::Tokenizer::Token::String);
+            SC_TEST_EXPECT(scanToken("\"String\"").getType() == Json::Tokenizer::Token::String);
             SC_TEST_EXPECT(scanToken(asdString).getToken(asdString) == "ASD");
-            SC_TEST_EXPECT(scanToken("\"ASD").getType() == JsonTokenizer::Token::Invalid);
-            SC_TEST_EXPECT(scanToken("\"ASD\"\"").getType() == JsonTokenizer::Token::String);
-            SC_TEST_EXPECT(scanToken("123").getType() == JsonTokenizer::Token::Number);
-            SC_TEST_EXPECT(scanToken("adsf").getType() == JsonTokenizer::Token::Invalid); // numbers a not validated
+            SC_TEST_EXPECT(scanToken("\"ASD").getType() == Json::Tokenizer::Token::Invalid);
+            SC_TEST_EXPECT(scanToken("\"ASD\"\"").getType() == Json::Tokenizer::Token::String);
+            SC_TEST_EXPECT(scanToken("123").getType() == Json::Tokenizer::Token::Number);
+            SC_TEST_EXPECT(scanToken("adsf").getType() == Json::Tokenizer::Token::Invalid); // numbers a not validated
         }
         if (test_section("tokenizeObject"))
         {
