@@ -18,7 +18,7 @@ SC::Result SC::Http::ClientAsync::get(Async::EventLoop& loop, StringView url)
     SC_TRY(parser.parse(url));
     SC_TRY_MSG(parser.protocol == "http", "Invalid protocol");
     // TODO: Make DNS Resolution asynchronous
-    SC_TRY(DNSResolver::resolve(parser.hostname, ipAddress))
+    SC_TRY(SocketNetworking::resolveDNS(parser.hostname, ipAddress))
     port = parser.port;
     SocketIPAddress localHost;
     SC_TRY(localHost.fromAddressPort(ipAddress.view(), port));

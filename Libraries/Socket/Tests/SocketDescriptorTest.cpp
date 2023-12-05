@@ -26,9 +26,9 @@ struct SC::SocketDescriptorTest : public SC::TestCase
         if (test_section("DNS"))
         {
             SmallString<256> ipAddress;
-            SC_TEST_EXPECT(DNSResolver::resolve("localhost", ipAddress));
+            SC_TEST_EXPECT(SocketNetworking::resolveDNS("localhost", ipAddress));
             SC_TEST_EXPECT(ipAddress.view() == "127.0.0.1");
-            if (DNSResolver::resolve("apple.com", ipAddress)) // needs internet connection
+            if (SocketNetworking::resolveDNS("apple.com", ipAddress)) // needs internet connection
             {
                 SC_TEST_EXPECT(ipAddress.view() == "17.253.144.10");
             }

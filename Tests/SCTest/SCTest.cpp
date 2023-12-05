@@ -98,8 +98,7 @@ int main(int argc, const char* argv[])
     SystemDirectories directories;
     if (not directories.init())
         return -2;
-    WindowsNetworking winsocket;
-    if (not winsocket.initNetworking())
+    if (not SocketNetworking::initNetworking())
         return -3;
     Console    console(globalConsoleConversionBuffer);
     TestReport report(console, argc, argv);

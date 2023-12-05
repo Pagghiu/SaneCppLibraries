@@ -20,12 +20,10 @@ using socklen_t = int;
 #include <arpa/inet.h>  // inet_pton
 #include <sys/select.h> // fd_set for emscripten
 
-SC::Result SC::WindowsNetworking::initNetworking() { return Result(true); }
-SC::Result SC::WindowsNetworking::shutdownNetworking() { return Result(true); }
-bool       SC::WindowsNetworking::isNetworkingInited() { return Result(true); }
+SC::Result SC::SocketNetworking::initNetworking() { return Result(true); }
+SC::Result SC::SocketNetworking::shutdownNetworking() { return Result(true); }
+bool       SC::SocketNetworking::isNetworkingInited() { return Result(true); }
 #endif
-
-SC::WindowsNetworking::~WindowsNetworking() { SC_TRUST_RESULT(shutdownNetworking()); }
 
 namespace SC
 {
@@ -116,7 +114,7 @@ SC::Result SC::SocketServer::close() { return socket.close(); }
 
 SC::Result SC::SocketServer::listen(SocketIPAddress nativeAddress, uint32_t numberOfWaitingConnections)
 {
-    SC_TRY(WindowsNetworking::isNetworkingInited());
+    SC_TRY(SocketNetworking::isNetworkingInited());
     SC_TRY_MSG(socket.isValid(), "Invalid socket");
     SocketDescriptor::Handle listenSocket;
     SC_TRUST_RESULT(socket.get(listenSocket, Result::Error("invalid listen socket")));
@@ -170,7 +168,7 @@ SC::Result SC::SocketClient::connect(StringView address, uint16_t port)
 
 SC::Result SC::SocketClient::connect(SocketIPAddress ipAddress)
 {
-    SC_TRY(WindowsNetworking::isNetworkingInited());
+    SC_TRY(SocketNetworking::isNetworkingInited());
     SocketDescriptor::Handle openedSocket;
     SC_TRUST_RESULT(socket.get(openedSocket, Result::Error("invalid connect socket")));
     socklen_t nativeSize = ipAddress.sizeOfHandle();
@@ -314,7 +312,7 @@ int SC::SocketFlags::toNative(ProtocolType family)
     Assert::unreachable();
 }
 
-SC::Result SC::DNSResolver::resolve(StringView host, String& ipAddress)
+SC::Result SC::SocketNetworking::resolveDNS(StringView host, String& ipAddress)
 {
     struct addrinfo hints, *res, *p;
     int             status;

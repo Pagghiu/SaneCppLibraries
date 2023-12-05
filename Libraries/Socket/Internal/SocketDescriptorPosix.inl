@@ -44,7 +44,7 @@ SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily
                                         SocketFlags::ProtocolType protocol, SocketFlags::BlockingType blocking,
                                         SocketFlags::InheritableType inheritable)
 {
-    SC_TRY(WindowsNetworking::isNetworkingInited());
+    SC_TRY(SocketNetworking::isNetworkingInited());
     SC_TRUST_RESULT(close());
 
     int typeWithAdditions = SocketFlags::toNative(socketType);

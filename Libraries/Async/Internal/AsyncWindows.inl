@@ -281,7 +281,7 @@ struct SC::Async::EventLoop::KernelQueue
     // Socket ACCEPT
     [[nodiscard]] static Result setupAsync(Async::SocketAccept& async)
     {
-        SC_TRY(WindowsNetworking::isNetworkingInited());
+        SC_TRY(SocketNetworking::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return Result(true);
     }
@@ -358,7 +358,7 @@ struct SC::Async::EventLoop::KernelQueue
     // Socket CONNECT
     [[nodiscard]] static Result setupAsync(Async::SocketConnect& async)
     {
-        SC_TRY(WindowsNetworking::isNetworkingInited());
+        SC_TRY(SocketNetworking::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return Result(true);
     }
@@ -421,7 +421,7 @@ struct SC::Async::EventLoop::KernelQueue
     // Socket SEND
     [[nodiscard]] static Result setupAsync(Async::SocketSend& async)
     {
-        SC_TRY(WindowsNetworking::isNetworkingInited());
+        SC_TRY(SocketNetworking::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return Result(true);
     }
@@ -457,7 +457,7 @@ struct SC::Async::EventLoop::KernelQueue
     // Socket RECEIVE
     [[nodiscard]] static Result setupAsync(Async::SocketReceive& async)
     {
-        SC_TRY(WindowsNetworking::isNetworkingInited());
+        SC_TRY(SocketNetworking::isNetworkingInited());
         async.overlapped.get().userData = &async;
         return Result(true);
     }

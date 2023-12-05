@@ -52,7 +52,7 @@ SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily
                                         SocketFlags::ProtocolType protocol, SocketFlags::BlockingType blocking,
                                         SocketFlags::InheritableType inheritable)
 {
-    SC_TRY(WindowsNetworking::isNetworkingInited());
+    SC_TRY(SocketNetworking::isNetworkingInited());
     SC_TRUST_RESULT(close());
 
     DWORD flags = WSA_FLAG_OVERLAPPED;
@@ -70,7 +70,7 @@ SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily
     return Result(isValid());
 }
 
-struct SC::WindowsNetworking::Internal
+struct SC::SocketNetworking::Internal
 {
     Atomic<bool> networkingInited = false;
 
@@ -81,9 +81,9 @@ struct SC::WindowsNetworking::Internal
     }
 };
 
-bool SC::WindowsNetworking::isNetworkingInited() { return Internal::get().networkingInited.load(); }
+bool SC::SocketNetworking::isNetworkingInited() { return Internal::get().networkingInited.load(); }
 
-SC::Result SC::WindowsNetworking::initNetworking()
+SC::Result SC::SocketNetworking::initNetworking()
 {
     if (isNetworkingInited() == false)
     {
@@ -97,7 +97,7 @@ SC::Result SC::WindowsNetworking::initNetworking()
     return Result(true);
 }
 
-SC::Result SC::WindowsNetworking::shutdownNetworking()
+SC::Result SC::SocketNetworking::shutdownNetworking()
 {
     WSACleanup();
     Internal::get().networkingInited.exchange(false);

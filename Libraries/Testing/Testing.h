@@ -18,7 +18,7 @@ struct TestReport;
 //! @addtogroup group_testing
 //! @{
 
-/// @brief Collects multiple SC::TestCase and reports their results
+/// @brief Collects multiple TestCase and reports their results
 struct SC::TestReport
 {
     Console&   console;                       ///< The passed in console object where to print results
