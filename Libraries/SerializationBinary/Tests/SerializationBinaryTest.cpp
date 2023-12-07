@@ -1,29 +1,19 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../SerializationBinaryBuffer.h"
-#include "../SerializationBinaryReadVersioned.h"
-#include "../SerializationBinaryReadWriteFast.h"
+#include "../SerializationBinary.h"
 #include "SerializationSuiteTest.h"
 namespace SC
 {
 struct SerializationBinaryTest;
 } // namespace SC
 
-namespace SC
+struct SC::SerializationBinaryTest : public SC::SerializationSuiteTest::SerializationTest
 {
-struct SerializationBinaryTest;
-}
-struct SC::SerializationBinaryTest
-    : public SC::SerializationSuiteTest::TestTemplate<SC::SerializationBinary::BufferWriter,
-                                                      SC::SerializationBinary::BufferReader>
-{
-    SerializationBinaryTest(SC::TestReport& report) : TestTemplate(report, "SerializationBinaryTest")
+    SerializationBinaryTest(SC::TestReport& report) : SerializationTest(report, "SerializationBinaryTest")
     {
-        runSameVersionTests<SerializationBinary::ReadWriteFast, SerializationBinary::ReadWriteFast>();
-
-        runVersionedTests<SC::Reflection::Schema, SerializationBinary::ReadWriteFast,
-                          SerializationBinary::ReadVersioned, SerializationBinary::VersionSchema>();
+        runSameVersionTests<SerializationBinary, SerializationBinary>();
+        runVersionedTests<SerializationBinary, SerializationBinary, Reflection::Schema>();
     }
 };
 

@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../../Containers/Array.h"
+#include "../../Containers/SmallVector.h"
 #include "../../Containers/Vector.h"
 #include "../../Reflection/Reflection.h"
 #include "../../Strings/String.h"
@@ -30,8 +31,7 @@ struct ConversionStruct1;
 struct ConversionStruct2;
 struct PackedStruct1;
 struct PackedStruct2;
-template <typename SerializerWriterBuffer, typename SerializerReaderBuffer>
-struct TestTemplate;
+struct SerializationTest;
 
 } // namespace SerializationSuiteTest
 } // namespace SC
@@ -278,8 +278,7 @@ SC_REFLECT_STRUCT_FIELD(0, field0)
 SC_REFLECT_STRUCT_FIELD(2, field2)
 SC_REFLECT_STRUCT_LEAVE()
 
-template <typename SerializerWriterBuffer, typename SerializerReaderBuffer>
-struct SC::SerializationSuiteTest::TestTemplate : public SC::TestCase
+struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
 {
     // Used only for the test
     template <typename T>
@@ -291,191 +290,206 @@ struct SC::SerializationSuiteTest::TestTemplate : public SC::TestCase
         return alignedRead;
     }
 
-    TestTemplate(SC::TestReport& report, StringView name) : TestCase(report, name) {}
+    SerializationTest(SC::TestReport& report, StringView name) : TestCase(report, name) {}
 
     template <typename SerializerWriter, typename SerializerReader>
     void runSameVersionTests()
     {
+        size_t numWriteOperations = 0;
+        size_t numReadOperations  = 0;
         if (test_section("Primitive Structure Write"))
         {
-            PrimitiveStruct        primitive;
-            SerializerWriterBuffer writerBuffer;
-            SerializerWriter       serializerWriter;
-            SC_TEST_EXPECT(serializerWriter.serialize(primitive, writerBuffer));
-            SC_TEST_EXPECT(writerBuffer.numberOfOperations == 1);
+            PrimitiveStruct objectToSerialize;
+
+            // Serialization
+            SmallVector<uint8_t, 256> buffer;
+            SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
+
+            // Verification
+            SC_TEST_EXPECT(numWriteOperations == 1);
             uint32_t index = 0;
             for (uint32_t i = 0; i < 4; ++i)
             {
-                SC_TEST_EXPECT(readPrimitive<uint8_t>(writerBuffer.buffer, index) == primitive.arrayValue[i]);
+                SC_TEST_EXPECT(readPrimitive<uint8_t>(buffer, index) == objectToSerialize.arrayValue[i]);
             }
-            SC_TEST_EXPECT(readPrimitive<float>(writerBuffer.buffer, index) == primitive.floatValue);
-            SC_TEST_EXPECT(readPrimitive<int64_t>(writerBuffer.buffer, index) == primitive.int64Value);
+            SC_TEST_EXPECT(readPrimitive<float>(buffer, index) == objectToSerialize.floatValue);
+            SC_TEST_EXPECT(readPrimitive<int64_t>(buffer, index) == objectToSerialize.int64Value);
         }
-        if (test_section("Primitive Structure Read"))
+        if (test_section("PrimitiveStruct"))
         {
-            PrimitiveStruct        primitive;
-            SerializerWriterBuffer writerBuffer;
-            SerializerWriter       serializerWriter;
-            SC_TEST_EXPECT(serializerWriter.serialize(primitive, writerBuffer));
-            SC_TEST_EXPECT(writerBuffer.numberOfOperations == 1);
-            SerializerReaderBuffer reader;
-            reader.buffer = move(writerBuffer.buffer);
-            PrimitiveStruct primitiveRead;
-            memset(&primitiveRead, 0, sizeof(primitiveRead));
-            SerializerReader serializerReader;
-            SC_TEST_EXPECT(serializerReader.serialize(primitiveRead, reader));
-            SC_TEST_EXPECT(reader.numberOfOperations == writerBuffer.numberOfOperations);
-            SC_TEST_EXPECT(not(primitive != primitiveRead));
+            PrimitiveStruct objectToSerialize;
+            PrimitiveStruct deserializedObject;
+            memset(&deserializedObject, 0, sizeof(deserializedObject));
+
+            // Serialization
+            SmallVector<uint8_t, 256> buffer;
+            SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
+            SC_TEST_EXPECT(numWriteOperations == 1);
+
+            // Deserialization
+            SC_TEST_EXPECT(SerializerReader::loadExact(deserializedObject, buffer.toSpanConst(), &numReadOperations));
+            SC_TEST_EXPECT(numReadOperations == numWriteOperations);
+
+            // Verification
+            SC_TEST_EXPECT(not(objectToSerialize != deserializedObject));
         }
-        if (test_section("TopLevel Structure Read"))
+        if (test_section("TopLevelStruct"))
         {
-            TopLevelStruct         topLevel;
-            SerializerWriterBuffer writerBuffer;
-            SerializerWriter       serializerWriter;
-            SC_TEST_EXPECT(serializerWriter.serialize(topLevel, writerBuffer));
-            SC_TEST_EXPECT(writerBuffer.numberOfOperations == 3);
-            SerializerReaderBuffer reader;
-            reader.buffer = move(writerBuffer.buffer);
-            TopLevelStruct topLevelRead;
-            memset(&topLevelRead, 0, sizeof(topLevelRead));
-            SerializerReader serializerReader;
-            SC_TEST_EXPECT(serializerReader.serialize(topLevelRead, reader));
-            SC_TEST_EXPECT(reader.numberOfOperations == writerBuffer.numberOfOperations);
-            SC_TEST_EXPECT(not(topLevel != topLevelRead));
+            TopLevelStruct objectToSerialize;
+            TopLevelStruct deserializedObject;
+            memset(&deserializedObject, 0, sizeof(deserializedObject));
+
+            // Serialization
+            SmallVector<uint8_t, 256> buffer;
+            SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
+            SC_TEST_EXPECT(numWriteOperations == 3);
+
+            // Deserialization
+            SC_TEST_EXPECT(SerializerReader::loadExact(deserializedObject, buffer.toSpanConst(), &numReadOperations));
+            SC_TEST_EXPECT(numReadOperations == numWriteOperations);
+
+            // Verification
+            SC_TEST_EXPECT(not(objectToSerialize != deserializedObject));
         }
         if (test_section("VectorStructSimple"))
         {
-            VectorStructSimple topLevel;
-            SC_TRUST_RESULT(topLevel.vectorOfInts.push_back(1));
-            SC_TRUST_RESULT(topLevel.vectorOfInts.push_back(2));
-            SC_TRUST_RESULT(topLevel.vectorOfInts.push_back(3));
-            SC_TRUST_RESULT(topLevel.vectorOfInts.push_back(4));
-            SerializerWriterBuffer writerBuffer;
-            SerializerWriter       serializerWriter;
-            SC_TEST_EXPECT(serializerWriter.serialize(topLevel, writerBuffer));
-            SC_TEST_EXPECT(writerBuffer.numberOfOperations == 4);
-            SerializerReaderBuffer reader;
-            reader.buffer = move(writerBuffer.buffer);
-            VectorStructSimple topLevelRead;
-            SerializerReader   serializerReader;
-            SC_TEST_EXPECT(serializerReader.serialize(topLevelRead, reader));
-            SC_TEST_EXPECT(reader.numberOfOperations == writerBuffer.numberOfOperations);
-            SC_TEST_EXPECT(topLevelRead.emptyVector.size() == 0);
-            SC_TEST_EXPECT(topLevelRead.vectorOfInts.size() == 4);
-            for (size_t idx = 0; idx < topLevel.vectorOfInts.size(); ++idx)
+            VectorStructSimple objectToSerialize;
+            SC_TRUST_RESULT(objectToSerialize.vectorOfInts.push_back(1));
+            SC_TRUST_RESULT(objectToSerialize.vectorOfInts.push_back(2));
+            SC_TRUST_RESULT(objectToSerialize.vectorOfInts.push_back(3));
+            SC_TRUST_RESULT(objectToSerialize.vectorOfInts.push_back(4));
+            VectorStructSimple deserializedObject;
+
+            // Serialization
+            SmallVector<uint8_t, 256> buffer;
+            SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
+            SC_TEST_EXPECT(numWriteOperations == 4);
+
+            // Deserialization
+            SC_TEST_EXPECT(SerializerReader::loadExact(deserializedObject, buffer.toSpanConst(), &numReadOperations));
+            SC_TEST_EXPECT(numReadOperations == numWriteOperations);
+
+            // Verification
+            SC_TEST_EXPECT(deserializedObject.emptyVector.size() == 0);
+            SC_TEST_EXPECT(deserializedObject.vectorOfInts.size() == 4);
+            for (size_t idx = 0; idx < objectToSerialize.vectorOfInts.size(); ++idx)
             {
-                SC_TEST_EXPECT(topLevel.vectorOfInts[idx] == topLevelRead.vectorOfInts[idx]);
+                SC_TEST_EXPECT(objectToSerialize.vectorOfInts[idx] == deserializedObject.vectorOfInts[idx]);
             }
         }
         if (test_section("VectorStructComplex"))
         {
-            VectorStructComplex topLevel;
-            SC_TRUST_RESULT(topLevel.vectorOfStrings.push_back("asdasdasd1"));
-            SC_TRUST_RESULT(topLevel.vectorOfStrings.push_back("asdasdasd2"));
-            SC_TRUST_RESULT(topLevel.vectorOfStrings.push_back("asdasdasd3"));
-            SerializerWriterBuffer writerBuffer;
-            SerializerWriter       serializerWriter;
-            SC_TEST_EXPECT(serializerWriter.serialize(topLevel, writerBuffer));
-            SC_TEST_EXPECT(writerBuffer.numberOfOperations == 10);
-            SerializerReaderBuffer reader;
-            reader.buffer = move(writerBuffer.buffer);
-            VectorStructComplex topLevelRead;
-            SerializerReader    serializerReader;
-            SC_TEST_EXPECT(serializerReader.serialize(topLevelRead, reader));
-            SC_TEST_EXPECT(reader.numberOfOperations == writerBuffer.numberOfOperations);
-            SC_TEST_EXPECT(topLevelRead.vectorOfStrings.size() == 3);
-            SC_TEST_EXPECT(topLevelRead.vectorOfStrings[0] == "asdasdasd1");
-            SC_TEST_EXPECT(topLevelRead.vectorOfStrings[1] == "asdasdasd2");
-            SC_TEST_EXPECT(topLevelRead.vectorOfStrings[2] == "asdasdasd3");
+            VectorStructComplex objectToSerialize;
+            SC_TRUST_RESULT(objectToSerialize.vectorOfStrings.push_back("asdasdasd1"));
+            SC_TRUST_RESULT(objectToSerialize.vectorOfStrings.push_back("asdasdasd2"));
+            SC_TRUST_RESULT(objectToSerialize.vectorOfStrings.push_back("asdasdasd3"));
+            VectorStructComplex deserializedObject;
+
+            // Serialization
+            SmallVector<uint8_t, 256> buffer;
+            SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
+            SC_TEST_EXPECT(numWriteOperations == 10);
+
+            // Deserialization
+            SC_TEST_EXPECT(SerializerReader::loadExact(deserializedObject, buffer.toSpanConst(), &numReadOperations));
+            SC_TEST_EXPECT(numReadOperations == numWriteOperations);
+
+            // Verification
+            SC_TEST_EXPECT(deserializedObject.vectorOfStrings.size() == 3);
+            SC_TEST_EXPECT(deserializedObject.vectorOfStrings[0] == "asdasdasd1");
+            SC_TEST_EXPECT(deserializedObject.vectorOfStrings[1] == "asdasdasd2");
+            SC_TEST_EXPECT(deserializedObject.vectorOfStrings[2] == "asdasdasd3");
         }
     }
 
-    template <typename SchemaCompiler, typename SerializerWriter, typename SerializerVersioned, typename VersionSchema>
+    template <typename SerializerWriter, typename SerializerReader, typename SerializerSchemaCompiler>
     void runVersionedTests()
     {
+        size_t numReadOperations  = 0;
+        size_t numWriteOperations = 0;
         if (test_section("VersionedStruct1/2"))
         {
-            VersionedStruct1       struct1;
-            SerializerWriterBuffer writerBuffer;
-            SerializerWriter       serializerWriter;
-            SC_TEST_EXPECT(serializerWriter.serialize(struct1, writerBuffer));
-            SerializerVersioned    reader;
-            VersionedStruct2       struct2;
-            constexpr auto         schema = SchemaCompiler::template compile<VersionedStruct1>();
-            SerializerReaderBuffer readerBuffer;
-            readerBuffer.buffer = move(writerBuffer.buffer);
-            VersionSchema versionSchema;
-            versionSchema.sourceTypes = {schema.typeInfos.values, schema.typeInfos.size};
-            SC_TEST_EXPECT(reader.readVersioned(struct2, readerBuffer, versionSchema));
-            SC_TEST_EXPECT(readerBuffer.readPosition == readerBuffer.buffer.size());
-            SC_TEST_EXPECT(not(struct2 != struct1));
+            constexpr auto   schema = SerializerSchemaCompiler::template compile<VersionedStruct1>();
+            VersionedStruct1 objectToSerialize;
+            VersionedStruct2 deserializedObject;
+
+            // Serialization
+            SmallVector<uint8_t, 256> buffer;
+            SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
+
+            // Deserialization
+            SC_TEST_EXPECT(SerializerReader::loadVersioned(deserializedObject, buffer.toSpanConst(), schema.typeInfos,
+                                                           &numReadOperations));
+
+            // Verification
+            SC_TEST_EXPECT(not(deserializedObject != objectToSerialize));
         }
         if (test_section("VersionedArray1/2"))
         {
-            VersionedArray1 array1;
-            SC_TRUST_RESULT(array1.points.push_back({1.0f, 2.0f}));
-            SC_TRUST_RESULT(array1.points.push_back({3.0f, 4.0f}));
-            SC_TRUST_RESULT(array1.points.push_back({5.0f, 6.0f}));
-            SerializerWriterBuffer writerBuffer;
-            SerializerWriter       serializerWriter;
-            SC_TEST_EXPECT(serializerWriter.serialize(array1, writerBuffer));
-            SC_TEST_EXPECT(writerBuffer.numberOfOperations == 4);
-            SerializerVersioned    reader;
-            VersionedArray2        array2;
-            constexpr auto         schema = SchemaCompiler::template compile<VersionedArray1>();
-            SerializerReaderBuffer readerBuffer;
-            readerBuffer.buffer = move(writerBuffer.buffer);
-            VersionSchema versionSchema;
-            versionSchema.sourceTypes = {schema.typeInfos.values, schema.typeInfos.size};
-            SC_TEST_EXPECT(reader.readVersioned(array2, readerBuffer, versionSchema));
-            SC_TEST_EXPECT(readerBuffer.readPosition == readerBuffer.buffer.size());
-            SC_TEST_EXPECT(array2.points.size() == 2);
-            SC_TEST_EXPECT(array1.simpleInts.size() == 3); // It's dropping one element
-            SC_TEST_EXPECT(array2.simpleInts.size() == 2); // It's dropping one element
-            SC_TEST_EXPECT(not(array2 != array1));
+            constexpr auto  schema = SerializerSchemaCompiler::template compile<VersionedArray1>();
+            VersionedArray1 objectToSerialize;
+            VersionedArray2 deserializedObject;
+            SC_TRUST_RESULT(objectToSerialize.points.push_back({1.0f, 2.0f}));
+            SC_TRUST_RESULT(objectToSerialize.points.push_back({3.0f, 4.0f}));
+            SC_TRUST_RESULT(objectToSerialize.points.push_back({5.0f, 6.0f}));
+
+            // Serialization
+            SmallVector<uint8_t, 256> buffer;
+            SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
+            SC_TEST_EXPECT(numWriteOperations == 4);
+
+            // Deserialization
+            SC_TEST_EXPECT(SerializerReader::loadVersioned(deserializedObject, buffer.toSpanConst(), schema.typeInfos,
+                                                           &numReadOperations));
+
+            // Verification
+            SC_TEST_EXPECT(deserializedObject.points.size() == 2);
+            SC_TEST_EXPECT(objectToSerialize.simpleInts.size() == 3);  // Dropping one element
+            SC_TEST_EXPECT(deserializedObject.simpleInts.size() == 2); // Dropping one element
+            SC_TEST_EXPECT(not(deserializedObject != objectToSerialize));
         }
         if (test_section("ConversionStruct1/2"))
         {
-            ConversionStruct1      struct1;
-            ConversionStruct2      struct2;
-            SerializerWriterBuffer writerBuffer;
-            SerializerWriter       serializerWriter;
-            SC_TEST_EXPECT(serializerWriter.serialize(struct1, writerBuffer));
-            SerializerVersioned    reader;
-            constexpr auto         schema = SchemaCompiler::template compile<ConversionStruct1>();
-            SerializerReaderBuffer readerBuffer;
-            readerBuffer.buffer = move(writerBuffer.buffer);
-            VersionSchema versionSchema;
-            versionSchema.sourceTypes = {schema.typeInfos.values, schema.typeInfos.size};
-            SC_TEST_EXPECT(reader.readVersioned(struct2, readerBuffer, versionSchema));
-            SC_TEST_EXPECT(readerBuffer.readPosition == readerBuffer.buffer.size());
-            SC_TEST_EXPECT(struct2.intToFloat == struct1.intToFloat);
-            SC_TEST_EXPECT(struct2.floatToInt == struct1.floatToInt);
-            SC_TEST_EXPECT(struct2.uint16To32 == struct1.uint16To32);
-            SC_TEST_EXPECT(struct2.signed16ToUnsigned == struct1.signed16ToUnsigned);
+            constexpr auto    schema = SerializerSchemaCompiler::template compile<ConversionStruct1>();
+            ConversionStruct1 objectToSerialize;
+            ConversionStruct2 deserializedObject;
+
+            // Serialization
+            SmallVector<uint8_t, 256> buffer;
+            SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
+
+            // Deserialization
+            SC_TEST_EXPECT(SerializerReader::loadVersioned(deserializedObject, buffer.toSpanConst(), schema.typeInfos,
+                                                           &numReadOperations));
+
+            // Verification
+            SC_TEST_EXPECT(deserializedObject.intToFloat == objectToSerialize.intToFloat);
+            SC_TEST_EXPECT(deserializedObject.floatToInt == objectToSerialize.floatToInt);
+            SC_TEST_EXPECT(deserializedObject.uint16To32 == objectToSerialize.uint16To32);
+            SC_TEST_EXPECT(deserializedObject.signed16ToUnsigned == objectToSerialize.signed16ToUnsigned);
         }
-        if (test_section("Packed Struct"))
+        if (test_section("PackedStruct"))
         {
-            PackedStruct1 struct1;
-            struct1.field0 = 0;
-            struct1.field1 = 1;
-            struct1.field2 = 2;
-            PackedStruct2          struct2;
-            SerializerWriterBuffer writerBuffer;
-            SerializerWriter       serializerWriter;
-            SC_TEST_EXPECT(serializerWriter.serialize(struct1, writerBuffer));
-            SC_TEST_EXPECT(writerBuffer.numberOfOperations == 1);
-            SerializerVersioned    reader;
-            constexpr auto         schema = SchemaCompiler::template compile<PackedStruct1>();
-            SerializerReaderBuffer readerBuffer;
-            readerBuffer.buffer = move(writerBuffer.buffer);
-            VersionSchema versionSchema;
-            versionSchema.sourceTypes = {schema.typeInfos.values, schema.typeInfos.size};
-            SC_TEST_EXPECT(reader.readVersioned(struct2, readerBuffer, versionSchema));
-            SC_TEST_EXPECT(readerBuffer.numberOfOperations == 2);
-            SC_TEST_EXPECT(readerBuffer.readPosition == readerBuffer.buffer.size());
-            SC_TEST_EXPECT(struct2.field0 == 0);
-            SC_TEST_EXPECT(struct2.field2 == 2);
+            constexpr auto schema = SerializerSchemaCompiler::template compile<PackedStruct1>();
+            PackedStruct1  objectToSerialize;
+            PackedStruct2  deserializedObject;
+            objectToSerialize.field0 = 0;
+            objectToSerialize.field1 = 1;
+            objectToSerialize.field2 = 2;
+
+            // Serialization
+            SmallVector<uint8_t, 256> buffer;
+            SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
+            SC_TEST_EXPECT(numWriteOperations == 1);
+
+            // Deserialization
+            SC_TEST_EXPECT(SerializerReader::loadVersioned(deserializedObject, buffer.toSpanConst(), schema.typeInfos,
+                                                           &numReadOperations));
+            SC_TEST_EXPECT(numReadOperations == 2);
+
+            // Verification
+            SC_TEST_EXPECT(deserializedObject.field0 == 0);
+            SC_TEST_EXPECT(deserializedObject.field2 == 2);
         }
     }
 };

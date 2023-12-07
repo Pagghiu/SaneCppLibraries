@@ -44,10 +44,6 @@ void runHttpParserTest(TestReport& report);
 void runHttpServerAsyncTest(TestReport& report);
 void runHttpURLParserTest(TestReport& report);
 
-// JSON
-void runJsonFormatterTest(TestReport& report);
-void runJsonTokenizerTest(TestReport& report);
-
 // Plugin
 void runPluginTest(TestReport& report);
 
@@ -60,7 +56,8 @@ void runReflectionTest(TestReport& report);
 // Serialization
 void runSerializationBinaryTest(TestReport& report);
 void runSerializationBinaryTypeErasedTest(TestReport& report);
-void runSerializationStructuredJsonTest(TestReport& report);
+void runSerializationJsonTest(TestReport& report);
+void runSerializationJsonTokenizerTest(TestReport& report);
 
 // Socket
 void runSocketDescriptorTest(TestReport& report);
@@ -153,8 +150,6 @@ int main(int argc, const char* argv[])
     runHttpURLParserTest(report);
 
     // JSON tests
-    runJsonFormatterTest(report);
-    runJsonTokenizerTest(report);
 
     // Plugin tests
     runPluginTest(report);
@@ -168,7 +163,8 @@ int main(int argc, const char* argv[])
     // Serialization tests
     runSerializationBinaryTest(report);
     runSerializationBinaryTypeErasedTest(report);
-    runSerializationStructuredJsonTest(report);
+    runSerializationJsonTokenizerTest(report);
+    runSerializationJsonTest(report);
 
     // Socket tests
     runSocketDescriptorTest(report);

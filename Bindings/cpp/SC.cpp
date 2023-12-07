@@ -11,10 +11,9 @@
 #include "../../Libraries/Http/HttpParser.cpp"
 #include "../../Libraries/Http/HttpServerAsync.cpp"
 #include "../../Libraries/Http/HttpURLParser.cpp"
-#include "../../Libraries/Json/JsonFormatter.cpp"
 #include "../../Libraries/Plugin/Plugin.cpp"
 #include "../../Libraries/Process/Process.cpp"
-#include "../../Libraries/SerializationStructured/SerializationStructuredJson.cpp"
+#include "../../Libraries/SerializationText/SerializationJson.cpp"
 #include "../../Libraries/Socket/SocketDescriptor.cpp"
 #include "../../Libraries/Strings/StringBuilder.cpp"
 #include "../../Libraries/Strings/StringConverter.cpp"
@@ -28,5 +27,4 @@
 #include "../../Libraries/Testing/Testing.cpp"
 #include "../../Libraries/Threading/Threading.cpp"
 
-#include "../../LibrariesExtra/SerializationBinaryTypeErased/SerializationBinaryTypeErasedReadVersioned.cpp"
-#include "../../LibrariesExtra/SerializationBinaryTypeErased/SerializationBinaryTypeErasedReadWriteFast.cpp"
+#include "../../LibrariesExtra/SerializationBinaryTypeErased/SerializationBinaryTypeErased.cpp"

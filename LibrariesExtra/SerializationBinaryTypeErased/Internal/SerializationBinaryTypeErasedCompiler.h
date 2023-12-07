@@ -2,14 +2,13 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../../Libraries/Reflection/Reflection.h"
-#include "../../Libraries/Reflection/ReflectionSchemaCompiler.h"
+#include "../../../Libraries/Reflection/Reflection.h"
+#include "../../../Libraries/Reflection/ReflectionSchemaCompiler.h"
 namespace SC
 {
-namespace Reflection
+namespace detail
 {
-
-struct VectorVTable
+struct SerializationBinaryTypeErasedVectorVTable
 {
     enum class DropEccessItems
     {
@@ -17,8 +16,9 @@ struct VectorVTable
         Yes
     };
 
-    using FunctionGetSegmentSpan      = bool (*)(TypeInfo property, Span<uint8_t> object, Span<uint8_t>& itemBegin);
-    using FunctionGetSegmentSpanConst = bool (*)(TypeInfo property, Span<const uint8_t> object,
+    using FunctionGetSegmentSpan      = bool (*)(Reflection::TypeInfo property, Span<uint8_t> object,
+                                            Span<uint8_t>& itemBegin);
+    using FunctionGetSegmentSpanConst = bool (*)(Reflection::TypeInfo property, Span<const uint8_t> object,
                                                  Span<const uint8_t>& itemBegin);
 
     using FunctionResize = bool (*)(Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
@@ -31,23 +31,49 @@ struct VectorVTable
     FunctionResizeWithoutInitialize resizeWithoutInitialize;
     uint32_t                        linkID;
 
-    constexpr VectorVTable()
+    constexpr SerializationBinaryTypeErasedVectorVTable()
         : getSegmentSpan(nullptr), getSegmentSpanConst(nullptr), resize(nullptr), resizeWithoutInitialize(nullptr),
           linkID(0)
     {}
 };
+
 template <int MAX_VTABLES>
-struct ReflectionVTables
+struct SerializationBinaryTypeErasedReflectionVTables
 {
-    ArrayWithSize<VectorVTable, MAX_VTABLES> vector;
+    Reflection::ArrayWithSize<SerializationBinaryTypeErasedVectorVTable, MAX_VTABLES> vector;
 };
 
+struct SerializationBinaryTypeErasedArrayAccess
+{
+    using VectorVTable = SerializationBinaryTypeErasedVectorVTable;
+    Span<const VectorVTable> vectorVtable;
+
+    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::TypeInfo property, Span<uint8_t> object,
+                                      Span<uint8_t>& itemBegin);
+    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::TypeInfo property, Span<const uint8_t> object,
+                                      Span<const uint8_t>& itemBegin);
+
+    using DropEccessItems = VectorVTable::DropEccessItems;
+    enum class Initialize
+    {
+        No,
+        Yes
+    };
+
+    bool resize(uint32_t linkID, Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
+                Initialize initialize, DropEccessItems dropEccessItems);
+};
+} // namespace detail
+
+namespace Reflection
+{
 struct FlatSchemaBuilderTypeErased : public SchemaBuilder<FlatSchemaBuilderTypeErased>
 {
     using Type = SchemaType<FlatSchemaBuilderTypeErased>;
 
-    static const uint32_t          MAX_VTABLES = 100;
-    ReflectionVTables<MAX_VTABLES> vtables;
+    static const uint32_t MAX_VTABLES = 100;
+
+    detail::SerializationBinaryTypeErasedReflectionVTables<MAX_VTABLES> vtables;
 
     constexpr FlatSchemaBuilderTypeErased(Type* output, const uint32_t capacity) : SchemaBuilder(output, capacity) {}
 };
@@ -55,6 +81,7 @@ struct FlatSchemaBuilderTypeErased : public SchemaBuilder<FlatSchemaBuilderTypeE
 template <typename Container, typename ItemType, int N>
 struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
 {
+    using VectorVTable = detail::SerializationBinaryTypeErasedVectorVTable;
     [[nodiscard]] constexpr static bool build(FlatSchemaBuilderTypeErased& builder)
     {
         VectorVTable vector;
@@ -83,6 +110,7 @@ struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
             return false;
         }
     }
+
     static bool resizeWithoutInitialize(Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
                                         VectorVTable::DropEccessItems dropEccessItems)
     {
@@ -118,6 +146,7 @@ struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
             return false;
         }
     }
+
     template <typename Q = ItemType>
     [[nodiscard]] static typename TypeTraits::EnableIf<not TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
         constexpr assignResizeWithoutInitialize(VectorVTable& vector)
@@ -136,29 +165,5 @@ struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
 using SchemaTypeErased = Reflection::SchemaCompiler<FlatSchemaBuilderTypeErased>;
 
 } // namespace Reflection
-namespace SerializationBinaryTypeErased
-{
-namespace detail
-{
-struct ArrayAccess
-{
-    Span<const Reflection::VectorVTable> vectorVtable;
 
-    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::TypeInfo property, Span<uint8_t> object,
-                                      Span<uint8_t>& itemBegin);
-    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::TypeInfo property, Span<const uint8_t> object,
-                                      Span<const uint8_t>& itemBegin);
-
-    using DropEccessItems = Reflection::VectorVTable::DropEccessItems;
-    enum class Initialize
-    {
-        No,
-        Yes
-    };
-
-    bool resize(uint32_t linkID, Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
-                Initialize initialize, DropEccessItems dropEccessItems);
-};
-} // namespace detail
-} // namespace SerializationBinaryTypeErased
 } // namespace SC

@@ -3,60 +3,23 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 // This needs to go before the compiler
-#include "../Reflection/ReflectionSC.h" // TODO: Split the SC Containers specifics in separate header
+#include "../../Reflection/ReflectionSC.h" // TODO: Split the SC Containers specifics in separate header
 // Compiler must be after
-#include "../Reflection/ReflectionSchemaCompiler.h"
-#include "SerializationBinarySkipper.h"
+#include "../../Reflection/ReflectionSchemaCompiler.h"
+#include "SerializationBinarySchema.h"
 
 namespace SC
 {
-namespace SerializationBinary
-{
-
-/// @brief Holds Schema of serialized binary data
-struct VersionSchema
-{
-    /// @brief Controls compatibility options for versioned deserialization
-    struct Options
-    {
-        bool allowFloatToIntTruncation    = true; ///< allow truncating a float to get an integer value
-        bool allowDropEccessArrayItems    = true; ///< drop array items in source data if destination array is smaller
-        bool allowDropEccessStructMembers = true; ///< drop fields that have no matching memberTag in destination struct
-    };
-    Options options; ///< Options for versioned deserialization
-
-    Span<const Reflection::TypeInfo> sourceTypes;
-
-    uint32_t sourceTypeIndex = 0; ///< Currently active type in sourceTypes Span
-
-    constexpr Reflection::TypeInfo current() const { return sourceTypes.data()[sourceTypeIndex]; }
-
-    constexpr void advance() { sourceTypeIndex++; }
-
-    constexpr void resolveLink()
-    {
-        if (sourceTypes.data()[sourceTypeIndex].hasValidLinkIndex())
-            sourceTypeIndex = static_cast<uint32_t>(sourceTypes.data()[sourceTypeIndex].getLinkIndex());
-    }
-
-    template <typename BinaryStream>
-    [[nodiscard]] constexpr bool skipCurrent(BinaryStream& stream)
-    {
-        SerializationBinary::detail::Skipper<BinaryStream> skipper(stream, sourceTypeIndex);
-        skipper.sourceTypes = sourceTypes;
-        return skipper.skip();
-    }
-};
 
 namespace detail
 {
 template <typename BinaryStream, typename T, typename SFINAESelector = void>
-struct SerializerReadVersioned;
+struct SerializerBinaryReadVersioned;
 
 template <typename BinaryStream, typename T, typename SFINAESelector>
-struct SerializerReadVersioned
+struct SerializerBinaryReadVersioned
 {
-    [[nodiscard]] static constexpr bool readVersioned(T& object, BinaryStream& stream, VersionSchema& schema)
+    [[nodiscard]] static constexpr bool readVersioned(T& object, BinaryStream& stream, SerializationSchema& schema)
     {
         if (schema.current().type != Reflection::TypeCategory::TypeStruct)
             return false;
@@ -88,7 +51,7 @@ struct SerializerReadVersioned
   private:
     struct MemberIterator
     {
-        VersionSchema& schema;
+        SerializationSchema& schema;
 
         BinaryStream& stream;
         T&            object;
@@ -105,7 +68,7 @@ struct SerializerReadVersioned
             {
                 consumed = true;
                 consumedWithSuccess =
-                    SerializerReadVersioned<BinaryStream, R>::readVersioned(object.*field, stream, schema);
+                    SerializerBinaryReadVersioned<BinaryStream, R>::readVersioned(object.*field, stream, schema);
                 return false; // stop iterations
             }
             return true;
@@ -116,7 +79,7 @@ struct SerializerReadVersioned
 template <typename BinaryStream, typename T>
 struct SerializerReadVersionedItems
 {
-    [[nodiscard]] static constexpr bool readVersioned(T* object, BinaryStream& stream, VersionSchema& schema,
+    [[nodiscard]] static constexpr bool readVersioned(T* object, BinaryStream& stream, SerializationSchema& schema,
                                                       uint32_t numSourceItems, uint32_t numDestinationItems)
     {
         schema.resolveLink();
@@ -145,7 +108,7 @@ struct SerializerReadVersionedItems
         for (uint32_t idx = 0; idx < commonSubsetItems; ++idx)
         {
             schema.sourceTypeIndex = arrayItemTypeIndex;
-            if (not SerializerReadVersioned<BinaryStream, T>::readVersioned(object[idx], stream, schema))
+            if (not SerializerBinaryReadVersioned<BinaryStream, T>::readVersioned(object[idx], stream, schema))
                 return false;
         }
 
@@ -167,9 +130,9 @@ struct SerializerReadVersionedItems
 };
 
 template <typename BinaryStream, typename T, int N>
-struct SerializerReadVersioned<BinaryStream, T[N]>
+struct SerializerBinaryReadVersioned<BinaryStream, T[N]>
 {
-    [[nodiscard]] static constexpr bool readVersioned(T (&object)[N], BinaryStream& stream, VersionSchema& schema)
+    [[nodiscard]] static constexpr bool readVersioned(T (&object)[N], BinaryStream& stream, SerializationSchema& schema)
     {
         schema.advance(); // make T current type
         return SerializerReadVersionedItems<BinaryStream, T>::readVersioned(
@@ -178,10 +141,10 @@ struct SerializerReadVersioned<BinaryStream, T[N]>
 };
 
 template <typename BinaryStream, typename T>
-struct SerializerReadVersioned<BinaryStream, SC::Vector<T>>
+struct SerializerBinaryReadVersioned<BinaryStream, SC::Vector<T>>
 {
     [[nodiscard]] static constexpr bool readVersioned(SC::Vector<T>& object, BinaryStream& stream,
-                                                      VersionSchema& schema)
+                                                      SerializationSchema& schema)
     {
         uint64_t sizeInBytes = 0;
         SC_TRY(stream.serializeBytes(&sizeInBytes, sizeof(sizeInBytes)));
@@ -204,10 +167,10 @@ struct SerializerReadVersioned<BinaryStream, SC::Vector<T>>
 };
 
 template <typename BinaryStream, typename T, int N>
-struct SerializerReadVersioned<BinaryStream, SC::Array<T, N>>
+struct SerializerBinaryReadVersioned<BinaryStream, SC::Array<T, N>>
 {
     [[nodiscard]] static constexpr bool readVersioned(SC::Array<T, N>& object, BinaryStream& stream,
-                                                      VersionSchema& schema)
+                                                      SerializationSchema& schema)
     {
         uint64_t sizeInBytes = 0;
         if (not stream.serializeBytes(&sizeInBytes, sizeof(sizeInBytes)))
@@ -235,8 +198,8 @@ struct SerializerReadVersioned<BinaryStream, SC::Array<T, N>>
 };
 
 template <typename BinaryStream, typename T>
-struct SerializerReadVersioned<BinaryStream, T,
-                               typename SC::TypeTraits::EnableIf<Reflection::IsPrimitive<T>::value>::type>
+struct SerializerBinaryReadVersioned<BinaryStream, T,
+                                     typename SC::TypeTraits::EnableIf<Reflection::IsPrimitive<T>::value>::type>
 {
     template <typename ValueType>
     [[nodiscard]] static bool readCastValue(T& destination, BinaryStream& stream)
@@ -248,7 +211,7 @@ struct SerializerReadVersioned<BinaryStream, T,
         return true;
     }
 
-    [[nodiscard]] static constexpr bool readVersioned(T& object, BinaryStream& stream, VersionSchema& schema)
+    [[nodiscard]] static constexpr bool readVersioned(T& object, BinaryStream& stream, SerializationSchema& schema)
     {
         // clang-format off
         switch (schema.current().type)
@@ -285,32 +248,5 @@ struct SerializerReadVersioned<BinaryStream, T,
     }
 };
 } // namespace detail
-
-//! @defgroup group_serialization_binary Serialization Binary
-//! @copybrief library_serialization_binary (see @ref library_serialization_binary for more details)
-
-//! @addtogroup group_serialization_binary
-//! @{
-
-/// @brief De-serializes binary data with its associated schema into object `T`
-struct ReadVersioned
-{
-    /// @brief Deserialize object `T` from a Binary stream with a reflection schema not matching `T` schema
-    /// @tparam T Type of object to be dserialized
-    /// @tparam StreamType Any stream type ducking Binary SC::SerializationBinary::Buffer
-    /// @param value The object to deserialize
-    /// @param stream The stream holding the bytes to be used for deserialization
-    /// @param versionSchema The schema used to serialize data in the stream
-    /// @return `true` if deserialization succeded
-    template <typename T, typename StreamType>
-    [[nodiscard]] bool readVersioned(T& value, StreamType& stream, VersionSchema& versionSchema)
-    {
-        using VersionedSerializer = detail::SerializerReadVersioned<StreamType, T>;
-        return VersionedSerializer::readVersioned(value, stream, versionSchema);
-    }
-};
-//! @}
-
-} // namespace SerializationBinary
 
 } // namespace SC

@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/Compiler.h"
+#include "../Foundation/Span.h"
 namespace SC
 {
 namespace Reflection
@@ -19,6 +20,7 @@ struct ArrayWithSize
     T        values[N] = {};
     uint32_t size      = 0;
 
+    operator Span<const T>() const { return {values, size}; }
     /// @brief Check if array contains given value, and retrieve index where such item exists
     /// @param value Value to look for
     /// @param outIndex if not `nullptr` will receive the index where item has been found

@@ -3,27 +3,20 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 // This needs to go before the compiler
-#include "../../Libraries/Reflection/ReflectionSC.h"
+#include "../../../Libraries/Reflection/ReflectionSC.h"
 // Compiler must be after
-#include "../../Libraries/SerializationBinary/SerializationBinaryBuffer.h"
-#include "../../Libraries/SerializationBinary/SerializationBinarySkipper.h"
+#include "../../../Libraries/SerializationBinary/Internal/SerializationBinaryBuffer.h"
 #include "SerializationBinaryTypeErasedCompiler.h"
 
 namespace SC
 {
-/// @brief Serializes C++ objects to a binary format (see @ref library_serialization_binary_type_erased)
-namespace SerializationBinaryTypeErased
-{
+struct SerializationBinaryBufferWriter;
+
 /// @brief Writes object `T` to a buffer
-struct WriteFast
+struct SerializationBinaryTypeErasedWriteExact
 {
-    /// @brief Writes object `T` to a buffer
-    /// @tparam T Type of object to be serialized
-    /// @param object The object to be serialized
-    /// @param buffer The buffer receiving serialized bytes
-    /// @return `true` if the operation succeeded
     template <typename T>
-    [[nodiscard]] constexpr bool serialize(const T& object, SerializationBinary::Buffer& buffer)
+    [[nodiscard]] constexpr bool write(const T& object, SerializationBinaryBufferWriter& buffer)
     {
         constexpr auto flatSchema = Reflection::SchemaTypeErased::compile<T>();
 
@@ -50,7 +43,7 @@ struct WriteFast
     [[nodiscard]] bool writeStruct();
     [[nodiscard]] bool writeArrayVector();
 
-    SerializationBinary::Buffer* destination = nullptr;
+    SerializationBinaryBufferWriter* destination = nullptr;
 
     Span<const Reflection::TypeInfo>       sourceTypes;
     Span<const Reflection::TypeStringView> sourceNames;
@@ -59,19 +52,14 @@ struct WriteFast
     uint32_t             sourceTypeIndex;
     Reflection::TypeInfo sourceType;
 
-    detail::ArrayAccess arrayAccess;
+    detail::SerializationBinaryTypeErasedArrayAccess arrayAccess;
 };
 
 /// @brief Reads object `T` from a buffer, assuming no versioning changes with data in buffer
-struct ReadFast
+struct SerializationBinaryTypeErasedReadExact
 {
-    /// @brief Reads object `T` from a buffer, assuming no versioning changes
-    /// @tparam T Type of object to be deserialized
-    /// @param object The object to be deserialized
-    /// @param buffer The buffer providing bytes for deserialization
-    /// @return `true` if the operation succeeded
     template <typename T>
-    [[nodiscard]] bool serialize(T& object, SerializationBinary::Buffer& buffer)
+    [[nodiscard]] bool loadExact(T& object, SerializationBinaryBufferReader& buffer)
     {
         constexpr auto flatSchema = Reflection::SchemaTypeErased::compile<T>();
 
@@ -96,7 +84,7 @@ struct ReadFast
     [[nodiscard]] bool readStruct();
     [[nodiscard]] bool readArrayVector();
 
-    SerializationBinary::Buffer* source = nullptr;
+    SerializationBinaryBufferReader* source = nullptr;
 
     Span<const Reflection::TypeInfo>       sinkTypes;
     Span<const Reflection::TypeStringView> sinkNames;
@@ -105,7 +93,6 @@ struct ReadFast
     uint32_t             sinkTypeIndex = 0;
     Span<uint8_t>        sinkObject;
 
-    detail::ArrayAccess arrayAccess;
+    detail::SerializationBinaryTypeErasedArrayAccess arrayAccess;
 };
-} // namespace SerializationBinaryTypeErased
 } // namespace SC

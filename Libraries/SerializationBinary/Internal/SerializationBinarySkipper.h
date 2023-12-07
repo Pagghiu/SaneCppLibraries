@@ -2,22 +2,21 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Reflection/Reflection.h"
+#include "../../Reflection/Reflection.h"
 
 namespace SC
 {
-namespace SerializationBinary
-{
 namespace detail
 {
-// Keeping SerializationBinary::Skipper in header just so that SerializationBinary is header only
 template <typename BinaryStream>
-struct Skipper
+struct SerializationBinarySkipper
 {
     Span<const Reflection::TypeInfo> sourceTypes;
     Reflection::TypeInfo             sourceType;
 
-    Skipper(BinaryStream& stream, uint32_t& sourceTypeIndex) : sourceObject(stream), sourceTypeIndex(sourceTypeIndex) {}
+    SerializationBinarySkipper(BinaryStream& stream, uint32_t& sourceTypeIndex)
+        : sourceObject(stream), sourceTypeIndex(sourceTypeIndex)
+    {}
 
     [[nodiscard]] bool skip()
     {
@@ -103,5 +102,4 @@ struct Skipper
     }
 };
 } // namespace detail
-} // namespace SerializationBinary
 } // namespace SC

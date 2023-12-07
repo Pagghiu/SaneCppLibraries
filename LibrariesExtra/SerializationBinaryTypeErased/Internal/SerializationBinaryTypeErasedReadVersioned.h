@@ -3,42 +3,18 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 // This needs to go before the compiler
-#include "../../Libraries/Reflection/ReflectionSC.h"
+#include "../../../Libraries/Reflection/ReflectionSC.h"
 // Compiler must be after
-#include "../../Libraries/SerializationBinary/SerializationBinaryBuffer.h"
-#include "../../Libraries/SerializationBinary/SerializationBinarySkipper.h"
+#include "../../../Libraries/SerializationBinary/Internal/SerializationBinarySchema.h"
 #include "SerializationBinaryTypeErasedCompiler.h"
 namespace SC
 {
-namespace SerializationBinaryTypeErased
-{
-
-/// @brief Holds Schema of serialized binary data
-struct VersionSchema
-{
-    Span<const Reflection::TypeInfo> sourceTypes;
-
-    /// @brief Controls compatibility options for versioned deserialization
-    struct Options
-    {
-        bool allowFloatToIntTruncation    = true; ///< allow truncating a float to get an integer value
-        bool allowDropEccessArrayItems    = true; ///< drop array items in source data if destination array is smaller
-        bool allowDropEccessStructMembers = true; ///< drop fields that have no matching memberTag in destination struct
-    };
-    Options options; ///< Options for versioned deserialization
-};
-
+struct SerializationBinaryBufferReader;
 /// @brief De-serializes binary data with its associated schema into object `T`
-struct ReadVersioned
+struct SerializationBinaryTypeErasedReadVersioned
 {
-    /// @brief Deserialize object `T` from a Binary stream with a reflection schema not matching `T` schema
-    /// @tparam T Type of object to be dserialized
-    /// @param object The object to deserialize
-    /// @param source The stream holding the bytes to be used for deserialization
-    /// @param schema The schema used to serialize data in the stream
-    /// @return `true` if deserialization succeded
     template <typename T>
-    [[nodiscard]] bool readVersioned(T& object, SerializationBinary::Buffer& source, VersionSchema& schema)
+    [[nodiscard]] bool loadVersioned(T& object, SerializationBinaryBufferReader& source, SerializationSchema& schema)
     {
         constexpr auto flatSchema = Reflection::SchemaTypeErased::compile<T>();
 
@@ -64,9 +40,9 @@ struct ReadVersioned
   private:
     Span<const Reflection::TypeStringView> sinkNames;
 
-    detail::ArrayAccess arrayAccess;
+    detail::SerializationBinaryTypeErasedArrayAccess arrayAccess;
 
-    VersionSchema::Options options;
+    SerializationSchema::Options options;
 
     Span<const Reflection::TypeInfo> sinkTypes;
     Span<uint8_t>                    sinkObject;
@@ -74,7 +50,7 @@ struct ReadVersioned
     uint32_t                         sinkTypeIndex = 0;
 
     Span<const Reflection::TypeInfo> sourceTypes;
-    SerializationBinary::Buffer*     sourceObject = nullptr;
+    SerializationBinaryBufferReader* sourceObject = nullptr;
     Reflection::TypeInfo             sourceType;
     uint32_t                         sourceTypeIndex = 0;
 
@@ -83,5 +59,4 @@ struct ReadVersioned
     [[nodiscard]] bool readArrayVector();
     [[nodiscard]] bool skipCurrent();
 };
-} // namespace SerializationBinaryTypeErased
 } // namespace SC

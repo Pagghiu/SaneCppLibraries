@@ -2,22 +2,16 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Strings/StringView.h"
+#include "../../Strings/StringView.h"
 
 namespace SC
 {
-namespace Json
-{
-struct Tokenizer;
-}
+struct JsonTokenizer;
 struct JsonTokenizerTest;
 } // namespace SC
 
-//! @addtogroup group_json
-//! @{
-
 /// @brief Tokenizes a JSON text stream, without validating numbers and strings
-struct SC::Json::Tokenizer
+struct SC::JsonTokenizer
 {
     struct Token
     {
@@ -53,7 +47,7 @@ struct SC::Json::Tokenizer
         }
 
       private:
-        friend struct Tokenizer;
+        friend struct JsonTokenizer;
         size_t tokenStartBytes  = 0;
         size_t tokenLengthBytes = 0;
         Type   type;
@@ -81,12 +75,10 @@ struct SC::Json::Tokenizer
     static constexpr void tokenizeNull(StringIteratorASCII& it, Token& token);
 };
 
-//! @}
-
 //-----------------------------------------------------------------------------------------------------------------------
 // Implementation details
 //-----------------------------------------------------------------------------------------------------------------------
-constexpr bool SC::Json::Tokenizer::tokenizeNext(StringIteratorASCII& it, Token& token)
+constexpr bool SC::JsonTokenizer::tokenizeNext(StringIteratorASCII& it, Token& token)
 {
     if (skipWhitespaces(it))
     {
@@ -95,7 +87,7 @@ constexpr bool SC::Json::Tokenizer::tokenizeNext(StringIteratorASCII& it, Token&
     return false;
 }
 
-constexpr bool SC::Json::Tokenizer::scanToken(StringIteratorASCII& it, Token& token)
+constexpr bool SC::JsonTokenizer::scanToken(StringIteratorASCII& it, Token& token)
 {
     StringIteratorASCII::CodePoint current = 0;
     const StringIteratorASCII      start   = it;
@@ -125,7 +117,7 @@ constexpr bool SC::Json::Tokenizer::scanToken(StringIteratorASCII& it, Token& to
 }
 
 // Returns false when iterator is at end
-constexpr bool SC::Json::Tokenizer::skipWhitespaces(StringIteratorASCII& it)
+constexpr bool SC::JsonTokenizer::skipWhitespaces(StringIteratorASCII& it)
 {
     constexpr StringIteratorSkipTable table({'\t', '\n', '\r', ' '});
     StringIteratorASCII::CodePoint    current = 0;
@@ -140,8 +132,7 @@ constexpr bool SC::Json::Tokenizer::skipWhitespaces(StringIteratorASCII& it)
     return not it.isAtEnd();
 }
 
-constexpr void SC::Json::Tokenizer::tokenizeString(StringIteratorASCII& it, const StringIteratorASCII start,
-                                                   Token& token)
+constexpr void SC::JsonTokenizer::tokenizeString(StringIteratorASCII& it, const StringIteratorASCII start, Token& token)
 {
     while (it.advanceUntilMatches('"')) // find the end of the string
     {
@@ -159,8 +150,8 @@ constexpr void SC::Json::Tokenizer::tokenizeString(StringIteratorASCII& it, cons
     }
 }
 
-constexpr void SC::Json::Tokenizer::tokenizeNumber(StringIteratorASCII& it, StringIteratorASCII::CodePoint previousChar,
-                                                   Token& token)
+constexpr void SC::JsonTokenizer::tokenizeNumber(StringIteratorASCII& it, StringIteratorASCII::CodePoint previousChar,
+                                                 Token& token)
 {
     // eat all non whitespaces that could possibly form a number (to be validated, as it may contain multiple dots)
     constexpr StringIteratorSkipTable numbersTable({'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.'});
@@ -183,7 +174,7 @@ constexpr void SC::Json::Tokenizer::tokenizeNumber(StringIteratorASCII& it, Stri
     token.type = Token::Number;
 }
 
-constexpr void SC::Json::Tokenizer::tokenizeTrue(StringIteratorASCII& it, Token& token)
+constexpr void SC::JsonTokenizer::tokenizeTrue(StringIteratorASCII& it, Token& token)
 {
     if (it.advanceIfMatches('r') and it.advanceIfMatches('u') and it.advanceIfMatches('e'))
     {
@@ -191,7 +182,7 @@ constexpr void SC::Json::Tokenizer::tokenizeTrue(StringIteratorASCII& it, Token&
     }
 }
 
-constexpr void SC::Json::Tokenizer::tokenizeFalse(StringIteratorASCII& it, Token& token)
+constexpr void SC::JsonTokenizer::tokenizeFalse(StringIteratorASCII& it, Token& token)
 {
     if (it.advanceIfMatches('a') and it.advanceIfMatches('l') and it.advanceIfMatches('s') and it.advanceIfMatches('e'))
     {
@@ -199,7 +190,7 @@ constexpr void SC::Json::Tokenizer::tokenizeFalse(StringIteratorASCII& it, Token
     }
 }
 
-constexpr void SC::Json::Tokenizer::tokenizeNull(StringIteratorASCII& it, Token& token)
+constexpr void SC::JsonTokenizer::tokenizeNull(StringIteratorASCII& it, Token& token)
 {
     if (it.advanceIfMatches('u') and it.advanceIfMatches('l') and it.advanceIfMatches('l'))
     {
