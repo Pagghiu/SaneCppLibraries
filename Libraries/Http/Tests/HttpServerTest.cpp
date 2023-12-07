@@ -17,8 +17,8 @@ struct SC::HttpServerTest : public SC::TestCase
     {
         if (test_section("server async"))
         {
-            constexpr int    wantedNumTries = 3;
-            Async::EventLoop eventLoop;
+            constexpr int  wantedNumTries = 3;
+            AsyncEventLoop eventLoop;
             numTries = 0;
             SC_TEST_EXPECT(eventLoop.create());
             HttpServer server;

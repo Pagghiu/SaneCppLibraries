@@ -92,8 +92,7 @@ SC::Result SC::HttpServerBase::parse(Span<const char> readData, ClientChannel& c
 }
 
 // HttpServer
-SC::Result SC::HttpServer::start(Async::EventLoop& eventLoop, uint32_t maxConnections, StringView address,
-                                 uint16_t port)
+SC::Result SC::HttpServer::start(AsyncEventLoop& eventLoop, uint32_t maxConnections, StringView address, uint16_t port)
 {
     SC_TRY(requestClients.resize(maxConnections));
     SC_TRY(requests.resize(maxConnections));
@@ -108,7 +107,7 @@ SC::Result SC::HttpServer::start(Async::EventLoop& eventLoop, uint32_t maxConnec
 
 SC::Result SC::HttpServer::stop() { return asyncAccept.stop(); }
 
-void SC::HttpServer::onNewClient(Async::SocketAccept::Result& result)
+void SC::HttpServer::onNewClient(AsyncSocketAccept::Result& result)
 {
     SocketDescriptor acceptedClient;
     if (not result.moveTo(acceptedClient))
@@ -140,7 +139,7 @@ void SC::HttpServer::onNewClient(Async::SocketAccept::Result& result)
     result.reactivateRequest(true);
 }
 
-void SC::HttpServer::onReceive(Async::SocketReceive::Result& result)
+void SC::HttpServer::onReceive(AsyncSocketReceive::Result& result)
 {
     SC_COMPILER_WARNING_PUSH_OFFSETOF
     RequestClient& requestClient = SC_COMPILER_FIELD_OFFSET(RequestClient, asyncReceive, result.async);
@@ -177,7 +176,7 @@ void SC::HttpServer::onReceive(Async::SocketReceive::Result& result)
     }
 }
 
-void SC::HttpServer::onAfterSend(Async::SocketSend::Result& result)
+void SC::HttpServer::onAfterSend(AsyncSocketSend::Result& result)
 {
     if (result.isValid())
     {

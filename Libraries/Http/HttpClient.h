@@ -21,10 +21,10 @@ struct HttpClient;
 struct SC::HttpClient
 {
     /// @brief Setups this client to execute a `GET` request on the given url
-    /// @param loop The Async::EventLoop to use for monitoring network packets
+    /// @param loop The AsyncEventLoop to use for monitoring network packets
     /// @param url The url to `GET`
     /// @return Valid Result if dns resolution and creation of underlying client tcp socket succeeded
-    [[nodiscard]] Result get(Async::EventLoop& loop, StringView url);
+    [[nodiscard]] Result get(AsyncEventLoop& loop, StringView url);
 
     Delegate<HttpClient&> callback; ///< The callback that is called after `GET` operation succeeded
 
@@ -37,19 +37,19 @@ struct SC::HttpClient
     }
 
   private:
-    void onConnected(Async::SocketConnect::Result& result);
-    void onAfterSend(Async::SocketSend::Result& result);
-    void onAfterRead(Async::SocketReceive::Result& result);
+    void onConnected(AsyncSocketConnect::Result& result);
+    void onAfterSend(AsyncSocketSend::Result& result);
+    void onAfterRead(AsyncSocketReceive::Result& result);
 
     SmallVector<char, 1024> content;
 
     String customDebugName;
 
     // TODO: can we find a way to putt all asyncs in a single tagged union when they're not used in parallel?
-    Async::SocketConnect connectAsync;
-    Async::SocketSend    sendAsync;
-    Async::SocketReceive receiveAsync;
-    SocketDescriptor     clientSocket;
-    Async::EventLoop*    eventLoop = nullptr;
+    AsyncSocketConnect connectAsync;
+    AsyncSocketSend    sendAsync;
+    AsyncSocketReceive receiveAsync;
+    SocketDescriptor   clientSocket;
+    AsyncEventLoop*    eventLoop = nullptr;
 };
 //! @}

@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 
-#include "../Async/Async.h" // Async::LoopWakeUp
+#include "../Async/Async.h" // AsyncLoopWakeUp
 #include "../Containers/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/OpaqueObject.h"
@@ -48,7 +48,7 @@ struct SC::FileSystemWatcher
         static constexpr int MaxChangesBufferSize = 1024;
 #if SC_PLATFORM_WINDOWS
         static constexpr int Windows =
-            MaxChangesBufferSize + sizeof(void*) + sizeof(FileDescriptor) + sizeof(Async::WindowsPoll);
+            MaxChangesBufferSize + sizeof(void*) + sizeof(FileDescriptor) + sizeof(AsyncWindowsPoll);
 #else
         static constexpr int Windows = 0;
 #endif
@@ -128,14 +128,14 @@ struct SC::FileSystemWatcher
     /// @brief Support object to allow user holding memory for needed resources for async mode
     struct EventLoopRunner
     {
-        Async::EventLoop& eventLoop;
-        EventLoopRunner(Async::EventLoop& eventLoop) : eventLoop(eventLoop) {}
+        AsyncEventLoop& eventLoop;
+        EventLoopRunner(AsyncEventLoop& eventLoop) : eventLoop(eventLoop) {}
 
       private:
         friend struct FileSystemWatcher;
 #if SC_PLATFORM_APPLE
-        Async::LoopWakeUp eventLoopAsync = {};
-        EventObject       eventObject    = {};
+        AsyncLoopWakeUp eventLoopAsync = {};
+        EventObject     eventObject    = {};
 #endif
     };
 
@@ -147,7 +147,7 @@ struct SC::FileSystemWatcher
     /// @return Valid Result if the watcher has been initialized correctly
     [[nodiscard]] Result init(ThreadRunner& runner);
 
-    /// @brief Setup watcher to receive async notifications on SC::EventLoop
+    /// @brief Setup watcher to receive async notifications on SC::AsyncEventLoop
     /// @param runner Address of a ThreadRunner object that must be valid until close()
     /// @return Valid Result if the watcher has been initialized correctly
     [[nodiscard]] Result init(EventLoopRunner& runner);

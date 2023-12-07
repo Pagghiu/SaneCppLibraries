@@ -3,25 +3,25 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "../Async.h"
 
-struct SC::Async::EventLoop::Internal
+struct SC::AsyncEventLoop::Internal
 {
     FileDescriptor loopFd;
 
     ~Internal() { SC_TRUST_RESULT(close()); }
     [[nodiscard]] Result close() { return loopFd.close(); }
     [[nodiscard]] Result createEventLoop() { return Result(true); }
-    [[nodiscard]] Result createWakeup(EventLoop&) { return Result(true); }
+    [[nodiscard]] Result createWakeup(AsyncEventLoop&) { return Result(true); }
 
-    [[nodiscard]] Async::AsyncRequest* getAsyncRequest(const int& event) const { return nullptr; }
+    [[nodiscard]] AsyncRequest* getAsyncRequest(const int& event) const { return nullptr; }
 };
 
-struct SC::Async::EventLoop::KernelQueue
+struct SC::AsyncEventLoop::KernelQueue
 {
     int newEvents = 0;
     int events[1] = {0};
 
-    [[nodiscard]] Result pushNewSubmission(Async::AsyncRequest& async) { return Result(false); }
-    [[nodiscard]] Result pollAsync(EventLoop& eventLoop, PollMode pollMode) { return Result(false); }
+    [[nodiscard]] Result pushNewSubmission(AsyncRequest& async) { return Result(false); }
+    [[nodiscard]] Result pollAsync(AsyncEventLoop& eventLoop, PollMode pollMode) { return Result(false); }
     [[nodiscard]] Result validateEvent(int& event, bool& continueProcessing) { return Result(true); }
     template <typename T>
     [[nodiscard]] Result setupAsync(T&)
@@ -45,12 +45,12 @@ struct SC::Async::EventLoop::KernelQueue
     }
 };
 
-SC::Result SC::Async::EventLoop::wakeUpFromExternalThread() { return Result(true); }
-SC::Result SC::Async::EventLoop::associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor)
+SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread() { return Result(true); }
+SC::Result SC::AsyncEventLoop::associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor)
 {
     return Result(true);
 }
-SC::Result SC::Async::EventLoop::associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor)
+SC::Result SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor)
 {
     return Result(true);
 }

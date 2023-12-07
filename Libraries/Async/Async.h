@@ -27,56 +27,49 @@
 namespace SC
 {
 struct EventObject;
-/// @brief Asynchronous I/O (files, sockets, timers, processes, fs events, threads wake-up) (see @ref library_async)
-namespace Async
-{
-struct EventLoop;
+struct AsyncEventLoop;
 
 struct AsyncRequest;
 struct AsyncResult;
 template <typename T>
 struct AsyncResultOf;
-} // namespace Async
 } // namespace SC
 
 namespace SC
 {
-namespace Async
-{
 namespace detail
 {
-struct WinOverlapped;
-struct WinOverlappedDefinition
+struct AsyncWinOverlapped;
+struct AsyncWinOverlappedDefinition
 {
     static constexpr int Windows = sizeof(void*) * 7;
 
     static constexpr size_t Alignment = alignof(void*);
 
-    using Object = WinOverlapped;
+    using Object = AsyncWinOverlapped;
 };
-using WinOverlappedOpaque = OpaqueObject<WinOverlappedDefinition>;
+using WinOverlappedOpaque = OpaqueObject<AsyncWinOverlappedDefinition>;
 
-struct WinWaitDefinition
+struct AsyncWinWaitDefinition
 {
     using Handle                    = FileDescriptor::Handle;  // fd
     static constexpr Handle Invalid = FileDescriptor::Invalid; // invalid fd
     static Result           releaseHandle(Handle& waitHandle);
 };
-struct WinWaitHandle : public UniqueHandle<WinWaitDefinition>
+struct WinWaitHandle : public UniqueHandle<AsyncWinWaitDefinition>
 {
 };
 } // namespace detail
-} // namespace Async
 } // namespace SC
 
 //! @addtogroup group_async
 //! @{
 
 /// @brief Base class for all async requests, holding state and type.
-struct SC::Async::AsyncRequest
+struct SC::AsyncRequest
 {
-    Async::AsyncRequest* next = nullptr;
-    Async::AsyncRequest* prev = nullptr;
+    AsyncRequest* next = nullptr;
+    AsyncRequest* prev = nullptr;
 
 #if SC_CONFIGURATION_DEBUG
     void setDebugName(const char* newDebugName) { debugName = newDebugName; }
@@ -85,24 +78,24 @@ struct SC::Async::AsyncRequest
 #endif
 
     /// @brief Get the event loop associated with this AsyncRequest
-    [[nodiscard]] EventLoop* getEventLoop() const { return eventLoop; }
+    [[nodiscard]] AsyncEventLoop* getEventLoop() const { return eventLoop; }
 
     /// @brief Type of async request
     enum class Type : uint8_t
     {
-        LoopTimeout,   ///< Request is an Async::LoopTimeout object
-        LoopWakeUp,    ///< Request is an Async::LoopWakeUp object
-        ProcessExit,   ///< Request is an Async::ProcessExit object
-        SocketAccept,  ///< Request is an Async::SocketAccept object
-        SocketConnect, ///< Request is an Async::SocketConnect object
-        SocketSend,    ///< Request is an Async::SocketSend object
-        SocketReceive, ///< Request is an Async::SocketReceive object
-        SocketClose,   ///< Request is an Async::SocketClose object
-        FileRead,      ///< Request is an Async::FileRead object
-        FileWrite,     ///< Request is an Async::FileWrite object
-        FileClose,     ///< Request is an Async::FileClose object
+        LoopTimeout,   ///< Request is an AsyncLoopTimeout object
+        LoopWakeUp,    ///< Request is an AsyncLoopWakeUp object
+        ProcessExit,   ///< Request is an AsyncProcessExit object
+        SocketAccept,  ///< Request is an AsyncSocketAccept object
+        SocketConnect, ///< Request is an AsyncSocketConnect object
+        SocketSend,    ///< Request is an AsyncSocketSend object
+        SocketReceive, ///< Request is an AsyncSocketReceive object
+        SocketClose,   ///< Request is an AsyncSocketClose object
+        FileRead,      ///< Request is an AsyncFileRead object
+        FileWrite,     ///< Request is an AsyncFileWrite object
+        FileClose,     ///< Request is an AsyncFileClose object
 #if SC_PLATFORM_WINDOWS
-        WindowsPoll, ///< Request is an Async::WindowsPoll object
+        WindowsPoll, ///< Request is an AsyncWindowsPoll object
 #endif
     };
 
@@ -118,10 +111,10 @@ struct SC::Async::AsyncRequest
 
   protected:
     [[nodiscard]] Result validateAsync();
-    [[nodiscard]] Result queueSubmission(EventLoop& eventLoop);
+    [[nodiscard]] Result queueSubmission(AsyncEventLoop& eventLoop);
 
-    void       updateTime();
-    EventLoop* eventLoop = nullptr;
+    void            updateTime();
+    AsyncEventLoop* eventLoop = nullptr;
 
   private:
     [[nodiscard]] static const char* TypeToString(Type type);
@@ -133,10 +126,10 @@ struct SC::Async::AsyncRequest
         Cancelling  // when in cancellation queue
     };
 
-    friend struct EventLoop;
+    friend struct AsyncEventLoop;
 
     template <typename Lambda>
-    [[nodiscard]] static Result applyOnAsync(Async::AsyncRequest& async, Lambda&& lambda);
+    [[nodiscard]] static Result applyOnAsync(AsyncRequest& async, Lambda&& lambda);
 
 #if SC_CONFIGURATION_DEBUG
     const char* debugName = "None";
@@ -147,9 +140,9 @@ struct SC::Async::AsyncRequest
 };
 
 /// @brief Base class for all async result objcets
-struct SC::Async::AsyncResult
+struct SC::AsyncResult
 {
-    using Type = Async::AsyncRequest::Type;
+    using Type = AsyncRequest::Type;
 
     /// @brief Constructs an async result from a result
     /// @param res The result of async operation
@@ -163,16 +156,16 @@ struct SC::Async::AsyncResult
     [[nodiscard]] const SC::Result& isValid() const { return returnCode; }
 
   protected:
-    friend struct EventLoop;
+    friend struct AsyncEventLoop;
 
     bool       shouldBeReactivated = false;
     SC::Result returnCode;
 };
 
-/// @brief Helper to create an async result class
+/// @brief Create an async result for a given AsyncRequest-derived class
 /// @tparam T Type of the request class associated to this result
 template <typename T>
-struct SC::Async::AsyncResultOf : public Async::AsyncResult
+struct SC::AsyncResultOf : public AsyncResult
 {
     T& async;
     AsyncResultOf(T& async, AsyncResult&& res) : AsyncResult(move(res)), async(async) {}
@@ -180,91 +173,83 @@ struct SC::Async::AsyncResultOf : public Async::AsyncResult
 
 namespace SC
 {
-namespace Async
-{
 //! @addtogroup group_async
 //! @{
 
-struct LoopTimeout;
-/// @brief Result for LoopTimeout
-using LoopTimeoutResult = AsyncResultOf<Async::LoopTimeout>;
-
 /// @brief Starts a Timeout that is invoked after expiration (relative) time has passed.
-struct LoopTimeout : public AsyncRequest
+struct AsyncLoopTimeout : public AsyncRequest
 {
-    using Result = LoopTimeoutResult;
-    LoopTimeout() : AsyncRequest(Type::LoopTimeout) {}
+    /// @brief Result for LoopTimeout
+    using Result = AsyncResultOf<AsyncLoopTimeout>;
+    AsyncLoopTimeout() : AsyncRequest(Type::LoopTimeout) {}
 
     /// Starts a Timeout that is invoked after expiration (relative) time has passed.
-    [[nodiscard]] SC::Result start(EventLoop& loop, Time::Milliseconds expiration);
+    [[nodiscard]] SC::Result start(AsyncEventLoop& loop, Time::Milliseconds expiration);
 
     [[nodiscard]] auto getTimeout() const { return timeout; }
 
     Function<void(Result&)> callback;
 
   private:
-    friend struct EventLoop;
+    friend struct AsyncEventLoop;
     Time::Milliseconds          timeout; // not needed, but keeping just for debugging
     Time::HighResolutionCounter expirationTime;
 };
 //------------------------------------------------------------------------------------------------------
-struct LoopWakeUp;
-/// @brief Result for LoopWakeUp
-using LoopWakeUpResult = AsyncResultOf<LoopWakeUp>;
 
 /// @brief Starts a wake-up operation, allowing threads to execute callbacks on loop thread.
 /// Callback will be called from the main event loop after an external thread calls wakeUpFromExternalThread.
-struct LoopWakeUp : public AsyncRequest
+struct AsyncLoopWakeUp : public AsyncRequest
 {
-    using Result = LoopWakeUpResult;
-    LoopWakeUp() : AsyncRequest(Type::LoopWakeUp) {}
+    /// @brief Result for AsyncLoopWakeUp
+    using Result = AsyncResultOf<AsyncLoopWakeUp>;
+    AsyncLoopWakeUp() : AsyncRequest(Type::LoopWakeUp) {}
 
     /// Starts a wake up request, that will be fullfilled when an external thread calls wakeUpFromExternalThread.
     /// EventObject is optional and allows the external thread to wait until the user callback has completed execution.
-    [[nodiscard]] SC::Result start(EventLoop& eventLoop, EventObject* eventObject = nullptr);
+    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, EventObject* eventObject = nullptr);
 
     [[nodiscard]] SC::Result wakeUp();
 
     Function<void(Result&)> callback;
 
   private:
-    friend struct EventLoop;
+    friend struct AsyncEventLoop;
 
     EventObject* eventObject = nullptr;
     Atomic<bool> pending     = false;
 };
 //------------------------------------------------------------------------------------------------------
-struct ProcessExit;
-/// @brief Result for ProcessExit
-struct ProcessExitResult : public AsyncResultOf<ProcessExit>
-{
-    ProcessExitResult(ProcessExit& async, Result&& res) : AsyncResultOf(async, move(res)) {}
-
-    [[nodiscard]] SC::Result moveTo(ProcessDescriptor::ExitStatus& status)
-    {
-        status = exitStatus;
-        return returnCode;
-    }
-
-  private:
-    friend struct EventLoop;
-    ProcessDescriptor::ExitStatus exitStatus;
-};
 
 /// @brief Starts a process exit notification request, that will be fullfilled when the given process is exited.
-struct ProcessExit : public AsyncRequest
+struct AsyncProcessExit : public AsyncRequest
 {
-    using Result = ProcessExitResult;
+    struct Result : public AsyncResultOf<AsyncProcessExit>
+    {
+        Result(AsyncProcessExit& async, SC::Result&& res) : AsyncResultOf(async, move(res)) {}
 
-    ProcessExit() : AsyncRequest(Type::ProcessExit) {}
+        [[nodiscard]] SC::Result moveTo(ProcessDescriptor::ExitStatus& status)
+        {
+            status = exitStatus;
+            return returnCode;
+        }
+
+      private:
+        friend struct AsyncEventLoop;
+        ProcessDescriptor::ExitStatus exitStatus;
+    };
+
+    // using Result = AsyncProcessExitResult;
+
+    AsyncProcessExit() : AsyncRequest(Type::ProcessExit) {}
 
     /// Starts a process exit notification request, that will be fullfilled when the given process is exited.
-    [[nodiscard]] SC::Result start(EventLoop& eventLoop, ProcessDescriptor::Handle process);
+    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, ProcessDescriptor::Handle process);
 
     Function<void(Result&)> callback;
 
   private:
-    friend struct EventLoop;
+    friend struct AsyncEventLoop;
     ProcessDescriptor::Handle handle = ProcessDescriptor::Invalid;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
@@ -272,38 +257,36 @@ struct ProcessExit : public AsyncRequest
 #endif
 };
 //------------------------------------------------------------------------------------------------------
-struct SocketAccept;
-/// @brief Result for SocketAccept
-struct SocketAcceptResult : public AsyncResultOf<SocketAccept>
-{
-    SocketAcceptResult(SocketAccept& async, Result&& res) : AsyncResultOf(async, move(res)) {}
-
-    [[nodiscard]] SC::Result moveTo(SocketDescriptor& client)
-    {
-        SC_TRY(returnCode);
-        return client.assign(move(acceptedClient));
-    }
-
-  private:
-    friend struct EventLoop;
-    SocketDescriptor acceptedClient;
-};
 
 /// @brief Starts a socket accept operation, obtaining a new socket from a listening socket.
 /// The callback is called with a new socket connected to the given listening endpoint will be returned.
-struct SocketAccept : public AsyncRequest
+struct AsyncSocketAccept : public AsyncRequest
 {
-    using Result = SocketAcceptResult;
-    SocketAccept() : AsyncRequest(Type::SocketAccept) {}
+    /// @brief Result for AsyncSocketAccept
+    struct Result : public AsyncResultOf<AsyncSocketAccept>
+    {
+        Result(AsyncSocketAccept& async, SC::Result&& res) : AsyncResultOf(async, move(res)) {}
+
+        [[nodiscard]] SC::Result moveTo(SocketDescriptor& client)
+        {
+            SC_TRY(returnCode);
+            return client.assign(move(acceptedClient));
+        }
+
+      private:
+        friend struct AsyncEventLoop;
+        SocketDescriptor acceptedClient;
+    };
+    AsyncSocketAccept() : AsyncRequest(Type::SocketAccept) {}
 
     /// Starts a socket accept operation, that will return a new socket connected to the given listening endpoint.
     /// SocketDescriptor must be created with async flags (createAsyncTCPSocket) and already bound and listening.
-    [[nodiscard]] SC::Result start(EventLoop& eventLoop, const SocketDescriptor& socketDescriptor);
+    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& socketDescriptor);
 
     Function<void(Result&)> callback;
 
   private:
-    friend struct EventLoop;
+    friend struct AsyncEventLoop;
     SocketDescriptor::Handle   handle        = SocketDescriptor::Invalid;
     SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
 #if SC_PLATFORM_WINDOWS
@@ -314,25 +297,25 @@ struct SocketAccept : public AsyncRequest
 #endif
 };
 //------------------------------------------------------------------------------------------------------
-struct SocketConnect;
-/// @brief Result for SocketConnect
-using SocketConnectResult = AsyncResultOf<SocketConnect>;
+
 /// @brief Starts a socket connect operation, connecting to a remote endpoint.
 /// Callback will be called when the given socket is connected to ipAddress.
-struct SocketConnect : public AsyncRequest
+struct AsyncSocketConnect : public AsyncRequest
 {
-    using Result = SocketConnectResult;
-    SocketConnect() : AsyncRequest(Type::SocketConnect) {}
+    /// @brief Result for AsyncSocketConnect
+    using Result = AsyncResultOf<AsyncSocketConnect>;
+
+    AsyncSocketConnect() : AsyncRequest(Type::SocketConnect) {}
 
     /// Starts a socket connect operation.
     /// Callback will be called when the given socket is connected to ipAddress.
-    [[nodiscard]] SC::Result start(EventLoop& loop, const SocketDescriptor& socketDescriptor,
+    [[nodiscard]] SC::Result start(AsyncEventLoop& loop, const SocketDescriptor& socketDescriptor,
                                    SocketIPAddress ipAddress);
 
     Function<void(Result&)> callback;
 
   private:
-    friend struct EventLoop;
+    friend struct AsyncEventLoop;
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
     SocketIPAddress          ipAddress;
 #if SC_PLATFORM_WINDOWS
@@ -340,24 +323,24 @@ struct SocketConnect : public AsyncRequest
 #endif
 };
 //------------------------------------------------------------------------------------------------------
-struct SocketSend;
-/// @brief Result for SocketSend
-using SocketSendResult = AsyncResultOf<SocketSend>;
+
 /// @brief Starts a socket send operation, sending bytes to a remote endpoint.
 /// Callback will be called when the given socket is ready to send more data.
-struct SocketSend : public AsyncRequest
+struct AsyncSocketSend : public AsyncRequest
 {
-    using Result = SocketSendResult;
-    SocketSend() : AsyncRequest(Type::SocketSend) {}
+    /// @brief Result for AsyncSocketSend
+    using Result = AsyncResultOf<AsyncSocketSend>;
+    AsyncSocketSend() : AsyncRequest(Type::SocketSend) {}
 
     /// Starts a socket send operation.
     /// Callback will be called when the given socket is ready to send more data.
-    [[nodiscard]] SC::Result start(EventLoop& loop, const SocketDescriptor& socketDescriptor, Span<const char> data);
+    [[nodiscard]] SC::Result start(AsyncEventLoop& loop, const SocketDescriptor& socketDescriptor,
+                                   Span<const char> data);
 
     Function<void(Result&)> callback;
 
   private:
-    friend struct EventLoop;
+    friend struct AsyncEventLoop;
 
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
     Span<const char>         data;
@@ -366,38 +349,39 @@ struct SocketSend : public AsyncRequest
 #endif
 };
 //------------------------------------------------------------------------------------------------------
-struct SocketReceive;
-/// @brief Result for SocketReceive
-struct SocketReceiveResult : public AsyncResultOf<SocketReceive>
-{
-    SocketReceiveResult(SocketReceive& async, Result&& res) : AsyncResultOf(async, move(res)) {}
+struct AsyncSocketReceive;
 
-    [[nodiscard]] SC::Result moveTo(Span<char>& outData)
-    {
-        outData = readData;
-        return returnCode;
-    }
-
-  private:
-    friend struct EventLoop;
-    Span<char> readData;
-};
 /// @brief Starts a socket receive operation, receiving bytes from a remote endpoint.
 /// Callback will be called when some data is read from socket.
-struct SocketReceive : public AsyncRequest
+struct AsyncSocketReceive : public AsyncRequest
 {
-    using Result = SocketReceiveResult;
+    /// @brief Result for AsyncSocketReceive
+    struct Result : public AsyncResultOf<AsyncSocketReceive>
+    {
+        Result(AsyncSocketReceive& async, SC::Result&& res) : AsyncResultOf(async, move(res)) {}
 
-    SocketReceive() : AsyncRequest(Type::SocketReceive) {}
+        [[nodiscard]] SC::Result moveTo(Span<char>& outData)
+        {
+            outData = readData;
+            return returnCode;
+        }
+
+      private:
+        friend struct AsyncEventLoop;
+        Span<char> readData;
+    };
+
+    AsyncSocketReceive() : AsyncRequest(Type::SocketReceive) {}
 
     /// Starts a socket receive operation.
     /// Callback will be called when some data is read from socket.
-    [[nodiscard]] SC::Result start(EventLoop& eventLoop, const SocketDescriptor& socketDescriptor, Span<char> data);
+    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& socketDescriptor,
+                                   Span<char> data);
 
     Function<void(Result&)> callback;
 
   private:
-    friend struct EventLoop;
+    friend struct AsyncEventLoop;
 
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
     Span<char>               data;
@@ -406,60 +390,60 @@ struct SocketReceive : public AsyncRequest
 #endif
 };
 //------------------------------------------------------------------------------------------------------
-struct SocketClose;
-/// @brief Result for SocketClose
-using SocketCloseResult = AsyncResultOf<SocketClose>;
+
 /// @brief Starts a socket close operation.
 /// Callback will be called when the socket has been fully closed.
-struct SocketClose : public AsyncRequest
+struct AsyncSocketClose : public AsyncRequest
 {
-    using Result = SocketCloseResult;
-    SocketClose() : AsyncRequest(Type::SocketClose) {}
+    /// @brief Result for AsyncSocketClose
+    using Result = AsyncResultOf<AsyncSocketClose>;
+
+    AsyncSocketClose() : AsyncRequest(Type::SocketClose) {}
 
     /// Starts a socket close operation.
     /// Callback will be called when the socket has been fully closed.
-    [[nodiscard]] SC::Result start(EventLoop& eventLoop, const SocketDescriptor& socketDescriptor);
+    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& socketDescriptor);
 
     int                     code = 0;
     Function<void(Result&)> callback;
 
   private:
-    friend struct EventLoop;
+    friend struct AsyncEventLoop;
 
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
 };
 //------------------------------------------------------------------------------------------------------
-struct FileRead;
-/// @brief Result for FileRead
-struct FileReadResult : public AsyncResultOf<FileRead>
-{
-    FileReadResult(FileRead& async, Result&& res) : AsyncResultOf(async, move(res)) {}
 
-    [[nodiscard]] SC::Result moveTo(Span<char>& data)
-    {
-        data = readData;
-        return returnCode;
-    }
-
-  private:
-    friend struct EventLoop;
-    Span<char> readData;
-};
 /// @brief Starts a file receive operation, reading bytes from a file.
 /// Callback will be called when some data is read from file.
-struct FileRead : public AsyncRequest
+struct AsyncFileRead : public AsyncRequest
 {
-    using Result = FileReadResult;
-    FileRead() : AsyncRequest(Type::FileRead) {}
+    /// @brief Result for AsyncFileRead
+    struct Result : public AsyncResultOf<AsyncFileRead>
+    {
+        Result(AsyncFileRead& async, SC::Result&& res) : AsyncResultOf(async, move(res)) {}
+
+        [[nodiscard]] SC::Result moveTo(Span<char>& data)
+        {
+            data = readData;
+            return returnCode;
+        }
+
+      private:
+        friend struct AsyncEventLoop;
+        Span<char> readData;
+    };
+
+    AsyncFileRead() : AsyncRequest(Type::FileRead) {}
     /// Starts a file receive operation, that will return when some data is read from file.
-    [[nodiscard]] SC::Result start(EventLoop& loop, FileDescriptor::Handle fileDescriptor, Span<char> readBuffer);
+    [[nodiscard]] SC::Result start(AsyncEventLoop& loop, FileDescriptor::Handle fileDescriptor, Span<char> readBuffer);
 
     uint64_t offset = 0;
 
     Function<void(Result&)> callback;
 
   private:
-    friend struct EventLoop;
+    friend struct AsyncEventLoop;
 
     FileDescriptor::Handle fileDescriptor;
     Span<char>             readBuffer;
@@ -468,31 +452,31 @@ struct FileRead : public AsyncRequest
 #endif
 };
 //------------------------------------------------------------------------------------------------------
-struct FileWrite;
-/// @brief Result for FileWrite
-struct FileWriteResult : public AsyncResultOf<FileWrite>
-{
-    FileWriteResult(FileWrite& async, Result&& res) : AsyncResultOf(async, move(res)) {}
 
-    [[nodiscard]] SC::Result moveTo(size_t& writtenSizeInBytes)
-    {
-        writtenSizeInBytes = writtenBytes;
-        return returnCode;
-    }
-
-  private:
-    friend struct EventLoop;
-    size_t writtenBytes = 0;
-};
 /// @brief Starts a file write operation, writing bytes to a file.
 /// Callback will be called when the file is ready to receive more bytes to write.
-struct FileWrite : public AsyncRequest
+struct AsyncFileWrite : public AsyncRequest
 {
-    using Result = FileWriteResult;
-    FileWrite() : AsyncRequest(Type::FileWrite) {}
+    /// @brief Result for AsyncFileWrite
+    struct Result : public AsyncResultOf<AsyncFileWrite>
+    {
+        Result(AsyncFileWrite& async, SC::Result&& res) : AsyncResultOf(async, move(res)) {}
+
+        [[nodiscard]] SC::Result moveTo(size_t& writtenSizeInBytes)
+        {
+            writtenSizeInBytes = writtenBytes;
+            return returnCode;
+        }
+
+      private:
+        friend struct AsyncEventLoop;
+        size_t writtenBytes = 0;
+    };
+
+    AsyncFileWrite() : AsyncRequest(Type::FileWrite) {}
 
     /// Starts a file receive operation, that will return when the file is ready to receive more bytes to write.
-    [[nodiscard]] SC::Result start(EventLoop& eventLoop, FileDescriptor::Handle fileDescriptor,
+    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fileDescriptor,
                                    Span<const char> writeBuffer);
 
     uint64_t offset = 0;
@@ -500,7 +484,7 @@ struct FileWrite : public AsyncRequest
     Function<void(Result&)> callback;
 
   private:
-    friend struct EventLoop;
+    friend struct AsyncEventLoop;
     FileDescriptor::Handle fileDescriptor;
     Span<const char>       writeBuffer;
 #if SC_PLATFORM_WINDOWS
@@ -508,44 +492,43 @@ struct FileWrite : public AsyncRequest
 #endif
 };
 //------------------------------------------------------------------------------------------------------
-struct FileClose;
-using FileCloseResult = AsyncResultOf<FileClose>;
+
 /// @brief Starts a file close operation, closing the OS file descriptor.
 /// Callback will be called when the file is actually closed.
-struct FileClose : public AsyncRequest
+struct AsyncFileClose : public AsyncRequest
 {
-    using Result = FileCloseResult;
-    FileClose() : AsyncRequest(Type::FileClose) {}
+    using Result = AsyncResultOf<AsyncFileClose>;
+    AsyncFileClose() : AsyncRequest(Type::FileClose) {}
 
-    [[nodiscard]] SC::Result start(EventLoop& eventLoop, FileDescriptor::Handle fileDescriptor);
+    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fileDescriptor);
 
-    int                     code = 0;
+    int code = 0;
+
     Function<void(Result&)> callback;
 
   private:
-    friend struct EventLoop;
+    friend struct AsyncEventLoop;
     FileDescriptor::Handle fileDescriptor;
 };
 //------------------------------------------------------------------------------------------------------
 #if SC_PLATFORM_WINDOWS || DOXYGEN
-struct WindowsPoll;
-using WindowsPollResult = AsyncResultOf<WindowsPoll>;
+
 /// @brief Starts a windows poll operation, to be signaled by `GetOverlappedResult`.
 /// Callback will be called when `GetOverlappedResult` signals events on the given file descriptor.
-struct WindowsPoll : public AsyncRequest
+struct AsyncWindowsPoll : public AsyncRequest
 {
-    using Result = WindowsPollResult;
-    WindowsPoll() : AsyncRequest(Type::WindowsPoll) {}
+    using Result = AsyncResultOf<AsyncWindowsPoll>;
+    AsyncWindowsPoll() : AsyncRequest(Type::WindowsPoll) {}
 
     /// Starts a windows poll operation, monitoring the given file descriptor with GetOverlappedResult
-    [[nodiscard]] SC::Result start(EventLoop& loop, FileDescriptor::Handle fileDescriptor);
+    [[nodiscard]] SC::Result start(AsyncEventLoop& loop, FileDescriptor::Handle fileDescriptor);
 
     [[nodiscard]] auto& getOverlappedOpaque() { return overlapped; }
 
     Function<void(Result&)> callback;
 
   private:
-    friend struct EventLoop;
+    friend struct AsyncEventLoop;
 
     FileDescriptor::Handle fileDescriptor;
 
@@ -554,11 +537,11 @@ struct WindowsPoll : public AsyncRequest
 #endif
 //! @}
 
-} // namespace Async
 } // namespace SC
 //------------------------------------------------------------------------------------------------------
 
-struct SC::Async::EventLoop
+/// @brief Asynchronous I/O (files, sockets, timers, processes, fs events, threads wake-up) (see @ref library_async)
+struct SC::AsyncEventLoop
 {
     /// Creates the event loop kernel object
     [[nodiscard]] Result create();
@@ -576,13 +559,13 @@ struct SC::Async::EventLoop
     [[nodiscard]] Result runNoWait();
 
     /// Wake up the event loop from a thread different than the one where run() is called (and potentially blocked).
-    /// The parameter is an Async::LoopWakeUp that must have been previously started (with Async::LoopWakeUp::start).
-    [[nodiscard]] Result wakeUpFromExternalThread(Async::LoopWakeUp& wakeUp);
+    /// The parameter is an AsyncLoopWakeUp that must have been previously started (with AsyncLoopWakeUp::start).
+    [[nodiscard]] Result wakeUpFromExternalThread(AsyncLoopWakeUp& wakeUp);
 
     /// Wake up the event loop from a thread different than the one where run() is called (and potentially blocked)
     [[nodiscard]] Result wakeUpFromExternalThread();
 
-    /// Helper to creates a TCP socket with Async::AsyncRequest flags of the given family (IPV4 / IPV6).
+    /// Helper to creates a TCP socket with AsyncRequest flags of the given family (IPV4 / IPV6).
     /// It also automatically registers the socket with the eventLoop (associateExternallyCreatedTCPSocket)
     [[nodiscard]] Result createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor);
 
@@ -605,10 +588,10 @@ struct SC::Async::EventLoop
     int numberOfWakeups       = 0;
     int numberOfExternals     = 0;
 
-    IntrusiveDoubleLinkedList<Async::AsyncRequest> submissions;
-    IntrusiveDoubleLinkedList<Async::AsyncRequest> activeTimers;
-    IntrusiveDoubleLinkedList<Async::AsyncRequest> activeWakeUps;
-    IntrusiveDoubleLinkedList<Async::AsyncRequest> manualCompletions;
+    IntrusiveDoubleLinkedList<AsyncRequest> submissions;
+    IntrusiveDoubleLinkedList<AsyncRequest> activeTimers;
+    IntrusiveDoubleLinkedList<AsyncRequest> activeWakeUps;
+    IntrusiveDoubleLinkedList<AsyncRequest> manualCompletions;
 
     Time::HighResolutionCounter loopTime;
 
@@ -634,9 +617,9 @@ struct SC::Async::EventLoop
 
     [[nodiscard]] int getTotalNumberOfActiveHandle() const;
 
-    void removeActiveHandle(Async::AsyncRequest& async);
-    void addActiveHandle(Async::AsyncRequest& async);
-    void scheduleManualCompletion(Async::AsyncRequest& async);
+    void removeActiveHandle(AsyncRequest& async);
+    void addActiveHandle(AsyncRequest& async);
+    void scheduleManualCompletion(AsyncRequest& async);
     void increaseActiveCount();
     void decreaseActiveCount();
 
@@ -647,23 +630,23 @@ struct SC::Async::EventLoop
     void updateTime();
     void executeTimers(KernelQueue& queue, const Time::HighResolutionCounter& nextTimer);
 
-    [[nodiscard]] Result stopAsync(Async::AsyncRequest& async);
+    [[nodiscard]] Result stopAsync(AsyncRequest& async);
 
     // LoopWakeUp
     void executeWakeUps(AsyncResult& result);
 
     // Setup
-    [[nodiscard]] Result queueSubmission(Async::AsyncRequest& async);
+    [[nodiscard]] Result queueSubmission(AsyncRequest& async);
 
     // Phases
-    [[nodiscard]] Result stageSubmission(KernelQueue& queue, Async::AsyncRequest& async);
-    [[nodiscard]] Result setupAsync(KernelQueue& queue, Async::AsyncRequest& async);
-    [[nodiscard]] Result activateAsync(KernelQueue& queue, Async::AsyncRequest& async);
-    [[nodiscard]] Result cancelAsync(KernelQueue& queue, Async::AsyncRequest& async);
+    [[nodiscard]] Result stageSubmission(KernelQueue& queue, AsyncRequest& async);
+    [[nodiscard]] Result setupAsync(KernelQueue& queue, AsyncRequest& async);
+    [[nodiscard]] Result activateAsync(KernelQueue& queue, AsyncRequest& async);
+    [[nodiscard]] Result cancelAsync(KernelQueue& queue, AsyncRequest& async);
 
-    void reportError(KernelQueue& queue, Async::AsyncRequest& async, Result&& returnCode);
-    void completeAsync(KernelQueue& queue, Async::AsyncRequest& async, Result&& returnCode, bool& reactivate);
-    void completeAndEventuallyReactivate(KernelQueue& queue, Async::AsyncRequest& async, Result&& returnCode);
+    void reportError(KernelQueue& queue, AsyncRequest& async, Result&& returnCode);
+    void completeAsync(KernelQueue& queue, AsyncRequest& async, Result&& returnCode, bool& reactivate);
+    void completeAndEventuallyReactivate(KernelQueue& queue, AsyncRequest& async, Result&& returnCode);
 
     enum class PollMode
     {
@@ -673,7 +656,7 @@ struct SC::Async::EventLoop
 
     [[nodiscard]] Result runStep(PollMode pollMode);
 
-    friend struct Async::AsyncRequest;
+    friend struct AsyncRequest;
 };
 
 //! @}

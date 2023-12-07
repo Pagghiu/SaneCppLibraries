@@ -130,9 +130,9 @@ struct SC::ProcessTest : public SC::TestCase
             SC_TEST_EXPECT(output == expectedOutput);
             SC_TEST_EXPECT(not hasError);
         }
-        if (test_section("Process EventLoop"))
+        if (test_section("Process AsyncEventLoop"))
         {
-            Async::EventLoop eventLoop;
+            AsyncEventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
             Process process;
 #if SC_PLATFORM_APPLE
@@ -143,8 +143,8 @@ struct SC::ProcessTest : public SC::TestCase
             ProcessDescriptor::Handle processHandle;
             SC_TEST_EXPECT(process.handle.get(processHandle, Result::Error("Invalid Handle")));
             ProcessDescriptor::ExitStatus exitStatus;
-            Async::ProcessExit            async;
-            async.callback = [&](Async::ProcessExit::Result& res) { SC_TEST_EXPECT(res.moveTo(exitStatus)); };
+            AsyncProcessExit              async;
+            async.callback = [&](AsyncProcessExit::Result& res) { SC_TEST_EXPECT(res.moveTo(exitStatus)); };
             SC_TEST_EXPECT(async.start(eventLoop, processHandle));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(exitStatus.status == 0);

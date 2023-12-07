@@ -105,9 +105,9 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
     void eventLoop(const StringView appDirectory)
     {
-        if (test_section("EventLoop"))
+        if (test_section("AsyncEventLoop"))
         {
-            Async::EventLoop eventLoop;
+            AsyncEventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
             FileSystemWatcher fileEventsWatcher;
@@ -180,9 +180,9 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
     void eventLoopInterrupt(const StringView appDirectory)
     {
-        if (test_section("EventLoop interrupt"))
+        if (test_section("AsyncEventLoop interrupt"))
         {
-            Async::EventLoop eventLoop;
+            AsyncEventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
             FileSystemWatcher fileEventsWatcher;
@@ -211,9 +211,9 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
     void eventLoopWatchUnwatch(const StringView appDirectory)
     {
-        if (test_section("EventLoop watch/unwatch"))
+        if (test_section("AsyncEventLoop watch/unwatch"))
         {
-            Async::EventLoop eventLoop;
+            AsyncEventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
             FileSystemWatcher                  fileEventsWatcher;

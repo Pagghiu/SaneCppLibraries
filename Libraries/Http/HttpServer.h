@@ -85,13 +85,13 @@ struct SC::HttpServer : public HttpServerBase
     HttpServer(const HttpServer&)            = delete;
     HttpServer& operator=(const HttpServer&) = delete;
 
-    /// @brief Starts the http server on the given Async::EventLoop, address and port
+    /// @brief Starts the http server on the given AsyncEventLoop, address and port
     /// @param loop The event loop to be used, where to add the listening socket
     /// @param maxConnections Maximum number of concurrent listnening connections
     /// @param address The address of local interface where to listen to
     /// @param port The local port where to start listening to
     /// @return Valid Result if http listening has been started successfully
-    [[nodiscard]] Result start(Async::EventLoop& loop, uint32_t maxConnections, StringView address, uint16_t port);
+    [[nodiscard]] Result start(AsyncEventLoop& loop, uint32_t maxConnections, StringView address, uint16_t port);
 
     /// @brief Stops the http server
     /// @return Valid Result if server has been stopped successfully
@@ -102,19 +102,19 @@ struct SC::HttpServer : public HttpServerBase
     {
         ArenaMap<RequestClient>::Key key;
 
-        SocketDescriptor     socket;
-        SmallString<50>      debugName;
-        Async::SocketReceive asyncReceive;
-        Async::SocketSend    asyncSend;
+        SocketDescriptor   socket;
+        SmallString<50>    debugName;
+        AsyncSocketReceive asyncReceive;
+        AsyncSocketSend    asyncSend;
     };
     ArenaMap<RequestClient> requestClients;
     SocketDescriptor        serverSocket;
 
-    Async::SocketAccept asyncAccept;
+    AsyncSocketAccept asyncAccept;
 
-    void onNewClient(Async::SocketAccept::Result& result);
-    void onReceive(Async::SocketReceive::Result& result);
-    void onAfterSend(Async::SocketSend::Result& result);
+    void onNewClient(AsyncSocketAccept::Result& result);
+    void onReceive(AsyncSocketReceive::Result& result);
+    void onAfterSend(AsyncSocketSend::Result& result);
 };
 
 //! @}

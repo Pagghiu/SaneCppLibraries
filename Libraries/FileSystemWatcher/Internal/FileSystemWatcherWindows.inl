@@ -9,14 +9,14 @@
 #include "../../Strings/StringConverter.h"
 #include "../../Threading/Threading.h"
 
-#include "../../Async/Internal/AsyncWindows.h" // Async::WinOverlapped
+#include "../../Async/Internal/AsyncWindows.h" // AsyncWinOverlapped
 
 struct SC::FileSystemWatcher::FolderWatcherInternal
 {
-    Async::WindowsPoll asyncPoll;
-    uint8_t            changesBuffer[FolderWatcherSizes::MaxChangesBufferSize];
-    FolderWatcher*     parentEntry = nullptr; // We could in theory use SC_COMPILER_FIELD_OFFSET somehow to obtain it...
-    FileDescriptor     fileHandle;
+    AsyncWindowsPoll asyncPoll;
+    uint8_t          changesBuffer[FolderWatcherSizes::MaxChangesBufferSize];
+    FolderWatcher*   parentEntry = nullptr; // We could in theory use SC_COMPILER_FIELD_OFFSET somehow to obtain it...
+    FileDescriptor   fileHandle;
 
     OVERLAPPED& getOverlapped() { return asyncPoll.getOverlappedOpaque().get().overlapped; }
 };
@@ -207,7 +207,7 @@ struct SC::FileSystemWatcher::Internal
         threadingRunner->shouldStop.exchange(false);
     }
 
-    void onEventLoopNotification(Async::WindowsPoll::Result& result)
+    void onEventLoopNotification(AsyncWindowsPoll::Result& result)
     {
         FolderWatcherInternal& fwi = SC_COMPILER_FIELD_OFFSET(FolderWatcherInternal, asyncPoll, result.async);
         SC_ASSERT_DEBUG(fwi.fileHandle.isValid());
