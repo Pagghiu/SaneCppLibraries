@@ -14,7 +14,7 @@
 #include "Internal/DebuggerWindows.inl"
 #endif
 
-bool SC::Plugin::Definition::find(const StringView text, StringView& extracted)
+bool SC::PluginDefinition::find(const StringView text, StringView& extracted)
 {
     auto       it           = text.getIterator<StringIteratorASCII>();
     const auto beginPluging = ("SC_BEGIN_PLUGIN"_a8).getIterator<StringIteratorASCII>();
@@ -30,7 +30,7 @@ bool SC::Plugin::Definition::find(const StringView text, StringView& extracted)
     return true;
 }
 
-SC::Result SC::Plugin::Definition::getDynamicLibraryAbsolutePath(String& fullDynamicPath) const
+SC::Result SC::PluginDefinition::getDynamicLibraryAbsolutePath(String& fullDynamicPath) const
 {
     SC_TRY(Path::join(fullDynamicPath, {directory.view(), identity.identifier.view()}));
     StringBuilder builder(fullDynamicPath);
@@ -42,7 +42,7 @@ SC::Result SC::Plugin::Definition::getDynamicLibraryAbsolutePath(String& fullDyn
     return Result(true);
 }
 
-SC::Result SC::Plugin::Definition::getDynamicLibraryPDBAbsolutePath(String& fullDynamicPath) const
+SC::Result SC::PluginDefinition::getDynamicLibraryPDBAbsolutePath(String& fullDynamicPath) const
 {
     SC_TRY(Path::join(fullDynamicPath, {directory.view(), identity.identifier.view()}));
     StringBuilder builder(fullDynamicPath);
@@ -54,7 +54,7 @@ SC::Result SC::Plugin::Definition::getDynamicLibraryPDBAbsolutePath(String& full
     return Result(true);
 }
 
-bool SC::Plugin::Definition::parse(StringView text, Definition& pluginDefinition)
+bool SC::PluginDefinition::parse(StringView text, PluginDefinition& pluginDefinition)
 {
     auto       it = text.getIterator<StringIteratorASCII>();
     StringView key, value;
@@ -98,7 +98,7 @@ bool SC::Plugin::Definition::parse(StringView text, Definition& pluginDefinition
     return true;
 }
 
-bool SC::Plugin::Definition::parseLine(StringIteratorASCII& iterator, StringView& key, StringView& value)
+bool SC::PluginDefinition::parseLine(StringIteratorASCII& iterator, StringView& key, StringView& value)
 {
     constexpr StringIteratorSkipTable skipTable({'\t', '\n', '\r', ' ', '/', ':'});
 
@@ -150,7 +150,7 @@ bool SC::Plugin::Definition::parseLine(StringIteratorASCII& iterator, StringView
     return value.sizeInBytes() > 0;
 }
 
-SC::Result SC::Plugin::Scanner::scanDirectory(const StringView directory, Vector<Definition>& definitions)
+SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Vector<PluginDefinition>& definitions)
 {
     FileSystemIterator fsIterator;
     fsIterator.options.recursive = false; // Manually recurse only first level dirs
@@ -158,10 +158,10 @@ SC::Result SC::Plugin::Scanner::scanDirectory(const StringView directory, Vector
     FileSystem fs;
     SC_TRY(fs.init(directory));
     bool multiplePluginDefinitions = false;
-    // Iterate each directory at first level and tentatively build a Plugin Definition.
-    // A plugin will be valid if only a single Plugin Definition will be parsed.
+    // Iterate each directory at first level and tentatively build a Plugin PluginDefinition.
+    // A plugin will be valid if only a single Plugin PluginDefinition will be parsed.
     // Both no plugin definition (identity.identifier.isEmpty()) and multiple
-    // contradictory plugin definitions (multiplePluginDefinitions) will prevent creation of the Plugin Definition
+    // contradictory plugin definitions (multiplePluginDefinitions) will prevent creation of the Plugin PluginDefinition
     String file;
     while (fsIterator.enumerateNext())
     {
@@ -184,17 +184,17 @@ SC::Result SC::Plugin::Scanner::scanDirectory(const StringView directory, Vector
             {
                 continue;
             }
-            Definition& pluginDefinition = definitions.back();
+            PluginDefinition& pluginDefinition = definitions.back();
             {
-                File pluginFile;
+                PluginFile pluginFile;
                 SC_TRY(pluginFile.absolutePath.assign(item.path));
                 SC_TRY(pluginDefinition.files.push_back(move(pluginFile)));
             }
             SC_TRY(fs.read(item.path, file, StringEncoding::Ascii));
             StringView extracted;
-            if (Definition::find(file.view(), extracted))
+            if (PluginDefinition::find(file.view(), extracted))
             {
-                if (Definition::parse(extracted, pluginDefinition))
+                if (PluginDefinition::parse(extracted, pluginDefinition))
                 {
                     if (pluginDefinition.identity.identifier.isEmpty())
                     {
@@ -222,7 +222,7 @@ SC::Result SC::Plugin::Scanner::scanDirectory(const StringView directory, Vector
     return fsIterator.checkErrors();
 }
 
-SC::Result SC::Plugin::Compiler::findBestCompiler(Compiler& compiler)
+SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
 {
 #if SC_PLATFORM_WINDOWS
     compiler.type               = Type::MicrosoftCompiler;
@@ -277,7 +277,7 @@ SC::Result SC::Plugin::Compiler::findBestCompiler(Compiler& compiler)
     }
     if (not found)
     {
-        return Result::Error("Visual Studio Compiler not found");
+        return Result::Error("Visual Studio PluginCompiler not found");
     }
 #else
     compiler.type         = Type::ClangCompiler;
@@ -287,7 +287,7 @@ SC::Result SC::Plugin::Compiler::findBestCompiler(Compiler& compiler)
     return Result(true);
 }
 
-SC::Result SC::Plugin::Compiler::compileFile(StringView sourceFile, StringView objectFile) const
+SC::Result SC::PluginCompiler::compileFile(StringView sourceFile, StringView objectFile) const
 {
     Process process;
 
@@ -315,7 +315,7 @@ SC::Result SC::Plugin::Compiler::compileFile(StringView sourceFile, StringView o
     return Result(process.exitStatus.status == 0);
 }
 
-SC::Result SC::Plugin::Compiler::compile(const Definition& plugin) const
+SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin) const
 {
     // TODO: Spawn parallel tasks
     for (auto& file : plugin.files)
@@ -331,7 +331,7 @@ SC::Result SC::Plugin::Compiler::compile(const Definition& plugin) const
     return Result(true);
 }
 
-SC::Result SC::Plugin::Compiler::link(const Definition& definition, StringView executablePath) const
+SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, StringView executablePath) const
 {
     Process process;
     String  destFile = StringEncoding::Native;
@@ -390,7 +390,7 @@ SC::Result SC::Plugin::Compiler::link(const Definition& definition, StringView e
     return Result(process.exitStatus.status == 0);
 }
 
-SC::Result SC::Plugin::DynamicLibrary::unload()
+SC::Result SC::PluginDynamicLibrary::unload()
 {
     SC_TRY(dynamicLibrary.close());
 #if SC_PLATFORM_WINDOWS
@@ -409,7 +409,7 @@ SC::Result SC::Plugin::DynamicLibrary::unload()
     return Result(true);
 }
 
-SC::Result SC::Plugin::DynamicLibrary::load(const Compiler& compiler, StringView executablePath)
+SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, StringView executablePath)
 {
     SC_TRY_MSG(not dynamicLibrary.isValid(), "Dynamic Library must be unloaded first");
     SC_TRY(compiler.compile(definition));
@@ -431,11 +431,11 @@ SC::Result SC::Plugin::DynamicLibrary::load(const Compiler& compiler, StringView
     return Result(true);
 }
 
-SC::Result SC::Plugin::Registry::init(Vector<Definition>&& definitions)
+SC::Result SC::PluginRegistry::init(Vector<PluginDefinition>&& definitions)
 {
     for (auto& definition : definitions)
     {
-        DynamicLibrary pdl;
+        PluginDynamicLibrary pdl;
         pdl.definition = move(definition);
         SC_TRY(libraries.insertIfNotExists({pdl.definition.identity.identifier, move(pdl)}));
     }
@@ -443,18 +443,18 @@ SC::Result SC::Plugin::Registry::init(Vector<Definition>&& definitions)
     return Result(true);
 }
 
-const SC::Plugin::DynamicLibrary* SC::Plugin::Registry::findPlugin(const StringView identifier)
+const SC::PluginDynamicLibrary* SC::PluginRegistry::findPlugin(const StringView identifier)
 {
     auto result = libraries.get(identifier);
     return result ? result : nullptr;
 }
 
-SC::Result SC::Plugin::Registry::loadPlugin(const StringView identifier, const Compiler& compiler,
-                                            StringView executablePath, LoadMode loadMode)
+SC::Result SC::PluginRegistry::loadPlugin(const StringView identifier, const PluginCompiler& compiler,
+                                          StringView executablePath, LoadMode loadMode)
 {
-    DynamicLibrary* res = libraries.get(identifier);
+    PluginDynamicLibrary* res = libraries.get(identifier);
     SC_TRY(res != nullptr);
-    DynamicLibrary& lib = *res;
+    PluginDynamicLibrary& lib = *res;
     if (loadMode == LoadMode::Reload or not lib.dynamicLibrary.isValid())
     {
         // TODO: Shield against circular dependencies
@@ -473,11 +473,11 @@ SC::Result SC::Plugin::Registry::loadPlugin(const StringView identifier, const C
     return Result(true);
 }
 
-SC::Result SC::Plugin::Registry::unloadPlugin(const StringView identifier)
+SC::Result SC::PluginRegistry::unloadPlugin(const StringView identifier)
 {
-    DynamicLibrary* res = libraries.get(identifier);
+    PluginDynamicLibrary* res = libraries.get(identifier);
     SC_TRY(res != nullptr);
-    DynamicLibrary& lib = *res;
+    PluginDynamicLibrary& lib = *res;
     if (lib.dynamicLibrary.isValid())
     {
         for (const auto& kv : libraries.getItems())
@@ -495,12 +495,12 @@ SC::Result SC::Plugin::Registry::unloadPlugin(const StringView identifier)
     return lib.unload();
 }
 
-SC::Result SC::Plugin::Registry::removeAllBuildProducts(const StringView identifier)
+SC::Result SC::PluginRegistry::removeAllBuildProducts(const StringView identifier)
 {
-    DynamicLibrary* res = libraries.get(identifier);
+    PluginDynamicLibrary* res = libraries.get(identifier);
     SC_TRY(res != nullptr);
-    DynamicLibrary& lib = *res;
-    FileSystem      fs;
+    PluginDynamicLibrary& lib = *res;
+    FileSystem            fs;
     SC_TRY(fs.init(lib.definition.directory.view()));
     StringNative<255> buffer;
     StringBuilder     fmt(buffer);
