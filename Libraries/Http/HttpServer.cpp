@@ -1,12 +1,12 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "HttpServerAsync.h"
+#include "HttpServer.h"
 #include "../Strings/SmallString.h"
 #include "../Strings/StringBuilder.h"
 
-// Http::ServerBase::Request
-bool SC::Http::ServerBase::Request::find(Http::Parser::Result result, StringView& res) const
+// HttpServerBase::Request
+bool SC::HttpServerBase::Request::find(HttpParser::Result result, StringView& res) const
 {
     size_t found;
     if (headerOffsets.find([result](const auto& it) { return it.result == result; }, &found))
@@ -18,8 +18,8 @@ bool SC::Http::ServerBase::Request::find(Http::Parser::Result result, StringView
     return false;
 }
 
-// Http::ServerBase::Response
-SC::Result SC::Http::ServerBase::Response::startResponse(int code)
+// HttpServerBase::Response
+SC::Result SC::HttpServerBase::Response::startResponse(int code)
 {
     StringBuilder sb(outputBuffer, StringEncoding::Ascii, StringBuilder::Clear);
     SC_TRY(sb.format("HTTP/1.1 "));
@@ -29,11 +29,11 @@ SC::Result SC::Http::ServerBase::Response::startResponse(int code)
     case 404: SC_TRY(sb.append("{} Not Found\r\n", code)); break;
     case 405: SC_TRY(sb.append("{} Not Allowed\r\n", code)); break;
     }
-    ended = false;
+    responseEnded = false;
     return Result(true);
 }
 
-SC::Result SC::Http::ServerBase::Response::addHeader(StringView headerName, StringView headerValue)
+SC::Result SC::HttpServerBase::Response::addHeader(StringView headerName, StringView headerValue)
 {
     StringBuilder sb(outputBuffer, StringEncoding::Ascii);
     SC_TRY(sb.append(headerName));
@@ -43,18 +43,18 @@ SC::Result SC::Http::ServerBase::Response::addHeader(StringView headerName, Stri
     return Result(true);
 }
 
-SC::Result SC::Http::ServerBase::Response::end(StringView sv)
+SC::Result SC::HttpServerBase::Response::end(StringView sv)
 {
     StringBuilder sb(outputBuffer, StringEncoding::Ascii);
     SC_TRY(sb.append("Content-Length: {}\r\n\r\n", sv.sizeInBytes()));
     SC_TRY(sb.append(sv));
-    ended = true;
+    responseEnded = true;
     return Result(outputBuffer.pop_back()); // pop null terminator
 }
 
-// Http::Server
+// HttpServer
 
-SC::Result SC::Http::ServerBase::parse(Span<const char> readData, ClientChannel& client)
+SC::Result SC::HttpServerBase::parse(Span<const char> readData, ClientChannel& client)
 {
     bool& parsedSuccessfully = client.request.parsedSuccessfully;
     if (client.request.headerBuffer.size() > maxHeaderSize)
@@ -66,23 +66,23 @@ SC::Result SC::Http::ServerBase::parse(Span<const char> readData, ClientChannel&
     size_t readBytes;
     while (client.request.parsedSuccessfully and not readData.empty())
     {
-        Http::Parser&    parser = client.request.parser;
+        HttpParser&      parser = client.request.parser;
         Span<const char> parsedData;
         parsedSuccessfully &= parser.parse(readData, readBytes, parsedData);
         parsedSuccessfully &= readData.sliceStart(readBytes, readData);
-        if (parser.state == Http::Parser::State::Finished)
+        if (parser.state == HttpParser::State::Finished)
             break;
-        if (parser.state == Http::Parser::State::Result)
+        if (parser.state == HttpParser::State::Result)
         {
             Header header;
             header.result = parser.result;
             header.start  = static_cast<uint32_t>(parser.tokenStart);
             header.length = static_cast<uint32_t>(parser.tokenLength);
             parsedSuccessfully &= client.request.headerOffsets.push_back(header);
-            if (parser.result == Http::Parser::Result::HeadersEnd)
+            if (parser.result == HttpParser::Result::HeadersEnd)
             {
                 client.request.headersEndReceived = true;
-                SC_TRY(client.request.find(Http::Parser::Result::Url, client.request.url));
+                SC_TRY(client.request.find(HttpParser::Result::Url, client.request.url));
                 onClient(client);
                 break;
             }
@@ -91,9 +91,9 @@ SC::Result SC::Http::ServerBase::parse(Span<const char> readData, ClientChannel&
     return Result(parsedSuccessfully);
 }
 
-// Http::ServerAsync
-SC::Result SC::Http::ServerAsync::start(Async::EventLoop& eventLoop, uint32_t maxConnections, StringView address,
-                                        uint16_t port)
+// HttpServer
+SC::Result SC::HttpServer::start(Async::EventLoop& eventLoop, uint32_t maxConnections, StringView address,
+                                 uint16_t port)
 {
     SC_TRY(requestClients.resize(maxConnections));
     SC_TRY(requests.resize(maxConnections));
@@ -101,14 +101,14 @@ SC::Result SC::Http::ServerAsync::start(Async::EventLoop& eventLoop, uint32_t ma
     SC_TRY(nativeAddress.fromAddressPort(address, port));
     SC_TRY(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
     SC_TRY(SocketServer(serverSocket).listen(nativeAddress));
-    asyncAccept.setDebugName("Http::ServerAsync");
-    asyncAccept.callback.bind<Http::ServerAsync, &Http::ServerAsync::onNewClient>(*this);
+    asyncAccept.setDebugName("HttpServer");
+    asyncAccept.callback.bind<HttpServer, &HttpServer::onNewClient>(*this);
     return asyncAccept.start(eventLoop, serverSocket);
 }
 
-SC::Result SC::Http::ServerAsync::stop() { return asyncAccept.stop(); }
+SC::Result SC::HttpServer::stop() { return asyncAccept.stop(); }
 
-void SC::Http::ServerAsync::onNewClient(Async::SocketAccept::Result& result)
+void SC::HttpServer::onNewClient(Async::SocketAccept::Result& result)
 {
     SocketDescriptor acceptedClient;
     if (not result.moveTo(acceptedClient))
@@ -133,14 +133,14 @@ void SC::Http::ServerAsync::onNewClient(Async::SocketAccept::Result& result)
         auto& buffer = req.request.headerBuffer;
         succeeded &= buffer.resizeWithoutInitializing(buffer.capacity());
         client.asyncReceive.setDebugName(client.debugName.bytesIncludingTerminator());
-        client.asyncReceive.callback.bind<Http::ServerAsync, &Http::ServerAsync::onReceive>(*this);
+        client.asyncReceive.callback.bind<HttpServer, &HttpServer::onReceive>(*this);
         succeeded &= client.asyncReceive.start(*asyncAccept.getEventLoop(), client.socket, buffer.toSpan());
         SC_ASSERT_RELEASE(succeeded);
     }
     result.reactivateRequest(true);
 }
 
-void SC::Http::ServerAsync::onReceive(Async::SocketReceive::Result& result)
+void SC::HttpServer::onReceive(Async::SocketReceive::Result& result)
 {
     SC_COMPILER_WARNING_PUSH_OFFSETOF
     RequestClient& requestClient = SC_COMPILER_FIELD_OFFSET(RequestClient, asyncReceive, result.async);
@@ -153,7 +153,7 @@ void SC::Http::ServerAsync::onReceive(Async::SocketReceive::Result& result)
         // TODO: Invoke on error
         return;
     }
-    if (not Http::ServerBase::parse(readData, client))
+    if (not HttpServerBase::parse(readData, client))
     {
         // TODO: Invoke on error
         return;
@@ -163,7 +163,7 @@ void SC::Http::ServerAsync::onReceive(Async::SocketReceive::Result& result)
         requestClient.asyncSend.setDebugName(requestClient.debugName.bytesIncludingTerminator());
 
         auto outspan = client.response.outputBuffer.toSpan();
-        requestClient.asyncSend.callback.bind<Http::ServerAsync, &Http::ServerAsync::onAfterSend>(*this);
+        requestClient.asyncSend.callback.bind<HttpServer, &HttpServer::onAfterSend>(*this);
         auto res = requestClient.asyncSend.start(*asyncAccept.getEventLoop(), requestClient.socket, outspan);
         if (not res)
         {
@@ -177,7 +177,7 @@ void SC::Http::ServerAsync::onReceive(Async::SocketReceive::Result& result)
     }
 }
 
-void SC::Http::ServerAsync::onAfterSend(Async::SocketSend::Result& result)
+void SC::HttpServer::onAfterSend(Async::SocketSend::Result& result)
 {
     if (result.isValid())
     {

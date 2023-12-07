@@ -14,7 +14,7 @@ struct SC::HttpURLParserTest : public SC::TestCase
     {
         if (test_section("full"))
         {
-            Http::URLParser urlParser;
+            HttpURLParser urlParser;
             SC_TEST_EXPECT(urlParser.parse("http://user:pass@site.com:80/pa/th?q=val#hash"));
 
             SC_TEST_EXPECT(urlParser.protocol == "http");
@@ -30,7 +30,7 @@ struct SC::HttpURLParserTest : public SC::TestCase
         }
         if (test_section("mini"))
         {
-            Http::URLParser urlParser;
+            HttpURLParser urlParser;
             SC_TEST_EXPECT(urlParser.parse("http://site.com"));
 
             SC_TEST_EXPECT(urlParser.protocol == "http");
@@ -46,7 +46,7 @@ struct SC::HttpURLParserTest : public SC::TestCase
         }
         if (test_section("invalid"))
         {
-            Http::URLParser urlParser;
+            HttpURLParser urlParser;
             SC_TEST_EXPECT(not urlParser.parse("http:/site.com"));           // missing double //
             SC_TEST_EXPECT(not urlParser.parse("http.//site.com"));          // wrong . instead of :
             SC_TEST_EXPECT(not urlParser.parse("http//site.com"));           // missing :

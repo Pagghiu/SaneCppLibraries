@@ -8,10 +8,7 @@
 namespace SC
 {
 /// @brief HTTP parser, client and server (see @ref library_http)
-namespace Http
-{
-struct ClientAsync;
-}
+struct HttpClient;
 } // namespace SC
 
 //! @defgroup group_http Http
@@ -21,7 +18,7 @@ struct ClientAsync;
 //! @{
 
 /// @brief Http async client
-struct SC::Http::ClientAsync
+struct SC::HttpClient
 {
     /// @brief Setups this client to execute a `GET` request on the given url
     /// @param loop The Async::EventLoop to use for monitoring network packets
@@ -29,7 +26,7 @@ struct SC::Http::ClientAsync
     /// @return Valid Result if dns resolution and creation of underlying client tcp socket succeeded
     [[nodiscard]] Result get(Async::EventLoop& loop, StringView url);
 
-    Delegate<Http::ClientAsync&> callback; ///< The callback that is called after `GET` operation succeeded
+    Delegate<HttpClient&> callback; ///< The callback that is called after `GET` operation succeeded
 
     /// @brief Get the response StringView sent by the server
     [[nodiscard]] StringView getResponse() const;

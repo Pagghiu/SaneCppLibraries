@@ -11,9 +11,9 @@ struct HttpParserTest;
 
 struct SC::HttpParserTest : public SC::TestCase
 {
-    void testRequest(Http::Parser& parser, const StringView originalString, const StringView expectedMethodView)
+    void testRequest(HttpParser& parser, const StringView originalString, const StringView expectedMethodView)
     {
-        parser.type = Http::Parser::Type::Request;
+        parser.type = HttpParser::Type::Request;
         // Test the streaming parser sending a single character at time
         size_t position  = 0;
         size_t readBytes = 0;
@@ -29,105 +29,105 @@ struct SC::HttpParserTest : public SC::TestCase
             Span<const char> parsedData;
             SC_TEST_EXPECT(parser.parse(sv.toCharSpan(), readBytes, parsedData));
             position += readBytes;
-            if (parser.state == Http::Parser::State::Finished)
+            if (parser.state == HttpParser::State::Finished)
                 break;
             SC_TEST_EXPECT(currentField.append(parsedData));
-            if (parser.state == Http::Parser::State::Result)
+            if (parser.state == HttpParser::State::Result)
             {
                 const StringView parsed(currentField.toSpan(), false, StringEncoding::Ascii);
                 switch (parser.result)
                 {
-                case Http::Parser::Result::Method: {
+                case HttpParser::Result::Method: {
                     SC_TEST_EXPECT(parsed == expectedMethodView);
                     break;
                 }
-                case Http::Parser::Result::Url: {
+                case HttpParser::Result::Url: {
                     SC_TEST_EXPECT(parsed == "/asd");
                     break;
                 }
-                case Http::Parser::Result::Version: {
+                case HttpParser::Result::Version: {
                     SC_TEST_EXPECT(parsed == "HTTP/1.1");
                     break;
                 }
-                case Http::Parser::Result::HeaderName: {
-                    switch (numMatches[static_cast<int>(Http::Parser::Result::HeaderName)])
+                case HttpParser::Result::HeaderName: {
+                    switch (numMatches[static_cast<int>(HttpParser::Result::HeaderName)])
                     {
                     case 0: SC_TEST_EXPECT(parsed == "User-agent"); break;
                     case 1: SC_TEST_EXPECT(parsed == "Host"); break;
                     }
                     break;
                 }
-                case Http::Parser::Result::HeaderValue: {
-                    switch (numMatches[static_cast<int>(Http::Parser::Result::HeaderValue)])
+                case HttpParser::Result::HeaderValue: {
+                    switch (numMatches[static_cast<int>(HttpParser::Result::HeaderValue)])
                     {
                     case 0: SC_TEST_EXPECT(parsed == "Mozilla/1.1"); break;
                     case 1: SC_TEST_EXPECT(parsed == "github.com"); break;
                     }
                     break;
                 }
-                case Http::Parser::Result::HeadersEnd: break;
-                case Http::Parser::Result::StatusCode: break;
-                case Http::Parser::Result::StatusString: break;
-                case Http::Parser::Result::Body: break;
+                case HttpParser::Result::HeadersEnd: break;
+                case HttpParser::Result::StatusCode: break;
+                case HttpParser::Result::StatusString: break;
+                case HttpParser::Result::Body: break;
                 }
                 numMatches[static_cast<int>(parser.result)]++;
                 currentField.clear();
             }
         }
-        SC_TEST_EXPECT(parser.state == Http::Parser::State::Finished);
+        SC_TEST_EXPECT(parser.state == HttpParser::State::Finished);
 
-        SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::Method)] == 1);
-        SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::Url)] == 1);
-        SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::Version)] == 1);
-        SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::HeaderName)] == 2);
-        SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::HeaderValue)] == 2);
-        SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::HeadersEnd)] == 1);
-        SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::StatusCode)] == 0);
-        SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::StatusString)] == 0);
-        SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::Body)] == 0);
+        SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::Method)] == 1);
+        SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::Url)] == 1);
+        SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::Version)] == 1);
+        SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::HeaderName)] == 2);
+        SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::HeaderValue)] == 2);
+        SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::HeadersEnd)] == 1);
+        SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::StatusCode)] == 0);
+        SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::StatusString)] == 0);
+        SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::Body)] == 0);
     }
     HttpParserTest(SC::TestReport& report) : TestCase(report, "HttpParserTest")
     {
         if (test_section("request GET"))
         {
-            Http::Parser parser;
-            parser.method = Http::Parser::Method::HttpPUT;
+            HttpParser parser;
+            parser.method = HttpParser::Method::HttpPUT;
             testRequest(parser,
                         "GET /asd HTTP/1.1\r\n"
                         "User-agent: Mozilla/1.1\r\n"
                         "Host:   github.com\r\n"
                         "\r\n",
                         "GET");
-            SC_TEST_EXPECT(parser.method == Http::Parser::Method::HttpGET);
+            SC_TEST_EXPECT(parser.method == HttpParser::Method::HttpGET);
         }
         if (test_section("request POST"))
         {
-            Http::Parser parser;
-            parser.method = Http::Parser::Method::HttpPUT;
+            HttpParser parser;
+            parser.method = HttpParser::Method::HttpPUT;
             testRequest(parser,
                         "POST /asd HTTP/1.1\r\n"
                         "User-agent: Mozilla/1.1\r\n"
                         "Host:   github.com\r\n"
                         "\r\n",
                         "POST");
-            SC_TEST_EXPECT(parser.method == Http::Parser::Method::HttpPOST);
+            SC_TEST_EXPECT(parser.method == HttpParser::Method::HttpPOST);
         }
         if (test_section("request PUT"))
         {
-            Http::Parser parser;
-            parser.method = Http::Parser::Method::HttpPOST;
+            HttpParser parser;
+            parser.method = HttpParser::Method::HttpPOST;
             testRequest(parser,
                         "PUT /asd HTTP/1.1\r\n"
                         "User-agent: Mozilla/1.1\r\n"
                         "Host:   github.com\r\n"
                         "\r\n",
                         "PUT");
-            SC_TEST_EXPECT(parser.method == Http::Parser::Method::HttpPUT);
+            SC_TEST_EXPECT(parser.method == HttpParser::Method::HttpPUT);
         }
         if (test_section("response"))
         {
-            Http::Parser parser;
-            parser.type = Http::Parser::Type::Response;
+            HttpParser parser;
+            parser.type = HttpParser::Type::Response;
 
             const StringView originalString = "HTTP/1.1   200   OK\r\n"
                                               "Server: nginx/1.2.1\r\n"
@@ -153,40 +153,40 @@ struct SC::HttpParserTest : public SC::TestCase
                 SC_TEST_EXPECT(parser.parse(sv.toCharSpan(), readBytes, parsedData));
                 SC_TEST_EXPECT(currentField.append(parsedData));
                 position += readBytes;
-                if (parser.state == Http::Parser::State::Finished)
+                if (parser.state == HttpParser::State::Finished)
                     break;
-                if (parser.state == Http::Parser::State::Result)
+                if (parser.state == HttpParser::State::Result)
                 {
                     const StringView parsed(currentField.toSpan(), false, StringEncoding::Ascii);
                     switch (parser.result)
                     {
-                    case Http::Parser::Result::Method: break;
-                    case Http::Parser::Result::Url: break;
+                    case HttpParser::Result::Method: break;
+                    case HttpParser::Result::Url: break;
 
-                    case Http::Parser::Result::Version: {
+                    case HttpParser::Result::Version: {
                         SC_TEST_EXPECT(parsed == "HTTP/1.1");
                         break;
                     }
-                    case Http::Parser::Result::HeaderName: {
-                        switch (numMatches[static_cast<int>(Http::Parser::Result::HeaderName)])
+                    case HttpParser::Result::HeaderName: {
+                        switch (numMatches[static_cast<int>(HttpParser::Result::HeaderName)])
                         {
                         case 0: SC_TEST_EXPECT(parsed == "Server"); break;
                         case 1: SC_TEST_EXPECT(parsed == "Content-Type"); break;
                         case 2: SC_TEST_EXPECT(parsed == "Content-Length"); break;
                         case 3: SC_TEST_EXPECT(parsed == "Connection"); break;
                         }
-                        if (numMatches[static_cast<int>(Http::Parser::Result::HeaderName)] == 2)
+                        if (numMatches[static_cast<int>(HttpParser::Result::HeaderName)] == 2)
                         {
-                            SC_TEST_EXPECT(parser.matchesHeader(Http::Parser::HeaderType::ContentLength));
+                            SC_TEST_EXPECT(parser.matchesHeader(HttpParser::HeaderType::ContentLength));
                         }
                         else
                         {
-                            SC_TEST_EXPECT(not parser.matchesHeader(Http::Parser::HeaderType::ContentLength));
+                            SC_TEST_EXPECT(not parser.matchesHeader(HttpParser::HeaderType::ContentLength));
                         }
                         break;
                     }
-                    case Http::Parser::Result::HeaderValue: {
-                        switch (numMatches[static_cast<int>(Http::Parser::Result::HeaderValue)])
+                    case HttpParser::Result::HeaderValue: {
+                        switch (numMatches[static_cast<int>(HttpParser::Result::HeaderValue)])
                         {
                         case 0: SC_TEST_EXPECT(parsed == "nginx/1.2.1"); break;
                         case 1: SC_TEST_EXPECT(parsed == "text/html"); break;
@@ -195,16 +195,16 @@ struct SC::HttpParserTest : public SC::TestCase
                         }
                         break;
                     }
-                    case Http::Parser::Result::HeadersEnd: break;
-                    case Http::Parser::Result::StatusCode: {
+                    case HttpParser::Result::HeadersEnd: break;
+                    case HttpParser::Result::StatusCode: {
                         SC_TEST_EXPECT(parsed == "200");
                         break;
                     }
-                    case Http::Parser::Result::StatusString: {
+                    case HttpParser::Result::StatusString: {
                         SC_TEST_EXPECT(parsed == "OK");
                         break;
                     }
-                    case Http::Parser::Result::Body: {
+                    case HttpParser::Result::Body: {
                         SC_TEST_EXPECT(parsed == "<html />");
                         break;
                     }
@@ -213,19 +213,19 @@ struct SC::HttpParserTest : public SC::TestCase
                     currentField.clear();
                 }
             }
-            SC_TEST_EXPECT(parser.state == Http::Parser::State::Finished);
+            SC_TEST_EXPECT(parser.state == HttpParser::State::Finished);
             SC_TEST_EXPECT(parser.statusCode == 200);
             SC_TEST_EXPECT(parser.contentLength == 8);
 
-            SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::Method)] == 0);
-            SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::Url)] == 0);
-            SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::StatusCode)] == 1);
-            SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::StatusString)] == 1);
-            SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::Version)] == 1);
-            SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::HeaderName)] == 4);
-            SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::HeaderValue)] == 4);
-            SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::HeadersEnd)] == 1);
-            SC_TEST_EXPECT(numMatches[static_cast<int>(Http::Parser::Result::Body)] == 1);
+            SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::Method)] == 0);
+            SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::Url)] == 0);
+            SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::StatusCode)] == 1);
+            SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::StatusString)] == 1);
+            SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::Version)] == 1);
+            SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::HeaderName)] == 4);
+            SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::HeaderValue)] == 4);
+            SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::HeadersEnd)] == 1);
+            SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Result::Body)] == 1);
         }
     }
 };

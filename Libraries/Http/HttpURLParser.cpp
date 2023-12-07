@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "HttpURLParser.h"
 
-SC::Result SC::Http::URLParser::parse(StringView url)
+SC::Result SC::HttpURLParser::parse(StringView url)
 {
     StringIteratorASCII it = url.getIterator<StringIteratorASCII>();
 
@@ -36,7 +36,7 @@ SC::Result SC::Http::URLParser::parse(StringView url)
     return Result(true);
 }
 
-SC::Result SC::Http::URLParser::parsePath()
+SC::Result SC::HttpURLParser::parsePath()
 {
     StringIteratorASCII it = path.getIterator<StringIteratorASCII>();
     if (it.advanceUntilMatches('?'))
@@ -51,7 +51,7 @@ SC::Result SC::Http::URLParser::parsePath()
     return validatePath();
 }
 
-SC::Result SC::Http::URLParser::parseHost()
+SC::Result SC::HttpURLParser::parseHost()
 {
     StringIteratorASCII it = host.getIterator<StringIteratorASCII>();
 
@@ -87,7 +87,7 @@ SC::Result SC::Http::URLParser::parseHost()
     return validateHost();
 }
 
-SC::Result SC::Http::URLParser::validateProtocol()
+SC::Result SC::HttpURLParser::validateProtocol()
 {
     // TODO: Expand supported protocols
     if (protocol == "http")
@@ -104,19 +104,19 @@ SC::Result SC::Http::URLParser::validateProtocol()
     return Result(false);
 }
 
-SC::Result SC::Http::URLParser::validatePath()
+SC::Result SC::HttpURLParser::validatePath()
 {
     // TODO: Improve validatePath
     return Result(not pathname.containsChar(' '));
 }
 
-SC::Result SC::Http::URLParser::validateHost()
+SC::Result SC::HttpURLParser::validateHost()
 {
     // TODO: Improve validateHost
     return Result(not host.isEmpty() and (host.containsChar('.') or hostname == "localhost"));
 }
 
-SC::Result SC::Http::URLParser::parseUserPassword(StringView userPassowrd)
+SC::Result SC::HttpURLParser::parseUserPassword(StringView userPassowrd)
 {
     StringViewTokenizer tokenizer(userPassowrd);
     SC_TRY(tokenizer.tokenizeNext({':'}, StringViewTokenizer::Options::SkipEmpty));

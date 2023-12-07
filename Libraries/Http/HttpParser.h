@@ -7,17 +7,14 @@
 
 namespace SC
 {
-namespace Http
-{
-struct Parser;
-}
+struct HttpParser;
 } // namespace SC
 
 //! @addtogroup group_http
 //! @{
 
 /// @brief Incremental HTTP request or response parser
-struct SC::Http::Parser
+struct SC::HttpParser
 {
     /// @brief Method of the current request / response
     enum class Method
@@ -107,7 +104,7 @@ struct SC::Http::Parser
     template <bool spaces>
     [[nodiscard]] bool parseVersion(char currentChar);
 
-    template <bool (Http::Parser::*Func)(char), Result currentResult>
+    template <bool (HttpParser::*Func)(char), Result currentResult>
     [[nodiscard]] SC::Result process(Span<const char>& data, size_t& readBytes, Span<const char>& parsedData);
 };
 

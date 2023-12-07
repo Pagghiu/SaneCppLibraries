@@ -1,7 +1,7 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../HttpClientAsync.h"
+#include "../HttpClient.h"
 #include "../../Socket/SocketDescriptor.h"
 #include "../../Testing/Testing.h"
 

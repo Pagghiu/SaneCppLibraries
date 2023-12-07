@@ -13,28 +13,24 @@
 
 namespace SC
 {
-namespace Http
-{
-struct ServerBase;
-struct ServerAsync;
-} // namespace Http
+struct HttpServerBase;
+struct HttpServer;
 } // namespace SC
 
 //! @addtogroup group_http
 //! @{
 
 /// @brief Http server common logic
-struct SC::Http::ServerBase
+struct SC::HttpServerBase
 {
     /// @brief Http header
     struct Header
     {
-        Http::Parser::Result result = Http::Parser::Result::Method;
+        HttpParser::Result result = HttpParser::Result::Method;
 
         uint32_t start  = 0;
         uint32_t length = 0;
     };
-    struct ClientChannel;
 
     /// @brief Http request
     struct Request
@@ -42,30 +38,31 @@ struct SC::Http::ServerBase
         bool headersEndReceived = false; ///< All headers have been received
         bool parsedSuccessfully = true;  ///< Request headers have been parsed successfully
 
-        Http::Parser parser; ///< The parser used to parse headers
-        StringView   url;    ///< The url extracted from parsed headers
+        HttpParser parser; ///< The parser used to parse headers
+        StringView url;    ///< The url extracted from parsed headers
 
         SmallVector<char, 255>  headerBuffer;  ///< Buffer containing all headers
         SmallVector<Header, 16> headerOffsets; ///< Headers, defined as offsets in headerBuffer
 
-        /// @brief Finds a specific Http::Parser::Result in the list of parsed header
+        /// @brief Finds a specific HttpParser::Result in the list of parsed header
         /// @param result The result to look for (Method, Url etc.)
         /// @param res A StringView, pointing at headerBuffer containing the found result
         /// @return `true` if the result has been found
-        [[nodiscard]] bool find(Http::Parser::Result result, StringView& res) const;
+        [[nodiscard]] bool find(HttpParser::Result result, StringView& res) const;
     };
 
     struct Response
     {
-        bool                   ended = false;
         SmallVector<char, 255> outputBuffer;
-        size_t                 highwaterMark = 255;
+
+        bool   responseEnded = false;
+        size_t highwaterMark = 255;
 
         [[nodiscard]] Result startResponse(int code);
         [[nodiscard]] Result addHeader(StringView headerName, StringView headerValue);
-        [[nodiscard]] bool   mustBeFlushed() const { return ended or outputBuffer.size() > highwaterMark; }
-
         [[nodiscard]] Result end(StringView sv);
+
+        [[nodiscard]] bool mustBeFlushed() const { return responseEnded or outputBuffer.size() > highwaterMark; }
     };
 
     uint32_t maxHeaderSize = 8 * 1024;
@@ -82,11 +79,11 @@ struct SC::Http::ServerBase
 };
 
 /// @brief Http server using Async library
-struct SC::Http::ServerAsync : public Http::ServerBase
+struct SC::HttpServer : public HttpServerBase
 {
-    ServerAsync() {}
-    ServerAsync(const ServerAsync&)            = delete;
-    ServerAsync& operator=(const ServerAsync&) = delete;
+    HttpServer() {}
+    HttpServer(const HttpServer&)            = delete;
+    HttpServer& operator=(const HttpServer&) = delete;
 
     /// @brief Starts the http server on the given Async::EventLoop, address and port
     /// @param loop The event loop to be used, where to add the listening socket
