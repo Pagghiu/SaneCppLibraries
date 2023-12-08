@@ -130,25 +130,6 @@ struct SC::ProcessTest : public SC::TestCase
             SC_TEST_EXPECT(output == expectedOutput);
             SC_TEST_EXPECT(not hasError);
         }
-        if (test_section("Process AsyncEventLoop"))
-        {
-            AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
-            Process process;
-#if SC_PLATFORM_APPLE
-            SC_TEST_EXPECT(process.launch("which", "sudo"));
-#else
-            SC_TEST_EXPECT(process.launch("where", "where.exe"));
-#endif
-            ProcessDescriptor::Handle processHandle;
-            SC_TEST_EXPECT(process.handle.get(processHandle, Result::Error("Invalid Handle")));
-            ProcessDescriptor::ExitStatus exitStatus;
-            AsyncProcessExit              async;
-            async.callback = [&](AsyncProcessExit::Result& res) { SC_TEST_EXPECT(res.moveTo(exitStatus)); };
-            SC_TEST_EXPECT(async.start(eventLoop, processHandle));
-            SC_TEST_EXPECT(eventLoop.runOnce());
-            SC_TEST_EXPECT(exitStatus.status == 0);
-        }
     }
 };
 

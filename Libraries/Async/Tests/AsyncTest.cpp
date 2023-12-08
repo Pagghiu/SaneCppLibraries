@@ -4,6 +4,7 @@
 #include "../Async.h"
 #include "../../FileSystem/FileSystem.h"
 #include "../../FileSystem/Path.h"
+#include "../../Process/Process.h"
 #include "../../Strings/String.h"
 #include "../../Testing/Testing.h"
 #include "../../Threading/Threading.h" // EventObject
@@ -21,6 +22,7 @@ struct SC::AsyncTest : public SC::TestCase
         loopWakeUpFromExternalThread();
         loopWakeUp();
         loopWakeUpEventObject();
+        processExit();
         socketAccept();
         socketConnect();
         socketSendReceive();
@@ -174,6 +176,29 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(params.loopRes1);
             SC_TEST_EXPECT(params.observedNotifier1Called == 1);
             SC_TEST_EXPECT(callbackThreadID == Thread::CurrentThreadID());
+        }
+    }
+
+    void processExit()
+    {
+        if (test_section("process exit"))
+        {
+            AsyncEventLoop eventLoop;
+            SC_TEST_EXPECT(eventLoop.create());
+            Process process;
+#if SC_PLATFORM_APPLE
+            SC_TEST_EXPECT(process.launch("which", "sudo"));
+#else
+            SC_TEST_EXPECT(process.launch("where", "where.exe"));
+#endif
+            ProcessDescriptor::Handle processHandle;
+            SC_TEST_EXPECT(process.handle.get(processHandle, Result::Error("Invalid Handle")));
+            ProcessDescriptor::ExitStatus exitStatus;
+            AsyncProcessExit              async;
+            async.callback = [&](AsyncProcessExit::Result& res) { SC_TEST_EXPECT(res.moveTo(exitStatus)); };
+            SC_TEST_EXPECT(async.start(eventLoop, processHandle));
+            SC_TEST_EXPECT(eventLoop.runOnce());
+            SC_TEST_EXPECT(exitStatus.status == 0);
         }
     }
 
@@ -612,4 +637,341 @@ struct SC::AsyncTest : public SC::TestCase
 namespace SC
 {
 void runAsyncTest(SC::TestReport& report) { AsyncTest test(report); }
+} // namespace SC
+
+namespace SC
+{
+// clang-format off
+Result snippetForEventLoop()
+{
+//! [AsyncEventLoopSnippet]
+AsyncEventLoop eventLoop;
+SC_TRY(eventLoop.create()); // Create OS specific queue handles
+// ...
+// Add all needed AsyncRequest
+// ...
+SC_TRY(eventLoop.run());
+// ...
+// Here all AsyncRequest have either finished or have been stopped
+// ...
+SC_TRY(eventLoop.close()); // Free OS specific queue handles
+//! [AsyncEventLoopSnippet]
+return Result(true);
+}
+
+SC::Result snippetForTimeout(AsyncEventLoop& eventLoop, Console& console)
+{
+//! [AsyncLoopTimeoutSnippet]
+// Create a timeout that will be called after 200 milliseconds
+// AsyncLoopTimeout must be valid until callback is called
+AsyncLoopTimeout timeout;
+timeout.callback = [&](AsyncLoopTimeout::Result&)
+{
+    console.print("My timeout has been called!");
+};
+// Start the timeout, that will be called 200 ms from now
+SC_TRY(timeout.start(eventLoop, Time::Milliseconds(200)));
+//! [AsyncLoopTimeoutSnippet]
+SC_TRY(eventLoop.run());
+return Result(true);
+}
+
+SC::Result snippetForWakeUp1(AsyncEventLoop& eventLoop, Console& console)
+{
+//! [AsyncLoopWakeUpSnippet1]
+// Assuming an already created (and running) AsyncEventLoop named eventLoop
+// ...
+// This code runs on some different thread from the one calling SC::AsyncEventLoop::run.
+// The callback is invoked from the thread calling SC::AsyncEventLoop::run
+AsyncLoopWakeUp wakeUp; // Memory lifetime must be valid until callback is called
+wakeUp.callback = [&](AsyncLoopWakeUp::Result&)
+{
+    console.print("My wakeUp has been called!");
+};
+SC_TRY(wakeUp.start(eventLoop));
+//! [AsyncLoopWakeUpSnippet1]
+return Result(true);
+}
+
+SC::Result snippetForWakeUp2(AsyncEventLoop& eventLoop, Console& console)
+{
+//! [AsyncLoopWakeUpSnippet2]
+// Assuming an already created (and running) AsyncEventLoop named eventLoop
+// ...
+// This code runs on some different thread from the one calling SC::AsyncEventLoop::run.
+// The callback is invoked from the thread calling SC::AsyncEventLoop::run
+AsyncLoopWakeUp wakeUpWaiting; // Memory lifetime must be valid until callback is called
+wakeUpWaiting.callback = [&](AsyncLoopWakeUp::Result&)
+{
+    console.print("My wakeUp has been called!");
+};
+EventObject eventObject;
+SC_TRY(wakeUpWaiting.start(eventLoop, &eventObject));
+eventObject.wait(); // Wait until callback has been fully run inside event loop thread
+// From here on we know for sure that callback has been called
+//! [AsyncLoopWakeUpSnippet2]
+return Result(true);
+}
+
+SC::Result snippetForProcess(AsyncEventLoop& eventLoop, Console& console)
+{
+//! [AsyncProcessSnippet]
+// Assuming an already created (and running) AsyncEventLoop named eventLoop
+// ...
+Process process;
+SC_TRY(process.launch("executable", "--parameter"));
+ProcessDescriptor::Handle processHandle;
+SC_TRY(process.handle.get(processHandle, Result::Error("Invalid Handle")));
+AsyncProcessExit processExit; //  Memory lifetime must be valid until callback is called
+processExit.callback = [&](AsyncProcessExit::Result& res)
+{
+    ProcessDescriptor::ExitStatus exitStatus;
+    if(res.moveTo(exitStatus))
+    {
+        console.print("Process Exit status = {}", exitStatus.status);
+    }
+};
+SC_TRY(processExit.start(eventLoop, processHandle));
+//! [AsyncProcessSnippet]
+SC_TRY(eventLoop.run());
+return Result(true);
+}
+
+SC::Result snippetForSocketAccept(AsyncEventLoop& eventLoop, Console& console)
+{
+//! [AsyncSocketAcceptSnippet]
+// Assuming an already created (and running) AsyncEventLoop named eventLoop
+// ...
+// Create a listening socket
+constexpr uint32_t numWaitingConnections = 2;
+SocketDescriptor   serverSocket;
+uint16_t           tcpPort = 5050;
+SocketIPAddress    nativeAddress;
+SC_TRY(nativeAddress.fromAddressPort("127.0.0.1", tcpPort));
+SC_TRY(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
+SC_TRY(SocketServer(serverSocket).listen(nativeAddress, numWaitingConnections));
+// Accept connect for new clients
+AsyncSocketAccept accept;
+accept.callback = [&](AsyncSocketAccept::Result& res)
+{
+    SocketDescriptor client;
+    if(res.moveTo(client))
+    {
+        // ...do something with new client
+        console.printLine("New client connected!");
+        res.reactivateRequest(true); // We want to receive more clients
+    }
+};
+SC_TRY(accept.start(eventLoop, serverSocket));
+// ... at some later point
+// Stop accepting new clients
+SC_TRY(accept.stop());
+//! [AsyncSocketAcceptSnippet]
+SC_TRY(eventLoop.run());
+return Result(true);
+}
+
+SC::Result snippetForSocketConnect(AsyncEventLoop& eventLoop, Console& console)
+{
+//! [AsyncSocketConnectSnippet]
+// Assuming an already created (and running) AsyncEventLoop named eventLoop
+// ...
+SocketIPAddress localHost;
+SC_TRY(localHost.fromAddressPort("127.0.0.1", 5050)); // Connect to some host and port
+AsyncSocketConnect connect;
+SocketDescriptor   client;
+SC_TRY(eventLoop.createAsyncTCPSocket(localHost.getAddressFamily(), client));
+connect.callback = [&](AsyncSocketConnect::Result& res)
+{
+    if (res.isValid())
+    {
+        // Do something with client that is now connected
+        console.printLine("Client connected");
+    }
+};
+SC_TRY(connect.start(eventLoop, client, localHost));
+//! [AsyncSocketConnectSnippet]
+SC_TRY(eventLoop.run());
+return Result(true);
+}
+
+SC::Result snippetForSocketSend(AsyncEventLoop& eventLoop, Console& console)
+{
+SocketDescriptor client;
+//! [AsyncSocketSendSnippet]
+// Assuming an already created (and running) AsyncEventLoop named `eventLoop`
+// and a connected or accepted socket named `client`
+// ...
+const char sendBuffer[] = {123, 111};
+
+// The memory pointed by the span must be valid until callback is called
+Span<const char> sendData = {sendBuffer, sizeof(sendBuffer)};
+
+AsyncSocketSend sendAsync;
+sendAsync.callback = [&](AsyncSocketSend::Result& res)
+{
+    if(res.isValid())
+    {
+        // Now we could free the data pointed by span and queue new data
+        console.printLine("Ready to send more data");
+    }
+};
+
+SC_TRY(sendAsync.start(eventLoop, client, sendData));
+//! [AsyncSocketSendSnippet]
+SC_TRY(eventLoop.run());
+return Result(true);
+}
+
+SC::Result snippetForSocketReceive(AsyncEventLoop& eventLoop, Console& console)
+{
+SocketDescriptor client;
+//! [AsyncSocketReceiveSnippet]
+// Assuming an already created (and running) AsyncEventLoop named `eventLoop`
+// and a connected or accepted socket named `client`
+// ...
+AsyncSocketReceive receiveAsync;
+char receivedData[100] = {0};
+receiveAsync.callback = [&](AsyncSocketReceive::Result& res)
+{
+    Span<char> readData;
+    if(res.moveTo(readData))
+    {
+        // readData now contains a slice of receivedData with the received bytes
+        console.print("{} bytes have been read", readData.sizeInBytes());
+    }
+    // Ask to reactivate the request if we want to receive more data
+    res.reactivateRequest(true);
+};
+SC_TRY(receiveAsync.start(eventLoop, client, {receivedData, sizeof(receivedData)}));
+//! [AsyncSocketReceiveSnippet]
+SC_TRY(eventLoop.run());
+return Result(true);
+}
+
+SC::Result snippetForSocketClose(AsyncEventLoop& eventLoop, Console& console)
+{
+SocketDescriptor client;
+//! [AsyncSocketCloseSnippet]
+// Assuming an already created (and running) AsyncEventLoop named `eventLoop`
+// and a connected or accepted socket named `client`
+// ...
+AsyncSocketClose asyncClose;
+
+asyncClose.callback = [&](AsyncSocketClose::Result& result)
+{
+    if(result.isValid())
+    {
+        console.printLine("Socket was closed successfully");
+    }
+};
+SC_TRY(asyncClose.start(eventLoop, client));
+
+//! [AsyncSocketCloseSnippet]
+SC_TRY(eventLoop.run());
+return Result(true);
+}
+
+SC::Result snippetForFileRead(AsyncEventLoop& eventLoop, Console& console)
+{
+//! [AsyncFileReadSnippet]
+// Assuming an already created (and running) AsyncEventLoop named `eventLoop`
+// ...
+
+// Open the file
+FileDescriptor fd;
+FileDescriptor::OpenOptions options;
+options.async    = true;
+options.blocking = false;
+SC_TRY(fd.open("MyFile.txt", FileDescriptor::ReadOnly, options));
+FileDescriptor::Handle handle;
+
+// Obtain file descriptor handle and associate it with event loop
+SC_TRY(fd.get(handle, Result::Error("Invalid handle")));
+SC_TRY(eventLoop.associateExternallyCreatedFileDescriptor(fd));
+
+// Create the async file read request
+AsyncFileRead asyncReadFile;
+asyncReadFile.callback = [&](AsyncFileRead::Result& res)
+{
+    Span<char> readData;
+    if(res.moveTo(readData))
+    {
+        console.print("Read {} bytes from file", readData.sizeInBytes());
+        res.reactivateRequest(true); // Ask to receive more data
+    }
+};
+char buffer[100] = {0};
+SC_TRY(asyncReadFile.start(eventLoop, handle, {buffer, sizeof(buffer)}));
+//! [AsyncFileReadSnippet]
+SC_TRY(eventLoop.run());
+return Result(true);
+}
+
+
+SC::Result snippetForFileWrite(AsyncEventLoop& eventLoop, Console& console)
+{
+//! [AsyncFileWriteSnippet]
+// Assuming an already created (and running) AsyncEventLoop named eventLoop
+// ...
+
+// Open the file (for write)
+FileDescriptor::OpenOptions options;
+options.async    = true;
+options.blocking = false;
+FileDescriptor fd;
+SC_TRY(fd.open("MyFile.txt", FileDescriptor::WriteCreateTruncate, options));
+SC_TRY(eventLoop.associateExternallyCreatedFileDescriptor(fd));
+auto writeSpan = StringView("test").toCharSpan();
+FileDescriptor::Handle handle;
+// Obtain file descriptor handle
+SC_TRY(fd.get(handle, Result::Error("Invalid Handle")));
+
+// Create the async file write request
+AsyncFileWrite asyncWriteFile;
+asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
+{
+    size_t writtenBytes = 0;
+    if(res.moveTo(writtenBytes))
+    {
+        console.print("{} bytes have been written", writtenBytes);
+    }
+};
+SC_TRY(asyncWriteFile.start(eventLoop, handle, writeSpan));
+//! [AsyncFileWriteSnippet]
+SC_TRY(eventLoop.run());
+return Result(true);
+}
+
+SC::Result snippetForFileClose(AsyncEventLoop& eventLoop, Console& console)
+{
+//! [AsyncFileCloseSnippet]
+// Assuming an already created (and running) AsyncEventLoop named eventLoop
+// ...
+
+// Open a file and associated it with event loop
+FileDescriptor fd;
+FileDescriptor::OpenOptions options;
+options.async    = true;
+options.blocking = false;
+SC_TRY(fd.open("MyFile.txt", FileDescriptor::WriteCreateTruncate, options));
+SC_TRY(eventLoop.associateExternallyCreatedFileDescriptor(fd));
+
+// Create the file close request
+FileDescriptor::Handle handle;
+SC_TRY(fd.get(handle, Result::Error("handle")));
+AsyncFileClose asyncFileClose;
+asyncFileClose.callback = [&](AsyncFileClose::Result& result)
+{
+    if(result.isValid())
+    {
+        console.printLine("File was closed successfully");
+    }
+};
+SC_TRY(asyncFileClose.start(eventLoop, handle));
+//! [AsyncFileCloseSnippet]
+SC_TRY(eventLoop.run());
+return Result(true);
+}
+// clang-format on
 } // namespace SC
