@@ -233,8 +233,11 @@ template <class T> struct IsLValueReference<T&> { static constexpr bool value = 
 /// Determines if a type is an rvalue reference.
 template <class T> struct IsRValueReference     { static constexpr bool value = false; };
 template <class T> struct IsRValueReference<T&&>{ static constexpr bool value = true; };
+//! @}
 
 }
+//! @addtogroup group_foundation_utility
+//! @{
 
 /// Converts an lvalue to an rvalue reference.
 template <typename T> constexpr T&& move(T& value) { return static_cast<T&&>(value); }

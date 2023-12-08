@@ -25,7 +25,7 @@ struct smallerThan
     constexpr bool operator()(const T& a, const T& b) { return a < b; }
 };
 
-/// @brief Sorts a range of Iterator according to BinaryPredicate through bubble sort algorithm.
+/// @brief Sorts iterator range according to BinaryPredicate (bubble sort).
 /// @tparam Iterator A type that behaves as an iterator (can just be a pointer to element in array / vector)
 /// @tparam BinaryPredicate A predicate that takes `(a, b)` and returns `bool` (example SC::Algorithms::smallerThan)
 /// @param first Iterator pointing at first element of the range

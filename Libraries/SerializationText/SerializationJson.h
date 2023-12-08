@@ -12,10 +12,10 @@ namespace SC
 struct SerializationJson;
 } // namespace SC
 
-//! @defgroup library_serialization_text Serialization Text
+//! @defgroup group_serialization_text Serialization Text
 //! @copybrief library_serialization_text (see @ref library_serialization_text for more details)
 
-//! @addtogroup library_serialization_text
+//! @addtogroup group_serialization_text
 //! @{
 
 /// @brief Reads or writes C++ structures to / from json using @ref library_reflection information

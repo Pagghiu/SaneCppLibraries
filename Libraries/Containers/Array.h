@@ -31,7 +31,7 @@ struct SC::ArrayAllocator
     }
 };
 
-/// @brief A contiguous sequence of elements kept in SC::Array inline storage
+/// @brief A contiguous sequence of elements kept inside its inline storage
 /// @tparam T Type of single element of the Array
 /// @tparam N Number of elements contained inside this Array inline storage
 template <typename T, int N>
