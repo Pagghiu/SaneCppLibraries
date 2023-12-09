@@ -205,7 +205,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(params.changes == 1);
             SC_TEST_EXPECT(fileEventsWatcher.close());
-            SC_TEST_EXPECT(fs.removeFile({"salve.txt", "atutti.txt"}));
+            SC_TEST_EXPECT(fs.removeFiles({"salve.txt", "atutti.txt"}));
         }
     }
 

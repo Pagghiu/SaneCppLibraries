@@ -184,7 +184,7 @@ SC::Result SC::FileSystem::formatError(int errorNumber, StringView item, bool is
     return Result::FromStableCharPointer(errorMessageBuffer.view().bytesIncludingTerminator());
 }
 
-SC::Result SC::FileSystem::removeFile(Span<const StringView> files)
+SC::Result SC::FileSystem::removeFiles(Span<const StringView> files)
 {
     StringView encodedPath;
     for (auto& path : files)
@@ -198,11 +198,11 @@ SC::Result SC::FileSystem::removeFile(Span<const StringView> files)
 SC::Result SC::FileSystem::removeFileIfExists(StringView source)
 {
     if (existsAndIsFile(source))
-        return removeFile(Span<const StringView>{source});
+        return removeFiles(Span<const StringView>{source});
     return Result(true);
 }
 
-SC::Result SC::FileSystem::removeDirectoryRecursive(Span<const StringView> directories)
+SC::Result SC::FileSystem::removeDirectoriesRecursive(Span<const StringView> directories)
 {
     for (auto& path : directories)
     {
@@ -212,7 +212,7 @@ SC::Result SC::FileSystem::removeDirectoryRecursive(Span<const StringView> direc
     return Result(true);
 }
 
-SC::Result SC::FileSystem::copyFile(Span<const CopyOperation> sourceDestination)
+SC::Result SC::FileSystem::copyFiles(Span<const CopyOperation> sourceDestination)
 {
     if (currentDirectory.isEmpty())
         return Result(false);
@@ -226,7 +226,7 @@ SC::Result SC::FileSystem::copyFile(Span<const CopyOperation> sourceDestination)
     return Result(true);
 }
 
-SC::Result SC::FileSystem::copyDirectory(Span<const CopyOperation> sourceDestination)
+SC::Result SC::FileSystem::copyDirectories(Span<const CopyOperation> sourceDestination)
 {
     if (currentDirectory.isEmpty())
         return Result(false);
@@ -239,7 +239,7 @@ SC::Result SC::FileSystem::copyDirectory(Span<const CopyOperation> sourceDestina
     return Result(true);
 }
 
-SC::Result SC::FileSystem::removeEmptyDirectory(Span<const StringView> directories)
+SC::Result SC::FileSystem::removeEmptyDirectories(Span<const StringView> directories)
 {
     StringView encodedPath;
     for (StringView path : directories)
@@ -250,7 +250,7 @@ SC::Result SC::FileSystem::removeEmptyDirectory(Span<const StringView> directori
     return Result(true);
 }
 
-SC::Result SC::FileSystem::removeEmptyDirectoryRecursive(Span<const StringView> directories)
+SC::Result SC::FileSystem::removeEmptyDirectoriesRecursive(Span<const StringView> directories)
 {
     StringView encodedPath;
     for (StringView path : directories)
@@ -267,7 +267,7 @@ SC::Result SC::FileSystem::removeEmptyDirectoryRecursive(Span<const StringView> 
     return Result(true);
 }
 
-SC::Result SC::FileSystem::makeDirectory(Span<const StringView> directories)
+SC::Result SC::FileSystem::makeDirectories(Span<const StringView> directories)
 {
     StringView encodedPath;
     for (auto& path : directories)
@@ -278,7 +278,7 @@ SC::Result SC::FileSystem::makeDirectory(Span<const StringView> directories)
     return Result(true);
 }
 
-SC::Result SC::FileSystem::makeDirectoryRecursive(Span<const StringView> directories)
+SC::Result SC::FileSystem::makeDirectoriesRecursive(Span<const StringView> directories)
 {
     StringView encodedPath;
     for (auto& path : directories)
@@ -308,7 +308,7 @@ SC::Result SC::FileSystem::makeDirectoryRecursive(Span<const StringView> directo
     return Result(true);
 }
 
-SC::Result SC::FileSystem::makeDirectoryIfNotExists(Span<const StringView> directories)
+SC::Result SC::FileSystem::makeDirectoriesIfNotExists(Span<const StringView> directories)
 {
     for (const auto& path : directories)
     {
