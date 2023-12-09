@@ -18,9 +18,25 @@ struct FileSystemIterator;
 //! @addtogroup group_file_system_iterator
 //! @{
 
-/// @brief Iterates files and directories inside a given path
+/// @brief Iterates files and directories inside a given path.
+/// FileSystemIterator uses an iterator pattern to enumerate files instead of a callback.
+/// This allows avoiding blocking on enumeration of very large directories and also the allocation of a huge number of
+/// strings to hold all filenames.
+/// When configuring an iteration, the caller can ask for a fully recursive enumeration or manually call
+/// SC::FileSystemIterator::recurseSubdirectory when the current SC::FileSystemIterator::Entry item
+/// (obtained with SC::FileSystemIterator::get) matches a directory of interest.
+///
+/// Example of recursive iteration of a directory:
+/// \snippet Libraries/FileSystemIterator/Tests/FileSystemIteratorTest.cpp walkRecursiveSnippet
+///
+/// If only some directories should be recursed, manual recursion can help speeding up directory iteration:
+/// \snippet Libraries/FileSystemIterator/Tests/FileSystemIteratorTest.cpp walkRecursiveManualSnippet
 struct SC::FileSystemIterator
 {
+  private:
+    struct Internal;
+
+  public:
     /// Entry type (File or Directory)
     enum class Type
     {
@@ -31,14 +47,17 @@ struct SC::FileSystemIterator
     /// @brief Contains information on a file or directory
     struct Entry
     {
-        StringView name;
-        StringView path;
-        uint32_t   level = 0;
-        Type       type  = Type::File;
+        StringView name;               ///< Name of current entry (file with extension or directory)
+        StringView path;               ///< Absolute path of the current entry
+        uint32_t   level = 0;          ///< Current level of nesting from start of iteration
+        Type       type  = Type::File; ///< Tells if it's a file or a directory
 
-        FileDescriptor parentFileDescriptor;
-
+        /// @brief Check if current entry is a directory
         bool isDirectory() const { return type == Type::Directory; }
+
+      private:
+        FileDescriptor parentFileDescriptor;
+        friend struct Internal;
     };
 
     /// @brief Options when iterating (recursive and other options)
@@ -81,7 +100,6 @@ struct SC::FileSystemIterator
     [[nodiscard]] Result recurseSubdirectory();
 
   private:
-    struct Internal;
     struct InternalDefinition
     {
         static constexpr int Windows = 4272;

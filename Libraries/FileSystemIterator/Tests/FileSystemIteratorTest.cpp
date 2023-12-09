@@ -15,22 +15,45 @@ struct SC::FileSystemIteratorTest : public SC::TestCase
         using namespace SC;
         if (test_section("walk_recursive"))
         {
-            FileSystemIterator fsIterator;
-            fsIterator.options.recursive = false;
-            SC_TEST_EXPECT(fsIterator.init(report.applicationRootDirectory));
-            while (fsIterator.enumerateNext())
-            {
-                auto& item = fsIterator.get();
-                report.console.printLine(item.path); // This will take the UTF16 fast path on Windows
-                if (item.isDirectory())
-                {
-                    SC_TEST_EXPECT(fsIterator.recurseSubdirectory());
-                }
-            }
-            SC_TEST_EXPECT(fsIterator.checkErrors());
+            walkRecursiveManual();
+            walkRecursive();
+        }
+    };
+    inline void walkRecursiveManual();
+    inline void walkRecursive();
+};
+void SC::FileSystemIteratorTest::walkRecursive()
+{
+    //! [walkRecursiveSnippet]
+    FileSystemIterator fsIterator;
+    fsIterator.options.recursive = true;
+    SC_TEST_EXPECT(fsIterator.init(report.applicationRootDirectory));
+    while (fsIterator.enumerateNext())
+    {
+        report.console.printLine(fsIterator.get().path);
+    }
+    SC_TEST_EXPECT(fsIterator.checkErrors());
+    //! [walkRecursiveSnippet]
+}
+void SC::FileSystemIteratorTest::walkRecursiveManual()
+{
+    //! [walkRecursiveManualSnippet]
+    FileSystemIterator fsIterator;
+    fsIterator.options.recursive = false; // As we manually call recurseSubdirectory
+    SC_TEST_EXPECT(fsIterator.init(report.applicationRootDirectory));
+    while (fsIterator.enumerateNext())
+    {
+        const FileSystemIterator::Entry& entry = fsIterator.get();
+        report.console.printLine(entry.path);
+        // Only recurse directories not ending with "someExcludePattern"
+        if (entry.isDirectory() and not entry.name.endsWith("someExcludePattern"))
+        {
+            SC_TEST_EXPECT(fsIterator.recurseSubdirectory());
         }
     }
-};
+    SC_TEST_EXPECT(fsIterator.checkErrors());
+    //! [walkRecursiveManualSnippet]
+}
 
 namespace SC
 {
