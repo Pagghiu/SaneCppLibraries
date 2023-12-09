@@ -52,6 +52,8 @@ struct SC::detail::FileDescriptorDefinition
 //! @{
 
 /// @brief Wraps an OS File descriptor to read and write to and from it.
+/// Example usage:
+/// \snippet Libraries/File/Tests/FileDescriptorTest.cpp FileSnippet
 struct SC::FileDescriptor : public SC::UniqueHandle<SC::detail::FileDescriptorDefinition>
 {
     using UniqueHandle::UniqueHandle;
