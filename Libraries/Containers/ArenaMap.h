@@ -70,6 +70,12 @@ struct SC::ArenaMapKey
 
 /// @brief A sparse vector keeping objects at a stable memory location
 /// @tparam T Type of items kept in this Arena
+///
+/// SC::ArenaMap is a container used to keep objects memory location stable. @n
+/// Internally it hold sparse objects inside of a SC::Vector and for this reason it can only be SC::ArenaMap::resize-d
+/// when it's empty.
+/// @n Objects can be inserted up to the SC::ArenaMap::size and insertion returns *handle* keys allowing to retrieve the
+/// inserted object in constant time.
 template <typename T>
 struct SC::ArenaMap
 {
@@ -109,6 +115,7 @@ struct SC::ArenaMap
         return *this;
     }
 
+    /// @brief Get the maximum number of objects that can be stored in this map
     uint32_t getNumAllocated() const { return static_cast<uint32_t>(items.size()); }
 
     template <typename MapType>
@@ -190,8 +197,13 @@ struct SC::ArenaMap
         numUsed = 0;
     }
 
+    /// @brief Get the number of uset slots in the arena
     [[nodiscard]] size_t size() const { return numUsed; }
 
+    /// @brief Changes the size of the arena.
+    /// @note Can only be called on empty arena (SC::ArenaMap::size == 0)
+    /// @param newSize The new wanted number of elements to be stored in the arena
+    /// @return `true` if resize succeded
     [[nodiscard]] bool resize(size_t newSize)
     {
         if (numUsed != 0)

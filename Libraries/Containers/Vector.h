@@ -41,6 +41,12 @@ struct SC::VectorAllocator
 
 /// @brief A contiguous sequence of heap allocated elements
 /// @tparam T Type of single vector element
+///
+/// All methods of SC::Vector that can fail, return a `[[nodiscard]]` `bool` (example SC::Vector::push_back). @n
+/// Assignment and Copy / move construct operators will just assert as they can't return a failure code. @n
+/// `memcpy` is used to optimize copies when `T` is a memcpy-able object.
+/// @note Use SC::SmallVector everywhere a SC::Vector reference is needed if the upper bound size of required elements
+/// is known to get rid of unnecessary heap allocations.
 template <typename T>
 struct SC::Vector
 {

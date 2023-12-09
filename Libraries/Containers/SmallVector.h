@@ -17,6 +17,12 @@ struct SmallVector;
 /// @brief A Vector that can hold up to `N` elements inline and `> N` on heap
 /// @tparam T Type of single vector element
 /// @tparam N Number of elements kept inline to avoid heap allocation
+///
+/// SC::SmallVector is like SC::Vector but it will do heap allocation once more than `N` elements are needed. @n
+/// When the `size()` becomes less than `N` the container will switch back using memory coming from inline storage.
+/// @note SC::SmallVector derives from SC::Vector and it can be passed everywhere a reference to SC::Vector is needed.
+/// It can be used to get rid of unnecessary allocations where the upper bound of required elements is known or it can
+/// be predicted.
 template <typename T, int N>
 struct SC::SmallVector : public Vector<T>
 {

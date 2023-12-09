@@ -34,6 +34,11 @@ struct SC::ArrayAllocator
 /// @brief A contiguous sequence of elements kept inside its inline storage
 /// @tparam T Type of single element of the Array
 /// @tparam N Number of elements contained inside this Array inline storage
+///
+/// SC::Array is like a SC::Vector but it will only allow up to `N` elements in the array, using inline storage, without
+/// resorting to heap allocation. @n
+/// Trying to push or insert more than N elements will fail. @n
+/// Only up to SC::Array::size elements are valid (and `N` - `size()` are initialized).
 template <typename T, int N>
 struct SC::Array
 {

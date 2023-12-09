@@ -13,7 +13,7 @@ struct VectorSet;
 //! @addtogroup group_containers
 //! @{
 
-/// @brief Simple and inefficient set built with a Vector, ensuring no item duplication
+/// @brief A set built on an unsorted Vector, ensuring no item duplication
 /// @tparam Value The contained value
 /// @tparam Container The underlying container used
 template <typename Value, typename Container = SC::Vector<Value>>
@@ -21,6 +21,7 @@ struct SC::VectorSet
 {
     Container items;
 
+    /// @brief Return size of the set
     auto size() const { return items.size(); }
 
     [[nodiscard]] Value*       begin() { return items.begin(); }

@@ -62,7 +62,7 @@ struct SC::VectorMapItem
     Value value; ///< Map item value
 };
 
-/// @brief A simple map holding VectorMapItem key-value pairs in an unsorted Vector
+/// @brief A map holding VectorMapItem key-value pairs in an unsorted Vector
 /// @tparam Key Type of the key (must support `==` comparison)
 /// @tparam Value Value type associated with Key
 /// @tparam Container Container used for the Map
@@ -73,10 +73,11 @@ struct SC::VectorMap
 
     Container items;
 
+    /// @brief Return the number of key-value pairs in the map
     [[nodiscard]] auto size() const { return items.size(); }
-    [[nodiscard]] auto isEmpty() const { return items.isEmpty(); }
 
-    [[nodiscard]] const Container& getItems() const { return items; }
+    /// @brief Check if the map is empty
+    [[nodiscard]] auto isEmpty() const { return items.isEmpty(); }
 
     [[nodiscard]] Item*       begin() { return items.begin(); }
     [[nodiscard]] const Item* begin() const { return items.begin(); }

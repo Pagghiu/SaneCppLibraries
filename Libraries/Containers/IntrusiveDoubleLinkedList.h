@@ -15,6 +15,9 @@ struct IntrusiveDoubleLinkedList;
 
 /// @brief An Intrusive Double Linked List
 /// @tparam T The Type being linked. It must declare two pointers to itself named `next` and `prev`.
+///
+/// This is an useful data structure when we want to delegate the allocation strategy to caller. @n
+/// Both @ref library_async and @ref library_process use this data structure to store requests.
 template <typename T>
 struct SC::IntrusiveDoubleLinkedList
 {

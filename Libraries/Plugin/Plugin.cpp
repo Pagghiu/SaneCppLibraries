@@ -480,7 +480,7 @@ SC::Result SC::PluginRegistry::unloadPlugin(const StringView identifier)
     PluginDynamicLibrary& lib = *res;
     if (lib.dynamicLibrary.isValid())
     {
-        for (const auto& kv : libraries.getItems())
+        for (const auto& kv : libraries)
         {
             // TODO: Shield against circular dependencies
             if (kv.value.definition.dependencies.contains(identifier))
