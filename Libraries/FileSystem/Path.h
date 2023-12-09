@@ -46,11 +46,33 @@ struct SC::Path
         StringView ext;            ///< Ex. `"ext"` for `"C:\\dir\\name.ext"` on windows or `"/dir/name.ext"` on posix
 
         /// @brief Parses all components on windows input path
+        ///
+        /// For example:
+        /// @code{.cpp}
+        /// path.parseWindows("C:\\ASD\\bbb\\name.ext");
+        /// path.root == "C:\\";
+        /// path.directory == "C:\\ASD\\bbb";
+        /// path.base == "name.ext";
+        /// path.name == "name";
+        /// path.ext == "ext";
+        /// path.endsWithSeparator == false;
+        /// @endcode
         /// @param input A path in windows form (ex "C:\\directory\name.ext")
         /// @returns false if both name and extension will be empty after parsing or if parsing name/extension fails
         [[nodiscard]] bool parseWindows(StringView input);
 
         /// @brief Parses all components on posix input path
+        ///
+        /// For example:
+        ///
+        /// @code{.cpp}
+        /// Path::ParsedView path;
+        /// path.parsePosix("/123/456");
+        /// path.root == "/";
+        /// path.directory == "/123";
+        /// path.base == "456";
+        /// path.endsWithSeparator == false;
+        /// @endcode
         /// @param input A path in posix form (ex "/directory/name.ext")
         /// @returns false if both name and extension will be empty after parsing or if parsing name/extension fails
         [[nodiscard]] bool parsePosix(StringView input);
@@ -70,6 +92,9 @@ struct SC::Path
     /// @param[out] name         Output string holding name ("name" in "name.ext")
     /// @param[out] extension    Output string holding extension ("ext" in "name.ext")
     /// @returns `false` if both name and extension will be empty after trying to parse them
+    ///
+    /// Example:
+    /// \snippet Libraries/FileSystem/Tests/PathTest.cpp parseNameExtensionSnippet
     [[nodiscard]] static bool parseNameExtension(const StringView input, StringView& name, StringView& extension);
 
     /// @brief Splits a Posix or Windows path into a ParsedView.
@@ -83,7 +108,7 @@ struct SC::Path
     ///
     /// For example:
     ///
-    /// @code
+    /// @code{.cpp}
     /// Path::dirname("/dirname/basename", Path::AsPosix) == "/dirname";
     /// Path::dirname("/dirname/basename//", Path::AsPosix) == "/dirname";
     /// Path::dirname("C:\\dirname\\basename", Path::AsWindows) == "C:\\dirname";
@@ -99,7 +124,7 @@ struct SC::Path
     ///
     /// For example:
     ///
-    /// @code
+    /// @code{.cpp}
     /// Path::basename("/a/basename", Path::AsPosix) == "basename";
     /// Path::basename("/a/basename//", Path::AsPosix) == "basename";
     /// @endcode
@@ -112,7 +137,7 @@ struct SC::Path
     ///
     /// For example:
     ///
-    /// @code
+    /// @code{.cpp}
     /// Path::basename("/a/basename.html", ".html") == "basename";
     /// @endcode
     /// @param[in] input The StringView with path to be parsed. Trailing spearators are ignored.
@@ -121,6 +146,17 @@ struct SC::Path
     [[nodiscard]] static StringView basename(StringView input, StringView suffix);
 
     /// @brief Checks if a path is absolute.
+    ///
+    /// For example:
+    ///
+    /// @code{.cpp}
+    /// Path::isAbsolute("/dirname/basename", Path::AsPosix) == true;        // Posix Absolute
+    /// Path::isAbsolute("./dirname/basename", Path::AsPosix) == false;      // Posix Relative
+    /// Path::isAbsolute("C:\\dirname\\basename", Path::AsWindows) == true;  // Windows with Drive
+    /// Path::isAbsolute("\\\\server\\dir", Path::AsWindows) == true;        // Windows with Network
+    /// Path::isAbsolute("\\\\?\\C:\\server\\dir", Path::AsWindows) == true; // Windows with Long
+    /// Path::isAbsolute("..\\dirname\\basename", Path::AsWindows) == false; // Windows relative
+    /// @endcode
     /// @param[in] input The StringView with path to be parsed. Trailing spearators are ignored.
     /// @param[in] type Specify to parse as Windows or Posix path
     /// @return `true` if `input` is absolute
@@ -158,7 +194,7 @@ struct SC::Path
     ///
     /// For example:
     ///
-    /// @code
+    /// @code{.cpp}
     /// Path::normalize("/Users/SC/../Documents/", cmp, &path, Path::AsPosix);
     /// SC_RELEASE_ASSERT(path == "/Users/Documents");
     /// @endcode
@@ -173,7 +209,7 @@ struct SC::Path
     ///
     /// For example:
     ///
-    /// @code
+    /// @code{.cpp}
     /// Path::relativeFromTo("/a/b/1/2/3", "/a/b/d/e", path, Path::AsPosix, Path::AsPosix);
     /// SC_TEST_ASSERT(path == "../../../d/e");
     /// @endcode
@@ -186,7 +222,7 @@ struct SC::Path
     [[nodiscard]] static bool relativeFromTo(StringView source, StringView destination, String& output, Type type,
                                              Type outputType = AsNative);
 
-    /// @brief Append to an existing path a series of StringView with the wanted separator
+    /// @brief Append to an existing path a series of StringView with a separator
     /// @param[out] output The destination string containing the existing path, that will be extended
     /// @param[in] paths The path components to join, appended to `output`
     /// @param[in] inputType Specify to append as Windows or Posix path components
