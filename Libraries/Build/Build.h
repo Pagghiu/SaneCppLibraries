@@ -166,7 +166,7 @@ struct Compile
     using Union = TaggedUnion<Compile>;
 };
 
-/// @brief Map of Compile flags (include paths, preprocessor defines etc.)
+/// @brief Map of SC::Build::Compile flags (include paths, preprocessor defines etc.)
 struct CompileFlags : public TaggedMap<Compile::Type, Compile::Union>
 {
     /// @brief Add paths to includes search paths list
@@ -218,7 +218,7 @@ struct Link
     using Union = TaggedUnion<Link>;
 };
 
-/// @brief Map of Link flags (library paths, LTO switch etc.)
+/// @brief Map of SC::Build::Link flags (library paths, LTO switch etc.)
 struct LinkFlags : public TaggedMap<Link::Type, Link::Union>
 {
     /// @brief Add the given paths to the library search paths list
@@ -234,7 +234,7 @@ struct LinkFlags : public TaggedMap<Link::Type, Link::Union>
     }
 };
 
-/// @brief Holds together CompileFlags, LinkFlags for a given Architecture
+/// @brief Groups SC::Build::CompileFlags and SC::Build::LinkFlags for a given SC::Build::Architecture
 struct Configuration
 {
     /// @brief A pre-made preset with pre-configured set of options
@@ -314,7 +314,7 @@ struct TargetType
     }
 };
 
-/// @brief Project composed of files with their compile and link flags
+/// @brief Groups multiple Configuration and source files with their compile and link flags
 struct Project
 {
     /// @brief Project list of files
@@ -379,7 +379,7 @@ struct Project
     [[nodiscard]] Result validate() const;
 };
 
-/// @brief A Workspace brings related Project together with shared compile and link flags
+/// @brief Groups multiple Project together with shared compile and link flags
 struct Workspace
 {
     String          name;     ///< Workspace name
@@ -399,7 +399,7 @@ struct Parameters
     Generator::Type              generator;     ///< Build system types to generate
 };
 
-/// @brief Groups multiple Workspace together
+/// @brief Top level build description holding all Workspace objects
 struct Definition
 {
     Vector<Workspace> workspaces; ///< Workspaces to be generated
