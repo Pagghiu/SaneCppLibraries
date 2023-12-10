@@ -8,7 +8,7 @@
 #include "../Foundation/Function.h"
 #include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Result.h"
-#include "../Strings/StringView.h"
+#include "../Strings/SmallString.h"
 #include "../Threading/Threading.h" // EventObject
 
 namespace SC
@@ -23,7 +23,25 @@ struct String;
 //! @addtogroup group_file_system_watcher
 //! @{
 
-/// @brief Notifies about events (add, remove, rename, modified) on files and directories
+/// @brief Notifies about events (add, remove, rename, modified) on files and directories.
+/// Caller can specify a callback for receiving notifications the SC::FileSystemWatcher::watch method.
+///
+/// Changes are grouped in two categories:
+/// - Added, removed and renamed files and directories
+/// - Modified files
+///
+/// There are two modes in which FileSystemWatcher can be initialized, defining how notifications are delivered:
+///
+/// | Mode                                  | Description                                       |
+/// |:--------------------------------------|:--------------------------------------------------|
+/// | SC::FileSystemWatcher::ThreadRunner   | @copybrief SC::FileSystemWatcher::ThreadRunner    |
+/// | SC::FileSystemWatcher::EventLoopRunner| @copybrief SC::FileSystemWatcher::EventLoopRunner |
+///
+/// Example using SC::FileSystemWatcher::EventLoopRunner:
+/// \snippet Libraries/FileSystemWatcher/Tests/FileSystemWatcherTest.cpp fileSystemWatcherEventLoopRunnerSnippet
+///
+/// Example using SC::FileSystemWatcher::ThreadRunner:
+/// \snippet Libraries/FileSystemWatcher/Tests/FileSystemWatcherTest.cpp fileSystemWatcherThreadRunnerSnippet
 struct SC::FileSystemWatcher
 {
   private:
@@ -120,12 +138,12 @@ struct SC::FileSystemWatcher
         FileSystemWatcher* parent = nullptr;
         FolderWatcher*     next   = nullptr;
         FolderWatcher*     prev   = nullptr;
-        String*            path   = nullptr;
+        SmallString<1024>  path;
 
         OpaqueObject<FolderWatcherSizes> internal;
     };
 
-    /// @brief Support object to allow user holding memory for needed resources for async mode
+    /// @brief Delivers notifications using @ref library_async (SC::AsyncEventLoop).
     struct EventLoopRunner
     {
         AsyncEventLoop& eventLoop;
@@ -139,7 +157,7 @@ struct SC::FileSystemWatcher
 #endif
     };
 
-    /// @brief Support object to allow user holding memory for needed resources for threaded mode
+    /// @brief Delivers notifications on a background thread.
     using ThreadRunner = OpaqueObject<ThreadRunnerDefinition>;
 
     /// @brief Setup watcher to receive notifications from a background thread
@@ -162,7 +180,7 @@ struct SC::FileSystemWatcher
     /// @param path The directory being monitored
     /// @param notifyCallback A callback that will be invoked by the given runner
     /// @return Valid Result if directory is accessible and the watcher is initialized properly.
-    [[nodiscard]] Result watch(FolderWatcher& watcher, String& path,
+    [[nodiscard]] Result watch(FolderWatcher& watcher, StringView path,
                                Function<void(const Notification&)>&& notifyCallback);
 
   private:

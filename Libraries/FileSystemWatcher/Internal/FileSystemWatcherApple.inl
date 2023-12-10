@@ -143,7 +143,7 @@ struct SC::FileSystemWatcher::Internal
             StringNative<1024> buffer;
             StringConverter    converter(buffer);
             StringView         encodedPath;
-            SC_TRY(converter.convertNullTerminateFastPath(it->path->view(), encodedPath));
+            SC_TRY(converter.convertNullTerminateFastPath(it->path.view(), encodedPath));
             watchedPaths[numAllocatedPaths] =
                 CFStringCreateWithFileSystemRepresentation(nullptr, encodedPath.getNullTerminatedNative());
             if (not watchedPaths[numAllocatedPaths])
@@ -289,10 +289,10 @@ struct SC::FileSystemWatcher::Internal
             internal.mutex.unlock();
             while (watcher != nullptr)
             {
-                if (path.startsWith(watcher->path->view())) // TODO: This works only if encodings are the same
+                if (path.startsWith(watcher->path.view())) // TODO: This works only if encodings are the same
                 {
-                    internal.notification.basePath = watcher->path->view();
-                    StringView relativePath        = path.sliceStartBytes(watcher->path->view().sizeInBytes());
+                    internal.notification.basePath = watcher->path.view();
+                    StringView relativePath        = path.sliceStartBytes(watcher->path.view().sizeInBytes());
 
                     // TODO: Refactor into a 'trimEnd'
                     while (relativePath.sizeInBytes() > 1 and relativePath.startsWithChar('/'))

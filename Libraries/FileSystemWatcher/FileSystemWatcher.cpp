@@ -16,12 +16,12 @@ SC::Result SC::FileSystemWatcher::init(EventLoopRunner& runner) { return interna
 SC::Result SC::FileSystemWatcher::init(ThreadRunner& runner) { return internal.get().init(*this, runner); }
 
 SC::Result SC::FileSystemWatcher::close() { return internal.get().close(); }
-SC::Result SC::FileSystemWatcher::watch(FolderWatcher& watcher, String& path,
+SC::Result SC::FileSystemWatcher::watch(FolderWatcher& watcher, StringView path,
                                         Function<void(const Notification&)>&& notifyCallback)
 {
     SC_TRY_MSG(watcher.parent == nullptr, "Watcher belongs to other FileSystemWatcher");
-    watcher.parent         = this;
-    watcher.path           = &path;
+    watcher.parent = this;
+    SC_TRY(watcher.path.assign(path));
     watcher.notifyCallback = move(notifyCallback);
     watchers.queueBack(watcher);
     return internal.get().startWatching(&watcher);

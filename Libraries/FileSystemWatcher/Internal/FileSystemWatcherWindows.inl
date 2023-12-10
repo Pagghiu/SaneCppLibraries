@@ -135,7 +135,7 @@ struct SC::FileSystemWatcher::Internal
                        "startWatching exceeded MaxWatchablePaths");
         }
         StringView encodedPath;
-        SC_TRY(converter.convertNullTerminateFastPath(entry->path->view(), encodedPath));
+        SC_TRY(converter.convertNullTerminateFastPath(entry->path.view(), encodedPath));
         HANDLE newHandle = ::CreateFileW(encodedPath.getNullTerminatedNative(),                            //
                                          FILE_LIST_DIRECTORY,                                              //
                                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,           //
@@ -221,7 +221,7 @@ struct SC::FileSystemWatcher::Internal
         FILE_NOTIFY_INFORMATION* event  = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(opaque.changesBuffer);
 
         Notification notification;
-        notification.basePath = entry.path->view();
+        notification.basePath = entry.path.view();
         while (notification.basePath.sizeInBytes() > 1 and notification.basePath.endsWithChar('\\'))
         {
             notification.basePath =

@@ -91,7 +91,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             FileSystemWatcher::FolderWatcher watcher;
             // We save the results and expect them after the wait to avoid Thread Sanitizer issues
             // due to the SC_TEST_EXPECT calls inside the labmda that runs in the thread
-            const Result res        = fileEventsWatcher.watch(watcher, path, move(lambda));
+            const Result res        = fileEventsWatcher.watch(watcher, path.view(), move(lambda));
             const bool   fsWriteRes = fs.write("test.txt", "content");
             params.eventObject.wait();
             SC_TEST_EXPECT(fsWriteRes);
@@ -161,7 +161,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(path.assign(appDirectory));
             FileSystemWatcher::FolderWatcher watcher;
             Thread::Sleep(200); // on macOS watch latency is 500 ms, so we sleep to avoid report of 'dir' creation
-            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path, move(lambda)));
+            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view(), move(lambda)));
             SC_TEST_EXPECT(fs.write("dir/test.txt", "content"));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(params.changes == 1);
@@ -199,7 +199,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                 int changes = 0;
             } params;
             auto lambda = [&](const FileSystemWatcher::Notification&) { params.changes++; };
-            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path, move(lambda)));
+            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view(), move(lambda)));
             SC_TEST_EXPECT(fs.write("salve.txt", "content"));
             SC_TEST_EXPECT(fs.write("atutti.txt", "content"));
             SC_TEST_EXPECT(eventLoop.runOnce());
@@ -248,7 +248,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                     params.changes1++;
                 }
             };
-            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher1, path1, move(lambda1)));
+            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher1, path1.view(), move(lambda1)));
             auto lambda2 = [&](const FileSystemWatcher::Notification& notification)
             {
                 if (notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
@@ -260,7 +260,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             // Additionally we explicitly create and delete files and only listen for Operation::AddRemoveRename
             // because in some cases we also get modified Operation::Modified
             constexpr int waitForEventsTimeout = 100;
-            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2, move(lambda2)));
+            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2.view(), move(lambda2)));
             FileSystem fs1;
             FileSystem fs2;
             SC_TEST_EXPECT(fs1.init(path1.view()));
@@ -292,7 +292,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(params.changes1 == 2);
             SC_TEST_EXPECT(params.changes2 == 1);
 
-            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2, move(lambda2)));
+            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2.view(), move(lambda2)));
             SC_TEST_EXPECT(fs2.removeFile("atutti.txt"));
             Thread::Sleep(waitForEventsTimeout);
             SC_TEST_EXPECT(eventLoop.runOnce());
@@ -310,4 +310,96 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 namespace SC
 {
 void runFileSystemWatcherTest(SC::TestReport& report) { FileSystemWatcherTest test(report); }
+} // namespace SC
+
+namespace SC
+{
+Result fileSystemWatcherEventLoopRunnerSnippet(AsyncEventLoop& eventLoop, Console& console)
+{
+    //! [fileSystemWatcherEventLoopRunnerSnippet]
+    // Initialize the FileSystemWatcher
+    FileSystemWatcher fileSystemWatcher;
+
+    FileSystemWatcher::EventLoopRunner eventLoopRunner(eventLoop);
+    SC_TRY(fileSystemWatcher.init(eventLoopRunner));
+
+    // Setup notification callback
+    auto onFileModified = [&](const FileSystemWatcher::Notification& notification)
+    {
+        // This callback will be called from the thread calling AsyncEventLoop::run
+        SmallString<1024> buffer;
+        StringView        fullPath;
+        if (notification.getFullPath(buffer, fullPath))
+        {
+            switch (notification.operation)
+            {
+            case FileSystemWatcher::Operation::Modified: // File has been modified
+                console.print("Modified {} {}\n", notification.relativePath, fullPath);
+                break;
+            case FileSystemWatcher::Operation::AddRemoveRename: // File was added / removed
+                console.print("AddRemoveRename {} {}\n", notification.relativePath, fullPath);
+                break;
+            }
+        }
+    };
+
+    // Start watching a specific folder
+    FileSystemWatcher::FolderWatcher folderWatcher;
+    SC_TRY(fileSystemWatcher.watch(folderWatcher, "/path/to/dir", onFileModified));
+
+    // ...
+    // At a later point when there is no more need of watching the folder
+    SC_TRY(folderWatcher.unwatch());
+
+    // ...
+    // When all watchers have been unwatched and to dispose all system resources
+    SC_TRY(fileSystemWatcher.close());
+    //! [fileSystemWatcherEventLoopRunnerSnippet]
+    return Result(true);
+}
+
+Result fileSystemWatcherThreadRunnerSnippet(Console& console)
+{
+    //! [fileSystemWatcherThreadRunnerSnippet]
+    // Initialize the FileSystemWatcher
+    FileSystemWatcher::ThreadRunner threadRunner; // <--- The thread runner
+
+    FileSystemWatcher fileSystemWatcher;
+    SC_TRY(fileSystemWatcher.init(threadRunner));
+
+    // Setup notification callback
+    auto onFileModified = [&](const FileSystemWatcher::Notification& notification)
+    {
+        // Warning! This callback is called from a background thread!
+        // Make sure to do proper synchronization!
+        SmallString<1024> buffer;
+        StringView        fullPath;
+        if (notification.getFullPath(buffer, fullPath))
+        {
+            switch (notification.operation)
+            {
+            case FileSystemWatcher::Operation::Modified: // File has been modified
+                console.print("Modified {} {}\n", notification.relativePath, fullPath);
+                break;
+            case FileSystemWatcher::Operation::AddRemoveRename: // File was added / removed
+                console.print("AddRemoveRename {} {}\n", notification.relativePath, fullPath);
+                break;
+            }
+        }
+    };
+
+    // Start watching a specific folder
+    FileSystemWatcher::FolderWatcher folderWatcher;
+    SC_TRY(fileSystemWatcher.watch(folderWatcher, "/path/to/dir", onFileModified));
+
+    // ...
+    // At a later point when there is no more need of watching the folder
+    SC_TRY(folderWatcher.unwatch());
+
+    // ...
+    // When all watchers have been unwatched and to dispose all system resources
+    SC_TRY(fileSystemWatcher.close());
+    //! [fileSystemWatcherThreadRunnerSnippet]
+    return Result(true);
+}
 } // namespace SC
