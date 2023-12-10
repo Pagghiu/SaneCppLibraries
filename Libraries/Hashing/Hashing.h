@@ -11,7 +11,16 @@ namespace SC
 //! @addtogroup group_hashing
 //! @{
 
-/// @brief Compute MD5, SHA1 or SHA256 hash for stream of data
+/// @brief Compute MD5, SHA1 or SHA256 hash for stream of data.
+/// @n
+/// Data can be added until needed with SC::Hashing::update call.
+/// SC::Hashing::finalize will generate an actual SC::Hashing::Result holding the computed *hash*.
+///
+/// Example:
+/// \snippet Libraries/Hashing/Tests/HashingTest.cpp HashingSnippet
+///
+/// Example with update (for hashing longer streams of data):
+/// \snippet Libraries/Hashing/Tests/HashingTest.cpp HashingUpdateSnippet
 struct Hashing
 {
     struct Result

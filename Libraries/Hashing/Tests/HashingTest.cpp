@@ -19,6 +19,7 @@ struct SC::HashingTest : public SC::TestCase
         using namespace SC;
         if (test_section("MD5"))
         {
+            //! [HashingSnippet]
             Hashing hash;
             SC_TEST_EXPECT(hash.setType(Hashing::TypeMD5));
 
@@ -30,10 +31,12 @@ struct SC::HashingTest : public SC::TestCase
             SC_TEST_EXPECT(StringBuilder(test).appendHex(res.toBytesSpan()));
             SC_TEST_EXPECT(test == "098F6BCD4621D373CADE4E832627B4F6"_a8);
             report.console.printLine(test.view());
+            //! [HashingSnippet]
         }
 
         if (test_section("MD5 Update"))
         {
+            //! [HashingUpdateSnippet]
             Hashing hash;
             SC_TEST_EXPECT(hash.setType(Hashing::TypeMD5));
 
@@ -45,6 +48,7 @@ struct SC::HashingTest : public SC::TestCase
             String test;
             SC_TEST_EXPECT(StringBuilder(test).appendHex(res.toBytesSpan()));
             SC_TEST_EXPECT(test == "05A671C66AEFEA124CC08B76EA6D30BB"_a8);
+            //! [HashingUpdateSnippet]
         }
 
         if (test_section("SHA1"))
