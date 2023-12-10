@@ -18,7 +18,7 @@ void runVectorMapTest(TestReport& report);
 void runVectorSetTest(TestReport& report);
 void runVectorTest(TestReport& report);
 void runFunctionTest(TestReport& report);
-void runOpaqueTest(TestReport& report);
+void runUniqueHandleTest(TestReport& report);
 void runOptionalTest(TestReport& report);
 void runTaggedUnionTest(TestReport& report);
 void runSmallStringTest(TestReport& report);
@@ -119,7 +119,7 @@ int main(int argc, const char* argv[])
     runBaseTest(report);
     runFunctionTest(report);
     runIntrusiveDoubleLinkedListTest(report);
-    runOpaqueTest(report);
+    runUniqueHandleTest(report);
     runOptionalTest(report);
     runSmallVectorTest(report);
     runStringConverterTest(report);

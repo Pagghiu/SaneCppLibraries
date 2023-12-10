@@ -9,17 +9,44 @@ namespace SC
 //! @addtogroup group_foundation_utility
 //! @{
 
-/// @brief Wrapper for function pointers, member functions and lambdas up to `LAMBDA_SIZE`.
+/// @brief Wraps function pointers, member functions and lambdas without ever allocating. @n
 ///
 /// Example:
-/// @code
-/// int someFunc(float a) { return static_cast<int>(a * 2); }
-///
-/// Function<int(float)> func = &somefunc;
-/// @endcode
-/// Size of lambdas or less than LAMBDA_SIZE.
-/// If lambda is bigger than `LAMBDA_SIZE` the constructor will static assert.
-/// @tparam FuncType Type of function to be wrapped (Lambda, free function or pointer to member function)
+/**
+ * @code{.cpp}
+    struct MyClass
+    {
+        float memberValue = 2.0;
+        int memberFunc(float a) { return static_cast<int>(a + memberValue); }
+    };
+    int someFunc(float a) { return static_cast<int>(a * 2); }
+
+    struct BigClass
+    {
+        uint64_t values[4];
+    };
+
+    // ... somewhere later
+    MyClass myClass;
+
+    Function<int(float)> func;
+
+    func = &someFunc;                                                   // Bind free func
+    func.bind<MyClass, &MyClass::memberFunc>(myClass);                  // Bind member func
+    func = [](float a) -> int { return static_cast<int>(a + 1.5); };    // Bind lambda func
+
+    BigClass bigClass;
+
+    // This will static_assert because sizeof(BigClass) (grabbed by copy) exceeds LAMBDA_SIZE
+    // func = [bigClass](float a) -> int { return static_cast<int>(a);};
+
+    @endcode
+
+    Size of lambdas or less than LAMBDA_SIZE (currently `2 * sizeof(void*)`). @n
+    If lambda is bigger than `LAMBDA_SIZE` the constructor will static assert.
+    @tparam FuncType Type of function to be wrapped (Lambda, free function or pointer to member function)
+
+ * */
 template <typename FuncType>
 struct Function;
 

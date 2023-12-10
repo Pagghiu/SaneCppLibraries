@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 
+#include "../../Foundation/Deferred.h"
 #include <errno.h>     // errno
 #include <netdb.h>     // socketlen_t/getsocketopt/send/recv
 #include <sys/event.h> // kqueue

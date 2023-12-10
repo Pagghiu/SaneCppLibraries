@@ -5,6 +5,7 @@
 
 #include "../Containers/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Function.h"
+#include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Span.h"
 #include "../System/Time.h"
 #include "../Threading/Atomic.h"

@@ -10,6 +10,7 @@
 // clang-format on
 
 #include "../../File/FileDescriptor.h"
+#include "../../Foundation/Deferred.h"
 #include "../FileSystem.h"
 
 #ifndef SC_FILESYSTEM_WINDOWS_USE_SHELL_OPERATIONS

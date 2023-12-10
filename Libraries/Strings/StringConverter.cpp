@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 
 #include "../Strings/StringConverter.h"
+#include "../Foundation/Deferred.h"
 #include "../Foundation/Result.h"
 #include "../Strings/String.h"
 

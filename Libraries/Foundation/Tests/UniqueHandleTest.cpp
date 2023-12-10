@@ -1,21 +1,23 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../../Testing/Testing.h"
 #include "../UniqueHandle.h"
+#include "../../Testing/Testing.h"
 
 namespace SC
 {
-struct OpaqueTest;
+struct UniqueHandleTest;
 }
 
-struct SC::OpaqueTest : public SC::TestCase
+struct SC::UniqueHandleTest : public SC::TestCase
 {
     struct HandleDefinition
     {
-        using Handle                    = int;
+        using Handle = int;
+
         static constexpr Handle Invalid = -1;
-        static bool&            getDeleteCalled()
+
+        static bool& getDeleteCalled()
         {
             static bool deleteCalled = false;
             return deleteCalled;
@@ -27,7 +29,7 @@ struct SC::OpaqueTest : public SC::TestCase
         }
     };
 
-    OpaqueTest(SC::TestReport& report) : TestCase(report, "OpaqueTest")
+    UniqueHandleTest(SC::TestReport& report) : TestCase(report, "UniqueHandleTest")
     {
         using namespace SC;
         if (test_section("UniqueHandle"))
@@ -61,5 +63,5 @@ struct SC::OpaqueTest : public SC::TestCase
 
 namespace SC
 {
-void runOpaqueTest(SC::TestReport& report) { OpaqueTest test(report); }
+void runUniqueHandleTest(SC::TestReport& report) { UniqueHandleTest test(report); }
 } // namespace SC

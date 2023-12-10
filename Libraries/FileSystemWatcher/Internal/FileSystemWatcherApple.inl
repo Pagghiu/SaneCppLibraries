@@ -3,6 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 
 #include "../../Async/Async.h"
+#include "../../Foundation/Deferred.h"
 #include "../../Strings/SmallString.h"
 #include "../../Strings/StringConverter.h"
 #include "../../Threading/Threading.h"

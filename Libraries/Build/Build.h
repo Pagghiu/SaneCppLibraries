@@ -154,14 +154,16 @@ struct Compile
         }
         Assert::unreachable();
     }
+    template <Type E, typename T>
+    using Tag = TaggedType<Type, E, T>; // Helper to save some typing
 
-    using FieldsTypes = TypeTraits::TypeList<TaggedField<Type, includePaths, Vector<String>>,          //
-                                             TaggedField<Type, preprocessorDefines, Vector<String>>,   //
-                                             TaggedField<Type, optimizationLevel, Optimization::Type>, //
-                                             TaggedField<Type, enableASAN, bool>,                      //
-                                             TaggedField<Type, enableRTTI, bool>,                      //
-                                             TaggedField<Type, enableExceptions, bool>,                //
-                                             TaggedField<Type, enableStdCpp, bool>>;
+    using FieldsTypes = TypeTraits::TypeList<Tag<includePaths, Vector<String>>,          //
+                                             Tag<preprocessorDefines, Vector<String>>,   //
+                                             Tag<optimizationLevel, Optimization::Type>, //
+                                             Tag<enableASAN, bool>,                      //
+                                             Tag<enableRTTI, bool>,                      //
+                                             Tag<enableExceptions, bool>,                //
+                                             Tag<enableStdCpp, bool>>;
 
     using Union = TaggedUnion<Compile>;
 };
@@ -207,12 +209,14 @@ struct Link
         }
         Assert::unreachable();
     }
+    template <Type E, typename T>
+    using Tag = TaggedType<Type, E, T>; // Helper to save some typing
 
-    using FieldsTypes = TypeTraits::TypeList<TaggedField<Type, libraryPaths, Vector<String>>,      //
-                                             TaggedField<Type, libraryFrameworks, Vector<String>>, //
-                                             TaggedField<Type, enableLTO, bool>,                   //
-                                             TaggedField<Type, enableASAN, bool>,                  //
-                                             TaggedField<Type, enableStdCpp, bool>                 //
+    using FieldsTypes = TypeTraits::TypeList<Tag<libraryPaths, Vector<String>>,      //
+                                             Tag<libraryFrameworks, Vector<String>>, //
+                                             Tag<enableLTO, bool>,                   //
+                                             Tag<enableASAN, bool>,                  //
+                                             Tag<enableStdCpp, bool>                 //
                                              >;
 
     using Union = TaggedUnion<Link>;

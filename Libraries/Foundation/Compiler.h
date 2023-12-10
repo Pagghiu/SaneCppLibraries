@@ -236,6 +236,11 @@ template <class T> struct IsRValueReference<T&&>{ static constexpr bool value = 
 //! @}
 
 }
+//! @defgroup group_foundation_utility Language Utilities
+//! @ingroup group_foundation
+//! Language Utilities
+/// Utility classes allowing common C++ constructs.
+
 //! @addtogroup group_foundation_utility
 //! @{
 
@@ -274,38 +279,6 @@ template <typename T> constexpr inline void swap(T& t1, T& t2)
 template <typename T> constexpr T min(T t1, T t2) { return t1 < t2 ? t1 : t2; }
 /// Finds the maximum of two values.
 template <typename T> constexpr T max(T t1, T t2) { return t1 > t2 ? t1 : t2; }
-
-//! @}
-
-//! @defgroup group_foundation_utility Language Utilities
-//! @ingroup group_foundation
-//! Language Utilities
-/// Utility classes allowing common C++ constructs.
-
-//! @addtogroup group_foundation_utility
-//! @{
-
-/// @brief Executes a function at end of current scope (in the spirit of Zig `defer` keyword).
-/// @tparam F The lanbda / function to execute
-template <typename F> struct Deferred
-{
-    /// @brief Constructs Deferred object with a functor F
-    Deferred(F&& f) : f(forward<F>(f)) {}   
-
-    /// @brief Invokes the function F upon destruction, if disarm() has not been previously called.
-    ~Deferred() { if (armed) f(); }
-
-    /// @brief Disarms the Deferred object, preventing function invocation on destruction.
-    void disarm() { armed = false; }
-
-  private:
-    F    f;             ///< The function to be invoked.
-    bool armed = true;  ///< Indicates whether the Deferred object is 'armed' for function invocation.
-};
-
-/// @brief Creates a Deferred object with a function for delayed invocation at end of current scope.
-/// @param f The lambda to be invoked at end of current scope
-template <typename F> Deferred<F> MakeDeferred(F&& f) { return Deferred<F>(forward<F>(f)); }
 
 //! @}
 

@@ -17,8 +17,11 @@ enum TestType
 
 struct TestUnion
 {
-    using FieldsTypes =
-        TypeTraits::TypeList<TaggedField<TestType, TypeString, String>, TaggedField<TestType, TypeInt, int>>;
+    template <TestType E, typename T>
+    using AssociateTag = TaggedType<TestType, E, T>; // Helper to save some typing
+    using FieldsTypes  = TypeTraits::TypeList<       // List of types for the union
+        AssociateTag<TypeString, String>,           // Associate String to TypeString
+        AssociateTag<TypeInt, int>>;                // Associate int to TypeInt
 };
 } // namespace SC
 
@@ -30,7 +33,8 @@ struct SC::TaggedUnionTest : public SC::TestCase
         if (test_section("Rule of 5"))
         {
             TaggedUnion<TestUnion> defaultConstructed;
-            auto*                  str1 = defaultConstructed.field<TypeString>();
+
+            auto* str1 = defaultConstructed.field<TypeString>();
             SC_TEST_EXPECT(str1 and str1->isEmpty());
             SC_TRUST_RESULT(str1->assign("ASD"));
             auto* ptr2 = defaultConstructed.field<TypeInt>();
@@ -38,12 +42,14 @@ struct SC::TaggedUnionTest : public SC::TestCase
 
             // Copy construct
             TaggedUnion<TestUnion> copyConstructed = defaultConstructed;
-            auto*                  str2            = copyConstructed.field<TypeString>();
+
+            auto* str2 = copyConstructed.field<TypeString>();
             SC_TEST_EXPECT(*str1 == *str2);
 
             // Move construct
             TaggedUnion<TestUnion> moveConstructed = move(copyConstructed);
-            auto*                  str3            = moveConstructed.field<TypeString>();
+
+            auto* str3 = moveConstructed.field<TypeString>();
             SC_TEST_EXPECT(*str1 == *str3);
 
             // Copy Assign

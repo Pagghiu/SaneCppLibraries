@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../File/FileDescriptor.h"
-#include "../Foundation/OpaqueObject.h"
+#include "../Foundation/AlignedStorage.h"
 #include "../Foundation/Result.h"
 #include "../System/Time.h" // Milliseconds
 

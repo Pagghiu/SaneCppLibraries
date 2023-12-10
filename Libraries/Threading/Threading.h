@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../Foundation/AlignedStorage.h"
 #include "../Foundation/Function.h"
-#include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Result.h"
 #include "../Strings/StringView.h"
 #include "Internal/Optional.h" // UniqueOptional

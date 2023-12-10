@@ -8,13 +8,70 @@ namespace SC
 //! @addtogroup group_foundation_utility
 //! @{
 
-/// @brief  Static PIMPL helper. Typically user declares size in bytes of a structure in the header
-///         but the structure is defined in an implementation .cpp file.
-///         That's just a tiny helper to save some minimal amount of typing.
-///         When creating this class you will be forced to redefining 4 functions to avoid linker errors
-///         (construct, destruct, moveConstruct, moveAssign).
-///         These functions are meant to be defined in a .cpp file that will know how to construct Object.
+/// @brief Hides implementation details from public headers (static PIMPL). @n
+/// Opaque object avoids the heap allocation that often comes with PIMPL, allowing to hide OS specific details from
+/// public headers.
+/// User declares size in bytes of a struct in the header but the structure can be defined in an implementation .cpp
+/// file. Choosing a size that is too small will generate a `static_assert` that contains in the error message the
+/// minimum size to use. Up to 4 functions will need to be defined to avoid linker errors (`construct`, `destruct`,
+/// `moveConstruct`, `moveAssign`). These functions are meant to be defined in a `.cpp` file that will know how to
+/// construct Object, as it can see its definition.
 /// @tparam Definition Pass in a custom Definition declaring Sizes and alignment on different platforms
+///
+/// Example:
+/**
+ * @code{.cpp}
+ // ... in the header file
+ struct TestObject
+ {
+    private:
+    struct Internal;
+
+    // Define maximum sizes and alignment in bytes of Internal object on each platform
+    struct InternalDefinition
+    {
+        static constexpr int Windows = 224;
+        static constexpr int Apple   = 144;
+        static constexpr int Default = sizeof(void*);
+
+        static constexpr size_t Alignment = alignof(void*);
+
+        using Object = Internal;
+    };
+
+  public:
+    // Must be public to avoid GCC complaining
+    using InternalOpaque = OpaqueObject<InternalDefinition>;
+
+  private:
+    InternalOpaque internal;
+};
+
+// ... In .cpp file
+
+// Declare Internal struct with all platform specific details
+struct SC::TestObject::Internal
+{
+    SC_NtSetInformationFile    pNtSetInformationFile = nullptr;
+    LPFN_CONNECTEX             pConnectEx            = nullptr;
+    LPFN_ACCEPTEX              pAcceptEx             = nullptr;
+    LPFN_DISCONNECTEX          pDisconnectEx         = nullptr;
+    // ... additional stuff
+};
+
+// Declare only two of the four functions to avoid linker errors.
+template <>
+void SC::TestObject::InternalOpaque::construct(Handle& buffer)
+{
+    placementNew(buffer.reinterpret_as<Object>());
+}
+template <>
+void SC::TestObject::InternalOpaque::destruct(Object& obj)
+{
+    obj.~Object();
+}
+ @endcode
+*/
 template <typename Definition>
 struct OpaqueObject
 {
