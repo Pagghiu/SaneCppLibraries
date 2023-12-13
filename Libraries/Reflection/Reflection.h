@@ -14,12 +14,21 @@ namespace Reflection
 {
 //! @defgroup group_reflection Reflection
 //! @copybrief library_reflection (see @ref library_reflection for more details)
+///
+/// Reflection generates compile time information of fields in a structure or class. @n
+/// Typically this library is used with one of the serialization libraries
+/// ( @ref library_serialization_binary or @ref library_serialization_text).
+///
+/// @note Reflection uses more complex C++ constructs compared to other libraries in this repository.
+/// To limit the issue, effort has been spent trying not to use obscure C++ meta-programming techniques.
+/// The library uses only template partial specialization and `constexpr`.
 
 //! @addtogroup group_reflection
 //! @{
 
 /// @brief Enumeration of possible category types recognized by Reflection.
 /// @note We can use only 7 of the 8 bits here, as in TypeInfo we're stealing 1 bit for TypeInfo::hasLink
+//! [reflectionSnippet3]
 enum class TypeCategory : uint8_t
 {
     TypeInvalid = 0, ///< Invalid type sentinel
@@ -41,6 +50,7 @@ enum class TypeCategory : uint8_t
     TypeArray  = 12, ///< Type is an array type
     TypeVector = 13, ///< Type is a vector type
 };
+//! [reflectionSnippet3]
 
 /// @brief A single 8 bytes union holding most important information about a reflected type
 /// This structure is expected to be stored in an flat array.
@@ -49,6 +59,7 @@ enum class TypeCategory : uint8_t
 /// When one of these children is simple primitive type, this type is stored inline with the type itself.
 /// When instead a complex type is needed, a linkID is provided.
 /// Such link is as offset in the flat array where detailed definition of the complex type exists.
+//! [reflectionSnippet4]
 struct TypeInfo
 {
     bool         hasLink : 1; ///< Contains a link to another type
@@ -96,6 +107,7 @@ struct TypeInfo
         StructInfo structInfo;
         ArrayInfo  arrayInfo;
     };
+    //! [reflectionSnippet4]
 
     /// @brief Constructs an invalid type info.
     constexpr TypeInfo()

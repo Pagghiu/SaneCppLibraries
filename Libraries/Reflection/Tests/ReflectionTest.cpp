@@ -24,9 +24,9 @@ struct SimpleStructure;
 struct IntermediateStructure;
 struct ComplexStructure;
 } // namespace TestNamespace
+//! [reflectionSnippet1]
 struct TestNamespace::SimpleStructure
 {
-    // Base Types
     SC::uint8_t  f0 = 0;
     SC::uint16_t f1 = 1;
     SC::uint32_t f2 = 2;
@@ -66,7 +66,9 @@ struct Reflect<TestNamespace::SimpleStructure> : ReflectStruct<TestNamespace::Si
 };
 } // namespace Reflection
 } // namespace SC
+//! [reflectionSnippet1]
 
+//! [reflectionSnippet2]
 struct TestNamespace::IntermediateStructure
 {
     SC::Vector<int> vectorOfInt;
@@ -96,6 +98,7 @@ SC_REFLECT_STRUCT_FIELD(3, f4)
 SC_REFLECT_STRUCT_FIELD(4, intermediateStructure)
 SC_REFLECT_STRUCT_FIELD(5, vectorOfStructs)
 SC_REFLECT_STRUCT_LEAVE()
+//! [reflectionSnippet2]
 
 namespace SC
 {
