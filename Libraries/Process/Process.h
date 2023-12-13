@@ -28,7 +28,40 @@ struct SC::ProcessID
     int32_t pid = 0;
 };
 
-/// @brief Execute a child process
+/// @brief Execute a child process.
+///
+/// Features:
+/// - Redirecting standard in/out/err of a child process to a Pipe
+/// - Wait for the child process exit code
+///
+/// @n
+/**
+ * Example: launch a process and wait for it to finish execution
+ * @code{.cpp}
+Process process;
+SC_TRY(process.launch("executable.exe", "--argument1", "--argument2"));
+SC_TRY(process.waitForExitSync());
+ * @endcode
+ *
+ * Example: wait for the process to fully execute
+ * @code{.cpp}
+Process process;
+SC_TRY(process.launch("executable.exe", "--argument1", "--argument2"));
+SC_TRY(process.waitForExitSync());
+ * @endcode
+ *
+ * Example: read process output
+ * @code{.cpp}
+Process process;
+PipeDescriptor outputPipe;
+SC_TRY(process.redirectStdOutTo(outputPipe));
+SC_TRY(process.launch("executable.exe", "--argument1", "--argument2"));
+String output = StringEncoding::Ascii; // Could also use SmallString<N>
+SC_TRY(outputPipe.readPipe.readUntilEOF(output));
+SC_TRY(process.waitForExitSync());
+// ... Do something with the 'output' string
+ * @endcode
+ * */
 struct SC::Process
 {
     /// @brief Options for SC::Proces::launch
@@ -108,6 +141,40 @@ struct SC::Process
 };
 
 /// @brief Execute multiple child processes chaining input / output between them.
+/// @n
+/// Chains multiple child processes together, so that the output of a process becomes input of another (similar to what
+/// happens wit the pipe (`|`) operator on Posix shells).
+///
+/// SC::PipeDescriptor from [File](@ref library_file) library is used to chain read / write endpoints of different
+/// processes together.
+///
+/// @n
+/**
+ * Example: print result `ls ~ | grep desktop` in current terminal
+ * @code{.cpp}
+ProcessChain chain([&](const ProcessChain::Error&) { });
+Process      p1, p2;
+SC_TRY(chain.pipe(p1, "ls", "~"));
+SC_TRY(chain.pipe(p2, "grep", "Desktop"));
+SC_TRY(chain.launch());
+SC_TRY(chain.waitForExitSync());
+ * @endcode
+ *
+ * Example: read result of `ls ~ | grep desktop` into a String
+ * @code{.cpp}
+ProcessChain chain([&](const ProcessChain::Error&) { });
+Process      p1, p2;
+SC_TRY(chain.pipe(p1, "ls", "~"));
+SC_TRY(chain.pipe(p2, "grep", "Desktop"));
+ProcessChain::Options options;
+options.pipeSTDOUT = true;
+SC_TRY(chain.launch(options));
+String output(StringEncoding::Ascii);
+SC_TRY(chain.readStdOutUntilEOFSync(output));
+SC_TRY(chain.waitForExitSync());
+// ... Do something with the 'output' string
+ * @endcode
+ * */
 struct SC::ProcessChain
 {
     /// @brief Specify if a child process input / output should be piped (intercepted)
