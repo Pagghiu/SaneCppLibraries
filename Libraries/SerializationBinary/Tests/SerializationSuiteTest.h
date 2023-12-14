@@ -36,6 +36,9 @@ struct SerializationTest;
 } // namespace SerializationSuiteTest
 } // namespace SC
 
+//! [serializationBinaryExactSnippet1]
+
+//! [serializationBinaryWriteSnippet1]
 struct SC::SerializationSuiteTest::PrimitiveStruct
 {
     uint8_t arrayValue[4] = {0, 1, 2, 3};
@@ -62,6 +65,7 @@ SC_REFLECT_STRUCT_FIELD(0, arrayValue)
 SC_REFLECT_STRUCT_FIELD(1, floatValue)
 SC_REFLECT_STRUCT_FIELD(2, int64Value)
 SC_REFLECT_STRUCT_LEAVE()
+//! [serializationBinaryWriteSnippet1]
 
 struct SC::SerializationSuiteTest::NestedStruct
 {
@@ -99,6 +103,7 @@ struct SC::SerializationSuiteTest::TopLevelStruct
 SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::TopLevelStruct)
 SC_REFLECT_STRUCT_FIELD(0, nestedStruct)
 SC_REFLECT_STRUCT_LEAVE()
+//! [serializationBinaryExactSnippet1]
 
 struct SC::SerializationSuiteTest::VectorStructSimple
 {
@@ -120,6 +125,7 @@ SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::VectorStructComplex)
 SC_REFLECT_STRUCT_FIELD(0, vectorOfStrings)
 SC_REFLECT_STRUCT_LEAVE()
 
+//! [serializationBinaryVersionedSnippet1]
 struct SC::SerializationSuiteTest::VersionedStruct1
 {
     float          floatValue     = 1.5f;
@@ -154,6 +160,8 @@ SC_REFLECT_STRUCT_VISIT(SC::SerializationSuiteTest::VersionedStruct2)
 SC_REFLECT_STRUCT_FIELD(3, int64Value)
 SC_REFLECT_STRUCT_FIELD(0, floatValue)
 SC_REFLECT_STRUCT_LEAVE()
+
+//! [serializationBinaryVersionedSnippet1]
 
 struct SC::SerializationSuiteTest::VersionedPoint3D
 {
@@ -419,7 +427,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
 
             // Deserialization
             SC_TEST_EXPECT(SerializerReader::loadVersioned(deserializedObject, buffer.toSpanConst(), schema.typeInfos,
-                                                           &numReadOperations));
+                                                           SerializationBinaryOptions(), &numReadOperations));
 
             // Verification
             SC_TEST_EXPECT(not(deserializedObject != objectToSerialize));
@@ -440,7 +448,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
 
             // Deserialization
             SC_TEST_EXPECT(SerializerReader::loadVersioned(deserializedObject, buffer.toSpanConst(), schema.typeInfos,
-                                                           &numReadOperations));
+                                                           SerializationBinaryOptions(), &numReadOperations));
 
             // Verification
             SC_TEST_EXPECT(deserializedObject.points.size() == 2);
@@ -460,7 +468,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
 
             // Deserialization
             SC_TEST_EXPECT(SerializerReader::loadVersioned(deserializedObject, buffer.toSpanConst(), schema.typeInfos,
-                                                           &numReadOperations));
+                                                           SerializationBinaryOptions(), &numReadOperations));
 
             // Verification
             SC_TEST_EXPECT(deserializedObject.intToFloat == objectToSerialize.intToFloat);
@@ -484,7 +492,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
 
             // Deserialization
             SC_TEST_EXPECT(SerializerReader::loadVersioned(deserializedObject, buffer.toSpanConst(), schema.typeInfos,
-                                                           &numReadOperations));
+                                                           SerializationBinaryOptions(), &numReadOperations));
             SC_TEST_EXPECT(numReadOperations == 2);
 
             // Verification

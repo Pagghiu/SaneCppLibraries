@@ -9,9 +9,9 @@ namespace SC
 {
 namespace detail
 {
-[[nodiscard]] static bool tryPrimitiveConversion(const SerializationSchema::Options& options,
-                                                 const Reflection::TypeInfo&         sourceType,
-                                                 SerializationBinaryBufferReader*    sourceObject,
+[[nodiscard]] static bool tryPrimitiveConversion(const SerializationBinaryOptions& options,
+                                                 const Reflection::TypeInfo&       sourceType,
+                                                 SerializationBinaryBufferReader*  sourceObject,
                                                  const Reflection::TypeInfo& sinkType, Span<uint8_t>& sinkObject);
 }
 } // namespace SC
@@ -538,9 +538,9 @@ template <typename T>
     }
 }
 
-[[nodiscard]] static bool tryPrimitiveConversion(const SerializationSchema::Options& options,
-                                                 const Reflection::TypeInfo&         sourceType,
-                                                 SerializationBinaryBufferReader*    sourceObject,
+[[nodiscard]] static bool tryPrimitiveConversion(const SerializationBinaryOptions& options,
+                                                 const Reflection::TypeInfo&       sourceType,
+                                                 SerializationBinaryBufferReader*  sourceObject,
                                                  const Reflection::TypeInfo& sinkType, Span<uint8_t>& sinkObject)
 {
     switch (sourceType.type)

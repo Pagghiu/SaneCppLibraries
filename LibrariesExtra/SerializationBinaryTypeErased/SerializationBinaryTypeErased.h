@@ -61,11 +61,14 @@ struct SerializationBinaryTypeErased
     /// @return `true` if deserialization succeded
     template <typename T>
     [[nodiscard]] static bool loadVersioned(T& object, Span<const uint8_t> buffer,
-                                            Span<const Reflection::TypeInfo> schema, size_t* numberOfReads = nullptr)
+                                            Span<const Reflection::TypeInfo> schema,
+                                            SerializationBinaryOptions options = {}, size_t* numberOfReads = nullptr)
     {
-        SerializationBinaryBufferReader            readerBuffer(buffer);
         SerializationBinaryTypeErasedReadVersioned loader;
-        SerializationSchema                        serializationSchema(schema);
+
+        SerializationSchema serializationSchema(schema);
+        serializationSchema.options = options;
+        SerializationBinaryBufferReader readerBuffer(buffer);
         if (not loader.loadVersioned(object, readerBuffer, serializationSchema))
             return false;
         if (numberOfReads)

@@ -42,7 +42,7 @@ struct SerializationBinaryTypeErasedReadVersioned
 
     detail::SerializationBinaryTypeErasedArrayAccess arrayAccess;
 
-    SerializationSchema::Options options;
+    SerializationBinaryOptions options;
 
     Span<const Reflection::TypeInfo> sinkTypes;
     Span<uint8_t>                    sinkObject;

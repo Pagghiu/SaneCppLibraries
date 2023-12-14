@@ -2,8 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
+#include "../SerializationBinaryOptions.h"
 #include "SerializationBinarySkipper.h"
-
 namespace SC
 {
 
@@ -17,14 +17,7 @@ struct SerializationSchema
 
     SerializationSchema(const Span<const Reflection::TypeInfo> typeInfos) : sourceTypes(typeInfos) {}
 
-    /// @brief Controls compatibility options for versioned deserialization
-    struct Options
-    {
-        bool allowFloatToIntTruncation    = true; ///< allow truncating a float to get an integer value
-        bool allowDropEccessArrayItems    = true; ///< drop array items in source data if destination array is smaller
-        bool allowDropEccessStructMembers = true; ///< drop fields that have no matching memberTag in destination struct
-    };
-    Options options; ///< Options for versioned deserialization
+    SerializationBinaryOptions options; ///< Options for versioned deserialization
 
     uint32_t sourceTypeIndex = 0; ///< Currently active type in sourceTypes Span
 
