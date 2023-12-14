@@ -11,6 +11,7 @@ namespace SC
 struct Test;
 } // namespace SC
 
+//! [serializationJsonSnippet1]
 struct SC::Test
 {
     int    x      = 2;
@@ -36,6 +37,7 @@ SC_REFLECT_STRUCT_FIELD(2, xy)
 SC_REFLECT_STRUCT_FIELD(3, myTest)
 SC_REFLECT_STRUCT_FIELD(4, myVector)
 SC_REFLECT_STRUCT_LEAVE()
+//! [serializationJsonSnippet1]
 
 namespace SC
 {
@@ -44,40 +46,63 @@ struct SerializationJsonTest;
 
 struct SC::SerializationJsonTest : public SC::TestCase
 {
+    inline void jsonWrite();
+    inline void jsonLoadExact();
+    inline void jsonLoadVersioned();
     SerializationJsonTest(SC::TestReport& report) : TestCase(report, "SerializationJsonTest")
     {
-        constexpr StringView testJSON = R"({"x":2,"y":1.50,"xy":[1,3],"myTest":"asdf","myVector":["Str1","Str2"]})"_a8;
         if (test_section("SerializationJson::write"))
         {
-            Test                   test;
-            SmallVector<char, 256> buffer;
-            StringFormatOutput     output(StringEncoding::Ascii, buffer);
-
-            SC_TEST_EXPECT(SerializationJson::write(test, output));
-            const StringView serializedJSON(buffer.data(), buffer.size() - 1, false, StringEncoding::Ascii);
-            SC_TEST_EXPECT(serializedJSON == testJSON);
+            jsonWrite();
         }
         if (test_section("SerializationJson::loadExact"))
         {
-            Test test;
-            memset(&test, 0, sizeof(test));
-            SC_TEST_EXPECT(SerializationJson::loadExact(test, testJSON));
-            SC_TEST_EXPECT(test == Test());
+            jsonLoadExact();
         }
         if (test_section("SerializationJson::loadVersioned"))
         {
-            constexpr StringView scrambledJson =
-                R"({"y"  :  1.50, "x": 2.0, "myVector"  :  ["Str1","Str2"], "myTest":"asdf"})"_a8;
-            Test test;
-            test.x = 0;
-            test.y = 0;
-            (void)test.myVector.resize(1);
-            (void)test.myTest.assign("FDFSA"_a8);
-            SC_TEST_EXPECT(SerializationJson::loadVersioned(test, scrambledJson));
-            SC_TEST_EXPECT(test == Test());
+            jsonLoadVersioned();
         }
     }
 };
+
+void SC::SerializationJsonTest::jsonWrite()
+{
+    //! [serializationJsonWriteSnippet]
+    constexpr StringView   testJSON = R"({"x":2,"y":1.50,"xy":[1,3],"myTest":"asdf","myVector":["Str1","Str2"]})"_a8;
+    Test                   test;
+    SmallVector<char, 256> buffer;
+    StringFormatOutput     output(StringEncoding::Ascii, buffer);
+
+    SC_TEST_EXPECT(SerializationJson::write(test, output));
+    const StringView serializedJSON(buffer.data(), buffer.size() - 1, false, StringEncoding::Ascii);
+    SC_TEST_EXPECT(serializedJSON == testJSON);
+    //! [serializationJsonWriteSnippet]
+}
+void SC::SerializationJsonTest::jsonLoadExact()
+{
+    //! [serializationJsonLoadExactSnippet]
+    constexpr StringView testJSON = R"({"x":2,"y":1.50,"xy":[1,3],"myTest":"asdf","myVector":["Str1","Str2"]})"_a8;
+    Test                 test;
+    memset(&test, 0, sizeof(test));
+    SC_TEST_EXPECT(SerializationJson::loadExact(test, testJSON));
+    SC_TEST_EXPECT(test == Test());
+    //! [serializationJsonLoadExactSnippet]
+}
+void SC::SerializationJsonTest::jsonLoadVersioned()
+{
+    //! [serializationJsonLoadVersionedSnippet]
+    constexpr StringView scrambledJson =
+        R"({"y"  :  1.50, "x": 2.0, "myVector"  :  ["Str1","Str2"], "myTest":"asdf"})"_a8;
+    Test test;
+    test.x = 0;
+    test.y = 0;
+    (void)test.myVector.resize(1);
+    (void)test.myTest.assign("FDFSA"_a8);
+    SC_TEST_EXPECT(SerializationJson::loadVersioned(test, scrambledJson));
+    SC_TEST_EXPECT(test == Test());
+    //! [serializationJsonLoadVersionedSnippet]
+}
 
 namespace SC
 {
