@@ -27,7 +27,12 @@ struct SocketDescriptorDefinition;
 } // namespace SC
 
 //! @defgroup group_socket Socket
-//! @copybrief library_socket (see @ref library_socket for more details)
+//! @copybrief library_socket (see @ref library_socket for more details).
+///
+/// Socket library allows creating TCP / UDP sockets and using them as client or server and resolving DNS.
+///
+/// It can be used standalone if synchronous networking is preferred or as a companion to [Async](@ref library_async)
+/// for creation of non-blocking socket descriptors.
 
 //! @addtogroup group_socket
 //! @{
@@ -105,7 +110,10 @@ struct SC::SocketFlags
     [[nodiscard]] static int          toNative(ProtocolType family);
 };
 
-/// @brief Native representation of an IP Address
+/// @brief Native representation of an IP Address.
+///
+/// Example:
+/// @snippet Libraries/Socket/Tests/SocketDescriptorTest.cpp socketIpAddressSnippet
 struct SC::SocketIPAddress
 {
     /// @brief Constructs an ip address from a given family (IPV4 or IPV6)
@@ -134,7 +142,10 @@ struct SC::SocketIPAddress
     SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
 };
 
-/// @brief Low-level OS socket handle
+/// @brief Low-level OS socket handle.
+/// It also allow querying inheritability and changing it (and blocking mode)
+/// Example (extracted from unit test):
+/// @snippet Libraries/Socket/Tests/SocketDescriptorTest.cpp socketDescriptorSnippet
 struct SC::SocketDescriptor : public UniqueHandle<detail::SocketDescriptorDefinition>
 {
     /// @brief Creates a new Socket Descriptor of given family, type, protocol
@@ -178,7 +189,32 @@ struct SocketServer;
 struct DNSResolver;
 } // namespace SC
 
-/// @brief Use a SocketDescriptor as a Server (example TCP Socket Server)
+/// @brief Use a SocketDescriptor as a Server (example TCP Socket Server).
+///
+/// Example:
+/**
+ * @code{.cpp}
+    SocketDescriptor serverSocket;
+    SocketServer     server(serverSocket);
+
+    // Look for an available port
+    constexpr int    tcpPort       = 5050;
+    const StringView serverAddress = "::1"; // or "127.0.0.1"
+    SocketIPAddress  nativeAddress;
+    SC_TRY(nativeAddress.fromAddressPort(serverAddress, tcpPort));
+
+    // Create socket and start listening
+    SC_TRY(serverSocket.create(nativeAddress.getAddressFamily()));
+    SC_TRY(server.listen(nativeAddress, tcpPort));
+
+    // Accept a client
+    SocketDescriptor acceptedClientSocket;
+    SC_TRY(server.accept(family, acceptedClientSocket));
+    SC_TRY(acceptedClientSocket.isValid());
+
+    // ... Do something with acceptedClientSocket
+    @endcode
+*/
 struct SC::SocketServer
 {
     /// @brief Build a SocketServer from a SocketDescriptor (already created with SocketDescriptor::create)
@@ -205,7 +241,51 @@ struct SC::SocketServer
     SocketDescriptor& socket;
 };
 
-/// @brief Use a SocketDescriptor as a client (example TCP Socket Client)
+/// @brief Use a SocketDescriptor as a client (example TCP Socket Client).
+///
+/// The socket client can be obtained via SC::SocketServer::accept or connected to an endpoint
+/// through SC::SocketClient::connect
+/// Example (accepted client from server, doing a synchronous read):
+/**
+ * @code{.cpp}
+    SocketDescriptor acceptedClientSocket;
+    // ... assuming acceptedClientSocket has been obtained with SocketServer::accept
+    SC_TRY(server.accept(family, acceptedClientSocket));
+    SC_TRY(acceptedClientSocket.isValid());
+
+    // Read some data blocking until it's available
+    SocketClient acceptedClient(acceptedClientSocket);
+    Span<char>   readData;
+    SC_TRY(acceptedClient.read({buf, sizeof(buf)}, readData));
+    SC_TRY(buf[0] == testValue and testValue != 0);
+
+    // Read again blocking but with a timeout of 10 seconds
+    SC_TRY(acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, 10000_ms));
+    SC_TRY(buf[0] == testValue + 1);
+
+    // Close the client
+    SC_TRY(acceptedClient.close());
+    @endcode
+*/
+/// Example (connecting client to server, doing two synchronous writes):
+/**
+ * @code{.cpp}
+    SocketDescriptor clientSocket;
+    SocketClient     client(clientSocket);
+
+    // Connect to the server
+    SC_TRY(client.connect(serverAddress, tcpPort));
+
+    // Write some data to the socket
+    char buf[1] = {testValue};
+    SC_TRY(client.write({buf, sizeof(buf)}));
+    buf[0]++; // change the value and write again
+    SC_TRY(client.write({buf, sizeof(buf)}));
+
+    // Close the socket
+    SC_TRY(client.close());
+    @endcode
+*/
 struct SC::SocketClient
 {
     /// @brief Constructs this SocketClient from a SocketDescriptor (already created with SocketDescriptor::create)
@@ -256,6 +336,9 @@ struct SC::SocketNetworking
     /// @param[in] host The host string (example.com)
     /// @param[out] ipAddress The ip address of the given host string
     /// @return Valid Result if ip address for the passed host has been successfully resolved
+    ///
+    /// Example:
+    /// @snippet Libraries/Socket/Tests/SocketDescriptorTest.cpp resolveDNSSnippet
     [[nodiscard]] static Result resolveDNS(StringView host, String& ipAddress);
 
     /// @brief Initializes Winsock2 on Windows (WSAStartup)
