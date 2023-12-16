@@ -7,8 +7,8 @@
 #include "../Foundation/Function.h"
 #include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Span.h"
-#include "../System/Time.h"
 #include "../Threading/Atomic.h"
+#include "../Time/Time.h"
 
 // Descriptors
 #include "../File/FileDescriptor.h"

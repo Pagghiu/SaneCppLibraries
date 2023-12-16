@@ -3,7 +3,7 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include "../Strings/SmallString.h"
 #include "../Strings/StringConverter.h"
-#include "../System/Time.h"
+#include "../Time/Time.h"
 #include <string.h> // strlen
 
 #if SC_PLATFORM_WINDOWS

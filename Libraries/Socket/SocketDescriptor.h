@@ -5,7 +5,7 @@
 #include "../File/FileDescriptor.h"
 #include "../Foundation/AlignedStorage.h"
 #include "../Foundation/Result.h"
-#include "../System/Time.h" // Milliseconds
+#include "../Time/Time.h" // Milliseconds
 
 namespace SC
 {

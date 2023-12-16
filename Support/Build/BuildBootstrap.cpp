@@ -6,7 +6,7 @@
 #include "../../Libraries/FileSystem/Path.h"
 #include "../../Libraries/Strings/SmallString.h"
 #include "../../Libraries/System/Console.h"
-#include "../../Libraries/System/Time.h"
+#include "../../Libraries/Time/Time.h"
 
 #include "../../Bindings/cpp/SC.cpp"
 namespace SC

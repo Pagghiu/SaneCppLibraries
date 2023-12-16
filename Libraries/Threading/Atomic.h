@@ -84,7 +84,7 @@ typedef enum memory_order
 } memory_order;
 
 #endif
-/// @brief Atomic variables according to C++ memory model
+/// @brief Atomic variables according to C++ memory model (only for `int` and `bool` for now)
 template <typename T>
 struct Atomic;
 

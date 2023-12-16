@@ -4,7 +4,7 @@
 #pragma once
 #include "../Foundation/Result.h"
 #include "../Strings/SmallString.h"
-#include "../System/Time.h"
+#include "../Time/Time.h"
 
 namespace SC
 {
