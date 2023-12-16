@@ -212,7 +212,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                                               {"$(MACOSX_DEPLOYMENT_TARGET)", "$(WindowsTargetPlatformVersion)"},
                                               {"$(SC_GENERATOR)", "msvc2022"},
                                           });
-            if (not configuration.outputPath.view().endsWithChar('\\'))
+            if (not configuration.outputPath.view().endsWithCodePoint('\\'))
             {
                 builder.append("\\");
             }
@@ -232,7 +232,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                                               {"$(MACOSX_DEPLOYMENT_TARGET)", "$(WindowsTargetPlatformVersion)"},
                                               {"$(SC_GENERATOR)", "msvc2022"},
                                           });
-            if (not configuration.outputPath.view().endsWithChar('\\'))
+            if (not configuration.outputPath.view().endsWithCodePoint('\\'))
             {
                 builder.append("\\");
             }

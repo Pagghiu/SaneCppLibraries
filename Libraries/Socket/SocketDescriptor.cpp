@@ -351,8 +351,7 @@ SC::Result SC::SocketNetworking::resolveDNS(StringView host, String& ipAddress)
 
         // Convert IP address to a readable string
         inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr);
-        StringView ipView(ipstr, ::strlen(ipstr), true, StringEncoding::Ascii);
-        SC_TRY(ipAddress.assign(ipView));
+        SC_TRY(ipAddress.assign(StringView::fromNullTerminated(ipstr, StringEncoding::Ascii)));
     }
 
     freeaddrinfo(res); // Free the linked list

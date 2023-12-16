@@ -269,7 +269,7 @@ template bool StringIterator<StringIteratorUTF8>::reverseAdvanceCodePoints(size_
 template bool StringIterator<StringIteratorUTF16>::reverseAdvanceCodePoints(size_t numCodePoints);
 
 template <typename CharIterator>
-bool StringIterator<CharIterator>::endsWithChar(CodePoint character) const
+bool StringIterator<CharIterator>::endsWithCodePoint(CodePoint character) const
 {
     if (start != end)
     {
@@ -278,12 +278,12 @@ bool StringIterator<CharIterator>::endsWithChar(CodePoint character) const
     }
     return false;
 }
-template bool StringIterator<StringIteratorASCII>::endsWithChar(CodePoint character) const;
-template bool StringIterator<StringIteratorUTF8>::endsWithChar(CodePoint character) const;
-template bool StringIterator<StringIteratorUTF16>::endsWithChar(CodePoint character) const;
+template bool StringIterator<StringIteratorASCII>::endsWithCodePoint(CodePoint character) const;
+template bool StringIterator<StringIteratorUTF8>::endsWithCodePoint(CodePoint character) const;
+template bool StringIterator<StringIteratorUTF16>::endsWithCodePoint(CodePoint character) const;
 
 template <typename CharIterator>
-bool StringIterator<CharIterator>::startsWithChar(CodePoint character) const
+bool StringIterator<CharIterator>::startsWithCodePoint(CodePoint character) const
 {
     if (start != end)
     {
@@ -291,9 +291,9 @@ bool StringIterator<CharIterator>::startsWithChar(CodePoint character) const
     }
     return false;
 }
-template bool StringIterator<StringIteratorASCII>::startsWithChar(CodePoint character) const;
-template bool StringIterator<StringIteratorUTF8>::startsWithChar(CodePoint character) const;
-template bool StringIterator<StringIteratorUTF16>::startsWithChar(CodePoint character) const;
+template bool StringIterator<StringIteratorASCII>::startsWithCodePoint(CodePoint character) const;
+template bool StringIterator<StringIteratorUTF8>::startsWithCodePoint(CodePoint character) const;
+template bool StringIterator<StringIteratorUTF16>::startsWithCodePoint(CodePoint character) const;
 
 template <typename CharIterator>
 template <typename IteratorType>

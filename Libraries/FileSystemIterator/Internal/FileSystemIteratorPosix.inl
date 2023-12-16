@@ -115,7 +115,7 @@ struct SC::FileSystemIterator::Internal
                 break;
             }
         }
-        entry.name = StringView(item->d_name, item->d_namlen, true, StringEncoding::Utf8);
+        entry.name = StringView({item->d_name, item->d_namlen}, true, StringEncoding::Utf8);
         SC_TRY(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
         SC_TRY(currentPath.appendNullTerminated("/"_u8));
         SC_TRY(currentPath.appendNullTerminated(entry.name));

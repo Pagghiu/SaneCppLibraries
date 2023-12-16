@@ -14,6 +14,7 @@ struct SC::StringFormatTest : public SC::TestCase
 {
     StringFormatTest(SC::TestReport& report) : TestCase(report, "StringFormatTest")
     {
+        // Using StringBuilder in tests as it's just a tiny wrapper on StringFormat
         using namespace SC;
         if (test_section("edge_cases"))
         {
@@ -51,15 +52,6 @@ struct SC::StringFormatTest : public SC::TestCase
             SC_TEST_EXPECT(buffer.isEmpty());
             SC_TEST_EXPECT(not builder.format("{{{{}}}-{{{}}}}", 1, 2));
             SC_TEST_EXPECT(buffer.isEmpty());
-        }
-        if (test_section("append"))
-        {
-            String        buffer(StringEncoding::Ascii);
-            StringBuilder builder(buffer);
-            SC_TEST_EXPECT(builder.append(StringView("asdf", 3, false, StringEncoding::Ascii)));
-            SC_TEST_EXPECT(builder.append("asd"));
-            SC_TEST_EXPECT(builder.append(String("asd").view()));
-            SC_TEST_EXPECT(buffer == "asdasdasd");
         }
         if (test_section("append"))
         {
@@ -129,24 +121,6 @@ struct SC::StringFormatTest : public SC::TestCase
             SC_TEST_EXPECT(buffer == "0_1_0");
             SC_TEST_EXPECT(builder.format("{0:.2}_{1}_{0:.4}", 1.2222, "salve"));
             SC_TEST_EXPECT(buffer == "1.22_salve_1.2222");
-        }
-        if (test_section("appendReplaceAll"))
-        {
-            String        buffer(StringEncoding::Ascii);
-            StringBuilder builder(buffer);
-            SC_TEST_EXPECT(builder.appendReplaceAll("123 456 123 10", "123", "1234"));
-            SC_TEST_EXPECT(buffer == "1234 456 1234 10");
-            buffer = String();
-            SC_TEST_EXPECT(builder.appendReplaceAll("088123", "123", "1"));
-            SC_TEST_EXPECT(buffer == "0881");
-        }
-        if (test_section("appendReplaceMultiple"))
-        {
-            String        buffer(StringEncoding::Utf8);
-            StringBuilder builder(buffer);
-            SC_TEST_EXPECT(
-                builder.appendReplaceMultiple("asd\\salve\\bas"_u8, {{"asd", "un"}, {"bas", "a_tutti"}, {"\\", "/"}}));
-            SC_TEST_EXPECT(buffer == "un/salve/a_tutti");
         }
     }
 };

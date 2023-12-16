@@ -31,7 +31,7 @@ SC::FileSystemIterator::~FileSystemIterator() {}
     Result res = internal.get().enumerateNext(currentEntry, options);
     if (not res)
     {
-        const StringView message(res.message, ::strlen(res.message), true, StringEncoding::Ascii);
+        const StringView message = StringView::fromNullTerminated(res.message, StringEncoding::Ascii);
         if (message != "Iteration Finished"_a8)
         {
             errorResult   = res;

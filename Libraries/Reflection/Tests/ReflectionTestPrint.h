@@ -48,7 +48,7 @@ inline int printTypes(StringBuilder& builder, int typeIndex, const Reflection::T
                       const Reflection::TypeStringView* typeNames)
 {
     SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-    const StringView typeName(typeNames[0].data, typeNames[0].length, false, StringEncoding::Ascii);
+    const StringView typeName({typeNames[0].data, typeNames[0].length}, false, StringEncoding::Ascii);
     builder.append("[{:02}] {}", typeIndex, typeName);
     switch (types[0].type)
     {
@@ -71,7 +71,7 @@ inline int printTypes(StringBuilder& builder, int typeIndex, const Reflection::T
         const Reflection::TypeInfo& field = types[idx + 1];
         builder.append("[{:02}] ", typeIndex + idx + 1);
 
-        const StringView fieldName(typeNames[idx + 1].data, typeNames[idx + 1].length, false, StringEncoding::Ascii);
+        const StringView fieldName({typeNames[idx + 1].data, typeNames[idx + 1].length}, false, StringEncoding::Ascii);
         if (types[0].type == Reflection::TypeCategory::TypeStruct)
         {
             builder.append("Type={}\tOffset={}\tSize={}\tName={}", typeCategoryToStringView(field.type),

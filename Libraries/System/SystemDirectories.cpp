@@ -70,7 +70,7 @@ bool SC::SystemDirectories::init()
 #if SC_XCTEST
     Dl_info dlinfo;
     SC_TRY(dladdr((void*)Memory::allocate, &dlinfo));
-    const StringView path(dlinfo.dli_fname, ::strlen(dlinfo.dli_fname), true, StringEncoding::Utf8);
+    const StringView path = StringView::fromNullTerminated(dlinfo.dli_fname, StringEncoding::Utf8);
     SC_TRY(executableFile.assign(path));
     SC_TRY(applicationRootDirectory.assign(Path::dirname(executableFile.view(), Path::Type::AsPosix, 3)));
     return true;
@@ -99,9 +99,8 @@ bool SC::SystemDirectories::init()
             char          urlToFs[MaxPathLength];
             if (CFURLGetFileSystemRepresentation(bundleURL, true, reinterpret_cast<uint8_t*>(urlToFs), MaxPathLength))
             {
-                StringView bundlePath(urlToFs, strlen(urlToFs), true, StringEncoding::Utf8);
                 CFRelease(bundleURL);
-                return applicationRootDirectory.assign(bundlePath);
+                return applicationRootDirectory.assign(StringView::fromNullTerminated(urlToFs, StringEncoding::Utf8));
             }
             CFRelease(bundleURL);
         }
@@ -123,9 +122,8 @@ bool SC::SystemDirectories::init()
     id appFolder  = ((id(*)(id, SEL))objc_msgSend)(mainBundle, bundleURLSel);
     id path       = ((id(*)(id, SEL))objc_msgSend)(appFolder, pathSel);
 
-    const char* theString = ((const char* (*)(id, SEL))objc_msgSend)(path, UTF8StringSel);
-    StringView  bundlePath(theString, strlen(theString), true, StringEncoding::Utf8);
-    applicationRootDirectory = bundlePath;
+    const char* theString    = ((const char* (*)(id, SEL))objc_msgSend)(path, UTF8StringSel);
+    applicationRootDirectory = StringView::fromNullTerminated(theString, StringEncoding::Utf8);
     ((void (*)(id, SEL))objc_msgSend)(pool, sel_getUid("release"));
     return true;
 #endif

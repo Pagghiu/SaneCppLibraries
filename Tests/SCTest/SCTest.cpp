@@ -21,8 +21,10 @@ void runFunctionTest(TestReport& report);
 void runUniqueHandleTest(TestReport& report);
 void runOptionalTest(TestReport& report);
 void runTaggedUnionTest(TestReport& report);
+void runStringTest(TestReport& report);
 void runSmallStringTest(TestReport& report);
 void runStringConverterTest(TestReport& report);
+void runStringBuilderTest(TestReport& report);
 void runStringFormatTest(TestReport& report);
 void runStringViewTest(TestReport& report);
 
@@ -123,7 +125,9 @@ int main(int argc, const char* argv[])
     runOptionalTest(report);
     runSmallVectorTest(report);
     runStringConverterTest(report);
+    runStringBuilderTest(report);
     runStringFormatTest(report);
+    runStringTest(report);
     runSmallStringTest(report);
     runStringViewTest(report);
     runTaggedUnionTest(report);

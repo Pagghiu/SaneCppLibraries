@@ -52,6 +52,26 @@ struct StringFormatOutput
 };
 
 /// @brief Formats String with a simple DSL embedded in the format string
+///
+/// This is a small implementation to format using a minimal string based DSL, but good enough for simple usages.
+/// It uses the same `{}` syntax and supports positional arguments. @n
+/// `StringFormat::format(output, "{1} {0}", "World", "Hello")` is formatted as `"Hello World"`. @n
+///  Inside the `{}` after a colon (`:`) a specification string can be used to indicate how to format
+/// the given value. As the backend for actual number to string formatting is `snprintf`, such specification strings are
+/// the same as what would be given to snprintf. For example passing `"{:02}"` is transformed to `"%.02f"` when passed
+/// to snprintf. @n
+/// `{` is escaped if found near to another `{`. In other words `format("{{")` will print a single `{`.
+///
+/// Example:
+/// @code{.cpp}
+/// String        buffer(StringEncoding::Ascii);
+/// StringBuilder builder(buffer);
+/// SC_TEST_EXPECT(builder.format("{1}_{0}_{1}", 1, 0));
+/// SC_TEST_EXPECT(buffer == "0_1_0");
+/// SC_TEST_EXPECT(builder.format("{0:.2}_{1}_{0:.4}", 1.2222, "salve"));
+/// SC_TEST_EXPECT(buffer == "1.22_salve_1.2222");
+/// @endcode
+/// @note It's not convenient to use SC::StringFormat directly, as you should probably use SC::StringBuilder
 /// @tparam RangeIterator Type of the specific StringIterator used
 template <typename RangeIterator>
 struct StringFormat
@@ -228,7 +248,7 @@ struct StringFormatterFor<char[N]>
 {
     static bool format(StringFormatOutput& data, const StringView specifier, const char* str)
     {
-        const StringView sv(str, N - 1, true, StringEncoding::Ascii);
+        const StringView sv({str, N - 1}, true, StringEncoding::Ascii);
         return StringFormatterFor<StringView>::format(data, specifier, sv);
     }
 };

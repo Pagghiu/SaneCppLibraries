@@ -31,7 +31,7 @@ static bool formatSprintf(StringFormatOutput& data, const char (&formatSpecifier
     const int  numCharsExcludingTerminator = snprintf(buffer, sizeof(buffer), compoundSpecifier, value);
     const bool validResult =
         (numCharsExcludingTerminator >= 0) and (static_cast<size_t>(numCharsExcludingTerminator + 1) < BUFFER_SIZE);
-    return validResult && data.append(StringView(buffer, static_cast<size_t>(numCharsExcludingTerminator), true,
+    return validResult && data.append(StringView({buffer, static_cast<size_t>(numCharsExcludingTerminator)}, true,
                                                  StringEncoding::Ascii));
 }
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
@@ -131,13 +131,13 @@ bool StringFormatterFor<double>::format(StringFormatOutput& data, const StringVi
 bool StringFormatterFor<char>::format(StringFormatOutput& data, const StringView specifier, const char value)
 {
     SC_COMPILER_UNUSED(specifier);
-    return data.append(StringView(&value, sizeof(value), false, StringEncoding::Ascii));
+    return data.append(StringView({&value, sizeof(value)}, false, StringEncoding::Ascii));
 }
 
 bool StringFormatterFor<const char*>::format(StringFormatOutput& data, const StringView specifier, const char* value)
 {
     SC_COMPILER_UNUSED(specifier);
-    return data.append(StringView(value, strlen(value), true, StringEncoding::Ascii));
+    return data.append(StringView::fromNullTerminated(value, StringEncoding::Ascii));
 }
 
 #if SC_PLATFORM_WINDOWS

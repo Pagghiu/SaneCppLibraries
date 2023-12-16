@@ -115,7 +115,7 @@ SC::Result SC::Process::formatArguments(Span<const StringView> params)
             SC_TRY(formattedCmd.appendNullTerminated(" "));
         }
         first = false;
-        if (svp.containsChar(' ')) // TODO: Must escape also quotes
+        if (svp.containsCodePoint(' ')) // TODO: Must escape also quotes
         {
             SC_TRY(formattedCmd.appendNullTerminated("\""));
             SC_TRY(formattedCmd.appendNullTerminated(svp));

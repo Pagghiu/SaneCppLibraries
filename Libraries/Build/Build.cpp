@@ -74,21 +74,21 @@ const SC::Build::Configuration* SC::Build::Project::getConfiguration(StringView 
 
 bool SC::Build::Project::addDirectory(StringView subdirectory, StringView filter)
 {
-    if (subdirectory.containsChar('*') or subdirectory.containsChar('?'))
+    if (subdirectory.containsCodePoint('*') or subdirectory.containsCodePoint('?'))
         return false;
     return files.push_back({Project::File::Add, subdirectory, filter});
 }
 
 bool SC::Build::Project::addFile(StringView singleFile)
 {
-    if (singleFile.containsChar('*') or singleFile.containsChar('?'))
+    if (singleFile.containsCodePoint('*') or singleFile.containsCodePoint('?'))
         return false;
     return files.push_back({Project::File::Add, {}, singleFile});
 }
 
 bool SC::Build::Project::removeFiles(StringView subdirectory, StringView filter)
 {
-    if (subdirectory.containsChar('*') or subdirectory.containsChar('?'))
+    if (subdirectory.containsCodePoint('*') or subdirectory.containsCodePoint('?'))
         return false;
     return files.push_back({Project::File::Remove, subdirectory, filter});
 }
@@ -150,7 +150,7 @@ SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const V
     bool doRecurse = false;
     for (const auto& it : filters)
     {
-        if (it.mask.view().containsChar('/'))
+        if (it.mask.view().containsCodePoint('/'))
         {
             doRecurse = true;
             break;
@@ -251,7 +251,7 @@ SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<Strin
                         if (overlapExisting.isEmpty())
                         {
                             // Case .5 and .3 after .2
-                            if (overlapNew.startsWithChar('/'))
+                            if (overlapNew.startsWithCodePoint('/'))
                             {
                                 // Case .3 after 2 (can be merged)
                                 Project::File mergedFile;

@@ -16,12 +16,12 @@ SC::TestReport::TestReport(Console& console, int argc, const char** argv) : cons
 {
     for (int idx = 1; idx < argc; ++idx)
     {
-        const auto param = StringView(argv[idx], strlen(argv[idx]), true, StringEncoding::Ascii);
+        const auto param = StringView::fromNullTerminated(argv[idx], StringEncoding::Ascii);
         if (param == "--test"_a8 && testToRun.isEmpty())
         {
             if (idx + 1 < argc)
             {
-                testToRun = StringView(argv[idx + 1], strlen(argv[idx + 1]), true, StringEncoding::Ascii);
+                testToRun = StringView::fromNullTerminated(argv[idx + 1], StringEncoding::Ascii);
 
                 console.print("TestReport::Running single test \"{}\"\n"_a8, testToRun);
             }
@@ -30,7 +30,7 @@ SC::TestReport::TestReport(Console& console, int argc, const char** argv) : cons
         {
             if (idx + 1 < argc)
             {
-                sectionToRun = StringView(argv[idx + 1], strlen(argv[idx + 1]), true, StringEncoding::Ascii);
+                sectionToRun = StringView::fromNullTerminated(argv[idx + 1], StringEncoding::Ascii);
 
                 console.print("TestReport::Running single section \"{}\"\n"_a8, sectionToRun);
             }
@@ -138,7 +138,7 @@ bool SC::TestCase::recordExpectation(StringView expression, Result status)
 {
     return recordExpectation(
         expression, status,
-        StringView(status.message, status.message ? ::strlen(status.message) : 0, true, StringEncoding::Ascii));
+        StringView({status.message, status.message ? ::strlen(status.message) : 0}, true, StringEncoding::Ascii));
 }
 
 bool SC::TestCase::test_section(StringView sectionName)

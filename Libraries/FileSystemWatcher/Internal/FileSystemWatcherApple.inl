@@ -260,7 +260,7 @@ struct SC::FileSystemWatcher::Internal
             if (flags & EVENT_SYSTEM)
                 continue;
 
-            const StringView path(paths[idx], strlen(paths[idx]), true, StringEncoding::Utf8);
+            const StringView path          = StringView::fromNullTerminated(paths[idx], StringEncoding::Utf8);
             internal.notification.fullPath = path;
 
             const bool isDirectory = flags & kFSEventStreamEventFlagItemIsDir;
@@ -296,7 +296,7 @@ struct SC::FileSystemWatcher::Internal
                     StringView relativePath        = path.sliceStartBytes(watcher->path.view().sizeInBytes());
 
                     // TODO: Refactor into a 'trimEnd'
-                    while (relativePath.sizeInBytes() > 1 and relativePath.startsWithChar('/'))
+                    while (relativePath.sizeInBytes() > 1 and relativePath.startsWithCodePoint('/'))
                     {
                         // Remove initial '/'
                         relativePath = relativePath.sliceStart(1);

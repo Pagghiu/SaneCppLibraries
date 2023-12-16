@@ -58,7 +58,7 @@ struct SC::ArrayTest : public SC::TestCase
                 SC_TEST_EXPECT(arr.push_back(str));
                 SC_TEST_EXPECT(arr.push_back(str));
             }
-            StringView sv(arr[1].data(), arr[1].size() - 1, true, StringEncoding::Ascii);
+            StringView sv({arr[1].data(), arr[1].size() - 1}, true, StringEncoding::Ascii);
             SC_TEST_EXPECT(sv == testString);
             SC_TEST_EXPECT(arr.resize(10));
             SC_TEST_EXPECT(not arr.push_back(arr[0]));
@@ -74,12 +74,12 @@ struct SC::ArrayTest : public SC::TestCase
             Array<Vector<char>, 11> arr2 = arr;
             SC_TEST_EXPECT(arr2.size() == 2);
             SC_TEST_EXPECT(arr2.capacity() == 11);
-            StringView sv(arr2.back().data(), arr2.back().size() - 1, true, StringEncoding::Ascii);
+            StringView sv({arr2.back().data(), arr2.back().size() - 1}, true, StringEncoding::Ascii);
             SC_TEST_EXPECT(sv == testString);
 
             Array<Vector<char>, 2> arr3;
             SC_TEST_EXPECT(arr3.appendMove(arr));
-            sv = StringView(arr3.back().data(), arr3.back().size() - 1, true, StringEncoding::Ascii);
+            sv = StringView({arr3.back().data(), arr3.back().size() - 1}, true, StringEncoding::Ascii);
             SC_TEST_EXPECT(sv == testString);
         }
         if (test_section("assignment"))

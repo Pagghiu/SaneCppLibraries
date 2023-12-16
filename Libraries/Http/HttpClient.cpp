@@ -38,7 +38,7 @@ SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringView url)
 
 SC::StringView SC::HttpClient::getResponse() const
 {
-    return StringView(content.data(), content.size(), false, StringEncoding::Ascii);
+    return StringView(content.toSpanConst(), false, StringEncoding::Ascii);
 }
 
 void SC::HttpClient::onConnected(AsyncSocketConnect::Result& result)

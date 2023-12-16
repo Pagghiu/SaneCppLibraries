@@ -105,8 +105,7 @@ struct SC::FileSystemIterator::Internal
             }
         }
 
-        entry.name =
-            StringView(dirEnumerator.cFileName, wcsnlen_s(dirEnumerator.cFileName, MAX_PATH) * sizeof(wchar_t), true);
+        entry.name = StringView({dirEnumerator.cFileName, wcsnlen_s(dirEnumerator.cFileName, MAX_PATH)}, true);
         SC_TRY(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
         SC_TRY(currentPath.appendNullTerminated(options.forwardSlashes ? L"/" : L"\\"));
         SC_TRY(currentPath.appendNullTerminated(entry.name));

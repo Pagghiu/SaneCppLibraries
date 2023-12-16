@@ -2,10 +2,8 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../SmallString.h"
-#include "../../Algorithms/AlgorithmBubbleSort.h"
 #include "../../Containers/SmallVector.h"
 #include "../../Testing/Testing.h"
-#include "../String.h"
 #include "../StringBuilder.h"
 
 namespace SC
@@ -18,38 +16,6 @@ struct SC::SmallStringTest : public SC::TestCase
     SmallStringTest(SC::TestReport& report) : TestCase(report, "SmallStringTest")
     {
         using namespace SC;
-
-        if (test_section("construction_comparison"))
-        {
-            StringView sv  = "Test String";
-            String     str = String("Test String");
-            SC_TEST_EXPECT(str == sv);
-            // SC_TEST_EXPECT(sv == str);
-            SC_TEST_EXPECT(str != "ASD");
-            SC_TEST_EXPECT(str == "Test String");
-            SC_TEST_EXPECT(str == str);
-            SC_TEST_EXPECT(str != String("ASD"));
-            str = "Salver";
-            SC_TEST_EXPECT(str == "Salver");
-            // SC_TEST_EXPECT(str < "Zest Ztring");
-        }
-        if (test_section("compare"))
-        {
-            StringView sv[3] = {
-                StringView("3"),
-                StringView("1"),
-                StringView("2"),
-            };
-            Algorithms::bubbleSort(sv, sv + 3, [](StringView a, StringView b) { return a < b; });
-            SC_TEST_EXPECT(sv[0] == "1");
-            SC_TEST_EXPECT(sv[1] == "2");
-            SC_TEST_EXPECT(sv[2] == "3");
-            Algorithms::bubbleSort(
-                sv, sv + 3, [](StringView a, StringView b) { return a.compare(b) == StringView::Comparison::Bigger; });
-            SC_TEST_EXPECT(sv[0] == "3");
-            SC_TEST_EXPECT(sv[1] == "2");
-            SC_TEST_EXPECT(sv[2] == "1");
-        }
         if (test_section("construction move SmallVector(heap)->Vector"))
         {
             String vec2;
@@ -98,14 +64,6 @@ struct SC::SmallStringTest : public SC::TestCase
             SC_TEST_EXPECT(ss.data.size() == 5);
             SC_TEST_EXPECT(ss.data.capacity() == 5);
             SC_TEST_EXPECT(SegmentHeader::getSegmentHeader(ss.data.items)->isSmallVector);
-        }
-        if (test_section("HexString"))
-        {
-            uint8_t bytes[4] = {0x12, 0x34, 0x56, 0x78};
-
-            String        s;
-            StringBuilder b(s);
-            SC_TEST_EXPECT(b.appendHex({bytes, sizeof(bytes)}) and s.view() == "12345678");
         }
     }
 };

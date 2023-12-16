@@ -18,7 +18,12 @@ struct Reflect;
 //! @addtogroup group_strings
 //! @{
 
-/// @brief A non-modifiable owning string with associated encoding
+/// @brief A non-modifiable owning string with associated encoding.
+///
+/// SC::String is (currently) implemented as a SC::Vector with the associated string encoding.
+/// A SC::StringView can be obtained from it calling SC::String::view method but it's up to the user making sure that
+/// the usage of such SC::StringView doesn't exceed lifetime of the SC::String it originated from (but thankfully
+/// Address Sanitizer will catch the issue if it goes un-noticed).
 struct SC::String
 {
     /// @brief Builds an empty String with a given Encoding
@@ -37,7 +42,7 @@ struct SC::String
     template <size_t N>
     String(const char (&text)[N])
     {
-        SC_ASSERT_RELEASE(assign(StringView(text, N - 1, true, StringEncoding::Ascii)));
+        SC_ASSERT_RELEASE(assign(StringView({text, N - 1}, true, StringEncoding::Ascii)));
     }
 
     /// @brief Assigns a StringView to this String, replacing existing contents
@@ -118,7 +123,7 @@ struct SC::String
     template <size_t N>
     String& operator=(const char (&text)[N])
     {
-        SC_ASSERT_RELEASE(assign(StringView(text, N - 1, true, StringEncoding::Ascii)));
+        SC_ASSERT_RELEASE(assign(StringView({text, N - 1}, true, StringEncoding::Ascii)));
         return *this;
     }
 
@@ -180,7 +185,7 @@ inline SC::StringView SC::String::view() const
 {
     const bool  isEmpty = data.isEmpty();
     const char* items   = isEmpty ? nullptr : data.items;
-    return StringView(items, isEmpty ? 0 : data.size() - StringEncodingGetSize(encoding), not isEmpty, encoding);
+    return StringView({items, isEmpty ? 0 : data.size() - StringEncodingGetSize(encoding)}, not isEmpty, encoding);
 }
 
 inline auto SC::String::nativeWritableBytesIncludingTerminator()

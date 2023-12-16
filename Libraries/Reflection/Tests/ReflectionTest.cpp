@@ -237,10 +237,10 @@ struct SC::ReflectionTest : public SC::TestCase
 
         constexpr auto       className        = TypeToString<TestNamespace::ComplexStructure>::get();
         constexpr StringView classNameExected = "TestNamespace::ComplexStructure";
-        constexpr StringView classNameView(className.data, className.length, false, StringEncoding::Ascii);
+        constexpr StringView classNameView({className.data, className.length}, false, StringEncoding::Ascii);
         static_assert(classNameView == classNameExected, "Please update SC::ClNm for your compiler");
         constexpr auto intName     = TypeToString<int>::get();
-        constexpr auto intNameView = StringView(intName.data, intName.length, false, StringEncoding::Ascii);
+        constexpr auto intNameView = StringView({intName.data, intName.length}, false, StringEncoding::Ascii);
         static_assert(intNameView == "int", "Please update SC::ClNm for your compiler");
 
         static_assert(not ExtendedTypeInfo<String>::IsPacked, "String should not be packed");

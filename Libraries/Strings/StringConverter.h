@@ -15,7 +15,13 @@ struct String;
 //! @addtogroup group_strings
 //! @{
 
-/// @brief Converts String to a different encoding (UTF8, UTF16)
+/// @brief Converts String to a different encoding (UTF8, UTF16).
+///
+/// SC::StringConverter converts strings between different UTF encodings and can add null-terminator if requested.
+/// When the SC::StringView is already null-terminated, the class just forwards the original SC::StringView.
+///
+/// Example:
+/// \snippet Libraries/Strings/Tests/StringConverterTest.cpp stringConverterTestSnippet
 struct SC::StringConverter
 {
     /// @brief Specifies if to add a null terminator

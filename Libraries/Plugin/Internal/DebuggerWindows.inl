@@ -81,7 +81,7 @@ struct SC::Debugger::Internal
         SC::Vector<WCHAR> nameBuffer;
         SC_TRY(nameBuffer.resizeWithoutInitializing(USHRT_MAX));
 
-        if (theFile.startsWithChar('\\'))
+        if (theFile.startsWithCodePoint('\\'))
         {
             theFile = theFile.sliceStart(1); // Eat one slash
         }
@@ -186,7 +186,7 @@ struct SC::Debugger::Internal
                       nameLengthInBytes / sizeof(WCHAR));
             nameBuffer[nameLengthInBytes / sizeof(WCHAR)] = L'\0';
 
-            StringView handleName = StringView(nameBuffer.data(), nameLengthInBytes, true);
+            StringView handleName = StringView({nameBuffer.data(), nameLengthInBytes / sizeof(WCHAR)}, true);
             // theFile          is something like              Y:\MyDir\Sub.pdb
             // theFileDirectory is something like                 MyDir\Sub.pdb
             // handleName       is something like \Device\Mup\Mac\MyDir\Sub.pdb

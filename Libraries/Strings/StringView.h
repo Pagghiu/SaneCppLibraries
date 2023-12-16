@@ -19,6 +19,31 @@ struct SC_COMPILER_EXPORT StringAlgorithms;
 //! @{
 
 /// @brief Non-owning view over a range of characers with UTF Encoding.
+///
+/// It additional also holds the SC::StringEncoding information (`ASCII`, `UTF8` or `UTF16`).
+/// During construction the encoding information and the null-termination state must be specified.
+/// All methods are const because it's not possible to modify a string with it.
+/// @n
+/**
+    Example (Construct)
+    @code{.cpp}
+    StringView s("asd");
+    SC_ASSERT_RELEASE(s.sizeInBytes() == 3);
+    SC_ASSERT_RELEASE(s.isNullTerminated());
+    @endcode
+
+    Example (Construct from null terminated string)
+    @code{.cpp}
+    const char* somestring = "asdf";
+    // construct only "asd", not null terminated (as there is 'f' after 'd')
+    StringView s({somestring, strlen(asd) - 1}, false, StringEncoding::Ascii);
+    SC_ASSERT_RELEASE(s.sizeInBytes() == 3);
+    SC_ASSERT_RELEASE(not s.isNullTerminated());
+    //
+    // ... or
+    StringView s2 = StringView::fromNullTerminated(s, StringEncoding::Ascii); // s2 == "asdf"
+    @endcode
+*/
 struct SC::StringView
 {
     /// @brief Construct an emtpy StringView
@@ -29,28 +54,7 @@ struct SC::StringView
     /// @param nullTerm `true` if a null terminator code point is expected to be found after Span.
     ///                 On ASCII and UTF8 this is 1 byte, on UTF16 it must be 2 bytes.
     /// @param encoding The encoding of the text contained in this StringView
-    constexpr StringView(Span<char> textSpan, bool nullTerm, StringEncoding encoding);
-
-    /// @brief Construct a StringView from a Span of bytes.
-    /// @param textSpan The span containing the text _EXCLUDING_ eventual null terminator
-    /// @param nullTerm `true` if a null terminator code point is expected to be found after Span.
-    ///                 On ASCII and UTF8 this is 1 byte, on UTF16 it must be 2 bytes.
-    /// @param encoding The encoding of the text contained in this StringView
     constexpr StringView(Span<const char> textSpan, bool nullTerm, StringEncoding encoding);
-
-    /// @brief Construct a StringView from a C string
-    /// @param text The C-String
-    /// @param numBytes Number of bytes in the string EXCLUDING null terminator
-    /// @param nullTerm `true` if a null terminator code point is expected to be found after Span.
-    ///                 On ASCII and UTF8 this is 1 byte, on UTF16 it must be 2 bytes.
-    /// @param encoding The encoding of the text contained in this StringView
-    constexpr StringView(const char* text, size_t numBytes, bool nullTerm, StringEncoding encoding);
-
-    /// @brief Constructs a StringView from a null-terminated C-String
-    /// @param text The null-terminated C-String
-    /// @param encoding The encoding of the text contained in this StringView
-    /// @return The StringView containing text with given encoding
-    static StringView fromNullTerminated(const char* text, StringEncoding encoding);
 
     /// @brief Constructs a StringView with a null terminated string terminal
     /// @tparam N Number of characters in text string literal
@@ -64,18 +68,18 @@ struct SC::StringView
     /// @param text The Null terminated wide-string literal
     template <size_t N>
     constexpr StringView(const wchar_t (&text)[N]);
-    /// @brief Constructs an UTF16 StringView from a null-terminated wide C-String
-    /// @param text The null-terminated wide C-String
-    /// @param numBytes Number of bytes in the string EXCLUDING null terminator (that must be 2 bytes)
-    /// @param nullTerm `true` if a null terminator code point is expected to be found after Span.
-    ///                 On ASCII and UTF8 this is 1 byte, on UTF16 it must be 2 bytes.
-    constexpr StringView(const wchar_t* text, size_t numBytes, bool nullTerm);
 
     /// @brief Construct an UTF16 StringView from a Span of bytes.
     /// @param textSpan The span containing the text _EXCLUDING_ eventual null terminator
     /// @param nullTerm `true` if a null terminator code point is expected to be found after Span (two bytes on UTF16)
     constexpr StringView(Span<const wchar_t> textSpan, bool nullTerm);
 #endif
+
+    /// @brief Constructs a StringView from a null-terminated C-String
+    /// @param text The null-terminated C-String
+    /// @param encoding The encoding of the text contained in this StringView
+    /// @return The StringView containing text with given encoding
+    static StringView fromNullTerminated(const char* text, StringEncoding encoding);
 
     /// @brief Get encoding of this StringView
     /// @return This StringView encoding
@@ -110,19 +114,48 @@ struct SC::StringView
     /// @brief Result of ordering comparison done by StringView::compare
     enum class Comparison
     {
-        Smaller = -1, ///< Current string is smaller than the other
-        Equals  = 0,  ///< Current string is equal to the other
-        Bigger  = 1   ///< Current string is bigger than the other
+        Smaller = -1, ////< Current string is smaller than the other
+        Equals  = 0,  ////< Current string is equal to the other
+        Bigger  = 1   ////< Current string is bigger than the other
     };
 
     /// @brief Ordering comparison between non-normalized StringView (operates on code points, not on utf graphemes)
     /// @param other The string being compared to current one
     /// @return Result of the comparison (smaller, equals or bigger)
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// // àèìòù (1 UTF16-LE sequence, 2 UTF8 sequence)
+    /// SC_ASSERT_RELEASE("\xc3\xa0\xc3\xa8\xc3\xac\xc3\xb2\xc3\xb9"_u8.compare(
+    ///                     "\xe0\x0\xe8\x0\xec\x0\xf2\x0\xf9\x0"_u16) == StringView::Comparison::Equals);
+    ///
+    /// // 日本語語語 (1 UTF16-LE sequence, 3 UTF8 sequence)
+    /// StringView stringutf8  = StringView("\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e\xe8\xaa\x9e\xe8\xaa\x9e"_u8);
+    /// StringView stringutf16 = StringView("\xE5\x65\x2C\x67\x9E\x8a\x9E\x8a\x9E\x8a\x00"_u16); // LE
+    /// // Comparisons are on code points NOT grapheme clusters!!
+    /// SC_ASSERT_RELEASE(stringutf8.compare(stringutf16) == StringView::Comparison::Equals);
+    /// SC_ASSERT_RELEASE(stringutf16.compare(stringutf8) == StringView::Comparison::Equals);
+    /// SC_ASSERT_RELEASE(stringutf8 == stringutf16);
+    /// SC_ASSERT_RELEASE(stringutf16 == stringutf8);
+    /// @endcode
     [[nodiscard]] Comparison compare(StringView other) const;
 
     /// @brief Ordering operator for StringView using StringView::compare
     /// @param other The string being compared to current one
     /// @return `true` if current string is Comparison::Smaller than other
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// StringView sv[3] = {
+    ///     StringView("3"),
+    ///     StringView("1"),
+    ///     StringView("2"),
+    /// };
+    /// Algorithms::bubbleSort(sv, sv + 3, [](StringView a, StringView b) { return a < b; });
+    /// SC_TEST_EXPECT(sv[0] == "1");
+    /// SC_TEST_EXPECT(sv[1] == "2");
+    /// SC_TEST_EXPECT(sv[2] == "3");
+    /// @endcode
     [[nodiscard]] bool operator<(StringView other) const { return compare(other) == Comparison::Smaller; }
 
     /// @brief Call given lambda with one of StringIteratorASCII, StringIteratorUTF8, StringIteratorUTF16 depending on
@@ -162,10 +195,17 @@ struct SC::StringView
     [[nodiscard]] constexpr bool operator==(StringView other) const;
 
     /// @brief Check if this StringView is equal to other StringView (operates on code points, not on utf graphemes).
-    /// Returns the number of code points that are the same in both StringViews.
+    /// Returns the number of code points that are the same in both StringView-s.
     /// @param other The StringView to be compared to
     /// @param commonOverlappingPoints number of equal code points in both StringView
     /// @return `true` if the two StringViews are equal
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// StringView asd = "123 456"_a8;
+    /// size_t overlapPoints = 0;
+    /// SC_TEST_EXPECT(not asd.fullyOverlaps("123___", overlapPoints) and overlapPoints == 3);
+    /// @endcode
     [[nodiscard]] constexpr bool fullyOverlaps(StringView other, size_t& commonOverlappingPoints) const;
 
     /// @brief Check if StringView is empty
@@ -189,21 +229,41 @@ struct SC::StringView
     /// @brief Check if StringView ends with given utf code point
     /// @param c The utf code point to check against
     /// @return  Returns `true` if this StringView ends with code point c
-    [[nodiscard]] bool endsWithChar(StringCodePoint c) const;
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// SC_TEST_EXPECT("123 456".endsWithCodePoint("6"));
+    /// @endcode
+    [[nodiscard]] bool endsWithCodePoint(StringCodePoint c) const;
 
     /// @brief Check if StringView starts with given utf code point
     /// @param c The utf code point to check against
     /// @return  Returns `true` if this StringView starts with code point c
-    [[nodiscard]] bool startsWithChar(StringCodePoint c) const;
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// SC_TEST_EXPECT("123 456".startsWithCodePoint("1"));
+    /// @endcode
+    [[nodiscard]] bool startsWithCodePoint(StringCodePoint c) const;
 
     /// @brief Check if StringView starts with another StringView
     /// @param str The other StringView to check with current
     /// @return  Returns `true` if this StringView starts with str
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// SC_TEST_EXPECT("123 456".startsWith("123"));
+    /// @endcode
     [[nodiscard]] bool startsWith(const StringView str) const;
 
     /// @brief Check if StringView ends with another StringView
     /// @param str The other StringView to check with current
     /// @return  Returns `true` if this StringView ends with str
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// SC_TEST_EXPECT("123 456".endsWith("456"));
+    /// @endcode
     [[nodiscard]] bool endsWith(const StringView str) const;
 
     /// @brief Check if StringView contains another StringView with compatible encoding.
@@ -211,17 +271,26 @@ struct SC::StringView
     /// @return  Returns `true` if this StringView contains str
     /// @warning This method will assert if strings have non compatible encoding.
     ///          It can be checked with StringView::hasCompatibleEncoding (str) == `true`
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// StringView asd = "123 456";
+    /// SC_TRY(asd.containsString("123"));
+    /// SC_TRY(asd.containsString("456"));
+    /// SC_TRY(not asd.containsString("124"));
+    /// SC_TRY(not asd.containsString("4567"));
+    /// @endcode
     [[nodiscard]] bool containsString(const StringView str) const;
 
     /// @brief Check if StringView contains given utf code point
     /// @param c The utf code point to check against
     /// @return  Returns `true` if this StringView contains code point c
-    [[nodiscard]] bool containsChar(StringCodePoint c) const;
+    [[nodiscard]] bool containsCodePoint(StringCodePoint c) const;
 
     /// @brief Check if current StringView has compatible encoding with str.
     ///        This means checking if two encodings have the same utf unit size.
     /// @param str The other StringView to check with current
-    /// @return Returns `true` if this StringView has compatible encoding with str
+    /// @return `true` if this StringView has compatible encoding with str
     [[nodiscard]] constexpr bool hasCompatibleEncoding(StringView str) const;
 
     /// Returns a StringView from two iterators. The from iterator will be shortened until the start of to
@@ -254,33 +323,71 @@ struct SC::StringView
     /// @param start The initial code point where the slice starts
     /// @param end One after the final code point where the slice ends
     /// @return The `[start, end)` StringView slice
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// StringView str = "123_567";
+    /// SC_TEST_EXPECT(str.sliceStartEnd(0, 3) == "123");
+    /// SC_TEST_EXPECT(str.sliceStartEnd(4, 7) == "567");
+    /// @endcode
     [[nodiscard]] StringView sliceStartEnd(size_t start, size_t end) const;
 
     /// @brief Get slice `[start, start+length]` starting at offset `start` and of `length` code points
     /// @param start The initial code point where the slice starts
     /// @param length One after the final code point where the slice ends
     /// @return The `[start, start+length]` StringView slice
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// StringView str = "123_567";
+    /// SC_TEST_EXPECT(str.sliceStartLength(7, 0) == "");
+    /// SC_TEST_EXPECT(str.sliceStartLength(0, 3) == "123");
+    /// @endcode
     [[nodiscard]] StringView sliceStartLength(size_t start, size_t length) const;
 
     /// @brief Get slice `[offset, end]` measured in utf code points
     /// @param offset The initial code point where the slice starts
     /// @return The sliced StringView `[offset, end]`
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// StringView str = "123_567";
+    /// SC_TEST_EXPECT(str.sliceStart(4) == "567");
+    /// @endcode
     [[nodiscard]] StringView sliceStart(size_t offset) const;
 
     /// @brief Get slice `[end-offset, end]` measured in utf code points
     /// @param offset The initial code point where the slice starts
     /// @return The sliced StringView `[end-offset, end]`
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// StringView str = "123_567";
+    /// SC_TEST_EXPECT(str.sliceEnd(4) == "123");
+    /// @endcode
     [[nodiscard]] StringView sliceEnd(size_t offset) const;
 
     /// @brief Returns a shortened StringView without utf code points matching `c` at end.
     /// @param c The utf code point to look for
     /// @return The trimmed StringView
-    [[nodiscard]] StringView trimEndingChar(StringCodePoint c) const;
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// SC_TEST_EXPECT("myTest___"_a8.trimEndingCodePoint('_') == "myTest");
+    /// SC_TEST_EXPECT("myTest"_a8.trimEndingCodePoint('_') == "myTest");
+    /// @endcode
+    [[nodiscard]] StringView trimEndingCodePoint(StringCodePoint c) const;
 
     /// @brief Returns a shortened StringView without utf code points matching `c` at start.
     /// @param c The utf code point to look for
     /// @return The trimmed StringView
-    [[nodiscard]] StringView trimStartingChar(StringCodePoint c) const;
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// SC_TEST_EXPECT("___myTest"_a8.trimStartingCodePoint('_') == "myTest");
+    /// SC_TEST_EXPECT("_myTest"_a8.trimStartingCodePoint('_') == "myTest");
+    /// @endcode
+    [[nodiscard]] StringView trimStartingCodePoint(StringCodePoint c) const;
 
     /// @brief Returns a shortened StringView from current cutting the first `start` bytes.
     /// @param start Offset in bytes where the slice starts.
@@ -303,27 +410,72 @@ struct SC::StringView
 
     /// @brief Check if StringView can be parsed as an integer number.
     /// @return `true` if StringView is an integer number.
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// SC_TEST_EXPECT("-34"_a8.isIntegerNumber());
+    /// SC_TEST_EXPECT("+12"_a8.isIntegerNumber());
+    /// SC_TEST_EXPECT(not "+12$"_a8.isIntegerNumber());
+    /// @endcode
     [[nodiscard]] bool isIntegerNumber() const;
 
     /// @brief Check if StringView can be parsed as an floating point number.
     /// @return `true` if StringView is a floating point number.
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// SC_TEST_EXPECT("-34."_a8.isFloatingNumber());
+    /// SC_TEST_EXPECT("-34.0"_a8.isFloatingNumber());
+    /// SC_TEST_EXPECT("0.34"_a8.isFloatingNumber());
+    /// SC_TEST_EXPECT(not "+12$"_a8.isFloatingNumber());
+    /// SC_TEST_EXPECT(not "$+12"_a8.isFloatingNumber());
+    /// SC_TEST_EXPECT(not "+$12"_a8.isFloatingNumber());
+    /// @endcode
     [[nodiscard]] bool isFloatingNumber() const;
-
-    /// Parses int32, returning false if it fails
 
     /// @brief Try parsing current StringView as a 32 bit integer.
     /// @param value Will receive the parsed 32 bit integer, if function returns `true`.
     /// @return `true` if the StringView has been successfully parsed as a 32 bit integer.
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// StringView other("123");
+    /// int32_t    value;
+    /// if(other.parseInt32(value))
+    /// {
+    ///     // ... do something with value
+    /// }
+    /// @endcode
     [[nodiscard]] bool parseInt32(int32_t& value) const;
 
     /// @brief Try parsing current StringView as a floating point number.
     /// @param value Will receive the parsed floating point number, if function returns `true`.
     /// @return `true` if the StringView has been successfully parsed as a floating point number.
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// StringView other("12.34");
+    /// float    value;
+    /// if(other.parseFloat(value))
+    /// {
+    ///     // ... do something with value
+    /// }
+    /// @endcode
     [[nodiscard]] bool parseFloat(float& value) const;
 
     /// @brief Try parsing current StringView as a double precision floating point number.
     /// @param value Will receive the parsed double precision floating point number, if function returns `true`.
     /// @return `true` if the StringView has been successfully parsed as a double precision floating point number.
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// StringView other("12.342321");
+    /// double    value;
+    /// if(other.parseDouble(value))
+    /// {
+    ///     // ... do something with value
+    /// }
+    /// @endcode
     [[nodiscard]] bool parseDouble(double& value) const;
 
   private:
@@ -359,29 +511,81 @@ struct SC::StringView
 /// @brief Splits a StringView in tokens according to separators
 struct SC::StringViewTokenizer
 {
-    StringCodePoint splittingCharacter = 0;
-    size_t          numSplitsNonEmpty  = 0;
-    size_t          numSplitsTotal     = 0;
-    StringView      component;
-    StringView      processed;
+    StringCodePoint splittingCharacter = 0; ///< The last splitting character matched in current tokenization
+
+    size_t numSplitsNonEmpty = 0; ///< How many non-empty splits have occurred in current tokenization
+    size_t numSplitsTotal    = 0; ///< How many total splits have occurred in current tokenization
+
+    StringView component; ///< Current component that has been tokenized by tokenizeNext
+    StringView processed; ///< Substring of original string passed in constructor processed so far
 
     enum Options
     {
-        IncludeEmpty,
-        SkipEmpty
+        IncludeEmpty, ///< If to tokenizeNext should return also empty tokens
+        SkipEmpty     ///< If to tokenizeNext should NOT return also empty tokens
     };
+
+    /// @brief Build a tokenizer operating on the given text string view
     StringViewTokenizer(StringView text) : originalText(text), current(text) {}
-    [[nodiscard]] bool   tokenizeNext(Span<const StringCodePoint> separators, Options options);
+
+    /// @brief Splits the string along a list of separators
+    /// @param separators List of separators
+    /// @param options If to skip empty tokens or not
+    /// @return `true` if there are additional tokens to parse
+    /// @n
+    /**
+     * Example:
+        @code{.cpp}
+        StringViewTokenizer tokenizer("bring,me,the,horizon");
+        while (tokenizer.tokenizeNext(',', StringViewTokenizer::SkipEmpty))
+        {
+            console.printLine(tokenizer.component);
+        }
+        @endcode
+    */
+    [[nodiscard]] bool tokenizeNext(Span<const StringCodePoint> separators, Options options);
+
+    /// @brief Count the number of tokens that exist in the string view passed in constructor, when splitted along the
+    /// given separators
+    /// @param separators Separators to split the original string with
+    /// @return Current StringViewTokenizer to inspect SC::StringViewTokenizer::numSplitsNonEmpty or
+    /// SC::StringViewTokenizer::numSplitsTotal.
+    /// @n
+    /**
+     * Example:
+        @code{.cpp}
+        SC_TEST_EXPECT(StringViewTokenizer("___").countTokens('_').numSplitsNonEmpty == 0);
+        SC_TEST_EXPECT(StringViewTokenizer("___").countTokens('_').numSplitsTotal == 3);
+        @endcode
+    */
     StringViewTokenizer& countTokens(Span<const StringCodePoint> separators);
 
+    /// @brief Check if the tokenizer has processed the entire the string view passed in the constructer
     [[nodiscard]] bool isFinished() const;
 
   private:
-    StringView originalText;
-    StringView current;
+    StringView originalText; // Original text as passed in the constructor
+    StringView current;      // Substring from current position until the end of original text
 };
 
-/// @brief Algorithms operating on strings (glob / wildcard)
+/// @brief Algorithms operating on strings (glob / wildcard).
+/// @n
+/// Example
+/// @code{.cpp}
+/// SC_ASSERT(StringAlgorithms::matchWildcard("", ""));
+/// SC_ASSERT(StringAlgorithms::matchWildcard("1?3", "123"));
+/// SC_ASSERT(StringAlgorithms::matchWildcard("1*3", "12223"));
+/// SC_ASSERT(StringAlgorithms::matchWildcard("*2", "12"));
+/// SC_ASSERT(not StringAlgorithms::matchWildcard("*1", "12"));
+/// SC_ASSERT(not StringAlgorithms::matchWildcard("*1", "112"));
+/// SC_ASSERT(not StringAlgorithms::matchWildcard("**1", "112"));
+/// SC_ASSERT(not StringAlgorithms::matchWildcard("*?1", "112"));
+/// SC_ASSERT(StringAlgorithms::matchWildcard("1*", "12123"));
+/// SC_ASSERT(StringAlgorithms::matchWildcard("*/myString", "myString/myString/myString"));
+/// SC_ASSERT(StringAlgorithms::matchWildcard("**/myString", "myString/myString/myString"));
+/// SC_ASSERT(not StringAlgorithms::matchWildcard("*/String", "myString/myString/myString"));
+/// SC_ASSERT(StringAlgorithms::matchWildcard("*/Directory/File.cpp", "/Root/Directory/File.cpp"));
+/// @endcode
 struct SC::StringAlgorithms
 {
     [[nodiscard]] static bool matchWildcard(StringView s1, StringView s2);
@@ -400,16 +604,16 @@ namespace SC
 {
 constexpr SC::StringView operator""_a8(const char* txt, size_t sz)
 {
-    return SC::StringView(txt, sz, true, SC::StringEncoding::Ascii);
+    return SC::StringView({txt, sz}, true, SC::StringEncoding::Ascii);
 }
 constexpr SC::StringView operator""_u8(const char* txt, size_t sz)
 {
-    return SC::StringView(txt, sz, true, SC::StringEncoding::Utf8);
+    return SC::StringView({txt, sz}, true, SC::StringEncoding::Utf8);
 }
 constexpr SC::StringView operator""_u16(const char* txt, size_t sz)
 {
     const bool isNullTerminated = sz > 0 and sz % 2 == 1 and txt[sz - 1] == 0;
-    return SC::StringView(txt, isNullTerminated ? sz - 1 : sz, isNullTerminated, SC::StringEncoding::Utf16);
+    return SC::StringView({txt, isNullTerminated ? sz - 1 : sz}, isNullTerminated, SC::StringEncoding::Utf16);
 }
 } // namespace SC
 
@@ -423,26 +627,11 @@ constexpr SC::StringView::StringView()
     : text(nullptr), textSizeInBytes(0), encoding(static_cast<SizeType>(StringEncoding::Ascii)), hasNullTerm(false)
 {}
 
-constexpr SC::StringView::StringView(Span<char> textSpan, bool nullTerm, StringEncoding encoding)
-    : text(textSpan.data()), textSizeInBytes(static_cast<SizeType>(textSpan.sizeInBytes())),
-      encoding(static_cast<SizeType>(encoding)), hasNullTerm(nullTerm)
-{
-    static_assert(sizeof(StringView) == sizeof(void*) + sizeof(SizeType), "StringView wrong size");
-    SC_ASSERT_DEBUG(textSpan.sizeInBytes() <= MaxLength);
-}
-
 constexpr SC::StringView::StringView(Span<const char> textSpan, bool nullTerm, StringEncoding encoding)
     : text(textSpan.data()), textSizeInBytes(static_cast<SizeType>(textSpan.sizeInBytes())),
       encoding(static_cast<SizeType>(encoding)), hasNullTerm(nullTerm)
 {
     SC_ASSERT_DEBUG(textSpan.sizeInBytes() <= MaxLength);
-}
-
-constexpr SC::StringView::StringView(const char* text, size_t numBytes, bool nullTerm, StringEncoding encoding)
-    : text(text), textSizeInBytes(static_cast<SizeType>(numBytes)), encoding(static_cast<SizeType>(encoding)),
-      hasNullTerm(nullTerm)
-{
-    SC_ASSERT_DEBUG(numBytes <= MaxLength);
 }
 
 template <SC::size_t N>
@@ -456,13 +645,6 @@ constexpr SC::StringView::StringView(const wchar_t (&text)[N])
     : textWide(text), textSizeInBytes((N - 1) * sizeof(wchar_t)), encoding(static_cast<SizeType>(StringEncoding::Wide)),
       hasNullTerm(true)
 {}
-
-constexpr SC::StringView::StringView(const wchar_t* text, size_t numBytes, bool nullTerm)
-    : textWide(text), textSizeInBytes(static_cast<SizeType>(numBytes)),
-      encoding(static_cast<SizeType>(StringEncoding::Wide)), hasNullTerm(nullTerm)
-{
-    SC_ASSERT_DEBUG(numBytes <= MaxLength);
-}
 
 constexpr SC::StringView::StringView(Span<const wchar_t> textSpan, bool nullTerm)
     : textWide(textSpan.data()), textSizeInBytes(static_cast<SizeType>(textSpan.sizeInBytes())),
@@ -614,7 +796,8 @@ inline SC::StringView SC::StringView::fromIterators(StringIterator from, StringI
         StringIterator fromEnd = from;
         fromEnd.setToEnd();
         if (fromEnd.bytesDistanceFrom(to) >= 0) // If current iterator of to is inside from range
-            return StringView(from.getCurrentIt(), static_cast<size_t>(numBytes), false, StringIterator::getEncoding());
+            return StringView({from.getCurrentIt(), static_cast<size_t>(numBytes)}, false,
+                              StringIterator::getEncoding());
     }
     return StringView(); // TODO: Make StringView::fromIterators return bool to make it fallible
 }
@@ -625,7 +808,7 @@ inline SC::StringView SC::StringView::fromIteratorUntilEnd(StringIterator it)
     StringIterator endIt = it;
     endIt.setToEnd();
     const size_t numBytes = static_cast<size_t>(endIt.bytesDistanceFrom(it));
-    return StringView(it.getCurrentIt(), numBytes, false, StringIterator::getEncoding());
+    return StringView({it.getCurrentIt(), numBytes}, false, StringIterator::getEncoding());
 }
 
 template <typename StringIterator>
@@ -634,7 +817,7 @@ constexpr SC::StringView SC::StringView::fromIteratorFromStart(StringIterator it
     StringIterator start = it;
     start.setToStart();
     const size_t numBytes = static_cast<size_t>(it.bytesDistanceFrom(start));
-    return StringView(start.getCurrentIt(), numBytes, false, StringIterator::getEncoding());
+    return StringView({start.getCurrentIt(), numBytes}, false, StringIterator::getEncoding());
 }
 
 constexpr SC::StringView SC::StringView::sliceStartBytes(size_t start) const
@@ -642,7 +825,7 @@ constexpr SC::StringView SC::StringView::sliceStartBytes(size_t start) const
     if (start < sizeInBytes())
         return sliceStartLengthBytes(start, sizeInBytes() - start);
     SC_ASSERT_RELEASE(start < sizeInBytes());
-    return StringView(text, 0, false, getEncoding());
+    return StringView({text, 0}, false, getEncoding());
 }
 
 constexpr SC::StringView SC::StringView::sliceStartEndBytes(size_t start, size_t end) const
@@ -650,7 +833,7 @@ constexpr SC::StringView SC::StringView::sliceStartEndBytes(size_t start, size_t
     if (end >= start)
         return sliceStartLengthBytes(start, end - start);
     SC_ASSERT_RELEASE(end >= start);
-    return StringView(text, 0, false, getEncoding());
+    return StringView({text, 0}, false, getEncoding());
 }
 
 constexpr SC::StringView SC::StringView::sliceStartLengthBytes(size_t start, size_t length) const
@@ -658,7 +841,7 @@ constexpr SC::StringView SC::StringView::sliceStartLengthBytes(size_t start, siz
     if (start + length > sizeInBytes())
     {
         SC_ASSERT_RELEASE(start + length > sizeInBytes());
-        return StringView(text, 0, false, getEncoding());
+        return StringView({text, 0}, false, getEncoding());
     }
-    return StringView(text + start, length, hasNullTerm and (start + length == sizeInBytes()), getEncoding());
+    return StringView({text + start, length}, hasNullTerm and (start + length == sizeInBytes()), getEncoding());
 }

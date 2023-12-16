@@ -111,7 +111,7 @@ SC::Result SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOptions 
     StringConverter    convert(buffer);
     StringView         filePath;
     SC_TRY(convert.convertNullTerminateFastPath(path, filePath));
-    if (not filePath.startsWithChar('/'))
+    if (not filePath.startsWithCodePoint('/'))
         return Result::Error("Path must be absolute");
     int flags = 0;
     switch (mode)

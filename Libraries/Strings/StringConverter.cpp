@@ -44,7 +44,8 @@ bool SC::StringConverter::convertSameEncoding(StringView text, Vector<char>& buf
             }
             else
             {
-                *encodedText = StringView(text.bytesWithoutTerminator(), text.sizeInBytes(), false, text.getEncoding());
+                *encodedText =
+                    StringView({text.bytesWithoutTerminator(), text.sizeInBytes()}, false, text.getEncoding());
             }
         }
     }
@@ -57,7 +58,7 @@ bool SC::StringConverter::convertSameEncoding(StringView text, Vector<char>& buf
             SC_TRY(buffer.append(text.toCharSpan()));
             if (encodedText)
             {
-                *encodedText = StringView(buffer.data(), buffer.size(), true, text.getEncoding());
+                *encodedText = StringView(buffer.toSpanConst(), true, text.getEncoding());
             }
             SC_TRY(buffer.resize(buffer.size() + numZeros, 0)); // null terminator
         }
@@ -81,12 +82,12 @@ void SC::StringConverter::eventuallyNullTerminate(Vector<char>& buffer, StringEn
         }
         if (encodedText)
         {
-            *encodedText = StringView(buffer.data(), buffer.size() - destinationCharSize, true, destinationEncoding);
+            *encodedText = StringView({buffer.data(), buffer.size() - destinationCharSize}, true, destinationEncoding);
         }
     }
     else if (encodedText)
     {
-        *encodedText = StringView(buffer.data(), buffer.size(), false, destinationEncoding);
+        *encodedText = StringView(buffer.toSpanConst(), false, destinationEncoding);
     }
 }
 

@@ -8,7 +8,7 @@
 
 SC::StringView SC::StringView::fromNullTerminated(const char* text, StringEncoding encoding)
 {
-    return StringView(text, ::strlen(text), true, encoding);
+    return StringView({text, ::strlen(text)}, true, encoding);
 }
 
 bool SC::StringView::parseInt32(int32_t& value) const
@@ -147,7 +147,7 @@ bool SC::StringView::startsWith(const StringView str) const
     {
         if (str.textSizeInBytes <= textSizeInBytes)
         {
-            const StringView ours(text, str.textSizeInBytes, false, getEncoding());
+            const StringView ours({text, str.textSizeInBytes}, false, getEncoding());
             return str == ours;
         }
         return false;
@@ -161,7 +161,7 @@ bool SC::StringView::endsWith(const StringView str) const
     {
         if (str.sizeInBytes() <= sizeInBytes())
         {
-            const StringView ours(text + textSizeInBytes - str.textSizeInBytes, str.textSizeInBytes, false,
+            const StringView ours({text + textSizeInBytes - str.textSizeInBytes, str.textSizeInBytes}, false,
                                   getEncoding());
             return str == ours;
         }
@@ -176,19 +176,19 @@ bool SC::StringView::containsString(const StringView str) const
     return withIterator([str](auto it) { return it.advanceAfterFinding(str.getIterator<decltype(it)>()); });
 }
 
-bool SC::StringView::containsChar(StringCodePoint c) const
+bool SC::StringView::containsCodePoint(StringCodePoint c) const
 {
     return withIterator([c](auto it) { return it.advanceUntilMatches(c); });
 }
 
-bool SC::StringView::endsWithChar(StringCodePoint c) const
+bool SC::StringView::endsWithCodePoint(StringCodePoint c) const
 {
-    return withIterator([c](auto it) { return it.endsWithChar(c); });
+    return withIterator([c](auto it) { return it.endsWithCodePoint(c); });
 }
 
-bool SC::StringView::startsWithChar(StringCodePoint c) const
+bool SC::StringView::startsWithCodePoint(StringCodePoint c) const
 {
-    return withIterator([c](auto it) { return it.startsWithChar(c); });
+    return withIterator([c](auto it) { return it.startsWithCodePoint(c); });
 }
 
 SC::StringView SC::StringView::sliceStartEnd(size_t start, size_t end) const
@@ -200,7 +200,7 @@ SC::StringView SC::StringView::sliceStartEnd(size_t start, size_t end) const
             auto startIt = it;
             SC_ASSERT_RELEASE(start <= end && it.advanceCodePoints(end - start));
             const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
-            return StringView(startIt.getCurrentIt(), distance,
+            return StringView({startIt.getCurrentIt(), distance},
                               hasNullTerm and (start + distance == sizeInBytesIncludingTerminator()), getEncoding());
         });
 }
@@ -214,7 +214,7 @@ SC::StringView SC::StringView::sliceStart(size_t offset) const
             auto startIt = it;
             it.setToEnd();
             const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
-            return StringView(startIt.getCurrentIt(), distance,
+            return StringView({startIt.getCurrentIt(), distance},
                               hasNullTerm and (offset + distance == sizeInBytesIncludingTerminator()), getEncoding());
         });
 }
@@ -228,25 +228,25 @@ SC::StringView SC::StringView::sliceEnd(size_t offset) const
             it.setToEnd();
             SC_ASSERT_RELEASE(it.reverseAdvanceCodePoints(offset));
             const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
-            return StringView(startIt.getCurrentIt(), distance,
+            return StringView({startIt.getCurrentIt(), distance},
                               hasNullTerm and (offset + distance == sizeInBytesIncludingTerminator()), getEncoding());
         });
 }
 
-SC::StringView SC::StringView::trimEndingChar(StringCodePoint c) const
+SC::StringView SC::StringView::trimEndingCodePoint(StringCodePoint c) const
 {
     auto sv = *this;
-    while (sv.endsWithChar(c))
+    while (sv.endsWithCodePoint(c))
     {
         sv = sv.sliceEnd(1);
     }
     return sv;
 }
 
-SC::StringView SC::StringView::trimStartingChar(StringCodePoint c) const
+SC::StringView SC::StringView::trimStartingCodePoint(StringCodePoint c) const
 {
     auto sv = *this;
-    while (sv.startsWithChar(c))
+    while (sv.startsWithCodePoint(c))
     {
         sv = sv.sliceStart(1);
     }

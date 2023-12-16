@@ -119,6 +119,7 @@ struct SerializationBinary
     /// @param buffer The buffer holding the bytes to be used for deserialization
     /// @param schema The schema used to serialize data in the buffer
     /// @param numberOfReads If provided, will return the number deserialization operations
+    /// @param options Options for data conversion (allow dropping fields, array items etc)
     /// @return `true` if deserialization succeded
     ///
     /// @n

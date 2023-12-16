@@ -12,7 +12,7 @@ bool SC::HttpServerBase::Request::find(HttpParser::Result result, StringView& re
     if (headerOffsets.find([result](const auto& it) { return it.result == result; }, &found))
     {
         const Header& header = headerOffsets[found];
-        res = StringView(headerBuffer.data() + header.start, header.length, false, StringEncoding::Ascii);
+        res = StringView({headerBuffer.data() + header.start, header.length}, false, StringEncoding::Ascii);
         return true;
     }
     return false;

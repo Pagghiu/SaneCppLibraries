@@ -2,6 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../StringView.h"
+#include "../../Algorithms/AlgorithmBubbleSort.h"
 #include "../../Testing/Testing.h"
 
 namespace SC
@@ -48,7 +49,7 @@ struct SC::StringViewTest : public SC::TestCase
             other = "-123";
             SC_TEST_EXPECT(other.parseInt32(value));
             SC_TEST_EXPECT(value == -123);
-            other = StringView("-456___", 4, false, StringEncoding::Ascii);
+            other = StringView({"-456___", 4}, false, StringEncoding::Ascii);
             SC_TEST_EXPECT(other.parseInt32(value));
             SC_TEST_EXPECT(value == -456);
             SC_TEST_EXPECT(StringView("0").parseInt32(value) and value == 0);
@@ -77,10 +78,10 @@ struct SC::StringViewTest : public SC::TestCase
             other = "-123";
             SC_TEST_EXPECT(other.parseFloat(value));
             SC_TEST_EXPECT(value == -123.0f);
-            other = StringView("-456___", 4, false, StringEncoding::Ascii);
+            other = StringView({"-456___", 4}, false, StringEncoding::Ascii);
             SC_TEST_EXPECT(other.parseFloat(value));
             SC_TEST_EXPECT(value == -456.0f);
-            other = StringView("-456.2___", 6, false, StringEncoding::Ascii);
+            other = StringView({"-456.2___", 6}, false, StringEncoding::Ascii);
             SC_TEST_EXPECT(other.parseFloat(value));
             SC_TEST_EXPECT(StringView(".2").parseFloat(value) and value == 0.2f);
             SC_TEST_EXPECT(StringView("-.2").parseFloat(value) and value == -0.2f);
@@ -104,23 +105,23 @@ struct SC::StringViewTest : public SC::TestCase
                     test = "Ciao_123"_a8;
                 if (i == 2)
                     test = "Ciao_123"_u8;
-                SC_TEST_EXPECT(test.startsWithChar('C'));
-                SC_TEST_EXPECT(test.endsWithChar('3'));
+                SC_TEST_EXPECT(test.startsWithCodePoint('C'));
+                SC_TEST_EXPECT(test.endsWithCodePoint('3'));
                 SC_TEST_EXPECT(test.startsWith("Ciao"));
                 SC_TEST_EXPECT(test.startsWith("Ciao"_u8));
                 SC_TEST_EXPECT(test.startsWith("\x43\x00\x69\x00\x61\x00\x6f\x00\x00"_u16));
                 SC_TEST_EXPECT(test.endsWith("\x31\x00\x32\x00\x33\x00\x00"_u16));
                 SC_TEST_EXPECT(test.endsWith("123"));
                 SC_TEST_EXPECT(test.endsWith("123"_u8));
-                SC_TEST_EXPECT(not test.startsWithChar('D'));
-                SC_TEST_EXPECT(not test.endsWithChar('4'));
+                SC_TEST_EXPECT(not test.startsWithCodePoint('D'));
+                SC_TEST_EXPECT(not test.endsWithCodePoint('4'));
                 SC_TEST_EXPECT(not test.startsWith("Cia_"));
                 SC_TEST_EXPECT(not test.endsWith("1_3"));
             }
 
             StringView test2;
-            SC_TEST_EXPECT(not test2.startsWithChar('a'));
-            SC_TEST_EXPECT(not test2.endsWithChar('a'));
+            SC_TEST_EXPECT(not test2.startsWithCodePoint('a'));
+            SC_TEST_EXPECT(not test2.endsWithCodePoint('a'));
             SC_TEST_EXPECT(test2.startsWith(""));
             SC_TEST_EXPECT(not test2.startsWith("A"));
             SC_TEST_EXPECT(test2.endsWith(""));
@@ -138,10 +139,10 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(str.sliceStart(4) == "567");
             SC_TEST_EXPECT(str.sliceEnd(4) == "123");
 
-            SC_TEST_EXPECT("myTest___"_a8.trimEndingChar('_') == "myTest");
-            SC_TEST_EXPECT("myTest"_a8.trimEndingChar('_') == "myTest");
-            SC_TEST_EXPECT("___myTest"_a8.trimStartingChar('_') == "myTest");
-            SC_TEST_EXPECT("_myTest"_a8.trimStartingChar('_') == "myTest");
+            SC_TEST_EXPECT("myTest___"_a8.trimEndingCodePoint('_') == "myTest");
+            SC_TEST_EXPECT("myTest"_a8.trimEndingCodePoint('_') == "myTest");
+            SC_TEST_EXPECT("___myTest"_a8.trimStartingCodePoint('_') == "myTest");
+            SC_TEST_EXPECT("_myTest"_a8.trimStartingCodePoint('_') == "myTest");
         }
         if (test_section("split"))
         {
@@ -214,6 +215,23 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(not asd.fullyOverlaps("123___", overlapPoints) and overlapPoints == 3);
         }
         if (test_section("compare"))
+        {
+            StringView sv[3] = {
+                StringView("3"),
+                StringView("1"),
+                StringView("2"),
+            };
+            Algorithms::bubbleSort(sv, sv + 3, [](StringView a, StringView b) { return a < b; });
+            SC_TEST_EXPECT(sv[0] == "1");
+            SC_TEST_EXPECT(sv[1] == "2");
+            SC_TEST_EXPECT(sv[2] == "3");
+            Algorithms::bubbleSort(
+                sv, sv + 3, [](StringView a, StringView b) { return a.compare(b) == StringView::Comparison::Bigger; });
+            SC_TEST_EXPECT(sv[0] == "3");
+            SC_TEST_EXPECT(sv[1] == "2");
+            SC_TEST_EXPECT(sv[2] == "1");
+        }
+        if (test_section("compare UTF"))
         {
             // àèìòù (1 UTF16-LE sequence, 2 UTF8 sequence)
             SC_TEST_EXPECT("\xc3\xa0\xc3\xa8\xc3\xac\xc3\xb2\xc3\xb9"_u8.compare(

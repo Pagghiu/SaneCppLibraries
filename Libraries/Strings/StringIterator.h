@@ -39,7 +39,12 @@ constexpr bool StringEncodingAreBinaryCompatible(StringEncoding encoding1, Strin
 constexpr uint32_t StringEncodingGetSize(StringEncoding encoding);
 
 /// @brief A position inside a fixed range `[start, end)` of UTF code points.
-/// Invariants: start <= end and it >= start and it <= end
+///
+/// It's a range of bytes (start and end pointers) with a *current* pointer pointing at a specific code point of the
+/// range. There are three classes derived from it (SC::StringIteratorASCII, SC::StringIteratorUTF8 and
+/// SC::StringIteratorUTF16) and they allow doing operations along the string view in UTF code points.
+/// @note Code points are not the same as perceived characters (that would be grapheme clusters).
+/// Invariants: start <= end and it >= start and it <= end.
 /// @tparam CharIterator StringIteratorASCII, StringIteratorUTF8 or StringIteratorUTF16
 template <typename CharIterator>
 struct SC_COMPILER_EXPORT StringIterator
@@ -191,12 +196,12 @@ struct SC_COMPILER_EXPORT StringIterator
     /// @brief Check if this Iterator ends with a given code point
     /// @param character the code point
     /// @return `true` if `character` exists as last code point of this StringIterator range
-    [[nodiscard]] bool endsWithChar(CodePoint character) const;
+    [[nodiscard]] bool endsWithCodePoint(CodePoint character) const;
 
     /// @brief Check if this Iterator starts with a given code point
     /// @param character the code point
     /// @return `true` if `character` exists as first code point of this StringIterator range
-    [[nodiscard]] bool startsWithChar(CodePoint character) const;
+    [[nodiscard]] bool startsWithCodePoint(CodePoint character) const;
 
     /// @brief Check if this Iterator at its end matches entirely another Iterator's range
     /// @param other  The other iterator to match

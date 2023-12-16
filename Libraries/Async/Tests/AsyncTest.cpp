@@ -512,7 +512,7 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.run());
             SC_TEST_EXPECT(fd.close());
 
-            StringView sv(params.readBuffer, sizeof(params.readBuffer), false, StringEncoding::Ascii);
+            StringView sv({params.readBuffer, sizeof(params.readBuffer)}, false, StringEncoding::Ascii);
             SC_TEST_EXPECT(sv.compare("test") == StringView::Comparison::Equals);
 
             SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));

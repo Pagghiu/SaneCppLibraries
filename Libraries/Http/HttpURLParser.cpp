@@ -107,13 +107,13 @@ SC::Result SC::HttpURLParser::validateProtocol()
 SC::Result SC::HttpURLParser::validatePath()
 {
     // TODO: Improve validatePath
-    return Result(not pathname.containsChar(' '));
+    return Result(not pathname.containsCodePoint(' '));
 }
 
 SC::Result SC::HttpURLParser::validateHost()
 {
     // TODO: Improve validateHost
-    return Result(not host.isEmpty() and (host.containsChar('.') or hostname == "localhost"));
+    return Result(not host.isEmpty() and (host.containsCodePoint('.') or hostname == "localhost"));
 }
 
 SC::Result SC::HttpURLParser::parseUserPassword(StringView userPassowrd)

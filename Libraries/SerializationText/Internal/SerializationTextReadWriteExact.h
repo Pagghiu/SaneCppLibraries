@@ -35,7 +35,7 @@ struct SerializationTextReadWriteExact
         template <typename R, int N>
         constexpr bool operator()(int, R T::*field, const char (&name)[N], size_t)
         {
-            const StringView fieldName = StringView(name, N - 1, true, StringEncoding::Ascii);
+            const StringView fieldName = StringView({name, N - 1}, true, StringEncoding::Ascii);
             if (not stream.startObjectField(index++, fieldName))
                 return false;
             return SerializationTextReadWriteExact<SerializerStream, R>::serialize(0, object.*field, stream);

@@ -57,6 +57,7 @@ struct SerializationBinaryTypeErased
     /// @param object The object to deserialize
     /// @param buffer The buffer holding the bytes to be used for deserialization
     /// @param schema The schema used to serialize data in the buffer
+    /// @param options Options for data conversion (allow dropping fields, array items etc)
     /// @param numberOfReads If provided, will return the number deserialization operations
     /// @return `true` if deserialization succeded
     template <typename T>

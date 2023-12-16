@@ -39,7 +39,7 @@ struct SC::SmallString : public String
     SmallString(const char (&text)[Q])
     {
         init();
-        SC_ASSERT_RELEASE(assign(StringView(text, Q - 1, true, StringEncoding::Ascii)));
+        SC_ASSERT_RELEASE(assign(StringView({text, Q - 1}, true, StringEncoding::Ascii)));
     }
 
     SmallString(Vector<char>&& data, StringEncoding encoding) : String(encoding)
@@ -94,7 +94,7 @@ struct SC::SmallString : public String
     template <size_t Q>
     SmallString& operator=(const char (&text)[Q])
     {
-        SC_ASSERT_RELEASE(assign(StringView(text, Q - 1, true, StringEncoding::Ascii)));
+        SC_ASSERT_RELEASE(assign(StringView({text, Q - 1}, true, StringEncoding::Ascii)));
         return *this;
     }
 
