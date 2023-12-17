@@ -73,15 +73,16 @@ struct SC::AsyncTest : public SC::TestCase
             threadWasCalled = 0;
             wakeUpSucceded  = 0;
 
-            Action externalThreadLambda = [this, &eventLoop]()
+            auto externalThreadLambda = [this, &eventLoop](Thread& thread)
             {
+                thread.setThreadName(SC_NATIVE_STR("test"));
                 threadWasCalled++;
                 if (eventLoop.wakeUpFromExternalThread())
                 {
                     wakeUpSucceded++;
                 }
             };
-            SC_TEST_EXPECT(newThread.start("test", &externalThreadLambda));
+            SC_TEST_EXPECT(newThread.start(externalThreadLambda));
             Time::HighResolutionCounter start, end;
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(newThread.join());
@@ -123,10 +124,18 @@ struct SC::AsyncTest : public SC::TestCase
             Thread newThread2;
             Result loopRes1 = Result(false);
             Result loopRes2 = Result(false);
-            Action action1  = [&] { loopRes1 = wakeUp1.wakeUp(); };
-            Action action2  = [&] { loopRes2 = wakeUp1.wakeUp(); };
-            SC_TEST_EXPECT(newThread1.start("test1", &action1));
-            SC_TEST_EXPECT(newThread2.start("test2", &action2));
+            auto   action1  = [&](Thread& thread)
+            {
+                thread.setThreadName(SC_NATIVE_STR("test1"));
+                loopRes1 = wakeUp1.wakeUp();
+            };
+            auto action2 = [&](Thread& thread)
+            {
+                thread.setThreadName(SC_NATIVE_STR("test2"));
+                loopRes2 = wakeUp1.wakeUp();
+            };
+            SC_TEST_EXPECT(newThread1.start(action1));
+            SC_TEST_EXPECT(newThread2.start(action2));
             SC_TEST_EXPECT(newThread1.join());
             SC_TEST_EXPECT(newThread2.join());
             SC_TEST_EXPECT(loopRes1);
@@ -163,13 +172,14 @@ struct SC::AsyncTest : public SC::TestCase
             };
             SC_TEST_EXPECT(wakeUp.start(eventLoop, &params.eventObject));
             Thread newThread1;
-            Action threadLambda = [&params, &wakeUp]
+            auto   threadLambda = [&params, &wakeUp](Thread& thread)
             {
+                thread.setThreadName(SC_NATIVE_STR("test1"));
                 params.loopRes1 = wakeUp.wakeUp();
                 params.eventObject.wait();
                 params.observedNotifier1Called = params.notifier1Called;
             };
-            SC_TEST_EXPECT(newThread1.start("test1", &threadLambda));
+            SC_TEST_EXPECT(newThread1.start(threadLambda));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(params.notifier1Called == 1);
             SC_TEST_EXPECT(newThread1.join());

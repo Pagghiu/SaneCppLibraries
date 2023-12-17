@@ -618,9 +618,9 @@ constexpr SC::StringView operator""_u16(const char* txt, size_t sz)
 } // namespace SC
 
 #if SC_PLATFORM_WINDOWS
-#define SC_STR_NATIVE(str) L##str
+#define SC_NATIVE_STR(str) L##str
 #else
-#define SC_STR_NATIVE(str) str
+#define SC_NATIVE_STR(str) str
 #endif
 
 constexpr SC::StringView::StringView()

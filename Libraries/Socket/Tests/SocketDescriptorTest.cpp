@@ -117,8 +117,9 @@ void SC::SocketDescriptorTest::tcpClientServer()
         Result      closeRes   = Result(false);
         EventObject eventObject;
     } params;
-    Action func = [&]()
+    auto func = [&](Thread& thread)
     {
+        thread.setThreadName(SC_NATIVE_STR("func"));
         SocketDescriptor clientSocket;
         SocketClient     client(clientSocket);
         params.connectRes = client.connect(serverAddress, tcpPort);
@@ -131,7 +132,7 @@ void SC::SocketDescriptorTest::tcpClientServer()
         params.closeRes = client.close();
     };
     Thread thread;
-    SC_TEST_EXPECT(thread.start("tcp", &func));
+    SC_TEST_EXPECT(thread.start(func));
     SocketFlags::AddressFamily family;
     SC_TEST_EXPECT(serverSocket.getAddressFamily(family));
     SocketDescriptor acceptedClientSocket;

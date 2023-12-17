@@ -4,61 +4,65 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include "../../Strings/StringView.h"
 #include "../Threading.h"
 
-SC::Mutex::Mutex() { InitializeCriticalSection(&mutex.reinterpret_as<CRITICAL_SECTION>()); }
-SC::Mutex::~Mutex() { InitializeCriticalSection(&mutex.reinterpret_as<CRITICAL_SECTION>()); }
-void SC::Mutex::lock() { EnterCriticalSection(&mutex.reinterpret_as<CRITICAL_SECTION>()); }
-void SC::Mutex::unlock() { LeaveCriticalSection(&mutex.reinterpret_as<CRITICAL_SECTION>()); }
+SC::Mutex::Mutex() { ::InitializeCriticalSection(&mutex.reinterpret_as<CRITICAL_SECTION>()); }
+SC::Mutex::~Mutex() { ::InitializeCriticalSection(&mutex.reinterpret_as<CRITICAL_SECTION>()); }
+void SC::Mutex::lock() { ::EnterCriticalSection(&mutex.reinterpret_as<CRITICAL_SECTION>()); }
+void SC::Mutex::unlock() { ::LeaveCriticalSection(&mutex.reinterpret_as<CRITICAL_SECTION>()); }
 
 SC::ConditionVariable::ConditionVariable()
 {
-    InitializeConditionVariable(&condition.reinterpret_as<CONDITION_VARIABLE>());
+    ::InitializeConditionVariable(&condition.reinterpret_as<CONDITION_VARIABLE>());
 }
 SC::ConditionVariable::~ConditionVariable() {} // Nothing to do
 void SC::ConditionVariable::wait(Mutex& mutex)
 {
-    SleepConditionVariableCS(&condition.reinterpret_as<CONDITION_VARIABLE>(),
-                             &mutex.mutex.reinterpret_as<CRITICAL_SECTION>(), INFINITE);
+    ::SleepConditionVariableCS(&condition.reinterpret_as<CONDITION_VARIABLE>(),
+                               &mutex.mutex.reinterpret_as<CRITICAL_SECTION>(), INFINITE);
 }
-void SC::ConditionVariable::signal() { WakeConditionVariable(&condition.reinterpret_as<CONDITION_VARIABLE>()); }
+void SC::ConditionVariable::signal() { ::WakeConditionVariable(&condition.reinterpret_as<CONDITION_VARIABLE>()); }
 
 struct SC::Thread::Internal
 {
     using NativeHandle       = HANDLE;
     using CallbackReturnType = DWORD;
+    static CallbackReturnType WINAPI threadFunc(void* argument)
+    {
+        Thread& self = *static_cast<Thread*>(argument);
+        self.userFunction(self);
+        return 0;
+    }
 
-    [[nodiscard]] static Result createThread(CreateParams& self, OpaqueThread& opaqueThread, HANDLE& threadHandle,
+    [[nodiscard]] static Result createThread(Thread& self, OpaqueThread& opaqueThread,
                                              DWORD(WINAPI* threadFunc)(void* argument))
     {
-        DWORD threadID;
-        opaqueThread.reinterpret_as<HANDLE>() =
-            CreateThread(0, 512 * 1024, threadFunc, &self, CREATE_SUSPENDED, &threadID);
-        if (opaqueThread.reinterpret_as<HANDLE>() == nullptr)
+        DWORD   threadID;
+        HANDLE& threadHandle = opaqueThread.reinterpret_as<HANDLE>();
+        threadHandle         = ::CreateThread(0, 512 * 1024, threadFunc, &self, CREATE_SUSPENDED, &threadID);
+        if (threadHandle == nullptr)
         {
             return Result::Error("Thread::create - CreateThread failed");
         }
-        threadHandle = opaqueThread.reinterpret_as<HANDLE>();
         ResumeThread(threadHandle);
         return Result(true);
     }
 
-    static void setThreadName(HANDLE& threadHandle, const StringView& nameNullTerminated)
+    static void setThreadName(const wchar_t* nameNullTerminated)
     {
-        SetThreadDescription(threadHandle, nameNullTerminated.getNullTerminatedNative());
+        ::SetThreadDescription(::GetCurrentThread(), nameNullTerminated);
     }
 
-    [[nodiscard]] static Result joinThread(OpaqueThread* threadNative)
+    [[nodiscard]] static Result joinThread(OpaqueThread& threadNative)
     {
-        WaitForSingleObject(threadNative->reinterpret_as<HANDLE>(), INFINITE);
-        CloseHandle(threadNative->reinterpret_as<HANDLE>());
+        ::WaitForSingleObject(threadNative.reinterpret_as<HANDLE>(), INFINITE);
+        ::CloseHandle(threadNative.reinterpret_as<HANDLE>());
         return Result(true);
     }
 
-    [[nodiscard]] static Result detachThread(OpaqueThread* threadNative)
+    [[nodiscard]] static Result detachThread(OpaqueThread& threadNative)
     {
-        CloseHandle(threadNative->reinterpret_as<HANDLE>());
+        CloseHandle(threadNative.reinterpret_as<HANDLE>());
         return Result(true);
     }
 };
@@ -66,3 +70,13 @@ struct SC::Thread::Internal
 void SC::Thread::Sleep(uint32_t milliseconds) { ::Sleep(milliseconds); }
 
 SC::uint64_t SC::Thread::CurrentThreadID() { return ::GetCurrentThreadId(); }
+
+SC::uint64_t SC::Thread::threadID()
+{
+    OpaqueThread* threadNative = nullptr;
+    if (thread.get(threadNative))
+    {
+        return ::GetThreadId(threadNative->reinterpret_as<HANDLE>());
+    }
+    return 0;
+}

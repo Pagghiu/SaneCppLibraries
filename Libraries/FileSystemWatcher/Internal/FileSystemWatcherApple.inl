@@ -23,7 +23,6 @@ struct SC::FileSystemWatcher::Internal
     CFRunLoopSourceRef refreshSignal = nullptr;
     FSEventStreamRef   fsEventStream = nullptr;
     Thread             pollingThread;
-    Action             pollingFunction;
     Result             signalReturnCode = Result(false);
     EventObject        refreshSignalFinished;
     Mutex              mutex;
@@ -62,14 +61,16 @@ struct SC::FileSystemWatcher::Internal
         refreshSignal         = CFRunLoopSourceCreate(nullptr, 0, &signalContext);
         SC_TRY_MSG(refreshSignal != nullptr, "CFRunLoopSourceCreate failed");
 
-        // Create and start the thread
-        pollingFunction.bind<Internal, &Internal::threadRun>(*this);
-
-        // Use the syncFunc that is guaranteed to run before start returns to obtain
-        // the CFRunLoop allocated into that thread
-        Action initFunction;
-        initFunction.bind<Internal, &Internal::threadInit>(*this);
-        SC_TRY(pollingThread.start("FileSystemWatcher::init", &pollingFunction, &initFunction));
+        EventObject eventObject;
+        auto        pollingFunction = [&](Thread& thread)
+        {
+            thread.setThreadName("FileSystemWatcher::init");
+            threadInit(); // Obtain the CFRunLoop for this thread
+            eventObject.signal();
+            threadRun();
+        };
+        SC_TRY(pollingThread.start(pollingFunction));
+        eventObject.wait();
         return Result(true);
     }
 
@@ -103,8 +104,7 @@ struct SC::FileSystemWatcher::Internal
     void releaseResources()
     {
         CFRelease(refreshSignal);
-        refreshSignal   = nullptr;
-        pollingFunction = Action();
+        refreshSignal = nullptr;
     }
 
     // This gets executed before Thread::start returns

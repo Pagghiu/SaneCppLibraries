@@ -84,7 +84,16 @@ typedef enum memory_order
 } memory_order;
 
 #endif
-/// @brief Atomic variables according to C++ memory model (only for `int` and `bool` for now)
+/// @brief Atomic variables (only for `int` and `bool` for now).
+/// @n
+/// Example:
+/// @code{.cpp}
+/// Atomic<bool> test = true;
+///
+/// SC_TEST_EXPECT(test.load());
+/// test.exchange(false);
+/// SC_TEST_EXPECT(not test.load());
+/// @endcode
 template <typename T>
 struct Atomic;
 

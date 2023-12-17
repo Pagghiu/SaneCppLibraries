@@ -179,7 +179,7 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Vector<P
             SC_TRY(definitions.back().directory.assign(pluginDirectory));
             multiplePluginDefinitions = false;
         }
-        if (item.level == 1 and item.name.endsWith(SC_STR_NATIVE(".cpp")))
+        if (item.level == 1 and item.name.endsWith(SC_NATIVE_STR(".cpp")))
         {
             if (multiplePluginDefinitions)
             {
@@ -322,7 +322,7 @@ SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin) const
     for (auto& file : plugin.files)
     {
         StringView        dirname    = Path::dirname(file.absolutePath.view(), Path::AsNative);
-        StringView        outputName = Path::basename(file.absolutePath.view(), SC_STR_NATIVE(".cpp"));
+        StringView        outputName = Path::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
         StringNative<256> destFile   = StringEncoding::Native;
         SC_TRY(Path::join(destFile, {dirname, outputName}));
         StringBuilder builder(destFile);
@@ -344,7 +344,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, StringVi
         StringNative<256> objectPath = StringEncoding::Native;
         StringBuilder     b(objectPath);
         StringView        dirname    = Path::dirname(file.absolutePath.view(), Path::AsNative);
-        StringView        outputName = Path::basename(file.absolutePath.view(), SC_STR_NATIVE(".cpp"));
+        StringView        outputName = Path::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
         SC_TRY(b.append(dirname));
         SC_TRY(b.append("/"));
         SC_TRY(b.append(outputName));
@@ -527,7 +527,7 @@ SC::Result SC::PluginRegistry::removeAllBuildProducts(const StringView identifie
     for (auto& file : lib.definition.files)
     {
         StringView        dirname    = Path::dirname(file.absolutePath.view(), Path::AsNative);
-        StringView        outputName = Path::basename(file.absolutePath.view(), SC_STR_NATIVE(".cpp"));
+        StringView        outputName = Path::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
         StringNative<256> destFile   = StringEncoding::Native;
         SC_TRY(Path::join(destFile, {dirname, outputName}));
         StringBuilder builder(destFile);

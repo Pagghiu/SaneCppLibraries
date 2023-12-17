@@ -5,7 +5,6 @@
 #include "../Foundation/AlignedStorage.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/Result.h"
-#include "../Strings/StringView.h"
 #include "Internal/Optional.h" // UniqueOptional
 
 namespace SC
@@ -22,7 +21,10 @@ struct EventObject;
 //! @addtogroup group_threading
 //! @{
 
-/// @brief A native OS Mutex
+/// @brief A native OS mutex to synchronize access to shared resources.
+///
+/// Example:
+/// @snippet Libraries/Threading/Tests/ThreadingTest.cpp mutexSnippet
 struct SC::Mutex
 {
     Mutex();
@@ -57,7 +59,7 @@ struct SC::Mutex
     OpaqueMutex mutex;
 };
 
-/// @brief A native OS condition variable
+/// @brief A native OS condition variable.
 struct SC::ConditionVariable
 {
     ConditionVariable();
@@ -92,29 +94,52 @@ struct SC::ConditionVariable
     OpaqueConditionVariable condition;
 };
 
-/// @brief A native OS thread
+/// @brief A native OS thread.
+///
+/// Example:
+/// @code{.cpp}
+/// Thread thread;
+/// thread.start([](Thread& thread)
+/// {
+///     // It's highly recommended setting a name for the thread
+///     thread.setThreadName(SC_STR_NATIVE("My Thread"));
+///     // Do something on the thread
+///     Thread::Sleep(1000); // Sleep for 1 second
+/// });
+/// thread.join(); // wait until thread has finished executing
+///
+/// // ...or
+///
+/// thread.detach(); // To keep thread running after Thread destructor
+/// @endcode
+///
+/// @warning Thread destructor will assert if SC::Thread::detach() or SC::Thread::join() has not been called.
 struct SC::Thread
 {
     Thread() = default;
     ~Thread();
 
-    // Can me moved
-    Thread(Thread&&)            = default;
-    Thread& operator=(Thread&&) = default;
-
-    // Cannot be copied
+    // Cannot be copied or moved (as it would require a dynamic allocation for the type erased Function)
+    Thread(Thread&&)                 = delete;
+    Thread& operator=(Thread&&)      = delete;
     Thread(const Thread&)            = delete;
     Thread& operator=(const Thread&) = delete;
 
-    /// @brief Returns current thread identifier
+    /// @brief Returns thread id of the thread calling the function
     /// @return thread id
     static uint64_t CurrentThreadID();
 
-    /// Starts the new thread with given name and func
-    /// @param threadName Name given to the thread being started
+    /// @brief Returns thread id of this thread object (not current thread)
+    uint64_t threadID();
+
+    /// @brief Starts the new thread with given name and func
     /// @param func     Function running on thread. Must be a valid pointer to action for the entire duration of thread.
-    /// @param syncFunc Function garanteed to be run before  start returns
-    [[nodiscard]] Result start(StringView threadName, Action* func, Action* syncFunc = nullptr);
+    [[nodiscard]] Result start(Function<void(Thread&)>&& func);
+
+    /// @brief Sets current thread name ONLY if called from inside the thread.
+    /// @param name The name of the thread
+    /// @warning This function will ASSERT if it's not called from the thread itself.
+    void setThreadName(const native_char_t* name);
 
     /// @brief Waits for thread to finish and releases its resources
     /// @return Valid Result if thread has finished
@@ -134,13 +159,17 @@ struct SC::Thread
     static void Sleep(uint32_t milliseconds);
 
   private:
-    struct CreateParams;
+    void setThreadNameInternal(const native_char_t* name);
     struct Internal;
     using OpaqueThread = AlignedStorage<sizeof(void*), alignof(void*)>;
     UniqueOptional<OpaqueThread> thread;
+    Function<void(Thread&)>      userFunction;
 };
 
-/// @brief An automatically reset event object to synchonize two threads
+/// @brief An automatically reset event object to synchonize two threads.
+/// @n
+/// Example:
+/// @snippet Libraries/Threading/Tests/ThreadingTest.cpp eventObjectSnippet
 struct SC::EventObject
 {
     bool autoReset = true;

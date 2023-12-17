@@ -24,7 +24,6 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
 struct SC::FileSystemWatcher::ThreadRunnerInternal
 {
     Thread thread;
-    Action threadFunction;
 
     static constexpr int N = ThreadRunnerDefinition::MaxWatchablePaths;
 
@@ -44,7 +43,6 @@ struct SC::FileSystemWatcher::Internal
     {
         self            = &parent;
         threadingRunner = &runner.get();
-        threadingRunner->threadFunction.bind<Internal, &Internal::threadRun>(*this);
         return Result(true);
     }
 
@@ -179,13 +177,16 @@ struct SC::FileSystemWatcher::Internal
         if (threadingRunner and not threadingRunner->thread.wasStarted())
         {
             threadingRunner->shouldStop.exchange(false);
-            SC_TRY(threadingRunner->thread.start("FileSystemWatcher::init", &threadingRunner->threadFunction))
+            Function<void(Thread&)> threadFunction;
+            threadFunction.bind<Internal, &Internal::threadRun>(*this);
+            SC_TRY(threadingRunner->thread.start(move(threadFunction)))
         }
         return Result(true);
     }
 
-    void threadRun()
+    void threadRun(Thread& thread)
     {
+        thread.setThreadName(SC_NATIVE_STR("FileSystemWatcher::init"));
         ThreadRunnerInternal& runner = *threadingRunner;
         while (not runner.shouldStop.load())
         {
