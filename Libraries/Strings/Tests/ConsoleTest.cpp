@@ -6,6 +6,7 @@
 #include "../../Strings/String.h"
 #include "../../Testing/Testing.h"
 
+//! [testingSnippet]
 namespace SC
 {
 struct ConsoleTest;
@@ -33,3 +34,4 @@ namespace SC
 {
 void runConsoleTest(SC::TestReport& report) { ConsoleTest test(report); }
 } // namespace SC
+//! [testingSnippet]

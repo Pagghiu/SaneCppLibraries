@@ -18,15 +18,20 @@ struct TestReport;
 //! @addtogroup group_testing
 //! @{
 
-/// @brief Collects multiple TestCase and reports their results, allowing filtering tests
+/// @brief Collects multiple TestCase and reports their results.
+///
+/// This is passed as argument to SC::TestCase derived classes, and contains handle to _globals_ like a console,
+/// paths to the library and application root, path to executable etc.
 struct SC::TestReport
 {
-    Console&   console;                       ///< The passed in console object where to print results
-    bool       abortOnFirstFailedTest = true; ///< If `true` will abort after first failed test
-    bool       debugBreakOnFailedTest = true; ///< If `true` will issue a debugger halt when a test fails
-    StringView libraryRootDirectory;          ///< Path to SC Library
-    StringView executableFile;                ///< Path to current executable
-    StringView applicationRootDirectory;      ///< Path to application (on macOS is different from executable path)
+    Console&   console;                  ///< The passed in console object where to print results
+    StringView libraryRootDirectory;     ///< Path to sources directory for library
+    StringView executableFile;           ///< Path to current executable
+    StringView applicationRootDirectory; ///< Path to application (on macOS is different from executable path)
+
+    // Options
+    bool abortOnFirstFailedTest = true; ///< If `true` will abort after first failed test
+    bool debugBreakOnFailedTest = true; ///< If `true` will issue a debugger halt when a test fails
 
     /// @brief Build from a console and executalbe arguments
     /// @param console A Console object where to print test results
@@ -42,8 +47,9 @@ struct SC::TestReport
   private:
     [[nodiscard]] bool isTestEnabled(StringView testName) const;
     [[nodiscard]] bool isSectionEnabled(StringView sectionName) const;
-    void               testCaseFinished(TestCase& testCase);
-    void               printSectionResult(TestCase& testCase);
+
+    void testCaseFinished(TestCase& testCase);
+    void printSectionResult(TestCase& testCase);
 
     friend struct TestCase;
     uint32_t   numTestsSucceeded = 0;
@@ -54,7 +60,11 @@ struct SC::TestReport
     StringView sectionToRun;
 };
 
-/// @brief A Test case, with multiple section
+/// @brief A test case that can be split into multiple sections.
+/// To create a test case derive from SC::TestCase and run tests in the constructor
+///
+/// Example:
+/// @snippet Libraries/Strings/Tests/ConsoleTest.cpp testingSnippet
 struct SC::TestCase
 {
     /// @brief Adds this TestCase to a TestReport with a name
