@@ -315,7 +315,6 @@ int SC::SocketFlags::toNative(ProtocolType family)
 SC::Result SC::SocketNetworking::resolveDNS(StringView host, String& ipAddress)
 {
     struct addrinfo hints, *res, *p;
-    int             status;
 
     // Setup hints structure
     memset(&hints, 0, sizeof hints);
@@ -327,7 +326,8 @@ SC::Result SC::SocketNetworking::resolveDNS(StringView host, String& ipAddress)
     StringView nullTerminated;
     SC_TRY(converter.convertNullTerminateFastPath(host, nullTerminated));
     // Get address information
-    if ((status = getaddrinfo(nullTerminated.bytesIncludingTerminator(), NULL, &hints, &res)) != 0)
+    const int status = getaddrinfo(nullTerminated.bytesIncludingTerminator(), NULL, &hints, &res);
+    if (status != 0)
     {
         return Result::Error("DNSResolver::resolve: getaddrinfo error");
     }

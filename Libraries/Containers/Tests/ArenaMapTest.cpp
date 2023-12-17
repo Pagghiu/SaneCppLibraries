@@ -93,7 +93,9 @@ struct SC::ArenaMapTest : public SC::TestCase
             mapCopy = map;
             mapMove = move(map);
 
+#ifndef __clang_analyzer__
             SC_TEST_EXPECT(map.size() == 0);
+#endif // not __clang_analyzer__
             SC_TEST_EXPECT(mapCopy.size() == 3);
             SC_TEST_EXPECT(mapMove.size() == 3);
 

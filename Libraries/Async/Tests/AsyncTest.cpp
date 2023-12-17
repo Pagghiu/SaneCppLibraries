@@ -201,7 +201,7 @@ struct SC::AsyncTest : public SC::TestCase
 #else
             SC_TEST_EXPECT(process.launch("where", "where.exe"));
 #endif
-            ProcessDescriptor::Handle processHandle;
+            ProcessDescriptor::Handle processHandle = 0;
             SC_TEST_EXPECT(process.handle.get(processHandle, Result::Error("Invalid Handle")));
             ProcessDescriptor::ExitStatus exitStatus;
             AsyncProcessExit              async;
@@ -483,7 +483,7 @@ struct SC::AsyncTest : public SC::TestCase
 
             auto writeSpan = StringView("test").toCharSpan();
 
-            FileDescriptor::Handle handle;
+            FileDescriptor::Handle handle = FileDescriptor::Invalid;
             SC_TEST_EXPECT(fd.get(handle, Result::Error("asd")));
 
             AsyncFileWrite asyncWriteFile;
@@ -558,7 +558,7 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, options));
             SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
 
-            FileDescriptor::Handle handle;
+            FileDescriptor::Handle handle = FileDescriptor::Invalid;
             SC_TEST_EXPECT(fd.get(handle, Result::Error("handle")));
             AsyncFileClose asyncClose;
             asyncClose.callback = [this](auto& result) { SC_TEST_EXPECT(result.isValid()); };
@@ -595,7 +595,7 @@ struct SC::AsyncTest : public SC::TestCase
                 // This will provoke the following failures:
                 // - Apple: after poll on macOS (where we're pushing the async handles to OS)
                 // - Windows: during Staging (precisely in Activate)
-                SocketDescriptor::Handle handle;
+                SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
                 SC_TEST_EXPECT(serverSideClient.get(handle, Result::Error("ASD")));
                 SocketDescriptor socketToClose;
                 SC_TEST_EXPECT(socketToClose.assign(handle));

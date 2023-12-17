@@ -149,11 +149,15 @@ struct SC::SmallVectorTest : public SC::TestCase
                 addItems(vec, 3);
                 SC_TEST_EXPECT(vec.size() == 3);
                 vec2 = move(vec);
+#ifndef __clang_analyzer__
                 SC_TEST_EXPECT(vec.size() == 0);
+#endif // not __clang_analyzer__
                 SC_TEST_EXPECT(vec2.size() == 3);
                 SegmentHeader* vec1Header = SegmentHeader::getSegmentHeader(vec.items);
                 SC_TEST_EXPECT(vec1Header != nullptr);
+#ifndef __clang_analyzer__
                 SC_TEST_EXPECT(vec1Header->isSmallVector);
+#endif // not __clang_analyzer__
             }
             SegmentHeader* vec2Header = SegmentHeader::getSegmentHeader(vec2.items);
             SC_TEST_EXPECT(vec2Header->isSmallVector);
@@ -167,11 +171,15 @@ struct SC::SmallVectorTest : public SC::TestCase
                 addItems(vec, 4);
                 SC_TEST_EXPECT(vec.size() == 4);
                 vec2 = move(vec);
+#ifndef __clang_analyzer__
                 SC_TEST_EXPECT(vec.size() == 0);
+#endif // not __clang_analyzer__
                 SC_TEST_EXPECT(vec2.size() == 4);
                 SegmentHeader* vec1Header = SegmentHeader::getSegmentHeader(vec.items);
                 SC_TEST_EXPECT(vec1Header != nullptr);
+#ifndef __clang_analyzer__
                 SC_TEST_EXPECT(vec1Header->isSmallVector);
+#endif // not __clang_analyzer__
             }
             SegmentHeader* vec2Header = SegmentHeader::getSegmentHeader(vec2.items);
             SC_TEST_EXPECT(not vec2Header->isSmallVector);
@@ -186,11 +194,15 @@ struct SC::SmallVectorTest : public SC::TestCase
                 addItems(vec, 3);
                 SC_TEST_EXPECT(vec.size() == 3);
                 vec2 = move(vec);
+#ifndef __clang_analyzer__
                 SC_TEST_EXPECT(vec.size() == 0);
+#endif // not __clang_analyzer__
                 SC_TEST_EXPECT(vec2.size() == 3);
                 SegmentHeader* vec1Header = SegmentHeader::getSegmentHeader(vec.items);
                 SC_TEST_EXPECT(vec1Header != nullptr);
+#ifndef __clang_analyzer__
                 SC_TEST_EXPECT(vec1Header->isSmallVector);
+#endif // not __clang_analyzer__
             }
             SegmentHeader* vec2Header = SegmentHeader::getSegmentHeader(vec2.items);
             SC_TEST_EXPECT(vec2Header->isSmallVector);
@@ -208,7 +220,9 @@ struct SC::SmallVectorTest : public SC::TestCase
                 SC_TEST_EXPECT(vec2.size() == 4);
                 SegmentHeader* vec1Header = SegmentHeader::getSegmentHeader(vec.items);
                 SC_TEST_EXPECT(vec1Header != nullptr);
+#ifndef __clang_analyzer__
                 SC_TEST_EXPECT(vec1Header->isSmallVector);
+#endif // not __clang_analyzer__
             }
             SegmentHeader* vec2Header = SegmentHeader::getSegmentHeader(vec2.items);
             SC_TEST_EXPECT(not vec2Header->isSmallVector);

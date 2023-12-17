@@ -80,7 +80,9 @@ struct SC::TaggedUnionTest : public SC::TestCase
             TaggedUnion<TestUnion> moveAssigned;
             moveAssigned.assign<TypeInt>(2);
             moveAssigned = move(copyAssigned);
+#ifndef __clang_analyzer__
             SC_TEST_EXPECT(copyAssigned.field<TypeString>()->isEmpty());
+#endif // not __clang_analyzer__
             SC_TEST_EXPECT(moveAssigned.field<TypeString>()->view() == "ASD");
 
             switch (moveAssigned.getType())

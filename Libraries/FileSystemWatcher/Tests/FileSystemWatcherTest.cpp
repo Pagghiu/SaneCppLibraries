@@ -292,7 +292,14 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(params.changes1 == 2);
             SC_TEST_EXPECT(params.changes2 == 1);
 
-            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2.view(), move(lambda2)));
+            auto lambda3 = [&](const FileSystemWatcher::Notification& notification)
+            {
+                if (notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
+                {
+                    params.changes2++;
+                }
+            };
+            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2.view(), move(lambda3)));
             SC_TEST_EXPECT(fs2.removeFile("atutti.txt"));
             Thread::Sleep(waitForEventsTimeout);
             SC_TEST_EXPECT(eventLoop.runOnce());

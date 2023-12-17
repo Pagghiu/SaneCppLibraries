@@ -461,7 +461,9 @@ void SC::VectorTest::testClassType()
 
         vector2 = move(vector1);
         SC_TEST_EXPECT(vector1.items == nullptr);
+#ifndef __clang_analyzer__
         SC_TEST_EXPECT(vector1.size() == 0);
+#endif // not __clang_analyzer__
         SC_TEST_EXPECT(vector2.size() == 2);
         int32_t value;
         SC_TEST_EXPECT(vector2[0].toString().parseInt32(value) && value == 0);
