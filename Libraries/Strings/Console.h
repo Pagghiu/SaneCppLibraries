@@ -14,6 +14,16 @@ struct String;
 //! @{
 
 /// @brief Writes to console using SC::StringFormat.
+///
+/// Example:
+/// @code{.cpp}
+/// // Create a buffer used for UTF conversions (if necessray)
+/// SmallVector<char, 512 * sizeof(native_char_t)> consoleConversionBuffer;
+/// // Construct console with the buffer
+/// String str = StringView("Test Test\n");
+/// // Have fun printing
+/// console.print(str.view());
+/// @endcode
 struct SC_COMPILER_EXPORT Console
 {
     /// @brief Constructs a console with a conversion buffer used for string conversions (UTF8 / UTF16)

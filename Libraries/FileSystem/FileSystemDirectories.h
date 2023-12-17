@@ -9,10 +9,7 @@ namespace SC
 struct FileSystemDirectories;
 } // namespace SC
 
-//! @defgroup group_system System
-//! @copybrief library_system (see @ref library_system for more details)
-
-//! @addtogroup group_system
+//! @addtogroup group_file_system
 //! @{
 
 /// @brief Reports location of system directories (executable / application root)

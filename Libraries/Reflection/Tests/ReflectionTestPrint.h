@@ -1,9 +1,9 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#include "../../Strings/Console.h"
 #include "../../Strings/String.h"
 #include "../../Strings/StringBuilder.h"
-#include "../../System/Console.h"
 #include "../Reflection.h"
 
 namespace SC

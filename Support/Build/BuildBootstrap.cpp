@@ -4,8 +4,8 @@
 
 #include "../../Libraries/Containers/SmallVector.h"
 #include "../../Libraries/FileSystem/Path.h"
+#include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Strings/SmallString.h"
-#include "../../Libraries/System/Console.h"
 #include "../../Libraries/Time/Time.h"
 
 #include "../../Bindings/cpp/SC.cpp"

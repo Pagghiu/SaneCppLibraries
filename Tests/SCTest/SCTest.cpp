@@ -21,12 +21,6 @@ void runFunctionTest(TestReport& report);
 void runUniqueHandleTest(TestReport& report);
 void runOptionalTest(TestReport& report);
 void runTaggedUnionTest(TestReport& report);
-void runStringTest(TestReport& report);
-void runSmallStringTest(TestReport& report);
-void runStringConverterTest(TestReport& report);
-void runStringBuilderTest(TestReport& report);
-void runStringFormatTest(TestReport& report);
-void runStringViewTest(TestReport& report);
 
 // File
 void runFileDescriptorTest(TestReport& report);
@@ -34,9 +28,13 @@ void runFileDescriptorTest(TestReport& report);
 // FileSystem
 void runFileSystemDirectoriesTest(TestReport& report);
 void runFileSystemTest(TestReport& report);
-void runFileSystemIteratorTest(TestReport& report);
-void runFileSystemWatcherTest(TestReport& report);
 void runPathTest(TestReport& report);
+
+// FileSystemIterator
+void runFileSystemIteratorTest(TestReport& report);
+
+// FileSystemWatcher
+void runFileSystemWatcherTest(TestReport& report);
 
 // Hashing
 void runHashingTest(TestReport& report);
@@ -65,8 +63,14 @@ void runSerializationJsonTokenizerTest(TestReport& report);
 // Socket
 void runSocketDescriptorTest(TestReport& report);
 
-// System
+// Strings
 void runConsoleTest(TestReport& report);
+void runStringTest(TestReport& report);
+void runSmallStringTest(TestReport& report);
+void runStringConverterTest(TestReport& report);
+void runStringBuilderTest(TestReport& report);
+void runStringFormatTest(TestReport& report);
+void runStringViewTest(TestReport& report);
 
 // Time
 void runTimeTest(TestReport& report);
@@ -87,7 +91,7 @@ void runDebugVisualizersTest(TestReport& report);
 #include "../../Libraries/FileSystem/FileSystemDirectories.h"
 #include "../../Libraries/FileSystem/Path.h"
 #include "../../Libraries/Socket/SocketDescriptor.h"
-#include "../../Libraries/System/Console.h"
+#include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Testing/Testing.h"
 
 SC::Console* globalConsole;
@@ -126,12 +130,6 @@ int main(int argc, const char* argv[])
     runUniqueHandleTest(report);
     runOptionalTest(report);
     runSmallVectorTest(report);
-    runStringConverterTest(report);
-    runStringBuilderTest(report);
-    runStringFormatTest(report);
-    runStringTest(report);
-    runSmallStringTest(report);
-    runStringViewTest(report);
     runTaggedUnionTest(report);
     runVectorTest(report);
     runVectorMapTest(report);
@@ -143,9 +141,13 @@ int main(int argc, const char* argv[])
     // FileSystem tests
     runFileSystemTest(report);
     runFileSystemDirectoriesTest(report);
-    runFileSystemIteratorTest(report);
-    runFileSystemWatcherTest(report);
     runPathTest(report);
+
+    // FileSystemIterator tests
+    runFileSystemIteratorTest(report);
+
+    // FileSystemWatcher tests
+    runFileSystemWatcherTest(report);
 
     // Hashing tests
     runHashingTest(report);
@@ -155,8 +157,6 @@ int main(int argc, const char* argv[])
     runHttpClientTest(report);
     runHttpServerTest(report);
     runHttpURLParserTest(report);
-
-    // JSON tests
 
     // Plugin tests
     runPluginTest(report);
@@ -176,8 +176,14 @@ int main(int argc, const char* argv[])
     // Socket tests
     runSocketDescriptorTest(report);
 
-    // System tests
+    // Strings tests
     runConsoleTest(report);
+    runStringConverterTest(report);
+    runStringBuilderTest(report);
+    runStringFormatTest(report);
+    runStringTest(report);
+    runSmallStringTest(report);
+    runStringViewTest(report);
 
     // Time tests
     runTimeTest(report);

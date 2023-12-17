@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../Hashing.h"
+#include "../../Strings/Console.h"
 #include "../../Strings/String.h"
 #include "../../Strings/StringBuilder.h"
-#include "../../System/Console.h"
 #include "../../Testing/Testing.h"
 
 namespace SC

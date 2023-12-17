@@ -6,10 +6,10 @@
 #include "../../Containers/SmallVector.h"
 #include "../../Containers/Vector.h"
 #include "../../Reflection/Reflection.h"
+#include "../../Strings/Console.h"
 #include "../../Strings/String.h"
 #include "../../Strings/StringBuilder.h"
 #include "../../Strings/StringView.h"
-#include "../../System/Console.h"
 #include "../../Testing/Testing.h"
 
 namespace SC

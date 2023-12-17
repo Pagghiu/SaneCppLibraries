@@ -15,10 +15,7 @@ struct SystemDynamicLibraryDefinition;
 }
 } // namespace SC
 
-//! @defgroup group_system System
-//! @copybrief library_system (see @ref library_system for more details)
-
-//! @addtogroup group_system
+//! @addtogroup group_plugin
 //! @{
 
 /// @brief Definition of native dynamic library handle for SystemDynamicLibrary

@@ -3,8 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 #include <SC/Libraries/Containers/SmallVector.h>
 #include <SC/Libraries/Plugin/PluginMacros.h>
+#include <SC/Libraries/Strings/Console.h>
 #include <SC/Libraries/Strings/String.h>
-#include <SC/Libraries/System/Console.h>
 
 struct TestPluginParent
 {

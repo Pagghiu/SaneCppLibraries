@@ -3,8 +3,8 @@
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
 #include "../Foundation/Result.h"
+#include "../Strings/Console.h" // SC_COMPILER_DEBUG_BREAK
 #include "../Strings/StringView.h"
-#include "../System/Console.h" // SC_COMPILER_DEBUG_BREAK
 
 namespace SC
 {

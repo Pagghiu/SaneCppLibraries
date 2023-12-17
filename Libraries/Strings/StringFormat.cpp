@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #include "../Strings/StringFormat.h"
+#include "../Strings/Console.h" // TODO: Console here is a module circular dependency. Consider type-erasing with a Function
 #include "../Strings/String.h"
 #include "../Strings/StringConverter.h"
-#include "../System/Console.h" // TODO: Console here is a module circular dependency. Consider type-erasing with a Function
 
 #include <inttypes.h> // PRIu64 / PRIi64
 #include <stdio.h>    // snprintf

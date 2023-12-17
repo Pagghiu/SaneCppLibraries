@@ -15,7 +15,7 @@
 
 #define SC_ASYNC_ENABLE_LOG 0
 #if SC_ASYNC_ENABLE_LOG
-#include "../System/Console.h"
+#include "../Strings/Console.h"
 #else
 #if defined(SC_LOG_MESSAGE)
 #undef SC_LOG_MESSAGE
