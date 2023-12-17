@@ -1,23 +1,23 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "../SystemDirectories.h"
+#include "../FileSystemDirectories.h"
 #include "../../Foundation/Limits.h"
 #include "../../Testing/Testing.h"
 
 namespace SC
 {
-struct SystemTest;
+struct FileSystemDirectoriesTest;
 }
 
-struct SC::SystemTest : public SC::TestCase
+struct SC::FileSystemDirectoriesTest : public SC::TestCase
 {
-    SystemTest(SC::TestReport& report) : TestCase(report, "SystemTest")
+    FileSystemDirectoriesTest(SC::TestReport& report) : TestCase(report, "FileSystemDirectoriesTest")
     {
         using namespace SC;
-        if (test_section("SystemDirectories"))
+        if (test_section("FileSystemDirectories"))
         {
-            SystemDirectories directories;
+            FileSystemDirectories directories;
             SC_TEST_EXPECT(directories.init());
             report.console.print("executableFile=\"{}\"\n", directories.getExecutablePath());
             report.console.print("applicationRootDirectory=\"{}\"\n", directories.getApplicationPath());
@@ -27,5 +27,5 @@ struct SC::SystemTest : public SC::TestCase
 
 namespace SC
 {
-void runSystemTest(SC::TestReport& report) { SystemTest test(report); }
+void runFileSystemDirectoriesTest(SC::TestReport& report) { FileSystemDirectoriesTest test(report); }
 } // namespace SC

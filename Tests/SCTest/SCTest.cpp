@@ -32,6 +32,7 @@ void runStringViewTest(TestReport& report);
 void runFileDescriptorTest(TestReport& report);
 
 // FileSystem
+void runFileSystemDirectoriesTest(TestReport& report);
 void runFileSystemTest(TestReport& report);
 void runFileSystemIteratorTest(TestReport& report);
 void runFileSystemWatcherTest(TestReport& report);
@@ -66,7 +67,8 @@ void runSocketDescriptorTest(TestReport& report);
 
 // System
 void runConsoleTest(TestReport& report);
-void runSystemTest(TestReport& report);
+
+// Time
 void runTimeTest(TestReport& report);
 
 // Threading
@@ -82,10 +84,10 @@ void runDebugVisualizersTest(TestReport& report);
 } // namespace SC
 
 #include "../../Libraries/Containers/SmallVector.h"
+#include "../../Libraries/FileSystem/FileSystemDirectories.h"
 #include "../../Libraries/FileSystem/Path.h"
 #include "../../Libraries/Socket/SocketDescriptor.h"
 #include "../../Libraries/System/Console.h"
-#include "../../Libraries/System/SystemDirectories.h"
 #include "../../Libraries/Testing/Testing.h"
 
 SC::Console* globalConsole;
@@ -94,7 +96,7 @@ int main(int argc, const char* argv[])
 {
     SC::SmallVector<char, 1024 * sizeof(SC::native_char_t)> globalConsoleConversionBuffer;
     using namespace SC;
-    SystemDirectories directories;
+    FileSystemDirectories directories;
     if (not directories.init())
         return -2;
     if (not SocketNetworking::initNetworking())
@@ -140,6 +142,7 @@ int main(int argc, const char* argv[])
 
     // FileSystem tests
     runFileSystemTest(report);
+    runFileSystemDirectoriesTest(report);
     runFileSystemIteratorTest(report);
     runFileSystemWatcherTest(report);
     runPathTest(report);
@@ -175,7 +178,8 @@ int main(int argc, const char* argv[])
 
     // System tests
     runConsoleTest(report);
-    runSystemTest(report);
+
+    // Time tests
     runTimeTest(report);
 
     // Threading tests

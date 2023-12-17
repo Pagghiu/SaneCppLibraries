@@ -6,7 +6,7 @@
 
 namespace SC
 {
-struct SystemDirectories;
+struct FileSystemDirectories;
 } // namespace SC
 
 //! @defgroup group_system System
@@ -16,13 +16,13 @@ struct SystemDirectories;
 //! @{
 
 /// @brief Reports location of system directories (executable / application root)
-struct SC::SystemDirectories
+struct SC::FileSystemDirectories
 {
     /// @brief Absolute executable path with extension (UTF16 on Windows, UTF8 elsewhere)
     StringView getExecutablePath() const { return executableFile.view(); }
 
     /// @brief Absolute Application path with extension (UTF16 on Windows, UTF8 elsewhere)
-    /// @note on macOS this is different from SystemDirectories::getExecutablePath
+    /// @note on macOS this is different from FileSystemDirectories::getExecutablePath
     StringView getApplicationPath() const { return applicationRootDirectory.view(); }
 
     /// @brief Initializes the paths

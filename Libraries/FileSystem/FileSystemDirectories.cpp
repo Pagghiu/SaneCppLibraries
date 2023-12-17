@@ -1,7 +1,7 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
-#include "SystemDirectories.h"
+#include "FileSystemDirectories.h"
 #include "../Containers/SmallVector.h"
 #include "../Foundation/Result.h"
 
@@ -11,7 +11,7 @@
 
 #include <Windows.h>
 
-bool SC::SystemDirectories::init()
+bool SC::FileSystemDirectories::init()
 {
     // TODO: OsPaths::init() for Windows is messy. Tune the API to improve writing software like this.
     // Reason is because it's handy counting in wchars but we can't do it with StringNative.
@@ -36,8 +36,9 @@ bool SC::SystemDirectories::init()
 
     StringView utf16executable = StringView(Span<const wchar_t>(buffer.data(), (buffer.size() - 1)), true);
 
-    // TODO: SystemDirectories::init - We must also convert to utf8 because dirname will not work on non utf8 or ascii
-    // text assigning directly the SmallString inside StringNative will copy as is instad of converting utf16 to utf8
+    // TODO: FileSystemDirectories::init - We must also convert to utf8 because dirname will not work on non utf8 or
+    // ascii text assigning directly the SmallString inside StringNative will copy as is instad of converting utf16 to
+    // utf8
     executableFile = ""_u8;
     StringBuilder builder(executableFile);
     SC_TRY(builder.append(utf16executable));
@@ -65,7 +66,7 @@ OBJC_EXPORT      Class _Nullable objc_lookUpClass(const char* _Nonnull name) OBJ
 #include <dlfcn.h>
 #endif
 
-bool SC::SystemDirectories::init()
+bool SC::FileSystemDirectories::init()
 {
 #if SC_XCTEST
     Dl_info dlinfo;
@@ -131,6 +132,6 @@ bool SC::SystemDirectories::init()
 }
 
 #else
-bool SC::SystemDirectories::init() { return true; }
+bool SC::FileSystemDirectories::init() { return true; }
 
 #endif
