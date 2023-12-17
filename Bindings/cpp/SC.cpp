@@ -22,7 +22,6 @@
 #include "../../Libraries/Strings/StringIterator.cpp"
 #include "../../Libraries/Strings/StringView.cpp"
 #include "../../Libraries/System/Console.cpp"
-#include "../../Libraries/System/DynamicLibrary.cpp"
 #include "../../Libraries/Testing/Testing.cpp"
 #include "../../Libraries/Threading/Threading.cpp"
 #include "../../Libraries/Time/Time.cpp"

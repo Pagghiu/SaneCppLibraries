@@ -5,7 +5,7 @@
 #include "../Containers/SmallVector.h"
 #include "../Containers/VectorMap.h"
 #include "../Strings/SmallString.h"
-#include "../System/DynamicLibrary.h"
+#include "Internal/DynamicLibrary.h"
 
 namespace SC
 {

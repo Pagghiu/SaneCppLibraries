@@ -1,8 +1,8 @@
 // Copyright (c) 2022-2023, Stefano Cristiano
 //
 // All Rights Reserved. Reproduction is not allowed.
+#include "../../Strings/SmallString.h"
 #include "DynamicLibrary.h"
-#include "../Strings/SmallString.h"
 
 #if SC_PLATFORM_WINDOWS
 

@@ -22,6 +22,10 @@ struct SC::BaseTest : public SC::TestCase
             int* b = new int[2];
             delete[] b;
         }
+        if (test_section("Assert::print"))
+        {
+            Assert::print("a!=b", "FileName.cpp", "Function", 12);
+        }
         if (test_section("Assert::printBacktrace"))
         {
             SC_TEST_EXPECT(Assert::printBacktrace());

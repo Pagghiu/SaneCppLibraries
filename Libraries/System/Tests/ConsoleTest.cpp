@@ -21,10 +21,6 @@ struct SC::ConsoleTest : public SC::TestCase
 
         Console console(consoleConversionBuffer);
 
-        if (test_section("Assert::print"))
-        {
-            Assert::print("a!=b", "FileName.cpp", "Function", 12);
-        }
         if (test_section("print"))
         {
             String str = StringView("Test Test\n");

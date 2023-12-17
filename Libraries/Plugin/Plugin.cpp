@@ -13,6 +13,7 @@
 #if SC_PLATFORM_WINDOWS
 #include "Internal/DebuggerWindows.inl"
 #endif
+#include "Internal/DynamicLibrary.inl"
 
 bool SC::PluginDefinition::find(const StringView text, StringView& extracted)
 {

@@ -2,9 +2,9 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Foundation/Result.h"
-#include "../Foundation/UniqueHandle.h"
-#include "../Strings/StringView.h"
+#include "../../Foundation/Result.h"
+#include "../../Foundation/UniqueHandle.h"
+#include "../../Strings/StringView.h"
 
 namespace SC
 {
