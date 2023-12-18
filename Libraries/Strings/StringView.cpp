@@ -17,7 +17,7 @@ bool SC::StringView::parseInt32(int32_t& value) const
     {
         return false;
     }
-    char buffer[12]; // 10 digits + sign + nullterm
+    char buffer[12]; // 10 digits + sign + nullTerm
     if (textSizeInBytes >= sizeof(buffer))
         return false;
 

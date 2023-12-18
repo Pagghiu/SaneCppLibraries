@@ -125,7 +125,7 @@ struct SC_COMPILER_EXPORT StringIterator
 
     /// @brief Advance position only if any of the code points in given Span is matched
     /// @param items Span of points to be checked
-    /// @return `true` if next code point was sucessfully matched
+    /// @return `true` if next code point was successfully matched
     [[nodiscard]] bool advanceIfMatchesAny(Span<const CodePoint> items);
 
     /// @brief Advance position if any code point in the range [first, last] is matched

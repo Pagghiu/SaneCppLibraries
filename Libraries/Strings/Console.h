@@ -17,7 +17,7 @@ struct String;
 ///
 /// Example:
 /// @code{.cpp}
-/// // Create a buffer used for UTF conversions (if necessray)
+/// // Create a buffer used for UTF conversions (if necessary)
 /// SmallVector<char, 512 * sizeof(native_char_t)> consoleConversionBuffer;
 /// // Construct console with the buffer
 /// String str = StringView("Test Test\n");

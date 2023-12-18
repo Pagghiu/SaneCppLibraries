@@ -29,9 +29,9 @@ struct StringFormatOutput
     /// @param destination The destination console
     StringFormatOutput(StringEncoding encoding, Console& destination);
 
-    /// @brief Appends the StringView (eventually converting it) to destination vuffer
+    /// @brief Appends the StringView (eventually converting it) to destination buffer
     /// @param text The StringView to be appended to buffer or console
-    /// @return `true` if conversion succeded
+    /// @return `true` if conversion succeeded
     [[nodiscard]] bool append(StringView text);
 
     /// @brief Method to be called when format begins, so that it can be rolled back on failure
@@ -41,8 +41,8 @@ struct StringFormatOutput
     void onFormatFailed();
 
     /// @brief Method to be called when format succeeds
-    /// @return `true` if null terminator has been sucessfully added
-    [[nodiscard]] bool onFormatSucceded();
+    /// @return `true` if null terminator has been successfully added
+    [[nodiscard]] bool onFormatSucceeded();
 
   private:
     Vector<char>*  data    = nullptr;
@@ -81,7 +81,7 @@ struct StringFormat
     /// @param data Destination abstraction (buffer or console)
     /// @param fmt The format string to be used
     /// @param args Actual arguments being formatted
-    /// @return `true` if format succeded
+    /// @return `true` if format succeeded
     template <typename... Types>
     [[nodiscard]] static bool format(StringFormatOutput& data, StringView fmt, Types&&... args);
 
@@ -203,7 +203,7 @@ bool SC::StringFormat<RangeIterator>::format(StringFormatOutput& data, StringVie
 {
     data.onFormatBegin();
     if (Implementation::executeFormat(data, fmt.getIterator<RangeIterator>(), forward<Types>(args)...))
-        SC_LANGUAGE_LIKELY { return data.onFormatSucceded(); }
+        SC_LANGUAGE_LIKELY { return data.onFormatSucceeded(); }
     else
     {
         data.onFormatFailed();

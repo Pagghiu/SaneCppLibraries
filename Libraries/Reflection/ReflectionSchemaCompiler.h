@@ -68,7 +68,7 @@ struct SchemaCompiler
             if (types.values[baseLinkID].typeInfo.type == TypeCategory::TypeStruct and
                 types.values[baseLinkID].typeInfo.structInfo.isPacked)
             {
-                // This is a little help for Binary Serialization, as packed structs end up serialzied as is
+                // This is a little help for Binary Serialization, as packed structs end up serialized as is
                 Algorithms::bubbleSort(types.values + baseLinkID + 1, types.values + baseLinkID + 1 + numberOfChildren,
                                        OrderByMemberOffset());
             }
@@ -131,7 +131,7 @@ struct SchemaCompiler
     /// built
     /// @tparam MAX_TOTAL_TYPES Maximum number of types (struct members). When using constexpr it will trim it to actual
     /// size.
-    /// @returns FlatTrimmedResult with only the requried compiled types.
+    /// @returns FlatTrimmedResult with only the required compiled types.
     template <typename T, uint32_t MAX_LINK_BUFFER_SIZE = 20, uint32_t MAX_TOTAL_TYPES = 100>
     static constexpr auto compile()
     {

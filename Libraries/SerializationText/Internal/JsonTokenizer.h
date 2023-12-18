@@ -10,7 +10,7 @@ struct JsonTokenizer;
 struct JsonTokenizerTest;
 } // namespace SC
 
-/// @brief Tokenizes a JSON text stream, without validating numbers and strings
+/// @brief Tokenize a JSON text stream, without validating numbers and strings
 struct SC::JsonTokenizer
 {
     struct Token
@@ -27,8 +27,8 @@ struct SC::JsonTokenizer
             True,
             False,
             Null,
-            String, // Unvalidated
-            Number, // Unvalidated
+            String, // Not validated
+            Number, // Not validated
         };
         /// @brief Constructs an invalid Token
         constexpr Token() : type(Invalid) {}
@@ -140,7 +140,7 @@ constexpr void SC::JsonTokenizer::tokenizeString(StringIteratorASCII& it, const 
             continue;
         StringIteratorASCII startNext = start;
         (void)startNext.stepForward();  // but let's slice away leading '"'
-        token.type     = Token::String; // Ok we have an (unvalidated) string
+        token.type     = Token::String; // Ok we have a (not validated) string
         auto realStart = start;
         realStart.setToStart();
         token.tokenStartBytes  = static_cast<size_t>(startNext.bytesDistanceFrom(realStart));

@@ -238,13 +238,13 @@ struct SC::StringViewTest : public SC::TestCase
                                "\xe0\x0\xe8\x0\xec\x0\xf2\x0\xf9\x0"_u16) == StringView::Comparison::Equals);
 
             // 日本語語語 (1 UTF16-LE sequence, 3 UTF8 sequence)
-            StringView stringutf8  = StringView("\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e\xe8\xaa\x9e\xe8\xaa\x9e"_u8);
-            StringView stringutf16 = StringView("\xE5\x65\x2C\x67\x9E\x8a\x9E\x8a\x9E\x8a\x00"_u16); // LE
+            StringView stringUtf8  = StringView("\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e\xe8\xaa\x9e\xe8\xaa\x9e"_u8);
+            StringView stringUtf16 = StringView("\xE5\x65\x2C\x67\x9E\x8a\x9E\x8a\x9E\x8a\x00"_u16); // LE
 
-            SC_TEST_EXPECT(stringutf8.compare(stringutf16) == StringView::Comparison::Equals);
-            SC_TEST_EXPECT(stringutf16.compare(stringutf8) == StringView::Comparison::Equals);
-            SC_TEST_EXPECT(stringutf8 == stringutf16);
-            SC_TEST_EXPECT(stringutf16 == stringutf8);
+            SC_TEST_EXPECT(stringUtf8.compare(stringUtf16) == StringView::Comparison::Equals);
+            SC_TEST_EXPECT(stringUtf16.compare(stringUtf8) == StringView::Comparison::Equals);
+            SC_TEST_EXPECT(stringUtf8 == stringUtf16);
+            SC_TEST_EXPECT(stringUtf16 == stringUtf8);
             // U+24B62 (2 UTF16-LE sequence, 4 UTF8 sequence)
             SC_TEST_EXPECT("\xf0\xa4\xad\xa2"_u8.compare("\x52\xD8\x62\xDF\x00"_u16) == StringView::Comparison::Equals);
             StringView aASCII = "A"_a8;

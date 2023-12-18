@@ -41,7 +41,7 @@ struct SerializationJson;
 /// than SC::SerializationJson::loadVersioned.
 /// @snippet Libraries/SerializationText/Tests/SerializationJsonTest.cpp serializationJsonLoadExactSnippet
 /// @note (*) simpler code probably means faster code, even if it has not been properly benchmarked yet so the
-/// hypotetical performance gain is yet to be defined.
+/// hypothetical performance gain is yet to be defined.
 struct SC::SerializationJson
 {
     /// @brief Formatting options
@@ -78,7 +78,7 @@ struct SC::SerializationJson
     /// @tparam T Type of object to load
     /// @param object Object to load
     /// @param text Json text to be deserialized
-    /// @return `true` if load succeded
+    /// @return `true` if load succeeded
     /// @see SC::SerializationJson for example usage
     template <typename T>
     [[nodiscard]] static bool loadExact(T& object, StringView text)
@@ -91,7 +91,7 @@ struct SC::SerializationJson
     /// @tparam T Type of object load
     /// @param object Object to load
     /// @param text Json text to be deserialized
-    /// @return `true` if load succeded
+    /// @return `true` if load succeeded
     /// @see SC::SerializationJson for example usage
     template <typename T>
     [[nodiscard]] static bool loadVersioned(T& object, StringView text)

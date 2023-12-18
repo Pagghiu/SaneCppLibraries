@@ -220,7 +220,7 @@ void StringFormatOutput::onFormatBegin()
     }
 }
 
-bool StringFormatOutput::onFormatSucceded()
+bool StringFormatOutput::onFormatSucceeded()
 {
     if (data != nullptr)
     {

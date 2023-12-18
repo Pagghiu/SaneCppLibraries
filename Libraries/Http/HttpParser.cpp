@@ -224,10 +224,10 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
                 SC_CO_RETURN(topLevelCoroutine, SC::Result(true));
             } while (state == State::Parsing);
 
-            if (matchesHeader(HeaderType::ContentLength) and not parsedcontentLength)
+            if (matchesHeader(HeaderType::ContentLength) and not parsedContentLength)
             {
 
-                parsedcontentLength = true;
+                parsedContentLength = true;
 
                 globalStart += globalLength;
                 tokenStart   = globalStart;

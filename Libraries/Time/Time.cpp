@@ -37,9 +37,9 @@ SC::Time::Absolute SC::Time::Absolute::now()
     _ftime_s(&t);
     return static_cast<int64_t>(t.time) * 1000 + t.millitm;
 #else
-    struct timespec tspec;
-    clock_gettime(CLOCK_REALTIME, &tspec);
-    return static_cast<int64_t>(round(tspec.tv_nsec / 1.0e6) + tspec.tv_sec * 1000);
+    struct timespec nowTimeSpec;
+    clock_gettime(CLOCK_REALTIME, &nowTimeSpec);
+    return static_cast<int64_t>(round(nowTimeSpec.tv_nsec / 1.0e6) + nowTimeSpec.tv_sec * 1000);
 #endif
 }
 

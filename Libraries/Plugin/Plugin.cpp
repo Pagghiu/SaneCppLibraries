@@ -18,8 +18,8 @@
 bool SC::PluginDefinition::find(const StringView text, StringView& extracted)
 {
     auto       it           = text.getIterator<StringIteratorASCII>();
-    const auto beginPluging = ("SC_BEGIN_PLUGIN"_a8).getIterator<StringIteratorASCII>();
-    SC_TRY(it.advanceAfterFinding(beginPluging));
+    const auto beginPlugin = ("SC_BEGIN_PLUGIN"_a8).getIterator<StringIteratorASCII>();
+    SC_TRY(it.advanceAfterFinding(beginPlugin));
     SC_TRY(it.advanceUntilMatches('\n'));
     SC_TRY(it.stepForward());
     auto       start     = it;
@@ -234,13 +234,13 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
     bool found = false;
     for (const StringView& base : root)
     {
-        FileSystemIterator fsfsIterator;
-        SC_TRY(fsfsIterator.init(base));
-        while (fsfsIterator.enumerateNext())
+        FileSystemIterator fsIterator;
+        SC_TRY(fsIterator.init(base));
+        while (fsIterator.enumerateNext())
         {
-            if (fsfsIterator.get().isDirectory())
+            if (fsIterator.get().isDirectory())
             {
-                const StringView candidate = fsfsIterator.get().name;
+                const StringView candidate = fsIterator.get().name;
                 StringBuilder    compilerBuilder(compiler.compilerPath, StringBuilder::Clear);
                 SC_TRY(compilerBuilder.append(base));
                 SC_TRY(compilerBuilder.append(L"/"));
@@ -264,7 +264,7 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
                     if (fs.existsAndIsFile(compiler.compilerPath.view()) and
                         fs.existsAndIsFile(compiler.linkerPath.view()))
                     {
-                        // TODO: Improve vstudio detection, finding latest
+                        // TODO: Improve visual studio detection, finding latest
                         found = true;
                         break;
                     }

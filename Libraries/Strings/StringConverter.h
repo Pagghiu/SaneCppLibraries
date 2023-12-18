@@ -83,7 +83,7 @@ struct SC::StringConverter
     /// needed.
     /// @param input The StringView to be converted
     /// @param encodedText The converted output StringView
-    /// @return `true` if the conversion succeded
+    /// @return `true` if the conversion succeeded
     [[nodiscard]] bool convertNullTerminateFastPath(StringView input, StringView& encodedText);
 
     /// Appends the input string null terminated
@@ -98,9 +98,9 @@ struct SC::StringConverter
     /// @param stringData The buffer to be modified
     /// @param encoding The requested encoding, that determines how many null-termination bytes exist
     /// @return `true`
-    [[nodiscard]] static bool popNulltermIfExists(Vector<char>& stringData, StringEncoding encoding);
+    [[nodiscard]] static bool popNullTermIfExists(Vector<char>& stringData, StringEncoding encoding);
 
-    /// @brief Will unconditionall add a null-terminator to given buffer.
+    /// @brief Will unconditionally add a null-terminator to given buffer.
     /// @param stringData The destination buffer
     /// @param encoding The given encoding
     /// @return `true` if null-terminator was successfully pushed

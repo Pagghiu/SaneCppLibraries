@@ -38,7 +38,7 @@ struct SerializerBinaryReadVersioned
             }
             else
             {
-                if (not schema.options.allowDropEccessStructMembers)
+                if (not schema.options.allowDropExcessStructMembers)
                     return false;
                 // We must consume it anyway, discarding its content
                 if (not schema.skipCurrent(stream))
@@ -98,7 +98,7 @@ struct SerializerReadVersionedItems
             if (sourceNumBytes > destNumBytes)
             {
                 // We must consume these excess bytes anyway, discarding their content
-                if (not schema.options.allowDropEccessArrayItems)
+                if (not schema.options.allowDropExcessArrayItems)
                     return false;
                 return stream.advanceBytes(sourceNumBytes - minBytes);
             }
@@ -115,7 +115,7 @@ struct SerializerReadVersionedItems
         if (numSourceItems > numDestinationItems)
         {
             // We must consume these excess items anyway, discarding their content
-            if (not schema.options.allowDropEccessArrayItems)
+            if (not schema.options.allowDropExcessArrayItems)
                 return false;
 
             for (uint32_t idx = 0; idx < numSourceItems - numDestinationItems; ++idx)

@@ -73,7 +73,7 @@ struct SC::FileSystem
         bool useCloneIfSupported;
     };
 
-    /// @brief Specifiy source, destination and flags for a copy operation
+    /// @brief Specify source, destination and flags for a copy operation
     struct CopyOperation
     {
         StringView source;      ///< Copy operation source (can be a {relative | absolute} {file | directory} path)
@@ -93,7 +93,7 @@ struct SC::FileSystem
     /// @param source Source file path
     /// @param destination Destination file path
     /// @param copyFlags Copy flags (overwrite, use clone api etc.)
-    /// @return Valid Result if copy succeded
+    /// @return Valid Result if copy succeeded
     ///
     /// Example:
     /// \snippet Libraries/FileSystem/Tests/FileSystemTest.cpp copyExistsFileSnippet
@@ -112,7 +112,7 @@ struct SC::FileSystem
     /// @param source Source directory path
     /// @param destination Destination directory path
     /// @param copyFlags Copy flags (overwrite, use clone api etc.)
-    /// @return Valid Result if copy succeded
+    /// @return Valid Result if copy succeeded
     ///
     /// Example:
     /// \snippet Libraries/FileSystem/Tests/FileSystemTest.cpp copyDirectoryRecursiveSnippet

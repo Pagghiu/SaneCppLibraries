@@ -38,16 +38,16 @@ struct SC::SmallStringTest : public SC::TestCase
         }
         if (test_section("SmallString"))
         {
-            // Test String ssignable to SmallString
+            // Test String assignment to SmallString
             SmallString<10> ss10;
             String          normal("asd");
             ss10                 = normal;
-            auto assertUpcasting = [this](String& s) { SC_TEST_EXPECT(s.sizeInBytesIncludingTerminator() == 4); };
-            assertUpcasting(ss10);
+            auto assertUpCasting = [this](String& s) { SC_TEST_EXPECT(s.sizeInBytesIncludingTerminator() == 4); };
+            assertUpCasting(ss10);
             SC_TEST_EXPECT(ss10.view() == "asd");
             SC_TEST_EXPECT(SegmentHeader::getSegmentHeader(ss10.data.items)->isSmallVector);
             SC_TEST_EXPECT(SegmentHeader::getSegmentHeader(ss10.data.items)->capacityBytes == 10);
-            // Test SmallString assignable to regular string
+            // Test SmallString assignment to regular string
             SmallString<20> ss20;
             ss20   = "ASD22";
             normal = move(ss20);

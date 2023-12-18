@@ -188,7 +188,7 @@ constexpr auto MemberGetAddress(T& obj)
         static_assert(NumMembers == 11, "NOT IMPLEMENTED");
     }
 }
-// MakeUnion creates a static constexpr union of a non-constexpr Base class and a parametrically paddable member
+// MakeUnion creates a static constexpr union of a non-constexpr Base class and a parametrically pad-able member
 // Its constructor is initializing just a char, so that Base and Pad can still be non-constexpr classes, as they
 // will never need to be initialized. We will just be comparing their addresses in the union (See MemberOffsetOff)
 template <typename Base, typename Member, size_t O>

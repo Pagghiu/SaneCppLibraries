@@ -62,7 +62,7 @@ struct SC::AsyncTest : public SC::TestCase
     }
 
     int  threadWasCalled = 0;
-    int  wakeUpSucceded  = 0;
+    int  wakeUpSucceeded  = 0;
     void loopWakeUpFromExternalThread()
     {
         if (test_section("loop wakeUpFromExternalThread"))
@@ -71,7 +71,7 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.create());
             Thread newThread;
             threadWasCalled = 0;
-            wakeUpSucceded  = 0;
+            wakeUpSucceeded  = 0;
 
             auto externalThreadLambda = [this, &eventLoop](Thread& thread)
             {
@@ -79,7 +79,7 @@ struct SC::AsyncTest : public SC::TestCase
                 threadWasCalled++;
                 if (eventLoop.wakeUpFromExternalThread())
                 {
-                    wakeUpSucceded++;
+                    wakeUpSucceeded++;
                 }
             };
             SC_TEST_EXPECT(newThread.start(externalThreadLambda));
@@ -87,7 +87,7 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(newThread.join());
             SC_TEST_EXPECT(threadWasCalled == 1);
-            SC_TEST_EXPECT(wakeUpSucceded == 1);
+            SC_TEST_EXPECT(wakeUpSucceeded == 1);
         }
     }
 

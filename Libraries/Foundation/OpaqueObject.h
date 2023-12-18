@@ -109,7 +109,7 @@ struct OpaqueObject
     static void construct(Handle& buffer);
     static void destruct(Object& obj);
     static void moveConstruct(Handle& buffer, Object&& obj);
-    static void moveAssign(Object& pthis, Object&& obj);
+    static void moveAssign(Object& selfPointer, Object&& obj);
 };
 
 //! @}

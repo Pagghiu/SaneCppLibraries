@@ -198,7 +198,7 @@ struct SC::TaggedUnion
     /// @tparam wantedType Compile time know enum value associated to wanted type
     /// @return A reference to the wanted type.
     /// If wantedType is not the active type, a new value will be default initialized
-    /// @note Return type is made esplicit instead of using `auto` to help intellisense deducing type
+    /// @note Return type is made explicit instead of using `auto` to help intellisense deducing type
     template <EnumType wantedType>
     typename TypeAt<EnumToType<wantedType>::index>::type& changeTo()
     {
@@ -216,7 +216,7 @@ struct SC::TaggedUnion
     /// @brief Get a pointer to currently active field
     /// @tparam wantedType Compile time know enum value associated to wanted type
     /// @return A pointer to currently active field or nullptr if wantedType doesn't match currently active type.
-    /// @note Return type is made esplicit instead of using `auto` to help intellisense deducing type
+    /// @note Return type is made explicit instead of using `auto` to help intellisense deducing type
     template <EnumType wantedType>
     [[nodiscard]] typename TypeAt<EnumToType<wantedType>::index>::type* field()
     {
@@ -230,7 +230,7 @@ struct SC::TaggedUnion
     /// @brief Get a pointer to currently active field
     /// @tparam wantedType Compile time know enum value associated to wanted type
     /// @return A pointer to currently active field or nullptr if wantedType doesn't match currently active type.
-    /// @note Return type is made esplicit instead of using `auto` to help intellisense deducing type
+    /// @note Return type is made explicit instead of using `auto` to help intellisense deducing type
     template <EnumType wantedType>
     [[nodiscard]] const typename TypeAt<EnumToType<wantedType>::index>::type* field() const
     {
@@ -353,24 +353,24 @@ struct SC::TaggedUnion
         return largest;
     }
     template <class T>
-    static constexpr T MaxElement(std::initializer_list<T> ilist)
+    static constexpr T MaxElement(std::initializer_list<T> list)
     {
-        return *MaxElement(ilist.begin(), ilist.end());
+        return *MaxElement(list.begin(), list.end());
     }
 
     template <class... Types>
-    struct ComputeMaxSizeAndAligment;
+    struct ComputeMaxSizeAndAlignment;
 
     template <class... Types>
-    struct ComputeMaxSizeAndAligment<TypeTraits::TypeList<Types...>>
+    struct ComputeMaxSizeAndAlignment<TypeTraits::TypeList<Types...>>
     {
-        static constexpr size_t maxAligment = MaxElement({alignof(typename Types::type)...});
-        static constexpr size_t maxSize     = MaxElement({sizeof(typename Types::type)...});
+        static constexpr size_t maxAlignment = MaxElement({alignof(typename Types::type)...});
+        static constexpr size_t maxSize      = MaxElement({sizeof(typename Types::type)...});
     };
 
-    using Storage = ComputeMaxSizeAndAligment<typename Union::FieldsTypes>;
+    using Storage = ComputeMaxSizeAndAlignment<typename Union::FieldsTypes>;
 
-    AlignedStorage<Storage::maxSize, Storage::maxAligment> storage;
+    AlignedStorage<Storage::maxSize, Storage::maxAlignment> storage;
 
     EnumType type;
 };

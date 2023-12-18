@@ -436,7 +436,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("  <ItemGroup>\n");
         for (auto& it : files)
         {
-            if (it.type == WriterInternal::RenderItem::DebugVisualizerfile)
+            if (it.type == WriterInternal::RenderItem::DebugVisualizerFile)
             {
                 builder.append("    <Natvis Include=\"{}\" />\n", it.path);
             }
@@ -625,7 +625,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         for (auto& it : renderer.renderItems)
         {
             const StringView dir = Path::removeStartingSeparator(Path::dirname(it.referencePath.view(), Path::AsPosix));
-            if (it.type == WriterInternal::RenderItem::DebugVisualizerfile)
+            if (it.type == WriterInternal::RenderItem::DebugVisualizerFile)
             {
                 builder.append("    <Natvis Include=\"{}\">\n", it.path);
                 builder.append("      <Filter>");

@@ -45,7 +45,7 @@ struct SC::ArenaMapTest : public SC::TestCase
             SC_TEST_EXPECT(map.get(keys[2])->view() == "BDA");
             ArenaMap<String>::Key key;
             SC_TEST_EXPECT(map.containsValue("BDA", &key) and key.isValid());
-            SC_TEST_EXPECT(not map.containsValue("asdasd"));
+            SC_TEST_EXPECT(not map.containsValue("__ASD__"));
             SC_TEST_EXPECT(map.containsKey(keys[1]));
             SC_TEST_EXPECT(map.remove(keys[1]));
             SC_TEST_EXPECT(not map.remove(keys[1]));

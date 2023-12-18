@@ -32,7 +32,7 @@ bool StringBuilder::append(StringView str)
 {
     if (str.isEmpty())
         return true;
-    SC_TRY(StringConverter::popNulltermIfExists(stringData, encoding));
+    SC_TRY(StringConverter::popNullTermIfExists(stringData, encoding));
     return StringConverter::convertEncodingTo(encoding, str, stringData);
 }
 
@@ -51,7 +51,7 @@ bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf
     {
         return append(source);
     }
-    SC_TRY(StringConverter::popNulltermIfExists(stringData, encoding));
+    SC_TRY(StringConverter::popNullTermIfExists(stringData, encoding));
     StringView current             = source;
     const auto occurrencesIterator = occurrencesOf.getIterator<StringIteratorASCII>();
     bool       res;

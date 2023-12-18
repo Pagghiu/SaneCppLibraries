@@ -2,7 +2,7 @@
 //
 // All Rights Reserved. Reproduction is not allowed.
 #pragma once
-#include "../Strings/StringConverter.h" // popNulltermIfExists
+#include "../Strings/StringConverter.h" // popNullTermIfExists
 #include "../Strings/StringFormat.h"
 namespace SC
 {
@@ -78,10 +78,10 @@ struct StringBuilder
     /// @return `true` if append succeeded
     [[nodiscard]] bool append(StringView str);
 
-    /// @brief Appends source to destination buffer, replacing `occurencesOf` StringView with StringView `with`
+    /// @brief Appends source to destination buffer, replacing `occurrencesOf` StringView with StringView `with`
     /// @param source The StringView to be appended
-    /// @param occurencesOf The StringView to be searched inside `source`
-    /// @param with The replacement StringView to be written in destination uffer
+    /// @param occurrencesOf The StringView to be searched inside `source`
+    /// @param with The replacement StringView to be written in destination buffer
     /// @return `true` if append succeeded
     /// @n
     /**
@@ -93,7 +93,7 @@ struct StringBuilder
         SC_ASSERT_RELEASE(buffer == "un/salve/a/tutti");
         @endcode
     */
-    [[nodiscard]] bool appendReplaceAll(StringView source, StringView occurencesOf, StringView with);
+    [[nodiscard]] bool appendReplaceAll(StringView source, StringView occurrencesOf, StringView with);
 
     /// @brief Appends source to destination buffer, replacing multiple substitutions pairs
     /// @param source The StringView to be appended
@@ -153,7 +153,7 @@ inline bool SC::StringBuilder::format(StringView fmt, Types&&... args)
 template <typename... Types>
 inline bool SC::StringBuilder::append(StringView fmt, Types&&... args)
 {
-    if (not StringConverter::popNulltermIfExists(stringData, encoding))
+    if (not StringConverter::popNullTermIfExists(stringData, encoding))
     {
         return false;
     }

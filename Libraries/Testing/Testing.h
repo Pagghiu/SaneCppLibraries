@@ -33,7 +33,7 @@ struct SC::TestReport
     bool abortOnFirstFailedTest = true; ///< If `true` will abort after first failed test
     bool debugBreakOnFailedTest = true; ///< If `true` will issue a debugger halt when a test fails
 
-    /// @brief Build from a console and executalbe arguments
+    /// @brief Build from a console and executable arguments
     /// @param console A Console object where to print test results
     /// @param argc Number of command line arguments
     /// @param argv Command line arguments Arguments
@@ -41,7 +41,7 @@ struct SC::TestReport
     ~TestReport();
 
     /// @brief Gets return code for this process
-    /// @return `-1` if tests are failed, `0` if tests are successfull
+    /// @return `-1` if tests are failed, `0` if tests are successful
     [[nodiscard]] int getTestReturnCode() const;
 
   private:
@@ -68,20 +68,20 @@ struct SC::TestReport
 struct SC::TestCase
 {
     /// @brief Adds this TestCase to a TestReport with a name
-    /// @param report The parten TestReport
+    /// @param report The current TestReport
     /// @param testName Name of this TestCase
     TestCase(TestReport& report, StringView testName);
     ~TestCase();
 
     /// @brief Records an expectation for a given expression
-    /// @param expression The string-ized expression of this test
+    /// @param expression Expression converted to string
     /// @param status The boolean expectation of a test
     /// @param detailedError A detailed error message
     /// @return `status`
     bool recordExpectation(StringView expression, bool status, StringView detailedError = StringView());
 
     /// @brief Records an expectation for a given expression
-    /// @param expression The string-ized expression of this test
+    /// @param expression Expression converted to string
     /// @param status A Result object, output from a test
     /// @return `false` if `status` Result is not valid
     bool recordExpectation(StringView expression, Result status);

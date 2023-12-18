@@ -18,7 +18,7 @@ struct SC_COMPILER_EXPORT StringAlgorithms;
 //! @addtogroup group_strings
 //! @{
 
-/// @brief Non-owning view over a range of characers with UTF Encoding.
+/// @brief Non-owning view over a range of characters with UTF Encoding.
 ///
 /// It additional also holds the SC::StringEncoding information (`ASCII`, `UTF8` or `UTF16`).
 /// During construction the encoding information and the null-termination state must be specified.
@@ -34,9 +34,9 @@ struct SC_COMPILER_EXPORT StringAlgorithms;
 
     Example (Construct from null terminated string)
     @code{.cpp}
-    const char* somestring = "asdf";
+    const char* someString = "asdf";
     // construct only "asd", not null terminated (as there is 'f' after 'd')
-    StringView s({somestring, strlen(asd) - 1}, false, StringEncoding::Ascii);
+    StringView s({someString, strlen(asd) - 1}, false, StringEncoding::Ascii);
     SC_ASSERT_RELEASE(s.sizeInBytes() == 3);
     SC_ASSERT_RELEASE(not s.isNullTerminated());
     //
@@ -130,13 +130,13 @@ struct SC::StringView
     ///                     "\xe0\x0\xe8\x0\xec\x0\xf2\x0\xf9\x0"_u16) == StringView::Comparison::Equals);
     ///
     /// // 日本語語語 (1 UTF16-LE sequence, 3 UTF8 sequence)
-    /// StringView stringutf8  = StringView("\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e\xe8\xaa\x9e\xe8\xaa\x9e"_u8);
-    /// StringView stringutf16 = StringView("\xE5\x65\x2C\x67\x9E\x8a\x9E\x8a\x9E\x8a\x00"_u16); // LE
+    /// StringView stringUtf8  = StringView("\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e\xe8\xaa\x9e\xe8\xaa\x9e"_u8);
+    /// StringView stringUtf16 = StringView("\xE5\x65\x2C\x67\x9E\x8a\x9E\x8a\x9E\x8a\x00"_u16); // LE
     /// // Comparisons are on code points NOT grapheme clusters!!
-    /// SC_ASSERT_RELEASE(stringutf8.compare(stringutf16) == StringView::Comparison::Equals);
-    /// SC_ASSERT_RELEASE(stringutf16.compare(stringutf8) == StringView::Comparison::Equals);
-    /// SC_ASSERT_RELEASE(stringutf8 == stringutf16);
-    /// SC_ASSERT_RELEASE(stringutf16 == stringutf8);
+    /// SC_ASSERT_RELEASE(stringUtf8.compare(stringUtf16) == StringView::Comparison::Equals);
+    /// SC_ASSERT_RELEASE(stringUtf16.compare(stringUtf8) == StringView::Comparison::Equals);
+    /// SC_ASSERT_RELEASE(stringUtf8 == stringUtf16);
+    /// SC_ASSERT_RELEASE(stringUtf16 == stringUtf8);
     /// @endcode
     [[nodiscard]] Comparison compare(StringView other) const;
 
@@ -560,7 +560,7 @@ struct SC::StringViewTokenizer
     */
     StringViewTokenizer& countTokens(Span<const StringCodePoint> separators);
 
-    /// @brief Check if the tokenizer has processed the entire the string view passed in the constructer
+    /// @brief Check if the tokenizer has processed the entire the string view passed in the constructor
     [[nodiscard]] bool isFinished() const;
 
   private:

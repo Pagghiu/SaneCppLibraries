@@ -45,7 +45,7 @@ struct SC::HttpClient
 
     String customDebugName;
 
-    // TODO: can we find a way to putt all asyncs in a single tagged union when they're not used in parallel?
+    // TODO: can we find a way to put all async requests in a single tagged union when they're not used in parallel?
     AsyncSocketConnect connectAsync;
     AsyncSocketSend    sendAsync;
     AsyncSocketReceive receiveAsync;

@@ -35,12 +35,12 @@ struct SC::Span
     constexpr Span(Type& type) : items(&type), sizeElements(1) {}
 
     /// @brief Span specialized constructor (mainly used for converting const char* to StringView)
-    /// @param ilist an initializer list of elements
-    constexpr Span(std::initializer_list<Type> ilist) : items(nullptr), sizeElements(0)
+    /// @param list an initializer list of elements
+    constexpr Span(std::initializer_list<Type> list) : items(nullptr), sizeElements(0)
     {
         // We need this two step initialization to avoid warnings on all compilers
-        items        = ilist.begin();
-        sizeElements = ilist.size();
+        items        = list.begin();
+        sizeElements = list.size();
     }
 
     /// @brief Converts to a span with `const` qualified Type
@@ -94,7 +94,7 @@ struct SC::Span
     [[nodiscard]] constexpr SizeType sizeInElements() const { return sizeElements; }
 
     /// @brief Size of Span in bytes
-    /// @return The number of bytes coverting the entire Span
+    /// @return The number of bytes covering the entire Span
     [[nodiscard]] constexpr SizeType sizeInBytes() const { return sizeElements * sizeof(Type); }
 
     /// @brief Creates another Span, starting at an offset in elements from current Span, until end.
@@ -138,8 +138,6 @@ struct SC::Span
   private:
     Type*    items;
     SizeType sizeElements;
-    template <typename O>
-    friend struct SpanVoid;
 };
 
 //! @}

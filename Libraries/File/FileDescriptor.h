@@ -97,7 +97,7 @@ struct SC::FileDescriptor : public SC::UniqueHandle<SC::detail::FileDescriptorDe
     /// @return `true` if blocking mode has been changed successfully
     [[nodiscard]] Result setInheritable(bool inheritable);
 
-    /// @brief Queries the inheritable state of this decriptor
+    /// @brief Queries the inheritable state of this descriptor
     /// @param hasValue will be set to true if the file descriptor has inheritable file set
     /// @return Valid Result if the inheritable flag has been queried successfully
     [[nodiscard]] Result isInheritable(bool& hasValue) const;
@@ -118,12 +118,12 @@ struct SC::FileDescriptor : public SC::UniqueHandle<SC::detail::FileDescriptorDe
     /// @brief Writes bytes at offset from start of the file descriptor
     /// @param data Span of bytes containing the data to write
     /// @param offset Offset from begin of file descriptor to start writing
-    /// @return Valid result if write succeded
+    /// @return Valid result if write succeeded
     [[nodiscard]] Result write(Span<const char> data, uint64_t offset);
 
     /// @brief Writes bytes from current position (FileDescriptor::seek) of the file descriptor
     /// @param data Span of bytes containing the data to write
-    /// @return Valid result if write succeded
+    /// @return Valid result if write succeeded
     [[nodiscard]] Result write(Span<const char> data);
 
     /// @brief How the offset to FileDescriptor::seek is defined
@@ -137,29 +137,29 @@ struct SC::FileDescriptor : public SC::UniqueHandle<SC::detail::FileDescriptorDe
     /// @brief Changes the current position in the file descriptor, if seekable.
     /// @param seekMode How the offset is defined (from start, end, current)
     /// @param offset An offset to be applied according to seekMode to this descriptor
-    /// @return Valid result if seek succeeed
+    /// @return Valid result if seek succeeds
     [[nodiscard]] Result seek(SeekMode seekMode, uint64_t offset);
 
     /// @brief Gets current descriptor position (if seekable)
     /// @param position (output) current position of file descriptor
-    /// @return Valid result if seek succeeed
+    /// @return Valid result if seek succeeds
     [[nodiscard]] Result currentPosition(size_t& position) const;
 
     /// @brief Gets total file size in bytes (if seekable)
     /// @param sizeInBytes (output) total size of file
-    /// @return Valid result if seek succeeed
+    /// @return Valid result if seek succeeds
     [[nodiscard]] Result sizeInBytes(size_t& sizeInBytes) const;
 
     /// @brief Reads into a given dynamic buffer until End of File (EOF) is signaled.
     ///         Works also for non-seekable file descriptors (stdout / in / err).
     /// @param destination A destination buffer to write to (it will be resized as needed)
-    /// @return Valid result if read succeded until EOF
+    /// @return Valid result if read succeeded until EOF
     [[nodiscard]] Result readUntilEOF(Vector<char>& destination);
 
     /// @brief Reads into a given string until End of File (EOF) is signaled
     ///         Works also for non-seekable file descriptors (stdout / in / err).
     /// @param destination A destination string to write to (it will be sized as needed)
-    /// @return Valid result if read succeded until EOF
+    /// @return Valid result if read succeeded until EOF
     [[nodiscard]] Result readUntilEOF(String& destination);
 
     /// @brief Results of readAppend function
@@ -175,7 +175,7 @@ struct SC::FileDescriptor : public SC::UniqueHandle<SC::detail::FileDescriptorDe
     /// and only later appended to buffer. This allows sizing the buffer only to the actually needed size without
     /// having to resize the buffer beforehand.
     /// @param result returns information about EOF being reached and actuallyRead bytes
-    /// @return Valid result if read succeded
+    /// @return Valid result if read succeeded
     [[nodiscard]] Result readAppend(Vector<char>& buffer, Span<char> fallbackBuffer, ReadResult& result);
 
   private:

@@ -83,7 +83,7 @@ struct SC::Path
     /// @param[in] inputs The input paths to join
     /// @param[in] separator The separator to use. By default `/` on Posix and `\` on Windows
     /// @param[in] skipEmpty If true will skip empty entries in `inputs` Span
-    /// @return true if the Path was sucessfully joined
+    /// @return true if the Path was successfully joined
     [[nodiscard]] static bool join(String& output, Span<const StringView> inputs,
                                    StringView separator = SeparatorStringView(), bool skipEmpty = false);
 
@@ -104,7 +104,7 @@ struct SC::Path
     /// @return `true` if path was parsed successfully
     [[nodiscard]] static bool parse(StringView input, Path::ParsedView& pathView, Type type);
 
-    /// @brief Returns the directory name of a path. Trailing spearators are ignored.
+    /// @brief Returns the directory name of a path. Trailing separators are ignored.
     ///
     /// For example:
     ///
@@ -114,13 +114,13 @@ struct SC::Path
     /// Path::dirname("C:\\dirname\\basename", Path::AsWindows) == "C:\\dirname";
     /// Path::dirname("\\dirname\\basename\\\\", Path::AsWindows) == "\\dirname";
     /// @endcode
-    /// @param[in] input The StringView with path to be parsed. Trailing spearators are ignored.
+    /// @param[in] input The StringView with path to be parsed. Trailing separators are ignored.
     /// @param[in] type Specify to parse as Windows or Posix path
-    /// @param repeat how many direcyory levels should be removed `dirname("/1/2/3/4", repeat=1) == "/1/2"`
+    /// @param repeat how many directory levels should be removed `dirname("/1/2/3/4", repeat=1) == "/1/2"`
     /// @return Substring of `input` holding the directory name
     [[nodiscard]] static StringView dirname(StringView input, Type type, int repeat = 0);
 
-    /// @brief Returns the base name of a path. Trailing spearators are ignored.
+    /// @brief Returns the base name of a path. Trailing separators are ignored.
     ///
     /// For example:
     ///
@@ -128,19 +128,19 @@ struct SC::Path
     /// Path::basename("/a/basename", Path::AsPosix) == "basename";
     /// Path::basename("/a/basename//", Path::AsPosix) == "basename";
     /// @endcode
-    /// @param[in] input The StringView with path to be parsed. Trailing spearators are ignored.
+    /// @param[in] input The StringView with path to be parsed. Trailing separators are ignored.
     /// @param[in] type Specify to parse as Windows or Posix path
     /// @return Substring of `input` holding the base name
     [[nodiscard]] static StringView basename(StringView input, Type type);
 
-    /// @brief Returns the base name of a path. Suffix is stripped if existing. Trailing spearators are ignored.
+    /// @brief Returns the base name of a path. Suffix is stripped if existing. Trailing separators are ignored.
     ///
     /// For example:
     ///
     /// @code{.cpp}
     /// Path::basename("/a/basename.html", ".html") == "basename";
     /// @endcode
-    /// @param[in] input The StringView with path to be parsed. Trailing spearators are ignored.
+    /// @param[in] input The StringView with path to be parsed. Trailing separators are ignored.
     /// @param[in] suffix The StringView extension (or suffix in general) to strip if existing.
     /// @return Substring of `input` holding the base name
     [[nodiscard]] static StringView basename(StringView input, StringView suffix);
@@ -157,7 +157,7 @@ struct SC::Path
     /// Path::isAbsolute("\\\\?\\C:\\server\\dir", Path::AsWindows) == true; // Windows with Long
     /// Path::isAbsolute("..\\dirname\\basename", Path::AsWindows) == false; // Windows relative
     /// @endcode
-    /// @param[in] input The StringView with path to be parsed. Trailing spearators are ignored.
+    /// @param[in] input The StringView with path to be parsed. Trailing separators are ignored.
     /// @param[in] type Specify to parse as Windows or Posix path
     /// @return `true` if `input` is absolute
     [[nodiscard]] static bool isAbsolute(StringView input, Type type);

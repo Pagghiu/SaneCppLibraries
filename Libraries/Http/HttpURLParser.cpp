@@ -116,9 +116,9 @@ SC::Result SC::HttpURLParser::validateHost()
     return Result(not host.isEmpty() and (host.containsCodePoint('.') or hostname == "localhost"));
 }
 
-SC::Result SC::HttpURLParser::parseUserPassword(StringView userPassowrd)
+SC::Result SC::HttpURLParser::parseUserPassword(StringView userPassword)
 {
-    StringViewTokenizer tokenizer(userPassowrd);
+    StringViewTokenizer tokenizer(userPassword);
     SC_TRY(tokenizer.tokenizeNext({':'}, StringViewTokenizer::Options::SkipEmpty));
     username = tokenizer.component;
     SC_TRY(tokenizer.tokenizeNext({}, StringViewTokenizer::Options::SkipEmpty));

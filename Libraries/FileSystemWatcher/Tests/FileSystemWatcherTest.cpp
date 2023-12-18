@@ -22,7 +22,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         threadRunner(appDirectory);
         eventLoop(appDirectory);
         eventLoopInterrupt(appDirectory);
-        eventLoopWatchUnwatch(appDirectory);
+        eventLoopWatchStop(appDirectory);
     }
 
     void initClose()
@@ -90,7 +90,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(path.assign(appDirectory));
             FileSystemWatcher::FolderWatcher watcher;
             // We save the results and expect them after the wait to avoid Thread Sanitizer issues
-            // due to the SC_TEST_EXPECT calls inside the labmda that runs in the thread
+            // due to the SC_TEST_EXPECT calls inside the lambda that runs in the thread
             const Result res        = fileEventsWatcher.watch(watcher, path.view(), move(lambda));
             const bool   fsWriteRes = fs.write("test.txt", "content");
             params.eventObject.wait();
@@ -201,17 +201,17 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             auto lambda = [&](const FileSystemWatcher::Notification&) { params.changes++; };
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view(), move(lambda)));
             SC_TEST_EXPECT(fs.write("salve.txt", "content"));
-            SC_TEST_EXPECT(fs.write("atutti.txt", "content"));
+            SC_TEST_EXPECT(fs.write("a_tutti.txt", "content"));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(params.changes == 1);
             SC_TEST_EXPECT(fileEventsWatcher.close());
-            SC_TEST_EXPECT(fs.removeFiles({"salve.txt", "atutti.txt"}));
+            SC_TEST_EXPECT(fs.removeFiles({"salve.txt", "a_tutti.txt"}));
         }
     }
 
-    void eventLoopWatchUnwatch(const StringView appDirectory)
+    void eventLoopWatchStop(const StringView appDirectory)
     {
-        if (test_section("AsyncEventLoop watch/unwatch"))
+        if (test_section("AsyncEventLoop watch/stopWatching"))
         {
             AsyncEventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
@@ -270,23 +270,23 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
             Thread::Sleep(waitForEventsTimeout);
             SC_TEST_EXPECT(eventLoop.runOnce());
-            SC_TEST_EXPECT(fs2.write("atutti.txt", "content"));
+            SC_TEST_EXPECT(fs2.write("a_tutti.txt", "content"));
 
             Thread::Sleep(waitForEventsTimeout);
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(params.changes1 == 1);
             SC_TEST_EXPECT(params.changes2 == 1);
-            SC_TEST_EXPECT(watcher2.unwatch());
+            SC_TEST_EXPECT(watcher2.stopWatching());
             SC_TEST_EXPECT(fs1.removeFile("salve.txt"));
-            SC_TEST_EXPECT(fs2.removeFile("atutti.txt"));
+            SC_TEST_EXPECT(fs2.removeFile("a_tutti.txt"));
 
             Thread::Sleep(waitForEventsTimeout);
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(params.changes1 == 2);
             SC_TEST_EXPECT(params.changes2 == 1);
-            SC_TEST_EXPECT(watcher1.unwatch());
+            SC_TEST_EXPECT(watcher1.stopWatching());
             SC_TEST_EXPECT(fs1.write("salve.txt", "content NEW YEAH"));
-            SC_TEST_EXPECT(fs2.write("atutti.txt", "content NEW YEAH"));
+            SC_TEST_EXPECT(fs2.write("a_tutti.txt", "content NEW YEAH"));
 
             SC_TEST_EXPECT(eventLoop.runNoWait());
             SC_TEST_EXPECT(params.changes1 == 2);
@@ -300,7 +300,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                 }
             };
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2.view(), move(lambda3)));
-            SC_TEST_EXPECT(fs2.removeFile("atutti.txt"));
+            SC_TEST_EXPECT(fs2.removeFile("a_tutti.txt"));
             Thread::Sleep(waitForEventsTimeout);
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(params.changes1 == 2);
@@ -356,7 +356,7 @@ Result fileSystemWatcherEventLoopRunnerSnippet(AsyncEventLoop& eventLoop, Consol
 
     // ...
     // At a later point when there is no more need of watching the folder
-    SC_TRY(folderWatcher.unwatch());
+    SC_TRY(folderWatcher.stopWatching());
 
     // ...
     // When all watchers have been unwatched and to dispose all system resources
@@ -401,7 +401,7 @@ Result fileSystemWatcherThreadRunnerSnippet(Console& console)
 
     // ...
     // At a later point when there is no more need of watching the folder
-    SC_TRY(folderWatcher.unwatch());
+    SC_TRY(folderWatcher.stopWatching());
 
     // ...
     // When all watchers have been unwatched and to dispose all system resources

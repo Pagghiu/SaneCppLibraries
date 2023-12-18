@@ -17,11 +17,11 @@
 
 //! @defgroup group_async Async
 //! @copybrief library_async (see @ref library_async for more details)
-//! Async is a multiplatform asynchronous evented I/O library.
+//! Async is a multi-platform / event-driven asynchronous I/O library.
 //!
 /// It exposes async programming model for common IO operations like reading / writing to / from a file or tcp socket.
 /// Synchronous I/O operations could block the current thread of execution for an undefined amount of time, making it
-/// difficult to scale an application to a large number of concurrent operations, or to cohexist with other even loop,
+/// difficult to scale an application to a large number of concurrent operations, or to coexist with other even loop,
 /// like for example a GUI event loop. Such async programming model uses a common pattern, where the call fills an
 /// AsyncRequest with the required data. The AsyncRequest is added to an AsyncEventLoop that will queue the request to
 /// some low level OS IO queue. The event loop can then monitor all the requests in a single call to
@@ -71,7 +71,7 @@ struct WinWaitHandle : public UniqueHandle<AsyncWinWaitDefinition>
 
 /// @brief Base class for all async requests, holding state and type.
 /// An async operation is struct derived from AsyncRequest asking for some I/O to be done made to the OS. @n
-/// Every async operation has an associated callback that is invoked when the request is fullfilled.
+/// Every async operation has an associated callback that is invoked when the request is fulfilled.
 /// If the `start` function returns a valid (non error) Return code, then the user callback will be called both
 /// in case of success and in case of any error. @n
 /// If the function returns an invalid Return code or if the operation is manually cancelled with
@@ -151,7 +151,7 @@ struct SC::AsyncRequest
     int32_t eventIndex;
 };
 
-/// @brief Base class for all async result objcets
+/// @brief Base class for all async results
 struct SC::AsyncResult
 {
     using Type = AsyncRequest::Type;
@@ -231,13 +231,13 @@ struct AsyncLoopWakeUp : public AsyncRequest
     using Result = AsyncResultOf<AsyncLoopWakeUp>;
     AsyncLoopWakeUp() : AsyncRequest(Type::LoopWakeUp) {}
 
-    /// @brief Starts a wake up request, that will be fullfilled when an external thread calls AsyncLoopWakeUp::wakeUp.
+    /// @brief Starts a wake up request, that will be fulfilled when an external thread calls AsyncLoopWakeUp::wakeUp.
     /// @param eventLoop The event loop where queuing this async request
     /// @param eventObject Optional EventObject to synchronize external threads waiting until the callback is finished.
     /// @return Valid Result if the request has been successfully queued
     [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, EventObject* eventObject = nullptr);
 
-    /// Wakes up event loop, schedulcallinging AsyncLoopWakeUp::callback on next AsyncEventLoop::run (or its variations)
+    /// Wakes up event loop, scheduling AsyncLoopWakeUp::callback on next AsyncEventLoop::run (or its variations)
     [[nodiscard]] SC::Result wakeUp();
 
     Function<void(Result&)> callback; ///< Callback called by SC::AsyncEventLoop::run after SC::AsyncLoopWakeUp::wakeUp
@@ -490,8 +490,8 @@ struct AsyncSocketClose : public AsyncRequest
 
 /// @brief Starts a file read operation, reading bytes from a file.
 /// Callback will be called after some data is read from file. @n
-/// @ref library_file library can be used to open the file and obtan a file descriptor handle.
-/// Make sure to associate the file desciptor with SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor.
+/// @ref library_file library can be used to open the file and obtain a file descriptor handle.
+/// Make sure to associate the file descriptor with SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor.
 ///
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncFileReadSnippet
 struct AsyncFileRead : public AsyncRequest

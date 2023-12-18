@@ -110,7 +110,7 @@ struct SC::AsyncEventLoop::Internal
     [[nodiscard]] Result createWakeup(AsyncEventLoop& loop)
     {
         // No need to register it with AsyncEventLoop as we're calling PostQueuedCompletionStatus manually
-        // As a consequence we don't need to do loop.decreseActiveCount()
+        // As a consequence we don't need to do loop.decreaseActiveCount()
         wakeUpAsync.eventLoop = &loop;
         wakeUpAsync.state     = AsyncRequest::State::Active;
         return Result(true);
@@ -516,9 +516,9 @@ struct SC::AsyncEventLoop::KernelQueue
         auto& overlapped                 = operation.overlapped.get();
         overlapped.overlapped.Offset     = static_cast<DWORD>(operation.offset & 0xffffffff);
         overlapped.overlapped.OffsetHigh = static_cast<DWORD>((operation.offset >> 32) & 0xffffffff);
-        const DWORD numAvalableBuffer    = static_cast<DWORD>(operation.readBuffer.sizeInBytes());
+        const DWORD numAvailableBuffer   = static_cast<DWORD>(operation.readBuffer.sizeInBytes());
         DWORD       numBytes;
-        BOOL res = ::ReadFile(operation.fileDescriptor, operation.readBuffer.data(), numAvalableBuffer, &numBytes,
+        BOOL res = ::ReadFile(operation.fileDescriptor, operation.readBuffer.data(), numAvailableBuffer, &numBytes,
                               &overlapped.overlapped);
         if (res == FALSE and GetLastError() != ERROR_IO_PENDING)
         {
@@ -684,7 +684,7 @@ void SC::detail::WinOverlappedOpaque::moveConstruct(Handle& buffer, Object&& obj
     placementNew(buffer.reinterpret_as<Object>(), move(obj));
 }
 template <>
-void SC::detail::WinOverlappedOpaque::moveAssign(Object& pthis, Object&& obj)
+void SC::detail::WinOverlappedOpaque::moveAssign(Object& selfObject, Object&& obj)
 {
-    pthis = move(obj);
+    selfObject = move(obj);
 }

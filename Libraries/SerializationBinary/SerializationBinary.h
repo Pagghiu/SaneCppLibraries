@@ -109,7 +109,7 @@ struct SerializationBinary
     //
     /// The versioned read serializer SC::SerializationBinary::loadVersioned must be used when source and destination
     /// schemas do not match.
-    /// _Compatibility_ flags can be customized throufh SC::SerializationBinaryOptions object, allowing to remap data
+    /// _Compatibility_ flags can be customized through SC::SerializationBinaryOptions object, allowing to remap data
     /// coming from an older (or just different) version of the schema to the current one.
     /// SerializationBinary::loadVersioned will try to match the `memberTag` field specified in [Reflection](@ref
     /// library_reflection) to match fields between source and destination schemas.
@@ -120,7 +120,7 @@ struct SerializationBinary
     /// @param schema The schema used to serialize data in the buffer
     /// @param numberOfReads If provided, will return the number deserialization operations
     /// @param options Options for data conversion (allow dropping fields, array items etc)
-    /// @return `true` if deserialization succeded
+    /// @return `true` if deserialization succeeded
     ///
     /// @n
     /// Assuming the following structs:

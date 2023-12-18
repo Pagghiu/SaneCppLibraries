@@ -27,7 +27,7 @@ struct SC::StringTest : public SC::TestCase
             SC_TEST_EXPECT(str != String("ASD"));
             str = "Salver";
             SC_TEST_EXPECT(str == "Salver");
-            SC_TEST_EXPECT(str < "Zest Ztring");
+            SC_TEST_EXPECT(str < "Zest string");
         }
     }
 };

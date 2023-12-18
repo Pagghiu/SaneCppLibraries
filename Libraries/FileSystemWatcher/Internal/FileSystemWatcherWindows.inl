@@ -126,7 +126,7 @@ struct SC::FileSystemWatcher::Internal
         {
             SC_TRY(eventLoopRunner->eventLoop.getLoopFileDescriptor(loopFDS));
         }
-        // TODO: we should probably check if we are leaking on some partial failure codepath...some RAII would help
+        // TODO: we should probably check if we are leaking on some partial failure code path...some RAII would help
         if (threadingRunner)
         {
             SC_TRY_MSG(threadingRunner->numEntries < ThreadRunnerDefinition::MaxWatchablePaths,

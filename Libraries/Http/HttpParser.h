@@ -26,7 +26,7 @@ struct SC::HttpParser
     Method method = Method::HttpGET; ///< Http method
 
     size_t   tokenStart    = 0; ///< Offset in bytes to start of parsed token
-    size_t   tokenLength   = 0; ///< Lenth in bytes of parsed token
+    size_t   tokenLength   = 0; ///< Length in bytes of parsed token
     uint32_t statusCode    = 0; ///< Parsed http status code
     uint64_t contentLength = 0; ///< Content-Length of http request
 
@@ -84,7 +84,7 @@ struct SC::HttpParser
     size_t globalLength          = 0;
     int    topLevelCoroutine     = 0;
     int    nestedParserCoroutine = 0;
-    bool   parsedcontentLength   = false;
+    bool   parsedContentLength   = false;
     size_t matchIndex            = 0;
 
     static constexpr size_t numMatches = 1;

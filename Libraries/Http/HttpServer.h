@@ -87,7 +87,7 @@ struct SC::HttpServer : public HttpServerBase
 
     /// @brief Starts the http server on the given AsyncEventLoop, address and port
     /// @param loop The event loop to be used, where to add the listening socket
-    /// @param maxConnections Maximum number of concurrent listnening connections
+    /// @param maxConnections Maximum number of concurrent listening connections
     /// @param address The address of local interface where to listen to
     /// @param port The local port where to start listening to
     /// @return Valid Result if http listening has been started successfully

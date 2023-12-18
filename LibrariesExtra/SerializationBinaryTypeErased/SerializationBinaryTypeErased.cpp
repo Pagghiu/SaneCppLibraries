@@ -93,7 +93,7 @@ bool SC::SerializationBinaryTypeErasedReadVersioned::readStruct()
         }
         else
         {
-            if (not options.allowDropEccessStructMembers)
+            if (not options.allowDropExcessStructMembers)
                 return false;
             // We must consume it anyway, discarding its content
             if (not skipCurrent())
@@ -145,8 +145,8 @@ bool SC::SerializationBinaryTypeErasedReadVersioned::readArrayVector()
         const auto numWantedBytes = sourceNumBytes / sourceItemSize * sinkItemSize;
         if (not arrayAccess.resize(arraySinkTypeIndex, arraySinkObject, arraySinkType, numWantedBytes,
                                    isPacked ? ArrayAccess::Initialize::No : ArrayAccess::Initialize::Yes,
-                                   options.allowDropEccessArrayItems ? ArrayAccess::DropEccessItems::Yes
-                                                                     : ArrayAccess::DropEccessItems::No))
+                                   options.allowDropExcessArrayItems ? ArrayAccess::DropExcessItems::Yes
+                                                                     : ArrayAccess::DropExcessItems::No))
             return false;
         if (not arrayAccess.getSegmentSpan(arraySinkTypeIndex, arraySinkType, arraySinkObject, arraySinkStart))
             return false;
@@ -159,7 +159,7 @@ bool SC::SerializationBinaryTypeErasedReadVersioned::readArrayVector()
         if (sourceNumBytes > static_cast<uint64_t>(arraySinkStart.sizeInBytes()))
         {
             // We must consume these excess bytes anyway, discarding their content
-            if (not options.allowDropEccessArrayItems)
+            if (not options.allowDropExcessArrayItems)
                 return false;
             return sourceObject->advanceBytes(static_cast<size_t>(sourceNumBytes - minBytes));
         }
@@ -187,7 +187,7 @@ bool SC::SerializationBinaryTypeErasedReadVersioned::readArrayVector()
         if (sourceNumElements > sinkNumElements)
         {
             // We must consume these excess items anyway, discarding their content
-            if (not options.allowDropEccessArrayItems)
+            if (not options.allowDropExcessArrayItems)
                 return false;
             for (uint32_t idx = 0; idx < sourceNumElements - sinkNumElements; ++idx)
             {
@@ -399,7 +399,7 @@ bool SC::SerializationBinaryTypeErasedReadExact::readArrayVector()
         using ArrayAccess = detail::SerializationBinaryTypeErasedArrayAccess;
         if (not arrayAccess.resize(arraySinkTypeIndex, arraySinkObject, arraySinkType, sinkNumBytes,
                                    isBulkReadable ? ArrayAccess::Initialize::No : ArrayAccess::Initialize::Yes,
-                                   ArrayAccess::DropEccessItems::No))
+                                   ArrayAccess::DropExcessItems::No))
             return false;
         if (not arrayAccess.getSegmentSpan(arraySinkTypeIndex, arraySinkType, arraySinkObject, arraySinkStart))
             return false;
@@ -462,7 +462,7 @@ bool SC::detail::SerializationBinaryTypeErasedArrayAccess::getSegmentSpan(uint32
 bool SC::detail::SerializationBinaryTypeErasedArrayAccess::resize(uint32_t linkID, Span<uint8_t> object,
                                                                   Reflection::TypeInfo property, uint64_t sizeInBytes,
                                                                   Initialize      initialize,
-                                                                  DropEccessItems dropEccessItems)
+                                                                  DropExcessItems dropExcessItems)
 {
     for (uint32_t index = 0; index < vectorVtable.sizeInBytes(); ++index)
     {
@@ -470,12 +470,12 @@ bool SC::detail::SerializationBinaryTypeErasedArrayAccess::resize(uint32_t linkI
         {
             if (initialize == Initialize::Yes)
             {
-                return vectorVtable.data()[index].resize(object, property, sizeInBytes, dropEccessItems);
+                return vectorVtable.data()[index].resize(object, property, sizeInBytes, dropExcessItems);
             }
             else
             {
                 return vectorVtable.data()[index].resizeWithoutInitialize(object, property, sizeInBytes,
-                                                                          dropEccessItems);
+                                                                          dropExcessItems);
             }
         }
     }

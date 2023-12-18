@@ -142,13 +142,13 @@ struct SC::Path::Internal
     template <typename StringIterator, char separator1, char separator2>
     static SC::StringView dirnameTemplate(StringView input)
     {
-        StringView dirn;
-        StringView base = basename<separator1, separator2>(input, &dirn);
-        if (dirn.isEmpty())
+        StringView dirnameOut;
+        StringView base = basename<separator1, separator2>(input, &dirnameOut);
+        if (dirnameOut.isEmpty())
         {
             return "."_a8;
         }
-        return dirn;
+        return dirnameOut;
     }
 
     template <char separator1, char separator2>
@@ -410,12 +410,12 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
     StringViewTokenizer tokenizer(view);
     auto                isDoubleDot = [](StringView it) -> bool
     {
-        constexpr StringView utf8ddot = "..";
+        constexpr StringView utf8dot = "..";
 #if SC_PLATFORM_WINDOWS
-        constexpr StringView utf16ddot = L"..";
-        return it == (it.getEncoding() == StringEncoding::Utf16 ? utf16ddot : utf8ddot);
+        constexpr StringView utf16dot = L"..";
+        return it == (it.getEncoding() == StringEncoding::Utf16 ? utf16dot : utf8dot);
 #else
-        return it == utf8ddot;
+        return it == utf8dot;
 #endif
     };
     auto isDot = [&](StringView it) -> bool

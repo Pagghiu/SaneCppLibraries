@@ -150,7 +150,7 @@ struct TypeInfo
         return true;
     }
 
-    /// @brief Check if this type info has a valid ilink index
+    /// @brief Check if this type info has a valid link index
     [[nodiscard]] constexpr bool hasValidLinkIndex() const { return hasLink and linkIndex > 0; }
 
     /// @brief Check if this type info needs to be linked

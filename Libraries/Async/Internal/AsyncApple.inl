@@ -319,7 +319,7 @@ struct SC::AsyncEventLoop::KernelQueue
         // we expect connect to fail with
         if (res)
         {
-            return Result::Error("connect failed (succeded?)");
+            return Result::Error("connect failed (succeeded?)");
         }
         if (errno != EAGAIN and errno != EINPROGRESS)
         {

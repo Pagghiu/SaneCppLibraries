@@ -166,7 +166,7 @@ struct SC::Thread
     Function<void(Thread&)>      userFunction;
 };
 
-/// @brief An automatically reset event object to synchonize two threads.
+/// @brief An automatically reset event object to synchronize two threads.
 /// @n
 /// Example:
 /// @snippet Libraries/Threading/Tests/ThreadingTest.cpp eventObjectSnippet

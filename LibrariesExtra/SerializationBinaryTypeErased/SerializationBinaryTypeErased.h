@@ -53,13 +53,13 @@ struct SerializationBinaryTypeErased
         return bufferReader.positionIsAtEnd();
     }
     /// @brief Deserialize object `T` from a Binary buffer with a reflection schema not matching `T` schema
-    /// @tparam T Type of object to be dserialized
+    /// @tparam T Type of object to be deserialized
     /// @param object The object to deserialize
     /// @param buffer The buffer holding the bytes to be used for deserialization
     /// @param schema The schema used to serialize data in the buffer
     /// @param options Options for data conversion (allow dropping fields, array items etc)
     /// @param numberOfReads If provided, will return the number deserialization operations
-    /// @return `true` if deserialization succeded
+    /// @return `true` if deserialization succeeded
     template <typename T>
     [[nodiscard]] static bool loadVersioned(T& object, Span<const uint8_t> buffer,
                                             Span<const Reflection::TypeInfo> schema,

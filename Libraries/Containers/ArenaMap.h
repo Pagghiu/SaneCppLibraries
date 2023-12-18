@@ -197,13 +197,13 @@ struct SC::ArenaMap
         numUsed = 0;
     }
 
-    /// @brief Get the number of uset slots in the arena
+    /// @brief Get the number of used slots in the arena
     [[nodiscard]] size_t size() const { return numUsed; }
 
     /// @brief Changes the size of the arena.
     /// @note Can only be called on empty arena (SC::ArenaMap::size == 0)
     /// @param newSize The new wanted number of elements to be stored in the arena
-    /// @return `true` if resize succeded
+    /// @return `true` if resize succeeded
     [[nodiscard]] bool resize(size_t newSize)
     {
         if (numUsed != 0)

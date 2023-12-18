@@ -12,8 +12,8 @@ namespace SC
 struct SerializationBinaryOptions
 {
     bool allowFloatToIntTruncation    = true; ///< Can truncate a float to get an integer value
-    bool allowDropEccessArrayItems    = true; ///< Can drop array items if destination array is smaller
-    bool allowDropEccessStructMembers = true; ///< Can drop fields not matching any memberTag in destination struct
+    bool allowDropExcessArrayItems    = true; ///< Can drop array items if destination array is smaller
+    bool allowDropExcessStructMembers = true; ///< Can drop fields not matching any memberTag in destination struct
 };
 
 //! @}

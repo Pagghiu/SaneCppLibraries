@@ -743,7 +743,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         String output;
         for (auto& item : renderer.renderItems)
         {
-            if (item.type == WriterInternal::RenderItem::DebugVisualizerfile)
+            if (item.type == WriterInternal::RenderItem::DebugVisualizerFile)
             {
                 if (output.isEmpty())
                 {

@@ -156,7 +156,7 @@ static constexpr Sv ClNm()
 using TypeStringView = Sv;
 
 /// @brief Strips down class name produced by ClNm to reduce binary size (from C++17 going forward)
-/// @tparam T A type that will be stringized
+/// @tparam T A type that will be converted to string
 template <typename T>
 struct TypeToString
 {

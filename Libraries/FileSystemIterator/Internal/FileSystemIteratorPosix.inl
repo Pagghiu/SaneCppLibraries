@@ -28,7 +28,7 @@ struct SC::FileSystemIterator::Internal
     {
         DIR*   dirEnumerator     = nullptr;
         size_t textLengthInBytes = 0;
-        int    fileDescriptor    = -1; // TODO: use actual filedescriptor class here
+        int    fileDescriptor    = -1; // TODO: use actual fileDescriptor class here
         bool   gotDot1           = false;
         bool   gotDot2           = false;
 

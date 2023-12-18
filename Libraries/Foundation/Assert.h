@@ -30,7 +30,7 @@ struct SC::Assert
     [[noreturn]] static void exit(int code);
 
     /// @brief Prints an assertion to standard output
-    /// @param expression A stringized version of the failed assertion
+    /// @param expression The failed assertion converted to string
     /// @param filename Name of the file where the assertion failed
     /// @param functionName Name of the function containing the assertion that failed
     /// @param lineNumber Line number where the assertion is defined
@@ -41,17 +41,17 @@ struct SC::Assert
     static void printAscii(const char* str);
 
     /// @brief Prints backtrace (call stack) of the caller to standard output
-    /// @return `true` if backtace was correctly captured and print, `false` otherwise
+    /// @return `true` if backtrace was correctly captured and print, `false` otherwise
     [[nodiscard]] static bool printBacktrace();
 
     /// @brief Prints backtrace (call stack) previously captured with captureBacktrace() of the caller to standard
     /// output
-    /// @return `true` if backtace was correctly captured and print, `false` otherwise
+    /// @return `true` if backtrace was correctly captured and print, `false` otherwise
     [[nodiscard]] static bool printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeInBytes);
 
     /// @brief Captures backtrace of calling stack
     /// @param framesToSkip Number of call stack frames to skip
-    /// @param backtraceBuffer A pre-allocated buffer to hold current backgrace
+    /// @param backtraceBuffer A pre-allocated buffer to hold current backtrace
     /// @param backtraceBufferSizeInBytes Size of the backtraceBuffer
     /// @param hash Hash of current stack trace
     /// @return number of frames captured in backtraceBuffer

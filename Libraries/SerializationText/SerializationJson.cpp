@@ -12,7 +12,7 @@ bool SC::SerializationJson::Writer::onSerializationStart()
     return setOptions(options);
 }
 
-bool SC::SerializationJson::Writer::onSerializationEnd() { return output.onFormatSucceded(); }
+bool SC::SerializationJson::Writer::onSerializationEnd() { return output.onFormatSucceeded(); }
 
 bool SC::SerializationJson::Writer::setOptions(Options opt)
 {

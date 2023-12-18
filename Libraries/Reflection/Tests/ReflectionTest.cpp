@@ -236,9 +236,9 @@ struct SC::ReflectionTest : public SC::TestCase
                       "structWithArrayUnpacked struct should not be recursively packed");
 
         constexpr auto       className        = TypeToString<TestNamespace::ComplexStructure>::get();
-        constexpr StringView classNameExected = "TestNamespace::ComplexStructure";
+        constexpr StringView classNameExpected = "TestNamespace::ComplexStructure";
         constexpr StringView classNameView({className.data, className.length}, false, StringEncoding::Ascii);
-        static_assert(classNameView == classNameExected, "Please update SC::ClNm for your compiler");
+        static_assert(classNameView == classNameExpected, "Please update SC::ClNm for your compiler");
         constexpr auto intName     = TypeToString<int>::get();
         constexpr auto intNameView = StringView({intName.data, intName.length}, false, StringEncoding::Ascii);
         static_assert(intNameView == "int", "Please update SC::ClNm for your compiler");

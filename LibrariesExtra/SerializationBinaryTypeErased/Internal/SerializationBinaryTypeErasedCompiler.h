@@ -10,7 +10,7 @@ namespace detail
 {
 struct SerializationBinaryTypeErasedVectorVTable
 {
-    enum class DropEccessItems
+    enum class DropExcessItems
     {
         No,
         Yes
@@ -22,9 +22,9 @@ struct SerializationBinaryTypeErasedVectorVTable
                                                  Span<const uint8_t>& itemBegin);
 
     using FunctionResize = bool (*)(Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
-                                    DropEccessItems dropEccessItems);
+                                    DropExcessItems dropExcessItems);
     using FunctionResizeWithoutInitialize = bool (*)(Span<uint8_t> object, Reflection::TypeInfo property,
-                                                     uint64_t sizeInBytes, DropEccessItems dropEccessItems);
+                                                     uint64_t sizeInBytes, DropExcessItems dropExcessItems);
     FunctionGetSegmentSpan          getSegmentSpan;
     FunctionGetSegmentSpanConst     getSegmentSpanConst;
     FunctionResize                  resize;
@@ -53,7 +53,7 @@ struct SerializationBinaryTypeErasedArrayAccess
     [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::TypeInfo property, Span<const uint8_t> object,
                                       Span<const uint8_t>& itemBegin);
 
-    using DropEccessItems = VectorVTable::DropEccessItems;
+    using DropExcessItems = VectorVTable::DropExcessItems;
     enum class Initialize
     {
         No,
@@ -61,7 +61,7 @@ struct SerializationBinaryTypeErasedArrayAccess
     };
 
     bool resize(uint32_t linkID, Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
-                Initialize initialize, DropEccessItems dropEccessItems);
+                Initialize initialize, DropExcessItems dropExcessItems);
 };
 } // namespace detail
 
@@ -94,10 +94,10 @@ struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
     }
 
     static bool resize(Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
-                       VectorVTable::DropEccessItems dropEccessItems)
+                       VectorVTable::DropExcessItems dropExcessItems)
     {
         SC_COMPILER_UNUSED(property);
-        SC_COMPILER_UNUSED(dropEccessItems);
+        SC_COMPILER_UNUSED(dropExcessItems);
         if (object.sizeInBytes() >= sizeof(void*))
         {
             auto&      vectorByte = *reinterpret_cast<Container*>(object.data());
@@ -112,10 +112,10 @@ struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
     }
 
     static bool resizeWithoutInitialize(Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
-                                        VectorVTable::DropEccessItems dropEccessItems)
+                                        VectorVTable::DropExcessItems dropExcessItems)
     {
         SC_COMPILER_UNUSED(property);
-        SC_COMPILER_UNUSED(dropEccessItems);
+        SC_COMPILER_UNUSED(dropExcessItems);
         if (object.sizeInBytes() >= sizeof(void*))
         {
             auto&      vectorByte = *reinterpret_cast<Container*>(object.data());

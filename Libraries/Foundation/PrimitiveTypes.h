@@ -34,21 +34,21 @@ using ssize_t = long;
 #else
 using native_char_t = char; ///< The native char for the platform (wchar_t (4 bytes) on Windows, char (1 byte) everywhere else )
 
-using uint8_t  = unsigned char;     ///< Platform Indipendent (1) byte unsigned int
-using uint16_t = unsigned short;    ///< Platform Indipendent (2) bytes unsigned int
-using uint32_t = unsigned int;      ///< Platform Indipendent (4) bytes unsigned int
-using uint64_t = unsigned long long;///< Platform Indipendent (8) bytes unsigned int
+using uint8_t  = unsigned char;     ///< Platform independent (1) byte unsigned int
+using uint16_t = unsigned short;    ///< Platform independent (2) bytes unsigned int
+using uint32_t = unsigned int;      ///< Platform independent (4) bytes unsigned int
+using uint64_t = unsigned long long;///< Platform independent (8) bytes unsigned int
 
-using int8_t  = signed char;        ///< Platform Indipendent (1) byte signed int
-using int16_t = short;              ///< Platform Indipendent (2) bytes signed int
-using int32_t = int;                ///< Platform Indipendent (4) bytes signed int
-using int64_t = long long;          ///< Platform Indipendent (8) bytes signed int
+using int8_t  = signed char;        ///< Platform independent (1) byte signed int
+using int16_t = short;              ///< Platform independent (2) bytes signed int
+using int32_t = int;                ///< Platform independent (4) bytes signed int
+using int64_t = long long;          ///< Platform independent (8) bytes signed int
 #if SC_PLATFORM_EMSCRIPTEN
 using size_t  = unsigned __PTRDIFF_TYPE__;
 using ssize_t = signed  __PTRDIFF_TYPE__;
 #else
-using size_t  = unsigned long;      ///< Platform Indipendent unsigned size type
-using ssize_t = signed long;        ///< Platform Indipendent signed size type
+using size_t  = unsigned long;      ///< Platform independent unsigned size type
+using ssize_t = signed long;        ///< Platform independent signed size type
 #endif
 #endif
 //! @}

@@ -27,7 +27,7 @@ SC::Result SC::FileSystemWatcher::watch(FolderWatcher& watcher, StringView path,
     return internal.get().startWatching(&watcher);
 }
 
-SC::Result SC::FileSystemWatcher::FolderWatcher::unwatch()
+SC::Result SC::FileSystemWatcher::FolderWatcher::stopWatching()
 {
     SC_TRY_MSG(parent != nullptr, "FolderWatcher already unwatched");
     return parent->internal.get().stopWatching(*this);

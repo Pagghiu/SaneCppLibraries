@@ -53,7 +53,7 @@ struct SC::PluginDefinition
     SmallString<10>  category;    ///< Category where plugin belongs to
     SmallString<255> directory;   ///< Path to the directory holding the plugin
 
-    SmallVector<PluginIdentifier, 10> dependencies; ///< Dependencies necessary to load thisp plugin
+    SmallVector<PluginIdentifier, 10> dependencies; ///< Dependencies necessary to load this plugin
     SmallVector<PluginFile, 10>       files;        ///< Source files that compose this plugin
 
     /// @brief Get main plugin file, holding plugin definition
@@ -149,7 +149,7 @@ struct SC::PluginCompiler
 struct SC::PluginDynamicLibrary
 {
     PluginDefinition     definition;     ///< Definition of the loaded plugin
-    SystemDynamicLibrary dynamicLibrary; ///< System handle of plugin's dynamic libray
+    SystemDynamicLibrary dynamicLibrary; ///< System handle of plugin's dynamic library
   private:
     void* instance                      = nullptr;
     bool (*pluginInit)(void*& instance) = nullptr;
@@ -191,7 +191,7 @@ struct SC::PluginRegistry
 
     /// @brief Removes all temporary build products of the Plugin with given identifier
     /// @param identifier Identifier of the plugin
-    /// @return Valid Result if all build products for the given plugn can be successfully removed
+    /// @return Valid Result if all build products for the given plugin can be successfully removed
     [[nodiscard]] Result removeAllBuildProducts(const StringView identifier);
 
     /// @brief Find a PluginDynamicLibrary in the registry with a given identifier

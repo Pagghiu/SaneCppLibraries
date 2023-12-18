@@ -64,7 +64,7 @@ SC_TRY(process.waitForExitSync());
  * */
 struct SC::Process
 {
-    /// @brief Options for SC::Proces::launch
+    /// @brief Options for SC::Process::launch
     struct Options
     {
         bool inheritFileDescriptors; ///< If true, child process will inherit parent file descriptors
@@ -191,14 +191,14 @@ struct SC::ProcessChain
         }
     };
 
-    /// @brief Error context for error callback specified in costructor
+    /// @brief Error context for error callback specified in constructor
     struct Error
     {
         Result returnCode = Result(true);
     };
 
     /// @brief construct with an error delegate
-    /// @param onError a Delegate that will recerive error notifications for processes that fail to start
+    /// @param onError a Delegate that will receive error notifications for processes that fail to start
     ProcessChain(Delegate<const Error&> onError) : onError(onError) {}
 
     /// @brief Add a process to the chain, with given arguments

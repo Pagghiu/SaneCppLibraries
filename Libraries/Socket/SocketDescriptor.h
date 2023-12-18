@@ -77,7 +77,7 @@ struct SC::SocketFlags
         Inheritable     ///< Socket will be inherited by child processes
     };
 
-    /// @brief Sets the addresss family of an IP Address (IPv4 or IPV6)
+    /// @brief Sets the address family of an IP Address (IPv4 or IPV6)
     enum AddressFamily
     {
         AddressFamilyIPV4, ///< IP Address is IPV4
@@ -153,7 +153,7 @@ struct SC::SocketDescriptor : public UniqueHandle<detail::SocketDescriptorDefini
     /// @param socketType Socket type (Stream or Dgram)
     /// @param protocol Protocol (TCP or UDP)
     /// @param blocking If the socket should be created in blocking mode
-    /// @param inheritable If the socket shoudl be inheritable by child processess
+    /// @param inheritable If the socket should be inheritable by child processes
     /// @return Valid Result if a socket with the requested options has been successfully created
     [[nodiscard]] Result create(SocketFlags::AddressFamily   addressFamily,
                                 SocketFlags::SocketType      socketType  = SocketFlags::SocketStream,
@@ -171,7 +171,7 @@ struct SC::SocketDescriptor : public UniqueHandle<detail::SocketDescriptorDefini
     /// @return Valid Result if it has been possible changing the inheritable status of this socket
     [[nodiscard]] Result setInheritable(bool value);
 
-    /// @brief Changes the blocking flag for this socket (if IO reads / writes should be blockign or not)
+    /// @brief Changes the blocking flag for this socket (if IO reads / writes should be blocking or not)
     /// @param value `true` if this socket should be made blocking, `false` for non-blocking
     /// @return Valid Result if it has been possible changing the blocking status of this socket
     [[nodiscard]] Result setBlocking(bool value);
@@ -321,8 +321,8 @@ struct SC::SocketClient
     /// @brief Read bytes from this socket blocking until they're actually received or timeout occurs
     /// @param[in] data Span of memory pointing at a buffer that will receive the read data
     /// @param[out] readData A sub-Span of `data` that has the length of actually read bytes
-    /// @param[in] timeout For how many millisenconds the read should wait before timing out
-    /// @return Valid Result if bytes have been read successfully and timeout didn't occurr
+    /// @param[in] timeout For how many milliseconds the read should wait before timing out
+    /// @return Valid Result if bytes have been read successfully and timeout didn't occur
     [[nodiscard]] Result readWithTimeout(Span<char> data, Span<char>& readData, Time::Milliseconds timeout);
 
   private:

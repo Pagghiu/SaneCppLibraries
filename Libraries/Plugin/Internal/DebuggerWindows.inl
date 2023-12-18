@@ -230,22 +230,22 @@ SC::Result SC::Debugger::unlockFileFromAllProcesses(SC::StringView fileName)
             UINT  nProcInfoNeeded;
             UINT  nProcInfo = 10;
 
-            RM_PROCESS_INFO rgpi[10] = {0};
+            RM_PROCESS_INFO rmProcessInfo[10] = {0};
 
-            dwError = RmGetList(dwSession, &nProcInfoNeeded, &nProcInfo, rgpi, &dwReason);
+            dwError = RmGetList(dwSession, &nProcInfoNeeded, &nProcInfo, rmProcessInfo, &dwReason);
             if (dwError == ERROR_SUCCESS)
             {
                 for (UINT i = 0; i < nProcInfo; i++)
                 {
                     HANDLE hProcess =
-                        OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, rgpi[i].Process.dwProcessId);
+                        OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, rmProcessInfo[i].Process.dwProcessId);
                     if (hProcess)
                     {
                         FILETIME ftCreate, ftExit, ftKernel, ftUser;
                         if (GetProcessTimes(hProcess, &ftCreate, &ftExit, &ftKernel, &ftUser) &&
-                            CompareFileTime(&rgpi[i].Process.ProcessStartTime, &ftCreate) == 0)
+                            CompareFileTime(&rmProcessInfo[i].Process.ProcessStartTime, &ftCreate) == 0)
                         {
-                            SC_TRY(Internal::unlockFileFromProcess(fileName, rgpi[i].Process.dwProcessId));
+                            SC_TRY(Internal::unlockFileFromProcess(fileName, rmProcessInfo[i].Process.dwProcessId));
                         }
                         CloseHandle(hProcess);
                     }

@@ -93,7 +93,7 @@ struct SC::FileSystemWatcher
     InternalOpaque internal;
 
   public:
-    /// @brief Specifies the event classes. Some events are grouped in a signle one because
+    /// @brief Specifies the event classes. Some events are grouped in a single one because
     /// it's non-trivial providing precise notifications that are consistent across platforms.
     enum class Operation
     {
@@ -128,9 +128,9 @@ struct SC::FileSystemWatcher
     {
         Function<void(const Notification&)> notifyCallback; ///< Function that will be called on a notification
 
-        /// @brief Stop watching this Direectory. After calling it the FolderWatcher can be reused or released.
-        /// @return Valid result if directory was unwached successfuly.
-        Result unwatch();
+        /// @brief Stop watching this directory. After calling it the FolderWatcher can be reused or released.
+        /// @return Valid result if directory was unwatched successfully.
+        Result stopWatching();
 
       private:
         friend struct FileSystemWatcher;
@@ -176,7 +176,7 @@ struct SC::FileSystemWatcher
 
     /// @brief Watch a single directory
     /// @param watcher Reference to a (not already used) watcher. Its address must not change until
-    /// FolderWatcher::unwatch or FileSystemWatcher::close
+    /// FolderWatcher::stopWatching or FileSystemWatcher::close
     /// @param path The directory being monitored
     /// @param notifyCallback A callback that will be invoked by the given runner
     /// @return Valid Result if directory is accessible and the watcher is initialized properly.

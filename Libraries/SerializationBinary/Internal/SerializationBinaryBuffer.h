@@ -59,7 +59,7 @@ struct SerializationBinaryBufferReader
 
     /// @brief Read bytes into given span of memory. Updates readPosition
     /// @param object The destination span
-    /// @return `true` if read succeded
+    /// @return `true` if read succeeded
     [[nodiscard]] bool serializeBytes(Span<uint8_t> object)
     {
         if (readPosition + object.sizeInBytes() > memory.sizeInBytes())

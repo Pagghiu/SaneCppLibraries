@@ -23,7 +23,7 @@ struct SC::VectorAllocator
 {
     static SegmentHeader* reallocate(SegmentHeader* oldHeader, size_t newSize);
 
-    static SegmentHeader* allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* pself);
+    static SegmentHeader* allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* selfPointer);
 
     static void release(SegmentHeader* oldHeader);
 
@@ -66,8 +66,8 @@ struct SC::Vector
     Vector() : items(nullptr) {}
 
     /// @brief Constructs a Vector from an initializer list
-    /// @param ilist The initializer list that will be appended to this Vector
-    Vector(std::initializer_list<T> ilist) : items(nullptr) { (void)append({ilist.begin(), ilist.size()}); }
+    /// @param list The initializer list that will be appended to this Vector
+    Vector(std::initializer_list<T> list) : items(nullptr) { (void)append({list.begin(), list.size()}); }
 
     /// @brief Destroys the Vector, releasing allocated memory
     ~Vector() { destroy(); }
@@ -110,22 +110,22 @@ struct SC::Vector
 
     /// @brief Copies an element in front of the Vector, at position 0
     /// @param element The element to be copied in front of the Vector
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     [[nodiscard]] bool push_front(const T& element) { return insert(0, {&element, 1}); }
 
     /// @brief Moves an element in front of the Vector, at position 0
     /// @param element The element to be moved in front of the Vector
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     [[nodiscard]] bool push_front(T&& element) { return insertMove(0, {&element, 1}); }
 
     /// @brief Appends an element copying it at the end of the Vector
     /// @param element The element to be copied at the end of the Vector
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     [[nodiscard]] bool push_back(const T& element) { return Operations::push_back(items, element); }
 
     /// @brief Appends an element moving it at the end of the Vector
     /// @param element The element to be moved at the end of the Vector
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     [[nodiscard]] bool push_back(T&& element) { return Operations::push_back(items, move(element)); }
 
     /// @brief Removes the last element of the vector
@@ -154,20 +154,20 @@ struct SC::Vector
 
     /// @brief Reserves memory for newCapacity elements, allocating memory if necessary.
     /// @param newCapacity The wanted new capacity for this Vector
-    /// @return `true` if memory reservation succeded
+    /// @return `true` if memory reservation succeeded
     [[nodiscard]] bool reserve(size_t newCapacity);
 
     /// @brief Resizes this vector to newSize, preserving existing elements.
     /// @param newSize The wanted new size of the vector
     /// @param value a default value that will be used for new elements inserted.
-    /// @return `true` if resize succeded
+    /// @return `true` if resize succeeded
     [[nodiscard]] bool resize(size_t newSize, const T& value = T());
 
     /// @brief Resizes this vector to newSize, preserving existing elements. Does not initialize the items between
     /// size() and capacity().
     ///         Be careful, it's up to the caller to initialize such items to avoid UB.
     /// @param newSize The wanted new size of the vector
-    /// @return `true` if resize succeded
+    /// @return `true` if resize succeeded
     [[nodiscard]] bool resizeWithoutInitializing(size_t newSize);
 
     /// @brief  Removes all elements from container, calling destructor for each of them.
@@ -178,7 +178,7 @@ struct SC::Vector
     void clearWithoutInitializing() { (void)resizeWithoutInitializing(0); }
 
     /// @brief Reallocates the vector so that size() == capacity(). If Vector is empty, it deallocates its memory.
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     [[nodiscard]] bool shrink_to_fit() { return Operations::shrink_to_fit(items); }
 
     /// @brief Check if the vector is empty
@@ -215,24 +215,24 @@ struct SC::Vector
     /// @brief Inserts a range of items copying them at given index
     /// @param idx Index where to start inserting the range of items
     /// @param data the range of items to copy
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     [[nodiscard]] bool insert(size_t idx, Span<const T> data);
 
     /// @brief Appends a range of items copying them at the end of vector
     /// @param data the range of items to copy
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     [[nodiscard]] bool append(Span<const T> data);
 
     /// @brief Appends a range of items copying them at the end of vector
     /// @param src the range of items to copy
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     template <typename U>
     [[nodiscard]] bool append(Span<const U> src);
 
     /// @brief Appends another vector moving its contents at the end of vector
     /// @tparam U Type of the vector to be move appended
     /// @param src The vector to be moved at end of vector
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     template <typename U>
     [[nodiscard]] bool appendMove(U&& src);
 
@@ -317,7 +317,7 @@ inline SC::SegmentHeader* SC::VectorAllocator::reallocate(SegmentHeader* oldHead
     return newHeader;
 }
 
-inline SC::SegmentHeader* SC::VectorAllocator::allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* pself)
+inline SC::SegmentHeader* SC::VectorAllocator::allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* selfPointer)
 {
     if (numNewBytes > SegmentHeader::MaxValue)
     {
@@ -327,9 +327,9 @@ inline SC::SegmentHeader* SC::VectorAllocator::allocate(SegmentHeader* oldHeader
     {
         if (oldHeader->isFollowedBySmallVector)
         {
-            // If we were folloed by a small vector, we check if that small vector has enough memory
+            // If we were followed by a small vector, we check if that small vector has enough memory
             SegmentHeader* followingHeader =
-                reinterpret_cast<SegmentHeader*>(static_cast<char*>(pself) + alignof(SegmentHeader));
+                reinterpret_cast<SegmentHeader*>(static_cast<char*>(selfPointer) + alignof(SegmentHeader));
             if (followingHeader->isSmallVector && followingHeader->capacityBytes >= numNewBytes)
             {
                 return followingHeader;

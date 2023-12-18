@@ -16,7 +16,7 @@ struct Array;
 struct SC::ArrayAllocator
 {
     [[nodiscard]] static SegmentHeader* reallocate(SegmentHeader* oldHeader, size_t newSize);
-    [[nodiscard]] static SegmentHeader* allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* pself);
+    [[nodiscard]] static SegmentHeader* allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* selfPointer);
     static void                         release(SegmentHeader* oldHeader);
 
     template <typename T>
@@ -63,8 +63,8 @@ struct SC::Array
     Array();
 
     /// @brief Constructs a Array from an initializer list
-    /// @param ilist The initializer list that will be appended to this Array
-    Array(std::initializer_list<T> ilist);
+    /// @param list The initializer list that will be appended to this Array
+    Array(std::initializer_list<T> list);
 
     /// @brief Destroys the Array, releasing allocated memory
     ~Array() { Operations::destroy(&segmentHeader); }
@@ -119,22 +119,22 @@ struct SC::Array
 
     /// @brief Copies an element in front of the Array, at position 0
     /// @param element The element to be copied in front of the Array
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     [[nodiscard]] bool push_front(const T& element) { return insert(0, {&element, 1}); }
 
     /// @brief Moves an element in front of the Array, at position 0
     /// @param element The element to be moved in front of the Array
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     [[nodiscard]] bool push_front(T&& element) { return insertMove(0, {&element, 1}); }
 
     /// @brief Appends an element copying it at the end of the Array
     /// @param element The element to be copied at the end of the Array
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     [[nodiscard]] bool push_back(const T& element);
 
     /// @brief Appends an element moving it at the end of the Array
     /// @param element The element to be moved at the end of the Array
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     [[nodiscard]] bool push_back(T&& element);
 
     /// @brief Removes the last element of the array
@@ -163,20 +163,20 @@ struct SC::Array
 
     /// @brief Reserves memory for newCapacity elements, allocating memory if necessary.
     /// @param newCapacity The wanted new capacity for this Array
-    /// @return `true` if memory reservation succeded
+    /// @return `true` if memory reservation succeeded
     [[nodiscard]] bool reserve(size_t newCapacity) { return newCapacity <= capacity(); }
 
     /// @brief Resizes this array to newSize, preserving existing elements.
     /// @param newSize The wanted new size of the array
     /// @param value a default value that will be used for new elements inserted.
-    /// @return `true` if resize succeded
+    /// @return `true` if resize succeeded
     [[nodiscard]] bool resize(size_t newSize, const T& value = T());
 
     /// @brief Resizes this array to newSize, preserving existing elements. Does not initialize the items between
     /// size() and capacity().
     ///         Be careful, it's up to the caller to initialize such items to avoid UB.
     /// @param newSize The wanted new size of the array
-    /// @return `true` if resize succeded
+    /// @return `true` if resize succeeded
     [[nodiscard]] bool resizeWithoutInitializing(size_t newSize);
 
     /// @brief  Removes all elements from container, calling destructor for each of them.
@@ -224,24 +224,24 @@ struct SC::Array
     /// @brief Inserts a range of items copying them at given index
     /// @param idx Index where to start inserting the range of items
     /// @param data the range of items to copy
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     [[nodiscard]] bool insert(size_t idx, Span<const T> data);
 
     /// @brief Appends a range of items copying them at the end of array
     /// @param data the range of items to copy
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     [[nodiscard]] bool append(Span<const T> data);
 
     /// @brief Appends a range of items copying them at the end of array
     /// @param data the range of items to copy
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     template <typename U>
     [[nodiscard]] bool append(Span<const U> data);
 
     /// @brief Appends another array moving its contents at the end of array
     /// @tparam U Type of the array to be move appended
     /// @param src The array to be moved at end of array
-    /// @return `true` if operation succeded
+    /// @return `true` if operation succeeded
     template <typename U>
     [[nodiscard]] bool appendMove(U&& src);
 
@@ -304,10 +304,10 @@ inline SC::SegmentHeader* SC::ArrayAllocator::reallocate(SegmentHeader* oldHeade
     }
     return nullptr;
 }
-inline SC::SegmentHeader* SC::ArrayAllocator::allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* pself)
+inline SC::SegmentHeader* SC::ArrayAllocator::allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* selfPointer)
 {
     SC_COMPILER_UNUSED(numNewBytes);
-    SC_COMPILER_UNUSED(pself);
+    SC_COMPILER_UNUSED(selfPointer);
     oldHeader->initDefaults();
     return oldHeader;
 }
@@ -327,11 +327,11 @@ SC::Array<T, N>::Array()
 }
 
 template <typename T, int N>
-SC::Array<T, N>::Array(std::initializer_list<T> ilist)
+SC::Array<T, N>::Array(std::initializer_list<T> list)
 {
     segmentHeader.capacityBytes = sizeof(T) * N;
-    const auto sz               = min(static_cast<int>(ilist.size()), N);
-    Parent::copyConstructMultiple(items, 0, static_cast<size_t>(sz), ilist.begin());
+    const auto sz               = min(static_cast<int>(list.size()), N);
+    Parent::copyConstructMultiple(items, 0, static_cast<size_t>(sz), list.begin());
     segmentHeader.setSize(static_cast<size_t>(sz));
 }
 

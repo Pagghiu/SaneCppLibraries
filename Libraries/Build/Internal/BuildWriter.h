@@ -24,7 +24,7 @@ struct SC::Build::WriterInternal
             CppFile,
             Framework,
             Configuration,
-            DebugVisualizerfile
+            DebugVisualizerFile
         };
         Type   type = Unknown;
         String name;
@@ -81,7 +81,7 @@ struct SC::Build::WriterInternal
                     }
                     else if (nameView.endsWith(".natvis") or nameView.endsWith(".lldbinit"))
                     {
-                        renderItem.type = RenderItem::DebugVisualizerfile;
+                        renderItem.type = RenderItem::DebugVisualizerFile;
                     }
                     SC_TRY(Path::relativeFromTo(destinationDirectory, it.view(), renderItem.path,
                                                 Path::Type::AsNative,  // input type
