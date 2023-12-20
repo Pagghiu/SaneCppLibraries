@@ -1,6 +1,5 @@
-// Copyright (c) 2022-2023, Stefano Cristiano
-//
-// All Rights Reserved. Reproduction is not allowed.
+// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
 #include "../Hashing.h"
 #include "../../Strings/Console.h"
 #include "../../Strings/String.h"

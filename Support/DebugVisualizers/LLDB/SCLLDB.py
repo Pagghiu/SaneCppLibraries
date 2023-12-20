@@ -1,3 +1,5 @@
+# Copyright (c) Stefano Cristiano
+# SPDX-License-Identifier: MIT
 import lldb
 import codecs
 

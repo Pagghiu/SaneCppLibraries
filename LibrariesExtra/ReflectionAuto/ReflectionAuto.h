@@ -1,6 +1,5 @@
-// Copyright (c) 2022-2023, Stefano Cristiano
-//
-// All Rights Reserved. Reproduction is not allowed.
+// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
 //------------------------------------------------------------------------
 // Adapted from "C++ Type Loophole" with some changes to count aggregates collapsing arrays
 // Up-to-date source is at GitHub repo: https://github.com/alexpolt/luple

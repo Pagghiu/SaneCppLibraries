@@ -1,6 +1,5 @@
-// Copyright (c) 2022-2023, Stefano Cristiano
-//
-// All Rights Reserved. Reproduction is not allowed.
+// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
 #include "Libraries/Build/Build.h"
 #include "Libraries/Strings/StringBuilder.h"
 

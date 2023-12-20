@@ -1,6 +1,5 @@
-// Copyright (c) 2022-2023, Stefano Cristiano
-//
-// All Rights Reserved. Reproduction is not allowed.
+// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
 #include <SC/Libraries/Containers/SmallVector.h>
 #include <SC/Libraries/Plugin/PluginMacros.h>
 #include <SC/Libraries/Strings/Console.h>

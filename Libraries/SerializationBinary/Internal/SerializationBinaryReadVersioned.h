@@ -1,6 +1,5 @@
-// Copyright (c) 2022-2023, Stefano Cristiano
-//
-// All Rights Reserved. Reproduction is not allowed.
+// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
 #pragma once
 // This needs to go before the compiler
 #include "../../Reflection/ReflectionSC.h" // TODO: Split the SC Containers specifics in separate header
