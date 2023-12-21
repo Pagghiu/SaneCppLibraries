@@ -1,0 +1,143 @@
+@page library_file_system File System
+
+@brief 🟨 File System operations { exists | copy | delete } for { files | directories }
+
+[TOC]
+
+FileSystem executed executing operations on files and directories.  
+Path is able to parse and manipulate windows and posix paths.
+
+# Features
+
+| SC::Path                          | @copybrief SC::Path                           |
+|:----------------------------------|:----------------------------------------------|
+| SC::Path::join                    | @copybrief SC::Path::join                     |
+| SC::Path::parseNameExtension      | @copybrief SC::Path::parseNameExtension       |
+| SC::Path::parse                   | @copybrief SC::Path::parse                    |
+| SC::Path::dirname                 | @copybrief SC::Path::dirname                  |
+| SC::Path::basename                | @copybrief SC::Path::basename                 |
+| SC::Path::isAbsolute              | @copybrief SC::Path::isAbsolute               |
+| SC::Path::normalize               | @copybrief SC::Path::normalize                |
+| SC::Path::relativeFromTo          | @copybrief SC::Path::relativeFromTo           |
+| SC::Path::append                  | @copybrief SC::Path::append                   |
+| SC::Path::endsWithSeparator       | @copybrief SC::Path::endsWithSeparator        |
+| SC::Path::removeStartingSeparator | @copybrief SC::Path::removeStartingSeparator  |
+
+| SC::FileSystem                                | @copybrief SC::FileSystem                                 |
+|:----------------------------------------------|:----------------------------------------------------------|
+| **Copy Files**                                |                                                           |
+| SC::FileSystem::copyFile                      | @copybrief SC::FileSystem::copyFile                       |
+| **Delete Files**                              |                                                           |
+| SC::FileSystem::removeFile                    | @copybrief SC::FileSystem::removeFile                     |
+| SC::FileSystem::removeFileIfExists            | @copybrief SC::FileSystem::removeFileIfExists             |
+| **Copy Directories**                          |                                                           |
+| SC::FileSystem::copyDirectory                 | @copybrief SC::FileSystem::copyDirectory                  |
+| **Delete Directories**                        |                                                           |
+| SC::FileSystem::removeEmptyDirectory          | @copybrief SC::FileSystem::removeEmptyDirectory           |
+| SC::FileSystem::removeEmptyDirectoryRecursive | @copybrief SC::FileSystem::removeEmptyDirectoryRecursive  |
+| SC::FileSystem::removeDirectoryRecursive      | @copybrief SC::FileSystem::removeDirectoryRecursive       |
+| **Create Directories**                        |                                                           |
+| SC::FileSystem::makeDirectory                 | @copybrief SC::FileSystem::makeDirectory                  |
+| SC::FileSystem::makeDirectoryIfNotExists      | @copybrief SC::FileSystem::makeDirectoryIfNotExists       |
+| SC::FileSystem::makeDirectoryRecursive        | @copybrief SC::FileSystem::makeDirectoryRecursive         |
+| **Check Existence**                           |                                                           |
+| SC::FileSystem::exists                        | @copybrief SC::FileSystem::exists                         |
+| SC::FileSystem::existsAndIsFile               | @copybrief SC::FileSystem::existsAndIsFile                |
+| SC::FileSystem::existsAndIsDirectory          | @copybrief SC::FileSystem::existsAndIsDirectory           |
+| **Read / Change modification time**           |                                                           |
+| SC::FileSystem::getFileTime                   | @copybrief SC::FileSystem::getFileTime                    |
+| SC::FileSystem::setLastModifiedTime           | @copybrief SC::FileSystem::setLastModifiedTime            |
+
+| Miscellaneous Classes                         |                                                           |
+|:----------------------------------------------|:----------------------------------------------------------|
+| SC::FileSystemDirectories                     | @copybrief SC::FileSystemDirectories                      |
+
+# Status
+🟨 MVP  
+The library contains commonly used function but it's missing some notable ones like `stat`.
+ SC::FileSystem::getFileTime and SC::FileSystem::setLastModifiedTime will probably be refactored in a future dedicated class for handling `stat` based operations.
+
+# Description 
+SC::Path class allows parsing and manipulating windows and posix paths.
+
+SC::FileSystem allows all typical file operations ( exists | copy | delete | make files or directory).
+Some less used functions are  SC::FileSystem::getFileTime and SC::FileSystem::setLastModifiedTime .
+The library doesn't allow reading or writing seeking inside a file, as that is domain of the [File](@ref library_file) library.
+SC::FileSystem::init needs an absolute path to a directory and makes it a the *base directory*.
+All paths passed later on as arguments to all methods can be either absolute paths or relative.
+If they are relative, they will be interpreted as relative to the base directory and **NOT** current directory of the process.
+The class wants explicitly to make sure its behavior doesn't implicitly depend on current directory of process 
+(unless it's passed explicitly to SC::FileSystem::init of course).
+
+# Path
+## Path::isAbsolute
+@copydoc SC::Path::isAbsolute
+
+## Path::dirname
+@copydoc SC::Path::dirname
+
+## Path::basename
+@copydoc SC::Path::basename
+
+## Path::parseNameExtension
+@copydoc SC::Path::parseNameExtension
+
+## Path::normalize
+@copydoc SC::Path::normalize
+
+## Path::relativeFromTo
+@copydoc SC::Path::relativeFromTo
+
+# FileSystem
+## copyFile
+@copydoc SC::FileSystem::copyFile
+
+## copyDirectory
+@copydoc SC::FileSystem::copyDirectory
+
+## removeDirectoryRecursive
+@copydoc SC::FileSystem::removeDirectoryRecursive
+
+## makeDirectoryRecursive
+@copydoc SC::FileSystem::makeDirectoryRecursive
+
+## existsAndIsFile
+@copydoc SC::FileSystem::existsAndIsFile
+
+## existsAndIsDirectory
+@copydoc SC::FileSystem::existsAndIsDirectory
+
+## write
+@copydoc SC::FileSystem::write
+
+## read
+@copydoc SC::FileSystem::read
+
+# Roadmap
+
+🟩 Usable Features:
+- Implement the entire API on Linux 
+
+🟦 Complete Features:
+- `stat`
+- `fstat`
+- `rename`
+- `chmod`
+- `chown`
+- `fsync`
+- `link` (hardlink)
+- `symlink`
+- `sendfile`
+
+💡 Unplanned Features:
+There are many fs operations tat can be added
+- `fchmod`
+- `fchown`
+- `lchown`
+- `access`
+- `ftruncate`
+- `lstat`
+- `statfs`
+- `fdatasync`
+- `ftruncate`
+- `readlink`
