@@ -1,0 +1,20 @@
+var searchData=
+[
+  ['name_0',['name',['../struct_s_c_1_1_build_1_1_configuration.html#a9f1d14456588af5493335cbee4c56f44',1,'SC::Build::Configuration::name()'],['../struct_s_c_1_1_build_1_1_project.html#aa2b7b1c40d1f3553deced23a244befb0',1,'SC::Build::Project::name()'],['../struct_s_c_1_1_build_1_1_workspace.html#a0182a20e0938a80992ca04779f28409e',1,'SC::Build::Workspace::name()'],['../struct_s_c_1_1_path_1_1_parsed_view.html#aa456088c57feea77a90f88d0e9f4a5fd',1,'SC::Path::ParsedView::name()'],['../struct_s_c_1_1_file_system_iterator_1_1_entry.html#a88b1f4eb013289e9a452acd91dcc217c',1,'SC::FileSystemIterator::Entry::name()'],['../struct_s_c_1_1_plugin_identity.html#a920da02ebbc0fbadd7d4fc12939ff21b',1,'SC::PluginIdentity::name()']]],
+  ['namedescription_1',['NameDescription',['../struct_s_c_1_1_build_1_1_compile_1_1_name_description.html',1,'SC::Build::Compile']]],
+  ['native_2',['Native',['../group__group__strings.html#gga394218cf32c79b0ada9bd2d4892eaf52a925641e0b76c28cc940e8f3ca178d826',1,'SC']]],
+  ['native_5fchar_5ft_3',['native_char_t',['../group__group__foundation__utility.html#ga2e9b71b1eb203f4dac78a2407c96c296',1,'SC']]],
+  ['needslinking_4',['needsLinking',['../struct_s_c_1_1_reflection_1_1_type_info.html#a0c6897b1812f78c142467d72c66b1265',1,'SC::Reflection::TypeInfo']]],
+  ['nonblocking_5',['NonBlocking',['../struct_s_c_1_1_socket_flags.html#aec08f165e03740d9137b9e7cca67941ba25afb353e41cd7298ba414dac55da436',1,'SC::SocketFlags']]],
+  ['none_6',['None',['../struct_s_c_1_1_build_1_1_configuration.html#adaa0948e96bd738b68201ae929a371aea6adf97f83acf6453d4a6a4b1070f3754',1,'SC::Build::Configuration']]],
+  ['noninheritable_7',['NonInheritable',['../struct_s_c_1_1_socket_flags.html#ab7ac892f56746963a049a84488c11bada0c8ad2aeef309cc59c03268de46e977c',1,'SC::SocketFlags']]],
+  ['normalize_8',['normalize',['../struct_s_c_1_1_path.html#a6dd228260719ef421a76f22fc536be93',1,'SC::Path']]],
+  ['notification_9',['Notification',['../struct_s_c_1_1_file_system_watcher_1_1_notification.html',1,'SC::FileSystemWatcher']]],
+  ['notifycallback_10',['notifyCallback',['../struct_s_c_1_1_file_system_watcher_1_1_folder_watcher.html#a5e385be5f0997604bb77b0d199855e44',1,'SC::FileSystemWatcher::FolderWatcher']]],
+  ['now_11',['now',['../struct_s_c_1_1_time_1_1_absolute.html#a19d0cdf1273a90aafe937290a2871ef9',1,'SC::Time::Absolute']]],
+  ['nulltermination_12',['NullTermination',['../struct_s_c_1_1_string_converter.html#a4b383fd8150e23a78b178744d3384c1a',1,'SC::StringConverter']]],
+  ['numberofchildren_13',['numberOfChildren',['../struct_s_c_1_1_reflection_1_1_type_info.html#a0b52c3eca302479f0894c053670c4f63',1,'SC::Reflection::TypeInfo']]],
+  ['numelements_14',['numElements',['../struct_s_c_1_1_reflection_1_1_type_info_1_1_array_info.html#af484bfeb62ff98f135baef78c77fa06a',1,'SC::Reflection::TypeInfo::ArrayInfo']]],
+  ['numsplitsnonempty_15',['numSplitsNonEmpty',['../struct_s_c_1_1_string_view_tokenizer.html#a789036967257ceda469ceea7422a0c44',1,'SC::StringViewTokenizer']]],
+  ['numsplitstotal_16',['numSplitsTotal',['../struct_s_c_1_1_string_view_tokenizer.html#a98b76543516fd814ce363627996a1e4f',1,'SC::StringViewTokenizer']]]
+];

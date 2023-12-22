@@ -1,0 +1,36 @@
+var namespace_s_c_1_1_reflection =
+[
+    [ "ArrayWithSize", "struct_s_c_1_1_reflection_1_1_array_with_size.html", "struct_s_c_1_1_reflection_1_1_array_with_size" ],
+    [ "ExtendedStructTypeInfo", "struct_s_c_1_1_reflection_1_1_extended_struct_type_info.html", null ],
+    [ "ExtendedTypeInfo", "struct_s_c_1_1_reflection_1_1_extended_type_info.html", null ],
+    [ "FlatSchemaBuilder", "struct_s_c_1_1_reflection_1_1_flat_schema_builder.html", "struct_s_c_1_1_reflection_1_1_flat_schema_builder" ],
+    [ "IsPrimitive", "struct_s_c_1_1_reflection_1_1_is_primitive.html", null ],
+    [ "Reflect", "struct_s_c_1_1_reflection_1_1_reflect.html", null ],
+    [ "ReflectPrimitive", "struct_s_c_1_1_reflection_1_1_reflect_primitive.html", null ],
+    [ "ReflectStruct", "struct_s_c_1_1_reflection_1_1_reflect_struct.html", null ],
+    [ "SchemaBuilder", "struct_s_c_1_1_reflection_1_1_schema_builder.html", null ],
+    [ "SchemaCompiler", "struct_s_c_1_1_reflection_1_1_schema_compiler.html", null ],
+    [ "SchemaType", "struct_s_c_1_1_reflection_1_1_schema_type.html", null ],
+    [ "Sv", "struct_s_c_1_1_reflection_1_1_sv.html", "struct_s_c_1_1_reflection_1_1_sv" ],
+    [ "TypeInfo", "struct_s_c_1_1_reflection_1_1_type_info.html", "struct_s_c_1_1_reflection_1_1_type_info" ],
+    [ "TypeToString", "struct_s_c_1_1_reflection_1_1_type_to_string.html", null ],
+    [ "VectorArrayVTable", "struct_s_c_1_1_reflection_1_1_vector_array_v_table.html", null ],
+    [ "WritableRange", "struct_s_c_1_1_reflection_1_1_writable_range.html", null ],
+    [ "Schema", "group__group__reflection.html#gad56daa68887908f053687c5fd352b22c", null ],
+    [ "TypeCategory", "group__group__reflection.html#ga51ba295f91ad01d05b37e7b9cd0fe4df", [
+      [ "TypeInvalid", "group__group__reflection.html#gga51ba295f91ad01d05b37e7b9cd0fe4dfadbe97bac1645d61541b5cf414044099f", null ],
+      [ "TypeUINT8", "group__group__reflection.html#gga51ba295f91ad01d05b37e7b9cd0fe4dfa9baa9611c7081806481ab5b61d7c63c7", null ],
+      [ "TypeUINT16", "group__group__reflection.html#gga51ba295f91ad01d05b37e7b9cd0fe4dfa0d59bcc7abf90a4de8cd6e8a9aeae891", null ],
+      [ "TypeUINT32", "group__group__reflection.html#gga51ba295f91ad01d05b37e7b9cd0fe4dfa092792ef382d8eaae4b06c5ce1335275", null ],
+      [ "TypeUINT64", "group__group__reflection.html#gga51ba295f91ad01d05b37e7b9cd0fe4dfa2d42c7ff850cb13a383af089327edaec", null ],
+      [ "TypeINT8", "group__group__reflection.html#gga51ba295f91ad01d05b37e7b9cd0fe4dfa8ad908d9ddbc6655b1ef3885985b0b80", null ],
+      [ "TypeINT16", "group__group__reflection.html#gga51ba295f91ad01d05b37e7b9cd0fe4dfa72499d938d70729a121d976d343412b6", null ],
+      [ "TypeINT32", "group__group__reflection.html#gga51ba295f91ad01d05b37e7b9cd0fe4dfa7de98cb2c92a46e4dabf6bf04f0943f9", null ],
+      [ "TypeINT64", "group__group__reflection.html#gga51ba295f91ad01d05b37e7b9cd0fe4dfa778e00d0d9a57e14a6c5d69df4e3420d", null ],
+      [ "TypeFLOAT32", "group__group__reflection.html#gga51ba295f91ad01d05b37e7b9cd0fe4dfa8d0c2109d5e5be1a4a614c6db8604393", null ],
+      [ "TypeDOUBLE64", "group__group__reflection.html#gga51ba295f91ad01d05b37e7b9cd0fe4dfaa7587438792cf65b2ba0fecadf3545b0", null ],
+      [ "TypeStruct", "group__group__reflection.html#gga51ba295f91ad01d05b37e7b9cd0fe4dfa9c147791ce8bcfc2393561bf6c880d1c", null ],
+      [ "TypeArray", "group__group__reflection.html#gga51ba295f91ad01d05b37e7b9cd0fe4dfa40768bb89ee70d0db382b835306466c0", null ],
+      [ "TypeVector", "group__group__reflection.html#gga51ba295f91ad01d05b37e7b9cd0fe4dfa7e80d7f10043a5b0514d6d088c12beb4", null ]
+    ] ]
+];

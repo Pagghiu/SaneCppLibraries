@@ -1,0 +1,28 @@
+var group__group__foundation__compiler__macros =
+[
+    [ "SC_ASSERT_DEBUG", "group__group__foundation__compiler__macros.html#ga03ca4f94b68a107fbbbcc0949e10c6a9", null ],
+    [ "SC_ASSERT_RELEASE", "group__group__foundation__compiler__macros.html#ga6bc5136e9c6fbc77420173ccf4e32d21", null ],
+    [ "SC_COMPILER_ASAN", "group__group__foundation__compiler__macros.html#gac27cb8fd02c8b3558cb1e3494dc05041", null ],
+    [ "SC_COMPILER_CLANG", "group__group__foundation__compiler__macros.html#ga9fd7b1d90698a326561cd6c60e42d5fc", null ],
+    [ "SC_COMPILER_CLANG_CL", "group__group__foundation__compiler__macros.html#gaf3a809222322ec1fb596373453d90f08", null ],
+    [ "SC_COMPILER_EXPORT", "group__group__foundation__compiler__macros.html#ga1a37a5eaff861383d132a644a072dc1e", null ],
+    [ "SC_COMPILER_FORCE_INLINE", "group__group__foundation__compiler__macros.html#ga770898d053aaacac72ecf76ef0aa344f", null ],
+    [ "SC_COMPILER_GCC", "group__group__foundation__compiler__macros.html#ga884cc84f5a1df11fb37d7ea72ed219c0", null ],
+    [ "SC_COMPILER_MSVC", "group__group__foundation__compiler__macros.html#ga92f94685d5135b1448911d8b1d1f761f", null ],
+    [ "SC_COMPILER_OFFSETOF", "group__group__foundation__compiler__macros.html#ga342911d1485dfa61d6ee82a773d79c41", null ],
+    [ "SC_COMPILER_UNUSED", "group__group__foundation__compiler__macros.html#gababf7af235538b85d47ad4c71bb1e349", null ],
+    [ "SC_COMPILER_WARNING_POP", "group__group__foundation__compiler__macros.html#ga04a2ef148fa8164b1a2fb0611f0d7b31", null ],
+    [ "SC_COMPILER_WARNING_PUSH_OFFSETOF", "group__group__foundation__compiler__macros.html#ga70fa661c9b8a64173ed96de422bcf2b1", null ],
+    [ "SC_COMPILER_WARNING_PUSH_UNUSED_RESULT", "group__group__foundation__compiler__macros.html#gab61d123dc400964ff65eacdec3349ccd", null ],
+    [ "SC_CONFIGURATION_DEBUG", "group__group__foundation__compiler__macros.html#ga9b8a68c61a0ea1be0a7b0a52f8507667", null ],
+    [ "SC_CONFIGURATION_RELEASE", "group__group__foundation__compiler__macros.html#ga3304f499618a316bb0ee218a0b131493", null ],
+    [ "SC_LANGUAGE_CPP_AT_LEAST_14", "group__group__foundation__compiler__macros.html#ga528d431f30dfe15d6e40bc3718edc950", null ],
+    [ "SC_LANGUAGE_CPP_AT_LEAST_17", "group__group__foundation__compiler__macros.html#gae929ef54afc2a08d13e2befac860b4aa", null ],
+    [ "SC_LANGUAGE_CPP_AT_LEAST_20", "group__group__foundation__compiler__macros.html#ga804671b393ea2031767cfcf13cb0822c", null ],
+    [ "SC_LANGUAGE_CPP_LESS_THAN_20", "group__group__foundation__compiler__macros.html#gad2555c8161ca8cdd8c370e30705f2073", null ],
+    [ "SC_LANGUAGE_CPP_VERSION", "group__group__foundation__compiler__macros.html#ga910115b42ebeeb3c8574da5dc4433bf6", null ],
+    [ "SC_LANGUAGE_LIKELY", "group__group__foundation__compiler__macros.html#gade98de21b3cfe285a18f221fee6e3b7f", null ],
+    [ "SC_LANGUAGE_UNLIKELY", "group__group__foundation__compiler__macros.html#ga4b2efc45c46474068fc341fd9d7060eb", null ],
+    [ "SC_PLATFORM_64_BIT", "group__group__foundation__compiler__macros.html#ga0c8d8c0b52de9ab2621ba929e1326532", null ],
+    [ "SC_PLATFORM_ARM64", "group__group__foundation__compiler__macros.html#ga13f0b9a8e5ef3a467f59d48e83664c3f", null ]
+];

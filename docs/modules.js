@@ -1,0 +1,26 @@
+var modules =
+[
+    [ "Algorithms", "group__group__algorithms.html", "group__group__algorithms" ],
+    [ "Async", "group__group__async.html", "group__group__async" ],
+    [ "Build", "group__group__build.html", "group__group__build" ],
+    [ "Containers", "group__group__containers.html", "group__group__containers" ],
+    [ "File", "group__group__file.html", "group__group__file" ],
+    [ "FileSystem", "group__group__file__system.html", "group__group__file__system" ],
+    [ "FileSystem Iterator", "group__group__file__system__iterator.html", "group__group__file__system__iterator" ],
+    [ "FileSystem Watcher", "group__group__file__system__watcher.html", "group__group__file__system__watcher" ],
+    [ "Foundation", "group__group__foundation.html", "group__group__foundation" ],
+    [ "Group_system", "group__group__system.html", "group__group__system" ],
+    [ "Group_time", "group__group__time.html", "group__group__time" ],
+    [ "Hashing", "group__group__hashing.html", "group__group__hashing" ],
+    [ "Http", "group__group__http.html", "group__group__http" ],
+    [ "Plugin", "group__group__plugin.html", "group__group__plugin" ],
+    [ "Process", "group__group__process.html", "group__group__process" ],
+    [ "Reflection", "group__group__reflection.html", "group__group__reflection" ],
+    [ "Serialization Binary", "group__group__serialization__binary.html", "group__group__serialization__binary" ],
+    [ "Serialization Binary Type Erased", "group__group__serialization__type__erased.html", "group__group__serialization__type__erased" ],
+    [ "Serialization Text", "group__group__serialization__text.html", "group__group__serialization__text" ],
+    [ "Socket", "group__group__socket.html", "group__group__socket" ],
+    [ "Strings", "group__group__strings.html", "group__group__strings" ],
+    [ "Testing", "group__group__testing.html", "group__group__testing" ],
+    [ "Threading", "group__group__threading.html", "group__group__threading" ]
+];

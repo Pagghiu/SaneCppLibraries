@@ -1,0 +1,27 @@
+var searchData=
+[
+  ['init_0',['init',['../struct_s_c_1_1_file_system.html#a477e4faa714b7c1a21887079b9cf82b1',1,'SC::FileSystem::init()'],['../struct_s_c_1_1_file_system_directories.html#a5ee6ca28714b9a106c402a988172d1eb',1,'SC::FileSystemDirectories::init()'],['../struct_s_c_1_1_file_system_iterator.html#aa316d5a4b1ec3f298a1d2790a502673c',1,'SC::FileSystemIterator::init()'],['../struct_s_c_1_1_file_system_watcher.html#a6fbb3ce10ebae059d57b85134c7c8c24',1,'SC::FileSystemWatcher::init(ThreadRunner &amp;runner)'],['../struct_s_c_1_1_file_system_watcher.html#a5de1da476a1313bf14d0ce123aaf2215',1,'SC::FileSystemWatcher::init(EventLoopRunner &amp;runner)'],['../struct_s_c_1_1_plugin_registry.html#a1b2b8e1ec44ae214ae8d3ab05eafdad1',1,'SC::PluginRegistry::init()']]],
+  ['initnetworking_1',['initNetworking',['../struct_s_c_1_1_socket_networking.html#ae86e67f4b18e299840c6d2eca4587786',1,'SC::SocketNetworking']]],
+  ['inroundeduppermilliseconds_2',['inRoundedUpperMilliseconds',['../struct_s_c_1_1_time_1_1_relative.html#aacc58b235bcdd57998ca339bb27e737e',1,'SC::Time::Relative']]],
+  ['insert_3',['insert',['../struct_s_c_1_1_array.html#a360b785587eee42fc9fa59bf6494196b',1,'SC::Array::insert()'],['../struct_s_c_1_1_vector.html#ac5f76b9121155000a7370f06b0cabd2c',1,'SC::Vector::insert()'],['../struct_s_c_1_1_vector_set.html#a577a9c1d739202c98b46ec0d3a29d8f2',1,'SC::VectorSet::insert()']]],
+  ['insertifnotexists_4',['insertIfNotExists',['../struct_s_c_1_1_vector_map.html#a99554778a77a2990d5707406c28661c5',1,'SC::VectorMap']]],
+  ['insertoverwrite_5',['insertOverwrite',['../struct_s_c_1_1_vector_map.html#adc59c8a8da1798516b43489c7a4d6fa8',1,'SC::VectorMap']]],
+  ['insertvalueuniquekey_6',['insertValueUniqueKey',['../struct_s_c_1_1_vector_map.html#a3a298bad7ef90f78fe374304ad2a950b',1,'SC::VectorMap']]],
+  ['isabsolute_7',['isAbsolute',['../struct_s_c_1_1_path.html#af3853f37a0a0ba97887c71fab9011424',1,'SC::Path']]],
+  ['isatend_8',['isAtEnd',['../struct_s_c_1_1_string_iterator.html#aef9bf420c068b853eb73bef3d89a7085',1,'SC::StringIterator']]],
+  ['isatstart_9',['isAtStart',['../struct_s_c_1_1_string_iterator.html#a39c0cb6fe4ae1b432be2a4caf48d6137',1,'SC::StringIterator']]],
+  ['isdirectory_10',['isDirectory',['../struct_s_c_1_1_file_system_iterator_1_1_entry.html#a183849c0a747271ad9ab8d0551c25af6',1,'SC::FileSystemIterator::Entry']]],
+  ['isempty_11',['isEmpty',['../struct_s_c_1_1_array.html#a4ca35cac0cf7232b8fa0cf680ca433f9',1,'SC::Array::isEmpty()'],['../struct_s_c_1_1_vector.html#aaea29fdcebe12448f67415a88d59b4d5',1,'SC::Vector::isEmpty()'],['../struct_s_c_1_1_vector_map.html#a3f9839eb474d78cfbc3dc3350323759d',1,'SC::VectorMap::isEmpty()'],['../struct_s_c_1_1_string.html#acb12d89bfd4449e89e319867bd733d18',1,'SC::String::isEmpty()'],['../struct_s_c_1_1_string_view.html#ae4cd6b3f5863c25b9ba5ea21d87900f3',1,'SC::StringView::isEmpty()']]],
+  ['isfinished_12',['isFinished',['../struct_s_c_1_1_string_view_tokenizer.html#a4ed6f710bbb4fc59a0b0d05af345c87b',1,'SC::StringViewTokenizer']]],
+  ['isfloatingnumber_13',['isFloatingNumber',['../struct_s_c_1_1_string_view.html#aeeba9ee862bba57974352e3b6e5951ba',1,'SC::StringView']]],
+  ['isfollowedby_14',['isFollowedBy',['../struct_s_c_1_1_string_iterator.html#aa6924428b576a45dcd83af9c44bede70',1,'SC::StringIterator']]],
+  ['isinheritable_15',['isInheritable',['../struct_s_c_1_1_file_descriptor.html#a945558848ef26709909d59faa80fc222',1,'SC::FileDescriptor::isInheritable()'],['../struct_s_c_1_1_socket_descriptor.html#a65ac2b5205b3967dc63c0f058605e70c',1,'SC::SocketDescriptor::isInheritable()']]],
+  ['isintegernumber_16',['isIntegerNumber',['../struct_s_c_1_1_string_view.html#ab869d50039dd3681f821dc5defbe5e10',1,'SC::StringView']]],
+  ['islaterthanorequalto_17',['isLaterThanOrEqualTo',['../struct_s_c_1_1_time_1_1_high_resolution_counter.html#ab38287337b7dd250cf52b4f39343b71b',1,'SC::Time::HighResolutionCounter']]],
+  ['isnetworkinginited_18',['isNetworkingInited',['../struct_s_c_1_1_socket_networking.html#a696f8479363cf2ff0bc7075a38cf7d9e',1,'SC::SocketNetworking']]],
+  ['isnullterminated_19',['isNullTerminated',['../struct_s_c_1_1_string_view.html#a13c6d1eae0b58372f7b3d1be3453db47',1,'SC::StringView']]],
+  ['isprecededby_20',['isPrecededBy',['../struct_s_c_1_1_string_iterator.html#ace8e0acc24c77c59f816a0c4a5e94dd2',1,'SC::StringIterator']]],
+  ['isprimitiveorpackedstruct_21',['isPrimitiveOrPackedStruct',['../struct_s_c_1_1_reflection_1_1_type_info.html#a3fdbf03bdf3a0263fe1c5f438c55720e',1,'SC::Reflection::TypeInfo']]],
+  ['isprimitivetype_22',['isPrimitiveType',['../struct_s_c_1_1_reflection_1_1_type_info.html#ae658a6998bc13564357f12ae053ae92a',1,'SC::Reflection::TypeInfo']]],
+  ['isvalid_23',['isValid',['../struct_s_c_1_1_async_result.html#a653f29d24de75f491beaa2d4f73fb3ce',1,'SC::AsyncResult::isValid()'],['../struct_s_c_1_1_strong_i_d.html#ad8b9cc8b1db1e0a87a1bd08262c0c7cc',1,'SC::StrongID::isValid()'],['../struct_s_c_1_1_unique_handle.html#a86dec523ac151babb01e75898647b9ed',1,'SC::UniqueHandle::isValid()']]]
+];
