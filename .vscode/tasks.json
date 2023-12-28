@@ -49,17 +49,5 @@
                 "kind": "build",
             }
         },
-        {
-            "label": "Refresh SCTest compile_commands_arm64.json macos-arm64 Debug",
-            "type": "shell",
-            "command": "xcrun xcodebuild -scheme SCTest -configuration Debug -project \"${workspaceFolder}/_Build/Projects/MacOS/SCTest.xcodeproj\" ARCHS=arm64 USE_ACTIVE_ARCS=NO OTHER_CFLAGS=\"\\$(inherited) -gen-cdb-fragment-path \"\"\\${workspaceFolder}/_Build/Intermediate/\\$(PROJECT_NAME)/macOS-13.0-arm64-xcode13-Debug/CompilationDatabase\"\"\" && sed -e '1s/^/[\\'$'\n''/' -e '$s/,$/\\'$'\n'']/' \"${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13.0-arm64-xcode13-Debug/CompilationDatabase/\"*.json > \"${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13.0-arm64-xcode13-Debug/compile_commands_arm64.json\" && rm \"${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13.0-arm64-xcode13-Debug/CompilationDatabase/\"*.json && rmdir \"${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13.0-arm64-xcode13-Debug/CompilationDatabase\"",
-            "problemMatcher": []
-        },
-        {
-            "label": "Refresh SCTest compile_commands_arm64.json macos-arm64 Release",
-            "type": "shell",
-            "command": "xcrun xcodebuild -scheme SCTest -configuration Release -project \"${workspaceFolder}/_Build/Projects/MacOS/SCTest.xcodeproj\" ARCHS=arm64 USE_ACTIVE_ARCS=NO OTHER_CFLAGS=\"\\$(inherited) -gen-cdb-fragment-path \"\"\\${workspaceFolder}/_Build/Intermediate/\\$(PROJECT_NAME)/macOS-13.0-arm64-xcode13-Release/CompilationDatabase\"\"\" && sed -e '1s/^/[\\'$'\n''/' -e '$s/,$/\\'$'\n'']/' \"${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13.0-arm64-xcode13-Release/CompilationDatabase/\"*.json > \"${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13.0-arm64-xcode13-Release/compile_commands_arm64.json\" && rm \"${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13.0-arm64-xcode13-Release/CompilationDatabase/\"*.json && rmdir \"${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13.0-arm64-xcode13-Release/CompilationDatabase\"",
-            "problemMatcher": []
-        },
     ]
 }

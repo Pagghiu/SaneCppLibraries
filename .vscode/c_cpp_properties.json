@@ -8,7 +8,7 @@
             "cStandard": "c11",
             "cppStandard": "c++14",
             "intelliSenseMode": "macos-clang-arm64",
-            "compileCommands": "${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13.0-arm64-xcode13-Debug/compile_commands_arm64.json"
+            "compileCommands": "${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13.0-arm64 x86_64-xcode13-Debug/compile_commands.json"
         },
         {
             "name": "SCTest macOS arm64 Release",
@@ -18,7 +18,7 @@
             "cStandard": "c11",
             "cppStandard": "c++14",
             "intelliSenseMode": "macos-clang-arm64",
-            "compileCommands": "${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13.0-arm64-xcode13-Release/compile_commands_arm64.json"
+            "compileCommands": "${workspaceFolder}/_Build/Intermediate/SCTest/macOS-13.0-arm64 x86_64-xcode13-Release/compile_commands.json"
         }
     ],
     "version": 4

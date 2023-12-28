@@ -285,6 +285,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                 7B00740E2A73143F00660B94 /* Sources */,
                 7B00740F2A73143F00660B94 /* Frameworks */,
                 7B0074102A73143F00660B94 /* CopyFiles */,
+                7B6078112B3CEF9400680265 /* ShellScript */,
             );
             buildRules = (
             );
@@ -342,6 +343,35 @@ struct SC::Build::ProjectWriter::WriterXCode
             );
         };
 /* End PBXProject section */
+)delimiter");
+        SC_COMPILER_WARNING_POP;
+        return true;
+    }
+
+    [[nodiscard]] bool writePBXShellScriptBuildPhase(StringBuilder& builder)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        builder.append(R"delimiter(
+/* Begin PBXShellScriptBuildPhase section */
+        7B6078112B3CEF9400680265 /* ShellScript */ = {
+            isa = PBXShellScriptBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SYMROOT)/compile_commands.json",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "sed -e '1s/^/[\\'$'\\n''/' -e '$s/,$/\\'$'\\n'']/' \"${SYMROOT}/CompilationDatabase/\"*.json > \"${SYMROOT}/\"compile_commands.json\nrm -rf \"${SYMROOT}/CompilationDatabase/\"";
+			showEnvVarsInLog = 0;        };
+/* End PBXShellScriptBuildPhase section */
 )delimiter");
         SC_COMPILER_WARNING_POP;
         return true;
@@ -527,6 +557,11 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
             builder.append("\n            GCC_ENABLE_CPP_EXCEPTIONS = NO;");
         }
+        builder.append(R"delimiter(
+        OTHER_CFLAGS = (
+            "$(inherited)",
+            "-gen-cdb-fragment-path \"$(SYMROOT)/CompilationDatabase\"",
+        );)delimiter");
 
         if (not configuration->compile.hasValue<Compile::enableStdCpp>(true))
         {
@@ -723,6 +758,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 
         writePBXNativeTarget(builder, project);
         writePBXProject(builder, project);
+        writePBXShellScriptBuildPhase(builder);
         writePBXSourcesBuildPhase(builder, renderer.renderItems);
         writeXCBuildConfiguration(builder, project, renderer.renderItems);
         writeXCConfigurationList(builder, project, renderer.renderItems);

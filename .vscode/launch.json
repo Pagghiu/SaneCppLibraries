@@ -8,7 +8,10 @@
             "name": "(lldb) Debug SCTest Clang",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/Output/macOS-13-arm64_x86_64-Xcode-Debug/SCTest",
+            "program" : "",
+            "osx": {
+                "program": "${workspaceFolder}/_Build/Output/macOS-13.0-arm64 x86_64-xcode13-Debug/SCTest",
+            },
             "args": [],
             "cwd": "${fileDirname}",
             "preLaunchTask": "Build SCTest Debug",
