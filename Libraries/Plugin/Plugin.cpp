@@ -16,7 +16,7 @@
 
 bool SC::PluginDefinition::find(const StringView text, StringView& extracted)
 {
-    auto       it           = text.getIterator<StringIteratorASCII>();
+    auto       it          = text.getIterator<StringIteratorASCII>();
     const auto beginPlugin = ("SC_BEGIN_PLUGIN"_a8).getIterator<StringIteratorASCII>();
     SC_TRY(it.advanceAfterFinding(beginPlugin));
     SC_TRY(it.advanceUntilMatches('\n'));
