@@ -64,7 +64,7 @@ int main(int argc, const char* argv[])
         console.printLine("Build error Visual Studio 2022\n");
         return -1;
     }
-    res = SCBuild::generate(Build::Generator::XCode14, targetDirectory, sourcesDirectory);
+    res = SCBuild::generate(Build::Generator::XCode, targetDirectory, sourcesDirectory);
     if (not res)
     {
         console.printLine("Build error XCode\n");

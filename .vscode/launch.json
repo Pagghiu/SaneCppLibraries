@@ -10,7 +10,7 @@
             "request": "launch",
             "program" : "",
             "osx": {
-                "program": "${workspaceFolder}/_Build/Output/macOS-13.0-arm64 x86_64-xcode13-Debug/SCTest",
+                "program": "${workspaceFolder}/_Build/Output/macOS-13.0-arm64 x86_64-XCode-Debug/SCTest",
             },
             "args": [],
             "cwd": "${fileDirname}",

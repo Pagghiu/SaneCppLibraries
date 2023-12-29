@@ -117,8 +117,8 @@ SC::Result SC::Build::Definition::generate(StringView projectFileName, const Bui
     StringView           directory;
     switch (parameters.generator)
     {
-    case Build::Generator::XCode14: directory = "MacOS"; break;
-    case Build::Generator::VisualStudio2022: directory = "Windows"; break;
+    case Build::Generator::XCode: directory = "XCode"; break;
+    case Build::Generator::VisualStudio2022: directory = "VisualStudio2022"; break;
     }
     return Result(writer.write(rootPath, projectFileName, directory));
 }
@@ -294,7 +294,7 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
     String prjName;
     switch (parameters.generator)
     {
-    case Generator::XCode14: {
+    case Generator::XCode: {
         String                buffer;
         WriterXCode           writer(definition, definitionCompiler);
         const Project&        project = definition.workspaces[0].projects[0];

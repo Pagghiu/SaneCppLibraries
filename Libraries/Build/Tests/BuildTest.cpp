@@ -35,8 +35,7 @@ struct SC::BuildTest : public SC::TestCase
         }
         if (test_section("XCode"))
         {
-            SC_TEST_EXPECT(
-                SCBuild::generate(Build::Generator::XCode14, targetDirectory.view(), sourcesDirectory.view()));
+            SC_TEST_EXPECT(SCBuild::generate(Build::Generator::XCode, targetDirectory.view(), sourcesDirectory.view()));
         }
     }
 };

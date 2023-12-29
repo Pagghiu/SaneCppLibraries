@@ -8,7 +8,7 @@
             "type": "shell",
             // Building scheme for DEBUG (will use settings set in the scheme, ASAN for example)
             // Building only a single arch because, USE_ACTIVE_ARCS is ignored when invoked from xcodebuild
-            "command": "xcodebuild -scheme SCTest -configuration Debug -project \"${workspaceFolder}/_Build/Projects/MacOS/SCTest.xcodeproj\"",
+            "command": "xcodebuild -scheme SCTest -configuration Debug -project \"${workspaceFolder}/_Build/Projects/XCode/SCTest.xcodeproj\"",
             "problemMatcher": [
                 "$gcc"
             ],
@@ -30,7 +30,7 @@
             "type": "shell",
             // We cannot use "archive" action as produces a broken symlink instead of proper executable (BUG)
             // If you want to build only 1 arch add ONLY_ACTIVE_ARCH=NO AND (ARCHS=arm64 or ARCHS=x86_64)
-            "command": "xcodebuild -target SCTest -configuration Release -project \"${workspaceFolder}/_Build/Projects/MacOS/SCTest.xcodeproj\"",
+            "command": "xcodebuild -target SCTest -configuration Release -project \"${workspaceFolder}/_Build/Projects/XCode/SCTest.xcodeproj\"",
             "problemMatcher": [
                 "$gcc"
             ],
@@ -41,7 +41,7 @@
         {
             "label": "Build SCTest Release ARM64",
             "type": "shell",
-            "command": "xcodebuild -target SCTest -configuration Release -project \"${workspaceFolder}/_Build/Projects/MacOS/SCTest.xcodeproj\" ONLY_ACTIVE_ARCH=NO ARCHS=arm64",
+            "command": "xcodebuild -target SCTest -configuration Release -project \"${workspaceFolder}/_Build/Projects/XCode/SCTest.xcodeproj\" ONLY_ACTIVE_ARCH=NO ARCHS=arm64",
             "problemMatcher": [
                 "$gcc"
             ],

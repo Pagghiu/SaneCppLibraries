@@ -80,7 +80,7 @@ struct Generator
 {
     enum Type
     {
-        XCode14,          ///< Generate projects for XCode 14
+        XCode,            ///< Generate projects for XCode (Version 14+)
         VisualStudio2022, ///< Generate projects for Visual Studio 2022
     };
 
@@ -89,7 +89,7 @@ struct Generator
     {
         switch (type)
         {
-        case XCode14: return "XCode14";
+        case XCode: return "XCode";
         case VisualStudio2022: return "VisualStudio2022";
         }
         Assert::unreachable();
@@ -456,9 +456,9 @@ struct ConfigurePresets
             SC_TRY(definition.generate(projectName, parameters, targetDirectory));
         }
         break;
-        case Build::Generator::XCode14: {
+        case Build::Generator::XCode: {
             Build::Parameters parameters;
-            parameters.generator     = Build::Generator::XCode14;
+            parameters.generator     = Build::Generator::XCode;
             parameters.platforms     = {Build::Platform::MacOS};
             parameters.architectures = {Build::Architecture::Arm64, Build::Architecture::Intel64};
             Build::Definition definition;
