@@ -17,7 +17,19 @@ Visit the [documentation website](https://pagghiu.github.io/SaneCppLibraries/ind
 
 An [introductory blog post](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html) has been written too.
 
+I've also started a [Youtube Channel](https://www.youtube.com/@Pagghiu) with some videos on the project.
+
+You can check [Sane C++ Libraries Project Video](https://www.youtube.com/watch?v=5w1_rRXgyv0) to get started.
+
 # Libraries
+
+Many libraries are in draft state, while others are slightly more usable.  
+Click on specific page each library to know about its status.  
+
+- 🟥 Draft (incomplete, work in progress, proof of concept, works on basic case)
+- 🟨 MVP (minimum set of features have been implemented)
+- 🟩 Usable (a reasonable set of features has been implemented to make library useful)
+- 🟦 Complete (all planned features have been implemented)
 
 Library                                                                                             | Description
 :---------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------------------

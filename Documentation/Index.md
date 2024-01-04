@@ -13,7 +13,10 @@ Project [Principles](@ref page_principles):
 - Fight bloat measured in cognitive and build complexity, compile time, binary size and debug performance
 - Providing out-of-the-box functionalities typically given for granted in every respectable modern language
 - [Re-invent the wheel](https://xkcd.com/927/) hoping it will be more round this time
-- You can take a look at the [introductory blog post](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html) if you like
+
+You can take a look at the [introductory blog post](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html) if you like.
+
+I've also started a [Youtube Channel](https://www.youtube.com/@Pagghiu) with some videos on the project.
 
 ## Status
 Many libraries are in draft state, while others are slightly more usable.  
