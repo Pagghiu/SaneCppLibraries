@@ -1,5 +1,6 @@
 var NAVTREEINDEX3 =
 {
+"struct_s_c_1_1_file_descriptor.html#a87d99c72e5bc8bed8b2fc0806a45c40b":[9,4,0,7],
 "struct_s_c_1_1_file_descriptor.html#a8cccd5b04111df5e220b8f5f3451d131":[9,4,0,14],
 "struct_s_c_1_1_file_descriptor.html#a90271ecf4e2ed5586f84f66163964507":[9,4,0,12],
 "struct_s_c_1_1_file_descriptor.html#a945558848ef26709909d59faa80fc222":[9,4,0,5],
@@ -248,6 +249,5 @@ var NAVTREEINDEX3 =
 "struct_s_c_1_1_plugin_registry.html#af568bb084b8277d4bb43197d1045fbf4":[9,13,6,3],
 "struct_s_c_1_1_plugin_scanner.html":[9,13,3],
 "struct_s_c_1_1_process.html":[9,14,1],
-"struct_s_c_1_1_process.html#a1877bdc5ed01b54d0fbbf72111a6ad84":[9,14,1,7],
-"struct_s_c_1_1_process.html#a1fe60993c3d77b5f2f5dc9dc03e987b0":[9,14,1,12]
+"struct_s_c_1_1_process.html#a1877bdc5ed01b54d0fbbf72111a6ad84":[9,14,1,7]
 };
