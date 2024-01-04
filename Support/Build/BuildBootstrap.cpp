@@ -70,6 +70,12 @@ int main(int argc, const char* argv[])
         console.printLine("Build error XCode\n");
         return -1;
     }
+    res = SCBuild::generate(Build::Generator::Makefile, targetDirectory, sourcesDirectory);
+    if (not res)
+    {
+        console.printLine("Build error Makefile\n");
+        return -1;
+    }
     Time::Relative elapsed = SC::Time::Absolute::now().subtract(started);
     builder.format("Build finished (configure took {} ms)", elapsed.inRoundedUpperMilliseconds().ms);
     console.printLine(buffer.view());

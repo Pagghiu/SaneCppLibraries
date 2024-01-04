@@ -712,6 +712,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
             RenderItem xcodeFile;
             xcodeFile.name = Path::basename(it.view(), Path::AsPosix);
+            SC_TRY(StringBuilder(xcodeFile.name, StringBuilder::DoNotClear).append(".framework"));
             xcodeFile.type = RenderItem::Framework;
             SC_TRY(Path::join(xcodeFile.path, {"System/Library/Frameworks", xcodeFile.name.view()}, "/"));
             SC_TRY(computeBuildHash(xcodeFile.name.view(), xcodeFile.buildHash));

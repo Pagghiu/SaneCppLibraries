@@ -23,9 +23,11 @@ struct ProjectWriter
   private:
     struct WriterXCode;
     struct WriterVisualStudio;
+    struct WriterMakefile;
 };
 } // namespace Build
 } // namespace SC
+#include "Internal/BuildWriterMakefile.inl"
 #include "Internal/BuildWriterVisualStudio.inl"
 #include "Internal/BuildWriterXCode.inl"
 
@@ -119,6 +121,7 @@ SC::Result SC::Build::Definition::generate(StringView projectFileName, const Bui
     {
     case Build::Generator::XCode: directory = "XCode"; break;
     case Build::Generator::VisualStudio2022: directory = "VisualStudio2022"; break;
+    case Build::Generator::Makefile: directory = "Make"; break;
     }
     return Result(writer.write(rootPath, projectFileName, directory));
 }
@@ -356,7 +359,17 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
         }
         break;
     }
+    case Generator::Makefile: {
+        String buffer1;
+        SC_TRY(prjName.assign("Makefile"));
+        WriterMakefile           writer(definition, definitionCompiler);
+        WriterMakefile::Renderer renderer;
+        StringBuilder            sb1(buffer1, StringBuilder::Clear);
+        SC_TRY(writer.writeMakefile(sb1, normalizedDirectory.view(), definition.workspaces[0], renderer));
+        SC_TRY(fs.removeFileIfExists(prjName.view()));
+        SC_TRY(fs.write(prjName.view(), buffer1.view()));
+        break;
     }
-
+    }
     return Result(true);
 }

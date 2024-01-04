@@ -37,7 +37,7 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
     });
     if (parameters.platforms.contains(Build::Platform::MacOS))
     {
-        project.link.addFrameworks({"CoreFoundation.framework", "CoreServices.framework"});
+        project.link.addFrameworks({"CoreFoundation", "CoreServices"});
     }
     if (parameters.generator == Build::Generator::VisualStudio2022)
     {

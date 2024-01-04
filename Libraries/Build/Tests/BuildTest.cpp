@@ -37,6 +37,11 @@ struct SC::BuildTest : public SC::TestCase
         {
             SC_TEST_EXPECT(SCBuild::generate(Build::Generator::XCode, targetDirectory.view(), sourcesDirectory.view()));
         }
+        if (test_section("Makefile"))
+        {
+            SC_TEST_EXPECT(
+                SCBuild::generate(Build::Generator::Makefile, targetDirectory.view(), sourcesDirectory.view()));
+        }
     }
 };
 

@@ -82,6 +82,7 @@ struct Generator
     {
         XCode,            ///< Generate projects for XCode (Version 14+)
         VisualStudio2022, ///< Generate projects for Visual Studio 2022
+        Makefile,         ///< Generate posix makefiles
     };
 
     /// @brief Get StringView from Generator::Type
@@ -91,6 +92,7 @@ struct Generator
         {
         case XCode: return "XCode";
         case VisualStudio2022: return "VisualStudio2022";
+        case Makefile: return "Makefile";
         }
         Assert::unreachable();
     }
@@ -460,6 +462,17 @@ struct ConfigurePresets
             Build::Parameters parameters;
             parameters.generator     = Build::Generator::XCode;
             parameters.platforms     = {Build::Platform::MacOS};
+            parameters.architectures = {Build::Architecture::Arm64, Build::Architecture::Intel64};
+            Build::Definition definition;
+            SC_TRY(configure(definition, parameters, sourcesDirectory));
+            SC_TRY(definition.generate(projectName, parameters, targetDirectory));
+        }
+        break;
+
+        case Build::Generator::Makefile: {
+            Build::Parameters parameters;
+            parameters.generator     = Build::Generator::Makefile;
+            parameters.platforms     = {Build::Platform::MacOS, Build::Platform::Linux};
             parameters.architectures = {Build::Architecture::Arm64, Build::Architecture::Intel64};
             Build::Definition definition;
             SC_TRY(configure(definition, parameters, sourcesDirectory));
