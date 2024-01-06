@@ -111,6 +111,18 @@ struct Sv
     template <uint32_t N>
     constexpr Sv(const char (&data)[N]) : data(data), length(N - 1)
     {}
+
+    constexpr bool operator==(const Sv other) const
+    {
+        if (length != other.length)
+            return false;
+        for (uint32_t idx = 0; idx < length; ++idx)
+        {
+            if (data[idx] != other.data[idx])
+                return false;
+        }
+        return true;
+    }
 };
 
 /// @brief Returns name of type T (ClNm stands for ClassName, but we shorten it to save bytes on symbol mangling)

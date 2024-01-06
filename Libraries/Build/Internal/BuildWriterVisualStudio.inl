@@ -197,20 +197,20 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             builder.append("<TargetName>{}</TargetName>", project.targetName);
         }
+        constexpr StringView replacements[8][2] = {
+            {"/", "\\"},
+            {"$(PROJECT_DIR)\\", "$(ProjectDir)"},
+            {"$(CONFIGURATION)", "$(Configuration)"},
+            {"$(PROJECT_NAME)", "$(ProjectName)"},
+            {"$(ARCHS)", "$(PlatformTarget)"},
+            {"$(PLATFORM_DISPLAY_NAME)", "$(SDKIdentifier)"},
+            {"$(MACOSX_DEPLOYMENT_TARGET)", "$(WindowsTargetPlatformVersion)"},
+            {"$(SC_GENERATOR)", "msvc2022"},
+        };
         if (not configuration.outputPath.isEmpty())
         {
             builder.append("    <OutDir>");
-            builder.appendReplaceMultiple(configuration.outputPath.view(),
-                                          {
-                                              {"/", "\\"},
-                                              {"$(PROJECT_DIR)\\", "$(ProjectDir)"},
-                                              {"$(CONFIGURATION)", "$(Configuration)"},
-                                              {"$(PROJECT_NAME)", "$(ProjectName)"},
-                                              {"$(ARCHS)", "$(PlatformTarget)"},
-                                              {"$(PLATFORM_DISPLAY_NAME)", "$(SDKIdentifier)"},
-                                              {"$(MACOSX_DEPLOYMENT_TARGET)", "$(WindowsTargetPlatformVersion)"},
-                                              {"$(SC_GENERATOR)", "msvc2022"},
-                                          });
+            builder.appendReplaceMultiple(configuration.outputPath.view(), {replacements, 8});
             if (not configuration.outputPath.view().endsWithCodePoint('\\'))
             {
                 builder.append("\\");
@@ -220,17 +220,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         if (not configuration.intermediatesPath.isEmpty())
         {
             builder.append("    <IntDir>");
-            builder.appendReplaceMultiple(configuration.intermediatesPath.view(),
-                                          {
-                                              {"/", "\\"},
-                                              {"$(PROJECT_DIR)\\", "$(ProjectDir)"},
-                                              {"$(CONFIGURATION)", "$(Configuration)"},
-                                              {"$(PROJECT_NAME)", "$(ProjectName)"},
-                                              {"$(ARCHS)", "$(PlatformTarget)"},
-                                              {"$(PLATFORM_DISPLAY_NAME)", "$(SDKIdentifier)"},
-                                              {"$(MACOSX_DEPLOYMENT_TARGET)", "$(WindowsTargetPlatformVersion)"},
-                                              {"$(SC_GENERATOR)", "msvc2022"},
-                                          });
+            builder.appendReplaceMultiple(configuration.intermediatesPath.view(), {replacements, 8});
             if (not configuration.outputPath.view().endsWithCodePoint('\\'))
             {
                 builder.append("\\");
@@ -244,14 +234,12 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             (projectIncludePaths and not projectIncludePaths->isEmpty()))
         {
             builder.append("    <IncludePath>");
+            constexpr StringView includeReplacements[1][2] = {{"$(PROJECT_DIR)\\", "$(ProjectDir)"}};
             if (includePaths)
             {
                 for (auto& it : *includePaths)
                 {
-                    builder.appendReplaceMultiple(it.view(), {
-                                                                 {"/", "\\"},
-                                                                 {"$(PROJECT_DIR)\\", "$(ProjectDir)"},
-                                                             });
+                    builder.appendReplaceMultiple(it.view(), {includeReplacements, 1});
                     builder.append(";");
                 }
             }
@@ -259,10 +247,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             {
                 for (auto& it : *projectIncludePaths)
                 {
-                    builder.appendReplaceMultiple(it.view(), {
-                                                                 {"/", "\\"},
-                                                                 {"$(PROJECT_DIR)\\", "$(ProjectDir)"},
-                                                             });
+                    builder.appendReplaceMultiple(it.view(), {includeReplacements, 1});
                     builder.append(";");
                 }
             }
@@ -300,14 +285,12 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         if ((configArray and not configArray->isEmpty()) or (projectArray and not projectArray->isEmpty()))
         {
             builder.append("    <PreprocessorDefinitions>");
+            constexpr StringView replacements[2][2] = {{"/", "\\"}, {"$(PROJECT_DIR)\\", "$(ProjectDir)"}};
             if (configArray)
             {
                 for (auto& it : *configArray)
                 {
-                    builder.appendReplaceMultiple(it.view(), {
-                                                                 {"/", "\\"},
-                                                                 {"$(PROJECT_DIR)\\", "$(ProjectDir)"},
-                                                             });
+                    builder.appendReplaceMultiple(it.view(), {replacements, 2});
                     builder.append(";");
                 }
             }
@@ -315,10 +298,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             {
                 for (auto& it : *projectArray)
                 {
-                    builder.appendReplaceMultiple(it.view(), {
-                                                                 {"/", "\\"},
-                                                                 {"$(PROJECT_DIR)\\", "$(ProjectDir)"},
-                                                             });
+                    builder.appendReplaceMultiple(it.view(), {replacements, 2});
                     builder.append(";");
                 }
             }

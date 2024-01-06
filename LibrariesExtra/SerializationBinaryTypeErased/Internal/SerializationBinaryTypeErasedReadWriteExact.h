@@ -19,11 +19,14 @@ struct SerializationBinaryTypeErasedWriteExact
     {
         constexpr auto flatSchema = Reflection::SchemaTypeErased::compile<T>();
 
-        arrayAccess.vectorVtable = {flatSchema.vtables.vector.values, flatSchema.vtables.vector.size};
+        using VectorVTable = detail::SerializationBinaryTypeErasedArrayAccess::VectorVTable;
 
-        sourceTypes     = {flatSchema.typeInfos.values, flatSchema.typeInfos.size};
-        sourceNames     = {flatSchema.typeNames.values, flatSchema.typeNames.size};
-        sourceObject    = sourceObject.reinterpret_object(object);
+        arrayAccess.vectorVtable =
+            Span<const VectorVTable>(flatSchema.vtables.vector.values, flatSchema.vtables.vector.size);
+
+        sourceTypes  = Span<const Reflection::TypeInfo>(flatSchema.typeInfos.values, flatSchema.typeInfos.size);
+        sourceNames  = Span<const Reflection::TypeStringView>(flatSchema.typeNames.values, flatSchema.typeNames.size);
+        sourceObject = sourceObject.reinterpret_object(object);
         sourceTypeIndex = 0;
 
         destination = &buffer;
@@ -62,10 +65,12 @@ struct SerializationBinaryTypeErasedReadExact
     {
         constexpr auto flatSchema = Reflection::SchemaTypeErased::compile<T>();
 
-        arrayAccess.vectorVtable = {flatSchema.vtables.vector.values, flatSchema.vtables.vector.size};
+        using VectorVTable = detail::SerializationBinaryTypeErasedArrayAccess::VectorVTable;
+        arrayAccess.vectorVtable =
+            Span<const VectorVTable>(flatSchema.vtables.vector.values, flatSchema.vtables.vector.size);
 
-        sinkTypes     = {flatSchema.typeInfos.values, flatSchema.typeInfos.size};
-        sinkNames     = {flatSchema.typeNames.values, flatSchema.typeNames.size};
+        sinkTypes     = Span<const Reflection::TypeInfo>(flatSchema.typeInfos.values, flatSchema.typeInfos.size);
+        sinkNames     = Span<const Reflection::TypeStringView>(flatSchema.typeNames.values, flatSchema.typeNames.size);
         sinkObject    = sinkObject.reinterpret_object(object);
         sinkTypeIndex = 0;
 

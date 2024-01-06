@@ -36,10 +36,10 @@ struct SC::StringBuilderTest : public SC::TestCase
         }
         if (test_section("appendReplaceMultiple"))
         {
-            String        buffer(StringEncoding::Utf8);
-            StringBuilder builder(buffer);
-            SC_TEST_EXPECT(
-                builder.appendReplaceMultiple("asd\\salve\\bas"_u8, {{"asd", "un"}, {"bas", "a_tutti"}, {"\\", "/"}}));
+            String           buffer(StringEncoding::Utf8);
+            StringBuilder    builder(buffer);
+            const StringView test[3][2] = {{"asd", "un"}, {"bas", "a_tutti"}, {"\\", "/"}};
+            SC_TEST_EXPECT(builder.appendReplaceMultiple("asd\\salve\\bas"_u8, {test, 3}));
             SC_TEST_EXPECT(buffer == "un/salve/a_tutti");
         }
         if (test_section("appendHex"))

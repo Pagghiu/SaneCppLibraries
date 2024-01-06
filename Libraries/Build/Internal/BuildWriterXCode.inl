@@ -536,10 +536,11 @@ struct SC::Build::ProjectWriter::WriterXCode
         const Configuration* configuration = project.getConfiguration(xcodeObject.name.view());
         SC_TRY(configuration != nullptr);
         builder.append("\n                       CONFIGURATION_BUILD_DIR = \"");
-        builder.appendReplaceMultiple(configuration->outputPath.view(), {{"$(SC_GENERATOR)", "XCode"}});
+        constexpr StringView generator[2] = {"$(SC_GENERATOR)", "XCode"};
+        builder.appendReplaceMultiple(configuration->outputPath.view(), {generator});
         builder.append("\";");
         builder.append("\n                       SYMROOT = \"");
-        builder.appendReplaceMultiple(configuration->intermediatesPath.view(), {{"$(SC_GENERATOR)", "XCode"}});
+        builder.appendReplaceMultiple(configuration->intermediatesPath.view(), {generator});
         builder.append("\";");
         if (configuration->compile.hasValue<Compile::enableRTTI>(true))
         {
