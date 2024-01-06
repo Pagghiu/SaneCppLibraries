@@ -46,13 +46,13 @@ struct SC::AsyncTest : public SC::TestCase
                 SC_TEST_EXPECT(res.async.getTimeout().ms == 1);
                 timeout1Called++;
             };
-            SC_TEST_EXPECT(timeout1.start(eventLoop, 1_ms));
+            SC_TEST_EXPECT(timeout1.start(eventLoop, Time::Milliseconds(1)));
             timeout2.callback = [&](AsyncLoopTimeout::Result&)
             {
                 // TODO: investigate allowing dropping AsyncResultBase
                 timeout2Called++;
             };
-            SC_TEST_EXPECT(timeout2.start(eventLoop, 100_ms));
+            SC_TEST_EXPECT(timeout2.start(eventLoop, Time::Milliseconds(100)));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(timeout1Called == 1 and timeout2Called == 0);
             SC_TEST_EXPECT(eventLoop.runOnce());

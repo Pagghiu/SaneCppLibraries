@@ -142,9 +142,9 @@ void SC::SocketDescriptorTest::tcpClientServer()
     Span<char>   readData;
     SC_TEST_EXPECT(acceptedClient.read({buf, sizeof(buf)}, readData));
     SC_TEST_EXPECT(buf[0] == testValue and testValue != 0);
-    SC_TEST_EXPECT(not acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, 10_ms));
+    SC_TEST_EXPECT(not acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, Time::Milliseconds(10)));
     params.eventObject.signal();
-    SC_TEST_EXPECT(acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, 10000_ms));
+    SC_TEST_EXPECT(acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, Time::Seconds(10)));
     SC_TEST_EXPECT(buf[0] == testValue + 1);
     SC_TEST_EXPECT(acceptedClient.close());
     SC_TEST_EXPECT(server.close());

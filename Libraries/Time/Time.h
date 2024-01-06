@@ -40,15 +40,6 @@ struct SC::Time::Seconds
     int64_t   sec;
 };
 
-namespace SC
-{
-constexpr inline SC::Time::Milliseconds operator""_ms(uint64_t ms)
-{
-    return Time::Milliseconds(static_cast<int64_t>(ms));
-}
-constexpr inline SC::Time::Seconds operator""_sec(uint64_t sec) { return Time::Seconds(static_cast<int64_t>(sec)); }
-} // namespace SC
-
 /// @brief Interval of time represented with 64 bit double precision float
 struct SC::Time::Relative
 {
