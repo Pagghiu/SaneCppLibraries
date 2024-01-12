@@ -41,7 +41,7 @@
 - Code should always work correctly on recent `GCC`, `Clang` and `MSVC` compilers
 - Code should always work on `x86`, `x86_64`, `ARM64` and `Wasm`
 - No code should be added without a test
-- Code coverage is expected to be >= 85%
+- Code coverage is expected to be >= 90%
 - Minimize Undefined Behavior (within limits dictated by other principles)
 - If a method can fail, place it in a "create / init / assign" method instead of the constructor
 

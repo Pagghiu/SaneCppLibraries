@@ -1,5 +1,10 @@
 # Sane C++
 
+[![YouTube](https://img.shields.io/youtube/channel/subscribers/UCnmN_whfM12LU6VNQWG0NFg)](https://youtube.com/@Pagghiu)
+[![X (formerly Twitter) Follow](https://img.shields.io/twitter/follow/pagghiu_)](https://twitter.com/pagghiu_)
+[![Discord](https://img.shields.io/discord/1195076118307426384)](https://discord.gg/SDyJFR8N)
+![GitHub Repo stars](https://img.shields.io/github/stars/Pagghiu/SaneCppLibraries)
+
 **Sane C++** is a set of C++ platform abstraction libraries for ✅ macOS, ✅ Windows and 🚧 Linux.
 
 ![Sane Cpp](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease/article.svg)
@@ -54,6 +59,25 @@ Library                                                                         
 [Testing](https://pagghiu.github.io/SaneCppLibraries/library_testing.html)                              | 🟨 Simple testing framework used by all of the other libraries
 [Threading](https://pagghiu.github.io/SaneCppLibraries/library_threading.html)                          | 🟥 Atomic, thread, mutex, condition variable
 [Time](https://pagghiu.github.io/SaneCppLibraries/library_time.html)                                    | 🟨 Time handling (relative, absolute, high resolution)
+
+# Getting in touch
+
+- [Sane Coding Discord](https://discord.gg/SDyJFR8N)  
+![Discord](https://img.shields.io/discord/1195076118307426384)
+- [Twitter](https://twitter.com/pagghiu_) `@pagghiu_`
+- [Mastodon](https://mastodon.gamedev.place/@pagghiu) `@pagghiu`
+- [Github Discussion](https://github.com/Pagghiu/SaneCppLibraries/discussions)
+
+Alternatively I am also reading the following discords too:
+- [Italian C++ Discord](https://discord.gg/GPATr8QxfS) (`@Pagghiu` from any appropriate channel or just a DM, english and italian are both fine)
+- [Handmade Network discord](https://discord.gg/hmn) (`@Pagghiu` from any appropriate channel or just a DM)
+
+# Contributing
+
+Please take some time to read the [Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html) and [Coding Style](Documentation/CodingStyle.md).
+
+After that you can read the [CONTRIBUTING.md](CONTRIBUTING.md) guide.
+
 
 # License
 
