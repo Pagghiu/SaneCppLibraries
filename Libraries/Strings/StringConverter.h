@@ -123,7 +123,13 @@ struct SC::StringConverter
 
     StringEncoding encoding;
     Vector<char>&  data;
-    /// Appends the input string null terminated
+    // Appends the input string null terminated
     [[nodiscard]] bool internalAppend(StringView input, StringView* encodedText);
+
+    // Fallbacks for platforms without an API to do the conversion out of the box (Linux)
+    [[nodiscard]] static bool convertUTF16LE_to_UTF8(const StringView sourceUtf16, Vector<char>& destination,
+                                                     int& writtenCodeUnits);
+    [[nodiscard]] static bool convertUTF8_to_UTF16LE(const StringView sourceUtf8, Vector<char>& destination,
+                                                     int& writtenCodeUnits);
 };
 //! @}

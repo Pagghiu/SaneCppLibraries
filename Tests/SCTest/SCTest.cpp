@@ -184,9 +184,7 @@ int main(int argc, const char* argv[])
 
     // Strings tests
     runConsoleTest(report);
-#if !SC_PLATFORM_LINUX
     runStringConverterTest(report);
-#endif
     runStringBuilderTest(report);
     runStringFormatTest(report);
     runStringTest(report);
