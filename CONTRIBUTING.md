@@ -30,8 +30,12 @@ Alternatively I am also reading the following discords too:
 
 ## Finding something to do
 
+- Take a look at the [good first issue](https://github.com/Pagghiu/SaneCppLibraries/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) list.
 - Just grep the project for `TODO:` and pick one you like 😄.  
 - Also take a look at each specific [Library](https://pagghiu.github.io/SaneCppLibraries/libraries.html) page **Roadmap**.  
+
+
+> I highly suggest to create a discussion (on discord or github discussion or in the issue tracker) on any contribution you are planning to share!
 
 In general outside of the above, it's highly likely to be accepted any PR doing:
 
