@@ -16,7 +16,16 @@ extern "C"
     void* memcpy(void* dst, const void* src, SC::size_t n);
     int   memcmp(const void* s1, const void* s2, SC::size_t n);
     void* memset(void* dst, SC::int32_t c, SC::size_t len);
+#if !SC_PLATFORM_LINUX
     void* memchr(const void* ptr, SC::int32_t c, SC::size_t count);
+#endif
 #endif
     // string
 }
+
+#if SC_PLATFORM_LINUX
+extern "C++"
+{
+    extern const void* memchr(const void* __s, int __c, SC::size_t __n) __asm("memchr");
+}
+#endif

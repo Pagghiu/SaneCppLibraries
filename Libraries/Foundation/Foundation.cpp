@@ -6,13 +6,13 @@
 
 // system includes
 #include <float.h>  // FLT_MAX / DBL_MAX
+#include <stdint.h> // Linux *_{MAX | MIN}
 #include <stdio.h>  // stdout
 #include <stdlib.h> // malloc, free, *_MAX (integer)
 #include <string.h> // strlen
 
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #include <BaseTsd.h>
-#include <stdint.h>
 using ssize_t = SSIZE_T;
 #endif
 

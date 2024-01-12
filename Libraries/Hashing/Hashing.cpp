@@ -162,6 +162,107 @@ bool SC::Hashing::finalize(Result& res)
     return true;
 }
 
+#elif SC_PLATFORM_LINUX
+#include <linux/if_alg.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#include "../Foundation/Deferred.h"
+
+SC::Hashing::Hashing() {}
+
+SC::Hashing::~Hashing()
+{
+    if (inited)
+    {
+        ::close(hashSocket);
+        ::close(mainSocket);
+    }
+}
+
+bool SC::Hashing::setType(Type newType)
+{
+    struct sockaddr_alg sa = {0};
+    switch (newType)
+    {
+    case TypeMD5: sa = {.salg_family = AF_ALG, .salg_type = "hash", .salg_name = "md5"}; break;
+    case TypeSHA1: sa = {.salg_family = AF_ALG, .salg_type = "hash", .salg_name = "sha1"}; break;
+    case TypeSHA256: sa = {.salg_family = AF_ALG, .salg_type = "hash", .salg_name = "sha256"}; break;
+    }
+    if (inited)
+    {
+        if (hashSocket != -1)
+            ::close(hashSocket);
+        hashSocket = -1;
+
+        if (mainSocket != -1)
+            ::close(mainSocket);
+        mainSocket = -1;
+    }
+
+    inited = false;
+    type   = newType;
+
+    mainSocket = ::socket(AF_ALG, SOCK_SEQPACKET, 0);
+    if (mainSocket == -1)
+    {
+        return false;
+    }
+    auto deferCloseSock = MakeDeferred(
+        [&]
+        {
+            ::close(mainSocket);
+            mainSocket = -1;
+        });
+
+    if (::bind(mainSocket, reinterpret_cast<struct sockaddr*>(&sa), sizeof(sa)) == -1)
+    {
+        return false;
+    }
+
+    hashSocket = ::accept(mainSocket, NULL, 0);
+    if (hashSocket == -1)
+    {
+        return false;
+    }
+
+    deferCloseSock.disarm();
+    inited = true;
+    return true;
+}
+
+bool SC::Hashing::update(Span<const uint8_t> data)
+{
+    if (!inited)
+        return false;
+
+    if (::send(hashSocket, data.data(), data.sizeInBytes(), MSG_MORE) == -1)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool SC::Hashing::finalize(Result& res)
+{
+    if (!inited)
+        return false;
+
+    if (::recv(hashSocket, res.hash, sizeof(res.hash), 0) == -1)
+    {
+        return false;
+    }
+    switch (type)
+    {
+    case TypeMD5: res.size = Result::MD5_DIGEST_LENGTH; break;
+    case TypeSHA1: res.size = Result::SHA1_DIGEST_LENGTH; break;
+    case TypeSHA256: res.size = Result::SHA256_DIGEST_LENGTH; break;
+    }
+
+    return true;
+}
+
 #else
 
 SC::Hashing::Hashing() {}

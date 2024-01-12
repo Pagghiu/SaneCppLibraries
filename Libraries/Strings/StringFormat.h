@@ -220,8 +220,10 @@ template <> struct StringFormatterFor<double>       {static bool format(StringFo
 template <> struct StringFormatterFor<SC::ssize_t>  {static bool format(StringFormatOutput&, const StringView, const SC::ssize_t);};
 #endif
 #else
+#if !SC_PLATFORM_LINUX
 template <> struct StringFormatterFor<SC::size_t>   {static bool format(StringFormatOutput&, const StringView, const SC::size_t);};
 template <> struct StringFormatterFor<SC::ssize_t>  {static bool format(StringFormatOutput&, const StringView, const SC::ssize_t);};
+#endif
 #endif
 template <> struct StringFormatterFor<SC::int64_t>  {static bool format(StringFormatOutput&, const StringView, const SC::int64_t);};
 template <> struct StringFormatterFor<SC::uint64_t> {static bool format(StringFormatOutput&, const StringView, const SC::uint64_t);};

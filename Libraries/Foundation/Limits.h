@@ -35,7 +35,7 @@ struct SC::MaxValue
     constexpr operator uint16_t() const { return UnsignedMaxValue<uint16_t>(); }
     constexpr operator uint32_t() const { return UnsignedMaxValue<uint32_t>(); }
     constexpr operator uint64_t() const { return UnsignedMaxValue<uint64_t>(); }
-#if SC_COMPILER_MSVC == 0 && SC_COMPILER_CLANG_CL == 0
+#if SC_COMPILER_MSVC == 0 && SC_COMPILER_CLANG_CL == 0 && !SC_PLATFORM_LINUX
     constexpr operator size_t() const { return UnsignedMaxValue<size_t>(); }
 #endif
 
@@ -43,7 +43,7 @@ struct SC::MaxValue
     constexpr operator int16_t() const { return SignedMaxValue<int16_t>(); }
     constexpr operator int32_t() const { return SignedMaxValue<int32_t>(); }
     constexpr operator int64_t() const { return SignedMaxValue<int64_t>(); }
-#if SC_COMPILER_MSVC == 0 && SC_COMPILER_CLANG_CL == 0
+#if SC_COMPILER_MSVC == 0 && SC_COMPILER_CLANG_CL == 0 && !SC_PLATFORM_LINUX
     constexpr operator ssize_t() const { return SignedMaxValue<ssize_t>(); }
 #endif
 

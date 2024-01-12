@@ -133,7 +133,7 @@ struct Compile
         enableStdCpp,        ///< C++ Standard Library
     };
 
-    /// @brief Two StringViews representing anme and description
+    /// @brief Two StringViews representing name and description
     struct NameDescription
     {
         StringView name;
@@ -145,7 +145,7 @@ struct Compile
     {
         switch (type)
         {
-        case includePaths: return {"includePaths", "Includ paths"};
+        case includePaths: return {"includePaths", "Include paths"};
         case preprocessorDefines: return {"preprocessorDefines", "Preprocessor defines"};
         case optimizationLevel: return {"optimizationLevel", "Optimization level"};
         case enableASAN: return {"enableASAN", "Address Sanitizer"};
@@ -270,7 +270,7 @@ struct Configuration
         Assert::unreachable();
     }
 
-    /// @brief Set compile flags dpeending on the given Preset
+    /// @brief Set compile flags depending on the given Preset
     [[nodiscard]] bool applyPreset(Preset newPreset)
     {
         preset = newPreset;
@@ -352,7 +352,7 @@ struct Project
     CompileFlags compile; ///< Shared CompileFlags for all files in the project
     LinkFlags    link;    ///< Shared LinkFlags for all files in the project
 
-    Vector<Configuration> configurations; ///< Build configurations created inside the proeject
+    Vector<Configuration> configurations; ///< Build configurations created inside the project
 
     /// @brief Set root directory for this project (all relative paths will be relative to this one)
     [[nodiscard]] bool setRootDirectory(StringView file);

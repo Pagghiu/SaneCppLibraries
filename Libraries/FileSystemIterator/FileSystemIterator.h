@@ -103,7 +103,7 @@ struct SC::FileSystemIterator
     {
         static constexpr int Windows = 4272;
         static constexpr int Apple   = 2104;
-        static constexpr int Default = sizeof(void*);
+        static constexpr int Default = 2088;
 
         static constexpr size_t Alignment = alignof(void*);
 

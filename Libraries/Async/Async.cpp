@@ -6,10 +6,10 @@
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/AsyncWindows.inl"
-#elif SC_PLATFORM_EMSCRIPTEN
-#include "Internal/AsyncEmscripten.inl"
 #elif SC_PLATFORM_APPLE
 #include "Internal/AsyncApple.inl"
+#else
+#include "Internal/AsyncEmscripten.inl"
 #endif
 
 #define SC_ASYNC_ENABLE_LOG 0

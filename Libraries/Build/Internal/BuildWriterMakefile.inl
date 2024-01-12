@@ -35,6 +35,9 @@ ifndef CONFIG
 endif
 
 .PHONY: clean all
+
+CLANG_DETECTED := $(shell $(CXX) --version 2>&1 | grep -q clang && echo "yes")
+OS_TYPE := $(shell uname)
 )delimiter");
 
         builder.append("\nall:");
@@ -55,12 +58,13 @@ endif
         builder.append(R"delimiter(
 
 # Force a clean when makefile is modified
-Makefile.touched: Makefile
+Makefile.$(CONFIG).touched: Makefile
 	@touch $@
 	$(MAKE) clean
 
 # Implicitly evaluate the makefile rebuild force clean during parsing
--include Makefile.touched
+-include Makefile.$(CONFIG).touched
+
 )delimiter");
 
         for (const Project& project : workspace.projects)
@@ -126,7 +130,7 @@ Makefile.touched: Makefile
 
         builder.append("\n# Flags for .cpp files");
         builder.append("\n{0}_CXXFLAGS := $({0}_CPPFLAGS) -std=c++14", makeTarget.view());
-        // TODO: Merge these with configuration overriders
+        // TODO: Merge these with configuration overrides
         if (not project.compile.hasValue<Compile::enableRTTI>(true))
         {
             builder.append(" -fno-rtti");
@@ -154,20 +158,39 @@ Makefile.touched: Makefile
         // TODO: De-hardcode LIBRARIES
         builder.append("\n{0}_LIBRARIES := -ldl -lpthread", makeTarget.view());
 
-        // TODO: De-hardcode LDFLAGS
-        builder.append("\n{0}_LDFLAGS :=", makeTarget.view());
+        builder.append("\n\nifeq ($(CLANG_DETECTED),yes)\n");
+        // Clang specific flags
+        builder.append("{0}_COMPILER_SPECIFIC_FLAGS :=", makeTarget.view());
         if (not project.link.hasValue<Link::enableStdCpp>(true))
         {
             builder.append(" -nostdlib++");
         }
-        builder.append(" -fvisibility=hidden $({0}_LIBRARIES) $({0}_FRAMEWORKS) $(LDFLAGS)", makeTarget.view());
+        builder.append("\nelse\n");
+        // Non Clang specific flags
+        builder.append("{0}_COMPILER_SPECIFIC_FLAGS :=\n", makeTarget.view());
+        builder.append("endif\n");
+
+        builder.append("\nifeq ($(OS_TYPE),Darwin)\n");
+        builder.append("     {0}_OS_SPECIFIC_FLAGS := $({0}_FRAMEWORKS)\n", makeTarget.view());
+        builder.append("else ifeq ($(OS_TYPE),Linux)\n");
+        builder.append("     {0}_OS_SPECIFIC_FLAGS :=\n", makeTarget.view());
+        builder.append("else\n");
+        builder.append("     {0}_OS_SPECIFIC_FLAGS :=\n", makeTarget.view());
+        builder.append("endif\n");
+
+        // TODO: De-hardcode LDFLAGS
+        builder.append("\n{0}_LDFLAGS :=", makeTarget.view());
+
+        builder.append(
+            " $({0}_COMPILER_SPECIFIC_FLAGS) -fvisibility=hidden $({0}_LIBRARIES) $({0}_OS_SPECIFIC_FLAGS) $(LDFLAGS)",
+            makeTarget.view());
 
         builder.append(R"delimiter(
 {0}_CLEAN:
 	@echo Cleaning {0}
 	$(VRBS)rm -rf $({0}_TARGET_DIR)/$(TARGET) $({0}_INTERMEDIATE_DIR)
 
-# Rebuild object files when an header depedency changes
+# Rebuild object files when an header dependency changes
 include $({0}_OBJECT_FILES:%.o=%.d)
 )delimiter",
                        makeTarget.view());
@@ -196,7 +219,12 @@ $({0}_TARGET_DIR):
 
 {0}_BUILD: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 
+
+ifeq ($(CLANG_DETECTED),yes)
 {0}_COMPILE_COMMANDS: $({0}_INTERMEDIATE_DIR)/compile_commands.json
+else
+{0}_COMPILE_COMMANDS: # On GCC This is not supported
+endif
 
 $({0}_INTERMEDIATE_DIR)/compile_commands.json: $({0}_OBJECT_FILES)
 	@echo Generate compile_commands.json
@@ -212,6 +240,13 @@ $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
 	$(VRBS)$(CXX) -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
 )delimiter",
                        makeTarget.view());
+
+        builder.append(R"delimiter(
+define MJ_if_Clang
+    $(if $(CLANG_DETECTED),-MJ $@.json)
+endef
+)delimiter");
+
         for (const RenderItem& item : renderer.renderItems)
         {
             if (item.type == RenderItem::CppFile)
@@ -221,7 +256,7 @@ $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
                 builder.append(R"delimiter(
 $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
 	@echo "Compiling {1}.cpp"
-	$(VRBS)$(CXX) $({0}_CXXFLAGS) -o "$@" -MMD -pthread -MJ $@.json -c "$<"
+	$(VRBS)$(CXX) $({0}_CXXFLAGS) -o "$@" -MMD -pthread $(call MJ_if_Clang) -c "$<"
 
 )delimiter",
                                makeTarget.view(), basename, item.path.view());

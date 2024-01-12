@@ -37,12 +37,19 @@ using native_char_t = char; ///< The native char for the platform (wchar_t (4 by
 using uint8_t  = unsigned char;     ///< Platform independent (1) byte unsigned int
 using uint16_t = unsigned short;    ///< Platform independent (2) bytes unsigned int
 using uint32_t = unsigned int;      ///< Platform independent (4) bytes unsigned int
+#if SC_PLATFORM_LINUX
+using uint64_t = unsigned long int;///< Platform independent (8) bytes unsigned int
+#else
 using uint64_t = unsigned long long;///< Platform independent (8) bytes unsigned int
-
+#endif
 using int8_t  = signed char;        ///< Platform independent (1) byte signed int
 using int16_t = short;              ///< Platform independent (2) bytes signed int
 using int32_t = int;                ///< Platform independent (4) bytes signed int
+#if SC_PLATFORM_LINUX
+using int64_t = signed long int;          ///< Platform independent (8) bytes signed int
+#else
 using int64_t = long long;          ///< Platform independent (8) bytes signed int
+#endif
 #if SC_PLATFORM_EMSCRIPTEN
 using size_t  = unsigned __PTRDIFF_TYPE__;
 using ssize_t = signed  __PTRDIFF_TYPE__;

@@ -50,7 +50,7 @@ struct SC::Mutex
     static constexpr int OpaqueMutexSize      = sizeof(void*) * 6 + sizeof(long);
     static constexpr int OpaqueMutexAlignment = alignof(long);
 #else
-    static constexpr int OpaqueMutexSize      = sizeof(void*;
+    static constexpr int OpaqueMutexSize      = sizeof(void*) * 6;
     static constexpr int OpaqueMutexAlignment = alignof(long);
 #endif
     // Wrap native mutex as opaque array of bytes
@@ -84,7 +84,7 @@ struct SC::ConditionVariable
     static constexpr int OpaqueCVSize         = sizeof(void*) * 12;
     static constexpr int OpaqueCVAlignment    = alignof(long);
 #else
-    static constexpr int OpaqueCVSize         = sizeof(void*);
+    static constexpr int OpaqueCVSize         = sizeof(void*) * 6;
     static constexpr int OpaqueCVAlignment    = alignof(long);
 #endif
 

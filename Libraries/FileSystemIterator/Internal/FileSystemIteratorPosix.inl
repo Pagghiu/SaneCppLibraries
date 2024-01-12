@@ -102,19 +102,24 @@ struct SC::FileSystemIterator::Internal
             }
             if (not(parent.gotDot1 and parent.gotDot2))
             {
-                const bool isDot1 = strncmp(item->d_name, ".", 1) == 0;
-                const bool isDot2 = strncmp(item->d_name, "..", 2) == 0;
-                if (isDot1)
-                    parent.gotDot1 = true;
-                if (isDot2)
+                if (strcmp(item->d_name, "..") == 0)
+                {
                     parent.gotDot2 = true;
+                    continue;
+                }
+                else if (strcmp(item->d_name, ".") == 0)
+                {
+                    parent.gotDot1 = true;
+                    continue;
+                }
             }
-            else
-            {
-                break;
-            }
+            break;
         }
+#if SC_PLATFORM_APPLE
         entry.name = StringView({item->d_name, item->d_namlen}, true, StringEncoding::Utf8);
+#else
+        entry.name = StringView({item->d_name, strlen(item->d_name)}, true, StringEncoding::Utf8);
+#endif
         SC_TRY(currentPath.setTextLengthInBytesIncludingTerminator(recurseStack.back().textLengthInBytes));
         SC_TRY(currentPath.appendNullTerminated("/"_u8));
         SC_TRY(currentPath.appendNullTerminated(entry.name));

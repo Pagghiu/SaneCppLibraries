@@ -5,12 +5,37 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(lldb) Debug SCTest Clang",
+            "name": "(gdb) Debug SCTest",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/Output/Posix-Any-Any-Makefile-Debug/SCTest",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "preLaunchTask": "Build SCTest Debug",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "(lldb) Debug SCTest",
             "type": "lldb",
             "request": "launch",
-            "program" : "",
+            "program": "",
             "osx": {
-                "program": "${workspaceFolder}/_Build/Output/macOS-13.0-arm64 x86_64-XCode-Debug/SCTest",
+                "program": "${workspaceFolder}/_Build/Output/Posix-Any-Any-Makefile-Debug/SCTest",
             },
             "args": [],
             "cwd": "${fileDirname}",

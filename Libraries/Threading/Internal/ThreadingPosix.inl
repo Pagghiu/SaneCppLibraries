@@ -42,8 +42,10 @@ struct SC::Thread::Internal
 
     static void setThreadName(const char* nameNullTerminated)
     {
-#if !SC_PLATFORM_EMSCRIPTEN
+#if SC_PLATFORM_APPLE
         pthread_setname_np(nameNullTerminated);
+#elif SC_PLATFORM_LINUX
+        pthread_setname_np(pthread_self(), nameNullTerminated);
 #endif
     }
 
@@ -74,10 +76,12 @@ SC::uint64_t SC::Thread::CurrentThreadID()
 {
 #if SC_PLATFORM_EMSCRIPTEN
     return 0;
-#else
+#elif SC_PLATFORM_APPLE
     uint64_t tid;
     pthread_threadid_np(NULL, &tid);
     return tid;
+#else
+    return pthread_self();
 #endif
 }
 
@@ -89,9 +93,13 @@ SC::uint64_t SC::Thread::threadID()
     OpaqueThread* threadNative = nullptr;
     if (thread.get(threadNative))
     {
+#if SC_PLATFORM_APPLE
         uint64_t tid;
         pthread_threadid_np(threadNative->reinterpret_as<pthread_t>(), &tid);
         return tid;
+#else
+        return threadNative->reinterpret_as<pthread_t>();
+#endif
     }
     return 0;
 #endif

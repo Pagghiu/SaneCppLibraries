@@ -206,7 +206,11 @@ SC::Result SC::FileSystem::removeDirectoriesRecursive(Span<const StringView> dir
     for (auto& path : directories)
     {
         SC_TRY(convert(path, fileFormatBuffer1)); // force write
+#if SC_PLATFORM_APPLE || SC_FILESYSTEM_WINDOWS_USE_SHELL_OPERATIONS
         SC_TRY_FORMAT_ERRNO(path, Internal::removeDirectoryRecursive(fileFormatBuffer1));
+#else
+        SC_TRY_FORMAT_ERRNO(path, fallbackRemoveDirectoryRecursive(fileFormatBuffer1));
+#endif
     }
     return Result(true);
 }
@@ -233,7 +237,11 @@ SC::Result SC::FileSystem::copyDirectories(Span<const CopyOperation> sourceDesti
     {
         SC_TRY(convert(op.source, fileFormatBuffer1));      // force write
         SC_TRY(convert(op.destination, fileFormatBuffer2)); // force write
+#if SC_PLATFORM_APPLE || SC_FILESYSTEM_WINDOWS_USE_SHELL_OPERATIONS
         SC_TRY_FORMAT_NATIVE(op.source, Internal::copyDirectory(fileFormatBuffer1, fileFormatBuffer2, op.copyFlags));
+#else
+        SC_TRY_FORMAT_NATIVE(op.source, fallbackCopyDirectory(fileFormatBuffer1, fileFormatBuffer2, op.copyFlags));
+#endif
     }
     return Result(true);
 }
@@ -353,5 +361,90 @@ SC::Result SC::FileSystem::setLastModifiedTime(StringView file, Time::Absolute t
     SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
     return Internal::setLastModifiedTime(encodedPath.getNullTerminatedNative(), time);
 }
+
+#if !SC_PLATFORM_APPLE
+#include "../Containers/SmallVector.h"
+#include "../FileSystemIterator/FileSystemIterator.h"
+SC::Result SC::FileSystem::fallbackCopyDirectory(String& sourceDirectory, String& destinationDirectory,
+                                                 FileSystem::CopyFlags options)
+{
+    FileSystemIterator fileIterator;
+    StringView         sourceView = sourceDirectory.view();
+    SC_TRY(fileIterator.init(sourceView));
+    fileIterator.options.recursive           = true;
+    StringNative<512> destinationPath        = StringEncoding::Native;
+    StringNative<512> destinationPathDirname = StringEncoding::Native;
+    if (not Internal::existsAndIsDirectory(destinationDirectory.view().getNullTerminatedNative()))
+    {
+        SC_TRY(Internal::makeDirectory(destinationDirectory.view().getNullTerminatedNative()));
+    }
+    while (fileIterator.enumerateNext())
+    {
+        const FileSystemIterator::Entry& entry = fileIterator.get();
+
+        const StringView partialPath = entry.path.sliceStartBytes(sourceView.sizeInBytes());
+        StringConverter  destinationConvert(destinationPath, StringConverter::Clear);
+        SC_TRY(destinationConvert.appendNullTerminated(destinationDirectory.view()));
+        SC_TRY(destinationConvert.appendNullTerminated(partialPath));
+        if (entry.isDirectory())
+        {
+            if (options.overwrite)
+            {
+                // We don't care about the result
+                if (Internal::existsAndIsFile(destinationPath.view().getNullTerminatedNative()))
+                {
+                    (void)Internal::removeFile(destinationPath.view().getNullTerminatedNative());
+                }
+            }
+            // The directory may have been already been created by a file copy
+            if (not Internal::existsAndIsDirectory(destinationPath.view().getNullTerminatedNative()))
+            {
+                SC_TRY(Internal::makeDirectory(destinationPath.view().getNullTerminatedNative()));
+            }
+        }
+        else
+        {
+            // When creating a file the directory may have not been already created (happens on Linux)
+            destinationPathDirname = Path::dirname(destinationDirectory.view(), Path::AsNative);
+            if (not Internal::existsAndIsDirectory(destinationPathDirname.view().getNullTerminatedNative()))
+            {
+                SC_TRY(Internal::makeDirectory(destinationPathDirname.view().getNullTerminatedNative()));
+            }
+            SC_TRY(Internal::copyFile(entry.path, destinationPath.view(), options));
+        }
+    }
+    SC_TRY(fileIterator.checkErrors());
+    return Result(true);
+}
+
+SC::Result SC::FileSystem::fallbackRemoveDirectoryRecursive(String& sourceDirectory)
+{
+    FileSystemIterator fileIterator;
+    SC_TRY(fileIterator.init(sourceDirectory.view()));
+    fileIterator.options.recursive = true;
+    SmallVector<StringNative<512>, 64> emptyDirectories;
+    while (fileIterator.enumerateNext())
+    {
+        const FileSystemIterator::Entry& entry = fileIterator.get();
+        if (entry.isDirectory())
+        {
+            SC_TRY(emptyDirectories.push_back(entry.path));
+        }
+        else
+        {
+            SC_TRY(Internal::removeFile(entry.path.getNullTerminatedNative()));
+        }
+    }
+    SC_TRY(fileIterator.checkErrors());
+
+    while (not emptyDirectories.isEmpty())
+    {
+        SC_TRY(Internal::removeEmptyDirectory(emptyDirectories.back().view().getNullTerminatedNative()));
+        SC_TRY(emptyDirectories.pop_back());
+    }
+    SC_TRY(Internal::removeEmptyDirectory(sourceDirectory.view().getNullTerminatedNative()));
+    return Result(true);
+}
+#endif
 
 #undef SC_TRY_FORMAT_ERRNO

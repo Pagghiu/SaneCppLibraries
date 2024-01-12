@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../FileSystem.h"
+
 // clang-format off
 #include <stdio.h>
 #include <errno.h>
@@ -10,11 +11,14 @@
 #include <string.h> //strerror_r
 #include <math.h> // round
 #include <fcntl.h> // AT_FDCWD
-#if __APPLE__
+#if SC_PLATFORM_APPLE
 #include <copyfile.h>
 #include <sys/attr.h>
 #include <sys/clonefile.h>
 #include <removefile.h>
+#elif SC_PLATFORM_LINUX
+#include "../../Foundation/Deferred.h"
+#include <sys/sendfile.h>
 #endif
 // clang-format on
 
@@ -103,6 +107,7 @@ struct SC::FileSystem::Internal
     {
         buffer.encoding = StringEncoding::Utf8;
         SC_TRY(buffer.data.resizeWithoutInitializing(buffer.data.capacity()));
+#if SC_PLATFORM_APPLE
         const int res = strerror_r(errorNumber, buffer.nativeWritableBytesIncludingTerminator(),
                                    buffer.sizeInBytesIncludingTerminator());
         if (res == 0)
@@ -111,6 +116,17 @@ struct SC::FileSystem::Internal
         }
         SC_TRUST_RESULT(buffer.data.resizeWithoutInitializing(0));
         return false;
+#else
+        char* res = strerror_r(errorNumber, buffer.nativeWritableBytesIncludingTerminator(),
+                               buffer.sizeInBytesIncludingTerminator());
+
+        if (res != buffer.nativeWritableBytesIncludingTerminator())
+        {
+            return buffer.assign(StringView({res, strlen(res)}, true, StringEncoding::Utf8));
+        }
+        return true;
+
+#endif
     }
 #if __APPLE__
     // TODO: We should add a version of copyfile/clonefile that uses the file descriptors already opened by the file
@@ -182,7 +198,7 @@ struct SC::FileSystem::Internal
         return copyFile(sourceDirectory.view(), destinationDirectory.view(), options, true); // true == isDirectory
     }
 
-    static bool removeDirectoryRecursive(String& directory)
+    [[nodiscard]] static bool removeDirectoryRecursive(String& directory)
     {
         removefile_state_t state = removefile_state_alloc();
         int                res   = removefile(directory.view().getNullTerminatedNative(), state, REMOVEFILE_RECURSIVE);
@@ -190,10 +206,46 @@ struct SC::FileSystem::Internal
         return res == 0;
     }
 #else
-    [[nodiscard]] static bool copyFile(const char* file1, const char* file2)
+
+    [[nodiscard]] static bool copyFile(const char* sourceFile, const char* destinationFile,
+                                       FileSystem::CopyFlags options)
     {
-        // On Linux we should probably use sendfile, splice or copy_file_Range
-        return false;
+        if (not options.overwrite and existsAndIsFile(destinationFile))
+        {
+            return false;
+        }
+        int inputDescriptor = ::open(sourceFile, O_RDONLY);
+        if (inputDescriptor < 0)
+        {
+            return false;
+        }
+        auto closeInput = MakeDeferred([&] { ::close(inputDescriptor); });
+        struct stat inputStat = {0};
+        int res = ::fstat(inputDescriptor, &inputStat);
+        if (res < 0)
+        {
+            return false;
+        }
+
+        int outputDescriptor =
+            ::open(destinationFile, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        if (outputDescriptor < 0)
+        {
+            return false;
+        }
+        auto closeOutput = MakeDeferred([&] { ::close(outputDescriptor); });
+        int sendRes = ::sendfile(outputDescriptor, inputDescriptor, nullptr, inputStat.st_size);
+        if (sendRes < 0)
+        {
+            return false;
+        }
+        return true;
+    }
+
+    [[nodiscard]] static bool copyFile(const StringView& source, const StringView& destination,
+                                       FileSystem::CopyFlags options)
+    {
+        return copyFile(source.bytesIncludingTerminator(), destination.bytesIncludingTerminator(), options);
     }
 #endif
 
@@ -202,8 +254,13 @@ struct SC::FileSystem::Internal
         struct stat st;
         if (::stat(file, &st) == 0)
         {
+#if SC_PLATFORM_APPLE
             time.modifiedTime = Time::Absolute(
                 static_cast<int64_t>(::round(st.st_mtimespec.tv_nsec / 1.0e6) + st.st_mtimespec.tv_sec * 1000));
+#else
+            time.modifiedTime =
+                Time::Absolute(static_cast<int64_t>(::round(st.st_mtim.tv_nsec / 1.0e6) + st.st_mtim.tv_sec * 1000));
+#endif
             return Result(true);
         }
         return Result(false);

@@ -23,10 +23,10 @@ struct SC::ProcessTest : public SC::TestCase
         if (test_section("Process inherit"))
         {
             Process process;
-#if SC_PLATFORM_APPLE
-            SC_TEST_EXPECT(process.launch("which", "sudo"));
-#else
+#if SC_PLATFORM_WINDOWS
             SC_TEST_EXPECT(process.launch("where", "where.exe"));
+#else
+            SC_TEST_EXPECT(process.launch("which", "sudo"));
 #endif
             SC_TEST_EXPECT(process.waitForExitSync());
         }
@@ -35,12 +35,12 @@ struct SC::ProcessTest : public SC::TestCase
             Process        process;
             PipeDescriptor outputPipe;
             SC_TEST_EXPECT(process.redirectStdOutTo(outputPipe));
-#if SC_PLATFORM_APPLE
-            StringView expectedOutput = "/usr/bin/sudo\n";
-            SC_TEST_EXPECT(process.launch("which", "sudo"));
-#else
+#if SC_PLATFORM_WINDOWS
             StringView expectedOutput = "C:\\Windows\\System32\\where.exe\r\n";
             SC_TEST_EXPECT(process.launch("where", "where.exe"));
+#else
+            StringView expectedOutput = "/usr/bin/sudo\n";
+            SC_TEST_EXPECT(process.launch("which", "sudo"));
 #endif
             SmallString<255> output = StringEncoding::Ascii;
             SC_TEST_EXPECT(outputPipe.readPipe.readUntilEOF(output));
@@ -53,10 +53,10 @@ struct SC::ProcessTest : public SC::TestCase
             auto         onErr    = [&](const ProcessChain::Error&) { hasError = true; };
             Process      p1;
             ProcessChain chain(onErr);
-#if SC_PLATFORM_APPLE
-            SC_TEST_EXPECT(chain.pipe(p1, {"ls", "~/Public"}));
-#else
+#if SC_PLATFORM_WINDOWS
             SC_TEST_EXPECT(chain.pipe(p1, {"where", "where.exe"}));
+#else
+            SC_TEST_EXPECT(chain.pipe(p1, {"ls", "~/Public"}));
 #endif
             SC_TEST_EXPECT(chain.launch());
             SC_TEST_EXPECT(chain.waitForExitSync());
@@ -68,12 +68,12 @@ struct SC::ProcessTest : public SC::TestCase
             auto         onErr    = [&](const ProcessChain::Error&) { hasError = true; };
             ProcessChain chain(onErr);
             Process      p1, p2;
-#if SC_PLATFORM_APPLE
-            SC_TEST_EXPECT(chain.pipe(p1, "ls", "~"));
-            SC_TEST_EXPECT(chain.pipe(p2, "grep", "Desktop"));
-#else
+#if SC_PLATFORM_WINDOWS
             SC_TEST_EXPECT(chain.pipe(p1, "where", "/?"));
             SC_TEST_EXPECT(chain.pipe(p2, "findstr", "dir]"));
+#else
+            SC_TEST_EXPECT(chain.pipe(p1, "ls", "~"));
+            SC_TEST_EXPECT(chain.pipe(p2, "grep", "Desktop"));
 #endif
             SC_TEST_EXPECT(chain.launch());
             SC_TEST_EXPECT(chain.waitForExitSync());
@@ -85,12 +85,12 @@ struct SC::ProcessTest : public SC::TestCase
             auto         onErr    = [&](const ProcessChain::Error&) { hasError = true; };
             ProcessChain chain(onErr);
             Process      p1;
-#if SC_PLATFORM_APPLE
-            StringView expectedOutput = "a s d\n";
-            SC_TEST_EXPECT(chain.pipe(p1, "echo", "a s d"));
-#else
+#if SC_PLATFORM_WINDOWS
             StringView expectedOutput = "C:\\Windows\\System32\\where.exe\r\n";
             SC_TEST_EXPECT(chain.pipe(p1, "where", "where.exe"));
+#else
+            StringView expectedOutput = "a s d\n";
+            SC_TEST_EXPECT(chain.pipe(p1, "echo", "a s d"));
 #endif
             ProcessChain::Options options;
             options.pipeSTDOUT = true;
@@ -112,14 +112,14 @@ struct SC::ProcessTest : public SC::TestCase
             ProcessChain chain(onErr);
             String       output(StringEncoding::Ascii);
             Process      p1, p2;
-#if SC_PLATFORM_APPLE
-            StringView expectedOutput = "Desktop\n";
-            SC_TEST_EXPECT(chain.pipe(p1, {"ls", "~"}));
-            SC_TEST_EXPECT(chain.pipe(p2, {"grep", "Desktop"}));
-#else
+#if SC_PLATFORM_WINDOWS
             StringView expectedOutput = "WHERE [/R dir] [/Q] [/F] [/T] pattern...\r\n";
             SC_TEST_EXPECT(chain.pipe(p1, {"where", "/?"}));
             SC_TEST_EXPECT(chain.pipe(p2, {"findstr", "dir]"}));
+#else
+            StringView expectedOutput = "sbin\n";
+            SC_TEST_EXPECT(chain.pipe(p1, {"ls", "/"}));
+            SC_TEST_EXPECT(chain.pipe(p2, {"grep", "sbin"}));
 #endif
             ProcessChain::Options options;
             options.pipeSTDOUT = true;

@@ -4,10 +4,10 @@
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/FileSystemWatcherWindows.inl"
-#elif SC_PLATFORM_EMSCRIPTEN
-#include "Internal/FileSystemWatcherEmscripten.inl"
 #elif SC_PLATFORM_APPLE
 #include "Internal/FileSystemWatcherApple.inl"
+#else
+#include "Internal/FileSystemWatcherEmscripten.inl"
 #endif
 
 SC::Result SC::FileSystemWatcher::init(EventLoopRunner& runner) { return internal.get().init(*this, runner); }

@@ -108,6 +108,7 @@ int main(int argc, const char* argv[])
     TestReport report(console, argc, argv);
     report.applicationRootDirectory = directories.getApplicationPath();
     report.executableFile           = directories.getExecutablePath();
+
     SC::SmallString<255> correctedPath;
     {
         SmallVector<StringView, 50> components;
@@ -146,19 +147,25 @@ int main(int argc, const char* argv[])
     runFileSystemIteratorTest(report);
 
     // FileSystemWatcher tests
+#if !SC_PLATFORM_LINUX
     runFileSystemWatcherTest(report);
+#endif
 
     // Hashing tests
     runHashingTest(report);
 
     // Http tests
     runHttpParserTest(report);
+#if !SC_PLATFORM_LINUX
     runHttpClientTest(report);
     runHttpServerTest(report);
+#endif
     runHttpURLParserTest(report);
 
     // Plugin tests
+#if !SC_PLATFORM_LINUX
     runPluginTest(report);
+#endif
 
     // Process tests
     runProcessTest(report);
@@ -177,7 +184,9 @@ int main(int argc, const char* argv[])
 
     // Strings tests
     runConsoleTest(report);
+#if !SC_PLATFORM_LINUX
     runStringConverterTest(report);
+#endif
     runStringBuilderTest(report);
     runStringFormatTest(report);
     runStringTest(report);
@@ -192,7 +201,9 @@ int main(int argc, const char* argv[])
     runThreadingTest(report);
 
     // Async tests
+#if !SC_PLATFORM_LINUX
     runAsyncTest(report);
+#endif
 
     // DebugVisualizers tests
     runDebugVisualizersTest(report);

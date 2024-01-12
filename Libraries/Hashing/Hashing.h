@@ -73,6 +73,9 @@ struct Hashing
     alignas(uint64_t) char buffer[16];
     struct CryptoPrivate;
     bool destroyHash();
+#elif SC_PLATFORM_LINUX
+    int mainSocket = -1; // Not using FileDescriptor just to avoid dependency...
+    int hashSocket = -1;
 #endif
     bool inited = false;
     Type type   = TypeMD5;

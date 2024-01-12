@@ -131,6 +131,22 @@ bool SC::FileSystemDirectories::init()
 }
 
 #else
-bool SC::FileSystemDirectories::init() { return true; }
+#include "../FileSystem/Path.h"
+#include <limits.h>
+#include <unistd.h>
+bool SC::FileSystemDirectories::init()
+{
+    // TODO: Fill on linux
+    // /proc/self/exe
+    // readlink
+    char path[PATH_MAX + 1] = {0};
+    auto pathLength         = ::readlink("/proc/self/exe", path, PATH_MAX);
+    if (pathLength <= 0)
+    {
+        return false;
+    }
+    SC_TRY(executableFile.assign(StringView({path, static_cast<size_t>(pathLength)}, true, StringEncoding::Utf8)));
 
+    return applicationRootDirectory.assign(Path::dirname(executableFile.view(), Path::AsPosix));
+}
 #endif

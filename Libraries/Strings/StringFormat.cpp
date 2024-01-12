@@ -42,7 +42,7 @@ bool StringFormatterFor<ssize_t>::format(StringFormatOutput& data, const StringV
 }
 #endif
 #else
-
+#if !SC_PLATFORM_LINUX
 bool StringFormatterFor<SC::size_t>::format(StringFormatOutput& data, const StringView specifier,
                                             const SC::size_t value)
 {
@@ -56,6 +56,7 @@ bool StringFormatterFor<SC::ssize_t>::format(StringFormatOutput& data, const Str
     constexpr char formatSpecifier[] = "zd";
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
+#endif
 #endif
 
 bool StringFormatterFor<SC::int64_t>::format(StringFormatOutput& data, const StringView specifier,

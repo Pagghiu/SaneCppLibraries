@@ -293,5 +293,10 @@ struct SC::FileSystem
 
     Result formatError(int errorNumber, StringView item, bool isWindowsNativeError);
     struct Internal;
+
+    // Fallbacks
+    [[nodiscard]] static Result fallbackCopyDirectory(String& sourceDirectory, String& destinationDirectory,
+                                                      FileSystem::CopyFlags options);
+    [[nodiscard]] static Result fallbackRemoveDirectoryRecursive(String& sourceDirectory);
 };
 //! @}
