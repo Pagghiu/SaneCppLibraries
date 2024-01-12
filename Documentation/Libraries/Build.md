@@ -71,7 +71,6 @@ Such "post-configure" build settings could be serialized to JSON (or using binar
 # Roadmap
 
 🟨 MVP Features:
-- Generate makefiles for Linux
 - Build non-console type projects
 - Build artifacts invoking with direct compiler invocation (bypass XCode / VisualStudio build systems)
 

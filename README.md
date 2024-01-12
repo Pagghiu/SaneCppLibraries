@@ -1,6 +1,6 @@
 # Sane C++
 
-**Sane C++** is a set of C++ platform abstraction libraries for macOS and Windows
+**Sane C++** is a set of C++ platform abstraction libraries for ✅ macOS, ✅ Windows and 🚧 Linux.
 
 ![Sane Cpp](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease/article.svg)
 
@@ -31,29 +31,29 @@ Click on specific page each library to know about its status.
 - 🟩 Usable (a reasonable set of features has been implemented to make library useful)
 - 🟦 Complete (all planned features have been implemented)
 
-Library                                                                                             | Description
-:---------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------------------
-[Algorithms](https://pagghiu.github.io/SaneCppLibraries/library_algorithms.html)                         | 🟥 Placeholder library templated algorithms will be placed
-[Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html)                                   | 🟨 Async I/O (files, sockets, timers, processes, fs events, threads wake-up)
-[Build](https://pagghiu.github.io/SaneCppLibraries/library_build.html)                                   | 🟥 Minimal build system where builds are described in C++
-[Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html)                         | 🟨 Generic containers (SC::Vector, SC::SmallVector, SC::Array etc.)
-[File](https://pagghiu.github.io/SaneCppLibraries/library_file.html)                                     | 🟩 Synchronous Disk File I/O
-[File System](https://pagghiu.github.io/SaneCppLibraries/library_file_system.html)                       | 🟨 File System operations { exists | copy | delete } for { files | directories }
-[File System Iterator](https://pagghiu.github.io/SaneCppLibraries/library_file_system_iterator.html)     | 🟨 Enumerates files and directories inside a given path
-[File System Watcher](https://pagghiu.github.io/SaneCppLibraries/library_file_system_watcher.html)       | 🟨 Notifications {add, remove, rename, modified} for files and directories
-[Foundation](https://pagghiu.github.io/SaneCppLibraries/library_foundation.html)                         | 🟩 Primitive types, asserts, limits, Function, Span, Result, Tagged Union
-[Hashing](https://pagghiu.github.io/SaneCppLibraries/library_hashing.html)                               | 🟩 Compute `MD5`, `SHA1` or `SHA256` hashes for a stream of bytes
-[Http](https://pagghiu.github.io/SaneCppLibraries/library_http.html)                                     | 🟥 HTTP parser, client and server
-[Plugin](https://pagghiu.github.io/SaneCppLibraries/library_plugin.html)                                 | 🟥 Minimal dependency based plugin system with hot-reload
-[Process](https://pagghiu.github.io/SaneCppLibraries/library_process.html)                               | 🟨 Create child processes and chain them (also usable with [Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html) library)
-[Reflection](https://pagghiu.github.io/SaneCppLibraries/library_reflection.html)                         | 🟩 Describe C++ types at compile time for serialization
-[Serialization Binary](https://pagghiu.github.io/SaneCppLibraries/library_serialization_binary.html)     | 🟨 Serialize to and from a binary format using [Reflection](https://pagghiu.github.io/SaneCppLibraries/library_reflection.html)
-[Serialization Text](https://pagghiu.github.io/SaneCppLibraries/library_serialization_text.html)         | 🟨 Serialize to / from text formats (JSON) using [Reflection](https://pagghiu.github.io/SaneCppLibraries/library_reflection.html)
-[Socket](https://pagghiu.github.io/SaneCppLibraries/library_socket.html)                                 | 🟨 Synchronous socket networking and DNS lookup
-[Strings](https://pagghiu.github.io/SaneCppLibraries/library_strings.html)                               | 🟩 String formatting / conversion / manipulation (ASCII / UTF8 / UTF16)
-[Testing](https://pagghiu.github.io/SaneCppLibraries/library_testing.html)                               | 🟨 Simple testing framework used by all of the other libraries
-[Threading](https://pagghiu.github.io/SaneCppLibraries/library_threading.html)                           | 🟥 Atomic, thread, mutex, condition variable
-[Time](https://pagghiu.github.io/SaneCppLibraries/library_time.html)                                     | 🟨 Time handling (relative, absolute, high resolution)
+Library                                                                                                 | Description
+:-------------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------------------
+[Algorithms](https://pagghiu.github.io/SaneCppLibraries/library_algorithms.html)                        | 🟥 Placeholder library templated algorithms will be placed
+[Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html)                                  | 🟨 Async I/O (files, sockets, timers, processes, fs events, threads wake-up)
+[Build](https://pagghiu.github.io/SaneCppLibraries/library_build.html)                                  | 🟥 Minimal build system where builds are described in C++
+[Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html)                        | 🟨 Generic containers (SC::Vector, SC::SmallVector, SC::Array etc.)
+[File](https://pagghiu.github.io/SaneCppLibraries/library_file.html)                                    | 🟩 Synchronous Disk File I/O
+[File System](https://pagghiu.github.io/SaneCppLibraries/library_file_system.html)                      | 🟩 File System operations { exists | copy | delete } for { files | directories }
+[File System Iterator](https://pagghiu.github.io/SaneCppLibraries/library_file_system_iterator.html)    | 🟩 Enumerates files and directories inside a given path
+[File System Watcher](https://pagghiu.github.io/SaneCppLibraries/library_file_system_watcher.html)      | 🟨 Notifications {add, remove, rename, modified} for files and directories
+[Foundation](https://pagghiu.github.io/SaneCppLibraries/library_foundation.html)                        | 🟩 Primitive types, asserts, limits, Function, Span, Result, Tagged Union
+[Hashing](https://pagghiu.github.io/SaneCppLibraries/library_hashing.html)                              | 🟩 Compute `MD5`, `SHA1` or `SHA256` hashes for a stream of bytes
+[Http](https://pagghiu.github.io/SaneCppLibraries/library_http.html)                                    | 🟥 HTTP parser, client and server
+[Plugin](https://pagghiu.github.io/SaneCppLibraries/library_plugin.html)                                | 🟥 Minimal dependency based plugin system with hot-reload
+[Process](https://pagghiu.github.io/SaneCppLibraries/library_process.html)                              | 🟩 Create child processes and chain them (also usable with [Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html) library)
+[Reflection](https://pagghiu.github.io/SaneCppLibraries/library_reflection.html)                        | 🟩 Describe C++ types at compile time for serialization
+[Serialization Binary](https://pagghiu.github.io/SaneCppLibraries/library_serialization_binary.html)    | 🟨 Serialize to and from a binary format using [Reflection](https://pagghiu.github.io/SaneCppLibraries/library_reflection.html)
+[Serialization Text](https://pagghiu.github.io/SaneCppLibraries/library_serialization_text.html)        | 🟨 Serialize to / from text formats (JSON) using [Reflection](https://pagghiu.github.io/SaneCppLibraries/library_reflection.html)
+[Socket](https://pagghiu.github.io/SaneCppLibraries/library_socket.html)                                | 🟨 Synchronous socket networking and DNS lookup
+[Strings](https://pagghiu.github.io/SaneCppLibraries/library_strings.html)                              | 🟩 String formatting / conversion / manipulation (ASCII / UTF8 / UTF16)
+[Testing](https://pagghiu.github.io/SaneCppLibraries/library_testing.html)                              | 🟨 Simple testing framework used by all of the other libraries
+[Threading](https://pagghiu.github.io/SaneCppLibraries/library_threading.html)                          | 🟥 Atomic, thread, mutex, condition variable
+[Time](https://pagghiu.github.io/SaneCppLibraries/library_time.html)                                    | 🟨 Time handling (relative, absolute, high resolution)
 
 # License
 

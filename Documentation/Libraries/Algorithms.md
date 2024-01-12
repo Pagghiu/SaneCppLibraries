@@ -34,8 +34,6 @@ in the future and it's better grouping them here rather than keeping them around
 - Rotate
 - Count / Count If
 
-- Implement the entire API on Linux using io_uring
-
 🟦 Complete Features:
 - Not sure what to list here
 

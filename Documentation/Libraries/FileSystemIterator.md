@@ -11,7 +11,7 @@ SC::FileSystemIterator enumerates files and directories at a given path.
 - Handle recursive iteration
 
 # Status
-🟨 MVP  
+🟩 Usable  
 The library is simple but gets the job done.  
 Thanks to @ref library_strings library it handles UTF16 / UTF8 conversions seamlessly, making less difficult writing cross platform filesystem iteration / manipulation code.
 
@@ -19,9 +19,6 @@ Thanks to @ref library_strings library it handles UTF16 / UTF8 conversions seaml
 @copydetails SC::FileSystemIterator
 
 # Roadmap
-
-🟩 Usable Features:
-- Implement the entire API on Linux 
 
 🟦 Complete Features:
 - Not sure what else could be useful here

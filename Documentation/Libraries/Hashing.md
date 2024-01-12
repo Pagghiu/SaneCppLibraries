@@ -24,7 +24,7 @@ The library is very simple it it has what is needed so far (mainly by [Build](@r
 # Roadmap
 
 🟦 Complete Features:
-- Support Linux
+- None for now
 
 💡 Unplanned Features:  
-- None so far
+- None for now

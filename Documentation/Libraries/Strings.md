@@ -130,7 +130,7 @@ The reason is that `ASCII` is efficient when it's known that the strings manipul
 UTF8 is useful on Posix platforms and UTF16 is needed because that's the default encoding used by Win32 API.
 All functions interacting with filesystem, for example the ones in [FileSystem](@ref library_file_system) or 
 [FileSystemIterator](@ref library_file_system_iterator), return strings in the operating system native encoding.
-This means that on windows they will be UTF16 strings and on Apple Devices (or Linux in the future) they are UTF8.
+This means that on windows they will be UTF16 strings and on Apple Devices (or Linux) they are UTF8.
 
 # Roadmap
 We need to understand if we want to allow iterating *grapheme clusters* (perceived end-user 'characters') or advanced

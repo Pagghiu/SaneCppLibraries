@@ -1,6 +1,6 @@
 @page library_process Process
 
-@brief 🟨 Create child processes and chain them (also usable with [Async](@ref library_async) library)
+@brief 🟩 Create child processes and chain them (also usable with [Async](@ref library_async) library)
 
 [TOC]
 
@@ -13,7 +13,7 @@ Process allows launching and chaining input and output of child processes.
 | SC::ProcessChain          | @copybrief SC::ProcessChain       |
 
 # Status
-🟨 MVP  
+🟩 Usable  
 Library allows all basic operations on child processes and it's being used in [Plugin](@ref library_plugin).
 
 # Description
@@ -27,9 +27,6 @@ The SC::Process class is used when handling a process in isolation, while the SC
 @copydoc SC::ProcessChain
 
 # Roadmap
-
-🟩 Usable Features:
-- Implement the API on Linux
 
 🟦 Complete Features:
 - To be defined

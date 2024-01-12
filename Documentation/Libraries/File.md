@@ -39,7 +39,7 @@ It can also be used to read or write the standard input, output or error from cu
 # Roadmap
 
 🟦 Complete Features:
-- Verify and tune for Linux
+- None for now
 
 💡 Unplanned Features:
-- Nothing for now
+- None for now

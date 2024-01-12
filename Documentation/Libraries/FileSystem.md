@@ -1,6 +1,6 @@
 @page library_file_system File System
 
-@brief 🟨 File System operations { exists | copy | delete } for { files | directories }
+@brief 🟩 File System operations { exists | copy | delete } for { files | directories }
 
 [TOC]
 
@@ -53,7 +53,7 @@ Path is able to parse and manipulate windows and posix paths.
 | SC::FileSystemDirectories                     | @copybrief SC::FileSystemDirectories                      |
 
 # Status
-🟨 MVP  
+🟩 Usable  
 The library contains commonly used function but it's missing some notable ones like `stat`.
  SC::FileSystem::getFileTime and SC::FileSystem::setLastModifiedTime will probably be refactored in a future dedicated class for handling `stat` based operations.
 
@@ -114,9 +114,6 @@ The class wants explicitly to make sure its behavior doesn't implicitly depend o
 @copydoc SC::FileSystem::read
 
 # Roadmap
-
-🟩 Usable Features:
-- Implement the entire API on Linux 
 
 🟦 Complete Features:
 - `stat`
