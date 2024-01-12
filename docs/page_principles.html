@@ -114,9 +114,9 @@ $(document).ready(function(){initNavTree('page_principles.html',''); initResizab
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md224">📖 Readability</a></li>
-<li class="level1"><a href="#autotoc_md225">✅ Correctness</a></li>
-<li class="level1"><a href="#autotoc_md226">🚀 Speed</a></li>
+<ul><li class="level1"><a href="#autotoc_md247">📖 Readability</a></li>
+<li class="level1"><a href="#autotoc_md248">✅ Correctness</a></li>
+<li class="level1"><a href="#autotoc_md249">🚀 Speed</a></li>
 </ul>
 </div>
 <div class="textblock"><p >✅ Fast compile times <br  />
@@ -125,7 +125,7 @@ $(document).ready(function(){initNavTree('page_principles.html',''); initResizab
  ✅ Easy to integrate <br  />
  ⛔️ No C++ Standard Library / Exceptions / RTTI <br  />
  ⛔️ No third party dependencies (prefer OS API)</p>
-<h1><a class="anchor" id="autotoc_md224"></a>
+<h1><a class="anchor" id="autotoc_md247"></a>
 📖 Readability</h1>
 <ul>
 <li>Common:<ul>
@@ -156,7 +156,7 @@ $(document).ready(function(){initNavTree('page_principles.html',''); initResizab
 </ul>
 </li>
 </ul>
-<h1><a class="anchor" id="autotoc_md225"></a>
+<h1><a class="anchor" id="autotoc_md248"></a>
 ✅ Correctness</h1>
 <ul>
 <li>Make sure that memory ownership is clear and explicit</li>
@@ -168,11 +168,11 @@ $(document).ready(function(){initNavTree('page_principles.html',''); initResizab
 <li>Code should always work correctly on recent <code>GCC</code>, <code>Clang</code> and <code>MSVC</code> compilers</li>
 <li>Code should always work on <code>x86</code>, <code>x86_64</code>, <code>ARM64</code> and <code>Wasm</code></li>
 <li>No code should be added without a test</li>
-<li>Code coverage is expected to be &gt;= 85%</li>
+<li>Code coverage is expected to be &gt;= 90%</li>
 <li>Minimize Undefined Behavior (within limits dictated by other principles)</li>
 <li>If a method can fail, place it in a "create / init / assign" method instead of the constructor</li>
 </ul>
-<h1><a class="anchor" id="autotoc_md226"></a>
+<h1><a class="anchor" id="autotoc_md249"></a>
 🚀 Speed</h1>
 <ul>
 <li>Do not use non zero-cost abstractions (<b>exceptions</b> or <b>RTTI</b>)</li>

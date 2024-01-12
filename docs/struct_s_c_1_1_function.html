@@ -145,7 +145,7 @@ struct SC::Function&lt; FuncType &gt;</div><p >Wraps function pointers, member f
 <div class="line"> </div>
 <div class="line"><span class="comment">// This will static_assert because sizeof(BigClass) (grabbed by copy) exceeds LAMBDA_SIZE</span></div>
 <div class="line"><span class="comment">// func = [bigClass](float a) -&gt; int { return static_cast&lt;int&gt;(a);};</span></div>
-<div class="ttc" id="agroup__group__foundation__utility_html_ga8ce2d4c0cc42c26d02cc6f196030340e"><div class="ttname"><a href="group__group__foundation__utility.html#ga8ce2d4c0cc42c26d02cc6f196030340e">SC::uint64_t</a></div><div class="ttdeci">unsigned long long uint64_t</div><div class="ttdoc">Platform independent (8) bytes unsigned int.</div><div class="ttdef"><b>Definition:</b> PrimitiveTypes.h:40</div></div>
+<div class="ttc" id="agroup__group__foundation__utility_html_ga8ce2d4c0cc42c26d02cc6f196030340e"><div class="ttname"><a href="group__group__foundation__utility.html#ga8ce2d4c0cc42c26d02cc6f196030340e">SC::uint64_t</a></div><div class="ttdeci">unsigned long long uint64_t</div><div class="ttdoc">Platform independent (8) bytes unsigned int.</div><div class="ttdef"><b>Definition:</b> PrimitiveTypes.h:42</div></div>
 </div><!-- fragment --><p >Size of lambdas or less than LAMBDA_SIZE (currently <code>2 * sizeof(void*)</code>). <br  />
  If lambda is bigger than <code>LAMBDA_SIZE</code> the constructor will static assert. </p><dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">

@@ -186,7 +186,7 @@ Public Attributes</h2></td></tr>
 <div class="line">        report.console.printLine(fsIterator.get().path);</div>
 <div class="line">    }</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fsIterator.checkErrors());</div>
-<div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:105</div></div>
+<div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:104</div></div>
 </div><!-- fragment --><p >If only some directories should be recursed, manual recursion can help speeding up directory iteration: </p><div class="fragment"><div class="line">    FileSystemIterator fsIterator;</div>
 <div class="line">    fsIterator.options.recursive = <span class="keyword">false</span>; <span class="comment">// As we manually call recurseSubdirectory</span></div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fsIterator.init(report.applicationRootDirectory));</div>

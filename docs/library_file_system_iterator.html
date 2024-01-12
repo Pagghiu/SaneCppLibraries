@@ -114,26 +114,26 @@ $(document).ready(function(){initNavTree('library_file_system_iterator.html','')
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md78">Features</a></li>
-<li class="level1"><a href="#autotoc_md79">Status</a></li>
-<li class="level1"><a href="#autotoc_md80">Description</a></li>
-<li class="level1"><a href="#autotoc_md81">Roadmap</a></li>
+<ul><li class="level1"><a href="#autotoc_md101">Features</a></li>
+<li class="level1"><a href="#autotoc_md102">Status</a></li>
+<li class="level1"><a href="#autotoc_md103">Description</a></li>
+<li class="level1"><a href="#autotoc_md104">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟨 Enumerates files and directories inside a given path</p>
 <p ><a class="el" href="struct_s_c_1_1_file_system_iterator.html" title="Iterates files and directories inside a given path.">SC::FileSystemIterator</a> enumerates files and directories at a given path.</p>
-<h1><a class="anchor" id="autotoc_md78"></a>
+<h1><a class="anchor" id="autotoc_md101"></a>
 Features</h1>
 <ul>
 <li>Iterate files in directory</li>
 <li>Handle recursive iteration</li>
 </ul>
-<h1><a class="anchor" id="autotoc_md79"></a>
+<h1><a class="anchor" id="autotoc_md102"></a>
 Status</h1>
-<p >🟨 MVP <br  />
+<p >🟩 Usable <br  />
  The library is simple but gets the job done. <br  />
  Thanks to <a class="el" href="library_strings.html">Strings</a> library it handles UTF16 / UTF8 conversions seamlessly, making less difficult writing cross platform filesystem iteration / manipulation code.</p>
-<h1><a class="anchor" id="autotoc_md80"></a>
+<h1><a class="anchor" id="autotoc_md103"></a>
 Description</h1>
 <p >FileSystemIterator uses an iterator pattern to enumerate files instead of a callback. This allows avoiding blocking on enumeration of very large directories and also the allocation of a huge number of strings to hold all filenames. When configuring an iteration, the caller can ask for a fully recursive enumeration or manually call <a class="el" href="struct_s_c_1_1_file_system_iterator.html#aa8cf8da817e4783df2f2b1892b31d50d" title="Recurse into current item (assuming Entry::isDirectory == true)">SC::FileSystemIterator::recurseSubdirectory</a> when the current <a class="el" href="struct_s_c_1_1_file_system_iterator_1_1_entry.html" title="Contains information on a file or directory.">SC::FileSystemIterator::Entry</a> item (obtained with <a class="el" href="struct_s_c_1_1_file_system_iterator.html#a3095bc292f512c4c8e4c022172d413dc" title="Get current Entry being iterated.">SC::FileSystemIterator::get</a>) matches a directory of interest.</p>
 <p >Example of recursive iteration of a directory: </p><div class="fragment"><div class="line">    FileSystemIterator fsIterator;</div>
@@ -144,7 +144,7 @@ Description</h1>
 <div class="line">        report.console.printLine(fsIterator.get().path);</div>
 <div class="line">    }</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fsIterator.checkErrors());</div>
-<div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:105</div></div>
+<div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:104</div></div>
 </div><!-- fragment --><p >If only some directories should be recursed, manual recursion can help speeding up directory iteration: </p><div class="fragment"><div class="line">    FileSystemIterator fsIterator;</div>
 <div class="line">    fsIterator.options.recursive = <span class="keyword">false</span>; <span class="comment">// As we manually call recurseSubdirectory</span></div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fsIterator.init(report.applicationRootDirectory));</div>
@@ -159,11 +159,8 @@ Description</h1>
 <div class="line">        }</div>
 <div class="line">    }</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fsIterator.checkErrors());</div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md81"></a>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md104"></a>
 Roadmap</h1>
-<p >🟩 Usable Features:</p><ul>
-<li>Implement the entire API on Linux</li>
-</ul>
 <p >🟦 Complete Features:</p><ul>
 <li>Not sure what else could be useful here</li>
 </ul>

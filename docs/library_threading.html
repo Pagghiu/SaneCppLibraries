@@ -114,20 +114,20 @@ $(document).ready(function(){initNavTree('library_threading.html',''); initResiz
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md198">Features</a></li>
-<li class="level1"><a href="#autotoc_md199">Status</a></li>
-<li class="level1"><a href="#autotoc_md200">Description</a><ul><li class="level2"><a href="#autotoc_md201">SC::Thread</a></li>
-<li class="level2"><a href="#autotoc_md202">SC::Mutex</a></li>
-<li class="level2"><a href="#autotoc_md203">SC::EventObject</a></li>
-<li class="level2"><a href="#autotoc_md204">SC::Atomic</a></li>
+<ul><li class="level1"><a href="#autotoc_md221">Features</a></li>
+<li class="level1"><a href="#autotoc_md222">Status</a></li>
+<li class="level1"><a href="#autotoc_md223">Description</a><ul><li class="level2"><a href="#autotoc_md224">SC::Thread</a></li>
+<li class="level2"><a href="#autotoc_md225">SC::Mutex</a></li>
+<li class="level2"><a href="#autotoc_md226">SC::EventObject</a></li>
+<li class="level2"><a href="#autotoc_md227">SC::Atomic</a></li>
 </ul>
 </li>
-<li class="level1"><a href="#autotoc_md205">Roadmap</a></li>
+<li class="level1"><a href="#autotoc_md228">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟥 Atomic, thread, mutex, condition variable</p>
 <p >Threading is a library defining basic primitives for user-space threading and synchronization.</p>
-<h1><a class="anchor" id="autotoc_md198"></a>
+<h1><a class="anchor" id="autotoc_md221"></a>
 Features</h1>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -143,13 +143,13 @@ Features</h1>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_event_object.html" title="An automatically reset event object to synchronize two threads.">SC::EventObject</a>   </td><td class="markdownTableBodyLeft">An automatically reset event object to synchronize two threads.   </td></tr>
 </table>
-<h1><a class="anchor" id="autotoc_md199"></a>
+<h1><a class="anchor" id="autotoc_md222"></a>
 Status</h1>
 <p >🟥 Draft <br  />
  Only the features needed for other libraries have been implemented so far. The Atomic header is really only being implemented for a few data types and needs some love to extend and improve it.</p>
-<h1><a class="anchor" id="autotoc_md200"></a>
+<h1><a class="anchor" id="autotoc_md223"></a>
 Description</h1>
-<h2><a class="anchor" id="autotoc_md201"></a>
+<h2><a class="anchor" id="autotoc_md224"></a>
 SC::Thread</h2>
 <p >A native OS thread. Example: </p><div class="fragment"><div class="line">Thread thread;</div>
 <div class="line">thread.start([](Thread&amp; thread)</div>
@@ -165,7 +165,7 @@ SC::Thread</h2>
 <div class="line"> </div>
 <div class="line">thread.detach(); <span class="comment">// To keep thread running after Thread destructor</span></div>
 </div><!-- fragment --><dl class="section warning"><dt>Warning</dt><dd>Thread destructor will assert if <a class="el" href="struct_s_c_1_1_thread.html#a7ec0ae5d34ef6821aa884452c17c5046" title="Detaches the thread so that its resources are automatically released back to the system without Threa...">SC::Thread::detach()</a> or <a class="el" href="struct_s_c_1_1_thread.html#aad66dfb65ebdca81f0dea267e7a35c08" title="Waits for thread to finish and releases its resources.">SC::Thread::join()</a> has not been called.</dd></dl>
-<h2><a class="anchor" id="autotoc_md202"></a>
+<h2><a class="anchor" id="autotoc_md225"></a>
 SC::Mutex</h2>
 <p >A native OS mutex to synchronize access to shared resources. Example: </p><div class="fragment"><div class="line">    Mutex  mutex;</div>
 <div class="line">    <span class="keywordtype">int</span>    globalVariable = 0;</div>
@@ -191,8 +191,8 @@ SC::Mutex</h2>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(thread1.join());</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(thread2.join());</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(globalVariable == 2);</div>
-<div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:105</div></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md203"></a>
+<div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:104</div></div>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md226"></a>
 SC::EventObject</h2>
 <p >An automatically reset event object to synchronize two threads. <br  />
 Example: </p><div class="fragment"><div class="line">    EventObject eventObject;</div>
@@ -219,7 +219,7 @@ Example: </p><div class="fragment"><div class="line">    EventObject eventObject
 <div class="line">    <span class="comment">// Prints:</span></div>
 <div class="line">    <span class="comment">// Signal</span></div>
 <div class="line">    <span class="comment">// After waiting</span></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md204"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md227"></a>
 SC::Atomic</h2>
 <p >Atomic variables (only for <code>int</code> and <code>bool</code> for now). <br  />
 Example: </p><div class="fragment"><div class="line">Atomic&lt;bool&gt; test = <span class="keyword">true</span>;</div>
@@ -227,7 +227,7 @@ Example: </p><div class="fragment"><div class="line">Atomic&lt;bool&gt; test = <
 <div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(test.load());</div>
 <div class="line">test.exchange(<span class="keyword">false</span>);</div>
 <div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not test.load());</div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md205"></a>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md228"></a>
 Roadmap</h1>
 <p >🟨 MVP</p><ul>
 <li>Scoped Lock / Unlock</li>

@@ -114,20 +114,20 @@ $(document).ready(function(){initNavTree('index.html',''); initResizable(); });
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md4">Motivation</a></li>
-<li class="level1"><a href="#autotoc_md5">Status</a></li>
-<li class="level1"><a href="#autotoc_md6">Platforms</a></li>
-<li class="level1"><a href="#autotoc_md7">Learning</a></li>
-<li class="level1"><a href="#autotoc_md8">Building</a><ul><li class="level2"><a href="#autotoc_md9">Dependencies</a></li>
-<li class="level2"><a href="#autotoc_md10">Integrate in your project</a></li>
-<li class="level2"><a href="#autotoc_md11">Build the test</a></li>
-<li class="level2"><a href="#autotoc_md12">ABI / API Stability</a></li>
+<ul><li class="level1"><a href="#autotoc_md27">Motivation</a></li>
+<li class="level1"><a href="#autotoc_md28">Status</a></li>
+<li class="level1"><a href="#autotoc_md29">Platforms</a></li>
+<li class="level1"><a href="#autotoc_md30">Learning</a></li>
+<li class="level1"><a href="#autotoc_md31">Building</a><ul><li class="level2"><a href="#autotoc_md32">Dependencies</a></li>
+<li class="level2"><a href="#autotoc_md33">Integrate in your project</a></li>
+<li class="level2"><a href="#autotoc_md34">Build the test</a></li>
+<li class="level2"><a href="#autotoc_md35">ABI / API Stability</a></li>
 </ul>
 </li>
 </ul>
 </div>
 <div class="textblock"><p ><a class="anchor" id="md_Index"></a></p>
-<p ><b>Sane C++</b> is a set of C++ platform abstraction libraries for macOS and Windows (<a href="#autotoc_md3">Platforms</a>). <br  />
+<p ><b>Sane C++</b> is a set of C++ platform abstraction libraries for ✅ macOS, ✅ Windows and 🚧 Linux (<a href="#autotoc_md6">Platforms</a>). <br  />
 </p>
 <p >Project <a class="el" href="page_principles.html">Principles</a>:</p>
 <p >✅ Fast compile times <br  />
@@ -136,7 +136,7 @@ $(document).ready(function(){initNavTree('index.html',''); initResizable(); });
  ✅ Easy to integrate <br  />
  ⛔️ No C++ Standard Library / Exceptions / RTTI <br  />
  ⛔️ No third party dependencies (prefer OS API)</p>
-<h1><a class="anchor" id="autotoc_md4"></a>
+<h1><a class="anchor" id="autotoc_md27"></a>
 Motivation</h1>
 <ul>
 <li>Having fun building from scratch a cohesive ecosystem of libraries sharing the same core principles</li>
@@ -146,7 +146,7 @@ Motivation</h1>
 </ul>
 <p >You can take a look at the <a href="https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html">introductory blog post</a> if you like.</p>
 <p >I've also started a <a href="https://www.youtube.com/@Pagghiu">Youtube Channel</a> with some videos on the project.</p>
-<h1><a class="anchor" id="autotoc_md5"></a>
+<h1><a class="anchor" id="autotoc_md28"></a>
 Status</h1>
 <p >Many libraries are in draft state, while others are slightly more usable. <br  />
  Click on specific page each library to know about its status. <br  />
@@ -175,7 +175,7 @@ Status</h1>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyLeft"><a class="el" href="library_file.html">File</a>   </td><td class="markdownTableBodyLeft">🟩 Synchronous Disk File I/O    </td></tr>
 <tr class="markdownTableRowEven">
-<td class="markdownTableBodyLeft"><a class="el" href="library_file_system.html">File System</a>   </td><td class="markdownTableBodyLeft">🟨 File System operations { exists | copy | delete } for { files | directories }    </td></tr>
+<td class="markdownTableBodyLeft"><a class="el" href="library_file_system.html">File System</a>   </td><td class="markdownTableBodyLeft">🟩 File System operations { exists | copy | delete } for { files | directories }    </td></tr>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyLeft"><a class="el" href="library_file_system_iterator.html">File System Iterator</a>   </td><td class="markdownTableBodyLeft">🟨 Enumerates files and directories inside a given path    </td></tr>
 <tr class="markdownTableRowEven">
@@ -189,7 +189,7 @@ Status</h1>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyLeft"><a class="el" href="library_plugin.html">Plugin</a>   </td><td class="markdownTableBodyLeft">🟥 Minimal dependency based plugin system with hot-reload    </td></tr>
 <tr class="markdownTableRowOdd">
-<td class="markdownTableBodyLeft"><a class="el" href="library_process.html">Process</a>   </td><td class="markdownTableBodyLeft">🟨 Create child processes and chain them (also usable with <a class="el" href="library_async.html">Async</a> library)    </td></tr>
+<td class="markdownTableBodyLeft"><a class="el" href="library_process.html">Process</a>   </td><td class="markdownTableBodyLeft">🟩 Create child processes and chain them (also usable with <a class="el" href="library_async.html">Async</a> library)    </td></tr>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyLeft"><a class="el" href="library_reflection.html">Reflection</a>   </td><td class="markdownTableBodyLeft">🟩 Describe C++ types at compile time for serialization    </td></tr>
 <tr class="markdownTableRowOdd">
@@ -207,29 +207,36 @@ Status</h1>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyLeft"><a class="el" href="library_time.html">Time</a>   </td><td class="markdownTableBodyLeft">🟨 Time handling (relative, absolute, high resolution)   </td></tr>
 </table>
-<h1><a class="anchor" id="autotoc_md6"></a>
+<h1><a class="anchor" id="autotoc_md29"></a>
 Platforms</h1>
-<p >Supported:</p><ul>
-<li>macOS</li>
-<li>Windows</li>
+<p >Supported: <br  />
+ ✅ macOS <br  />
+ ✅ Windows <br  />
+ 🚧 Linux (partial, see Note below ⬇️) <br  />
+</p>
+<dl class="section note"><dt>Note</dt><dd>Following libraries are still to be ported to Linux: <br  />
+<ul>
+<li><a class="el" href="library_async.html">Async</a></li>
+<li><a class="el" href="library_file_system_watcher.html">FileSystemWatcher</a></li>
+<li><a class="el" href="library_plugin.html">Plugin</a></li>
 </ul>
-<p >Planned:</p><ul>
+</dd></dl>
+<p>Planned:</p><ul>
 <li>iOS</li>
-<li>Linux</li>
 <li>WASM (Emscripten / WASI)</li>
 </ul>
 <p >Not Planned:</p><ul>
 <li>Android</li>
 </ul>
-<h1><a class="anchor" id="autotoc_md7"></a>
+<h1><a class="anchor" id="autotoc_md30"></a>
 Learning</h1>
 <p >One way to learn and explore the library is to read and / or step through the extensive set of unit tests (current test code coverage is &gt; 90%).</p>
-<h1><a class="anchor" id="autotoc_md8"></a>
+<h1><a class="anchor" id="autotoc_md31"></a>
 Building</h1>
-<h2><a class="anchor" id="autotoc_md9"></a>
+<h2><a class="anchor" id="autotoc_md32"></a>
 Dependencies</h2>
 <p >None (aside from your C++ compiler and its SDK / Sysroot)</p>
-<h2><a class="anchor" id="autotoc_md10"></a>
+<h2><a class="anchor" id="autotoc_md33"></a>
 Integrate in your project</h2>
 <ul>
 <li>Add:<ul>
@@ -255,7 +262,7 @@ Integrate in your project</h2>
 <dl class="section note"><dt>Note</dt><dd>If you're using the Standard C++ Library you should define also define the following preprocessor macro: <br  />
  <code>SC_COMPILER_ENABLE_STD_CPP=1</code>. <br  />
  You can also choose to <a class="el" href="page_how_to.html">Disable the standard C++ library</a> in your project if you're satisfied with what's provided by the libraries and you will not need to define the macro at all.</dd></dl>
-<h2><a class="anchor" id="autotoc_md11"></a>
+<h2><a class="anchor" id="autotoc_md34"></a>
 Build the test</h2>
 <ul>
 <li>Generate test project (run <code>SCBuild.sh</code> or <code>SCBuild.bat</code>)</li>
@@ -263,7 +270,7 @@ Build the test</h2>
 </ul>
 <p >Projects are generated using the self-hosted <a class="el" href="library_build.html">Build</a> system that allows describing projects using C++. <br  />
  The library is compiled with a single <code>clang</code> (or <code>cl.exe</code>) invocation and the resulting executable generates projects.</p>
-<h2><a class="anchor" id="autotoc_md12"></a>
+<h2><a class="anchor" id="autotoc_md35"></a>
 ABI / API Stability</h2>
 <p >There are no plans to provide ABI stability.</p>
 <p >Each library declares its own API stability, but as the project is very young, expect breaking changes everywhere / every time for now. <br  />

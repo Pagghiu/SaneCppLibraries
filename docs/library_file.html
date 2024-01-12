@@ -114,16 +114,16 @@ $(document).ready(function(){initNavTree('library_file.html',''); initResizable(
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md54">Features</a></li>
-<li class="level1"><a href="#autotoc_md55">Status</a></li>
-<li class="level1"><a href="#autotoc_md56">Description</a></li>
-<li class="level1"><a href="#autotoc_md57">Roadmap</a></li>
+<ul><li class="level1"><a href="#autotoc_md77">Features</a></li>
+<li class="level1"><a href="#autotoc_md78">Status</a></li>
+<li class="level1"><a href="#autotoc_md79">Description</a></li>
+<li class="level1"><a href="#autotoc_md80">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟩 Synchronous Disk File I/O</p>
 <p >File library allows synchronous I/O operations on files and pipes. <br  />
 </p>
-<h1><a class="anchor" id="autotoc_md54"></a>
+<h1><a class="anchor" id="autotoc_md77"></a>
 Features</h1>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -149,12 +149,12 @@ Features</h1>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_pipe_descriptor.html#a3dcae6cfbee78db33167e4f183463bf4" title="The write side of the pipe.">SC::PipeDescriptor::writePipe</a>   </td><td class="markdownTableBodyLeft">The write side of the pipe.   </td></tr>
 </table>
-<h1><a class="anchor" id="autotoc_md55"></a>
+<h1><a class="anchor" id="autotoc_md78"></a>
 Status</h1>
 <p >🟩 Usable <br  />
  This library has a relatively limited scope and it should not need many additional features compared to now. <br  />
  Will consider bumping to Complete in the future.</p>
-<h1><a class="anchor" id="autotoc_md56"></a>
+<h1><a class="anchor" id="autotoc_md79"></a>
 Description</h1>
 <p ><a class="el" href="struct_s_c_1_1_file_descriptor.html" title="Wraps an OS File descriptor to read and write to and from it.">SC::FileDescriptor</a> object can be created by <a class="el" href="struct_s_c_1_1_file_descriptor.html#a25b32da09cbe7e56d3d12d6992a44a72" title="Opens file at path with a given mode">SC::FileDescriptor::open</a>-ing a path on file system and it can be <a class="el" href="struct_s_c_1_1_file_descriptor.html#a7872531dfb1a1f7eddeb1591452f684c" title="Reads bytes at offset into user supplied span.">SC::FileDescriptor::read</a> or <a class="el" href="struct_s_c_1_1_file_descriptor.html#a5551f0d07b77177e38dfc777fbb8aabf" title="Writes bytes at offset from start of the file descriptor.">SC::FileDescriptor::write</a>. <br  />
  Also non-blocking mode can be controlled with <a class="el" href="struct_s_c_1_1_file_descriptor.html#a8cccd5b04111df5e220b8f5f3451d131" title="Set blocking mode (read / write waiting for I/O).">SC::FileDescriptor::setBlocking</a>. <br  />
@@ -197,14 +197,14 @@ Description</h1>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.removeFile(fileName));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.changeDirectory(report.applicationRootDirectory));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.removeEmptyDirectory(name));</div>
-<div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:105</div></div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md57"></a>
+<div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:104</div></div>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md80"></a>
 Roadmap</h1>
 <p >🟦 Complete Features:</p><ul>
-<li>Verify and tune for Linux</li>
+<li>None for now</li>
 </ul>
 <p >💡 Unplanned Features:</p><ul>
-<li>Nothing for now </li>
+<li>None for now </li>
 </ul>
 </div></div><!-- contents -->
 </div><!-- PageDoc -->

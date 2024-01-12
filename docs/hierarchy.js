@@ -5,6 +5,7 @@ var hierarchy =
     [ "SC::TypeTraits::AddReference< T >", "struct_s_c_1_1_type_traits_1_1_add_reference.html", null ],
     [ "SC::AlignedStorage< N, Alignment >", "struct_s_c_1_1_aligned_storage.html", null ],
     [ "SC::AlignedStorage< OpaqueCVSize, OpaqueCVAlignment >", "struct_s_c_1_1_aligned_storage.html", null ],
+    [ "SC::AlignedStorage< OpaqueMutexSize, OpaqueMutexAlignment >", "struct_s_c_1_1_aligned_storage.html", null ],
     [ "SC::Build::Architecture", "struct_s_c_1_1_build_1_1_architecture.html", null ],
     [ "SC::ArenaMap< T >", "struct_s_c_1_1_arena_map.html", null ],
     [ "SC::ArenaMap< T >::ArenaMapIterator< MapType >", "struct_s_c_1_1_arena_map_1_1_arena_map_iterator.html", null ],

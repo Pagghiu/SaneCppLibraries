@@ -114,36 +114,36 @@ $(document).ready(function(){initNavTree('library_async.html',''); initResizable
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md17">Features</a></li>
-<li class="level1"><a href="#autotoc_md18">Status</a></li>
-<li class="level1"><a href="#autotoc_md19">Description</a><ul><li class="level2"><a href="#autotoc_md20">AsyncEventLoop</a><ul><li class="level3"><a href="#autotoc_md21">Run modes</a></li>
+<ul><li class="level1"><a href="#autotoc_md40">Features</a></li>
+<li class="level1"><a href="#autotoc_md41">Status</a></li>
+<li class="level1"><a href="#autotoc_md42">Description</a><ul><li class="level2"><a href="#autotoc_md43">AsyncEventLoop</a><ul><li class="level3"><a href="#autotoc_md44">Run modes</a></li>
 </ul>
 </li>
-<li class="level2"><a href="#autotoc_md22">AsyncLoopTimeout</a></li>
-<li class="level2"><a href="#autotoc_md23">AsyncLoopWakeUp</a></li>
-<li class="level2"><a href="#autotoc_md24">AsyncProcessExit</a></li>
-<li class="level2"><a href="#autotoc_md25">AsyncSocketAccept</a></li>
-<li class="level2"><a href="#autotoc_md26">AsyncSocketConnect</a></li>
-<li class="level2"><a href="#autotoc_md27">AsyncSocketSend</a></li>
-<li class="level2"><a href="#autotoc_md28">AsyncSocketReceive</a></li>
-<li class="level2"><a href="#autotoc_md29">AsyncSocketClose</a></li>
-<li class="level2"><a href="#autotoc_md30">AsyncFileRead</a></li>
-<li class="level2"><a href="#autotoc_md31">AsyncFileWrite</a></li>
-<li class="level2"><a href="#autotoc_md32">AsyncFileClose</a></li>
-<li class="level2"><a href="#autotoc_md33">AsyncWindowsPoll</a></li>
+<li class="level2"><a href="#autotoc_md45">AsyncLoopTimeout</a></li>
+<li class="level2"><a href="#autotoc_md46">AsyncLoopWakeUp</a></li>
+<li class="level2"><a href="#autotoc_md47">AsyncProcessExit</a></li>
+<li class="level2"><a href="#autotoc_md48">AsyncSocketAccept</a></li>
+<li class="level2"><a href="#autotoc_md49">AsyncSocketConnect</a></li>
+<li class="level2"><a href="#autotoc_md50">AsyncSocketSend</a></li>
+<li class="level2"><a href="#autotoc_md51">AsyncSocketReceive</a></li>
+<li class="level2"><a href="#autotoc_md52">AsyncSocketClose</a></li>
+<li class="level2"><a href="#autotoc_md53">AsyncFileRead</a></li>
+<li class="level2"><a href="#autotoc_md54">AsyncFileWrite</a></li>
+<li class="level2"><a href="#autotoc_md55">AsyncFileClose</a></li>
+<li class="level2"><a href="#autotoc_md56">AsyncWindowsPoll</a></li>
 </ul>
 </li>
-<li class="level1"><a href="#autotoc_md34">Implementation</a><ul><li class="level2"><a href="#autotoc_md35">Memory allocation</a></li>
+<li class="level1"><a href="#autotoc_md57">Implementation</a><ul><li class="level2"><a href="#autotoc_md58">Memory allocation</a></li>
 </ul>
 </li>
-<li class="level1"><a href="#autotoc_md36">Roadmap</a></li>
+<li class="level1"><a href="#autotoc_md59">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟨 Async I/O (files, sockets, timers, processes, fs events, threads wake-up)</p>
 <p >Async is a multi-platform / event-driven asynchronous I/O library. <br  />
 </p>
 <p >It exposes async programming model for common IO operations like reading / writing to / from a file or tcp socket. Synchronous I/O operations could block the current thread of execution for an undefined amount of time, making it difficult to scale an application to a large number of concurrent operations, or to coexist with other even loop, like for example a GUI event loop. Such async programming model uses a common pattern, where the call fills an AsyncRequest with the required data. The AsyncRequest is added to an AsyncEventLoop that will queue the request to some low level OS IO queue. The event loop can then monitor all the requests in a single call to <a class="el" href="struct_s_c_1_1_async_event_loop.html#af77cd7ac7a1a577204e43d14debc45c5" title="Blocks until there are no more active queued requests.">SC::AsyncEventLoop::run</a>, <a class="el" href="struct_s_c_1_1_async_event_loop.html#aeef889e7c4c8f7cbbfe974ee6be27f09" title="Blocks until at least one request proceeds, ensuring forward progress.">SC::AsyncEventLoop::runOnce</a> or <a class="el" href="struct_s_c_1_1_async_event_loop.html#a1bc6365abc9c05fdbeec9c7f4519c319" title="Process active requests if they exist or returns immediately without blocking.">SC::AsyncEventLoop::runNoWait</a>. These three different run methods cover different integration use cases of the event loop inside of an applications.</p>
-<h1><a class="anchor" id="autotoc_md17"></a>
+<h1><a class="anchor" id="autotoc_md40"></a>
 Features</h1>
 <p >This is the list of supported async operations:</p>
 <table class="markdownTable">
@@ -172,16 +172,16 @@ Features</h1>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyNone"><a class="el" href="struct_s_c_1_1_async_windows_poll.html">AsyncWindowsPoll</a>   </td><td class="markdownTableBodyNone">Starts a windows poll operation, to be signaled by <code>GetOverlappedResult</code>.   </td></tr>
 </table>
-<h1><a class="anchor" id="autotoc_md18"></a>
+<h1><a class="anchor" id="autotoc_md41"></a>
 Status</h1>
 <p >🟨 MVP <br  />
  This is usable but needs some more testing and implementing the API on Linux.</p>
-<h1><a class="anchor" id="autotoc_md19"></a>
+<h1><a class="anchor" id="autotoc_md42"></a>
 Description</h1>
 <p >An async operation is struct derived from AsyncRequest asking for some I/O to be done made to the OS. <br  />
 Every async operation has an associated callback that is invoked when the request is fulfilled. If the <code>start</code> function returns a valid (non error) Return code, then the user callback will be called both in case of success and in case of any error. <br  />
 If the function returns an invalid Return code or if the operation is manually cancelled with <a class="el" href="struct_s_c_1_1_async_request.html#a876920e9ae9215108ace2082f387a553" title="Stops the async operation.">SC::AsyncRequest::stop</a>, then the user callback will not be called. </p><dl class="section note"><dt>Note</dt><dd>The memory address of all AsyncRequest derived objects must be stable for the entire duration of a started async request. This means that they can be freed / moved after the user callback is executed.</dd></dl>
-<h2><a class="anchor" id="autotoc_md20"></a>
+<h2><a class="anchor" id="autotoc_md43"></a>
 AsyncEventLoop</h2>
 <p >Asynchronous I/O (files, sockets, timers, processes, fs events, threads wake-up) (see <a class="el" href="library_async.html">Async</a>) AsyncEventLoop pushes all AsyncRequest derived classes to I/O queues in the OS. Basic lifetime for an event loop is: </p><div class="fragment"><div class="line">AsyncEventLoop eventLoop;</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(eventLoop.create()); <span class="comment">// Create OS specific queue handles</span></div>
@@ -194,7 +194,7 @@ AsyncEventLoop</h2>
 <div class="line"><span class="comment">// ...</span></div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(eventLoop.close()); <span class="comment">// Free OS specific queue handles</span></div>
 <div class="ttc" id="agroup__group__foundation__utility_html_gae6b0d665676a4a5eedc2ad69693c04ee"><div class="ttname"><a href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a></div><div class="ttdeci">#define SC_TRY(expression)</div><div class="ttdoc">Checks the value of the given expression and if failed, returns this value to caller.</div><div class="ttdef"><b>Definition:</b> Result.h:47</div></div>
-</div><!-- fragment --><h3><a class="anchor" id="autotoc_md21"></a>
+</div><!-- fragment --><h3><a class="anchor" id="autotoc_md44"></a>
 Run modes</h3>
 <p >Event loop can be run in different ways to allow integrated it in multiple ways in applications that may already have an existing event loop (example GUI applications).</p>
 <table class="markdownTable">
@@ -207,7 +207,7 @@ Run modes</h3>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_async_event_loop.html#a1bc6365abc9c05fdbeec9c7f4519c319" title="Process active requests if they exist or returns immediately without blocking.">SC::AsyncEventLoop::runNoWait</a>   </td><td class="markdownTableBodyLeft">Process active requests if they exist or returns immediately without blocking. It's useful for game-like applications where the event loop runs every frame and one would like to check and dispatch its I/O callbacks in-between frames. This call allows poll-checking I/O without blocking.  </td></tr>
 </table>
-<h2><a class="anchor" id="autotoc_md22"></a>
+<h2><a class="anchor" id="autotoc_md45"></a>
 AsyncLoopTimeout</h2>
 <p >Starts a Timeout that is invoked after expiration (relative) time has passed. </p><div class="fragment"><div class="line"><span class="comment">// Create a timeout that will be called after 200 milliseconds</span></div>
 <div class="line"><span class="comment">// AsyncLoopTimeout must be valid until callback is called</span></div>
@@ -218,7 +218,7 @@ AsyncLoopTimeout</h2>
 <div class="line">};</div>
 <div class="line"><span class="comment">// Start the timeout, that will be called 200 ms from now</span></div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(timeout.start(eventLoop, Time::Milliseconds(200)));</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md23"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md46"></a>
 AsyncLoopWakeUp</h2>
 <p >Starts a wake-up operation, allowing threads to execute callbacks on loop thread. <br  />
 <a class="el" href="struct_s_c_1_1_async_loop_wake_up.html#a8c5574bae42f75cd0be00ab2b12e7e1e" title="Callback called by SC::AsyncEventLoop::run after SC::AsyncLoopWakeUp::wakeUp.">SC::AsyncLoopWakeUp::callback</a> will be invoked on the thread running <a class="el" href="struct_s_c_1_1_async_event_loop.html#af77cd7ac7a1a577204e43d14debc45c5" title="Blocks until there are no more active queued requests.">SC::AsyncEventLoop::run</a> (or its variations) after <a class="el" href="struct_s_c_1_1_async_loop_wake_up.html#a93c49987a8e8b9d93b7069e18af1044b" title="Wakes up event loop, scheduling AsyncLoopWakeUp::callback on next AsyncEventLoop::run (or its variati...">SC::AsyncLoopWakeUp::wakeUp</a> has been called. </p><dl class="section note"><dt>Note</dt><dd>There is no guarantee that after calling AsyncLoopWakeUp::start the callback has actually finished execution. An optional <a class="el" href="struct_s_c_1_1_event_object.html" title="An automatically reset event object to synchronize two threads.">SC::EventObject</a> passed to <a class="el" href="struct_s_c_1_1_async_loop_wake_up.html#a2bbe85a47a27ef3e1eb6f9b215b784ac" title="Starts a wake up request, that will be fulfilled when an external thread calls AsyncLoopWakeUp::wakeU...">SC::AsyncLoopWakeUp::start</a> can be used for synchronization</dd></dl>
@@ -246,7 +246,7 @@ AsyncLoopWakeUp</h2>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(wakeUpWaiting.start(eventLoop, &amp;eventObject));</div>
 <div class="line">eventObject.wait(); <span class="comment">// Wait until callback has been fully run inside event loop thread</span></div>
 <div class="line"><span class="comment">// From here on we know for sure that callback has been called</span></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md24"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md47"></a>
 AsyncProcessExit</h2>
 <p >Starts a process exit notification request, so that when process is exited the callback will be called. <br  />
 <a class="el" href="library_process.html">Process</a> library can be used to start a process and obtain the native process handle.</p>
@@ -266,7 +266,7 @@ AsyncProcessExit</h2>
 <div class="line">    }</div>
 <div class="line">};</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(processExit.start(eventLoop, processHandle));</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md25"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md48"></a>
 AsyncSocketAccept</h2>
 <p >Starts a socket accept operation, obtaining a new socket from a listening socket. <br  />
 The callback is called with a new socket connected to the given listening endpoint will be returned. <br  />
@@ -298,9 +298,9 @@ Alternatively <a class="el" href="struct_s_c_1_1_async_event_loop.html#add7fd25e
 <div class="line"><span class="comment">// ... at some later point</span></div>
 <div class="line"><span class="comment">// Stop accepting new clients</span></div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(accept.stop());</div>
-<div class="ttc" id="agroup__group__foundation__utility_html_gad8fad7d612c760f3f17579d9c53faadd"><div class="ttname"><a href="group__group__foundation__utility.html#gad8fad7d612c760f3f17579d9c53faadd">SC::uint32_t</a></div><div class="ttdeci">unsigned int uint32_t</div><div class="ttdoc">Platform independent (4) bytes unsigned int.</div><div class="ttdef"><b>Definition:</b> PrimitiveTypes.h:39</div></div>
-<div class="ttc" id="agroup__group__foundation__utility_html_gaf80f7e5966d771dbad93f9ca8d1deda7"><div class="ttname"><a href="group__group__foundation__utility.html#gaf80f7e5966d771dbad93f9ca8d1deda7">SC::uint16_t</a></div><div class="ttdeci">unsigned short uint16_t</div><div class="ttdoc">Platform independent (2) bytes unsigned int.</div><div class="ttdef"><b>Definition:</b> PrimitiveTypes.h:38</div></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md26"></a>
+<div class="ttc" id="agroup__group__foundation__utility_html_gad8fad7d612c760f3f17579d9c53faadd"><div class="ttname"><a href="group__group__foundation__utility.html#gad8fad7d612c760f3f17579d9c53faadd">SC::uint32_t</a></div><div class="ttdeci">unsigned int uint32_t</div><div class="ttdoc">Platform independent (4) bytes unsigned int.</div><div class="ttdef"><b>Definition:</b> PrimitiveTypes.h:38</div></div>
+<div class="ttc" id="agroup__group__foundation__utility_html_gaf80f7e5966d771dbad93f9ca8d1deda7"><div class="ttname"><a href="group__group__foundation__utility.html#gaf80f7e5966d771dbad93f9ca8d1deda7">SC::uint16_t</a></div><div class="ttdeci">unsigned short uint16_t</div><div class="ttdoc">Platform independent (2) bytes unsigned int.</div><div class="ttdef"><b>Definition:</b> PrimitiveTypes.h:37</div></div>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md49"></a>
 AsyncSocketConnect</h2>
 <p >Starts a socket connect operation, connecting to a remote endpoint. <br  />
 Callback will be called when the given socket is connected to ipAddress. <br  />
@@ -322,7 +322,7 @@ Alternatively <a class="el" href="struct_s_c_1_1_async_event_loop.html#add7fd25e
 <div class="line">    }</div>
 <div class="line">};</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(connect.start(eventLoop, client, localHost));</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md27"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md50"></a>
 AsyncSocketSend</h2>
 <p >Starts a socket send operation, sending bytes to a remote endpoint. Callback will be called when the given socket is ready to send more data. <br  />
 <a class="el" href="library_socket.html">Socket</a> library can be used to create a Socket but the socket should be created with <a class="el" href="struct_s_c_1_1_socket_flags.html#aec08f165e03740d9137b9e7cca67941ba25afb353e41cd7298ba414dac55da436" title="Socket is in non-blocking mode.">SC::SocketFlags::NonBlocking</a> and associated to the event loop with <a class="el" href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a" title="Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventloop.">SC::AsyncEventLoop::associateExternallyCreatedTCPSocket</a> or though AsyncSocketAccept. <br  />
@@ -346,7 +346,7 @@ Alternatively <a class="el" href="struct_s_c_1_1_async_event_loop.html#add7fd25e
 <div class="line">};</div>
 <div class="line"> </div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(sendAsync.start(eventLoop, client, sendData));</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md28"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md51"></a>
 AsyncSocketReceive</h2>
 <p >Starts a socket receive operation, receiving bytes from a remote endpoint. Callback will be called when some data is read from socket. <br  />
 <a class="el" href="library_socket.html">Socket</a> library can be used to create a Socket but the socket should be created with <a class="el" href="struct_s_c_1_1_socket_flags.html#aec08f165e03740d9137b9e7cca67941ba25afb353e41cd7298ba414dac55da436" title="Socket is in non-blocking mode.">SC::SocketFlags::NonBlocking</a> and associated to the event loop with <a class="el" href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a" title="Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventloop.">SC::AsyncEventLoop::associateExternallyCreatedTCPSocket</a> or though AsyncSocketAccept. <br  />
@@ -368,7 +368,7 @@ Alternatively <a class="el" href="struct_s_c_1_1_async_event_loop.html#add7fd25e
 <div class="line">    res.reactivateRequest(<span class="keyword">true</span>);</div>
 <div class="line">};</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(receiveAsync.start(eventLoop, client, {receivedData, sizeof(receivedData)}));</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md29"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md52"></a>
 AsyncSocketClose</h2>
 <p >Starts a socket close operation. Callback will be called when the socket has been fully closed.</p>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named `eventLoop`</span></div>
@@ -385,7 +385,7 @@ AsyncSocketClose</h2>
 <div class="line">};</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(asyncClose.start(eventLoop, client));</div>
 <div class="line"> </div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md30"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md53"></a>
 AsyncFileRead</h2>
 <p >Starts a file read operation, reading bytes from a file. Callback will be called after some data is read from file. <br  />
 <a class="el" href="library_file.html">File</a> library can be used to open the file and obtain a file descriptor handle. Make sure to associate the file descriptor with <a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a" title="Associates a File descriptor created externally with the eventloop.">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a>.</p>
@@ -417,7 +417,7 @@ AsyncFileRead</h2>
 <div class="line">};</div>
 <div class="line"><span class="keywordtype">char</span> buffer[100] = {0};</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(asyncReadFile.start(eventLoop, handle, {buffer, sizeof(buffer)}));</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md31"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md54"></a>
 AsyncFileWrite</h2>
 <p >Starts a file write operation, writing bytes to a file. Callback will be called when the file is ready to receive more bytes to write. <br  />
 <a class="el" href="library_file.html">File</a> library can be used to open the file and obtan a file descriptor handle. <br  />
@@ -448,7 +448,7 @@ Make sure to associate the file desciptor with <a class="el" href="struct_s_c_1_
 <div class="line">    }</div>
 <div class="line">};</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(asyncWriteFile.start(eventLoop, handle, writeSpan));</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md32"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md55"></a>
 AsyncFileClose</h2>
 <p >Starts a file close operation, closing the OS file descriptor. Callback will be called when the file is actually closed. <br  />
 <a class="el" href="library_file.html">File</a> library can be used to open the file and obtan a file descriptor handle.</p>
@@ -475,19 +475,19 @@ AsyncFileClose</h2>
 <div class="line">    }</div>
 <div class="line">};</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(asyncFileClose.start(eventLoop, handle));</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md33"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md56"></a>
 AsyncWindowsPoll</h2>
 <p >Starts a windows poll operation, to be signaled by <code>GetOverlappedResult</code>. Callback will be called when <code>GetOverlappedResult</code> signals events on the given file descriptor. Check <a class="el" href="library_file_system_watcher.html">File System Watcher</a> for an example usage of this notification.</p>
-<h1><a class="anchor" id="autotoc_md34"></a>
+<h1><a class="anchor" id="autotoc_md57"></a>
 Implementation</h1>
 <p >Library abstracts async operations by exposing a completion based mechanism. This mechanism currently maps on <code>kqueue</code> on macOS and <code>OVERLAPPED</code> on Windows but it should efficiently map over <code>io_uring</code> on Linux (when it will be implemented).</p>
 <p >The api works on file and socket descriptors, that can be obtained from the <a class="el" href="library_file.html">File</a> and <a class="el" href="library_socket.html">Socket</a> libraries.</p>
-<h2><a class="anchor" id="autotoc_md35"></a>
+<h2><a class="anchor" id="autotoc_md58"></a>
 Memory allocation</h2>
 <p >The entire library is free of allocations, as it uses a double linked list inside <a class="el" href="struct_s_c_1_1_async_request.html" title="Base class for all async requests, holding state and type.">SC::AsyncRequest</a>. <br  />
  Caller is responsible for keeping AsyncRequest-derived objects memory stable until async callback is called. <br  />
  <a class="el" href="struct_s_c_1_1_arena_map.html" title="A sparse vector keeping objects at a stable memory location.">SC::ArenaMap</a> from the <a class="el" href="library_containers.html">Containers</a> can be used to preallocate a bounded pool of Async objects.</p>
-<h1><a class="anchor" id="autotoc_md36"></a>
+<h1><a class="anchor" id="autotoc_md59"></a>
 Roadmap</h1>
 <p >🟩 Usable Features:</p><ul>
 <li>Implement the entire API on Linux (using io_uring)</li>

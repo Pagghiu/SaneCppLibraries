@@ -114,19 +114,19 @@ $(document).ready(function(){initNavTree('library_reflection_auto.html',''); ini
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md217">Status</a></li>
-<li class="level1"><a href="#autotoc_md218">Description</a></li>
-<li class="level1"><a href="#autotoc_md219">Roadmap</a></li>
+<ul><li class="level1"><a href="#autotoc_md240">Status</a></li>
+<li class="level1"><a href="#autotoc_md241">Description</a></li>
+<li class="level1"><a href="#autotoc_md242">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟥 Describe C++ structs at compile time without listing all fields</p>
 <p >Reflection Auto is a companion library to <a class="el" href="library_reflection.html">Reflection</a> allowing describing structures at compile time without explicitly listing all of its fields.</p>
-<h1><a class="anchor" id="autotoc_md217"></a>
+<h1><a class="anchor" id="autotoc_md240"></a>
 Status</h1>
 <p >🟥 Draft <br  />
  This is mostly an experiment at this point, not even sure if this will be actually shippable anytime soon. <br  />
  Auto reflection is totally experimental and is not really production ready, as it fails on some types / compilers combinations too.</p>
-<h1><a class="anchor" id="autotoc_md218"></a>
+<h1><a class="anchor" id="autotoc_md241"></a>
 Description</h1>
 <p >It's possible also trying the experimental <b>AUTO REFLECTION</b> mode. <br  />
  This mode is enabled the tests with the <code>SC_REFLECT_AUTOMATIC</code> macro set to 1. <br  />
@@ -139,7 +139,7 @@ Description</h1>
 <li>Cannot auto-deduce structs that inherit from other</li>
 </ul>
 <dl class="section note"><dt>Note</dt><dd>Auto Reflection is probably not very useful as for any real world project data text-based file format will need the field names as string anyway. For binary file formats, their evolution will require manually matching field order between successive versions of the schema, and auto reflection can break file formats without even noticing by just moving, adding or removing a field from a struct already being serialized.</dd></dl>
-<h1><a class="anchor" id="autotoc_md219"></a>
+<h1><a class="anchor" id="autotoc_md242"></a>
 Roadmap</h1>
 <p >🟦 Complete Features:</p><ul>
 <li>To be decided</li>

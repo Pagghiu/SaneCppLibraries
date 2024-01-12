@@ -114,25 +114,25 @@ $(document).ready(function(){initNavTree('library_time.html',''); initResizable(
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md206">Features</a></li>
-<li class="level1"><a href="#autotoc_md207">Status</a></li>
-<li class="level1"><a href="#autotoc_md208">Description</a><ul><li class="level2"><a href="#autotoc_md209">SC::Time::Absolute</a><ul><li class="level3"><a href="#autotoc_md210">SC::Time::Absolute::parseLocal</a></li>
+<ul><li class="level1"><a href="#autotoc_md229">Features</a></li>
+<li class="level1"><a href="#autotoc_md230">Status</a></li>
+<li class="level1"><a href="#autotoc_md231">Description</a><ul><li class="level2"><a href="#autotoc_md232">SC::Time::Absolute</a><ul><li class="level3"><a href="#autotoc_md233">SC::Time::Absolute::parseLocal</a></li>
 </ul>
 </li>
-<li class="level2"><a href="#autotoc_md211">SC::Time::Relative</a></li>
-<li class="level2"><a href="#autotoc_md212">SC::Time::HighResolutionCounter</a><ul><li class="level3"><a href="#autotoc_md213">SC::Time::HighResolutionCounter::snap</a></li>
-<li class="level3"><a href="#autotoc_md214">SC::Time::HighResolutionCounter::subtractApproximate</a></li>
-<li class="level3"><a href="#autotoc_md215">SC::Time::HighResolutionCounter::isLaterThanOrEqualTo</a></li>
+<li class="level2"><a href="#autotoc_md234">SC::Time::Relative</a></li>
+<li class="level2"><a href="#autotoc_md235">SC::Time::HighResolutionCounter</a><ul><li class="level3"><a href="#autotoc_md236">SC::Time::HighResolutionCounter::snap</a></li>
+<li class="level3"><a href="#autotoc_md237">SC::Time::HighResolutionCounter::subtractApproximate</a></li>
+<li class="level3"><a href="#autotoc_md238">SC::Time::HighResolutionCounter::isLaterThanOrEqualTo</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li class="level1"><a href="#autotoc_md216">Roadmap</a></li>
+<li class="level1"><a href="#autotoc_md239">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟨 Time handling (relative, absolute, high resolution)</p>
 <p >Library contains classes to measure time and compute or measure time intervals.</p>
-<h1><a class="anchor" id="autotoc_md206"></a>
+<h1><a class="anchor" id="autotoc_md229"></a>
 Features</h1>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -144,16 +144,16 @@ Features</h1>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_time_1_1_high_resolution_counter.html" title="An high resolution time counter.">SC::Time::HighResolutionCounter</a>   </td><td class="markdownTableBodyLeft">An high resolution time counter.   </td></tr>
 </table>
-<h1><a class="anchor" id="autotoc_md207"></a>
+<h1><a class="anchor" id="autotoc_md230"></a>
 Status</h1>
 <p >🟨 MVP <br  />
  This library is in MVP state but it doesn't have a clear roadmap.</p>
-<h1><a class="anchor" id="autotoc_md208"></a>
+<h1><a class="anchor" id="autotoc_md231"></a>
 Description</h1>
-<h2><a class="anchor" id="autotoc_md209"></a>
+<h2><a class="anchor" id="autotoc_md232"></a>
 SC::Time::Absolute</h2>
 <p >Absolute time represented with milliseconds since epoch.</p>
-<h3><a class="anchor" id="autotoc_md210"></a>
+<h3><a class="anchor" id="autotoc_md233"></a>
 SC::Time::Absolute::parseLocal</h3>
 <p >Parses local time to a Parsed structure. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -169,15 +169,15 @@ Example: <div class="fragment"><div class="line">    Time::Absolute::ParseResult
 <div class="line">    report.console.print(<span class="stringliteral">&quot;{:02}/{:02}/{} {:02}:{:02}:{:02} {}&quot;</span>, local.dayOfMonth, local.month, local.year, local.hour,</div>
 <div class="line">                         local.minutes, local.seconds,</div>
 <div class="line">                         local.isDaylightSaving ? <span class="stringliteral">&quot;DAYLIGHT SAVING&quot;</span> : <span class="stringliteral">&quot;NO DAYLIGHT SAVING&quot;</span>);</div>
-<div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:105</div></div>
+<div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:104</div></div>
 </div><!-- fragment --></dd></dl>
-<h2><a class="anchor" id="autotoc_md211"></a>
+<h2><a class="anchor" id="autotoc_md234"></a>
 SC::Time::Relative</h2>
 <p >Interval of time represented with 64 bit double precision float.</p>
-<h2><a class="anchor" id="autotoc_md212"></a>
+<h2><a class="anchor" id="autotoc_md235"></a>
 SC::Time::HighResolutionCounter</h2>
 <p >An high resolution time counter.</p>
-<h3><a class="anchor" id="autotoc_md213"></a>
+<h3><a class="anchor" id="autotoc_md236"></a>
 SC::Time::HighResolutionCounter::snap</h3>
 <p >Sets HighResolutionCounter to current instant <br  />
 Example: </p><div class="fragment"><div class="line">    Time::HighResolutionCounter start, end;</div>
@@ -186,7 +186,7 @@ Example: </p><div class="fragment"><div class="line">    Time::HighResolutionCou
 <div class="line">    end.snap();</div>
 <div class="line">    Time::Relative elapsed = end.subtractApproximate(start);</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(elapsed.inRoundedUpperMilliseconds().ms &lt; 150 and elapsed.inRoundedUpperMilliseconds().ms &gt; 50);</div>
-</div><!-- fragment --><h3><a class="anchor" id="autotoc_md214"></a>
+</div><!-- fragment --><h3><a class="anchor" id="autotoc_md237"></a>
 SC::Time::HighResolutionCounter::subtractApproximate</h3>
 <p >Subtracts another HighResolutionCounter from this one, returning an approximate Relative. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -201,7 +201,7 @@ Example: <div class="fragment"><div class="line">    Time::HighResolutionCounter
 <div class="line">    Time::Relative elapsed = end.subtractApproximate(start);</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(elapsed.inRoundedUpperMilliseconds().ms == 321);</div>
 </div><!-- fragment --></dd></dl>
-<h3><a class="anchor" id="autotoc_md215"></a>
+<h3><a class="anchor" id="autotoc_md238"></a>
 SC::Time::HighResolutionCounter::isLaterThanOrEqualTo</h3>
 <p >Check if this HighResolutionCounter is later or equal to another HighResolutionCounter. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -216,7 +216,7 @@ Example: <div class="fragment"><div class="line">    Time::HighResolutionCounter
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(end.isLaterThanOrEqualTo(start));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not start.isLaterThanOrEqualTo(end));</div>
 </div><!-- fragment --></dd></dl>
-<h1><a class="anchor" id="autotoc_md216"></a>
+<h1><a class="anchor" id="autotoc_md239"></a>
 Roadmap</h1>
 <p >🟩 Usable</p><ul>
 <li>No Plan</li>

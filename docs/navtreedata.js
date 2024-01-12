@@ -25,27 +25,51 @@
 var NAVTREE =
 [
   [ "Sane C++", "index.html", [
-    [ "Motivation", "index.html#autotoc_md4", null ],
-    [ "Status", "index.html#autotoc_md5", null ],
-    [ "Platforms", "index.html#autotoc_md6", null ],
-    [ "Learning", "index.html#autotoc_md7", null ],
-    [ "Building", "index.html#autotoc_md8", [
-      [ "Dependencies", "index.html#autotoc_md9", null ],
-      [ "Integrate in your project", "index.html#autotoc_md10", null ],
-      [ "Build the test", "index.html#autotoc_md11", null ],
-      [ "ABI / API Stability", "index.html#autotoc_md12", null ]
+    [ "Motivation", "index.html#autotoc_md27", null ],
+    [ "Status", "index.html#autotoc_md28", null ],
+    [ "Platforms", "index.html#autotoc_md29", null ],
+    [ "Learning", "index.html#autotoc_md30", null ],
+    [ "Building", "index.html#autotoc_md31", [
+      [ "Dependencies", "index.html#autotoc_md32", null ],
+      [ "Integrate in your project", "index.html#autotoc_md33", null ],
+      [ "Build the test", "index.html#autotoc_md34", null ],
+      [ "ABI / API Stability", "index.html#autotoc_md35", null ]
+    ] ],
+    [ "Coding Style", "md__coding_style.html", [
+      [ "Formatting", "md__coding_style.html#autotoc_md1", null ],
+      [ "Casing", "md__coding_style.html#autotoc_md2", null ],
+      [ "[[nodiscard]]", "md__coding_style.html#autotoc_md3", null ],
+      [ "Error checking", "md__coding_style.html#autotoc_md4", null ],
+      [ "Return values", "md__coding_style.html#autotoc_md5", null ],
+      [ "struct vs class", "md__coding_style.html#autotoc_md6", null ],
+      [ "Namespaces", "md__coding_style.html#autotoc_md7", null ],
+      [ "Platform specific code", "md__coding_style.html#autotoc_md8", null ],
+      [ "Header inclusion", "md__coding_style.html#autotoc_md9", null ],
+      [ "Public Headers", "md__coding_style.html#autotoc_md10", null ],
+      [ "Forward declarations", "md__coding_style.html#autotoc_md11", null ],
+      [ "Functions", "md__coding_style.html#autotoc_md12", null ],
+      [ "Member variables", "md__coding_style.html#autotoc_md13", null ],
+      [ "Testing", "md__coding_style.html#autotoc_md14", null ],
+      [ "Documentation", "md__coding_style.html#autotoc_md15", null ],
+      [ "Comments", "md__coding_style.html#autotoc_md16", null ],
+      [ "Braces", "md__coding_style.html#autotoc_md17", null ],
+      [ "Parameters", "md__coding_style.html#autotoc_md18", null ],
+      [ "Casts", "md__coding_style.html#autotoc_md19", null ],
+      [ "Globals / Static member variables", "md__coding_style.html#autotoc_md20", null ],
+      [ "Virtual", "md__coding_style.html#autotoc_md21", null ],
+      [ "Exceptions / RTTI", "md__coding_style.html#autotoc_md22", null ]
     ] ],
     [ "How To", "page_how_to.html", [
-      [ "Disable Standard C++ Library", "page_how_to.html#autotoc_md0", null ],
-      [ "Disable Exceptions and RTTI", "page_how_to.html#autotoc_md1", null ],
-      [ "Use Debug Visualizers", "page_how_to.html#autotoc_md2", null ]
+      [ "Disable Standard C++ Library", "page_how_to.html#autotoc_md23", null ],
+      [ "Disable Exceptions and RTTI", "page_how_to.html#autotoc_md24", null ],
+      [ "Use Debug Visualizers", "page_how_to.html#autotoc_md25", null ]
     ] ],
     [ "Libraries", "libraries.html", "libraries" ],
     [ "Extra Libraries", "libraries_extra.html", "libraries_extra" ],
     [ "Principles", "page_principles.html", [
-      [ "📖 Readability", "page_principles.html#autotoc_md224", null ],
-      [ "✅ Correctness", "page_principles.html#autotoc_md225", null ],
-      [ "🚀 Speed", "page_principles.html#autotoc_md226", null ]
+      [ "📖 Readability", "page_principles.html#autotoc_md247", null ],
+      [ "✅ Correctness", "page_principles.html#autotoc_md248", null ],
+      [ "🚀 Speed", "page_principles.html#autotoc_md249", null ]
     ] ],
     [ "Modules", "modules.html", "modules" ],
     [ "Namespaces", "namespaces.html", [
@@ -79,11 +103,11 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "_algorithm_bubble_sort_8h_source.html",
-"library_async.html#autotoc_md28",
-"struct_s_c_1_1_array.html#a00bd63b9ae4521341da66c72a6e0eb01",
-"struct_s_c_1_1_file_descriptor.html#a87d99c72e5bc8bed8b2fc0806a45c40b",
-"struct_s_c_1_1_process.html#a1fe60993c3d77b5f2f5dc9dc03e987b0",
-"struct_s_c_1_1_string_view.html#a0060d85819c222cb6e397f828780d343"
+"library_async.html#autotoc_md51",
+"namespaces.html",
+"struct_s_c_1_1_deferred.html#a205c32ceb8887c669bcd71c547ebaf71",
+"struct_s_c_1_1_plugin_definition.html#ae56a9bb1859e765c94f50b2b83a500eb",
+"struct_s_c_1_1_string_iterator.html#a8f00cabd965b4a3df8dc880f8c78d7a3"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';
