@@ -1,6 +1,5 @@
-// Copyright (c) 2022, Stefano Cristiano
-//
-// All Rights Reserved. Reproduction is not allowed.
+// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/Result.h"
 #include "../Strings/Console.h" // SC_COMPILER_DEBUG_BREAK

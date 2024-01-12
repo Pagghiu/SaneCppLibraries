@@ -1,6 +1,5 @@
-// Copyright (c) 2022, Stefano Cristiano
-//
-// All Rights Reserved. Reproduction is not allowed.
+// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
 
 // Enables auto reflection in
 // Issues so far when in C++ 14:

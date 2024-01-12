@@ -1,6 +1,5 @@
-// Copyright (c) 2022, Stefano Cristiano
-//
-// All Rights Reserved. Reproduction is not allowed.
+// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
 #include "../String.h"
 #include "../../Testing/Testing.h"
 
