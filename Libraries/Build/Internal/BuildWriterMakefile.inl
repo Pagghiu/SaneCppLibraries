@@ -190,12 +190,10 @@ Makefile.$(CONFIG).touched: Makefile
 	@echo Cleaning {0}
 	$(VRBS)rm -rf $({0}_TARGET_DIR)/$(TARGET) $({0}_INTERMEDIATE_DIR)
 
-# Rebuild object files when an header dependency changes
-include $({0}_OBJECT_FILES:%.o=%.d)
 )delimiter",
                        makeTarget.view());
 
-        builder.append("\n{0}_OBJECT_FILES := \\", makeTarget.view());
+        builder.append("{0}_OBJECT_FILES := \\", makeTarget.view());
 
         for (const RenderItem& item : renderer.renderItems)
         {
@@ -206,7 +204,12 @@ include $({0}_OBJECT_FILES:%.o=%.d)
                 builder.append("\n$({0}_INTERMEDIATE_DIR)/{1}.o \\", makeTarget.view(), basename);
             }
         }
-        builder.append("\n");
+        builder.append(R"delimiter(
+
+# Rebuild object files when an header dependency changes
+-include $({0}_OBJECT_FILES:.o=.d)
+)delimiter",
+                       makeTarget.view());
 
         builder.append(R"delimiter(
 $({0}_INTERMEDIATE_DIR):
@@ -218,7 +221,6 @@ $({0}_TARGET_DIR):
 	$(VRBS)mkdir -p $@
 
 {0}_BUILD: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
-
 
 ifeq ($(CLANG_DETECTED),yes)
 {0}_COMPILE_COMMANDS: $({0}_INTERMEDIATE_DIR)/compile_commands.json
