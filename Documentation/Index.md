@@ -1,7 +1,7 @@
 # Sane C++
 
 [TOC]
-**Sane C++** is a set of C++ platform abstraction libraries for ✅ macOS, ✅ Windows and 🚧 Linux ([Platforms](#autotoc_md6)).  
+**Sane C++** is a set of C++ platform abstraction libraries for ✅ macOS, ✅ Windows and 🚧 Linux ([Platforms](#autotoc_md47)).  
 
 Project [Principles](@ref page_principles):
 
@@ -35,62 +35,18 @@ This is done so that they can be matured in parallel with all other libraries an
 ## Platforms
 
 Supported:  
-✅ macOS  
+✅ macOS (and iOS)  
 ✅ Windows  
 🚧 Linux (partial, see Note below ⬇️)  
 
-@note Following libraries are still to be ported to Linux:  
+Planned:  
+🔮 WASM (Emscripten / WASI)
+
+Not Planned:  
+❓ Android
+
+@note The following libraries have not been ported (yet) to Linux:  
     - [Async](@ref library_async)
     - [FileSystemWatcher](@ref library_file_system_watcher) 
     - [Plugin](@ref library_plugin)
-
-Planned:
-- iOS
-- WASM (Emscripten / WASI)
-
-Not Planned:
-- Android
-
-## Learning
-
-One way to learn and explore the library is to read and / or step through the extensive set of unit tests (current test code coverage is > 90%).
-
-## Building
-
-### Dependencies
-
-None (aside from your C++ compiler and its SDK / Sysroot)
-
-### Integrate in your project
-- Add:
-    - `SC.cpp` (located at `Bindings/cpp`)
-- Link (**macOS**):
-    -  `CoreFoundation.framework`
-    -  `CoreServices.framework`
-- Link (**Windows**):
-    - Nothing (implicitly linking `Ws2_32.lib`, `ntdll.lib`, `Rstrtmgr.lib` and `shlwapi.lib` through `#pragma comment(lib, ...)`)
-- Include:
-    - Include public headers `Libraries/**SomeLibrary**/SomeHeader.h`
-
-@warning All files in *Internal* or *Tests* sub-folders of each library are considered private / implementation details.  
-Only the headers in the root directory of a library are considered public.
-
-@note If you're using the Standard C++ Library you should define also define the following preprocessor macro:  
-`SC_COMPILER_ENABLE_STD_CPP=1`.  
-You can also choose to [Disable the standard C++ library](@ref page_how_to) in your project if you're satisfied with what's provided by the libraries and you will not need to define the macro at all.
-
-### Build the test
-
-- Generate test project (run `SCBuild.sh` or `SCBuild.bat`)
-- Open generated projects (in `_Build/Projects`). 
-
-Projects are generated using the self-hosted [Build](@ref library_build) system that allows describing projects using C++.  
-The library is compiled with a single `clang` (or `cl.exe`) invocation and the resulting executable generates projects.
-
-### ABI / API Stability
-
-There are no plans to provide ABI stability.
-
-Each library declares its own API stability, but as the project is very young, expect breaking changes everywhere / every time for now.  
-At some point API will stabilize naturally and it will be made explicit for each library.
 
