@@ -17,41 +17,73 @@ struct SC::StringBuilderTest : public SC::TestCase
         using namespace SC;
         if (test_section("append"))
         {
-            String        buffer(StringEncoding::Ascii);
-            StringBuilder builder(buffer);
-            SC_TEST_EXPECT(builder.append(StringView({"asdf", 3}, false, StringEncoding::Ascii)));
-            SC_TEST_EXPECT(builder.append("asd"));
-            SC_TEST_EXPECT(builder.append(String("asd").view()));
-            SC_TEST_EXPECT(buffer == "asdasdasd");
+            appendTest();
         }
         if (test_section("appendReplaceAll"))
         {
-            String        buffer(StringEncoding::Ascii);
-            StringBuilder builder(buffer);
-            SC_TEST_EXPECT(builder.appendReplaceAll("123 456 123 10", "123", "1234"));
-            SC_TEST_EXPECT(buffer == "1234 456 1234 10");
-            buffer = String();
-            SC_TEST_EXPECT(builder.appendReplaceAll("088123", "123", "1"));
-            SC_TEST_EXPECT(buffer == "0881");
+            appendReplaceAllTest();
         }
         if (test_section("appendReplaceMultiple"))
         {
-            String           buffer(StringEncoding::Utf8);
-            StringBuilder    builder(buffer);
-            const StringView test[3][2] = {{"asd", "un"}, {"bas", "a_tutti"}, {"\\", "/"}};
-            SC_TEST_EXPECT(builder.appendReplaceMultiple("asd\\salve\\bas"_u8, {test, 3}));
-            SC_TEST_EXPECT(buffer == "un/salve/a_tutti");
+            appendReplaceMultipleTest();
         }
         if (test_section("appendHex"))
         {
-            uint8_t bytes[4] = {0x12, 0x34, 0x56, 0x78};
-
-            String        s;
-            StringBuilder b(s);
-            SC_TEST_EXPECT(b.appendHex({bytes, sizeof(bytes)}) and s.view() == "12345678");
+            appendHexTest();
         }
     }
+
+    void appendTest();
+    void appendReplaceAllTest();
+    void appendReplaceMultipleTest();
+    void appendHexTest();
 };
+
+void SC::StringBuilderTest::appendTest()
+{
+    //! [stringBuilderTestAppendSnippet]
+    String        buffer(StringEncoding::Ascii);
+    StringBuilder builder(buffer);
+    SC_TEST_EXPECT(builder.append(StringView({"asdf", 3}, false, StringEncoding::Ascii)));
+    SC_TEST_EXPECT(builder.append("asd"));
+    SC_TEST_EXPECT(builder.append(String("asd").view()));
+    SC_TEST_EXPECT(buffer == "asdasdasd");
+    //! [stringBuilderTestAppendSnippet]
+}
+
+void SC::StringBuilderTest::appendReplaceAllTest()
+{
+    //! [stringBuilderTestAppendReplaceAllSnippet]
+    String        buffer(StringEncoding::Ascii);
+    StringBuilder builder(buffer);
+    SC_TEST_EXPECT(builder.appendReplaceAll("123 456 123 10", "123", "1234"));
+    SC_TEST_EXPECT(buffer == "1234 456 1234 10");
+    buffer = String();
+    SC_TEST_EXPECT(builder.appendReplaceAll("088123", "123", "1"));
+    SC_TEST_EXPECT(buffer == "0881");
+    //! [stringBuilderTestAppendReplaceAllSnippet]
+}
+
+void SC::StringBuilderTest::appendReplaceMultipleTest()
+{
+    //! [stringBuilderTestAppendReplaceMultipleSnippet]
+    String        buffer(StringEncoding::Utf8);
+    StringBuilder sb(buffer);
+    SC_TEST_EXPECT(sb.appendReplaceMultiple("asd\\salve\\bas"_u8, {{"asd", "un"}, {"bas", "a_tutti"}, {"\\", "/"}}));
+    SC_TEST_EXPECT(buffer == "un/salve/a_tutti");
+    //! [stringBuilderTestAppendReplaceMultipleSnippet]
+}
+
+void SC::StringBuilderTest::appendHexTest()
+{
+    //! [stringBuilderTestAppendHexSnippet]
+    uint8_t bytes[4] = {0x12, 0x34, 0x56, 0x78};
+
+    String        buffer;
+    StringBuilder builder(buffer);
+    SC_TEST_EXPECT(builder.appendHex({bytes, sizeof(bytes)}) and buffer.view() == "12345678");
+    //! [stringBuilderTestAppendHexSnippet]
+}
 
 namespace SC
 {

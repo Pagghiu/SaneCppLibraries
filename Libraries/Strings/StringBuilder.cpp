@@ -71,13 +71,14 @@ bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf
     return StringConverter::pushNullTerm(stringData, encoding);
 }
 
-[[nodiscard]] bool StringBuilder::appendReplaceMultiple(StringView source, Span<const StringView[2]> substitutions)
+[[nodiscard]] bool StringBuilder::appendReplaceMultiple(StringView source, Span<const ReplacePair> substitutions)
 {
     String buffer, other;
     SC_TRY(buffer.assign(source));
     for (auto it : substitutions)
     {
-        SC_TRY(StringBuilder(other, StringBuilder::Clear).appendReplaceAll(buffer.view(), it[0], it[1]));
+        StringBuilder sb(other, StringBuilder::Clear);
+        SC_TRY(sb.appendReplaceAll(buffer.view(), it.searchFor, it.replaceWith));
         swap(other, buffer);
     }
     return append(buffer.view());

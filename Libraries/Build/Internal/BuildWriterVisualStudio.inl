@@ -197,7 +197,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             builder.append("<TargetName>{}</TargetName>", project.targetName);
         }
-        constexpr StringView replacements[8][2] = {
+        constexpr StringBuilder::ReplacePair replacements[] = {
             {"/", "\\"},
             {"$(PROJECT_DIR)\\", "$(ProjectDir)"},
             {"$(CONFIGURATION)", "$(Configuration)"},
@@ -210,7 +210,8 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         if (not configuration.outputPath.isEmpty())
         {
             builder.append("    <OutDir>");
-            builder.appendReplaceMultiple(configuration.outputPath.view(), {replacements, 8});
+            builder.appendReplaceMultiple(configuration.outputPath.view(),
+                                          {replacements, sizeof(replacements) / sizeof(replacements[0])});
             if (not configuration.outputPath.view().endsWithCodePoint('\\'))
             {
                 builder.append("\\");
@@ -234,12 +235,13 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             (projectIncludePaths and not projectIncludePaths->isEmpty()))
         {
             builder.append("    <IncludePath>");
-            constexpr StringView includeReplacements[1][2] = {{"$(PROJECT_DIR)\\", "$(ProjectDir)"}};
+            constexpr StringBuilder::ReplacePair includeReplacements[] = {{"$(PROJECT_DIR)\\", "$(ProjectDir)"}};
             if (includePaths)
             {
                 for (auto& it : *includePaths)
                 {
-                    builder.appendReplaceMultiple(it.view(), {includeReplacements, 1});
+                    builder.appendReplaceMultiple(
+                        it.view(), {includeReplacements, sizeof(includeReplacements) / sizeof(includeReplacements[0])});
                     builder.append(";");
                 }
             }
@@ -247,7 +249,8 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             {
                 for (auto& it : *projectIncludePaths)
                 {
-                    builder.appendReplaceMultiple(it.view(), {includeReplacements, 1});
+                    builder.appendReplaceMultiple(
+                        it.view(), {includeReplacements, sizeof(includeReplacements) / sizeof(includeReplacements[0])});
                     builder.append(";");
                 }
             }
@@ -285,7 +288,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         if ((configArray and not configArray->isEmpty()) or (projectArray and not projectArray->isEmpty()))
         {
             builder.append("    <PreprocessorDefinitions>");
-            constexpr StringView replacements[2][2] = {{"/", "\\"}, {"$(PROJECT_DIR)\\", "$(ProjectDir)"}};
+            constexpr StringBuilder::ReplacePair replacements[] = {{"/", "\\"}, {"$(PROJECT_DIR)\\", "$(ProjectDir)"}};
             if (configArray)
             {
                 for (auto& it : *configArray)

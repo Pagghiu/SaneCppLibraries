@@ -308,12 +308,12 @@ $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
 
     [[nodiscard]] static bool appendVariable(StringBuilder& builder, StringView text, StringView makeTarget)
     {
-        const StringView replacements[7][2] = {
+        const StringBuilder::ReplacePair replacements[] = {
             {"$(PROJECT_DIR)", "$(CURDIR)"},       {"$(CONFIGURATION)", "$(CONFIG)"},
             {"$(PROJECT_NAME)", makeTarget},       {"$(ARCHS)", "Any"},
             {"$(PLATFORM_DISPLAY_NAME)", "Posix"}, {"$(MACOSX_DEPLOYMENT_TARGET)", "Any"},
             {"$(SC_GENERATOR)", "Makefile"},
         };
-        return builder.appendReplaceMultiple(text, {replacements, 7});
+        return builder.appendReplaceMultiple(text, {replacements, sizeof(replacements) / sizeof(replacements[0])});
     }
 };
