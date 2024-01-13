@@ -114,27 +114,27 @@ $(document).ready(function(){initNavTree('library_file_system_watcher.html','');
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md105">Features</a></li>
-<li class="level1"><a href="#autotoc_md106">Status</a></li>
-<li class="level1"><a href="#autotoc_md107">Description</a></li>
-<li class="level1"><a href="#autotoc_md108">Details</a></li>
-<li class="level1"><a href="#autotoc_md109">Roadmap</a></li>
+<ul><li class="level1"><a href="#autotoc_md117">Features</a></li>
+<li class="level1"><a href="#autotoc_md118">Status</a></li>
+<li class="level1"><a href="#autotoc_md119">Description</a></li>
+<li class="level1"><a href="#autotoc_md120">Details</a></li>
+<li class="level1"><a href="#autotoc_md121">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟨 Notifications {add, remove, rename, modified} for files and directories</p>
 <p ><a class="el" href="struct_s_c_1_1_file_system_watcher.html" title="Notifies about events (add, remove, rename, modified) on files and directories.">SC::FileSystemWatcher</a> allows watching directories for changes that happen to them. <br  />
 </p>
-<h1><a class="anchor" id="autotoc_md105"></a>
+<h1><a class="anchor" id="autotoc_md117"></a>
 Features</h1>
 <ul>
 <li>Get notified about modified files or directories</li>
 <li>Get notified about added / removed / renamed files or directories</li>
 </ul>
-<h1><a class="anchor" id="autotoc_md106"></a>
+<h1><a class="anchor" id="autotoc_md118"></a>
 Status</h1>
 <p >🟨 MVP <br  />
  Library does have basic capabilities and it can be used just fine.</p>
-<h1><a class="anchor" id="autotoc_md107"></a>
+<h1><a class="anchor" id="autotoc_md119"></a>
 Description</h1>
 <p >Caller can specify a callback for receiving notifications the <a class="el" href="struct_s_c_1_1_file_system_watcher.html#ae6a291713a671926ecaa447017ff82c2" title="Watch a single directory.">SC::FileSystemWatcher::watch</a> method.</p>
 <p >Changes are grouped in two categories:</p><ul>
@@ -226,7 +226,7 @@ Description</h1>
 <div class="line">    <span class="comment">// ...</span></div>
 <div class="line">    <span class="comment">// When all watchers have been unwatched and to dispose all system resources</span></div>
 <div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(fileSystemWatcher.close());</div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md108"></a>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md120"></a>
 Details</h1>
 <p >The class tries to unify differences between OS specific API to deliver folder change notifications</p>
 <ul>
@@ -236,7 +236,7 @@ Details</h1>
 </li>
 </ul>
 <p >The behavior between these different system also depends on the file system where the watched directory resides.</p>
-<h1><a class="anchor" id="autotoc_md109"></a>
+<h1><a class="anchor" id="autotoc_md121"></a>
 Roadmap</h1>
 <p >🟩 Usable Features:</p><ul>
 <li>Implement the entire API on Linux</li>

@@ -114,16 +114,16 @@ $(document).ready(function(){initNavTree('library_plugin.html',''); initResizabl
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md132">Features</a></li>
-<li class="level1"><a href="#autotoc_md133">Status</a></li>
-<li class="level1"><a href="#autotoc_md134">Description</a></li>
-<li class="level1"><a href="#autotoc_md135">Examples</a></li>
-<li class="level1"><a href="#autotoc_md136">Roadmap</a></li>
+<ul><li class="level1"><a href="#autotoc_md144">Features</a></li>
+<li class="level1"><a href="#autotoc_md145">Status</a></li>
+<li class="level1"><a href="#autotoc_md146">Description</a></li>
+<li class="level1"><a href="#autotoc_md147">Examples</a></li>
+<li class="level1"><a href="#autotoc_md148">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟥 Minimal dependency based plugin system with hot-reload</p>
 <p >Plugin library allows extending application compiling C++ source to executable code at runtime.</p>
-<h1><a class="anchor" id="autotoc_md132"></a>
+<h1><a class="anchor" id="autotoc_md144"></a>
 Features</h1>
 <ul>
 <li>Compile and link cpp files to dynamic library</li>
@@ -131,11 +131,11 @@ Features</h1>
 <li>Reload all dependant plugins of a given one</li>
 <li>Forcefully unlock and delete dll being debugged from Visual Studio Debugger</li>
 </ul>
-<h1><a class="anchor" id="autotoc_md133"></a>
+<h1><a class="anchor" id="autotoc_md145"></a>
 Status</h1>
 <p >🟥 Draft <br  />
  This entire system is still in early stages, and it's an experiment at best,so it's not recommended for general use.</p>
-<h1><a class="anchor" id="autotoc_md134"></a>
+<h1><a class="anchor" id="autotoc_md146"></a>
 Description</h1>
 <p >The main use case is for now splitting applications in smaller pieces that can be hot-reloaded at runtime. <br  />
  A secondary use case could be allowing customization on a delivered application (mainly on Desktop systems). Plugins are always meant to be delivered in source code form (.cpp) and they're compiled on the fly. A plugin is made of a single .cpp file and it declares itself through a special comment in the source code. Such comment can declare the name, the version, a description / category and a list of dependencies. <br  />
@@ -146,11 +146,11 @@ Description</h1>
  The idea is that plugins only use functionality provided by the calling executable or by other plugins.</p>
 <p >On Windows, some extra care has been taken to force-unlock the .pdb file from visual studio debugger, that happens if the dll is being loaded on a program being debugged.</p>
 <p >As of today this is all implemented using native dynamic library mechanisms and they're loaded in process, so doing the wrong thing with memory or forgetting to clean everything during shutdown can yield to instabilities and eventually crash the main executable.</p>
-<h1><a class="anchor" id="autotoc_md135"></a>
+<h1><a class="anchor" id="autotoc_md147"></a>
 Examples</h1>
 <p >No examples are provided so far as the API is very likely to change drastically going towards MVP. <br  />
  If you like to see where we are just a take a look at the associated unit test.</p>
-<h1><a class="anchor" id="autotoc_md136"></a>
+<h1><a class="anchor" id="autotoc_md148"></a>
 Roadmap</h1>
 <p >There are plans to experiment with out of process plugins using some sort of RPC system (like Audio Unit plugins on macOS) and / or experimenting using WASM as a plugin host to eliminate such instability / security issues. Other ideas include redistribute a minimal C++ toolchain (probably a customized clang) that can compile the plugins without needing a system compiler or a sysroot, as all public headers of libraries in this project do not need any system or compiler header.</p>
 <p >🟨 MVP</p><ul>

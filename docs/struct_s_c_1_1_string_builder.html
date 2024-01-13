@@ -111,6 +111,7 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_string_builder.html',''
 
 <div class="header">
   <div class="summary">
+<a href="#nested-classes">Classes</a> &#124;
 <a href="#pub-types">Public Types</a> &#124;
 <a href="#pub-methods">Public Member Functions</a> &#124;
 <a href="struct_s_c_1_1_string_builder-members.html">List of all members</a>  </div>
@@ -123,6 +124,12 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_string_builder.html',''
 
 <p><code>#include &lt;<a class="el" href="_string_builder_8h_source.html">StringBuilder.h</a>&gt;</code></p>
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="nested-classes" name="nested-classes"></a>
+Classes</h2></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_builder_1_1_replace_pair.html">ReplacePair</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Holds a search / replace pair for <a class="el" href="struct_s_c_1_1_string_builder.html#a79b431f1b1a30f31868dd669d2427e79" title="Appends source to destination buffer, replacing multiple substitutions pairs.">StringBuilder::appendReplaceMultiple</a>.  <a href="struct_s_c_1_1_string_builder_1_1_replace_pair.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-types" name="pub-types"></a>
 Public Types</h2></td></tr>
 <tr class="memitem:a4469f304bc2f7accc20ea5c12254e232"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_builder.html#a4469f304bc2f7accc20ea5c12254e232">Flags</a> { <br />
@@ -159,9 +166,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a6b30ac7813be680de0bda54e7dd9b8f4"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_builder.html#a6b30ac7813be680de0bda54e7dd9b8f4">appendReplaceAll</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> source, <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> occurrencesOf, <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> with)</td></tr>
 <tr class="memdesc:a6b30ac7813be680de0bda54e7dd9b8f4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Appends source to destination buffer, replacing <code>occurrencesOf</code> <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> with <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> <code>with</code>  <a href="struct_s_c_1_1_string_builder.html#a6b30ac7813be680de0bda54e7dd9b8f4">More...</a><br /></td></tr>
 <tr class="separator:a6b30ac7813be680de0bda54e7dd9b8f4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3d4a384a14ce4fc7da60d98e8689ee12"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_builder.html#a3d4a384a14ce4fc7da60d98e8689ee12">appendReplaceMultiple</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> source, <a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>[2]&gt; substitutions)</td></tr>
-<tr class="memdesc:a3d4a384a14ce4fc7da60d98e8689ee12"><td class="mdescLeft">&#160;</td><td class="mdescRight">Appends source to destination buffer, replacing multiple substitutions pairs.  <a href="struct_s_c_1_1_string_builder.html#a3d4a384a14ce4fc7da60d98e8689ee12">More...</a><br /></td></tr>
-<tr class="separator:a3d4a384a14ce4fc7da60d98e8689ee12"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a79b431f1b1a30f31868dd669d2427e79"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_builder.html#a79b431f1b1a30f31868dd669d2427e79">appendReplaceMultiple</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> source, <a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="struct_s_c_1_1_string_builder_1_1_replace_pair.html">ReplacePair</a> &gt; substitutions)</td></tr>
+<tr class="memdesc:a79b431f1b1a30f31868dd669d2427e79"><td class="mdescLeft">&#160;</td><td class="mdescRight">Appends source to destination buffer, replacing multiple substitutions pairs.  <a href="struct_s_c_1_1_string_builder.html#a79b431f1b1a30f31868dd669d2427e79">More...</a><br /></td></tr>
+<tr class="separator:a79b431f1b1a30f31868dd669d2427e79"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a447ad194cfd03d2a9eada84d0f371754"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_builder.html#a447ad194cfd03d2a9eada84d0f371754">appendHex</a> (<a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="group__group__foundation__utility.html#ga463999463d674ca87f888a65b7d4a254">uint8_t</a> &gt; data)</td></tr>
 <tr class="memdesc:a447ad194cfd03d2a9eada84d0f371754"><td class="mdescLeft">&#160;</td><td class="mdescRight">Appends given binary data escaping it as hexadecimal ASCII characters.  <a href="struct_s_c_1_1_string_builder.html#a447ad194cfd03d2a9eada84d0f371754">More...</a><br /></td></tr>
 <tr class="separator:a447ad194cfd03d2a9eada84d0f371754"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -389,16 +396,15 @@ template&lt;typename... Types&gt; </div>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd><code>true</code> if append succeeded <br  />
- Example: <div class="fragment"><div class="line"><a class="code hl_typedef" href="group__group__foundation__utility.html#ga463999463d674ca87f888a65b7d4a254">uint8_t</a> bytes[4] = {0x12, 0x34, 0x56, 0x78};</div>
+<dl class="section return"><dt>Returns</dt><dd><code>true</code> if append succeeded</dd></dl>
+<p>Example: </p><div class="fragment"><div class="line">    <a class="code hl_typedef" href="group__group__foundation__utility.html#ga463999463d674ca87f888a65b7d4a254">uint8_t</a> bytes[4] = {0x12, 0x34, 0x56, 0x78};</div>
 <div class="line"> </div>
-<div class="line">String        s;</div>
-<div class="line"><a class="code hl_function" href="struct_s_c_1_1_string_builder.html#aa53c13af98aac1b7ccf439bfc7cd519a">StringBuilder</a> b(s);</div>
-<div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(b.appendHex({bytes, sizeof(bytes)}) and s.view() == <span class="stringliteral">&quot;12345678&quot;</span>);</div>
+<div class="line">    String        buffer;</div>
+<div class="line">    <a class="code hl_function" href="struct_s_c_1_1_string_builder.html#aa53c13af98aac1b7ccf439bfc7cd519a">StringBuilder</a> builder(buffer);</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(builder.appendHex({bytes, sizeof(bytes)}) and buffer.view() == <span class="stringliteral">&quot;12345678&quot;</span>);</div>
 <div class="ttc" id="agroup__group__foundation__utility_html_ga463999463d674ca87f888a65b7d4a254"><div class="ttname"><a href="group__group__foundation__utility.html#ga463999463d674ca87f888a65b7d4a254">SC::uint8_t</a></div><div class="ttdeci">unsigned char uint8_t</div><div class="ttdoc">Platform independent (1) byte unsigned int.</div><div class="ttdef"><b>Definition:</b> PrimitiveTypes.h:36</div></div>
 <div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:104</div></div>
-</div><!-- fragment --> </dd></dl>
-
+</div><!-- fragment --> 
 </div>
 </div>
 <a id="a6b30ac7813be680de0bda54e7dd9b8f4" name="a6b30ac7813be680de0bda54e7dd9b8f4"></a>
@@ -442,18 +448,19 @@ template&lt;typename... Types&gt; </div>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd><code>true</code> if append succeeded <br  />
- Example: <div class="fragment"><div class="line">String        buffer(<a class="code hl_enumvalue" href="group__group__strings.html#gga394218cf32c79b0ada9bd2d4892eaf52a81f91ccd37ce1d232cbfc1520374319d">StringEncoding::Utf8</a>);</div>
-<div class="line"><a class="code hl_function" href="struct_s_c_1_1_string_builder.html#aa53c13af98aac1b7ccf439bfc7cd519a">StringBuilder</a> builder(buffer);</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(builder.appendReplaceMultiple(<span class="stringliteral">&quot;asd\\salve\\bas&quot;</span>_u8, {{<span class="stringliteral">&quot;asd&quot;</span>, <span class="stringliteral">&quot;un&quot;</span>}, {<span class="stringliteral">&quot;bas&quot;</span>, <span class="stringliteral">&quot;a/tutti&quot;</span>}, {<span class="stringliteral">&quot;\\&quot;</span>, <span class="stringliteral">&quot;/&quot;</span>}}));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__compiler__macros.html#ga6bc5136e9c6fbc77420173ccf4e32d21">SC_ASSERT_RELEASE</a>(buffer == <span class="stringliteral">&quot;un/salve/a/tutti&quot;</span>);</div>
-<div class="ttc" id="agroup__group__strings_html_gga394218cf32c79b0ada9bd2d4892eaf52a81f91ccd37ce1d232cbfc1520374319d"><div class="ttname"><a href="group__group__strings.html#gga394218cf32c79b0ada9bd2d4892eaf52a81f91ccd37ce1d232cbfc1520374319d">SC::StringEncoding::Utf8</a></div><div class="ttdeci">@ Utf8</div><div class="ttdoc">Encoding is UTF8.</div></div>
-</div><!-- fragment --> </dd></dl>
-
+<dl class="section return"><dt>Returns</dt><dd><code>true</code> if append succeeded</dd></dl>
+<p>Example: </p><div class="fragment"><div class="line">    String        buffer(<a class="code hl_enumvalue" href="group__group__strings.html#gga394218cf32c79b0ada9bd2d4892eaf52a76b8d0dcd02ccaf203c167ced6d7ef31">StringEncoding::Ascii</a>);</div>
+<div class="line">    <a class="code hl_function" href="struct_s_c_1_1_string_builder.html#aa53c13af98aac1b7ccf439bfc7cd519a">StringBuilder</a> builder(buffer);</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(builder.appendReplaceAll(<span class="stringliteral">&quot;123 456 123 10&quot;</span>, <span class="stringliteral">&quot;123&quot;</span>, <span class="stringliteral">&quot;1234&quot;</span>));</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(buffer == <span class="stringliteral">&quot;1234 456 1234 10&quot;</span>);</div>
+<div class="line">    buffer = String();</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(builder.appendReplaceAll(<span class="stringliteral">&quot;088123&quot;</span>, <span class="stringliteral">&quot;123&quot;</span>, <span class="stringliteral">&quot;1&quot;</span>));</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(buffer == <span class="stringliteral">&quot;0881&quot;</span>);</div>
+</div><!-- fragment --> 
 </div>
 </div>
-<a id="a3d4a384a14ce4fc7da60d98e8689ee12" name="a3d4a384a14ce4fc7da60d98e8689ee12"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a3d4a384a14ce4fc7da60d98e8689ee12">&#9670;&nbsp;</a></span>appendReplaceMultiple()</h2>
+<a id="a79b431f1b1a30f31868dd669d2427e79" name="a79b431f1b1a30f31868dd669d2427e79"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a79b431f1b1a30f31868dd669d2427e79">&#9670;&nbsp;</a></span>appendReplaceMultiple()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -467,7 +474,7 @@ template&lt;typename... Types&gt; </div>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>[2]&gt;&#160;</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="struct_s_c_1_1_string_builder_1_1_replace_pair.html">ReplacePair</a> &gt;&#160;</td>
           <td class="paramname"><em>substitutions</em>&#160;</td>
         </tr>
         <tr>
@@ -486,16 +493,13 @@ template&lt;typename... Types&gt; </div>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd><code>true</code> if append succeeded <br  />
- Example: <div class="fragment"><div class="line">String        buffer(<a class="code hl_enumvalue" href="group__group__strings.html#gga394218cf32c79b0ada9bd2d4892eaf52a76b8d0dcd02ccaf203c167ced6d7ef31">StringEncoding::Ascii</a>);</div>
-<div class="line"><a class="code hl_function" href="struct_s_c_1_1_string_builder.html#aa53c13af98aac1b7ccf439bfc7cd519a">StringBuilder</a> builder(buffer);</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(builder.appendReplaceAll(<span class="stringliteral">&quot;123 456 123 10&quot;</span>, <span class="stringliteral">&quot;123&quot;</span>, <span class="stringliteral">&quot;1234&quot;</span>));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__compiler__macros.html#ga6bc5136e9c6fbc77420173ccf4e32d21">SC_ASSERT_RELEASE</a>(buffer == <span class="stringliteral">&quot;1234 456 1234 10&quot;</span>);</div>
-<div class="line">buffer = String();</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(builder.appendReplaceAll(<span class="stringliteral">&quot;088123&quot;</span>, <span class="stringliteral">&quot;123&quot;</span>, <span class="stringliteral">&quot;1&quot;</span>));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__compiler__macros.html#ga6bc5136e9c6fbc77420173ccf4e32d21">SC_ASSERT_RELEASE</a>(buffer == <span class="stringliteral">&quot;0881&quot;</span>);</div>
-</div><!-- fragment --> </dd></dl>
-
+<dl class="section return"><dt>Returns</dt><dd><code>true</code> if append succeeded</dd></dl>
+<p>Example: </p><div class="fragment"><div class="line">    String        buffer(<a class="code hl_enumvalue" href="group__group__strings.html#gga394218cf32c79b0ada9bd2d4892eaf52a81f91ccd37ce1d232cbfc1520374319d">StringEncoding::Utf8</a>);</div>
+<div class="line">    <a class="code hl_function" href="struct_s_c_1_1_string_builder.html#aa53c13af98aac1b7ccf439bfc7cd519a">StringBuilder</a> sb(buffer);</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(sb.appendReplaceMultiple(<span class="stringliteral">&quot;asd\\salve\\bas&quot;</span>_u8, {{<span class="stringliteral">&quot;asd&quot;</span>, <span class="stringliteral">&quot;un&quot;</span>}, {<span class="stringliteral">&quot;bas&quot;</span>, <span class="stringliteral">&quot;a_tutti&quot;</span>}, {<span class="stringliteral">&quot;\\&quot;</span>, <span class="stringliteral">&quot;/&quot;</span>}}));</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(buffer == <span class="stringliteral">&quot;un/salve/a_tutti&quot;</span>);</div>
+<div class="ttc" id="agroup__group__strings_html_gga394218cf32c79b0ada9bd2d4892eaf52a81f91ccd37ce1d232cbfc1520374319d"><div class="ttname"><a href="group__group__strings.html#gga394218cf32c79b0ada9bd2d4892eaf52a81f91ccd37ce1d232cbfc1520374319d">SC::StringEncoding::Utf8</a></div><div class="ttdeci">@ Utf8</div><div class="ttdoc">Encoding is UTF8.</div></div>
+</div><!-- fragment --> 
 </div>
 </div>
 <a id="a0f1f85a8b4393176aa1c4f96e3ee550b" name="a0f1f85a8b4393176aa1c4f96e3ee550b"></a>

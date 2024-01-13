@@ -114,24 +114,24 @@ $(document).ready(function(){initNavTree('library_containers.html',''); initResi
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md65">Features</a></li>
-<li class="level1"><a href="#autotoc_md66">Status</a></li>
-<li class="level1"><a href="#autotoc_md67">Description</a><ul><li class="level2"><a href="#autotoc_md68">Vector</a></li>
-<li class="level2"><a href="#autotoc_md69">Array</a></li>
-<li class="level2"><a href="#autotoc_md70">SmallVector</a></li>
-<li class="level2"><a href="#autotoc_md71">VectorMap</a></li>
-<li class="level2"><a href="#autotoc_md72">VectorSet</a></li>
-<li class="level2"><a href="#autotoc_md73">ArenaMap</a></li>
-<li class="level2"><a href="#autotoc_md74">IntrusiveDoubleLinkedList</a></li>
+<ul><li class="level1"><a href="#autotoc_md77">Features</a></li>
+<li class="level1"><a href="#autotoc_md78">Status</a></li>
+<li class="level1"><a href="#autotoc_md79">Description</a><ul><li class="level2"><a href="#autotoc_md80">Vector</a></li>
+<li class="level2"><a href="#autotoc_md81">Array</a></li>
+<li class="level2"><a href="#autotoc_md82">SmallVector</a></li>
+<li class="level2"><a href="#autotoc_md83">VectorMap</a></li>
+<li class="level2"><a href="#autotoc_md84">VectorSet</a></li>
+<li class="level2"><a href="#autotoc_md85">ArenaMap</a></li>
+<li class="level2"><a href="#autotoc_md86">IntrusiveDoubleLinkedList</a></li>
 </ul>
 </li>
-<li class="level1"><a href="#autotoc_md75">Details</a></li>
-<li class="level1"><a href="#autotoc_md76">Roadmap</a></li>
+<li class="level1"><a href="#autotoc_md87">Details</a></li>
+<li class="level1"><a href="#autotoc_md88">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟨 Generic containers (<a class="el" href="struct_s_c_1_1_vector.html" title="A contiguous sequence of heap allocated elements.">SC::Vector</a>, <a class="el" href="struct_s_c_1_1_small_vector.html" title="A Vector that can hold up to N elements inline and &gt; N on heap.">SC::SmallVector</a>, <a class="el" href="struct_s_c_1_1_array.html" title="A contiguous sequence of elements kept inside its inline storage.">SC::Array</a> etc.)</p>
 <p >Containers is a library holding some commonly used generic data structures.</p>
-<h1><a class="anchor" id="autotoc_md65"></a>
+<h1><a class="anchor" id="autotoc_md77"></a>
 Features</h1>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -151,12 +151,12 @@ Features</h1>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_intrusive_double_linked_list.html" title="An Intrusive Double Linked List.">SC::IntrusiveDoubleLinkedList</a>   </td><td class="markdownTableBodyLeft">An Intrusive Double Linked List.   </td></tr>
 </table>
-<h1><a class="anchor" id="autotoc_md66"></a>
+<h1><a class="anchor" id="autotoc_md78"></a>
 Status</h1>
 <p >🟨 MVP <br  />
  <a class="el" href="struct_s_c_1_1_vector.html" title="A contiguous sequence of heap allocated elements.">SC::Vector</a>, <a class="el" href="struct_s_c_1_1_array.html" title="A contiguous sequence of elements kept inside its inline storage.">SC::Array</a> and friends should be reasonably stable. <br  />
 </p>
-<h1><a class="anchor" id="autotoc_md67"></a>
+<h1><a class="anchor" id="autotoc_md79"></a>
 Description</h1>
 <p >Generic data structures are a fundamental building blocks for almost every application. <br  />
  These are some of commonly used ones for common tasks, and the library will grow adding what's needed.</p>
@@ -166,7 +166,7 @@ Description</h1>
 <p ><a class="el" href="struct_s_c_1_1_small_vector.html" title="A Vector that can hold up to N elements inline and &gt; N on heap.">SC::SmallVector</a> is the middle ground between <a class="el" href="struct_s_c_1_1_array.html" title="A contiguous sequence of elements kept inside its inline storage.">SC::Array</a> and <a class="el" href="struct_s_c_1_1_vector.html" title="A contiguous sequence of heap allocated elements.">SC::Vector</a>. <br  />
  It's a vector with inline storage for <code>N</code> elements, deriving from <a class="el" href="struct_s_c_1_1_vector.html" title="A contiguous sequence of heap allocated elements.">SC::Vector</a> and it's designed to be passed everywhere a reference to <a class="el" href="struct_s_c_1_1_vector.html" title="A contiguous sequence of heap allocated elements.">SC::Vector</a> is needed. This allows the caller to get rid of temporary heap allocations if an estimate of the space required is already known or if it's possible providing a reasonable default. <br  />
  If this estimation is wrong, heap allocation will happen.</p>
-<h2><a class="anchor" id="autotoc_md68"></a>
+<h2><a class="anchor" id="autotoc_md80"></a>
 Vector</h2>
 <p >A contiguous sequence of heap allocated elements. </p><dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
@@ -186,7 +186,7 @@ Assignment and Copy / move construct operators will just assert as they can't re
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(myVector.pop_front());</div>
 <div class="line">console.print(<span class="stringliteral">&quot;Vector&lt;int&gt; is {}&quot;</span>, myVector.isEmpty() ? <span class="stringliteral">&quot;empty&quot;</span> : <span class="stringliteral">&quot;not empty&quot;</span>);</div>
 <div class="ttc" id="agroup__group__foundation__utility_html_gae6b0d665676a4a5eedc2ad69693c04ee"><div class="ttname"><a href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a></div><div class="ttdeci">#define SC_TRY(expression)</div><div class="ttdoc">Checks the value of the given expression and if failed, returns this value to caller.</div><div class="ttdef"><b>Definition:</b> Result.h:47</div></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md69"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md81"></a>
 Array</h2>
 <p >A contiguous sequence of elements kept inside its inline storage. </p><dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
@@ -208,7 +208,7 @@ Only up to <a class="el" href="struct_s_c_1_1_array.html#a3285cd46fac25d8520c9c8
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(myVector.pop_front());</div>
 <div class="line">(void)myVector.pop_front(); <span class="comment">// &lt;-- This will fail</span></div>
 <div class="line">console.print(<span class="stringliteral">&quot;Array&lt;int, 3&gt; is {}&quot;</span>, myVector.isEmpty() ? <span class="stringliteral">&quot;empty&quot;</span> : <span class="stringliteral">&quot;not empty&quot;</span>);</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md70"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md82"></a>
 SmallVector</h2>
 <p >A Vector that can hold up to <code>N</code> elements inline and <code>&gt; N</code> on heap. </p><dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
@@ -238,7 +238,7 @@ When the <code>size()</code> becomes less than <code>N</code> the container will
 <div class="line"><span class="comment">// ... later on</span></div>
 <div class="line"> </div>
 <div class="line">mySmallVector.pop_back(); <span class="comment">// &lt;-- Vector is moved back to SmallVector inline storage</span></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md71"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md83"></a>
 VectorMap</h2>
 <p >A map holding VectorMapItem key-value pairs in an unsorted Vector. </p><dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
@@ -255,7 +255,7 @@ VectorMap</h2>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(map.contains(<span class="stringliteral">&quot;A&quot;</span>, value) &amp;&amp; *value == 2); <span class="comment">// &lt;-- &quot;A&quot; is a StringView, avoiding allocation</span></div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(map.contains(<span class="stringliteral">&quot;B&quot;</span>, value) &amp;&amp; *value == 3); <span class="comment">// &lt;-- &quot;B&quot; is a StringView, avoiding allocation</span></div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(not map.contains(<span class="stringliteral">&quot;C&quot;</span>)); <span class="comment">// &lt;-- &quot;C&quot; is a StringView, avoiding allocation</span></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md72"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md84"></a>
 VectorSet</h2>
 <p >A set built on an unsorted Vector, ensuring no item duplication. </p><dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
@@ -276,7 +276,7 @@ VectorSet</h2>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(setOfStrings.size() == 1);</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(setOfStrings.contains(<span class="stringliteral">&quot;456&quot;</span>));</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(not setOfStrings.contains(<span class="stringliteral">&quot;123&quot;</span>));</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md73"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md85"></a>
 ArenaMap</h2>
 <p >A sparse vector keeping objects at a stable memory location. </p><dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
@@ -302,7 +302,7 @@ Internally it hold sparse objects inside of a <a class="el" href="struct_s_c_1_1
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(map.get(keys[0])-&gt;view() == <span class="stringliteral">&quot;ASD&quot;</span>); <span class="comment">// Get first element</span></div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(map.get(keys[1])-&gt;view() == <span class="stringliteral">&quot;DSA&quot;</span>); <span class="comment">// Get second element</span></div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(map.get(keys[2])-&gt;view() == <span class="stringliteral">&quot;BDA&quot;</span>); <span class="comment">// Get third element</span></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md74"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md86"></a>
 IntrusiveDoubleLinkedList</h2>
 <p >An Intrusive Double Linked List. </p><dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
@@ -336,7 +336,7 @@ Both <a class="el" href="library_async.html">Async</a> and <a class="el" href="l
 <div class="line">Item* second = queue.dequeueFront();</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(second-&gt;data == 1);</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(queue.isEmpty());</div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md75"></a>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md87"></a>
 Details</h1>
 <ul>
 <li><code>SC::SegmentItems</code> is the class representing a variable and contiguous slice of objects backing both <a class="el" href="struct_s_c_1_1_vector.html" title="A contiguous sequence of heap allocated elements.">SC::Vector</a> and <a class="el" href="struct_s_c_1_1_array.html" title="A contiguous sequence of elements kept inside its inline storage.">SC::Array</a>. <br  />
@@ -345,7 +345,7 @@ Details</h1>
 <li><code>SC::SegmentHeaderBase</code> is aligned to <code>uint64_t</code>.</li>
 <li><a class="el" href="struct_s_c_1_1_vector.html" title="A contiguous sequence of heap allocated elements.">SC::Vector</a> and <a class="el" href="struct_s_c_1_1_array.html" title="A contiguous sequence of elements kept inside its inline storage.">SC::Array</a> use <code>SC::SegmentHeader</code> = <code>SC::SegmentHeaderBase</code> so the <code>SC::SegmentHeader</code> size is 8 bytes.</li>
 </ul>
-<h1><a class="anchor" id="autotoc_md76"></a>
+<h1><a class="anchor" id="autotoc_md88"></a>
 Roadmap</h1>
 <p >🟩 Usable Features:</p><ul>
 <li>Add option to let user disable heap allocations in <a class="el" href="struct_s_c_1_1_small_vector.html" title="A Vector that can hold up to N elements inline and &gt; N on heap.">SC::SmallVector</a></li>

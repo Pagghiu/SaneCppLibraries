@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.9.2"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Sane C++: How To</title>
+<title>Sane C++: SC::StringBuilder::ReplacePair Struct Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -91,7 +91,7 @@ $(function() {
 </div>
 <script type="text/javascript">
 /* @license magnet:?xt=urn:btih:d3d9a9a6595521f9666a5e94cc830dab83b65699&amp;dn=expat.txt MIT */
-$(document).ready(function(){initNavTree('page_how_to.html',''); initResizable(); });
+$(document).ready(function(){initNavTree('struct_s_c_1_1_string_builder_1_1_replace_pair.html',''); initResizable(); });
 /* @license-end */
 </script>
 <div id="doc-content">
@@ -109,48 +109,56 @@ $(document).ready(function(){initNavTree('page_how_to.html',''); initResizable()
 </iframe>
 </div>
 
-<div><div class="header">
-  <div class="headertitle"><div class="title">How To </div></div>
+<div class="header">
+  <div class="summary">
+<a href="#pub-attribs">Public Attributes</a> &#124;
+<a href="struct_s_c_1_1_string_builder_1_1_replace_pair-members.html">List of all members</a>  </div>
+  <div class="headertitle"><div class="title">SC::StringBuilder::ReplacePair Struct Reference</div></div>
 </div><!--header-->
 <div class="contents">
-<div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md23">Disable Standard C++ Library</a></li>
-<li class="level1"><a href="#autotoc_md24">Disable Exceptions and RTTI</a></li>
-<li class="level1"><a href="#autotoc_md25">Use Debug Visualizers</a></li>
-</ul>
+
+<p>Holds a search / replace pair for <a class="el" href="struct_s_c_1_1_string_builder.html#a79b431f1b1a30f31868dd669d2427e79" title="Appends source to destination buffer, replacing multiple substitutions pairs.">StringBuilder::appendReplaceMultiple</a>.  
+ <a href="struct_s_c_1_1_string_builder_1_1_replace_pair.html#details">More...</a></p>
+
+<p><code>#include &lt;<a class="el" href="_string_builder_8h_source.html">StringBuilder.h</a>&gt;</code></p>
+<table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
+Public Attributes</h2></td></tr>
+<tr class="memitem:a6b480a88e13f8f9321dbcbbedb874e8c"><td class="memItemLeft" align="right" valign="top"><a id="a6b480a88e13f8f9321dbcbbedb874e8c" name="a6b480a88e13f8f9321dbcbbedb874e8c"></a>
+<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td><td class="memItemRight" valign="bottom"><b>searchFor</b></td></tr>
+<tr class="separator:a6b480a88e13f8f9321dbcbbedb874e8c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a110e33fa1cd5249311cbf25cf644ef6a"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_builder_1_1_replace_pair.html#a110e33fa1cd5249311cbf25cf644ef6a">replaceWith</a></td></tr>
+<tr class="memdesc:a110e33fa1cd5249311cbf25cf644ef6a"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> to be searched for in source string.  <a href="struct_s_c_1_1_string_builder_1_1_replace_pair.html#a110e33fa1cd5249311cbf25cf644ef6a">More...</a><br /></td></tr>
+<tr class="separator:a110e33fa1cd5249311cbf25cf644ef6a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p >Holds a search / replace pair for <a class="el" href="struct_s_c_1_1_string_builder.html#a79b431f1b1a30f31868dd669d2427e79" title="Appends source to destination buffer, replacing multiple substitutions pairs.">StringBuilder::appendReplaceMultiple</a>. </p>
+</div><h2 class="groupheader">Member Data Documentation</h2>
+<a id="a110e33fa1cd5249311cbf25cf644ef6a" name="a110e33fa1cd5249311cbf25cf644ef6a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a110e33fa1cd5249311cbf25cf644ef6a">&#9670;&nbsp;</a></span>replaceWith</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> SC::StringBuilder::ReplacePair::replaceWith</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p><a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> to be searched for in source string. </p>
+
 </div>
-<div class="textblock"><h1><a class="anchor" id="autotoc_md23"></a>
-Disable Standard C++ Library</h1>
-<p >If you're satisfied with the C++ standard library alternatives included in this SC and do not plan to use C++ Standard Library in your project:</p><ul>
-<li><em>XCode / Clang / GCC</em>:<ul>
-<li>Add <b>&ndash;nostdlib</b></li>
-<li>Add <b>&ndash;nostdinc++</b></li>
+</div>
+<hr/>The documentation for this struct was generated from the following file:<ul>
+<li><a class="el" href="_string_builder_8h_source.html">StringBuilder.h</a></li>
 </ul>
-</li>
-</ul>
-<h1><a class="anchor" id="autotoc_md24"></a>
-Disable Exceptions and RTTI</h1>
-<p >If you disable the Standard C++ Library, you can also disable Exceptions and RTTI</p><ul>
-<li><em>XCode / Clang / GCC</em>:<ul>
-<li>Add <b>-fno-exceptions</b></li>
-<li>Add <b>-fno-rtti</b></li>
-</ul>
-</li>
-<li><em>Visual Studio / MSVC / ClangCL</em><ul>
-<li>Set <b>Enable C++ Exceptions</b> to <b>No</b></li>
-<li>Set <b>Enable Runtime Type Information</b> set to <b>No</b> (<b>GR-</b>)</li>
-</ul>
-</li>
-</ul>
-<h1><a class="anchor" id="autotoc_md25"></a>
-Use Debug Visualizers</h1>
-<p >This library contains debug visualizers for <a class="el" href="library_containers.html">Containers</a> and <a class="el" href="library_strings.html">Strings</a> for <code>clang</code> and <code>cl.exe</code> (Microsoft Compiler). Using them will make your life easier. <a class="el" href="library_build.html">Build</a> is setting them up automatically for XCode and Visual Studio projects. </p>
-</div></div><!-- contents -->
-</div><!-- PageDoc -->
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
+    <li class="navelem"><b>SC</b></li><li class="navelem"><a class="el" href="struct_s_c_1_1_string_builder.html">StringBuilder</a></li><li class="navelem"><a class="el" href="struct_s_c_1_1_string_builder_1_1_replace_pair.html">ReplacePair</a></li>
     <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.2 </li>
   </ul>
 </div>

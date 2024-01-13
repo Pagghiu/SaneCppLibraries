@@ -141,6 +141,7 @@ var hierarchy =
     [ "SC::TypeTraits::RemoveConst< T >", "struct_s_c_1_1_type_traits_1_1_remove_const.html", null ],
     [ "SC::TypeTraits::RemovePointer< T >", "struct_s_c_1_1_type_traits_1_1_remove_pointer.html", null ],
     [ "SC::TypeTraits::RemoveReference< T >", "struct_s_c_1_1_type_traits_1_1_remove_reference.html", null ],
+    [ "SC::StringBuilder::ReplacePair", "struct_s_c_1_1_string_builder_1_1_replace_pair.html", null ],
     [ "SC::HttpServerBase::Request", "struct_s_c_1_1_http_server_base_1_1_request.html", null ],
     [ "SC::HttpServerBase::Response", "struct_s_c_1_1_http_server_base_1_1_response.html", null ],
     [ "SC::Hashing::Result", "struct_s_c_1_1_hashing_1_1_result.html", null ],

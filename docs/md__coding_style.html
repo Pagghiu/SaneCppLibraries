@@ -116,13 +116,13 @@ $(document).ready(function(){initNavTree('md__coding_style.html',''); initResiza
 <div class="textblock"><blockquote class="doxtable">
 <p >Note: this document will be updated regularly clarifying existing rules and adding missing guidelines that will emerge from discussions or PRs being reviewed. </p>
 </blockquote>
-<h1><a class="anchor" id="autotoc_md1"></a>
+<h1><a class="anchor" id="autotoc_md17"></a>
 Formatting</h1>
 <p >All files should be formatted according to the <code>.clang-format</code> file using <code>clang-format</code> version 15. <br  />
 </p>
 <p >Ideally someday the Github CI will validate PR that are not properly formatted.</p>
 <p >In some specific cases use <code>// clang-format off</code> and <code>// clang-format on</code> where a custom formatting can improve code look. For example many template specializations in the <code><a class="el" href="namespace_s_c_1_1_reflection.html" title="Describe C++ types at compile time for serialization (see Reflection).">SC::Reflection</a></code> library are better manually formatted/aligned to highlight the pattern.</p>
-<h1><a class="anchor" id="autotoc_md2"></a>
+<h1><a class="anchor" id="autotoc_md18"></a>
 Casing</h1>
 <ul>
 <li><code>CamelCase</code> must be used for:<ul>
@@ -142,10 +142,10 @@ Casing</h1>
 </ul>
 </li>
 </ul>
-<h1><a class="anchor" id="autotoc_md3"></a>
+<h1><a class="anchor" id="autotoc_md19"></a>
 [[nodiscard]]</h1>
 <p >Function and methods returning a value must always be marked as <code>[[nodiscard]]</code></p>
-<h1><a class="anchor" id="autotoc_md4"></a>
+<h1><a class="anchor" id="autotoc_md20"></a>
 Error checking</h1>
 <p >When using system API try to handle at least the basic error codes in the very first draft implementation and leave <code>TODO:</code> to remember handling additional errors that can occur.</p>
 <p >Always use <code>SC_TRY</code> family of macros to check report errors to the caller. Some very specific use cases may be exempted from this rule when it's unreasonable and useless. When the specific use case has been approved, the method that doesn't want to do any error checking should use the <code>SC_COMPILER_WARNING_*</code> macros.</p>
@@ -166,7 +166,7 @@ Error checking</h1>
 <div class="ttc" id="agroup__group__foundation__compiler__macros_html_gab61d123dc400964ff65eacdec3349ccd"><div class="ttname"><a href="group__group__foundation__compiler__macros.html#gab61d123dc400964ff65eacdec3349ccd">SC_COMPILER_WARNING_PUSH_UNUSED_RESULT</a></div><div class="ttdeci">#define SC_COMPILER_WARNING_PUSH_UNUSED_RESULT</div><div class="ttdoc">Disables unused-result warning (due to ignoring a return value marked as [[nodiscard]])</div><div class="ttdef"><b>Definition:</b> Compiler.h:143</div></div>
 <div class="ttc" id="astruct_s_c_1_1_result_html"><div class="ttname"><a href="struct_s_c_1_1_result.html">SC::Result</a></div><div class="ttdoc">An ascii string used as boolean result. SC_TRY macro forwards errors to caller.</div><div class="ttdef"><b>Definition:</b> Result.h:11</div></div>
 </div><!-- fragment --><p >For example <code><a class="el" href="namespace_s_c_1_1_build.html" title="Minimal build system where builds are described in C++ (see Build)">SC::Build</a></code> writers disable unused result warnings for ignoring the potential failure of appending strings in the <code><a class="el" href="struct_s_c_1_1_string_builder.html" title="Builds String out of a sequence of StringView or formatting through StringFormat.">SC::StringBuilder</a></code> being used.</p>
-<h1><a class="anchor" id="autotoc_md5"></a>
+<h1><a class="anchor" id="autotoc_md21"></a>
 Return values</h1>
 <p >If the return value of a function is already returning <code>bool</code> or <code><a class="el" href="struct_s_c_1_1_result.html" title="An ascii string used as boolean result. SC_TRY macro forwards errors to caller.">SC::Result</a></code>, consider adding an <code>out</code> parameter, that can be a <code>pointer</code> or a <code>reference.</code></p>
 <p >Example of mandatory out value:</p>
@@ -212,49 +212,49 @@ Return values</h1>
 <div class="line">    <span class="comment">// we know also at what index the item was found</span></div>
 <div class="line">    myVector[foundIndex]++;</div>
 <div class="line">}</div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md6"></a>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md22"></a>
 struct vs class</h1>
 <p ><code>struct</code> is preferred to <code>class</code> due to an arbitrary initial choice made during the very first phases of the project.</p>
 <p >Using <code>struct</code> is now necessary for consistency with the existing code.</p>
-<h1><a class="anchor" id="autotoc_md7"></a>
+<h1><a class="anchor" id="autotoc_md23"></a>
 Namespaces</h1>
 <p >All functions and structs must be defined in the namespace <code>SC</code>. <br  />
  Some libraries defining many related classes may group them in a nested namespace inside <code>SC</code>.</p>
 <p ><code>using namespace</code> is only allowed inside a function or method scope.</p>
-<h1><a class="anchor" id="autotoc_md8"></a>
+<h1><a class="anchor" id="autotoc_md24"></a>
 Platform specific code</h1>
 <p >Platform specific code should be isolated with proper <code>#ifdef</code> inside a specific function if it's a small amount of code. <br  />
  Bigger platform specific re-implementation should be separated in specific <code>.inl</code> files included by the library <code>.cpp</code> file.</p>
-<h1><a class="anchor" id="autotoc_md9"></a>
+<h1><a class="anchor" id="autotoc_md25"></a>
 Header inclusion</h1>
 <p >Each header and compile unit should include what's necessary to use or compile it in isolation. </p><blockquote class="doxtable">
 <p >The unity build is a distribution mechanism detail. </p>
 </blockquote>
-<h1><a class="anchor" id="autotoc_md10"></a>
+<h1><a class="anchor" id="autotoc_md26"></a>
 Public Headers</h1>
 <p >Public headers are meant to be included by users of the library. Such headers should have the smallest amount of code that is needed to use them. Everywhere possible, write the implementation code in a .cpp file rather than an header.</p>
 <blockquote class="doxtable">
 <p >Public headers are not allowed to include any OS specific or System / compiler provided header. </p>
 </blockquote>
-<h1><a class="anchor" id="autotoc_md11"></a>
+<h1><a class="anchor" id="autotoc_md27"></a>
 Forward declarations</h1>
 <p >Use forward declarations everywhere possible to reduce the number of header dependencies.</p>
-<h1><a class="anchor" id="autotoc_md12"></a>
+<h1><a class="anchor" id="autotoc_md28"></a>
 Functions</h1>
 <p >Free functions should be defined as <code>static</code> inside a struct (or nested namespace) with very few specific exceptions.</p>
-<h1><a class="anchor" id="autotoc_md13"></a>
+<h1><a class="anchor" id="autotoc_md29"></a>
 Member variables</h1>
 <p >Member variables should not start with lowercase <code>m</code> to indicate it's a member variable (so <code>someThing</code> is good but <code>mSomeThing</code> is not)</p>
 <p >Good: </p><div class="fragment"><div class="line"><span class="keywordtype">int</span> myVariable;</div>
 </div><!-- fragment --><p >Bad 1: </p><div class="fragment"><div class="line"><span class="keywordtype">int</span> mMyVariable;</div>
 </div><!-- fragment --><p >Bad 2: </p><div class="fragment"><div class="line"><span class="keywordtype">int</span> m_myVariable;</div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md14"></a>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md30"></a>
 Testing</h1>
 <p >All newly added code must have associated tests.</p>
-<h1><a class="anchor" id="autotoc_md15"></a>
+<h1><a class="anchor" id="autotoc_md31"></a>
 Documentation</h1>
 <p >All public classes should be documented, possibly with an usage example.</p>
-<h1><a class="anchor" id="autotoc_md16"></a>
+<h1><a class="anchor" id="autotoc_md32"></a>
 Comments</h1>
 <p >Comments should in general avoid repeating what's stated in the code. <br  />
  Please, take some time to find a good variable and method name that can avoid a comment. <br  />
@@ -264,7 +264,7 @@ Comments</h1>
 <div class="fragment"><div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(converter.appendNullTerminated(currentWorkingDirectory));</div>
 <div class="line"><span class="comment">// TODO: Assert if path is not absolute</span></div>
 <div class="line"><span class="keywordflow">return</span> Result(existsAndIsDirectory(<span class="stringliteral">&quot;.&quot;</span>));</div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md17"></a>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md33"></a>
 Braces</h1>
 <p >Braces may be omitted only if a single statement guarded by the if and only if there are no else clauses.</p>
 <p >Good: </p><div class="fragment"><div class="line"><span class="keywordflow">if</span> (someCondition)</div>
@@ -289,7 +289,7 @@ Braces</h1>
 <div class="line">    myVariable = 0;</div>
 <div class="line">    otherStuff();</div>
 <div class="line">}</div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md18"></a>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md34"></a>
 Parameters</h1>
 <p >Pointer parameters always indicate that such parameter <em>can</em> be null. <br  />
  Use references to indicate that a parameter is mandatory.</p>
@@ -312,27 +312,27 @@ Parameters</h1>
 <div class="line">{</div>
 <div class="line">    <span class="keywordflow">return</span> parameter + mandatoryParameter.value;</div>
 <div class="line">}</div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md19"></a>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md35"></a>
 Casts</h1>
 <p >Try writing code that can avoid casts, by using correct integer types where possible.</p>
 <blockquote class="doxtable">
 <p >When cast is needed, do not use C-style casts but ONLY C++ style casts (<code>static_cast</code>, <code>reinterpret_cast</code>). </p>
 </blockquote>
-<h1><a class="anchor" id="autotoc_md20"></a>
+<h1><a class="anchor" id="autotoc_md36"></a>
 Globals / Static member variables</h1>
 <p >Globals and static member variables should be avoided at all costs. <br  />
 </p>
 <blockquote class="doxtable">
 <p >Special exemption allowing usage of globals will need to be discussed and approved on a case by case basis. </p>
 </blockquote>
-<h1><a class="anchor" id="autotoc_md21"></a>
+<h1><a class="anchor" id="autotoc_md37"></a>
 Virtual</h1>
 <p >Usage of <code>virtual</code> should be avoided if possible. <br  />
  Prefer static dispatch (using <code>enums</code>) and for runtime-only use cases consider using <code><a class="el" href="struct_s_c_1_1_function.html" title="Wraps function pointers, member functions and lambdas without ever allocating.">SC::Function</a></code></p>
 <blockquote class="doxtable">
 <p >Special exemption allowing <code>virtual</code> usage will need to be discussed and approved on a case by case basis. </p>
 </blockquote>
-<h1><a class="anchor" id="autotoc_md22"></a>
+<h1><a class="anchor" id="autotoc_md38"></a>
 Exceptions / RTTI</h1>
 <p >Exceptions and RTTI are not allowed. </p>
 </div></div><!-- contents -->

@@ -114,18 +114,18 @@ $(document).ready(function(){initNavTree('library_process.html',''); initResizab
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md137">Features</a></li>
-<li class="level1"><a href="#autotoc_md138">Status</a></li>
-<li class="level1"><a href="#autotoc_md139">Description</a><ul><li class="level2"><a href="#autotoc_md140">Process</a></li>
-<li class="level2"><a href="#autotoc_md141">ProcessChain</a></li>
+<ul><li class="level1"><a href="#autotoc_md149">Features</a></li>
+<li class="level1"><a href="#autotoc_md150">Status</a></li>
+<li class="level1"><a href="#autotoc_md151">Description</a><ul><li class="level2"><a href="#autotoc_md152">Process</a></li>
+<li class="level2"><a href="#autotoc_md153">ProcessChain</a></li>
 </ul>
 </li>
-<li class="level1"><a href="#autotoc_md142">Roadmap</a></li>
+<li class="level1"><a href="#autotoc_md154">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟩 Create child processes and chain them (also usable with <a class="el" href="library_async.html">Async</a> library)</p>
 <p >Process allows launching and chaining input and output of child processes.</p>
-<h1><a class="anchor" id="autotoc_md137"></a>
+<h1><a class="anchor" id="autotoc_md149"></a>
 Features</h1>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -135,14 +135,14 @@ Features</h1>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_process_chain.html" title="Execute multiple child processes chaining input / output between them.">SC::ProcessChain</a>   </td><td class="markdownTableBodyLeft">Execute multiple child processes chaining input / output between them.   </td></tr>
 </table>
-<h1><a class="anchor" id="autotoc_md138"></a>
+<h1><a class="anchor" id="autotoc_md150"></a>
 Status</h1>
 <p >🟩 Usable <br  />
  Library allows all basic operations on child processes and it's being used in <a class="el" href="library_plugin.html">Plugin</a>.</p>
-<h1><a class="anchor" id="autotoc_md139"></a>
+<h1><a class="anchor" id="autotoc_md151"></a>
 Description</h1>
 <p >The <a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process.">SC::Process</a> class is used when handling a process in isolation, while the <a class="el" href="struct_s_c_1_1_process_chain.html" title="Execute multiple child processes chaining input / output between them.">SC::ProcessChain</a> is used when there is need to chain inputs and outputs of multiple processes together.</p>
-<h2><a class="anchor" id="autotoc_md140"></a>
+<h2><a class="anchor" id="autotoc_md152"></a>
 Process</h2>
 <p >Execute a child process. Features:</p><ul>
 <li>Redirecting standard in/out/err of a child process to a Pipe</li>
@@ -164,7 +164,7 @@ Process</h2>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(outputPipe.readPipe.readUntilEOF(output));</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.waitForExitSync());</div>
 <div class="line"><span class="comment">// ... Do something with the &#39;output&#39; string</span></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md141"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md153"></a>
 ProcessChain</h2>
 <p >Execute multiple child processes chaining input / output between them. <br  />
 Chains multiple child processes together, so that the output of a process becomes input of another (similar to what happens wit the pipe (<code>|</code>) operator on Posix shells).</p>
@@ -187,7 +187,7 @@ Chains multiple child processes together, so that the output of a process become
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(chain.readStdOutUntilEOFSync(output));</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(chain.waitForExitSync());</div>
 <div class="line"><span class="comment">// ... Do something with the &#39;output&#39; string</span></div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md142"></a>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md154"></a>
 Roadmap</h1>
 <p >🟦 Complete Features:</p><ul>
 <li>To be defined</li>

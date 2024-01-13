@@ -45,7 +45,7 @@ var searchData=
   ['appendmove_42',['appendMove',['../struct_s_c_1_1_vector.html#a53b622a41a73c08cd42a3e6731d01f48',1,'SC::Vector::appendMove()'],['../struct_s_c_1_1_array.html#a557b59cd3995cbe56d43c37cea643f30',1,'SC::Array::appendMove()']]],
   ['appendnullterminated_43',['appendNullTerminated',['../struct_s_c_1_1_string_converter.html#ad19a429c37c8ce98cd9bc9be6652dd86',1,'SC::StringConverter']]],
   ['appendreplaceall_44',['appendReplaceAll',['../struct_s_c_1_1_string_builder.html#a6b30ac7813be680de0bda54e7dd9b8f4',1,'SC::StringBuilder']]],
-  ['appendreplacemultiple_45',['appendReplaceMultiple',['../struct_s_c_1_1_string_builder.html#a3d4a384a14ce4fc7da60d98e8689ee12',1,'SC::StringBuilder']]],
+  ['appendreplacemultiple_45',['appendReplaceMultiple',['../struct_s_c_1_1_string_builder.html#a79b431f1b1a30f31868dd669d2427e79',1,'SC::StringBuilder']]],
   ['applicationrootdirectory_46',['applicationRootDirectory',['../struct_s_c_1_1_test_report.html#ae4447c334e11d801bd487486c38335ba',1,'SC::TestReport']]],
   ['applypreset_47',['applyPreset',['../struct_s_c_1_1_build_1_1_configuration.html#ac91ac0e8b263958d393c2ff87fe9cad1',1,'SC::Build::Configuration']]],
   ['architecture_48',['architecture',['../struct_s_c_1_1_build_1_1_configuration.html#ad38b2fda987303e5c110ed748d09c3af',1,'SC::Build::Configuration']]],

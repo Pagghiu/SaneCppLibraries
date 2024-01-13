@@ -25,51 +25,47 @@
 var NAVTREE =
 [
   [ "Sane C++", "index.html", [
-    [ "Motivation", "index.html#autotoc_md27", null ],
-    [ "Status", "index.html#autotoc_md28", null ],
-    [ "Platforms", "index.html#autotoc_md29", null ],
-    [ "Learning", "index.html#autotoc_md30", null ],
-    [ "Building", "index.html#autotoc_md31", [
-      [ "Dependencies", "index.html#autotoc_md32", null ],
-      [ "Integrate in your project", "index.html#autotoc_md33", null ],
-      [ "Build the test", "index.html#autotoc_md34", null ],
-      [ "ABI / API Stability", "index.html#autotoc_md35", null ]
-    ] ],
+    [ "Motivation", "index.html#autotoc_md45", null ],
+    [ "Status", "index.html#autotoc_md46", null ],
+    [ "Platforms", "index.html#autotoc_md47", null ],
+    [ "Building", "md__building.html", null ],
     [ "Coding Style", "md__coding_style.html", [
-      [ "Formatting", "md__coding_style.html#autotoc_md1", null ],
-      [ "Casing", "md__coding_style.html#autotoc_md2", null ],
-      [ "[[nodiscard]]", "md__coding_style.html#autotoc_md3", null ],
-      [ "Error checking", "md__coding_style.html#autotoc_md4", null ],
-      [ "Return values", "md__coding_style.html#autotoc_md5", null ],
-      [ "struct vs class", "md__coding_style.html#autotoc_md6", null ],
-      [ "Namespaces", "md__coding_style.html#autotoc_md7", null ],
-      [ "Platform specific code", "md__coding_style.html#autotoc_md8", null ],
-      [ "Header inclusion", "md__coding_style.html#autotoc_md9", null ],
-      [ "Public Headers", "md__coding_style.html#autotoc_md10", null ],
-      [ "Forward declarations", "md__coding_style.html#autotoc_md11", null ],
-      [ "Functions", "md__coding_style.html#autotoc_md12", null ],
-      [ "Member variables", "md__coding_style.html#autotoc_md13", null ],
-      [ "Testing", "md__coding_style.html#autotoc_md14", null ],
-      [ "Documentation", "md__coding_style.html#autotoc_md15", null ],
-      [ "Comments", "md__coding_style.html#autotoc_md16", null ],
-      [ "Braces", "md__coding_style.html#autotoc_md17", null ],
-      [ "Parameters", "md__coding_style.html#autotoc_md18", null ],
-      [ "Casts", "md__coding_style.html#autotoc_md19", null ],
-      [ "Globals / Static member variables", "md__coding_style.html#autotoc_md20", null ],
-      [ "Virtual", "md__coding_style.html#autotoc_md21", null ],
-      [ "Exceptions / RTTI", "md__coding_style.html#autotoc_md22", null ]
+      [ "Formatting", "md__coding_style.html#autotoc_md17", null ],
+      [ "Casing", "md__coding_style.html#autotoc_md18", null ],
+      [ "[[nodiscard]]", "md__coding_style.html#autotoc_md19", null ],
+      [ "Error checking", "md__coding_style.html#autotoc_md20", null ],
+      [ "Return values", "md__coding_style.html#autotoc_md21", null ],
+      [ "struct vs class", "md__coding_style.html#autotoc_md22", null ],
+      [ "Namespaces", "md__coding_style.html#autotoc_md23", null ],
+      [ "Platform specific code", "md__coding_style.html#autotoc_md24", null ],
+      [ "Header inclusion", "md__coding_style.html#autotoc_md25", null ],
+      [ "Public Headers", "md__coding_style.html#autotoc_md26", null ],
+      [ "Forward declarations", "md__coding_style.html#autotoc_md27", null ],
+      [ "Functions", "md__coding_style.html#autotoc_md28", null ],
+      [ "Member variables", "md__coding_style.html#autotoc_md29", null ],
+      [ "Testing", "md__coding_style.html#autotoc_md30", null ],
+      [ "Documentation", "md__coding_style.html#autotoc_md31", null ],
+      [ "Comments", "md__coding_style.html#autotoc_md32", null ],
+      [ "Braces", "md__coding_style.html#autotoc_md33", null ],
+      [ "Parameters", "md__coding_style.html#autotoc_md34", null ],
+      [ "Casts", "md__coding_style.html#autotoc_md35", null ],
+      [ "Globals / Static member variables", "md__coding_style.html#autotoc_md36", null ],
+      [ "Virtual", "md__coding_style.html#autotoc_md37", null ],
+      [ "Exceptions / RTTI", "md__coding_style.html#autotoc_md38", null ]
     ] ],
-    [ "How To", "page_how_to.html", [
-      [ "Disable Standard C++ Library", "page_how_to.html#autotoc_md23", null ],
-      [ "Disable Exceptions and RTTI", "page_how_to.html#autotoc_md24", null ],
-      [ "Use Debug Visualizers", "page_how_to.html#autotoc_md25", null ]
+    [ "FAQ", "page_faq.html", [
+      [ "Where can I learn more?", "page_faq.html#autotoc_md39", null ],
+      [ "Can I disable Standard C++ Library?", "page_faq.html#autotoc_md40", null ],
+      [ "Can I disable Exceptions and RTTI?", "page_faq.html#autotoc_md41", null ],
+      [ "Does the library have debug visualizers?", "page_faq.html#autotoc_md42", null ],
+      [ "What plans for ABI / API stability?", "page_faq.html#autotoc_md43", null ]
     ] ],
     [ "Libraries", "libraries.html", "libraries" ],
     [ "Extra Libraries", "libraries_extra.html", "libraries_extra" ],
     [ "Principles", "page_principles.html", [
-      [ "📖 Readability", "page_principles.html#autotoc_md247", null ],
-      [ "✅ Correctness", "page_principles.html#autotoc_md248", null ],
-      [ "🚀 Speed", "page_principles.html#autotoc_md249", null ]
+      [ "📖 Readability", "page_principles.html#autotoc_md259", null ],
+      [ "✅ Correctness", "page_principles.html#autotoc_md260", null ],
+      [ "🚀 Speed", "page_principles.html#autotoc_md261", null ]
     ] ],
     [ "Modules", "modules.html", "modules" ],
     [ "Namespaces", "namespaces.html", [
@@ -103,11 +99,11 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "_algorithm_bubble_sort_8h_source.html",
-"library_async.html#autotoc_md51",
-"namespaces.html",
-"struct_s_c_1_1_deferred.html#a205c32ceb8887c669bcd71c547ebaf71",
-"struct_s_c_1_1_plugin_definition.html#ae56a9bb1859e765c94f50b2b83a500eb",
-"struct_s_c_1_1_string_iterator.html#a8f00cabd965b4a3df8dc880f8c78d7a3"
+"library_async.html#autotoc_md69",
+"page_faq.html#autotoc_md42",
+"struct_s_c_1_1_event_object.html",
+"struct_s_c_1_1_plugin_dynamic_library.html#a538f2ae50e3679fb07d4896a5555db70",
+"struct_s_c_1_1_string_iterator.html#a9426b4a66e8b14b32b863bfb85018d68"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';
