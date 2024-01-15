@@ -32,7 +32,7 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
     project.getConfiguration("Debug")->compile.addDefines({"DEBUG=1"});
     // TODO: These includes must be relative to rootDirectory
     project.compile.addIncludes({
-        "../../../..",           // SC Root (for PluginTest)
+        "../../..",              // SC Root (for PluginTest)
         "../../../Tests/SCTest", // For SCConfig.h (enabled by SC_COMPILER_ENABLE_CONFIG == 1)
     });
     if (parameters.platforms.contains(Build::Platform::MacOS))

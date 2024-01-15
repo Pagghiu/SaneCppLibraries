@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include <SC/Libraries/Containers/SmallVector.h>
-#include <SC/Libraries/Plugin/PluginMacros.h>
-#include <SC/Libraries/Strings/Console.h>
-#include <SC/Libraries/Strings/String.h>
+#include <Libraries/Containers/SmallVector.h>
+#include <Libraries/Plugin/PluginMacros.h>
+#include <Libraries/Strings/Console.h>
+#include <Libraries/Strings/String.h>
 
 struct TestPluginParent
 {
