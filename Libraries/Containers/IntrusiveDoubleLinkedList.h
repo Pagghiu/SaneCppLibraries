@@ -103,21 +103,21 @@ struct SC::IntrusiveDoubleLinkedList
                 found = true;
                 break;
             }
-            it = it->next;
+            it = static_cast<T*>(it->next);
         }
         SC_ASSERT_DEBUG(found);
 #endif
         if (&item == front)
         {
-            front = front->next;
+            front = static_cast<T*>(front->next);
         }
         if (&item == back)
         {
-            back = back->prev;
+            back = static_cast<T*>(back->prev);
         }
 
-        T* next = item.next;
-        T* prev = item.prev;
+        T* next = static_cast<T*>(item.next);
+        T* prev = static_cast<T*>(item.prev);
 
         if (prev)
         {
