@@ -5,10 +5,11 @@
 #if SC_PLATFORM_APPLE
 #include <CommonCrypto/CommonDigest.h>
 
+#if SC_COMPILER_CLANG
 // CC_MD5_* are deprecated
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-
+#endif
 SC::Hashing::Hashing()
 {
     static_assert(sizeof(CC_MD5_CTX) <= sizeof(buffer), "Check size");    // 92
@@ -76,8 +77,9 @@ bool SC::Hashing::finalize(Result& res)
     }
     return true;
 }
+#if SC_COMPILER_CLANG
 #pragma clang diagnostic pop
-
+#endif
 #elif SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>

@@ -90,7 +90,19 @@ Makefile.$(CONFIG).touched: Makefile
 )delimiter",
                        makeTarget.view());
 
-        builder.append("\n{0}_COMMON_FLAGS :=", makeTarget.view());
+        // TODO: On GCC we need to enable also the following fixing the warnings
+        // -Werror=conversion
+        // -Wshadow
+        // -Wsign-compare
+        // -Werror=sign-conversion
+        // -Wmissing-field-initializers
+        builder.append("\n{0}_WARNING_FLAGS :=-Werror -Werror=return-type -Wunreachable-code -Wnon-virtual-dtor "
+                       "-Woverloaded-virtual -Wmissing-braces -Wparentheses -Wswitch -Wunused-function -Wunused-label "
+                       "-Wunused-parameter -Wunused-variable -Wunused-value -Wempty-body -Wuninitialized "
+                       "-Wunknown-pragmas -Wenum-conversion -Werror=float-conversion -Werror=implicit-fallthrough",
+                       makeTarget.view());
+
+        builder.append("\n{0}_COMMON_FLAGS := $({0}_WARNING_FLAGS)", makeTarget.view());
         const auto projectArray = project.compile.get<Compile::preprocessorDefines>();
         if ((projectArray and not projectArray->isEmpty()))
         {

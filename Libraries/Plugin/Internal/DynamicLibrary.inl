@@ -91,10 +91,10 @@ SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& sy
 }
 #else
 
-SC::Result SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle& handle) { return Result(true); }
+SC::Result SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle&) { return Result(true); }
 
-SC::Result SC::SystemDynamicLibrary::load(StringView fullPath) { return Result(true); }
+SC::Result SC::SystemDynamicLibrary::load(StringView) { return Result(true); }
 
-SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const { return Result(true); }
+SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView, void*&) const { return Result(true); }
 
 #endif
