@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "../Threading.h"
 
+#include <errno.h> // errno
 #include <pthread.h>
 #include <unistd.h> // usleep
 SC::Mutex::Mutex() { pthread_mutex_init(&mutex.reinterpret_as<pthread_mutex_t>(), 0); }
@@ -70,7 +71,14 @@ struct SC::Thread::Internal
     }
 };
 
-void SC::Thread::Sleep(uint32_t milliseconds) { ::usleep(milliseconds * 1000); }
+void SC::Thread::Sleep(uint32_t milliseconds)
+{
+    int rc;
+    do
+    {
+        rc = ::usleep(milliseconds * 1000);
+    } while (rc == -1 && errno == EINTR);
+}
 
 SC::uint64_t SC::Thread::CurrentThreadID()
 {
