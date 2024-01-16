@@ -474,7 +474,7 @@ struct SC::AsyncTest : public SC::TestCase
 
             FileDescriptor::OpenOptions options;
             options.async    = true;
-            options.blocking = false;
+            options.blocking = true;
 
             FileDescriptor fd;
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, options));
@@ -551,7 +551,7 @@ struct SC::AsyncTest : public SC::TestCase
 
             FileDescriptor::OpenOptions options;
             options.async    = true;
-            options.blocking = false;
+            options.blocking = true;
 
             FileDescriptor fd;
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, options));

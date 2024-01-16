@@ -125,6 +125,10 @@ SC::Result SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOptions 
     {
         flags |= O_CLOEXEC;
     }
+    if (not options.blocking)
+    {
+        SC_TRY(setBlocking(false));
+    }
     const int access         = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
     const int fileDescriptor = ::open(filePath.getNullTerminatedNative(), flags, access);
     SC_TRY_MSG(fileDescriptor != -1, "open failed");
