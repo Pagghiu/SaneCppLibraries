@@ -138,7 +138,7 @@ bool SC::PluginDefinition::parseLine(StringIteratorASCII& iterator, StringView& 
     auto valueStart = iterator;
     while (iterator.advanceRead(current))
     {
-        if (current == '\n')
+        if (current == '\n' or current == '\r')
         {
             (void)iterator.stepBackward();
             value = StringView::fromIterators(valueStart, iterator);
