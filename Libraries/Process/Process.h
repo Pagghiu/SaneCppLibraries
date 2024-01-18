@@ -79,11 +79,12 @@ struct SC::Process
     FileDescriptor standardOutput; ///< Descriptor of process stdout
     FileDescriptor standardError;  ///< Descriptor of process stderr
 
-    /// @brief Waits (blocking) for process to exit after launch
+    /// @brief Waits (blocking) for process to exit after launch. It can only be called if Process::launch succeeded.
     [[nodiscard]] Result waitForExitSync();
 
     /// @brief Launch child process with the given arguments
     /// @param args Process executable path and its arguments (if any)
+    /// @returns Error if the requested executable doesn't exist / is not accessible / it cannot be executed
     template <typename... StringView>
     [[nodiscard]] Result launch(StringView&&... args)
     {
@@ -92,11 +93,23 @@ struct SC::Process
     }
 
     /// @brief Launch child process with the given arguments
+    /// @param options Options for launching process (inherit file descriptors)
+    /// @param args Process executable path and its arguments (if any)
+    /// @returns Error if the requested executable doesn't exist / is not accessible / it cannot be executed
+    template <typename... StringView>
+    [[nodiscard]] Result launch(Options options, StringView&&... args)
+    {
+        SC_TRY(formatArguments({forward<StringView>(args)...}));
+        return launch(options);
+    }
+
+    /// @brief Launch child process with the given arguments
     /// @param cmd Process executable path and its arguments (if any)
-    [[nodiscard]] Result launch(Span<const StringView> cmd)
+    /// @returns Error if the requested executable doesn't exist / is not accessible / it cannot be executed
+    [[nodiscard]] Result launch(Span<const StringView> cmd, Options options = Options())
     {
         SC_TRY(formatArguments(cmd));
-        return launch();
+        return launch(options);
     }
 
     /// @brief Redirect Process Standard Output to the given pipe
@@ -121,9 +134,19 @@ struct SC::Process
 
     [[nodiscard]] Result formatArguments(Span<const StringView> cmd);
 
-    StringNative<255>  command          = StringEncoding::Native;
     StringNative<255>  currentDirectory = StringEncoding::Native;
     StringNative<1024> environment      = StringEncoding::Native;
+
+    // On Windows command holds the concatenation of executable and arguments.
+    // On Posix command holds the concatenation of executable and arguments SEPARATED BY null-terminators (\0).
+    // This is done so that in this single buffer with no allocation (under 255) or a single allocation (above 255)
+    // we can track all arguments to be passed to execve.
+    StringNative<255> command = StringEncoding::Native;
+#if !SC_PLATFORM_WINDOWS // On Posix we need to track the "sub-strings" hidden in command
+    static constexpr size_t MAX_NUM_ARGUMENTS = 256;
+    size_t commandArgumentsByteOffset[MAX_NUM_ARGUMENTS]; // Tracking length of each argument in the command string
+    size_t commandArgumentsNumber = 0;                    // Counts number of arguments (including executable name)
+#endif
 
     friend struct IntrusiveDoubleLinkedList<Process>;
     friend struct ProcessChain;
@@ -133,10 +156,9 @@ struct SC::Process
     Process* prev = nullptr;
     struct Internal;
 
-    template <typename Lambda>
-    [[nodiscard]] Result spawn(Lambda&& lambda);
     [[nodiscard]] Result fork();
-    [[nodiscard]] bool   isChild() const;
+
+    [[nodiscard]] bool isChild() const;
 };
 
 /// @brief Execute multiple child processes chaining input / output between them.

@@ -17,8 +17,7 @@ struct SC::ProcessTest : public SC::TestCase
         if (test_section("Process error"))
         {
             Process process;
-            SC_TEST_EXPECT(process.launch("piadsfj", "afsdkj"));
-            SC_TEST_EXPECT(not process.waitForExitSync());
+            SC_TEST_EXPECT(not process.launch("DOCTORI", "ASDF"));
         }
         if (test_section("Process inherit"))
         {
@@ -56,7 +55,7 @@ struct SC::ProcessTest : public SC::TestCase
 #if SC_PLATFORM_WINDOWS
             SC_TEST_EXPECT(chain.pipe(p1, {"where", "where.exe"}));
 #else
-            SC_TEST_EXPECT(chain.pipe(p1, {"ls", "~/Public"}));
+            SC_TEST_EXPECT(chain.pipe(p1, {"echo", "DOCTORI"}));
 #endif
             SC_TEST_EXPECT(chain.launch());
             SC_TEST_EXPECT(chain.waitForExitSync());
@@ -72,8 +71,8 @@ struct SC::ProcessTest : public SC::TestCase
             SC_TEST_EXPECT(chain.pipe(p1, "where", "/?"));
             SC_TEST_EXPECT(chain.pipe(p2, "findstr", "dir]"));
 #else
-            SC_TEST_EXPECT(chain.pipe(p1, "ls", "~"));
-            SC_TEST_EXPECT(chain.pipe(p2, "grep", "Desktop"));
+            SC_TEST_EXPECT(chain.pipe(p1, "echo", "Doctori tuttappost?"));
+            SC_TEST_EXPECT(chain.pipe(p2, "grep", "Doc"));
 #endif
             SC_TEST_EXPECT(chain.launch());
             SC_TEST_EXPECT(chain.waitForExitSync());
@@ -89,8 +88,8 @@ struct SC::ProcessTest : public SC::TestCase
             StringView expectedOutput = "C:\\Windows\\System32\\where.exe\r\n";
             SC_TEST_EXPECT(chain.pipe(p1, "where", "where.exe"));
 #else
-            StringView expectedOutput = "a s d\n";
-            SC_TEST_EXPECT(chain.pipe(p1, "echo", "a s d"));
+            StringView expectedOutput = "DOCTORI\n";
+            SC_TEST_EXPECT(chain.pipe(p1, "echo", "DOCTORI"));
 #endif
             ProcessChain::Options options;
             options.pipeSTDOUT = true;

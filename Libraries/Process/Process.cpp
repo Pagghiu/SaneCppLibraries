@@ -105,6 +105,7 @@ SC::Result SC::ProcessChain::waitForExitSync()
 
 SC::Result SC::Process::formatArguments(Span<const StringView> params)
 {
+#if SC_PLATFORM_WINDOWS
     bool            first = true;
     StringConverter formattedCmd(command, StringConverter::Clear);
     for (const StringView& svp : params)
@@ -125,6 +126,21 @@ SC::Result SC::Process::formatArguments(Span<const StringView> params)
             SC_TRY(formattedCmd.appendNullTerminated(svp));
         }
     }
+#else
+
+    size_t idx             = 0;
+    commandArgumentsNumber = params.sizeInElements();
+    StringConverter formattedCmd(command, StringConverter::Clear);
+    for (const StringView p : params)
+    {
+        commandArgumentsByteOffset[idx] = command.sizeInBytesIncludingTerminator();
+        SC_TRY(formattedCmd.appendNullTerminated(p, false)); // false == keep previous null terminator
+        idx++;
+        if (idx >= MAX_NUM_ARGUMENTS)
+            return Result::Error("Exceeding limit of 256 arguments");
+    }
+
+#endif
     return Result(true);
 }
 
