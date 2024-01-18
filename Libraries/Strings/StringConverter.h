@@ -90,8 +90,9 @@ struct SC::StringConverter
     /// @brief Appends the given StringView and adds null-terminator.
     /// If existing null-terminator was already last inserted code point, it will be removed before appending input.
     /// @param input The StringView to be appended
+    /// @param popExistingNullTerminator If true, removes existing null terminator before adding the new one
     /// @return `true` if the StringView has been successfully appended
-    [[nodiscard]] bool appendNullTerminated(StringView input);
+    [[nodiscard]] bool appendNullTerminated(StringView input, bool popExistingNullTerminator = true);
 
     /// @brief Removes ending null-terminator from stringData if it exists
     /// @param stringData The buffer to be modified

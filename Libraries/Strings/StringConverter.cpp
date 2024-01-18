@@ -220,9 +220,12 @@ bool SC::StringConverter::convertNullTerminateFastPath(StringView input, StringV
     return true;
 }
 
-bool SC::StringConverter::appendNullTerminated(StringView input)
+bool SC::StringConverter::appendNullTerminated(StringView input, bool popExistingNullTerminator)
 {
-    SC_TRY(StringConverter::popNullTermIfExists(data, encoding));
+    if (popExistingNullTerminator)
+    {
+        SC_TRY(StringConverter::popNullTermIfExists(data, encoding));
+    }
     return internalAppend(input, nullptr);
 }
 
