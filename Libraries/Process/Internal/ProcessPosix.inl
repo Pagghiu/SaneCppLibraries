@@ -5,6 +5,7 @@
 #include "../Process.h"
 
 #include <errno.h>
+#include <signal.h>   // sigfillset / sigdelset / sigaction
 #include <stdio.h>    // stdout, stdin
 #include <stdlib.h>   // abort
 #include <sys/wait.h> // waitpid
@@ -30,6 +31,53 @@ struct SC::Process::Internal
         {
             return Result::Error("dup2 failed");
         }
+        return Result(true);
+    }
+
+    static Result resetInheritedSignalHandlers()
+    {
+        // For every signal, we restore the default action
+        struct sigaction action;
+        memset(&action, 0, sizeof(action));
+        action.sa_handler = SIG_DFL;
+
+        int res = sigemptyset(&action.sa_mask);
+        if (res < 0)
+        {
+            return Result::Error("sigemptyset failed");
+        }
+#ifdef NSIG
+        constexpr int numSignals = NSIG;
+#else
+        constexpr int numSignals = 32;
+#endif
+        for (int signal = 1; signal < numSignals; signal++)
+        {
+            if (signal == SIGKILL or signal == SIGSTOP)
+                continue; // these signals are not meant to be changed
+
+            res = sigaction(signal, &action, NULL);
+            if (res < 0 && errno != EINVAL)
+            {
+                return Result::Error("sigaction failed");
+            }
+        }
+
+        // Clear all signals set
+        sigset_t signalSet;
+
+        res = sigemptyset(&signalSet);
+        if (res < 0)
+        {
+            return Result::Error("sigemptyset failed");
+        }
+
+        res = pthread_sigmask(SIG_SETMASK, &signalSet, NULL);
+        if (res > 0) // pthread returns > 0 error codes
+        {
+            return Result::Error("signal_mask failed");
+        }
+
         return Result(true);
     }
 };
@@ -66,6 +114,21 @@ SC::Result SC::Process::waitForExitSync()
 SC::Result SC::Process::launch(Options options)
 {
     SC_COMPILER_UNUSED(options);
+    sigset_t emptySignals;
+    sigset_t previousSignals;
+
+    // Disable all signals before forking, to avoid them running in child during fork
+    sigfillset(&emptySignals);
+    sigdelset(&emptySignals, SIGABRT);
+    sigdelset(&emptySignals, SIGBUS);
+    sigdelset(&emptySignals, SIGILL);
+    sigdelset(&emptySignals, SIGKILL);
+    sigdelset(&emptySignals, SIGSEGV);
+    sigdelset(&emptySignals, SIGSTOP);
+    sigdelset(&emptySignals, SIGSYS);
+    sigdelset(&emptySignals, SIGTRAP);
+    if (pthread_sigmask(SIG_BLOCK, &emptySignals, &previousSignals) != 0)
+        abort();
 
     // Create a CLOSE_ON_EXEC pipe (non-inheritable) to communicate execvp failure
     PipeDescriptor pipe;
@@ -81,6 +144,9 @@ SC::Result SC::Process::launch(Options options)
 
         // If execvpe doesn't take control, we exit with failure code on error
         auto exitDeferred = MakeDeferred([&] { _exit(EXIT_FAILURE); });
+
+        // Try restoring default signal handlers
+        SC_TRY(Internal::resetInheritedSignalHandlers());
 
         if (standardInput.isValid())
         {
@@ -139,6 +205,8 @@ SC::Result SC::Process::launch(Options options)
     {
         // Parent branch
 
+        if (pthread_sigmask(SIG_SETMASK, &previousSignals, NULL) != 0)
+            abort();
         Span<char> actuallyRead;
 
         // Closing the writePipe to allow read to succeed with
