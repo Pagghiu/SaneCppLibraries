@@ -9,7 +9,7 @@ struct SC::AsyncEventLoop::Internal
     ~Internal() { SC_TRUST_RESULT(close()); }
     [[nodiscard]] Result close() { return loopFd.close(); }
     [[nodiscard]] Result createEventLoop() { return Result(true); }
-    [[nodiscard]] Result createWakeup(AsyncEventLoop&) { return Result(true); }
+    [[nodiscard]] Result createSharedWatchers(AsyncEventLoop&) { return Result(true); }
 
     [[nodiscard]] AsyncRequest* getAsyncRequest(const int&) const { return nullptr; }
 };

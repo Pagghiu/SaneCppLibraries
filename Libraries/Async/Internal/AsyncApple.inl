@@ -31,10 +31,20 @@ struct SC::AsyncEventLoop::Internal
         const int newQueue = kqueue();
         if (newQueue == -1)
         {
-            // TODO: Better kqueue error handling
-            return Result::Error("AsyncEventLoop::Internal::createEventLoop() - kqueue failed");
+            // TODO: Better error handling
+            return Result::Error("AsyncEventLoop::Internal::createEventLoop() failed");
         }
         SC_TRY(loopFd.assign(newQueue));
+        return Result(true);
+    }
+
+    [[nodiscard]] Result createSharedWatchers(AsyncEventLoop& loop)
+    {
+        SC_TRY(createWakeup(loop));
+        SC_TRY(loop.runNoWait());   // Register the read handle before everything else
+        loop.decreaseActiveCount(); // Avoids wakeup (read) keeping the queue up. Must be after runNoWait().
+        // TODO: For consistency in the future decreaseActiveCount() should be usable immediately after
+        // AsyncRequest::start() (similar to uv_unref).
         return Result(true);
     }
 
@@ -51,8 +61,6 @@ struct SC::AsyncEventLoop::Internal
             wakeUpPipeDescriptor,
             Result::Error("AsyncEventLoop::Internal::createWakeup() - AsyncRequest read handle invalid")));
         SC_TRY(wakeupPipeRead.start(loop, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)}));
-        SC_TRY(loop.runNoWait());   // We want to register the read handle before everything else
-        loop.decreaseActiveCount(); // we don't want the read to keep the queue up
         return Result(true);
     }
 
@@ -74,7 +82,7 @@ struct SC::AsyncEventLoop::Internal
         {
             return Result(true);
         }
-        return Result::Error("kevent EV_DELETE failed");
+        return Result::Error("stopSingleWatcherImmediate failed");
     }
 };
 
@@ -118,6 +126,7 @@ struct SC::AsyncEventLoop::KernelQueue
                                        unsigned int options = 0)
     {
         EV_SET(events + newEvents, fileDescriptor, filter, operation, options, 0, &async);
+        // NOTE: newEvents will be incremented in ::pushNewSubmission()
         return true;
     }
 
@@ -142,16 +151,16 @@ struct SC::AsyncEventLoop::KernelQueue
         return specTimeout;
     }
 
-    [[nodiscard]] Result pollAsync(AsyncEventLoop& self, PollMode pollMode)
+    [[nodiscard]] Result pollAsync(AsyncEventLoop& eventLoop, PollMode pollMode)
     {
         const Time::HighResolutionCounter* nextTimer =
-            pollMode == PollMode::ForcedForwardProgress ? self.findEarliestTimer() : nullptr;
+            pollMode == PollMode::ForcedForwardProgress ? eventLoop.findEarliestTimer() : nullptr;
         FileDescriptor::Handle loopHandle;
-        SC_TRY(self.internal.get().loopFd.get(loopHandle, Result::Error("pollAsync() - Invalid Handle")));
+        SC_TRY(eventLoop.internal.get().loopFd.get(loopHandle, Result::Error("pollAsync() - Invalid Handle")));
 
         struct timespec specTimeout;
         // when nextTimer is null, specTimeout is initialized to 0, so that PollMode::NoWait
-        specTimeout = timerToTimespec(self.loopTime, nextTimer);
+        specTimeout = timerToTimespec(eventLoop.loopTime, nextTimer);
         int res;
         do
         {
@@ -162,8 +171,8 @@ struct SC::AsyncEventLoop::KernelQueue
                 // Interrupted, we must recompute timeout
                 if (nextTimer)
                 {
-                    self.updateTime();
-                    specTimeout = timerToTimespec(self.loopTime, nextTimer);
+                    eventLoop.updateTime();
+                    specTimeout = timerToTimespec(eventLoop.loopTime, nextTimer);
                 }
                 continue;
             }
@@ -171,25 +180,25 @@ struct SC::AsyncEventLoop::KernelQueue
         } while (true);
         if (res == -1)
         {
-            return Result::Error("AsyncEventLoop::Internal::poll() - kevent failed");
+            return Result::Error("AsyncEventLoop::Internal::poll() - failed");
         }
         newEvents = static_cast<int>(res);
         if (nextTimer)
         {
-            self.executeTimers(*this, *nextTimer);
+            eventLoop.executeTimers(*this, *nextTimer);
         }
         return Result(true);
     }
 
-    [[nodiscard]] Result flushQueue(AsyncEventLoop& self)
+    [[nodiscard]] Result flushQueue(AsyncEventLoop& eventLoop)
     {
         FileDescriptor::Handle loopHandle;
-        SC_TRY(self.internal.get().loopFd.get(loopHandle, Result::Error("flushQueue() - Invalid Handle")));
+        SC_TRY(eventLoop.internal.get().loopFd.get(loopHandle, Result::Error("flushQueue() - Invalid Handle")));
 
         int res;
         do
         {
-            res = kevent(loopHandle, events, newEvents, nullptr, 0, nullptr);
+            res = ::kevent(loopHandle, events, newEvents, nullptr, 0, nullptr);
         } while (res == -1 && errno == EINTR);
         if (res != 0)
         {
@@ -227,6 +236,7 @@ struct SC::AsyncEventLoop::KernelQueue
         SC_ASSERT_RELEASE(false and "AsyncRequest::Type::LoopTimeout cannot be argument of completion");
         return false;
     }
+
     [[nodiscard]] static bool stopAsync(AsyncLoopTimeout& async)
     {
         async.eventLoop->numberOfTimers -= 1;
@@ -451,8 +461,9 @@ struct SC::AsyncEventLoop::KernelQueue
     [[nodiscard]] static Result completeAsync(AsyncFileWrite::Result& result)
     {
         AsyncFileWrite& async = result.async;
-        auto            span  = async.writeBuffer;
-        ssize_t         res;
+
+        auto    span = async.writeBuffer;
+        ssize_t res;
         do
         {
             res = ::pwrite(async.fileDescriptor, span.data(), span.sizeInBytes(), static_cast<off_t>(async.offset));

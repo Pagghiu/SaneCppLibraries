@@ -197,7 +197,7 @@ SC::Result SC::AsyncEventLoop::queueSubmission(AsyncRequest& async)
 
 SC::Result SC::AsyncEventLoop::run()
 {
-    while (getTotalNumberOfActiveHandle() > 0 or not submissions.isEmpty())
+    while (getTotalNumberOfActiveHandle() > 0 or not submissions.isEmpty() or not manualCompletions.isEmpty())
     {
         SC_TRY(runOnce());
     };
@@ -247,7 +247,7 @@ SC::Result SC::AsyncEventLoop::create()
 {
     Internal& self = internal.get();
     SC_TRY(self.createEventLoop());
-    SC_TRY(self.createWakeup(*this));
+    SC_TRY(self.createSharedWatchers(*this));
     return SC::Result(true);
 }
 
@@ -375,10 +375,16 @@ SC::Result SC::AsyncEventLoop::runStep(PollMode pollMode)
         }
     }
 
+    IntrusiveDoubleLinkedList<AsyncRequest> manualCompletionsToReactivate;
     while (AsyncRequest* async = manualCompletions.dequeueFront())
     {
         completeAndEventuallyReactivate(queue, *async, Result(true));
+        if (async->state == AsyncRequest::State::Active)
+        {
+            manualCompletionsToReactivate.queueBack(*async);
+        }
     }
+    manualCompletions = manualCompletionsToReactivate;
     SC_LOG_MESSAGE("Active Requests After Completion = {}\n", getTotalNumberOfActiveHandle());
     return SC::Result(true);
 }

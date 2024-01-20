@@ -106,7 +106,7 @@ struct SC::AsyncEventLoop::Internal
         return Result(true);
     }
 
-    [[nodiscard]] Result createWakeup(AsyncEventLoop& loop)
+    [[nodiscard]] Result createSharedWatchers(AsyncEventLoop& loop)
     {
         // No need to register it with AsyncEventLoop as we're calling PostQueuedCompletionStatus manually
         // As a consequence we don't need to do loop.decreaseActiveCount()
