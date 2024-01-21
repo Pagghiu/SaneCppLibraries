@@ -85,7 +85,7 @@ struct SC::AsyncRequest
 #if SC_CONFIGURATION_DEBUG
     void setDebugName(const char* newDebugName) { debugName = newDebugName; }
 #else
-    void setDebugName(const char* newDebugName) { SC_COMPILER_UNUSED(newDebugName); }
+    void   setDebugName(const char* newDebugName) { SC_COMPILER_UNUSED(newDebugName); }
 #endif
 
     /// @brief Get the event loop associated with this AsyncRequest
@@ -526,6 +526,8 @@ struct AsyncFileRead : public AsyncRequest
     Span<char>             readBuffer;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
+#elif SC_PLATFORM_LINUX
+    size_t syncReadBytes    = 0;
 #endif
 };
 
@@ -569,6 +571,8 @@ struct AsyncFileWrite : public AsyncRequest
     Span<const char>       writeBuffer;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
+#elif SC_PLATFORM_LINUX
+    size_t syncWrittenBytes = 0;
 #endif
 };
 
@@ -688,6 +692,8 @@ struct SC::AsyncEventLoop
     IntrusiveDoubleLinkedList<AsyncRequest> activeWakeUps;
     IntrusiveDoubleLinkedList<AsyncRequest> manualCompletions;
 
+    IntrusiveDoubleLinkedList<AsyncProcessExit> activeProcessChild;
+
     Time::HighResolutionCounter loopTime;
 
     struct KernelQueue;
@@ -697,7 +703,7 @@ struct SC::AsyncEventLoop
     {
         static constexpr int Windows = 224;
         static constexpr int Apple   = 144;
-        static constexpr int Default = sizeof(void*);
+        static constexpr int Default = 208;
 
         static constexpr size_t Alignment = alignof(void*);
 

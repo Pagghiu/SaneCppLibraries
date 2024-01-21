@@ -156,10 +156,8 @@ int main(int argc, const char* argv[])
 
     // Http tests
     runHttpParserTest(report);
-#if !SC_PLATFORM_LINUX
     runHttpClientTest(report);
     runHttpServerTest(report);
-#endif
     runHttpURLParserTest(report);
 
     // Plugin tests
@@ -199,9 +197,7 @@ int main(int argc, const char* argv[])
     runThreadingTest(report);
 
     // Async tests
-#if !SC_PLATFORM_LINUX
     runAsyncTest(report);
-#endif
 
     // DebugVisualizers tests
     runDebugVisualizersTest(report);

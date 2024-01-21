@@ -7,8 +7,12 @@
 #if SC_PLATFORM_WINDOWS
 #include "Internal/AsyncWindows.inl"
 #elif SC_PLATFORM_APPLE
-#include "Internal/AsyncApple.inl"
-#else
+#define SC_ASYNC_USE_EPOLL 0 // uses kqueue
+#include "Internal/AsyncPosix.inl"
+#elif SC_PLATFORM_LINUX
+#define SC_ASYNC_USE_EPOLL 1 // uses epoll
+#include "Internal/AsyncPosix.inl"
+#elif SC_PLATFORM_EMSCRIPTEN
 #include "Internal/AsyncEmscripten.inl"
 #endif
 

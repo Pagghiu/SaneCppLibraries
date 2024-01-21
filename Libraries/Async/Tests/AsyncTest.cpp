@@ -64,6 +64,7 @@ struct SC::AsyncTest : public SC::TestCase
     int  wakeUpSucceeded = 0;
     void loopWakeUpFromExternalThread()
     {
+        // TODO: This test is not actually testing anything (on Linux)
         if (test_section("loop wakeUpFromExternalThread"))
         {
             AsyncEventLoop eventLoop;
@@ -315,7 +316,7 @@ struct SC::AsyncTest : public SC::TestCase
             SocketIPAddress  nativeAddress;
             SC_TEST_EXPECT(nativeAddress.fromAddressPort(connectAddress, tcpPort));
             SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
-            SC_TEST_EXPECT(SocketServer(serverSocket).listen(nativeAddress, 0));
+            SC_TEST_EXPECT(SocketServer(serverSocket).listen(nativeAddress, 2)); // 2 waiting connection
 
             acceptedCount = 0;
 

@@ -2,14 +2,27 @@
 // SPDX-License-Identifier: MIT
 
 #include "../../Foundation/Deferred.h"
-#include <errno.h>     // errno
+#include "../Async.h"
+
+#if SC_ASYNC_USE_EPOLL
+
+#include <errno.h>        // For error handling
+#include <fcntl.h>        // For fcntl function (used for setting non-blocking mode)
+#include <signal.h>       // For signal-related functions
+#include <sys/epoll.h>    // For epoll functions
+#include <sys/signalfd.h> // For signalfd functions
+#include <sys/socket.h>   // For socket-related functions
+
+#else
+
+#include <errno.h>     // For error handling
 #include <netdb.h>     // socketlen_t/getsocketopt/send/recv
 #include <sys/event.h> // kqueue
 #include <sys/time.h>  // timespec
 #include <sys/wait.h>  // WIFEXITED / WEXITSTATUS
 #include <unistd.h>    // read/write/pread/pwrite
 
-#include "../Async.h"
+#endif
 
 struct SC::AsyncEventLoop::Internal
 {
@@ -18,17 +31,52 @@ struct SC::AsyncEventLoop::Internal
     AsyncFileRead  wakeupPipeRead;
     PipeDescriptor wakeupPipe;
     char           wakeupPipeReadBuf[10];
+#if SC_ASYNC_USE_EPOLL
+    FileDescriptor   signalProcessExitDescriptor;
+    AsyncProcessExit signalProcessExit;
+#endif
 
     ~Internal() { SC_TRUST_RESULT(close()); }
-
     [[nodiscard]] Result close()
     {
-        return Result(wakeupPipe.readPipe.close() and wakeupPipe.writePipe.close() and loopFd.close());
+#if SC_ASYNC_USE_EPOLL
+        FileDescriptor::Handle processExitHandle;
+        if (signalProcessExitDescriptor.get(processExitHandle, Result::Error("signalProcessExitDescriptor")))
+        {
+            SC_TRY(stopSingleWatcherImmediate(signalProcessExit, processExitHandle, EPOLLIN | EPOLLET));
+        }
+        SC_TRY(signalProcessExitDescriptor.close());
+#endif
+        SC_TRY(wakeupPipe.readPipe.close());
+        SC_TRY(wakeupPipe.writePipe.close());
+        return loopFd.close();
     }
+
+#if SC_ASYNC_USE_EPOLL
+    [[nodiscard]] static bool addEventWatcher(AsyncRequest& async, int fileDescriptor, int32_t filter)
+    {
+        struct epoll_event event = {0};
+        event.events             = filter;
+        event.data.ptr           = &async; // data.ptr is a user data pointer
+        FileDescriptor::Handle loopNativeDescriptor;
+        SC_TRY(async.eventLoop->getLoopFileDescriptor(loopNativeDescriptor));
+
+        int res = ::epoll_ctl(loopNativeDescriptor, EPOLL_CTL_ADD, fileDescriptor, &event);
+        if (res == -1)
+        {
+            return false;
+        }
+        return true;
+    }
+#endif
 
     [[nodiscard]] Result createEventLoop()
     {
-        const int newQueue = kqueue();
+#if SC_ASYNC_USE_EPOLL
+        const int newQueue = ::epoll_create1(O_CLOEXEC); // Use epoll_create1 instead of kqueue
+#else
+        const int newQueue = ::kqueue();
+#endif
         if (newQueue == -1)
         {
             // TODO: Better error handling
@@ -40,6 +88,9 @@ struct SC::AsyncEventLoop::Internal
 
     [[nodiscard]] Result createSharedWatchers(AsyncEventLoop& loop)
     {
+#if SC_ASYNC_USE_EPOLL
+        SC_TRY(createProcessSignalWatcher(loop));
+#endif
         SC_TRY(createWakeup(loop));
         SC_TRY(loop.runNoWait());   // Register the read handle before everything else
         loop.decreaseActiveCount(); // Avoids wakeup (read) keeping the queue up. Must be after runNoWait().
@@ -59,25 +110,67 @@ struct SC::AsyncEventLoop::Internal
         FileDescriptor::Handle wakeUpPipeDescriptor;
         SC_TRY(wakeupPipe.readPipe.get(
             wakeUpPipeDescriptor,
-            Result::Error("AsyncEventLoop::Internal::createWakeup() - AsyncRequest read handle invalid")));
+            Result::Error("AsyncEventLoop::Internal::createSharedWatchers() - AsyncRequest read handle invalid")));
         SC_TRY(wakeupPipeRead.start(loop, wakeUpPipeDescriptor, {wakeupPipeReadBuf, sizeof(wakeupPipeReadBuf)}));
         return Result(true);
     }
 
+#if SC_ASYNC_USE_EPOLL
+    // TODO: This should be lazily created on demand
+    [[nodiscard]] Result createProcessSignalWatcher(AsyncEventLoop& loop)
+    {
+        signalProcessExit.eventLoop = &loop;
+        sigset_t mask;
+        sigemptyset(&mask);
+        sigaddset(&mask, SIGCHLD);
+
+        if (sigprocmask(SIG_BLOCK, &mask, nullptr) == -1)
+        {
+            return Result::Error("Failed to set signal mask");
+        }
+        const int signalFd = signalfd(-1, &mask, SFD_CLOEXEC | SFD_NONBLOCK);
+        if (signalFd == -1)
+        {
+            return Result::Error("Failed to create signalfd");
+        }
+
+        SC_TRY(signalProcessExitDescriptor.assign(signalFd));
+        // Signal watcher is active by default.
+        // This is a shortcut for .addActiveHandle() and .decreaseActiveCount().
+        signalProcessExit.state = AsyncRequest::State::Active;
+        SC_TRY(addEventWatcher(signalProcessExit, signalFd, EPOLLIN | EPOLLET));
+        return Result(true);
+    }
+#endif
+
+#if SC_ASYNC_USE_EPOLL
+    [[nodiscard]] static AsyncRequest* getAsyncRequest(const struct epoll_event& event)
+    {
+        return static_cast<AsyncRequest*>(event.data.ptr);
+    }
+#else
     [[nodiscard]] static AsyncRequest* getAsyncRequest(const struct kevent& event)
     {
         return static_cast<AsyncRequest*>(event.udata);
     }
+#endif
 
     [[nodiscard]] static Result stopSingleWatcherImmediate(AsyncRequest& async, SocketDescriptor::Handle handle,
-                                                           short filter)
+                                                           int32_t filter)
     {
         FileDescriptor::Handle loopNativeDescriptor;
-        SC_TRUST_RESULT(async.eventLoop->internal.get().loopFd.get(
+        SC_TRY(async.eventLoop->internal.get().loopFd.get(
             loopNativeDescriptor, Result::Error("AsyncEventLoop::Internal::pollAsync() - Invalid Handle")));
+#if SC_ASYNC_USE_EPOLL
+        struct epoll_event event;
+        event.events   = filter;
+        event.data.ptr = &async;
+        const int res  = ::epoll_ctl(loopNativeDescriptor, EPOLL_CTL_DEL, handle, &event);
+#else
         struct kevent kev;
         EV_SET(&kev, handle, filter, EV_DELETE, 0, 0, nullptr);
-        const int res = kevent(loopNativeDescriptor, &kev, 1, 0, 0, nullptr);
+        const int res = ::kevent(loopNativeDescriptor, &kev, 1, 0, 0, nullptr);
+#endif
         if (res == 0 or (errno == EBADF or errno == ENOENT))
         {
             return Result(true);
@@ -90,8 +183,11 @@ struct SC::AsyncEventLoop::KernelQueue
 {
     static constexpr int totalNumEvents = 1024;
 
+#if SC_ASYNC_USE_EPOLL
+    epoll_event events[totalNumEvents];
+#else
     struct kevent events[totalNumEvents];
-
+#endif
     int newEvents = 0;
 
     KernelQueue() { memset(events, 0, sizeof(events)); }
@@ -104,12 +200,25 @@ struct SC::AsyncEventLoop::KernelQueue
         case AsyncRequest::Type::LoopWakeUp:
             // These are not added to active queue
             break;
+#if SC_ASYNC_USE_EPOLL
+        case AsyncRequest::Type::FileWrite:
+#endif
         case AsyncRequest::Type::SocketClose:
         case AsyncRequest::Type::FileClose: {
             async.eventLoop->scheduleManualCompletion(async);
             break;
         }
         default: {
+#if SC_ASYNC_USE_EPOLL
+            if (async.type == AsyncRequest::Type::FileRead)
+            {
+                if (&async != &async.eventLoop->internal.get().wakeupPipeRead)
+                {
+                    async.eventLoop->scheduleManualCompletion(async);
+                    break;
+                }
+            }
+#endif
             async.eventLoop->addActiveHandle(async);
             newEvents += 1;
             if (newEvents >= totalNumEvents)
@@ -122,13 +231,20 @@ struct SC::AsyncEventLoop::KernelQueue
         return Result(true);
     }
 
-    [[nodiscard]] bool setEventWatcher(AsyncRequest& async, int fileDescriptor, short filter, short operation,
-                                       unsigned int options = 0)
+#if SC_ASYNC_USE_EPOLL
+    // In epoll (differently from kqueue) the watcher is immediately added, so we call this 'add' instead of 'set'
+    [[nodiscard]] bool addEventWatcher(AsyncRequest& async, int fileDescriptor, int32_t filter)
     {
-        EV_SET(events + newEvents, fileDescriptor, filter, operation, options, 0, &async);
+        return Internal::addEventWatcher(async, fileDescriptor, filter);
+    }
+#else
+    [[nodiscard]] bool setEventWatcher(AsyncRequest& async, int fileDescriptor, short filter, unsigned int options = 0)
+    {
         // NOTE: newEvents will be incremented in ::pushNewSubmission()
+        EV_SET(events + newEvents, fileDescriptor, filter, EV_ADD | EV_ENABLE, options, 0, &async);
         return true;
     }
+#endif
 
     // POLL
     static struct timespec timerToTimespec(const Time::HighResolutionCounter& loopTime,
@@ -165,7 +281,11 @@ struct SC::AsyncEventLoop::KernelQueue
         do
         {
             auto spec = nextTimer or pollMode == PollMode::NoWait ? &specTimeout : nullptr;
-            res       = kevent(loopHandle, events, newEvents, events, totalNumEvents, spec);
+#if SC_ASYNC_USE_EPOLL
+            res = ::epoll_pwait2(loopHandle, events, totalNumEvents, spec, 0);
+#else
+            res = ::kevent(loopHandle, events, newEvents, events, totalNumEvents, spec);
+#endif
             if (res == -1 && errno == EINTR)
             {
                 // Interrupted, we must recompute timeout
@@ -192,6 +312,10 @@ struct SC::AsyncEventLoop::KernelQueue
 
     [[nodiscard]] Result flushQueue(AsyncEventLoop& eventLoop)
     {
+#if SC_ASYNC_USE_EPOLL
+        SC_COMPILER_UNUSED(eventLoop);
+        // TODO: Implement flush for epoll
+#else
         FileDescriptor::Handle loopHandle;
         SC_TRY(eventLoop.internal.get().loopFd.get(loopHandle, Result::Error("flushQueue() - Invalid Handle")));
 
@@ -205,9 +329,23 @@ struct SC::AsyncEventLoop::KernelQueue
             return Result::Error("AsyncEventLoop::Internal::flushQueue() - kevent failed");
         }
         newEvents = 0;
+#endif
         return Result(true);
     }
 
+#if SC_ASYNC_USE_EPOLL
+    [[nodiscard]] static Result validateEvent(const epoll_event& event, bool& continueProcessing)
+    {
+        continueProcessing = true;
+
+        if ((event.events & EPOLLERR) != 0 || (event.events & EPOLLHUP) != 0)
+        {
+            continueProcessing = false;
+            return Result::Error("Error in processing event (epoll EPOLLERR or EPOLLHUP)");
+        }
+        return Result(true);
+    }
+#else
     [[nodiscard]] static Result validateEvent(const struct kevent& event, bool& continueProcessing)
     {
         continueProcessing = (event.flags & EV_DELETE) == 0;
@@ -217,6 +355,7 @@ struct SC::AsyncEventLoop::KernelQueue
         }
         return Result(true);
     }
+#endif
 
     // TIMEOUT
     [[nodiscard]] static bool setupAsync(AsyncLoopTimeout& async)
@@ -272,7 +411,7 @@ struct SC::AsyncEventLoop::KernelQueue
     static void completeAsyncLoopWakeUpFromFakeRead(AsyncFileRead::Result& result)
     {
         AsyncFileRead& async = result.async;
-        // TODO: Investigate usage of MACHPORT to avoid executing this additional read syscall
+        // TODO: Investigate MACHPORT (kqueue) and eventfd (epoll) to avoid the additional read syscall
         auto readSpan = async.readBuffer;
         do
         {
@@ -294,7 +433,11 @@ struct SC::AsyncEventLoop::KernelQueue
     // Socket ACCEPT
     [[nodiscard]] bool setupAsync(AsyncSocketAccept& async)
     {
-        return setEventWatcher(async, async.handle, EVFILT_READ, EV_ADD | EV_ENABLE);
+#if SC_ASYNC_USE_EPOLL
+        return addEventWatcher(async, async.handle, EPOLLIN);
+#else
+        return setEventWatcher(async, async.handle, EVFILT_READ);
+#endif
     }
     [[nodiscard]] static bool activateAsync(AsyncSocketAccept&) { return true; }
 
@@ -310,13 +453,21 @@ struct SC::AsyncEventLoop::KernelQueue
 
     [[nodiscard]] static Result stopAsync(AsyncSocketAccept& async)
     {
+#if SC_ASYNC_USE_EPOLL
+        return Internal::stopSingleWatcherImmediate(async, async.handle, EPOLLIN);
+#else
         return Internal::stopSingleWatcherImmediate(async, async.handle, EVFILT_READ);
+#endif
     }
 
     // Socket CONNECT
     [[nodiscard]] bool setupAsync(AsyncSocketConnect& async)
     {
-        return setEventWatcher(async, async.handle, EVFILT_WRITE, EV_ADD | EV_ENABLE);
+#if SC_ASYNC_USE_EPOLL
+        return addEventWatcher(async, async.handle, EPOLLOUT);
+#else
+        return setEventWatcher(async, async.handle, EVFILT_WRITE);
+#endif
     }
 
     [[nodiscard]] static Result activateAsync(AsyncSocketConnect& async)
@@ -348,7 +499,11 @@ struct SC::AsyncEventLoop::KernelQueue
         // TODO: This is making a syscall for each connected socket, we should probably aggregate them
         // And additionally it's stupid as probably WRITE will be subscribed again anyway
         // But probably this means to review the entire process of async stop
+#if SC_ASYNC_USE_EPOLL
+        SC_TRUST_RESULT(Internal::stopSingleWatcherImmediate(result.async, async.handle, EPOLLOUT));
+#else
         SC_TRUST_RESULT(Internal::stopSingleWatcherImmediate(result.async, async.handle, EVFILT_WRITE));
+#endif
         if (socketRes == 0)
         {
             SC_TRY_MSG(errorCode == 0, "connect SO_ERROR");
@@ -359,13 +514,21 @@ struct SC::AsyncEventLoop::KernelQueue
 
     [[nodiscard]] static Result stopAsync(AsyncSocketConnect& async)
     {
+#if SC_ASYNC_USE_EPOLL
+        return Internal::stopSingleWatcherImmediate(async, async.handle, EPOLLOUT);
+#else
         return Internal::stopSingleWatcherImmediate(async, async.handle, EVFILT_WRITE);
+#endif
     }
 
     // Socket SEND
     [[nodiscard]] Result setupAsync(AsyncSocketSend& async)
     {
-        return Result(setEventWatcher(async, async.handle, EVFILT_WRITE, EV_ADD | EV_ENABLE));
+#if SC_ASYNC_USE_EPOLL
+        return Result(addEventWatcher(async, async.handle, EPOLLOUT));
+#else
+        return Result(setEventWatcher(async, async.handle, EVFILT_WRITE));
+#endif
     }
 
     [[nodiscard]] static bool activateAsync(AsyncSocketSend&) { return true; }
@@ -381,13 +544,21 @@ struct SC::AsyncEventLoop::KernelQueue
 
     [[nodiscard]] Result stopAsync(AsyncSocketSend& async)
     {
+#if SC_ASYNC_USE_EPOLL
+        return Internal::stopSingleWatcherImmediate(async, async.handle, EPOLLOUT);
+#else
         return Internal::stopSingleWatcherImmediate(async, async.handle, EVFILT_WRITE);
+#endif
     }
 
     // Socket RECEIVE
     [[nodiscard]] Result setupAsync(AsyncSocketReceive& async)
     {
-        return Result(setEventWatcher(async, async.handle, EVFILT_READ, EV_ADD | EV_ENABLE));
+#if SC_ASYNC_USE_EPOLL
+        return Result(addEventWatcher(async, async.handle, EPOLLIN | EPOLLRDHUP));
+#else
+        return Result(setEventWatcher(async, async.handle, EVFILT_READ));
+#endif
     }
 
     [[nodiscard]] static bool activateAsync(AsyncSocketReceive&) { return true; }
@@ -402,7 +573,11 @@ struct SC::AsyncEventLoop::KernelQueue
 
     [[nodiscard]] static Result stopAsync(AsyncSocketReceive& async)
     {
+#if SC_ASYNC_USE_EPOLL
+        return Internal::stopSingleWatcherImmediate(async, async.handle, EPOLLIN | EPOLLRDHUP);
+#else
         return Internal::stopSingleWatcherImmediate(async, async.handle, EVFILT_READ);
+#endif
     }
 
     // Socket CLOSE
@@ -419,46 +594,114 @@ struct SC::AsyncEventLoop::KernelQueue
     // File READ
     [[nodiscard]] bool setupAsync(AsyncFileRead& async)
     {
-        return setEventWatcher(async, async.fileDescriptor, EVFILT_READ, EV_ADD);
+#if SC_ASYNC_USE_EPOLL
+        // TODO: Check if we need EPOLLET for edge-triggered mode
+        if (&async == &async.eventLoop->internal.get().wakeupPipeRead)
+        {
+            return addEventWatcher(async, async.fileDescriptor, EPOLLIN | EPOLLET);
+        }
+        // TODO: epoll doesn't support regular file descriptors (needs a thread pool).
+        return true;
+#else
+        return setEventWatcher(async, async.fileDescriptor, EVFILT_READ);
+#endif
     }
 
-    [[nodiscard]] static bool activateAsync(AsyncFileRead&) { return true; }
+    [[nodiscard]] static bool activateAsync(AsyncFileRead& async)
+    {
+#if SC_ASYNC_USE_EPOLL
+        if (&async != &async.eventLoop->internal.get().wakeupPipeRead)
+        {
+            // TODO: This is a synchronous operation! Run this code in a threadpool.
+            Result                res(true);
+            AsyncFileRead::Result result(async, move(res));
+            if (executeOperation(result))
+            {
+                result.async.syncReadBytes = result.readData.sizeInBytes();
+                return true;
+            }
+            return false;
+        }
+#else
+        SC_COMPILER_UNUSED(async);
+#endif
+        return true;
+    }
+
+    [[nodiscard]] static Result executeOperation(AsyncFileRead::Result& result)
+    {
+        auto    span = result.async.readBuffer;
+        ssize_t res;
+        do
+        {
+            res = ::pread(result.async.fileDescriptor, span.data(), span.sizeInBytes(),
+                          static_cast<off_t>(result.async.offset));
+        } while ((res == -1) and (errno == EINTR));
+        SC_TRY_MSG(res >= 0, "::read failed");
+        return Result(result.async.readBuffer.sliceStartLength(0, static_cast<size_t>(res), result.readData));
+    }
 
     [[nodiscard]] static Result completeAsync(AsyncFileRead::Result& result)
     {
         if (&result.async == &result.async.eventLoop->internal.get().wakeupPipeRead)
         {
             completeAsyncLoopWakeUpFromFakeRead(result);
+            return Result(true);
         }
         else
         {
-            auto    span = result.async.readBuffer;
-            ssize_t res;
-            do
-            {
-                res = ::pread(result.async.fileDescriptor, span.data(), span.sizeInBytes(),
-                              static_cast<off_t>(result.async.offset));
-            } while ((res == -1) and (errno == EINTR));
-            SC_TRY_MSG(res >= 0, "::read failed");
-            SC_TRY(result.async.readBuffer.sliceStartLength(0, static_cast<size_t>(res), result.readData));
+#if SC_ASYNC_USE_EPOLL
+            return Result(result.async.readBuffer.sliceStartLength(0, result.async.syncReadBytes, result.readData));
+#else
+            return executeOperation(result);
+#endif
         }
-        return Result(true);
     }
 
     [[nodiscard]] static Result stopAsync(AsyncFileRead& async)
     {
+#if SC_ASYNC_USE_EPOLL
+        if (&async == &async.eventLoop->internal.get().wakeupPipeRead)
+        {
+            return Internal::stopSingleWatcherImmediate(async, async.fileDescriptor, EPOLLIN | EPOLLET);
+        }
+        return Result(true);
+#else
         return Internal::stopSingleWatcherImmediate(async, async.fileDescriptor, EVFILT_READ);
+#endif
     }
 
     // File WRITE
     [[nodiscard]] bool setupAsync(AsyncFileWrite& async)
     {
-        return setEventWatcher(async, async.fileDescriptor, EVFILT_WRITE, EV_ADD);
+#if SC_ASYNC_USE_EPOLL
+        SC_COMPILER_UNUSED(async);
+        // TODO: epoll doesn't support regular file descriptors (needs a thread pool).
+        return true;
+#else
+        return setEventWatcher(async, async.fileDescriptor, EVFILT_WRITE);
+#endif
     }
 
-    [[nodiscard]] static bool activateAsync(AsyncFileWrite&) { return true; }
+    [[nodiscard]] static bool activateAsync(AsyncFileWrite& async)
+    {
+#if SC_ASYNC_USE_EPOLL
+        // TODO: This is a synchronous operation! Run this code in a threadpool.
+        Result                 res(true);
+        AsyncFileWrite::Result result(async, move(res));
+        if (executeOperation(result))
+        {
+            async.syncWrittenBytes = result.writtenBytes;
+            return true;
+        }
+        return false;
+#else
+        SC_COMPILER_UNUSED(async);
+        return true;
+#endif
+    }
 
-    [[nodiscard]] static Result completeAsync(AsyncFileWrite::Result& result)
+    [[nodiscard]] static Result executeOperation(AsyncFileWrite::Result& result)
     {
         AsyncFileWrite& async = result.async;
 
@@ -473,9 +716,25 @@ struct SC::AsyncEventLoop::KernelQueue
         return Result(true);
     }
 
+    [[nodiscard]] static Result completeAsync(AsyncFileWrite::Result& result)
+    {
+#if SC_ASYNC_USE_EPOLL
+        result.writtenBytes = result.async.syncWrittenBytes;
+        return Result(true);
+#else
+        return executeOperation(result);
+#endif
+    }
+
     [[nodiscard]] static Result stopAsync(AsyncFileWrite& async)
     {
+#if SC_ASYNC_USE_EPOLL
+        SC_COMPILER_UNUSED(async);
+        // TODO: epoll doesn't support regular file descriptors (needs a thread pool).
+        return Result(true);
+#else
         return Internal::stopSingleWatcherImmediate(async, async.fileDescriptor, EVFILT_WRITE);
+#endif
     }
 
     // File Close
@@ -493,11 +752,52 @@ struct SC::AsyncEventLoop::KernelQueue
     // PROCESS
     [[nodiscard]] bool setupAsync(AsyncProcessExit& async)
     {
-        return setEventWatcher(async, async.handle, EVFILT_PROC, EV_ADD | EV_ENABLE, NOTE_EXIT | NOTE_EXITSTATUS);
+#if SC_ASYNC_USE_EPOLL
+        async.eventLoop->activeProcessChild.queueBack(async);
+        return true;
+#else
+        return setEventWatcher(async, async.handle, EVFILT_PROC, NOTE_EXIT | NOTE_EXITSTATUS);
+#endif
     }
 
     [[nodiscard]] static bool activateAsync(AsyncProcessExit&) { return true; }
 
+#if SC_ASYNC_USE_EPOLL
+    [[nodiscard]] Result completeAsync(AsyncProcessExit::Result& result)
+    {
+        struct signalfd_siginfo siginfo;
+        FileDescriptor::Handle  sigHandle;
+
+        Internal& internal = result.async.eventLoop->internal.get();
+        SC_TRY(internal.signalProcessExitDescriptor.get(sigHandle, Result::Error("Invalid signal handle")));
+        ssize_t size = ::read(sigHandle, &siginfo, sizeof(siginfo));
+
+        if (size == sizeof(siginfo))
+        {
+            // Check if the received signal is related to process exit
+            if (siginfo.ssi_signo == SIGCHLD)
+            {
+                // Loop all process handles to find if one of our interest has exited
+                AsyncProcessExit* current = result.async.eventLoop->activeProcessChild.front;
+
+                while (current)
+                {
+                    if (siginfo.ssi_pid == current->handle)
+                    {
+                        result.exitStatus.status = siginfo.ssi_status;
+                        result.async.eventLoop->activeProcessChild.remove(*current);
+                        current->callback(result);
+                        // TODO: Handle lazy deactivation for signals when no more processes exist
+                        result.reactivateRequest(true);
+                        return Result(true);
+                    }
+                    current = static_cast<AsyncProcessExit*>(current->next);
+                }
+            }
+        }
+        return Result(true); // Return true even if unhandled, we have received a SIGCHLD for a non monitored pid
+    }
+#else
     [[nodiscard]] Result completeAsync(AsyncProcessExit::Result& result)
     {
         SC_TRY_MSG(result.async.eventIndex >= 0, "Invalid event Index");
@@ -513,10 +813,15 @@ struct SC::AsyncEventLoop::KernelQueue
         }
         return Result(false);
     }
-
+#endif
     [[nodiscard]] static Result stopAsync(AsyncProcessExit& async)
     {
+#if SC_ASYNC_USE_EPOLL
+        SC_COMPILER_UNUSED(async);
+        return Result(true);
+#else
         return Internal::stopSingleWatcherImmediate(async, async.handle, EVFILT_PROC);
+#endif
     }
 };
 
