@@ -240,9 +240,10 @@ struct SC::FileSystemWatcher::Internal
             default: notification.operation = Operation::AddRemoveRename; break;
             }
             entry.notifyCallback(notification);
-
+            if (not event->NextEntryOffset)
+                break;
             *reinterpret_cast<uint8_t**>(&event) += event->NextEntryOffset;
-        } while (event->NextEntryOffset);
+        } while (true);
 
         memset(&opaque.getOverlapped(), 0, sizeof(opaque.getOverlapped()));
         HANDLE handle;

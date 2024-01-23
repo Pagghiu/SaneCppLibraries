@@ -19,8 +19,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         const StringView appDirectory = report.applicationRootDirectory;
         initClose();
         threadRunner(appDirectory);
-        eventLoop(appDirectory);
-        eventLoopInterrupt(appDirectory);
+        eventLoopSubdirectory(appDirectory);
+        eventLoopWatchClose(appDirectory);
         eventLoopWatchStop(appDirectory);
     }
 
@@ -102,7 +102,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         }
     }
 
-    void eventLoop(const StringView appDirectory)
+    void eventLoopSubdirectory(const StringView appDirectory)
     {
         if (test_section("AsyncEventLoop"))
         {
@@ -177,10 +177,11 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         }
     }
 
-    void eventLoopInterrupt(const StringView appDirectory)
+    void eventLoopWatchClose(const StringView appDirectory)
     {
-        if (test_section("AsyncEventLoop interrupt"))
+        if (test_section("AsyncEventLoop close"))
         {
+
             AsyncEventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
@@ -201,8 +202,9 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view(), move(lambda)));
             SC_TEST_EXPECT(fs.write("salve.txt", "content"));
             SC_TEST_EXPECT(fs.write("a_tutti.txt", "content"));
-            SC_TEST_EXPECT(eventLoop.runOnce());
-            SC_TEST_EXPECT(params.changes == 1);
+            SC_TEST_EXPECT(eventLoop.runOnce());   // On Linux (inotify) both events will be dispatched here
+            SC_TEST_EXPECT(eventLoop.runNoWait()); // On Windows and macOS each event notification unblocks the loop
+            SC_TEST_EXPECT(params.changes == 2);
             SC_TEST_EXPECT(fileEventsWatcher.close());
             SC_TEST_EXPECT(fs.removeFiles({"salve.txt", "a_tutti.txt"}));
         }

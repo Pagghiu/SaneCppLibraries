@@ -147,9 +147,7 @@ int main(int argc, const char* argv[])
     runFileSystemIteratorTest(report);
 
     // FileSystemWatcher tests
-#if !SC_PLATFORM_LINUX
     runFileSystemWatcherTest(report);
-#endif
 
     // Hashing tests
     runHashingTest(report);

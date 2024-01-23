@@ -6,6 +6,8 @@
 #include "Internal/FileSystemWatcherWindows.inl"
 #elif SC_PLATFORM_APPLE
 #include "Internal/FileSystemWatcherApple.inl"
+#elif SC_PLATFORM_LINUX
+#include "Internal/FileSystemWatcherLinux.inl"
 #else
 #include "Internal/FileSystemWatcherEmscripten.inl"
 #endif

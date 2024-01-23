@@ -204,7 +204,8 @@ struct SC::PipeDescriptor
     /// @param readFlag Specifies how the read side should be created
     /// @param writeFlag Specifies how the write side should be created
     /// @return Valid Result if pipe creation succeeded
-    [[nodiscard]] Result createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag);
+    [[nodiscard]] Result createPipe(InheritableReadFlag  readFlag  = ReadNonInheritable,
+                                    InheritableWriteFlag writeFlag = WriteNonInheritable);
 
     /// @brief Closes the pipe
     /// @return Valid Result if pipe destruction succeeded

@@ -52,7 +52,7 @@ struct SC::FileSystemWatcher
         static constexpr int Windows =
             (2 * MaxWatchablePaths) * sizeof(void*) + sizeof(uint64_t) + sizeof(Thread) + sizeof(Action);
         static constexpr int Apple   = sizeof(void*);
-        static constexpr int Default = sizeof(void*);
+        static constexpr int Default = sizeof(Thread) + sizeof(void*) * 2;
 
         static constexpr size_t Alignment = alignof(void*);
 
@@ -62,15 +62,13 @@ struct SC::FileSystemWatcher
     struct FolderWatcherInternal;
     struct FolderWatcherSizes
     {
+        static constexpr int MaxNumberOfSubdirs   = 128; // Max number of subfolders tracked in a watcher
         static constexpr int MaxChangesBufferSize = 1024;
-#if SC_PLATFORM_WINDOWS
         static constexpr int Windows =
             MaxChangesBufferSize + sizeof(void*) + sizeof(FileDescriptor) + sizeof(AsyncFilePoll);
-#else
-        static constexpr int Windows = 0;
-#endif
-        static constexpr int Apple   = sizeof(void*);
-        static constexpr int Default = sizeof(void*);
+        static constexpr int Apple = sizeof(void*);
+        static constexpr int Default =
+            sizeof(Array<int64_t, MaxNumberOfSubdirs>) + sizeof(Vector<char>) + sizeof(void*);
 
         static constexpr size_t Alignment = alignof(void*);
 
@@ -80,7 +78,7 @@ struct SC::FileSystemWatcher
     {
         static constexpr int Windows = 3 * sizeof(void*);
         static constexpr int Apple   = 43 * sizeof(void*) + sizeof(Mutex);
-        static constexpr int Default = sizeof(void*);
+        static constexpr int Default = sizeof(void*) * 4;
 
         static constexpr size_t Alignment = alignof(void*);
 
@@ -153,6 +151,8 @@ struct SC::FileSystemWatcher
 #if SC_PLATFORM_APPLE
         AsyncLoopWakeUp eventLoopAsync = {};
         EventObject     eventObject    = {};
+#elif SC_PLATFORM_LINUX
+        AsyncFilePoll asyncPoll = {};
 #endif
     };
 
