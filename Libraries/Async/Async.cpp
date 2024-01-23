@@ -53,7 +53,7 @@ const char* SC::AsyncRequest::TypeToString(Type type)
     case Type::FileWrite: return "FileWrite";
     case Type::FileClose: return "FileClose";
 #if SC_PLATFORM_WINDOWS
-    case Type::WindowsPoll: return "WindowsPoll";
+    case Type::FilePoll: return "FilePoll";
 #endif
     }
     Assert::unreachable();
@@ -181,15 +181,13 @@ SC::Result SC::AsyncFileClose::start(AsyncEventLoop& loop, FileDescriptor::Handl
     return SC::Result(true);
 }
 
-#if SC_PLATFORM_WINDOWS
-SC::Result SC::AsyncWindowsPoll::start(AsyncEventLoop& loop, FileDescriptor::Handle fd)
+SC::Result SC::AsyncFilePoll::start(AsyncEventLoop& loop, FileDescriptor::Handle fd)
 {
     SC_TRY(validateAsync());
     SC_TRY(queueSubmission(loop));
     fileDescriptor = fd;
     return SC::Result(true);
 }
-#endif
 
 SC::Result SC::AsyncEventLoop::queueSubmission(AsyncRequest& async)
 {
@@ -409,9 +407,7 @@ SC::Result SC::AsyncRequest::applyOnAsync(AsyncRequest& async, Lambda&& lambda)
     case AsyncRequest::Type::FileRead: SC_TRY(lambda(*static_cast<AsyncFileRead*>(&async))); break;
     case AsyncRequest::Type::FileWrite: SC_TRY(lambda(*static_cast<AsyncFileWrite*>(&async))); break;
     case AsyncRequest::Type::FileClose: SC_TRY(lambda(*static_cast<AsyncFileClose*>(&async))); break;
-#if SC_PLATFORM_WINDOWS
-    case AsyncRequest::Type::WindowsPoll: SC_TRY(lambda(*static_cast<AsyncWindowsPoll*>(&async))); break;
-#endif
+    case AsyncRequest::Type::FilePoll: SC_TRY(lambda(*static_cast<AsyncFilePoll*>(&async))); break;
     }
     return SC::Result(true);
 }

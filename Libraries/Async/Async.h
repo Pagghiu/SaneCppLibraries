@@ -105,9 +105,7 @@ struct SC::AsyncRequest
         FileRead,      ///< Request is an AsyncFileRead object
         FileWrite,     ///< Request is an AsyncFileWrite object
         FileClose,     ///< Request is an AsyncFileClose object
-#if SC_PLATFORM_WINDOWS
-        WindowsPoll, ///< Request is an AsyncWindowsPoll object
-#endif
+        FilePoll,      ///< Request is an AsyncFilePoll object
     };
 
     /// @brief Constructs a free async request of given type
@@ -145,9 +143,12 @@ struct SC::AsyncRequest
 #if SC_CONFIGURATION_DEBUG
     const char* debugName = "None";
 #endif
-    State   state;
-    Type    type;
+    State   state;     // 1 byte
+    Type    type;      // 1 byte
+    int16_t flags = 0; // 2 bytes
     int32_t eventIndex;
+
+    static constexpr int16_t Flag_RegularFile = 1 << 1;
 };
 
 /// @brief Base class for all async results
@@ -533,8 +534,8 @@ struct AsyncFileRead : public AsyncRequest
 
 /// @brief Starts a file write operation, writing bytes to a file.
 /// Callback will be called when the file is ready to receive more bytes to write. @n
-/// @ref library_file library can be used to open the file and obtan a file descriptor handle. @n
-/// Make sure to associate the file desciptor with SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor.
+/// @ref library_file library can be used to open the file and obtain a file descriptor handle. @n
+/// Make sure to associate the file descriptor with SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor.
 ///
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncFileWriteSnippet
 struct AsyncFileWrite : public AsyncRequest
@@ -578,7 +579,7 @@ struct AsyncFileWrite : public AsyncRequest
 
 /// @brief Starts a file close operation, closing the OS file descriptor.
 /// Callback will be called when the file is actually closed. @n
-/// @ref library_file library can be used to open the file and obtan a file descriptor handle.
+/// @ref library_file library can be used to open the file and obtain a file descriptor handle.
 ///
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncFileCloseSnippet
 struct AsyncFileClose : public AsyncRequest
@@ -597,19 +598,20 @@ struct AsyncFileClose : public AsyncRequest
     FileDescriptor::Handle fileDescriptor;
 };
 
-#if SC_PLATFORM_WINDOWS || DOXYGEN
-/// @brief Starts a windows poll operation, to be signaled by `GetOverlappedResult`.
-/// Callback will be called when `GetOverlappedResult` signals events on the given file descriptor.
+/// @brief Starts a file poll operation, using `GetOverlappedResult` (windows), kevent (macOS) and epoll (Linux).
+/// Callback will be called when any of the three API signals readiness events on the given file descriptor.
 /// Check @ref library_file_system_watcher for an example usage of this notification.
-struct AsyncWindowsPoll : public AsyncRequest
+struct AsyncFilePoll : public AsyncRequest
 {
-    using Result = AsyncResultOf<AsyncWindowsPoll>;
-    AsyncWindowsPoll() : AsyncRequest(Type::WindowsPoll) {}
+    using Result = AsyncResultOf<AsyncFilePoll>;
+    AsyncFilePoll() : AsyncRequest(Type::FilePoll) {}
 
-    /// Starts a windows poll operation, monitoring the given file descriptor with GetOverlappedResult
+    /// Starts a file descriptor poll operation, monitoring its readiness with appropriate OS API
     [[nodiscard]] SC::Result start(AsyncEventLoop& loop, FileDescriptor::Handle fileDescriptor);
 
+#if SC_PLATFORM_WINDOWS
     [[nodiscard]] auto& getOverlappedOpaque() { return overlapped; }
+#endif
 
     Function<void(Result&)> callback;
 
@@ -617,10 +619,10 @@ struct AsyncWindowsPoll : public AsyncRequest
     friend struct AsyncEventLoop;
 
     FileDescriptor::Handle fileDescriptor;
-
+#if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
-};
 #endif
+};
 
 //! @}
 
@@ -639,13 +641,13 @@ struct SC::AsyncEventLoop
     [[nodiscard]] Result close();
 
     /// Blocks until there are no more active queued requests.
-    /// It's useful for applications where the eventloop is the only (or the main) loop.
+    /// It's useful for applications where the eventLoop is the only (or the main) loop.
     /// One example could be a console based app doing socket IO or a web server.
     /// Waiting on requests blocks the current thread with 0% CPU utilization.
     [[nodiscard]] Result run();
 
     /// Blocks until at least one request proceeds, ensuring forward progress.
-    /// It's useful for applications where the eventloop events needs to be interleaved with other work.
+    /// It's useful for applications where the eventLoop events needs to be interleaved with other work.
     /// For example one possible way of integrating with a UI event loop could be to schedule a recurrent timeout
     /// timer every 1/60 seconds where calling GUI event loop  updates every 60 seconds, blocking for I/O for
     /// the remaining time. Waiting on requests blocks the current thread with 0% CPU utilization.
@@ -668,10 +670,10 @@ struct SC::AsyncEventLoop
     /// It also automatically registers the socket with the eventLoop (associateExternallyCreatedTCPSocket)
     [[nodiscard]] Result createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor);
 
-    /// Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventloop.
+    /// Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventLoop.
     [[nodiscard]] Result associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor);
 
-    /// Associates a File descriptor created externally with the eventloop.
+    /// Associates a File descriptor created externally with the eventLoop.
     [[nodiscard]] Result associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor);
 
     /// Returns handle to the kernel level IO queue object.
@@ -701,9 +703,9 @@ struct SC::AsyncEventLoop
     struct Internal;
     struct InternalDefinition
     {
-        static constexpr int Windows = 224;
-        static constexpr int Apple   = 144;
-        static constexpr int Default = 208;
+        static constexpr int Windows = 160;
+        static constexpr int Apple   = 88;
+        static constexpr int Default = 168;
 
         static constexpr size_t Alignment = alignof(void*);
 

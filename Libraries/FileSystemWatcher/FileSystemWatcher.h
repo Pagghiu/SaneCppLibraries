@@ -65,7 +65,7 @@ struct SC::FileSystemWatcher
         static constexpr int MaxChangesBufferSize = 1024;
 #if SC_PLATFORM_WINDOWS
         static constexpr int Windows =
-            MaxChangesBufferSize + sizeof(void*) + sizeof(FileDescriptor) + sizeof(AsyncWindowsPoll);
+            MaxChangesBufferSize + sizeof(void*) + sizeof(FileDescriptor) + sizeof(AsyncFilePoll);
 #else
         static constexpr int Windows = 0;
 #endif

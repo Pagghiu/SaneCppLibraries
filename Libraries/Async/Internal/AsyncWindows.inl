@@ -656,15 +656,15 @@ struct SC::AsyncEventLoop::KernelQueue
     [[nodiscard]] static Result stopAsync(AsyncProcessExit& async) { return async.waitHandle.close(); }
 
     // Windows Poll
-    [[nodiscard]] static Result setupAsync(AsyncWindowsPoll& async)
+    [[nodiscard]] static Result setupAsync(AsyncFilePoll& async)
     {
         async.overlapped.get().userData = &async;
         return Result(true);
     }
 
-    [[nodiscard]] static Result activateAsync(AsyncWindowsPoll&) { return Result(true); }
-    [[nodiscard]] static Result completeAsync(AsyncWindowsPoll::Result&) { return Result(true); }
-    [[nodiscard]] static Result stopAsync(AsyncWindowsPoll&) { return Result(true); }
+    [[nodiscard]] static Result activateAsync(AsyncFilePoll&) { return Result(true); }
+    [[nodiscard]] static Result completeAsync(AsyncFilePoll::Result&) { return Result(true); }
+    [[nodiscard]] static Result stopAsync(AsyncFilePoll&) { return Result(true); }
 };
 
 template <>
