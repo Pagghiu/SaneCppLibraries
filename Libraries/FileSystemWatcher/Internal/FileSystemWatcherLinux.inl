@@ -1,33 +1,20 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
-#if SC_PLATFORM_WINDOWS
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#else
-#include "../../FileSystemIterator/FileSystemIterator.h"
 #include <errno.h>
-#include <limits.h>      // PATH_MAX
-#include <signal.h>      //
-#include <stdio.h>       //snprintf
 #include <string.h>      // strlen
 #include <sys/inotify.h> // inotify
+#include <sys/select.h>  // fd_set / FD_ZERO
 #include <sys/stat.h>    // fstat
 #include <unistd.h>      // read
-#endif
 
+#include "../../FileSystemIterator/FileSystemIterator.h"
 #include "../../Strings/SmallString.h"
-#include "../../Strings/StringBuilder.h"
 #include "../../Strings/StringConverter.h"
 #include "../../Threading/Threading.h"
 
 struct SC::FileSystemWatcher::FolderWatcherInternal
 {
-#if SC_PLATFORM_WINDOWS
-    OVERLAPPED&    getOverlapped() { return asyncPoll.getOverlappedOpaque().get().overlapped; }
-    uint8_t        changesBuffer[FolderWatcherSizes::MaxChangesBufferSize];
-    FileDescriptor fileHandle;
-#else
     struct Pair
     {
         int32_t notifyID   = 0;
@@ -38,9 +25,8 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
 
     Array<Pair, FolderWatcherSizes::MaxNumberOfSubdirs> notifyHandles;
 
-    Vector<char>   relativePaths;
+    Vector<char> relativePaths;
 
-#endif
     FolderWatcher* parentEntry = nullptr; // We could in theory use SC_COMPILER_FIELD_OFFSET somehow to obtain it...
 };
 
@@ -49,15 +35,7 @@ struct SC::FileSystemWatcher::ThreadRunnerInternal
     Thread       thread;
     Atomic<bool> shouldStop = false;
 
-#if SC_PLATFORM_WINDOWS
-    static constexpr int N = ThreadRunnerDefinition::MaxWatchablePaths;
-
-    HANDLE         hEvents[N] = {0};
-    FolderWatcher* entries[N] = {nullptr};
-    DWORD          numEntries = 0;
-#else
-    PipeDescriptor shutdownPipe;
-#endif
+    PipeDescriptor shutdownPipe; // Allows unblocking the ::read() when stopping the watcher
 };
 
 struct SC::FileSystemWatcher::Internal
@@ -65,41 +43,33 @@ struct SC::FileSystemWatcher::Internal
     FileSystemWatcher*    self            = nullptr;
     EventLoopRunner*      eventLoopRunner = nullptr;
     ThreadRunnerInternal* threadingRunner = nullptr;
-#if SC_PLATFORM_WINDOWS
-#else
+
     FileDescriptor notifyFd;
-#endif
+
     [[nodiscard]] Result init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
         self            = &parent;
         threadingRunner = &runner.get();
-#if SC_PLATFORM_WINDOWS
-        return Result(true);
-#else
+
         SC_TRY(threadingRunner->shutdownPipe.createPipe());
         return notifyFd.assign(::inotify_init1(IN_CLOEXEC));
-#endif
     }
 
     [[nodiscard]] Result init(FileSystemWatcher& parent, EventLoopRunner& runner)
     {
         self            = &parent;
         eventLoopRunner = &runner;
-#if SC_PLATFORM_WINDOWS
-#else
+
         int notifyHandle = ::inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
         SC_TRY(notifyFd.assign(notifyHandle));
 
         SC_TRY(eventLoopRunner->eventLoop.associateExternallyCreatedFileDescriptor(notifyFd));
         runner.asyncPoll.callback.bind<Internal, &Internal::onEventLoopNotification>(*this);
         return runner.asyncPoll.start(eventLoopRunner->eventLoop, notifyHandle);
-#endif
     }
 
     [[nodiscard]] Result close()
     {
-#if SC_PLATFORM_WINDOWS
-#else
         if (eventLoopRunner)
         {
             SC_TRY(eventLoopRunner->asyncPoll.stop());
@@ -109,76 +79,28 @@ struct SC::FileSystemWatcher::Internal
         {
             SC_TRY(stopWatching(*entry));
         }
-#endif
+
         if (threadingRunner)
         {
             if (threadingRunner->thread.wasStarted())
             {
                 threadingRunner->shouldStop.exchange(true);
-#if SC_PLATFORM_WINDOWS
-                do
-                {
-                    for (DWORD idx = 0; idx < threadingRunner->numEntries; ++idx)
-                    {
-                        ::SetEvent(threadingRunner->hEvents[idx]);
-                    }
-                } while (threadingRunner->shouldStop.load());
-#else
+                // Write to shutdownPipe to unblock the ::select() in the dedicated thread
                 char dummy = 1;
                 SC_TRY(threadingRunner->shutdownPipe.writePipe.write({&dummy, sizeof(dummy)}));
                 SC_TRY(threadingRunner->shutdownPipe.close());
-                SC_TRY(notifyFd.close());
-#endif
                 SC_TRY(threadingRunner->thread.join());
             }
         }
-
-#if SC_PLATFORM_WINDOWS
-        for (FolderWatcher* entry = self->watchers.front; entry != nullptr; entry = entry->next)
-        {
-            SC_TRY(stopWatching(*entry));
-        }
-#endif
+        SC_TRY(notifyFd.close());
         return Result(true);
     }
-
-#if SC_PLATFORM_WINDOWS
-    void signalWatcherEvent(FolderWatcher& watcher)
-    {
-        auto& opaque = watcher.internal.get();
-        ::SetEvent(opaque.getOverlapped().hEvent);
-    }
-
-    void closeWatcherEvent(FolderWatcher& watcher)
-    {
-        auto& opaque = watcher.internal.get();
-        ::CloseHandle(opaque.getOverlapped().hEvent);
-        opaque.getOverlapped().hEvent = INVALID_HANDLE_VALUE;
-    }
-
-    void closeFileHandle(FolderWatcher& watcher)
-    {
-        auto& opaque = watcher.internal.get();
-        SC_TRUST_RESULT(opaque.fileHandle.close());
-    }
-#endif
 
     [[nodiscard]] Result stopWatching(FolderWatcher& folderWatcher)
     {
         folderWatcher.parent->watchers.remove(folderWatcher);
         folderWatcher.parent = nullptr;
-#if SC_PLATFORM_WINDOWS
-        if (threadingRunner)
-        {
-            signalWatcherEvent(folderWatcher);
-            closeWatcherEvent(folderWatcher);
-        }
-        else
-        {
-            SC_TRUST_RESULT(folderWatcher.internal.get().asyncPoll.stop());
-        }
-        closeFileHandle(folderWatcher);
-#else
+
         FolderWatcherInternal& folderInternal = folderWatcher.internal.get();
 
         int rootNotifyFd;
@@ -191,44 +113,17 @@ struct SC::FileSystemWatcher::Internal
         }
         folderInternal.notifyHandles.clear();
         folderInternal.relativePaths.clear();
-#endif
         return Result(true);
     }
 
     [[nodiscard]] Result startWatching(FolderWatcher* entry)
     {
         // TODO: Add check for trying to watch folders already being watched or children of recursive watches
-        StringNative<1024>     buffer = StringEncoding::Native; // TODO: this needs to go into caller context
-        StringConverter        converter(buffer);
-        FileDescriptor::Handle loopFDS = FileDescriptor::Invalid;
-        if (eventLoopRunner)
-        {
-            SC_TRY(eventLoopRunner->eventLoop.getLoopFileDescriptor(loopFDS));
-        }
-        StringView encodedPath;
-        SC_TRY(converter.convertNullTerminateFastPath(entry->path.view(), encodedPath));
+        StringNative<1024> buffer = StringEncoding::Native; // TODO: this needs to go into caller context
+        StringView         encodedPath;
+        SC_TRY(StringConverter(buffer).convertNullTerminateFastPath(entry->path.view(), encodedPath));
         FolderWatcherInternal& opaque = entry->internal.get();
-#if SC_PLATFORM_WINDOWS
-        if (threadingRunner)
-        {
-            threadingRunner->numEntries = 0;
-        }
-        // TODO: we should probably check if we are leaking on some partial failure code path...some RAII would help
-        if (threadingRunner)
-        {
-            SC_TRY_MSG(threadingRunner->numEntries < ThreadRunnerDefinition::MaxWatchablePaths,
-                       "startWatching exceeded MaxWatchablePaths");
-        }
-        HANDLE newHandle = ::CreateFileW(encodedPath.getNullTerminatedNative(),                            //
-                                         FILE_LIST_DIRECTORY,                                              //
-                                         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,           //
-                                         nullptr,                                                          //
-                                         OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, //
-                                         nullptr);
 
-        SC_TRY(newHandle != INVALID_HANDLE_VALUE);
-        SC_TRY(opaque.fileHandle.assign(newHandle));
-#else
         int rootNotifyFd;
         SC_TRY(notifyFd.get(rootNotifyFd, Result::Error("invalid notifyFd")));
         const int newHandle = ::inotify_add_watch(rootNotifyFd, encodedPath.getNullTerminatedNative(),
@@ -243,8 +138,9 @@ struct SC::FileSystemWatcher::Internal
         pair.nameOffset = 0;
         SC_TRY(opaque.notifyHandles.push_back(pair));
 
+        // Watch all subfolders of current directoy.
         // TODO: We should also dynamically add / remove watched directories added after now...
-        StringConverter    sb(opaque.relativePaths, StringEncoding::Utf8);
+        StringConverter    converter(opaque.relativePaths, StringEncoding::Utf8);
         FileSystemIterator iterator;
         iterator.options.recursive = true;
         SC_TRY(iterator.init(encodedPath));
@@ -262,44 +158,15 @@ struct SC::FileSystemWatcher::Internal
                 }
                 pair.notifyID   = notifyFd;
                 pair.nameOffset = opaque.relativePaths.size();
-                SC_TRY(sb.appendNullTerminated(iterator.get().name, false)); // keep null terminator
+                SC_TRY(converter.appendNullTerminated(iterator.get().name, false)); // keep null terminator
                 SC_TRY(opaque.notifyHandles.push_back(pair));
             }
         }
         SC_TRY(iterator.checkErrors());
-#endif
 
         opaque.parentEntry = entry;
 
-#if SC_PLATFORM_WINDOWS
-        if (threadingRunner)
-        {
-            opaque.getOverlapped().hEvent = ::CreateEventW(nullptr, FALSE, 0, nullptr);
-
-            threadingRunner->hEvents[threadingRunner->numEntries] = opaque.getOverlapped().hEvent;
-            threadingRunner->entries[threadingRunner->numEntries] = entry;
-            threadingRunner->numEntries++;
-        }
-        else
-        {
-            SC_TRY(eventLoopRunner->eventLoop.associateExternallyCreatedFileDescriptor(opaque.fileHandle));
-            opaque.asyncPoll.callback.bind<Internal, &Internal::onEventLoopNotification>(*this);
-            auto res = opaque.asyncPoll.start(eventLoopRunner->eventLoop, newHandle);
-            SC_TRY(res);
-        }
-
-        BOOL success = ::ReadDirectoryChangesW(newHandle,                         //
-                                               opaque.changesBuffer,              //
-                                               sizeof(opaque.changesBuffer),      //
-                                               TRUE,                              // watchSubtree
-                                               FILE_NOTIFY_CHANGE_FILE_NAME |     //
-                                                   FILE_NOTIFY_CHANGE_DIR_NAME |  //
-                                                   FILE_NOTIFY_CHANGE_LAST_WRITE, //
-                                               nullptr,                           // lpBytesReturned
-                                               &opaque.getOverlapped(),           // lpOverlapped
-                                               nullptr);                          // lpCompletionRoutine
-        SC_TRY_MSG(success == TRUE, "ReadDirectoryChangesW");
-#endif
+        // Launch the thread that monitors the inotify watch if we're on thread runner
         if (threadingRunner and not threadingRunner->thread.wasStarted())
         {
             threadingRunner->shouldStop.exchange(false);
@@ -316,28 +183,13 @@ struct SC::FileSystemWatcher::Internal
         ThreadRunnerInternal& runner = *threadingRunner;
         while (not runner.shouldStop.load())
         {
-#if SC_PLATFORM_WINDOWS
-            const DWORD result = ::WaitForMultipleObjects(runner.numEntries, runner.hEvents, TRUE, INFINITE);
-            if (result != WAIT_FAILED and not runner.shouldStop.load())
-            {
-                const DWORD            index  = result - WAIT_OBJECT_0;
-                FolderWatcher&         entry  = *runner.entries[index];
-                FolderWatcherInternal& opaque = entry.internal.get();
-                DWORD                  transferredBytes;
-                HANDLE                 handle;
-                if (opaque.fileHandle.get(handle, Result::Error("Invalid fs handle")))
-                {
-                    ::GetOverlappedResult(handle, &opaque.getOverlapped(), &transferredBytes, FALSE);
-                    notifyEntry(entry);
-                }
-            }
-#else
             int notifyHandle;
             SC_ASSERT_RELEASE(notifyFd.get(notifyHandle, Result(false)));
 
             int shutdownHandle;
             SC_ASSERT_RELEASE(runner.shutdownPipe.readPipe.get(shutdownHandle, Result(false)));
 
+            // Setup a select fd_set to listen on both notifyHandle and shutdownHandle simultaneously
             fd_set fds;
             FD_ZERO(&fds);
             FD_SET(notifyHandle, &fds);
@@ -347,80 +199,20 @@ struct SC::FileSystemWatcher::Internal
             int selectRes;
             do
             {
+                // Block until some events are received on the notifyFd or when shutdownPipe is written to
                 selectRes = ::select(maxFd + 1, &fds, nullptr, nullptr, nullptr);
             } while (selectRes == -1 and errno == EINTR);
 
             if (FD_ISSET(shutdownHandle, &fds))
             {
-                return; // Interrupted
+                return; // Interrupted by shutdownPipe.writePipe.write (from close())
             }
-
+            // Here select has received data on notifyHandle
             readAndNotify(notifyFd, self->watchers);
-#endif
         }
         threadingRunner->shouldStop.exchange(false);
     }
 
-#if SC_PLATFORM_WINDOWS
-    void onEventLoopNotification(AsyncWindowsPoll::Result& result)
-    {
-        SC_COMPILER_WARNING_PUSH_OFFSETOF;
-        FolderWatcherInternal& fwi = SC_COMPILER_FIELD_OFFSET(FolderWatcherInternal, asyncPoll, result.async);
-        SC_COMPILER_WARNING_POP;
-
-        SC_ASSERT_DEBUG(fwi.fileHandle.isValid());
-        notifyEntry(*fwi.parentEntry);
-        result.reactivateRequest(true);
-    }
-
-    static void notifyEntry(FolderWatcher& entry)
-    {
-        FolderWatcherInternal&   opaque = entry.internal.get();
-        FILE_NOTIFY_INFORMATION* event  = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(opaque.changesBuffer);
-
-        Notification notification;
-        notification.basePath = entry.path.view();
-        while (notification.basePath.sizeInBytes() > 1 and notification.basePath.endsWithCodePoint('\\'))
-        {
-            notification.basePath =
-                notification.basePath.sliceStartEndBytes(0, notification.basePath.sizeInBytes() - 1);
-        }
-
-        do
-        {
-            const Span<const wchar_t> span(event->FileName, event->FileNameLength / sizeof(wchar_t));
-            const StringView          path(span, false);
-
-            notification.relativePath = path;
-            switch (event->Action)
-            {
-            case FILE_ACTION_MODIFIED: notification.operation = Operation::Modified; break;
-            default: notification.operation = Operation::AddRemoveRename; break;
-            }
-            entry.notifyCallback(notification);
-
-            *reinterpret_cast<uint8_t**>(&event) += event->NextEntryOffset;
-        } while (event->NextEntryOffset);
-
-        memset(&opaque.getOverlapped(), 0, sizeof(opaque.getOverlapped()));
-        HANDLE handle;
-        if (opaque.fileHandle.get(handle, Result::Error("Invalid fs handle")))
-        {
-            BOOL success = ::ReadDirectoryChangesW(handle,                            //
-                                                   opaque.changesBuffer,              //
-                                                   sizeof(opaque.changesBuffer),      //
-                                                   TRUE,                              // watchSubtree
-                                                   FILE_NOTIFY_CHANGE_FILE_NAME |     //
-                                                       FILE_NOTIFY_CHANGE_DIR_NAME |  //
-                                                       FILE_NOTIFY_CHANGE_LAST_WRITE, //
-                                                   nullptr,                           // lpBytesReturned
-                                                   &opaque.getOverlapped(),           // lpOverlapped
-                                                   nullptr);                          // lpCompletionRoutine
-            // TODO: Handle ReadDirectoryChangesW error
-            (void)success;
-        }
-    }
-#else
     void onEventLoopNotification(AsyncFilePoll::Result& result)
     {
         readAndNotify(notifyFd, self->watchers);
@@ -433,6 +225,7 @@ struct SC::FileSystemWatcher::Internal
         SC_ASSERT_RELEASE(notifyFd.get(notifyHandle, Result(false)));
         int  numReadBytes;
         char inotifyBuffer[3 * 1024];
+        // TODO: Handle the case where kernel is sending more than 3kb of events.
         do
         {
             numReadBytes = ::read(notifyHandle, inotifyBuffer, sizeof(inotifyBuffer));
@@ -447,6 +240,7 @@ struct SC::FileSystemWatcher::Internal
         const struct inotify_event* event     = nullptr;
         const struct inotify_event* prevEvent = nullptr;
 
+        // Loop through all inotify_event and find the associated FolderWatcher to notify
         SmallString<1024> bufferString;
         for (const char* iterator = actuallyRead.data();                  //
              iterator < actuallyRead.data() + actuallyRead.sizeInBytes(); //
@@ -456,15 +250,13 @@ struct SC::FileSystemWatcher::Internal
             for (const FolderWatcher* entry = watchers.front; entry != nullptr; entry = entry->next)
             {
                 size_t foundIndex;
+                // Check if current FolderWatcher has a watcher matching the one from current event
                 if (entry->internal.get().notifyHandles.contains(FolderWatcherInternal::Pair{event->wd, 0},
                                                                  &foundIndex))
                 {
-                    if (notifySingleEvent(event, prevEvent, entry, foundIndex, bufferString))
-                    {
-                        prevEvent = event;
-                        break;
-                    }
+                    (void)notifySingleEvent(event, prevEvent, entry, foundIndex, bufferString);
                     prevEvent = event;
+                    break;
                 }
             }
         }
@@ -477,12 +269,16 @@ struct SC::FileSystemWatcher::Internal
         Notification notification;
 
         notification.basePath = entry->path.view();
+
+        // 1. Compute relative Path
         if (foundIndex == 0)
         {
+            // Something changed in the original root folder being watched
             notification.relativePath = StringView({event->name, ::strlen(event->name)}, true, StringEncoding::Utf8);
         }
         else
         {
+            // Something changed in any of the sub folders of the original root folder being watched
             const FolderWatcherInternal& internal = entry->internal.get();
             const char* dirStart = internal.relativePaths.data() + internal.notifyHandles[foundIndex].nameOffset;
 
@@ -495,12 +291,14 @@ struct SC::FileSystemWatcher::Internal
             SC_TRY(converter.appendNullTerminated(relativeName));
             notification.relativePath = bufferString.view();
         }
+
+        // 2. Compute event Type
         if (event->mask & (IN_ATTRIB | IN_MODIFY))
         {
+            // Try to coalesce Modified after AddRemoveRename for consistency with the other backends
+            // I'm not really sure that Modified is consistently pushed after AddRemoveRename from Linux Kernel.
             if (prevEvent != nullptr and (prevEvent->wd == event->wd))
             {
-                // Try to coalesce Modified after AddRemoveRename for consistency with the other backends
-                // I'm not really sure that Modified is consistently pushed after AddRemoveRename from Linux Kernel.
                 return Result(false);
             }
             notification.operation = Operation::Modified;
@@ -509,22 +307,19 @@ struct SC::FileSystemWatcher::Internal
         {
             notification.operation = Operation::AddRemoveRename;
         }
+
+        // 3. Finally invoke user callback with the notification
         entry->notifyCallback(notification);
         return Result(true);
     }
-#endif
 };
 
 SC::Result SC::FileSystemWatcher::Notification::getFullPath(String& buffer, StringView& outStringView) const
 {
-    StringBuilder builder(buffer);
-    SC_TRY(builder.append(basePath));
-#if SC_PLATFORM_WINDOWS
-    SC_TRY(builder.append("\\"));
-#else
-    SC_TRY(builder.append("/"));
-#endif
-    SC_TRY(builder.append(relativePath));
+    StringConverter converter(buffer, StringConverter::Clear);
+    SC_TRY(converter.appendNullTerminated(basePath));
+    SC_TRY(converter.appendNullTerminated("/"));
+    SC_TRY(converter.appendNullTerminated(relativePath));
     outStringView = buffer.view();
     return Result(true);
 }
