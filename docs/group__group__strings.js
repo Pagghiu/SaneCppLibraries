@@ -49,7 +49,7 @@ var group__group__strings =
       ] ],
       [ "StringConverter", "struct_s_c_1_1_string_converter.html#adf1287ad7f8237e408e51d0f7e154f74", null ],
       [ "StringConverter", "struct_s_c_1_1_string_converter.html#aa9b7a7dcb7929443c318889dfda78156", null ],
-      [ "appendNullTerminated", "struct_s_c_1_1_string_converter.html#ad19a429c37c8ce98cd9bc9be6652dd86", null ],
+      [ "appendNullTerminated", "struct_s_c_1_1_string_converter.html#ad1c2fc3bf6099567ea171eabfb1ddfb9", null ],
       [ "convertNullTerminateFastPath", "struct_s_c_1_1_string_converter.html#a08064181f307de011d57587c801cae1b", null ]
     ] ],
     [ "SC::StringFormatOutput", "struct_s_c_1_1_string_format_output.html", [

@@ -1,7 +1,8 @@
 var struct_s_c_1_1_process =
 [
     [ "Options", "struct_s_c_1_1_process_1_1_options.html", "struct_s_c_1_1_process_1_1_options" ],
-    [ "launch", "struct_s_c_1_1_process.html#a5fbfa1b81e17cf3f2ebbae7ee701ac43", null ],
+    [ "launch", "struct_s_c_1_1_process.html#ace407a6ee7d282c80f0f9acc4aba3e4c", null ],
+    [ "launch", "struct_s_c_1_1_process.html#a87a75c72f4c4a07bfd9896aa2e1be5d5", null ],
     [ "launch", "struct_s_c_1_1_process.html#a40fe51159f0c55869269fe5c128d3c00", null ],
     [ "redirectStdErrTo", "struct_s_c_1_1_process.html#af3685a024d03f6cac17434af1e7238e3", null ],
     [ "redirectStdInTo", "struct_s_c_1_1_process.html#ad313577c0ad7746aae25e9eaeaeaac50", null ],

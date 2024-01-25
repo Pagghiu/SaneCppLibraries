@@ -170,7 +170,7 @@ Features</h1>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyNone"><a class="el" href="struct_s_c_1_1_async_loop_wake_up.html">AsyncLoopWakeUp</a>   </td><td class="markdownTableBodyNone">Starts a wake-up operation, allowing threads to execute callbacks on loop thread.    </td></tr>
 <tr class="markdownTableRowOdd">
-<td class="markdownTableBodyNone"><a class="el" href="struct_s_c_1_1_async_windows_poll.html">AsyncWindowsPoll</a>   </td><td class="markdownTableBodyNone">Starts a windows poll operation, to be signaled by <code>GetOverlappedResult</code>.   </td></tr>
+<td class="markdownTableBodyNone">AsyncWindowsPoll   </td><td class="markdownTableBodyNone"></td></tr>
 </table>
 <h1><a class="anchor" id="autotoc_md53"></a>
 Status</h1>
@@ -201,9 +201,9 @@ Run modes</h3>
 <tr class="markdownTableHead">
 <th class="markdownTableHeadLeft">Run mode   </th><th class="markdownTableHeadLeft">Description    </th></tr>
 <tr class="markdownTableRowOdd">
-<td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_async_event_loop.html#af77cd7ac7a1a577204e43d14debc45c5" title="Blocks until there are no more active queued requests.">SC::AsyncEventLoop::run</a>   </td><td class="markdownTableBodyLeft">Blocks until there are no more active queued requests. It's useful for applications where the eventloop is the only (or the main) loop. One example could be a console based app doing socket IO or a web server. Waiting on requests blocks the current thread with 0% CPU utilization.   </td></tr>
+<td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_async_event_loop.html#af77cd7ac7a1a577204e43d14debc45c5" title="Blocks until there are no more active queued requests.">SC::AsyncEventLoop::run</a>   </td><td class="markdownTableBodyLeft">Blocks until there are no more active queued requests. It's useful for applications where the eventLoop is the only (or the main) loop. One example could be a console based app doing socket IO or a web server. Waiting on requests blocks the current thread with 0% CPU utilization.   </td></tr>
 <tr class="markdownTableRowEven">
-<td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_async_event_loop.html#aeef889e7c4c8f7cbbfe974ee6be27f09" title="Blocks until at least one request proceeds, ensuring forward progress.">SC::AsyncEventLoop::runOnce</a>   </td><td class="markdownTableBodyLeft">Blocks until at least one request proceeds, ensuring forward progress. It's useful for applications where the eventloop events needs to be interleaved with other work. For example one possible way of integrating with a UI event loop could be to schedule a recurrent timeout timer every 1/60 seconds where calling GUI event loop updates every 60 seconds, blocking for I/O for the remaining time. Waiting on requests blocks the current thread with 0% CPU utilization.   </td></tr>
+<td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_async_event_loop.html#aeef889e7c4c8f7cbbfe974ee6be27f09" title="Blocks until at least one request proceeds, ensuring forward progress.">SC::AsyncEventLoop::runOnce</a>   </td><td class="markdownTableBodyLeft">Blocks until at least one request proceeds, ensuring forward progress. It's useful for applications where the eventLoop events needs to be interleaved with other work. For example one possible way of integrating with a UI event loop could be to schedule a recurrent timeout timer every 1/60 seconds where calling GUI event loop updates every 60 seconds, blocking for I/O for the remaining time. Waiting on requests blocks the current thread with 0% CPU utilization.   </td></tr>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_async_event_loop.html#a1bc6365abc9c05fdbeec9c7f4519c319" title="Process active requests if they exist or returns immediately without blocking.">SC::AsyncEventLoop::runNoWait</a>   </td><td class="markdownTableBodyLeft">Process active requests if they exist or returns immediately without blocking. It's useful for game-like applications where the event loop runs every frame and one would like to check and dispatch its I/O callbacks in-between frames. This call allows poll-checking I/O without blocking.  </td></tr>
 </table>
@@ -270,7 +270,7 @@ AsyncProcessExit</h2>
 AsyncSocketAccept</h2>
 <p >Starts a socket accept operation, obtaining a new socket from a listening socket. <br  />
 The callback is called with a new socket connected to the given listening endpoint will be returned. <br  />
-<a class="el" href="library_socket.html">Socket</a> library can be used to create a Socket but the socket should be created with <a class="el" href="struct_s_c_1_1_socket_flags.html#aec08f165e03740d9137b9e7cca67941ba25afb353e41cd7298ba414dac55da436" title="Socket is in non-blocking mode.">SC::SocketFlags::NonBlocking</a> and associated to the event loop with <a class="el" href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a" title="Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventloop.">SC::AsyncEventLoop::associateExternallyCreatedTCPSocket</a>. <br  />
+<a class="el" href="library_socket.html">Socket</a> library can be used to create a Socket but the socket should be created with <a class="el" href="struct_s_c_1_1_socket_flags.html#aec08f165e03740d9137b9e7cca67941ba25afb353e41cd7298ba414dac55da436" title="Socket is in non-blocking mode.">SC::SocketFlags::NonBlocking</a> and associated to the event loop with <a class="el" href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a" title="Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedTCPSocket</a>. <br  />
 Alternatively <a class="el" href="struct_s_c_1_1_async_event_loop.html#add7fd25e710032ebadfb9c40a479f6a3" title="Helper to creates a TCP socket with AsyncRequest flags of the given family (IPV4 / IPV6).">SC::AsyncEventLoop::createAsyncTCPSocket</a> creates and associates the socket to the loop. </p><dl class="section note"><dt>Note</dt><dd>To continue accepting new socket <a class="el" href="struct_s_c_1_1_async_result.html#a0a7a91675236ec57657243e01960c093" title="Ask the event loop to re-activate this request after it was already completed.">SC::AsyncResult::reactivateRequest</a> must be called.</dd></dl>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named eventLoop</span></div>
 <div class="line"><span class="comment">// ...</span></div>
@@ -304,7 +304,7 @@ Alternatively <a class="el" href="struct_s_c_1_1_async_event_loop.html#add7fd25e
 AsyncSocketConnect</h2>
 <p >Starts a socket connect operation, connecting to a remote endpoint. <br  />
 Callback will be called when the given socket is connected to ipAddress. <br  />
-<a class="el" href="library_socket.html">Socket</a> library can be used to create a Socket but the socket should be created with <a class="el" href="struct_s_c_1_1_socket_flags.html#aec08f165e03740d9137b9e7cca67941ba25afb353e41cd7298ba414dac55da436" title="Socket is in non-blocking mode.">SC::SocketFlags::NonBlocking</a> and associated to the event loop with <a class="el" href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a" title="Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventloop.">SC::AsyncEventLoop::associateExternallyCreatedTCPSocket</a>. <br  />
+<a class="el" href="library_socket.html">Socket</a> library can be used to create a Socket but the socket should be created with <a class="el" href="struct_s_c_1_1_socket_flags.html#aec08f165e03740d9137b9e7cca67941ba25afb353e41cd7298ba414dac55da436" title="Socket is in non-blocking mode.">SC::SocketFlags::NonBlocking</a> and associated to the event loop with <a class="el" href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a" title="Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedTCPSocket</a>. <br  />
 Alternatively <a class="el" href="struct_s_c_1_1_async_event_loop.html#add7fd25e710032ebadfb9c40a479f6a3" title="Helper to creates a TCP socket with AsyncRequest flags of the given family (IPV4 / IPV6).">SC::AsyncEventLoop::createAsyncTCPSocket</a> creates and associates the socket to the loop.</p>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named eventLoop</span></div>
 <div class="line"><span class="comment">// ...</span></div>
@@ -325,7 +325,7 @@ Alternatively <a class="el" href="struct_s_c_1_1_async_event_loop.html#add7fd25e
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md62"></a>
 AsyncSocketSend</h2>
 <p >Starts a socket send operation, sending bytes to a remote endpoint. Callback will be called when the given socket is ready to send more data. <br  />
-<a class="el" href="library_socket.html">Socket</a> library can be used to create a Socket but the socket should be created with <a class="el" href="struct_s_c_1_1_socket_flags.html#aec08f165e03740d9137b9e7cca67941ba25afb353e41cd7298ba414dac55da436" title="Socket is in non-blocking mode.">SC::SocketFlags::NonBlocking</a> and associated to the event loop with <a class="el" href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a" title="Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventloop.">SC::AsyncEventLoop::associateExternallyCreatedTCPSocket</a> or though AsyncSocketAccept. <br  />
+<a class="el" href="library_socket.html">Socket</a> library can be used to create a Socket but the socket should be created with <a class="el" href="struct_s_c_1_1_socket_flags.html#aec08f165e03740d9137b9e7cca67941ba25afb353e41cd7298ba414dac55da436" title="Socket is in non-blocking mode.">SC::SocketFlags::NonBlocking</a> and associated to the event loop with <a class="el" href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a" title="Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedTCPSocket</a> or though AsyncSocketAccept. <br  />
 Alternatively <a class="el" href="struct_s_c_1_1_async_event_loop.html#add7fd25e710032ebadfb9c40a479f6a3" title="Helper to creates a TCP socket with AsyncRequest flags of the given family (IPV4 / IPV6).">SC::AsyncEventLoop::createAsyncTCPSocket</a> creates and associates the socket to the loop.</p>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named `eventLoop`</span></div>
 <div class="line"><span class="comment">// and a connected or accepted socket named `client`</span></div>
@@ -349,7 +349,7 @@ Alternatively <a class="el" href="struct_s_c_1_1_async_event_loop.html#add7fd25e
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md63"></a>
 AsyncSocketReceive</h2>
 <p >Starts a socket receive operation, receiving bytes from a remote endpoint. Callback will be called when some data is read from socket. <br  />
-<a class="el" href="library_socket.html">Socket</a> library can be used to create a Socket but the socket should be created with <a class="el" href="struct_s_c_1_1_socket_flags.html#aec08f165e03740d9137b9e7cca67941ba25afb353e41cd7298ba414dac55da436" title="Socket is in non-blocking mode.">SC::SocketFlags::NonBlocking</a> and associated to the event loop with <a class="el" href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a" title="Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventloop.">SC::AsyncEventLoop::associateExternallyCreatedTCPSocket</a> or though AsyncSocketAccept. <br  />
+<a class="el" href="library_socket.html">Socket</a> library can be used to create a Socket but the socket should be created with <a class="el" href="struct_s_c_1_1_socket_flags.html#aec08f165e03740d9137b9e7cca67941ba25afb353e41cd7298ba414dac55da436" title="Socket is in non-blocking mode.">SC::SocketFlags::NonBlocking</a> and associated to the event loop with <a class="el" href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a" title="Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedTCPSocket</a> or though AsyncSocketAccept. <br  />
 Alternatively <a class="el" href="struct_s_c_1_1_async_event_loop.html#add7fd25e710032ebadfb9c40a479f6a3" title="Helper to creates a TCP socket with AsyncRequest flags of the given family (IPV4 / IPV6).">SC::AsyncEventLoop::createAsyncTCPSocket</a> creates and associates the socket to the loop.</p>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named `eventLoop`</span></div>
 <div class="line"><span class="comment">// and a connected or accepted socket named `client`</span></div>
@@ -388,7 +388,7 @@ AsyncSocketClose</h2>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md65"></a>
 AsyncFileRead</h2>
 <p >Starts a file read operation, reading bytes from a file. Callback will be called after some data is read from file. <br  />
-<a class="el" href="library_file.html">File</a> library can be used to open the file and obtain a file descriptor handle. Make sure to associate the file descriptor with <a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a" title="Associates a File descriptor created externally with the eventloop.">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a>.</p>
+<a class="el" href="library_file.html">File</a> library can be used to open the file and obtain a file descriptor handle. Make sure to associate the file descriptor with <a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a" title="Associates a File descriptor created externally with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a>.</p>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named `eventLoop`</span></div>
 <div class="line"><span class="comment">// ...</span></div>
 <div class="line"> </div>
@@ -420,8 +420,8 @@ AsyncFileRead</h2>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md66"></a>
 AsyncFileWrite</h2>
 <p >Starts a file write operation, writing bytes to a file. Callback will be called when the file is ready to receive more bytes to write. <br  />
-<a class="el" href="library_file.html">File</a> library can be used to open the file and obtan a file descriptor handle. <br  />
-Make sure to associate the file desciptor with <a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a" title="Associates a File descriptor created externally with the eventloop.">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a>.</p>
+<a class="el" href="library_file.html">File</a> library can be used to open the file and obtain a file descriptor handle. <br  />
+Make sure to associate the file descriptor with <a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a" title="Associates a File descriptor created externally with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a>.</p>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named eventLoop</span></div>
 <div class="line"><span class="comment">// ...</span></div>
 <div class="line"> </div>
@@ -451,7 +451,7 @@ Make sure to associate the file desciptor with <a class="el" href="struct_s_c_1_
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md67"></a>
 AsyncFileClose</h2>
 <p >Starts a file close operation, closing the OS file descriptor. Callback will be called when the file is actually closed. <br  />
-<a class="el" href="library_file.html">File</a> library can be used to open the file and obtan a file descriptor handle.</p>
+<a class="el" href="library_file.html">File</a> library can be used to open the file and obtain a file descriptor handle.</p>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named eventLoop</span></div>
 <div class="line"><span class="comment">// ...</span></div>
 <div class="line"> </div>
@@ -477,7 +477,6 @@ AsyncFileClose</h2>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(asyncFileClose.start(eventLoop, handle));</div>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md68"></a>
 AsyncWindowsPoll</h2>
-<p >Starts a windows poll operation, to be signaled by <code>GetOverlappedResult</code>. Callback will be called when <code>GetOverlappedResult</code> signals events on the given file descriptor. Check <a class="el" href="library_file_system_watcher.html">File System Watcher</a> for an example usage of this notification.</p>
 <h1><a class="anchor" id="autotoc_md69"></a>
 Implementation</h1>
 <p >Library abstracts async operations by exposing a completion based mechanism. This mechanism currently maps on <code>kqueue</code> on macOS and <code>OVERLAPPED</code> on Windows but it should efficiently map over <code>io_uring</code> on Linux (when it will be implemented).</p>

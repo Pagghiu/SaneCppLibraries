@@ -162,6 +162,8 @@ Public Types</h2></td></tr>
 &#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a693ed2547c9ef849d2af2c59b0ce818d">FileWrite</a>
 , <br />
 &#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a0865974fc9fb115095eddadbb838f30e">FileClose</a>
+, <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524ac4a4109fa1a034a514a42877cdc156c8">FilePoll</a>
 <br />
  }</td></tr>
 <tr class="memdesc:af5065f89c50d598913f77f9e6a53c524"><td class="mdescLeft">&#160;</td><td class="mdescRight">Type of async request.  <a href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">More...</a><br /></td></tr>
@@ -226,7 +228,7 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b> ()</td
 <div class="textblock"><p >Starts a socket connect operation, connecting to a remote endpoint. </p>
 <p ><br  />
 Callback will be called when the given socket is connected to ipAddress. <br  />
-<a class="el" href="library_socket.html">Socket</a> library can be used to create a Socket but the socket should be created with <a class="el" href="struct_s_c_1_1_socket_flags.html#aec08f165e03740d9137b9e7cca67941ba25afb353e41cd7298ba414dac55da436" title="Socket is in non-blocking mode.">SC::SocketFlags::NonBlocking</a> and associated to the event loop with <a class="el" href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a" title="Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventloop.">SC::AsyncEventLoop::associateExternallyCreatedTCPSocket</a>. <br  />
+<a class="el" href="library_socket.html">Socket</a> library can be used to create a Socket but the socket should be created with <a class="el" href="struct_s_c_1_1_socket_flags.html#aec08f165e03740d9137b9e7cca67941ba25afb353e41cd7298ba414dac55da436" title="Socket is in non-blocking mode.">SC::SocketFlags::NonBlocking</a> and associated to the event loop with <a class="el" href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a" title="Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedTCPSocket</a>. <br  />
 Alternatively <a class="el" href="struct_s_c_1_1_async_event_loop.html#add7fd25e710032ebadfb9c40a479f6a3" title="Helper to creates a TCP socket with AsyncRequest flags of the given family (IPV4 / IPV6).">SC::AsyncEventLoop::createAsyncTCPSocket</a> creates and associates the socket to the loop.</p>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named eventLoop</span></div>
 <div class="line"><span class="comment">// ...</span></div>
@@ -246,7 +248,7 @@ Alternatively <a class="el" href="struct_s_c_1_1_async_event_loop.html#add7fd25e
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(connect.start(eventLoop, client, localHost));</div>
 <div class="ttc" id="agroup__group__foundation__utility_html_gae6b0d665676a4a5eedc2ad69693c04ee"><div class="ttname"><a href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a></div><div class="ttdeci">#define SC_TRY(expression)</div><div class="ttdoc">Checks the value of the given expression and if failed, returns this value to caller.</div><div class="ttdef"><b>Definition:</b> Result.h:47</div></div>
 <div class="ttc" id="astruct_s_c_1_1_async_event_loop_html_add7fd25e710032ebadfb9c40a479f6a3"><div class="ttname"><a href="struct_s_c_1_1_async_event_loop.html#add7fd25e710032ebadfb9c40a479f6a3">SC::AsyncEventLoop::createAsyncTCPSocket</a></div><div class="ttdeci">Result createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor &amp;outDescriptor)</div><div class="ttdoc">Helper to creates a TCP socket with AsyncRequest flags of the given family (IPV4 / IPV6).</div></div>
-<div class="ttc" id="astruct_s_c_1_1_async_socket_connect_html_a35460eb5e45c4640f5c9747446276007"><div class="ttname"><a href="struct_s_c_1_1_async_socket_connect.html#a35460eb5e45c4640f5c9747446276007">SC::AsyncSocketConnect::Result</a></div><div class="ttdeci">AsyncResultOf&lt; AsyncSocketConnect &gt; Result</div><div class="ttdoc">Callback result for AsyncSocketConnect.</div><div class="ttdef"><b>Definition:</b> Async.h:351</div></div>
+<div class="ttc" id="astruct_s_c_1_1_async_socket_connect_html_a35460eb5e45c4640f5c9747446276007"><div class="ttname"><a href="struct_s_c_1_1_async_socket_connect.html#a35460eb5e45c4640f5c9747446276007">SC::AsyncSocketConnect::Result</a></div><div class="ttdeci">AsyncResultOf&lt; AsyncSocketConnect &gt; Result</div><div class="ttdoc">Callback result for AsyncSocketConnect.</div><div class="ttdef"><b>Definition:</b> Async.h:352</div></div>
 </div><!-- fragment --> </div><h2 class="groupheader">Member Typedef Documentation</h2>
 <a id="a35460eb5e45c4640f5c9747446276007" name="a35460eb5e45c4640f5c9747446276007"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a35460eb5e45c4640f5c9747446276007">&#9670;&nbsp;</a></span>Result</h2>

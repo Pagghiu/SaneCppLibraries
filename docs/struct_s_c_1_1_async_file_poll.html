@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.9.2"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Sane C++: SC::AsyncWindowsPoll Struct Reference</title>
+<title>Sane C++: SC::AsyncFilePoll Struct Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -91,7 +91,7 @@ $(function() {
 </div>
 <script type="text/javascript">
 /* @license magnet:?xt=urn:btih:d3d9a9a6595521f9666a5e94cc830dab83b65699&amp;dn=expat.txt MIT */
-$(document).ready(function(){initNavTree('struct_s_c_1_1_async_windows_poll.html',''); initResizable(); });
+$(document).ready(function(){initNavTree('struct_s_c_1_1_async_file_poll.html',''); initResizable(); });
 /* @license-end */
 </script>
 <div id="doc-content">
@@ -115,30 +115,30 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_async_windows_poll.html
 <a href="#pub-methods">Public Member Functions</a> &#124;
 <a href="#pub-attribs">Public Attributes</a> &#124;
 <a href="#friends">Friends</a> &#124;
-<a href="struct_s_c_1_1_async_windows_poll-members.html">List of all members</a>  </div>
-  <div class="headertitle"><div class="title">SC::AsyncWindowsPoll Struct Reference<div class="ingroups"><a class="el" href="group__group__async.html">Async</a></div></div></div>
+<a href="struct_s_c_1_1_async_file_poll-members.html">List of all members</a>  </div>
+  <div class="headertitle"><div class="title">SC::AsyncFilePoll Struct Reference<div class="ingroups"><a class="el" href="group__group__async.html">Async</a></div></div></div>
 </div><!--header-->
 <div class="contents">
 
-<p>Starts a windows poll operation, to be signaled by <code>GetOverlappedResult</code>.  
- <a href="struct_s_c_1_1_async_windows_poll.html#details">More...</a></p>
+<p>Starts a file poll operation, using <code>GetOverlappedResult</code> (windows), kevent (macOS) and epoll (Linux).  
+ <a href="struct_s_c_1_1_async_file_poll.html#details">More...</a></p>
 
 <p><code>#include &lt;<a class="el" href="_async_8h_source.html">Async.h</a>&gt;</code></p>
 <div class="dynheader">
-Inheritance diagram for SC::AsyncWindowsPoll:</div>
+Inheritance diagram for SC::AsyncFilePoll:</div>
 <div class="dyncontent">
  <div class="center">
-  <img src="struct_s_c_1_1_async_windows_poll.png" usemap="#SC::AsyncWindowsPoll_map" alt=""/>
-  <map id="SC::AsyncWindowsPoll_map" name="SC::AsyncWindowsPoll_map">
-<area href="struct_s_c_1_1_async_request.html" title="Base class for all async requests, holding state and type." alt="SC::AsyncRequest" shape="rect" coords="0,0,142,24"/>
+  <img src="struct_s_c_1_1_async_file_poll.png" usemap="#SC::AsyncFilePoll_map" alt=""/>
+  <map id="SC::AsyncFilePoll_map" name="SC::AsyncFilePoll_map">
+<area href="struct_s_c_1_1_async_request.html" title="Base class for all async requests, holding state and type." alt="SC::AsyncRequest" shape="rect" coords="0,0,115,24"/>
   </map>
 </div></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-types" name="pub-types"></a>
 Public Types</h2></td></tr>
-<tr class="memitem:a882023914766b00ad7af4d19bb261848"><td class="memItemLeft" align="right" valign="top"><a id="a882023914766b00ad7af4d19bb261848" name="a882023914766b00ad7af4d19bb261848"></a>
-using&#160;</td><td class="memItemRight" valign="bottom"><b>Result</b> = <a class="el" href="struct_s_c_1_1_async_result_of.html">AsyncResultOf</a>&lt; <a class="el" href="struct_s_c_1_1_async_windows_poll.html">AsyncWindowsPoll</a> &gt;</td></tr>
-<tr class="separator:a882023914766b00ad7af4d19bb261848"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2700c35fda49bed7a2473c743e8ad701"><td class="memItemLeft" align="right" valign="top"><a id="a2700c35fda49bed7a2473c743e8ad701" name="a2700c35fda49bed7a2473c743e8ad701"></a>
+using&#160;</td><td class="memItemRight" valign="bottom"><b>Result</b> = <a class="el" href="struct_s_c_1_1_async_result_of.html">AsyncResultOf</a>&lt; <a class="el" href="struct_s_c_1_1_async_file_poll.html">AsyncFilePoll</a> &gt;</td></tr>
+<tr class="separator:a2700c35fda49bed7a2473c743e8ad701"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_types_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pub_types_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Public Types inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
 <tr class="memitem:af5065f89c50d598913f77f9e6a53c524 inherit pub_types_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top">enum class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">Type</a> : uint8_t { <br />
 &#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a71ee59b61aa037f9247d066a7ef7384d">LoopTimeout</a>
@@ -162,6 +162,8 @@ using&#160;</td><td class="memItemRight" valign="bottom"><b>Result</b> = <a clas
 &#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a693ed2547c9ef849d2af2c59b0ce818d">FileWrite</a>
 , <br />
 &#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a0865974fc9fb115095eddadbb838f30e">FileClose</a>
+, <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524ac4a4109fa1a034a514a42877cdc156c8">FilePoll</a>
 <br />
  }</td></tr>
 <tr class="memdesc:af5065f89c50d598913f77f9e6a53c524"><td class="mdescLeft">&#160;</td><td class="mdescRight">Type of async request.  <a href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">More...</a><br /></td></tr>
@@ -169,12 +171,9 @@ using&#160;</td><td class="memItemRight" valign="bottom"><b>Result</b> = <a clas
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:aa5fe52efe47aa0519d3b518011389861"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">SC::Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_windows_poll.html#aa5fe52efe47aa0519d3b518011389861">start</a> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;loop, FileDescriptor::Handle fileDescriptor)</td></tr>
-<tr class="memdesc:aa5fe52efe47aa0519d3b518011389861"><td class="mdescLeft">&#160;</td><td class="mdescRight">Starts a windows poll operation, monitoring the given file descriptor with GetOverlappedResult.  <a href="struct_s_c_1_1_async_windows_poll.html#aa5fe52efe47aa0519d3b518011389861">More...</a><br /></td></tr>
-<tr class="separator:aa5fe52efe47aa0519d3b518011389861"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a43ff33dd4945d250d104929dadfa2d26"><td class="memItemLeft" align="right" valign="top"><a id="a43ff33dd4945d250d104929dadfa2d26" name="a43ff33dd4945d250d104929dadfa2d26"></a>
-auto &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>getOverlappedOpaque</b> ()</td></tr>
-<tr class="separator:a43ff33dd4945d250d104929dadfa2d26"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae3b516404b38e0a19f7e9d29224ca0df"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">SC::Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_file_poll.html#ae3b516404b38e0a19f7e9d29224ca0df">start</a> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;loop, FileDescriptor::Handle fileDescriptor)</td></tr>
+<tr class="memdesc:ae3b516404b38e0a19f7e9d29224ca0df"><td class="mdescLeft">&#160;</td><td class="mdescRight">Starts a file descriptor poll operation, monitoring its readiness with appropriate OS API.  <a href="struct_s_c_1_1_async_file_poll.html#ae3b516404b38e0a19f7e9d29224ca0df">More...</a><br /></td></tr>
+<tr class="separator:ae3b516404b38e0a19f7e9d29224ca0df"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
 <tr class="memitem:a8f1d866203c63c120045181b0eced844 inherit pub_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="a8f1d866203c63c120045181b0eced844" name="a8f1d866203c63c120045181b0eced844"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>setDebugName</b> (const char *newDebugName)</td></tr>
@@ -191,9 +190,9 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>setDebugName</b> (con
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a71770713f7c3a43226e1834b1427497a"><td class="memItemLeft" align="right" valign="top"><a id="a71770713f7c3a43226e1834b1427497a" name="a71770713f7c3a43226e1834b1427497a"></a>
+<tr class="memitem:a92c2866cbb99176ee50c392a7ed45c25"><td class="memItemLeft" align="right" valign="top"><a id="a92c2866cbb99176ee50c392a7ed45c25" name="a92c2866cbb99176ee50c392a7ed45c25"></a>
 <a class="el" href="struct_s_c_1_1_function.html">Function</a>&lt; void(<a class="el" href="struct_s_c_1_1_async_result_of.html">Result</a> &amp;)&gt;&#160;</td><td class="memItemRight" valign="bottom"><b>callback</b></td></tr>
-<tr class="separator:a71770713f7c3a43226e1834b1427497a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="separator:a92c2866cbb99176ee50c392a7ed45c25"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_attribs_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
 <tr class="memitem:ad977b9a7f485953a06261916c9fa87ee inherit pub_attribs_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ad977b9a7f485953a06261916c9fa87ee" name="ad977b9a7f485953a06261916c9fa87ee"></a>
 <a class="el" href="struct_s_c_1_1_async_request.html">AsyncRequest</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>next</b> = nullptr</td></tr>
@@ -226,17 +225,17 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b> ()</td
 <tr class="separator:a6397be27006b8fdfa51fabd1c3a415f8 inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
-<div class="textblock"><p >Starts a windows poll operation, to be signaled by <code>GetOverlappedResult</code>. </p>
-<p >Callback will be called when <code>GetOverlappedResult</code> signals events on the given file descriptor. Check <a class="el" href="library_file_system_watcher.html">File System Watcher</a> for an example usage of this notification. </p>
+<div class="textblock"><p >Starts a file poll operation, using <code>GetOverlappedResult</code> (windows), kevent (macOS) and epoll (Linux). </p>
+<p >Callback will be called when any of the three API signals readiness events on the given file descriptor. Check <a class="el" href="library_file_system_watcher.html">File System Watcher</a> for an example usage of this notification. </p>
 </div><h2 class="groupheader">Member Function Documentation</h2>
-<a id="aa5fe52efe47aa0519d3b518011389861" name="aa5fe52efe47aa0519d3b518011389861"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aa5fe52efe47aa0519d3b518011389861">&#9670;&nbsp;</a></span>start()</h2>
+<a id="ae3b516404b38e0a19f7e9d29224ca0df" name="ae3b516404b38e0a19f7e9d29224ca0df"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae3b516404b38e0a19f7e9d29224ca0df">&#9670;&nbsp;</a></span>start()</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">SC::Result</a> SC::AsyncWindowsPoll::start </td>
+          <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">SC::Result</a> SC::AsyncFilePoll::start </td>
           <td>(</td>
           <td class="paramtype"><a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;&#160;</td>
           <td class="paramname"><em>loop</em>, </td>
@@ -255,7 +254,7 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b> ()</td
       </table>
 </div><div class="memdoc">
 
-<p>Starts a windows poll operation, monitoring the given file descriptor with GetOverlappedResult. </p>
+<p>Starts a file descriptor poll operation, monitoring its readiness with appropriate OS API. </p>
 
 </div>
 </div>
@@ -267,7 +266,7 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b> ()</td
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
-    <li class="navelem"><b>SC</b></li><li class="navelem"><a class="el" href="struct_s_c_1_1_async_windows_poll.html">AsyncWindowsPoll</a></li>
+    <li class="navelem"><b>SC</b></li><li class="navelem"><a class="el" href="struct_s_c_1_1_async_file_poll.html">AsyncFilePoll</a></li>
     <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.2 </li>
   </ul>
 </div>

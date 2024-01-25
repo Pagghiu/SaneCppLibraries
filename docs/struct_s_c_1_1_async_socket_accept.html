@@ -203,6 +203,8 @@ Additional Inherited Members</h2></td></tr>
 &#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a693ed2547c9ef849d2af2c59b0ce818d">FileWrite</a>
 , <br />
 &#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a0865974fc9fb115095eddadbb838f30e">FileClose</a>
+, <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524ac4a4109fa1a034a514a42877cdc156c8">FilePoll</a>
 <br />
  }</td></tr>
 <tr class="memdesc:af5065f89c50d598913f77f9e6a53c524"><td class="mdescLeft">&#160;</td><td class="mdescRight">Type of async request.  <a href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">More...</a><br /></td></tr>
@@ -226,7 +228,7 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b> ()</td
 <div class="textblock"><p >Starts a socket accept operation, obtaining a new socket from a listening socket. </p>
 <p ><br  />
 The callback is called with a new socket connected to the given listening endpoint will be returned. <br  />
-<a class="el" href="library_socket.html">Socket</a> library can be used to create a Socket but the socket should be created with <a class="el" href="struct_s_c_1_1_socket_flags.html#aec08f165e03740d9137b9e7cca67941ba25afb353e41cd7298ba414dac55da436" title="Socket is in non-blocking mode.">SC::SocketFlags::NonBlocking</a> and associated to the event loop with <a class="el" href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a" title="Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventloop.">SC::AsyncEventLoop::associateExternallyCreatedTCPSocket</a>. <br  />
+<a class="el" href="library_socket.html">Socket</a> library can be used to create a Socket but the socket should be created with <a class="el" href="struct_s_c_1_1_socket_flags.html#aec08f165e03740d9137b9e7cca67941ba25afb353e41cd7298ba414dac55da436" title="Socket is in non-blocking mode.">SC::SocketFlags::NonBlocking</a> and associated to the event loop with <a class="el" href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a" title="Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedTCPSocket</a>. <br  />
 Alternatively <a class="el" href="struct_s_c_1_1_async_event_loop.html#add7fd25e710032ebadfb9c40a479f6a3" title="Helper to creates a TCP socket with AsyncRequest flags of the given family (IPV4 / IPV6).">SC::AsyncEventLoop::createAsyncTCPSocket</a> creates and associates the socket to the loop. </p><dl class="section note"><dt>Note</dt><dd>To continue accepting new socket <a class="el" href="struct_s_c_1_1_async_result.html#a0a7a91675236ec57657243e01960c093" title="Ask the event loop to re-activate this request after it was already completed.">SC::AsyncResult::reactivateRequest</a> must be called.</dd></dl>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named eventLoop</span></div>
 <div class="line"><span class="comment">// ...</span></div>

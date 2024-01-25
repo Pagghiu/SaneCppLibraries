@@ -155,9 +155,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a08064181f307de011d57587c801cae1b"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_converter.html#a08064181f307de011d57587c801cae1b">convertNullTerminateFastPath</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> input, <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> &amp;encodedText)</td></tr>
 <tr class="memdesc:a08064181f307de011d57587c801cae1b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts a given input <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> to null-terminated version.  <a href="struct_s_c_1_1_string_converter.html#a08064181f307de011d57587c801cae1b">More...</a><br /></td></tr>
 <tr class="separator:a08064181f307de011d57587c801cae1b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad19a429c37c8ce98cd9bc9be6652dd86"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_converter.html#ad19a429c37c8ce98cd9bc9be6652dd86">appendNullTerminated</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> input)</td></tr>
-<tr class="memdesc:ad19a429c37c8ce98cd9bc9be6652dd86"><td class="mdescLeft">&#160;</td><td class="mdescRight">Appends the input string null terminated.  <a href="struct_s_c_1_1_string_converter.html#ad19a429c37c8ce98cd9bc9be6652dd86">More...</a><br /></td></tr>
-<tr class="separator:ad19a429c37c8ce98cd9bc9be6652dd86"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad1c2fc3bf6099567ea171eabfb1ddfb9"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_converter.html#ad1c2fc3bf6099567ea171eabfb1ddfb9">appendNullTerminated</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> input, bool popExistingNullTerminator=true)</td></tr>
+<tr class="memdesc:ad1c2fc3bf6099567ea171eabfb1ddfb9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Appends the input string null terminated.  <a href="struct_s_c_1_1_string_converter.html#ad1c2fc3bf6099567ea171eabfb1ddfb9">More...</a><br /></td></tr>
+<tr class="separator:ad1c2fc3bf6099567ea171eabfb1ddfb9"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-static-methods" name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
@@ -336,8 +336,8 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>FileSystemIterator<
 </div>
 </div>
 <h2 class="groupheader">Member Function Documentation</h2>
-<a id="ad19a429c37c8ce98cd9bc9be6652dd86" name="ad19a429c37c8ce98cd9bc9be6652dd86"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ad19a429c37c8ce98cd9bc9be6652dd86">&#9670;&nbsp;</a></span>appendNullTerminated()</h2>
+<a id="ad1c2fc3bf6099567ea171eabfb1ddfb9" name="ad1c2fc3bf6099567ea171eabfb1ddfb9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad1c2fc3bf6099567ea171eabfb1ddfb9">&#9670;&nbsp;</a></span>appendNullTerminated()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -346,8 +346,18 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>FileSystemIterator<
           <td class="memname">bool SC::StringConverter::appendNullTerminated </td>
           <td>(</td>
           <td class="paramtype"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td>
-          <td class="paramname"><em>input</em></td><td>)</td>
+          <td class="paramname"><em>input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>popExistingNullTerminator</em> = <code>true</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -356,6 +366,7 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>FileSystemIterator<
 <p >Appends the given <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> and adds null-terminator. If existing null-terminator was already last inserted code point, it will be removed before appending input. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">input</td><td>The <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> to be appended </td></tr>
+    <tr><td class="paramname">popExistingNullTerminator</td><td>If true, removes existing null terminator before adding the new one </td></tr>
   </table>
   </dd>
 </dl>

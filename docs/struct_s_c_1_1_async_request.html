@@ -133,17 +133,17 @@ Inheritance diagram for SC::AsyncRequest:</div>
   <img src="struct_s_c_1_1_async_request.png" usemap="#SC::AsyncRequest_map" alt=""/>
   <map id="SC::AsyncRequest_map" name="SC::AsyncRequest_map">
 <area href="struct_s_c_1_1_async_file_close.html" title="Starts a file close operation, closing the OS file descriptor." alt="SC::AsyncFileClose" shape="rect" coords="166,56,322,80"/>
-<area href="struct_s_c_1_1_async_file_read.html" title="Starts a file read operation, reading bytes from a file." alt="SC::AsyncFileRead" shape="rect" coords="166,112,322,136"/>
-<area href="struct_s_c_1_1_async_file_write.html" title="Starts a file write operation, writing bytes to a file." alt="SC::AsyncFileWrite" shape="rect" coords="166,168,322,192"/>
-<area href="struct_s_c_1_1_async_loop_timeout.html" title="Starts a Timeout that is invoked after expiration (relative) time has passed." alt="SC::AsyncLoopTimeout" shape="rect" coords="166,224,322,248"/>
-<area href="struct_s_c_1_1_async_loop_wake_up.html" title="Starts a wake-up operation, allowing threads to execute callbacks on loop thread." alt="SC::AsyncLoopWakeUp" shape="rect" coords="166,280,322,304"/>
-<area href="struct_s_c_1_1_async_process_exit.html" title="Starts a process exit notification request, so that when process is exited the callback will be calle..." alt="SC::AsyncProcessExit" shape="rect" coords="166,336,322,360"/>
-<area href="struct_s_c_1_1_async_socket_accept.html" title="Starts a socket accept operation, obtaining a new socket from a listening socket." alt="SC::AsyncSocketAccept" shape="rect" coords="166,392,322,416"/>
-<area href="struct_s_c_1_1_async_socket_close.html" title="Starts a socket close operation." alt="SC::AsyncSocketClose" shape="rect" coords="166,448,322,472"/>
-<area href="struct_s_c_1_1_async_socket_connect.html" title="Starts a socket connect operation, connecting to a remote endpoint." alt="SC::AsyncSocketConnect" shape="rect" coords="166,504,322,528"/>
-<area href="struct_s_c_1_1_async_socket_receive.html" title="Starts a socket receive operation, receiving bytes from a remote endpoint." alt="SC::AsyncSocketReceive" shape="rect" coords="166,560,322,584"/>
-<area href="struct_s_c_1_1_async_socket_send.html" title="Starts a socket send operation, sending bytes to a remote endpoint." alt="SC::AsyncSocketSend" shape="rect" coords="166,616,322,640"/>
-<area href="struct_s_c_1_1_async_windows_poll.html" title="Starts a windows poll operation, to be signaled by GetOverlappedResult." alt="SC::AsyncWindowsPoll" shape="rect" coords="166,672,322,696"/>
+<area href="struct_s_c_1_1_async_file_poll.html" title="Starts a file poll operation, using GetOverlappedResult (windows), kevent (macOS) and epoll (Linux)." alt="SC::AsyncFilePoll" shape="rect" coords="166,112,322,136"/>
+<area href="struct_s_c_1_1_async_file_read.html" title="Starts a file read operation, reading bytes from a file." alt="SC::AsyncFileRead" shape="rect" coords="166,168,322,192"/>
+<area href="struct_s_c_1_1_async_file_write.html" title="Starts a file write operation, writing bytes to a file." alt="SC::AsyncFileWrite" shape="rect" coords="166,224,322,248"/>
+<area href="struct_s_c_1_1_async_loop_timeout.html" title="Starts a Timeout that is invoked after expiration (relative) time has passed." alt="SC::AsyncLoopTimeout" shape="rect" coords="166,280,322,304"/>
+<area href="struct_s_c_1_1_async_loop_wake_up.html" title="Starts a wake-up operation, allowing threads to execute callbacks on loop thread." alt="SC::AsyncLoopWakeUp" shape="rect" coords="166,336,322,360"/>
+<area href="struct_s_c_1_1_async_process_exit.html" title="Starts a process exit notification request, so that when process is exited the callback will be calle..." alt="SC::AsyncProcessExit" shape="rect" coords="166,392,322,416"/>
+<area href="struct_s_c_1_1_async_socket_accept.html" title="Starts a socket accept operation, obtaining a new socket from a listening socket." alt="SC::AsyncSocketAccept" shape="rect" coords="166,448,322,472"/>
+<area href="struct_s_c_1_1_async_socket_close.html" title="Starts a socket close operation." alt="SC::AsyncSocketClose" shape="rect" coords="166,504,322,528"/>
+<area href="struct_s_c_1_1_async_socket_connect.html" title="Starts a socket connect operation, connecting to a remote endpoint." alt="SC::AsyncSocketConnect" shape="rect" coords="166,560,322,584"/>
+<area href="struct_s_c_1_1_async_socket_receive.html" title="Starts a socket receive operation, receiving bytes from a remote endpoint." alt="SC::AsyncSocketReceive" shape="rect" coords="166,616,322,640"/>
+<area href="struct_s_c_1_1_async_socket_send.html" title="Starts a socket send operation, sending bytes to a remote endpoint." alt="SC::AsyncSocketSend" shape="rect" coords="166,672,322,696"/>
   </map>
 </div></div>
 <table class="memberdecls">
@@ -171,6 +171,8 @@ Public Types</h2></td></tr>
 &#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a693ed2547c9ef849d2af2c59b0ce818d">FileWrite</a>
 , <br />
 &#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a0865974fc9fb115095eddadbb838f30e">FileClose</a>
+, <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524ac4a4109fa1a034a514a42877cdc156c8">FilePoll</a>
 <br />
  }</td></tr>
 <tr class="memdesc:af5065f89c50d598913f77f9e6a53c524"><td class="mdescLeft">&#160;</td><td class="mdescRight">Type of async request.  <a href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">More...</a><br /></td></tr>
@@ -273,6 +275,8 @@ If the function returns an invalid Return code or if the operation is manually c
 <tr><td class="fieldname"><a id="af5065f89c50d598913f77f9e6a53c524a693ed2547c9ef849d2af2c59b0ce818d" name="af5065f89c50d598913f77f9e6a53c524a693ed2547c9ef849d2af2c59b0ce818d"></a>FileWrite&#160;</td><td class="fielddoc"><p >Request is an <a class="el" href="struct_s_c_1_1_async_file_write.html" title="Starts a file write operation, writing bytes to a file.">AsyncFileWrite</a> object. </p>
 </td></tr>
 <tr><td class="fieldname"><a id="af5065f89c50d598913f77f9e6a53c524a0865974fc9fb115095eddadbb838f30e" name="af5065f89c50d598913f77f9e6a53c524a0865974fc9fb115095eddadbb838f30e"></a>FileClose&#160;</td><td class="fielddoc"><p >Request is an <a class="el" href="struct_s_c_1_1_async_file_close.html" title="Starts a file close operation, closing the OS file descriptor.">AsyncFileClose</a> object. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="af5065f89c50d598913f77f9e6a53c524ac4a4109fa1a034a514a42877cdc156c8" name="af5065f89c50d598913f77f9e6a53c524ac4a4109fa1a034a514a42877cdc156c8"></a>FilePoll&#160;</td><td class="fielddoc"><p >Request is an <a class="el" href="struct_s_c_1_1_async_file_poll.html" title="Starts a file poll operation, using GetOverlappedResult (windows), kevent (macOS) and epoll (Linux).">AsyncFilePoll</a> object. </p>
 </td></tr>
 </table>
 

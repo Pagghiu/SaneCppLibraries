@@ -158,10 +158,10 @@ Public Member Functions</h2></td></tr>
 <tr class="memdesc:add7fd25e710032ebadfb9c40a479f6a3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Helper to creates a TCP socket with <a class="el" href="struct_s_c_1_1_async_request.html" title="Base class for all async requests, holding state and type.">AsyncRequest</a> flags of the given family (IPV4 / IPV6).  <a href="struct_s_c_1_1_async_event_loop.html#add7fd25e710032ebadfb9c40a479f6a3">More...</a><br /></td></tr>
 <tr class="separator:add7fd25e710032ebadfb9c40a479f6a3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adebd85cf61505414b484cf6574c6bc1a"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a">associateExternallyCreatedTCPSocket</a> (<a class="el" href="struct_s_c_1_1_socket_descriptor.html">SocketDescriptor</a> &amp;outDescriptor)</td></tr>
-<tr class="memdesc:adebd85cf61505414b484cf6574c6bc1a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventloop.  <a href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a">More...</a><br /></td></tr>
+<tr class="memdesc:adebd85cf61505414b484cf6574c6bc1a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventLoop.  <a href="struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a">More...</a><br /></td></tr>
 <tr class="separator:adebd85cf61505414b484cf6574c6bc1a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a10f7a7f846c5879a2ad6c66e77e1d56a"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a">associateExternallyCreatedFileDescriptor</a> (<a class="el" href="struct_s_c_1_1_file_descriptor.html">FileDescriptor</a> &amp;outDescriptor)</td></tr>
-<tr class="memdesc:a10f7a7f846c5879a2ad6c66e77e1d56a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Associates a File descriptor created externally with the eventloop.  <a href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a">More...</a><br /></td></tr>
+<tr class="memdesc:a10f7a7f846c5879a2ad6c66e77e1d56a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Associates a File descriptor created externally with the eventLoop.  <a href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a">More...</a><br /></td></tr>
 <tr class="separator:a10f7a7f846c5879a2ad6c66e77e1d56a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a51dfc8d3dbfa0751d4fe6cf4b29f6410"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_event_loop.html#a51dfc8d3dbfa0751d4fe6cf4b29f6410">getLoopFileDescriptor</a> (FileDescriptor::Handle &amp;fileDescriptor) const</td></tr>
 <tr class="memdesc:a51dfc8d3dbfa0751d4fe6cf4b29f6410"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns handle to the kernel level IO queue object.  <a href="struct_s_c_1_1_async_event_loop.html#a51dfc8d3dbfa0751d4fe6cf4b29f6410">More...</a><br /></td></tr>
@@ -206,7 +206,7 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncRequest</b></t
       </table>
 </div><div class="memdoc">
 
-<p>Associates a File descriptor created externally with the eventloop. </p>
+<p>Associates a File descriptor created externally with the eventLoop. </p>
 
 </div>
 </div>
@@ -226,7 +226,7 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncRequest</b></t
       </table>
 </div><div class="memdoc">
 
-<p>Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventloop. </p>
+<p>Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventLoop. </p>
 
 </div>
 </div>
@@ -363,7 +363,7 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncRequest</b></t
 </div><div class="memdoc">
 
 <p>Blocks until there are no more active queued requests. </p>
-<p >It's useful for applications where the eventloop is the only (or the main) loop. One example could be a console based app doing socket IO or a web server. Waiting on requests blocks the current thread with 0% CPU utilization. </p>
+<p >It's useful for applications where the eventLoop is the only (or the main) loop. One example could be a console based app doing socket IO or a web server. Waiting on requests blocks the current thread with 0% CPU utilization. </p>
 
 </div>
 </div>
@@ -403,7 +403,7 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncRequest</b></t
 </div><div class="memdoc">
 
 <p>Blocks until at least one request proceeds, ensuring forward progress. </p>
-<p >It's useful for applications where the eventloop events needs to be interleaved with other work. For example one possible way of integrating with a UI event loop could be to schedule a recurrent timeout timer every 1/60 seconds where calling GUI event loop updates every 60 seconds, blocking for I/O for the remaining time. Waiting on requests blocks the current thread with 0% CPU utilization. </p>
+<p >It's useful for applications where the eventLoop events needs to be interleaved with other work. For example one possible way of integrating with a UI event loop could be to schedule a recurrent timeout timer every 1/60 seconds where calling GUI event loop updates every 60 seconds, blocking for I/O for the remaining time. Waiting on requests blocks the current thread with 0% CPU utilization. </p>
 
 </div>
 </div>

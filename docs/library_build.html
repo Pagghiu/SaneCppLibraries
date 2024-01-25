@@ -173,7 +173,7 @@ Description</h1>
 <div class="line">    project.getConfiguration(<span class="stringliteral">&quot;Debug&quot;</span>)-&gt;compile.addDefines({<span class="stringliteral">&quot;DEBUG=1&quot;</span>});</div>
 <div class="line">    <span class="comment">// TODO: These includes must be relative to rootDirectory</span></div>
 <div class="line">    project.compile.addIncludes({</div>
-<div class="line">        <span class="stringliteral">&quot;../../../..&quot;</span>,           <span class="comment">// SC Root (for PluginTest)</span></div>
+<div class="line">        <span class="stringliteral">&quot;../../..&quot;</span>,              <span class="comment">// SC Root (for PluginTest)</span></div>
 <div class="line">        <span class="stringliteral">&quot;../../../Tests/SCTest&quot;</span>, <span class="comment">// For SCConfig.h (enabled by SC_COMPILER_ENABLE_CONFIG == 1)</span></div>
 <div class="line">    });</div>
 <div class="line">    <span class="keywordflow">if</span> (parameters.platforms.contains(Build::Platform::MacOS))</div>

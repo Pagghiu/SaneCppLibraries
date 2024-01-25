@@ -17,6 +17,7 @@ var hierarchy =
     [ "SC::AsyncEventLoop", "struct_s_c_1_1_async_event_loop.html", null ],
     [ "SC::AsyncRequest", "struct_s_c_1_1_async_request.html", [
       [ "SC::AsyncFileClose", "struct_s_c_1_1_async_file_close.html", null ],
+      [ "SC::AsyncFilePoll", "struct_s_c_1_1_async_file_poll.html", null ],
       [ "SC::AsyncFileRead", "struct_s_c_1_1_async_file_read.html", null ],
       [ "SC::AsyncFileWrite", "struct_s_c_1_1_async_file_write.html", null ],
       [ "SC::AsyncLoopTimeout", "struct_s_c_1_1_async_loop_timeout.html", null ],
@@ -26,8 +27,7 @@ var hierarchy =
       [ "SC::AsyncSocketClose", "struct_s_c_1_1_async_socket_close.html", null ],
       [ "SC::AsyncSocketConnect", "struct_s_c_1_1_async_socket_connect.html", null ],
       [ "SC::AsyncSocketReceive", "struct_s_c_1_1_async_socket_receive.html", null ],
-      [ "SC::AsyncSocketSend", "struct_s_c_1_1_async_socket_send.html", null ],
-      [ "SC::AsyncWindowsPoll", "struct_s_c_1_1_async_windows_poll.html", null ]
+      [ "SC::AsyncSocketSend", "struct_s_c_1_1_async_socket_send.html", null ]
     ] ],
     [ "SC::AsyncResult", "struct_s_c_1_1_async_result.html", [
       [ "SC::AsyncResultOf< AsyncFileRead >", "struct_s_c_1_1_async_result_of.html", [
@@ -106,7 +106,6 @@ var hierarchy =
     [ "SC::Build::Compile::NameDescription", "struct_s_c_1_1_build_1_1_compile_1_1_name_description.html", null ],
     [ "SC::FileSystemWatcher::Notification", "struct_s_c_1_1_file_system_watcher_1_1_notification.html", null ],
     [ "SC::OpaqueObject< Definition >", "struct_s_c_1_1_opaque_object.html", null ],
-    [ "SC::OpaqueObject< AsyncWinOverlappedDefinition >", "struct_s_c_1_1_opaque_object.html", null ],
     [ "SC::OpaqueObject< InternalDefinition >", "struct_s_c_1_1_opaque_object.html", null ],
     [ "SC::FileDescriptor::OpenOptions", "struct_s_c_1_1_file_descriptor_1_1_open_options.html", null ],
     [ "SC::Build::Optimization", "struct_s_c_1_1_build_1_1_optimization.html", null ],

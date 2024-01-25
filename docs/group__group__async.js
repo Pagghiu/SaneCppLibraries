@@ -12,7 +12,8 @@ var group__group__async =
         [ "SocketClose", "struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524ade4927e6e379001e3409112ddfc656d5", null ],
         [ "FileRead", "struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524aac986feb3052f4ac59400a84056c3839", null ],
         [ "FileWrite", "struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a693ed2547c9ef849d2af2c59b0ce818d", null ],
-        [ "FileClose", "struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a0865974fc9fb115095eddadbb838f30e", null ]
+        [ "FileClose", "struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a0865974fc9fb115095eddadbb838f30e", null ],
+        [ "FilePoll", "struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524ac4a4109fa1a034a514a42877cdc156c8", null ]
       ] ],
       [ "AsyncRequest", "struct_s_c_1_1_async_request.html#a0cad8875aba183bd5c3790f7b0b5cb1b", null ],
       [ "getEventLoop", "struct_s_c_1_1_async_request.html#a0f687064dc07d418717f5f94ab2cb7c5", null ],
@@ -78,8 +79,8 @@ var group__group__async =
       [ "start", "struct_s_c_1_1_async_file_write.html#a1cf7e0f707d437d84e54a5318eaf7033", null ]
     ] ],
     [ "SC::AsyncFileClose", "struct_s_c_1_1_async_file_close.html", null ],
-    [ "SC::AsyncWindowsPoll", "struct_s_c_1_1_async_windows_poll.html", [
-      [ "start", "struct_s_c_1_1_async_windows_poll.html#aa5fe52efe47aa0519d3b518011389861", null ]
+    [ "SC::AsyncFilePoll", "struct_s_c_1_1_async_file_poll.html", [
+      [ "start", "struct_s_c_1_1_async_file_poll.html#ae3b516404b38e0a19f7e9d29224ca0df", null ]
     ] ],
     [ "SC::AsyncEventLoop", "struct_s_c_1_1_async_event_loop.html", [
       [ "associateExternallyCreatedFileDescriptor", "struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a", null ],
