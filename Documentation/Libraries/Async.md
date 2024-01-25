@@ -28,7 +28,7 @@ This is the list of supported async operations:
 
 # Status
 🟨 MVP  
-This is usable but needs some more testing and implementing the API on Linux.
+This is usable but needs some more testing and a few more features.
 
 # Description
 @copydetails SC::AsyncRequest
@@ -85,7 +85,8 @@ Event loop can be run in different ways to allow integrated it in multiple ways 
 # Implementation
 
 Library abstracts async operations by exposing a completion based mechanism.
-This mechanism currently maps on `kqueue` on macOS and `OVERLAPPED` on Windows but it should efficiently map over `io_uring` on Linux (when it will be implemented).
+This mechanism currently maps on `kqueue` on macOS and `OVERLAPPED` on Windows.
+It currently uses `epoll` on Linux but it should efficiently map over `io_uring`, that will be implemented in the future, as the API is centered around completions and not readiness.
 
 The api works on file and socket descriptors, that can be obtained from the [File](@ref library_file) and [Socket](@ref library_socket) libraries.
 
@@ -97,11 +98,11 @@ SC::ArenaMap from the [Containers](@ref library_containers) can be used to preal
 # Roadmap
 
 🟩 Usable Features:
-- Implement the entire API on Linux (using io_uring)
+- Use a thread pool to execute File Operations actually asynchronously.
 - Implement option to do blocking poll check without dispatching callbacks (needed for efficient gui event loop integration)
 
 🟦 Complete Features:
-- Use a thread pool to execute File Operations actually asynchronously.
+- Implement `io_uring` backend for Linux
 - Implement FS operations (open stat read write unlink copyfile mkdir chmod etc.)
 
 💡 Unplanned Features:

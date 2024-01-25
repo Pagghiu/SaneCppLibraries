@@ -1,6 +1,6 @@
 @page library_file_system_watcher File System Watcher
 
-@brief 🟨 Notifications {add, remove, rename, modified} for files and directories
+@brief 🟩 Notifications {add, remove, rename, modified} for files and directories
 
 [TOC]
 
@@ -11,7 +11,7 @@ SC::FileSystemWatcher allows watching directories for changes that happen to the
 - Get notified about added / removed / renamed files or directories
 
 # Status
-🟨 MVP  
+🟩 Usable  
 Library does have basic capabilities and it can be used just fine.
 
 # Description
@@ -28,9 +28,6 @@ The class tries to unify differences between OS specific API to deliver folder c
 The behavior between these different system also depends on the file system where the watched directory resides.
 
 # Roadmap
-
-🟩 Usable Features:
-- Implement the entire API on Linux 
 
 🟦 Complete Features:
 - Not sure what else could be useful here

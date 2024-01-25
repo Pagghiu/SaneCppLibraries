@@ -40,7 +40,7 @@ Alternatively I am also reading the following discords too:
 In general outside of the above, it's highly likely to be accepted any PR doing:
 
 - Bug fixing
-- Implementation of existing Libraries on unsupported OS (`Linux` / `iOS` and maybe `Android` in some future)
+- Implementation of existing Libraries on unsupported OS
 - Wrapping any library to make it easily usable from C
 
 ## Do not expand project scope

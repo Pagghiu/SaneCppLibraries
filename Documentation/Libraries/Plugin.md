@@ -54,7 +54,6 @@ the plugins without needing a system compiler or a sysroot, as all public header
 any system or compiler header.
 
 🟨 MVP
-- Implement the API on Linux
 - Integrate with [FileSystemWatcher](@ref library_file_system_watcher) to get hot-reload during development.
 
 🟩 Usable Features:

@@ -5,7 +5,7 @@
 [![Discord](https://img.shields.io/discord/1195076118307426384)](https://discord.gg/SDyJFR8N)
 ![GitHub Repo stars](https://img.shields.io/github/stars/Pagghiu/SaneCppLibraries)
 
-**Sane C++** is a set of C++ platform abstraction libraries for ✅ macOS, ✅ Windows and 🚧 Linux.
+**Sane C++** is a set of C++ platform abstraction libraries for ✅ macOS, ✅ Windows and ✅ Linux.
 
 ![Sane Cpp](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease/article.svg)
 
@@ -45,7 +45,7 @@ Library                                                                         
 [File](https://pagghiu.github.io/SaneCppLibraries/library_file.html)                                    | 🟩 Synchronous Disk File I/O
 [File System](https://pagghiu.github.io/SaneCppLibraries/library_file_system.html)                      | 🟩 File System operations { exists | copy | delete } for { files | directories }
 [File System Iterator](https://pagghiu.github.io/SaneCppLibraries/library_file_system_iterator.html)    | 🟩 Enumerates files and directories inside a given path
-[File System Watcher](https://pagghiu.github.io/SaneCppLibraries/library_file_system_watcher.html)      | 🟨 Notifications {add, remove, rename, modified} for files and directories
+[File System Watcher](https://pagghiu.github.io/SaneCppLibraries/library_file_system_watcher.html)      | 🟩 Notifications {add, remove, rename, modified} for files and directories
 [Foundation](https://pagghiu.github.io/SaneCppLibraries/library_foundation.html)                        | 🟩 Primitive types, asserts, limits, Function, Span, Result, Tagged Union
 [Hashing](https://pagghiu.github.io/SaneCppLibraries/library_hashing.html)                              | 🟩 Compute `MD5`, `SHA1` or `SHA256` hashes for a stream of bytes
 [Http](https://pagghiu.github.io/SaneCppLibraries/library_http.html)                                    | 🟥 HTTP parser, client and server

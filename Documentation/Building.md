@@ -74,7 +74,7 @@ Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 [1] Needs only `make` and `c++` command (can be switched to be `clang` or `gcc`)  
 [2] Needs XCode installed
 
-#### VScode on Linux
+#### VSCode on Linux
 Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 - `Build SCTest Debug` [1]
 - `Build SCTest Release` [1]
