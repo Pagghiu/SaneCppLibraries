@@ -50,7 +50,7 @@ SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& sy
     symbol = reinterpret_cast<void*>(::GetProcAddress(module, symbolZeroTerminated.bytesIncludingTerminator()));
     return Result(symbol != nullptr);
 }
-#elif SC_PLATFORM_APPLE
+#elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
 
 #include <dlfcn.h> // dlopen
 
@@ -91,10 +91,10 @@ SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& sy
 }
 #else
 
-SC::Result SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle&) { return Result(true); }
+SC::Result SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle&) { return Result(false); }
 
-SC::Result SC::SystemDynamicLibrary::load(StringView) { return Result(true); }
+SC::Result SC::SystemDynamicLibrary::load(StringView) { return Result(false); }
 
-SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView, void*&) const { return Result(true); }
+SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView, void*&) const { return Result(false); }
 
 #endif

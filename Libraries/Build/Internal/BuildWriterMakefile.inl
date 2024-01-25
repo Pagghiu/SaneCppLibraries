@@ -185,7 +185,8 @@ Makefile.$(CONFIG).touched: Makefile
         builder.append("\nifeq ($(OS_TYPE),Darwin)\n");
         builder.append("     {0}_OS_SPECIFIC_FLAGS := $({0}_FRAMEWORKS)\n", makeTarget.view());
         builder.append("else ifeq ($(OS_TYPE),Linux)\n");
-        builder.append("     {0}_OS_SPECIFIC_FLAGS :=\n", makeTarget.view());
+        // -rdynamic is needed to resolve Plugin symbols in the executable
+        builder.append("     {0}_OS_SPECIFIC_FLAGS := -rdynamic\n", makeTarget.view());
         builder.append("else\n");
         builder.append("     {0}_OS_SPECIFIC_FLAGS :=\n", makeTarget.view());
         builder.append("endif\n");

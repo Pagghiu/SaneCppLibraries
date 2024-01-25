@@ -36,8 +36,10 @@ SC::Result SC::PluginDefinition::getDynamicLibraryAbsolutePath(String& fullDynam
     StringBuilder builder(fullDynamicPath);
 #if SC_PLATFORM_WINDOWS
     SC_TRY(builder.append(".dll"));
-#else
+#elif SC_PLATFORM_APPLE
     SC_TRY(builder.append(".dylib"));
+#else
+    SC_TRY(builder.append(".so"));
 #endif
     return Result(true);
 }
@@ -48,8 +50,10 @@ SC::Result SC::PluginDefinition::getDynamicLibraryPDBAbsolutePath(String& fullDy
     StringBuilder builder(fullDynamicPath);
 #if SC_PLATFORM_WINDOWS
     SC_TRY(builder.append(".pdb"));
-#else
+#elif SC_PLATFORM_APPLE
     SC_TRY(builder.append(".dSYM"));
+#else
+    SC_TRY(builder.append(".sym"));
 #endif
     return Result(true);
 }
@@ -279,10 +283,14 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
     {
         return Result::Error("Visual Studio PluginCompiler not found");
     }
-#else
+#elif SC_PLATFORM_APPLE
     compiler.type         = Type::ClangCompiler;
     compiler.compilerPath = "clang"_a8;
     compiler.linkerPath   = "clang"_a8;
+#elif SC_PLATFORM_LINUX
+    compiler.type         = Type::GnuCompiler;
+    compiler.compilerPath = "g++"_a8;
+    compiler.linkerPath   = "g++"_a8;
 #endif
     return Result(true);
 }
@@ -307,9 +315,9 @@ SC::Result SC::PluginCompiler::compileFile(StringView sourceFile, StringView obj
 #else
     SC_TRY(includeBuilder.append("-I"));
     SC_TRY(includeBuilder.append(includePath.view()));
-    SC_TRY(process.launch("clang", "-DSC_DISABLE_CONFIG=1", "-DSC_PLUGIN_LIBRARY=1", "-nostdinc++", "-nostdinc",
-                          "-fno-stack-protector", "-std=c++14", includes.view(), "-fno-exceptions", "-fno-rtti", "-g",
-                          "-c", "-fpic", sourceFile, "-o", objectFile));
+    SC_TRY(process.launch(compilerPath.view(), "-DSC_DISABLE_CONFIG=1", "-DSC_PLUGIN_LIBRARY=1", "-nostdinc++",
+                          "-nostdinc", "-fno-stack-protector", "-std=c++14", includes.view(), "-fno-exceptions",
+                          "-fno-rtti", "-g", "-c", "-fpic", sourceFile, "-o", objectFile));
 #endif
     SC_TRY(process.waitForExitSync());
     return Result(process.exitStatus.status == 0);
@@ -377,7 +385,20 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, StringVi
     SC_TRY(args.push_back(outFile.view()));
     SC_COMPILER_UNUSED(executablePath);
 #else
-    SC_TRY(args.append({"clang", "-bundle_loader", executablePath, "-bundle", "-fpic", "-nostdlib++", "-nostdlib"}));
+#if SC_PLATFORM_APPLE
+    SC_TRY(args.append(
+        {linkerPath.view(), "-bundle_loader", executablePath, "-bundle", "-fpic", "-nostdlib++", "-nostdlib"}));
+#else
+    SC_COMPILER_UNUSED(executablePath);
+    if (type == Type::ClangCompiler)
+    {
+        SC_TRY(args.append({linkerPath.view(), "-shared", "-fpic", "-nostdlib++", "-nostdlib"}));
+    }
+    else
+    {
+        SC_TRY(args.append({linkerPath.view(), "-shared", "-fpic", "-nostdlib"}));
+    }
+#endif
     SC_TRY(objectFiles.reserve(definition.files.size()));
     for (auto& obj : objectFiles)
     {
@@ -519,8 +540,11 @@ SC::Result SC::PluginRegistry::removeAllBuildProducts(const StringView identifie
         numTries--;
         SC_TRY_MSG(numTries >= 0, "PluginRegistry: Cannot remove dll");
     }
-#else
+#elif SC_PLATFORM_APPLE
     SC_TRY(fmt.format("{}.dylib", identifier));
+    SC_TRY(fs.removeFile(buffer.view()));
+#else
+    SC_TRY(fmt.format("{}.so", identifier));
     SC_TRY(fs.removeFile(buffer.view()));
 #endif
     for (auto& file : lib.definition.files)
