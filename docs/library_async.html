@@ -175,7 +175,7 @@ Features</h1>
 <h1><a class="anchor" id="autotoc_md53"></a>
 Status</h1>
 <p >🟨 MVP <br  />
- This is usable but needs some more testing and implementing the API on Linux.</p>
+ This is usable but needs some more testing and a few more features.</p>
 <h1><a class="anchor" id="autotoc_md54"></a>
 Description</h1>
 <p >An async operation is struct derived from AsyncRequest asking for some I/O to be done made to the OS. <br  />
@@ -479,7 +479,7 @@ AsyncFileClose</h2>
 AsyncWindowsPoll</h2>
 <h1><a class="anchor" id="autotoc_md69"></a>
 Implementation</h1>
-<p >Library abstracts async operations by exposing a completion based mechanism. This mechanism currently maps on <code>kqueue</code> on macOS and <code>OVERLAPPED</code> on Windows but it should efficiently map over <code>io_uring</code> on Linux (when it will be implemented).</p>
+<p >Library abstracts async operations by exposing a completion based mechanism. This mechanism currently maps on <code>kqueue</code> on macOS and <code>OVERLAPPED</code> on Windows. It currently uses <code>epoll</code> on Linux but it should efficiently map over <code>io_uring</code>, that will be implemented in the future, as the API is centered around completions and not readiness.</p>
 <p >The api works on file and socket descriptors, that can be obtained from the <a class="el" href="library_file.html">File</a> and <a class="el" href="library_socket.html">Socket</a> libraries.</p>
 <h2><a class="anchor" id="autotoc_md70"></a>
 Memory allocation</h2>
@@ -489,11 +489,11 @@ Memory allocation</h2>
 <h1><a class="anchor" id="autotoc_md71"></a>
 Roadmap</h1>
 <p >🟩 Usable Features:</p><ul>
-<li>Implement the entire API on Linux (using io_uring)</li>
+<li>Use a thread pool to execute File Operations actually asynchronously.</li>
 <li>Implement option to do blocking poll check without dispatching callbacks (needed for efficient gui event loop integration)</li>
 </ul>
 <p >🟦 Complete Features:</p><ul>
-<li>Use a thread pool to execute File Operations actually asynchronously.</li>
+<li>Implement <code>io_uring</code> backend for Linux</li>
 <li>Implement FS operations (open stat read write unlink copyfile mkdir chmod etc.)</li>
 </ul>
 <p >💡 Unplanned Features:</p><ul>
