@@ -20,11 +20,11 @@
 
 Visit the [documentation website](https://pagghiu.github.io/SaneCppLibraries/index.html) for more information.
 
-Blog posts 
+Blog posts:
 - [January 2024 Update](https://pagghiu.github.io/site/blog/2024-01-23-SaneCppLibrariesUpdate.html)
 - [Public Release blog post](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html)
 
-I've also started a [Youtube Channel](https://www.youtube.com/@Pagghiu) with videos showing some bits of the development process.
+On the [Youtube Channel](https://www.youtube.com/@Pagghiu) you can find some videos showing some bits of the development process:
 - [Creating a Makefile](https://www.youtube.com/watch?v=2ccW8TBAWWE)
 - [Add Makefile backend to SC::Build](https://www.youtube.com/watch?v=wYmT3xAzMxU)
 - [Start Linux Porting](https://www.youtube.com/watch?v=DUZeu6VDGL8)

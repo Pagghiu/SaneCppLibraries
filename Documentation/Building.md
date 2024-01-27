@@ -81,6 +81,13 @@ Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 
 [1] Needs only `make` and `c++`
 
+#### VSCode on Windows
+Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
+- `Build SCTest Debug` [1]
+- `Build SCTest Debug ARM64` [1]
+
+[1] Needs `Visual Studio 2022` installed
+
 ### Debug the tests
 
 #### Visual Studio or XCode
@@ -89,10 +96,19 @@ Running the default target should work out of the box, as paths are already gene
 
 #### VSCode on macOS or Linux
 
-Select any `Run and Debug` configuration like:
+Select one of the appropriate `Run and Debug` configuration like:
 
-- `(gdb) Debug SCTest` [1]
-- `(lldb) Debug SCTest` [2]
+- `SCTest [posix] (gdb)` [1]
+- `SCTest [posix] (lldb)` [2]
 
 [1] Uses `gdb` debugger. Implicitly invokes `Build SCTest Debug` to build the executable.  
-[2] Uses `lldb` debugger. Implicitly invokes `Build SCTest Debug` to build the executable.
+[2] Uses `lldb` debugger. Implicitly invokes `Build SCTest Debug` to build the executable. You need `CodeLLDB` or similar extension installed in VSCode.
+
+#### VSCode on Windows
+
+Select one of the appropriate `Run and Debug` configuration like:
+
+- `SCTest x64 [win] (vsdbg)` [1]
+- `SCTest ARM64 [win] (vsdbg)` [1]
+
+[1] Needs `Visual Studio 2022` installed
