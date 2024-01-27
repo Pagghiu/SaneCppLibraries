@@ -14,6 +14,8 @@ namespace SC
 {
 struct FileDescriptorPosixHelpers;
 }
+
+// TODO: Add check all posix calls here for EINTR
 struct SC::FileDescriptorPosixHelpers
 {
   private:
@@ -240,28 +242,44 @@ SC::Result SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
 
 SC::Result SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
 {
-    const ssize_t res = ::pwrite(handle, data.data(), data.sizeInBytes(), static_cast<off_t>(offset));
+    ssize_t res;
+    do
+    {
+        res = ::pwrite(handle, data.data(), data.sizeInBytes(), static_cast<off_t>(offset));
+    } while (res == -1 and errno == EINTR);
     SC_TRY_MSG(res >= 0, "pwrite failed");
     return Result(static_cast<size_t>(res) == data.sizeInBytes());
 }
 
 SC::Result SC::FileDescriptor::write(Span<const char> data)
 {
-    const ssize_t res = ::write(handle, data.data(), data.sizeInBytes());
+    ssize_t res;
+    do
+    {
+        res = ::write(handle, data.data(), data.sizeInBytes());
+    } while (res == -1 and errno == EINTR);
     SC_TRY_MSG(res >= 0, "write failed");
     return Result(static_cast<size_t>(res) == data.sizeInBytes());
 }
 
 SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, uint64_t offset)
 {
-    const ssize_t res = ::pread(handle, data.data(), data.sizeInBytes(), static_cast<off_t>(offset));
+    ssize_t res;
+    do
+    {
+        res = ::pread(handle, data.data(), data.sizeInBytes(), static_cast<off_t>(offset));
+    } while (res == -1 and errno == EINTR);
     SC_TRY_MSG(res >= 0, "pread failed");
     return Result(data.sliceStartLength(0, static_cast<size_t>(res), actuallyRead));
 }
 
 SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
 {
-    const ssize_t res = ::read(handle, data.data(), data.sizeInBytes());
+    ssize_t res;
+    do
+    {
+        res = ::read(handle, data.data(), data.sizeInBytes());
+    } while (res == -1 and errno == EINTR);
     SC_TRY_MSG(res >= 0, "read failed");
     return Result(data.sliceStartLength(0, static_cast<size_t>(res), actuallyRead));
 }
@@ -272,7 +290,13 @@ SC::Result SC::PipeDescriptor::createPipe(InheritableReadFlag readFlag, Inherita
 {
     int pipes[2];
     // TODO: Use pipe2 to set cloexec flags immediately
-    if (::pipe(pipes) != 0)
+    int res;
+    do
+    {
+        res = ::pipe(pipes);
+    } while (res == -1 and errno == EINTR);
+
+    if (res != 0)
     {
         return Result::Error("PipeDescriptor::createPipe - pipe failed");
     }
