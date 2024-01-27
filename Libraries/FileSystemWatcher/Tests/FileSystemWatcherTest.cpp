@@ -202,8 +202,10 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view(), move(lambda)));
             SC_TEST_EXPECT(fs.write("salve.txt", "content"));
             SC_TEST_EXPECT(fs.write("a_tutti.txt", "content"));
-            SC_TEST_EXPECT(eventLoop.runOnce());   // On Linux (inotify) both events will be dispatched here
-            SC_TEST_EXPECT(eventLoop.runNoWait()); // On Windows and macOS each event notification unblocks the loop
+            SC_TEST_EXPECT(eventLoop.runOnce()); // On Windows and Linux (inotify) both events will be dispatched here
+#if SC_PLATFORM_APPLE
+            SC_TEST_EXPECT(eventLoop.runNoWait()); // On macOS each event unblocks the loop, so we need one more run
+#endif
             SC_TEST_EXPECT(params.changes == 2);
             SC_TEST_EXPECT(fileEventsWatcher.close());
             SC_TEST_EXPECT(fs.removeFiles({"salve.txt", "a_tutti.txt"}));
