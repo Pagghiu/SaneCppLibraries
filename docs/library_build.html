@@ -114,28 +114,28 @@ $(document).ready(function(){initNavTree('library_build.html',''); initResizable
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md72">Features</a></li>
-<li class="level1"><a href="#autotoc_md73">Status</a></li>
-<li class="level1"><a href="#autotoc_md74">Description</a></li>
-<li class="level1"><a href="#autotoc_md75">Architecture</a></li>
-<li class="level1"><a href="#autotoc_md76">Roadmap</a></li>
+<ul><li class="level1"><a href="#autotoc_md74">Features</a></li>
+<li class="level1"><a href="#autotoc_md75">Status</a></li>
+<li class="level1"><a href="#autotoc_md76">Description</a></li>
+<li class="level1"><a href="#autotoc_md77">Architecture</a></li>
+<li class="level1"><a href="#autotoc_md78">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟥 Minimal build system where builds are described in C++</p>
 <p >Build uses C++ to imperatively describe a sequence of build operations. <br  />
 </p>
-<h1><a class="anchor" id="autotoc_md72"></a>
+<h1><a class="anchor" id="autotoc_md74"></a>
 Features</h1>
 <ul>
 <li>Describe builds in a cpp file</li>
 <li>Generate XCode 14 console Projects</li>
 <li>Generate Visual Studio 2022 console Projects</li>
 </ul>
-<h1><a class="anchor" id="autotoc_md73"></a>
+<h1><a class="anchor" id="autotoc_md75"></a>
 Status</h1>
 <p >🟥 Draft <br  />
  Build currently used to generate test projects of this repository but still not mature enough to be used for anything else.</p>
-<h1><a class="anchor" id="autotoc_md74"></a>
+<h1><a class="anchor" id="autotoc_md76"></a>
 Description</h1>
 <p >Build C++ files (named by convention <code>SCBuild.cpp</code>) are compiled the fly and they generate project files for existing build systems. <br  />
  In the future the plan is to allow also the system to run standalone directly invoking compilers to produce libraries and executables.</p>
@@ -268,7 +268,7 @@ Description</h1>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_build_1_1_link_flags.html" title="Map of SC::Build::Link flags (library paths, LTO switch etc.)">SC::Build::LinkFlags</a>   </td><td class="markdownTableBodyNone">Map of <a class="el" href="struct_s_c_1_1_build_1_1_link.html" title="Linking switches (library paths, LTO etc.)">SC::Build::Link</a> flags (library paths, LTO switch etc.)   </td></tr>
 </table>
-<h1><a class="anchor" id="autotoc_md75"></a>
+<h1><a class="anchor" id="autotoc_md77"></a>
 Architecture</h1>
 <ul>
 <li>User adds a <code>SCBuild.cpp</code> files to his library</li>
@@ -295,7 +295,7 @@ Architecture</h1>
 </ul>
 <p >So far the entire build configuration is created in C++ but each invocation with a different set of "build parameters" it's building a data structure that is free of conditionals, as they've been evaluated by the imperative code. Such "post-configure" build settings could be serialized to JSON (or using binary <a class="el" href="library_serialization_binary.html">Serialization</a>) or to any other declarative format if needed. <br  />
 </p>
-<h1><a class="anchor" id="autotoc_md76"></a>
+<h1><a class="anchor" id="autotoc_md78"></a>
 Roadmap</h1>
 <p >🟨 MVP Features:</p><ul>
 <li>Build non-console type projects</li>

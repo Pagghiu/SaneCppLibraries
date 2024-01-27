@@ -1,11 +1,11 @@
 var NAVTREEINDEX2 =
 {
-"page_faq.html#autotoc_md42":[5,3],
-"page_faq.html#autotoc_md43":[5,4],
+"page_faq.html#autotoc_md44":[5,3],
+"page_faq.html#autotoc_md45":[5,4],
 "page_principles.html":[8],
-"page_principles.html#autotoc_md259":[8,0],
-"page_principles.html#autotoc_md260":[8,1],
-"page_principles.html#autotoc_md261":[8,2],
+"page_principles.html#autotoc_md261":[8,0],
+"page_principles.html#autotoc_md262":[8,1],
+"page_principles.html#autotoc_md263":[8,2],
 "pages.html":[],
 "struct_s_c_1_1_algorithms_1_1smaller_than.html":[9,0,0],
 "struct_s_c_1_1_algorithms_1_1smaller_than.html#a4e65939d1f9360d690c988a2dcfc0e0e":[9,0,0,0],

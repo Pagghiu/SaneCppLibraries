@@ -114,16 +114,16 @@ $(document).ready(function(){initNavTree('library_hashing.html',''); initResizab
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md135">Features</a></li>
-<li class="level1"><a href="#autotoc_md136">Status</a></li>
-<li class="level1"><a href="#autotoc_md137">Description</a></li>
-<li class="level1"><a href="#autotoc_md138">Roadmap</a></li>
+<ul><li class="level1"><a href="#autotoc_md137">Features</a></li>
+<li class="level1"><a href="#autotoc_md138">Status</a></li>
+<li class="level1"><a href="#autotoc_md139">Description</a></li>
+<li class="level1"><a href="#autotoc_md140">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟩 Compute <code>MD5</code>, <code>SHA1</code> or <code>SHA256</code> hashes for a stream of bytes</p>
 <p >The Hashing library abstracts OS API to compute MD5, SHA1 and SHA256 hashes. <br  />
 </p>
-<h1><a class="anchor" id="autotoc_md135"></a>
+<h1><a class="anchor" id="autotoc_md137"></a>
 Features</h1>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -135,11 +135,11 @@ Features</h1>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_hashing.html#a9e6526d460ccfe42f9ac6d67e27e588aac32d7d196554da59edffaf8d3ec7065a" title="Compute SHA256 hash for the incoming stream of bytes.">SC::Hashing::TypeSHA256</a>   </td><td class="markdownTableBodyLeft">Compute SHA256 hash for the incoming stream of bytes.   </td></tr>
 </table>
-<h1><a class="anchor" id="autotoc_md136"></a>
+<h1><a class="anchor" id="autotoc_md138"></a>
 Status</h1>
 <p >🟩 Usable <br  />
  The library is very simple it it has what is needed so far (mainly by <a class="el" href="library_build.html">Build</a>).</p>
-<h1><a class="anchor" id="autotoc_md137"></a>
+<h1><a class="anchor" id="autotoc_md139"></a>
 Description</h1>
 <p >Compute MD5, SHA1 or SHA256 hash for stream of data. <br  />
 Data can be added until needed with <a class="el" href="struct_s_c_1_1_hashing.html#add6a5ecb202fb037372345fb1d5b82de" title="Add data to be hashed.">SC::Hashing::update</a> call. <a class="el" href="struct_s_c_1_1_hashing.html#adf805b7b604334c337177c294b2c1873" title="Finalizes hash computation that has been pushed through Hashing::update.">SC::Hashing::finalize</a> will generate an actual <a class="el" href="struct_s_c_1_1_hashing_1_1_result.html">SC::Hashing::Result</a> holding the computed <em>hash</em>.</p>
@@ -166,7 +166,7 @@ Data can be added until needed with <a class="el" href="struct_s_c_1_1_hashing.h
 <div class="line">            String test;</div>
 <div class="line">            <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(StringBuilder(test).appendHex(res.toBytesSpan()));</div>
 <div class="line">            <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(test == <span class="stringliteral">&quot;05A671C66AEFEA124CC08B76EA6D30BB&quot;</span>_a8);</div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md138"></a>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md140"></a>
 Roadmap</h1>
 <p >🟦 Complete Features:</p><ul>
 <li>None for now</li>

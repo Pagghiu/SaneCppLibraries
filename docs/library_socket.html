@@ -114,21 +114,21 @@ $(document).ready(function(){initNavTree('library_socket.html',''); initResizabl
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md183">Features</a></li>
-<li class="level1"><a href="#autotoc_md184">Status</a></li>
-<li class="level1"><a href="#autotoc_md185">Description</a><ul><li class="level2"><a href="#autotoc_md186">SocketServer</a></li>
-<li class="level2"><a href="#autotoc_md187">SocketClient</a></li>
-<li class="level2"><a href="#autotoc_md188">SocketIPAddress</a></li>
-<li class="level2"><a href="#autotoc_md189">SocketNetworking::resolveDNS</a></li>
+<ul><li class="level1"><a href="#autotoc_md185">Features</a></li>
+<li class="level1"><a href="#autotoc_md186">Status</a></li>
+<li class="level1"><a href="#autotoc_md187">Description</a><ul><li class="level2"><a href="#autotoc_md188">SocketServer</a></li>
+<li class="level2"><a href="#autotoc_md189">SocketClient</a></li>
+<li class="level2"><a href="#autotoc_md190">SocketIPAddress</a></li>
+<li class="level2"><a href="#autotoc_md191">SocketNetworking::resolveDNS</a></li>
 </ul>
 </li>
-<li class="level1"><a href="#autotoc_md190">Roadmap</a></li>
+<li class="level1"><a href="#autotoc_md192">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟨 Synchronous socket networking and DNS lookup</p>
 <p >Socket library allows creating TCP / UDP sockets and using them as client or server and resolving DNS.</p>
 <p >It can be used standalone if synchronous networking is preferred or as a companion to <a class="el" href="library_async.html">Async</a> for creation of non-blocking socket descriptors.</p>
-<h1><a class="anchor" id="autotoc_md183"></a>
+<h1><a class="anchor" id="autotoc_md185"></a>
 Features</h1>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -142,17 +142,17 @@ Features</h1>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_socket_networking.html" title="DNS Resolution and globals initialization (Winsock2 WSAStartup)">SC::SocketNetworking</a>   </td><td class="markdownTableBodyLeft">DNS Resolution and globals initialization (Winsock2 WSAStartup)   </td></tr>
 </table>
-<h1><a class="anchor" id="autotoc_md184"></a>
+<h1><a class="anchor" id="autotoc_md186"></a>
 Status</h1>
 <p >🟨 MVP <br  />
  Simple synchronous TCP client / server workflow is supported, but it would need better testing. <br  />
 </p>
-<h1><a class="anchor" id="autotoc_md185"></a>
+<h1><a class="anchor" id="autotoc_md187"></a>
 Description</h1>
 <p ><a class="el" href="struct_s_c_1_1_socket_server.html" title="Use a SocketDescriptor as a Server (example TCP Socket Server).">SC::SocketServer</a> can <a class="el" href="struct_s_c_1_1_socket_server.html#a69b0d0642b78d9eabf6888071b002dcb" title="Start listening for incoming connections at a specific address / port combination.">SC::SocketServer::listen</a> on a given port / address and <a class="el" href="struct_s_c_1_1_socket_server.html#aeabb14ac60f8530d60292cf87bbf4f26" title="Accepts a new client, blocking while waiting for it.">SC::SocketServer::accept</a> a new client socket. <a class="el" href="struct_s_c_1_1_socket_client.html" title="Use a SocketDescriptor as a client (example TCP Socket Client).">SC::SocketClient</a> can <a class="el" href="struct_s_c_1_1_socket_client.html#aaf0d952ccce99b1ecf25565b72a43b70" title="Connect to a given address and port combination.">SC::SocketClient::connect</a>, <a class="el" href="struct_s_c_1_1_socket_client.html#a9b691ac6107db42668c3b0d60723aa41" title="Writes bytes to this socket.">SC::SocketClient::write</a>, <a class="el" href="struct_s_c_1_1_socket_client.html#a0824c36280ebdab4befcde0db8ed41b8" title="Read bytes from this socket blocking until they&#39;re actually received.">SC::SocketClient::read</a> and <a class="el" href="struct_s_c_1_1_socket_client.html#a3ecad8f8bbb2c578ce478dbfbc2fa4c6" title="Read bytes from this socket blocking until they&#39;re actually received or timeout occurs.">SC::SocketClient::readWithTimeout</a>.</p>
 <p ><a class="el" href="struct_s_c_1_1_socket_i_p_address.html" title="Native representation of an IP Address.">SC::SocketIPAddress</a> allows creating an ip address native object from a <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">SC::StringView</a> and port.</p>
 <p ><a class="el" href="struct_s_c_1_1_socket_networking.html" title="DNS Resolution and globals initialization (Winsock2 WSAStartup)">SC::SocketNetworking</a> class allow resolving a StringView to an IP address.</p>
-<h2><a class="anchor" id="autotoc_md186"></a>
+<h2><a class="anchor" id="autotoc_md188"></a>
 SocketServer</h2>
 <p >Example: </p><div class="fragment"><div class="line">SocketDescriptor serverSocket;</div>
 <div class="line">SocketServer     server(serverSocket);</div>
@@ -174,7 +174,7 @@ SocketServer</h2>
 <div class="line"> </div>
 <div class="line"><span class="comment">// ... Do something with acceptedClientSocket</span></div>
 <div class="ttc" id="agroup__group__foundation__utility_html_gae6b0d665676a4a5eedc2ad69693c04ee"><div class="ttname"><a href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a></div><div class="ttdeci">#define SC_TRY(expression)</div><div class="ttdoc">Checks the value of the given expression and if failed, returns this value to caller.</div><div class="ttdef"><b>Definition:</b> Result.h:47</div></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md187"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md189"></a>
 SocketClient</h2>
 <p >The socket client can be obtained via <a class="el" href="struct_s_c_1_1_socket_server.html#aeabb14ac60f8530d60292cf87bbf4f26" title="Accepts a new client, blocking while waiting for it.">SC::SocketServer::accept</a> or connected to an endpoint through <a class="el" href="struct_s_c_1_1_socket_client.html#aaf0d952ccce99b1ecf25565b72a43b70" title="Connect to a given address and port combination.">SC::SocketClient::connect</a> Example (accepted client from server, doing a synchronous read): </p><div class="fragment"><div class="line">SocketDescriptor acceptedClientSocket;</div>
 <div class="line"><span class="comment">// ... assuming acceptedClientSocket has been obtained with SocketServer::accept</span></div>
@@ -207,14 +207,14 @@ SocketClient</h2>
 <div class="line"> </div>
 <div class="line"><span class="comment">// Close the socket</span></div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(client.close());</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md188"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md190"></a>
 SocketIPAddress</h2>
 <p >Example: </p><div class="fragment"><div class="line">    SocketIPAddress address;</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not address.fromAddressPort(<span class="stringliteral">&quot;1223.22.44.1&quot;</span>, 6666));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(address.fromAddressPort(<span class="stringliteral">&quot;127.0.0.1&quot;</span>, 123));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(address.fromAddressPort(<span class="stringliteral">&quot;::1&quot;</span>, 123));</div>
 <div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:104</div></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md189"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md191"></a>
 SocketNetworking::resolveDNS</h2>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -231,7 +231,7 @@ SocketNetworking::resolveDNS</h2>
 <div class="line">    {</div>
 <div class="line">        <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(ipAddress.view() == <span class="stringliteral">&quot;17.253.144.10&quot;</span>);</div>
 <div class="line">    }</div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md190"></a>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md192"></a>
 Roadmap</h1>
 <p >🟩 Usable</p><ul>
 <li>UDP Sockets</li>

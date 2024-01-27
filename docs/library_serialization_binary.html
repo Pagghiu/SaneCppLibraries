@@ -114,24 +114,24 @@ $(document).ready(function(){initNavTree('library_serialization_binary.html','')
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md165">Features</a></li>
-<li class="level1"><a href="#autotoc_md166">Status</a></li>
-<li class="level1"><a href="#autotoc_md167">Description</a><ul><li class="level2"><a href="#autotoc_md168">SerializationBinary::write</a></li>
-<li class="level2"><a href="#autotoc_md169">SerializationBinary::loadExact</a></li>
-<li class="level2"><a href="#autotoc_md170">SerializationBinary::loadVersioned</a></li>
-<li class="level2"><a href="#autotoc_md171">SerializationBinaryOptions</a></li>
-<li class="level2"><a href="#autotoc_md172">Binary Format</a></li>
-<li class="level2"><a href="#autotoc_md173">Packed types (optimization)</a></li>
+<ul><li class="level1"><a href="#autotoc_md167">Features</a></li>
+<li class="level1"><a href="#autotoc_md168">Status</a></li>
+<li class="level1"><a href="#autotoc_md169">Description</a><ul><li class="level2"><a href="#autotoc_md170">SerializationBinary::write</a></li>
+<li class="level2"><a href="#autotoc_md171">SerializationBinary::loadExact</a></li>
+<li class="level2"><a href="#autotoc_md172">SerializationBinary::loadVersioned</a></li>
+<li class="level2"><a href="#autotoc_md173">SerializationBinaryOptions</a></li>
+<li class="level2"><a href="#autotoc_md174">Binary Format</a></li>
+<li class="level2"><a href="#autotoc_md175">Packed types (optimization)</a></li>
 </ul>
 </li>
-<li class="level1"><a href="#autotoc_md174">Alternative implementation</a></li>
-<li class="level1"><a href="#autotoc_md175">Roadmap</a></li>
+<li class="level1"><a href="#autotoc_md176">Alternative implementation</a></li>
+<li class="level1"><a href="#autotoc_md177">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟨 Serialize to and from a binary format using <a class="el" href="library_reflection.html">Reflection</a></p>
 <p >This is a versioned binary serializer / deserializer built on top of <a class="el" href="library_reflection.html">Reflection</a>. <br  />
 It uses struct member iterators on Reflection schema serialize all members and the recursively <code>Packed</code> property for optimizations, reducing the number of read / writes (or <code>memcpy</code>) needed.</p>
-<h1><a class="anchor" id="autotoc_md165"></a>
+<h1><a class="anchor" id="autotoc_md167"></a>
 Features</h1>
 <ul>
 <li>No heap allocations</li>
@@ -150,18 +150,18 @@ Features</h1>
 </ul>
 </li>
 </ul>
-<h1><a class="anchor" id="autotoc_md166"></a>
+<h1><a class="anchor" id="autotoc_md168"></a>
 Status</h1>
 <p >🟨 MVP <br  />
  Under described limitations, the library should be usable but more testing is needed and also supporting all of the relevant additional container data-types.</p>
-<h1><a class="anchor" id="autotoc_md167"></a>
+<h1><a class="anchor" id="autotoc_md169"></a>
 Description</h1>
 <ul>
 <li>Writing data can be done with the <a class="el" href="struct_s_c_1_1_serialization_binary.html#a99a912e23ae7b2483523647e6f4163e6" title="Writes object T to a binary buffer.">SC::SerializationBinary::write</a>.</li>
 <li>Reading data without changing the reflected data structures, can be done with the <a class="el" href="struct_s_c_1_1_serialization_binary.html#aca1c089744d4424b604c1fb1dadccc14" title="Loads object T from binary buffer as written by SerializationBinary::write.">SC::SerializationBinary::loadExact</a>.</li>
 <li>Reading data generated from a different (past or future) version of the data structure, can be done with the <a class="el" href="struct_s_c_1_1_serialization_binary.html#a00f5825946f838fd9bf53fa90c305b7e" title="Deserialize object T from a Binary buffer with a reflection schema not matching T schema.">SC::SerializationBinary::loadVersioned</a> and uses <a class="el" href="library_reflection.html">Reflection</a> <em>Flat Schema</em>.</li>
 </ul>
-<h2><a class="anchor" id="autotoc_md168"></a>
+<h2><a class="anchor" id="autotoc_md170"></a>
 SerializationBinary::write</h2>
 <p ><a class="el" href="struct_s_c_1_1_serialization_binary.html#a99a912e23ae7b2483523647e6f4163e6" title="Writes object T to a binary buffer.">SC::SerializationBinary::write</a> is used to serialize data. The schema itself is not used at all but it could written along with the binary data so that when reading back the data in a later version of the program, the correct choice can be made between deserializing using SerializationBinary::loadVersioned (slower but allows for missing fields and conversion) or deserializing using SerializationBinary::loadExact (faster, but schema must match 1:1). <br  />
 </p><dl class="tparams"><dt>Template Parameters</dt><dd>
@@ -212,7 +212,7 @@ SerializationBinary::write</h2>
 <div class="line">Vector buffer;</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(SerializerWriter::write(objectToSerialize, buffer));</div>
 <div class="ttc" id="agroup__group__foundation__utility_html_gae6b0d665676a4a5eedc2ad69693c04ee"><div class="ttname"><a href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a></div><div class="ttdeci">#define SC_TRY(expression)</div><div class="ttdoc">Checks the value of the given expression and if failed, returns this value to caller.</div><div class="ttdef"><b>Definition:</b> Result.h:47</div></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md169"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md171"></a>
 SerializationBinary::loadExact</h2>
 <p ><a class="el" href="struct_s_c_1_1_serialization_binary.html#aca1c089744d4424b604c1fb1dadccc14" title="Loads object T from binary buffer as written by SerializationBinary::write.">SC::SerializationBinary::loadExact</a> can deserialize binary data into a struct whose schema has not changed from when SerializationBinary::write has been used to generate that same binary data. In other words if the schema of the type passed to SerializationBinary::write must match the one of current type being deserialized. If the two schemas hash match then it's possible to use this fast path, that skips all versioning checks. </p><dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
@@ -308,7 +308,7 @@ SerializationBinary::loadExact</h2>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(SerializerReader::loadExact(deserializedObject, buffer.toSpanConst()));</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__compiler__macros.html#ga6bc5136e9c6fbc77420173ccf4e32d21">SC_ASSERT_RELEASE</a>(objectToSerialize.nestedStruct.doubleVal == deserializedObject.nestedStruct.doubleVal);</div>
 <div class="ttc" id="agroup__group__foundation__compiler__macros_html_ga6bc5136e9c6fbc77420173ccf4e32d21"><div class="ttname"><a href="group__group__foundation__compiler__macros.html#ga6bc5136e9c6fbc77420173ccf4e32d21">SC_ASSERT_RELEASE</a></div><div class="ttdeci">#define SC_ASSERT_RELEASE(e)</div><div class="ttdoc">Assert expression e to be true.</div><div class="ttdef"><b>Definition:</b> Assert.h:67</div></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md170"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md172"></a>
 SerializationBinary::loadVersioned</h2>
 <p >The versioned read serializer <a class="el" href="struct_s_c_1_1_serialization_binary.html#a00f5825946f838fd9bf53fa90c305b7e" title="Deserialize object T from a Binary buffer with a reflection schema not matching T schema.">SC::SerializationBinary::loadVersioned</a> must be used when source and destination schemas do not match. <em>Compatibility</em> flags can be customized through <a class="el" href="struct_s_c_1_1_serialization_binary_options.html" title="Conversion options for the binary versioned deserializer.">SC::SerializationBinaryOptions</a> object, allowing to remap data coming from an older (or just different) version of the schema to the current one. SerializationBinary::loadVersioned will try to match the <code>memberTag</code> field specified in [Reflection](<a class="el" href="library_reflection.html">Reflection</a>) to match fields between source and destination schemas. When the types of the fields are different, a few options allow controlling the behaviour. </p><dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
@@ -374,7 +374,7 @@ Assuming the following structs: </p><div class="fragment"><div class="line"><spa
 <div class="line"><span class="comment">// Deserialization</span></div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(SerializerReader::loadVersioned(deserializedObject, buffer.toSpanConst(), schema.typeInfos));</div>
 </div><!-- fragment --><dl class="section note"><dt>Note</dt><dd>The versioned serializer is greatly simplified in conjunction with <a class="el" href="library_reflection.html">Reflection</a> sorting <code>Packed</code> structs by <code>offsetInBytes</code>.</dd></dl>
-<h2><a class="anchor" id="autotoc_md171"></a>
+<h2><a class="anchor" id="autotoc_md173"></a>
 SerializationBinaryOptions</h2>
 <p >Conversion options for the binary versioned deserializer.</p>
 <table class="markdownTable">
@@ -387,7 +387,7 @@ SerializationBinaryOptions</h2>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_serialization_binary_options.html#a1ea21f76f55780944040b5cdc93f7cfb">allowDropExcessStructMembers</a>   </td><td class="markdownTableBodyLeft">Can drop fields not matching any memberTag in destination struct.   </td></tr>
 </table>
-<h2><a class="anchor" id="autotoc_md172"></a>
+<h2><a class="anchor" id="autotoc_md174"></a>
 Binary Format</h2>
 <p >The binary format is defined as follows:</p>
 <ul>
@@ -409,16 +409,16 @@ Binary Format</h2>
 </ul>
 </li>
 </ul>
-<h2><a class="anchor" id="autotoc_md173"></a>
+<h2><a class="anchor" id="autotoc_md175"></a>
 Packed types (optimization)</h2>
 <p >If a <code>struct</code>, <code>T[N]</code> array or content of <code>Vector&lt;T&gt;</code> is made of a recursively <code>Packed</code> type (i.e. no padding bytes at any level inside the given type) it will be serialized in a single operation. <br  />
  This can really condense a large number of operations in a single one on types obeying to the <code>Packed</code> property.</p>
 <dl class="section note"><dt>Note</dt><dd>It's possible to <code>static_assert</code> the <code>Packed</code> property of a type, if one wants to be sure not to accidentally introduce padding bytes in serialized types.</dd></dl>
-<h1><a class="anchor" id="autotoc_md174"></a>
+<h1><a class="anchor" id="autotoc_md176"></a>
 Alternative implementation</h1>
 <p >The binary serializer has an additional parallel implementation implementations, see <a class="el" href="library_serialization_binary_type_erased.html">SerializationBinaryTypeErased</a> in Libraries Extra. <br  />
  This is just an experiment to check if with some more runtime-code and less compile-time-code we can further bring down compile times, but we still need to build a proper benchmark for it.</p>
-<h1><a class="anchor" id="autotoc_md175"></a>
+<h1><a class="anchor" id="autotoc_md177"></a>
 Roadmap</h1>
 <p >The binary serializer is not a streaming one, so loading a large data structure will at some point need double of the required space in memory. <br  />
  This can be solved implementing streaming binary serializer or experimenting with memory mapped files to support really large binary data structures.</p>

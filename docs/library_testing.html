@@ -114,18 +114,18 @@ $(document).ready(function(){initNavTree('library_testing.html',''); initResizab
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md227">Features</a></li>
-<li class="level1"><a href="#autotoc_md228">Status</a></li>
-<li class="level1"><a href="#autotoc_md229">Description</a><ul><li class="level2"><a href="#autotoc_md230">SC::TestCase</a></li>
-<li class="level2"><a href="#autotoc_md231">SC::TestReport</a></li>
+<ul><li class="level1"><a href="#autotoc_md229">Features</a></li>
+<li class="level1"><a href="#autotoc_md230">Status</a></li>
+<li class="level1"><a href="#autotoc_md231">Description</a><ul><li class="level2"><a href="#autotoc_md232">SC::TestCase</a></li>
+<li class="level2"><a href="#autotoc_md233">SC::TestReport</a></li>
 </ul>
 </li>
-<li class="level1"><a href="#autotoc_md232">Roadmap</a></li>
+<li class="level1"><a href="#autotoc_md234">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟨 Simple testing framework used by all of the other libraries</p>
 <p >Testing is a very simple test framework that allows splitting tests in sections and record successful/failed expectations.</p>
-<h1><a class="anchor" id="autotoc_md227"></a>
+<h1><a class="anchor" id="autotoc_md229"></a>
 Features</h1>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -135,14 +135,14 @@ Features</h1>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_test_report.html" title="Collects multiple TestCase and reports their results.">SC::TestReport</a>   </td><td class="markdownTableBodyLeft">Collects multiple TestCase and reports their results.   </td></tr>
 </table>
-<h1><a class="anchor" id="autotoc_md228"></a>
+<h1><a class="anchor" id="autotoc_md230"></a>
 Status</h1>
 <p >🟨 MVP <br  />
  Testing library is minimal but it's useful as is for now.</p>
-<h1><a class="anchor" id="autotoc_md229"></a>
+<h1><a class="anchor" id="autotoc_md231"></a>
 Description</h1>
 <p >Testing integrates with the <a class="el" href="struct_s_c_1_1_result.html" title="An ascii string used as boolean result. SC_TRY macro forwards errors to caller.">SC::Result</a> object that is part of <a class="el" href="library_foundation.html">Foundation</a> library. So far it doesn't support test discovery and all tests must be manually invoked in the main test file.</p>
-<h2><a class="anchor" id="autotoc_md230"></a>
+<h2><a class="anchor" id="autotoc_md232"></a>
 SC::TestCase</h2>
 <p >A test case that can be split into multiple sections. To create a test case derive from <a class="el" href="struct_s_c_1_1_test_case.html" title="A test case that can be split into multiple sections.">SC::TestCase</a> and run tests in the constructor</p>
 <p >Example: </p><div class="fragment"><div class="line"><span class="keyword">namespace </span>SC</div>
@@ -176,10 +176,10 @@ SC::TestCase</h2>
 <div class="ttc" id="astruct_s_c_1_1_test_case_html"><div class="ttname"><a href="struct_s_c_1_1_test_case.html">SC::TestCase</a></div><div class="ttdoc">A test case that can be split into multiple sections.</div><div class="ttdef"><b>Definition:</b> Testing.h:68</div></div>
 <div class="ttc" id="astruct_s_c_1_1_test_case_html_aa52397db9eace05a6e02a652c2fd307e"><div class="ttname"><a href="struct_s_c_1_1_test_case.html#aa52397db9eace05a6e02a652c2fd307e">SC::TestCase::test_section</a></div><div class="ttdeci">bool test_section(StringView sectionName)</div><div class="ttdoc">Starts a new test section.</div></div>
 <div class="ttc" id="astruct_s_c_1_1_test_report_html"><div class="ttname"><a href="struct_s_c_1_1_test_report.html">SC::TestReport</a></div><div class="ttdoc">Collects multiple TestCase and reports their results.</div><div class="ttdef"><b>Definition:</b> Testing.h:25</div></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md231"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md233"></a>
 SC::TestReport</h2>
 <p >Collects multiple TestCase and reports their results. This is passed as argument to <a class="el" href="struct_s_c_1_1_test_case.html" title="A test case that can be split into multiple sections.">SC::TestCase</a> derived classes, and contains handle to <em>globals</em> like a console, paths to the library and application root, path to executable etc.</p>
-<h1><a class="anchor" id="autotoc_md232"></a>
+<h1><a class="anchor" id="autotoc_md234"></a>
 Roadmap</h1>
 <p >🟩 Usable</p><ul>
 <li>Test discovery</li>

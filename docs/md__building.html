@@ -127,10 +127,12 @@ $(document).ready(function(){initNavTree('md__building.html',''); initResizable(
 <li class="level3"><a href="#autotoc_md10">XCode</a></li>
 <li class="level3"><a href="#autotoc_md11">VScode on macOS</a></li>
 <li class="level3"><a href="#autotoc_md12">VSCode on Linux</a></li>
+<li class="level3"><a href="#autotoc_md13">VSCode on Windows</a></li>
 </ul>
 </li>
-<li class="level2"><a href="#autotoc_md13">Debug the tests</a><ul><li class="level3"><a href="#autotoc_md14">Visual Studio or XCode</a></li>
-<li class="level3"><a href="#autotoc_md15">VSCode on macOS or Linux</a></li>
+<li class="level2"><a href="#autotoc_md14">Debug the tests</a><ul><li class="level3"><a href="#autotoc_md15">Visual Studio or XCode</a></li>
+<li class="level3"><a href="#autotoc_md16">VSCode on macOS or Linux</a></li>
+<li class="level3"><a href="#autotoc_md17">VSCode on Windows</a></li>
 </ul>
 </li>
 </ul>
@@ -241,20 +243,35 @@ VSCode on Linux</h3>
 <li><code>Build SCTest Release</code> [1]</li>
 </ul>
 <p >[1] Needs only <code>make</code> and <code>c++</code></p>
-<h2><a class="anchor" id="autotoc_md13"></a>
+<h3><a class="anchor" id="autotoc_md13"></a>
+VSCode on Windows</h3>
+<p >Under VSCode select <code>Tasks: Run Task</code> and choose an appropriate targets like:</p><ul>
+<li><code>Build SCTest Debug</code> [1]</li>
+<li><code>Build SCTest Debug ARM64</code> [1]</li>
+</ul>
+<p >[1] Needs <code>Visual Studio 2022</code> installed</p>
+<h2><a class="anchor" id="autotoc_md14"></a>
 Debug the tests</h2>
-<h3><a class="anchor" id="autotoc_md14"></a>
+<h3><a class="anchor" id="autotoc_md15"></a>
 Visual Studio or XCode</h3>
 <p >Running the default target should work out of the box, as paths are already generated accordingly.</p>
-<h3><a class="anchor" id="autotoc_md15"></a>
+<h3><a class="anchor" id="autotoc_md16"></a>
 VSCode on macOS or Linux</h3>
-<p >Select any <code>Run and Debug</code> configuration like:</p>
+<p >Select one of the appropriate <code>Run and Debug</code> configuration like:</p>
 <ul>
-<li><code>(gdb) Debug SCTest</code> [1]</li>
-<li><code>(lldb) Debug SCTest</code> [2]</li>
+<li><code>SCTest [posix] (gdb)</code> [1]</li>
+<li><code>SCTest [posix] (lldb)</code> [2]</li>
 </ul>
 <p >[1] Uses <code>gdb</code> debugger. Implicitly invokes <code>Build SCTest Debug</code> to build the executable. <br  />
- [2] Uses <code>lldb</code> debugger. Implicitly invokes <code>Build SCTest Debug</code> to build the executable. </p>
+ [2] Uses <code>lldb</code> debugger. Implicitly invokes <code>Build SCTest Debug</code> to build the executable. You need <code>CodeLLDB</code> or similar extension installed in VSCode.</p>
+<h3><a class="anchor" id="autotoc_md17"></a>
+VSCode on Windows</h3>
+<p >Select one of the appropriate <code>Run and Debug</code> configuration like:</p>
+<ul>
+<li><code>SCTest x64 [win] (vsdbg)</code> [1]</li>
+<li><code>SCTest ARM64 [win] (vsdbg)</code> [1]</li>
+</ul>
+<p >[1] Needs <code>Visual Studio 2022</code> installed </p>
 </div></div><!-- contents -->
 </div><!-- PageDoc -->
 </div><!-- doc-content -->

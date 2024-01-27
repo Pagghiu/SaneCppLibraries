@@ -114,22 +114,22 @@ $(document).ready(function(){initNavTree('page_faq.html',''); initResizable(); }
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md39">Where can I learn more?</a></li>
-<li class="level1"><a href="#autotoc_md40">Can I disable Standard C++ Library?</a></li>
-<li class="level1"><a href="#autotoc_md41">Can I disable Exceptions and RTTI?</a></li>
-<li class="level1"><a href="#autotoc_md42">Does the library have debug visualizers?</a></li>
-<li class="level1"><a href="#autotoc_md43">What plans for ABI / API stability?</a></li>
+<ul><li class="level1"><a href="#autotoc_md41">Where can I learn more?</a></li>
+<li class="level1"><a href="#autotoc_md42">Can I disable Standard C++ Library?</a></li>
+<li class="level1"><a href="#autotoc_md43">Can I disable Exceptions and RTTI?</a></li>
+<li class="level1"><a href="#autotoc_md44">Does the library have debug visualizers?</a></li>
+<li class="level1"><a href="#autotoc_md45">What plans for ABI / API stability?</a></li>
 </ul>
 </div>
-<div class="textblock"><h1><a class="anchor" id="autotoc_md39"></a>
+<div class="textblock"><h1><a class="anchor" id="autotoc_md41"></a>
 Where can I learn more?</h1>
 <p >There are many way to learn about the library:</p><ul>
 <li>Read the <a href="https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html">introductory blog post</a></li>
 <li>Take a look at videos from <a href="https://www.youtube.com/@Pagghiu">Youtube Channel</a></li>
 <li>Read and / or step through the extensive set of unit tests (current test code coverage is &gt; 90%).</li>
-<li>Ask in the <a href="https://discord.gg/SDyJFR8N">Discord</a></li>
+<li>Ask in the <a href="https://discord.gg/tyBfFp33Z6">Discord</a></li>
 </ul>
-<h1><a class="anchor" id="autotoc_md40"></a>
+<h1><a class="anchor" id="autotoc_md42"></a>
 Can I disable Standard C++ Library?</h1>
 <p >Yes, if you're satisfied with the C++ standard library alternatives included in this SC and do not plan to use C++ Standard Library in your project:</p><ul>
 <li><em>XCode / Clang / GCC</em>:<ul>
@@ -138,7 +138,7 @@ Can I disable Standard C++ Library?</h1>
 </ul>
 </li>
 </ul>
-<h1><a class="anchor" id="autotoc_md41"></a>
+<h1><a class="anchor" id="autotoc_md43"></a>
 Can I disable Exceptions and RTTI?</h1>
 <p >Yes, if you disable the Standard C++ Library, you can also disable Exceptions and RTTI</p><ul>
 <li><em>XCode / Clang / GCC</em>:<ul>
@@ -152,11 +152,11 @@ Can I disable Exceptions and RTTI?</h1>
 </ul>
 </li>
 </ul>
-<h1><a class="anchor" id="autotoc_md42"></a>
+<h1><a class="anchor" id="autotoc_md44"></a>
 Does the library have debug visualizers?</h1>
 <p >Yes, this library contains debug visualizers for <a class="el" href="library_containers.html">Containers</a> and <a class="el" href="library_strings.html">Strings</a> for <code>clang</code> and <code>cl.exe</code> (Microsoft Compiler). Using them will make your life easier. <br  />
  <a class="el" href="library_build.html">Build</a> is setting them up automatically for XCode and Visual Studio projects.</p>
-<h1><a class="anchor" id="autotoc_md43"></a>
+<h1><a class="anchor" id="autotoc_md45"></a>
 What plans for ABI / API stability?</h1>
 <p >There are no plans to provide ABI stability.</p>
 <p >Each library declares its own API stability, but as the project is very young, expect breaking changes for now. <br  />
