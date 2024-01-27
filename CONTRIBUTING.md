@@ -19,7 +19,7 @@ Please, before committing to any large body of work describe your intentions get
 
 And very importantly, try your best to be nice when interacting with other people about this project 😊.
 
-- [Sane Coding Discord](https://discord.gg/SDyJFR8N)
+- [Sane Coding Discord](https://discord.gg/tyBfFp33Z6)
 - [Twitter](https://twitter.com/pagghiu_) `@pagghiu_`
 - [Mastodon](https://mastodon.gamedev.place/@pagghiu) `@pagghiu`
 - [Github Discussion](https://github.com/Pagghiu/SaneCppLibraries/discussions)

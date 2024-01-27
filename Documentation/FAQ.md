@@ -8,7 +8,7 @@ There are many way to learn about the library:
 - Read the [introductory blog post](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html)
 - Take a look at videos from [Youtube Channel](https://www.youtube.com/@Pagghiu)
 - Read and / or step through the extensive set of unit tests (current test code coverage is > 90%).
-- Ask in the [Discord](https://discord.gg/SDyJFR8N)
+- Ask in the [Discord](https://discord.gg/tyBfFp33Z6)
 
 
 # Can I disable Standard C++ Library?

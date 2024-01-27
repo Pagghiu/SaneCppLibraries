@@ -2,10 +2,10 @@
 
 [![YouTube](https://img.shields.io/youtube/channel/subscribers/UCnmN_whfM12LU6VNQWG0NFg)](https://youtube.com/@Pagghiu)
 [![X (formerly Twitter) Follow](https://img.shields.io/twitter/follow/pagghiu_)](https://twitter.com/pagghiu_)
-[![Discord](https://img.shields.io/discord/1195076118307426384)](https://discord.gg/SDyJFR8N)
+[![Discord](https://img.shields.io/discord/1195076118307426384)](https://discord.gg/tyBfFp33Z6)
 ![GitHub Repo stars](https://img.shields.io/github/stars/Pagghiu/SaneCppLibraries)
 
-**Sane C++** is a set of C++ platform abstraction libraries for ✅ macOS, ✅ Windows and ✅ Linux.
+**Sane C++** is a set of C++ platform abstraction libraries for macOS, Windows and Linux.
 
 ![Sane Cpp](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease/article.svg)
 
@@ -20,11 +20,19 @@
 
 Visit the [documentation website](https://pagghiu.github.io/SaneCppLibraries/index.html) for more information.
 
-An [introductory blog post](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html) has been written too.
+Blog posts 
+- [January 2024 Update](https://pagghiu.github.io/site/blog/2024-01-23-SaneCppLibrariesUpdate.html)
+- [Public Release blog post](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html)
 
-I've also started a [Youtube Channel](https://www.youtube.com/@Pagghiu) with some videos on the project.
-
-You can check [Sane C++ Libraries Project Video](https://www.youtube.com/watch?v=5w1_rRXgyv0) to get started.
+I've also started a [Youtube Channel](https://www.youtube.com/@Pagghiu) with videos showing some bits of the development process.
+- [Creating a Makefile](https://www.youtube.com/watch?v=2ccW8TBAWWE)
+- [Add Makefile backend to SC::Build](https://www.youtube.com/watch?v=wYmT3xAzMxU)
+- [Start Linux Porting](https://www.youtube.com/watch?v=DUZeu6VDGL8)
+- [Build Everything on Linux](https://www.youtube.com/watch?v=gu3x3Y1zZLI)
+- [Posix fork](https://www.youtube.com/watch?v=-OiVELMxL6Q)
+- [SC::Async Linux epoll 1/2](https://www.youtube.com/watch?v=4rC4aKCD0V8)
+- [SC::Async Linux epoll 2/2](https://www.youtube.com/watch?v=uCsGpJcF2oc)
+- [SC::FileSystemWatcher Linux inotify implementation](https://www.youtube.com/watch?v=92saVDCRnCI)
 
 # Libraries
 
@@ -62,7 +70,7 @@ Library                                                                         
 
 # Getting in touch
 
-- [Sane Coding Discord](https://discord.gg/SDyJFR8N)  
+- [Sane Coding Discord](https://discord.gg/tyBfFp33Z6)  
 ![Discord](https://img.shields.io/discord/1195076118307426384)
 - [Twitter](https://twitter.com/pagghiu_) `@pagghiu_`
 - [Mastodon](https://mastodon.gamedev.place/@pagghiu) `@pagghiu`
