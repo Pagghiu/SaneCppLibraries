@@ -202,11 +202,10 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view(), move(lambda)));
             SC_TEST_EXPECT(fs.write("salve.txt", "content"));
             SC_TEST_EXPECT(fs.write("a_tutti.txt", "content"));
-            SC_TEST_EXPECT(eventLoop.runOnce()); // On Windows and Linux (inotify) both events will be dispatched here
-#if SC_PLATFORM_APPLE
-            SC_TEST_EXPECT(eventLoop.runNoWait()); // On macOS each event unblocks the loop, so we need one more run
-#endif
-            SC_TEST_EXPECT(params.changes == 2);
+            // On different OS and FileSystems it's possible to get completely random number of changes
+            SC_TEST_EXPECT(eventLoop.runOnce());
+            SC_TEST_EXPECT(eventLoop.runNoWait());
+            SC_TEST_EXPECT(params.changes >= 2);
             SC_TEST_EXPECT(fileEventsWatcher.close());
             SC_TEST_EXPECT(fs.removeFiles({"salve.txt", "a_tutti.txt"}));
         }
@@ -259,10 +258,14 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                     params.changes2++;
                 }
             };
-            // Sleeps exist because Windows does not recognize events properly if we're running too fast.
-            // Additionally we explicitly create and delete files and only listen for Operation::AddRemoveRename
-            // because in some cases we also get modified Operation::Modified
+// Sleeps exist because Windows does not recognize events properly if we're running too fast.
+// Additionally we explicitly create and delete files and only listen for Operation::AddRemoveRename
+// because in some cases we also get modified Operation::Modified
+#if SC_PLATFORM_WINDOWS
+            constexpr int waitForEventsTimeout = 200;
+#else
             constexpr int waitForEventsTimeout = 100;
+#endif
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2.view(), move(lambda2)));
             FileSystem fs1;
             FileSystem fs2;
