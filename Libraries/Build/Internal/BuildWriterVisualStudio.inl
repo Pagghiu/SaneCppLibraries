@@ -336,6 +336,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             builder.append("      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>\n");
         }
+        builder.append("      <MultiProcessorCompilation>true</MultiProcessorCompilation>");
         builder.append("    </ClCompile>\n");
         builder.append("    <Link>\n");
         builder.append("      <SubSystem>Console</SubSystem>\n");
