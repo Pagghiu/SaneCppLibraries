@@ -12,7 +12,6 @@
             "preLaunchTask": "Build SCTest Debug",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${fileDirname}",
             "environment": [],
             "console": "integratedTerminal"
         },
@@ -24,7 +23,6 @@
             "preLaunchTask": "Build SCTest Debug ARM64",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${fileDirname}",
             "environment": [],
             "console": "integratedTerminal"
         },
@@ -35,7 +33,6 @@
             "program": "${workspaceFolder}/_Build/Output/Posix-Any-Any-Makefile-Debug/SCTest",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${fileDirname}",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
@@ -60,7 +57,6 @@
             "request": "launch",
             "program": "${workspaceFolder}/_Build/Output/Posix-Any-Any-Makefile-Debug/SCTest",
             "args": [],
-            "cwd": "${fileDirname}",
             "preLaunchTask": "Build SCTest Debug",
             "console": "integratedTerminal",
             "preRunCommands": [
