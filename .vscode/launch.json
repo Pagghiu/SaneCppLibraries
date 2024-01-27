@@ -5,7 +5,31 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Debug SCTest",
+            "name": "SCTest x64 [win] (vsdbg)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/Output/Windows-10.0-x64-msvc2022-Debug/SCTest.exe",
+            "preLaunchTask": "Build SCTest Debug",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "SCTest ARM64 [win] (vsdbg)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/Output/Windows-10.0-ARM64-msvc2022-Debug/SCTest.exe",
+            "preLaunchTask": "Build SCTest Debug ARM64",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "SCTest [posix] (gdb)",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/_Build/Output/Posix-Any-Any-Makefile-Debug/SCTest",
@@ -30,13 +54,11 @@
             ]
         },
         {
-            "name": "(lldb) Debug SCTest",
+            // Install CodeLLDB extension or similar to use this one
+            "name": "SCTest [posix] (lldb)",
             "type": "lldb",
             "request": "launch",
-            "program": "",
-            "osx": {
-                "program": "${workspaceFolder}/_Build/Output/Posix-Any-Any-Makefile-Debug/SCTest",
-            },
+            "program": "${workspaceFolder}/_Build/Output/Posix-Any-Any-Makefile-Debug/SCTest",
             "args": [],
             "cwd": "${fileDirname}",
             "preLaunchTask": "Build SCTest Debug",

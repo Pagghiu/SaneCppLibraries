@@ -87,6 +87,18 @@
             "intelliSenseMode": "linux-gcc-x64",
             // Compile commands is only generated if one of the build task using make are run using Clang as compiler
             "compileCommands": "${workspaceFolder}/_Build/Intermediate/SCTest/Posix-Any-Any-Makefile-Release/compile_commands.json"
+        },
+        {
+            "name": "SCTest Windows x64 Debug",
+            "cStandard": "c11",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "windows-msvc-x64"
+        },
+        {
+            "name": "SCTest Windows x64 Release",
+            "cStandard": "c11",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "windows-msvc-x64"
         }
     ],
     "version": 4

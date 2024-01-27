@@ -7,10 +7,23 @@
             "label": "Build SCTest Debug",
             "type": "shell",
             "osx": {
-                "command": "make -j`sysctl -n hw.physicalcpu` -C _Build/Projects/Make",
+                "command": "make -j`sysctl -n hw.physicalcpu` -C _Build/Projects/Make"
             },
             "linux": {
                 "command": "make -j`nproc` -C _Build/Projects/Make"
+            },
+            "windows": {
+                "command": "${env:ProgramFiles}/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe",
+                "args": [
+                    "_Build/Projects/VisualStudio2022/SCTest.sln",
+                    "/p:Configuration=Debug",
+                    "/p:Platform=x64",
+                ],
+                "properties": {
+                    "problemMatcher": [
+                        "$msvc"
+                    ]
+                }
             },
             "problemMatcher": [
                 "$gcc"
@@ -29,6 +42,40 @@
             }
         },
         {
+            "label": "Build SCTest Debug ARM64",
+            "type": "shell",
+            "osx": {
+                "command": "make -j`sysctl -n hw.physicalcpu` -C _Build/Projects/Make"
+            },
+            "linux": {
+                "command": "make -j`nproc` -C _Build/Projects/Make"
+            },
+            "windows": {
+                "command": "${env:ProgramFiles}/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe",
+                "args": [
+                    "_Build/Projects/VisualStudio2022/SCTest.sln",
+                    "/p:Configuration=Debug",
+                    "/p:Platform=ARM64",
+                ],
+                "properties": {
+                    "problemMatcher": [
+                        "$msvc"
+                    ]
+                }
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "never",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "group": {
+                "kind": "build",
+            }
+        },
+        {
             "label": "Build SCTest Release",
             "type": "shell",
             "osx": {
@@ -36,6 +83,19 @@
             },
             "linux": {
                 "command": "make -j`nproc` -C _Build/Projects/Make CONFIG=Release"
+            },
+            "windows": {
+                "command": "${env:ProgramFiles}/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe",
+                "args": [
+                    "_Build/Projects/VisualStudio2022/SCTest.sln",
+                    "/p:Configuration=Release",
+                    "/p:Platform=x64",
+                ],
+                "properties": {
+                    "problemMatcher": [
+                        "$msvc"
+                    ]
+                }
             },
             "problemMatcher": [
                 "$gcc"
