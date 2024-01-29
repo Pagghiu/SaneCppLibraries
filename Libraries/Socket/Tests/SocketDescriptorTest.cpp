@@ -54,10 +54,6 @@ void SC::SocketDescriptorTest::resolveDNS()
     SmallString<256> ipAddress;
     SC_TEST_EXPECT(SocketNetworking::resolveDNS("localhost", ipAddress));
     SC_TEST_EXPECT(ipAddress.view() == "127.0.0.1");
-    if (SocketNetworking::resolveDNS("apple.com", ipAddress)) // needs internet connection
-    {
-        SC_TEST_EXPECT(ipAddress.view() == "17.253.144.10");
-    }
     //! [resolveDNSSnippet]
 }
 
