@@ -566,9 +566,11 @@ bool SC::SegmentOperations<Allocator, T>::ensureCapacity(T*& oldItems, size_t ne
     newSegment->setSize(oldSize);
     if (oldSize > 0)
     {
-        oldSegment = SegmentItems<T>::getSegment(oldItems);
         SegmentItems<T>::moveItems(Allocator::template getItems<T>(oldSegment),
                                    Allocator::template getItems<T>(newSegment), oldSize, keepFirstN);
+    }
+    if (oldSegment != nullptr)
+    {
         Allocator::release(oldSegment);
     }
     oldItems = Allocator::template getItems<T>(newSegment);
