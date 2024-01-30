@@ -47,6 +47,10 @@ struct SC::FileSystemIterator::Internal
         }
         void close()
         {
+            if (dirEnumerator != nullptr)
+            {
+                ::closedir(dirEnumerator);
+            }
             if (fileDescriptor != -1)
             {
                 ::close(fileDescriptor);
