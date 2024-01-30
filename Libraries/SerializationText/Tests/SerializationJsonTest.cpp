@@ -82,8 +82,14 @@ void SC::SerializationJsonTest::jsonLoadExact()
 {
     //! [serializationJsonLoadExactSnippet]
     constexpr StringView testJSON = R"({"x":2,"y":1.50,"xy":[1,3],"myTest":"asdf","myVector":["Str1","Str2"]})"_a8;
-    Test                 test;
-    memset(&test, 0, sizeof(test));
+
+    Test test;
+    test.x        = 1;
+    test.y        = 3.22f;
+    test.xy[0]    = 4;
+    test.xy[1]    = 4;
+    test.myTest   = "KFDOK";
+    test.myVector = {"LPDFSOK", "DSAFKO"};
     SC_TEST_EXPECT(SerializationJson::loadExact(test, testJSON));
     SC_TEST_EXPECT(test == Test());
     //! [serializationJsonLoadExactSnippet]
