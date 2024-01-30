@@ -64,7 +64,14 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
                 params.callbackThreadID = Thread::CurrentThreadID();
                 params.changes++;
-                SC_TEST_EXPECT(notification.operation == FileSystemWatcher::Operation::AddRemoveRename);
+                if (params.changes == 1)
+                {
+                    SC_TEST_EXPECT(notification.operation == FileSystemWatcher::Operation::AddRemoveRename);
+                }
+                else
+                {
+                    SC_TEST_EXPECT(notification.operation == FileSystemWatcher::Operation::Modified);
+                }
                 SC_TEST_EXPECT(notification.basePath == params.appDirectory);
                 // Comparisons must use the same encoding
                 SC_TEST_EXPECT(notification.relativePath == "test.txt");
@@ -202,8 +209,10 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view(), move(lambda)));
             SC_TEST_EXPECT(fs.write("salve.txt", "content"));
             SC_TEST_EXPECT(fs.write("a_tutti.txt", "content"));
+            Thread::Sleep(100);
             // On different OS and FileSystems it's possible to get completely random number of changes
             SC_TEST_EXPECT(eventLoop.runOnce());
+            Thread::Sleep(100);
             SC_TEST_EXPECT(eventLoop.runNoWait());
             SC_TEST_EXPECT(params.changes >= 2);
             SC_TEST_EXPECT(fileEventsWatcher.close());
