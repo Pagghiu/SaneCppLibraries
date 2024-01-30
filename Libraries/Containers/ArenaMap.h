@@ -1,7 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Containers/Vector.h"
+#include "../Foundation/Assert.h"
+#include "../Foundation/Memory.h"
 
 namespace SC
 {
@@ -91,31 +92,44 @@ struct SC::ArenaMap
     ArenaMap& operator=(const ArenaMap& other)
     {
         clear();
-        SC_ASSERT_RELEASE(items.resize(other.size()));
-        for (size_t idx = 0; idx < other.items.size(); ++idx)
+        T* newItems = reinterpret_cast<T*>(Memory::allocate(other.itemsSize * sizeof(T)));
+
+        typename Key::Generation* newGenerations = reinterpret_cast<typename Key::Generation*>(
+            Memory::allocate(other.itemsSize * sizeof(typename Key::Generation)));
+        SC_ASSERT_RELEASE(newItems);
+        SC_ASSERT_RELEASE(newGenerations);
+        ::memset(newGenerations, 0, other.itemsSize * sizeof(typename Key::Generation));
+        items       = newItems;
+        generations = newGenerations;
+        itemsSize   = other.itemsSize;
+        for (size_t idx = 0; idx < other.itemsSize; ++idx)
         {
             if (other.generations[idx].used)
             {
-                new (&items[idx].object, PlacementNew()) T(other.items[idx].object);
+                new (&items[idx], PlacementNew()) T(other.items[idx]);
             }
+            generations[idx] = other.generations[idx];
         }
-        generations = other.generations;
-        numUsed     = other.numUsed;
+        numUsed = other.numUsed;
         return *this;
     }
 
     ArenaMap& operator=(ArenaMap&& other)
     {
         clear();
-        items         = move(other.items);
-        generations   = move(other.generations);
-        numUsed       = other.numUsed;
-        other.numUsed = 0;
+        items             = other.items;
+        itemsSize         = other.itemsSize;
+        other.items       = nullptr;
+        other.itemsSize   = 0;
+        generations       = other.generations;
+        other.generations = nullptr;
+        numUsed           = other.numUsed;
+        other.numUsed     = 0;
         return *this;
     }
 
     /// @brief Get the maximum number of objects that can be stored in this map
-    uint32_t getNumAllocated() const { return static_cast<uint32_t>(items.size()); }
+    uint32_t getNumAllocated() const { return static_cast<uint32_t>(itemsSize); }
 
     template <typename MapType>
     struct ArenaMapIterator
@@ -146,8 +160,8 @@ struct SC::ArenaMap
             return it.index != index;
         }
 
-        auto& operator*() const { return map->items[index].object; }
-        auto* operator->() const { return &map->items[index].object; }
+        auto& operator*() const { return map->items[index]; }
+        auto* operator->() const { return &map->items[index]; }
     };
     using ConstIterator = ArenaMapIterator<const ArenaMap>;
     using Iterator      = ArenaMapIterator<ArenaMap>;
@@ -184,16 +198,22 @@ struct SC::ArenaMap
 
     void clear()
     {
-        for (size_t idx = 0; idx < items.size(); ++idx)
+        for (size_t idx = 0; idx < itemsSize; ++idx)
         {
             if (generations[idx].used)
             {
-                items[idx].object.~T();
+                items[idx].~T();
             }
+            generations[idx].used = 0;
         }
-        generations.clear();
-        items.clear();
-        numUsed = 0;
+        if (items)
+            Memory::release(items);
+        items     = nullptr;
+        itemsSize = 0;
+        if (generations)
+            Memory::release(generations);
+        generations = nullptr;
+        numUsed     = 0;
     }
 
     /// @brief Get the number of used slots in the arena
@@ -209,11 +229,24 @@ struct SC::ArenaMap
             return false;
         if (newSize > Key::MaxIndex)
             return false;
-        if (not items.resize(newSize))
+        if (items)
+            Memory::release(items);
+        items = nullptr;
+        if (generations)
+            Memory::release(generations);
+        generations = nullptr;
+        T* newItems = reinterpret_cast<T*>(Memory::allocate(newSize * sizeof(T)));
+        if (not newItems)
             return false;
-        if (not generations.resize(newSize))
+        items = newItems;
+        typename Key::Generation* newGenerations =
+            reinterpret_cast<typename Key::Generation*>(Memory::allocate(newSize * sizeof(typename Key::Generation)));
+        if (not newGenerations)
             return false;
-        numUsed = 0;
+        ::memset(newGenerations, 0, newSize * sizeof(typename Key::Generation));
+        generations = newGenerations;
+        itemsSize   = newSize;
+        numUsed     = 0;
         return true;
     }
 
@@ -223,7 +256,7 @@ struct SC::ArenaMap
         Key key = allocateNewKeySlot();
         if (key.isValid())
         {
-            new (&items[key.index].object, PlacementNew()) T(object);
+            new (&items[key.index], PlacementNew()) T(object);
         }
         return key;
     }
@@ -233,7 +266,7 @@ struct SC::ArenaMap
         Key key = allocateNewKeySlot();
         if (key.isValid())
         {
-            new (&items[key.index].object, PlacementNew()) T();
+            new (&items[key.index], PlacementNew()) T();
         }
         return key;
     }
@@ -244,7 +277,7 @@ struct SC::ArenaMap
         Key key = allocateNewKeySlot();
         if (key.isValid())
         {
-            new (&items[key.index].object, PlacementNew()) T(move(object));
+            new (&items[key.index], PlacementNew()) T(move(object));
         }
         return key;
     }
@@ -258,9 +291,9 @@ struct SC::ArenaMap
     template <typename ComparableToValue>
     [[nodiscard]] bool containsValue(const ComparableToValue& value, Key* optionalKey = nullptr) const
     {
-        for (size_t idx = 0; idx < items.size(); ++idx)
+        for (size_t idx = 0; idx < itemsSize; ++idx)
         {
-            if (generations[idx].used and items[idx].object == value)
+            if (generations[idx].used and items[idx] == value)
             {
                 if (optionalKey)
                 {
@@ -287,7 +320,7 @@ struct SC::ArenaMap
             generations[key.index].generation++;
         }
         generations[key.index].used = 0;
-        items[key.index].object.~T();
+        items[key.index].~T();
         numUsed--;
         return true;
     }
@@ -296,42 +329,35 @@ struct SC::ArenaMap
     {
         if (generations[key.index] != key.generation)
             return nullptr;
-        return &items[key.index].object;
+        return &items[key.index];
     }
 
     [[nodiscard]] const T* get(Key key) const
     {
         if (generations[key.index] != key.generation)
             return nullptr;
-        return &items[key.index].object;
+        return &items[key.index];
     }
 
   private:
-    struct Item
-    {
-        T object;
-        Item() {}
-        Item(const Item&) {}
-        Item& operator=(const Item&) {}
-        ~Item() {}
-    };
+    T*     items     = nullptr;
+    size_t itemsSize = 0;
 
-    Vector<Item> items;
-
-    Vector<typename Key::Generation> generations;
+    typename Key::Generation* generations = nullptr;
 
     uint32_t numUsed = 0;
 
     [[nodiscard]] Key allocateNewKeySlot()
     {
-        for (size_t idx = 0; idx < generations.size(); ++idx)
+        for (size_t idx = 0; idx < itemsSize; ++idx)
         {
             if (generations[idx].used == 0)
             {
-                Key key;
                 generations[idx].used = 1;
-                key.generation        = generations[idx];
-                key.index             = static_cast<uint32_t>(idx);
+
+                Key key;
+                key.generation = generations[idx];
+                key.index      = static_cast<uint32_t>(idx);
                 numUsed++;
                 return key;
             }
