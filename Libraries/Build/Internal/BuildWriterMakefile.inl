@@ -177,10 +177,19 @@ Makefile.$(CONFIG).touched: Makefile
         {
             builder.append(" -nostdlib++");
         }
+        if (not project.compile.hasValue<Compile::enableASAN>(true))
+        {
+            builder.append(" -fsanitize=address,undefined"); // TODO: Split the UBSAN flag
+        }
+
         builder.append("\nelse\n");
         // Non Clang specific flags
-        builder.append("{0}_COMPILER_SPECIFIC_FLAGS :=\n", makeTarget.view());
-        builder.append("endif\n");
+        builder.append("{0}_COMPILER_SPECIFIC_FLAGS :=", makeTarget.view());
+        if (not project.compile.hasValue<Compile::enableASAN>(true))
+        {
+            builder.append(" -fsanitize=address,undefined"); // TODO: Split the UBSAN flag
+        }
+        builder.append("\nendif\n");
 
         builder.append("\nifeq ($(OS_TYPE),Darwin)\n");
         builder.append("     {0}_OS_SPECIFIC_FLAGS := $({0}_FRAMEWORKS)\n", makeTarget.view());
@@ -313,6 +322,11 @@ $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
         else
         {
             builder.append("\n{0}_CONFIG_FLAGS := -DNDEBUG=1 -O3", makeTarget);
+        }
+
+        if (configuration.compile.hasValue<Compile::enableASAN>(true))
+        {
+            builder.append(" -fsanitize=address,undefined"); // TODO: Split the UBSAN flag
         }
 
         builder.append("\nendif");
