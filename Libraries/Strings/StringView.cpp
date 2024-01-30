@@ -26,7 +26,10 @@ bool SC::StringView::parseInt32(int32_t& value) const
     }
     else
     {
-        memcpy(buffer, text, textSizeInBytes);
+        if (text != nullptr)
+        {
+            memcpy(buffer, text, textSizeInBytes);
+        }
         buffer[textSizeInBytes] = 0;
 
         value = atoi(buffer);
@@ -67,7 +70,8 @@ bool SC::StringView::parseDouble(double& value) const
     {
         char         buffer[255];
         const size_t bufferSize = min(textSizeInBytes, static_cast<decltype(textSizeInBytes)>(sizeof(buffer) - 1));
-        memcpy(buffer, text, bufferSize);
+        if (text != nullptr)
+            memcpy(buffer, text, bufferSize);
         buffer[bufferSize] = 0;
         value              = atof(buffer);
     }

@@ -23,7 +23,10 @@ static bool formatSprintf(StringFormatOutput& data, const char (&formatSpecifier
     const size_t specifierLength = specifier.sizeInBytes();
     if (specifierLength > sizeof(compoundSpecifier) - FORMAT_LENGTH - 2)
         return false; // if someone things it's a good idea doing a specifier > 50 chars...
-    memcpy(compoundSpecifier + 1, specifier.bytesWithoutTerminator(), specifierLength);
+    if (specifierLength > 0)
+    {
+        memcpy(compoundSpecifier + 1, specifier.bytesWithoutTerminator(), specifierLength);
+    }
     memcpy(compoundSpecifier + 1 + specifierLength, formatSpecifier, FORMAT_LENGTH);
     compoundSpecifier[1 + specifierLength + FORMAT_LENGTH] = 0;
     char       buffer[BUFFER_SIZE];

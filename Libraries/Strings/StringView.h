@@ -737,6 +737,14 @@ constexpr bool SC::StringView::equalsIterator(StringView other, size_t& points) 
         }
         else
         {
+            if (text == nullptr)
+            {
+                return other.textSizeInBytes == 0;
+            }
+            if (other.text == nullptr)
+            {
+                return textSizeInBytes == 0;
+            }
             return memcmp(text, other.text, textSizeInBytes) == 0;
         }
     }
