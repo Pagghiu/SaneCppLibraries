@@ -11,6 +11,7 @@
             "program": "${workspaceFolder}/_Build/Output/Windows-10.0-x64-msvc2022-Debug/SCTest.exe",
             "preLaunchTask": "Build SCTest Debug",
             "args": [],
+            "cwd": "${workspaceRoot}",
             "stopAtEntry": false,
             "environment": [],
             "console": "integratedTerminal"
@@ -18,6 +19,7 @@
         {
             "name": "SCTest ARM64 [win] (vsdbg)",
             "type": "cppvsdbg",
+            "cwd": "${workspaceRoot}",
             "request": "launch",
             "program": "${workspaceFolder}/_Build/Output/Windows-10.0-ARM64-msvc2022-Debug/SCTest.exe",
             "preLaunchTask": "Build SCTest Debug ARM64",
@@ -36,6 +38,7 @@
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
+            "cwd": "${workspaceRoot}",
             "preLaunchTask": "Build SCTest Debug",
             "setupCommands": [
                 {
@@ -57,6 +60,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/_Build/Output/Posix-Any-Any-Makefile-Debug/SCTest",
             "args": [],
+            "cwd": "${workspaceRoot}",
             "preLaunchTask": "Build SCTest Debug",
             "console": "integratedTerminal",
             "preRunCommands": [

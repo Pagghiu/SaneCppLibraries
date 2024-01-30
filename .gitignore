@@ -14,5 +14,6 @@ Dependencies/*/*.txt
 *.a
 *.dylib
 *.dll
+*.so
 *.pdb
 *.ilk
