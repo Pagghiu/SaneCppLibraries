@@ -166,7 +166,6 @@ void  SC::Memory::release(void* allocatedMemory) { return ::free(allocatedMemory
 // Standard C++ Library support
 //--------------------------------------------------------------------
 #if not SC_COMPILER_ENABLE_STD_CPP and (not SC_COMPILER_MSVC or not SC_COMPILER_CLANG_CL)
-
 #if SC_COMPILER_ASAN == 0
 void operator delete(void* p) noexcept
 {
@@ -178,9 +177,19 @@ void operator delete[](void* p) noexcept
     if (p != 0)
         SC_LANGUAGE_LIKELY { ::free(p); }
 }
+void operator delete(void* p, size_t) noexcept
+{
+    if (p != 0)
+        SC_LANGUAGE_LIKELY { ::free(p); }
+}
+void operator delete[](void* p, size_t) noexcept
+{
+    if (p != 0)
+        SC_LANGUAGE_LIKELY { ::free(p); }
+}
 #endif
 
-#if not((SC_COMPILER_MSVC or SC_COMPILER_CLANG_CL) and SC_COMPILER_ASAN)
+#if SC_COMPILER_ASAN == 0
 void* operator new(size_t len) { return ::malloc(len); }
 void* operator new[](size_t len) { return ::malloc(len); }
 #endif
