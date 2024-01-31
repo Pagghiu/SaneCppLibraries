@@ -228,23 +228,35 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Vector<P
 
 SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
 {
+    struct Version
+    {
+        unsigned char version[3] = {0};
+
+        uint64_t value() const { return version[0] * 256 * 256 * 256 + version[1] * 256 * 256 + version[2] * 256; }
+
+        bool operator<(const Version other) const { return value() < other.value(); }
+    };
 #if SC_PLATFORM_WINDOWS
     compiler.type               = Type::MicrosoftCompiler;
     constexpr StringView root[] = {L"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC",
+                                   L"C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC",
                                    L"C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC",
                                    L"C:/Program Files/Microsoft Visual Studio/2022/Preview/VC/Tools/MSVC"};
 
-    bool found = false;
+    bool              found = false;
+    Version           version, bestVersion;
+    StringNative<256> bestCompiler, bestLinker;
     for (const StringView& base : root)
     {
         FileSystemIterator fsIterator;
-        SC_TRY(fsIterator.init(base));
+        if (not fsIterator.init(base))
+            continue;
         while (fsIterator.enumerateNext())
         {
             if (fsIterator.get().isDirectory())
             {
                 const StringView candidate = fsIterator.get().name;
-                StringBuilder    compilerBuilder(compiler.compilerPath, StringBuilder::Clear);
+                StringBuilder    compilerBuilder(bestCompiler, StringBuilder::Clear);
                 SC_TRY(compilerBuilder.append(base));
                 SC_TRY(compilerBuilder.append(L"/"));
                 SC_TRY(compilerBuilder.append(candidate));
@@ -257,19 +269,34 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
                 SC_TRY(compilerBuilder.append(L"/bin/Hostx64/x86/"));
 #endif
 #endif
-                compiler.linkerPath = compiler.compilerPath;
-                StringBuilder linkerBuilder(compiler.linkerPath);
+                SC_TRY(bestLinker.assign(bestCompiler.view()));
+                StringBuilder linkerBuilder(bestLinker);
                 SC_TRY(linkerBuilder.append(L"link.exe"));
                 SC_TRY(compilerBuilder.append(L"cl.exe"));
                 FileSystem fs;
                 if (fs.init(base))
                 {
-                    if (fs.existsAndIsFile(compiler.compilerPath.view()) and
-                        fs.existsAndIsFile(compiler.linkerPath.view()))
+                    if (fs.existsAndIsFile(bestCompiler.view()) and fs.existsAndIsFile(bestLinker.view()))
                     {
-                        // TODO: Improve visual studio detection, finding latest
+                        StringViewTokenizer tokenizer(candidate);
+                        int                 idx = 0;
+                        while (tokenizer.tokenizeNext('.', StringViewTokenizer::SkipEmpty))
+                        {
+                            int number;
+                            if (not tokenizer.component.parseInt32(number) or number < 0 or number > 255 or idx > 2)
+                            {
+                                continue;
+                            }
+                            version.version[idx] = static_cast<char>(number);
+                            idx++;
+                        }
+                        if (bestVersion < version)
+                        {
+                            bestVersion = version;
+                            SC_TRY(compiler.compilerPath.assign(bestCompiler.view()));
+                            SC_TRY(compiler.linkerPath.assign(bestLinker.view()));
+                        }
                         found = true;
-                        break;
                     }
                 }
             }
@@ -309,8 +336,8 @@ SC::Result SC::PluginCompiler::compileFile(StringView sourceFile, StringView obj
     SC_TRY(includeBuilder.append(L"/I\""));
     SC_TRY(includeBuilder.append(includePath.view()));
     SC_TRY(includeBuilder.append(L"\""));
-    SC_TRY(process.launch(compilerPath.view(), includes.view(), destFile.view(), L"/std:c++14",
-                          L"/DSC_DISABLE_CONFIG=1", L"/GR-", L"/WX", L"/W4", L"/permissive-", L"/sdl-", L"/GS-", L"/Zi",
+    SC_TRY(process.launch(compilerPath.view(), includes.view(), destFile.view(), L"/std:c++17",
+                          L"/DSC_DISABLE_CONFIG=1", L"/GR-", L"/WX", L"/W4", L"/permissive-", L"/GS-", L"/Zi",
                           L"/DSC_PLUGIN_LIBRARY=1", L"/EHsc-", L"/c", sourceFile));
 #else
     SC_TRY(includeBuilder.append("-I"));
