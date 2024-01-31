@@ -54,7 +54,19 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(StringView("0").parseInt32(value) and value == 0);
             SC_TEST_EXPECT(StringView("-0").parseInt32(value) and value == 0);
             SC_TEST_EXPECT(not StringView("").parseInt32(value));
-            SC_TEST_EXPECT(not StringView("1\02\0\0\0"_u16).parseInt32(value));   // UTF16 not supported
+#if SC_COMPILER_MSVC
+            SC_TEST_EXPECT(StringView(L"214").parseInt32(value) and value == 214);
+            SC_TEST_EXPECT(StringView(L"+214").parseInt32(value) and value == +214);
+            SC_TEST_EXPECT(StringView(L"-214").parseInt32(value) and value == -214);
+            SC_TEST_EXPECT(not StringView(L"a214").parseInt32(value));
+            SC_TEST_EXPECT(not StringView(L"-a14").parseInt32(value));
+#else
+            SC_TEST_EXPECT(StringView("\x32\x00\x31\x00\x34\x00"_u16).parseInt32(value) and value == 214);
+            SC_TEST_EXPECT(StringView("\x2b\x00\x32\x00\x31\x00\x34\x00"_u16).parseInt32(value) and value == +214);
+            SC_TEST_EXPECT(StringView("\x2d\x00\x32\x00\x31\x00\x34\x00"_u16).parseInt32(value) and value == -214);
+            SC_TEST_EXPECT(not StringView("\x61\x00\x32\x00\x31\x00\x34\x00"_u16).parseInt32(value));
+            SC_TEST_EXPECT(not StringView("\x2d\x00\x61\x00\x31\x00\x34\x00"_u16).parseInt32(value));
+#endif
             SC_TEST_EXPECT(not StringView("1234567891234567").parseInt32(value)); // Too long for int32
         }
 

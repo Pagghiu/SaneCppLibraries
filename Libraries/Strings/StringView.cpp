@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: MIT
 #include "../Strings/StringView.h"
 
+#include <errno.h>  // errno
+#include <stdint.h> // INT32_MIN/MAX
 #include <stdlib.h> //atoi
 #include <string.h> //strlen
-
 SC::StringView SC::StringView::fromNullTerminated(const char* text, StringEncoding encoding)
 {
     return StringView({text, ::strlen(text)}, true, encoding);
@@ -12,41 +13,60 @@ SC::StringView SC::StringView::fromNullTerminated(const char* text, StringEncodi
 
 bool SC::StringView::parseInt32(int32_t& value) const
 {
-    if (getEncoding() != StringEncoding::Ascii and getEncoding() != StringEncoding::Utf8)
-    {
+    if (text == nullptr)
         return false;
-    }
     char buffer[12]; // 10 digits + sign + nullTerm
-    if (textSizeInBytes >= sizeof(buffer))
-        return false;
-
-    if (hasNullTerm)
+    switch (getEncoding())
     {
-        value = atoi(text);
-    }
-    else
-    {
-        if (text != nullptr)
-        {
-            memcpy(buffer, text, textSizeInBytes);
-        }
-        buffer[textSizeInBytes] = 0;
-
-        value = atoi(buffer);
-    }
-    if (value == 0)
-    {
-        // atoi returns 0 on failed parsing...
-        StringIteratorASCII it = getIterator<StringIteratorASCII>();
-        (void)it.advanceIfMatchesAny({'-', '+'}); // optional
-        if (it.isAtEnd())
-        {
+    case StringEncoding::Utf16: {
+        StringIteratorUTF16 it(getIterator<StringIteratorUTF16>());
+        StringCodePoint     codePoint;
+        if (not it.advanceRead(codePoint))
             return false;
+
+        if ((codePoint < '0' or codePoint > '9') and (codePoint != '-' and codePoint != '+'))
+            return false;
+        int index       = 0;
+        buffer[index++] = static_cast<char>(codePoint);
+
+        while (it.advanceRead(codePoint))
+        {
+            if (codePoint < '0' or codePoint > '9')
+                return false;
+            buffer[index++] = static_cast<char>(codePoint);
         }
-        (void)it.advanceUntilDifferentFrom('0'); // any number of 0s
-        return it.isAtEnd();
+        buffer[index] = 0;
+
+        return StringView({buffer, sizeof(buffer) - 1}, true, StringEncoding::Ascii).parseInt32(value);
     }
-    return true;
+    break;
+
+    default: {
+        const auto* parseText = text;
+        if (!hasNullTerm)
+        {
+            if (textSizeInBytes >= sizeof(buffer))
+                return false;
+            memcpy(buffer, textWide, textSizeInBytes);
+            buffer[textSizeInBytes] = 0;
+            parseText               = buffer;
+        }
+        errno = 0;
+        char* endText;
+        auto  parsed = ::strtol(parseText, &endText, 10);
+        if (errno == 0 && parseText < endText)
+        {
+            if (parsed >= INT32_MIN and parsed <= INT32_MAX)
+            {
+                value = static_cast<int32_t>(parsed);
+                return true;
+            }
+        }
+    }
+    break;
+    }
+
+    return false;
 }
 
 bool SC::StringView::parseFloat(float& value) const
