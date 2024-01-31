@@ -14,6 +14,14 @@
 #include <Windows.h>
 #endif
 
+SC::Console::Console(Vector<char>& encodingConversionBuffer) : encodingConversionBuffer(encodingConversionBuffer)
+{
+#if SC_PLATFORM_WINDOWS
+    handle     = ::GetStdHandle(STD_OUTPUT_HANDLE);
+    isConsole  = ::GetFileType(handle) == FILE_TYPE_CHAR;
+    isDebugger = ::IsDebuggerPresent() == TRUE;
+#endif
+}
 void SC::Console::printLine(const StringView str)
 {
     print(str);
@@ -26,47 +34,87 @@ void SC::Console::print(const StringView str)
         return;
 #if SC_PLATFORM_WINDOWS
     StringView encodedPath;
-    if (str.getEncoding() == StringEncoding::Ascii)
+    if (!isConsole)
     {
-        WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), str.bytesWithoutTerminator(),
-                      static_cast<DWORD>(str.sizeInBytes()), nullptr, nullptr);
-#if SC_CONFIGURATION_DEBUG
-        if (str.isNullTerminated())
+        if (str.getEncoding() == StringEncoding::Utf16)
         {
-            OutputDebugStringA(str.bytesIncludingTerminator());
+            encodingConversionBuffer.clearWithoutInitializing();
+            if (StringConverter::convertEncodingToUTF8(str, encodingConversionBuffer, &encodedPath))
+            {
+                ::WriteFile(handle, encodedPath.bytesWithoutTerminator(), static_cast<DWORD>(encodedPath.sizeInBytes()),
+                            nullptr, nullptr);
+            }
+        }
+        else
+        {
+            ::WriteFile(handle, str.bytesWithoutTerminator(), static_cast<DWORD>(str.sizeInBytes()), nullptr, nullptr);
+        }
+    }
+    if (isConsole or isDebugger)
+    {
+        if (str.getEncoding() == StringEncoding::Ascii)
+        {
+            if (isConsole)
+            {
+                ::WriteConsoleA(handle, str.bytesWithoutTerminator(), static_cast<DWORD>(str.sizeInBytes()), nullptr,
+                                nullptr);
+            }
+#if SC_CONFIGURATION_DEBUG
+            if (isDebugger)
+            {
+                if (str.isNullTerminated())
+                {
+                    ::OutputDebugStringA(str.bytesIncludingTerminator());
+                }
+                else
+                {
+                    encodingConversionBuffer.clearWithoutInitializing();
+                    if (StringConverter::convertEncodingToUTF16(str, encodingConversionBuffer, &encodedPath))
+                    {
+                        ::OutputDebugStringW(encodedPath.getNullTerminatedNative());
+                    }
+                    else
+                    {
+                        if (isConsole)
+                        {
+                            ::WriteConsoleW(handle, L"ERROR: cannot format string",
+                                            static_cast<DWORD>(wcslen(L"ERROR: cannot format string")), nullptr,
+                                            nullptr);
+                        }
+                    }
+                }
+            }
+#endif
         }
         else
         {
             encodingConversionBuffer.clearWithoutInitializing();
             if (StringConverter::convertEncodingToUTF16(str, encodingConversionBuffer, &encodedPath))
             {
-                OutputDebugStringW(encodedPath.getNullTerminatedNative());
+                if (isConsole)
+                {
+                    ::WriteConsoleW(handle, encodedPath.getNullTerminatedNative(),
+                                    static_cast<DWORD>(encodedPath.sizeInBytes() / sizeof(wchar_t)), nullptr, nullptr);
+                }
+
+#if SC_CONFIGURATION_DEBUG
+                if (isDebugger)
+                {
+                    ::OutputDebugStringW(encodedPath.getNullTerminatedNative());
+                }
+#endif
             }
             else
             {
-                WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), L"ERROR: cannot format string",
-                              static_cast<DWORD>(wcslen(L"ERROR: cannot format string")), nullptr, nullptr);
+                if (isConsole)
+                {
+                    ::WriteConsoleW(handle, L"ERROR: cannot format string",
+                                    static_cast<DWORD>(wcslen(L"ERROR: cannot format string")), nullptr, nullptr);
+                }
             }
         }
-#endif
     }
-    else
-    {
-        encodingConversionBuffer.clearWithoutInitializing();
-        if (StringConverter::convertEncodingToUTF16(str, encodingConversionBuffer, &encodedPath))
-        {
-            WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), encodedPath.getNullTerminatedNative(),
-                          static_cast<DWORD>(encodedPath.sizeInBytes() / sizeof(wchar_t)), nullptr, nullptr);
-#if SC_CONFIGURATION_DEBUG
-            OutputDebugStringW(encodedPath.getNullTerminatedNative());
-#endif
-        }
-        else
-        {
-            WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), L"ERROR: cannot format string",
-                          static_cast<DWORD>(wcslen(L"ERROR: cannot format string")), nullptr, nullptr);
-        }
-    }
+
 #else
     fwrite(str.bytesWithoutTerminator(), sizeof(char), str.sizeInBytes(), stdout);
 #endif

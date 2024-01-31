@@ -27,7 +27,7 @@ struct SC_COMPILER_EXPORT Console
 {
     /// @brief Constructs a console with a conversion buffer used for string conversions (UTF8 / UTF16)
     /// @param encodingConversionBuffer The buffer used for UTF conversions
-    Console(Vector<char>& encodingConversionBuffer) : encodingConversionBuffer(encodingConversionBuffer) {}
+    Console(Vector<char>& encodingConversionBuffer);
 
     /// @brief Prints a formatted string using SC::StringFormat
     /// @tparam Types Types of `args`
@@ -57,6 +57,11 @@ struct SC_COMPILER_EXPORT Console
 
   private:
     Vector<char>& encodingConversionBuffer;
+#if SC_PLATFORM_WINDOWS
+    void* handle;
+    bool  isConsole  = true;
+    bool  isDebugger = true;
+#endif
 };
 
 //! @}
