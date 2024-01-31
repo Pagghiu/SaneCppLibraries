@@ -47,8 +47,13 @@ struct SC::MaxValue
     constexpr operator ssize_t() const { return SignedMaxValue<ssize_t>(); }
 #endif
 
+#if SC_COMPILER_MSVC
+    constexpr operator float() const { return 3.402823466e+38F; }
+    constexpr operator double() const { return 1.7976931348623158e+308; }
+#else
     constexpr operator float() const { return 3.40282347e+38F; }
     constexpr operator double() const { return 1.7976931348623157e+308; }
+#endif
 };
 
 //! @}
