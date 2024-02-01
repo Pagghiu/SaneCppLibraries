@@ -132,16 +132,18 @@ Makefile.$(CONFIG).touched: Makefile
         builder.append(R"delimiter(
 
 # Flags for both .c and .cpp files
-{0}_CPPFLAGS := $({0}_COMMON_FLAGS) $({0}_CONFIG_FLAGS) $(CPPFLAGS)
+{0}_CPPFLAGS := $({0}_COMMON_FLAGS) $({0}_CONFIG_FLAGS) $({0}_CONFIG_COMPILER_FLAGS) $(CPPFLAGS)
 
 # Flags for .c files
-{0}_CFLAGS := $({0}_CPPFLAGS) $(CFLAGS)
+{0}_CFLAGS := $({0}_CPPFLAGS) $({0}_CONFIG_COMPILER_FLAGS) $(CFLAGS)
 
 )delimiter",
                        makeTarget.view());
 
         builder.append("\n# Flags for .cpp files");
-        builder.append("\n{0}_CXXFLAGS := $({0}_CPPFLAGS) -std=c++14", makeTarget.view());
+        builder.append("\n{0}_CXXFLAGS := $({0}_CPPFLAGS) -std=c++14 -fstrict-aliasing -fvisibility=hidden "
+                       "-fvisibility-inlines-hidden",
+                       makeTarget.view());
         // TODO: Merge these with configuration overrides
         if (not project.compile.hasValue<Compile::enableRTTI>(true))
         {
@@ -155,6 +157,7 @@ Makefile.$(CONFIG).touched: Makefile
         {
             builder.append(" -fno-exceptions");
         }
+
         builder.append(" $(CXXFLAGS)");
 
         builder.append("\n{0}_FRAMEWORKS :=", makeTarget.view());
@@ -172,40 +175,40 @@ Makefile.$(CONFIG).touched: Makefile
 
         builder.append("\n\nifeq ($(CLANG_DETECTED),yes)\n");
         // Clang specific flags
-        builder.append("{0}_COMPILER_SPECIFIC_FLAGS :=", makeTarget.view());
+        builder.append("{0}_COMPILER_LDFLAGS :=", makeTarget.view());
         if (not project.link.hasValue<Link::enableStdCpp>(true))
         {
             builder.append(" -nostdlib++");
         }
-        if (not project.compile.hasValue<Compile::enableASAN>(true))
+        if (project.compile.hasValue<Compile::enableASAN>(true))
         {
             builder.append(" -fsanitize=address,undefined"); // TODO: Split the UBSAN flag
         }
 
         builder.append("\nelse\n");
         // Non Clang specific flags
-        builder.append("{0}_COMPILER_SPECIFIC_FLAGS :=", makeTarget.view());
-        if (not project.compile.hasValue<Compile::enableASAN>(true))
+        builder.append("{0}_COMPILER_LDFLAGS :=", makeTarget.view());
+        if (project.compile.hasValue<Compile::enableASAN>(true))
         {
             builder.append(" -fsanitize=address,undefined"); // TODO: Split the UBSAN flag
         }
         builder.append("\nendif\n");
 
         builder.append("\nifeq ($(OS_TYPE),Darwin)\n");
-        builder.append("     {0}_OS_SPECIFIC_FLAGS := $({0}_FRAMEWORKS)\n", makeTarget.view());
+        builder.append("     {0}_OS_LDFLAGS := $({0}_FRAMEWORKS)\n", makeTarget.view());
         builder.append("else ifeq ($(OS_TYPE),Linux)\n");
         // -rdynamic is needed to resolve Plugin symbols in the executable
-        builder.append("     {0}_OS_SPECIFIC_FLAGS := -rdynamic\n", makeTarget.view());
+        builder.append("     {0}_OS_LDFLAGS := -rdynamic\n", makeTarget.view());
         builder.append("else\n");
-        builder.append("     {0}_OS_SPECIFIC_FLAGS :=\n", makeTarget.view());
+        builder.append("     {0}_OS_LDFLAGS :=\n", makeTarget.view());
         builder.append("endif\n");
 
         // TODO: De-hardcode LDFLAGS
         builder.append("\n{0}_LDFLAGS :=", makeTarget.view());
 
-        builder.append(
-            " $({0}_COMPILER_SPECIFIC_FLAGS) -fvisibility=hidden $({0}_LIBRARIES) $({0}_OS_SPECIFIC_FLAGS) $(LDFLAGS)",
-            makeTarget.view());
+        builder.append(" $({0}_COMPILER_LDFLAGS) $({0}_CONFIG_LDFLAGS) $({0}_CONFIG_COMPILER_LDFLAGS) $({0}_LIBRARIES) "
+                       "$({0}_OS_LDFLAGS) $(LDFLAGS)",
+                       makeTarget.view());
 
         builder.append(R"delimiter(
 {0}_CLEAN:
@@ -329,6 +332,41 @@ $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
             builder.append(" -fsanitize=address,undefined"); // TODO: Split the UBSAN flag
         }
 
+        builder.append("\n{0}_CONFIG_LDFLAGS :=", makeTarget);
+        if (configuration.compile.hasValue<Compile::enableASAN>(true))
+        {
+            builder.append(" -fsanitize=address,undefined"); // TODO: Split the UBSAN flag
+        }
+
+        builder.append("\n\nifeq ($(CLANG_DETECTED),yes)\n");
+        // Clang specific flags
+        builder.append("{0}_CONFIG_COMPILER_FLAGS :=", makeTarget);
+        if (configuration.compile.hasValue<Compile::enableASAN>(true))
+        {
+            // The following prevent a linking error of the type
+            // ...
+            // Undefined symbols for architecture x86_64:
+            //   "vtable for __cxxabiv1::__function_type_info", referenced from:
+            //       typeinfo for void (SC::AlignedStorage<88, 8>&) in Async.o
+            // ...
+            // This happens on macOS (Intel only) with some combination of ASAN/UBSAN if standard library is not linked.
+            // Note:
+            // It's important that these flags come AFTER -fsanitize=address,undefined otherwise they will be overridden
+            builder.append(" -fno-sanitize=enum,return,float-divide-by-zero,function,vptr # Needed on macOS x64");
+        }
+        builder.append("\n{0}_CONFIG_COMPILER_LDFLAGS :=", makeTarget);
+        if (configuration.compile.hasValue<Compile::enableASAN>(true))
+        {
+            // See previous comment
+            builder.append(" -fno-sanitize=enum,return,float-divide-by-zero,function,vptr # Needed on macOS x64");
+        }
+
+        builder.append("\nelse\n");
+        // Non Clang specific flags
+        builder.append("{0}_CONFIG_COMPILER_FLAGS :=", makeTarget);
+        builder.append("\n{0}_CONFIG_COMPILER_LDFLAGS :=", makeTarget);
+
+        builder.append("\nendif\n");
         builder.append("\nendif");
 
         SC_COMPILER_WARNING_POP;
