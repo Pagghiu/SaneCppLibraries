@@ -21,7 +21,7 @@ struct SC::HttpServerTest : public SC::TestCase
             numTries = 0;
             SC_TEST_EXPECT(eventLoop.create());
             HttpServer server;
-            SC_TEST_EXPECT(server.start(eventLoop, 10, "127.0.0.1", 8080));
+            SC_TEST_EXPECT(server.start(eventLoop, 10, "127.0.0.1", 6152));
             server.onClient = [this, &server](HttpServer::ClientChannel& client)
             {
                 auto& res = client.response;
@@ -69,7 +69,7 @@ struct SC::HttpServerTest : public SC::TestCase
                 SC_TEST_EXPECT(client[i].setCustomDebugName(buffer.view()));
                 client[i].callback = [this](HttpClient& result)
                 { SC_TEST_EXPECT(result.getResponse().containsString("This is a title")); };
-                SC_TEST_EXPECT(client[i].get(eventLoop, "http://localhost:8080/index.html"));
+                SC_TEST_EXPECT(client[i].get(eventLoop, "http://localhost:6152/index.html"));
             }
             SC_TEST_EXPECT(eventLoop.run());
             SC_TEST_EXPECT(numTries == wantedNumTries);
