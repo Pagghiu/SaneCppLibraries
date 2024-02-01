@@ -1,3 +1,7 @@
+[![Windows](https://github.com/Pagghiu/SaneCppLibraries/actions/workflows/windows.yml/badge.svg)](https://github.com/Pagghiu/SaneCppLibraries/actions/workflows/windows.yml)
+[![macOS x64](https://github.com/Pagghiu/SaneCppLibraries/actions/workflows/macos_x64.yml/badge.svg)](https://github.com/Pagghiu/SaneCppLibraries/actions/workflows/macos_x64.yml)
+[![Linux](https://github.com/Pagghiu/SaneCppLibraries/actions/workflows/linux.yml/badge.svg)](https://github.com/Pagghiu/SaneCppLibraries/actions/workflows/linux.yml)
+
 # Sane C++
 
 [![YouTube](https://img.shields.io/youtube/channel/subscribers/UCnmN_whfM12LU6VNQWG0NFg)](https://youtube.com/@Pagghiu)

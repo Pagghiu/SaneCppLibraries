@@ -1,0 +1,23 @@
+name: Windows
+
+on:
+  push:
+    branches: [ "main", "development" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: configure
+      shell: cmd
+      run: SCBuild.bat configure
+    - name: build
+      shell: cmd
+      run: SCBuild.bat build
+    - name: test
+      run: ./_Build/Output/Windows-10.0-x64-msvc2022-Debug/SCTest.exe

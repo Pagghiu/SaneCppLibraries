@@ -1,0 +1,26 @@
+name: Linux
+
+on:
+  push:
+    branches: [ "main", "development" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: clang-format
+      run: find . \( -iname \*.h -o -iname \*.cpp -o -iname \*.mm -o -iname \*.m -o -iname \*.inl \) | xargs clang-format-15 --dry-run -Werror
+    - name: configure
+      run: ./SCBuild.sh
+    - name: build
+      run: make -j -C _Build/Projects/Make
+    - name: test
+      run: _Build/Output/Posix-Any-Any-Makefile-Debug/SCTest
