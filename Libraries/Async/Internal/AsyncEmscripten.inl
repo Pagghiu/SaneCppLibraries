@@ -19,29 +19,15 @@ struct SC::AsyncEventLoop::KernelQueue
     int newEvents = 0;
     int events[1] = {0};
 
-    [[nodiscard]] Result pushNewSubmission(AsyncRequest&) { return Result(false); }
-    [[nodiscard]] Result pollAsync(AsyncEventLoop&, PollMode) { return Result(false); }
+    [[nodiscard]] Result syncWithKernel(AsyncEventLoop&, SyncMode) { return Result(false); }
     [[nodiscard]] Result validateEvent(int&, bool&) { return Result(true); }
-    template <typename T>
-    [[nodiscard]] Result setupAsync(T&)
-    {
-        return Result(false);
-    }
-    template <typename T>
-    [[nodiscard]] Result stopAsync(T&)
-    {
-        return Result(false);
-    }
-    template <typename T>
-    [[nodiscard]] Result activateAsync(T&)
-    {
-        return Result(false);
-    }
-    template <typename T>
-    [[nodiscard]] Result completeAsync(T&)
-    {
-        return Result(false);
-    }
+    // clang-format off
+    template <typename T> [[nodiscard]] bool setupAsync(T&)     { return true; }
+    template <typename T> [[nodiscard]] bool teardownAsync(T&)  { return true; }
+    template <typename T> [[nodiscard]] bool activateAsync(T&)  { return true; }
+    template <typename T> [[nodiscard]] bool completeAsync(T&)  { return true; }
+    template <typename T> [[nodiscard]] bool cancelAsync(T&)    { return true; }
+    // clang-format on
 };
 
 SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread() { return Result(true); }

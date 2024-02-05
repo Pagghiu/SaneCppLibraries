@@ -262,10 +262,12 @@ struct SC::AsyncTest : public SC::TestCase
             acceptedCount = 0;
 
             AsyncSocketAccept accept;
+            accept.setDebugName("Accept");
             accept.callback = [this](AsyncSocketAccept::Result& res)
             {
                 SC_TEST_EXPECT(res.moveTo(acceptedClient[acceptedCount]));
                 acceptedCount++;
+                SC_TEST_EXPECT(acceptedCount < 3);
                 res.reactivateRequest(true);
             };
             SC_TEST_EXPECT(accept.start(eventLoop, serverSocket));

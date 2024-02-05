@@ -77,6 +77,30 @@ struct WinWaitHandle : public UniqueHandle<AsyncWinWaitDefinition>
 /// SC::AsyncRequest::stop, then the user callback will not be called.
 /// @note The memory address of all AsyncRequest derived objects must be stable for the entire duration of a started
 /// async request. This means that they can be freed / moved after the user callback is executed.
+///
+/// Some implementation details:
+/// SC::AsyncRequest::state dictates the lifetime of the async request according to a state machine.
+///
+/// Regular Lifetime of an Async request (called just async in the paragraph below):
+///
+/// 1. An async that has been started, will be pushed in the submission queue with state == State::Setup.
+/// 2. Inside stageSubmission a started async will be do the one time setup (with setupAsync)
+/// 3. Inside stageSubmission a Setup or Submitting async will be activated (with activateAsync)
+/// 4. If activateAsync is successful, the async becomes state == State::Active.
+///     - When this happens, the async is either tracked by the kernel or in one of the linked lists like activeWakeUps
+///
+/// 5. The Active async can become completed, when the kernel signals its completion (or readiness...):
+///      - [default] -> Async is complete and it will be teardown and freed (state == State::Free)
+///      - result.reactivateRequest(true) -> Async gets submitted again (state == State::Submitting) (3.)
+///
+/// Cancellation of an async:
+/// An async can be cancelled at any time:
+///
+/// 1. Async not yet submitted in State::Setup --> it just gets removed from the submission queue
+/// 2. Async in submission queue but already setup --> it will receive a teardownAsync
+/// 3. Async in Active state (so after setupAsync and activateAsync) --> will receive cancelAsync and teardownAsync
+///
+/// Any other case is considered an error (trying to cancel an async already being cancelled or being teardown).
 struct SC::AsyncRequest
 {
     AsyncRequest* next = nullptr;
@@ -122,17 +146,19 @@ struct SC::AsyncRequest
     [[nodiscard]] Result validateAsync();
     [[nodiscard]] Result queueSubmission(AsyncEventLoop& eventLoop);
 
-    void            updateTime();
+    static void     updateTime(AsyncEventLoop& loop);
     AsyncEventLoop* eventLoop = nullptr;
 
   private:
     [[nodiscard]] static const char* TypeToString(Type type);
     enum class State : uint8_t
     {
-        Free,       // not in any queue
-        Active,     // when monitored by OS syscall
-        Submitting, // when in submission queue
-        Cancelling  // when in cancellation queue
+        Free,       // not in any queue, this can be started with an async.start(...)
+        Setup,      // when in submission queue waiting to be setup (after an async.start(...))
+        Submitting, // when in submission queue waiting to be activated (after a result.reactivateRequest(true))
+        Active,     // when monitored by OS syscall or in activeWakeUps / activeTimeouts queues
+        Cancelling, // when in cancellation queue waiting for a cancelAsync (on active async)
+        Teardown    // when in cancellation queue waiting for a teardownAsync (on non-active, already setup async)
     };
 
     friend struct AsyncEventLoop;
@@ -676,17 +702,16 @@ struct SC::AsyncEventLoop
     /// Associates a File descriptor created externally with the eventLoop.
     [[nodiscard]] Result associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor);
 
+#if SC_PLATFORM_WINDOWS
     /// Returns handle to the kernel level IO queue object.
     /// Used by external systems calling OS async function themselves (FileSystemWatcher on windows for example)
     [[nodiscard]] Result getLoopFileDescriptor(FileDescriptor::Handle& fileDescriptor) const;
-
+#endif
     /// Get Loop time
     [[nodiscard]] Time::HighResolutionCounter getLoopTime() const { return loopTime; }
 
   private:
     int numberOfActiveHandles = 0;
-    int numberOfTimers        = 0;
-    int numberOfWakeups       = 0;
     int numberOfExternals     = 0;
 
     IntrusiveDoubleLinkedList<AsyncRequest> submissions;
@@ -694,7 +719,9 @@ struct SC::AsyncEventLoop
     IntrusiveDoubleLinkedList<AsyncRequest> activeWakeUps;
     IntrusiveDoubleLinkedList<AsyncRequest> manualCompletions;
 
+#if SC_PLATFORM_LINUX
     IntrusiveDoubleLinkedList<AsyncProcessExit> activeProcessChild;
+#endif
 
     Time::HighResolutionCounter loopTime;
 
@@ -733,7 +760,7 @@ struct SC::AsyncEventLoop
     void updateTime();
     void executeTimers(KernelQueue& queue, const Time::HighResolutionCounter& nextTimer);
 
-    [[nodiscard]] Result stopAsync(AsyncRequest& async);
+    [[nodiscard]] Result cancelAsync(AsyncRequest& async);
 
     // LoopWakeUp
     void executeWakeUps(AsyncResult& result);
@@ -744,20 +771,25 @@ struct SC::AsyncEventLoop
     // Phases
     [[nodiscard]] Result stageSubmission(KernelQueue& queue, AsyncRequest& async);
     [[nodiscard]] Result setupAsync(KernelQueue& queue, AsyncRequest& async);
+    [[nodiscard]] Result teardownAsync(KernelQueue& queue, AsyncRequest& async);
     [[nodiscard]] Result activateAsync(KernelQueue& queue, AsyncRequest& async);
     [[nodiscard]] Result cancelAsync(KernelQueue& queue, AsyncRequest& async);
+    [[nodiscard]] Result completeAsync(KernelQueue& queue, AsyncRequest& async, Result&& returnCode, bool& reactivate);
+
+    [[nodiscard]] Result completeAndEventuallyReactivate(KernelQueue& queue, AsyncRequest& async, Result&& returnCode);
 
     void reportError(KernelQueue& queue, AsyncRequest& async, Result&& returnCode);
-    void completeAsync(KernelQueue& queue, AsyncRequest& async, Result&& returnCode, bool& reactivate);
-    void completeAndEventuallyReactivate(KernelQueue& queue, AsyncRequest& async, Result&& returnCode);
 
-    enum class PollMode
+    enum class SyncMode
     {
         NoWait,
         ForcedForwardProgress
     };
 
-    [[nodiscard]] Result runStep(PollMode pollMode);
+    [[nodiscard]] Result runStep(SyncMode syncMode);
+
+    void runStepExecuteCompletions(KernelQueue& queue);
+    void runStepExecuteManualCompletions(KernelQueue& queue);
 
     friend struct AsyncRequest;
 };
