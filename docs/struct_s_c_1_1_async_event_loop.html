@@ -163,9 +163,6 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a10f7a7f846c5879a2ad6c66e77e1d56a"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a">associateExternallyCreatedFileDescriptor</a> (<a class="el" href="struct_s_c_1_1_file_descriptor.html">FileDescriptor</a> &amp;outDescriptor)</td></tr>
 <tr class="memdesc:a10f7a7f846c5879a2ad6c66e77e1d56a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Associates a File descriptor created externally with the eventLoop.  <a href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a">More...</a><br /></td></tr>
 <tr class="separator:a10f7a7f846c5879a2ad6c66e77e1d56a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a51dfc8d3dbfa0751d4fe6cf4b29f6410"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_event_loop.html#a51dfc8d3dbfa0751d4fe6cf4b29f6410">getLoopFileDescriptor</a> (FileDescriptor::Handle &amp;fileDescriptor) const</td></tr>
-<tr class="memdesc:a51dfc8d3dbfa0751d4fe6cf4b29f6410"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns handle to the kernel level IO queue object.  <a href="struct_s_c_1_1_async_event_loop.html#a51dfc8d3dbfa0751d4fe6cf4b29f6410">More...</a><br /></td></tr>
-<tr class="separator:a51dfc8d3dbfa0751d4fe6cf4b29f6410"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1189d814ee281d7a2e4267bcdf84243d"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_time_1_1_high_resolution_counter.html">Time::HighResolutionCounter</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_event_loop.html#a1189d814ee281d7a2e4267bcdf84243d">getLoopTime</a> () const</td></tr>
 <tr class="memdesc:a1189d814ee281d7a2e4267bcdf84243d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get Loop time.  <a href="struct_s_c_1_1_async_event_loop.html#a1189d814ee281d7a2e4267bcdf84243d">More...</a><br /></td></tr>
 <tr class="separator:a1189d814ee281d7a2e4267bcdf84243d"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -296,27 +293,6 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncRequest</b></t
 
 <p>Helper to creates a TCP socket with <a class="el" href="struct_s_c_1_1_async_request.html" title="Base class for all async requests, holding state and type.">AsyncRequest</a> flags of the given family (IPV4 / IPV6). </p>
 <p >It also automatically registers the socket with the eventLoop (associateExternallyCreatedTCPSocket) </p>
-
-</div>
-</div>
-<a id="a51dfc8d3dbfa0751d4fe6cf4b29f6410" name="a51dfc8d3dbfa0751d4fe6cf4b29f6410"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a51dfc8d3dbfa0751d4fe6cf4b29f6410">&#9670;&nbsp;</a></span>getLoopFileDescriptor()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">Result</a> SC::AsyncEventLoop::getLoopFileDescriptor </td>
-          <td>(</td>
-          <td class="paramtype">FileDescriptor::Handle &amp;&#160;</td>
-          <td class="paramname"><em>fileDescriptor</em></td><td>)</td>
-          <td> const</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Returns handle to the kernel level IO queue object. </p>
-<p >Used by external systems calling OS async function themselves (<a class="el" href="struct_s_c_1_1_file_system_watcher.html" title="Notifies about events (add, remove, rename, modified) on files and directories.">FileSystemWatcher</a> on windows for example) </p>
 
 </div>
 </div>

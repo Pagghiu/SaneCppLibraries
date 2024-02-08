@@ -115,6 +115,7 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_async_request.html','')
 <a href="#pub-methods">Public Member Functions</a> &#124;
 <a href="#pub-attribs">Public Attributes</a> &#124;
 <a href="#pro-methods">Protected Member Functions</a> &#124;
+<a href="#pro-static-methods">Static Protected Member Functions</a> &#124;
 <a href="#pro-attribs">Protected Attributes</a> &#124;
 <a href="#friends">Friends</a> &#124;
 <a href="struct_s_c_1_1_async_request-members.html">List of all members</a>  </div>
@@ -210,9 +211,12 @@ Protected Member Functions</h2></td></tr>
 <tr class="memitem:a650360163409a1c3ef0941900d2d0fe9"><td class="memItemLeft" align="right" valign="top"><a id="a650360163409a1c3ef0941900d2d0fe9" name="a650360163409a1c3ef0941900d2d0fe9"></a>
 <a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>queueSubmission</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;eventLoop)</td></tr>
 <tr class="separator:a650360163409a1c3ef0941900d2d0fe9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4147a203dabab0f5b561bcdd26b60734"><td class="memItemLeft" align="right" valign="top"><a id="a4147a203dabab0f5b561bcdd26b60734" name="a4147a203dabab0f5b561bcdd26b60734"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b> ()</td></tr>
-<tr class="separator:a4147a203dabab0f5b561bcdd26b60734"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pro-static-methods" name="pro-static-methods"></a>
+Static Protected Member Functions</h2></td></tr>
+<tr class="memitem:ad54c2edb6d65a44fd03885e2a0d1f402"><td class="memItemLeft" align="right" valign="top"><a id="ad54c2edb6d65a44fd03885e2a0d1f402" name="ad54c2edb6d65a44fd03885e2a0d1f402"></a>
+static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;loop)</td></tr>
+<tr class="separator:ad54c2edb6d65a44fd03885e2a0d1f402"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pro-attribs" name="pro-attribs"></a>
 Protected Attributes</h2></td></tr>
@@ -230,7 +234,30 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncEventLoop</b><
 <div class="textblock"><p >Base class for all async requests, holding state and type. </p>
 <p >An async operation is struct derived from <a class="el" href="struct_s_c_1_1_async_request.html" title="Base class for all async requests, holding state and type.">AsyncRequest</a> asking for some I/O to be done made to the OS. <br  />
 Every async operation has an associated callback that is invoked when the request is fulfilled. If the <code>start</code> function returns a valid (non error) Return code, then the user callback will be called both in case of success and in case of any error. <br  />
-If the function returns an invalid Return code or if the operation is manually cancelled with <a class="el" href="struct_s_c_1_1_async_request.html#a876920e9ae9215108ace2082f387a553" title="Stops the async operation.">SC::AsyncRequest::stop</a>, then the user callback will not be called. </p><dl class="section note"><dt>Note</dt><dd>The memory address of all <a class="el" href="struct_s_c_1_1_async_request.html" title="Base class for all async requests, holding state and type.">AsyncRequest</a> derived objects must be stable for the entire duration of a started async request. This means that they can be freed / moved after the user callback is executed. </dd></dl>
+If the function returns an invalid Return code or if the operation is manually cancelled with <a class="el" href="struct_s_c_1_1_async_request.html#a876920e9ae9215108ace2082f387a553" title="Stops the async operation.">SC::AsyncRequest::stop</a>, then the user callback will not be called. </p><dl class="section note"><dt>Note</dt><dd>The memory address of all <a class="el" href="struct_s_c_1_1_async_request.html" title="Base class for all async requests, holding state and type.">AsyncRequest</a> derived objects must be stable for the entire duration of a started async request. This means that they can be freed / moved after the user callback is executed.</dd></dl>
+<p>Some implementation details: SC::AsyncRequest::state dictates the lifetime of the async request according to a state machine.</p>
+<p >Regular Lifetime of an Async request (called just async in the paragraph below):</p>
+<ol type="1">
+<li>An async that has been started, will be pushed in the submission queue with state == State::Setup.</li>
+<li>Inside stageSubmission a started async will be do the one time setup (with setupAsync)</li>
+<li>Inside stageSubmission a Setup or Submitting async will be activated (with activateAsync)</li>
+<li>If activateAsync is successful, the async becomes state == State::Active.<ul>
+<li>When this happens, the async is either tracked by the kernel or in one of the linked lists like activeWakeUps</li>
+</ul>
+</li>
+<li>The Active async can become completed, when the kernel signals its completion (or readiness...):<ul>
+<li>[default] -&gt; Async is complete and it will be teardown and freed (state == State::Free)</li>
+<li>result.reactivateRequest(true) -&gt; Async gets submitted again (state == State::Submitting) (3.)</li>
+</ul>
+</li>
+</ol>
+<p >Cancellation of an async: An async can be cancelled at any time:</p>
+<ol type="1">
+<li>Async not yet submitted in State::Setup --&gt; it just gets removed from the submission queue</li>
+<li>Async in submission queue but already setup --&gt; it will receive a teardownAsync</li>
+<li>Async in Active state (so after setupAsync and activateAsync) --&gt; will receive cancelAsync and teardownAsync</li>
+</ol>
+<p >Any other case is considered an error (trying to cancel an async already being cancelled or being teardown). </p>
 </div><h2 class="groupheader">Member Enumeration Documentation</h2>
 <a id="af5065f89c50d598913f77f9e6a53c524" name="af5065f89c50d598913f77f9e6a53c524"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#af5065f89c50d598913f77f9e6a53c524">&#9670;&nbsp;</a></span>Type</h2>

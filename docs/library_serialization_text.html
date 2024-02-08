@@ -188,8 +188,14 @@ Let's consider the following structure described by <a class="el" href="library_
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(SerializationJson::loadVersioned(test, scrambledJson));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(test == Test());</div>
 </div><!-- fragment --><p >This is a special loader to deserialize the class from the exact same JSON that was output by the serializer itself. Whitespace changes are fine, but changing the order in which two fields exists or removing one will make deserialization fail. If these limitations are fine for the usage (for example the generated json files are not meant to be manually edited by users) than maybe it could be worth using it, as this code path is a lot simpler (*) than <a class="el" href="struct_s_c_1_1_serialization_json.html#a1f3ef0a95b0163d6455a982e8708f181" title="Parses a JSON buffer and writes C++ objects supporting reordered or missing fields.">SC::SerializationJson::loadVersioned</a>. </p><div class="fragment"><div class="line">    <span class="keyword">constexpr</span> StringView testJSON = R<span class="stringliteral">&quot;({&quot;x&quot;:2,&quot;y&quot;:1.50,&quot;xy&quot;:[1,3],&quot;myTest&quot;:&quot;asdf&quot;,&quot;myVector&quot;:[&quot;Str1&quot;,&quot;Str2&quot;]})&quot;_a8;</span></div>
-<div class="line"><span class="stringliteral">    Test                 test;</span></div>
-<div class="line"><span class="stringliteral">    memset(&amp;test, 0, </span><span class="keyword">sizeof</span>(test));</div>
+<div class="line"><span class="stringliteral"></span> </div>
+<div class="line"><span class="stringliteral">    Test test;</span></div>
+<div class="line"><span class="stringliteral">    test.x        = 1;</span></div>
+<div class="line"><span class="stringliteral">    test.y        = 3.22f;</span></div>
+<div class="line"><span class="stringliteral">    test.xy[0]    = 4;</span></div>
+<div class="line"><span class="stringliteral">    test.xy[1]    = 4;</span></div>
+<div class="line"><span class="stringliteral">    test.myTest   = </span><span class="stringliteral">&quot;KFDOK&quot;</span>;</div>
+<div class="line">    test.myVector = {<span class="stringliteral">&quot;LPDFSOK&quot;</span>, <span class="stringliteral">&quot;DSAFKO&quot;</span>};</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(SerializationJson::loadExact(test, testJSON));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(test == Test());</div>
 </div><!-- fragment --> <dl class="section note"><dt>Note</dt><dd>(*) simpler code probably means faster code, even if it has not been properly benchmarked yet so the hypothetical performance gain is yet to be defined.</dd></dl>

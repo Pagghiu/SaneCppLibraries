@@ -227,10 +227,6 @@ SocketNetworking::resolveDNS</h2>
 <p>Example: </p><div class="fragment"><div class="line">    SmallString&lt;256&gt; ipAddress;</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(SocketNetworking::resolveDNS(<span class="stringliteral">&quot;localhost&quot;</span>, ipAddress));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(ipAddress.view() == <span class="stringliteral">&quot;127.0.0.1&quot;</span>);</div>
-<div class="line">    <span class="keywordflow">if</span> (SocketNetworking::resolveDNS(<span class="stringliteral">&quot;apple.com&quot;</span>, ipAddress)) <span class="comment">// needs internet connection</span></div>
-<div class="line">    {</div>
-<div class="line">        <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(ipAddress.view() == <span class="stringliteral">&quot;17.253.144.10&quot;</span>);</div>
-<div class="line">    }</div>
 </div><!-- fragment --><h1><a class="anchor" id="autotoc_md192"></a>
 Roadmap</h1>
 <p >🟩 Usable</p><ul>

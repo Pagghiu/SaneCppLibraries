@@ -1,6 +1,5 @@
 var NAVTREEINDEX4 =
 {
-"struct_s_c_1_1_plugin_dynamic_library.html#a1d14d7bf25b60e25883407829f667426":[9,13,5,1],
 "struct_s_c_1_1_plugin_dynamic_library.html#a538f2ae50e3679fb07d4896a5555db70":[9,13,5,0],
 "struct_s_c_1_1_plugin_file.html":[9,13,0],
 "struct_s_c_1_1_plugin_file.html#a4cff1469131b5781bf05b52df17c54ed":[9,13,0,0],
@@ -56,20 +55,20 @@ var NAVTREEINDEX4 =
 "struct_s_c_1_1_reflection_1_1_array_with_size.html#a489b43fb6b06980d64bee00cb122a696":[9,15,1,2],
 "struct_s_c_1_1_reflection_1_1_array_with_size.html#ab051060390511f26d69e18601757da76":[9,15,1,0],
 "struct_s_c_1_1_reflection_1_1_array_with_size.html#ac77be154b7c8bfcce3ece8cd670c598f":[9,15,1,1],
-"struct_s_c_1_1_reflection_1_1_extended_struct_type_info.html":[11,0,0,2,1],
 "struct_s_c_1_1_reflection_1_1_extended_struct_type_info.html":[10,0,0,2,1],
-"struct_s_c_1_1_reflection_1_1_extended_type_info.html":[10,0,0,2,2],
+"struct_s_c_1_1_reflection_1_1_extended_struct_type_info.html":[11,0,0,2,1],
 "struct_s_c_1_1_reflection_1_1_extended_type_info.html":[11,0,0,2,2],
+"struct_s_c_1_1_reflection_1_1_extended_type_info.html":[10,0,0,2,2],
 "struct_s_c_1_1_reflection_1_1_flat_schema_builder.html":[9,15,8],
 "struct_s_c_1_1_reflection_1_1_flat_schema_builder_1_1_empty_v_tables.html":[9,15,8,0],
-"struct_s_c_1_1_reflection_1_1_is_primitive.html":[10,0,0,2,4],
 "struct_s_c_1_1_reflection_1_1_is_primitive.html":[11,0,0,2,4],
+"struct_s_c_1_1_reflection_1_1_is_primitive.html":[10,0,0,2,4],
 "struct_s_c_1_1_reflection_1_1_reflect.html":[10,0,0,2,5],
 "struct_s_c_1_1_reflection_1_1_reflect.html":[11,0,0,2,5],
 "struct_s_c_1_1_reflection_1_1_reflect_primitive.html":[11,0,0,2,6],
 "struct_s_c_1_1_reflection_1_1_reflect_primitive.html":[10,0,0,2,6],
-"struct_s_c_1_1_reflection_1_1_reflect_struct.html":[10,0,0,2,7],
 "struct_s_c_1_1_reflection_1_1_reflect_struct.html":[11,0,0,2,7],
+"struct_s_c_1_1_reflection_1_1_reflect_struct.html":[10,0,0,2,7],
 "struct_s_c_1_1_reflection_1_1_schema_builder.html":[9,15,7],
 "struct_s_c_1_1_reflection_1_1_schema_compiler.html":[9,15,5],
 "struct_s_c_1_1_reflection_1_1_schema_type.html":[9,15,6],
@@ -249,5 +248,6 @@ var NAVTREEINDEX4 =
 "struct_s_c_1_1_string_iterator.html#a4ff1c918a08ee8e8c9fb1d1f2b80b808":[9,20,6,10],
 "struct_s_c_1_1_string_iterator.html#a642e968f2ab5cfef10c8d7fabc794ec9":[9,20,6,0],
 "struct_s_c_1_1_string_iterator.html#a7ca45b1e696f8280aa3d04362d933d75":[9,20,6,29],
-"struct_s_c_1_1_string_iterator.html#a7ec4a5f33ec7cbf55bc4d26843634625":[9,20,6,28]
+"struct_s_c_1_1_string_iterator.html#a7ec4a5f33ec7cbf55bc4d26843634625":[9,20,6,28],
+"struct_s_c_1_1_string_iterator.html#a83e2eca80b8002e67b3e6690b469259d":[9,20,6,22]
 };

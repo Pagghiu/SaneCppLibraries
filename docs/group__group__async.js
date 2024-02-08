@@ -88,7 +88,6 @@ var group__group__async =
       [ "close", "struct_s_c_1_1_async_event_loop.html#adf307341059dd5332183b092281c8129", null ],
       [ "create", "struct_s_c_1_1_async_event_loop.html#a665bbeeb6e4cf1343f8824d937d70c70", null ],
       [ "createAsyncTCPSocket", "struct_s_c_1_1_async_event_loop.html#add7fd25e710032ebadfb9c40a479f6a3", null ],
-      [ "getLoopFileDescriptor", "struct_s_c_1_1_async_event_loop.html#a51dfc8d3dbfa0751d4fe6cf4b29f6410", null ],
       [ "getLoopTime", "struct_s_c_1_1_async_event_loop.html#a1189d814ee281d7a2e4267bcdf84243d", null ],
       [ "run", "struct_s_c_1_1_async_event_loop.html#af77cd7ac7a1a577204e43d14debc45c5", null ],
       [ "runNoWait", "struct_s_c_1_1_async_event_loop.html#a1bc6365abc9c05fdbeec9c7f4519c319", null ],

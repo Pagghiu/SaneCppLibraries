@@ -181,6 +181,29 @@ Description</h1>
 <p >An async operation is struct derived from AsyncRequest asking for some I/O to be done made to the OS. <br  />
 Every async operation has an associated callback that is invoked when the request is fulfilled. If the <code>start</code> function returns a valid (non error) Return code, then the user callback will be called both in case of success and in case of any error. <br  />
 If the function returns an invalid Return code or if the operation is manually cancelled with <a class="el" href="struct_s_c_1_1_async_request.html#a876920e9ae9215108ace2082f387a553" title="Stops the async operation.">SC::AsyncRequest::stop</a>, then the user callback will not be called. </p><dl class="section note"><dt>Note</dt><dd>The memory address of all AsyncRequest derived objects must be stable for the entire duration of a started async request. This means that they can be freed / moved after the user callback is executed.</dd></dl>
+<p>Some implementation details: SC::AsyncRequest::state dictates the lifetime of the async request according to a state machine.</p>
+<p >Regular Lifetime of an Async request (called just async in the paragraph below):</p>
+<ol type="1">
+<li>An async that has been started, will be pushed in the submission queue with state == State::Setup.</li>
+<li>Inside stageSubmission a started async will be do the one time setup (with setupAsync)</li>
+<li>Inside stageSubmission a Setup or Submitting async will be activated (with activateAsync)</li>
+<li>If activateAsync is successful, the async becomes state == State::Active.<ul>
+<li>When this happens, the async is either tracked by the kernel or in one of the linked lists like activeWakeUps</li>
+</ul>
+</li>
+<li>The Active async can become completed, when the kernel signals its completion (or readiness...):<ul>
+<li>[default] -&gt; Async is complete and it will be teardown and freed (state == State::Free)</li>
+<li>result.reactivateRequest(true) -&gt; Async gets submitted again (state == State::Submitting) (3.)</li>
+</ul>
+</li>
+</ol>
+<p >Cancellation of an async: An async can be cancelled at any time:</p>
+<ol type="1">
+<li>Async not yet submitted in State::Setup --&gt; it just gets removed from the submission queue</li>
+<li>Async in submission queue but already setup --&gt; it will receive a teardownAsync</li>
+<li>Async in Active state (so after setupAsync and activateAsync) --&gt; will receive cancelAsync and teardownAsync</li>
+</ol>
+<p >Any other case is considered an error (trying to cancel an async already being cancelled or being teardown).</p>
 <h2><a class="anchor" id="autotoc_md57"></a>
 AsyncEventLoop</h2>
 <p >Asynchronous I/O (files, sockets, timers, processes, fs events, threads wake-up) (see <a class="el" href="library_async.html">Async</a>) AsyncEventLoop pushes all AsyncRequest derived classes to I/O queues in the OS. Basic lifetime for an event loop is: </p><div class="fragment"><div class="line">AsyncEventLoop eventLoop;</div>
