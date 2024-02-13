@@ -11,8 +11,9 @@ var searchData=
   ['body_8',['Body',['../struct_s_c_1_1_http_parser.html#a3bc94745ed7fc4195ed6debbb12c7ee1aac101b32dda4448cf13a93fe283dddd8',1,'SC::HttpParser']]],
   ['bubblesort_9',['bubbleSort',['../group__group__algorithms.html#ga456ae4fd2fcc2b0eb628d99c47c09a67',1,'SC::Algorithms']]],
   ['build_10',['Build',['../group__group__build.html',1,'(Global Namespace)'],['../library_build.html',1,'libraries']]],
-  ['building_11',['Building',['../md__building.html',1,'']]],
-  ['bytesdistancefrom_12',['bytesDistanceFrom',['../struct_s_c_1_1_string_iterator.html#a02ae8ef1276bb06e27eb6b1587174f91',1,'SC::StringIterator']]],
-  ['bytesincludingterminator_13',['bytesIncludingTerminator',['../struct_s_c_1_1_string.html#ad149ac5f47fe0a8673a687e1e773002d',1,'SC::String::bytesIncludingTerminator()'],['../struct_s_c_1_1_string_view.html#ad30947f43e7e09202e819658a41a73ea',1,'SC::StringView::bytesIncludingTerminator() const']]],
-  ['byteswithoutterminator_14',['bytesWithoutTerminator',['../struct_s_c_1_1_string_view.html#a269818ad42e7f5ad0abd618ceb7fe6b1',1,'SC::StringView']]]
+  ['building_20_28contributor_29_11',['Building (Contributor)',['../page_building_contributor.html',1,'']]],
+  ['building_20_28user_29_12',['Building (User)',['../page_building_user.html',1,'']]],
+  ['bytesdistancefrom_13',['bytesDistanceFrom',['../struct_s_c_1_1_string_iterator.html#a02ae8ef1276bb06e27eb6b1587174f91',1,'SC::StringIterator']]],
+  ['bytesincludingterminator_14',['bytesIncludingTerminator',['../struct_s_c_1_1_string.html#ad149ac5f47fe0a8673a687e1e773002d',1,'SC::String::bytesIncludingTerminator()'],['../struct_s_c_1_1_string_view.html#ad30947f43e7e09202e819658a41a73ea',1,'SC::StringView::bytesIncludingTerminator() const']]],
+  ['byteswithoutterminator_15',['bytesWithoutTerminator',['../struct_s_c_1_1_string_view.html#a269818ad42e7f5ad0abd618ceb7fe6b1',1,'SC::StringView']]]
 ];

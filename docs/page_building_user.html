@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.9.2"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Sane C++: Building</title>
+<title>Sane C++ Libraries: Building (User)</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -52,7 +52,7 @@
  <tr id="projectrow">
   <td id="projectlogo"><img alt="Logo" src="SC.svg" height="50px"/></td>
   <td id="projectalign">
-   <div id="projectname">Sane C++<span id="projectnumber">&#160;v0.1.0</span>
+   <div id="projectname">Sane C++ Libraries
    </div>
    <div id="projectbrief">C++ Platform Abstraction Libraries</div>
   </td>
@@ -91,7 +91,7 @@ $(function() {
 </div>
 <script type="text/javascript">
 /* @license magnet:?xt=urn:btih:d3d9a9a6595521f9666a5e94cc830dab83b65699&amp;dn=expat.txt MIT */
-$(document).ready(function(){initNavTree('md__building.html',''); initResizable(); });
+$(document).ready(function(){initNavTree('page_building_user.html',''); initResizable(); });
 /* @license-end */
 </script>
 <div id="doc-content">
@@ -110,52 +110,46 @@ $(document).ready(function(){initNavTree('md__building.html',''); initResizable(
 </div>
 
 <div><div class="header">
-  <div class="headertitle"><div class="title">Building </div></div>
+  <div class="headertitle"><div class="title">Building (User) </div></div>
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><ul><li class="level2"><a href="#autotoc_md1">Add to your project</a><ul><li class="level3"><a href="#autotoc_md2">Windows</a></li>
-<li class="level3"><a href="#autotoc_md3">macOS</a></li>
-<li class="level3"><a href="#autotoc_md4">Linux</a></li>
+<ul><ul><ul><li class="level3"><a href="#autotoc_md11">Principles</a></li>
+<li class="level3"><a href="#autotoc_md12">Use in your project</a><ul><li class="level4"><a href="#autotoc_md13">macOS</a></li>
+<li class="level4"><a href="#autotoc_md14">Linux</a></li>
+<li class="level4"><a href="#autotoc_md15">Windows</a></li>
 </ul>
 </li>
-<li class="level2"><a href="#autotoc_md5">Preprocessor Options</a><ul><li class="level3"><a href="#autotoc_md6">SC_COMPILER_ENABLE_STD_CPP=1</a></li>
 </ul>
-</li>
-<li class="level2"><a href="#autotoc_md7">Generate test projects</a></li>
-<li class="level2"><a href="#autotoc_md8">Build the tests</a><ul><li class="level3"><a href="#autotoc_md9">Visual Studio 2022</a></li>
-<li class="level3"><a href="#autotoc_md10">XCode</a></li>
-<li class="level3"><a href="#autotoc_md11">VScode on macOS</a></li>
-<li class="level3"><a href="#autotoc_md12">VSCode on Linux</a></li>
-<li class="level3"><a href="#autotoc_md13">VSCode on Windows</a></li>
-</ul>
-</li>
-<li class="level2"><a href="#autotoc_md14">Debug the tests</a><ul><li class="level3"><a href="#autotoc_md15">Visual Studio or XCode</a></li>
-<li class="level3"><a href="#autotoc_md16">VSCode on macOS or Linux</a></li>
-<li class="level3"><a href="#autotoc_md17">VSCode on Windows</a></li>
-</ul>
-</li>
 </ul>
 </ul>
 </div>
-<div class="textblock"><h2><a class="anchor" id="autotoc_md1"></a>
-Add to your project</h2>
+<div class="textblock"><p >This is the guide to follow if you just want to use the libraries in your project, without running the test suite. <br  />
+ If you want to contribute or run the test suite, check the <a class="el" href="page_building_contributor.html">Building (Contributor)</a> page.</p>
+<h3><a class="anchor" id="autotoc_md11"></a>
+Principles</h3>
 <ul>
-<li>The library is only delivered in source form, and not as a binary.</li>
-<li>To add it in your existing program you will have to add a single file named <code>SC.cpp</code></li>
+<li>Libraries always meant to be compiled together with your existing project</li>
+<li>All libraries do not require any build system (you're free to use your favorite!)</li>
+<li>For the above reasons you don't really <em>build</em> the libraries</li>
+<li>You <em>add</em> or <em>use</em> them to your project just as another source file</li>
+</ul>
+<h3><a class="anchor" id="autotoc_md12"></a>
+Use in your project</h3>
+<ul>
+<li>Add a single file named <code>SC.cpp</code></li>
 <li>Headers in <code>Libraries/**SomeLibrary**/*.h</code> are public. <br  />
 </li>
 <li>Headers in <code>Libraries/**SomeLibrary**/[Internal | Tests]</code> are <b>NOT</b> public.</li>
-<li>You can customize the build changing <a href="#autotoc_md5">Preprocessor Options</a></li>
 </ul>
-<h3><a class="anchor" id="autotoc_md2"></a>
-Windows</h3>
-<ul>
-<li>Add <code>SC.cpp</code> (located at <code>Bindings/cpp</code>) to your build</li>
-<li>Include any public header located at <code>Libraries/**SomeLibrary**/SomeHeader.h</code></li>
+<dl class="section note"><dt>Note</dt><dd>Libraries assume you're not using the Standard C++ Library to ensure peak C++ sanity in your project. <br  />
+ If you really need you can:<ul>
+<li><code>#define</code> <code>SC_COMPILER_ENABLE_STD_CPP=1</code> if you really need Standard C++ Library</li>
+<li>But remember you can always <a class="el" href="page_faq.html">Disable the standard C++ library</a> with a few flags</li>
 </ul>
-<h3><a class="anchor" id="autotoc_md3"></a>
-macOS</h3>
+</dd></dl>
+<h4><a class="anchor" id="autotoc_md13"></a>
+macOS</h4>
 <ul>
 <li>Add <code>SC.cpp</code> (located at <code>Bindings/cpp</code>) to your build</li>
 <li>Include any public header located at <code>Libraries/**SomeLibrary**/SomeHeader.h</code></li>
@@ -165,8 +159,8 @@ macOS</h3>
 </ul>
 </li>
 </ul>
-<h3><a class="anchor" id="autotoc_md4"></a>
-Linux</h3>
+<h4><a class="anchor" id="autotoc_md14"></a>
+Linux</h4>
 <ul>
 <li>Add <code>SC.cpp</code> (located at <code>Bindings/cpp</code>) to your build</li>
 <li>Include any public header located at <code>Libraries/**SomeLibrary**/SomeHeader.h</code></li>
@@ -176,102 +170,19 @@ Linux</h3>
 </ul>
 </li>
 </ul>
+<h4><a class="anchor" id="autotoc_md15"></a>
+Windows</h4>
+<ul>
+<li>Add <code>SC.cpp</code> (located at <code>Bindings/cpp</code>) to your build</li>
+<li>Include any public header located at <code>Libraries/**SomeLibrary**/SomeHeader.h</code></li>
+</ul>
 <dl class="section note"><dt>Note</dt><dd>on Windows the following libraries are already implicitly linked through <code>#pragma comment(lib, ...)</code><ul>
 <li><code>Ws2_32.lib</code></li>
 <li><code>ntdll.lib</code></li>
 <li><code>Rstrtmgr.lib</code></li>
-<li><code>shlwapi.lib</code></li>
+<li><code>shlwapi.lib</code> </li>
 </ul>
 </dd></dl>
-<h2><a class="anchor" id="autotoc_md5"></a>
-Preprocessor Options</h2>
-<h3><a class="anchor" id="autotoc_md6"></a>
-SC_COMPILER_ENABLE_STD_CPP=1</h3>
-<ul>
-<li>Allows using the Standard C++ Library. <br  />
-</li>
-<li>You can forcefully <a class="el" href="page_faq.html">Disable the standard C++ library</a> in your project if you like.</li>
-</ul>
-<h2><a class="anchor" id="autotoc_md7"></a>
-Generate test projects</h2>
-<ul>
-<li>Generate test project<ul>
-<li><b>Linux</b>: <code>SCBuild.sh</code></li>
-<li><b>Windows</b>: <code>SCBuild.bat</code></li>
-<li><b>macOS</b>: <code>SCBuild.command</code></li>
-</ul>
-</li>
-<li>Open generated projects (in <code>_Build/Projects</code>).</li>
-</ul>
-<p >Projects are generated using the self-hosted <a class="el" href="library_build.html">Build</a> system that allows describing projects using C++. <br  />
-</p><ul>
-<li>Two <code>.cpp</code> files are compiled with a single <code>clang</code> / <code>g++</code> / <code>cl.exe</code> invocation:<ul>
-<li><code>SC.cpp</code> unity build file encompassing the entire library</li>
-<li><code>SCBuild.cpp</code> file defining the build</li>
-</ul>
-</li>
-<li>The resulting executable is then run to generate projects.</li>
-</ul>
-<h2><a class="anchor" id="autotoc_md8"></a>
-Build the tests</h2>
-<h3><a class="anchor" id="autotoc_md9"></a>
-Visual Studio 2022</h3>
-<ul>
-<li>Open <code>_Build/Projects/VisualStudio2022/SCTest.sln</code></li>
-<li>Build the default configuration target (or another one you prefer)</li>
-</ul>
-<h3><a class="anchor" id="autotoc_md10"></a>
-XCode</h3>
-<ul>
-<li>Open <code>_Build/Projects/XCode/SCTest.xcodeproj/project.xcworkspace</code></li>
-<li>Build the default configuration target (or another one you prefer)</li>
-</ul>
-<h3><a class="anchor" id="autotoc_md11"></a>
-VScode on macOS</h3>
-<p >Under VSCode select <code>Tasks: Run Task</code> and choose an appropriate targets like:</p><ul>
-<li><code>Build SCTest Debug</code> [1]</li>
-<li><code>Build SCTest Release</code> [1]</li>
-<li><code>Build SCTest XCode Debug</code> [2]</li>
-<li><code>Build SCTest XCode Release</code> [2]</li>
-</ul>
-<p >[1] Needs only <code>make</code> and <code>c++</code> command (can be switched to be <code>clang</code> or <code>gcc</code>) <br  />
- [2] Needs XCode installed</p>
-<h3><a class="anchor" id="autotoc_md12"></a>
-VSCode on Linux</h3>
-<p >Under VSCode select <code>Tasks: Run Task</code> and choose an appropriate targets like:</p><ul>
-<li><code>Build SCTest Debug</code> [1]</li>
-<li><code>Build SCTest Release</code> [1]</li>
-</ul>
-<p >[1] Needs only <code>make</code> and <code>c++</code></p>
-<h3><a class="anchor" id="autotoc_md13"></a>
-VSCode on Windows</h3>
-<p >Under VSCode select <code>Tasks: Run Task</code> and choose an appropriate targets like:</p><ul>
-<li><code>Build SCTest Debug</code> [1]</li>
-<li><code>Build SCTest Debug ARM64</code> [1]</li>
-</ul>
-<p >[1] Needs <code>Visual Studio 2022</code> installed</p>
-<h2><a class="anchor" id="autotoc_md14"></a>
-Debug the tests</h2>
-<h3><a class="anchor" id="autotoc_md15"></a>
-Visual Studio or XCode</h3>
-<p >Running the default target should work out of the box, as paths are already generated accordingly.</p>
-<h3><a class="anchor" id="autotoc_md16"></a>
-VSCode on macOS or Linux</h3>
-<p >Select one of the appropriate <code>Run and Debug</code> configuration like:</p>
-<ul>
-<li><code>SCTest [posix] (gdb)</code> [1]</li>
-<li><code>SCTest [posix] (lldb)</code> [2]</li>
-</ul>
-<p >[1] Uses <code>gdb</code> debugger. Implicitly invokes <code>Build SCTest Debug</code> to build the executable. <br  />
- [2] Uses <code>lldb</code> debugger. Implicitly invokes <code>Build SCTest Debug</code> to build the executable. You need <code>CodeLLDB</code> or similar extension installed in VSCode.</p>
-<h3><a class="anchor" id="autotoc_md17"></a>
-VSCode on Windows</h3>
-<p >Select one of the appropriate <code>Run and Debug</code> configuration like:</p>
-<ul>
-<li><code>SCTest x64 [win] (vsdbg)</code> [1]</li>
-<li><code>SCTest ARM64 [win] (vsdbg)</code> [1]</li>
-</ul>
-<p >[1] Needs <code>Visual Studio 2022</code> installed </p>
 </div></div><!-- contents -->
 </div><!-- PageDoc -->
 </div><!-- doc-content -->

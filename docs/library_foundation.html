@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.9.2"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Sane C++: Foundation</title>
+<title>Sane C++ Libraries: Foundation</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -52,7 +52,7 @@
  <tr id="projectrow">
   <td id="projectlogo"><img alt="Logo" src="SC.svg" height="50px"/></td>
   <td id="projectalign">
-   <div id="projectname">Sane C++<span id="projectnumber">&#160;v0.1.0</span>
+   <div id="projectname">Sane C++ Libraries
    </div>
    <div id="projectbrief">C++ Platform Abstraction Libraries</div>
   </td>
@@ -114,30 +114,30 @@ $(document).ready(function(){initNavTree('library_foundation.html',''); initResi
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md124">Features</a><ul><li class="level2"><a href="#autotoc_md125">Classes</a></li>
-<li class="level2"><a href="#autotoc_md126">Macros</a></li>
-<li class="level2"><a href="#autotoc_md127">Type Traits</a></li>
-<li class="level2"><a href="#autotoc_md128">Utilities</a></li>
+<ul><li class="level1"><a href="#autotoc_md121">Features</a><ul><li class="level2"><a href="#autotoc_md122">Classes</a></li>
+<li class="level2"><a href="#autotoc_md123">Macros</a></li>
+<li class="level2"><a href="#autotoc_md124">Type Traits</a></li>
+<li class="level2"><a href="#autotoc_md125">Utilities</a></li>
 </ul>
 </li>
-<li class="level1"><a href="#autotoc_md129">Status</a></li>
-<li class="level1"><a href="#autotoc_md130">Description</a><ul><li class="level2"><a href="#autotoc_md131">Function</a></li>
-<li class="level2"><a href="#autotoc_md132">Deferred</a></li>
-<li class="level2"><a href="#autotoc_md133">TaggedUnion</a></li>
-<li class="level2"><a href="#autotoc_md134">OpaqueObject</a></li>
-<li class="level2"><a href="#autotoc_md135">UniqueHandle</a></li>
+<li class="level1"><a href="#autotoc_md126">Status</a></li>
+<li class="level1"><a href="#autotoc_md127">Description</a><ul><li class="level2"><a href="#autotoc_md128">Function</a></li>
+<li class="level2"><a href="#autotoc_md129">Deferred</a></li>
+<li class="level2"><a href="#autotoc_md130">TaggedUnion</a></li>
+<li class="level2"><a href="#autotoc_md131">OpaqueObject</a></li>
+<li class="level2"><a href="#autotoc_md132">UniqueHandle</a></li>
 </ul>
 </li>
-<li class="level1"><a href="#autotoc_md136">Roadmap</a></li>
+<li class="level1"><a href="#autotoc_md133">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟩 Primitive types, asserts, limits, Function, Span, Result, Tagged Union</p>
 <p >Foundation library provides many fundamental type definitions and types widely used by other libraries. <br  />
  As this is included and needed by almost every other library, it tries to keep bloat to the bare minimum. <br  />
  Detailed documentation is in the <a class="el" href="group__group__foundation.html">Foundation</a> topic.</p>
-<h1><a class="anchor" id="autotoc_md124"></a>
+<h1><a class="anchor" id="autotoc_md121"></a>
 Features</h1>
-<h2><a class="anchor" id="autotoc_md125"></a>
+<h2><a class="anchor" id="autotoc_md122"></a>
 Classes</h2>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -157,17 +157,17 @@ Classes</h2>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_unique_handle.html" title="Move only handle that has a special tag value flagging its invalid state.">SC::UniqueHandle</a>   </td><td class="markdownTableBodyLeft">Move only handle that has a special tag value flagging its invalid state.   </td></tr>
 </table>
-<h2><a class="anchor" id="autotoc_md126"></a>
+<h2><a class="anchor" id="autotoc_md123"></a>
 Macros</h2>
 <ul>
 <li><a class="el" href="group__group__foundation__compiler__macros.html">Compiler Macros</a>: Compiler Macros Preprocessor macros to detect compiler and platform features.</li>
 </ul>
-<h2><a class="anchor" id="autotoc_md127"></a>
+<h2><a class="anchor" id="autotoc_md124"></a>
 Type Traits</h2>
 <ul>
 <li><a class="el" href="group__group__foundation__type__traits.html">Type Traits</a>: Type Traits (EnableIf, AddPointer, RemovePointer, etc.)</li>
 </ul>
-<h2><a class="anchor" id="autotoc_md128"></a>
+<h2><a class="anchor" id="autotoc_md125"></a>
 Utilities</h2>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -181,15 +181,15 @@ Utilities</h2>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_memory.html" title="Centralized functions to allocate, reallocate and deallocate memory.">SC::Memory</a>   </td><td class="markdownTableBodyLeft">Centralized functions to allocate, reallocate and deallocate memory.   </td></tr>
 </table>
-<h1><a class="anchor" id="autotoc_md129"></a>
+<h1><a class="anchor" id="autotoc_md126"></a>
 Status</h1>
 <p >🟩 Usable <br  />
  The library is very simple it it has what is needed so far by the other libraries.</p>
-<h1><a class="anchor" id="autotoc_md130"></a>
+<h1><a class="anchor" id="autotoc_md127"></a>
 Description</h1>
 <p >There is an hard rule in the library <a class="el" href="page_principles.html">Principles</a> not to include system and compiler headers in public headers. <br  />
  Foundation provides all primitive types to be used in headers and classes like <a class="el" href="struct_s_c_1_1_unique_handle.html" title="Move only handle that has a special tag value flagging its invalid state.">SC::UniqueHandle</a>, <a class="el" href="struct_s_c_1_1_opaque_object.html" title="Hides implementation details from public headers (static PIMPL).">SC::OpaqueObject</a>, <a class="el" href="struct_s_c_1_1_aligned_storage.html" title="A buffer of bytes with given alignment.">SC::AlignedStorage</a> to encourage static PIMPL in order to hide platform specific implementation details everywhere.</p>
-<h2><a class="anchor" id="autotoc_md131"></a>
+<h2><a class="anchor" id="autotoc_md128"></a>
 Function</h2>
 <p >Wraps function pointers, member functions and lambdas without ever allocating. <br  />
  Example: </p><div class="fragment"><div class="line"><span class="keyword">struct </span>MyClass</div>
@@ -225,7 +225,7 @@ Function</h2>
   </table>
   </dd>
 </dl>
-<h2><a class="anchor" id="autotoc_md132"></a>
+<h2><a class="anchor" id="autotoc_md129"></a>
 Deferred</h2>
 <p >Executes a function at end of current scope (in the spirit of Zig <code>defer</code> keyword). </p><dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
@@ -252,7 +252,7 @@ Deferred</h2>
 <div class="line"><span class="comment">// Deferred can be disarmed, meaning that the dispose function will not be executed</span></div>
 <div class="line">deferDeleteProcessHandle.disarm()</div>
 <div class="ttc" id="agroup__group__foundation__utility_html_gacc7ea8a5432bdb1976017ece8cbb0589"><div class="ttname"><a href="group__group__foundation__utility.html#gacc7ea8a5432bdb1976017ece8cbb0589">SC::MakeDeferred</a></div><div class="ttdeci">Deferred&lt; F &gt; MakeDeferred(F &amp;&amp;f)</div><div class="ttdoc">Creates a Deferred object holding a function that will be invoked at end of current scope.</div><div class="ttdef"><b>Definition:</b> Deferred.h:61</div></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md133"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md130"></a>
 TaggedUnion</h2>
 <p >Type safe union with an enum type, where each type has an associated enum value. </p><dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
@@ -297,7 +297,7 @@ TaggedUnion</h2>
 <div class="line">    <span class="keywordflow">case</span> TestString: console.print(<span class="stringliteral">&quot;String = {}&quot;</span>, *test.field&lt;TestString&gt;()); <span class="keywordflow">break</span>;</div>
 <div class="line">    <span class="keywordflow">case</span> TestInt:    console.print(<span class="stringliteral">&quot;Int = {}&quot;</span>,    *test.field&lt;TestInt&gt;());    <span class="keywordflow">break</span>;</div>
 <div class="line">}</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md134"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md131"></a>
 OpaqueObject</h2>
 <p >Hides implementation details from public headers (static PIMPL). <br  />
 Opaque object avoids the heap allocation that often comes with PIMPL, allowing to hide OS specific details from public headers. User declares size in bytes of a struct in the header but the structure can be defined in an implementation .cpp file. Choosing a size that is too small will generate a <code>static_assert</code> that contains in the error message the minimum size to use. Up to 4 functions will need to be defined to avoid linker errors (<code>construct</code>, <code>destruct</code>, <code>moveConstruct</code>, <code>moveAssign</code>). These functions are meant to be defined in a <code>.cpp</code> file that will know how to construct Object, as it can see its definition. </p><dl class="tparams"><dt>Template Parameters</dt><dd>
@@ -355,7 +355,7 @@ Opaque object avoids the heap allocation that often comes with PIMPL, allowing t
 <div class="line">{</div>
 <div class="line">    obj.~Object();</div>
 <div class="line">}</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md135"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md132"></a>
 UniqueHandle</h2>
 <p >Move only handle that has a special tag value flagging its invalid state. <br  />
  Typically used to wrap Operating System specific handles. </p><dl class="tparams"><dt>Template Parameters</dt><dd>
@@ -410,7 +410,7 @@ UniqueHandle</h2>
 <div class="line">    <span class="comment">// ... do something</span></div>
 <div class="line">}</div>
 <div class="ttc" id="agroup__group__foundation__utility_html_ga172de7f1b6d5f1fb4a9f6f040f8ec2aa"><div class="ttname"><a href="group__group__foundation__utility.html#ga172de7f1b6d5f1fb4a9f6f040f8ec2aa">SC::move</a></div><div class="ttdeci">constexpr T &amp;&amp; move(T &amp;value)</div><div class="ttdoc">Converts an lvalue to an rvalue reference.</div><div class="ttdef"><b>Definition:</b> Compiler.h:247</div></div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md136"></a>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md133"></a>
 Roadmap</h1>
 <p >🟦 Complete Features:</p><ul>
 <li>Things will be added as needed</li>

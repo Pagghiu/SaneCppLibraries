@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.9.2"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Sane C++: File System</title>
+<title>Sane C++ Libraries: File System</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -52,7 +52,7 @@
  <tr id="projectrow">
   <td id="projectlogo"><img alt="Logo" src="SC.svg" height="50px"/></td>
   <td id="projectalign">
-   <div id="projectname">Sane C++<span id="projectnumber">&#160;v0.1.0</span>
+   <div id="projectname">Sane C++ Libraries
    </div>
    <div id="projectbrief">C++ Platform Abstraction Libraries</div>
   </td>
@@ -114,34 +114,34 @@ $(document).ready(function(){initNavTree('library_file_system.html',''); initRes
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md95">Features</a></li>
-<li class="level1"><a href="#autotoc_md96">Status</a></li>
-<li class="level1"><a href="#autotoc_md97">Description</a></li>
-<li class="level1"><a href="#autotoc_md98">Path</a><ul><li class="level2"><a href="#autotoc_md99">Path::isAbsolute</a></li>
-<li class="level2"><a href="#autotoc_md100">Path::dirname</a></li>
-<li class="level2"><a href="#autotoc_md101">Path::basename</a></li>
-<li class="level2"><a href="#autotoc_md102">Path::parseNameExtension</a></li>
-<li class="level2"><a href="#autotoc_md103">Path::normalize</a></li>
-<li class="level2"><a href="#autotoc_md104">Path::relativeFromTo</a></li>
+<ul><li class="level1"><a href="#autotoc_md92">Features</a></li>
+<li class="level1"><a href="#autotoc_md93">Status</a></li>
+<li class="level1"><a href="#autotoc_md94">Description</a></li>
+<li class="level1"><a href="#autotoc_md95">Path</a><ul><li class="level2"><a href="#autotoc_md96">Path::isAbsolute</a></li>
+<li class="level2"><a href="#autotoc_md97">Path::dirname</a></li>
+<li class="level2"><a href="#autotoc_md98">Path::basename</a></li>
+<li class="level2"><a href="#autotoc_md99">Path::parseNameExtension</a></li>
+<li class="level2"><a href="#autotoc_md100">Path::normalize</a></li>
+<li class="level2"><a href="#autotoc_md101">Path::relativeFromTo</a></li>
 </ul>
 </li>
-<li class="level1"><a href="#autotoc_md105">FileSystem</a><ul><li class="level2"><a href="#autotoc_md106">copyFile</a></li>
-<li class="level2"><a href="#autotoc_md107">copyDirectory</a></li>
-<li class="level2"><a href="#autotoc_md108">removeDirectoryRecursive</a></li>
-<li class="level2"><a href="#autotoc_md109">makeDirectoryRecursive</a></li>
-<li class="level2"><a href="#autotoc_md110">existsAndIsFile</a></li>
-<li class="level2"><a href="#autotoc_md111">existsAndIsDirectory</a></li>
-<li class="level2"><a href="#autotoc_md112">write</a></li>
-<li class="level2"><a href="#autotoc_md113">read</a></li>
+<li class="level1"><a href="#autotoc_md102">FileSystem</a><ul><li class="level2"><a href="#autotoc_md103">copyFile</a></li>
+<li class="level2"><a href="#autotoc_md104">copyDirectory</a></li>
+<li class="level2"><a href="#autotoc_md105">removeDirectoryRecursive</a></li>
+<li class="level2"><a href="#autotoc_md106">makeDirectoryRecursive</a></li>
+<li class="level2"><a href="#autotoc_md107">existsAndIsFile</a></li>
+<li class="level2"><a href="#autotoc_md108">existsAndIsDirectory</a></li>
+<li class="level2"><a href="#autotoc_md109">write</a></li>
+<li class="level2"><a href="#autotoc_md110">read</a></li>
 </ul>
 </li>
-<li class="level1"><a href="#autotoc_md114">Roadmap</a></li>
+<li class="level1"><a href="#autotoc_md111">Roadmap</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟩 File System operations { exists | copy | delete } for { files | directories }</p>
 <p >FileSystem executed executing operations on files and directories. <br  />
  Path is able to parse and manipulate windows and posix paths.</p>
-<h1><a class="anchor" id="autotoc_md95"></a>
+<h1><a class="anchor" id="autotoc_md92"></a>
 Features</h1>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -223,17 +223,17 @@ Features</h1>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_file_system_directories.html" title="Reports location of system directories (executable / application root)">SC::FileSystemDirectories</a>   </td><td class="markdownTableBodyLeft">Reports location of system directories (executable / application root)   </td></tr>
 </table>
-<h1><a class="anchor" id="autotoc_md96"></a>
+<h1><a class="anchor" id="autotoc_md93"></a>
 Status</h1>
 <p >🟩 Usable <br  />
  The library contains commonly used function but it's missing some notable ones like <code>stat</code>. <a class="el" href="struct_s_c_1_1_file_system.html#a2fa57a1055ad6a1ec30fd87183fb8c73" title="Reads a FileTime structure for a given file.">SC::FileSystem::getFileTime</a> and <a class="el" href="struct_s_c_1_1_file_system.html#a34df1357d58124237b51157ea4f640e4" title="Change last modified time of a given file.">SC::FileSystem::setLastModifiedTime</a> will probably be refactored in a future dedicated class for handling <code>stat</code> based operations.</p>
-<h1><a class="anchor" id="autotoc_md97"></a>
+<h1><a class="anchor" id="autotoc_md94"></a>
 Description</h1>
 <p ><a class="el" href="struct_s_c_1_1_path.html" title="Represents a posix or windows file system path.">SC::Path</a> class allows parsing and manipulating windows and posix paths.</p>
 <p ><a class="el" href="struct_s_c_1_1_file_system.html" title="Execute fs operations { exists | copy | delete } for { files | directories }.">SC::FileSystem</a> allows all typical file operations ( exists | copy | delete | make files or directory). Some less used functions are <a class="el" href="struct_s_c_1_1_file_system.html#a2fa57a1055ad6a1ec30fd87183fb8c73" title="Reads a FileTime structure for a given file.">SC::FileSystem::getFileTime</a> and <a class="el" href="struct_s_c_1_1_file_system.html#a34df1357d58124237b51157ea4f640e4" title="Change last modified time of a given file.">SC::FileSystem::setLastModifiedTime</a> . The library doesn't allow reading or writing seeking inside a file, as that is domain of the <a class="el" href="library_file.html">File</a> library. <a class="el" href="struct_s_c_1_1_file_system.html#a477e4faa714b7c1a21887079b9cf82b1" title="Call init function when instantiating the class to set directory for all operations using relative pa...">SC::FileSystem::init</a> needs an absolute path to a directory and makes it a the <em>base directory</em>. All paths passed later on as arguments to all methods can be either absolute paths or relative. If they are relative, they will be interpreted as relative to the base directory and <b>NOT</b> current directory of the process. The class wants explicitly to make sure its behavior doesn't implicitly depend on current directory of process (unless it's passed explicitly to <a class="el" href="struct_s_c_1_1_file_system.html#a477e4faa714b7c1a21887079b9cf82b1" title="Call init function when instantiating the class to set directory for all operations using relative pa...">SC::FileSystem::init</a> of course).</p>
-<h1><a class="anchor" id="autotoc_md98"></a>
+<h1><a class="anchor" id="autotoc_md95"></a>
 Path</h1>
-<h2><a class="anchor" id="autotoc_md99"></a>
+<h2><a class="anchor" id="autotoc_md96"></a>
 Path::isAbsolute</h2>
 <p >Checks if a path is absolute. For example:</p>
 <div class="fragment"><div class="line">Path::isAbsolute(<span class="stringliteral">&quot;/dirname/basename&quot;</span>, Path::AsPosix) == <span class="keyword">true</span>;        <span class="comment">// Posix Absolute</span></div>
@@ -250,7 +250,7 @@ Path::isAbsolute</h2>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd><code>true</code> if <code>input</code> is absolute</dd></dl>
-<h2><a class="anchor" id="autotoc_md100"></a>
+<h2><a class="anchor" id="autotoc_md97"></a>
 Path::dirname</h2>
 <p >Returns the directory name of a path. Trailing separators are ignored.</p>
 <p >For example:</p>
@@ -267,7 +267,7 @@ Path::dirname</h2>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>Substring of <code>input</code> holding the directory name</dd></dl>
-<h2><a class="anchor" id="autotoc_md101"></a>
+<h2><a class="anchor" id="autotoc_md98"></a>
 Path::basename</h2>
 <p >Returns the base name of a path. Trailing separators are ignored.</p>
 <p >For example:</p>
@@ -281,7 +281,7 @@ Path::basename</h2>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>Substring of <code>input</code> holding the base name</dd></dl>
-<h2><a class="anchor" id="autotoc_md102"></a>
+<h2><a class="anchor" id="autotoc_md99"></a>
 Path::parseNameExtension</h2>
 <p >Splits a StringView of type "name.ext" into "name" and "ext". </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -320,7 +320,7 @@ Path::parseNameExtension</h2>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(name == <span class="stringliteral">&quot;name.&quot;</span>);</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(ext.isEmpty());</div>
 <div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:104</div></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md103"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md100"></a>
 Path::normalize</h2>
 <p >Resolves all <code>..</code> to output a normalized path String. For example:</p>
 <div class="fragment"><div class="line">Path::normalize(<span class="stringliteral">&quot;/Users/SC/../Documents/&quot;</span>, cmp, &amp;path, Path::AsPosix);</div>
@@ -335,7 +335,7 @@ Path::normalize</h2>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd><code>true</code> if the Path was successfully parsed and normalized</dd></dl>
-<h2><a class="anchor" id="autotoc_md104"></a>
+<h2><a class="anchor" id="autotoc_md101"></a>
 Path::relativeFromTo</h2>
 <p >Get relative path that appended to <code>source</code> resolves to <code>destination</code>. For example:</p>
 <div class="fragment"><div class="line">Path::relativeFromTo(<span class="stringliteral">&quot;/a/b/1/2/3&quot;</span>, <span class="stringliteral">&quot;/a/b/d/e&quot;</span>, path, Path::AsPosix, Path::AsPosix);</div>
@@ -351,9 +351,9 @@ Path::relativeFromTo</h2>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd><code>true</code> if source and destination paths can be properly parsed as absolute paths</dd></dl>
-<h1><a class="anchor" id="autotoc_md105"></a>
+<h1><a class="anchor" id="autotoc_md102"></a>
 FileSystem</h1>
-<h2><a class="anchor" id="autotoc_md106"></a>
+<h2><a class="anchor" id="autotoc_md103"></a>
 copyFile</h2>
 <p >Copy a single file. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -399,7 +399,7 @@ copyFile</h2>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.removeFiles({<span class="stringliteral">&quot;sourceFile.txt&quot;</span>, <span class="stringliteral">&quot;destinationFile.txt&quot;</span>}));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.exists(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.exists(<span class="stringliteral">&quot;destinationFile.txt&quot;</span>));</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md107"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md104"></a>
 copyDirectory</h2>
 <p >Copy a single directory. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -443,7 +443,7 @@ copyDirectory</h2>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.removeFile(<span class="stringliteral">&quot;COPY_copyDirectory/subdirectory/testFile.txt&quot;</span>));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.removeEmptyDirectory(<span class="stringliteral">&quot;COPY_copyDirectory/subdirectory&quot;</span>));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.removeEmptyDirectory(<span class="stringliteral">&quot;COPY_copyDirectory&quot;</span>));</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md108"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md105"></a>
 removeDirectoryRecursive</h2>
 <p >Remove single directory with its entire content (like posix <code>rm -rf</code>) </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -470,7 +470,7 @@ removeDirectoryRecursive</h2>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.existsAndIsFile(<span class="stringliteral">&quot;removeDirectoryTest/another/yeah.txt&quot;</span>));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.existsAndIsDirectory(<span class="stringliteral">&quot;removeDirectoryTest/another&quot;</span>));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.existsAndIsDirectory(<span class="stringliteral">&quot;removeDirectoryTest&quot;</span>));</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md109"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md106"></a>
 makeDirectoryRecursive</h2>
 <p >Create a new directory, creating also intermediate non existing directories (like posix <code>mkdir -p</code>) </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -495,7 +495,7 @@ makeDirectoryRecursive</h2>
 <div class="line">    <span class="comment">// Check that directory has been removed</span></div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.existsAndIsDirectory(<span class="stringliteral">&quot;Test3&quot;</span>));</div>
 </div><!-- fragment --></dd></dl>
-<h2><a class="anchor" id="autotoc_md110"></a>
+<h2><a class="anchor" id="autotoc_md107"></a>
 existsAndIsFile</h2>
 <p >Check if a file exists at given path. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -539,7 +539,7 @@ existsAndIsFile</h2>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.removeFiles({<span class="stringliteral">&quot;sourceFile.txt&quot;</span>, <span class="stringliteral">&quot;destinationFile.txt&quot;</span>}));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.exists(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.exists(<span class="stringliteral">&quot;destinationFile.txt&quot;</span>));</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md111"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md108"></a>
 existsAndIsDirectory</h2>
 <p >Check if a directory exists at given path. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -548,7 +548,7 @@ existsAndIsDirectory</h2>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd><code>true</code> if a directory exists at the given path</dd></dl>
-<h2><a class="anchor" id="autotoc_md112"></a>
+<h2><a class="anchor" id="autotoc_md109"></a>
 write</h2>
 <p >Writes a block of memory to a file. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -576,7 +576,7 @@ write</h2>
 <div class="line">    <span class="comment">// Remove all files created by the test</span></div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.removeFile(<span class="stringliteral">&quot;file.txt&quot;</span>));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.exists(<span class="stringliteral">&quot;file.txt&quot;</span>));</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md113"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md110"></a>
 read</h2>
 <p >Reads contents of a file into a <a class="el" href="struct_s_c_1_1_vector.html" title="A contiguous sequence of heap allocated elements.">SC::Vector</a> buffer. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -587,7 +587,7 @@ read</h2>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>Valid Result if file was fully read successfully </dd></dl>
 <dl class="section see"><dt>See also</dt><dd>write (for an usage example)</dd></dl>
-<h1><a class="anchor" id="autotoc_md114"></a>
+<h1><a class="anchor" id="autotoc_md111"></a>
 Roadmap</h1>
 <p >🟦 Complete Features:</p><ul>
 <li><code>stat</code></li>

@@ -4,7 +4,7 @@ var searchData=
   ['build_1',['Build',['../namespace_s_c_1_1_build.html',1,'SC']]],
   ['reflection_2',['Reflection',['../namespace_s_c_1_1_reflection.html',1,'SC']]],
   ['sameconstnessas_3',['SameConstnessAs',['../struct_s_c_1_1_type_traits_1_1_same_constness_as.html',1,'SC::TypeTraits']]],
-  ['sane_20c_2b_2b_4',['Sane C++',['../index.html',1,'']]],
+  ['sane_20c_2b_2b_20libraries_4',['Sane C++ Libraries',['../index.html',1,'']]],
   ['sc_5fassert_5fdebug_5',['SC_ASSERT_DEBUG',['../group__group__foundation__compiler__macros.html#ga03ca4f94b68a107fbbbcc0949e10c6a9',1,'Assert.h']]],
   ['sc_5fassert_5frelease_6',['SC_ASSERT_RELEASE',['../group__group__foundation__compiler__macros.html#ga6bc5136e9c6fbc77420173ccf4e32d21',1,'Assert.h']]],
   ['sc_5fcompiler_5fasan_7',['SC_COMPILER_ASAN',['../group__group__foundation__compiler__macros.html#gac27cb8fd02c8b3558cb1e3494dc05041',1,'Compiler.h']]],

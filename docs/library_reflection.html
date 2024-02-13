@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.9.2"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Sane C++: Reflection</title>
+<title>Sane C++ Libraries: Reflection</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -52,7 +52,7 @@
  <tr id="projectrow">
   <td id="projectlogo"><img alt="Logo" src="SC.svg" height="50px"/></td>
   <td id="projectalign">
-   <div id="projectname">Sane C++<span id="projectnumber">&#160;v0.1.0</span>
+   <div id="projectname">Sane C++ Libraries
    </div>
    <div id="projectbrief">C++ Platform Abstraction Libraries</div>
   </td>
@@ -114,24 +114,24 @@ $(document).ready(function(){initNavTree('library_reflection.html',''); initResi
 </div><!--header-->
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
-<ul><li class="level1"><a href="#autotoc_md157">Features</a></li>
-<li class="level1"><a href="#autotoc_md158">Status</a></li>
-<li class="level1"><a href="#autotoc_md159">Roadmap</a></li>
-<li class="level1"><a href="#autotoc_md160">Description</a><ul><li class="level2"><a href="#autotoc_md161">Packed attribute</a></li>
-<li class="level2"><a href="#autotoc_md162">How to use it</a></li>
-<li class="level2"><a href="#autotoc_md163">Struct member info</a></li>
-<li class="level2"><a href="#autotoc_md164">Reflection Macros</a></li>
-<li class="level2"><a href="#autotoc_md165">Example (print schema)</a></li>
+<ul><li class="level1"><a href="#autotoc_md154">Features</a></li>
+<li class="level1"><a href="#autotoc_md155">Status</a></li>
+<li class="level1"><a href="#autotoc_md156">Roadmap</a></li>
+<li class="level1"><a href="#autotoc_md157">Description</a><ul><li class="level2"><a href="#autotoc_md158">Packed attribute</a></li>
+<li class="level2"><a href="#autotoc_md159">How to use it</a></li>
+<li class="level2"><a href="#autotoc_md160">Struct member info</a></li>
+<li class="level2"><a href="#autotoc_md161">Reflection Macros</a></li>
+<li class="level2"><a href="#autotoc_md162">Example (print schema)</a></li>
 </ul>
 </li>
-<li class="level1"><a href="#autotoc_md166">Implementation</a></li>
+<li class="level1"><a href="#autotoc_md163">Implementation</a></li>
 </ul>
 </div>
 <div class="textblock"><p >🟩 Describe C++ types at compile time for serialization</p>
 <p >Reflection generates compile time information of fields in a structure or class. <br  />
 Typically this library is used with one of the serialization libraries ( <a class="el" href="library_serialization_binary.html">Serialization Binary</a> or <a class="el" href="library_serialization_text.html">Serialization Text</a>).</p>
 <dl class="section note"><dt>Note</dt><dd>Reflection uses more complex C++ constructs compared to other libraries in this repository. To limit the issue, effort has been spent trying not to use obscure C++ meta-programming techniques. The library uses only template partial specialization and <code>constexpr</code>.</dd></dl>
-<h1><a class="anchor" id="autotoc_md157"></a>
+<h1><a class="anchor" id="autotoc_md154"></a>
 Features</h1>
 <ul>
 <li>Reflection info is built at compile time</li>
@@ -142,11 +142,11 @@ Features</h1>
 <li>Describe Structs composition of any supported type</li>
 <li>Identify types that can be serialized with a single memcpy</li>
 </ul>
-<h1><a class="anchor" id="autotoc_md158"></a>
+<h1><a class="anchor" id="autotoc_md155"></a>
 Status</h1>
 <p >🟩 Usable <br  />
  Under described limitations, the library should be usable.</p>
-<h1><a class="anchor" id="autotoc_md159"></a>
+<h1><a class="anchor" id="autotoc_md156"></a>
 Roadmap</h1>
 <p >🟦 Complete Features:</p><ul>
 <li>To be decided</li>
@@ -154,11 +154,11 @@ Roadmap</h1>
 <p >💡 Unplanned Features:</p><ul>
 <li>None so far</li>
 </ul>
-<h1><a class="anchor" id="autotoc_md160"></a>
+<h1><a class="anchor" id="autotoc_md157"></a>
 Description</h1>
 <p >The main target use case is generating reflection information to be used for automatic serialization. There are many rules and limitations so far, and the main one is not supporting any type of reference or pointer. The output of the process is a <em>schema</em> of the reflected type. This schema is an array of <a class="el" href="struct_s_c_1_1_reflection_1_1_type_info.html" title="[reflectionSnippet3]">SC::Reflection::TypeInfo</a> tracking the type and offset location (in bytes) of the field in the structure it belongs to. <br  />
  Fields that refer to non-primitive types (like other structs for example) can follow a <em>link</em> index that describes that field elsewhere in the scheme.</p>
-<h2><a class="anchor" id="autotoc_md161"></a>
+<h2><a class="anchor" id="autotoc_md158"></a>
 Packed attribute</h2>
 <p >The schema contains information about all the types of all fields of the structure and the <em>packing state</em>. <br  />
  A <em>packed struct</em> is made of primitive types that are described to the Reflection system so that there are no padding bytes left in the struct. <br  />
@@ -190,7 +190,7 @@ Packed attribute</h2>
 </div><!-- fragment --><p >The <em>recursively packed</em> property allows binary serializers and deserializer to optimize reading / writing with a single <code>memcpy</code> (for example <a class="el" href="library_serialization_binary.html">Serialization Binary</a>). <br  />
 </p>
 <dl class="section note"><dt>Note</dt><dd>This means that serializers like <a class="el" href="library_serialization_binary.html">Serialization Binary</a> will not invoke type constructor when deserializing a Packed type, as all members are explicitly written by serialization.</dd></dl>
-<h2><a class="anchor" id="autotoc_md162"></a>
+<h2><a class="anchor" id="autotoc_md159"></a>
 How to use it</h2>
 <p >Describing a structure is done externally to the struct itself, specializing a SC::Reflection::Reflect&lt;&gt; struct. <br  />
 </p>
@@ -242,7 +242,7 @@ How to use it</h2>
 <div class="ttc" id="agroup__group__foundation__utility_html_gaafc7fc8fbdf6f411868102084a1abdc9"><div class="ttname"><a href="group__group__foundation__utility.html#gaafc7fc8fbdf6f411868102084a1abdc9">SC::int64_t</a></div><div class="ttdeci">long long int64_t</div><div class="ttdoc">Platform independent (8) bytes signed int.</div><div class="ttdef"><b>Definition:</b> PrimitiveTypes.h:50</div></div>
 <div class="ttc" id="agroup__group__foundation__utility_html_gad8fad7d612c760f3f17579d9c53faadd"><div class="ttname"><a href="group__group__foundation__utility.html#gad8fad7d612c760f3f17579d9c53faadd">SC::uint32_t</a></div><div class="ttdeci">unsigned int uint32_t</div><div class="ttdoc">Platform independent (4) bytes unsigned int.</div><div class="ttdef"><b>Definition:</b> PrimitiveTypes.h:38</div></div>
 <div class="ttc" id="agroup__group__foundation__utility_html_gaf490c67ea3fcc7d7c5fdc463c7e6ae8e"><div class="ttname"><a href="group__group__foundation__utility.html#gaf490c67ea3fcc7d7c5fdc463c7e6ae8e">SC::int16_t</a></div><div class="ttdeci">short int16_t</div><div class="ttdoc">Platform independent (2) bytes signed int.</div><div class="ttdef"><b>Definition:</b> PrimitiveTypes.h:45</div></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md163"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md160"></a>
 Struct member info</h2>
 <ul>
 <li>These fields are required for binary and text serialization with <b>Versioning</b> support<ul>
@@ -268,7 +268,7 @@ Struct member info</h2>
 <li>We could hash the <code>Field Name</code> to obtain <code>MemberTag</code> but an explicit integer has been preferred to allow breaking textual formats and binary formats independently.</li>
 </ul>
 </dd></dl>
-<h2><a class="anchor" id="autotoc_md164"></a>
+<h2><a class="anchor" id="autotoc_md161"></a>
 Reflection Macros</h2>
 <p >With some handy macros one can save typing and they're generally preferable.</p>
 <div class="fragment"><div class="line">SC_REFLECT_STRUCT_VISIT(TestNamespace::SimpleStructure)</div>
@@ -286,7 +286,7 @@ Reflection Macros</h2>
 <div class="line">SC_REFLECT_STRUCT_FIELD(10, arrayOfInt);</div>
 <div class="line"> </div>
 <div class="line">SC_REFLECT_STRUCT_LEAVE()</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md165"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md162"></a>
 Example (print schema)</h2>
 <p >To understand a little bit more how Serialization library can use this information, let's try to print the schema. <br  />
  The <em>compile time</em> flat schema can be obtained by calling <a class="el" href="struct_s_c_1_1_reflection_1_1_schema_compiler.html#a4563c88cfc0c9897aac239b2540124c2" title="Returns a constexpr compiled trimmed flat schema for type T.">SC::Reflection::Schema::compile</a>:</p>
@@ -506,7 +506,7 @@ Example (print schema)</h2>
 <div class="line">{</div>
 <div class="line">[27] Type=TypeINT32                 Size=4  Name=int</div>
 <div class="line">}</div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md166"></a>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md163"></a>
 Implementation</h1>
 <p >As already said in the introduction, effort has been put to keep the library as <em>readable</em> as possible, within the limits of C++. <br  />
  The only technique used is template partial specialization and some care in writing functions that are valid in <code>constexpr</code> context. <br  />
