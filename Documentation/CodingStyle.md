@@ -2,6 +2,9 @@
 
 > Note: this document will be updated regularly clarifying existing rules and adding missing guidelines that will emerge from discussions or PRs being reviewed.
 
+@note
+If you really like to contribute check also [CONTRIBUTING.md](https://github.com/Pagghiu/SaneCppLibraries/blob/main/CONTRIBUTING.md)!
+
 ## Formatting
 All files should be formatted according to the `.clang-format` file using `clang-format` version 15.  
 

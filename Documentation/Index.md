@@ -1,7 +1,7 @@
-# Sane C++
+# Sane C++ Libraries
 
 [TOC]
-**Sane C++** is a set of C++ platform abstraction libraries for macOS, Windows and Linux. ([Platforms](#autotoc_md49)).  
+**Sane C++ Libraries** is a set of C++ platform abstraction libraries for macOS, Windows and Linux. [Platforms](@ref page_platforms).  
 
 Project [Principles](@ref page_principles):
 
@@ -31,16 +31,3 @@ It is a deliberate decision to prototype single libraries and make them public D
 This is done so that they can be matured in parallel with all other libraries and evolve their API more naturally.  
 
 @copydetails libraries
-
-## Platforms
-
-Supported:  
-✅ macOS (and iOS)  
-✅ Windows  
-✅ Linux
-
-Planned:  
-🔮 WASM (Emscripten / WASI)
-
-Not Planned:  
-❓ Android

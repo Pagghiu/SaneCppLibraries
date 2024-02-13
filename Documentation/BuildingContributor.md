@@ -1,46 +1,12 @@
-## Building
+@page page_building_contributor Building (Contributor)
+
+Follow this guide if you're interested in building the library to contribute (check [CONTRIBUTING.md](https://github.com/Pagghiu/SaneCppLibraries/blob/main/CONTRIBUTING.md)!) or you're simply curious to run the test suite.
 
 [TOC]
-### Add to your project
-
-- The library is only delivered in source form, and not as a binary.
-- To add it in your existing program you will have to add a single file named `SC.cpp`
-- Headers in `Libraries/**SomeLibrary**/*.h` are public.  
-- Headers in `Libraries/**SomeLibrary**/[Internal | Tests]` are **NOT** public.
-- You can customize the build changing [Preprocessor Options](#autotoc_md5) 
-
-#### Windows
-- Add `SC.cpp` (located at `Bindings/cpp`) to your build
-- Include any public header located at `Libraries/**SomeLibrary**/SomeHeader.h`
-
-#### macOS
-- Add `SC.cpp` (located at `Bindings/cpp`) to your build
-- Include any public header located at `Libraries/**SomeLibrary**/SomeHeader.h`
-- Link:
-    - `CoreFoundation.framework`
-    - `CoreServices.framework`
-
-#### Linux
-- Add `SC.cpp` (located at `Bindings/cpp`) to your build
-- Include any public header located at `Libraries/**SomeLibrary**/SomeHeader.h`
-- Link:
-    - `libdl` (`-ldl`) 
-    - `libpthread` (`-lpthread`)
-
-@note on Windows the following libraries are already implicitly linked through `#pragma comment(lib, ...)`
-- `Ws2_32.lib`
-- `ntdll.lib`
-- `Rstrtmgr.lib`
-- `shlwapi.lib`
-
-### Preprocessor Options
-
-#### SC_COMPILER_ENABLE_STD_CPP=1
-
-- Allows using the Standard C++ Library.  
-- You can forcefully [Disable the standard C++ library](@ref page_faq) in your project if you like. 
 
 ### Generate test projects
+
+The test suite uses the handmade / self-hosted [SC::Build](@ref library_build) system, that describes builds in C++
 
 - Generate test project
     - **Linux**: `SCBuild.sh`
@@ -48,13 +14,13 @@
     - **macOS**: `SCBuild.command`
 - Open generated projects (in `_Build/Projects`). 
 
-Projects are generated using the self-hosted [Build](@ref library_build) system that allows describing projects using C++.  
+@note These batch / bash scripts are doing the following:  
 - Two `.cpp` files are compiled with a single `clang` / `g++` / `cl.exe` invocation:
     - `SC.cpp` unity build file encompassing the entire library
     - `SCBuild.cpp` file defining the build
 - The resulting executable is then run to generate projects.
 
-### Build the tests
+### Build the test suite
 
 #### Visual Studio 2022
 - Open `_Build/Projects/VisualStudio2022/SCTest.sln` 
@@ -71,6 +37,7 @@ Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 - `Build SCTest XCode Debug` [2]
 - `Build SCTest XCode Release` [2]
 
+@note
 [1] Needs only `make` and `c++` command (can be switched to be `clang` or `gcc`)  
 [2] Needs XCode installed
 
@@ -79,6 +46,7 @@ Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 - `Build SCTest Debug` [1]
 - `Build SCTest Release` [1]
 
+@note
 [1] Needs only `make` and `c++`
 
 #### VSCode on Windows
@@ -86,6 +54,7 @@ Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 - `Build SCTest Debug` [1]
 - `Build SCTest Debug ARM64` [1]
 
+@note
 [1] Needs `Visual Studio 2022` installed
 
 ### Debug the tests
@@ -101,6 +70,7 @@ Select one of the appropriate `Run and Debug` configuration like:
 - `SCTest [posix] (gdb)` [1]
 - `SCTest [posix] (lldb)` [2]
 
+@note
 [1] Uses `gdb` debugger. Implicitly invokes `Build SCTest Debug` to build the executable.  
 [2] Uses `lldb` debugger. Implicitly invokes `Build SCTest Debug` to build the executable. You need `CodeLLDB` or similar extension installed in VSCode.
 
@@ -111,4 +81,5 @@ Select one of the appropriate `Run and Debug` configuration like:
 - `SCTest x64 [win] (vsdbg)` [1]
 - `SCTest ARM64 [win] (vsdbg)` [1]
 
+@note
 [1] Needs `Visual Studio 2022` installed

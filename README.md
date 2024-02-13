@@ -2,14 +2,14 @@
 [![macOS x64](https://github.com/Pagghiu/SaneCppLibraries/actions/workflows/macos_x64.yml/badge.svg)](https://github.com/Pagghiu/SaneCppLibraries/actions/workflows/macos_x64.yml)
 [![Linux](https://github.com/Pagghiu/SaneCppLibraries/actions/workflows/linux.yml/badge.svg)](https://github.com/Pagghiu/SaneCppLibraries/actions/workflows/linux.yml)
 
-# Sane C++
+# Sane C++ Libraries
 
 [![YouTube](https://img.shields.io/youtube/channel/subscribers/UCnmN_whfM12LU6VNQWG0NFg)](https://youtube.com/@Pagghiu)
 [![X (formerly Twitter) Follow](https://img.shields.io/twitter/follow/pagghiu_)](https://twitter.com/pagghiu_)
 [![Discord](https://img.shields.io/discord/1195076118307426384)](https://discord.gg/tyBfFp33Z6)
 ![GitHub Repo stars](https://img.shields.io/github/stars/Pagghiu/SaneCppLibraries)
 
-**Sane C++** is a set of C++ platform abstraction libraries for macOS, Windows and Linux.
+**Sane C++ Libraries** is a set of C++ platform abstraction libraries for macOS, Windows and Linux.
 
 ![Sane Cpp](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease/article.svg)
 
@@ -72,6 +72,36 @@ Library                                                                         
 [Threading](https://pagghiu.github.io/SaneCppLibraries/library_threading.html)                          | 🟥 Atomic, thread, mutex, condition variable
 [Time](https://pagghiu.github.io/SaneCppLibraries/library_time.html)                                    | 🟨 Time handling (relative, absolute, high resolution)
 
+# Building
+
+Libraries can be used as is, adding a single file to your project and without needing any build system.  
+See [Building (user)](https://pagghiu.github.io/SaneCppLibraries/page_building_user.html) to just use the library
+
+Shortly:
+- Add [SC.cpp](Bindings/cpp/SC.cpp) to your build system of choice
+- Define `SC_COMPILER_ENABLE_STD_CPP=1` if you plan to use the Standard C++ library
+- Include any public header (`Libraries/[Library]/*.h`)
+
+## macOS
+- Link `CoreFoundation.framework`
+- Link `CoreFoundation.framework`
+
+## Linux
+- Link `libdl` (`-ldl`)
+- Link `libpthread` (`-lpthread`)
+
+## Windows
+- Nothing else to link (in addition to default libs)
+
+# Examples
+
+Check the [Examples](https://pagghiu.github.io/SaneCppLibraries/page_examples.html) page.
+
+# Tests
+
+Tests are built with the self-hosted [SC::Build](https://pagghiu.github.io/SaneCppLibraries/library_build.html) project generator, describing the builds in C++.    
+Check [Building (contributor)](https://pagghiu.github.io/SaneCppLibraries/page_building_contributor.html) to run the tests.
+
 # Getting in touch
 
 - [Sane Coding Discord](https://discord.gg/tyBfFp33Z6)  
@@ -93,4 +123,4 @@ After that you can read the [CONTRIBUTING.md](CONTRIBUTING.md) guide.
 
 # License
 
-Sane C++ is licensed under the MIT License, see [LICENSE.txt](LICENSE.txt) for more information.
+Sane C++ Libraries are licensed under the MIT License, see [LICENSE.txt](LICENSE.txt) for more information.
