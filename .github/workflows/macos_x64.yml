@@ -22,3 +22,4 @@ jobs:
       run: make -j -C _Build/Projects/Make
     - name: test
       run: _Build/Output/Posix-Any-Any-Makefile-Debug/SCTest
+      # run: lldb -o "run" -o "quit" -- _Build/Output/Posix-Any-Any-Makefile-Debug/SCTest

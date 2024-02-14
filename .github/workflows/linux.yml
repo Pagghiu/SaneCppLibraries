@@ -18,9 +18,15 @@ jobs:
     - uses: actions/checkout@v4
     - name: clang-format
       run: find . \( -iname \*.h -o -iname \*.cpp -o -iname \*.mm -o -iname \*.m -o -iname \*.inl \) | xargs clang-format-15 --dry-run -Werror
+    - name: install
+      run: sudo apt install -y liburing-dev
     - name: configure
       run: ./SCBuild.sh
     - name: build
       run: make -j -C _Build/Projects/Make
     - name: test
       run: _Build/Output/Posix-Any-Any-Makefile-Debug/SCTest
+    # - name: install gdb
+    #   run: sudo apt install -y gdb
+    # - name: test in gdb
+    #   run: gdb --batch -ex "run" -ex "quit" --args _Build/Output/Posix-Any-Any-Makefile-Debug/SCTest
