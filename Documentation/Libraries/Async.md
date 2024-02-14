@@ -24,7 +24,7 @@ This is the list of supported async operations:
 | [AsyncFileClose](@ref SC::AsyncFileClose)         | @copybrief SC::AsyncFileClose     |
 | [AsyncLoopTimeout](@ref SC::AsyncLoopTimeout)     | @copybrief SC::AsyncLoopTimeout   |
 | [AsyncLoopWakeUp](@ref SC::AsyncLoopWakeUp)       | @copybrief SC::AsyncLoopWakeUp    |
-| [AsyncWindowsPoll](@ref SC::AsyncWindowsPoll)     | @copybrief SC::AsyncWindowsPoll   |
+| [AsyncFilePoll](@ref SC::AsyncFilePoll)           | @copybrief SC::AsyncFilePoll      |
 
 # Status
 🟨 MVP  
@@ -79,14 +79,15 @@ Event loop can be run in different ways to allow integrated it in multiple ways 
 ## AsyncFileClose
 @copydoc SC::AsyncFileClose
 
-## AsyncWindowsPoll
-@copydoc SC::AsyncWindowsPoll
+## AsycFilePoll
+@copydoc SC::AsycFilePoll
 
 # Implementation
 
 Library abstracts async operations by exposing a completion based mechanism.
 This mechanism currently maps on `kqueue` on macOS and `OVERLAPPED` on Windows.
-It currently uses `epoll` on Linux but it should efficiently map over `io_uring`, that will be implemented in the future, as the API is centered around completions and not readiness.
+
+It currently uses by default `epoll` on Linux but an experimental `io_uring` backend can be enabled by defining `SC_ASYNC_USE_IO_URING=1` and linking `liburing` (with `-luring`).
 
 The api works on file and socket descriptors, that can be obtained from the [File](@ref library_file) and [Socket](@ref library_socket) libraries.
 
@@ -100,10 +101,10 @@ SC::ArenaMap from the [Containers](@ref library_containers) can be used to preal
 🟩 Usable Features:
 - Use a thread pool to execute File Operations actually asynchronously.
 - Implement option to do blocking poll check without dispatching callbacks (needed for efficient gui event loop integration)
+- More comprehensive test suite, testing all cancellations
 
 🟦 Complete Features:
-- Implement `io_uring` backend for Linux
 - Implement FS operations (open stat read write unlink copyfile mkdir chmod etc.)
 
 💡 Unplanned Features:
-- Additional async operation
+- Additional async operations

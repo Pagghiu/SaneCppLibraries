@@ -37,6 +37,9 @@ On the [Youtube Channel](https://www.youtube.com/@Pagghiu) you can find some vid
 - [SC::Async Linux epoll 1/2](https://www.youtube.com/watch?v=4rC4aKCD0V8)
 - [SC::Async Linux epoll 2/2](https://www.youtube.com/watch?v=uCsGpJcF2oc)
 - [SC::FileSystemWatcher Linux inotify implementation](https://www.youtube.com/watch?v=92saVDCRnCI)
+- [A Tour of SC::Async](https://www.youtube.com/watch?v=pIGosb2D2Ro)
+- [Linux Async I/O using io_uring (1 of 2)](https://www.youtube.com/watch?v=YR935rorb3E)
+- [Linux Async I/O using io_uring (2 of 2)](https://www.youtube.com/watch?v=CgYE0YrpHt0)
 
 # Libraries
 

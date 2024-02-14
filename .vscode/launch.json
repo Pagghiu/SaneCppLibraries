@@ -67,5 +67,30 @@
                 "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
             ],
         },
+        {
+            "name": "SCTest [linux][io_uring] (gdb)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/Output/Posix-Any-Any-Makefile-Debug/SCTest",
+            "args": [],
+            "stopAtEntry": false,
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Build SCTest Debug [linux][io_uring]",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
     ]
 }

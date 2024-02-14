@@ -19,6 +19,7 @@
 //! Async is a multi-platform / event-driven asynchronous I/O library.
 //!
 /// It exposes async programming model for common IO operations like reading / writing to / from a file or tcp socket.
+///
 /// Synchronous I/O operations could block the current thread of execution for an undefined amount of time, making it
 /// difficult to scale an application to a large number of concurrent operations, or to coexist with other even loop,
 /// like for example a GUI event loop. Such async programming model uses a common pattern, where the call fills an
@@ -26,7 +27,15 @@
 /// some low level OS IO queue. The event loop can then monitor all the requests in a single call to
 /// SC::AsyncEventLoop::run, SC::AsyncEventLoop::runOnce or SC::AsyncEventLoop::runNoWait. These three different run
 /// methods cover different integration use cases of the event loop inside of an applications.
-
+///
+/// The kernel Async API used on each operating systems are the following:
+/// - `IOCP` on Windows
+/// - `kqueue` on macOS
+/// - `epoll` on Linux
+/// - `io_uring` on Linux (experimental).
+///
+/// Note: To enable `io_uring` backend set `SC_ASYNC_USE_IO_URING=1` and link `liburing` (`-luring`).
+///
 namespace SC
 {
 struct EventObject;
@@ -109,7 +118,7 @@ struct SC::AsyncRequest
 #if SC_CONFIGURATION_DEBUG
     void setDebugName(const char* newDebugName) { debugName = newDebugName; }
 #else
-    void   setDebugName(const char* newDebugName) { SC_COMPILER_UNUSED(newDebugName); }
+    void setDebugName(const char* newDebugName) { SC_COMPILER_UNUSED(newDebugName); }
 #endif
 
     /// @brief Get the event loop associated with this AsyncRequest
@@ -312,6 +321,8 @@ struct AsyncProcessExit : public AsyncRequest
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
     detail::WinWaitHandle       waitHandle;
+#elif SC_PLATFORM_LINUX
+    FileDescriptor pidFd;
 #endif
 };
 
@@ -361,6 +372,9 @@ struct AsyncSocketAccept : public AsyncRequest
 
     SocketDescriptor clientSocket;
     uint8_t          acceptBuffer[288];
+#elif SC_PLATFORM_LINUX
+    AlignedStorage<28> sockAddrHandle;
+    uint32_t           sockAddrLen;
 #endif
 };
 
@@ -554,7 +568,7 @@ struct AsyncFileRead : public AsyncRequest
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
 #elif SC_PLATFORM_LINUX
-    size_t syncReadBytes    = 0;
+    size_t syncReadBytes = 0;
 #endif
 };
 
@@ -624,8 +638,9 @@ struct AsyncFileClose : public AsyncRequest
     FileDescriptor::Handle fileDescriptor;
 };
 
-/// @brief Starts a file poll operation, using `GetOverlappedResult` (windows), kevent (macOS) and epoll (Linux).
-/// Callback will be called when any of the three API signals readiness events on the given file descriptor.
+/// @brief Starts an handle polling operation.
+/// Uses `GetOverlappedResult` (windows), `kevent` (macOS), `epoll` (Linux) and `io_uring` (Linux).  
+/// Callback will be called when any of the three API signals readiness events on the given file descriptor.  
 /// Check @ref library_file_system_watcher for an example usage of this notification.
 struct AsyncFilePoll : public AsyncRequest
 {
@@ -732,7 +747,7 @@ struct SC::AsyncEventLoop
     {
         static constexpr int Windows = 160;
         static constexpr int Apple   = 88;
-        static constexpr int Default = 168;
+        static constexpr int Default = 304;
 
         static constexpr size_t Alignment = alignof(void*);
 

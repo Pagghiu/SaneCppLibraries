@@ -10,8 +10,12 @@
 #define SC_ASYNC_USE_EPOLL 0 // uses kqueue
 #include "Internal/AsyncPosix.inl"
 #elif SC_PLATFORM_LINUX
+#if SC_ASYNC_USE_IO_URING
+#include "Internal/AsyncLinux.inl" // uses io_uring
+#else
 #define SC_ASYNC_USE_EPOLL 1 // uses epoll
 #include "Internal/AsyncPosix.inl"
+#endif
 #elif SC_PLATFORM_EMSCRIPTEN
 #include "Internal/AsyncEmscripten.inl"
 #endif
