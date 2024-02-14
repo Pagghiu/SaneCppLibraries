@@ -120,7 +120,7 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_async_file_poll.html','
 </div><!--header-->
 <div class="contents">
 
-<p>Starts a file poll operation, using <code>GetOverlappedResult</code> (windows), kevent (macOS) and epoll (Linux).  
+<p>Starts an handle polling operation.  
  <a href="struct_s_c_1_1_async_file_poll.html#details">More...</a></p>
 
 <p><code>#include &lt;<a class="el" href="_async_8h_source.html">Async.h</a>&gt;</code></p>
@@ -226,8 +226,8 @@ static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b>
 <tr class="separator:a6397be27006b8fdfa51fabd1c3a415f8 inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
-<div class="textblock"><p >Starts a file poll operation, using <code>GetOverlappedResult</code> (windows), kevent (macOS) and epoll (Linux). </p>
-<p >Callback will be called when any of the three API signals readiness events on the given file descriptor. Check <a class="el" href="library_file_system_watcher.html">File System Watcher</a> for an example usage of this notification. </p>
+<div class="textblock"><p >Starts an handle polling operation. </p>
+<p >Uses <code>GetOverlappedResult</code> (windows), <code>kevent</code> (macOS), <code>epoll</code> (Linux) and <code>io_uring</code> (Linux). Callback will be called when any of the three API signals readiness events on the given file descriptor. Check <a class="el" href="library_file_system_watcher.html">File System Watcher</a> for an example usage of this notification. </p>
 </div><h2 class="groupheader">Member Function Documentation</h2>
 <a id="ae3b516404b38e0a19f7e9d29224ca0df" name="ae3b516404b38e0a19f7e9d29224ca0df"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ae3b516404b38e0a19f7e9d29224ca0df">&#9670;&nbsp;</a></span>start()</h2>

@@ -185,7 +185,7 @@ Example: </p><div class="fragment"><div class="line">    Time::HighResolutionCou
 <div class="line">    Thread::Sleep(100);</div>
 <div class="line">    end.snap();</div>
 <div class="line">    Time::Relative elapsed = end.subtractApproximate(start);</div>
-<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(elapsed.inRoundedUpperMilliseconds().ms &lt; 150 and elapsed.inRoundedUpperMilliseconds().ms &gt; 50);</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(elapsed.inRoundedUpperMilliseconds().ms &lt; 300 and elapsed.inRoundedUpperMilliseconds().ms &gt; 0);</div>
 </div><!-- fragment --><h3><a class="anchor" id="autotoc_md248"></a>
 SC::Time::HighResolutionCounter::subtractApproximate</h3>
 <p >Subtracts another HighResolutionCounter from this one, returning an approximate Relative. </p><dl class="params"><dt>Parameters</dt><dd>

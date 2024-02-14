@@ -243,7 +243,7 @@ Example: </p>
 <div class="line">    <a class="code hl_function" href="struct_s_c_1_1_thread.html#a0cfdda4fb8807acedc7f81645cfb512c">Thread::Sleep</a>(100);</div>
 <div class="line">    end.snap();</div>
 <div class="line">    Time::Relative elapsed = end.subtractApproximate(start);</div>
-<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(elapsed.inRoundedUpperMilliseconds().ms &lt; 150 and elapsed.inRoundedUpperMilliseconds().ms &gt; 50);</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(elapsed.inRoundedUpperMilliseconds().ms &lt; 300 and elapsed.inRoundedUpperMilliseconds().ms &gt; 0);</div>
 <div class="ttc" id="astruct_s_c_1_1_thread_html_a0cfdda4fb8807acedc7f81645cfb512c"><div class="ttname"><a href="struct_s_c_1_1_thread.html#a0cfdda4fb8807acedc7f81645cfb512c">SC::Thread::Sleep</a></div><div class="ttdeci">static void Sleep(uint32_t milliseconds)</div><div class="ttdoc">Puts current thread to sleep.</div></div>
 </div><!-- fragment --> 
 </div>

@@ -109,6 +109,7 @@ var hierarchy =
     [ "SC::OpaqueObject< InternalDefinition >", "struct_s_c_1_1_opaque_object.html", null ],
     [ "SC::FileDescriptor::OpenOptions", "struct_s_c_1_1_file_descriptor_1_1_open_options.html", null ],
     [ "SC::Build::Optimization", "struct_s_c_1_1_build_1_1_optimization.html", null ],
+    [ "SC::AsyncEventLoop::Options", "struct_s_c_1_1_async_event_loop_1_1_options.html", null ],
     [ "SC::FileSystemIterator::Options", "struct_s_c_1_1_file_system_iterator_1_1_options.html", null ],
     [ "SC::Process::Options", "struct_s_c_1_1_process_1_1_options.html", null ],
     [ "SC::ProcessChain::Options", "struct_s_c_1_1_process_chain_1_1_options.html", null ],

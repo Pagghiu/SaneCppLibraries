@@ -105,9 +105,9 @@ var NAVTREEINDEX =
 "_algorithm_bubble_sort_8h_source.html",
 "library_async.html#autotoc_md69",
 "page_faq.html#autotoc_md41",
-"struct_s_c_1_1_deferred.html#a205c32ceb8887c669bcd71c547ebaf71",
-"struct_s_c_1_1_plugin_definition.html#ae56a9bb1859e765c94f50b2b83a500eb",
-"struct_s_c_1_1_string_iterator.html#a7ca45b1e696f8280aa3d04362d933d75"
+"struct_s_c_1_1_deferred.html",
+"struct_s_c_1_1_plugin_definition.html#ac28d96432a593a1e3978fe11d1534146",
+"struct_s_c_1_1_string_iterator.html#a642e968f2ab5cfef10c8d7fabc794ec9"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

@@ -130,7 +130,7 @@ $(document).ready(function(){initNavTree('library_async.html',''); initResizable
 <li class="level2"><a href="#autotoc_md64">AsyncFileRead</a></li>
 <li class="level2"><a href="#autotoc_md65">AsyncFileWrite</a></li>
 <li class="level2"><a href="#autotoc_md66">AsyncFileClose</a></li>
-<li class="level2"><a href="#autotoc_md67">AsyncWindowsPoll</a></li>
+<li class="level2"><a href="#autotoc_md67">AsycFilePoll</a></li>
 </ul>
 </li>
 <li class="level1"><a href="#autotoc_md68">Implementation</a><ul><li class="level2"><a href="#autotoc_md69">Memory allocation</a></li>
@@ -142,7 +142,15 @@ $(document).ready(function(){initNavTree('library_async.html',''); initResizable
 <div class="textblock"><p >🟨 Async I/O (files, sockets, timers, processes, fs events, threads wake-up)</p>
 <p >Async is a multi-platform / event-driven asynchronous I/O library. <br  />
 </p>
-<p >It exposes async programming model for common IO operations like reading / writing to / from a file or tcp socket. Synchronous I/O operations could block the current thread of execution for an undefined amount of time, making it difficult to scale an application to a large number of concurrent operations, or to coexist with other even loop, like for example a GUI event loop. Such async programming model uses a common pattern, where the call fills an AsyncRequest with the required data. The AsyncRequest is added to an AsyncEventLoop that will queue the request to some low level OS IO queue. The event loop can then monitor all the requests in a single call to <a class="el" href="struct_s_c_1_1_async_event_loop.html#af77cd7ac7a1a577204e43d14debc45c5" title="Blocks until there are no more active queued requests.">SC::AsyncEventLoop::run</a>, <a class="el" href="struct_s_c_1_1_async_event_loop.html#aeef889e7c4c8f7cbbfe974ee6be27f09" title="Blocks until at least one request proceeds, ensuring forward progress.">SC::AsyncEventLoop::runOnce</a> or <a class="el" href="struct_s_c_1_1_async_event_loop.html#a1bc6365abc9c05fdbeec9c7f4519c319" title="Process active requests if they exist or returns immediately without blocking.">SC::AsyncEventLoop::runNoWait</a>. These three different run methods cover different integration use cases of the event loop inside of an applications.</p>
+<p >It exposes async programming model for common IO operations like reading / writing to / from a file or tcp socket.</p>
+<p >Synchronous I/O operations could block the current thread of execution for an undefined amount of time, making it difficult to scale an application to a large number of concurrent operations, or to coexist with other even loop, like for example a GUI event loop. Such async programming model uses a common pattern, where the call fills an AsyncRequest with the required data. The AsyncRequest is added to an AsyncEventLoop that will queue the request to some low level OS IO queue. The event loop can then monitor all the requests in a single call to <a class="el" href="struct_s_c_1_1_async_event_loop.html#af77cd7ac7a1a577204e43d14debc45c5" title="Blocks until there are no more active queued requests.">SC::AsyncEventLoop::run</a>, <a class="el" href="struct_s_c_1_1_async_event_loop.html#aeef889e7c4c8f7cbbfe974ee6be27f09" title="Blocks until at least one request proceeds, ensuring forward progress.">SC::AsyncEventLoop::runOnce</a> or <a class="el" href="struct_s_c_1_1_async_event_loop.html#a1bc6365abc9c05fdbeec9c7f4519c319" title="Process active requests if they exist or returns immediately without blocking.">SC::AsyncEventLoop::runNoWait</a>. These three different run methods cover different integration use cases of the event loop inside of an applications.</p>
+<p >The kernel Async API used on each operating systems are the following:</p><ul>
+<li><code>IOCP</code> on Windows</li>
+<li><code>kqueue</code> on macOS</li>
+<li><code>epoll</code> on Linux</li>
+<li><code>io_uring</code> on Linux (dynamically loading <code>liburing</code>)</li>
+</ul>
+<dl class="section note"><dt>Note</dt><dd>If <code>liburing</code> is not available on the system, the library will transparently fallback to epoll.</dd></dl>
 <h1><a class="anchor" id="autotoc_md51"></a>
 Features</h1>
 <p >This is the list of supported async operations:</p>
@@ -170,7 +178,7 @@ Features</h1>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyNone"><a class="el" href="struct_s_c_1_1_async_loop_wake_up.html">AsyncLoopWakeUp</a>   </td><td class="markdownTableBodyNone">Starts a wake-up operation, allowing threads to execute callbacks on loop thread.    </td></tr>
 <tr class="markdownTableRowOdd">
-<td class="markdownTableBodyNone">AsyncWindowsPoll   </td><td class="markdownTableBodyNone"></td></tr>
+<td class="markdownTableBodyNone"><a class="el" href="struct_s_c_1_1_async_file_poll.html">AsyncFilePoll</a>   </td><td class="markdownTableBodyNone">Starts an handle polling operation.   </td></tr>
 </table>
 <h1><a class="anchor" id="autotoc_md52"></a>
 Status</h1>
@@ -499,10 +507,11 @@ AsyncFileClose</h2>
 <div class="line">};</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(asyncFileClose.start(eventLoop, handle));</div>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md67"></a>
-AsyncWindowsPoll</h2>
+AsycFilePoll</h2>
 <h1><a class="anchor" id="autotoc_md68"></a>
 Implementation</h1>
-<p >Library abstracts async operations by exposing a completion based mechanism. This mechanism currently maps on <code>kqueue</code> on macOS and <code>OVERLAPPED</code> on Windows. It currently uses <code>epoll</code> on Linux but it should efficiently map over <code>io_uring</code>, that will be implemented in the future, as the API is centered around completions and not readiness.</p>
+<p >Library abstracts async operations by exposing a completion based mechanism. This mechanism currently maps on <code>kqueue</code> on macOS and <code>OVERLAPPED</code> on Windows.</p>
+<p >It currently tries to dynamically load <code>io_uring</code> on Linux doing an <code>epoll</code> backend fallback in case <code>liburing</code> is not available on the system. There is not need to link <code>liburing</code> because the library loads it dynamically and embeds the minimal set of <code>static</code> <code>inline</code> functions needed to interface with it.</p>
 <p >The api works on file and socket descriptors, that can be obtained from the <a class="el" href="library_file.html">File</a> and <a class="el" href="library_socket.html">Socket</a> libraries.</p>
 <h2><a class="anchor" id="autotoc_md69"></a>
 Memory allocation</h2>
@@ -514,13 +523,13 @@ Roadmap</h1>
 <p >🟩 Usable Features:</p><ul>
 <li>Use a thread pool to execute File Operations actually asynchronously.</li>
 <li>Implement option to do blocking poll check without dispatching callbacks (needed for efficient gui event loop integration)</li>
+<li>More comprehensive test suite, testing all cancellations</li>
 </ul>
 <p >🟦 Complete Features:</p><ul>
-<li>Implement <code>io_uring</code> backend for Linux</li>
 <li>Implement FS operations (open stat read write unlink copyfile mkdir chmod etc.)</li>
 </ul>
 <p >💡 Unplanned Features:</p><ul>
-<li>Additional async operation </li>
+<li>Additional async operations </li>
 </ul>
 </div></div><!-- contents -->
 </div><!-- PageDoc -->

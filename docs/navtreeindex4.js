@@ -1,5 +1,6 @@
 var NAVTREEINDEX4 =
 {
+"struct_s_c_1_1_plugin_definition.html#ac28d96432a593a1e3978fe11d1534146":[12,13,2,4],
 "struct_s_c_1_1_plugin_definition.html#ae56a9bb1859e765c94f50b2b83a500eb":[12,13,2,2],
 "struct_s_c_1_1_plugin_dynamic_library.html":[12,13,5],
 "struct_s_c_1_1_plugin_dynamic_library.html#a1d14d7bf25b60e25883407829f667426":[12,13,5,1],
@@ -49,8 +50,8 @@ var NAVTREEINDEX4 =
 "struct_s_c_1_1_process_chain.html#ac24ebc44c872cb0ef89da35454a9e6a8":[12,14,2,9],
 "struct_s_c_1_1_process_chain_1_1_error.html":[12,14,2,0],
 "struct_s_c_1_1_process_chain_1_1_options.html":[12,14,2,1],
-"struct_s_c_1_1_process_descriptor.html":[14,0,0,59],
 "struct_s_c_1_1_process_descriptor.html":[13,0,0,59],
+"struct_s_c_1_1_process_descriptor.html":[14,0,0,59],
 "struct_s_c_1_1_process_descriptor_1_1_exit_status.html":[13,0,0,59,0],
 "struct_s_c_1_1_process_descriptor_1_1_exit_status.html":[14,0,0,59,0],
 "struct_s_c_1_1_process_i_d.html":[12,14,0],
@@ -248,6 +249,5 @@ var NAVTREEINDEX4 =
 "struct_s_c_1_1_string_iterator.html#a39c0cb6fe4ae1b432be2a4caf48d6137":[12,20,6,17],
 "struct_s_c_1_1_string_iterator.html#a3c42fc2ca067c532ed4cbddb32d85963":[12,20,6,23],
 "struct_s_c_1_1_string_iterator.html#a4ac33244e4d798492e1ae7a2ad6b4dba":[12,20,6,3],
-"struct_s_c_1_1_string_iterator.html#a4ff1c918a08ee8e8c9fb1d1f2b80b808":[12,20,6,10],
-"struct_s_c_1_1_string_iterator.html#a642e968f2ab5cfef10c8d7fabc794ec9":[12,20,6,0]
+"struct_s_c_1_1_string_iterator.html#a4ff1c918a08ee8e8c9fb1d1f2b80b808":[12,20,6,10]
 };
