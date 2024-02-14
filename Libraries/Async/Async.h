@@ -32,10 +32,9 @@
 /// - `IOCP` on Windows
 /// - `kqueue` on macOS
 /// - `epoll` on Linux
-/// - `io_uring` on Linux (experimental).
+/// - `io_uring` on Linux (dynamically loading `liburing`)
 ///
-/// Note: To enable `io_uring` backend set `SC_ASYNC_USE_IO_URING=1` and link `liburing` (`-luring`).
-///
+/// @note If `liburing` is not available on the system, the library will transparently fallback to epoll.
 namespace SC
 {
 struct EventObject;
@@ -118,7 +117,7 @@ struct SC::AsyncRequest
 #if SC_CONFIGURATION_DEBUG
     void setDebugName(const char* newDebugName) { debugName = newDebugName; }
 #else
-    void setDebugName(const char* newDebugName) { SC_COMPILER_UNUSED(newDebugName); }
+    void               setDebugName(const char* newDebugName) { SC_COMPILER_UNUSED(newDebugName); }
 #endif
 
     /// @brief Get the event loop associated with this AsyncRequest
@@ -322,7 +321,7 @@ struct AsyncProcessExit : public AsyncRequest
     detail::WinOverlappedOpaque overlapped;
     detail::WinWaitHandle       waitHandle;
 #elif SC_PLATFORM_LINUX
-    FileDescriptor pidFd;
+    FileDescriptor     pidFd;
 #endif
 };
 
@@ -568,7 +567,7 @@ struct AsyncFileRead : public AsyncRequest
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
 #elif SC_PLATFORM_LINUX
-    size_t syncReadBytes = 0;
+    size_t             syncReadBytes    = 0;
 #endif
 };
 
@@ -613,7 +612,7 @@ struct AsyncFileWrite : public AsyncRequest
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
 #elif SC_PLATFORM_LINUX
-    size_t syncWrittenBytes = 0;
+    size_t             syncWrittenBytes = 0;
 #endif
 };
 
@@ -639,8 +638,8 @@ struct AsyncFileClose : public AsyncRequest
 };
 
 /// @brief Starts an handle polling operation.
-/// Uses `GetOverlappedResult` (windows), `kevent` (macOS), `epoll` (Linux) and `io_uring` (Linux).  
-/// Callback will be called when any of the three API signals readiness events on the given file descriptor.  
+/// Uses `GetOverlappedResult` (windows), `kevent` (macOS), `epoll` (Linux) and `io_uring` (Linux).
+/// Callback will be called when any of the three API signals readiness events on the given file descriptor.
 /// Check @ref library_file_system_watcher for an example usage of this notification.
 struct AsyncFilePoll : public AsyncRequest
 {
@@ -675,8 +674,20 @@ struct AsyncFilePoll : public AsyncRequest
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncEventLoopSnippet
 struct SC::AsyncEventLoop
 {
+    struct Options
+    {
+        enum class ApiType
+        {
+            Automatic = 0,
+            ForceUseIOURing, // Only valid for Linux
+            ForceUseEpoll,   // Only valid for Linux
+        };
+        ApiType apiType;
+
+        Options() { apiType = ApiType::Automatic; }
+    };
     /// Creates the event loop kernel object
-    [[nodiscard]] Result create();
+    [[nodiscard]] Result create(Options options = Options());
 
     /// Closes the event loop kernel object
     [[nodiscard]] Result close();
@@ -717,11 +728,6 @@ struct SC::AsyncEventLoop
     /// Associates a File descriptor created externally with the eventLoop.
     [[nodiscard]] Result associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor);
 
-#if SC_PLATFORM_WINDOWS
-    /// Returns handle to the kernel level IO queue object.
-    /// Used by external systems calling OS async function themselves (FileSystemWatcher on windows for example)
-    [[nodiscard]] Result getLoopFileDescriptor(FileDescriptor::Handle& fileDescriptor) const;
-#endif
     /// Get Loop time
     [[nodiscard]] Time::HighResolutionCounter getLoopTime() const { return loopTime; }
 
@@ -740,14 +746,30 @@ struct SC::AsyncEventLoop
 
     Time::HighResolutionCounter loopTime;
 
-    struct KernelQueue;
-
+#if SC_PLATFORM_LINUX
+    struct InternalPosix;
+    struct KernelQueuePosix;
+    struct InternalIoURing;
+    struct KernelQueueIoURing;
     struct Internal;
+    struct KernelQueue;
+#elif SC_PLATFORM_APPLE
+    struct InternalPosix;
+    struct KernelQueuePosix;
+    using Internal    = InternalPosix;
+    using KernelQueue = KernelQueuePosix;
+#elif SC_PLATFORM_WINDOWS
+    struct Internal;
+    struct KernelQueue;
+#else
+    struct Internal;
+    struct KernelQueue;
+#endif
     struct InternalDefinition
     {
         static constexpr int Windows = 160;
         static constexpr int Apple   = 88;
-        static constexpr int Default = 304;
+        static constexpr int Default = 336;
 
         static constexpr size_t Alignment = alignof(void*);
 

@@ -42,27 +42,6 @@
             }
         },
         {
-            "label": "Build SCTest Debug [linux][io_uring]",
-            "type": "shell",
-            "linux": {
-                "command": "make -j -C _Build/Projects/Make CPPFLAGS=-DSC_ASYNC_USE_IO_URING=1 LDFLAGS=-luring"
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "presentation": {
-                "echo": true,
-                "reveal": "never",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "group": {
-                "kind": "build",
-            }
-        },
-        {
             "label": "Build SCTest Debug ARM64",
             "type": "shell",
             "osx": {

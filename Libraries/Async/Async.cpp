@@ -7,15 +7,9 @@
 #if SC_PLATFORM_WINDOWS
 #include "Internal/AsyncWindows.inl"
 #elif SC_PLATFORM_APPLE
-#define SC_ASYNC_USE_EPOLL 0 // uses kqueue
 #include "Internal/AsyncPosix.inl"
 #elif SC_PLATFORM_LINUX
-#if SC_ASYNC_USE_IO_URING
 #include "Internal/AsyncLinux.inl" // uses io_uring
-#else
-#define SC_ASYNC_USE_EPOLL 1 // uses epoll
-#include "Internal/AsyncPosix.inl"
-#endif
 #elif SC_PLATFORM_EMSCRIPTEN
 #include "Internal/AsyncEmscripten.inl"
 #endif
@@ -247,10 +241,10 @@ void SC::AsyncEventLoop::invokeExpiredTimers()
     }
 }
 
-SC::Result SC::AsyncEventLoop::create()
+SC::Result SC::AsyncEventLoop::create(Options options)
 {
     Internal& self = internal.get();
-    SC_TRY(self.createEventLoop());
+    SC_TRY(self.createEventLoop(options));
     SC_TRY(self.createSharedWatchers(*this));
     return SC::Result(true);
 }
@@ -334,7 +328,7 @@ SC::Result SC::AsyncEventLoop::completeAndEventuallyReactivate(KernelQueue& queu
 
 SC::Result SC::AsyncEventLoop::runStep(SyncMode syncMode)
 {
-    KernelQueue queue;
+    KernelQueue queue(internal.get());
     SC_LOG_MESSAGE("---------------\n");
 
     while (AsyncRequest* async = submissions.dequeueFront())
@@ -387,15 +381,20 @@ void SC::AsyncEventLoop::runStepExecuteManualCompletions(KernelQueue& queue)
 
 void SC::AsyncEventLoop::runStepExecuteCompletions(KernelQueue& queue)
 {
-    Internal& self = internal.get();
-    for (decltype(KernelQueue::newEvents) idx = 0; idx < queue.newEvents; ++idx)
+    for (uint32_t idx = 0; idx < queue.getNumEvents(); ++idx)
     {
-        SC_LOG_MESSAGE(" Iteration = {}\n", (int)idx);
+        SC_LOG_MESSAGE(" Iteration = {}\n", idx);
         SC_LOG_MESSAGE(" Active Requests = {}\n", getTotalNumberOfActiveHandle());
         bool continueProcessing = true;
 
-        Result        result = Result(queue.validateEvent(queue.events[idx], continueProcessing));
-        AsyncRequest& async  = *self.getAsyncRequest(queue.events[idx]);
+        AsyncRequest* request = queue.getAsyncRequest(idx);
+        if (request == nullptr)
+        {
+            continue;
+        }
+
+        AsyncRequest& async  = *request;
+        Result        result = Result(queue.validateEvent(idx, continueProcessing));
         if (not result)
         {
             reportError(queue, async, move(result));
@@ -406,7 +405,7 @@ void SC::AsyncEventLoop::runStepExecuteCompletions(KernelQueue& queue)
         {
             continue;
         }
-        async.eventIndex = idx;
+        async.eventIndex = static_cast<int32_t>(idx);
         if (async.state == AsyncRequest::State::Active)
         {
             if (not completeAndEventuallyReactivate(queue, async, move(result)))
@@ -562,7 +561,7 @@ void SC::AsyncEventLoop::updateTime() { loopTime.snap(); }
 
 void SC::AsyncEventLoop::executeTimers(KernelQueue& queue, const Time::HighResolutionCounter& nextTimer)
 {
-    const bool timeoutOccurredWithoutIO = queue.newEvents == 0;
+    const bool timeoutOccurredWithoutIO = queue.getNumEvents() == 0;
     const bool timeoutWasAlreadyExpired = loopTime.isLaterThanOrEqualTo(nextTimer);
     if (timeoutOccurredWithoutIO or timeoutWasAlreadyExpired)
     {
@@ -638,20 +637,24 @@ void SC::AsyncEventLoop::scheduleManualCompletion(AsyncRequest& async)
     async.state = backupState;
 }
 
-#if SC_PLATFORM_WINDOWS
-SC::Result SC::AsyncEventLoop::getLoopFileDescriptor(SC::FileDescriptor::Handle& fileDescriptor) const
-{
-    return internal.get().loopFd.get(fileDescriptor,
-                                     SC::Result::Error("AsyncEventLoop::getLoopFileDescriptor invalid handle"));
-}
-#endif
-
 SC::Result SC::AsyncEventLoop::createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor)
 {
     auto res = outDescriptor.create(family, SocketFlags::SocketStream, SocketFlags::ProtocolTcp,
                                     SocketFlags::NonBlocking, SocketFlags::NonInheritable);
     SC_TRY(res);
     return associateExternallyCreatedTCPSocket(outDescriptor);
+}
+
+SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread() { return internal.get().wakeUpFromExternalThread(); }
+
+SC::Result SC::AsyncEventLoop::associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor)
+{
+    return internal.get().associateExternallyCreatedTCPSocket(outDescriptor);
+}
+
+SC::Result SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor)
+{
+    return internal.get().associateExternallyCreatedFileDescriptor(outDescriptor);
 }
 
 SC::Result SC::AsyncLoopWakeUp::wakeUp() { return getEventLoop()->wakeUpFromExternalThread(*this); }

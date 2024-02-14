@@ -52,6 +52,28 @@ struct SC::AsyncEventLoop::Internal
         wakeUpOverlapped.userData = &wakeUpAsync;
     }
 
+    [[nodiscard]] Result associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor)
+    {
+        HANDLE loopHandle;
+        SC_TRY(loopFd.get(loopHandle, Result::Error("loop handle")));
+        SOCKET socket;
+        SC_TRY(outDescriptor.get(socket, Result::Error("Invalid handle")));
+        HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(socket), loopHandle, 0, 0);
+        SC_TRY_MSG(iocp == loopHandle, "associateExternallyCreatedTCPSocket CreateIoCompletionPort failed");
+        return Result(true);
+    }
+
+    [[nodiscard]] Result associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor)
+    {
+        HANDLE loopHandle;
+        SC_TRY(loopFd.get(loopHandle, Result::Error("loop handle")));
+        HANDLE handle;
+        SC_TRY(outDescriptor.get(handle, Result::Error("Invalid handle")));
+        HANDLE iocp = ::CreateIoCompletionPort(handle, loopHandle, 0, 0);
+        SC_TRY_MSG(iocp == loopHandle, "associateExternallyCreatedFileDescriptor CreateIoCompletionPort failed");
+        return Result(true);
+    }
+
     [[nodiscard]] Result ensureConnectFunction(SocketDescriptor::Handle sock)
     {
         if (pConnectEx == nullptr)
@@ -94,8 +116,12 @@ struct SC::AsyncEventLoop::Internal
 
     [[nodiscard]] Result close() { return loopFd.close(); }
 
-    [[nodiscard]] Result createEventLoop()
+    [[nodiscard]] Result createEventLoop(AsyncEventLoop::Options options = AsyncEventLoop::Options())
     {
+        if (options.apiType != AsyncEventLoop::Options::ApiType::Automatic)
+        {
+            return Result::Error("createEventLoop only accepts ApiType::Automatic");
+        }
         HANDLE newQueue = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
         if (newQueue == INVALID_HANDLE_VALUE)
         {
@@ -115,11 +141,6 @@ struct SC::AsyncEventLoop::Internal
         return Result(true);
     }
 
-    [[nodiscard]] static AsyncRequest* getAsyncRequest(OVERLAPPED_ENTRY& event)
-    {
-        return detail::AsyncWinOverlapped::getUserDataFromOverlapped<AsyncRequest>(event.lpOverlapped);
-    }
-
     [[nodiscard]] static Result checkWSAResult(SOCKET handle, OVERLAPPED& overlapped, size_t* size = nullptr)
     {
         DWORD transferred = 0;
@@ -137,48 +158,35 @@ struct SC::AsyncEventLoop::Internal
         // TODO: should we reset also completion port?
         return Result(true);
     }
-};
 
-SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread()
-{
-    Internal&              self = internal.get();
-    FileDescriptor::Handle loopNativeDescriptor;
-    SC_TRY(self.loopFd.get(loopNativeDescriptor, Result::Error("watchInputs - Invalid Handle")));
-
-    if (PostQueuedCompletionStatus(loopNativeDescriptor, 0, 0, &self.wakeUpOverlapped.overlapped) == FALSE)
+    Result wakeUpFromExternalThread()
     {
-        return Result::Error("AsyncEventLoop::wakeUpFromExternalThread() - PostQueuedCompletionStatus");
+        FileDescriptor::Handle loopNativeDescriptor;
+        SC_TRY(loopFd.get(loopNativeDescriptor, Result::Error("watchInputs - Invalid Handle")));
+
+        if (PostQueuedCompletionStatus(loopNativeDescriptor, 0, 0, &wakeUpOverlapped.overlapped) == FALSE)
+        {
+            return Result::Error("AsyncEventLoop::wakeUpFromExternalThread() - PostQueuedCompletionStatus");
+        }
+        return Result(true);
     }
-    return Result(true);
-}
-
-SC::Result SC::AsyncEventLoop::associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor)
-{
-    HANDLE loopHandle;
-    SC_TRY(internal.get().loopFd.get(loopHandle, Result::Error("loop handle")));
-    SOCKET socket;
-    SC_TRY(outDescriptor.get(socket, Result::Error("Invalid handle")));
-    HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(socket), loopHandle, 0, 0);
-    SC_TRY_MSG(iocp == loopHandle, "associateExternallyCreatedTCPSocket CreateIoCompletionPort failed");
-    return Result(true);
-}
-
-SC::Result SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor)
-{
-    HANDLE loopHandle;
-    SC_TRY(internal.get().loopFd.get(loopHandle, Result::Error("loop handle")));
-    HANDLE handle;
-    SC_TRY(outDescriptor.get(handle, Result::Error("Invalid handle")));
-    HANDLE iocp = ::CreateIoCompletionPort(handle, loopHandle, 0, 0);
-    SC_TRY_MSG(iocp == loopHandle, "associateExternallyCreatedFileDescriptor CreateIoCompletionPort failed");
-    return Result(true);
-}
+};
 
 struct SC::AsyncEventLoop::KernelQueue
 {
     static constexpr int totalNumEvents = 128;
     OVERLAPPED_ENTRY     events[totalNumEvents];
     ULONG                newEvents = 0;
+
+    KernelQueue(Internal&) {}
+
+    uint32_t getNumEvents() const { return static_cast<uint32_t>(newEvents); }
+
+    [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t index)
+    {
+        OVERLAPPED_ENTRY& event = events[index];
+        return detail::AsyncWinOverlapped::getUserDataFromOverlapped<AsyncRequest>(event.lpOverlapped);
+    }
 
     // SYNC WITH KERNEL
     [[nodiscard]] Result syncWithKernel(AsyncEventLoop& self, SyncMode syncMode)
@@ -211,7 +219,7 @@ struct SC::AsyncEventLoop::KernelQueue
         return Result(true);
     }
 
-    [[nodiscard]] static bool validateEvent(const OVERLAPPED_ENTRY&, bool&) { return Result(true); }
+    [[nodiscard]] static bool validateEvent(uint32_t, bool&) { return Result(true); }
 
     // TIMEOUT
     [[nodiscard]] static bool setupAsync(AsyncLoopTimeout&) { return true; }
@@ -522,7 +530,7 @@ struct SC::AsyncEventLoop::KernelQueue
         SC_COMPILER_UNUSED(timeoutOccurred);
         AsyncProcessExit&      async = *static_cast<AsyncProcessExit*>(data);
         FileDescriptor::Handle loopNativeDescriptor;
-        SC_TRUST_RESULT(async.eventLoop->getLoopFileDescriptor(loopNativeDescriptor));
+        SC_TRUST_RESULT(async.eventLoop->internal.get().loopFd.get(loopNativeDescriptor, Result::Error("loopFd")));
 
         if (PostQueuedCompletionStatus(loopNativeDescriptor, 0, 0, &async.overlapped.get().overlapped) == FALSE)
         {

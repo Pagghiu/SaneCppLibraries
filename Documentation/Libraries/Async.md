@@ -87,7 +87,8 @@ Event loop can be run in different ways to allow integrated it in multiple ways 
 Library abstracts async operations by exposing a completion based mechanism.
 This mechanism currently maps on `kqueue` on macOS and `OVERLAPPED` on Windows.
 
-It currently uses by default `epoll` on Linux but an experimental `io_uring` backend can be enabled by defining `SC_ASYNC_USE_IO_URING=1` and linking `liburing` (with `-luring`).
+It currently tries to dynamically load `io_uring` on Linux doing an `epoll` backend fallback in case `liburing` is not available on the system.
+There is not need to link `liburing` because the library loads it dynamically and embeds the minimal set of `static` `inline` functions needed to interface with it.
 
 The api works on file and socket descriptors, that can be obtained from the [File](@ref library_file) and [Socket](@ref library_socket) libraries.
 

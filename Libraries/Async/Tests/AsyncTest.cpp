@@ -15,20 +15,30 @@ struct AsyncTest;
 
 struct SC::AsyncTest : public SC::TestCase
 {
+    AsyncEventLoop::Options options;
     AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
     {
-        loopTimeout();
-        loopWakeUpFromExternalThread();
-        loopWakeUp();
-        loopWakeUpEventObject();
-        processExit();
-        socketAccept();
-        socketConnect();
-        socketSendReceive();
-        socketSendReceiveError();
-        socketClose();
-        fileReadWrite();
-        fileClose();
+#if SC_PLATFORM_LINUX
+        // First run all the tests on IOURing and then on epoll
+        options.apiType = AsyncEventLoop::Options::ApiType::ForceUseIOURing;
+        for (int i = 0; i < 2; ++i)
+#endif
+        {
+            loopTimeout();
+            loopWakeUpFromExternalThread();
+            loopWakeUp();
+            loopWakeUpEventObject();
+            processExit();
+            socketAccept();
+            socketConnect();
+            socketSendReceive();
+            socketSendReceiveError();
+            socketClose();
+            fileReadWrite();
+            fileClose();
+            // Next run will be on epoll, in case of Linux
+            options.apiType = AsyncEventLoop::Options::ApiType::ForceUseEpoll;
+        }
     }
 
     void loopTimeout()
@@ -38,7 +48,7 @@ struct SC::AsyncTest : public SC::TestCase
         {
             AsyncLoopTimeout timeout1, timeout2;
             AsyncEventLoop   eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
+            SC_TEST_EXPECT(eventLoop.create(options));
             int timeout1Called = 0;
             int timeout2Called = 0;
             timeout1.callback  = [&](AsyncLoopTimeout::Result& res)
@@ -68,7 +78,7 @@ struct SC::AsyncTest : public SC::TestCase
         if (test_section("loop wakeUpFromExternalThread"))
         {
             AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
+            SC_TEST_EXPECT(eventLoop.create(options));
             Thread newThread;
             threadWasCalled = 0;
             wakeUpSucceeded = 0;
@@ -103,7 +113,7 @@ struct SC::AsyncTest : public SC::TestCase
             wakeUp2Called   = 0;
             wakeUp1ThreadID = 0;
             AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
+            SC_TEST_EXPECT(eventLoop.create(options));
             AsyncLoopWakeUp wakeUp1;
             AsyncLoopWakeUp wakeUp2;
 
@@ -162,7 +172,7 @@ struct SC::AsyncTest : public SC::TestCase
             uint64_t callbackThreadID = 0;
 
             AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
+            SC_TEST_EXPECT(eventLoop.create(options));
             AsyncLoopWakeUp wakeUp;
 
             wakeUp.callback = [&](AsyncLoopWakeUp::Result&)
@@ -194,7 +204,7 @@ struct SC::AsyncTest : public SC::TestCase
         if (test_section("process exit"))
         {
             AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
+            SC_TEST_EXPECT(eventLoop.create(options));
             Process processSuccess;
             Process processFailure;
 #if SC_PLATFORM_WINDOWS
@@ -249,7 +259,8 @@ struct SC::AsyncTest : public SC::TestCase
         if (test_section("socket accept"))
         {
             AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
+            acceptedCount = 0;
+            SC_TEST_EXPECT(eventLoop.create(options));
 
             constexpr uint32_t numWaitingConnections = 2;
             SocketDescriptor   serverSocket;
@@ -288,9 +299,9 @@ struct SC::AsyncTest : public SC::TestCase
 
             SC_TEST_EXPECT(accept.stop());
 
-            // on Windows stopAsync generates one more eventloop run because
-            // of the closing of the clientsocket used for acceptex, so to unify
-            // the behaviours in the test we do a runNoWait
+            // on Windows stopAsync generates one more event loop run because
+            // of the closing of the client socket used for acceptex, so to unify
+            // the behaviors in the test we do a runNoWait
             SC_TEST_EXPECT(eventLoop.runNoWait());
 
             SocketDescriptor client3;
@@ -310,7 +321,7 @@ struct SC::AsyncTest : public SC::TestCase
         if (test_section("socket connect"))
         {
             AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
+            SC_TEST_EXPECT(eventLoop.create(options));
 
             SocketDescriptor serverSocket;
             uint16_t         tcpPort        = 5050;
@@ -374,6 +385,8 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(SocketClient(clients[0]).write({&v, 1}));
             SC_TEST_EXPECT(eventLoop.run());
             SC_TEST_EXPECT(receiveCalls == 1);
+            SC_TEST_EXPECT(acceptedClient[0].close());
+            SC_TEST_EXPECT(acceptedClient[1].close());
         }
     }
 
@@ -402,7 +415,7 @@ struct SC::AsyncTest : public SC::TestCase
         if (test_section("socket send/receive"))
         {
             AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
+            SC_TEST_EXPECT(eventLoop.create(options));
             SocketDescriptor client, serverSideClient;
             createAndAssociateAsyncClientServerConnections(eventLoop, client, serverSideClient);
 
@@ -457,7 +470,7 @@ struct SC::AsyncTest : public SC::TestCase
         if (test_section("socket close"))
         {
             AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
+            SC_TEST_EXPECT(eventLoop.create(options));
             SocketDescriptor client, serverSideClient;
             createAndAssociateAsyncClientServerConnections(eventLoop, client, serverSideClient);
 
@@ -492,7 +505,7 @@ struct SC::AsyncTest : public SC::TestCase
         if (test_section("file read/write"))
         {
             AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
+            SC_TEST_EXPECT(eventLoop.create(options));
             StringNative<255> filePath = StringEncoding::Native;
             StringNative<255> dirPath  = StringEncoding::Native;
             const StringView  name     = "AsyncTest";
@@ -504,12 +517,12 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
             SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
 
-            FileDescriptor::OpenOptions options;
-            options.async    = true;
-            options.blocking = true;
+            FileDescriptor::OpenOptions openOptions;
+            openOptions.async    = true;
+            openOptions.blocking = true;
 
             FileDescriptor fd;
-            SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, options));
+            SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, openOptions));
             SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
 
             auto writeSpan = StringView("test").toCharSpan();
@@ -528,7 +541,7 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(fd.close());
 
-            SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::ReadOnly, options));
+            SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::ReadOnly, openOptions));
             SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
             SC_TEST_EXPECT(fd.get(handle, Result::Error("asd")));
 
@@ -568,7 +581,7 @@ struct SC::AsyncTest : public SC::TestCase
         if (test_section("file close"))
         {
             AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
+            SC_TEST_EXPECT(eventLoop.create(options));
             StringNative<255> filePath = StringEncoding::Native;
             StringNative<255> dirPath  = StringEncoding::Native;
             const StringView  name     = "AsyncTest";
@@ -581,12 +594,12 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
             SC_TEST_EXPECT(fs.write(filePath.view(), "test"));
 
-            FileDescriptor::OpenOptions options;
-            options.async    = true;
-            options.blocking = true;
+            FileDescriptor::OpenOptions openOptions;
+            openOptions.async    = true;
+            openOptions.blocking = true;
 
             FileDescriptor fd;
-            SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, options));
+            SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, openOptions));
             SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
 
             FileDescriptor::Handle handle = FileDescriptor::Invalid;
@@ -612,7 +625,7 @@ struct SC::AsyncTest : public SC::TestCase
         if (test_section("error send/receive"))
         {
             AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
+            SC_TEST_EXPECT(eventLoop.create(options));
             SocketDescriptor client, serverSideClient;
             createAndAssociateAsyncClientServerConnections(eventLoop, client, serverSideClient);
 

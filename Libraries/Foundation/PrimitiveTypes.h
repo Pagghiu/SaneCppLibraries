@@ -84,6 +84,8 @@ namespace SC
 /// Placement New
 template<typename T> void placementNew(T& storage) { new (&storage, PlacementNew()) T(); }
 template<typename T> void placementNew(T& storage, T&& other) { new (&storage, PlacementNew()) T(forward<T>(other)); }
+
+template<typename T, typename Q> void placementNew(T& storage, Q& other) { new (&storage, PlacementNew()) T(other); }
 }
 //! @}
 // clang-format on
