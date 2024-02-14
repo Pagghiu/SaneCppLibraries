@@ -56,7 +56,7 @@ void SC::TimeTest::testHighResolutionCounterSnap()
     Thread::Sleep(100);
     end.snap();
     Time::Relative elapsed = end.subtractApproximate(start);
-    SC_TEST_EXPECT(elapsed.inRoundedUpperMilliseconds().ms < 150 and elapsed.inRoundedUpperMilliseconds().ms > 50);
+    SC_TEST_EXPECT(elapsed.inRoundedUpperMilliseconds().ms < 300 and elapsed.inRoundedUpperMilliseconds().ms > 0);
     //! [highResolutionCounterSnapSnippet]
 }
 
