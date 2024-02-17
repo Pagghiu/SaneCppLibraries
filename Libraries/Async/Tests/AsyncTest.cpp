@@ -18,11 +18,14 @@ struct SC::AsyncTest : public SC::TestCase
     AsyncEventLoop::Options options;
     AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
     {
-#if SC_PLATFORM_LINUX
-        // First run all the tests on IOURing and then on epoll
-        options.apiType = AsyncEventLoop::Options::ApiType::ForceUseIOURing;
-        for (int i = 0; i < 2; ++i)
-#endif
+        int numTestsToRun = 1;
+        if (AsyncEventLoop::tryLoadingLiburing())
+        {
+            // Run all tests on epoll backend first, and then re-run them on io_uring
+            options.apiType = AsyncEventLoop::Options::ApiType::ForceUseEpoll;
+            numTestsToRun   = 2;
+        }
+        for (int i = 0; i < numTestsToRun; ++i)
         {
             loopTimeout();
             loopWakeUpFromExternalThread();
@@ -36,8 +39,11 @@ struct SC::AsyncTest : public SC::TestCase
             socketClose();
             fileReadWrite();
             fileClose();
-            // Next run will be on epoll, in case of Linux
-            options.apiType = AsyncEventLoop::Options::ApiType::ForceUseEpoll;
+            if (numTestsToRun == 2)
+            {
+                // If on Linux next run will test io_uring backend (if it's installed)
+                options.apiType = AsyncEventLoop::Options::ApiType::ForceUseIOURing;
+            }
         }
     }
 

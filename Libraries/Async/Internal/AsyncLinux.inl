@@ -63,6 +63,8 @@ struct SC::AsyncEventLoop::KernelQueue
 // TODO: Protect it with a mutex or force passing it during creation
 static AsyncLinuxLibURingLoader globalLibURing;
 
+bool SC::AsyncEventLoop::tryLoadingLiburing() { return globalLibURing.init(); }
+
 struct SC::AsyncEventLoop::InternalIoURing
 {
     static constexpr int QueueDepth = 64;

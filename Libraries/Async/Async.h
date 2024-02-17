@@ -731,6 +731,10 @@ struct SC::AsyncEventLoop
     /// Get Loop time
     [[nodiscard]] Time::HighResolutionCounter getLoopTime() const { return loopTime; }
 
+    /// Check if liburing is loadable (only on Linux)
+    /// @return true if liburing has been loaded, false otherwise (and on any non-Linux os)
+    [[nodiscard]] static bool tryLoadingLiburing();
+
   private:
     int numberOfActiveHandles = 0;
     int numberOfExternals     = 0;

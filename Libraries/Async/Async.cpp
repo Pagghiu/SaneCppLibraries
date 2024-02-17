@@ -658,3 +658,8 @@ SC::Result SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor(FileDesc
 }
 
 SC::Result SC::AsyncLoopWakeUp::wakeUp() { return getEventLoop()->wakeUpFromExternalThread(*this); }
+
+#if SC_PLATFORM_LINUX
+#else
+bool SC::AsyncEventLoop::tryLoadingLiburing() { return false; }
+#endif
