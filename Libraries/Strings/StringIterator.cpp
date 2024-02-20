@@ -365,39 +365,43 @@ bool StringIteratorASCII::advanceUntilMatchesNonConstexpr(CodePoint c)
 // StringIteratorUTF16
 const char* StringIteratorUTF16::getNextOf(const char* bytes)
 {
-    const uint16_t* src = reinterpret_cast<const uint16_t*>(bytes);
-    uint16_t        value;
-    memcpy(&value, src, sizeof(uint16_t));   // Avoid potential unaligned read
-    if (value >= 0xD800 and value <= 0xDFFF) // TODO: This assumes Little endian
+    uint16_t value;
+    ::memcpy(&value, bytes, sizeof(uint16_t)); // Avoid potential unaligned read
+    if (value >= 0xD800 and value <= 0xDFFF)   // TODO: This assumes Little endian
     {
-        return reinterpret_cast<const char*>(src + 2); // Multi-byte character
+        return bytes + 4; // Multi-byte character
     }
-    return reinterpret_cast<const char*>(src + 1); // Single-byte character
+    else
+    {
+        return bytes + 2; // Single-byte character
+    }
 }
 
 const char* StringIteratorUTF16::getPreviousOf(const char* bytes)
 {
-    const uint16_t* src = reinterpret_cast<const uint16_t*>(bytes);
-    src                 = src - 1;
-    if (src[0] >= 0xD800 and src[0] <= 0xDFFF) // TODO: This assumes Little endian
+    uint16_t value;
+    ::memcpy(&value, bytes - 2, sizeof(uint16_t)); // Avoid potential unaligned read
+    if (value >= 0xD800 and value <= 0xDFFF)       // TODO: This assumes Little endian
     {
-        src = src - 1;
+        return bytes - 4; // Multi-byte character
     }
-    return reinterpret_cast<const char*>(src);
+    else
+    {
+        return bytes - 2; // Single-byte character
+    }
 }
 
 SC::uint32_t StringIteratorUTF16::decode(const char* bytes)
 {
-    const uint16_t* src = reinterpret_cast<const uint16_t*>(bytes);
-    uint16_t        src0;
-    memcpy(&src0, src, sizeof(uint16_t));                   // Avoid potential unaligned read
-    const uint32_t character = static_cast<uint32_t>(src0); // TODO: This assumes Little endian
-    if (character >= 0xD800 and character <= 0xDFFF)
+    uint16_t src0;
+    ::memcpy(&src0, bytes, sizeof(uint16_t)); // Avoid potential unaligned read
+    const uint32_t character = static_cast<uint32_t>(src0);
+    if (character >= 0xD800 and character <= 0xDFFF) // TODO: This assumes Little endian
     {
         uint16_t src1;
-        memcpy(&src1, src + 1, sizeof(uint16_t)); // Avoid potential unaligned read
+        ::memcpy(&src1, bytes + 2, sizeof(uint16_t)); // Avoid potential unaligned read
         const uint32_t nextCharacter = static_cast<uint32_t>(src1);
-        if (nextCharacter >= 0xDC00)
+        if (nextCharacter >= 0xDC00) // TODO: This assumes Little endian
         {
             return 0x10000 + ((nextCharacter - 0xDC00) | ((character - 0xD800) << 10));
         }
