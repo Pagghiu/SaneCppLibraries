@@ -97,6 +97,7 @@ var namespaces_dup =
       [ "TestCase", "struct_s_c_1_1_test_case.html", "struct_s_c_1_1_test_case" ],
       [ "TestReport", "struct_s_c_1_1_test_report.html", "struct_s_c_1_1_test_report" ],
       [ "Thread", "struct_s_c_1_1_thread.html", "struct_s_c_1_1_thread" ],
+      [ "ThreadPool", "struct_s_c_1_1_thread_pool.html", "struct_s_c_1_1_thread_pool" ],
       [ "UniqueHandle", "struct_s_c_1_1_unique_handle.html", "struct_s_c_1_1_unique_handle" ],
       [ "Vector", "struct_s_c_1_1_vector.html", "struct_s_c_1_1_vector" ],
       [ "VectorMap", "struct_s_c_1_1_vector_map.html", "struct_s_c_1_1_vector_map" ],

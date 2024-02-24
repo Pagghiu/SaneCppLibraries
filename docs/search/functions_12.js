@@ -1,5 +1,19 @@
 var searchData=
 [
-  ['unloadplugin_0',['unloadPlugin',['../struct_s_c_1_1_plugin_registry.html#a317867e40e733e5b9df04e8e69a6e2cc',1,'SC::PluginRegistry']]],
-  ['update_1',['update',['../struct_s_c_1_1_hashing.html#add6a5ecb202fb037372345fb1d5b82de',1,'SC::Hashing']]]
+  ['taggedunion_0',['TaggedUnion',['../struct_s_c_1_1_tagged_union.html#a02fe3fcf18a0905ff31df938870e9511',1,'SC::TaggedUnion::TaggedUnion(const TaggedUnion &amp;other)'],['../struct_s_c_1_1_tagged_union.html#aff11132f9d29d6f0c6a67a32d8b7b2d5',1,'SC::TaggedUnion::TaggedUnion(TaggedUnion &amp;&amp;other)']]],
+  ['test_5fsection_1',['test_section',['../struct_s_c_1_1_test_case.html#aa52397db9eace05a6e02a652c2fd307e',1,'SC::TestCase']]],
+  ['testcase_2',['TestCase',['../struct_s_c_1_1_test_case.html#ac07c37f0891e95ef146837051eeab1ae',1,'SC::TestCase']]],
+  ['testreport_3',['TestReport',['../struct_s_c_1_1_test_report.html#aa0c4534e0c25bf6e9ae3d90138db32d9',1,'SC::TestReport']]],
+  ['threadid_4',['threadID',['../struct_s_c_1_1_thread.html#a97edb5fab16dce61d534af722506e553',1,'SC::Thread']]],
+  ['tobytesspan_5',['toBytesSpan',['../struct_s_c_1_1_string_view.html#aea7f853cff0c3c913324c267f89773fb',1,'SC::StringView']]],
+  ['tocharspan_6',['toCharSpan',['../struct_s_c_1_1_string_view.html#a4d91b6c3dc11916ff9642b96bbbe1c06',1,'SC::StringView']]],
+  ['tokenizenext_7',['tokenizeNext',['../struct_s_c_1_1_string_view_tokenizer.html#a9d7015f7f8ee1f3af7ac23895f26d278',1,'SC::StringViewTokenizer']]],
+  ['tospan_8',['toSpan',['../struct_s_c_1_1_array.html#a11c836bb4180635b234eb2df1a7937ed',1,'SC::Array::toSpan()'],['../struct_s_c_1_1_vector.html#a7a44e0d25fec988cbda1cb7febbd65ff',1,'SC::Vector::toSpan()']]],
+  ['tospanconst_9',['toSpanConst',['../struct_s_c_1_1_array.html#a3ca2e0aaef3c36796372f3c4ee77aecc',1,'SC::Array::toSpanConst()'],['../struct_s_c_1_1_vector.html#a505b0326409eee9661bf63c07b47d180',1,'SC::Vector::toSpanConst()']]],
+  ['tostring_10',['toString',['../struct_s_c_1_1_build_1_1_platform.html#ad679437c9a0700e30a9f1a198afcf4f0',1,'SC::Build::Platform::toString()'],['../struct_s_c_1_1_build_1_1_architecture.html#a2b395b590933ab97ed2f1aefd4476b6f',1,'SC::Build::Architecture::toString()'],['../struct_s_c_1_1_build_1_1_generator.html#a4ffce205810862b0b5a0c9baa1baa167',1,'SC::Build::Generator::toString()'],['../struct_s_c_1_1_build_1_1_optimization.html#a32f3a84c90e23c6ce98bdc5d61017b63',1,'SC::Build::Optimization::toString()']]],
+  ['trimendingcodepoint_11',['trimEndingCodePoint',['../struct_s_c_1_1_string_view.html#a0f91b3b8a019d1b3a02898652c1fd175',1,'SC::StringView']]],
+  ['trimstartingcodepoint_12',['trimStartingCodePoint',['../struct_s_c_1_1_string_view.html#a1b677932258528d23cf666e85fafa694',1,'SC::StringView']]],
+  ['tryloadingliburing_13',['tryLoadingLiburing',['../struct_s_c_1_1_async_event_loop.html#adb22025d3a2dded2a265ecf645e7ef56',1,'SC::AsyncEventLoop']]],
+  ['typeinfo_14',['TypeInfo',['../struct_s_c_1_1_reflection_1_1_type_info.html#a2fa3acd3236da942b6b761a34eab0a99',1,'SC::Reflection::TypeInfo::TypeInfo()'],['../struct_s_c_1_1_reflection_1_1_type_info.html#aadc7e4a8964c8e963a5791850f654f2e',1,'SC::Reflection::TypeInfo::TypeInfo(TypeCategory type, uint16_t sizeInBytes, StructInfo structInfo)'],['../struct_s_c_1_1_reflection_1_1_type_info.html#a47646a1ad67eaa6ac09957899fc80c19',1,'SC::Reflection::TypeInfo::TypeInfo(TypeCategory type, uint16_t sizeInBytes, MemberInfo member)'],['../struct_s_c_1_1_reflection_1_1_type_info.html#ad101ccb0aceb2449d8313746109e9965',1,'SC::Reflection::TypeInfo::TypeInfo(TypeCategory type, uint16_t sizeInBytes, uint8_t numberOfChildren, ArrayInfo arrayInfo)'],['../struct_s_c_1_1_reflection_1_1_type_info.html#a38ca73f5ce8f7cf212d4c17720fbefb2',1,'SC::Reflection::TypeInfo::TypeInfo(TypeCategory type, uint16_t sizeInBytes)']]],
+  ['typetostring_15',['typeToString',['../struct_s_c_1_1_build_1_1_compile.html#a2bfe1ba544adf107c2f553d5950978d2',1,'SC::Build::Compile::typeToString()'],['../struct_s_c_1_1_build_1_1_link.html#ae4ea672c680ba4a33fbdb0cdaeeb38ac',1,'SC::Build::Link::typeToString()'],['../struct_s_c_1_1_build_1_1_target_type.html#a21f019c2e78bda6329b09872332bb9fd',1,'SC::Build::TargetType::typeToString()']]]
 ];

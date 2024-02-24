@@ -196,7 +196,7 @@ If the function returns an invalid Return code or if the operation is manually c
 <li>Inside stageSubmission a started async will be do the one time setup (with setupAsync)</li>
 <li>Inside stageSubmission a Setup or Submitting async will be activated (with activateAsync)</li>
 <li>If activateAsync is successful, the async becomes state == State::Active.<ul>
-<li>When this happens, the async is either tracked by the kernel or in one of the linked lists like activeWakeUps</li>
+<li>When this happens, the async is either tracked by the kernel or in one of the linked lists like activeLoopWakeUps</li>
 </ul>
 </li>
 <li>The Active async can become completed, when the kernel signals its completion (or readiness...):<ul>

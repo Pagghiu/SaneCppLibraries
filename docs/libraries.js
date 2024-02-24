@@ -242,26 +242,27 @@ var libraries =
       [ "Status", "library_threading.html#autotoc_md233", null ],
       [ "Description", "library_threading.html#autotoc_md234", [
         [ "SC::Thread", "library_threading.html#autotoc_md235", null ],
-        [ "SC::Mutex", "library_threading.html#autotoc_md236", null ],
-        [ "SC::EventObject", "library_threading.html#autotoc_md237", null ],
-        [ "SC::Atomic", "library_threading.html#autotoc_md238", null ]
+        [ "SC::ThreadPool", "library_threading.html#autotoc_md236", null ],
+        [ "SC::Mutex", "library_threading.html#autotoc_md237", null ],
+        [ "SC::EventObject", "library_threading.html#autotoc_md238", null ],
+        [ "SC::Atomic", "library_threading.html#autotoc_md239", null ]
       ] ],
-      [ "Roadmap", "library_threading.html#autotoc_md239", null ]
+      [ "Roadmap", "library_threading.html#autotoc_md240", null ]
     ] ],
     [ "Time", "library_time.html", [
-      [ "Features", "library_time.html#autotoc_md240", null ],
-      [ "Status", "library_time.html#autotoc_md241", null ],
-      [ "Description", "library_time.html#autotoc_md242", [
-        [ "SC::Time::Absolute", "library_time.html#autotoc_md243", [
-          [ "SC::Time::Absolute::parseLocal", "library_time.html#autotoc_md244", null ]
+      [ "Features", "library_time.html#autotoc_md241", null ],
+      [ "Status", "library_time.html#autotoc_md242", null ],
+      [ "Description", "library_time.html#autotoc_md243", [
+        [ "SC::Time::Absolute", "library_time.html#autotoc_md244", [
+          [ "SC::Time::Absolute::parseLocal", "library_time.html#autotoc_md245", null ]
         ] ],
-        [ "SC::Time::Relative", "library_time.html#autotoc_md245", null ],
-        [ "SC::Time::HighResolutionCounter", "library_time.html#autotoc_md246", [
-          [ "SC::Time::HighResolutionCounter::snap", "library_time.html#autotoc_md247", null ],
-          [ "SC::Time::HighResolutionCounter::subtractApproximate", "library_time.html#autotoc_md248", null ],
-          [ "SC::Time::HighResolutionCounter::isLaterThanOrEqualTo", "library_time.html#autotoc_md249", null ]
+        [ "SC::Time::Relative", "library_time.html#autotoc_md246", null ],
+        [ "SC::Time::HighResolutionCounter", "library_time.html#autotoc_md247", [
+          [ "SC::Time::HighResolutionCounter::snap", "library_time.html#autotoc_md248", null ],
+          [ "SC::Time::HighResolutionCounter::subtractApproximate", "library_time.html#autotoc_md249", null ],
+          [ "SC::Time::HighResolutionCounter::isLaterThanOrEqualTo", "library_time.html#autotoc_md250", null ]
         ] ]
       ] ],
-      [ "Roadmap", "library_time.html#autotoc_md250", null ]
+      [ "Roadmap", "library_time.html#autotoc_md251", null ]
     ] ]
 ];

@@ -63,6 +63,7 @@ var files_dup =
     [ "Testing.h", "_testing_8h_source.html", null ],
     [ "Atomic.h", "_atomic_8h_source.html", null ],
     [ "Threading.h", "_threading_8h_source.html", null ],
+    [ "ThreadPool.h", "_thread_pool_8h_source.html", null ],
     [ "Time.h", "_time_8h_source.html", null ],
     [ "SerializationBinaryTypeErased.h", "_serialization_binary_type_erased_8h_source.html", null ]
 ];

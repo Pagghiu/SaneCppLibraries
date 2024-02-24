@@ -25,7 +25,7 @@ var searchData=
   ['copyfile_22',['copyFile',['../struct_s_c_1_1_file_system.html#acd4fd51f636a8f5f3d0d7b187194388e',1,'SC::FileSystem']]],
   ['copyfiles_23',['copyFiles',['../struct_s_c_1_1_file_system.html#a496fdbb8cbf227307c754dc6f97b7646',1,'SC::FileSystem']]],
   ['counttokens_24',['countTokens',['../struct_s_c_1_1_string_view_tokenizer.html#a6a6345caf2c4edfb346cb70d4de9c2b6',1,'SC::StringViewTokenizer']]],
-  ['create_25',['create',['../struct_s_c_1_1_async_event_loop.html#acff1e9afb4330dabb78d5f491ba3d39e',1,'SC::AsyncEventLoop::create()'],['../struct_s_c_1_1_socket_descriptor.html#abae627322ab6d511fdf774516aa12bec',1,'SC::SocketDescriptor::create()']]],
+  ['create_25',['create',['../struct_s_c_1_1_async_event_loop.html#acff1e9afb4330dabb78d5f491ba3d39e',1,'SC::AsyncEventLoop::create()'],['../struct_s_c_1_1_socket_descriptor.html#abae627322ab6d511fdf774516aa12bec',1,'SC::SocketDescriptor::create()'],['../struct_s_c_1_1_thread_pool.html#ac4d16bfc16be6192930cb1609b50eedc',1,'SC::ThreadPool::create()']]],
   ['createarray_26',['createArray',['../struct_s_c_1_1_reflection_1_1_schema_type.html#a02ba92ef52888967113412cd13d52d7d',1,'SC::Reflection::SchemaType']]],
   ['createasynctcpsocket_27',['createAsyncTCPSocket',['../struct_s_c_1_1_async_event_loop.html#add7fd25e710032ebadfb9c40a479f6a3',1,'SC::AsyncEventLoop']]],
   ['creategeneric_28',['createGeneric',['../struct_s_c_1_1_reflection_1_1_schema_type.html#ac69130de3028614233b72003870f6470',1,'SC::Reflection::SchemaType']]],

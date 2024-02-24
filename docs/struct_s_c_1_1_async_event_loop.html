@@ -114,6 +114,7 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_async_event_loop.html',
 <a href="#nested-classes">Classes</a> &#124;
 <a href="#pub-types">Public Types</a> &#124;
 <a href="#pub-methods">Public Member Functions</a> &#124;
+<a href="#pub-static-methods">Static Public Member Functions</a> &#124;
 <a href="#friends">Friends</a> &#124;
 <a href="struct_s_c_1_1_async_event_loop-members.html">List of all members</a>  </div>
   <div class="headertitle"><div class="title">SC::AsyncEventLoop Struct Reference<div class="ingroups"><a class="el" href="group__group__async.html">Async</a></div></div></div>
@@ -171,6 +172,12 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a1189d814ee281d7a2e4267bcdf84243d"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_time_1_1_high_resolution_counter.html">Time::HighResolutionCounter</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_event_loop.html#a1189d814ee281d7a2e4267bcdf84243d">getLoopTime</a> () const</td></tr>
 <tr class="memdesc:a1189d814ee281d7a2e4267bcdf84243d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get Loop time.  <a href="struct_s_c_1_1_async_event_loop.html#a1189d814ee281d7a2e4267bcdf84243d">More...</a><br /></td></tr>
 <tr class="separator:a1189d814ee281d7a2e4267bcdf84243d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-static-methods" name="pub-static-methods"></a>
+Static Public Member Functions</h2></td></tr>
+<tr class="memitem:adb22025d3a2dded2a265ecf645e7ef56"><td class="memItemLeft" align="right" valign="top">static bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_event_loop.html#adb22025d3a2dded2a265ecf645e7ef56">tryLoadingLiburing</a> ()</td></tr>
+<tr class="memdesc:adb22025d3a2dded2a265ecf645e7ef56"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if liburing is loadable (only on Linux)  <a href="struct_s_c_1_1_async_event_loop.html#adb22025d3a2dded2a265ecf645e7ef56">More...</a><br /></td></tr>
+<tr class="separator:adb22025d3a2dded2a265ecf645e7ef56"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="friends" name="friends"></a>
 Friends</h2></td></tr>
@@ -386,6 +393,34 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncRequest</b></t
 
 <p>Blocks until at least one request proceeds, ensuring forward progress. </p>
 <p >It's useful for applications where the eventLoop events needs to be interleaved with other work. For example one possible way of integrating with a UI event loop could be to schedule a recurrent timeout timer every 1/60 seconds where calling GUI event loop updates every 60 seconds, blocking for I/O for the remaining time. Waiting on requests blocks the current thread with 0% CPU utilization. </p>
+
+</div>
+</div>
+<a id="adb22025d3a2dded2a265ecf645e7ef56" name="adb22025d3a2dded2a265ecf645e7ef56"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#adb22025d3a2dded2a265ecf645e7ef56">&#9670;&nbsp;</a></span>tryLoadingLiburing()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static bool SC::AsyncEventLoop::tryLoadingLiburing </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Check if liburing is loadable (only on Linux) </p>
+<dl class="section return"><dt>Returns</dt><dd>true if liburing has been loaded, false otherwise (and on any non-Linux os) </dd></dl>
 
 </div>
 </div>

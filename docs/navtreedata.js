@@ -66,9 +66,9 @@ var NAVTREE =
     [ "Extra Libraries", "libraries_extra.html", "libraries_extra" ],
     [ "Platforms", "page_platforms.html", null ],
     [ "Principles", "page_principles.html", [
-      [ "📖 Readability", "page_principles.html#autotoc_md258", null ],
-      [ "✅ Correctness", "page_principles.html#autotoc_md259", null ],
-      [ "🚀 Speed", "page_principles.html#autotoc_md260", null ]
+      [ "📖 Readability", "page_principles.html#autotoc_md259", null ],
+      [ "✅ Correctness", "page_principles.html#autotoc_md260", null ],
+      [ "🚀 Speed", "page_principles.html#autotoc_md261", null ]
     ] ],
     [ "Tests", "page_tests.html", null ],
     [ "Modules", "modules.html", "modules" ],
@@ -103,11 +103,11 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "_algorithm_bubble_sort_8h_source.html",
-"library_async.html#autotoc_md69",
-"page_faq.html#autotoc_md41",
-"struct_s_c_1_1_deferred.html",
-"struct_s_c_1_1_plugin_definition.html#ac28d96432a593a1e3978fe11d1534146",
-"struct_s_c_1_1_string_iterator.html#a642e968f2ab5cfef10c8d7fabc794ec9"
+"library_async.html#autotoc_md66",
+"page_examples.html",
+"struct_s_c_1_1_console.html#a02929e369dd92d4f3130a8c0814c4f26",
+"struct_s_c_1_1_plugin_definition.html#a6e6559a3690b3a9378e58b6b1132eab3",
+"struct_s_c_1_1_string_iterator.html#a39c0cb6fe4ae1b432be2a4caf48d6137"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

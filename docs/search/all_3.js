@@ -10,12 +10,13 @@ var searchData=
   ['dependencies_7',['dependencies',['../struct_s_c_1_1_plugin_definition.html#a623e3c1b529411e4a9443a38be39dcfe',1,'SC::PluginDefinition']]],
   ['description_8',['description',['../struct_s_c_1_1_plugin_definition.html#a170fb69cbc1eeae85c560f1f56cececc',1,'SC::PluginDefinition']]],
   ['destination_9',['destination',['../struct_s_c_1_1_file_system_1_1_copy_operation.html#aa34268773f08bd3c2ee2186ec139cbc1',1,'SC::FileSystem::CopyOperation']]],
-  ['detach_10',['detach',['../struct_s_c_1_1_unique_handle.html#a7d9c9d646c0bae2b78b21d67b674456e',1,'SC::UniqueHandle::detach()'],['../struct_s_c_1_1_thread.html#a7ec0ae5d34ef6821aa884452c17c5046',1,'SC::Thread::detach()']]],
-  ['directory_11',['directory',['../struct_s_c_1_1_path_1_1_parsed_view.html#ae3e55f6ab4e5013a3b13cca1428084f0',1,'SC::Path::ParsedView::directory()'],['../struct_s_c_1_1_plugin_definition.html#a83e7c1f520ab50e4c8e2fb1512ef2112',1,'SC::PluginDefinition::directory()']]],
-  ['dirname_12',['dirname',['../struct_s_c_1_1_path.html#a79cc6fc47148aa284c146bce636b7a28',1,'SC::Path']]],
-  ['disarm_13',['disarm',['../struct_s_c_1_1_deferred.html#acf6febf2a8e08eef171ade5687c224aa',1,'SC::Deferred']]],
-  ['donotaddzeroterminator_14',['DoNotAddZeroTerminator',['../struct_s_c_1_1_string_converter.html#a4b383fd8150e23a78b178744d3384c1aa675916b6efa99b5e2f20f81c926d4458',1,'SC::StringConverter']]],
-  ['donotclear_15',['DoNotClear',['../struct_s_c_1_1_string_builder.html#a4469f304bc2f7accc20ea5c12254e232aab15767200eb0607639accab3e72c1f7',1,'SC::StringBuilder::DoNotClear()'],['../struct_s_c_1_1_string_converter.html#a8811922e2999c5e83f015569c02cbec3a8a7e4c6b55c97eb549e00c68f0f0bf34',1,'SC::StringConverter::DoNotClear()']]],
-  ['dynamiclibrary_16',['dynamicLibrary',['../struct_s_c_1_1_plugin_dynamic_library.html#a1d14d7bf25b60e25883407829f667426',1,'SC::PluginDynamicLibrary']]],
-  ['dynamiclibrary_17',['DynamicLibrary',['../struct_s_c_1_1_build_1_1_target_type.html#ad357114ea742a6bb9826ae66ecc3fe26aee21501835ef4633b31f7b590ec9fee5',1,'SC::Build::TargetType']]]
+  ['destroy_10',['destroy',['../struct_s_c_1_1_thread_pool.html#a1627e46fb137380bb55e816c08ce2cb0',1,'SC::ThreadPool']]],
+  ['detach_11',['detach',['../struct_s_c_1_1_unique_handle.html#a7d9c9d646c0bae2b78b21d67b674456e',1,'SC::UniqueHandle::detach()'],['../struct_s_c_1_1_thread.html#a7ec0ae5d34ef6821aa884452c17c5046',1,'SC::Thread::detach()']]],
+  ['directory_12',['directory',['../struct_s_c_1_1_path_1_1_parsed_view.html#ae3e55f6ab4e5013a3b13cca1428084f0',1,'SC::Path::ParsedView::directory()'],['../struct_s_c_1_1_plugin_definition.html#a83e7c1f520ab50e4c8e2fb1512ef2112',1,'SC::PluginDefinition::directory()']]],
+  ['dirname_13',['dirname',['../struct_s_c_1_1_path.html#a79cc6fc47148aa284c146bce636b7a28',1,'SC::Path']]],
+  ['disarm_14',['disarm',['../struct_s_c_1_1_deferred.html#acf6febf2a8e08eef171ade5687c224aa',1,'SC::Deferred']]],
+  ['donotaddzeroterminator_15',['DoNotAddZeroTerminator',['../struct_s_c_1_1_string_converter.html#a4b383fd8150e23a78b178744d3384c1aa675916b6efa99b5e2f20f81c926d4458',1,'SC::StringConverter']]],
+  ['donotclear_16',['DoNotClear',['../struct_s_c_1_1_string_builder.html#a4469f304bc2f7accc20ea5c12254e232aab15767200eb0607639accab3e72c1f7',1,'SC::StringBuilder::DoNotClear()'],['../struct_s_c_1_1_string_converter.html#a8811922e2999c5e83f015569c02cbec3a8a7e4c6b55c97eb549e00c68f0f0bf34',1,'SC::StringConverter::DoNotClear()']]],
+  ['dynamiclibrary_17',['DynamicLibrary',['../struct_s_c_1_1_build_1_1_target_type.html#ad357114ea742a6bb9826ae66ecc3fe26aee21501835ef4633b31f7b590ec9fee5',1,'SC::Build::TargetType']]],
+  ['dynamiclibrary_18',['dynamicLibrary',['../struct_s_c_1_1_plugin_dynamic_library.html#a1d14d7bf25b60e25883407829f667426',1,'SC::PluginDynamicLibrary']]]
 ];
