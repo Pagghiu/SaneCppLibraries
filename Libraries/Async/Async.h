@@ -115,11 +115,14 @@ struct SC::AsyncRequest
     AsyncRequest* next = nullptr;
     AsyncRequest* prev = nullptr;
 
+    void setDebugName(const char* newDebugName)
+    {
 #if SC_CONFIGURATION_DEBUG
-    void setDebugName(const char* newDebugName) { debugName = newDebugName; }
+        debugName = newDebugName;
 #else
-    void               setDebugName(const char* newDebugName) { SC_COMPILER_UNUSED(newDebugName); }
+        SC_COMPILER_UNUSED(newDebugName);
 #endif
+    }
 
     /// @brief Get the event loop associated with this AsyncRequest
     [[nodiscard]] AsyncEventLoop* getEventLoop() const { return eventLoop; }
@@ -183,8 +186,8 @@ struct SC::AsyncRequest
     int16_t flags = 0; // 2 bytes
     int32_t eventIndex;
 
-    static constexpr int16_t Flag_RegularFile      = 1 << 1;
-    static constexpr int16_t Flag_ManualCompletion = 1 << 2;
+    static constexpr int16_t Flag_NeedsManualCompletion = 1 << 1;
+    static constexpr int16_t Flag_ManualCompletion      = 1 << 2;
 };
 
 /// @brief Base class for all async results
@@ -323,7 +326,7 @@ struct AsyncProcessExit : public AsyncRequest
     detail::WinOverlappedOpaque overlapped;
     detail::WinWaitHandle       waitHandle;
 #elif SC_PLATFORM_LINUX
-    FileDescriptor     pidFd;
+    FileDescriptor pidFd;
 #endif
 };
 
@@ -375,7 +378,7 @@ struct AsyncSocketAccept : public AsyncRequest
     uint8_t          acceptBuffer[288];
 #elif SC_PLATFORM_LINUX
     AlignedStorage<28> sockAddrHandle;
-    uint32_t           sockAddrLen;
+    uint32_t sockAddrLen;
 #endif
 };
 
@@ -568,8 +571,6 @@ struct AsyncFileRead : public AsyncRequest
     Span<char>             readBuffer;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
-#elif SC_PLATFORM_LINUX
-    size_t             syncReadBytes    = 0;
 #endif
 };
 
@@ -613,8 +614,6 @@ struct AsyncFileWrite : public AsyncRequest
     Span<const char>       writeBuffer;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
-#elif SC_PLATFORM_LINUX
-    size_t             syncWrittenBytes = 0;
 #endif
 };
 
@@ -773,7 +772,7 @@ struct SC::AsyncEventLoop
 #elif SC_PLATFORM_APPLE
     struct InternalPosix;
     struct KernelQueuePosix;
-    using Internal    = InternalPosix;
+    using Internal = InternalPosix;
     using KernelQueue = KernelQueuePosix;
 #elif SC_PLATFORM_WINDOWS
     struct Internal;
