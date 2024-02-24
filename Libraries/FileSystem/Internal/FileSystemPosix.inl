@@ -234,10 +234,28 @@ struct SC::FileSystem::Internal
             return false;
         }
         auto closeOutput = MakeDeferred([&] { ::close(outputDescriptor); });
-        int sendRes = ::sendfile(outputDescriptor, inputDescriptor, nullptr, inputStat.st_size);
+
+        const int sendRes = ::sendfile(outputDescriptor, inputDescriptor, nullptr, inputStat.st_size);
         if (sendRes < 0)
         {
-            return false;
+            // Sendfile failed, fallback to traditional read/write
+            constexpr size_t bufferSize = 4096;
+
+            char buffer[bufferSize];
+
+            ssize_t bytesRead;
+            while ((bytesRead = ::read(inputDescriptor, buffer, bufferSize)) > 0)
+            {
+                if (::write(outputDescriptor, buffer, static_cast<size_t>(bytesRead)) < 0)
+                {
+                    return false; // Error in write
+                }
+            }
+
+            if (bytesRead < 0)
+            {
+                return false; // Error in read
+            }
         }
         return true;
     }
