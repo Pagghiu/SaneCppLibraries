@@ -17,6 +17,7 @@ void SC::ConditionVariable::wait(Mutex& mutex)
     pthread_cond_wait(&condition.reinterpret_as<pthread_cond_t>(), &mutex.mutex.reinterpret_as<pthread_mutex_t>());
 }
 void SC::ConditionVariable::signal() { pthread_cond_signal(&condition.reinterpret_as<pthread_cond_t>()); }
+void SC::ConditionVariable::broadcast() { pthread_cond_broadcast(&condition.reinterpret_as<pthread_cond_t>()); }
 
 struct SC::Thread::Internal
 {

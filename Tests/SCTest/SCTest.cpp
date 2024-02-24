@@ -77,6 +77,7 @@ void runTimeTest(TestReport& report);
 // Threading
 void runAtomicTest(TestReport& report);
 void runThreadingTest(TestReport& report);
+void runThreadPoolTest(TestReport& report);
 
 // Async
 void runAsyncTest(SC::TestReport& report);
@@ -191,6 +192,7 @@ int main(int argc, const char* argv[])
     // Threading tests
     runAtomicTest(report);
     runThreadingTest(report);
+    runThreadPoolTest(report);
 
     // Async tests
     runAsyncTest(report);

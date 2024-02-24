@@ -25,6 +25,7 @@
 #include "../../Libraries/Strings/StringIterator.cpp"
 #include "../../Libraries/Strings/StringView.cpp"
 #include "../../Libraries/Testing/Testing.cpp"
+#include "../../Libraries/Threading/ThreadPool.cpp"
 #include "../../Libraries/Threading/Threading.cpp"
 #include "../../Libraries/Time/Time.cpp"
 

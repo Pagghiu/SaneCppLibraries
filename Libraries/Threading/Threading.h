@@ -72,6 +72,7 @@ struct SC::ConditionVariable
 
     void wait(Mutex& mutex);
     void signal();
+    void broadcast();
 
   private:
 #if SC_PLATFORM_APPLE

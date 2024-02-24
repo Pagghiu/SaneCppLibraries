@@ -21,6 +21,7 @@ void SC::ConditionVariable::wait(Mutex& mutex)
                                &mutex.mutex.reinterpret_as<CRITICAL_SECTION>(), INFINITE);
 }
 void SC::ConditionVariable::signal() { ::WakeConditionVariable(&condition.reinterpret_as<CONDITION_VARIABLE>()); }
+void SC::ConditionVariable::broadcast() { ::WakeAllConditionVariable(&condition.reinterpret_as<CONDITION_VARIABLE>()); }
 
 struct SC::Thread::Internal
 {
