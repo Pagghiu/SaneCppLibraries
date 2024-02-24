@@ -10,6 +10,7 @@ Threading is a library defining basic primitives for user-space threading and sy
 | Class                 | Description                       |
 |:----------------------|:----------------------------------|
 | SC::Thread            | @copybrief SC::Thread             |
+| SC::ThreadPool        | @copybrief SC::ThreadPool         |
 | SC::Mutex             | @copybrief SC::Mutex              |
 | SC::ConditionVariable | @copybrief SC::ConditionVariable  |
 | SC::Atomic            | @copybrief SC::Atomic             |
@@ -24,6 +25,9 @@ The Atomic header is really only being implemented for a few data types and need
 
 ## SC::Thread
 @copydoc SC::Thread
+
+## SC::ThreadPool
+@copydoc SC::ThreadPool
 
 ## SC::Mutex
 @copydoc SC::Mutex
@@ -43,7 +47,5 @@ The Atomic header is really only being implemented for a few data types and need
 
 🟦 Complete Features:
 - Support more types in Atomic<T>
-
-💡 Unplanned Features:
 - ReadWrite Lock
 - Barrier

@@ -14,17 +14,20 @@ struct ThreadPool;
 /// @brief Simple thread pool that executes tasks in a fixed number of worker threads.
 ///
 /// This class is not copyable / moveable due to it containing Mutex and Condition variable.
-/// If a runtime known amount of threadpools is required, use heap to allocate them.
+/// Additionally, this class does not allocate any memory by itself, and expects the caller to supply
+/// SC::ThreadPool::Task objects.
+///
+/// @warning The caller is responsible of keeping Task address stable until the it will be completed.
+/// If it's not already completed the task must still be valid during ThreadPool::destroy or ThreadPool destructor.
 ///
 /// Example:
-/// @snippet Libraries/Threading/Tests/ThreadPool.cpp threadPoolSnippet
+/// @snippet Libraries/Threading/Tests/ThreadPoolTest.cpp threadPoolSnippet
+///
 struct SC::ThreadPool
 {
     /// @brief A small task containing a function to execute that can be queued in the thread pool.
     ///
     /// Fill Task::function with any function to execute in the thread pool.
-    /// @warning The caller is responsible of keeping Task address stable until the it will be completed.
-    /// If it's not already completed the task must still be valid during ThreadPool::destroy or ThreadPool destructor.
     struct Task
     {
         Function<void()> function; ///< Function that will be executed during the task
