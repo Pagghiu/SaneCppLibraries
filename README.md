@@ -25,6 +25,7 @@
 Visit the [documentation website](https://pagghiu.github.io/SaneCppLibraries/index.html) for more information.
 
 Blog posts:
+- [February 2024 Update](https://pagghiu.github.io/site/blog/2024-02-23-SaneCppLibrariesUpdate.html)
 - [January 2024 Update](https://pagghiu.github.io/site/blog/2024-01-23-SaneCppLibrariesUpdate.html)
 - [Public Release blog post](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html)
 
@@ -40,6 +41,7 @@ On the [Youtube Channel](https://www.youtube.com/@Pagghiu) you can find some vid
 - [A Tour of SC::Async](https://www.youtube.com/watch?v=pIGosb2D2Ro)
 - [Linux Async I/O using io_uring (1 of 2)](https://www.youtube.com/watch?v=YR935rorb3E)
 - [Linux Async I/O using io_uring (2 of 2)](https://www.youtube.com/watch?v=CgYE0YrpHt0)
+- [Simple ThreadPool](https://www.youtube.com/watch?v=e48ruImESxI)
 
 # Libraries
 
@@ -72,7 +74,7 @@ Library                                                                         
 [Socket](https://pagghiu.github.io/SaneCppLibraries/library_socket.html)                                | 🟨 Synchronous socket networking and DNS lookup
 [Strings](https://pagghiu.github.io/SaneCppLibraries/library_strings.html)                              | 🟩 String formatting / conversion / manipulation (ASCII / UTF8 / UTF16)
 [Testing](https://pagghiu.github.io/SaneCppLibraries/library_testing.html)                              | 🟨 Simple testing framework used by all of the other libraries
-[Threading](https://pagghiu.github.io/SaneCppLibraries/library_threading.html)                          | 🟥 Atomic, thread, mutex, condition variable
+[Threading](https://pagghiu.github.io/SaneCppLibraries/library_threading.html)                          | 🟥 Atomic, thread, thread pool, mutex, condition variable
 [Time](https://pagghiu.github.io/SaneCppLibraries/library_time.html)                                    | 🟨 Time handling (relative, absolute, high resolution)
 
 # Building

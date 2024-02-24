@@ -1,6 +1,6 @@
 @page library_threading Threading
 
-@brief 🟥 Atomic, thread, mutex, condition variable
+@brief 🟥 Atomic, thread, thread pool, mutex, condition variable
 
 [TOC]
 
