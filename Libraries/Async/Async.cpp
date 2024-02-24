@@ -205,7 +205,7 @@ SC::Result SC::AsyncEventLoop::run()
 const SC::Time::HighResolutionCounter* SC::AsyncEventLoop::findEarliestTimer() const
 {
     const Time::HighResolutionCounter* earliestTime = nullptr;
-    for (AsyncRequest* async = activeTimers.front; async != nullptr; async = async->next)
+    for (AsyncRequest* async = activeLoopTimeouts.front; async != nullptr; async = async->next)
     {
         SC_ASSERT_DEBUG(async->type == AsyncRequest::Type::LoopTimeout);
         const auto& expirationTime = static_cast<AsyncLoopTimeout*>(async)->expirationTime;
@@ -219,24 +219,19 @@ const SC::Time::HighResolutionCounter* SC::AsyncEventLoop::findEarliestTimer() c
 
 void SC::AsyncEventLoop::invokeExpiredTimers()
 {
-    for (AsyncRequest* async = activeTimers.front; async != nullptr;)
+    for (AsyncLoopTimeout* async = activeLoopTimeouts.front; async != nullptr;)
     {
         SC_ASSERT_DEBUG(async->type == AsyncRequest::Type::LoopTimeout);
-        const auto& expirationTime = static_cast<AsyncLoopTimeout*>(async)->expirationTime;
+        const Time::HighResolutionCounter& expirationTime = async->expirationTime;
+        AsyncLoopTimeout*                  currentAsync   = async;
+        async                                             = static_cast<AsyncLoopTimeout*>(async->next);
         if (loopTime.isLaterThanOrEqualTo(expirationTime))
         {
-            AsyncRequest* currentAsync = async;
-            async                      = async->next;
-            activeTimers.remove(*currentAsync);
-            currentAsync->state          = AsyncRequest::State::Free;
-            Result                   res = Result(true);
-            AsyncLoopTimeout::Result result(*static_cast<AsyncLoopTimeout*>(currentAsync), move(res));
+            activeLoopTimeouts.remove(*currentAsync);
+            currentAsync->state = AsyncRequest::State::Free;
+            AsyncLoopTimeout::Result result(*currentAsync, Result(true));
             result.async.eventLoop = nullptr; // Allow reusing it
-            static_cast<AsyncLoopTimeout*>(currentAsync)->callback(result);
-        }
-        else
-        {
-            async = async->next;
+            currentAsync->callback(result);
         }
     }
 }
@@ -249,10 +244,38 @@ SC::Result SC::AsyncEventLoop::create(Options options)
     return SC::Result(true);
 }
 
+template <typename T>
+void SC::AsyncEventLoop::freeAsyncRequests(IntrusiveDoubleLinkedList<T>& linkedList)
+{
+    for (auto async = linkedList.front; async != nullptr; async = static_cast<T*>(async->next))
+    {
+        async->state     = AsyncRequest::State::Free;
+        async->eventLoop = nullptr;
+    }
+    linkedList.clear();
+}
+
 SC::Result SC::AsyncEventLoop::close()
 {
-    Internal& self = internal.get();
-    return self.close();
+    freeAsyncRequests(submissions);
+
+    freeAsyncRequests(activeLoopTimeouts);
+    freeAsyncRequests(activeLoopWakeUps);
+    freeAsyncRequests(activeProcessExits);
+    freeAsyncRequests(activeSocketAccepts);
+    freeAsyncRequests(activeSocketConnects);
+    freeAsyncRequests(activeSocketSends);
+    freeAsyncRequests(activeSocketReceives);
+    freeAsyncRequests(activeSocketCloses);
+    freeAsyncRequests(activeFileReads);
+    freeAsyncRequests(activeFileWrites);
+    freeAsyncRequests(activeFileCloses);
+    freeAsyncRequests(activeFilePolls);
+
+    freeAsyncRequests(manualCompletions);
+    numberOfActiveHandles = 0;
+    numberOfExternals     = 0;
+    return internal.get().close();
 }
 
 SC::Result SC::AsyncEventLoop::stageSubmission(KernelQueue& queue, AsyncRequest& async)
@@ -524,16 +547,6 @@ SC::Result SC::AsyncEventLoop::cancelAsync(AsyncRequest& async)
     switch (async.state)
     {
     case AsyncRequest::State::Active: {
-        // This kinda breaks the backend encapsulation but we can't easily do otherwise because
-        // we have to remove the async from the active queues to push it  in the submission queue.
-        if (async.type == AsyncRequest::Type::LoopTimeout)
-        {
-            activeTimers.remove(async);
-        }
-        else if (async.type == AsyncRequest::Type::LoopWakeUp)
-        {
-            activeWakeUps.remove(async);
-        }
         removeActiveHandle(async);
         async.state = AsyncRequest::State::Cancelling;
         submissions.queueBack(async);
@@ -595,10 +608,11 @@ SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
 
 void SC::AsyncEventLoop::executeWakeUps(AsyncResult& result)
 {
-    for (AsyncRequest* async = activeWakeUps.front; async != nullptr; async = async->next)
+    for (AsyncLoopWakeUp* async = activeLoopWakeUps.front; async != nullptr;
+         async                  = static_cast<AsyncLoopWakeUp*>(async->next))
     {
         SC_ASSERT_DEBUG(async->type == AsyncRequest::Type::LoopWakeUp);
-        AsyncLoopWakeUp* notifier = static_cast<AsyncLoopWakeUp*>(async);
+        AsyncLoopWakeUp* notifier = async;
         if (notifier->pending.load() == true)
         {
             AsyncLoopWakeUp::Result asyncResult(*notifier, Result(true));
@@ -617,24 +631,65 @@ void SC::AsyncEventLoop::removeActiveHandle(AsyncRequest& async)
 {
     SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Active);
     async.state = AsyncRequest::State::Free;
+
+    if ((async.flags & AsyncRequest::Flag_ManualCompletion) != 0)
+    {
+        return; // Asyncs flagged to be manually completed, are not added to active handles
+    }
     async.eventLoop->numberOfActiveHandles -= 1;
+    // clang-format off
+    switch (async.type)
+    {
+        case AsyncRequest::Type::LoopTimeout:   activeLoopTimeouts.remove(*static_cast<AsyncLoopTimeout*>(&async));     break;
+        case AsyncRequest::Type::LoopWakeUp:    activeLoopWakeUps.remove(*static_cast<AsyncLoopWakeUp*>(&async));       break;
+        case AsyncRequest::Type::ProcessExit:   activeProcessExits.remove(*static_cast<AsyncProcessExit*>(&async));     break;
+        case AsyncRequest::Type::SocketAccept:  activeSocketAccepts.remove(*static_cast<AsyncSocketAccept*>(&async));   break;
+        case AsyncRequest::Type::SocketConnect: activeSocketConnects.remove(*static_cast<AsyncSocketConnect*>(&async)); break;
+        case AsyncRequest::Type::SocketSend:    activeSocketSends.remove(*static_cast<AsyncSocketSend*>(&async));       break;
+        case AsyncRequest::Type::SocketReceive: activeSocketReceives.remove(*static_cast<AsyncSocketReceive*>(&async)); break;
+        case AsyncRequest::Type::SocketClose:   activeSocketCloses.remove(*static_cast<AsyncSocketClose*>(&async));     break;
+        case AsyncRequest::Type::FileRead:      activeFileReads.remove(*static_cast<AsyncFileRead*>(&async));           break;
+        case AsyncRequest::Type::FileWrite:     activeFileWrites.remove(*static_cast<AsyncFileWrite*>(&async));         break;
+        case AsyncRequest::Type::FileClose:     activeFileCloses.remove(*static_cast<AsyncFileClose*>(&async));         break;
+        case AsyncRequest::Type::FilePoll:      activeFilePolls.remove(*static_cast<AsyncFilePoll*>(&async));           break;
+    }
+    // clang-format on
 }
 
 void SC::AsyncEventLoop::addActiveHandle(AsyncRequest& async)
 {
     SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Submitting);
     async.state = AsyncRequest::State::Active;
+
+    if ((async.flags & AsyncRequest::Flag_ManualCompletion) != 0)
+    {
+        return; // Asyncs flagged to be manually completed, are not added to active handles
+    }
     async.eventLoop->numberOfActiveHandles += 1;
+    // clang-format off
+    switch (async.type)
+    {
+        case AsyncRequest::Type::LoopTimeout:   activeLoopTimeouts.queueBack(*static_cast<AsyncLoopTimeout*>(&async));      break;
+        case AsyncRequest::Type::LoopWakeUp:    activeLoopWakeUps.queueBack(*static_cast<AsyncLoopWakeUp*>(&async));        break;
+        case AsyncRequest::Type::ProcessExit:   activeProcessExits.queueBack(*static_cast<AsyncProcessExit*>(&async));      break;
+        case AsyncRequest::Type::SocketAccept:  activeSocketAccepts.queueBack(*static_cast<AsyncSocketAccept*>(&async));    break;
+        case AsyncRequest::Type::SocketConnect: activeSocketConnects.queueBack(*static_cast<AsyncSocketConnect*>(&async));  break;
+        case AsyncRequest::Type::SocketSend:    activeSocketSends.queueBack(*static_cast<AsyncSocketSend*>(&async));        break;
+        case AsyncRequest::Type::SocketReceive: activeSocketReceives.queueBack(*static_cast<AsyncSocketReceive*>(&async));  break;
+        case AsyncRequest::Type::SocketClose:   activeSocketCloses.queueBack(*static_cast<AsyncSocketClose*>(&async));      break;
+        case AsyncRequest::Type::FileRead:      activeFileReads.queueBack(*static_cast<AsyncFileRead*>(&async));            break;
+        case AsyncRequest::Type::FileWrite:     activeFileWrites.queueBack(*static_cast<AsyncFileWrite*>(&async));          break;
+        case AsyncRequest::Type::FileClose:     activeFileCloses.queueBack(*static_cast<AsyncFileClose*>(&async));          break;
+        case AsyncRequest::Type::FilePoll: 	    activeFilePolls.queueBack(*static_cast<AsyncFilePoll*>(&async));            break;
+    }
+    // clang-format on
 }
 
 void SC::AsyncEventLoop::scheduleManualCompletion(AsyncRequest& async)
 {
-    const AsyncRequest::State backupState = async.state;
     SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Setup or async.state == AsyncRequest::State::Submitting);
     async.eventLoop->manualCompletions.queueBack(async);
-    async.state = AsyncRequest::State::Active;
-    async.eventLoop->removeActiveHandle(async);
-    async.state = backupState;
+    async.flags |= AsyncRequest::Flag_ManualCompletion;
 }
 
 SC::Result SC::AsyncEventLoop::createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor)

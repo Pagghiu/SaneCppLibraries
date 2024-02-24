@@ -29,6 +29,13 @@ struct SC::IntrusiveDoubleLinkedList
 
     void clear()
     {
+        for (T* current = front; current != nullptr;)
+        {
+            T* next       = static_cast<T*>(current->next);
+            current->next = nullptr;
+            current->prev = nullptr;
+            current       = next;
+        }
         back  = nullptr;
         front = nullptr;
     }

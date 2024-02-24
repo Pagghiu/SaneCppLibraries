@@ -32,8 +32,8 @@ struct SC::AsyncEventLoop::InternalPosix
     AsyncFilePoll  wakeupPoll;
     PipeDescriptor wakeupPipe;
 #if SC_ASYNC_USE_EPOLL
-    FileDescriptor   signalProcessExitDescriptor;
-    AsyncProcessExit signalProcessExit;
+    FileDescriptor signalProcessExitDescriptor;
+    AsyncFilePoll  signalProcessExit;
 #endif
     InternalPosix() {}
     ~InternalPosix() { SC_TRUST_RESULT(close()); }
@@ -43,11 +43,6 @@ struct SC::AsyncEventLoop::InternalPosix
     [[nodiscard]] Result close()
     {
 #if SC_ASYNC_USE_EPOLL
-        FileDescriptor::Handle processExitHandle;
-        if (signalProcessExitDescriptor.get(processExitHandle, Result::Error("signalProcessExitDescriptor")))
-        {
-            SC_TRY(stopSingleWatcherImmediate(signalProcessExit, processExitHandle, EPOLLIN | EPOLLET));
-        }
         SC_TRY(signalProcessExitDescriptor.close());
 #endif
         SC_TRY(wakeupPipe.readPipe.close());
@@ -100,9 +95,10 @@ struct SC::AsyncEventLoop::InternalPosix
 #endif
         SC_TRY(createWakeup(eventLoop));
         SC_TRY(eventLoop.runNoWait());   // Register the read handle before everything else
-        eventLoop.decreaseActiveCount(); // Avoids wakeup (read) keeping the queue up. Must be after runNoWait().
-        // TODO: For consistency in the future decreaseActiveCount() should be usable immediately after
-        // AsyncRequest::start() (similar to uv_unref).
+        eventLoop.decreaseActiveCount(); // WakeUp doesn't keep the queue active. Must be after runNoWait().
+#if SC_ASYNC_USE_EPOLL
+        eventLoop.decreaseActiveCount(); // Process watcher doesn't keep the queue active. Must be after runNoWait().
+#endif
         return Result(true);
     }
 
@@ -171,7 +167,6 @@ struct SC::AsyncEventLoop::InternalPosix
     // TODO: This should be lazily created on demand
     [[nodiscard]] Result createProcessSignalWatcher(AsyncEventLoop& loop)
     {
-        signalProcessExit.eventLoop = &loop;
         sigset_t mask;
         sigemptyset(&mask);
         sigaddset(&mask, SIGCHLD);
@@ -180,6 +175,7 @@ struct SC::AsyncEventLoop::InternalPosix
         {
             return Result::Error("Failed to set signal mask");
         }
+
         const int signalFd = signalfd(-1, &mask, SFD_CLOEXEC | SFD_NONBLOCK);
         if (signalFd == -1)
         {
@@ -187,11 +183,43 @@ struct SC::AsyncEventLoop::InternalPosix
         }
 
         SC_TRY(signalProcessExitDescriptor.assign(signalFd));
-        // Signal watcher is active by default.
-        // This is a shortcut for .addActiveHandle() and .decreaseActiveCount().
-        signalProcessExit.state = AsyncRequest::State::Active;
-        SC_TRY(addEventWatcher(signalProcessExit, signalFd, EPOLLIN | EPOLLET));
-        return Result(true);
+        signalProcessExit.callback.bind<InternalPosix, &InternalPosix::onSIGCHLD>(*this);
+        return signalProcessExit.start(loop, signalFd);
+    }
+
+    void onSIGCHLD(AsyncFilePoll::Result& result)
+    {
+        struct signalfd_siginfo siginfo;
+        FileDescriptor::Handle  sigHandle;
+
+        const InternalPosix& internal = result.async.eventLoop->internal.get().getPosix();
+        (void)(internal.signalProcessExitDescriptor.get(sigHandle, Result::Error("Invalid signal handle")));
+        ssize_t size = ::read(sigHandle, &siginfo, sizeof(siginfo));
+
+        if (size == sizeof(siginfo))
+        {
+            // Check if the received signal is related to process exit
+            if (siginfo.ssi_signo == SIGCHLD)
+            {
+                // Loop all process handles to find if one of our interest has exited
+                AsyncProcessExit* current = result.async.eventLoop->activeProcessExits.front;
+
+                while (current)
+                {
+                    if (siginfo.ssi_pid == current->handle)
+                    {
+                        AsyncProcessExit::Result processResult(*current, Result(true));
+                        processResult.exitStatus.status = siginfo.ssi_status;
+                        result.async.eventLoop->removeActiveHandle(*current);
+                        current->callback(processResult);
+                        // TODO: Handle lazy deactivation for signals when no more processes exist
+                        result.reactivateRequest(true);
+                        break;
+                    }
+                    current = static_cast<AsyncProcessExit*>(current->next);
+                }
+            }
+        }
     }
 #endif
 
@@ -383,32 +411,10 @@ struct SC::AsyncEventLoop::KernelQueuePosix
 #endif
 
     // TIMEOUT
-    [[nodiscard]] static Result activateAsync(AsyncLoopTimeout& async)
-    {
-        async.eventLoop->activeTimers.queueBack(async);
-        return Result(true);
-    }
-
-    [[nodiscard]] static Result cancelAsync(AsyncLoopTimeout& async)
-    {
-        async.eventLoop->activeTimers.remove(async);
-        return Result(true);
-    }
+    // Nothing to do :)
 
     // WAKEUP
-
-    // Using activateAsync / cancelAsync so that AsyncEventLoop::cancelAsync() can add the async to submission queue
-    [[nodiscard]] static Result activateAsync(AsyncLoopWakeUp& async)
-    {
-        async.eventLoop->activeWakeUps.queueBack(async);
-        return Result(true);
-    }
-
-    [[nodiscard]] static Result cancelAsync(AsyncLoopWakeUp& async)
-    {
-        async.eventLoop->activeWakeUps.remove(async);
-        return Result(true);
-    }
+    // Nothing to do :)
 
     // Socket ACCEPT
     [[nodiscard]] Result setupAsync(AsyncSocketAccept& async)
@@ -773,52 +779,6 @@ struct SC::AsyncEventLoop::KernelQueuePosix
     // Process EXIT
 #if SC_ASYNC_USE_EPOLL
 
-    [[nodiscard]] static Result activateAsync(AsyncProcessExit& async)
-    {
-        async.eventLoop->activeProcessChild.queueBack(async);
-        return Result(true);
-    }
-
-    [[nodiscard]] static Result cancelAsync(AsyncProcessExit& async)
-    {
-        async.eventLoop->activeProcessChild.remove(async);
-        return Result(true);
-    }
-
-    [[nodiscard]] Result completeAsync(AsyncProcessExit::Result& result)
-    {
-        struct signalfd_siginfo siginfo;
-        FileDescriptor::Handle  sigHandle;
-
-        const InternalPosix& internal = result.async.eventLoop->internal.get().getPosix();
-        SC_TRY(internal.signalProcessExitDescriptor.get(sigHandle, Result::Error("Invalid signal handle")));
-        ssize_t size = ::read(sigHandle, &siginfo, sizeof(siginfo));
-
-        if (size == sizeof(siginfo))
-        {
-            // Check if the received signal is related to process exit
-            if (siginfo.ssi_signo == SIGCHLD)
-            {
-                // Loop all process handles to find if one of our interest has exited
-                AsyncProcessExit* current = result.async.eventLoop->activeProcessChild.front;
-
-                while (current)
-                {
-                    if (siginfo.ssi_pid == current->handle)
-                    {
-                        result.exitStatus.status = siginfo.ssi_status;
-                        result.async.eventLoop->activeProcessChild.remove(*current);
-                        current->callback(result);
-                        // TODO: Handle lazy deactivation for signals when no more processes exist
-                        result.reactivateRequest(true);
-                        return Result(true);
-                    }
-                    current = static_cast<AsyncProcessExit*>(current->next);
-                }
-            }
-        }
-        return Result(true); // Return true even if unhandled, we have received a SIGCHLD for a non monitored pid
-    }
 #else
 
     [[nodiscard]] Result setupAsync(AsyncProcessExit& async)

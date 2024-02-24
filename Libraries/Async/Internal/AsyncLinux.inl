@@ -329,17 +329,7 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
     }
 
     // WAKEUP
-    [[nodiscard]] static Result setupAsync(AsyncLoopWakeUp& async)
-    {
-        async.eventLoop->activeWakeUps.queueBack(async);
-        return Result(true);
-    }
-
-    [[nodiscard]] static Result teardownAsync(AsyncLoopWakeUp& async)
-    {
-        async.eventLoop->activeWakeUps.remove(async);
-        return Result(true);
-    }
+    // Nothing to do :)
 
     // Socket ACCEPT
     [[nodiscard]] Result activateAsync(AsyncSocketAccept& async)

@@ -35,21 +35,18 @@ SC::Result SC::detail::AsyncWinWaitDefinition::releaseHandle(Handle& waitHandle)
 
 struct SC::AsyncEventLoop::Internal
 {
-    FileDescriptor             loopFd;
-    AsyncLoopWakeUp            wakeUpAsync;
-    SC_NtSetInformationFile    pNtSetInformationFile = nullptr;
-    LPFN_CONNECTEX             pConnectEx            = nullptr;
-    LPFN_ACCEPTEX              pAcceptEx             = nullptr;
-    LPFN_DISCONNECTEX          pDisconnectEx         = nullptr;
-    detail::AsyncWinOverlapped wakeUpOverlapped;
+    FileDescriptor          loopFd;
+    AsyncFilePoll           asyncWakeUp;
+    SC_NtSetInformationFile pNtSetInformationFile = nullptr;
+    LPFN_CONNECTEX          pConnectEx            = nullptr;
+    LPFN_ACCEPTEX           pAcceptEx             = nullptr;
+    LPFN_DISCONNECTEX       pDisconnectEx         = nullptr;
 
     Internal()
     {
         HMODULE ntdll = GetModuleHandleA("ntdll.dll");
         pNtSetInformationFile =
             reinterpret_cast<SC_NtSetInformationFile>(GetProcAddress(ntdll, "NtSetInformationFile"));
-
-        wakeUpOverlapped.userData = &wakeUpAsync;
     }
 
     [[nodiscard]] Result associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor)
@@ -132,13 +129,25 @@ struct SC::AsyncEventLoop::Internal
         return Result(true);
     }
 
-    [[nodiscard]] Result createSharedWatchers(AsyncEventLoop& loop)
+    [[nodiscard]] Result createSharedWatchers(AsyncEventLoop& eventLoop)
     {
-        // No need to register it with AsyncEventLoop as we're calling PostQueuedCompletionStatus manually
-        // As a consequence we don't need to do loop.decreaseActiveCount()
-        wakeUpAsync.eventLoop = &loop;
-        wakeUpAsync.state     = AsyncRequest::State::Active;
+        SC_TRY(createWakeup(eventLoop));
+        SC_TRY(eventLoop.runNoWait());   // Register the read handle before everything else
+        eventLoop.decreaseActiveCount(); // Avoids wakeup (read) keeping the queue up. Must be after runNoWait().
         return Result(true);
+    }
+
+    [[nodiscard]] Result createWakeup(AsyncEventLoop& eventLoop)
+    {
+        asyncWakeUp.setDebugName("SharedWakeUp");
+        asyncWakeUp.callback.bind<Internal, &Internal::completeWakeUp>(*this);
+        return asyncWakeUp.start(eventLoop, 0);
+    }
+
+    void completeWakeUp(AsyncFilePoll::Result& result)
+    {
+        result.async.eventLoop->executeWakeUps(result);
+        result.reactivateRequest(true);
     }
 
     [[nodiscard]] static Result checkWSAResult(SOCKET handle, OVERLAPPED& overlapped, size_t* size = nullptr)
@@ -164,7 +173,8 @@ struct SC::AsyncEventLoop::Internal
         FileDescriptor::Handle loopNativeDescriptor;
         SC_TRY(loopFd.get(loopNativeDescriptor, Result::Error("watchInputs - Invalid Handle")));
 
-        if (PostQueuedCompletionStatus(loopNativeDescriptor, 0, 0, &wakeUpOverlapped.overlapped) == FALSE)
+        if (PostQueuedCompletionStatus(loopNativeDescriptor, 0, 0,
+                                       &asyncWakeUp.getOverlappedOpaque().get().overlapped) == FALSE)
         {
             return Result::Error("AsyncEventLoop::wakeUpFromExternalThread() - PostQueuedCompletionStatus");
         }
@@ -224,41 +234,9 @@ struct SC::AsyncEventLoop::KernelQueue
     // TIMEOUT
     [[nodiscard]] static bool setupAsync(AsyncLoopTimeout&) { return true; }
 
-    // Using activateAsync / cancelAsync so that AsyncEventLoop::cancelAsync() can add the async to submission queue
-    [[nodiscard]] static bool activateAsync(AsyncLoopTimeout& async)
-    {
-        async.eventLoop->activeTimers.queueBack(async);
-        return Result(true);
-    }
-
-    [[nodiscard]] static bool cancelAsync(AsyncLoopTimeout& async)
-    {
-        async.eventLoop->activeTimers.remove(async);
-        return Result(true);
-    }
-
     // WAKEUP
 
     [[nodiscard]] static bool setupAsync(AsyncLoopWakeUp&) { return true; }
-
-    // Using activateAsync / cancelAsync so that AsyncEventLoop::cancelAsync() can add the async to submission queue
-    [[nodiscard]] static bool activateAsync(AsyncLoopWakeUp& async)
-    {
-        async.eventLoop->activeWakeUps.queueBack(async);
-        return Result(true);
-    }
-
-    [[nodiscard]] static bool completeAsync(AsyncLoopWakeUp::Result& result)
-    {
-        result.async.eventLoop->executeWakeUps(result);
-        return Result(true);
-    }
-
-    [[nodiscard]] static bool cancelAsync(AsyncLoopWakeUp& async)
-    {
-        async.eventLoop->activeWakeUps.remove(async);
-        return Result(true);
-    }
 
     // Socket ACCEPT
 

@@ -39,12 +39,86 @@ struct SC::AsyncTest : public SC::TestCase
             socketClose();
             fileReadWrite();
             fileClose();
+            loopFreeSubmittingOnClose();
+            loopFreeActiveOnClose();
             if (numTestsToRun == 2)
             {
                 // If on Linux next run will test io_uring backend (if it's installed)
                 options.apiType = AsyncEventLoop::Options::ApiType::ForceUseIOURing;
             }
         }
+    }
+
+    void loopFreeSubmittingOnClose()
+    {
+        // This test checks that on close asyncs being submitted are being removed for submission queue and set as Free.
+        AsyncLoopTimeout  loopTimeout[2];
+        AsyncLoopWakeUp   loopWakeUp[2];
+        AsyncSocketAccept socketAccept[2];
+
+        AsyncEventLoop eventLoop;
+        SC_TEST_EXPECT(eventLoop.create());
+        SC_TEST_EXPECT(loopTimeout[0].start(eventLoop, Time::Milliseconds(12)));
+        SC_TEST_EXPECT(loopTimeout[1].start(eventLoop, Time::Milliseconds(122)));
+        SC_TEST_EXPECT(loopWakeUp[0].start(eventLoop));
+        SC_TEST_EXPECT(loopWakeUp[1].start(eventLoop));
+        constexpr uint32_t numWaitingConnections = 2;
+        SocketDescriptor   serverSocket[2];
+        SocketIPAddress    serverAddress[2];
+        SC_TEST_EXPECT(serverAddress[0].fromAddressPort("127.0.0.1", 5052));
+        SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(serverAddress[0].getAddressFamily(), serverSocket[0]));
+        SC_TEST_EXPECT(SocketServer(serverSocket[0]).listen(serverAddress[0], numWaitingConnections));
+        SC_TEST_EXPECT(serverAddress[1].fromAddressPort("127.0.0.1", 5053));
+        SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(serverAddress[1].getAddressFamily(), serverSocket[1]));
+        SC_TEST_EXPECT(SocketServer(serverSocket[1]).listen(serverAddress[1], numWaitingConnections));
+
+        SC_TEST_EXPECT(socketAccept[0].start(eventLoop, serverSocket[0]));
+        SC_TEST_EXPECT(socketAccept[1].start(eventLoop, serverSocket[1]));
+
+        // All the above requests are in submitting state, but we just abruptly close the loop
+        SC_TEST_EXPECT(eventLoop.close());
+
+        // So let's try using them again, and we should get no errors of anything "in use"
+        SC_TEST_EXPECT(eventLoop.create());
+        SC_TEST_EXPECT(loopTimeout[0].start(eventLoop, Time::Milliseconds(12)));
+        SC_TEST_EXPECT(loopTimeout[1].start(eventLoop, Time::Milliseconds(123)));
+        SC_TEST_EXPECT(loopWakeUp[0].start(eventLoop));
+        SC_TEST_EXPECT(loopWakeUp[1].start(eventLoop));
+        SC_TEST_EXPECT(socketAccept[0].start(eventLoop, serverSocket[0]));
+        SC_TEST_EXPECT(socketAccept[1].start(eventLoop, serverSocket[1]));
+        SC_TEST_EXPECT(eventLoop.close());
+    }
+
+    void loopFreeActiveOnClose()
+    {
+        // This test checks that on close active asyncs are being removed for submission queue and set as Free.
+        AsyncEventLoop eventLoop;
+        acceptedCount = 0;
+        SC_TEST_EXPECT(eventLoop.create(options));
+
+        constexpr uint32_t numWaitingConnections = 2;
+        SocketDescriptor   serverSocket[2];
+        SocketIPAddress    serverAddress[2];
+        SC_TEST_EXPECT(serverAddress[0].fromAddressPort("127.0.0.1", 5052));
+        SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(serverAddress[0].getAddressFamily(), serverSocket[0]));
+        SC_TEST_EXPECT(SocketServer(serverSocket[0]).listen(serverAddress[0], numWaitingConnections));
+        SC_TEST_EXPECT(serverAddress[1].fromAddressPort("127.0.0.1", 5053));
+        SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(serverAddress[1].getAddressFamily(), serverSocket[1]));
+        SC_TEST_EXPECT(SocketServer(serverSocket[1]).listen(serverAddress[1], numWaitingConnections));
+
+        AsyncSocketAccept asyncAccept[2];
+        SC_TEST_EXPECT(asyncAccept[0].start(eventLoop, serverSocket[0]));
+        SC_TEST_EXPECT(asyncAccept[1].start(eventLoop, serverSocket[1]));
+        SC_TEST_EXPECT(eventLoop.runNoWait());
+        // After runNoWait now the two AsyncSocketAccept are active
+        SC_TEST_EXPECT(eventLoop.close()); // but closing should make them available again
+
+        // So let's try using them again, and we should get no errors
+        SC_TEST_EXPECT(eventLoop.create(options));
+        SC_TEST_EXPECT(asyncAccept[0].start(eventLoop, serverSocket[0]));
+        SC_TEST_EXPECT(asyncAccept[1].start(eventLoop, serverSocket[1]));
+        SC_TEST_EXPECT(eventLoop.runNoWait());
+        SC_TEST_EXPECT(eventLoop.close());
     }
 
     void loopTimeout()
@@ -122,7 +196,7 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.create(options));
             AsyncLoopWakeUp wakeUp1;
             AsyncLoopWakeUp wakeUp2;
-
+            wakeUp1.setDebugName("wakeUp1");
             wakeUp1.callback = [this](AsyncLoopWakeUp::Result& res)
             {
                 wakeUp1ThreadID = Thread::CurrentThreadID();
@@ -130,6 +204,7 @@ struct SC::AsyncTest : public SC::TestCase
                 SC_TEST_EXPECT(res.async.stop());
             };
             SC_TEST_EXPECT(wakeUp1.start(eventLoop));
+            wakeUp2.setDebugName("wakeUp2");
             wakeUp2.callback = [&](AsyncLoopWakeUp::Result& res)
             {
                 wakeUp2Called++;
@@ -218,7 +293,7 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(processFailure.launch("cmd", "/C", "dir /DOCTORS")); // Returns 1 error code
 #else
             // Must wait for the process to be still active when adding it to kqueue
-            SC_TEST_EXPECT(processSuccess.launch("sleep", "0.1")); // Returns 0 error code
+            SC_TEST_EXPECT(processSuccess.launch("sleep", "0.2")); // Returns 0 error code
             SC_TEST_EXPECT(processFailure.launch("ls", "/~"));     // Returns 1 error code
 #endif
             ProcessDescriptor::Handle processHandleSuccess = 0;
@@ -236,11 +311,13 @@ struct SC::AsyncTest : public SC::TestCase
             };
             OutParams outParams1;
             OutParams outParams2;
+            asyncSuccess.setDebugName("asyncSuccess");
             asyncSuccess.callback = [&](AsyncProcessExit::Result& res)
             {
                 SC_TEST_EXPECT(res.moveTo(outParams1.exitStatus));
                 outParams1.numCallbackCalled++;
             };
+            asyncFailure.setDebugName("asyncFailure");
             asyncFailure.callback = [&](AsyncProcessExit::Result& res)
             {
                 SC_TEST_EXPECT(res.moveTo(outParams2.exitStatus));

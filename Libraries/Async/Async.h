@@ -95,7 +95,8 @@ struct WinWaitHandle : public UniqueHandle<AsyncWinWaitDefinition>
 /// 2. Inside stageSubmission a started async will be do the one time setup (with setupAsync)
 /// 3. Inside stageSubmission a Setup or Submitting async will be activated (with activateAsync)
 /// 4. If activateAsync is successful, the async becomes state == State::Active.
-///     - When this happens, the async is either tracked by the kernel or in one of the linked lists like activeWakeUps
+///     - When this happens, the async is either tracked by the kernel or in one of the linked lists like
+///     activeLoopWakeUps
 ///
 /// 5. The Active async can become completed, when the kernel signals its completion (or readiness...):
 ///      - [default] -> Async is complete and it will be teardown and freed (state == State::Free)
@@ -164,7 +165,7 @@ struct SC::AsyncRequest
         Free,       // not in any queue, this can be started with an async.start(...)
         Setup,      // when in submission queue waiting to be setup (after an async.start(...))
         Submitting, // when in submission queue waiting to be activated (after a result.reactivateRequest(true))
-        Active,     // when monitored by OS syscall or in activeWakeUps / activeTimeouts queues
+        Active,     // when monitored by OS syscall or in activeLoopWakeUps / activeTimeouts queues
         Cancelling, // when in cancellation queue waiting for a cancelAsync (on active async)
         Teardown    // when in cancellation queue waiting for a teardownAsync (on non-active, already setup async)
     };
@@ -182,7 +183,8 @@ struct SC::AsyncRequest
     int16_t flags = 0; // 2 bytes
     int32_t eventIndex;
 
-    static constexpr int16_t Flag_RegularFile = 1 << 1;
+    static constexpr int16_t Flag_RegularFile      = 1 << 1;
+    static constexpr int16_t Flag_ManualCompletion = 1 << 2;
 };
 
 /// @brief Base class for all async results
@@ -739,14 +741,25 @@ struct SC::AsyncEventLoop
     int numberOfActiveHandles = 0;
     int numberOfExternals     = 0;
 
+    // Submitting phase
     IntrusiveDoubleLinkedList<AsyncRequest> submissions;
-    IntrusiveDoubleLinkedList<AsyncRequest> activeTimers;
-    IntrusiveDoubleLinkedList<AsyncRequest> activeWakeUps;
-    IntrusiveDoubleLinkedList<AsyncRequest> manualCompletions;
 
-#if SC_PLATFORM_LINUX
-    IntrusiveDoubleLinkedList<AsyncProcessExit> activeProcessChild;
-#endif
+    // Active phase
+    IntrusiveDoubleLinkedList<AsyncLoopTimeout>   activeLoopTimeouts;
+    IntrusiveDoubleLinkedList<AsyncLoopWakeUp>    activeLoopWakeUps;
+    IntrusiveDoubleLinkedList<AsyncProcessExit>   activeProcessExits;
+    IntrusiveDoubleLinkedList<AsyncSocketAccept>  activeSocketAccepts;
+    IntrusiveDoubleLinkedList<AsyncSocketConnect> activeSocketConnects;
+    IntrusiveDoubleLinkedList<AsyncSocketSend>    activeSocketSends;
+    IntrusiveDoubleLinkedList<AsyncSocketReceive> activeSocketReceives;
+    IntrusiveDoubleLinkedList<AsyncSocketClose>   activeSocketCloses;
+    IntrusiveDoubleLinkedList<AsyncFileRead>      activeFileReads;
+    IntrusiveDoubleLinkedList<AsyncFileWrite>     activeFileWrites;
+    IntrusiveDoubleLinkedList<AsyncFileClose>     activeFileCloses;
+    IntrusiveDoubleLinkedList<AsyncFilePoll>      activeFilePolls;
+
+    // Manual completions
+    IntrusiveDoubleLinkedList<AsyncRequest> manualCompletions;
 
     Time::HighResolutionCounter loopTime;
 
@@ -771,7 +784,7 @@ struct SC::AsyncEventLoop
 #endif
     struct InternalDefinition
     {
-        static constexpr int Windows = 160;
+        static constexpr int Windows = 168;
         static constexpr int Apple   = 88;
         static constexpr int Default = 336;
 
@@ -833,6 +846,9 @@ struct SC::AsyncEventLoop
     void runStepExecuteManualCompletions(KernelQueue& queue);
 
     friend struct AsyncRequest;
+
+    template <typename T>
+    void freeAsyncRequests(IntrusiveDoubleLinkedList<T>& linkedList);
 };
 
 //! @}
