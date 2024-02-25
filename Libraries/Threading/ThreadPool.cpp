@@ -137,7 +137,10 @@ SC::Result SC::ThreadPool::destroy()
     {
         poolMutex.lock();
         auto deferUnlock = MakeDeferred([this] { poolMutex.unlock(); });
-        SC_TRY_MSG(numWorkerThreads > 0, "Cannot wait for tasks on an uninitialized threadpool");
+        if (numWorkerThreads == 0)
+        {
+            return Result(true); // this was already destroyed
+        }
         // 1. Free tasks that have not been executed yet
         while (taskHead)
         {
