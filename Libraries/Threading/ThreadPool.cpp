@@ -134,10 +134,10 @@ SC::Result SC::ThreadPool::create(size_t workerThreads)
 
 SC::Result SC::ThreadPool::destroy()
 {
-    SC_TRY_MSG(numWorkerThreads > 0, "Cannot destroy threadpool that was not created");
-
-    poolMutex.lock();
     {
+        poolMutex.lock();
+        auto deferUnlock = MakeDeferred([this] { poolMutex.unlock(); });
+        SC_TRY_MSG(numWorkerThreads > 0, "Cannot wait for tasks on an uninitialized threadpool");
         // 1. Free tasks that have not been executed yet
         while (taskHead)
         {
@@ -152,7 +152,6 @@ SC::Result SC::ThreadPool::destroy()
         stopRequested = true;
         taskAvailable.broadcast();
     }
-    poolMutex.unlock();
 
     // 3. Wait for all tasks to stop
     Result res = waitForAllTasks();
@@ -164,10 +163,10 @@ SC::Result SC::ThreadPool::destroy()
 
 SC::Result SC::ThreadPool::waitForAllTasks()
 {
-    SC_TRY_MSG(numWorkerThreads > 0, "Cannot wait for tasks on an uninitialized threadpool");
-
     // Function is entirely protected by the mutex
     poolMutex.lock();
+    auto deferUnlock = MakeDeferred([this] { poolMutex.unlock(); });
+    SC_TRY_MSG(numWorkerThreads > 0, "Cannot wait for tasks on an uninitialized threadpool");
     for (;;)
     {
         const bool runningWithPendingTasks    = not stopRequested and (taskHead != nullptr or numRunningTasks != 0);
@@ -181,7 +180,6 @@ SC::Result SC::ThreadPool::waitForAllTasks()
             break;
         }
     }
-    poolMutex.unlock();
     return Result(true);
 }
 
@@ -192,9 +190,6 @@ SC::Result SC::ThreadPool::waitForTask(Task& task)
     // Function is entirely protected by the mutex
     poolMutex.lock();
     auto deferUnlock = MakeDeferred([this] { poolMutex.unlock(); });
-
-    SC_TRY_MSG(task.threadPool != nullptr, "Trying to wait for a task that was never queued");
-    SC_TRY_MSG(task.threadPool == this, "Trying to wait for a task that was queued on another threadpool");
 
     for (;;)
     {
