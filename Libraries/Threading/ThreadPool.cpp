@@ -169,7 +169,10 @@ SC::Result SC::ThreadPool::waitForAllTasks()
     // Function is entirely protected by the mutex
     poolMutex.lock();
     auto deferUnlock = MakeDeferred([this] { poolMutex.unlock(); });
-    SC_TRY_MSG(numWorkerThreads > 0, "Cannot wait for tasks on an uninitialized threadpool");
+    if (numWorkerThreads == 0)
+    {
+        return Result(true);
+    }
     for (;;)
     {
         const bool runningWithPendingTasks    = not stopRequested and (taskHead != nullptr or numRunningTasks != 0);
