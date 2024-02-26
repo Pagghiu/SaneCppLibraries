@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../Async.h"
+#include "AsyncPrivate.h"
 
 #include <arpa/inet.h>   // sockaddr_in
 #include <stdint.h>      // uint32_t
@@ -11,8 +11,9 @@
 
 struct SC::AsyncEventLoop::Internal
 {
-    AlignedStorage<304> storage;
-    bool                isEpoll = true;
+    AlignedStorage<312> storage;
+
+    bool isEpoll = true;
 
     Internal();
     ~Internal();
@@ -41,7 +42,7 @@ struct SC::AsyncEventLoop::KernelQueue
     const KernelQueuePosix&   getPosix() const;
 
     [[nodiscard]] uint32_t getNumEvents() const;
-    [[nodiscard]] Result   syncWithKernel(AsyncEventLoop&, SyncMode);
+    [[nodiscard]] Result   syncWithKernel(AsyncEventLoop&, Private::SyncMode);
     [[nodiscard]] Result   validateEvent(uint32_t&, bool&);
 
     [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t);
@@ -52,6 +53,8 @@ struct SC::AsyncEventLoop::KernelQueue
     template <typename T> [[nodiscard]] Result activateAsync(T&);
     template <typename T> [[nodiscard]] Result completeAsync(T&);
     template <typename T> [[nodiscard]] Result cancelAsync(T&);
+
+    template <typename T, typename P> [[nodiscard]] static Result executeOperation(T&, P& p);
     // clang-format on
 };
 
@@ -113,8 +116,9 @@ struct SC::AsyncEventLoop::InternalIoURing
     [[nodiscard]] Result createSharedWatchers(AsyncEventLoop& eventLoop)
     {
         SC_TRY(createWakeup(eventLoop));
-        SC_TRY(eventLoop.runNoWait());   // Register the read handle before everything else
-        eventLoop.decreaseActiveCount(); // Avoids wakeup (read) keeping the queue up. Must be after runNoWait().
+        SC_TRY(eventLoop.runNoWait()); // Register the read handle before everything else
+        // Calls to decreaseActiveCount must be after runNoWait()
+        eventLoop.privateSelf.decreaseActiveCount(); // WakeUp (poll) doesn't keep the queue active
         return Result(true);
     }
 
@@ -153,7 +157,7 @@ struct SC::AsyncEventLoop::InternalIoURing
 
     static void completeWakeUp(AsyncFilePoll::Result& result)
     {
-        result.async.eventLoop->executeWakeUps(result);
+        result.getAsync().eventLoop->privateSelf.executeWakeUps(result);
         result.reactivateRequest(true);
     }
 
@@ -182,7 +186,7 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
 
     uint32_t getNumEvents() const { return static_cast<uint32_t>(newEvents); }
 
-    static io_uring& getRing(AsyncEventLoop& eventLoop) { return eventLoop.internal.get().getUring().ring; }
+    static io_uring& getRing(AsyncEventLoop& eventLoop) { return eventLoop.internalSelf.getUring().ring; }
 
     [[nodiscard]] Result getNewSubmission(AsyncRequest& async, io_uring_sqe*& newSubmission)
     {
@@ -192,7 +196,7 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
         if (kernelSubmission == nullptr)
         {
             // No space in the submission queue, let's try to flush submissions and try again
-            SC_TRY(flushSubmissions(*async.eventLoop, SyncMode::NoWait));
+            SC_TRY(flushSubmissions(*async.eventLoop, Private::SyncMode::NoWait));
             kernelSubmission = globalLibURing.io_uring_get_sqe(&ring);
             if (kernelSubmission == nullptr)
             {
@@ -217,14 +221,14 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
         globalLibURing.io_uring_cq_advance(&ring, newEvents);
     }
 
-    [[nodiscard]] Result syncWithKernel(AsyncEventLoop& eventLoop, SyncMode syncMode)
+    [[nodiscard]] Result syncWithKernel(AsyncEventLoop& eventLoop, Private::SyncMode syncMode)
     {
         SC_TRY(flushSubmissions(eventLoop, syncMode));
         copyReadyCompletions(getRing(eventLoop));
         return Result(true);
     }
 
-    [[nodiscard]] Result flushSubmissions(AsyncEventLoop& eventLoop, SyncMode syncMode)
+    [[nodiscard]] Result flushSubmissions(AsyncEventLoop& eventLoop, Private::SyncMode syncMode)
     {
         io_uring& ring = getRing(eventLoop);
         while (true)
@@ -232,11 +236,11 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
             int res = -1;
             switch (syncMode)
             {
-            case SyncMode::NoWait: {
+            case Private::SyncMode::NoWait: {
                 res = globalLibURing.io_uring_submit(&ring);
                 break;
             }
-            case SyncMode::ForcedForwardProgress: {
+            case Private::SyncMode::ForcedForwardProgress: {
                 res = globalLibURing.io_uring_submit_and_wait(&ring, 1);
                 break;
             }
@@ -255,7 +259,7 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
                     if (newEvents > 0)
                     {
                         // We've freed some slots, let's try again
-                        eventLoop.runStepExecuteCompletions(parentKernelQueue);
+                        eventLoop.privateSelf.runStepExecuteCompletions(parentKernelQueue);
                         continue;
                     }
                     else
@@ -293,7 +297,9 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
         return Result(true);
     }
 
+    //-------------------------------------------------------------------------------------------------------
     // TIMEOUT
+    //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result activateAsync(AsyncLoopTimeout& async)
     {
         io_uring_sqe* submission;
@@ -328,10 +334,14 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
         return Result(true);
     }
 
+    //-------------------------------------------------------------------------------------------------------
     // WAKEUP
+    //-------------------------------------------------------------------------------------------------------
     // Nothing to do :)
 
+    //-------------------------------------------------------------------------------------------------------
     // Socket ACCEPT
+    //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result activateAsync(AsyncSocketAccept& async)
     {
         io_uring_sqe* submission;
@@ -345,10 +355,12 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
 
     [[nodiscard]] Result completeAsync(AsyncSocketAccept::Result& res)
     {
-        return res.acceptedClient.assign(events[res.async.eventIndex].res);
+        return res.completionData.acceptedClient.assign(events[res.getAsync().eventIndex].res);
     }
 
+    //-------------------------------------------------------------------------------------------------------
     // Socket CONNECT
+    //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result activateAsync(AsyncSocketConnect& async)
     {
         io_uring_sqe* submission;
@@ -365,7 +377,9 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
         return Result(true);
     }
 
+    //-------------------------------------------------------------------------------------------------------
     // Socket SEND
+    //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result activateAsync(AsyncSocketSend& async)
     {
         io_uring_sqe* submission;
@@ -377,11 +391,15 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
 
     [[nodiscard]] Result completeAsync(AsyncSocketSend::Result& result)
     {
-        const size_t numBytes = static_cast<size_t>(events[result.async.eventIndex].res);
-        return Result(numBytes == result.async.data.sizeInBytes());
+        result.completionData.writtenBytes = static_cast<size_t>(events[result.getAsync().eventIndex].res);
+        SC_TRY_MSG(result.completionData.writtenBytes == result.getAsync().data.sizeInBytes(),
+                   "send didn't send all data");
+        return Result(true);
     }
 
+    //-------------------------------------------------------------------------------------------------------
     // Socket RECEIVE
+    //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result activateAsync(AsyncSocketReceive& async)
     {
         io_uring_sqe* submission;
@@ -393,11 +411,13 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
 
     [[nodiscard]] Result completeAsync(AsyncSocketReceive::Result& result)
     {
-        const size_t numBytes = static_cast<size_t>(events[result.async.eventIndex].res);
-        return Result(result.async.data.sliceStartLength(0, numBytes, result.readData));
+        result.completionData.readBytes = static_cast<size_t>(events[result.getAsync().eventIndex].res);
+        return Result(true);
     }
 
+    //-------------------------------------------------------------------------------------------------------
     // Socket CLOSE
+    //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result activateAsync(AsyncSocketClose& async)
     {
         io_uring_sqe* submission;
@@ -413,7 +433,9 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
         return Result(true);
     }
 
+    //-------------------------------------------------------------------------------------------------------
     // File READ
+    //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result activateAsync(AsyncFileRead& async)
     {
         io_uring_sqe* submission;
@@ -426,11 +448,13 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
 
     [[nodiscard]] Result completeAsync(AsyncFileRead::Result& result)
     {
-        const size_t numBytes = static_cast<size_t>(events[result.async.eventIndex].res);
-        return Result(result.async.readBuffer.sliceStartLength(0, numBytes, result.readData));
+        result.completionData.readBytes = static_cast<size_t>(events[result.getAsync().eventIndex].res);
+        return Result(true);
     }
 
+    //-------------------------------------------------------------------------------------------------------
     // File WRITE
+    //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result activateAsync(AsyncFileWrite& async)
     {
         io_uring_sqe* submission;
@@ -443,12 +467,14 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
 
     [[nodiscard]] Result completeAsync(AsyncFileWrite::Result& result)
     {
-        const size_t numBytes = static_cast<size_t>(events[result.async.eventIndex].res);
-        result.writtenBytes   = numBytes;
-        return Result(numBytes == result.async.writeBuffer.sizeInBytes());
+        const size_t numBytes              = static_cast<size_t>(events[result.getAsync().eventIndex].res);
+        result.completionData.writtenBytes = numBytes;
+        return Result(numBytes == result.getAsync().writeBuffer.sizeInBytes());
     }
 
+    //-------------------------------------------------------------------------------------------------------
     // File CLOSE
+    //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result activateAsync(AsyncFileClose& async)
     {
         io_uring_sqe* submission;
@@ -464,7 +490,9 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
         return Result(true);
     }
 
+    //-------------------------------------------------------------------------------------------------------
     // File POLL
+    //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result activateAsync(AsyncFilePoll& async)
     {
         // Documentation says:
@@ -486,7 +514,9 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
         return Result(true);
     }
 
+    //-------------------------------------------------------------------------------------------------------
     // Process EXIT
+    //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result setupAsync(AsyncProcessExit& async)
     {
         const int pidFd = ::syscall(SYS_pidfd_open, async.handle, SOCK_NONBLOCK); // == PIDFD_NONBLOCK
@@ -508,7 +538,7 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
         pid_t waitPid;
         do
         {
-            waitPid = ::waitpid(result.async.handle, &status, 0);
+            waitPid = ::waitpid(result.getAsync().handle, &status, 0);
         } while (waitPid == -1 and errno == EINTR);
         if (waitPid == -1)
         {
@@ -516,15 +546,16 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
         }
         if (WIFEXITED(status) != 0)
         {
-            result.exitStatus.status = WEXITSTATUS(status);
+            result.completionData.exitStatus.status = WEXITSTATUS(status);
         }
         return Result(true);
     }
 
     [[nodiscard]] Result teardownAsync(AsyncProcessExit& async) { return async.pidFd.close(); }
 
+    //-------------------------------------------------------------------------------------------------------
     // Templates
-
+    //-------------------------------------------------------------------------------------------------------
     template <typename T>
     [[nodiscard]] Result cancelAsync(T& async)
     {
@@ -635,12 +666,13 @@ const SC::AsyncEventLoop::KernelQueuePosix& SC::AsyncEventLoop::KernelQueue::get
 {
     return storage.reinterpret_as<const KernelQueuePosix>();
 }
+
 SC::uint32_t SC::AsyncEventLoop::KernelQueue::getNumEvents() const
 {
     return isEpoll ? getPosix().getNumEvents() : getUring().getNumEvents();
 }
 
-SC::Result SC::AsyncEventLoop::KernelQueue::syncWithKernel(AsyncEventLoop& eventLoop, SyncMode syncMode)
+SC::Result SC::AsyncEventLoop::KernelQueue::syncWithKernel(AsyncEventLoop& eventLoop, Private::SyncMode syncMode)
 {
     return isEpoll ? getPosix().syncWithKernel(eventLoop, syncMode) : getUring().syncWithKernel(eventLoop, syncMode);
 }
@@ -662,4 +694,6 @@ template <typename T>  SC::Result SC::AsyncEventLoop::KernelQueue::teardownAsync
 template <typename T>  SC::Result SC::AsyncEventLoop::KernelQueue::activateAsync(T& async) { return isEpoll ? getPosix().activateAsync(async) : getUring().activateAsync(async); }
 template <typename T>  SC::Result SC::AsyncEventLoop::KernelQueue::completeAsync(T& async) { return isEpoll ? getPosix().completeAsync(async) : getUring().completeAsync(async); }
 template <typename T>  SC::Result SC::AsyncEventLoop::KernelQueue::cancelAsync(T& async)   { return isEpoll ? getPosix().cancelAsync(async) : getUring().cancelAsync(async); }
+
+template <typename T, typename P>  SC::Result SC::AsyncEventLoop::KernelQueue::executeOperation(T& async, P& param)   { return KernelQueuePosix::executeOperation(async, param); }
 // clang-format on

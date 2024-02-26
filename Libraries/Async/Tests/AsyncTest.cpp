@@ -6,6 +6,7 @@
 #include "../../Process/Process.h"
 #include "../../Strings/String.h"
 #include "../../Testing/Testing.h"
+#include "../../Threading/ThreadPool.h"
 #include "../../Threading/Threading.h" // EventObject
 
 namespace SC
@@ -133,7 +134,7 @@ struct SC::AsyncTest : public SC::TestCase
             int timeout2Called = 0;
             timeout1.callback  = [&](AsyncLoopTimeout::Result& res)
             {
-                SC_TEST_EXPECT(res.async.getTimeout().ms == 1);
+                SC_TEST_EXPECT(res.getAsync().getTimeout().ms == 1);
                 timeout1Called++;
             };
             SC_TEST_EXPECT(timeout1.start(eventLoop, Time::Milliseconds(1)));
@@ -176,8 +177,11 @@ struct SC::AsyncTest : public SC::TestCase
             Time::HighResolutionCounter start, end;
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(newThread.join());
-            SC_TEST_EXPECT(threadWasCalled == 1);
-            SC_TEST_EXPECT(wakeUpSucceeded == 1);
+            SC_TEST_EXPECT(newThread.start(externalThreadLambda));
+            SC_TEST_EXPECT(eventLoop.runOnce());
+            SC_TEST_EXPECT(newThread.join());
+            SC_TEST_EXPECT(threadWasCalled == 2);
+            SC_TEST_EXPECT(wakeUpSucceeded == 2);
         }
     }
 
@@ -201,14 +205,14 @@ struct SC::AsyncTest : public SC::TestCase
             {
                 wakeUp1ThreadID = Thread::CurrentThreadID();
                 wakeUp1Called++;
-                SC_TEST_EXPECT(res.async.stop());
+                SC_TEST_EXPECT(res.getAsync().stop());
             };
             SC_TEST_EXPECT(wakeUp1.start(eventLoop));
             wakeUp2.setDebugName("wakeUp2");
             wakeUp2.callback = [&](AsyncLoopWakeUp::Result& res)
             {
                 wakeUp2Called++;
-                SC_TEST_EXPECT(res.async.stop());
+                SC_TEST_EXPECT(res.getAsync().stop());
             };
             SC_TEST_EXPECT(wakeUp2.start(eventLoop));
             Thread newThread1;
@@ -314,13 +318,13 @@ struct SC::AsyncTest : public SC::TestCase
             asyncSuccess.setDebugName("asyncSuccess");
             asyncSuccess.callback = [&](AsyncProcessExit::Result& res)
             {
-                SC_TEST_EXPECT(res.moveTo(outParams1.exitStatus));
+                SC_TEST_EXPECT(res.get(outParams1.exitStatus));
                 outParams1.numCallbackCalled++;
             };
             asyncFailure.setDebugName("asyncFailure");
             asyncFailure.callback = [&](AsyncProcessExit::Result& res)
             {
-                SC_TEST_EXPECT(res.moveTo(outParams2.exitStatus));
+                SC_TEST_EXPECT(res.get(outParams2.exitStatus));
                 outParams2.numCallbackCalled++;
             };
             SC_TEST_EXPECT(asyncSuccess.start(eventLoop, processHandleSuccess));
@@ -459,7 +463,7 @@ struct SC::AsyncTest : public SC::TestCase
             receiveAsync.callback           = [&](AsyncSocketReceive::Result& res)
             {
                 Span<char> readData;
-                SC_TEST_EXPECT(res.moveTo(readData));
+                SC_TEST_EXPECT(res.get(readData));
                 SC_TEST_EXPECT(readData.data()[0] == 1);
                 receiveCalls++;
             };
@@ -534,7 +538,7 @@ struct SC::AsyncTest : public SC::TestCase
             receiveAsync.callback = [this, &params](AsyncSocketReceive::Result& res)
             {
                 Span<char> readData;
-                SC_TEST_EXPECT(res.moveTo(readData));
+                SC_TEST_EXPECT(res.get(readData));
                 SC_TEST_EXPECT(readData.sizeInBytes() == 1);
                 params.receivedData[params.receiveCount] = readData.data()[0];
                 params.receiveCount++;
@@ -588,6 +592,7 @@ struct SC::AsyncTest : public SC::TestCase
         if (test_section("file read/write"))
         {
             AsyncEventLoop eventLoop;
+
             SC_TEST_EXPECT(eventLoop.create(options));
             StringNative<255> filePath = StringEncoding::Native;
             StringNative<255> dirPath  = StringEncoding::Native;
@@ -608,19 +613,19 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, openOptions));
             SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
 
-            auto writeSpan = StringView("test").toCharSpan();
-
             FileDescriptor::Handle handle = FileDescriptor::Invalid;
             SC_TEST_EXPECT(fd.get(handle, Result::Error("asd")));
 
             AsyncFileWrite asyncWriteFile;
+
+            asyncWriteFile.setDebugName("FileWrite");
             asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
             {
                 size_t writtenBytes = 0;
-                SC_TEST_EXPECT(res.moveTo(writtenBytes));
+                SC_TEST_EXPECT(res.get(writtenBytes));
                 SC_TEST_EXPECT(writtenBytes == 4);
             };
-            SC_TEST_EXPECT(asyncWriteFile.start(eventLoop, handle, writeSpan));
+            SC_TEST_EXPECT(asyncWriteFile.start(eventLoop, handle, StringView("test").toCharSpan()));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(fd.close());
 
@@ -635,13 +640,14 @@ struct SC::AsyncTest : public SC::TestCase
             };
             Params        params;
             AsyncFileRead asyncReadFile;
+            asyncReadFile.setDebugName("FileRead");
             asyncReadFile.callback = [this, &params](AsyncFileRead::Result& res)
             {
                 Span<char> readData;
-                SC_TEST_EXPECT(res.moveTo(readData));
+                SC_TEST_EXPECT(res.get(readData));
                 SC_TEST_EXPECT(readData.sizeInBytes() == 1);
                 params.readBuffer[params.readCount++] = readData.data()[0];
-                res.async.offset += readData.sizeInBytes();
+                res.getAsync().offset += readData.sizeInBytes();
                 res.reactivateRequest(params.readCount < 4);
             };
             char buffer[1] = {0};
@@ -863,7 +869,7 @@ AsyncProcessExit processExit; //  Memory lifetime must be valid until callback i
 processExit.callback = [&](AsyncProcessExit::Result& res)
 {
     ProcessDescriptor::ExitStatus exitStatus;
-    if(res.moveTo(exitStatus))
+    if(res.get(exitStatus))
     {
         console.print("Process Exit status = {}", exitStatus.status);
     }
@@ -972,7 +978,7 @@ char receivedData[100] = {0};
 receiveAsync.callback = [&](AsyncSocketReceive::Result& res)
 {
     Span<char> readData;
-    if(res.moveTo(readData))
+    if(res.get(readData))
     {
         // readData now contains a slice of receivedData with the received bytes
         console.print("{} bytes have been read", readData.sizeInBytes());
@@ -1032,7 +1038,7 @@ AsyncFileRead asyncReadFile;
 asyncReadFile.callback = [&](AsyncFileRead::Result& res)
 {
     Span<char> readData;
-    if(res.moveTo(readData))
+    if(res.get(readData))
     {
         console.print("Read {} bytes from file", readData.sizeInBytes());
         res.reactivateRequest(true); // Ask to receive more data
@@ -1069,7 +1075,7 @@ AsyncFileWrite asyncWriteFile;
 asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
 {
     size_t writtenBytes = 0;
-    if(res.moveTo(writtenBytes))
+    if(res.get(writtenBytes))
     {
         console.print("{} bytes have been written", writtenBytes);
     }

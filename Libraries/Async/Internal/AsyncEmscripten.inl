@@ -29,5 +29,8 @@ struct SC::AsyncEventLoop::KernelQueue
     template <typename T> [[nodiscard]] bool activateAsync(T&)  { return true; }
     template <typename T> [[nodiscard]] bool completeAsync(T&)  { return true; }
     template <typename T> [[nodiscard]] bool cancelAsync(T&)    { return true; }
+
+    template <typename T, typename P>
+    [[nodiscard]] static Result executeOperation(T&, P&)        { return Result(true); }
     // clang-format on
 };

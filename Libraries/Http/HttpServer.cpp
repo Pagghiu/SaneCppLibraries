@@ -141,12 +141,12 @@ void SC::HttpServer::onNewClient(AsyncSocketAccept::Result& result)
 void SC::HttpServer::onReceive(AsyncSocketReceive::Result& result)
 {
     SC_COMPILER_WARNING_PUSH_OFFSETOF
-    RequestClient& requestClient = SC_COMPILER_FIELD_OFFSET(RequestClient, asyncReceive, result.async);
+    RequestClient& requestClient = SC_COMPILER_FIELD_OFFSET(RequestClient, asyncReceive, result.getAsync());
     SC_COMPILER_WARNING_POP
-    SC_ASSERT_RELEASE(&requestClient.asyncReceive == &result.async);
+    SC_ASSERT_RELEASE(&requestClient.asyncReceive == &result.getAsync());
     ClientChannel& client = *requests.get(requestClient.key.cast_to<ClientChannel>());
     Span<char>     readData;
-    if (not result.moveTo(readData))
+    if (not result.get(readData))
     {
         // TODO: Invoke on error
         return;
@@ -180,7 +180,7 @@ void SC::HttpServer::onAfterSend(AsyncSocketSend::Result& result)
     if (result.isValid())
     {
         SC_COMPILER_WARNING_PUSH_OFFSETOF
-        RequestClient& requestClient = SC_COMPILER_FIELD_OFFSET(RequestClient, asyncSend, result.async);
+        RequestClient& requestClient = SC_COMPILER_FIELD_OFFSET(RequestClient, asyncSend, result.getAsync());
         SC_COMPILER_WARNING_POP
         auto clientKey = requestClient.key.cast_to<ClientChannel>();
         requests.get(clientKey)->response.outputBuffer.clear();
