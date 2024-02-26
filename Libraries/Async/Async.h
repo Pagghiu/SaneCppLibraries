@@ -36,6 +36,9 @@
 /// @note If `liburing` is not available on the system, the library will transparently fallback to epoll.
 namespace SC
 {
+// Forward Declarations
+struct ThreadPool;
+struct ThreadPoolTask;
 
 struct EventObject;
 struct AsyncEventLoop;
@@ -45,6 +48,9 @@ struct AsyncResult;
 template <typename T, typename C>
 struct AsyncResultOf;
 
+struct AsyncTask;
+template <typename AsyncType>
+struct AsyncTaskOf;
 } // namespace SC
 
 namespace SC
@@ -157,11 +163,12 @@ struct SC::AsyncRequest
 
   protected:
     [[nodiscard]] Result validateAsync();
-    [[nodiscard]] Result queueSubmission(AsyncEventLoop& eventLoop);
+    [[nodiscard]] Result queueSubmission(AsyncEventLoop& eventLoop, AsyncTask* task);
 
     static void updateTime(AsyncEventLoop& loop);
 
     AsyncEventLoop* eventLoop = nullptr;
+    AsyncTask*      asyncTask = nullptr;
 
   private:
     friend struct AsyncEventLoop;
@@ -229,6 +236,39 @@ struct SC::AsyncResultOf : public AsyncResult
     using AsyncResult::AsyncResult;
 
     CompletionData completionData;
+};
+
+/// @brief Holds (reference to) a SC::ThreadPool and SC::ThreadPool::Task to execute an SC::AsyncRequest in a background
+/// thread This object lifetime is the same as the SC::AsyncRequest it's associated with, like SC::AsyncFileRead or
+/// SC::AsyncFileWrite.
+/// @note Operations that support to be executed in background thread, accept an SC::AsyncTask in their `start` method.
+/// @warning The SC::ThreadPool::Task cannot be shared with other requests and it cannot be reused until the completion
+/// callback has been called.
+struct SC::AsyncTask
+{
+    ThreadPool&     threadPool;
+    ThreadPoolTask& task;
+
+    AsyncTask(AsyncResult& result, ThreadPool& pool, ThreadPoolTask& poolTask)
+        : asyncResult(result), threadPool(pool), task(poolTask)
+    {}
+
+  protected:
+    friend struct AsyncEventLoop;
+
+    AsyncResult& asyncResult;
+};
+
+/// @brief Create an async Callback result for a given AsyncRequest-derived class.
+/// You don't use this class directly but probably call the aliases like SC::AsyncFileRead::Task
+/// @tparam AsyncType Type of the request class associated to this result
+template <typename AsyncType>
+struct SC::AsyncTaskOf : public AsyncTask
+{
+    typename AsyncType::Result result;
+    AsyncTaskOf(AsyncType& request, ThreadPool& pool, ThreadPoolTask& task)
+        : result(request), AsyncTask(result, pool, task)
+    {}
 };
 
 namespace SC
@@ -584,9 +624,13 @@ struct AsyncFileRead : public AsyncRequest
         }
     };
 
+    using Task = AsyncTaskOf<AsyncFileRead>;
+
     AsyncFileRead() : AsyncRequest(Type::FileRead) {}
     /// Starts a file receive operation, that will return when some data is read from file.
-    [[nodiscard]] SC::Result start(AsyncEventLoop& loop, FileDescriptor::Handle fileDescriptor, Span<char> readBuffer);
+    /// Optionally the AsyncTask allows running operation on background thread (but it will be ignored on `io_uring`).
+    [[nodiscard]] SC::Result start(AsyncEventLoop& loop, FileDescriptor::Handle fileDescriptor, Span<char> readBuffer,
+                                   Task* task = nullptr);
 
     uint64_t offset = 0;
 
@@ -628,11 +672,14 @@ struct AsyncFileWrite : public AsyncRequest
         }
     };
 
+    using Task = AsyncTaskOf<AsyncFileWrite>;
+
     AsyncFileWrite() : AsyncRequest(Type::FileWrite) {}
 
     /// Starts a file receive operation, that will return when the file is ready to receive more bytes to write.
+    /// Optionally the AsyncTask allows running operation on background thread (but it will be ignored on `io_uring`).
     [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fileDescriptor,
-                                   Span<const char> writeBuffer);
+                                   Span<const char> writeBuffer, Task* task = nullptr);
 
     uint64_t offset = 0;
 

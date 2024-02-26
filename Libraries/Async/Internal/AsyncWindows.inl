@@ -47,6 +47,8 @@ struct SC::AsyncEventLoop::Internal
             reinterpret_cast<SC_NtSetInformationFile>(GetProcAddress(ntdll, "NtSetInformationFile"));
     }
 
+    [[nodiscard]] static constexpr bool makesSenseToRunInThreadPool(AsyncRequest&) { return true; }
+
     [[nodiscard]] Result associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor)
     {
         HANDLE loopHandle;
@@ -423,6 +425,7 @@ struct SC::AsyncEventLoop::KernelQueue
     //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] static Result setupAsync(AsyncSocketClose& async)
     {
+        // TODO: Allow running close on thread pool
         async.flags |= AsyncRequest::Flag_ManualCompletion;
         async.code = ::closesocket(async.handle);
         SC_TRY_MSG(async.code == 0, "Close returned error");
@@ -435,26 +438,36 @@ struct SC::AsyncEventLoop::KernelQueue
     [[nodiscard]] static Result activateAsync(AsyncFileRead& async)
     {
         AsyncFileRead::CompletionData completionData;
-        return executeOperation(async, completionData);
+        return executeOperation(async, completionData, false); // synchronous == false
     }
 
-    [[nodiscard]] static Result executeOperation(AsyncFileRead& async, AsyncFileRead::CompletionData& completionData)
+    [[nodiscard]] static Result executeOperation(AsyncFileRead& async, AsyncFileRead::CompletionData& completionData,
+                                                 bool synchronous = true)
     {
         OVERLAPPED& overlapped = async.overlapped.get().overlapped;
         overlapped.Offset      = static_cast<DWORD>(async.offset & 0xffffffff);
         overlapped.OffsetHigh  = static_cast<DWORD>((async.offset >> 32) & 0xffffffff);
         const DWORD bufSize    = static_cast<DWORD>(async.readBuffer.sizeInBytes());
         DWORD       numBytes;
-        if (::ReadFile(async.fileDescriptor, async.readBuffer.data(), bufSize, &numBytes, &overlapped) == FALSE)
+        if (::ReadFile(async.fileDescriptor, async.readBuffer.data(), bufSize, &numBytes, &overlapped))
         {
-            if (::GetLastError() != ERROR_IO_PENDING) // ERROR_IO_PENDING just indicates async operation is in progress
+            synchronous = false; // Finished synchronously, no need to call also ::GetOverlappedResult
+        }
+        else if (::GetLastError() != ERROR_IO_PENDING) // ERROR_IO_PENDING just indicates async operation is in progress
+        {
+            // File must have FileDescriptor::OpenOptions::async == true + associateExternallyCreatedFileDescriptor
+            // TODO: Consider if we should allow files opened without async flags and silently handle them synchronously
+            return Result::Error("ReadFile failed (forgot setting FileDescriptor::OpenOptions::async = true or "
+                                 "AsyncEventLoop::associateExternallyCreatedFileDescriptor?)");
+        }
+        if (synchronous)
+        {
+            // If we have been requested to do a synchronous operation, let's wait for it to be finished
+            if (::GetOverlappedResult(async.fileDescriptor, &overlapped, &numBytes, TRUE) == FALSE) // bWait == TRUE
             {
-                // File must have FileDescriptor::OpenOptions::async == true + associateExternallyCreatedFileDescriptor
-                return Result::Error("ReadFile failed (forgot setting FileDescriptor::OpenOptions::async = true or "
-                                     "AsyncEventLoop::associateExternallyCreatedFileDescriptor?)");
+                return Result::Error("ReadFile (GetOverlappedResult) error");
             }
         }
-
         completionData.readBytes = static_cast<size_t>(numBytes);
         return Result(true);
     }
@@ -479,23 +492,34 @@ struct SC::AsyncEventLoop::KernelQueue
     [[nodiscard]] static Result activateAsync(AsyncFileWrite& async)
     {
         AsyncFileWrite::CompletionData completionData;
-        return executeOperation(async, completionData);
+        return executeOperation(async, completionData, false); // synchronous == false
     }
 
-    [[nodiscard]] static Result executeOperation(AsyncFileWrite& async, AsyncFileWrite::CompletionData& completionData)
+    [[nodiscard]] static Result executeOperation(AsyncFileWrite& async, AsyncFileWrite::CompletionData& completionData,
+                                                 bool synchronous = true)
     {
         OVERLAPPED& overlapped = async.overlapped.get().overlapped;
         overlapped.Offset      = static_cast<DWORD>(async.offset & 0xffffffff);
         overlapped.OffsetHigh  = static_cast<DWORD>((async.offset >> 32) & 0xffffffff);
         const DWORD bufSize    = static_cast<DWORD>(async.writeBuffer.sizeInBytes());
         DWORD       numBytes;
-        if (::WriteFile(async.fileDescriptor, async.writeBuffer.data(), bufSize, &numBytes, &overlapped) == FALSE)
+        if (::WriteFile(async.fileDescriptor, async.writeBuffer.data(), bufSize, &numBytes, &overlapped))
         {
-            if (::GetLastError() != ERROR_IO_PENDING) // ERROR_IO_PENDING just indicates async operation is in progress
+            synchronous = false; // Finished synchronously, no need to call also ::GetOverlappedResult
+        }
+        else if (::GetLastError() != ERROR_IO_PENDING) // ERROR_IO_PENDING just indicates async operation is in progress
+        {
+            // File must have FileDescriptor::OpenOptions::async == true + associateExternallyCreatedFileDescriptor
+            // TODO: Consider if we should allow files opened without async flags and silently handle them synchronously
+            return Result::Error("WriteFile failed (forgot setting FileDescriptor::OpenOptions::async = true or "
+                                 "AsyncEventLoop::associateExternallyCreatedFileDescriptor?)");
+        }
+        if (synchronous)
+        {
+            // If we have been requested to do a synchronous operation, let's wait for it to be finished
+            if (::GetOverlappedResult(async.fileDescriptor, &overlapped, &numBytes, TRUE) == FALSE) // bWait == TRUE
             {
-                // File must have FileDescriptor::OpenOptions::async == true + associateExternallyCreatedFileDescriptor
-                return Result::Error("WriteFile failed (forgot setting FileDescriptor::OpenOptions::async = true or "
-                                     "AsyncEventLoop::associateExternallyCreatedFileDescriptor?)");
+                return Result::Error("WriteFile (GetOverlappedResult) error");
             }
         }
         completionData.writtenBytes = static_cast<size_t>(numBytes);
@@ -521,6 +545,7 @@ struct SC::AsyncEventLoop::KernelQueue
     //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result setupAsync(AsyncFileClose& async)
     {
+        // TODO: Allow running close on thread pool
         async.flags |= AsyncRequest::Flag_ManualCompletion;
         async.code = ::CloseHandle(async.fileDescriptor) == FALSE ? -1 : 0;
         SC_TRY_MSG(async.code == 0, "Close returned error");

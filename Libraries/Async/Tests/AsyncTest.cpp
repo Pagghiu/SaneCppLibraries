@@ -38,7 +38,8 @@ struct SC::AsyncTest : public SC::TestCase
             socketSendReceive();
             socketSendReceiveError();
             socketClose();
-            fileReadWrite();
+            fileReadWrite(false); // do not use thread-pool
+            fileReadWrite(true);  // use thread-pool
             fileClose();
             loopFreeSubmittingOnClose();
             loopFreeActiveOnClose();
@@ -587,11 +588,18 @@ struct SC::AsyncTest : public SC::TestCase
         }
     }
 
-    void fileReadWrite()
+    void fileReadWrite(bool useThreadPool)
     {
         if (test_section("file read/write"))
         {
-            AsyncEventLoop eventLoop;
+            AsyncEventLoop   eventLoop;
+            ThreadPool::Task readTask;
+            ThreadPool::Task writeTask;
+            ThreadPool       threadPool;
+            if (useThreadPool)
+            {
+                SC_TEST_EXPECT(threadPool.create(4));
+            }
 
             SC_TEST_EXPECT(eventLoop.create(options));
             StringNative<255> filePath = StringEncoding::Native;
@@ -616,7 +624,8 @@ struct SC::AsyncTest : public SC::TestCase
             FileDescriptor::Handle handle = FileDescriptor::Invalid;
             SC_TEST_EXPECT(fd.get(handle, Result::Error("asd")));
 
-            AsyncFileWrite asyncWriteFile;
+            AsyncFileWrite       asyncWriteFile;
+            AsyncFileWrite::Task asyncWriteTask = {asyncWriteFile, threadPool, writeTask};
 
             asyncWriteFile.setDebugName("FileWrite");
             asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
@@ -625,7 +634,8 @@ struct SC::AsyncTest : public SC::TestCase
                 SC_TEST_EXPECT(res.get(writtenBytes));
                 SC_TEST_EXPECT(writtenBytes == 4);
             };
-            SC_TEST_EXPECT(asyncWriteFile.start(eventLoop, handle, StringView("test").toCharSpan()));
+            SC_TEST_EXPECT(asyncWriteFile.start(eventLoop, handle, StringView("test").toCharSpan(),
+                                                useThreadPool ? &asyncWriteTask : nullptr));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(fd.close());
 
@@ -638,8 +648,9 @@ struct SC::AsyncTest : public SC::TestCase
                 int  readCount = 0;
                 char readBuffer[4];
             };
-            Params        params;
-            AsyncFileRead asyncReadFile;
+            Params              params;
+            AsyncFileRead       asyncReadFile;
+            AsyncFileRead::Task asyncReadTask = {asyncReadFile, threadPool, readTask};
             asyncReadFile.setDebugName("FileRead");
             asyncReadFile.callback = [this, &params](AsyncFileRead::Result& res)
             {
@@ -651,7 +662,8 @@ struct SC::AsyncTest : public SC::TestCase
                 res.reactivateRequest(params.readCount < 4);
             };
             char buffer[1] = {0};
-            SC_TEST_EXPECT(asyncReadFile.start(eventLoop, handle, {buffer, sizeof(buffer)}));
+            SC_TEST_EXPECT(asyncReadFile.start(eventLoop, handle, {buffer, sizeof(buffer)},
+                                               useThreadPool ? &asyncReadTask : nullptr));
             SC_TEST_EXPECT(eventLoop.run());
             SC_TEST_EXPECT(fd.close());
 

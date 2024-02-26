@@ -20,6 +20,9 @@ struct SC::AsyncEventLoop::Internal
     InternalIoURing& getUring();
     InternalPosix&   getPosix();
 
+    // On io_uring it doesn't make sense to run operations in a thread pool
+    [[nodiscard]] bool makesSenseToRunInThreadPool(AsyncRequest&) { return isEpoll; }
+
     [[nodiscard]] Result close();
     [[nodiscard]] Result createEventLoop(AsyncEventLoop::Options options);
     [[nodiscard]] Result createSharedWatchers(AsyncEventLoop&);

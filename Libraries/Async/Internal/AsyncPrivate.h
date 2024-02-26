@@ -2,6 +2,7 @@
 #include "../Async.h"
 
 #include "../../Containers/IntrusiveDoubleLinkedList.h"
+#include "ThreadSafeLinkedList.h"
 
 struct SC::AsyncEventLoop::Private
 {
@@ -31,6 +32,8 @@ struct SC::AsyncEventLoop::Private
     // Manual completions
     IntrusiveDoubleLinkedList<AsyncRequest> manualCompletions;
 
+    ThreadSafeLinkedList<AsyncRequest> manualThreadPoolCompletions;
+
     Time::HighResolutionCounter loopTime;
 
     [[nodiscard]] Result close();
@@ -56,7 +59,7 @@ struct SC::AsyncEventLoop::Private
     void executeWakeUps(AsyncResult& result);
 
     // Setup
-    [[nodiscard]] Result queueSubmission(AsyncRequest& async);
+    [[nodiscard]] Result queueSubmission(AsyncRequest& async, AsyncTask* task);
 
     // Phases
     [[nodiscard]] Result stageSubmission(KernelQueue& queue, AsyncRequest& async);
@@ -85,11 +88,15 @@ struct SC::AsyncEventLoop::Private
 
     void runStepExecuteCompletions(KernelQueue& queue);
     void runStepExecuteManualCompletions(KernelQueue& queue);
+    void runStepExecuteManualThreadPoolCompletions(KernelQueue& queue);
 
     friend struct AsyncRequest;
 
     template <typename T>
     void freeAsyncRequests(IntrusiveDoubleLinkedList<T>& linkedList);
+
+    template <typename T>
+    [[nodiscard]] Result waitForThreadPoolTasks(IntrusiveDoubleLinkedList<T>& linkedList);
 
     template <typename Lambda>
     [[nodiscard]] static Result applyOnAsync(AsyncRequest& async, Lambda&& lambda);

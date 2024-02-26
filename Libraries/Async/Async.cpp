@@ -68,7 +68,10 @@ void SC::AsyncRequest::markAsFree()
     flags     = 0;
 }
 
-SC::Result SC::AsyncRequest::queueSubmission(AsyncEventLoop& loop) { return loop.privateSelf.queueSubmission(*this); }
+SC::Result SC::AsyncRequest::queueSubmission(AsyncEventLoop& loop, AsyncTask* task)
+{
+    return loop.privateSelf.queueSubmission(*this, task);
+}
 
 void SC::AsyncRequest::updateTime(AsyncEventLoop& loop) { loop.privateSelf.updateTime(); }
 
@@ -89,14 +92,14 @@ SC::Result SC::AsyncLoopTimeout::start(AsyncEventLoop& loop, Time::Milliseconds 
     updateTime(loop);
     expirationTime = loop.getLoopTime().offsetBy(expiration);
     timeout        = expiration;
-    SC_TRY(queueSubmission(loop));
+    SC_TRY(queueSubmission(loop, nullptr));
     return SC::Result(true);
 }
 
 SC::Result SC::AsyncLoopWakeUp::start(AsyncEventLoop& loop, EventObject* eo)
 {
     eventObject = eo;
-    SC_TRY(queueSubmission(loop));
+    SC_TRY(queueSubmission(loop, nullptr));
     return SC::Result(true);
 }
 
@@ -105,7 +108,7 @@ SC::Result SC::AsyncLoopWakeUp::wakeUp() { return getEventLoop()->wakeUpFromExte
 SC::Result SC::AsyncProcessExit::start(AsyncEventLoop& loop, ProcessDescriptor::Handle process)
 {
     handle = process;
-    SC_TRY(queueSubmission(loop));
+    SC_TRY(queueSubmission(loop, nullptr));
     return SC::Result(true);
 }
 
@@ -114,7 +117,7 @@ SC::Result SC::AsyncSocketAccept::start(AsyncEventLoop& loop, const SocketDescri
     SC_TRY(validateAsync());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
     SC_TRY(socketDescriptor.getAddressFamily(addressFamily));
-    SC_TRY(queueSubmission(loop));
+    SC_TRY(queueSubmission(loop, nullptr));
     return SC::Result(true);
 }
 
@@ -124,7 +127,7 @@ SC::Result SC::AsyncSocketConnect::start(AsyncEventLoop& loop, const SocketDescr
     SC_TRY(validateAsync());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
     ipAddress = socketIpAddress;
-    SC_TRY(queueSubmission(loop));
+    SC_TRY(queueSubmission(loop, nullptr));
     return SC::Result(true);
 }
 
@@ -135,7 +138,7 @@ SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop, const SocketDescript
     SC_TRY(validateAsync());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
     data = dataToSend;
-    SC_TRY(queueSubmission(loop));
+    SC_TRY(queueSubmission(loop, nullptr));
     return SC::Result(true);
 }
 
@@ -145,7 +148,7 @@ SC::Result SC::AsyncSocketReceive::start(AsyncEventLoop& loop, const SocketDescr
     SC_TRY(validateAsync());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
     data = receiveData;
-    SC_TRY(queueSubmission(loop));
+    SC_TRY(queueSubmission(loop, nullptr));
     return SC::Result(true);
 }
 
@@ -153,27 +156,27 @@ SC::Result SC::AsyncSocketClose::start(AsyncEventLoop& loop, const SocketDescrip
 {
     SC_TRY(validateAsync());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
-    SC_TRY(queueSubmission(loop));
+    SC_TRY(queueSubmission(loop, nullptr));
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncFileRead::start(AsyncEventLoop& loop, FileDescriptor::Handle fd, Span<char> rb)
+SC::Result SC::AsyncFileRead::start(AsyncEventLoop& loop, FileDescriptor::Handle fd, Span<char> rb, Task* task)
 {
     SC_TRY_MSG(rb.sizeInBytes() > 0, "AsyncEventLoop::startFileRead - Zero sized read buffer");
     SC_TRY(validateAsync());
     fileDescriptor = fd;
     readBuffer     = rb;
-    SC_TRY(queueSubmission(loop));
+    SC_TRY(queueSubmission(loop, task));
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop, FileDescriptor::Handle fd, Span<const char> wb)
+SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop, FileDescriptor::Handle fd, Span<const char> wb, Task* task)
 {
     SC_TRY_MSG(wb.sizeInBytes() > 0, "AsyncEventLoop::startFileWrite - Zero sized write buffer");
     SC_TRY(validateAsync());
     fileDescriptor = fd;
     writeBuffer    = wb;
-    SC_TRY(queueSubmission(loop));
+    SC_TRY(queueSubmission(loop, task));
     return SC::Result(true);
 }
 
@@ -181,7 +184,7 @@ SC::Result SC::AsyncFileClose::start(AsyncEventLoop& loop, FileDescriptor::Handl
 {
     SC_TRY(validateAsync());
     fileDescriptor = fd;
-    SC_TRY(queueSubmission(loop));
+    SC_TRY(queueSubmission(loop, nullptr));
     return SC::Result(true);
 }
 
@@ -189,7 +192,7 @@ SC::Result SC::AsyncFilePoll::start(AsyncEventLoop& loop, FileDescriptor::Handle
 {
     SC_TRY(validateAsync());
     fileDescriptor = fd;
-    SC_TRY(queueSubmission(loop));
+    SC_TRY(queueSubmission(loop, nullptr));
     return SC::Result(true);
 }
 
@@ -277,10 +280,19 @@ bool SC::AsyncEventLoop::tryLoadingLiburing() { return false; }
 // AsyncEventLoop::Private
 //-------------------------------------------------------------------------------------------------------
 
-SC::Result SC::AsyncEventLoop::Private::queueSubmission(AsyncRequest& async)
+SC::Result SC::AsyncEventLoop::Private::queueSubmission(AsyncRequest& async, AsyncTask* task)
 {
+    if (task)
+    {
+        if (&task->asyncResult.async != &async)
+        {
+            return Result::Error("AsyncTask is bound to a different async being started");
+        }
+    }
     async.eventLoop = eventLoop;
     async.state     = AsyncRequest::State::Setup;
+    // Only set the async tasks for operations and backends where it makes sense to do so
+    async.asyncTask = eventLoop->internalSelf.makesSenseToRunInThreadPool(async) ? task : nullptr;
     submissions.queueBack(async);
     return Result(true);
 }
@@ -327,8 +339,44 @@ void SC::AsyncEventLoop::Private::freeAsyncRequests(IntrusiveDoubleLinkedList<T>
     linkedList.clear();
 }
 
+template <typename T>
+SC::Result SC::AsyncEventLoop::Private::waitForThreadPoolTasks(IntrusiveDoubleLinkedList<T>& linkedList)
+{
+    Result res = Result(true);
+    // Wait for all thread pool tasks
+    for (T* it = linkedList.front; it != nullptr; it = static_cast<T*>(it->next))
+    {
+        if (it->asyncTask != nullptr)
+        {
+            if (not it->asyncTask->threadPool.waitForTask(it->asyncTask->task))
+            {
+                res = Result::Error("Threadpool was already stopped");
+            }
+        }
+    }
+    return res;
+}
+
 SC::Result SC::AsyncEventLoop::Private::close()
 {
+    Result res = Result(true);
+
+    // Wait for all thread pool tasks
+    Result threadPoolRes1 = waitForThreadPoolTasks(activeFileReads);
+    Result threadPoolRes2 = waitForThreadPoolTasks(activeFileWrites);
+
+    if (not threadPoolRes1)
+        res = threadPoolRes1;
+
+    if (not threadPoolRes2)
+        res = threadPoolRes2;
+
+    while (AsyncRequest* async = manualThreadPoolCompletions.pop())
+    {
+        async->state     = AsyncRequest::State::Free;
+        async->eventLoop = nullptr;
+    }
+
     freeAsyncRequests(submissions);
 
     freeAsyncRequests(activeLoopTimeouts);
@@ -348,7 +396,7 @@ SC::Result SC::AsyncEventLoop::Private::close()
     numberOfActiveHandles = 0;
     numberOfExternals     = 0;
     SC_TRY(eventLoop->internalSelf.close());
-    return Result(true);
+    return res;
 }
 
 SC::Result SC::AsyncEventLoop::Private::stageSubmission(KernelQueue& queue, AsyncRequest& async)
@@ -451,7 +499,7 @@ SC::Result SC::AsyncEventLoop::Private::runStep(SyncMode syncMode)
 
     runStepExecuteCompletions(queue);
     runStepExecuteManualCompletions(queue);
-
+    runStepExecuteManualThreadPoolCompletions(queue);
     SC_LOG_MESSAGE("Active Requests After Completion = {} ( + {} manual)\n", getTotalNumberOfActiveHandle(),
                    numberOfManualCompletions);
     return SC::Result(true);
@@ -460,6 +508,17 @@ SC::Result SC::AsyncEventLoop::Private::runStep(SyncMode syncMode)
 void SC::AsyncEventLoop::Private::runStepExecuteManualCompletions(KernelQueue& queue)
 {
     while (AsyncRequest* async = manualCompletions.dequeueFront())
+    {
+        if (not completeAndEventuallyReactivate(queue, *async, Result(true)))
+        {
+            SC_LOG_MESSAGE("Error completing {}", async->debugName);
+        }
+    }
+}
+
+void SC::AsyncEventLoop::Private::runStepExecuteManualThreadPoolCompletions(KernelQueue& queue)
+{
+    while (AsyncRequest* async = manualThreadPoolCompletions.pop())
     {
         if (not completeAndEventuallyReactivate(queue, *async, Result(true)))
         {
@@ -518,7 +577,14 @@ struct SC::AsyncEventLoop::Private::SetupAsyncPhase
     template <typename T>
     SC::Result operator()(T& async)
     {
-        return Result(queue.setupAsync(async));
+        if (async.asyncTask)
+        {
+            return Result(true);
+        }
+        else
+        {
+            return Result(queue.setupAsync(async));
+        }
     }
 };
 
@@ -530,11 +596,39 @@ struct SC::AsyncEventLoop::Private::ActivateAsyncPhase
     template <typename T>
     SC::Result operator()(T& async)
     {
+        if (async.asyncTask)
+        {
+            AsyncTask* asyncTask     = async.asyncTask;
+            asyncTask->task.function = [asyncTask] { executeThreadPoolOperation(*asyncTask); };
+            return asyncTask->threadPool.queueTask(asyncTask->task);
+        }
+        
         if (async.flags & AsyncRequest::Flag_ManualCompletion)
         {
             async.eventLoop->privateSelf.scheduleManualCompletion(async);
         }
         return Result(queue.activateAsync(async));
+    }
+
+    static void executeThreadPoolOperation(AsyncTask& task)
+    {
+        AsyncRequest& async = task.asyncResult.async;
+        switch (async.type)
+        {
+        case AsyncRequest::Type::FileRead:
+            task.asyncResult.returnCode =
+                KernelQueue::executeOperation(static_cast<AsyncFileRead&>(async),
+                                              static_cast<AsyncFileRead::Result&>(task.asyncResult).completionData);
+            break;
+        case AsyncRequest::Type::FileWrite:
+            task.asyncResult.returnCode =
+                KernelQueue::executeOperation(static_cast<AsyncFileWrite&>(async),
+                                              static_cast<AsyncFileWrite::Result&>(task.asyncResult).completionData);
+            break;
+        default: SC_ASSERT_RELEASE("Unsupported threadpool operation" and false); return;
+        }
+        async.eventLoop->privateSelf.manualThreadPoolCompletions.push(async);
+        SC_ASSERT_RELEASE(async.eventLoop->wakeUpFromExternalThread());
     }
 };
 
@@ -546,6 +640,12 @@ struct SC::AsyncEventLoop::Private::CancelAsyncPhase
     template <typename T>
     SC::Result operator()(T& async)
     {
+        if (async.asyncTask)
+        {
+            async.eventLoop->privateSelf.manualThreadPoolCompletions.remove(async);
+            return Result(true);
+        }
+        
         if (async.flags & AsyncRequest::Flag_ManualCompletion)
         {
             async.eventLoop->privateSelf.manualCompletions.remove(async);
@@ -588,7 +688,19 @@ struct SC::AsyncEventLoop::Private::CompleteAsyncPhase
         AsyncResultType result(async, forward<Result>(returnCode));
         if (result.returnCode)
         {
-            result.returnCode = Result(queue.completeAsync(result));
+            if (result.getAsync().asyncTask)
+            {
+                AsyncTask* asyncTask  = result.getAsync().asyncTask;
+                result.returnCode     = asyncTask->asyncResult.returnCode;
+                result.completionData = move(static_cast<AsyncResultType&>(asyncTask->asyncResult).completionData);
+                // The task is already finished, but we call waitForTask to make sure it's being marked as free
+                // In other words this call here will not be waiting at all.
+                SC_TRY(asyncTask->threadPool.waitForTask(asyncTask->task));
+            }
+            else
+            {
+                result.returnCode = Result(queue.completeAsync(result));
+            }
         }
         if (result.getAsync().callback.isValid())
         {
@@ -764,6 +876,10 @@ void SC::AsyncEventLoop::Private::removeActiveHandle(AsyncRequest& async)
 
     numberOfActiveHandles -= 1;
 
+    if (async.asyncTask)
+    {
+        return; // Asyncs flagged to be manually completed for thread pool, are not added to active handles
+    }
     // clang-format off
     switch (async.type)
     {
@@ -796,6 +912,10 @@ void SC::AsyncEventLoop::Private::addActiveHandle(AsyncRequest& async)
 
     numberOfActiveHandles += 1;
 
+    if (async.asyncTask)
+    {
+        return; // Asyncs flagged to be manually completed for thread pool, are not added to active handles
+    }
     // clang-format off
     switch (async.type)
     {

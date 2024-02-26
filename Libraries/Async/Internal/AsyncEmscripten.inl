@@ -11,6 +11,7 @@ struct SC::AsyncEventLoop::Internal
     [[nodiscard]] Result wakeUpFromExternalThread() { return Result(true); }
     [[nodiscard]] Result associateExternallyCreatedTCPSocket(SocketDescriptor&) { return Result(true); }
     [[nodiscard]] Result associateExternallyCreatedFileDescriptor(FileDescriptor&) { return Result(true); }
+    [[nodiscard]] Result makesSenseToRunInThreadPool(AsyncRequest&) { return Result(true); }
 };
 
 struct SC::AsyncEventLoop::KernelQueue

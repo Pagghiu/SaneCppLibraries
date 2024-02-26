@@ -39,6 +39,8 @@ struct SC::AsyncEventLoop::InternalPosix
     InternalPosix() {}
     ~InternalPosix() { SC_TRUST_RESULT(close()); }
 
+    [[nodiscard]] static constexpr bool makesSenseToRunInThreadPool(AsyncRequest&) { return true; }
+
     const InternalPosix& getPosix() const { return *this; }
 
     [[nodiscard]] Result close()
@@ -577,6 +579,7 @@ struct SC::AsyncEventLoop::KernelQueuePosix
     //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result setupAsync(AsyncSocketClose& async)
     {
+        // TODO: Allow running close on thread pool
         async.flags |= AsyncRequest::Flag_ManualCompletion;
         async.code = ::close(async.handle);
         SC_TRY_MSG(async.code == 0, "Close returned error");
@@ -698,6 +701,7 @@ struct SC::AsyncEventLoop::KernelQueuePosix
     //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result setupAsync(AsyncFileClose& async)
     {
+        // TODO: Allow running close on thread pool
         async.flags |= AsyncRequest::Flag_ManualCompletion;
         async.code = ::close(async.fileDescriptor);
         SC_TRY_MSG(async.code == 0, "Close returned error");
