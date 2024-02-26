@@ -1,5 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include "../../File/FileDescriptor.h"
 #include "../../Foundation/Deferred.h"
 #include "../SocketDescriptor.h"
 

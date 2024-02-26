@@ -1,9 +1,11 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../File/FileDescriptor.h"
 #include "../Foundation/AlignedStorage.h"
 #include "../Foundation/Result.h"
+#include "../Foundation/Span.h"
+#include "../Foundation/UniqueHandle.h"
+#include "../Strings/StringView.h"
 #include "../Time/Time.h" // Milliseconds
 
 namespace SC
