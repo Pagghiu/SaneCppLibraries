@@ -6,10 +6,24 @@
 namespace SC
 {
 struct ThreadPool;
+struct ThreadPoolTask;
 } // namespace SC
 
 //! @addtogroup group_threading
 //! @{
+
+/// @brief A small task containing a function to execute that can be queued in the thread pool.
+///
+/// Fill Task::function with any function to execute in the thread pool.
+struct SC::ThreadPoolTask
+{
+
+    Function<void()> function; ///< Function that will be executed during the task
+  private:
+    friend struct ThreadPool;
+    ThreadPool*     threadPool = nullptr;
+    ThreadPoolTask* next       = nullptr;
+};
 
 /// @brief Simple thread pool that executes tasks in a fixed number of worker threads.
 ///
@@ -25,18 +39,7 @@ struct ThreadPool;
 ///
 struct SC::ThreadPool
 {
-    /// @brief A small task containing a function to execute that can be queued in the thread pool.
-    ///
-    /// Fill Task::function with any function to execute in the thread pool.
-    struct Task
-    {
-        Function<void()> function; ///< Function that will be executed during the task
-
-      private:
-        friend struct ThreadPool;
-        ThreadPool* threadPool = nullptr;
-        Task*       next       = nullptr;
-    };
+    using Task = ThreadPoolTask;
 
     ThreadPool() = default;
     ~ThreadPool() { (void)destroy(); }
