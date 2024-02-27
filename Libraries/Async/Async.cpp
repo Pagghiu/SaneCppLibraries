@@ -599,10 +599,10 @@ struct SC::AsyncEventLoop::Private::ActivateAsyncPhase
         if (async.asyncTask)
         {
             AsyncTask* asyncTask     = async.asyncTask;
-            asyncTask->task.function = [asyncTask] { executeThreadPoolOperation(*asyncTask); };
+            asyncTask->task.function = [&async] { executeThreadPoolOperation(async); };
             return asyncTask->threadPool.queueTask(asyncTask->task);
         }
-        
+
         if (async.flags & AsyncRequest::Flag_ManualCompletion)
         {
             async.eventLoop->privateSelf.scheduleManualCompletion(async);
@@ -610,23 +610,12 @@ struct SC::AsyncEventLoop::Private::ActivateAsyncPhase
         return Result(queue.activateAsync(async));
     }
 
-    static void executeThreadPoolOperation(AsyncTask& task)
+    template <typename T>
+    static void executeThreadPoolOperation(T& async)
     {
-        AsyncRequest& async = task.asyncResult.async;
-        switch (async.type)
-        {
-        case AsyncRequest::Type::FileRead:
-            task.asyncResult.returnCode =
-                KernelQueue::executeOperation(static_cast<AsyncFileRead&>(async),
-                                              static_cast<AsyncFileRead::Result&>(task.asyncResult).completionData);
-            break;
-        case AsyncRequest::Type::FileWrite:
-            task.asyncResult.returnCode =
-                KernelQueue::executeOperation(static_cast<AsyncFileWrite&>(async),
-                                              static_cast<AsyncFileWrite::Result&>(task.asyncResult).completionData);
-            break;
-        default: SC_ASSERT_RELEASE("Unsupported threadpool operation" and false); return;
-        }
+        AsyncTask& task             = *async.asyncTask;
+        auto&      completionData   = static_cast<typename T::Result&>(task.asyncResult).completionData;
+        task.asyncResult.returnCode = KernelQueue::executeOperation(async, completionData);
         async.eventLoop->privateSelf.manualThreadPoolCompletions.push(async);
         SC_ASSERT_RELEASE(async.eventLoop->wakeUpFromExternalThread());
     }
@@ -645,7 +634,7 @@ struct SC::AsyncEventLoop::Private::CancelAsyncPhase
             async.eventLoop->privateSelf.manualThreadPoolCompletions.remove(async);
             return Result(true);
         }
-        
+
         if (async.flags & AsyncRequest::Flag_ManualCompletion)
         {
             async.eventLoop->privateSelf.manualCompletions.remove(async);

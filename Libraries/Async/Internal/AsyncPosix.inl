@@ -752,5 +752,7 @@ struct SC::AsyncEventLoop::KernelQueuePosix
     template <typename T> [[nodiscard]] Result activateAsync(T&)  { return Result(true); }
     template <typename T> [[nodiscard]] Result completeAsync(T&)  { return Result(true); }
     template <typename T> [[nodiscard]] Result cancelAsync(T&)    { return Result(true); }
+
+    template <typename T, typename P> [[nodiscard]] static Result executeOperation(T&, P&) { return Result::Error("Implement executeOperation"); }
     // clang-format on
 };
