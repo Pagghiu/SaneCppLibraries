@@ -190,7 +190,7 @@ struct SC::AsyncEventLoop::KernelQueue
     OVERLAPPED_ENTRY events[totalNumEvents];
     ULONG            newEvents = 0;
 
-    KernelQueue(Internal&) {}
+    KernelQueue(Internal&) { memset(events, totalNumEvents, sizeof(events[0])); }
 
     uint32_t getNumEvents() const { return static_cast<uint32_t>(newEvents); }
 
@@ -324,7 +324,7 @@ struct SC::AsyncEventLoop::KernelQueue
     {
         SC_TRY(SocketNetworking::isNetworkingInited());
         AsyncEventLoop& eventLoop  = *asyncConnect.eventLoop;
-        auto&           overlapped = asyncConnect.overlapped.get();
+        OVERLAPPED&     overlapped = asyncConnect.overlapped.get().overlapped;
         // To allow loading connect function we must first bind the socket
         int bindRes;
         if (asyncConnect.ipAddress.getAddressFamily() == SocketFlags::AddressFamilyIPV4)
@@ -334,7 +334,8 @@ struct SC::AsyncEventLoop::KernelQueue
             addr.sin_family      = AF_INET;
             addr.sin_addr.s_addr = INADDR_ANY;
             addr.sin_port        = 0;
-            bindRes              = ::bind(asyncConnect.handle, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
+
+            bindRes = ::bind(asyncConnect.handle, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
         }
         else
         {
@@ -342,7 +343,8 @@ struct SC::AsyncEventLoop::KernelQueue
             ZeroMemory(&addr, sizeof(addr));
             addr.sin6_family = AF_INET6;
             addr.sin6_port   = 0;
-            bindRes          = ::bind(asyncConnect.handle, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
+
+            bindRes = ::bind(asyncConnect.handle, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
         }
         if (bindRes == SOCKET_ERROR)
         {
@@ -356,7 +358,7 @@ struct SC::AsyncEventLoop::KernelQueue
 
         DWORD dummyTransferred;
         BOOL  connectRes = eventLoop.internalSelf.pConnectEx(asyncConnect.handle, sockAddr, sockAddrLen, nullptr, 0,
-                                                             &dummyTransferred, &overlapped.overlapped);
+                                                             &dummyTransferred, &overlapped);
         if (connectRes == FALSE and WSAGetLastError() != WSA_IO_PENDING)
         {
             return Result::Error("ConnectEx failed");
@@ -377,13 +379,13 @@ struct SC::AsyncEventLoop::KernelQueue
     //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] static Result activateAsync(AsyncSocketSend& async)
     {
-        auto&  overlapped = async.overlapped.get();
-        WSABUF buffer;
+        OVERLAPPED& overlapped = async.overlapped.get().overlapped;
+        WSABUF      buffer;
         // this const_cast is caused by WSABUF being used for both send and receive
-        buffer.buf = const_cast<CHAR*>(async.data.data());
-        buffer.len = static_cast<ULONG>(async.data.sizeInBytes());
+        buffer.buf = const_cast<CHAR*>(async.buffer.data());
+        buffer.len = static_cast<ULONG>(async.buffer.sizeInBytes());
         DWORD     transferred;
-        const int res = ::WSASend(async.handle, &buffer, 1, &transferred, 0, &overlapped.overlapped, nullptr);
+        const int res = ::WSASend(async.handle, &buffer, 1, &transferred, 0, &overlapped, nullptr);
         SC_TRY_MSG(res != SOCKET_ERROR or WSAGetLastError() == WSA_IO_PENDING, "WSASend failed");
         // TODO: when res == 0 we could avoid the additional GetOverlappedResult syscall
         return Result(true);
@@ -391,9 +393,8 @@ struct SC::AsyncEventLoop::KernelQueue
 
     [[nodiscard]] static Result completeAsync(AsyncSocketSend::Result& result)
     {
-        AsyncSocketSend& async = result.getAsync();
-        return Internal::checkWSAResult(async.handle, async.overlapped.get().overlapped,
-                                        &result.completionData.writtenBytes);
+        return Internal::checkWSAResult(result.getAsync().handle, result.getAsync().overlapped.get().overlapped,
+                                        &result.completionData.numBytes);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -401,13 +402,13 @@ struct SC::AsyncEventLoop::KernelQueue
     //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] static Result activateAsync(AsyncSocketReceive& async)
     {
-        auto&  overlapped = async.overlapped.get();
-        WSABUF buffer;
-        buffer.buf = async.data.data();
-        buffer.len = static_cast<ULONG>(async.data.sizeInBytes());
+        OVERLAPPED& overlapped = async.overlapped.get().overlapped;
+        WSABUF      buffer;
+        buffer.buf = async.buffer.data();
+        buffer.len = static_cast<ULONG>(async.buffer.sizeInBytes());
         DWORD     transferred;
         DWORD     flags = 0;
-        const int res   = ::WSARecv(async.handle, &buffer, 1, &transferred, &flags, &overlapped.overlapped, nullptr);
+        const int res   = ::WSARecv(async.handle, &buffer, 1, &transferred, &flags, &overlapped, nullptr);
         SC_TRY_MSG(res != SOCKET_ERROR or WSAGetLastError() == WSA_IO_PENDING, "WSARecv failed");
         // TODO: when res == 0 we could avoid the additional GetOverlappedResult syscall
         return Result(true);
@@ -415,9 +416,8 @@ struct SC::AsyncEventLoop::KernelQueue
 
     [[nodiscard]] static Result completeAsync(AsyncSocketReceive::Result& result)
     {
-        AsyncSocketReceive& async = result.getAsync();
-        return Internal::checkWSAResult(async.handle, async.overlapped.get().overlapped,
-                                        &result.completionData.readBytes);
+        return Internal::checkWSAResult(result.getAsync().handle, result.getAsync().overlapped.get().overlapped,
+                                        &result.completionData.numBytes);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -433,6 +433,69 @@ struct SC::AsyncEventLoop::KernelQueue
     }
 
     //-------------------------------------------------------------------------------------------------------
+    // File READ / WRITE shared functions
+    //-------------------------------------------------------------------------------------------------------
+    template <typename Func, typename T>
+    [[nodiscard]] static Result executeFileOperation(Func func, T& async, typename T::CompletionData& completionData,
+                                                     bool synchronous)
+    {
+        OVERLAPPED& overlapped = async.overlapped.get().overlapped;
+        overlapped.Offset      = static_cast<DWORD>(async.offset & 0xffffffff);
+        overlapped.OffsetHigh  = static_cast<DWORD>((async.offset >> 32) & 0xffffffff);
+
+        const DWORD bufSize = static_cast<DWORD>(async.buffer.sizeInBytes());
+
+        const FileDescriptor::Handle fileDescriptor = async.fileDescriptor;
+
+        DWORD numBytes;
+        if (func(fileDescriptor, async.buffer.data(), bufSize, &numBytes, &overlapped) == FALSE)
+        {
+            if (::GetLastError() == ERROR_IO_PENDING) // ERROR_IO_PENDING just indicates async operation is in progress
+            {
+                if (synchronous)
+                {
+                    // If we have been requested to do a synchronous operation on an async file, wait for completion
+                    if (::GetOverlappedResult(fileDescriptor, &overlapped, &numBytes, TRUE) == FALSE) // bWait == TRUE
+                    {
+                        return Result::Error("ReadFile/WriteFile (GetOverlappedResult) error");
+                    }
+                }
+            }
+            else
+            {
+                // We got an unexpected error.
+                // In the async case probably the user forgot to open the file with async flags and associate it.
+                // In the sync case (threadpool) we try a regular sync call to support files opened with async == false.
+                if (not synchronous or func(fileDescriptor, async.buffer.data(), bufSize, &numBytes, nullptr) == FALSE)
+                {
+                    // File must have FileDescriptor::OpenOptions::async == true +
+                    // associateExternallyCreatedFileDescriptor
+                    return Result::Error(
+                        "ReadFile/WriteFile failed (forgot setting FileDescriptor::OpenOptions::async = true or "
+                        "AsyncEventLoop::associateExternallyCreatedFileDescriptor?)");
+                }
+            }
+        }
+
+        completionData.numBytes = static_cast<size_t>(numBytes);
+        return Result(true);
+    }
+
+    template <typename ResultType>
+    static Result completeFileOperation(ResultType& result)
+    {
+        OVERLAPPED& overlapped  = result.getAsync().overlapped.get().overlapped;
+        DWORD       transferred = 0;
+        if (::GetOverlappedResult(result.getAsync().fileDescriptor, &overlapped, &transferred, FALSE) == FALSE)
+        {
+            // TODO: report error
+            return Result::Error("GetOverlappedResult error");
+        }
+        result.completionData.numBytes = transferred;
+        return Result(true);
+    }
+
+    //-------------------------------------------------------------------------------------------------------
     // File READ
     //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] static Result activateAsync(AsyncFileRead& async)
@@ -444,47 +507,10 @@ struct SC::AsyncEventLoop::KernelQueue
     [[nodiscard]] static Result executeOperation(AsyncFileRead& async, AsyncFileRead::CompletionData& completionData,
                                                  bool synchronous = true)
     {
-        OVERLAPPED& overlapped = async.overlapped.get().overlapped;
-        overlapped.Offset      = static_cast<DWORD>(async.offset & 0xffffffff);
-        overlapped.OffsetHigh  = static_cast<DWORD>((async.offset >> 32) & 0xffffffff);
-        const DWORD bufSize    = static_cast<DWORD>(async.readBuffer.sizeInBytes());
-        DWORD       numBytes;
-        if (::ReadFile(async.fileDescriptor, async.readBuffer.data(), bufSize, &numBytes, &overlapped))
-        {
-            synchronous = false; // Finished synchronously, no need to call also ::GetOverlappedResult
-        }
-        else if (::GetLastError() != ERROR_IO_PENDING) // ERROR_IO_PENDING just indicates async operation is in progress
-        {
-            // File must have FileDescriptor::OpenOptions::async == true + associateExternallyCreatedFileDescriptor
-            // TODO: Consider if we should allow files opened without async flags and silently handle them synchronously
-            return Result::Error("ReadFile failed (forgot setting FileDescriptor::OpenOptions::async = true or "
-                                 "AsyncEventLoop::associateExternallyCreatedFileDescriptor?)");
-        }
-        if (synchronous)
-        {
-            // If we have been requested to do a synchronous operation, let's wait for it to be finished
-            if (::GetOverlappedResult(async.fileDescriptor, &overlapped, &numBytes, TRUE) == FALSE) // bWait == TRUE
-            {
-                return Result::Error("ReadFile (GetOverlappedResult) error");
-            }
-        }
-        completionData.readBytes = static_cast<size_t>(numBytes);
-        return Result(true);
+        return executeFileOperation(&::ReadFile, async, completionData, synchronous);
     }
 
-    [[nodiscard]] static Result completeAsync(AsyncFileRead::Result& result)
-    {
-        AsyncFileRead& async       = result.getAsync();
-        OVERLAPPED&    overlapped  = async.overlapped.get().overlapped;
-        DWORD          transferred = 0;
-        if (::GetOverlappedResult(async.fileDescriptor, &overlapped, &transferred, FALSE) == FALSE)
-        {
-            // TODO: report error
-            return Result::Error("GetOverlappedResult error");
-        }
-        result.completionData.readBytes = static_cast<size_t>(transferred);
-        return Result(true);
-    }
+    [[nodiscard]] static Result completeAsync(AsyncFileRead::Result& result) { return completeFileOperation(result); }
 
     //-------------------------------------------------------------------------------------------------------
     // File WRITE
@@ -498,47 +524,10 @@ struct SC::AsyncEventLoop::KernelQueue
     [[nodiscard]] static Result executeOperation(AsyncFileWrite& async, AsyncFileWrite::CompletionData& completionData,
                                                  bool synchronous = true)
     {
-        OVERLAPPED& overlapped = async.overlapped.get().overlapped;
-        overlapped.Offset      = static_cast<DWORD>(async.offset & 0xffffffff);
-        overlapped.OffsetHigh  = static_cast<DWORD>((async.offset >> 32) & 0xffffffff);
-        const DWORD bufSize    = static_cast<DWORD>(async.writeBuffer.sizeInBytes());
-        DWORD       numBytes;
-        if (::WriteFile(async.fileDescriptor, async.writeBuffer.data(), bufSize, &numBytes, &overlapped))
-        {
-            synchronous = false; // Finished synchronously, no need to call also ::GetOverlappedResult
-        }
-        else if (::GetLastError() != ERROR_IO_PENDING) // ERROR_IO_PENDING just indicates async operation is in progress
-        {
-            // File must have FileDescriptor::OpenOptions::async == true + associateExternallyCreatedFileDescriptor
-            // TODO: Consider if we should allow files opened without async flags and silently handle them synchronously
-            return Result::Error("WriteFile failed (forgot setting FileDescriptor::OpenOptions::async = true or "
-                                 "AsyncEventLoop::associateExternallyCreatedFileDescriptor?)");
-        }
-        if (synchronous)
-        {
-            // If we have been requested to do a synchronous operation, let's wait for it to be finished
-            if (::GetOverlappedResult(async.fileDescriptor, &overlapped, &numBytes, TRUE) == FALSE) // bWait == TRUE
-            {
-                return Result::Error("WriteFile (GetOverlappedResult) error");
-            }
-        }
-        completionData.writtenBytes = static_cast<size_t>(numBytes);
-        return Result(true);
+        return executeFileOperation(&::WriteFile, async, completionData, synchronous);
     }
 
-    [[nodiscard]] static Result completeAsync(AsyncFileWrite::Result& result)
-    {
-        AsyncFileWrite& async       = result.getAsync();
-        OVERLAPPED&     overlapped  = async.overlapped.get().overlapped;
-        DWORD           transferred = 0;
-        if (::GetOverlappedResult(async.fileDescriptor, &overlapped, &transferred, FALSE) == FALSE)
-        {
-            // TODO: report error
-            return Result::Error("GetOverlappedResult error");
-        }
-        result.completionData.writtenBytes = transferred;
-        return Result(true);
-    }
+    [[nodiscard]] static Result completeAsync(AsyncFileWrite::Result& result) { return completeFileOperation(result); }
 
     //-------------------------------------------------------------------------------------------------------
     // File CLOSE

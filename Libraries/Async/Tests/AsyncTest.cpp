@@ -614,12 +614,15 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
 
             FileDescriptor::OpenOptions openOptions;
-            openOptions.async    = true;
+            openOptions.async    = not useThreadPool;
             openOptions.blocking = true;
 
             FileDescriptor fd;
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, openOptions));
-            SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
+            if (not useThreadPool)
+            {
+                SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
+            }
 
             FileDescriptor::Handle handle = FileDescriptor::Invalid;
             SC_TEST_EXPECT(fd.get(handle, Result::Error("asd")));
@@ -640,7 +643,10 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(fd.close());
 
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::ReadOnly, openOptions));
-            SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
+            if (not useThreadPool)
+            {
+                SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
+            }
             SC_TEST_EXPECT(fd.get(handle, Result::Error("asd")));
 
             struct Params

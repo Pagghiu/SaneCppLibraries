@@ -137,7 +137,7 @@ SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop, const SocketDescript
 
     SC_TRY(validateAsync());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
-    data = dataToSend;
+    buffer = dataToSend;
     SC_TRY(queueSubmission(loop, nullptr));
     return SC::Result(true);
 }
@@ -147,7 +147,7 @@ SC::Result SC::AsyncSocketReceive::start(AsyncEventLoop& loop, const SocketDescr
 {
     SC_TRY(validateAsync());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
-    data = receiveData;
+    buffer = receiveData;
     SC_TRY(queueSubmission(loop, nullptr));
     return SC::Result(true);
 }
@@ -165,7 +165,7 @@ SC::Result SC::AsyncFileRead::start(AsyncEventLoop& loop, FileDescriptor::Handle
     SC_TRY_MSG(rb.sizeInBytes() > 0, "AsyncEventLoop::startFileRead - Zero sized read buffer");
     SC_TRY(validateAsync());
     fileDescriptor = fd;
-    readBuffer     = rb;
+    buffer         = rb;
     SC_TRY(queueSubmission(loop, task));
     return SC::Result(true);
 }
@@ -175,7 +175,7 @@ SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop, FileDescriptor::Handl
     SC_TRY_MSG(wb.sizeInBytes() > 0, "AsyncEventLoop::startFileWrite - Zero sized write buffer");
     SC_TRY(validateAsync());
     fileDescriptor = fd;
-    writeBuffer    = wb;
+    buffer         = wb;
     SC_TRY(queueSubmission(loop, task));
     return SC::Result(true);
 }

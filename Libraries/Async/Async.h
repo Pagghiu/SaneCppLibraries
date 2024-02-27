@@ -488,7 +488,7 @@ struct AsyncSocketSend : public AsyncRequest
 {
     struct CompletionData
     {
-        size_t writtenBytes = 0;
+        size_t numBytes = 0;
     };
     /// @brief Callback result for AsyncSocketSend
     using Result = AsyncResultOf<AsyncSocketSend, CompletionData>;
@@ -509,7 +509,7 @@ struct AsyncSocketSend : public AsyncRequest
     friend struct AsyncEventLoop;
 
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
-    Span<const char>         data;
+    Span<const char>         buffer;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
 #endif
@@ -528,7 +528,7 @@ struct AsyncSocketReceive : public AsyncRequest
 {
     struct CompletionData
     {
-        size_t readBytes = 0;
+        size_t numBytes = 0;
     };
     /// @brief Callback result for AsyncSocketReceive
     struct Result : public AsyncResultOf<AsyncSocketReceive, CompletionData>
@@ -540,7 +540,7 @@ struct AsyncSocketReceive : public AsyncRequest
         /// @return Valid Result if the data was read without errors
         [[nodiscard]] SC::Result get(Span<char>& outData)
         {
-            SC_TRY(getAsync().getReadBuffer().sliceStartLength(0, completionData.readBytes, outData));
+            SC_TRY(getAsync().getBuffer().sliceStartLength(0, completionData.numBytes, outData));
             return returnCode;
         }
     };
@@ -558,13 +558,13 @@ struct AsyncSocketReceive : public AsyncRequest
 
     Function<void(Result&)> callback; ///< Called after data has been received
 
-    Span<char> getReadBuffer() { return data; }
+    Span<char> getBuffer() { return buffer; }
 
   private:
     friend struct AsyncEventLoop;
 
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
-    Span<char>               data;
+    Span<char>               buffer;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
 #endif
@@ -610,7 +610,7 @@ struct AsyncFileRead : public AsyncRequest
 {
     struct CompletionData
     {
-        size_t readBytes = 0;
+        size_t numBytes = 0;
     };
     /// @brief Callback result for AsyncFileRead
     struct Result : public AsyncResultOf<AsyncFileRead, CompletionData>
@@ -619,7 +619,7 @@ struct AsyncFileRead : public AsyncRequest
 
         [[nodiscard]] SC::Result get(Span<char>& data)
         {
-            SC_TRY(getAsync().readBuffer.sliceStartLength(0, completionData.readBytes, data));
+            SC_TRY(getAsync().buffer.sliceStartLength(0, completionData.numBytes, data));
             return returnCode;
         }
     };
@@ -636,13 +636,13 @@ struct AsyncFileRead : public AsyncRequest
 
     Function<void(Result&)> callback;
 
-    Span<char> getReadBuffer() const { return readBuffer; }
+    Span<char> getBuffer() const { return buffer; }
 
   private:
     friend struct AsyncEventLoop;
 
     FileDescriptor::Handle fileDescriptor;
-    Span<char>             readBuffer;
+    Span<char>             buffer;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
 #endif
@@ -658,7 +658,7 @@ struct AsyncFileWrite : public AsyncRequest
 {
     struct CompletionData
     {
-        size_t writtenBytes = 0;
+        size_t numBytes = 0;
     };
     /// @brief Callback result for AsyncFileWrite
     struct Result : public AsyncResultOf<AsyncFileWrite, CompletionData>
@@ -667,7 +667,7 @@ struct AsyncFileWrite : public AsyncRequest
 
         [[nodiscard]] SC::Result get(size_t& writtenSizeInBytes)
         {
-            writtenSizeInBytes = completionData.writtenBytes;
+            writtenSizeInBytes = completionData.numBytes;
             return returnCode;
         }
     };
@@ -688,7 +688,7 @@ struct AsyncFileWrite : public AsyncRequest
   private:
     friend struct AsyncEventLoop;
     FileDescriptor::Handle fileDescriptor;
-    Span<const char>       writeBuffer;
+    Span<const char>       buffer;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
 #endif

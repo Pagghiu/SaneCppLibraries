@@ -537,10 +537,10 @@ struct SC::AsyncEventLoop::KernelQueuePosix
     [[nodiscard]] static Result completeAsync(AsyncSocketSend::Result& result)
     {
         AsyncSocketSend& async = result.getAsync();
-        const ssize_t    res   = ::send(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
+        const ssize_t    res   = ::send(async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
         SC_TRY_MSG(res >= 0, "error in send");
-        result.completionData.writtenBytes = static_cast<size_t>(res);
-        SC_TRY_MSG(result.completionData.writtenBytes == async.data.sizeInBytes(), "send didn't send all data");
+        result.completionData.numBytes = static_cast<size_t>(res);
+        SC_TRY_MSG(result.completionData.numBytes == async.buffer.sizeInBytes(), "send didn't send all data");
         return Result(true);
     }
 
@@ -568,9 +568,9 @@ struct SC::AsyncEventLoop::KernelQueuePosix
     [[nodiscard]] static Result completeAsync(AsyncSocketReceive::Result& result)
     {
         AsyncSocketReceive& async = result.getAsync();
-        const ssize_t       res   = ::recv(async.handle, async.data.data(), async.data.sizeInBytes(), 0);
+        const ssize_t       res   = ::recv(async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
         SC_TRY_MSG(res >= 0, "error in recv");
-        result.completionData.readBytes = static_cast<size_t>(res);
+        result.completionData.numBytes = static_cast<size_t>(res);
         return Result(true);
     }
 
@@ -616,7 +616,7 @@ struct SC::AsyncEventLoop::KernelQueuePosix
 
     [[nodiscard]] static Result executeOperation(AsyncFileRead& async, AsyncFileRead::CompletionData& completionData)
     {
-        auto    span = async.readBuffer;
+        auto    span = async.buffer;
         ssize_t res;
         do
         {
@@ -631,7 +631,7 @@ struct SC::AsyncEventLoop::KernelQueuePosix
         } while ((res == -1) and (errno == EINTR));
 
         SC_TRY_MSG(res >= 0, "::read failed");
-        completionData.readBytes = static_cast<size_t>(res);
+        completionData.numBytes = static_cast<size_t>(res);
         return Result(true);
     }
 
@@ -665,7 +665,7 @@ struct SC::AsyncEventLoop::KernelQueuePosix
 
     [[nodiscard]] static Result executeOperation(AsyncFileWrite& async, AsyncFileWrite::CompletionData& completionData)
     {
-        auto    span = async.writeBuffer;
+        auto    span = async.buffer;
         ssize_t res;
         do
         {
@@ -679,7 +679,7 @@ struct SC::AsyncEventLoop::KernelQueuePosix
             }
         } while ((res == -1) and (errno == EINTR));
         SC_TRY_MSG(res >= 0, "::write failed");
-        completionData.writtenBytes = static_cast<size_t>(res);
+        completionData.numBytes = static_cast<size_t>(res);
         return Result(true);
     }
 

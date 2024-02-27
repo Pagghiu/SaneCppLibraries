@@ -387,15 +387,15 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(async, submission));
-        globalLibURing.io_uring_prep_send(submission, async.handle, async.data.data(), async.data.sizeInBytes(), 0);
+        globalLibURing.io_uring_prep_send(submission, async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
     }
 
     [[nodiscard]] Result completeAsync(AsyncSocketSend::Result& result)
     {
-        result.completionData.writtenBytes = static_cast<size_t>(events[result.getAsync().eventIndex].res);
-        SC_TRY_MSG(result.completionData.writtenBytes == result.getAsync().data.sizeInBytes(),
+        result.completionData.numBytes = static_cast<size_t>(events[result.getAsync().eventIndex].res);
+        SC_TRY_MSG(result.completionData.numBytes == result.getAsync().buffer.sizeInBytes(),
                    "send didn't send all data");
         return Result(true);
     }
@@ -407,14 +407,14 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(async, submission));
-        globalLibURing.io_uring_prep_recv(submission, async.handle, async.data.data(), async.data.sizeInBytes(), 0);
+        globalLibURing.io_uring_prep_recv(submission, async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
     }
 
     [[nodiscard]] Result completeAsync(AsyncSocketReceive::Result& result)
     {
-        result.completionData.readBytes = static_cast<size_t>(events[result.getAsync().eventIndex].res);
+        result.completionData.numBytes = static_cast<size_t>(events[result.getAsync().eventIndex].res);
         return Result(true);
     }
 
@@ -443,15 +443,15 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(async, submission));
-        globalLibURing.io_uring_prep_read(submission, async.fileDescriptor, async.readBuffer.data(),
-                                          async.readBuffer.sizeInBytes(), async.offset);
+        globalLibURing.io_uring_prep_read(submission, async.fileDescriptor, async.buffer.data(),
+                                          async.buffer.sizeInBytes(), async.offset);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
     }
 
     [[nodiscard]] Result completeAsync(AsyncFileRead::Result& result)
     {
-        result.completionData.readBytes = static_cast<size_t>(events[result.getAsync().eventIndex].res);
+        result.completionData.numBytes = static_cast<size_t>(events[result.getAsync().eventIndex].res);
         return Result(true);
     }
 
@@ -462,17 +462,17 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(async, submission));
-        globalLibURing.io_uring_prep_write(submission, async.fileDescriptor, async.writeBuffer.data(),
-                                           async.writeBuffer.sizeInBytes(), 0);
+        globalLibURing.io_uring_prep_write(submission, async.fileDescriptor, async.buffer.data(),
+                                           async.buffer.sizeInBytes(), 0);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
     }
 
     [[nodiscard]] Result completeAsync(AsyncFileWrite::Result& result)
     {
-        const size_t numBytes              = static_cast<size_t>(events[result.getAsync().eventIndex].res);
-        result.completionData.writtenBytes = numBytes;
-        return Result(numBytes == result.getAsync().writeBuffer.sizeInBytes());
+        const size_t numBytes          = static_cast<size_t>(events[result.getAsync().eventIndex].res);
+        result.completionData.numBytes = numBytes;
+        return Result(numBytes == result.getAsync().buffer.sizeInBytes());
     }
 
     //-------------------------------------------------------------------------------------------------------
