@@ -580,7 +580,7 @@ struct SC::AsyncEventLoop::KernelQueuePosix
     [[nodiscard]] Result setupAsync(AsyncSocketClose& async)
     {
         // TODO: Allow running close on thread pool
-        async.flags |= AsyncRequest::Flag_ManualCompletion;
+        async.flags |= Private::Flag_ManualCompletion;
         async.code = ::close(async.handle);
         SC_TRY_MSG(async.code == 0, "Close returned error");
         return Result(true);
@@ -599,7 +599,7 @@ struct SC::AsyncEventLoop::KernelQueuePosix
         }
         else
         {
-            async.flags |= AsyncRequest::Flag_ManualCompletion; // on epoll regular files are not watchable
+            async.flags |= Private::Flag_ManualCompletion; // on epoll regular files are not watchable
             return Result(true);
         }
     }
@@ -648,7 +648,7 @@ struct SC::AsyncEventLoop::KernelQueuePosix
         }
         else
         {
-            async.flags |= AsyncRequest::Flag_ManualCompletion; // on epoll regular files are not watchable
+            async.flags |= Private::Flag_ManualCompletion; // on epoll regular files are not watchable
             return Result(true);
         }
     }
@@ -702,7 +702,7 @@ struct SC::AsyncEventLoop::KernelQueuePosix
     [[nodiscard]] Result setupAsync(AsyncFileClose& async)
     {
         // TODO: Allow running close on thread pool
-        async.flags |= AsyncRequest::Flag_ManualCompletion;
+        async.flags |= Private::Flag_ManualCompletion;
         async.code = ::close(async.fileDescriptor);
         SC_TRY_MSG(async.code == 0, "Close returned error");
         return Result(true);

@@ -51,6 +51,15 @@ const char* SC::AsyncRequest::TypeToString(Type type)
 }
 #endif
 
+void SC::AsyncRequest::setDebugName(const char* newDebugName)
+{
+#if SC_CONFIGURATION_DEBUG
+    debugName = newDebugName;
+#else
+    SC_COMPILER_UNUSED(newDebugName);
+#endif
+}
+
 SC::Result SC::AsyncRequest::validateAsync()
 {
     const bool asyncStateIsFree      = state == AsyncRequest::State::Free;
@@ -284,15 +293,25 @@ SC::Result SC::AsyncEventLoop::Private::queueSubmission(AsyncRequest& async, Asy
 {
     if (task)
     {
-        if (&task->asyncResult.async != &async)
+        if (task->async != nullptr)
         {
             return Result::Error("AsyncTask is bound to a different async being started");
         }
     }
     async.eventLoop = eventLoop;
     async.state     = AsyncRequest::State::Setup;
+
     // Only set the async tasks for operations and backends where it makes sense to do so
-    async.asyncTask = eventLoop->internalSelf.makesSenseToRunInThreadPool(async) ? task : nullptr;
+    if (task and eventLoop->internalSelf.makesSenseToRunInThreadPool(async))
+    {
+        async.asyncTask = task;
+        task->async     = &async;
+    }
+    else
+    {
+        async.asyncTask = nullptr;
+    }
+
     submissions.queueBack(async);
     return Result(true);
 }
@@ -352,6 +371,7 @@ SC::Result SC::AsyncEventLoop::Private::waitForThreadPoolTasks(IntrusiveDoubleLi
             {
                 res = Result::Error("Threadpool was already stopped");
             }
+            it->asyncTask->freeTask();
         }
     }
     return res;
@@ -603,7 +623,7 @@ struct SC::AsyncEventLoop::Private::ActivateAsyncPhase
             return asyncTask->threadPool.queueTask(asyncTask->task);
         }
 
-        if (async.flags & AsyncRequest::Flag_ManualCompletion)
+        if (async.flags & Private::Flag_ManualCompletion)
         {
             async.eventLoop->privateSelf.scheduleManualCompletion(async);
         }
@@ -613,9 +633,9 @@ struct SC::AsyncEventLoop::Private::ActivateAsyncPhase
     template <typename T>
     static void executeThreadPoolOperation(T& async)
     {
-        AsyncTask& task             = *async.asyncTask;
-        auto&      completionData   = static_cast<typename T::Result&>(task.asyncResult).completionData;
-        task.asyncResult.returnCode = KernelQueue::executeOperation(async, completionData);
+        AsyncTask& task           = *async.asyncTask;
+        auto&      completionData = static_cast<typename T::CompletionData&>(task.completionData);
+        task.returnCode           = KernelQueue::executeOperation(async, completionData);
         async.eventLoop->privateSelf.manualThreadPoolCompletions.push(async);
         SC_ASSERT_RELEASE(async.eventLoop->wakeUpFromExternalThread());
     }
@@ -631,11 +651,17 @@ struct SC::AsyncEventLoop::Private::CancelAsyncPhase
     {
         if (async.asyncTask)
         {
+            // Waiting here is not ideal but we need it to be able to reilably know that
+            // the task can be reused soon after cancelling an async that uses it.
+            SC_TRY(async.asyncTask->threadPool.waitForTask(async.asyncTask->task));
+
+            // Prevent this async from going in the CompleteAsyncPhase and mark task as free
             async.eventLoop->privateSelf.manualThreadPoolCompletions.remove(async);
+            async.asyncTask->freeTask();
             return Result(true);
         }
 
-        if (async.flags & AsyncRequest::Flag_ManualCompletion)
+        if (async.flags & Private::Flag_ManualCompletion)
         {
             async.eventLoop->privateSelf.manualCompletions.remove(async);
             return Result(true);
@@ -674,17 +700,18 @@ struct SC::AsyncEventLoop::Private::CompleteAsyncPhase
     {
         using AsyncType       = T;
         using AsyncResultType = typename AsyncType::Result;
+        using AsyncCompletion = typename AsyncType::CompletionData;
         AsyncResultType result(async, forward<Result>(returnCode));
         if (result.returnCode)
         {
             if (result.getAsync().asyncTask)
             {
                 AsyncTask* asyncTask  = result.getAsync().asyncTask;
-                result.returnCode     = asyncTask->asyncResult.returnCode;
-                result.completionData = move(static_cast<AsyncResultType&>(asyncTask->asyncResult).completionData);
-                // The task is already finished, but we call waitForTask to make sure it's being marked as free
-                // In other words this call here will not be waiting at all.
+                result.returnCode     = asyncTask->returnCode;
+                result.completionData = move(static_cast<AsyncCompletion&>(asyncTask->completionData));
+                // The task is already finished but we need waitForTask to make it available for next runs.
                 SC_TRY(asyncTask->threadPool.waitForTask(asyncTask->task));
+                asyncTask->freeTask();
             }
             else
             {
@@ -857,7 +884,7 @@ void SC::AsyncEventLoop::Private::removeActiveHandle(AsyncRequest& async)
     SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Active);
     async.state = AsyncRequest::State::Free;
 
-    if ((async.flags & AsyncRequest::Flag_ManualCompletion) != 0)
+    if ((async.flags & Private::Flag_ManualCompletion) != 0)
     {
         numberOfManualCompletions -= 1;
         return; // Asyncs flagged to be manually completed, are not added to active handles and do not count as active
@@ -893,7 +920,7 @@ void SC::AsyncEventLoop::Private::addActiveHandle(AsyncRequest& async)
     SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Submitting);
     async.state = AsyncRequest::State::Active;
 
-    if ((async.flags & AsyncRequest::Flag_ManualCompletion) != 0)
+    if ((async.flags & Private::Flag_ManualCompletion) != 0)
     {
         numberOfManualCompletions += 1;
         return; // Asyncs flagged to be manually completed, are not added to active handles

@@ -36,6 +36,9 @@ struct SC::AsyncEventLoop::Private
 
     Time::HighResolutionCounter loopTime;
 
+    // AsyncRequest flags
+    static constexpr int16_t Flag_ManualCompletion = 1 << 0;
+
     [[nodiscard]] Result close();
 
     [[nodiscard]] int getTotalNumberOfActiveHandle() const;

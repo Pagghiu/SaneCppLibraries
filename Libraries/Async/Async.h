@@ -47,6 +47,7 @@ struct AsyncRequest;
 struct AsyncResult;
 template <typename T, typename C>
 struct AsyncResultOf;
+struct AsyncCompletionData;
 
 struct AsyncTask;
 template <typename AsyncType>
@@ -122,14 +123,7 @@ struct SC::AsyncRequest
     AsyncRequest* next = nullptr;
     AsyncRequest* prev = nullptr;
 
-    void setDebugName(const char* newDebugName)
-    {
-#if SC_CONFIGURATION_DEBUG
-        debugName = newDebugName;
-#else
-        SC_COMPILER_UNUSED(newDebugName);
-#endif
-    }
+    void setDebugName(const char* newDebugName);
 
     /// @brief Get the event loop associated with this AsyncRequest
     [[nodiscard]] AsyncEventLoop* getEventLoop() const { return eventLoop; }
@@ -193,15 +187,16 @@ struct SC::AsyncRequest
     Type    type;       // 1 byte
     int16_t flags;      // 2 bytes
     int32_t eventIndex; // 4 bytes
+};
 
-    static constexpr int16_t Flag_ManualCompletion = 1 << 0;
+/// @brief Empty base struct for all AsyncRequest-derived CompletionData (internal) structs.
+struct SC::AsyncCompletionData
+{
 };
 
 /// @brief Base class for all async results
 struct SC::AsyncResult
 {
-    using Type = AsyncRequest::Type;
-
     /// @brief Constructs an async result from a request and a result
     /// @param res The result of async operation
     AsyncResult(AsyncRequest& request, SC::Result&& res) : async(request), returnCode(move(res)) {}
@@ -249,14 +244,19 @@ struct SC::AsyncTask
     ThreadPool&     threadPool;
     ThreadPoolTask& task;
 
-    AsyncTask(AsyncResult& result, ThreadPool& pool, ThreadPoolTask& poolTask)
-        : asyncResult(result), threadPool(pool), task(poolTask)
+    AsyncTask(AsyncCompletionData& asyncCompletionData, ThreadPool& pool, ThreadPoolTask& poolTask)
+        : completionData(asyncCompletionData), threadPool(pool), task(poolTask)
     {}
 
   protected:
+    void freeTask() { async = nullptr; }
+    bool isFree() const { return async == nullptr; }
     friend struct AsyncEventLoop;
 
-    AsyncResult& asyncResult;
+    AsyncCompletionData& completionData;
+
+    SC::Result    returnCode = SC::Result(true);
+    AsyncRequest* async      = nullptr;
 };
 
 /// @brief Create an async Callback result for a given AsyncRequest-derived class.
@@ -265,10 +265,8 @@ struct SC::AsyncTask
 template <typename AsyncType>
 struct SC::AsyncTaskOf : public AsyncTask
 {
-    typename AsyncType::Result result;
-    AsyncTaskOf(AsyncType& request, ThreadPool& pool, ThreadPoolTask& task)
-        : result(request), AsyncTask(result, pool, task)
-    {}
+    typename AsyncType::CompletionData asyncCompletionData;
+    AsyncTaskOf(ThreadPool& pool, ThreadPoolTask& task) : AsyncTask(asyncCompletionData, pool, task) {}
 };
 
 namespace SC
@@ -280,12 +278,13 @@ namespace SC
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncLoopTimeoutSnippet
 struct AsyncLoopTimeout : public AsyncRequest
 {
-    struct CompletionData
-    {
-    };
-    /// @brief Callback result for LoopTimeout
-    using Result = AsyncResultOf<AsyncLoopTimeout, CompletionData>;
     AsyncLoopTimeout() : AsyncRequest(Type::LoopTimeout) {}
+
+    /// @brief Completion data for AsyncLoopTimeout
+    using CompletionData = AsyncCompletionData;
+
+    /// @brief Callback result for AsyncLoopTimeout
+    using Result = AsyncResultOf<AsyncLoopTimeout, CompletionData>;
 
     /// @brief Starts a Timeout that is invoked after expiration (relative) time has passed.
     /// @param eventLoop The event loop where queuing this async request
@@ -318,12 +317,13 @@ struct AsyncLoopTimeout : public AsyncRequest
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncLoopWakeUpSnippet2
 struct AsyncLoopWakeUp : public AsyncRequest
 {
-    struct CompletionData
-    {
-    };
+    AsyncLoopWakeUp() : AsyncRequest(Type::LoopWakeUp) {}
+
+    /// @brief Completion data for AsyncLoopWakeUp
+    using CompletionData = AsyncCompletionData;
+
     /// @brief Callback result for AsyncLoopWakeUp
     using Result = AsyncResultOf<AsyncLoopWakeUp, CompletionData>;
-    AsyncLoopWakeUp() : AsyncRequest(Type::LoopWakeUp) {}
 
     /// @brief Starts a wake up request, that will be fulfilled when an external thread calls AsyncLoopWakeUp::wakeUp.
     /// @param eventLoop The event loop where queuing this async request
@@ -349,10 +349,15 @@ struct AsyncLoopWakeUp : public AsyncRequest
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncProcessSnippet
 struct AsyncProcessExit : public AsyncRequest
 {
-    struct CompletionData
+    AsyncProcessExit() : AsyncRequest(Type::ProcessExit) {}
+
+    /// @brief Completion data for AsyncProcessExit
+    struct CompletionData : public AsyncCompletionData
     {
         ProcessDescriptor::ExitStatus exitStatus;
     };
+
+    /// @brief Callback result for AsyncProcessExit
     struct Result : public AsyncResultOf<AsyncProcessExit, CompletionData>
     {
         using AsyncResultOf<AsyncProcessExit, CompletionData>::AsyncResultOf;
@@ -363,8 +368,6 @@ struct AsyncProcessExit : public AsyncRequest
             return returnCode;
         }
     };
-
-    AsyncProcessExit() : AsyncRequest(Type::ProcessExit) {}
 
     /// @brief Starts a process exit notification request, so that when process is exited the callback will be called.
     /// @param eventLoop The event loop where queuing this async request
@@ -381,7 +384,7 @@ struct AsyncProcessExit : public AsyncRequest
     detail::WinOverlappedOpaque overlapped;
     detail::WinWaitHandle       waitHandle;
 #elif SC_PLATFORM_LINUX
-    FileDescriptor pidFd;
+    FileDescriptor     pidFd;
 #endif
 };
 
@@ -396,10 +399,14 @@ struct AsyncProcessExit : public AsyncRequest
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncSocketAcceptSnippet
 struct AsyncSocketAccept : public AsyncRequest
 {
-    struct CompletionData
+    AsyncSocketAccept() : AsyncRequest(Type::SocketAccept) {}
+
+    /// @brief Completion data for AsyncSocketAccept
+    struct CompletionData : public AsyncCompletionData
     {
         SocketDescriptor acceptedClient;
     };
+
     /// @brief Callback result for AsyncSocketAccept
     struct Result : public AsyncResultOf<AsyncSocketAccept, CompletionData>
     {
@@ -411,7 +418,6 @@ struct AsyncSocketAccept : public AsyncRequest
             return client.assign(move(completionData.acceptedClient));
         }
     };
-    AsyncSocketAccept() : AsyncRequest(Type::SocketAccept) {}
 
     /// @brief Starts a socket accept operation, that returns a new socket connected to the given listening endpoint.
     /// @note SocketDescriptor must be created with async flags and already bound and listening.
@@ -433,7 +439,7 @@ struct AsyncSocketAccept : public AsyncRequest
     uint8_t          acceptBuffer[288];
 #elif SC_PLATFORM_LINUX
     AlignedStorage<28> sockAddrHandle;
-    uint32_t sockAddrLen;
+    uint32_t           sockAddrLen;
 #endif
 };
 
@@ -447,14 +453,13 @@ struct AsyncSocketAccept : public AsyncRequest
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncSocketConnectSnippet
 struct AsyncSocketConnect : public AsyncRequest
 {
-    struct CompletionData
-    {
-    };
+    AsyncSocketConnect() : AsyncRequest(Type::SocketConnect) {}
+
+    /// @brief Completion data for AsyncSocketConnect
+    using CompletionData = AsyncCompletionData;
 
     /// @brief Callback result for AsyncSocketConnect
     using Result = AsyncResultOf<AsyncSocketConnect, CompletionData>;
-
-    AsyncSocketConnect() : AsyncRequest(Type::SocketConnect) {}
 
     /// @brief Starts a socket connect operation.
     /// Callback will be called when the given socket is connected to ipAddress.
@@ -486,13 +491,16 @@ struct AsyncSocketConnect : public AsyncRequest
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncSocketSendSnippet
 struct AsyncSocketSend : public AsyncRequest
 {
-    struct CompletionData
+    AsyncSocketSend() : AsyncRequest(Type::SocketSend) {}
+
+    /// @brief Completion data for AsyncSocketSend
+    struct CompletionData : public AsyncCompletionData
     {
         size_t numBytes = 0;
     };
+
     /// @brief Callback result for AsyncSocketSend
     using Result = AsyncResultOf<AsyncSocketSend, CompletionData>;
-    AsyncSocketSend() : AsyncRequest(Type::SocketSend) {}
 
     /// @brief Starts a socket send operation.
     /// Callback will be called when the given socket is ready to send more data.
@@ -526,10 +534,14 @@ struct AsyncSocketReceive;
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncSocketReceiveSnippet
 struct AsyncSocketReceive : public AsyncRequest
 {
-    struct CompletionData
+    AsyncSocketReceive() : AsyncRequest(Type::SocketReceive) {}
+
+    /// @brief Completion data for AsyncSocketReceive
+    struct CompletionData : public AsyncCompletionData
     {
         size_t numBytes = 0;
     };
+
     /// @brief Callback result for AsyncSocketReceive
     struct Result : public AsyncResultOf<AsyncSocketReceive, CompletionData>
     {
@@ -540,12 +552,10 @@ struct AsyncSocketReceive : public AsyncRequest
         /// @return Valid Result if the data was read without errors
         [[nodiscard]] SC::Result get(Span<char>& outData)
         {
-            SC_TRY(getAsync().getBuffer().sliceStartLength(0, completionData.numBytes, outData));
+            SC_TRY(getAsync().buffer.sliceStartLength(0, completionData.numBytes, outData));
             return returnCode;
         }
     };
-
-    AsyncSocketReceive() : AsyncRequest(Type::SocketReceive) {}
 
     /// @brief Starts a socket receive operation.
     /// Callback will be called when some data is read from socket.
@@ -557,8 +567,6 @@ struct AsyncSocketReceive : public AsyncRequest
                                    Span<char> data);
 
     Function<void(Result&)> callback; ///< Called after data has been received
-
-    Span<char> getBuffer() { return buffer; }
 
   private:
     friend struct AsyncEventLoop;
@@ -576,13 +584,13 @@ struct AsyncSocketReceive : public AsyncRequest
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncSocketCloseSnippet
 struct AsyncSocketClose : public AsyncRequest
 {
-    struct CompletionData
-    {
-    };
+    AsyncSocketClose() : AsyncRequest(Type::SocketClose) {}
+
+    /// @brief Completion data for AsyncSocketClose
+    using CompletionData = AsyncCompletionData;
+
     /// @brief Callback result for AsyncSocketClose
     using Result = AsyncResultOf<AsyncSocketClose, CompletionData>;
-
-    AsyncSocketClose() : AsyncRequest(Type::SocketClose) {}
 
     /// @brief Starts a socket close operation.
     /// Callback will be called when the socket has been fully closed.
@@ -591,7 +599,9 @@ struct AsyncSocketClose : public AsyncRequest
     /// @return Valid Result if the request has been successfully queued
     [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& socketDescriptor);
 
-    int                     code = 0; ///< Return code of close socket operation
+    // TODO: Move code to CompletionData
+    int code = 0; ///< Return code of close socket operation
+
     Function<void(Result&)> callback; ///< Callback called after fully closing the socket
 
   private:
@@ -608,10 +618,14 @@ struct AsyncSocketClose : public AsyncRequest
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncFileReadSnippet
 struct AsyncFileRead : public AsyncRequest
 {
-    struct CompletionData
+    AsyncFileRead() : AsyncRequest(Type::FileRead) {}
+
+    /// @brief Completion data for AsyncFileRead
+    struct CompletionData : public AsyncCompletionData
     {
         size_t numBytes = 0;
     };
+
     /// @brief Callback result for AsyncFileRead
     struct Result : public AsyncResultOf<AsyncFileRead, CompletionData>
     {
@@ -636,8 +650,6 @@ struct AsyncFileRead : public AsyncRequest
 
     Function<void(Result&)> callback;
 
-    Span<char> getBuffer() const { return buffer; }
-
   private:
     friend struct AsyncEventLoop;
 
@@ -656,10 +668,14 @@ struct AsyncFileRead : public AsyncRequest
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncFileWriteSnippet
 struct AsyncFileWrite : public AsyncRequest
 {
-    struct CompletionData
+    AsyncFileWrite() : AsyncRequest(Type::FileWrite) {}
+
+    /// @brief Completion data for AsyncFileWrite
+    struct CompletionData : public AsyncCompletionData
     {
         size_t numBytes = 0;
     };
+
     /// @brief Callback result for AsyncFileWrite
     struct Result : public AsyncResultOf<AsyncFileWrite, CompletionData>
     {
@@ -674,7 +690,6 @@ struct AsyncFileWrite : public AsyncRequest
 
     using Task = AsyncTaskOf<AsyncFileWrite>;
 
-    AsyncFileWrite() : AsyncRequest(Type::FileWrite) {}
 
     /// Starts a file receive operation, that will return when the file is ready to receive more bytes to write.
     /// Optionally the AsyncTask allows running operation on background thread (but it will be ignored on `io_uring`).
@@ -701,17 +716,20 @@ struct AsyncFileWrite : public AsyncRequest
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncFileCloseSnippet
 struct AsyncFileClose : public AsyncRequest
 {
-    struct CompletionData
-    {
-    };
-    using Result = AsyncResultOf<AsyncFileClose, CompletionData>;
     AsyncFileClose() : AsyncRequest(Type::FileClose) {}
+
+    /// @brief Completion data for AsyncFileClose
+    using CompletionData = AsyncCompletionData;
+
+    /// @brief Callback result for AsyncFileClose
+    using Result = AsyncResultOf<AsyncFileClose, CompletionData>;
 
     [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fileDescriptor);
 
-    int code = 0;
+    // TODO: Move code to CompletionData
+    int code = 0; ///< Return code of close socket operation
 
-    Function<void(Result&)> callback;
+    Function<void(Result&)> callback; ///< Callback called after fully closing the file descriptor
 
   private:
     friend struct AsyncEventLoop;
@@ -724,11 +742,13 @@ struct AsyncFileClose : public AsyncRequest
 /// Check @ref library_file_system_watcher for an example usage of this notification.
 struct AsyncFilePoll : public AsyncRequest
 {
-    struct CompletionData
-    {
-    };
-    using Result = AsyncResultOf<AsyncFilePoll, CompletionData>;
     AsyncFilePoll() : AsyncRequest(Type::FilePoll) {}
+
+    /// @brief Completion data for AsyncFilePoll
+    using CompletionData = AsyncCompletionData;
+
+    /// @brief Callback result for AsyncFilePoll
+    using Result = AsyncResultOf<AsyncFilePoll, CompletionData>;
 
     /// Starts a file descriptor poll operation, monitoring its readiness with appropriate OS API
     [[nodiscard]] SC::Result start(AsyncEventLoop& loop, FileDescriptor::Handle fileDescriptor);
@@ -758,6 +778,7 @@ struct AsyncFilePoll : public AsyncRequest
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncEventLoopSnippet
 struct SC::AsyncEventLoop
 {
+    /// @brief Options given to AsyncEventLoop::create
     struct Options
     {
         enum class ApiType
@@ -853,7 +874,7 @@ struct SC::AsyncEventLoop
 #elif SC_PLATFORM_APPLE
     struct InternalPosix;
     struct KernelQueuePosix;
-    using Internal = InternalPosix;
+    using Internal    = InternalPosix;
     using KernelQueue = KernelQueuePosix;
 #elif SC_PLATFORM_WINDOWS
     struct Internal;

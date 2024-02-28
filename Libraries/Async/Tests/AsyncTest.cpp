@@ -633,7 +633,7 @@ struct SC::AsyncTest : public SC::TestCase
 
             // 5. Create and start the write operation
             AsyncFileWrite       asyncWriteFile;
-            AsyncFileWrite::Task asyncWriteTask = {asyncWriteFile, threadPool, writeTask};
+            AsyncFileWrite::Task asyncWriteTask = {threadPool, writeTask};
 
             asyncWriteFile.setDebugName("FileWrite");
             asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
@@ -665,7 +665,7 @@ struct SC::AsyncTest : public SC::TestCase
             };
             Params              params;
             AsyncFileRead       asyncReadFile;
-            AsyncFileRead::Task asyncReadTask = {asyncReadFile, threadPool, readTask};
+            AsyncFileRead::Task asyncReadTask = {threadPool, readTask};
             asyncReadFile.setDebugName("FileRead");
             asyncReadFile.callback = [this, &params](AsyncFileRead::Result& res)
             {
