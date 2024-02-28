@@ -592,7 +592,7 @@ struct SC::AsyncTest : public SC::TestCase
     {
         if (test_section("file read/write"))
         {
-            AsyncEventLoop   eventLoop;
+            // 1. Create ThreadPool and tasks
             ThreadPool::Task readTask;
             ThreadPool::Task writeTask;
             ThreadPool       threadPool;
@@ -601,7 +601,11 @@ struct SC::AsyncTest : public SC::TestCase
                 SC_TEST_EXPECT(threadPool.create(4));
             }
 
+            // 2. Create EventLoop
+            AsyncEventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create(options));
+
+            // 3. Create some files on disk
             StringNative<255> filePath = StringEncoding::Native;
             StringNative<255> dirPath  = StringEncoding::Native;
             const StringView  name     = "AsyncTest";
@@ -613,9 +617,9 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
             SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
 
+            // 4. Open the destination file and associate it with the event loop
             FileDescriptor::OpenOptions openOptions;
-            openOptions.async    = not useThreadPool;
-            openOptions.blocking = true;
+            openOptions.blocking = useThreadPool;
 
             FileDescriptor fd;
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, openOptions));
@@ -627,6 +631,7 @@ struct SC::AsyncTest : public SC::TestCase
             FileDescriptor::Handle handle = FileDescriptor::Invalid;
             SC_TEST_EXPECT(fd.get(handle, Result::Error("asd")));
 
+            // 5. Create and start the write operation
             AsyncFileWrite       asyncWriteFile;
             AsyncFileWrite::Task asyncWriteTask = {asyncWriteFile, threadPool, writeTask};
 
@@ -639,9 +644,12 @@ struct SC::AsyncTest : public SC::TestCase
             };
             SC_TEST_EXPECT(asyncWriteFile.start(eventLoop, handle, StringView("test").toCharSpan(),
                                                 useThreadPool ? &asyncWriteTask : nullptr));
+
+            // 6. Run the write operation and close the file
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(fd.close());
 
+            // 7. Open the file for read now
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::ReadOnly, openOptions));
             if (not useThreadPool)
             {
@@ -649,6 +657,7 @@ struct SC::AsyncTest : public SC::TestCase
             }
             SC_TEST_EXPECT(fd.get(handle, Result::Error("asd")));
 
+            // 8. Create and run the read task, reading a single byte at every reactivation
             struct Params
             {
                 int  readCount = 0;
@@ -670,12 +679,16 @@ struct SC::AsyncTest : public SC::TestCase
             char buffer[1] = {0};
             SC_TEST_EXPECT(asyncReadFile.start(eventLoop, handle, {buffer, sizeof(buffer)},
                                                useThreadPool ? &asyncReadTask : nullptr));
+
+            // 9. Run the read operation and close the file
             SC_TEST_EXPECT(eventLoop.run());
             SC_TEST_EXPECT(fd.close());
 
+            // 10. Check Results
             StringView sv({params.readBuffer, sizeof(params.readBuffer)}, false, StringEncoding::Ascii);
             SC_TEST_EXPECT(sv.compare("test") == StringView::Comparison::Equals);
 
+            // 11. Remove test files
             SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
             SC_TEST_EXPECT(fs.removeFile(fileName));
             SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory));
@@ -702,8 +715,7 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(fs.write(filePath.view(), "test"));
 
             FileDescriptor::OpenOptions openOptions;
-            openOptions.async    = true;
-            openOptions.blocking = true;
+            openOptions.blocking = false;
 
             FileDescriptor fd;
             SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, openOptions));
@@ -1042,7 +1054,6 @@ SC::Result snippetForFileRead(AsyncEventLoop& eventLoop, Console& console)
 // Open the file
 FileDescriptor fd;
 FileDescriptor::OpenOptions options;
-options.async    = true;
 options.blocking = false;
 SC_TRY(fd.open("MyFile.txt", FileDescriptor::ReadOnly, options));
 FileDescriptor::Handle handle;
@@ -1078,7 +1089,6 @@ SC::Result snippetForFileWrite(AsyncEventLoop& eventLoop, Console& console)
 
 // Open the file (for write)
 FileDescriptor::OpenOptions options;
-options.async    = true;
 options.blocking = false;
 FileDescriptor fd;
 SC_TRY(fd.open("MyFile.txt", FileDescriptor::WriteCreateTruncate, options));
@@ -1113,7 +1123,6 @@ SC::Result snippetForFileClose(AsyncEventLoop& eventLoop, Console& console)
 // Open a file and associated it with event loop
 FileDescriptor fd;
 FileDescriptor::OpenOptions options;
-options.async    = true;
 options.blocking = false;
 SC_TRY(fd.open("MyFile.txt", FileDescriptor::WriteCreateTruncate, options));
 SC_TRY(eventLoop.associateExternallyCreatedFileDescriptor(fd));

@@ -68,9 +68,8 @@ struct SC::FileDescriptor : public SC::UniqueHandle<SC::detail::FileDescriptorDe
     /// @brief Additional flags to be set when opening files
     struct OpenOptions
     {
-        bool inheritable = false; ///< Specify if file will be visible to child processes
-        bool blocking    = true;  ///< Specify if reads or writes to file should be blocking for IO until done
-        bool async       = false; ///< Specify if file will be used for Async I/O (see @ref library_async)
+        bool inheritable = false; ///< Set to true to make the file visible to child processes
+        bool blocking    = true;  ///< Set to false if file will be used for Async I/O (see @ref library_async)
     };
 
     /// @brief Opens file at `path` with a given `mode`

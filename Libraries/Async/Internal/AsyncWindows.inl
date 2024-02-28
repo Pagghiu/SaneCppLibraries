@@ -75,7 +75,6 @@ struct SC::AsyncEventLoop::Internal
     {
         if (pConnectEx == nullptr)
         {
-
             DWORD dwBytes;
             GUID  guid = WSAID_CONNECTEX;
             int   rc   = WSAIoctl(sock, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid), &pConnectEx,
@@ -155,7 +154,8 @@ struct SC::AsyncEventLoop::Internal
     {
         DWORD transferred = 0;
         DWORD flags       = 0;
-        BOOL  res         = ::WSAGetOverlappedResult(handle, &overlapped, &transferred, FALSE, &flags);
+
+        const BOOL res = ::WSAGetOverlappedResult(handle, &overlapped, &transferred, FALSE, &flags);
         if (res == FALSE)
         {
             // TODO: report error
@@ -171,11 +171,10 @@ struct SC::AsyncEventLoop::Internal
 
     Result wakeUpFromExternalThread()
     {
-        FileDescriptor::Handle loopNativeDescriptor;
-        SC_TRY(loopFd.get(loopNativeDescriptor, Result::Error("watchInputs - Invalid Handle")));
+        FileDescriptor::Handle loopHandle;
+        SC_TRY(loopFd.get(loopHandle, Result::Error("watchInputs - Invalid Handle")));
 
-        if (PostQueuedCompletionStatus(loopNativeDescriptor, 0, 0,
-                                       &asyncWakeUp.getOverlappedOpaque().get().overlapped) == FALSE)
+        if (PostQueuedCompletionStatus(loopHandle, 0, 0, &asyncWakeUp.getOverlappedOpaque().get().overlapped) == FALSE)
         {
             return Result::Error("AsyncEventLoop::wakeUpFromExternalThread() - PostQueuedCompletionStatus");
         }
@@ -204,9 +203,8 @@ struct SC::AsyncEventLoop::KernelQueue
     {
         const Time::HighResolutionCounter* nextTimer = self.privateSelf.findEarliestTimer();
 
-        FileDescriptor::Handle loopNativeDescriptor;
-        SC_TRY(self.internalSelf.loopFd.get(loopNativeDescriptor,
-                                            Result::Error("AsyncEventLoop::Internal::poll() - Invalid Handle")));
+        FileDescriptor::Handle loopHandle;
+        SC_TRY(self.internalSelf.loopFd.get(loopHandle, Result::Error("AsyncEventLoop::poll() - Invalid Handle")));
         Time::Milliseconds timeout;
         if (nextTimer)
         {
@@ -215,10 +213,9 @@ struct SC::AsyncEventLoop::KernelQueue
                 timeout = nextTimer->subtractApproximate(self.privateSelf.loopTime).inRoundedUpperMilliseconds();
             }
         }
-        const BOOL success = GetQueuedCompletionStatusEx(
-            loopNativeDescriptor, events, static_cast<ULONG>(TypeTraits::SizeOfArray(events)), &newEvents,
-            nextTimer or syncMode == Private::SyncMode::NoWait ? static_cast<ULONG>(timeout.ms) : INFINITE, FALSE);
-        if (not success and GetLastError() != WAIT_TIMEOUT)
+        DWORD ms  = nextTimer or syncMode == Private::SyncMode::NoWait ? static_cast<ULONG>(timeout.ms) : INFINITE;
+        BOOL  res = ::GetQueuedCompletionStatusEx(loopHandle, events, totalNumEvents, &newEvents, ms, FALSE);
+        if (not res and GetLastError() != WAIT_TIMEOUT)
         {
             // TODO: GetQueuedCompletionStatusEx error handling
             return Result::Error("KernelQueue::poll() - GetQueuedCompletionStatusEx error");
@@ -286,7 +283,7 @@ struct SC::AsyncEventLoop::KernelQueue
                                              reinterpret_cast<char*>(&operation.handle), sizeof(operation.handle));
         SC_TRY_MSG(socketOpRes == 0, "setsockopt SO_UPDATE_ACCEPT_CONTEXT failed");
         HANDLE loopHandle;
-        SC_TRY(result.getAsync().eventLoop->internalSelf.loopFd.get(loopHandle, Result::Error("loop handle")));
+        SC_TRY(result.getAsync().eventLoop->internalSelf.loopFd.get(loopHandle, Result::Error("completeAsync handle")));
         HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(clientSocket), loopHandle, 0, 0);
         SC_TRY_MSG(iocp == loopHandle, "completeAsync ACCEPT CreateIoCompletionPort failed");
         return result.completionData.acceptedClient.assign(move(operation.clientSocket));
@@ -549,10 +546,10 @@ struct SC::AsyncEventLoop::KernelQueue
     {
         SC_COMPILER_UNUSED(timeoutOccurred);
         AsyncProcessExit&      async = *static_cast<AsyncProcessExit*>(data);
-        FileDescriptor::Handle loopNativeDescriptor;
-        SC_TRUST_RESULT(async.eventLoop->internalSelf.loopFd.get(loopNativeDescriptor, Result::Error("loopFd")));
+        FileDescriptor::Handle loopHandle;
+        SC_TRUST_RESULT(async.eventLoop->internalSelf.loopFd.get(loopHandle, Result::Error("loopFd")));
 
-        if (PostQueuedCompletionStatus(loopNativeDescriptor, 0, 0, &async.overlapped.get().overlapped) == FALSE)
+        if (PostQueuedCompletionStatus(loopHandle, 0, 0, &async.overlapped.get().overlapped) == FALSE)
         {
             // TODO: Report error?
             // return Result::Error("AsyncEventLoop::wakeUpFromExternalThread() - PostQueuedCompletionStatus");

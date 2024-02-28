@@ -59,8 +59,9 @@ SC::Result SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOptions 
         break;
     case ReadAndWrite: accessMode |= FILE_GENERIC_READ | FILE_GENERIC_WRITE; break;
     }
-    DWORD               shareMode  = FILE_SHARE_READ | FILE_SHARE_WRITE;
-    DWORD               attributes = options.async ? FILE_FLAG_OVERLAPPED : 0;
+    DWORD shareMode  = FILE_SHARE_READ | FILE_SHARE_WRITE;
+    DWORD attributes = options.blocking ? 0 : FILE_FLAG_OVERLAPPED;
+
     SECURITY_ATTRIBUTES security;
     security.nLength              = sizeof(SECURITY_ATTRIBUTES);
     security.bInheritHandle       = options.inheritable ? TRUE : FALSE;
