@@ -34,6 +34,13 @@
 /// - `io_uring` on Linux (dynamically loading `liburing`)
 ///
 /// @note If `liburing` is not available on the system, the library will transparently fallback to epoll.
+///
+/// If an async operation is not supported by the OS, user can provide a SC::ThreadPool and SC::ThreadPoolTask (through
+/// an AsyncTask derived struct like SC::AsyncFileRead::Task or SC::AsyncFileWrite::Task for example) to execute the
+/// operation on a background thread. In some cases supplying the SC::ThreadPool and SC::ThreadPoolTask is optional
+/// (SC::AsyncFileRead / SC::AsyncFileWrite for example), and it will be signaled with the AsyncRequest::start method
+/// accepting a pointer to the SC::AsyncTask derived class. In some other cases the SC::AsyncTask derived class will be
+/// mandatory and the start method will require a reference instead of pointer.
 namespace SC
 {
 // Forward Declarations
@@ -194,7 +201,8 @@ struct SC::AsyncCompletionData
 {
 };
 
-/// @brief Base class for all async results
+/// @brief Base class for all async results (argument of completion callbacks).
+/// It holds Result (returnCode) and re-activation flag.
 struct SC::AsyncResult
 {
     /// @brief Constructs an async result from a request and a result
@@ -220,9 +228,10 @@ struct SC::AsyncResult
     SC::Result returnCode          = SC::Result(true);
 };
 
-/// @brief Create an async Callback result for a given AsyncRequest-derived class
+/// @brief Helper holding CompletionData for a specific AsyncRequest-derived class
 /// @tparam T Type of the request class associated to this result
-template <typename T, typename CompletionData>
+/// @tparam C Type of the CompletionData derived class associated to this result
+template <typename T, typename C>
 struct SC::AsyncResultOf : public AsyncResult
 {
     T&       getAsync() { return static_cast<T&>(AsyncResult::async); }
@@ -230,7 +239,7 @@ struct SC::AsyncResultOf : public AsyncResult
 
     using AsyncResult::AsyncResult;
 
-    CompletionData completionData;
+    C completionData;
 };
 
 /// @brief Holds (reference to) a SC::ThreadPool and SC::ThreadPool::Task to execute an SC::AsyncRequest in a background
@@ -343,7 +352,7 @@ struct AsyncLoopWakeUp : public AsyncRequest
     Atomic<bool> pending     = false;
 };
 
-/// @brief Starts a process exit notification request, so that when process is exited the callback will be called. @n
+/// @brief Starts monitoring a process, notifying about its termination.
 /// @ref library_process library can be used to start a process and obtain the native process handle.
 ///
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncProcessSnippet
@@ -369,7 +378,7 @@ struct AsyncProcessExit : public AsyncRequest
         }
     };
 
-    /// @brief Starts a process exit notification request, so that when process is exited the callback will be called.
+    /// @brief Starts monitoring a process, notifying about its termination.
     /// @param eventLoop The event loop where queuing this async request
     /// @param process Native handle of the process that is being monitored
     /// @return Valid Result if the request has been successfully queued
@@ -610,10 +619,20 @@ struct AsyncSocketClose : public AsyncRequest
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
 };
 
-/// @brief Starts a file read operation, reading bytes from a file.
-/// Callback will be called after some data is read from file. @n
-/// @ref library_file library can be used to open the file and obtain a file descriptor handle.
-/// Make sure to associate the file descriptor with SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor.
+/// @brief Starts a file read operation, reading bytes from a file (or pipe).
+/// Callback will be called when the data read from the file (or pipe) is available. @n
+///
+/// Use the optional `Task` parameter to execute file read on a background thread for APIs that exhibit
+/// blocking behaviour on buffered file I/O (all apis with the exception of `io_uring`).
+///
+/// @ref library_file library can be used to open the file and obtain a file (or pipe) descriptor handle.
+///
+/// @note Pipes or files opened using Posix `O_DIRECT` or Windows `FILE_FLAG_WRITE_THROUGH` & `FILE_FLAG_NO_BUFFERING`
+/// should instead avoid using the `Task` parameter for best performance.
+///
+/// When not using the `Task` remember to:
+/// - Open the file descriptor for non-blocking IO (SC::FileDescriptor::OpenOptions::blocking == `false`)
+/// - Call SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor on the file descriptor
 ///
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncFileReadSnippet
 struct AsyncFileRead : public AsyncRequest
@@ -640,13 +659,21 @@ struct AsyncFileRead : public AsyncRequest
 
     using Task = AsyncTaskOf<AsyncFileRead>;
 
-    AsyncFileRead() : AsyncRequest(Type::FileRead) {}
-    /// Starts a file receive operation, that will return when some data is read from file.
-    /// Optionally the AsyncTask allows running operation on background thread (but it will be ignored on `io_uring`).
-    [[nodiscard]] SC::Result start(AsyncEventLoop& loop, FileDescriptor::Handle fileDescriptor, Span<char> readBuffer,
-                                   Task* task = nullptr);
+    /// @brief Starts a file receive operation, that will return when data read from file (or pipe) is available.
+    /// @param eventLoop The EventLoop to run this operation on
+    /// @param fileDescriptor The file descriptor (file or pipe) to read data from (use SC::FileDescriptor or
+    /// SC::PipeDescriptor to open it, with SC::FileDescriptorOpenOptions::blocking == false)
+    /// @param readBuffer The writable span of memory where the data should be read into.
+    /// @param task The task allows running operation on background thread.
+    /// It's useful for any file not opened for direct IO (`O_DIRECT` / `FILE_FLAG_WRITE_THROUGH` &
+    /// `FILE_FLAG_NO_BUFFERING`).
+    /// This task will not be used on the `io_uring` backend, because that API allows proper async file read/writes.
+    /// If this is set to `nullptr` you will have to call SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor
+    /// on the fileDescriptor passed in.
+    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fileDescriptor,
+                                   Span<char> readBuffer, Task* task = nullptr);
 
-    uint64_t offset = 0;
+    uint64_t offset = 0; ///< Offset from file start where to start reading. Not supported on pipes.
 
     Function<void(Result&)> callback;
 
@@ -660,10 +687,21 @@ struct AsyncFileRead : public AsyncRequest
 #endif
 };
 
-/// @brief Starts a file write operation, writing bytes to a file.
+/// @brief Starts a file write operation, writing bytes to a file (or pipe).
 /// Callback will be called when the file is ready to receive more bytes to write. @n
-/// @ref library_file library can be used to open the file and obtain a file descriptor handle. @n
-/// Make sure to associate the file descriptor with SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor.
+///
+/// Use the optional `Task` parameter to execute file read on a background thread for APIs that exhibit
+/// blocking behaviour on buffered file I/O (all apis with the exception of `io_uring`).
+///
+/// @ref library_file library can be used to open the file and obtain a blocking or non-blocking file descriptor handle.
+/// @n
+///
+/// @note Pipes or files opened using Posix `O_DIRECT` or Windows `FILE_FLAG_WRITE_THROUGH` & `FILE_FLAG_NO_BUFFERING`
+/// should instead avoid using the `Task` parameter for best performance.
+///
+/// When not using the `Task` remember to:
+/// - Open the file descriptor for non-blocking IO (SC::FileDescriptor::OpenOptions::blocking == `false`)
+/// - Call SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor on the file descriptor
 ///
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncFileWriteSnippet
 struct AsyncFileWrite : public AsyncRequest
@@ -690,9 +728,17 @@ struct AsyncFileWrite : public AsyncRequest
 
     using Task = AsyncTaskOf<AsyncFileWrite>;
 
-
-    /// Starts a file receive operation, that will return when the file is ready to receive more bytes to write.
-    /// Optionally the AsyncTask allows running operation on background thread (but it will be ignored on `io_uring`).
+    /// @brief Starts a file write operation, signaling when the file (or pipe) is ready to receive more bytes.
+    /// @param eventLoop The EventLoop to run this operation on
+    /// @param fileDescriptor The file descriptor (file or pipe) to write data to (use SC::FileDescriptor or
+    /// SC::PipeDescriptor to open it, with SC::FileDescriptorOpenOptions::blocking == false)
+    /// @param writeBuffer The read-only span of memory where to read the data from.
+    /// @param task The task allows running operation on background thread.
+    /// It's useful for any file not opened for direct IO (`O_DIRECT` / `FILE_FLAG_WRITE_THROUGH` &
+    /// `FILE_FLAG_NO_BUFFERING`).
+    /// This task will not be used on the `io_uring` backend, because that API allows proper async file read/writes.
+    /// If this is set to `nullptr` you will have to call SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor
+    /// on the fileDescriptor passed in.
     [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fileDescriptor,
                                    Span<const char> writeBuffer, Task* task = nullptr);
 
@@ -711,7 +757,7 @@ struct AsyncFileWrite : public AsyncRequest
 
 /// @brief Starts a file close operation, closing the OS file descriptor.
 /// Callback will be called when the file is actually closed. @n
-/// @ref library_file library can be used to open the file and obtain a file descriptor handle.
+/// @ref library_file library can be used to open the file and obtain a blocking or non-blocking file descriptor handle.
 ///
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncFileCloseSnippet
 struct AsyncFileClose : public AsyncRequest
@@ -783,11 +829,11 @@ struct SC::AsyncEventLoop
     {
         enum class ApiType
         {
-            Automatic = 0,
-            ForceUseIOURing, // Only valid for Linux
-            ForceUseEpoll,   // Only valid for Linux
+            Automatic = 0,   ///< Platform specific backend chooses the best API.
+            ForceUseIOURing, ///< (Linux only) Tries to use `io_uring` (failing if it's not found on the system)
+            ForceUseEpoll,   ///< (Linux only) Tries to use `epoll`
         };
-        ApiType apiType;
+        ApiType apiType; ///< Criteria to choose Async IO API
 
         Options() { apiType = ApiType::Automatic; }
     };

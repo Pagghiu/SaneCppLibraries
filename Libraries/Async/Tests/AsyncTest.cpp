@@ -1051,19 +1051,28 @@ SC::Result snippetForFileRead(AsyncEventLoop& eventLoop, Console& console)
 // Assuming an already created (and running) AsyncEventLoop named `eventLoop`
 // ...
 
+// Assuming an already created threadPool and a task
+// ...
+
+ThreadPoolTask task;
+ThreadPool threadPool;
+SC_TRY(threadPool.create(4));
+
+// ...
+
 // Open the file
 FileDescriptor fd;
 FileDescriptor::OpenOptions options;
-options.blocking = false;
+options.blocking = true; // When using AsyncFileRead::Task you can use regular blocking descriptors
 SC_TRY(fd.open("MyFile.txt", FileDescriptor::ReadOnly, options));
 FileDescriptor::Handle handle;
 
 // Obtain file descriptor handle and associate it with event loop
 SC_TRY(fd.get(handle, Result::Error("Invalid handle")));
-SC_TRY(eventLoop.associateExternallyCreatedFileDescriptor(fd));
 
-// Create the async file read request
+// Create the async file read request and its threadpool task
 AsyncFileRead asyncReadFile;
+AsyncFileRead::Task asyncFileTask{threadPool, task};
 asyncReadFile.callback = [&](AsyncFileRead::Result& res)
 {
     Span<char> readData;
@@ -1074,7 +1083,7 @@ asyncReadFile.callback = [&](AsyncFileRead::Result& res)
     }
 };
 char buffer[100] = {0};
-SC_TRY(asyncReadFile.start(eventLoop, handle, {buffer, sizeof(buffer)}));
+SC_TRY(asyncReadFile.start(eventLoop, handle, {buffer, sizeof(buffer)},&asyncFileTask));
 //! [AsyncFileReadSnippet]
 SC_TRY(eventLoop.run());
 return Result(true);
@@ -1087,12 +1096,20 @@ SC::Result snippetForFileWrite(AsyncEventLoop& eventLoop, Console& console)
 // Assuming an already created (and running) AsyncEventLoop named eventLoop
 // ...
 
+// Assuming an already created threadPool and a task
+// ...
+
+ThreadPoolTask task;
+ThreadPool threadPool;
+SC_TRY(threadPool.create(4));
+
+// ...
+
 // Open the file (for write)
 FileDescriptor::OpenOptions options;
-options.blocking = false;
+options.blocking = true; // When using AsyncFileWrite::Task you can use regular blocking descriptors
 FileDescriptor fd;
 SC_TRY(fd.open("MyFile.txt", FileDescriptor::WriteCreateTruncate, options));
-SC_TRY(eventLoop.associateExternallyCreatedFileDescriptor(fd));
 auto writeSpan = StringView("test").toCharSpan();
 FileDescriptor::Handle handle;
 // Obtain file descriptor handle
@@ -1100,6 +1117,7 @@ SC_TRY(fd.get(handle, Result::Error("Invalid Handle")));
 
 // Create the async file write request
 AsyncFileWrite asyncWriteFile;
+AsyncFileWrite::Task asyncFileTask{threadPool, task};
 asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
 {
     size_t writtenBytes = 0;
@@ -1108,7 +1126,7 @@ asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
         console.print("{} bytes have been written", writtenBytes);
     }
 };
-SC_TRY(asyncWriteFile.start(eventLoop, handle, writeSpan));
+SC_TRY(asyncWriteFile.start(eventLoop, handle, writeSpan, &asyncFileTask));
 //! [AsyncFileWriteSnippet]
 SC_TRY(eventLoop.run());
 return Result(true);

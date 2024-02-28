@@ -24,6 +24,7 @@ This is the list of supported async operations:
 | [AsyncFileClose](@ref SC::AsyncFileClose)         | @copybrief SC::AsyncFileClose     |
 | [AsyncLoopTimeout](@ref SC::AsyncLoopTimeout)     | @copybrief SC::AsyncLoopTimeout   |
 | [AsyncLoopWakeUp](@ref SC::AsyncLoopWakeUp)       | @copybrief SC::AsyncLoopWakeUp    |
+| [AsyncProcessExit](@ref SC::AsyncProcessExit)     | @copybrief SC::AsyncProcessExit    |
 | [AsyncFilePoll](@ref SC::AsyncFilePoll)           | @copybrief SC::AsyncFilePoll      |
 
 # Status
@@ -79,8 +80,8 @@ Event loop can be run in different ways to allow integrated it in multiple ways 
 ## AsyncFileClose
 @copydoc SC::AsyncFileClose
 
-## AsycFilePoll
-@copydoc SC::AsycFilePoll
+## AsyncFilePoll
+@copydoc SC::AsyncFilePoll
 
 # Implementation
 
@@ -100,12 +101,14 @@ SC::ArenaMap from the [Containers](@ref library_containers) can be used to preal
 # Roadmap
 
 🟩 Usable Features:
-- Use a thread pool to execute File Operations actually asynchronously.
 - Implement option to do blocking poll check without dispatching callbacks (needed for efficient gui event loop integration)
 - More comprehensive test suite, testing all cancellations
+- FS operations (open stat read write unlink copyfile mkdir chmod etc.)
+- UDP Send/Receive
+- DNS Resolution
 
 🟦 Complete Features:
-- Implement FS operations (open stat read write unlink copyfile mkdir chmod etc.)
+- TTY with ANSI Escape Codes
 
 💡 Unplanned Features:
-- Additional async operations
+- Signal handling
