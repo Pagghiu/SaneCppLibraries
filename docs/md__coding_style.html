@@ -121,8 +121,9 @@ $(document).ready(function(){initNavTree('md__coding_style.html',''); initResiza
 Formatting</h1>
 <p >All files should be formatted according to the <code>.clang-format</code> file using <code>clang-format</code> version 15. <br  />
 </p>
-<p >Ideally someday the Github CI will validate PR that are not properly formatted.</p>
+<p >Github CI will fail on PR that are not properly formatted.</p>
 <p >In some specific cases use <code>// clang-format off</code> and <code>// clang-format on</code> where a custom formatting can improve code look. For example many template specializations in the <code><a class="el" href="namespace_s_c_1_1_reflection.html" title="Describe C++ types at compile time for serialization (see Reflection).">SC::Reflection</a></code> library are better manually formatted/aligned to highlight the pattern.</p>
+<p >All headers must have a trailing newline.</p>
 <h1><a class="anchor" id="autotoc_md18"></a>
 Casing</h1>
 <ul>
