@@ -1,6 +1,5 @@
 var struct_s_c_1_1_thread_pool =
 [
-    [ "Task", "struct_s_c_1_1_thread_pool_1_1_task.html", "struct_s_c_1_1_thread_pool_1_1_task" ],
     [ "create", "struct_s_c_1_1_thread_pool.html#ac4d16bfc16be6192930cb1609b50eedc", null ],
     [ "destroy", "struct_s_c_1_1_thread_pool.html#a1627e46fb137380bb55e816c08ce2cb0", null ],
     [ "queueTask", "struct_s_c_1_1_thread_pool.html#aaf653d678170723e58062fe5a8c6e3fd", null ],

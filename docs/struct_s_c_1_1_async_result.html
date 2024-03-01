@@ -111,8 +111,8 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_async_result.html','');
 
 <div class="header">
   <div class="summary">
-<a href="#pub-types">Public Types</a> &#124;
 <a href="#pub-methods">Public Member Functions</a> &#124;
+<a href="#pub-attribs">Public Attributes</a> &#124;
 <a href="#pro-attribs">Protected Attributes</a> &#124;
 <a href="#friends">Friends</a> &#124;
 <a href="struct_s_c_1_1_async_result-members.html">List of all members</a>  </div>
@@ -120,7 +120,7 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_async_result.html','');
 </div><!--header-->
 <div class="contents">
 
-<p>Base class for all async results.  
+<p>Base class for all async results (argument of completion callbacks).  
  <a href="struct_s_c_1_1_async_result.html#details">More...</a></p>
 
 <p><code>#include &lt;<a class="el" href="_async_8h_source.html">Async.h</a>&gt;</code></p>
@@ -130,31 +130,28 @@ Inheritance diagram for SC::AsyncResult:</div>
  <div class="center">
   <img src="struct_s_c_1_1_async_result.png" usemap="#SC::AsyncResult_map" alt=""/>
   <map id="SC::AsyncResult_map" name="SC::AsyncResult_map">
-<area href="struct_s_c_1_1_async_result_of.html" alt="SC::AsyncResultOf&lt; AsyncFileRead &gt;" shape="rect" coords="0,56,263,80"/>
-<area href="struct_s_c_1_1_async_result_of.html" alt="SC::AsyncResultOf&lt; AsyncFileWrite &gt;" shape="rect" coords="273,56,536,80"/>
-<area href="struct_s_c_1_1_async_result_of.html" alt="SC::AsyncResultOf&lt; AsyncProcessExit &gt;" shape="rect" coords="546,56,809,80"/>
-<area href="struct_s_c_1_1_async_result_of.html" alt="SC::AsyncResultOf&lt; AsyncSocketAccept &gt;" shape="rect" coords="819,56,1082,80"/>
-<area href="struct_s_c_1_1_async_result_of.html" alt="SC::AsyncResultOf&lt; AsyncSocketReceive &gt;" shape="rect" coords="1092,56,1355,80"/>
-<area href="struct_s_c_1_1_async_result_of.html" title="Create an async Callback result for a given AsyncRequest-derived class." alt="SC::AsyncResultOf&lt; T &gt;" shape="rect" coords="1365,56,1628,80"/>
-<area href="struct_s_c_1_1_async_file_read_1_1_result.html" title="Callback result for AsyncFileRead." alt="SC::AsyncFileRead::Result" shape="rect" coords="0,112,263,136"/>
-<area href="struct_s_c_1_1_async_file_write_1_1_result.html" title="Callback result for AsyncFileWrite." alt="SC::AsyncFileWrite::Result" shape="rect" coords="273,112,536,136"/>
-<area href="struct_s_c_1_1_async_process_exit_1_1_result.html" alt="SC::AsyncProcessExit::Result" shape="rect" coords="546,112,809,136"/>
-<area href="struct_s_c_1_1_async_socket_accept_1_1_result.html" title="Callback result for AsyncSocketAccept." alt="SC::AsyncSocketAccept::Result" shape="rect" coords="819,112,1082,136"/>
-<area href="struct_s_c_1_1_async_socket_receive_1_1_result.html" title="Callback result for AsyncSocketReceive." alt="SC::AsyncSocketReceive::Result" shape="rect" coords="1092,112,1355,136"/>
+<area href="struct_s_c_1_1_async_result_of.html" alt="SC::AsyncResultOf&lt; AsyncFileRead, CompletionData &gt;" shape="rect" coords="0,56,360,80"/>
+<area href="struct_s_c_1_1_async_result_of.html" alt="SC::AsyncResultOf&lt; AsyncFileWrite, CompletionData &gt;" shape="rect" coords="370,56,730,80"/>
+<area href="struct_s_c_1_1_async_result_of.html" alt="SC::AsyncResultOf&lt; AsyncProcessExit, CompletionData &gt;" shape="rect" coords="740,56,1100,80"/>
+<area href="struct_s_c_1_1_async_result_of.html" alt="SC::AsyncResultOf&lt; AsyncSocketAccept, CompletionData &gt;" shape="rect" coords="1110,56,1470,80"/>
+<area href="struct_s_c_1_1_async_result_of.html" alt="SC::AsyncResultOf&lt; AsyncSocketReceive, CompletionData &gt;" shape="rect" coords="1480,56,1840,80"/>
+<area href="struct_s_c_1_1_async_result_of.html" title="Helper holding CompletionData for a specific AsyncRequest-derived class." alt="SC::AsyncResultOf&lt; T, C &gt;" shape="rect" coords="1850,56,2210,80"/>
+<area href="struct_s_c_1_1_async_file_read_1_1_result.html" title="Callback result for AsyncFileRead." alt="SC::AsyncFileRead::Result" shape="rect" coords="0,112,360,136"/>
+<area href="struct_s_c_1_1_async_file_write_1_1_result.html" title="Callback result for AsyncFileWrite." alt="SC::AsyncFileWrite::Result" shape="rect" coords="370,112,730,136"/>
+<area href="struct_s_c_1_1_async_process_exit_1_1_result.html" title="Callback result for AsyncProcessExit." alt="SC::AsyncProcessExit::Result" shape="rect" coords="740,112,1100,136"/>
+<area href="struct_s_c_1_1_async_socket_accept_1_1_result.html" title="Callback result for AsyncSocketAccept." alt="SC::AsyncSocketAccept::Result" shape="rect" coords="1110,112,1470,136"/>
+<area href="struct_s_c_1_1_async_socket_receive_1_1_result.html" title="Callback result for AsyncSocketReceive." alt="SC::AsyncSocketReceive::Result" shape="rect" coords="1480,112,1840,136"/>
   </map>
 </div></div>
 <table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-types" name="pub-types"></a>
-Public Types</h2></td></tr>
-<tr class="memitem:af0048348a549097097ea36f3411a2be4"><td class="memItemLeft" align="right" valign="top"><a id="af0048348a549097097ea36f3411a2be4" name="af0048348a549097097ea36f3411a2be4"></a>
-using&#160;</td><td class="memItemRight" valign="bottom"><b>Type</b> = <a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">AsyncRequest::Type</a></td></tr>
-<tr class="separator:af0048348a549097097ea36f3411a2be4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a49ed7f96aa2b4dccfb4615800fb59945"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_result.html#a49ed7f96aa2b4dccfb4615800fb59945">AsyncResult</a> (<a class="el" href="struct_s_c_1_1_result.html">SC::Result</a> &amp;&amp;res)</td></tr>
-<tr class="memdesc:a49ed7f96aa2b4dccfb4615800fb59945"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs an async result from a result.  <a href="struct_s_c_1_1_async_result.html#a49ed7f96aa2b4dccfb4615800fb59945">More...</a><br /></td></tr>
-<tr class="separator:a49ed7f96aa2b4dccfb4615800fb59945"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acdd1f16cafe0f64a70878df19aa7420c"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_result.html#acdd1f16cafe0f64a70878df19aa7420c">AsyncResult</a> (<a class="el" href="struct_s_c_1_1_async_request.html">AsyncRequest</a> &amp;request, <a class="el" href="struct_s_c_1_1_result.html">SC::Result</a> &amp;&amp;res)</td></tr>
+<tr class="memdesc:acdd1f16cafe0f64a70878df19aa7420c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs an async result from a request and a result.  <a href="struct_s_c_1_1_async_result.html#acdd1f16cafe0f64a70878df19aa7420c">More...</a><br /></td></tr>
+<tr class="separator:acdd1f16cafe0f64a70878df19aa7420c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a962891fb67611a5e6ee2df33c96e883d"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_result.html#a962891fb67611a5e6ee2df33c96e883d">AsyncResult</a> (<a class="el" href="struct_s_c_1_1_async_request.html">AsyncRequest</a> &amp;request)</td></tr>
+<tr class="memdesc:a962891fb67611a5e6ee2df33c96e883d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs an async result from a request.  <a href="struct_s_c_1_1_async_result.html#a962891fb67611a5e6ee2df33c96e883d">More...</a><br /></td></tr>
+<tr class="separator:a962891fb67611a5e6ee2df33c96e883d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0a7a91675236ec57657243e01960c093"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_result.html#a0a7a91675236ec57657243e01960c093">reactivateRequest</a> (bool value)</td></tr>
 <tr class="memdesc:a0a7a91675236ec57657243e01960c093"><td class="mdescLeft">&#160;</td><td class="mdescRight">Ask the event loop to re-activate this request after it was already completed.  <a href="struct_s_c_1_1_async_result.html#a0a7a91675236ec57657243e01960c093">More...</a><br /></td></tr>
 <tr class="separator:a0a7a91675236ec57657243e01960c093"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -162,13 +159,19 @@ Public Member Functions</h2></td></tr>
 <tr class="memdesc:a653f29d24de75f491beaa2d4f73fb3ce"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if the returnCode of this result is valid.  <a href="struct_s_c_1_1_async_result.html#a653f29d24de75f491beaa2d4f73fb3ce">More...</a><br /></td></tr>
 <tr class="separator:a653f29d24de75f491beaa2d4f73fb3ce"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
+Public Attributes</h2></td></tr>
+<tr class="memitem:aac38a67256b0fba1853ac6b1db85b356"><td class="memItemLeft" align="right" valign="top"><a id="aac38a67256b0fba1853ac6b1db85b356" name="aac38a67256b0fba1853ac6b1db85b356"></a>
+<a class="el" href="struct_s_c_1_1_async_request.html">AsyncRequest</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>async</b></td></tr>
+<tr class="separator:aac38a67256b0fba1853ac6b1db85b356"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pro-attribs" name="pro-attribs"></a>
 Protected Attributes</h2></td></tr>
 <tr class="memitem:aad9180016c9441172d4fbf93b1911833"><td class="memItemLeft" align="right" valign="top"><a id="aad9180016c9441172d4fbf93b1911833" name="aad9180016c9441172d4fbf93b1911833"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>shouldBeReactivated</b> = false</td></tr>
 <tr class="separator:aad9180016c9441172d4fbf93b1911833"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a887db7b72f3ab42fd9040257b80ca251"><td class="memItemLeft" align="right" valign="top"><a id="a887db7b72f3ab42fd9040257b80ca251" name="a887db7b72f3ab42fd9040257b80ca251"></a>
-<a class="el" href="struct_s_c_1_1_result.html">SC::Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>returnCode</b></td></tr>
+<a class="el" href="struct_s_c_1_1_result.html">SC::Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>returnCode</b> = <a class="el" href="struct_s_c_1_1_result.html">SC::Result</a>(true)</td></tr>
 <tr class="separator:a887db7b72f3ab42fd9040257b80ca251"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="friends" name="friends"></a>
@@ -178,10 +181,11 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncEventLoop</b><
 <tr class="separator:a468008cb47fddadaf6d19d2803333a70"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
-<div class="textblock"><p >Base class for all async results. </p>
+<div class="textblock"><p >Base class for all async results (argument of completion callbacks). </p>
+<p >It holds <a class="el" href="struct_s_c_1_1_result.html" title="An ascii string used as boolean result. SC_TRY macro forwards errors to caller.">Result</a> (returnCode) and re-activation flag. </p>
 </div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a id="a49ed7f96aa2b4dccfb4615800fb59945" name="a49ed7f96aa2b4dccfb4615800fb59945"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a49ed7f96aa2b4dccfb4615800fb59945">&#9670;&nbsp;</a></span>AsyncResult()</h2>
+<a id="acdd1f16cafe0f64a70878df19aa7420c" name="acdd1f16cafe0f64a70878df19aa7420c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#acdd1f16cafe0f64a70878df19aa7420c">&#9670;&nbsp;</a></span>AsyncResult() <span class="overload">[1/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -192,8 +196,52 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncEventLoop</b><
         <tr>
           <td class="memname">SC::AsyncResult::AsyncResult </td>
           <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_async_request.html">AsyncRequest</a> &amp;&#160;</td>
+          <td class="paramname"><em>request</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
           <td class="paramtype"><a class="el" href="struct_s_c_1_1_result.html">SC::Result</a> &amp;&amp;&#160;</td>
-          <td class="paramname"><em>res</em></td><td>)</td>
+          <td class="paramname"><em>res</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Constructs an async result from a request and a result. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">res</td><td>The result of async operation </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="a962891fb67611a5e6ee2df33c96e883d" name="a962891fb67611a5e6ee2df33c96e883d"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a962891fb67611a5e6ee2df33c96e883d">&#9670;&nbsp;</a></span>AsyncResult() <span class="overload">[2/2]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">SC::AsyncResult::AsyncResult </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_async_request.html">AsyncRequest</a> &amp;&#160;</td>
+          <td class="paramname"><em>request</em></td><td>)</td>
           <td></td>
         </tr>
       </table>
@@ -204,13 +252,7 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncEventLoop</b><
 </table>
 </div><div class="memdoc">
 
-<p>Constructs an async result from a result. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">res</td><td>The result of async operation </td></tr>
-  </table>
-  </dd>
-</dl>
+<p>Constructs an async result from a request. </p>
 
 </div>
 </div>

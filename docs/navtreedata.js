@@ -105,9 +105,10 @@ var NAVTREEINDEX =
 "_algorithm_bubble_sort_8h_source.html",
 "library_async.html#autotoc_md66",
 "page_examples.html",
-"struct_s_c_1_1_console.html#a02929e369dd92d4f3130a8c0814c4f26",
-"struct_s_c_1_1_plugin_definition.html#a6e6559a3690b3a9378e58b6b1132eab3",
-"struct_s_c_1_1_string_iterator.html#a39c0cb6fe4ae1b432be2a4caf48d6137"
+"struct_s_c_1_1_build_1_1_project.html#a8737b61fd95c009a942f87280a34a754",
+"struct_s_c_1_1_pipe_descriptor.html#a306e3608548b24a1940ab766e89a36ac",
+"struct_s_c_1_1_string_builder_1_1_replace_pair.html#a110e33fa1cd5249311cbf25cf644ef6a",
+"struct_s_c_1_1_vector.html#afa7deec5ca8cd8b1bbc7399197861573"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

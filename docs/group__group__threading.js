@@ -14,10 +14,10 @@ var group__group__threading =
       [ "signal", "struct_s_c_1_1_event_object.html#a09fa49098202f0a683335020ad91c462", null ],
       [ "wait", "struct_s_c_1_1_event_object.html#abc0c56fcc752cb67a3f194e1cfa588e5", null ]
     ] ],
+    [ "SC::ThreadPoolTask", "struct_s_c_1_1_thread_pool_task.html", [
+      [ "function", "struct_s_c_1_1_thread_pool_task.html#a072b75678d89c9fd7120c87a6a00a140", null ]
+    ] ],
     [ "SC::ThreadPool", "struct_s_c_1_1_thread_pool.html", [
-      [ "Task", "struct_s_c_1_1_thread_pool_1_1_task.html", [
-        [ "function", "struct_s_c_1_1_thread_pool_1_1_task.html#a37fb1752b9d6d3e814df61a14269140e", null ]
-      ] ],
       [ "create", "struct_s_c_1_1_thread_pool.html#ac4d16bfc16be6192930cb1609b50eedc", null ],
       [ "destroy", "struct_s_c_1_1_thread_pool.html#a1627e46fb137380bb55e816c08ce2cb0", null ],
       [ "queueTask", "struct_s_c_1_1_thread_pool.html#aaf653d678170723e58062fe5a8c6e3fd", null ],

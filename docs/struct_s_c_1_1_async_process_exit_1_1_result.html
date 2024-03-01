@@ -112,38 +112,51 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_async_process_exit_1_1_
 <div class="header">
   <div class="summary">
 <a href="#pub-methods">Public Member Functions</a> &#124;
-<a href="#friends">Friends</a> &#124;
 <a href="struct_s_c_1_1_async_process_exit_1_1_result-members.html">List of all members</a>  </div>
   <div class="headertitle"><div class="title">SC::AsyncProcessExit::Result Struct Reference</div></div>
 </div><!--header-->
 <div class="contents">
+
+<p>Callback result for <a class="el" href="struct_s_c_1_1_async_process_exit.html" title="Starts monitoring a process, notifying about its termination.">AsyncProcessExit</a>.  
+ <a href="struct_s_c_1_1_async_process_exit_1_1_result.html#details">More...</a></p>
+
+<p><code>#include &lt;<a class="el" href="_async_8h_source.html">Async.h</a>&gt;</code></p>
 <div class="dynheader">
 Inheritance diagram for SC::AsyncProcessExit::Result:</div>
 <div class="dyncontent">
  <div class="center">
   <img src="struct_s_c_1_1_async_process_exit_1_1_result.png" usemap="#SC::AsyncProcessExit::Result_map" alt=""/>
   <map id="SC::AsyncProcessExit::Result_map" name="SC::AsyncProcessExit::Result_map">
-<area href="struct_s_c_1_1_async_result_of.html" alt="SC::AsyncResultOf&lt; AsyncProcessExit &gt;" shape="rect" coords="0,56,245,80"/>
-<area href="struct_s_c_1_1_async_result.html" title="Base class for all async results." alt="SC::AsyncResult" shape="rect" coords="0,0,245,24"/>
+<area href="struct_s_c_1_1_async_result_of.html" alt="SC::AsyncResultOf&lt; AsyncProcessExit, CompletionData &gt;" shape="rect" coords="0,56,342,80"/>
+<area href="struct_s_c_1_1_async_result.html" title="Base class for all async results (argument of completion callbacks)." alt="SC::AsyncResult" shape="rect" coords="0,0,342,24"/>
   </map>
 </div></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:aa69638e38d34f2e831277968b2fed657"><td class="memItemLeft" align="right" valign="top"><a id="aa69638e38d34f2e831277968b2fed657" name="aa69638e38d34f2e831277968b2fed657"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Result</b> (<a class="el" href="struct_s_c_1_1_async_process_exit.html">AsyncProcessExit</a> &amp;async, <a class="el" href="struct_s_c_1_1_result.html">SC::Result</a> &amp;&amp;res)</td></tr>
-<tr class="separator:aa69638e38d34f2e831277968b2fed657"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0a8587a8374395eae310458381615c46"><td class="memItemLeft" align="right" valign="top"><a id="a0a8587a8374395eae310458381615c46" name="a0a8587a8374395eae310458381615c46"></a>
-<a class="el" href="struct_s_c_1_1_result.html">SC::Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>moveTo</b> (<a class="el" href="struct_s_c_1_1_process_descriptor_1_1_exit_status.html">ProcessDescriptor::ExitStatus</a> &amp;status)</td></tr>
-<tr class="separator:a0a8587a8374395eae310458381615c46"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="inherit_header pub_methods_struct_s_c_1_1_async_result_of"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_s_c_1_1_async_result_of')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_s_c_1_1_async_result_of.html">SC::AsyncResultOf&lt; AsyncProcessExit &gt;</a></td></tr>
-<tr class="memitem:a85f03adf5e46cf900758e416a1a84ab1 inherit pub_methods_struct_s_c_1_1_async_result_of"><td class="memItemLeft" align="right" valign="top"><a id="a85f03adf5e46cf900758e416a1a84ab1" name="a85f03adf5e46cf900758e416a1a84ab1"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncResultOf</b> (<a class="el" href="struct_s_c_1_1_async_process_exit.html">AsyncProcessExit</a> &amp;async, <a class="el" href="struct_s_c_1_1_async_result.html">AsyncResult</a> &amp;&amp;res)</td></tr>
-<tr class="separator:a85f03adf5e46cf900758e416a1a84ab1 inherit pub_methods_struct_s_c_1_1_async_result_of"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2a48ce154d8b7bdba36bf4ad65dd0011"><td class="memItemLeft" align="right" valign="top"><a id="a2a48ce154d8b7bdba36bf4ad65dd0011" name="a2a48ce154d8b7bdba36bf4ad65dd0011"></a>
+<a class="el" href="struct_s_c_1_1_result.html">SC::Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>get</b> (<a class="el" href="struct_s_c_1_1_process_descriptor_1_1_exit_status.html">ProcessDescriptor::ExitStatus</a> &amp;status)</td></tr>
+<tr class="separator:a2a48ce154d8b7bdba36bf4ad65dd0011"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="inherit_header pub_methods_struct_s_c_1_1_async_result_of"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_s_c_1_1_async_result_of')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_s_c_1_1_async_result_of.html">SC::AsyncResultOf&lt; AsyncProcessExit, CompletionData &gt;</a></td></tr>
+<tr class="memitem:ac5d1d8dc58f8e552774201e80bcf39f6 inherit pub_methods_struct_s_c_1_1_async_result_of"><td class="memItemLeft" align="right" valign="top"><a id="ac5d1d8dc58f8e552774201e80bcf39f6" name="ac5d1d8dc58f8e552774201e80bcf39f6"></a>
+<a class="el" href="struct_s_c_1_1_async_process_exit.html">AsyncProcessExit</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>getAsync</b> ()</td></tr>
+<tr class="separator:ac5d1d8dc58f8e552774201e80bcf39f6 inherit pub_methods_struct_s_c_1_1_async_result_of"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7bc8da79999bb8f431a9b606cc10e3f2 inherit pub_methods_struct_s_c_1_1_async_result_of"><td class="memItemLeft" align="right" valign="top"><a id="a7bc8da79999bb8f431a9b606cc10e3f2" name="a7bc8da79999bb8f431a9b606cc10e3f2"></a>
+const <a class="el" href="struct_s_c_1_1_async_process_exit.html">AsyncProcessExit</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>getAsync</b> () const</td></tr>
+<tr class="separator:a7bc8da79999bb8f431a9b606cc10e3f2 inherit pub_methods_struct_s_c_1_1_async_result_of"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acdd1f16cafe0f64a70878df19aa7420c inherit pub_methods_struct_s_c_1_1_async_result_of"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_result_of.html#acdd1f16cafe0f64a70878df19aa7420c">AsyncResult</a> (<a class="el" href="struct_s_c_1_1_async_request.html">AsyncRequest</a> &amp;request, <a class="el" href="struct_s_c_1_1_result.html">SC::Result</a> &amp;&amp;res)</td></tr>
+<tr class="memdesc:acdd1f16cafe0f64a70878df19aa7420c inherit pub_methods_struct_s_c_1_1_async_result_of"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs an async result from a request and a result.  <a href="struct_s_c_1_1_async_result_of.html#acdd1f16cafe0f64a70878df19aa7420c">More...</a><br /></td></tr>
+<tr class="separator:acdd1f16cafe0f64a70878df19aa7420c inherit pub_methods_struct_s_c_1_1_async_result_of"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a962891fb67611a5e6ee2df33c96e883d inherit pub_methods_struct_s_c_1_1_async_result_of"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_result_of.html#a962891fb67611a5e6ee2df33c96e883d">AsyncResult</a> (<a class="el" href="struct_s_c_1_1_async_request.html">AsyncRequest</a> &amp;request)</td></tr>
+<tr class="memdesc:a962891fb67611a5e6ee2df33c96e883d inherit pub_methods_struct_s_c_1_1_async_result_of"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs an async result from a request.  <a href="struct_s_c_1_1_async_result_of.html#a962891fb67611a5e6ee2df33c96e883d">More...</a><br /></td></tr>
+<tr class="separator:a962891fb67611a5e6ee2df33c96e883d inherit pub_methods_struct_s_c_1_1_async_result_of"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_struct_s_c_1_1_async_result"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_s_c_1_1_async_result')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_s_c_1_1_async_result.html">SC::AsyncResult</a></td></tr>
-<tr class="memitem:a49ed7f96aa2b4dccfb4615800fb59945 inherit pub_methods_struct_s_c_1_1_async_result"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_result.html#a49ed7f96aa2b4dccfb4615800fb59945">AsyncResult</a> (<a class="el" href="struct_s_c_1_1_result.html">SC::Result</a> &amp;&amp;res)</td></tr>
-<tr class="memdesc:a49ed7f96aa2b4dccfb4615800fb59945 inherit pub_methods_struct_s_c_1_1_async_result"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs an async result from a result.  <a href="struct_s_c_1_1_async_result.html#a49ed7f96aa2b4dccfb4615800fb59945">More...</a><br /></td></tr>
-<tr class="separator:a49ed7f96aa2b4dccfb4615800fb59945 inherit pub_methods_struct_s_c_1_1_async_result"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acdd1f16cafe0f64a70878df19aa7420c inherit pub_methods_struct_s_c_1_1_async_result"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_result.html#acdd1f16cafe0f64a70878df19aa7420c">AsyncResult</a> (<a class="el" href="struct_s_c_1_1_async_request.html">AsyncRequest</a> &amp;request, <a class="el" href="struct_s_c_1_1_result.html">SC::Result</a> &amp;&amp;res)</td></tr>
+<tr class="memdesc:acdd1f16cafe0f64a70878df19aa7420c inherit pub_methods_struct_s_c_1_1_async_result"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs an async result from a request and a result.  <a href="struct_s_c_1_1_async_result.html#acdd1f16cafe0f64a70878df19aa7420c">More...</a><br /></td></tr>
+<tr class="separator:acdd1f16cafe0f64a70878df19aa7420c inherit pub_methods_struct_s_c_1_1_async_result"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a962891fb67611a5e6ee2df33c96e883d inherit pub_methods_struct_s_c_1_1_async_result"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_result.html#a962891fb67611a5e6ee2df33c96e883d">AsyncResult</a> (<a class="el" href="struct_s_c_1_1_async_request.html">AsyncRequest</a> &amp;request)</td></tr>
+<tr class="memdesc:a962891fb67611a5e6ee2df33c96e883d inherit pub_methods_struct_s_c_1_1_async_result"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs an async result from a request.  <a href="struct_s_c_1_1_async_result.html#a962891fb67611a5e6ee2df33c96e883d">More...</a><br /></td></tr>
+<tr class="separator:a962891fb67611a5e6ee2df33c96e883d inherit pub_methods_struct_s_c_1_1_async_result"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0a7a91675236ec57657243e01960c093 inherit pub_methods_struct_s_c_1_1_async_result"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_result.html#a0a7a91675236ec57657243e01960c093">reactivateRequest</a> (bool value)</td></tr>
 <tr class="memdesc:a0a7a91675236ec57657243e01960c093 inherit pub_methods_struct_s_c_1_1_async_result"><td class="mdescLeft">&#160;</td><td class="mdescRight">Ask the event loop to re-activate this request after it was already completed.  <a href="struct_s_c_1_1_async_result.html#a0a7a91675236ec57657243e01960c093">More...</a><br /></td></tr>
 <tr class="separator:a0a7a91675236ec57657243e01960c093 inherit pub_methods_struct_s_c_1_1_async_result"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -151,31 +164,27 @@ Public Member Functions</h2></td></tr>
 <tr class="memdesc:a653f29d24de75f491beaa2d4f73fb3ce inherit pub_methods_struct_s_c_1_1_async_result"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if the returnCode of this result is valid.  <a href="struct_s_c_1_1_async_result.html#a653f29d24de75f491beaa2d4f73fb3ce">More...</a><br /></td></tr>
 <tr class="separator:a653f29d24de75f491beaa2d4f73fb3ce inherit pub_methods_struct_s_c_1_1_async_result"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="friends" name="friends"></a>
-Friends</h2></td></tr>
-<tr class="memitem:a468008cb47fddadaf6d19d2803333a70"><td class="memItemLeft" align="right" valign="top"><a id="a468008cb47fddadaf6d19d2803333a70" name="a468008cb47fddadaf6d19d2803333a70"></a>
-struct&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncEventLoop</b></td></tr>
-<tr class="separator:a468008cb47fddadaf6d19d2803333a70"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="inherited" name="inherited"></a>
 Additional Inherited Members</h2></td></tr>
-<tr class="inherit_header pub_types_struct_s_c_1_1_async_result"><td colspan="2" onclick="javascript:toggleInherit('pub_types_struct_s_c_1_1_async_result')"><img src="closed.png" alt="-"/>&#160;Public Types inherited from <a class="el" href="struct_s_c_1_1_async_result.html">SC::AsyncResult</a></td></tr>
-<tr class="memitem:af0048348a549097097ea36f3411a2be4 inherit pub_types_struct_s_c_1_1_async_result"><td class="memItemLeft" align="right" valign="top"><a id="af0048348a549097097ea36f3411a2be4" name="af0048348a549097097ea36f3411a2be4"></a>
-using&#160;</td><td class="memItemRight" valign="bottom"><b>Type</b> = <a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">AsyncRequest::Type</a></td></tr>
-<tr class="separator:af0048348a549097097ea36f3411a2be4 inherit pub_types_struct_s_c_1_1_async_result"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="inherit_header pub_attribs_struct_s_c_1_1_async_result_of"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_struct_s_c_1_1_async_result_of')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="struct_s_c_1_1_async_result_of.html">SC::AsyncResultOf&lt; AsyncProcessExit &gt;</a></td></tr>
-<tr class="memitem:ae986e4f393aefb4d63eee1f30d885ee2 inherit pub_attribs_struct_s_c_1_1_async_result_of"><td class="memItemLeft" align="right" valign="top"><a id="ae986e4f393aefb4d63eee1f30d885ee2" name="ae986e4f393aefb4d63eee1f30d885ee2"></a>
-<a class="el" href="struct_s_c_1_1_async_process_exit.html">AsyncProcessExit</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>async</b></td></tr>
-<tr class="separator:ae986e4f393aefb4d63eee1f30d885ee2 inherit pub_attribs_struct_s_c_1_1_async_result_of"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="inherit_header pub_attribs_struct_s_c_1_1_async_result_of"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_struct_s_c_1_1_async_result_of')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="struct_s_c_1_1_async_result_of.html">SC::AsyncResultOf&lt; AsyncProcessExit, CompletionData &gt;</a></td></tr>
+<tr class="memitem:acad2f8cfaf4bfd627b1748b141f2a3d9 inherit pub_attribs_struct_s_c_1_1_async_result_of"><td class="memItemLeft" align="right" valign="top"><a id="acad2f8cfaf4bfd627b1748b141f2a3d9" name="acad2f8cfaf4bfd627b1748b141f2a3d9"></a>
+CompletionData&#160;</td><td class="memItemRight" valign="bottom"><b>completionData</b></td></tr>
+<tr class="separator:acad2f8cfaf4bfd627b1748b141f2a3d9 inherit pub_attribs_struct_s_c_1_1_async_result_of"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="inherit_header pub_attribs_struct_s_c_1_1_async_result"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_struct_s_c_1_1_async_result')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="struct_s_c_1_1_async_result.html">SC::AsyncResult</a></td></tr>
+<tr class="memitem:aac38a67256b0fba1853ac6b1db85b356 inherit pub_attribs_struct_s_c_1_1_async_result"><td class="memItemLeft" align="right" valign="top"><a id="aac38a67256b0fba1853ac6b1db85b356" name="aac38a67256b0fba1853ac6b1db85b356"></a>
+<a class="el" href="struct_s_c_1_1_async_request.html">AsyncRequest</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>async</b></td></tr>
+<tr class="separator:aac38a67256b0fba1853ac6b1db85b356 inherit pub_attribs_struct_s_c_1_1_async_result"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pro_attribs_struct_s_c_1_1_async_result"><td colspan="2" onclick="javascript:toggleInherit('pro_attribs_struct_s_c_1_1_async_result')"><img src="closed.png" alt="-"/>&#160;Protected Attributes inherited from <a class="el" href="struct_s_c_1_1_async_result.html">SC::AsyncResult</a></td></tr>
 <tr class="memitem:aad9180016c9441172d4fbf93b1911833 inherit pro_attribs_struct_s_c_1_1_async_result"><td class="memItemLeft" align="right" valign="top"><a id="aad9180016c9441172d4fbf93b1911833" name="aad9180016c9441172d4fbf93b1911833"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>shouldBeReactivated</b> = false</td></tr>
 <tr class="separator:aad9180016c9441172d4fbf93b1911833 inherit pro_attribs_struct_s_c_1_1_async_result"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a887db7b72f3ab42fd9040257b80ca251 inherit pro_attribs_struct_s_c_1_1_async_result"><td class="memItemLeft" align="right" valign="top"><a id="a887db7b72f3ab42fd9040257b80ca251" name="a887db7b72f3ab42fd9040257b80ca251"></a>
-<a class="el" href="struct_s_c_1_1_result.html">SC::Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>returnCode</b></td></tr>
+<a class="el" href="struct_s_c_1_1_result.html">SC::Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>returnCode</b> = <a class="el" href="struct_s_c_1_1_result.html">SC::Result</a>(true)</td></tr>
 <tr class="separator:a887db7b72f3ab42fd9040257b80ca251 inherit pro_attribs_struct_s_c_1_1_async_result"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-<hr/>The documentation for this struct was generated from the following file:<ul>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p >Callback result for <a class="el" href="struct_s_c_1_1_async_process_exit.html" title="Starts monitoring a process, notifying about its termination.">AsyncProcessExit</a>. </p>
+</div><hr/>The documentation for this struct was generated from the following file:<ul>
 <li><a class="el" href="_async_8h_source.html">Async.h</a></li>
 </ul>
 </div><!-- contents -->

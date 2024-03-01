@@ -130,7 +130,7 @@ $(document).ready(function(){initNavTree('library_async.html',''); initResizable
 <li class="level2"><a href="#autotoc_md64">AsyncFileRead</a></li>
 <li class="level2"><a href="#autotoc_md65">AsyncFileWrite</a></li>
 <li class="level2"><a href="#autotoc_md66">AsyncFileClose</a></li>
-<li class="level2"><a href="#autotoc_md67">AsycFilePoll</a></li>
+<li class="level2"><a href="#autotoc_md67">AsyncFilePoll</a></li>
 </ul>
 </li>
 <li class="level1"><a href="#autotoc_md68">Implementation</a><ul><li class="level2"><a href="#autotoc_md69">Memory allocation</a></li>
@@ -151,6 +151,7 @@ $(document).ready(function(){initNavTree('library_async.html',''); initResizable
 <li><code>io_uring</code> on Linux (dynamically loading <code>liburing</code>)</li>
 </ul>
 <dl class="section note"><dt>Note</dt><dd>If <code>liburing</code> is not available on the system, the library will transparently fallback to epoll.</dd></dl>
+<p>If an async operation is not supported by the OS, user can provide a <a class="el" href="struct_s_c_1_1_thread_pool.html" title="Simple thread pool that executes tasks in a fixed number of worker threads.">SC::ThreadPool</a> and <a class="el" href="struct_s_c_1_1_thread_pool_task.html" title="A small task containing a function to execute that can be queued in the thread pool.">SC::ThreadPoolTask</a> (through an AsyncTask derived struct like SC::AsyncFileRead::Task or SC::AsyncFileWrite::Task for example) to execute the operation on a background thread. In some cases supplying the <a class="el" href="struct_s_c_1_1_thread_pool.html" title="Simple thread pool that executes tasks in a fixed number of worker threads.">SC::ThreadPool</a> and <a class="el" href="struct_s_c_1_1_thread_pool_task.html" title="A small task containing a function to execute that can be queued in the thread pool.">SC::ThreadPoolTask</a> is optional (<a class="el" href="struct_s_c_1_1_async_file_read.html" title="Starts a file read operation, reading bytes from a file (or pipe).">SC::AsyncFileRead</a> / <a class="el" href="struct_s_c_1_1_async_file_write.html" title="Starts a file write operation, writing bytes to a file (or pipe).">SC::AsyncFileWrite</a> for example), and it will be signaled with the AsyncRequest::start method accepting a pointer to the <a class="el" href="struct_s_c_1_1_async_task.html" title="Holds (reference to) a SC::ThreadPool and SC::ThreadPool::Task to execute an SC::AsyncRequest in a ba...">SC::AsyncTask</a> derived class. In some other cases the <a class="el" href="struct_s_c_1_1_async_task.html" title="Holds (reference to) a SC::ThreadPool and SC::ThreadPool::Task to execute an SC::AsyncRequest in a ba...">SC::AsyncTask</a> derived class will be mandatory and the start method will require a reference instead of pointer.</p>
 <h1><a class="anchor" id="autotoc_md51"></a>
 Features</h1>
 <p >This is the list of supported async operations:</p>
@@ -168,9 +169,9 @@ Features</h1>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyNone"><a class="el" href="struct_s_c_1_1_async_socket_close.html">AsyncSocketClose</a>   </td><td class="markdownTableBodyNone">Starts a socket close operation.    </td></tr>
 <tr class="markdownTableRowEven">
-<td class="markdownTableBodyNone"><a class="el" href="struct_s_c_1_1_async_file_read.html">AsyncFileRead</a>   </td><td class="markdownTableBodyNone">Starts a file read operation, reading bytes from a file.    </td></tr>
+<td class="markdownTableBodyNone"><a class="el" href="struct_s_c_1_1_async_file_read.html">AsyncFileRead</a>   </td><td class="markdownTableBodyNone">Starts a file read operation, reading bytes from a file (or pipe).    </td></tr>
 <tr class="markdownTableRowOdd">
-<td class="markdownTableBodyNone"><a class="el" href="struct_s_c_1_1_async_file_write.html">AsyncFileWrite</a>   </td><td class="markdownTableBodyNone">Starts a file write operation, writing bytes to a file.    </td></tr>
+<td class="markdownTableBodyNone"><a class="el" href="struct_s_c_1_1_async_file_write.html">AsyncFileWrite</a>   </td><td class="markdownTableBodyNone">Starts a file write operation, writing bytes to a file (or pipe).    </td></tr>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyNone"><a class="el" href="struct_s_c_1_1_async_file_close.html">AsyncFileClose</a>   </td><td class="markdownTableBodyNone">Starts a file close operation, closing the OS file descriptor.    </td></tr>
 <tr class="markdownTableRowOdd">
@@ -178,6 +179,8 @@ Features</h1>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyNone"><a class="el" href="struct_s_c_1_1_async_loop_wake_up.html">AsyncLoopWakeUp</a>   </td><td class="markdownTableBodyNone">Starts a wake-up operation, allowing threads to execute callbacks on loop thread.    </td></tr>
 <tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone"><a class="el" href="struct_s_c_1_1_async_process_exit.html">AsyncProcessExit</a>   </td><td class="markdownTableBodyNone">Starts monitoring a process, notifying about its termination.    </td></tr>
+<tr class="markdownTableRowEven">
 <td class="markdownTableBodyNone"><a class="el" href="struct_s_c_1_1_async_file_poll.html">AsyncFilePoll</a>   </td><td class="markdownTableBodyNone">Starts an handle polling operation.   </td></tr>
 </table>
 <h1><a class="anchor" id="autotoc_md52"></a>
@@ -279,8 +282,7 @@ AsyncLoopWakeUp</h2>
 <div class="line"><span class="comment">// From here on we know for sure that callback has been called</span></div>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md58"></a>
 AsyncProcessExit</h2>
-<p >Starts a process exit notification request, so that when process is exited the callback will be called. <br  />
-<a class="el" href="library_process.html">Process</a> library can be used to start a process and obtain the native process handle.</p>
+<p >Starts monitoring a process, notifying about its termination. <a class="el" href="library_process.html">Process</a> library can be used to start a process and obtain the native process handle.</p>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named eventLoop</span></div>
 <div class="line"><span class="comment">// ...</span></div>
 <div class="line">Process process;</div>
@@ -291,7 +293,7 @@ AsyncProcessExit</h2>
 <div class="line">processExit.callback = [&amp;](AsyncProcessExit::Result&amp; res)</div>
 <div class="line">{</div>
 <div class="line">    ProcessDescriptor::ExitStatus exitStatus;</div>
-<div class="line">    <span class="keywordflow">if</span>(res.moveTo(exitStatus))</div>
+<div class="line">    <span class="keywordflow">if</span>(res.get(exitStatus))</div>
 <div class="line">    {</div>
 <div class="line">        console.print(<span class="stringliteral">&quot;Process Exit status = {}&quot;</span>, exitStatus.status);</div>
 <div class="line">    }</div>
@@ -390,7 +392,7 @@ Alternatively <a class="el" href="struct_s_c_1_1_async_event_loop.html#add7fd25e
 <div class="line">receiveAsync.callback = [&amp;](AsyncSocketReceive::Result&amp; res)</div>
 <div class="line">{</div>
 <div class="line">    Span&lt;char&gt; readData;</div>
-<div class="line">    <span class="keywordflow">if</span>(res.moveTo(readData))</div>
+<div class="line">    <span class="keywordflow">if</span>(res.get(readData))</div>
 <div class="line">    {</div>
 <div class="line">        <span class="comment">// readData now contains a slice of receivedData with the received bytes</span></div>
 <div class="line">        console.print(<span class="stringliteral">&quot;{} bytes have been read&quot;</span>, readData.sizeInBytes());</div>
@@ -418,51 +420,77 @@ AsyncSocketClose</h2>
 <div class="line"> </div>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md64"></a>
 AsyncFileRead</h2>
-<p >Starts a file read operation, reading bytes from a file. Callback will be called after some data is read from file. <br  />
-<a class="el" href="library_file.html">File</a> library can be used to open the file and obtain a file descriptor handle. Make sure to associate the file descriptor with <a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a" title="Associates a File descriptor created externally with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a>.</p>
+<p >Starts a file read operation, reading bytes from a file (or pipe). Callback will be called when the data read from the file (or pipe) is available. <br  />
+ Use the optional <code>Task</code> parameter to execute file read on a background thread for APIs that exhibit blocking behaviour on buffered file I/O (all apis with the exception of <code>io_uring</code>).</p>
+<p ><a class="el" href="library_file.html">File</a> library can be used to open the file and obtain a file (or pipe) descriptor handle.</p>
+<dl class="section note"><dt>Note</dt><dd>Pipes or files opened using Posix <code>O_DIRECT</code> or Windows <code>FILE_FLAG_WRITE_THROUGH</code> &amp; <code>FILE_FLAG_NO_BUFFERING</code> should instead avoid using the <code>Task</code> parameter for best performance.</dd></dl>
+<p>When not using the <code>Task</code> remember to:</p><ul>
+<li>Open the file descriptor for non-blocking IO (<a class="el" href="struct_s_c_1_1_file_descriptor_1_1_open_options.html#a4c696fe5fdc073f0efc39d47b308264a" title="Set to false if file will be used for Async I/O (see Async)">SC::FileDescriptor::OpenOptions::blocking</a> == <code>false</code>)</li>
+<li>Call <a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a" title="Associates a File descriptor created externally with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a> on the file descriptor</li>
+</ul>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named `eventLoop`</span></div>
+<div class="line"><span class="comment">// ...</span></div>
+<div class="line"> </div>
+<div class="line"><span class="comment">// Assuming an already created threadPool and a task</span></div>
+<div class="line"><span class="comment">// ...</span></div>
+<div class="line"> </div>
+<div class="line">ThreadPoolTask task;</div>
+<div class="line">ThreadPool threadPool;</div>
+<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(threadPool.create(4));</div>
+<div class="line"> </div>
 <div class="line"><span class="comment">// ...</span></div>
 <div class="line"> </div>
 <div class="line"><span class="comment">// Open the file</span></div>
 <div class="line">FileDescriptor fd;</div>
 <div class="line">FileDescriptor::OpenOptions options;</div>
-<div class="line">options.async    = <span class="keyword">true</span>;</div>
-<div class="line">options.blocking = <span class="keyword">false</span>;</div>
+<div class="line">options.blocking = <span class="keyword">true</span>; <span class="comment">// When using AsyncFileRead::Task you can use regular blocking descriptors</span></div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(fd.open(<span class="stringliteral">&quot;MyFile.txt&quot;</span>, FileDescriptor::ReadOnly, options));</div>
 <div class="line">FileDescriptor::Handle handle;</div>
 <div class="line"> </div>
 <div class="line"><span class="comment">// Obtain file descriptor handle and associate it with event loop</span></div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(fd.get(handle, Result::Error(<span class="stringliteral">&quot;Invalid handle&quot;</span>)));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(eventLoop.associateExternallyCreatedFileDescriptor(fd));</div>
 <div class="line"> </div>
-<div class="line"><span class="comment">// Create the async file read request</span></div>
+<div class="line"><span class="comment">// Create the async file read request and its threadpool task</span></div>
 <div class="line">AsyncFileRead asyncReadFile;</div>
+<div class="line">AsyncFileRead::Task asyncFileTask{threadPool, task};</div>
 <div class="line">asyncReadFile.callback = [&amp;](AsyncFileRead::Result&amp; res)</div>
 <div class="line">{</div>
 <div class="line">    Span&lt;char&gt; readData;</div>
-<div class="line">    <span class="keywordflow">if</span>(res.moveTo(readData))</div>
+<div class="line">    <span class="keywordflow">if</span>(res.get(readData))</div>
 <div class="line">    {</div>
 <div class="line">        console.print(<span class="stringliteral">&quot;Read {} bytes from file&quot;</span>, readData.sizeInBytes());</div>
 <div class="line">        res.reactivateRequest(<span class="keyword">true</span>); <span class="comment">// Ask to receive more data</span></div>
 <div class="line">    }</div>
 <div class="line">};</div>
 <div class="line"><span class="keywordtype">char</span> buffer[100] = {0};</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(asyncReadFile.start(eventLoop, handle, {buffer, sizeof(buffer)}));</div>
+<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(asyncReadFile.start(eventLoop, handle, {buffer, sizeof(buffer)},&amp;asyncFileTask));</div>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md65"></a>
 AsyncFileWrite</h2>
-<p >Starts a file write operation, writing bytes to a file. Callback will be called when the file is ready to receive more bytes to write. <br  />
-<a class="el" href="library_file.html">File</a> library can be used to open the file and obtain a file descriptor handle. <br  />
-Make sure to associate the file descriptor with <a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a" title="Associates a File descriptor created externally with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a>.</p>
+<p >Starts a file write operation, writing bytes to a file (or pipe). Callback will be called when the file is ready to receive more bytes to write. <br  />
+ Use the optional <code>Task</code> parameter to execute file read on a background thread for APIs that exhibit blocking behaviour on buffered file I/O (all apis with the exception of <code>io_uring</code>).</p>
+<p ><a class="el" href="library_file.html">File</a> library can be used to open the file and obtain a blocking or non-blocking file descriptor handle. <br  />
+ </p><dl class="section note"><dt>Note</dt><dd>Pipes or files opened using Posix <code>O_DIRECT</code> or Windows <code>FILE_FLAG_WRITE_THROUGH</code> &amp; <code>FILE_FLAG_NO_BUFFERING</code> should instead avoid using the <code>Task</code> parameter for best performance.</dd></dl>
+<p>When not using the <code>Task</code> remember to:</p><ul>
+<li>Open the file descriptor for non-blocking IO (<a class="el" href="struct_s_c_1_1_file_descriptor_1_1_open_options.html#a4c696fe5fdc073f0efc39d47b308264a" title="Set to false if file will be used for Async I/O (see Async)">SC::FileDescriptor::OpenOptions::blocking</a> == <code>false</code>)</li>
+<li>Call <a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a" title="Associates a File descriptor created externally with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a> on the file descriptor</li>
+</ul>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named eventLoop</span></div>
+<div class="line"><span class="comment">// ...</span></div>
+<div class="line"> </div>
+<div class="line"><span class="comment">// Assuming an already created threadPool and a task</span></div>
+<div class="line"><span class="comment">// ...</span></div>
+<div class="line"> </div>
+<div class="line">ThreadPoolTask task;</div>
+<div class="line">ThreadPool threadPool;</div>
+<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(threadPool.create(4));</div>
+<div class="line"> </div>
 <div class="line"><span class="comment">// ...</span></div>
 <div class="line"> </div>
 <div class="line"><span class="comment">// Open the file (for write)</span></div>
 <div class="line">FileDescriptor::OpenOptions options;</div>
-<div class="line">options.async    = <span class="keyword">true</span>;</div>
-<div class="line">options.blocking = <span class="keyword">false</span>;</div>
+<div class="line">options.blocking = <span class="keyword">true</span>; <span class="comment">// When using AsyncFileWrite::Task you can use regular blocking descriptors</span></div>
 <div class="line">FileDescriptor fd;</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(fd.open(<span class="stringliteral">&quot;MyFile.txt&quot;</span>, FileDescriptor::WriteCreateTruncate, options));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(eventLoop.associateExternallyCreatedFileDescriptor(fd));</div>
 <div class="line"><span class="keyword">auto</span> writeSpan = StringView(<span class="stringliteral">&quot;test&quot;</span>).toCharSpan();</div>
 <div class="line">FileDescriptor::Handle handle;</div>
 <div class="line"><span class="comment">// Obtain file descriptor handle</span></div>
@@ -470,26 +498,26 @@ Make sure to associate the file descriptor with <a class="el" href="struct_s_c_1
 <div class="line"> </div>
 <div class="line"><span class="comment">// Create the async file write request</span></div>
 <div class="line">AsyncFileWrite asyncWriteFile;</div>
+<div class="line">AsyncFileWrite::Task asyncFileTask{threadPool, task};</div>
 <div class="line">asyncWriteFile.callback = [&amp;](AsyncFileWrite::Result&amp; res)</div>
 <div class="line">{</div>
 <div class="line">    <span class="keywordtype">size_t</span> writtenBytes = 0;</div>
-<div class="line">    <span class="keywordflow">if</span>(res.moveTo(writtenBytes))</div>
+<div class="line">    <span class="keywordflow">if</span>(res.get(writtenBytes))</div>
 <div class="line">    {</div>
 <div class="line">        console.print(<span class="stringliteral">&quot;{} bytes have been written&quot;</span>, writtenBytes);</div>
 <div class="line">    }</div>
 <div class="line">};</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(asyncWriteFile.start(eventLoop, handle, writeSpan));</div>
+<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(asyncWriteFile.start(eventLoop, handle, writeSpan, &amp;asyncFileTask));</div>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md66"></a>
 AsyncFileClose</h2>
 <p >Starts a file close operation, closing the OS file descriptor. Callback will be called when the file is actually closed. <br  />
-<a class="el" href="library_file.html">File</a> library can be used to open the file and obtain a file descriptor handle.</p>
+<a class="el" href="library_file.html">File</a> library can be used to open the file and obtain a blocking or non-blocking file descriptor handle.</p>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named eventLoop</span></div>
 <div class="line"><span class="comment">// ...</span></div>
 <div class="line"> </div>
 <div class="line"><span class="comment">// Open a file and associated it with event loop</span></div>
 <div class="line">FileDescriptor fd;</div>
 <div class="line">FileDescriptor::OpenOptions options;</div>
-<div class="line">options.async    = <span class="keyword">true</span>;</div>
 <div class="line">options.blocking = <span class="keyword">false</span>;</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(fd.open(<span class="stringliteral">&quot;MyFile.txt&quot;</span>, FileDescriptor::WriteCreateTruncate, options));</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(eventLoop.associateExternallyCreatedFileDescriptor(fd));</div>
@@ -507,7 +535,8 @@ AsyncFileClose</h2>
 <div class="line">};</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(asyncFileClose.start(eventLoop, handle));</div>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md67"></a>
-AsycFilePoll</h2>
+AsyncFilePoll</h2>
+<p >Starts an handle polling operation. Uses <code>GetOverlappedResult</code> (windows), <code>kevent</code> (macOS), <code>epoll</code> (Linux) and <code>io_uring</code> (Linux). Callback will be called when any of the three API signals readiness events on the given file descriptor. Check <a class="el" href="library_file_system_watcher.html">File System Watcher</a> for an example usage of this notification.</p>
 <h1><a class="anchor" id="autotoc_md68"></a>
 Implementation</h1>
 <p >Library abstracts async operations by exposing a completion based mechanism. This mechanism currently maps on <code>kqueue</code> on macOS and <code>OVERLAPPED</code> on Windows.</p>
@@ -521,15 +550,17 @@ Memory allocation</h2>
 <h1><a class="anchor" id="autotoc_md70"></a>
 Roadmap</h1>
 <p >🟩 Usable Features:</p><ul>
-<li>Use a thread pool to execute File Operations actually asynchronously.</li>
 <li>Implement option to do blocking poll check without dispatching callbacks (needed for efficient gui event loop integration)</li>
 <li>More comprehensive test suite, testing all cancellations</li>
+<li>FS operations (open stat read write unlink copyfile mkdir chmod etc.)</li>
+<li>UDP Send/Receive</li>
+<li>DNS Resolution</li>
 </ul>
 <p >🟦 Complete Features:</p><ul>
-<li>Implement FS operations (open stat read write unlink copyfile mkdir chmod etc.)</li>
+<li>TTY with ANSI Escape Codes</li>
 </ul>
 <p >💡 Unplanned Features:</p><ul>
-<li>Additional async operations </li>
+<li>Signal handling </li>
 </ul>
 </div></div><!-- contents -->
 </div><!-- PageDoc -->

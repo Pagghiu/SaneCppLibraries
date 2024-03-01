@@ -19,7 +19,7 @@ var libraries =
         [ "AsyncFileRead", "library_async.html#autotoc_md64", null ],
         [ "AsyncFileWrite", "library_async.html#autotoc_md65", null ],
         [ "AsyncFileClose", "library_async.html#autotoc_md66", null ],
-        [ "AsycFilePoll", "library_async.html#autotoc_md67", null ]
+        [ "AsyncFilePoll", "library_async.html#autotoc_md67", null ]
       ] ],
       [ "Implementation", "library_async.html#autotoc_md68", [
         [ "Memory allocation", "library_async.html#autotoc_md69", null ]

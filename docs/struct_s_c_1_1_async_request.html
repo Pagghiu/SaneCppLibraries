@@ -135,11 +135,11 @@ Inheritance diagram for SC::AsyncRequest:</div>
   <map id="SC::AsyncRequest_map" name="SC::AsyncRequest_map">
 <area href="struct_s_c_1_1_async_file_close.html" title="Starts a file close operation, closing the OS file descriptor." alt="SC::AsyncFileClose" shape="rect" coords="166,56,322,80"/>
 <area href="struct_s_c_1_1_async_file_poll.html" title="Starts an handle polling operation." alt="SC::AsyncFilePoll" shape="rect" coords="166,112,322,136"/>
-<area href="struct_s_c_1_1_async_file_read.html" title="Starts a file read operation, reading bytes from a file." alt="SC::AsyncFileRead" shape="rect" coords="166,168,322,192"/>
-<area href="struct_s_c_1_1_async_file_write.html" title="Starts a file write operation, writing bytes to a file." alt="SC::AsyncFileWrite" shape="rect" coords="166,224,322,248"/>
+<area href="struct_s_c_1_1_async_file_read.html" title="Starts a file read operation, reading bytes from a file (or pipe)." alt="SC::AsyncFileRead" shape="rect" coords="166,168,322,192"/>
+<area href="struct_s_c_1_1_async_file_write.html" title="Starts a file write operation, writing bytes to a file (or pipe)." alt="SC::AsyncFileWrite" shape="rect" coords="166,224,322,248"/>
 <area href="struct_s_c_1_1_async_loop_timeout.html" title="Starts a Timeout that is invoked after expiration (relative) time has passed." alt="SC::AsyncLoopTimeout" shape="rect" coords="166,280,322,304"/>
 <area href="struct_s_c_1_1_async_loop_wake_up.html" title="Starts a wake-up operation, allowing threads to execute callbacks on loop thread." alt="SC::AsyncLoopWakeUp" shape="rect" coords="166,336,322,360"/>
-<area href="struct_s_c_1_1_async_process_exit.html" title="Starts a process exit notification request, so that when process is exited the callback will be calle..." alt="SC::AsyncProcessExit" shape="rect" coords="166,392,322,416"/>
+<area href="struct_s_c_1_1_async_process_exit.html" title="Starts monitoring a process, notifying about its termination." alt="SC::AsyncProcessExit" shape="rect" coords="166,392,322,416"/>
 <area href="struct_s_c_1_1_async_socket_accept.html" title="Starts a socket accept operation, obtaining a new socket from a listening socket." alt="SC::AsyncSocketAccept" shape="rect" coords="166,448,322,472"/>
 <area href="struct_s_c_1_1_async_socket_close.html" title="Starts a socket close operation." alt="SC::AsyncSocketClose" shape="rect" coords="166,504,322,528"/>
 <area href="struct_s_c_1_1_async_socket_connect.html" title="Starts a socket connect operation, connecting to a remote endpoint." alt="SC::AsyncSocketConnect" shape="rect" coords="166,560,322,584"/>
@@ -208,9 +208,9 @@ Protected Member Functions</h2></td></tr>
 <tr class="memitem:acba5bc94b35be4c2293b96b8806e7827"><td class="memItemLeft" align="right" valign="top"><a id="acba5bc94b35be4c2293b96b8806e7827" name="acba5bc94b35be4c2293b96b8806e7827"></a>
 <a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>validateAsync</b> ()</td></tr>
 <tr class="separator:acba5bc94b35be4c2293b96b8806e7827"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a650360163409a1c3ef0941900d2d0fe9"><td class="memItemLeft" align="right" valign="top"><a id="a650360163409a1c3ef0941900d2d0fe9" name="a650360163409a1c3ef0941900d2d0fe9"></a>
-<a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>queueSubmission</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;eventLoop)</td></tr>
-<tr class="separator:a650360163409a1c3ef0941900d2d0fe9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad244e08093db3f5fd7e7ecf278399ea7"><td class="memItemLeft" align="right" valign="top"><a id="ad244e08093db3f5fd7e7ecf278399ea7" name="ad244e08093db3f5fd7e7ecf278399ea7"></a>
+<a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>queueSubmission</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;eventLoop, <a class="el" href="struct_s_c_1_1_async_task.html">AsyncTask</a> *task)</td></tr>
+<tr class="separator:ad244e08093db3f5fd7e7ecf278399ea7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pro-static-methods" name="pro-static-methods"></a>
 Static Protected Member Functions</h2></td></tr>
@@ -223,6 +223,9 @@ Protected Attributes</h2></td></tr>
 <tr class="memitem:a6397be27006b8fdfa51fabd1c3a415f8"><td class="memItemLeft" align="right" valign="top"><a id="a6397be27006b8fdfa51fabd1c3a415f8" name="a6397be27006b8fdfa51fabd1c3a415f8"></a>
 <a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>eventLoop</b> = nullptr</td></tr>
 <tr class="separator:a6397be27006b8fdfa51fabd1c3a415f8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae5d524b8ca70e47397eaa4c4c609f6eb"><td class="memItemLeft" align="right" valign="top"><a id="ae5d524b8ca70e47397eaa4c4c609f6eb" name="ae5d524b8ca70e47397eaa4c4c609f6eb"></a>
+<a class="el" href="struct_s_c_1_1_async_task.html">AsyncTask</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>asyncTask</b> = nullptr</td></tr>
+<tr class="separator:ae5d524b8ca70e47397eaa4c4c609f6eb"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="friends" name="friends"></a>
 Friends</h2></td></tr>
@@ -285,7 +288,7 @@ If the function returns an invalid Return code or if the operation is manually c
 </td></tr>
 <tr><td class="fieldname"><a id="af5065f89c50d598913f77f9e6a53c524ad0ef686c2f1efec57dc91359943dad6d" name="af5065f89c50d598913f77f9e6a53c524ad0ef686c2f1efec57dc91359943dad6d"></a>LoopWakeUp&#160;</td><td class="fielddoc"><p >Request is an <a class="el" href="struct_s_c_1_1_async_loop_wake_up.html" title="Starts a wake-up operation, allowing threads to execute callbacks on loop thread.">AsyncLoopWakeUp</a> object. </p>
 </td></tr>
-<tr><td class="fieldname"><a id="af5065f89c50d598913f77f9e6a53c524aa3f077cb262fbabb3168de84317d1ec5" name="af5065f89c50d598913f77f9e6a53c524aa3f077cb262fbabb3168de84317d1ec5"></a>ProcessExit&#160;</td><td class="fielddoc"><p >Request is an <a class="el" href="struct_s_c_1_1_async_process_exit.html" title="Starts a process exit notification request, so that when process is exited the callback will be calle...">AsyncProcessExit</a> object. </p>
+<tr><td class="fieldname"><a id="af5065f89c50d598913f77f9e6a53c524aa3f077cb262fbabb3168de84317d1ec5" name="af5065f89c50d598913f77f9e6a53c524aa3f077cb262fbabb3168de84317d1ec5"></a>ProcessExit&#160;</td><td class="fielddoc"><p >Request is an <a class="el" href="struct_s_c_1_1_async_process_exit.html" title="Starts monitoring a process, notifying about its termination.">AsyncProcessExit</a> object. </p>
 </td></tr>
 <tr><td class="fieldname"><a id="af5065f89c50d598913f77f9e6a53c524a67023dca17a49d1311fb32963581b66f" name="af5065f89c50d598913f77f9e6a53c524a67023dca17a49d1311fb32963581b66f"></a>SocketAccept&#160;</td><td class="fielddoc"><p >Request is an <a class="el" href="struct_s_c_1_1_async_socket_accept.html" title="Starts a socket accept operation, obtaining a new socket from a listening socket.">AsyncSocketAccept</a> object. </p>
 </td></tr>
@@ -297,9 +300,9 @@ If the function returns an invalid Return code or if the operation is manually c
 </td></tr>
 <tr><td class="fieldname"><a id="af5065f89c50d598913f77f9e6a53c524ade4927e6e379001e3409112ddfc656d5" name="af5065f89c50d598913f77f9e6a53c524ade4927e6e379001e3409112ddfc656d5"></a>SocketClose&#160;</td><td class="fielddoc"><p >Request is an <a class="el" href="struct_s_c_1_1_async_socket_close.html" title="Starts a socket close operation.">AsyncSocketClose</a> object. </p>
 </td></tr>
-<tr><td class="fieldname"><a id="af5065f89c50d598913f77f9e6a53c524aac986feb3052f4ac59400a84056c3839" name="af5065f89c50d598913f77f9e6a53c524aac986feb3052f4ac59400a84056c3839"></a>FileRead&#160;</td><td class="fielddoc"><p >Request is an <a class="el" href="struct_s_c_1_1_async_file_read.html" title="Starts a file read operation, reading bytes from a file.">AsyncFileRead</a> object. </p>
+<tr><td class="fieldname"><a id="af5065f89c50d598913f77f9e6a53c524aac986feb3052f4ac59400a84056c3839" name="af5065f89c50d598913f77f9e6a53c524aac986feb3052f4ac59400a84056c3839"></a>FileRead&#160;</td><td class="fielddoc"><p >Request is an <a class="el" href="struct_s_c_1_1_async_file_read.html" title="Starts a file read operation, reading bytes from a file (or pipe).">AsyncFileRead</a> object. </p>
 </td></tr>
-<tr><td class="fieldname"><a id="af5065f89c50d598913f77f9e6a53c524a693ed2547c9ef849d2af2c59b0ce818d" name="af5065f89c50d598913f77f9e6a53c524a693ed2547c9ef849d2af2c59b0ce818d"></a>FileWrite&#160;</td><td class="fielddoc"><p >Request is an <a class="el" href="struct_s_c_1_1_async_file_write.html" title="Starts a file write operation, writing bytes to a file.">AsyncFileWrite</a> object. </p>
+<tr><td class="fieldname"><a id="af5065f89c50d598913f77f9e6a53c524a693ed2547c9ef849d2af2c59b0ce818d" name="af5065f89c50d598913f77f9e6a53c524a693ed2547c9ef849d2af2c59b0ce818d"></a>FileWrite&#160;</td><td class="fielddoc"><p >Request is an <a class="el" href="struct_s_c_1_1_async_file_write.html" title="Starts a file write operation, writing bytes to a file (or pipe).">AsyncFileWrite</a> object. </p>
 </td></tr>
 <tr><td class="fieldname"><a id="af5065f89c50d598913f77f9e6a53c524a0865974fc9fb115095eddadbb838f30e" name="af5065f89c50d598913f77f9e6a53c524a0865974fc9fb115095eddadbb838f30e"></a>FileClose&#160;</td><td class="fielddoc"><p >Request is an <a class="el" href="struct_s_c_1_1_async_file_close.html" title="Starts a file close operation, closing the OS file descriptor.">AsyncFileClose</a> object. </p>
 </td></tr>

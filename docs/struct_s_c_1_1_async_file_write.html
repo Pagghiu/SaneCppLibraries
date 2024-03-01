@@ -112,6 +112,7 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_async_file_write.html',
 <div class="header">
   <div class="summary">
 <a href="#nested-classes">Classes</a> &#124;
+<a href="#pub-types">Public Types</a> &#124;
 <a href="#pub-methods">Public Member Functions</a> &#124;
 <a href="#pub-attribs">Public Attributes</a> &#124;
 <a href="#friends">Friends</a> &#124;
@@ -120,7 +121,7 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_async_file_write.html',
 </div><!--header-->
 <div class="contents">
 
-<p>Starts a file write operation, writing bytes to a file.  
+<p>Starts a file write operation, writing bytes to a file (or pipe).  
  <a href="struct_s_c_1_1_async_file_write.html#details">More...</a></p>
 
 <p><code>#include &lt;<a class="el" href="_async_8h_source.html">Async.h</a>&gt;</code></p>
@@ -136,15 +137,53 @@ Inheritance diagram for SC::AsyncFileWrite:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="nested-classes" name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_file_write_1_1_result.html">Result</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Callback result for <a class="el" href="struct_s_c_1_1_async_file_write.html" title="Starts a file write operation, writing bytes to a file.">AsyncFileWrite</a>.  <a href="struct_s_c_1_1_async_file_write_1_1_result.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_file_write_1_1_completion_data.html">CompletionData</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Completion data for <a class="el" href="struct_s_c_1_1_async_file_write.html" title="Starts a file write operation, writing bytes to a file (or pipe).">AsyncFileWrite</a>.  <a href="struct_s_c_1_1_async_file_write_1_1_completion_data.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_file_write_1_1_result.html">Result</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Callback result for <a class="el" href="struct_s_c_1_1_async_file_write.html" title="Starts a file write operation, writing bytes to a file (or pipe).">AsyncFileWrite</a>.  <a href="struct_s_c_1_1_async_file_write_1_1_result.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-types" name="pub-types"></a>
+Public Types</h2></td></tr>
+<tr class="memitem:af68a1e2791ea0bbb85a8ca71163118ee"><td class="memItemLeft" align="right" valign="top"><a id="af68a1e2791ea0bbb85a8ca71163118ee" name="af68a1e2791ea0bbb85a8ca71163118ee"></a>
+using&#160;</td><td class="memItemRight" valign="bottom"><b>Task</b> = <a class="el" href="struct_s_c_1_1_async_task_of.html">AsyncTaskOf</a>&lt; <a class="el" href="struct_s_c_1_1_async_file_write.html">AsyncFileWrite</a> &gt;</td></tr>
+<tr class="separator:af68a1e2791ea0bbb85a8ca71163118ee"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="inherit_header pub_types_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pub_types_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Public Types inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
+<tr class="memitem:af5065f89c50d598913f77f9e6a53c524 inherit pub_types_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top">enum class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">Type</a> : uint8_t { <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a71ee59b61aa037f9247d066a7ef7384d">LoopTimeout</a>
+, <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524ad0ef686c2f1efec57dc91359943dad6d">LoopWakeUp</a>
+, <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524aa3f077cb262fbabb3168de84317d1ec5">ProcessExit</a>
+, <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a67023dca17a49d1311fb32963581b66f">SocketAccept</a>
+, <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524ae0abbcdda16ef722717b62fa921473cf">SocketConnect</a>
+, <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a0ee37a3e0ab94c4074507fe2ef896a46">SocketSend</a>
+, <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a15554c7d7411245226ffe818516cae90">SocketReceive</a>
+, <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524ade4927e6e379001e3409112ddfc656d5">SocketClose</a>
+, <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524aac986feb3052f4ac59400a84056c3839">FileRead</a>
+, <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a693ed2547c9ef849d2af2c59b0ce818d">FileWrite</a>
+, <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a0865974fc9fb115095eddadbb838f30e">FileClose</a>
+, <br />
+&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524ac4a4109fa1a034a514a42877cdc156c8">FilePoll</a>
+<br />
+ }</td></tr>
+<tr class="memdesc:af5065f89c50d598913f77f9e6a53c524"><td class="mdescLeft">&#160;</td><td class="mdescRight">Type of async request.  <a href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">More...</a><br /></td></tr>
+<tr class="separator:af5065f89c50d598913f77f9e6a53c524 inherit pub_types_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a1cf7e0f707d437d84e54a5318eaf7033"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">SC::Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_file_write.html#a1cf7e0f707d437d84e54a5318eaf7033">start</a> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;eventLoop, FileDescriptor::Handle fileDescriptor, <a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const char &gt; writeBuffer)</td></tr>
-<tr class="memdesc:a1cf7e0f707d437d84e54a5318eaf7033"><td class="mdescLeft">&#160;</td><td class="mdescRight">Starts a file receive operation, that will return when the file is ready to receive more bytes to write.  <a href="struct_s_c_1_1_async_file_write.html#a1cf7e0f707d437d84e54a5318eaf7033">More...</a><br /></td></tr>
-<tr class="separator:a1cf7e0f707d437d84e54a5318eaf7033"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6a05e75c8dbd9784ab61df2899ebed59"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">SC::Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_file_write.html#a6a05e75c8dbd9784ab61df2899ebed59">start</a> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;eventLoop, FileDescriptor::Handle fileDescriptor, <a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const char &gt; writeBuffer, <a class="el" href="struct_s_c_1_1_async_task_of.html">Task</a> *task=nullptr)</td></tr>
+<tr class="memdesc:a6a05e75c8dbd9784ab61df2899ebed59"><td class="mdescLeft">&#160;</td><td class="mdescRight">Starts a file write operation, signaling when the file (or pipe) is ready to receive more bytes.  <a href="struct_s_c_1_1_async_file_write.html#a6a05e75c8dbd9784ab61df2899ebed59">More...</a><br /></td></tr>
+<tr class="separator:a6a05e75c8dbd9784ab61df2899ebed59"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
 <tr class="memitem:a8f1d866203c63c120045181b0eced844 inherit pub_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="a8f1d866203c63c120045181b0eced844" name="a8f1d866203c63c120045181b0eced844"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>setDebugName</b> (const char *newDebugName)</td></tr>
@@ -183,42 +222,13 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncEventLoop</b><
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="inherited" name="inherited"></a>
 Additional Inherited Members</h2></td></tr>
-<tr class="inherit_header pub_types_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pub_types_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Public Types inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
-<tr class="memitem:af5065f89c50d598913f77f9e6a53c524 inherit pub_types_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top">enum class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">Type</a> : uint8_t { <br />
-&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a71ee59b61aa037f9247d066a7ef7384d">LoopTimeout</a>
-, <br />
-&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524ad0ef686c2f1efec57dc91359943dad6d">LoopWakeUp</a>
-, <br />
-&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524aa3f077cb262fbabb3168de84317d1ec5">ProcessExit</a>
-, <br />
-&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a67023dca17a49d1311fb32963581b66f">SocketAccept</a>
-, <br />
-&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524ae0abbcdda16ef722717b62fa921473cf">SocketConnect</a>
-, <br />
-&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a0ee37a3e0ab94c4074507fe2ef896a46">SocketSend</a>
-, <br />
-&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a15554c7d7411245226ffe818516cae90">SocketReceive</a>
-, <br />
-&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524ade4927e6e379001e3409112ddfc656d5">SocketClose</a>
-, <br />
-&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524aac986feb3052f4ac59400a84056c3839">FileRead</a>
-, <br />
-&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a693ed2547c9ef849d2af2c59b0ce818d">FileWrite</a>
-, <br />
-&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a0865974fc9fb115095eddadbb838f30e">FileClose</a>
-, <br />
-&#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524ac4a4109fa1a034a514a42877cdc156c8">FilePoll</a>
-<br />
- }</td></tr>
-<tr class="memdesc:af5065f89c50d598913f77f9e6a53c524"><td class="mdescLeft">&#160;</td><td class="mdescRight">Type of async request.  <a href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">More...</a><br /></td></tr>
-<tr class="separator:af5065f89c50d598913f77f9e6a53c524 inherit pub_types_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pro_methods_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pro_methods_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Protected Member Functions inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
 <tr class="memitem:acba5bc94b35be4c2293b96b8806e7827 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="acba5bc94b35be4c2293b96b8806e7827" name="acba5bc94b35be4c2293b96b8806e7827"></a>
 <a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>validateAsync</b> ()</td></tr>
 <tr class="separator:acba5bc94b35be4c2293b96b8806e7827 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a650360163409a1c3ef0941900d2d0fe9 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="a650360163409a1c3ef0941900d2d0fe9" name="a650360163409a1c3ef0941900d2d0fe9"></a>
-<a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>queueSubmission</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;eventLoop)</td></tr>
-<tr class="separator:a650360163409a1c3ef0941900d2d0fe9 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad244e08093db3f5fd7e7ecf278399ea7 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ad244e08093db3f5fd7e7ecf278399ea7" name="ad244e08093db3f5fd7e7ecf278399ea7"></a>
+<a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>queueSubmission</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;eventLoop, <a class="el" href="struct_s_c_1_1_async_task.html">AsyncTask</a> *task)</td></tr>
+<tr class="separator:ad244e08093db3f5fd7e7ecf278399ea7 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pro_static_methods_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pro_static_methods_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Static Protected Member Functions inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
 <tr class="memitem:ad54c2edb6d65a44fd03885e2a0d1f402 inherit pro_static_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ad54c2edb6d65a44fd03885e2a0d1f402" name="ad54c2edb6d65a44fd03885e2a0d1f402"></a>
 static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;loop)</td></tr>
@@ -227,22 +237,37 @@ static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b>
 <tr class="memitem:a6397be27006b8fdfa51fabd1c3a415f8 inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="a6397be27006b8fdfa51fabd1c3a415f8" name="a6397be27006b8fdfa51fabd1c3a415f8"></a>
 <a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>eventLoop</b> = nullptr</td></tr>
 <tr class="separator:a6397be27006b8fdfa51fabd1c3a415f8 inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae5d524b8ca70e47397eaa4c4c609f6eb inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ae5d524b8ca70e47397eaa4c4c609f6eb" name="ae5d524b8ca70e47397eaa4c4c609f6eb"></a>
+<a class="el" href="struct_s_c_1_1_async_task.html">AsyncTask</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>asyncTask</b> = nullptr</td></tr>
+<tr class="separator:ae5d524b8ca70e47397eaa4c4c609f6eb inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
-<div class="textblock"><p >Starts a file write operation, writing bytes to a file. </p>
+<div class="textblock"><p >Starts a file write operation, writing bytes to a file (or pipe). </p>
 <p >Callback will be called when the file is ready to receive more bytes to write. <br  />
-<a class="el" href="library_file.html">File</a> library can be used to open the file and obtain a file descriptor handle. <br  />
-Make sure to associate the file descriptor with <a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a" title="Associates a File descriptor created externally with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a>.</p>
+ Use the optional <code>Task</code> parameter to execute file read on a background thread for APIs that exhibit blocking behaviour on buffered file I/O (all apis with the exception of <code>io_uring</code>).</p>
+<p ><a class="el" href="library_file.html">File</a> library can be used to open the file and obtain a blocking or non-blocking file descriptor handle. <br  />
+ </p><dl class="section note"><dt>Note</dt><dd>Pipes or files opened using Posix <code>O_DIRECT</code> or Windows <code>FILE_FLAG_WRITE_THROUGH</code> &amp; <code>FILE_FLAG_NO_BUFFERING</code> should instead avoid using the <code>Task</code> parameter for best performance.</dd></dl>
+<p>When not using the <code>Task</code> remember to:</p><ul>
+<li>Open the file descriptor for non-blocking IO (<a class="el" href="struct_s_c_1_1_file_descriptor_1_1_open_options.html#a4c696fe5fdc073f0efc39d47b308264a" title="Set to false if file will be used for Async I/O (see Async)">SC::FileDescriptor::OpenOptions::blocking</a> == <code>false</code>)</li>
+<li>Call <a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a" title="Associates a File descriptor created externally with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a> on the file descriptor</li>
+</ul>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named eventLoop</span></div>
+<div class="line"><span class="comment">// ...</span></div>
+<div class="line"> </div>
+<div class="line"><span class="comment">// Assuming an already created threadPool and a task</span></div>
+<div class="line"><span class="comment">// ...</span></div>
+<div class="line"> </div>
+<div class="line">ThreadPoolTask task;</div>
+<div class="line">ThreadPool threadPool;</div>
+<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(threadPool.create(4));</div>
+<div class="line"> </div>
 <div class="line"><span class="comment">// ...</span></div>
 <div class="line"> </div>
 <div class="line"><span class="comment">// Open the file (for write)</span></div>
 <div class="line">FileDescriptor::OpenOptions options;</div>
-<div class="line">options.async    = <span class="keyword">true</span>;</div>
-<div class="line">options.blocking = <span class="keyword">false</span>;</div>
+<div class="line">options.blocking = <span class="keyword">true</span>; <span class="comment">// When using AsyncFileWrite::Task you can use regular blocking descriptors</span></div>
 <div class="line">FileDescriptor fd;</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(fd.open(<span class="stringliteral">&quot;MyFile.txt&quot;</span>, <a class="code hl_enumvalue" href="struct_s_c_1_1_file_descriptor.html#a777f74a69b78c2d0c79faa17ae268725a84c772a43b02841758d4ea78e88d712d">FileDescriptor::WriteCreateTruncate</a>, options));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(eventLoop.<a class="code hl_function" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a">associateExternallyCreatedFileDescriptor</a>(fd));</div>
 <div class="line"><span class="keyword">auto</span> writeSpan = StringView(<span class="stringliteral">&quot;test&quot;</span>).toCharSpan();</div>
 <div class="line">FileDescriptor::Handle handle;</div>
 <div class="line"><span class="comment">// Obtain file descriptor handle</span></div>
@@ -250,22 +275,22 @@ Make sure to associate the file descriptor with <a class="el" href="struct_s_c_1
 <div class="line"> </div>
 <div class="line"><span class="comment">// Create the async file write request</span></div>
 <div class="line">AsyncFileWrite asyncWriteFile;</div>
+<div class="line">AsyncFileWrite::Task asyncFileTask{threadPool, task};</div>
 <div class="line">asyncWriteFile.callback = [&amp;](AsyncFileWrite::Result&amp; res)</div>
 <div class="line">{</div>
 <div class="line">    <span class="keywordtype">size_t</span> writtenBytes = 0;</div>
-<div class="line">    <span class="keywordflow">if</span>(res.moveTo(writtenBytes))</div>
+<div class="line">    <span class="keywordflow">if</span>(res.get(writtenBytes))</div>
 <div class="line">    {</div>
 <div class="line">        console.print(<span class="stringliteral">&quot;{} bytes have been written&quot;</span>, writtenBytes);</div>
 <div class="line">    }</div>
 <div class="line">};</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(asyncWriteFile.start(eventLoop, handle, writeSpan));</div>
+<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(asyncWriteFile.start(eventLoop, handle, writeSpan, &amp;asyncFileTask));</div>
 <div class="ttc" id="agroup__group__foundation__utility_html_gae6b0d665676a4a5eedc2ad69693c04ee"><div class="ttname"><a href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a></div><div class="ttdeci">#define SC_TRY(expression)</div><div class="ttdoc">Checks the value of the given expression and if failed, returns this value to caller.</div><div class="ttdef"><b>Definition:</b> Result.h:47</div></div>
-<div class="ttc" id="astruct_s_c_1_1_async_event_loop_html_a10f7a7f846c5879a2ad6c66e77e1d56a"><div class="ttname"><a href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a></div><div class="ttdeci">Result associateExternallyCreatedFileDescriptor(FileDescriptor &amp;outDescriptor)</div><div class="ttdoc">Associates a File descriptor created externally with the eventLoop.</div></div>
 <div class="ttc" id="astruct_s_c_1_1_file_descriptor_html_a777f74a69b78c2d0c79faa17ae268725a84c772a43b02841758d4ea78e88d712d"><div class="ttname"><a href="struct_s_c_1_1_file_descriptor.html#a777f74a69b78c2d0c79faa17ae268725a84c772a43b02841758d4ea78e88d712d">SC::FileDescriptor::WriteCreateTruncate</a></div><div class="ttdeci">@ WriteCreateTruncate</div><div class="ttdoc">Opens in write mode, creating or truncating it if another file exists at same location.</div><div class="ttdef"><b>Definition:</b> FileDescriptor.h:63</div></div>
 <div class="ttc" id="astruct_s_c_1_1_result_html_a0ff6a228693a2c757223ff7137e1abad"><div class="ttname"><a href="struct_s_c_1_1_result.html#a0ff6a228693a2c757223ff7137e1abad">SC::Result::Error</a></div><div class="ttdeci">static constexpr Result Error(const char(&amp;msg)[numChars])</div><div class="ttdoc">Constructs an Error from a pointer to an ASCII string literal.</div><div class="ttdef"><b>Definition:</b> Result.h:23</div></div>
 </div><!-- fragment --> </div><h2 class="groupheader">Member Function Documentation</h2>
-<a id="a1cf7e0f707d437d84e54a5318eaf7033" name="a1cf7e0f707d437d84e54a5318eaf7033"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1cf7e0f707d437d84e54a5318eaf7033">&#9670;&nbsp;</a></span>start()</h2>
+<a id="a6a05e75c8dbd9784ab61df2899ebed59" name="a6a05e75c8dbd9784ab61df2899ebed59"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6a05e75c8dbd9784ab61df2899ebed59">&#9670;&nbsp;</a></span>start()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -286,7 +311,13 @@ Make sure to associate the file descriptor with <a class="el" href="struct_s_c_1
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype"><a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const char &gt;&#160;</td>
-          <td class="paramname"><em>writeBuffer</em>&#160;</td>
+          <td class="paramname"><em>writeBuffer</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_async_task_of.html">Task</a> *&#160;</td>
+          <td class="paramname"><em>task</em> = <code>nullptr</code>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -296,7 +327,16 @@ Make sure to associate the file descriptor with <a class="el" href="struct_s_c_1
       </table>
 </div><div class="memdoc">
 
-<p>Starts a file receive operation, that will return when the file is ready to receive more bytes to write. </p>
+<p>Starts a file write operation, signaling when the file (or pipe) is ready to receive more bytes. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">eventLoop</td><td>The EventLoop to run this operation on </td></tr>
+    <tr><td class="paramname">fileDescriptor</td><td>The file descriptor (file or pipe) to write data to (use <a class="el" href="struct_s_c_1_1_file_descriptor.html" title="Wraps an OS File descriptor to read and write to and from it.">SC::FileDescriptor</a> or <a class="el" href="struct_s_c_1_1_pipe_descriptor.html" title="Descriptor representing a Pipe used for InterProcess Communication (IPC)">SC::PipeDescriptor</a> to open it, with SC::FileDescriptorOpenOptions::blocking == false) </td></tr>
+    <tr><td class="paramname">writeBuffer</td><td>The read-only span of memory where to read the data from. </td></tr>
+    <tr><td class="paramname">task</td><td>The task allows running operation on background thread. It's useful for any file not opened for direct IO (<code>O_DIRECT</code> / <code>FILE_FLAG_WRITE_THROUGH</code> &amp; <code>FILE_FLAG_NO_BUFFERING</code>). This task will not be used on the <code>io_uring</code> backend, because that API allows proper async file read/writes. If this is set to <code>nullptr</code> you will have to call <a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a" title="Associates a File descriptor created externally with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a> on the fileDescriptor passed in. </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>

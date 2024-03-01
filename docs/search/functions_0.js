@@ -35,5 +35,5 @@ var searchData=
   ['associateexternallycreatedfiledescriptor_32',['associateExternallyCreatedFileDescriptor',['../struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a',1,'SC::AsyncEventLoop']]],
   ['associateexternallycreatedtcpsocket_33',['associateExternallyCreatedTCPSocket',['../struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a',1,'SC::AsyncEventLoop']]],
   ['asyncrequest_34',['AsyncRequest',['../struct_s_c_1_1_async_request.html#a0cad8875aba183bd5c3790f7b0b5cb1b',1,'SC::AsyncRequest']]],
-  ['asyncresult_35',['AsyncResult',['../struct_s_c_1_1_async_result.html#a49ed7f96aa2b4dccfb4615800fb59945',1,'SC::AsyncResult']]]
+  ['asyncresult_35',['AsyncResult',['../struct_s_c_1_1_async_result.html#acdd1f16cafe0f64a70878df19aa7420c',1,'SC::AsyncResult::AsyncResult(AsyncRequest &amp;request, SC::Result &amp;&amp;res)'],['../struct_s_c_1_1_async_result.html#a962891fb67611a5e6ee2df33c96e883d',1,'SC::AsyncResult::AsyncResult(AsyncRequest &amp;request)'],['../struct_s_c_1_1_async_result_of.html#acdd1f16cafe0f64a70878df19aa7420c',1,'SC::AsyncResultOf::AsyncResult(AsyncRequest &amp;request, SC::Result &amp;&amp;res)'],['../struct_s_c_1_1_async_result_of.html#a962891fb67611a5e6ee2df33c96e883d',1,'SC::AsyncResultOf::AsyncResult(AsyncRequest &amp;request)']]]
 ];

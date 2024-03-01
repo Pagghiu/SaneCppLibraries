@@ -126,7 +126,7 @@ $(document).ready(function(){initNavTree('library_threading.html',''); initResiz
 <li class="level1"><a href="#autotoc_md240">Roadmap</a></li>
 </ul>
 </div>
-<div class="textblock"><p >🟥 Atomic, thread, mutex, condition variable</p>
+<div class="textblock"><p >🟥 Atomic, thread, thread pool, mutex, condition variable</p>
 <p >Threading is a library defining basic primitives for user-space threading and synchronization.</p>
 <h1><a class="anchor" id="autotoc_md232"></a>
 Features</h1>
@@ -170,7 +170,7 @@ SC::Thread</h2>
 </div><!-- fragment --><dl class="section warning"><dt>Warning</dt><dd>Thread destructor will assert if <a class="el" href="struct_s_c_1_1_thread.html#a7ec0ae5d34ef6821aa884452c17c5046" title="Detaches the thread so that its resources are automatically released back to the system without Threa...">SC::Thread::detach()</a> or <a class="el" href="struct_s_c_1_1_thread.html#aad66dfb65ebdca81f0dea267e7a35c08" title="Waits for thread to finish and releases its resources.">SC::Thread::join()</a> has not been called.</dd></dl>
 <h2><a class="anchor" id="autotoc_md236"></a>
 SC::ThreadPool</h2>
-<p >Simple thread pool that executes tasks in a fixed number of worker threads. This class is not copyable / moveable due to it containing Mutex and Condition variable. Additionally, this class does not allocate any memory by itself, and expects the caller to supply <a class="el" href="struct_s_c_1_1_thread_pool_1_1_task.html" title="A small task containing a function to execute that can be queued in the thread pool.">SC::ThreadPool::Task</a> objects.</p>
+<p >Simple thread pool that executes tasks in a fixed number of worker threads. This class is not copyable / moveable due to it containing Mutex and Condition variable. Additionally, this class does not allocate any memory by itself, and expects the caller to supply SC::ThreadPool::Task objects.</p>
 <dl class="section warning"><dt>Warning</dt><dd>The caller is responsible of keeping Task address stable until the it will be completed. If it's not already completed the task must still be valid during ThreadPool::destroy or ThreadPool destructor.</dd></dl>
 <p>Example: </p><div class="fragment"><div class="line">    <span class="keyword">static</span> <span class="keyword">const</span> <span class="keywordtype">size_t</span> wantedThreads = 4;</div>
 <div class="line">    <span class="keyword">static</span> <span class="keyword">const</span> <span class="keywordtype">size_t</span> numTasks      = 100;</div>
@@ -182,7 +182,7 @@ SC::ThreadPool</h2>
 <div class="line">    <span class="keywordtype">size_t</span> values[numTasks];</div>
 <div class="line"> </div>
 <div class="line">    <span class="comment">// 2. Allocate the wanted number of tasks. Tasks memory should be valid until a task is finished.</span></div>
-<div class="line">    <a class="code hl_struct" href="struct_s_c_1_1_thread_pool_1_1_task.html">SC::ThreadPool::Task</a> tasks[numTasks];</div>
+<div class="line">    <a class="code hl_struct" href="struct_s_c_1_1_thread_pool_task.html">SC::ThreadPool::Task</a> tasks[numTasks];</div>
 <div class="line"> </div>
 <div class="line">    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> idx = 0; idx &lt; numTasks; idx++)</div>
 <div class="line">    {</div>
@@ -190,7 +190,7 @@ SC::ThreadPool</h2>
 <div class="line">        *value        = idx;</div>
 <div class="line"> </div>
 <div class="line">        <span class="comment">// 3. Setup the task function to execute on some random thread</span></div>
-<div class="line">        tasks[idx].<a class="code hl_variable" href="struct_s_c_1_1_thread_pool_1_1_task.html#a37fb1752b9d6d3e814df61a14269140e">function</a> = [value]()</div>
+<div class="line">        tasks[idx].<a class="code hl_variable" href="struct_s_c_1_1_thread_pool_task.html#a072b75678d89c9fd7120c87a6a00a140">function</a> = [value]()</div>
 <div class="line">        {</div>
 <div class="line">            <span class="keywordflow">if</span> (*value % 2)</div>
 <div class="line">            {</div>
@@ -223,14 +223,14 @@ SC::ThreadPool</h2>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(threadPool.<a class="code hl_function" href="struct_s_c_1_1_thread_pool.html#a1627e46fb137380bb55e816c08ce2cb0">destroy</a>());</div>
 <div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:104</div></div>
 <div class="ttc" id="astruct_s_c_1_1_thread_html_a0cfdda4fb8807acedc7f81645cfb512c"><div class="ttname"><a href="struct_s_c_1_1_thread.html#a0cfdda4fb8807acedc7f81645cfb512c">SC::Thread::Sleep</a></div><div class="ttdeci">static void Sleep(uint32_t milliseconds)</div><div class="ttdoc">Puts current thread to sleep.</div></div>
-<div class="ttc" id="astruct_s_c_1_1_thread_pool_1_1_task_html"><div class="ttname"><a href="struct_s_c_1_1_thread_pool_1_1_task.html">SC::ThreadPool::Task</a></div><div class="ttdoc">A small task containing a function to execute that can be queued in the thread pool.</div><div class="ttdef"><b>Definition:</b> ThreadPool.h:32</div></div>
-<div class="ttc" id="astruct_s_c_1_1_thread_pool_1_1_task_html_a37fb1752b9d6d3e814df61a14269140e"><div class="ttname"><a href="struct_s_c_1_1_thread_pool_1_1_task.html#a37fb1752b9d6d3e814df61a14269140e">SC::ThreadPool::Task::function</a></div><div class="ttdeci">Function&lt; void()&gt; function</div><div class="ttdoc">Function that will be executed during the task.</div><div class="ttdef"><b>Definition:</b> ThreadPool.h:33</div></div>
-<div class="ttc" id="astruct_s_c_1_1_thread_pool_html"><div class="ttname"><a href="struct_s_c_1_1_thread_pool.html">SC::ThreadPool</a></div><div class="ttdoc">Simple thread pool that executes tasks in a fixed number of worker threads.</div><div class="ttdef"><b>Definition:</b> ThreadPool.h:27</div></div>
+<div class="ttc" id="astruct_s_c_1_1_thread_pool_html"><div class="ttname"><a href="struct_s_c_1_1_thread_pool.html">SC::ThreadPool</a></div><div class="ttdoc">Simple thread pool that executes tasks in a fixed number of worker threads.</div><div class="ttdef"><b>Definition:</b> ThreadPool.h:41</div></div>
 <div class="ttc" id="astruct_s_c_1_1_thread_pool_html_a1627e46fb137380bb55e816c08ce2cb0"><div class="ttname"><a href="struct_s_c_1_1_thread_pool.html#a1627e46fb137380bb55e816c08ce2cb0">SC::ThreadPool::destroy</a></div><div class="ttdeci">Result destroy()</div><div class="ttdoc">Destroy the thread pool created previously with ThreadPool::create.</div></div>
 <div class="ttc" id="astruct_s_c_1_1_thread_pool_html_aaf653d678170723e58062fe5a8c6e3fd"><div class="ttname"><a href="struct_s_c_1_1_thread_pool.html#aaf653d678170723e58062fe5a8c6e3fd">SC::ThreadPool::queueTask</a></div><div class="ttdeci">Result queueTask(Task &amp;task)</div><div class="ttdoc">Queue a task (that should not be already in use)</div></div>
 <div class="ttc" id="astruct_s_c_1_1_thread_pool_html_abe38d572aa49547a745591820fb0973e"><div class="ttname"><a href="struct_s_c_1_1_thread_pool.html#abe38d572aa49547a745591820fb0973e">SC::ThreadPool::waitForTask</a></div><div class="ttdeci">Result waitForTask(Task &amp;task)</div><div class="ttdoc">Blocks execution until all queued and pending tasks will be fully completed.</div></div>
 <div class="ttc" id="astruct_s_c_1_1_thread_pool_html_ac4d16bfc16be6192930cb1609b50eedc"><div class="ttname"><a href="struct_s_c_1_1_thread_pool.html#ac4d16bfc16be6192930cb1609b50eedc">SC::ThreadPool::create</a></div><div class="ttdeci">Result create(size_t workerThreads)</div><div class="ttdoc">Create a thread pool with the requested number of worker threads.</div></div>
 <div class="ttc" id="astruct_s_c_1_1_thread_pool_html_af47fc96560293a054580e8290f08e410"><div class="ttname"><a href="struct_s_c_1_1_thread_pool.html#af47fc96560293a054580e8290f08e410">SC::ThreadPool::waitForAllTasks</a></div><div class="ttdeci">Result waitForAllTasks()</div><div class="ttdoc">Blocks execution until all queued and pending tasks will be fully completed.</div></div>
+<div class="ttc" id="astruct_s_c_1_1_thread_pool_task_html"><div class="ttname"><a href="struct_s_c_1_1_thread_pool_task.html">SC::ThreadPoolTask</a></div><div class="ttdoc">A small task containing a function to execute that can be queued in the thread pool.</div><div class="ttdef"><b>Definition:</b> ThreadPool.h:19</div></div>
+<div class="ttc" id="astruct_s_c_1_1_thread_pool_task_html_a072b75678d89c9fd7120c87a6a00a140"><div class="ttname"><a href="struct_s_c_1_1_thread_pool_task.html#a072b75678d89c9fd7120c87a6a00a140">SC::ThreadPoolTask::function</a></div><div class="ttdeci">Function&lt; void()&gt; function</div><div class="ttdoc">Function that will be executed during the task.</div><div class="ttdef"><b>Definition:</b> ThreadPool.h:21</div></div>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md237"></a>
 SC::Mutex</h2>
 <p >A native OS mutex to synchronize access to shared resources. Example: </p><div class="fragment"><div class="line">    Mutex  mutex;</div>

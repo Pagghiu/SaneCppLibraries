@@ -111,7 +111,7 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_thread_pool.html',''); 
 
 <div class="header">
   <div class="summary">
-<a href="#nested-classes">Classes</a> &#124;
+<a href="#pub-types">Public Types</a> &#124;
 <a href="#pub-methods">Public Member Functions</a> &#124;
 <a href="struct_s_c_1_1_thread_pool-members.html">List of all members</a>  </div>
   <div class="headertitle"><div class="title">SC::ThreadPool Struct Reference<div class="ingroups"><a class="el" href="group__group__threading.html">Threading</a></div></div></div>
@@ -123,11 +123,11 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_thread_pool.html',''); 
 
 <p><code>#include &lt;<a class="el" href="_thread_pool_8h_source.html">ThreadPool.h</a>&gt;</code></p>
 <table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="nested-classes" name="nested-classes"></a>
-Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_thread_pool_1_1_task.html">Task</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A small task containing a function to execute that can be queued in the thread pool.  <a href="struct_s_c_1_1_thread_pool_1_1_task.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-types" name="pub-types"></a>
+Public Types</h2></td></tr>
+<tr class="memitem:a0ecb43527bdbb2de6bb778609798334b"><td class="memItemLeft" align="right" valign="top"><a id="a0ecb43527bdbb2de6bb778609798334b" name="a0ecb43527bdbb2de6bb778609798334b"></a>
+using&#160;</td><td class="memItemRight" valign="bottom"><b>Task</b> = <a class="el" href="struct_s_c_1_1_thread_pool_task.html">ThreadPoolTask</a></td></tr>
+<tr class="separator:a0ecb43527bdbb2de6bb778609798334b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
@@ -137,20 +137,20 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a1627e46fb137380bb55e816c08ce2cb0"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_thread_pool.html#a1627e46fb137380bb55e816c08ce2cb0">destroy</a> ()</td></tr>
 <tr class="memdesc:a1627e46fb137380bb55e816c08ce2cb0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Destroy the thread pool created previously with <a class="el" href="struct_s_c_1_1_thread_pool.html#ac4d16bfc16be6192930cb1609b50eedc" title="Create a thread pool with the requested number of worker threads.">ThreadPool::create</a>.  <a href="struct_s_c_1_1_thread_pool.html#a1627e46fb137380bb55e816c08ce2cb0">More...</a><br /></td></tr>
 <tr class="separator:a1627e46fb137380bb55e816c08ce2cb0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aaf653d678170723e58062fe5a8c6e3fd"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_thread_pool.html#aaf653d678170723e58062fe5a8c6e3fd">queueTask</a> (<a class="el" href="struct_s_c_1_1_thread_pool_1_1_task.html">Task</a> &amp;task)</td></tr>
+<tr class="memitem:aaf653d678170723e58062fe5a8c6e3fd"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_thread_pool.html#aaf653d678170723e58062fe5a8c6e3fd">queueTask</a> (<a class="el" href="struct_s_c_1_1_thread_pool_task.html">Task</a> &amp;task)</td></tr>
 <tr class="memdesc:aaf653d678170723e58062fe5a8c6e3fd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Queue a task (that should not be already in use)  <a href="struct_s_c_1_1_thread_pool.html#aaf653d678170723e58062fe5a8c6e3fd">More...</a><br /></td></tr>
 <tr class="separator:aaf653d678170723e58062fe5a8c6e3fd"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af47fc96560293a054580e8290f08e410"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_thread_pool.html#af47fc96560293a054580e8290f08e410">waitForAllTasks</a> ()</td></tr>
 <tr class="memdesc:af47fc96560293a054580e8290f08e410"><td class="mdescLeft">&#160;</td><td class="mdescRight">Blocks execution until all queued and pending tasks will be fully completed.  <a href="struct_s_c_1_1_thread_pool.html#af47fc96560293a054580e8290f08e410">More...</a><br /></td></tr>
 <tr class="separator:af47fc96560293a054580e8290f08e410"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:abe38d572aa49547a745591820fb0973e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_thread_pool.html#abe38d572aa49547a745591820fb0973e">waitForTask</a> (<a class="el" href="struct_s_c_1_1_thread_pool_1_1_task.html">Task</a> &amp;task)</td></tr>
+<tr class="memitem:abe38d572aa49547a745591820fb0973e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_thread_pool.html#abe38d572aa49547a745591820fb0973e">waitForTask</a> (<a class="el" href="struct_s_c_1_1_thread_pool_task.html">Task</a> &amp;task)</td></tr>
 <tr class="memdesc:abe38d572aa49547a745591820fb0973e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Blocks execution until all queued and pending tasks will be fully completed.  <a href="struct_s_c_1_1_thread_pool.html#abe38d572aa49547a745591820fb0973e">More...</a><br /></td></tr>
 <tr class="separator:abe38d572aa49547a745591820fb0973e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p >Simple thread pool that executes tasks in a fixed number of worker threads. </p>
-<p >This class is not copyable / moveable due to it containing <a class="el" href="struct_s_c_1_1_mutex.html" title="A native OS mutex to synchronize access to shared resources.">Mutex</a> and Condition variable. Additionally, this class does not allocate any memory by itself, and expects the caller to supply <a class="el" href="struct_s_c_1_1_thread_pool_1_1_task.html" title="A small task containing a function to execute that can be queued in the thread pool.">SC::ThreadPool::Task</a> objects.</p>
-<dl class="section warning"><dt>Warning</dt><dd>The caller is responsible of keeping <a class="el" href="struct_s_c_1_1_thread_pool_1_1_task.html" title="A small task containing a function to execute that can be queued in the thread pool.">Task</a> address stable until the it will be completed. If it's not already completed the task must still be valid during <a class="el" href="struct_s_c_1_1_thread_pool.html#a1627e46fb137380bb55e816c08ce2cb0" title="Destroy the thread pool created previously with ThreadPool::create.">ThreadPool::destroy</a> or <a class="el" href="struct_s_c_1_1_thread_pool.html" title="Simple thread pool that executes tasks in a fixed number of worker threads.">ThreadPool</a> destructor.</dd></dl>
+<p >This class is not copyable / moveable due to it containing <a class="el" href="struct_s_c_1_1_mutex.html" title="A native OS mutex to synchronize access to shared resources.">Mutex</a> and Condition variable. Additionally, this class does not allocate any memory by itself, and expects the caller to supply SC::ThreadPool::Task objects.</p>
+<dl class="section warning"><dt>Warning</dt><dd>The caller is responsible of keeping Task address stable until the it will be completed. If it's not already completed the task must still be valid during <a class="el" href="struct_s_c_1_1_thread_pool.html#a1627e46fb137380bb55e816c08ce2cb0" title="Destroy the thread pool created previously with ThreadPool::create.">ThreadPool::destroy</a> or <a class="el" href="struct_s_c_1_1_thread_pool.html" title="Simple thread pool that executes tasks in a fixed number of worker threads.">ThreadPool</a> destructor.</dd></dl>
 <p>Example: </p><div class="fragment"><div class="line">    <span class="keyword">static</span> <span class="keyword">const</span> <span class="keywordtype">size_t</span> wantedThreads = 4;</div>
 <div class="line">    <span class="keyword">static</span> <span class="keyword">const</span> <span class="keywordtype">size_t</span> numTasks      = 100;</div>
 <div class="line"> </div>
@@ -161,7 +161,7 @@ Public Member Functions</h2></td></tr>
 <div class="line">    <span class="keywordtype">size_t</span> values[numTasks];</div>
 <div class="line"> </div>
 <div class="line">    <span class="comment">// 2. Allocate the wanted number of tasks. Tasks memory should be valid until a task is finished.</span></div>
-<div class="line">    <a class="code hl_struct" href="struct_s_c_1_1_thread_pool_1_1_task.html">SC::ThreadPool::Task</a> tasks[numTasks];</div>
+<div class="line">    <a class="code hl_struct" href="struct_s_c_1_1_thread_pool_task.html">SC::ThreadPool::Task</a> tasks[numTasks];</div>
 <div class="line"> </div>
 <div class="line">    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> idx = 0; idx &lt; numTasks; idx++)</div>
 <div class="line">    {</div>
@@ -169,7 +169,7 @@ Public Member Functions</h2></td></tr>
 <div class="line">        *value        = idx;</div>
 <div class="line"> </div>
 <div class="line">        <span class="comment">// 3. Setup the task function to execute on some random thread</span></div>
-<div class="line">        tasks[idx].<a class="code hl_variable" href="struct_s_c_1_1_thread_pool_1_1_task.html#a37fb1752b9d6d3e814df61a14269140e">function</a> = [value]()</div>
+<div class="line">        tasks[idx].<a class="code hl_variable" href="struct_s_c_1_1_thread_pool_task.html#a072b75678d89c9fd7120c87a6a00a140">function</a> = [value]()</div>
 <div class="line">        {</div>
 <div class="line">            <span class="keywordflow">if</span> (*value % 2)</div>
 <div class="line">            {</div>
@@ -202,14 +202,14 @@ Public Member Functions</h2></td></tr>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(threadPool.<a class="code hl_function" href="struct_s_c_1_1_thread_pool.html#a1627e46fb137380bb55e816c08ce2cb0">destroy</a>());</div>
 <div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:104</div></div>
 <div class="ttc" id="astruct_s_c_1_1_thread_html_a0cfdda4fb8807acedc7f81645cfb512c"><div class="ttname"><a href="struct_s_c_1_1_thread.html#a0cfdda4fb8807acedc7f81645cfb512c">SC::Thread::Sleep</a></div><div class="ttdeci">static void Sleep(uint32_t milliseconds)</div><div class="ttdoc">Puts current thread to sleep.</div></div>
-<div class="ttc" id="astruct_s_c_1_1_thread_pool_1_1_task_html"><div class="ttname"><a href="struct_s_c_1_1_thread_pool_1_1_task.html">SC::ThreadPool::Task</a></div><div class="ttdoc">A small task containing a function to execute that can be queued in the thread pool.</div><div class="ttdef"><b>Definition:</b> ThreadPool.h:32</div></div>
-<div class="ttc" id="astruct_s_c_1_1_thread_pool_1_1_task_html_a37fb1752b9d6d3e814df61a14269140e"><div class="ttname"><a href="struct_s_c_1_1_thread_pool_1_1_task.html#a37fb1752b9d6d3e814df61a14269140e">SC::ThreadPool::Task::function</a></div><div class="ttdeci">Function&lt; void()&gt; function</div><div class="ttdoc">Function that will be executed during the task.</div><div class="ttdef"><b>Definition:</b> ThreadPool.h:33</div></div>
-<div class="ttc" id="astruct_s_c_1_1_thread_pool_html"><div class="ttname"><a href="struct_s_c_1_1_thread_pool.html">SC::ThreadPool</a></div><div class="ttdoc">Simple thread pool that executes tasks in a fixed number of worker threads.</div><div class="ttdef"><b>Definition:</b> ThreadPool.h:27</div></div>
+<div class="ttc" id="astruct_s_c_1_1_thread_pool_html"><div class="ttname"><a href="struct_s_c_1_1_thread_pool.html">SC::ThreadPool</a></div><div class="ttdoc">Simple thread pool that executes tasks in a fixed number of worker threads.</div><div class="ttdef"><b>Definition:</b> ThreadPool.h:41</div></div>
 <div class="ttc" id="astruct_s_c_1_1_thread_pool_html_a1627e46fb137380bb55e816c08ce2cb0"><div class="ttname"><a href="struct_s_c_1_1_thread_pool.html#a1627e46fb137380bb55e816c08ce2cb0">SC::ThreadPool::destroy</a></div><div class="ttdeci">Result destroy()</div><div class="ttdoc">Destroy the thread pool created previously with ThreadPool::create.</div></div>
 <div class="ttc" id="astruct_s_c_1_1_thread_pool_html_aaf653d678170723e58062fe5a8c6e3fd"><div class="ttname"><a href="struct_s_c_1_1_thread_pool.html#aaf653d678170723e58062fe5a8c6e3fd">SC::ThreadPool::queueTask</a></div><div class="ttdeci">Result queueTask(Task &amp;task)</div><div class="ttdoc">Queue a task (that should not be already in use)</div></div>
 <div class="ttc" id="astruct_s_c_1_1_thread_pool_html_abe38d572aa49547a745591820fb0973e"><div class="ttname"><a href="struct_s_c_1_1_thread_pool.html#abe38d572aa49547a745591820fb0973e">SC::ThreadPool::waitForTask</a></div><div class="ttdeci">Result waitForTask(Task &amp;task)</div><div class="ttdoc">Blocks execution until all queued and pending tasks will be fully completed.</div></div>
 <div class="ttc" id="astruct_s_c_1_1_thread_pool_html_ac4d16bfc16be6192930cb1609b50eedc"><div class="ttname"><a href="struct_s_c_1_1_thread_pool.html#ac4d16bfc16be6192930cb1609b50eedc">SC::ThreadPool::create</a></div><div class="ttdeci">Result create(size_t workerThreads)</div><div class="ttdoc">Create a thread pool with the requested number of worker threads.</div></div>
 <div class="ttc" id="astruct_s_c_1_1_thread_pool_html_af47fc96560293a054580e8290f08e410"><div class="ttname"><a href="struct_s_c_1_1_thread_pool.html#af47fc96560293a054580e8290f08e410">SC::ThreadPool::waitForAllTasks</a></div><div class="ttdeci">Result waitForAllTasks()</div><div class="ttdoc">Blocks execution until all queued and pending tasks will be fully completed.</div></div>
+<div class="ttc" id="astruct_s_c_1_1_thread_pool_task_html"><div class="ttname"><a href="struct_s_c_1_1_thread_pool_task.html">SC::ThreadPoolTask</a></div><div class="ttdoc">A small task containing a function to execute that can be queued in the thread pool.</div><div class="ttdef"><b>Definition:</b> ThreadPool.h:19</div></div>
+<div class="ttc" id="astruct_s_c_1_1_thread_pool_task_html_a072b75678d89c9fd7120c87a6a00a140"><div class="ttname"><a href="struct_s_c_1_1_thread_pool_task.html#a072b75678d89c9fd7120c87a6a00a140">SC::ThreadPoolTask::function</a></div><div class="ttdeci">Function&lt; void()&gt; function</div><div class="ttdoc">Function that will be executed during the task.</div><div class="ttdef"><b>Definition:</b> ThreadPool.h:21</div></div>
 </div><!-- fragment --> </div><h2 class="groupheader">Member Function Documentation</h2>
 <a id="ac4d16bfc16be6192930cb1609b50eedc" name="ac4d16bfc16be6192930cb1609b50eedc"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ac4d16bfc16be6192930cb1609b50eedc">&#9670;&nbsp;</a></span>create()</h2>
@@ -260,7 +260,7 @@ Public Member Functions</h2></td></tr>
         <tr>
           <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">Result</a> SC::ThreadPool::queueTask </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="struct_s_c_1_1_thread_pool_1_1_task.html">Task</a> &amp;&#160;</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_thread_pool_task.html">Task</a> &amp;&#160;</td>
           <td class="paramname"><em>task</em></td><td>)</td>
           <td></td>
         </tr>
@@ -299,7 +299,7 @@ Public Member Functions</h2></td></tr>
         <tr>
           <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">Result</a> SC::ThreadPool::waitForTask </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="struct_s_c_1_1_thread_pool_1_1_task.html">Task</a> &amp;&#160;</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_thread_pool_task.html">Task</a> &amp;&#160;</td>
           <td class="paramname"><em>task</em></td><td>)</td>
           <td></td>
         </tr>

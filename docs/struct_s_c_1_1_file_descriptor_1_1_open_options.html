@@ -125,34 +125,15 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_file_descriptor_1_1_ope
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
 <tr class="memitem:ac7b9e9aea8742d7d1d659e0003a22300"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_descriptor_1_1_open_options.html#ac7b9e9aea8742d7d1d659e0003a22300">inheritable</a> = false</td></tr>
-<tr class="memdesc:ac7b9e9aea8742d7d1d659e0003a22300"><td class="mdescLeft">&#160;</td><td class="mdescRight">Specify if file will be visible to child processes.  <a href="struct_s_c_1_1_file_descriptor_1_1_open_options.html#ac7b9e9aea8742d7d1d659e0003a22300">More...</a><br /></td></tr>
+<tr class="memdesc:ac7b9e9aea8742d7d1d659e0003a22300"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set to true to make the file visible to child processes.  <a href="struct_s_c_1_1_file_descriptor_1_1_open_options.html#ac7b9e9aea8742d7d1d659e0003a22300">More...</a><br /></td></tr>
 <tr class="separator:ac7b9e9aea8742d7d1d659e0003a22300"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4c696fe5fdc073f0efc39d47b308264a"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_descriptor_1_1_open_options.html#a4c696fe5fdc073f0efc39d47b308264a">blocking</a> = true</td></tr>
-<tr class="memdesc:a4c696fe5fdc073f0efc39d47b308264a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Specify if reads or writes to file should be blocking for IO until done.  <a href="struct_s_c_1_1_file_descriptor_1_1_open_options.html#a4c696fe5fdc073f0efc39d47b308264a">More...</a><br /></td></tr>
+<tr class="memdesc:a4c696fe5fdc073f0efc39d47b308264a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set to false if file will be used for Async I/O (see <a class="el" href="library_async.html">Async</a>)  <a href="struct_s_c_1_1_file_descriptor_1_1_open_options.html#a4c696fe5fdc073f0efc39d47b308264a">More...</a><br /></td></tr>
 <tr class="separator:a4c696fe5fdc073f0efc39d47b308264a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8d05b6ea3a1ba8bbfef8bd9859a9c297"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_descriptor_1_1_open_options.html#a8d05b6ea3a1ba8bbfef8bd9859a9c297">async</a> = false</td></tr>
-<tr class="memdesc:a8d05b6ea3a1ba8bbfef8bd9859a9c297"><td class="mdescLeft">&#160;</td><td class="mdescRight">Specify if file will be used for Async I/O (see <a class="el" href="library_async.html">Async</a>)  <a href="struct_s_c_1_1_file_descriptor_1_1_open_options.html#a8d05b6ea3a1ba8bbfef8bd9859a9c297">More...</a><br /></td></tr>
-<tr class="separator:a8d05b6ea3a1ba8bbfef8bd9859a9c297"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p >Additional flags to be set when opening files. </p>
 </div><h2 class="groupheader">Member Data Documentation</h2>
-<a id="a8d05b6ea3a1ba8bbfef8bd9859a9c297" name="a8d05b6ea3a1ba8bbfef8bd9859a9c297"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a8d05b6ea3a1ba8bbfef8bd9859a9c297">&#9670;&nbsp;</a></span>async</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">bool SC::FileDescriptor::OpenOptions::async = false</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Specify if file will be used for Async I/O (see <a class="el" href="library_async.html">Async</a>) </p>
-
-</div>
-</div>
 <a id="a4c696fe5fdc073f0efc39d47b308264a" name="a4c696fe5fdc073f0efc39d47b308264a"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a4c696fe5fdc073f0efc39d47b308264a">&#9670;&nbsp;</a></span>blocking</h2>
 
@@ -165,7 +146,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Specify if reads or writes to file should be blocking for IO until done. </p>
+<p>Set to false if file will be used for Async I/O (see <a class="el" href="library_async.html">Async</a>) </p>
 
 </div>
 </div>
@@ -181,7 +162,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Specify if file will be visible to child processes. </p>
+<p>Set to true to make the file visible to child processes. </p>
 
 </div>
 </div>

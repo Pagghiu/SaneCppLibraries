@@ -136,9 +136,12 @@ Inheritance diagram for SC::AsyncFilePoll:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-types" name="pub-types"></a>
 Public Types</h2></td></tr>
-<tr class="memitem:a2700c35fda49bed7a2473c743e8ad701"><td class="memItemLeft" align="right" valign="top"><a id="a2700c35fda49bed7a2473c743e8ad701" name="a2700c35fda49bed7a2473c743e8ad701"></a>
-using&#160;</td><td class="memItemRight" valign="bottom"><b>Result</b> = <a class="el" href="struct_s_c_1_1_async_result_of.html">AsyncResultOf</a>&lt; <a class="el" href="struct_s_c_1_1_async_file_poll.html">AsyncFilePoll</a> &gt;</td></tr>
-<tr class="separator:a2700c35fda49bed7a2473c743e8ad701"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab9898773412087c200bc75b9b6332a60"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_file_poll.html#ab9898773412087c200bc75b9b6332a60">CompletionData</a> = <a class="el" href="struct_s_c_1_1_async_completion_data.html">AsyncCompletionData</a></td></tr>
+<tr class="memdesc:ab9898773412087c200bc75b9b6332a60"><td class="mdescLeft">&#160;</td><td class="mdescRight">Completion data for <a class="el" href="struct_s_c_1_1_async_file_poll.html" title="Starts an handle polling operation.">AsyncFilePoll</a>.  <a href="struct_s_c_1_1_async_file_poll.html#ab9898773412087c200bc75b9b6332a60">More...</a><br /></td></tr>
+<tr class="separator:ab9898773412087c200bc75b9b6332a60"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae5021053bbdb6d0c925cca32c68041ee"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_file_poll.html#ae5021053bbdb6d0c925cca32c68041ee">Result</a> = <a class="el" href="struct_s_c_1_1_async_result_of.html">AsyncResultOf</a>&lt; <a class="el" href="struct_s_c_1_1_async_file_poll.html">AsyncFilePoll</a>, <a class="el" href="struct_s_c_1_1_async_file_poll.html#ab9898773412087c200bc75b9b6332a60">CompletionData</a> &gt;</td></tr>
+<tr class="memdesc:ae5021053bbdb6d0c925cca32c68041ee"><td class="mdescLeft">&#160;</td><td class="mdescRight">Callback result for <a class="el" href="struct_s_c_1_1_async_file_poll.html" title="Starts an handle polling operation.">AsyncFilePoll</a>.  <a href="struct_s_c_1_1_async_file_poll.html#ae5021053bbdb6d0c925cca32c68041ee">More...</a><br /></td></tr>
+<tr class="separator:ae5021053bbdb6d0c925cca32c68041ee"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_types_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pub_types_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Public Types inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
 <tr class="memitem:af5065f89c50d598913f77f9e6a53c524 inherit pub_types_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top">enum class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">Type</a> : uint8_t { <br />
 &#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a71ee59b61aa037f9247d066a7ef7384d">LoopTimeout</a>
@@ -191,7 +194,7 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>setDebugName</b> (con
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
 <tr class="memitem:a92c2866cbb99176ee50c392a7ed45c25"><td class="memItemLeft" align="right" valign="top"><a id="a92c2866cbb99176ee50c392a7ed45c25" name="a92c2866cbb99176ee50c392a7ed45c25"></a>
-<a class="el" href="struct_s_c_1_1_function.html">Function</a>&lt; void(<a class="el" href="struct_s_c_1_1_async_result_of.html">Result</a> &amp;)&gt;&#160;</td><td class="memItemRight" valign="bottom"><b>callback</b></td></tr>
+<a class="el" href="struct_s_c_1_1_function.html">Function</a>&lt; void(<a class="el" href="struct_s_c_1_1_async_file_poll.html#ae5021053bbdb6d0c925cca32c68041ee">Result</a> &amp;)&gt;&#160;</td><td class="memItemRight" valign="bottom"><b>callback</b></td></tr>
 <tr class="separator:a92c2866cbb99176ee50c392a7ed45c25"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_attribs_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
 <tr class="memitem:ad977b9a7f485953a06261916c9fa87ee inherit pub_attribs_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ad977b9a7f485953a06261916c9fa87ee" name="ad977b9a7f485953a06261916c9fa87ee"></a>
@@ -213,9 +216,9 @@ Additional Inherited Members</h2></td></tr>
 <tr class="memitem:acba5bc94b35be4c2293b96b8806e7827 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="acba5bc94b35be4c2293b96b8806e7827" name="acba5bc94b35be4c2293b96b8806e7827"></a>
 <a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>validateAsync</b> ()</td></tr>
 <tr class="separator:acba5bc94b35be4c2293b96b8806e7827 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a650360163409a1c3ef0941900d2d0fe9 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="a650360163409a1c3ef0941900d2d0fe9" name="a650360163409a1c3ef0941900d2d0fe9"></a>
-<a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>queueSubmission</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;eventLoop)</td></tr>
-<tr class="separator:a650360163409a1c3ef0941900d2d0fe9 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad244e08093db3f5fd7e7ecf278399ea7 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ad244e08093db3f5fd7e7ecf278399ea7" name="ad244e08093db3f5fd7e7ecf278399ea7"></a>
+<a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>queueSubmission</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;eventLoop, <a class="el" href="struct_s_c_1_1_async_task.html">AsyncTask</a> *task)</td></tr>
+<tr class="separator:ad244e08093db3f5fd7e7ecf278399ea7 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pro_static_methods_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pro_static_methods_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Static Protected Member Functions inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
 <tr class="memitem:ad54c2edb6d65a44fd03885e2a0d1f402 inherit pro_static_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ad54c2edb6d65a44fd03885e2a0d1f402" name="ad54c2edb6d65a44fd03885e2a0d1f402"></a>
 static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;loop)</td></tr>
@@ -224,11 +227,47 @@ static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b>
 <tr class="memitem:a6397be27006b8fdfa51fabd1c3a415f8 inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="a6397be27006b8fdfa51fabd1c3a415f8" name="a6397be27006b8fdfa51fabd1c3a415f8"></a>
 <a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>eventLoop</b> = nullptr</td></tr>
 <tr class="separator:a6397be27006b8fdfa51fabd1c3a415f8 inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae5d524b8ca70e47397eaa4c4c609f6eb inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ae5d524b8ca70e47397eaa4c4c609f6eb" name="ae5d524b8ca70e47397eaa4c4c609f6eb"></a>
+<a class="el" href="struct_s_c_1_1_async_task.html">AsyncTask</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>asyncTask</b> = nullptr</td></tr>
+<tr class="separator:ae5d524b8ca70e47397eaa4c4c609f6eb inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p >Starts an handle polling operation. </p>
 <p >Uses <code>GetOverlappedResult</code> (windows), <code>kevent</code> (macOS), <code>epoll</code> (Linux) and <code>io_uring</code> (Linux). Callback will be called when any of the three API signals readiness events on the given file descriptor. Check <a class="el" href="library_file_system_watcher.html">File System Watcher</a> for an example usage of this notification. </p>
-</div><h2 class="groupheader">Member Function Documentation</h2>
+</div><h2 class="groupheader">Member Typedef Documentation</h2>
+<a id="ab9898773412087c200bc75b9b6332a60" name="ab9898773412087c200bc75b9b6332a60"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab9898773412087c200bc75b9b6332a60">&#9670;&nbsp;</a></span>CompletionData</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">using <a class="el" href="struct_s_c_1_1_async_file_poll.html#ab9898773412087c200bc75b9b6332a60">SC::AsyncFilePoll::CompletionData</a> =  <a class="el" href="struct_s_c_1_1_async_completion_data.html">AsyncCompletionData</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Completion data for <a class="el" href="struct_s_c_1_1_async_file_poll.html" title="Starts an handle polling operation.">AsyncFilePoll</a>. </p>
+
+</div>
+</div>
+<a id="ae5021053bbdb6d0c925cca32c68041ee" name="ae5021053bbdb6d0c925cca32c68041ee"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae5021053bbdb6d0c925cca32c68041ee">&#9670;&nbsp;</a></span>Result</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">using <a class="el" href="struct_s_c_1_1_async_file_poll.html#ae5021053bbdb6d0c925cca32c68041ee">SC::AsyncFilePoll::Result</a> =  <a class="el" href="struct_s_c_1_1_async_result_of.html">AsyncResultOf</a>&lt;<a class="el" href="struct_s_c_1_1_async_file_poll.html">AsyncFilePoll</a>, <a class="el" href="struct_s_c_1_1_async_file_poll.html#ab9898773412087c200bc75b9b6332a60">CompletionData</a>&gt;</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Callback result for <a class="el" href="struct_s_c_1_1_async_file_poll.html" title="Starts an handle polling operation.">AsyncFilePoll</a>. </p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
 <a id="ae3b516404b38e0a19f7e9d29224ca0df" name="ae3b516404b38e0a19f7e9d29224ca0df"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ae3b516404b38e0a19f7e9d29224ca0df">&#9670;&nbsp;</a></span>start()</h2>
 

@@ -1,6 +1,6 @@
 var struct_s_c_1_1_async_event_loop =
 [
-    [ "Options", "struct_s_c_1_1_async_event_loop_1_1_options.html", null ],
+    [ "Options", "struct_s_c_1_1_async_event_loop_1_1_options.html", "struct_s_c_1_1_async_event_loop_1_1_options" ],
     [ "associateExternallyCreatedFileDescriptor", "struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a", null ],
     [ "associateExternallyCreatedTCPSocket", "struct_s_c_1_1_async_event_loop.html#adebd85cf61505414b484cf6574c6bc1a", null ],
     [ "close", "struct_s_c_1_1_async_event_loop.html#adf307341059dd5332183b092281c8129", null ],

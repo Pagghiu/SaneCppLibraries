@@ -112,6 +112,7 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_async_file_read.html','
 <div class="header">
   <div class="summary">
 <a href="#nested-classes">Classes</a> &#124;
+<a href="#pub-types">Public Types</a> &#124;
 <a href="#pub-methods">Public Member Functions</a> &#124;
 <a href="#pub-attribs">Public Attributes</a> &#124;
 <a href="#friends">Friends</a> &#124;
@@ -120,7 +121,7 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_async_file_read.html','
 </div><!--header-->
 <div class="contents">
 
-<p>Starts a file read operation, reading bytes from a file.  
+<p>Starts a file read operation, reading bytes from a file (or pipe).  
  <a href="struct_s_c_1_1_async_file_read.html#details">More...</a></p>
 
 <p><code>#include &lt;<a class="el" href="_async_8h_source.html">Async.h</a>&gt;</code></p>
@@ -136,53 +137,18 @@ Inheritance diagram for SC::AsyncFileRead:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="nested-classes" name="nested-classes"></a>
 Classes</h2></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_file_read_1_1_completion_data.html">CompletionData</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Completion data for <a class="el" href="struct_s_c_1_1_async_file_read.html" title="Starts a file read operation, reading bytes from a file (or pipe).">AsyncFileRead</a>.  <a href="struct_s_c_1_1_async_file_read_1_1_completion_data.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_file_read_1_1_result.html">Result</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Callback result for <a class="el" href="struct_s_c_1_1_async_file_read.html" title="Starts a file read operation, reading bytes from a file.">AsyncFileRead</a>.  <a href="struct_s_c_1_1_async_file_read_1_1_result.html#details">More...</a><br /></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Callback result for <a class="el" href="struct_s_c_1_1_async_file_read.html" title="Starts a file read operation, reading bytes from a file (or pipe).">AsyncFileRead</a>.  <a href="struct_s_c_1_1_async_file_read_1_1_result.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
-Public Member Functions</h2></td></tr>
-<tr class="memitem:abe5acfaecb668b4ac5a08c19caabb22e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">SC::Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_file_read.html#abe5acfaecb668b4ac5a08c19caabb22e">start</a> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;loop, FileDescriptor::Handle fileDescriptor, <a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; char &gt; readBuffer)</td></tr>
-<tr class="memdesc:abe5acfaecb668b4ac5a08c19caabb22e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Starts a file receive operation, that will return when some data is read from file.  <a href="struct_s_c_1_1_async_file_read.html#abe5acfaecb668b4ac5a08c19caabb22e">More...</a><br /></td></tr>
-<tr class="separator:abe5acfaecb668b4ac5a08c19caabb22e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="inherit_header pub_methods_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
-<tr class="memitem:a8f1d866203c63c120045181b0eced844 inherit pub_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="a8f1d866203c63c120045181b0eced844" name="a8f1d866203c63c120045181b0eced844"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>setDebugName</b> (const char *newDebugName)</td></tr>
-<tr class="separator:a8f1d866203c63c120045181b0eced844 inherit pub_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0f687064dc07d418717f5f94ab2cb7c5 inherit pub_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_request.html#a0f687064dc07d418717f5f94ab2cb7c5">getEventLoop</a> () const</td></tr>
-<tr class="memdesc:a0f687064dc07d418717f5f94ab2cb7c5 inherit pub_methods_struct_s_c_1_1_async_request"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get the event loop associated with this <a class="el" href="struct_s_c_1_1_async_request.html" title="Base class for all async requests, holding state and type.">AsyncRequest</a>.  <a href="struct_s_c_1_1_async_request.html#a0f687064dc07d418717f5f94ab2cb7c5">More...</a><br /></td></tr>
-<tr class="separator:a0f687064dc07d418717f5f94ab2cb7c5 inherit pub_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0cad8875aba183bd5c3790f7b0b5cb1b inherit pub_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_request.html#a0cad8875aba183bd5c3790f7b0b5cb1b">AsyncRequest</a> (<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">Type</a> type)</td></tr>
-<tr class="memdesc:a0cad8875aba183bd5c3790f7b0b5cb1b inherit pub_methods_struct_s_c_1_1_async_request"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs a free async request of given type.  <a href="struct_s_c_1_1_async_request.html#a0cad8875aba183bd5c3790f7b0b5cb1b">More...</a><br /></td></tr>
-<tr class="separator:a0cad8875aba183bd5c3790f7b0b5cb1b inherit pub_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a876920e9ae9215108ace2082f387a553 inherit pub_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_request.html#a876920e9ae9215108ace2082f387a553">stop</a> ()</td></tr>
-<tr class="memdesc:a876920e9ae9215108ace2082f387a553 inherit pub_methods_struct_s_c_1_1_async_request"><td class="mdescLeft">&#160;</td><td class="mdescRight">Stops the async operation.  <a href="struct_s_c_1_1_async_request.html#a876920e9ae9215108ace2082f387a553">More...</a><br /></td></tr>
-<tr class="separator:a876920e9ae9215108ace2082f387a553 inherit pub_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
-Public Attributes</h2></td></tr>
-<tr class="memitem:a026863a020d7d20639354df84fe85c9b"><td class="memItemLeft" align="right" valign="top"><a id="a026863a020d7d20639354df84fe85c9b" name="a026863a020d7d20639354df84fe85c9b"></a>
-<a class="el" href="group__group__foundation__utility.html#ga8ce2d4c0cc42c26d02cc6f196030340e">uint64_t</a>&#160;</td><td class="memItemRight" valign="bottom"><b>offset</b> = 0</td></tr>
-<tr class="separator:a026863a020d7d20639354df84fe85c9b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aac1094ee088d0feb44a44ce40be98de5"><td class="memItemLeft" align="right" valign="top"><a id="aac1094ee088d0feb44a44ce40be98de5" name="aac1094ee088d0feb44a44ce40be98de5"></a>
-<a class="el" href="struct_s_c_1_1_function.html">Function</a>&lt; void(<a class="el" href="struct_s_c_1_1_async_file_read_1_1_result.html">Result</a> &amp;)&gt;&#160;</td><td class="memItemRight" valign="bottom"><b>callback</b></td></tr>
-<tr class="separator:aac1094ee088d0feb44a44ce40be98de5"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="inherit_header pub_attribs_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
-<tr class="memitem:ad977b9a7f485953a06261916c9fa87ee inherit pub_attribs_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ad977b9a7f485953a06261916c9fa87ee" name="ad977b9a7f485953a06261916c9fa87ee"></a>
-<a class="el" href="struct_s_c_1_1_async_request.html">AsyncRequest</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>next</b> = nullptr</td></tr>
-<tr class="separator:ad977b9a7f485953a06261916c9fa87ee inherit pub_attribs_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad90aa0fc966cb07d2abff6f03dc4e733 inherit pub_attribs_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ad90aa0fc966cb07d2abff6f03dc4e733" name="ad90aa0fc966cb07d2abff6f03dc4e733"></a>
-<a class="el" href="struct_s_c_1_1_async_request.html">AsyncRequest</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>prev</b> = nullptr</td></tr>
-<tr class="separator:ad90aa0fc966cb07d2abff6f03dc4e733 inherit pub_attribs_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="friends" name="friends"></a>
-Friends</h2></td></tr>
-<tr class="memitem:a468008cb47fddadaf6d19d2803333a70"><td class="memItemLeft" align="right" valign="top"><a id="a468008cb47fddadaf6d19d2803333a70" name="a468008cb47fddadaf6d19d2803333a70"></a>
-struct&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncEventLoop</b></td></tr>
-<tr class="separator:a468008cb47fddadaf6d19d2803333a70"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="inherited" name="inherited"></a>
-Additional Inherited Members</h2></td></tr>
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-types" name="pub-types"></a>
+Public Types</h2></td></tr>
+<tr class="memitem:ab66c115ebf207fe7c1b8644f3a6ce260"><td class="memItemLeft" align="right" valign="top"><a id="ab66c115ebf207fe7c1b8644f3a6ce260" name="ab66c115ebf207fe7c1b8644f3a6ce260"></a>
+using&#160;</td><td class="memItemRight" valign="bottom"><b>Task</b> = <a class="el" href="struct_s_c_1_1_async_task_of.html">AsyncTaskOf</a>&lt; <a class="el" href="struct_s_c_1_1_async_file_read.html">AsyncFileRead</a> &gt;</td></tr>
+<tr class="separator:ab66c115ebf207fe7c1b8644f3a6ce260"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_types_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pub_types_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Public Types inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
 <tr class="memitem:af5065f89c50d598913f77f9e6a53c524 inherit pub_types_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top">enum class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">Type</a> : uint8_t { <br />
 &#160;&#160;<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524a71ee59b61aa037f9247d066a7ef7384d">LoopTimeout</a>
@@ -212,13 +178,57 @@ Additional Inherited Members</h2></td></tr>
  }</td></tr>
 <tr class="memdesc:af5065f89c50d598913f77f9e6a53c524"><td class="mdescLeft">&#160;</td><td class="mdescRight">Type of async request.  <a href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">More...</a><br /></td></tr>
 <tr class="separator:af5065f89c50d598913f77f9e6a53c524 inherit pub_types_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
+Public Member Functions</h2></td></tr>
+<tr class="memitem:afdbafd13224f921d6fc6dd9288cc6a1e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">SC::Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_file_read.html#afdbafd13224f921d6fc6dd9288cc6a1e">start</a> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;eventLoop, FileDescriptor::Handle fileDescriptor, <a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; char &gt; readBuffer, <a class="el" href="struct_s_c_1_1_async_task_of.html">Task</a> *task=nullptr)</td></tr>
+<tr class="memdesc:afdbafd13224f921d6fc6dd9288cc6a1e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Starts a file receive operation, that will return when data read from file (or pipe) is available.  <a href="struct_s_c_1_1_async_file_read.html#afdbafd13224f921d6fc6dd9288cc6a1e">More...</a><br /></td></tr>
+<tr class="separator:afdbafd13224f921d6fc6dd9288cc6a1e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="inherit_header pub_methods_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
+<tr class="memitem:a8f1d866203c63c120045181b0eced844 inherit pub_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="a8f1d866203c63c120045181b0eced844" name="a8f1d866203c63c120045181b0eced844"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>setDebugName</b> (const char *newDebugName)</td></tr>
+<tr class="separator:a8f1d866203c63c120045181b0eced844 inherit pub_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0f687064dc07d418717f5f94ab2cb7c5 inherit pub_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_request.html#a0f687064dc07d418717f5f94ab2cb7c5">getEventLoop</a> () const</td></tr>
+<tr class="memdesc:a0f687064dc07d418717f5f94ab2cb7c5 inherit pub_methods_struct_s_c_1_1_async_request"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get the event loop associated with this <a class="el" href="struct_s_c_1_1_async_request.html" title="Base class for all async requests, holding state and type.">AsyncRequest</a>.  <a href="struct_s_c_1_1_async_request.html#a0f687064dc07d418717f5f94ab2cb7c5">More...</a><br /></td></tr>
+<tr class="separator:a0f687064dc07d418717f5f94ab2cb7c5 inherit pub_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0cad8875aba183bd5c3790f7b0b5cb1b inherit pub_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_request.html#a0cad8875aba183bd5c3790f7b0b5cb1b">AsyncRequest</a> (<a class="el" href="struct_s_c_1_1_async_request.html#af5065f89c50d598913f77f9e6a53c524">Type</a> type)</td></tr>
+<tr class="memdesc:a0cad8875aba183bd5c3790f7b0b5cb1b inherit pub_methods_struct_s_c_1_1_async_request"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs a free async request of given type.  <a href="struct_s_c_1_1_async_request.html#a0cad8875aba183bd5c3790f7b0b5cb1b">More...</a><br /></td></tr>
+<tr class="separator:a0cad8875aba183bd5c3790f7b0b5cb1b inherit pub_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a876920e9ae9215108ace2082f387a553 inherit pub_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_request.html#a876920e9ae9215108ace2082f387a553">stop</a> ()</td></tr>
+<tr class="memdesc:a876920e9ae9215108ace2082f387a553 inherit pub_methods_struct_s_c_1_1_async_request"><td class="mdescLeft">&#160;</td><td class="mdescRight">Stops the async operation.  <a href="struct_s_c_1_1_async_request.html#a876920e9ae9215108ace2082f387a553">More...</a><br /></td></tr>
+<tr class="separator:a876920e9ae9215108ace2082f387a553 inherit pub_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
+Public Attributes</h2></td></tr>
+<tr class="memitem:a026863a020d7d20639354df84fe85c9b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="group__group__foundation__utility.html#ga8ce2d4c0cc42c26d02cc6f196030340e">uint64_t</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_file_read.html#a026863a020d7d20639354df84fe85c9b">offset</a> = 0</td></tr>
+<tr class="memdesc:a026863a020d7d20639354df84fe85c9b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Offset from file start where to start reading. Not supported on pipes.  <a href="struct_s_c_1_1_async_file_read.html#a026863a020d7d20639354df84fe85c9b">More...</a><br /></td></tr>
+<tr class="separator:a026863a020d7d20639354df84fe85c9b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aac1094ee088d0feb44a44ce40be98de5"><td class="memItemLeft" align="right" valign="top"><a id="aac1094ee088d0feb44a44ce40be98de5" name="aac1094ee088d0feb44a44ce40be98de5"></a>
+<a class="el" href="struct_s_c_1_1_function.html">Function</a>&lt; void(<a class="el" href="struct_s_c_1_1_async_file_read_1_1_result.html">Result</a> &amp;)&gt;&#160;</td><td class="memItemRight" valign="bottom"><b>callback</b></td></tr>
+<tr class="separator:aac1094ee088d0feb44a44ce40be98de5"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="inherit_header pub_attribs_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
+<tr class="memitem:ad977b9a7f485953a06261916c9fa87ee inherit pub_attribs_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ad977b9a7f485953a06261916c9fa87ee" name="ad977b9a7f485953a06261916c9fa87ee"></a>
+<a class="el" href="struct_s_c_1_1_async_request.html">AsyncRequest</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>next</b> = nullptr</td></tr>
+<tr class="separator:ad977b9a7f485953a06261916c9fa87ee inherit pub_attribs_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad90aa0fc966cb07d2abff6f03dc4e733 inherit pub_attribs_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ad90aa0fc966cb07d2abff6f03dc4e733" name="ad90aa0fc966cb07d2abff6f03dc4e733"></a>
+<a class="el" href="struct_s_c_1_1_async_request.html">AsyncRequest</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>prev</b> = nullptr</td></tr>
+<tr class="separator:ad90aa0fc966cb07d2abff6f03dc4e733 inherit pub_attribs_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="friends" name="friends"></a>
+Friends</h2></td></tr>
+<tr class="memitem:a468008cb47fddadaf6d19d2803333a70"><td class="memItemLeft" align="right" valign="top"><a id="a468008cb47fddadaf6d19d2803333a70" name="a468008cb47fddadaf6d19d2803333a70"></a>
+struct&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncEventLoop</b></td></tr>
+<tr class="separator:a468008cb47fddadaf6d19d2803333a70"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="inherited" name="inherited"></a>
+Additional Inherited Members</h2></td></tr>
 <tr class="inherit_header pro_methods_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pro_methods_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Protected Member Functions inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
 <tr class="memitem:acba5bc94b35be4c2293b96b8806e7827 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="acba5bc94b35be4c2293b96b8806e7827" name="acba5bc94b35be4c2293b96b8806e7827"></a>
 <a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>validateAsync</b> ()</td></tr>
 <tr class="separator:acba5bc94b35be4c2293b96b8806e7827 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a650360163409a1c3ef0941900d2d0fe9 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="a650360163409a1c3ef0941900d2d0fe9" name="a650360163409a1c3ef0941900d2d0fe9"></a>
-<a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>queueSubmission</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;eventLoop)</td></tr>
-<tr class="separator:a650360163409a1c3ef0941900d2d0fe9 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad244e08093db3f5fd7e7ecf278399ea7 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ad244e08093db3f5fd7e7ecf278399ea7" name="ad244e08093db3f5fd7e7ecf278399ea7"></a>
+<a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>queueSubmission</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;eventLoop, <a class="el" href="struct_s_c_1_1_async_task.html">AsyncTask</a> *task)</td></tr>
+<tr class="separator:ad244e08093db3f5fd7e7ecf278399ea7 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pro_static_methods_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pro_static_methods_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Static Protected Member Functions inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
 <tr class="memitem:ad54c2edb6d65a44fd03885e2a0d1f402 inherit pro_static_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ad54c2edb6d65a44fd03885e2a0d1f402" name="ad54c2edb6d65a44fd03885e2a0d1f402"></a>
 static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;loop)</td></tr>
@@ -227,46 +237,62 @@ static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b>
 <tr class="memitem:a6397be27006b8fdfa51fabd1c3a415f8 inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="a6397be27006b8fdfa51fabd1c3a415f8" name="a6397be27006b8fdfa51fabd1c3a415f8"></a>
 <a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>eventLoop</b> = nullptr</td></tr>
 <tr class="separator:a6397be27006b8fdfa51fabd1c3a415f8 inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae5d524b8ca70e47397eaa4c4c609f6eb inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ae5d524b8ca70e47397eaa4c4c609f6eb" name="ae5d524b8ca70e47397eaa4c4c609f6eb"></a>
+<a class="el" href="struct_s_c_1_1_async_task.html">AsyncTask</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>asyncTask</b> = nullptr</td></tr>
+<tr class="separator:ae5d524b8ca70e47397eaa4c4c609f6eb inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
-<div class="textblock"><p >Starts a file read operation, reading bytes from a file. </p>
-<p >Callback will be called after some data is read from file. <br  />
-<a class="el" href="library_file.html">File</a> library can be used to open the file and obtain a file descriptor handle. Make sure to associate the file descriptor with <a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a" title="Associates a File descriptor created externally with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a>.</p>
+<div class="textblock"><p >Starts a file read operation, reading bytes from a file (or pipe). </p>
+<p >Callback will be called when the data read from the file (or pipe) is available. <br  />
+ Use the optional <code>Task</code> parameter to execute file read on a background thread for APIs that exhibit blocking behaviour on buffered file I/O (all apis with the exception of <code>io_uring</code>).</p>
+<p ><a class="el" href="library_file.html">File</a> library can be used to open the file and obtain a file (or pipe) descriptor handle.</p>
+<dl class="section note"><dt>Note</dt><dd>Pipes or files opened using Posix <code>O_DIRECT</code> or Windows <code>FILE_FLAG_WRITE_THROUGH</code> &amp; <code>FILE_FLAG_NO_BUFFERING</code> should instead avoid using the <code>Task</code> parameter for best performance.</dd></dl>
+<p>When not using the <code>Task</code> remember to:</p><ul>
+<li>Open the file descriptor for non-blocking IO (<a class="el" href="struct_s_c_1_1_file_descriptor_1_1_open_options.html#a4c696fe5fdc073f0efc39d47b308264a" title="Set to false if file will be used for Async I/O (see Async)">SC::FileDescriptor::OpenOptions::blocking</a> == <code>false</code>)</li>
+<li>Call <a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a" title="Associates a File descriptor created externally with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a> on the file descriptor</li>
+</ul>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named `eventLoop`</span></div>
+<div class="line"><span class="comment">// ...</span></div>
+<div class="line"> </div>
+<div class="line"><span class="comment">// Assuming an already created threadPool and a task</span></div>
+<div class="line"><span class="comment">// ...</span></div>
+<div class="line"> </div>
+<div class="line">ThreadPoolTask task;</div>
+<div class="line">ThreadPool threadPool;</div>
+<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(threadPool.create(4));</div>
+<div class="line"> </div>
 <div class="line"><span class="comment">// ...</span></div>
 <div class="line"> </div>
 <div class="line"><span class="comment">// Open the file</span></div>
 <div class="line">FileDescriptor fd;</div>
 <div class="line">FileDescriptor::OpenOptions options;</div>
-<div class="line">options.async    = <span class="keyword">true</span>;</div>
-<div class="line">options.blocking = <span class="keyword">false</span>;</div>
+<div class="line">options.blocking = <span class="keyword">true</span>; <span class="comment">// When using AsyncFileRead::Task you can use regular blocking descriptors</span></div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(fd.open(<span class="stringliteral">&quot;MyFile.txt&quot;</span>, <a class="code hl_enumvalue" href="struct_s_c_1_1_file_descriptor.html#a777f74a69b78c2d0c79faa17ae268725a77c8a81de7d48fc317ab0769a86d70b8">FileDescriptor::ReadOnly</a>, options));</div>
 <div class="line">FileDescriptor::Handle handle;</div>
 <div class="line"> </div>
 <div class="line"><span class="comment">// Obtain file descriptor handle and associate it with event loop</span></div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(fd.get(handle, <a class="code hl_function" href="struct_s_c_1_1_result.html#a0ff6a228693a2c757223ff7137e1abad">Result::Error</a>(<span class="stringliteral">&quot;Invalid handle&quot;</span>)));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(eventLoop.<a class="code hl_function" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a">associateExternallyCreatedFileDescriptor</a>(fd));</div>
 <div class="line"> </div>
-<div class="line"><span class="comment">// Create the async file read request</span></div>
+<div class="line"><span class="comment">// Create the async file read request and its threadpool task</span></div>
 <div class="line">AsyncFileRead asyncReadFile;</div>
+<div class="line">AsyncFileRead::Task asyncFileTask{threadPool, task};</div>
 <div class="line">asyncReadFile.callback = [&amp;](AsyncFileRead::Result&amp; res)</div>
 <div class="line">{</div>
 <div class="line">    Span&lt;char&gt; readData;</div>
-<div class="line">    <span class="keywordflow">if</span>(res.moveTo(readData))</div>
+<div class="line">    <span class="keywordflow">if</span>(res.get(readData))</div>
 <div class="line">    {</div>
 <div class="line">        console.print(<span class="stringliteral">&quot;Read {} bytes from file&quot;</span>, readData.sizeInBytes());</div>
 <div class="line">        res.reactivateRequest(<span class="keyword">true</span>); <span class="comment">// Ask to receive more data</span></div>
 <div class="line">    }</div>
 <div class="line">};</div>
 <div class="line"><span class="keywordtype">char</span> buffer[100] = {0};</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(asyncReadFile.start(eventLoop, handle, {buffer, sizeof(buffer)}));</div>
+<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(asyncReadFile.start(eventLoop, handle, {buffer, sizeof(buffer)},&amp;asyncFileTask));</div>
 <div class="ttc" id="agroup__group__foundation__utility_html_gae6b0d665676a4a5eedc2ad69693c04ee"><div class="ttname"><a href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a></div><div class="ttdeci">#define SC_TRY(expression)</div><div class="ttdoc">Checks the value of the given expression and if failed, returns this value to caller.</div><div class="ttdef"><b>Definition:</b> Result.h:47</div></div>
-<div class="ttc" id="astruct_s_c_1_1_async_event_loop_html_a10f7a7f846c5879a2ad6c66e77e1d56a"><div class="ttname"><a href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a></div><div class="ttdeci">Result associateExternallyCreatedFileDescriptor(FileDescriptor &amp;outDescriptor)</div><div class="ttdoc">Associates a File descriptor created externally with the eventLoop.</div></div>
 <div class="ttc" id="astruct_s_c_1_1_file_descriptor_html_a777f74a69b78c2d0c79faa17ae268725a77c8a81de7d48fc317ab0769a86d70b8"><div class="ttname"><a href="struct_s_c_1_1_file_descriptor.html#a777f74a69b78c2d0c79faa17ae268725a77c8a81de7d48fc317ab0769a86d70b8">SC::FileDescriptor::ReadOnly</a></div><div class="ttdeci">@ ReadOnly</div><div class="ttdoc">Opens in read-only mode.</div><div class="ttdef"><b>Definition:</b> FileDescriptor.h:62</div></div>
 <div class="ttc" id="astruct_s_c_1_1_result_html_a0ff6a228693a2c757223ff7137e1abad"><div class="ttname"><a href="struct_s_c_1_1_result.html#a0ff6a228693a2c757223ff7137e1abad">SC::Result::Error</a></div><div class="ttdeci">static constexpr Result Error(const char(&amp;msg)[numChars])</div><div class="ttdoc">Constructs an Error from a pointer to an ASCII string literal.</div><div class="ttdef"><b>Definition:</b> Result.h:23</div></div>
 </div><!-- fragment --> </div><h2 class="groupheader">Member Function Documentation</h2>
-<a id="abe5acfaecb668b4ac5a08c19caabb22e" name="abe5acfaecb668b4ac5a08c19caabb22e"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#abe5acfaecb668b4ac5a08c19caabb22e">&#9670;&nbsp;</a></span>start()</h2>
+<a id="afdbafd13224f921d6fc6dd9288cc6a1e" name="afdbafd13224f921d6fc6dd9288cc6a1e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#afdbafd13224f921d6fc6dd9288cc6a1e">&#9670;&nbsp;</a></span>start()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -275,7 +301,7 @@ static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b>
           <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">SC::Result</a> SC::AsyncFileRead::start </td>
           <td>(</td>
           <td class="paramtype"><a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;&#160;</td>
-          <td class="paramname"><em>loop</em>, </td>
+          <td class="paramname"><em>eventLoop</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -287,7 +313,13 @@ static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype"><a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; char &gt;&#160;</td>
-          <td class="paramname"><em>readBuffer</em>&#160;</td>
+          <td class="paramname"><em>readBuffer</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_async_task_of.html">Task</a> *&#160;</td>
+          <td class="paramname"><em>task</em> = <code>nullptr</code>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -297,7 +329,33 @@ static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b>
       </table>
 </div><div class="memdoc">
 
-<p>Starts a file receive operation, that will return when some data is read from file. </p>
+<p>Starts a file receive operation, that will return when data read from file (or pipe) is available. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">eventLoop</td><td>The EventLoop to run this operation on </td></tr>
+    <tr><td class="paramname">fileDescriptor</td><td>The file descriptor (file or pipe) to read data from (use <a class="el" href="struct_s_c_1_1_file_descriptor.html" title="Wraps an OS File descriptor to read and write to and from it.">SC::FileDescriptor</a> or <a class="el" href="struct_s_c_1_1_pipe_descriptor.html" title="Descriptor representing a Pipe used for InterProcess Communication (IPC)">SC::PipeDescriptor</a> to open it, with SC::FileDescriptorOpenOptions::blocking == false) </td></tr>
+    <tr><td class="paramname">readBuffer</td><td>The writable span of memory where the data should be read into. </td></tr>
+    <tr><td class="paramname">task</td><td>The task allows running operation on background thread. It's useful for any file not opened for direct IO (<code>O_DIRECT</code> / <code>FILE_FLAG_WRITE_THROUGH</code> &amp; <code>FILE_FLAG_NO_BUFFERING</code>). This task will not be used on the <code>io_uring</code> backend, because that API allows proper async file read/writes. If this is set to <code>nullptr</code> you will have to call <a class="el" href="struct_s_c_1_1_async_event_loop.html#a10f7a7f846c5879a2ad6c66e77e1d56a" title="Associates a File descriptor created externally with the eventLoop.">SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor</a> on the fileDescriptor passed in. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a id="a026863a020d7d20639354df84fe85c9b" name="a026863a020d7d20639354df84fe85c9b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a026863a020d7d20639354df84fe85c9b">&#9670;&nbsp;</a></span>offset</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="group__group__foundation__utility.html#ga8ce2d4c0cc42c26d02cc6f196030340e">uint64_t</a> SC::AsyncFileRead::offset = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Offset from file start where to start reading. Not supported on pipes. </p>
 
 </div>
 </div>

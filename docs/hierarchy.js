@@ -14,6 +14,14 @@ var hierarchy =
     [ "SC::Reflection::TypeInfo::ArrayInfo", "struct_s_c_1_1_reflection_1_1_type_info_1_1_array_info.html", null ],
     [ "SC::Reflection::ArrayWithSize< T, N >", "struct_s_c_1_1_reflection_1_1_array_with_size.html", null ],
     [ "SC::Assert", "struct_s_c_1_1_assert.html", null ],
+    [ "SC::AsyncCompletionData", "struct_s_c_1_1_async_completion_data.html", [
+      [ "SC::AsyncFileRead::CompletionData", "struct_s_c_1_1_async_file_read_1_1_completion_data.html", null ],
+      [ "SC::AsyncFileWrite::CompletionData", "struct_s_c_1_1_async_file_write_1_1_completion_data.html", null ],
+      [ "SC::AsyncProcessExit::CompletionData", "struct_s_c_1_1_async_process_exit_1_1_completion_data.html", null ],
+      [ "SC::AsyncSocketAccept::CompletionData", "struct_s_c_1_1_async_socket_accept_1_1_completion_data.html", null ],
+      [ "SC::AsyncSocketReceive::CompletionData", "struct_s_c_1_1_async_socket_receive_1_1_completion_data.html", null ],
+      [ "SC::AsyncSocketSend::CompletionData", "struct_s_c_1_1_async_socket_send_1_1_completion_data.html", null ]
+    ] ],
     [ "SC::AsyncEventLoop", "struct_s_c_1_1_async_event_loop.html", null ],
     [ "SC::AsyncRequest", "struct_s_c_1_1_async_request.html", [
       [ "SC::AsyncFileClose", "struct_s_c_1_1_async_file_close.html", null ],
@@ -30,22 +38,25 @@ var hierarchy =
       [ "SC::AsyncSocketSend", "struct_s_c_1_1_async_socket_send.html", null ]
     ] ],
     [ "SC::AsyncResult", "struct_s_c_1_1_async_result.html", [
-      [ "SC::AsyncResultOf< AsyncFileRead >", "struct_s_c_1_1_async_result_of.html", [
+      [ "SC::AsyncResultOf< AsyncFileRead, CompletionData >", "struct_s_c_1_1_async_result_of.html", [
         [ "SC::AsyncFileRead::Result", "struct_s_c_1_1_async_file_read_1_1_result.html", null ]
       ] ],
-      [ "SC::AsyncResultOf< AsyncFileWrite >", "struct_s_c_1_1_async_result_of.html", [
+      [ "SC::AsyncResultOf< AsyncFileWrite, CompletionData >", "struct_s_c_1_1_async_result_of.html", [
         [ "SC::AsyncFileWrite::Result", "struct_s_c_1_1_async_file_write_1_1_result.html", null ]
       ] ],
-      [ "SC::AsyncResultOf< AsyncProcessExit >", "struct_s_c_1_1_async_result_of.html", [
+      [ "SC::AsyncResultOf< AsyncProcessExit, CompletionData >", "struct_s_c_1_1_async_result_of.html", [
         [ "SC::AsyncProcessExit::Result", "struct_s_c_1_1_async_process_exit_1_1_result.html", null ]
       ] ],
-      [ "SC::AsyncResultOf< AsyncSocketAccept >", "struct_s_c_1_1_async_result_of.html", [
+      [ "SC::AsyncResultOf< AsyncSocketAccept, CompletionData >", "struct_s_c_1_1_async_result_of.html", [
         [ "SC::AsyncSocketAccept::Result", "struct_s_c_1_1_async_socket_accept_1_1_result.html", null ]
       ] ],
-      [ "SC::AsyncResultOf< AsyncSocketReceive >", "struct_s_c_1_1_async_result_of.html", [
+      [ "SC::AsyncResultOf< AsyncSocketReceive, CompletionData >", "struct_s_c_1_1_async_result_of.html", [
         [ "SC::AsyncSocketReceive::Result", "struct_s_c_1_1_async_socket_receive_1_1_result.html", null ]
       ] ],
-      [ "SC::AsyncResultOf< T >", "struct_s_c_1_1_async_result_of.html", null ]
+      [ "SC::AsyncResultOf< T, C >", "struct_s_c_1_1_async_result_of.html", null ]
+    ] ],
+    [ "SC::AsyncTask", "struct_s_c_1_1_async_task.html", [
+      [ "SC::AsyncTaskOf< AsyncType >", "struct_s_c_1_1_async_task_of.html", null ]
     ] ],
     [ "SC::Atomic< T >", "struct_s_c_1_1_atomic.html", null ],
     [ "SC::HttpServerBase::ClientChannel", "struct_s_c_1_1_http_server_base_1_1_client_channel.html", null ],
@@ -107,6 +118,7 @@ var hierarchy =
     [ "SC::FileSystemWatcher::Notification", "struct_s_c_1_1_file_system_watcher_1_1_notification.html", null ],
     [ "SC::OpaqueObject< Definition >", "struct_s_c_1_1_opaque_object.html", null ],
     [ "SC::OpaqueObject< InternalDefinition >", "struct_s_c_1_1_opaque_object.html", null ],
+    [ "SC::OpaqueObject< PrivateDefinition >", "struct_s_c_1_1_opaque_object.html", null ],
     [ "SC::FileDescriptor::OpenOptions", "struct_s_c_1_1_file_descriptor_1_1_open_options.html", null ],
     [ "SC::Build::Optimization", "struct_s_c_1_1_build_1_1_optimization.html", null ],
     [ "SC::AsyncEventLoop::Options", "struct_s_c_1_1_async_event_loop_1_1_options.html", null ],
@@ -198,11 +210,11 @@ var hierarchy =
     [ "SC::TaggedType< EnumType, enumValue, MemberType >", "struct_s_c_1_1_tagged_type.html", null ],
     [ "SC::TaggedUnion< Union >", "struct_s_c_1_1_tagged_union.html", null ],
     [ "SC::Build::TargetType", "struct_s_c_1_1_build_1_1_target_type.html", null ],
-    [ "SC::ThreadPool::Task", "struct_s_c_1_1_thread_pool_1_1_task.html", null ],
     [ "SC::TestCase", "struct_s_c_1_1_test_case.html", null ],
     [ "SC::TestReport", "struct_s_c_1_1_test_report.html", null ],
     [ "SC::Thread", "struct_s_c_1_1_thread.html", null ],
     [ "SC::ThreadPool", "struct_s_c_1_1_thread_pool.html", null ],
+    [ "SC::ThreadPoolTask", "struct_s_c_1_1_thread_pool_task.html", null ],
     [ "SC::Reflection::TypeInfo", "struct_s_c_1_1_reflection_1_1_type_info.html", null ],
     [ "SC::TypeTraits::TypeList< TT >", "struct_s_c_1_1_type_traits_1_1_type_list.html", null ],
     [ "SC::TypeTraits::TypeListGet< T, N, M >", "struct_s_c_1_1_type_traits_1_1_type_list_get.html", null ],

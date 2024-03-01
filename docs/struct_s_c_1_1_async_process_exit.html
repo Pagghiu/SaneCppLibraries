@@ -120,7 +120,7 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_async_process_exit.html
 </div><!--header-->
 <div class="contents">
 
-<p>Starts a process exit notification request, so that when process is exited the callback will be called.  
+<p>Starts monitoring a process, notifying about its termination.  
  <a href="struct_s_c_1_1_async_process_exit.html#details">More...</a></p>
 
 <p><code>#include &lt;<a class="el" href="_async_8h_source.html">Async.h</a>&gt;</code></p>
@@ -136,13 +136,17 @@ Inheritance diagram for SC::AsyncProcessExit:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="nested-classes" name="nested-classes"></a>
 Classes</h2></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_process_exit_1_1_completion_data.html">CompletionData</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Completion data for <a class="el" href="struct_s_c_1_1_async_process_exit.html" title="Starts monitoring a process, notifying about its termination.">AsyncProcessExit</a>.  <a href="struct_s_c_1_1_async_process_exit_1_1_completion_data.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_process_exit_1_1_result.html">Result</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Callback result for <a class="el" href="struct_s_c_1_1_async_process_exit.html" title="Starts monitoring a process, notifying about its termination.">AsyncProcessExit</a>.  <a href="struct_s_c_1_1_async_process_exit_1_1_result.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:a625ff0b0bfdf3151513a6cd3ba063f9d"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">SC::Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_process_exit.html#a625ff0b0bfdf3151513a6cd3ba063f9d">start</a> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;eventLoop, ProcessDescriptor::Handle process)</td></tr>
-<tr class="memdesc:a625ff0b0bfdf3151513a6cd3ba063f9d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Starts a process exit notification request, so that when process is exited the callback will be called.  <a href="struct_s_c_1_1_async_process_exit.html#a625ff0b0bfdf3151513a6cd3ba063f9d">More...</a><br /></td></tr>
+<tr class="memdesc:a625ff0b0bfdf3151513a6cd3ba063f9d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Starts monitoring a process, notifying about its termination.  <a href="struct_s_c_1_1_async_process_exit.html#a625ff0b0bfdf3151513a6cd3ba063f9d">More...</a><br /></td></tr>
 <tr class="separator:a625ff0b0bfdf3151513a6cd3ba063f9d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
 <tr class="memitem:a8f1d866203c63c120045181b0eced844 inherit pub_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="a8f1d866203c63c120045181b0eced844" name="a8f1d866203c63c120045181b0eced844"></a>
@@ -212,9 +216,9 @@ Additional Inherited Members</h2></td></tr>
 <tr class="memitem:acba5bc94b35be4c2293b96b8806e7827 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="acba5bc94b35be4c2293b96b8806e7827" name="acba5bc94b35be4c2293b96b8806e7827"></a>
 <a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>validateAsync</b> ()</td></tr>
 <tr class="separator:acba5bc94b35be4c2293b96b8806e7827 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a650360163409a1c3ef0941900d2d0fe9 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="a650360163409a1c3ef0941900d2d0fe9" name="a650360163409a1c3ef0941900d2d0fe9"></a>
-<a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>queueSubmission</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;eventLoop)</td></tr>
-<tr class="separator:a650360163409a1c3ef0941900d2d0fe9 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad244e08093db3f5fd7e7ecf278399ea7 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ad244e08093db3f5fd7e7ecf278399ea7" name="ad244e08093db3f5fd7e7ecf278399ea7"></a>
+<a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>queueSubmission</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;eventLoop, <a class="el" href="struct_s_c_1_1_async_task.html">AsyncTask</a> *task)</td></tr>
+<tr class="separator:ad244e08093db3f5fd7e7ecf278399ea7 inherit pro_methods_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pro_static_methods_struct_s_c_1_1_async_request"><td colspan="2" onclick="javascript:toggleInherit('pro_static_methods_struct_s_c_1_1_async_request')"><img src="closed.png" alt="-"/>&#160;Static Protected Member Functions inherited from <a class="el" href="struct_s_c_1_1_async_request.html">SC::AsyncRequest</a></td></tr>
 <tr class="memitem:ad54c2edb6d65a44fd03885e2a0d1f402 inherit pro_static_methods_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ad54c2edb6d65a44fd03885e2a0d1f402" name="ad54c2edb6d65a44fd03885e2a0d1f402"></a>
 static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b> (<a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> &amp;loop)</td></tr>
@@ -223,11 +227,13 @@ static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b>
 <tr class="memitem:a6397be27006b8fdfa51fabd1c3a415f8 inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="a6397be27006b8fdfa51fabd1c3a415f8" name="a6397be27006b8fdfa51fabd1c3a415f8"></a>
 <a class="el" href="struct_s_c_1_1_async_event_loop.html">AsyncEventLoop</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>eventLoop</b> = nullptr</td></tr>
 <tr class="separator:a6397be27006b8fdfa51fabd1c3a415f8 inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae5d524b8ca70e47397eaa4c4c609f6eb inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memItemLeft" align="right" valign="top"><a id="ae5d524b8ca70e47397eaa4c4c609f6eb" name="ae5d524b8ca70e47397eaa4c4c609f6eb"></a>
+<a class="el" href="struct_s_c_1_1_async_task.html">AsyncTask</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>asyncTask</b> = nullptr</td></tr>
+<tr class="separator:ae5d524b8ca70e47397eaa4c4c609f6eb inherit pro_attribs_struct_s_c_1_1_async_request"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
-<div class="textblock"><p >Starts a process exit notification request, so that when process is exited the callback will be called. </p>
-<p ><br  />
-<a class="el" href="library_process.html">Process</a> library can be used to start a process and obtain the native process handle.</p>
+<div class="textblock"><p >Starts monitoring a process, notifying about its termination. </p>
+<p ><a class="el" href="library_process.html">Process</a> library can be used to start a process and obtain the native process handle.</p>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named eventLoop</span></div>
 <div class="line"><span class="comment">// ...</span></div>
 <div class="line">Process process;</div>
@@ -238,7 +244,7 @@ static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b>
 <div class="line">processExit.callback = [&amp;](AsyncProcessExit::Result&amp; res)</div>
 <div class="line">{</div>
 <div class="line">    ProcessDescriptor::ExitStatus exitStatus;</div>
-<div class="line">    <span class="keywordflow">if</span>(res.moveTo(exitStatus))</div>
+<div class="line">    <span class="keywordflow">if</span>(res.get(exitStatus))</div>
 <div class="line">    {</div>
 <div class="line">        console.print(<span class="stringliteral">&quot;Process Exit status = {}&quot;</span>, exitStatus.status);</div>
 <div class="line">    }</div>
@@ -273,7 +279,7 @@ static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b>
       </table>
 </div><div class="memdoc">
 
-<p>Starts a process exit notification request, so that when process is exited the callback will be called. </p>
+<p>Starts monitoring a process, notifying about its termination. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">eventLoop</td><td>The event loop where queuing this async request </td></tr>
@@ -281,7 +287,7 @@ static void&#160;</td><td class="memItemRight" valign="bottom"><b>updateTime</b>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd>Valid <a class="el" href="struct_s_c_1_1_async_process_exit_1_1_result.html">Result</a> if the request has been successfully queued </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>Valid <a class="el" href="struct_s_c_1_1_async_process_exit_1_1_result.html" title="Callback result for AsyncProcessExit.">Result</a> if the request has been successfully queued </dd></dl>
 
 </div>
 </div>
