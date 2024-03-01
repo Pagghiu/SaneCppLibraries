@@ -14,6 +14,8 @@ Algorithms is a placeholder where templated algorithms will be added as needed o
 | [Algorithms::findIf](@ref SC::Algorithms::findIf)             | @copybrief SC::Algorithms::findIf     |
 | [Algorithms::removeIf](@ref SC::Algorithms::removeIf)         | @copybrief SC::Algorithms::removeIf   |
 
+@note `min` and `max` are in `Compiler.h` as they're widely used everywhere
+
 ## Status
 🟥 Draft  
 We need _MOAR_ algorithms.
@@ -29,7 +31,6 @@ in the future and it's better grouping them here rather than keeping them around
 🟨 MVP Features:
 - Unique
 - Better Sort (Insertion ?)
-- Min / Max
 - Min / Max Element
 - Rotate
 - Count / Count If

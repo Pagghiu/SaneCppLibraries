@@ -42,6 +42,7 @@ On the [Youtube Channel](https://www.youtube.com/@Pagghiu) you can find some vid
 - [Linux Async I/O using io_uring (1 of 2)](https://www.youtube.com/watch?v=YR935rorb3E)
 - [Linux Async I/O using io_uring (2 of 2)](https://www.youtube.com/watch?v=CgYE0YrpHt0)
 - [Simple ThreadPool](https://www.youtube.com/watch?v=e48ruImESxI)
+- [Async file read and writes using Thread Pool](https://www.youtube.com/watch?v=WF9beKyEA_E)
 
 # Libraries
 
