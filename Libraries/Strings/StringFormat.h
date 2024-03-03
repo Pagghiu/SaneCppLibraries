@@ -9,6 +9,8 @@ template <typename T>
 struct Vector;
 struct Console;
 struct String;
+template <int N>
+struct SmallString;
 template <typename T>
 struct StringFormatterFor;
 
@@ -239,9 +241,11 @@ template <> struct StringFormatterFor<StringView>   {static bool format(StringFo
 template <> struct StringFormatterFor<String>       {static bool format(StringFormatOutput&, const StringView, const String&);};
 template <> struct StringFormatterFor<const char*>  {static bool format(StringFormatOutput&, const StringView, const char*);};
 #if SC_PLATFORM_WINDOWS
-template <> struct StringFormatterFor<wchar_t>      {static bool format(StringFormatOutput&, const StringView, const wchar_t);};
+template <> struct StringFormatterFor<wchar_t>        {static bool format(StringFormatOutput&, const StringView, const wchar_t);};
 template <> struct StringFormatterFor<const wchar_t*> {static bool format(StringFormatOutput&, const StringView, const wchar_t*);};
 #endif
+
+template <int N> struct StringFormatterFor<SmallString<N>> {static bool format(StringFormatOutput& sfo, const StringView sv, const SmallString<N>& s){return StringFormatterFor<StringView>::format(sfo,sv,s.view());}};
 // clang-format on
 
 template <int N>
