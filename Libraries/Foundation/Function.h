@@ -55,39 +55,44 @@ struct Function<R(Args...)>
   private:
     enum class FunctionErasedOperation
     {
-        Execute = 0,
-        LambdaDestruct,
-        LambdaCopyConstruct,
-        LambdaMoveConstruct
+        Destruct,
+        CopyConstruct,
+        MoveConstruct
     };
-    using StubFunction = R (*)(FunctionErasedOperation operation, const void** other, const void* const*,
-                               typename TypeTraits::AddPointer<Args>::type...);
+    using StubFunction      = R (*)(const void* const*, typename TypeTraits::AddPointer<Args>::type...);
+    using OperationFunction = void (*)(FunctionErasedOperation operation, const void** other, const void* const*);
 
     static const int LAMBDA_SIZE = sizeof(void*) * 2;
 
-    StubFunction functionStub;
+    StubFunction      functionStub;
+    OperationFunction functionOperation;
+
     union
     {
         const void* classInstance;
         char        lambdaMemory[LAMBDA_SIZE] = {0};
     };
-    void sendLambdaSignal(FunctionErasedOperation operation, const void** other) const
+
+    void executeOperation(FunctionErasedOperation operation, const void** other) const
     {
-        if (functionStub)
-        {
-            (*functionStub)(operation, other, &classInstance, typename TypeTraits::AddPointer<Args>::type(nullptr)...);
-        }
+        if (functionOperation)
+            (*functionOperation)(operation, other, &classInstance);
     }
 
-    Function(const void* instance, StubFunction stub) : functionStub(stub) { classInstance = instance; }
+    Function(const void* instance, StubFunction stub, OperationFunction operation)
+        : functionStub(stub), functionOperation(operation)
+    {
+        classInstance = instance;
+    }
     using FreeFunction = R (*)(Args...);
 
   public:
     /// @brief Constructs an empty Function
     Function()
     {
-        static_assert(sizeof(Function) == sizeof(void*) * 3, "Function Size");
-        functionStub = nullptr;
+        static_assert(sizeof(Function) == sizeof(void*) * 4, "Function Size");
+        functionStub      = nullptr;
+        functionOperation = nullptr;
     }
 
     /// Constructs a function from a lambda with a compatible size (equal or less than LAMBDA_SIZE)
@@ -99,50 +104,56 @@ struct Function<R(Args...)>
             not TypeTraits::IsSame<typename TypeTraits::RemoveReference<Lambda>::type, Function>::value, void>::type>
     Function(Lambda&& lambda)
     {
-        functionStub = nullptr;
+        functionStub      = nullptr;
+        functionOperation = nullptr;
         bind(forward<typename TypeTraits::RemoveReference<Lambda>::type>(lambda));
     }
 
     /// @brief Destroys the function wrapper
-    ~Function() { sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr); }
+    ~Function() { executeOperation(FunctionErasedOperation::Destruct, nullptr); }
 
     /// @brief Move constructor for Function wrapper
     /// @param other The moved from function
     Function(Function&& other)
     {
-        functionStub  = other.functionStub;
-        classInstance = other.classInstance;
-        other.sendLambdaSignal(FunctionErasedOperation::LambdaMoveConstruct, &classInstance);
-        other.sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
-        other.functionStub = nullptr;
+        functionStub      = other.functionStub;
+        functionOperation = other.functionOperation;
+        classInstance     = other.classInstance;
+        other.executeOperation(FunctionErasedOperation::MoveConstruct, &classInstance);
+        other.executeOperation(FunctionErasedOperation::Destruct, nullptr);
+        other.functionStub      = nullptr;
+        other.functionOperation = nullptr;
     }
 
     /// @brief Copy constructor for Function wrapper
     /// @param other The function to be copied
     Function(const Function& other)
     {
-        functionStub = other.functionStub;
-        other.sendLambdaSignal(FunctionErasedOperation::LambdaCopyConstruct, &classInstance);
+        functionStub      = other.functionStub;
+        functionOperation = other.functionOperation;
+        other.executeOperation(FunctionErasedOperation::CopyConstruct, &classInstance);
     }
 
     /// @brief Copy assign a function to current function wrapper. Destroys existing wrapper.
     /// @param other The function to be assigned to current function
     Function& operator=(const Function& other)
     {
-        sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
-        functionStub = other.functionStub;
-        other.sendLambdaSignal(FunctionErasedOperation::LambdaCopyConstruct, &classInstance);
+        executeOperation(FunctionErasedOperation::Destruct, nullptr);
+        functionStub      = other.functionStub;
+        functionOperation = other.functionOperation;
+        other.executeOperation(FunctionErasedOperation::CopyConstruct, &classInstance);
         return *this;
     }
 
     /// @brief Move assign a function to current function wrapper. Destroys existing wrapper.
     /// @param other The function to be move-assigned to current function
-    Function& operator=(Function&& other)
+    Function& operator=(Function&& other) noexcept
     {
-        sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
-        functionStub = other.functionStub;
-        other.sendLambdaSignal(FunctionErasedOperation::LambdaMoveConstruct, &classInstance);
-        other.sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
+        executeOperation(FunctionErasedOperation::Destruct, nullptr);
+        functionStub      = other.functionStub;
+        functionOperation = other.functionOperation;
+        other.executeOperation(FunctionErasedOperation::MoveConstruct, &classInstance);
+        other.executeOperation(FunctionErasedOperation::Destruct, nullptr);
         other.functionStub = nullptr;
         return *this;
     }
@@ -157,24 +168,32 @@ struct Function<R(Args...)>
     template <typename Lambda>
     void bind(Lambda&& lambda)
     {
-        sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
-        functionStub = nullptr;
+        executeOperation(FunctionErasedOperation::Destruct, nullptr);
+        functionStub      = nullptr;
+        functionOperation = nullptr;
 
         new (&classInstance, PlacementNew()) Lambda(forward<Lambda>(lambda));
         static_assert(sizeof(Lambda) <= sizeof(lambdaMemory), "Lambda is too big");
-        functionStub = [](FunctionErasedOperation operation, const void** other, const void* const* p,
-                          typename TypeTraits::AddPointer<Args>::type... args) -> R
+        functionStub = [](const void* const* p, typename TypeTraits::AddPointer<Args>::type... args) -> R
         {
             Lambda& lambda = *reinterpret_cast<Lambda*>(const_cast<void**>(p));
-            if (operation == FunctionErasedOperation::Execute)
-                SC_LANGUAGE_LIKELY { return lambda(*args...); }
-            else if (operation == FunctionErasedOperation::LambdaDestruct)
+            return lambda(*args...);
+        };
+        functionOperation = [](FunctionErasedOperation operation, const void** other, const void* const* p)
+        {
+            Lambda& lambda = *reinterpret_cast<Lambda*>(const_cast<void**>(p));
+            if (operation == FunctionErasedOperation::Destruct)
                 lambda.~Lambda();
-            else if (operation == FunctionErasedOperation::LambdaCopyConstruct)
+            else if (operation == FunctionErasedOperation::CopyConstruct)
                 new (other, PlacementNew()) Lambda(lambda);
-            else if (operation == FunctionErasedOperation::LambdaMoveConstruct)
+            else if (operation == FunctionErasedOperation::MoveConstruct)
                 new (other, PlacementNew()) Lambda(move(lambda));
-            return R();
+            else
+#if SC_COMPILER_MSVC
+                __assume(false);
+#else
+                __builtin_unreachable();
+#endif
         };
     }
 
@@ -183,9 +202,10 @@ struct Function<R(Args...)>
     template <R (*FreeFunction)(Args...)>
     void bind()
     {
-        sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
-        classInstance = nullptr;
-        functionStub  = &FunctionWrapper<FreeFunction>;
+        executeOperation(FunctionErasedOperation::Destruct, nullptr);
+        classInstance     = nullptr;
+        functionStub      = &FunctionWrapper<FreeFunction>;
+        functionOperation = &FunctionOperation;
     }
 
     /// @brief Binds a class member function to function wrapper
@@ -195,9 +215,10 @@ struct Function<R(Args...)>
     template <typename Class, R (Class::*MemberFunction)(Args...) const>
     void bind(const Class& c)
     {
-        sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
-        classInstance = &c;
-        functionStub  = &MemberWrapper<Class, MemberFunction>;
+        executeOperation(FunctionErasedOperation::Destruct, nullptr);
+        classInstance     = &c;
+        functionStub      = &MemberWrapper<Class, MemberFunction>;
+        functionOperation = &MemberOperation;
     }
 
     /// @brief Binds a class member function to function wrapper
@@ -207,9 +228,10 @@ struct Function<R(Args...)>
     template <typename Class, R (Class::*MemberFunction)(Args...)>
     void bind(Class& c)
     {
-        sendLambdaSignal(FunctionErasedOperation::LambdaDestruct, nullptr);
-        classInstance = &c;
-        functionStub  = &MemberWrapper<Class, MemberFunction>;
+        executeOperation(FunctionErasedOperation::Destruct, nullptr);
+        classInstance     = &c;
+        functionStub      = &MemberWrapper<Class, MemberFunction>;
+        functionOperation = &MemberOperation;
     }
 
     /// @brief Binds a class member function to function wrapper
@@ -220,7 +242,7 @@ struct Function<R(Args...)>
     template <typename Class, R (Class::*MemberFunction)(Args...)>
     static Function fromMember(Class& c)
     {
-        return Function(&c, &MemberWrapper<Class, MemberFunction>);
+        return Function(&c, &MemberWrapper<Class, MemberFunction>, &MemberOperation);
     }
 
     /// @brief Binds a class member function to function wrapper
@@ -231,64 +253,42 @@ struct Function<R(Args...)>
     template <typename Class, R (Class::*MemberFunction)(Args...) const>
     static Function fromMember(const Class& c)
     {
-        return Function(&c, &MemberWrapper<Class, MemberFunction>);
+        return Function(&c, &MemberWrapper<Class, MemberFunction>, &MemberOperation);
     }
 
     /// @brief Invokes the wrapped function. If no function is bound, this is UB.
     /// @param args Arguments to be passed to the wrapped function
     /// @return the return value of the invoked function.
-    [[nodiscard]] R operator()(Args... args) const
-    {
-        return (*functionStub)(FunctionErasedOperation::Execute, nullptr, &classInstance, &args...);
-    }
+    [[nodiscard]] R operator()(Args... args) const { return (*functionStub)(&classInstance, &args...); }
 
   private:
-    template <typename Class, R (Class::*MemberFunction)(Args...)>
-    static R MemberWrapper(FunctionErasedOperation operation, const void** other, const void* const* p,
-                           typename TypeTraits::RemoveReference<Args>::type*... args)
+    static void MemberOperation(FunctionErasedOperation operation, const void** other, const void* const* p)
     {
-        if (operation == FunctionErasedOperation::Execute)
-            SC_LANGUAGE_LIKELY
-            {
-                Class* cls = const_cast<Class*>(static_cast<const Class*>(*p));
-                return (cls->*MemberFunction)(*args...);
-            }
-        else if (operation == FunctionErasedOperation::LambdaCopyConstruct or
-                 operation == FunctionErasedOperation::LambdaMoveConstruct)
-        {
+        if (operation == FunctionErasedOperation::CopyConstruct or operation == FunctionErasedOperation::MoveConstruct)
             *other = *p;
-        }
-
-        return R();
     }
-    template <typename Class, R (Class::*MemberFunction)(Args...) const>
-    static R MemberWrapper(FunctionErasedOperation operation, const void** other, const void* const* p,
-                           typename TypeTraits::RemoveReference<Args>::type*... args)
+
+    template <typename Class, R (Class::*MemberFunction)(Args...)>
+    static R MemberWrapper(const void* const* p, typename TypeTraits::RemoveReference<Args>::type*... args)
     {
-        if (operation == FunctionErasedOperation::Execute)
-            SC_LANGUAGE_LIKELY
-            {
-                const Class* cls = static_cast<const Class*>(*p);
-                return (cls->*MemberFunction)(*args...);
-            }
-        else if (operation == FunctionErasedOperation::LambdaCopyConstruct or
-                 operation == FunctionErasedOperation::LambdaMoveConstruct)
-        {
-            *other = *p;
-        }
-        return R();
+        Class* cls = const_cast<Class*>(static_cast<const Class*>(*p));
+        return (cls->*MemberFunction)(*args...);
+    }
+
+    template <typename Class, R (Class::*MemberFunction)(Args...) const>
+    static R MemberWrapper(const void* const* p, typename TypeTraits::RemoveReference<Args>::type*... args)
+    {
+        const Class* cls = static_cast<const Class*>(*p);
+        return (cls->*MemberFunction)(*args...);
     }
 
     template <R (*FreeFunction)(Args...)>
-    static R FunctionWrapper(FunctionErasedOperation operation, const void** other, const void* const* p,
-                             typename TypeTraits::RemoveReference<Args>::type*... args)
+    static R FunctionWrapper(const void* const* p, typename TypeTraits::RemoveReference<Args>::type*... args)
     {
-        SC_COMPILER_UNUSED(other);
         SC_COMPILER_UNUSED(p);
-        if (operation == FunctionErasedOperation::Execute)
-            SC_LANGUAGE_LIKELY { return FreeFunction(*args...); }
-        return R();
+        return FreeFunction(*args...);
     }
+    static void FunctionOperation(FunctionErasedOperation, const void**, const void* const*) {}
 };
 
 template <typename T>

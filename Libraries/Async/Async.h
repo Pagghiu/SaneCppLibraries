@@ -931,8 +931,8 @@ struct SC::AsyncEventLoop
 #endif
     struct InternalDefinition
     {
-        static constexpr int Windows = 176;
-        static constexpr int Apple   = 96;
+        static constexpr int Windows = 184;
+        static constexpr int Apple   = 104;
         static constexpr int Default = 336;
 
         static constexpr size_t Alignment = alignof(void*);
