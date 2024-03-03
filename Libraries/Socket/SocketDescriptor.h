@@ -135,9 +135,10 @@ struct SC::SocketIPAddress
 
     friend struct SocketServer;
     friend struct SocketClient;
-    // TODO: maybe we should only save a binary address instead of native structs (IPV6 would need 16 bytes)
-    uint32_t           sizeOfHandle() const;
-    AlignedStorage<28> handle;
+
+    uint32_t sizeOfHandle() const;
+
+    AlignedStorage<28> handle = {};
 
   private:
     SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;

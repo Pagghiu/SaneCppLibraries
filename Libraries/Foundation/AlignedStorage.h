@@ -56,7 +56,7 @@ struct AlignedStorage
     }
 
   private:
-    alignas(Alignment) char bytes[N];
+    alignas(Alignment) char bytes[N] = {0};
 };
 
 //! @}

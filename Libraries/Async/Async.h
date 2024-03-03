@@ -445,7 +445,7 @@ struct AsyncSocketAccept : public AsyncRequest
     detail::WinOverlappedOpaque overlapped;
 
     SocketDescriptor clientSocket;
-    uint8_t          acceptBuffer[288];
+    uint8_t          acceptBuffer[288] = {0};
 #elif SC_PLATFORM_LINUX
     AlignedStorage<28> sockAddrHandle;
     uint32_t           sockAddrLen;
@@ -680,7 +680,7 @@ struct AsyncFileRead : public AsyncRequest
   private:
     friend struct AsyncEventLoop;
 
-    FileDescriptor::Handle fileDescriptor;
+    FileDescriptor::Handle fileDescriptor = FileDescriptor::Invalid;
     Span<char>             buffer;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
@@ -748,7 +748,7 @@ struct AsyncFileWrite : public AsyncRequest
 
   private:
     friend struct AsyncEventLoop;
-    FileDescriptor::Handle fileDescriptor;
+    FileDescriptor::Handle fileDescriptor = FileDescriptor::Invalid;
     Span<const char>       buffer;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
@@ -779,7 +779,7 @@ struct AsyncFileClose : public AsyncRequest
 
   private:
     friend struct AsyncEventLoop;
-    FileDescriptor::Handle fileDescriptor;
+    FileDescriptor::Handle fileDescriptor = FileDescriptor::Invalid;
 };
 
 /// @brief Starts an handle polling operation.
@@ -808,7 +808,7 @@ struct AsyncFilePoll : public AsyncRequest
   private:
     friend struct AsyncEventLoop;
 
-    FileDescriptor::Handle fileDescriptor;
+    FileDescriptor::Handle fileDescriptor = FileDescriptor::Invalid;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
 #endif

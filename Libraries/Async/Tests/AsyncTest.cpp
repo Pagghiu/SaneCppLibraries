@@ -660,8 +660,8 @@ struct SC::AsyncTest : public SC::TestCase
             // 8. Create and run the read task, reading a single byte at every reactivation
             struct Params
             {
-                int  readCount = 0;
-                char readBuffer[4];
+                int  readCount     = 0;
+                char readBuffer[4] = {0};
             };
             Params              params;
             AsyncFileRead       asyncReadFile;
