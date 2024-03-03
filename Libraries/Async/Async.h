@@ -898,7 +898,7 @@ struct SC::AsyncEventLoop
         static constexpr int Apple   = 344;
         static constexpr int Default = 328;
 
-        static constexpr size_t Alignment = alignof(void*);
+        static constexpr size_t Alignment = 8;
 
         using Object = Private;
     };

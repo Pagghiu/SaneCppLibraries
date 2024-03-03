@@ -651,7 +651,7 @@ struct SC::AsyncEventLoop::Private::CancelAsyncPhase
     {
         if (async.asyncTask)
         {
-            // Waiting here is not ideal but we need it to be able to reilably know that
+            // Waiting here is not ideal but we need it to be able to reliably know that
             // the task can be reused soon after cancelling an async that uses it.
             SC_TRY(async.asyncTask->threadPool.waitForTask(async.asyncTask->task));
 
@@ -887,14 +887,14 @@ void SC::AsyncEventLoop::Private::removeActiveHandle(AsyncRequest& async)
     if ((async.flags & Private::Flag_ManualCompletion) != 0)
     {
         numberOfManualCompletions -= 1;
-        return; // Asyncs flagged to be manually completed, are not added to active handles and do not count as active
+        return; // Async flagged to be manually completed, are not added to active handles and do not count as active
     }
 
     numberOfActiveHandles -= 1;
 
     if (async.asyncTask)
     {
-        return; // Asyncs flagged to be manually completed for thread pool, are not added to active handles
+        return; // Async flagged to be manually completed for thread pool, are not added to active handles
     }
     // clang-format off
     switch (async.type)
@@ -923,14 +923,14 @@ void SC::AsyncEventLoop::Private::addActiveHandle(AsyncRequest& async)
     if ((async.flags & Private::Flag_ManualCompletion) != 0)
     {
         numberOfManualCompletions += 1;
-        return; // Asyncs flagged to be manually completed, are not added to active handles
+        return; // Async flagged to be manually completed, are not added to active handles
     }
 
     numberOfActiveHandles += 1;
 
     if (async.asyncTask)
     {
-        return; // Asyncs flagged to be manually completed for thread pool, are not added to active handles
+        return; // Async flagged to be manually completed for thread pool, are not added to active handles
     }
     // clang-format off
     switch (async.type)

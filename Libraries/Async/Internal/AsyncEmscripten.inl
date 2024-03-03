@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../Async.h"
+#include "AsyncPrivate.h"
 
 struct SC::AsyncEventLoop::Internal
 {
@@ -19,7 +20,7 @@ struct SC::AsyncEventLoop::KernelQueue
     KernelQueue(Internal&) {}
     uint32_t getNumEvents() const { return 0; }
 
-    [[nodiscard]] Result syncWithKernel(AsyncEventLoop&, SyncMode) { return Result(true); }
+    [[nodiscard]] Result syncWithKernel(AsyncEventLoop&, Private::SyncMode) { return Result(true); }
     [[nodiscard]] Result validateEvent(uint32_t, bool&) { return Result(true); }
 
     [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t) const { return nullptr; }
