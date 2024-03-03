@@ -201,6 +201,13 @@ SC::Result SC::FileSystem::removeFileIfExists(StringView source)
     return Result(true);
 }
 
+SC::Result SC::FileSystem::removeLinkIfExists(StringView source)
+{
+    if (existsAndIsLink(source))
+        return removeFiles(Span<const StringView>{source});
+    return Result(true);
+}
+
 SC::Result SC::FileSystem::removeDirectoriesRecursive(Span<const StringView> directories)
 {
     for (auto& path : directories)
@@ -346,6 +353,22 @@ bool SC::FileSystem::existsAndIsDirectory(StringView directory)
     StringView encodedPath;
     SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
     return Internal::existsAndIsFile(encodedPath.getNullTerminatedNative());
+}
+
+[[nodiscard]] bool SC::FileSystem::existsAndIsLink(StringView file)
+{
+    StringView encodedPath;
+    SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
+    return Internal::existsAndIsLink(encodedPath.getNullTerminatedNative());
+}
+
+[[nodiscard]] bool SC::FileSystem::moveDirectory(StringView sourceDirectory, StringView destinationDirectory)
+{
+    StringView encodedPath1;
+    StringView encodedPath2;
+    SC_TRY(convert(sourceDirectory, fileFormatBuffer1, &encodedPath1));
+    SC_TRY(convert(destinationDirectory, fileFormatBuffer2, &encodedPath2));
+    return Internal::moveDirectory(encodedPath1.getNullTerminatedNative(), encodedPath2.getNullTerminatedNative());
 }
 
 SC::Result SC::FileSystem::getFileTime(StringView file, FileTime& fileTime)

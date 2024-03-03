@@ -19,7 +19,11 @@ struct SC::FileSystem::Internal
 
     [[nodiscard]] static bool existsAndIsFile(const char* path) { return false; }
 
+    [[nodiscard]] static bool existsAndIsLink(const char* path) { return false; }
+
     [[nodiscard]] static bool removeEmptyDirectory(const char* path) { return false; }
+
+    [[nodiscard]] static bool moveDirectory(const char* source, const char* destination) { return false; }
 
     [[nodiscard]] static bool removeFile(const char* path) { return false; }
 

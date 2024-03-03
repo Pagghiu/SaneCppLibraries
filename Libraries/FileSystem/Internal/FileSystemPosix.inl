@@ -84,7 +84,22 @@ struct SC::FileSystem::Internal
     {
         struct stat path_stat;
         SC_TRY_LIBC(stat(path, &path_stat));
-        return S_ISREG(path_stat.st_mode) || S_ISLNK(path_stat.st_mode);
+        const bool isReg  = S_ISREG(path_stat.st_mode);
+        const bool isLink = S_ISLNK(path_stat.st_mode);
+        return isReg or isLink;
+    }
+
+    [[nodiscard]] static bool existsAndIsLink(const char* path)
+    {
+        struct stat link_stat;
+        SC_TRY_LIBC(lstat(path, &link_stat));
+        return S_ISLNK(link_stat.st_mode);
+    }
+
+    [[nodiscard]] static bool moveDirectory(const char* sourcePath, const char* destinationPath)
+    {
+        SC_TRY_LIBC(::rename(sourcePath, destinationPath));
+        return true;
     }
 
     [[nodiscard]] static bool removeEmptyDirectory(const char* path) { return rmdir(path) == 0; }

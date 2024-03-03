@@ -42,6 +42,7 @@ struct SC::FileSystemTest : public SC::TestCase
         {
             removeDirectoryRecursive();
         }
+        // TODO: Add tests for existsAndIsLink, removeLinkIfExists and moveDirectory
     }
 
     inline void formatError();

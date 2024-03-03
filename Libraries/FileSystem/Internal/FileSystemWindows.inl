@@ -86,6 +86,22 @@ struct SC::FileSystem::Internal
         return (res & FILE_ATTRIBUTE_DIRECTORY) == 0;
     }
 
+    [[nodiscard]] static bool existsAndIsLink(const wchar_t* dir)
+    {
+        const DWORD res = GetFileAttributesW(dir);
+        if (res == INVALID_FILE_ATTRIBUTES)
+        {
+            return false;
+        }
+        return (res & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+    }
+
+    [[nodiscard]] static bool moveDirectory(const wchar_t* sourcePath, const wchar_t* destinationPath)
+    {
+        // Use MOVEFILE_COPY_ALLOWED for moving across volumes
+        return ::MoveFileEx(sourcePath, destinationPath, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED) == TRUE;
+    }
+
     [[nodiscard]] static bool removeEmptyDirectory(const wchar_t* dir)
     {
         SC_TRY_LIBC(_wrmdir(dir));

@@ -136,6 +136,11 @@ struct SC::FileSystem
     /// @return Valid Result if the file doesn't exist or if it exists and it has been successfully removed.
     [[nodiscard]] Result removeFileIfExists(StringView source);
 
+    /// @brief Remove a single link, giving no error if it doesn't exist
+    /// @param source The link to be removed if it exists
+    /// @return Valid Result if the file doesn't exist or if it exists and it has been successfully removed.
+    [[nodiscard]] Result removeLinkIfExists(StringView source);
+
     /// @brief Remove multiple directories with their entire content (like posix `rm -rf`)
     /// @param directories List of directories to remove
     /// @return Valid Result if all directories and their contents have been successfully removed
@@ -229,12 +234,23 @@ struct SC::FileSystem
     [[nodiscard]] bool existsAndIsDirectory(StringView directory);
 
     /// @brief Check if a file exists at given path
-    /// @param file Fil path to check
+    /// @param file File path to check
     /// @return `true` if a file exists at the given path
     ///
     /// Example:
     /// \snippet Libraries/FileSystem/Tests/FileSystemTest.cpp copyExistsFileSnippet
     [[nodiscard]] bool existsAndIsFile(StringView file);
+
+    /// @brief Check if a link exists at given path
+    /// @param file Link path to check
+    /// @return `true` if a file exists at the given path
+    [[nodiscard]] bool existsAndIsLink(StringView file);
+
+    /// @brief Moves a directory from source to destination
+    /// @param sourceDirectory The source directory that will be moved to destination
+    /// @param destinationDirectory The destination directory
+    /// @return `true` if the move succeeded
+    [[nodiscard]] bool moveDirectory(StringView sourceDirectory, StringView destinationDirectory);
 
     /// @brief Writes a block of memory to a file
     /// @param file Path to the file that is meant to be written
