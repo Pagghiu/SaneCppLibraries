@@ -4,7 +4,6 @@
 
 #include "../Containers/IntrusiveDoubleLinkedList.h"
 #include "../File/FileDescriptor.h"
-#include "../Foundation/Function.h"
 #include "../Strings/SmallString.h"
 #include "ProcessDescriptor.h"
 
@@ -33,107 +32,178 @@ struct SC::ProcessID
 /// - Redirecting standard in/out/err of a child process to a Pipe
 /// - Wait for the child process exit code
 ///
-/// @n
-/**
- * Example: launch a process and wait for it to finish execution
- * @code{.cpp}
-Process process;
-SC_TRY(process.launch("executable.exe", "--argument1", "--argument2"));
-SC_TRY(process.waitForExitSync());
- * @endcode
- *
- * Example: wait for the process to fully execute
- * @code{.cpp}
-Process process;
-SC_TRY(process.launch("executable.exe", "--argument1", "--argument2"));
-SC_TRY(process.waitForExitSync());
- * @endcode
- *
- * Example: read process output
- * @code{.cpp}
-Process process;
-PipeDescriptor outputPipe;
-SC_TRY(process.redirectStdOutTo(outputPipe));
-SC_TRY(process.launch("executable.exe", "--argument1", "--argument2"));
-String output = StringEncoding::Ascii; // Could also use SmallString<N>
-SC_TRY(outputPipe.readPipe.readUntilEOF(output));
-SC_TRY(process.waitForExitSync());
-// ... Do something with the 'output' string
- * @endcode
- * */
+/// Example: execute child process (launch and wait for it to fully execute)
+/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessSnippet1
+///
+/// Example: execute child process, redirecting stdout to a string
+/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessSnippet2
+///
+/// Example: launch a child process and wait for it to finish execution
+/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessSnippet3
+///
+/// Example: execute child process, filling its stdin with a StringView
+/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessSnippet4
+///
+/// Example: read process output using a pipe, using launch + waitForExitSync
+/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessSnippet5
+
 struct SC::Process
 {
-    /// @brief Options for SC::Process::launch
-    struct Options
+    struct StdStream
     {
-        bool inheritFileDescriptors; ///< If true, child process will inherit parent file descriptors
-        Options() { inheritFileDescriptors = false; }
+        // clang-format off
+        /// @brief Read the process standard output/error into the given String
+        StdStream(String& externalString) { operation = Operation::String; string = &externalString;}
+
+        /// @brief Read the process standard output/error into the given Vector
+        StdStream(Vector<char>& externalVector) { operation = Operation::Vector; vector = &externalVector; }
+        // clang-format on
+
+        /// @brief Redirects child process standard output/error to a given file descriptor
+        StdStream(FileDescriptor&& file)
+        {
+            operation = Operation::FileDescriptor;
+            (void)file.get(fileDescriptor, Result::Error("Invalid redirection file descriptor"));
+            file.detach();
+        }
+
+        StdStream(PipeDescriptor& pipe)
+        {
+            operation      = Operation::ExternalPipe;
+            pipeDescriptor = &pipe;
+        }
+
+      protected:
+        struct AlreadySetup
+        {
+        };
+        StdStream() = default;
+        StdStream(AlreadySetup) { operation = Operation::AlreadySetup; }
+        friend struct Process;
+        friend struct ProcessChain;
+
+        enum class Operation
+        {
+            AlreadySetup,
+            Inherit,
+            Ignore,
+            ExternalPipe,
+            FileDescriptor,
+            Vector,
+            String,
+            WritableSpan,
+            ReadableSpan
+        };
+        Operation operation = Operation::Inherit;
+
+        Span<const char> readableSpan;
+        Span<char>       writableSpan;
+
+        String*       string;
+        Vector<char>* vector;
+
+        FileDescriptor::Handle fileDescriptor;
+
+        PipeDescriptor* pipeDescriptor;
+    };
+
+    struct StdOut : public StdStream
+    {
+        // clang-format off
+        struct Ignore{};
+        struct Inherit{};
+
+        /// @brief Ignores child process standard output/error (child process output will be silenced)
+        StdOut(Ignore) { operation = Operation::Ignore; }
+
+        /// @brief Inherits child process standard output/error (child process will print into parent process console)
+        StdOut(Inherit) { operation = Operation::Inherit; }
+
+        /// @brief Read the process standard output/error into the given Span
+        StdOut(Span<char> span) { operation = Operation::WritableSpan; writableSpan = span; }
+
+        using StdStream::StdStream;
+        friend struct ProcessChain;
+        // clang-format on
+    };
+
+    using StdErr = StdOut;
+
+    struct StdIn : public StdStream
+    {
+        // clang-format off
+        struct Inherit{};
+
+        /// @brief Inherits child process Input from parent process
+        StdIn(Inherit) { operation = Operation::Inherit; }
+
+        /// @brief Fills standard input with content of a C-String
+        template <int N> StdIn(const char (&item)[N]) : StdIn(StringView({item, N - 1}, true, StringEncoding::Ascii)) {}
+
+        /// @brief Fills standard input with content of a StringView
+        StdIn(StringView string) : StdIn(string.toCharSpan()) {}
+
+        /// @brief Fills standard input with content of a Span
+        StdIn(Span<const char> span) { operation = Operation::ReadableSpan; readableSpan = span;}
+
+        using StdStream::StdStream;
+        friend struct ProcessChain;
+        // clang-format on
     };
 
     ProcessDescriptor handle;    ///< Handle to the OS process
-    ProcessID         processID; ///< Id of the process
-
-    ProcessDescriptor::ExitStatus exitStatus; ///< Exit status code returned after process is finished
-
-    FileDescriptor standardInput;  ///< Descriptor of process stdin
-    FileDescriptor standardOutput; ///< Descriptor of process stdout
-    FileDescriptor standardError;  ///< Descriptor of process stderr
+    ProcessID         processID; ///< ID of the process (can be the same as handle on some OS)
 
     /// @brief Waits (blocking) for process to exit after launch. It can only be called if Process::launch succeeded.
     [[nodiscard]] Result waitForExitSync();
 
     /// @brief Launch child process with the given arguments
-    /// @param args Process executable path and its arguments (if any)
-    /// @returns Error if the requested executable doesn't exist / is not accessible / it cannot be executed
-    template <typename... StringView>
-    [[nodiscard]] Result launch(StringView&&... args)
-    {
-        SC_TRY(formatArguments({forward<StringView>(args)...}));
-        return launch();
-    }
-
-    /// @brief Launch child process with the given arguments
-    /// @param options Options for launching process (inherit file descriptors)
-    /// @param args Process executable path and its arguments (if any)
-    /// @returns Error if the requested executable doesn't exist / is not accessible / it cannot be executed
-    template <typename... StringView>
-    [[nodiscard]] Result launch(Options options, StringView&&... args)
-    {
-        SC_TRY(formatArguments({forward<StringView>(args)...}));
-        return launch(options);
-    }
-
-    /// @brief Launch child process with the given arguments
     /// @param cmd Process executable path and its arguments (if any)
+    /// @param stdOut Process::StdOut::Ignore{}, Process::StdOut::Inherit{} or redirect stdout to String/Vector/Span
+    /// @param stdIn Process::StdIn::Ignore{}, Process::StdIn::Inherit{} or feed stdin from
+    /// StringView/String/Vector/Span
+    /// @param stdErr Process::StdErr::Ignore{}, Process::StdErr::Inherit{} or redirect stderr to String/Vector/Span
     /// @returns Error if the requested executable doesn't exist / is not accessible / it cannot be executed
-    [[nodiscard]] Result launch(Span<const StringView> cmd, Options options = Options())
+    [[nodiscard]] Result launch(Span<const StringView> cmd,                        //
+                                const StdOut&          stdOut = StdOut::Inherit{}, //
+                                const StdIn&           stdIn  = StdIn::Inherit{},  //
+                                const StdErr&          stdErr = StdErr::Inherit{})
     {
         SC_TRY(formatArguments(cmd));
-        return launch(options);
+        return launch(stdOut, stdIn, stdErr);
     }
 
-    /// @brief Redirect Process Standard Output to the given pipe
-    /// @param pipe A reference to an empty Pipe object that will receive a pipe to read from stdout.
-    [[nodiscard]] Result redirectStdOutTo(PipeDescriptor& pipe);
+    /// @brief Executes a  child process with the given arguments, waiting (blocking) until it's fully finished
+    /// @param cmd Process executable path and its arguments (if any)
+    /// @param stdOut Process::StdOut::Ignore{}, Process::StdOut::Inherit{} or redirect stdout to String/Vector/Span
+    /// @param stdIn Process::StdIn::Ignore{}, Process::StdIn::Inherit{} or feed stdin from
+    /// StringView/String/Vector/Span
+    /// @param stdErr Process::StdErr::Ignore{}, Process::StdErr::Inherit{} or redirect stderr to String/Vector/Span
+    /// @returns Error if the requested executable doesn't exist / is not accessible / it cannot be executed
+    [[nodiscard]] Result exec(Span<const StringView> cmd,                        //
+                              const StdOut&          stdOut = StdOut::Inherit{}, //
+                              const StdIn&           stdIn  = StdIn::Inherit{},  //
+                              const StdErr&          stdErr = StdErr::Inherit{})
+    {
+        SC_TRY(launch(cmd, stdOut, stdIn, stdErr));
+        return waitForExitSync();
+    }
 
-    /// @brief Redirect Process Standard Error to the given pipe
-    /// @param pipe A reference to an empty Pipe object that will receive a pipe to read from stderr.
-    [[nodiscard]] Result redirectStdErrTo(PipeDescriptor& pipe);
-
-    /// @brief Redirect Process Standard Input to the given pipe
-    /// @param pipe A reference to an empty Pipe object that will receive a pipe to write to stdin.
-    [[nodiscard]] Result redirectStdInTo(PipeDescriptor& pipe);
+    /// @brief gets the return code from the exited child process (valid only after exec or waitForExitSync)
+    int32_t getExitStatus() const { return exitStatus.status; }
 
   private:
-    [[nodiscard]] Result launch(Options options = Options());
-    template <typename... StringView>
-    [[nodiscard]] Result formatCommand(StringView&&... args)
-    {
-        return formatArguments({forward<StringView>(args)...});
-    }
+    ProcessDescriptor::ExitStatus exitStatus; ///< Exit status code returned after process is finished
+
+    FileDescriptor stdInFd;  ///< Descriptor of process stdin
+    FileDescriptor stdOutFd; ///< Descriptor of process stdout
+    FileDescriptor stdErrFd; ///< Descriptor of process stderr
+
+    [[nodiscard]] Result launch(const StdOut& stdOutput, const StdIn& stdInput, const StdErr& stdError);
 
     [[nodiscard]] Result formatArguments(Span<const StringView> cmd);
 
+    // TODO: These must be exposed and filled properly with existing values
     StringNative<255>  currentDirectory = StringEncoding::Native;
     StringNative<1024> environment      = StringEncoding::Native;
 
@@ -143,7 +213,7 @@ struct SC::Process
     // we can track all arguments to be passed to execve.
     StringNative<255> command = StringEncoding::Native;
 #if !SC_PLATFORM_WINDOWS // On Posix we need to track the "sub-strings" hidden in command
-    static constexpr size_t MAX_NUM_ARGUMENTS = 256;
+    static constexpr size_t MAX_NUM_ARGUMENTS = 64;
     size_t commandArgumentsByteOffset[MAX_NUM_ARGUMENTS]; // Tracking length of each argument in the command string
     size_t commandArgumentsNumber = 0;                    // Counts number of arguments (including executable name)
 #endif
@@ -156,9 +226,7 @@ struct SC::Process
     Process* prev = nullptr;
     struct Internal;
 
-    [[nodiscard]] Result fork();
-
-    [[nodiscard]] bool isChild() const;
+    Result launchImplementation();
 };
 
 /// @brief Execute multiple child processes chaining input / output between them.
@@ -173,20 +241,20 @@ struct SC::Process
 /**
  * Example: print result `ls ~ | grep desktop` in current terminal
  * @code{.cpp}
-ProcessChain chain([&](const ProcessChain::Error&) { });
+ProcessChain chain;
 Process      p1, p2;
-SC_TRY(chain.pipe(p1, "ls", "~"));
-SC_TRY(chain.pipe(p2, "grep", "Desktop"));
+SC_TRY(chain.pipe(p1, {"ls", "~"}));
+SC_TRY(chain.pipe(p2, {"grep", "Desktop"}));
 SC_TRY(chain.launch());
 SC_TRY(chain.waitForExitSync());
  * @endcode
  *
  * Example: read result of `ls ~ | grep desktop` into a String
  * @code{.cpp}
-ProcessChain chain([&](const ProcessChain::Error&) { });
+ProcessChain chain;
 Process      p1, p2;
-SC_TRY(chain.pipe(p1, "ls", "~"));
-SC_TRY(chain.pipe(p2, "grep", "Desktop"));
+SC_TRY(chain.pipe(p1, {"ls", "~"}));
+SC_TRY(chain.pipe(p2, {"grep", "Desktop"}));
 ProcessChain::Options options;
 options.pipeSTDOUT = true;
 SC_TRY(chain.launch(options));
@@ -198,84 +266,36 @@ SC_TRY(chain.waitForExitSync());
  * */
 struct SC::ProcessChain
 {
-    /// @brief Specify if a child process input / output should be piped (intercepted)
-    struct Options
-    {
-        bool pipeSTDIN;
-        bool pipeSTDOUT;
-        bool pipeSTDERR;
-        Options()
-        {
-            pipeSTDIN  = false;
-            pipeSTDOUT = false;
-            pipeSTDERR = false;
-        }
-    };
-
-    /// @brief Error context for error callback specified in constructor
-    struct Error
-    {
-        Result returnCode = Result(true);
-    };
-
-    /// @brief construct with an error delegate
-    /// @param onError a Delegate that will receive error notifications for processes that fail to start
-    ProcessChain(Delegate<const Error&> onError) : onError(onError) {}
-
-    /// @brief Add a process to the chain, with given arguments
-    /// @param process A non-launched Process object (allocated by caller, must be alive until waitForExitSync)
-    /// @param args Path to executable and eventual args for this process
-    /// @return Invalid result if given process failed to create pipes for I/O redirection
-    template <typename... StringView>
-    [[nodiscard]] Result pipe(Process& process, StringView&&... args)
-    {
-        return pipe(process, {forward<const StringView>(args)...});
-    }
-
     /// @brief Add a process to the chain, with given arguments
     /// @param process A non-launched Process object (allocated by caller, must be alive until waitForExitSync)
     /// @param cmd Path to executable and eventual args for this process
     /// @return Invalid result if given process failed to create pipes for I/O redirection
+    /// @todo Expose options to decide if to pipe also stderr
     [[nodiscard]] Result pipe(Process& process, const Span<const StringView> cmd);
 
-    /// @brief Launch the entire chain of processes
-    /// @param options Options for redirection I/O of the given process chain
+    /// @brief Launch the entire chain of processes. Reading from pipes can be done after launching.
+    /// You can then call ProcessChain::waitForExitSync to block until the child process is fully finished.
     /// @return Valid result if given process chain has been launched successfully
-    [[nodiscard]] Result launch(Options options = Options());
+    [[nodiscard]] Result launch(const Process::StdOut& stdOut = Process::StdOut::Inherit{}, //
+                                const Process::StdIn&  stdIn  = Process::StdIn::Inherit{},  //
+                                const Process::StdErr& stdErr = Process::StdErr::Inherit{});
 
-    /// @brief Waits (blocking) for entire process chain to exit after launch
+    /// @brief Waits (blocking) for entire process chain to exit. Can be called only after ProcessChain::launch.
     /// @return Valid result if the given process chain exited normally without aborting
     [[nodiscard]] Result waitForExitSync();
 
-    /// @brief Reads stdout of last process in the chain into String
-    /// @param destination A String that will contain all stdout from given process
-    /// @return Valid result it was possible to read all stdout data in destination string
-    [[nodiscard]] Result readStdOutUntilEOFSync(String& destination);
-
-    /// @brief Reads stderr of last process in the chain into String
-    /// @param destination A String that will contain all stderr from given process
-    /// @return Valid result it was possible to read all stderr data in destination string
-    [[nodiscard]] Result readStdErrUntilEOFSync(String& destination);
-
-    /// @brief Reads stdout of last process in the chain into char buffer
-    /// @param destination A char buffer that will contain all stdout from given process
-    /// @return Valid result it was possible to read all stdout data in destination string
-    [[nodiscard]] Result readStdOutUntilEOFSync(Vector<char>& destination);
-
-    /// @brief Reads stderr of last process in the chain into char buffer
-    /// @param destination A char buffer that will contain all stderr from given process
-    /// @return Valid result it was possible to read all stderr data in destination string
-    [[nodiscard]] Result readStdErrUntilEOFSync(Vector<char>& destination);
+    /// @brief Launch the entire chain of processes and waits for the results (calling ProcessChain::waitForExitSync)
+    /// @return Valid result if given process chain has been launched and waited for exit successfully
+    [[nodiscard]] Result exec(const Process::StdOut& stdOut = Process::StdOut::Inherit{}, //
+                              const Process::StdIn&  stdIn  = Process::StdIn::Inherit{},  //
+                              const Process::StdErr& stdErr = Process::StdErr::Inherit{})
+    {
+        SC_TRY(launch(stdOut, stdIn, stdErr));
+        return waitForExitSync();
+    }
 
   private:
-    Delegate<const Error&> onError;
-    Error                  error;
-
     IntrusiveDoubleLinkedList<Process> processes;
-
-    PipeDescriptor inputPipe;
-    PipeDescriptor outputPipe;
-    PipeDescriptor errorPipe;
 };
 
 //! @}

@@ -294,12 +294,12 @@ struct SC::AsyncTest : public SC::TestCase
             Process processSuccess;
             Process processFailure;
 #if SC_PLATFORM_WINDOWS
-            SC_TEST_EXPECT(processSuccess.launch("where", "where.exe"));        // Returns 0 error code
-            SC_TEST_EXPECT(processFailure.launch("cmd", "/C", "dir /DOCTORS")); // Returns 1 error code
+            SC_TEST_EXPECT(processSuccess.launch({"where", "where.exe"}));        // Returns 0 error code
+            SC_TEST_EXPECT(processFailure.launch({"cmd", "/C", "dir /DOCTORS"})); // Returns 1 error code
 #else
             // Must wait for the process to be still active when adding it to kqueue
-            SC_TEST_EXPECT(processSuccess.launch("sleep", "0.2")); // Returns 0 error code
-            SC_TEST_EXPECT(processFailure.launch("ls", "/~"));     // Returns 1 error code
+            SC_TEST_EXPECT(processSuccess.launch({"sleep", "0.2"})); // Returns 0 error code
+            SC_TEST_EXPECT(processFailure.launch({"ls", "/~"}));     // Returns 1 error code
 #endif
             ProcessDescriptor::Handle processHandleSuccess = 0;
             SC_TEST_EXPECT(processSuccess.handle.get(processHandleSuccess, Result::Error("Invalid Handle 1")));
@@ -892,7 +892,7 @@ SC::Result snippetForProcess(AsyncEventLoop& eventLoop, Console& console)
 // Assuming an already created (and running) AsyncEventLoop named eventLoop
 // ...
 Process process;
-SC_TRY(process.launch("executable", "--parameter"));
+SC_TRY(process.launch({"executable", "--parameter"}));
 ProcessDescriptor::Handle processHandle;
 SC_TRY(process.handle.get(processHandle, Result::Error("Invalid Handle")));
 AsyncProcessExit processExit; //  Memory lifetime must be valid until callback is called

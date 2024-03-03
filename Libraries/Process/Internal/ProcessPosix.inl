@@ -82,18 +82,6 @@ struct SC::Process::Internal
     }
 };
 
-SC::Result SC::Process::fork()
-{
-    processID.pid = ::fork();
-    if (processID.pid < 0)
-    {
-        return Result::Error("fork failed");
-    }
-    return Result(true);
-}
-
-bool SC::Process::isChild() const { return processID.pid == 0; }
-
 SC::Result SC::Process::waitForExitSync()
 {
     int   status = -1;
@@ -111,9 +99,8 @@ SC::Result SC::Process::waitForExitSync()
     return Result(true);
 }
 
-SC::Result SC::Process::launch(Options options)
+SC::Result SC::Process::launchImplementation()
 {
-    SC_COMPILER_UNUSED(options);
     sigset_t emptySignals;
     sigset_t previousSignals;
 
@@ -135,10 +122,14 @@ SC::Result SC::Process::launch(Options options)
     SC_TRY(pipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteNonInheritable));
 
     // Fork child from parent here
-    SC_TRY(fork());
+    processID.pid = ::fork();
+    if (processID.pid < 0)
+    {
+        return Result::Error("fork failed");
+    }
 
     // Check parent / child branch
-    if (isChild())
+    if (processID.pid == 0)
     {
         // Child branch
 
@@ -148,17 +139,17 @@ SC::Result SC::Process::launch(Options options)
         // Try restoring default signal handlers
         SC_TRY(Internal::resetInheritedSignalHandlers());
 
-        if (standardInput.isValid())
+        if (stdInFd.isValid())
         {
-            SC_TRY(Internal::duplicateAndReplace(standardInput, Internal::getStandardInputFDS()));
+            SC_TRY(Internal::duplicateAndReplace(stdInFd, Internal::getStandardInputFDS()));
         }
-        if (standardOutput.isValid())
+        if (stdOutFd.isValid())
         {
-            SC_TRY(Internal::duplicateAndReplace(standardOutput, Internal::getStandardOutputFDS()));
+            SC_TRY(Internal::duplicateAndReplace(stdOutFd, Internal::getStandardOutputFDS()));
         }
-        if (standardError.isValid())
+        if (stdErrFd.isValid())
         {
-            SC_TRY(Internal::duplicateAndReplace(standardError, Internal::getStandardErrorFDS()));
+            SC_TRY(Internal::duplicateAndReplace(stdErrFd, Internal::getStandardErrorFDS()));
         }
         // As std handles have been duplicated / redirected, we can close all of them.
         // We explicitly close them because some may have not been marked as CLOEXEC.
@@ -170,9 +161,9 @@ SC::Result SC::Process::launch(Options options)
         // still valid between the fork() and the exec() call to do anything needed
         // (like the duplication / redirect we're doing here) without risk of leaking
         // any FD to the newly executed child process.
-        SC_TRY(standardInput.close());
-        SC_TRY(standardOutput.close());
-        SC_TRY(standardError.close());
+        SC_TRY(stdInFd.close());
+        SC_TRY(stdOutFd.close());
+        SC_TRY(stdErrFd.close());
 
         // Construct the argv pointers array, from the command string, that contains the
         // executable and all arguments separated by null terminators
@@ -199,7 +190,9 @@ SC::Result SC::Process::launch(Options options)
         childErrno = errno;
         // TODO: Add a write or Span overload that will not need to be called with a reinterpret_cast
         (void)pipe.writePipe.write({reinterpret_cast<char*>(&childErrno), sizeof(childErrno)});
-        (void)pipe.close();
+        // We should not close the writePipe because if this happens before readpipe has read, it will read 0
+        // bytes thinking incorrectly that the process has succeeded.
+        // (void)pipe.close();
     }
     else
     {
@@ -221,11 +214,9 @@ SC::Result SC::Process::launch(Options options)
             return Result::Error("execvp failed");
         }
         SC_TRY(handle.assign(processID.pid));
-        SC_TRY(standardInput.close());
-        SC_TRY(standardOutput.close());
-        SC_TRY(standardError.close());
-        // We are not aware of a way of knowing if the spawn failed on posix until without blocking
-        // on waitpid. For this reason we return true also on Windows implementation in case of error.
+        SC_TRY(stdInFd.close());
+        SC_TRY(stdOutFd.close());
+        SC_TRY(stdErrFd.close());
         return Result(true);
     }
     // The exit(127) inside isChild makes this unreachable

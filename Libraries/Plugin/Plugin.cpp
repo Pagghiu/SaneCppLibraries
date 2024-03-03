@@ -336,18 +336,18 @@ SC::Result SC::PluginCompiler::compileFile(StringView sourceFile, StringView obj
     SC_TRY(includeBuilder.append(L"/I\""));
     SC_TRY(includeBuilder.append(includePath.view()));
     SC_TRY(includeBuilder.append(L"\""));
-    SC_TRY(process.launch(compilerPath.view(), includes.view(), destFile.view(), L"/std:c++17",
-                          L"/DSC_DISABLE_CONFIG=1", L"/GR-", L"/WX", L"/W4", L"/permissive-", L"/GS-", L"/Zi",
-                          L"/DSC_PLUGIN_LIBRARY=1", L"/EHsc-", L"/c", sourceFile));
+    SC_TRY(process.launch({compilerPath.view(), includes.view(), destFile.view(), L"/std:c++17",
+                           L"/DSC_DISABLE_CONFIG=1", L"/GR-", L"/WX", L"/W4", L"/permissive-", L"/GS-", L"/Zi",
+                           L"/DSC_PLUGIN_LIBRARY=1", L"/EHsc-", L"/c", sourceFile}));
 #else
     SC_TRY(includeBuilder.append("-I"));
     SC_TRY(includeBuilder.append(includePath.view()));
-    SC_TRY(process.launch(compilerPath.view(), "-DSC_DISABLE_CONFIG=1", "-DSC_PLUGIN_LIBRARY=1", "-nostdinc++",
-                          "-nostdinc", "-fno-stack-protector", "-std=c++14", includes.view(), "-fno-exceptions",
-                          "-fno-rtti", "-g", "-c", "-fpic", sourceFile, "-o", objectFile));
+    SC_TRY(process.launch({compilerPath.view(), "-DSC_DISABLE_CONFIG=1", "-DSC_PLUGIN_LIBRARY=1", "-nostdinc++",
+                           "-nostdinc", "-fno-stack-protector", "-std=c++14", includes.view(), "-fno-exceptions",
+                           "-fno-rtti", "-g", "-c", "-fpic", sourceFile, "-o", objectFile}));
 #endif
     SC_TRY(process.waitForExitSync());
-    return Result(process.exitStatus.status == 0);
+    return Result(process.getExitStatus() == 0);
 }
 
 SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin) const
@@ -435,7 +435,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, StringVi
 #endif
     SC_TRY(process.launch(args.toSpanConst()));
     SC_TRY(process.waitForExitSync());
-    return Result(process.exitStatus.status == 0);
+    return Result(process.getExitStatus() == 0);
 }
 
 SC::Result SC::PluginDynamicLibrary::unload()

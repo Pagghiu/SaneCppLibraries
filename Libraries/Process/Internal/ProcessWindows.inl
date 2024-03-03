@@ -37,16 +37,17 @@ SC::Result SC::Process::waitForExitSync()
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/procthread/creating-a-child-process-with-redirected-input-and-output
-SC::Result SC::Process::launch(Options options)
+SC::Result SC::Process::launchImplementation()
 {
     STARTUPINFOW startupInfo;
-    const bool   someRedirection = standardInput.isValid() || standardOutput.isValid() || standardError.isValid();
+
+    const bool someRedirection = stdInFd.isValid() || stdOutFd.isValid() || stdErrFd.isValid();
 
     // On Windows to inherit flags they must be flagged as inheritable AND CreateProcess bInheritHandles must be true
     // TODO: This is not thread-safe in regard to handle inheritance, check out Microsoft Article on the topic
     // https://devblogs.microsoft.com/oldnewthing/20111216-00/?p=8873
 
-    const BOOL inheritHandles = options.inheritFileDescriptors or someRedirection ? TRUE : FALSE;
+    const BOOL inheritHandles = someRedirection ? TRUE : FALSE;
 
     DWORD creationFlags = 0; // CREATE_UNICODE_ENVIRONMENT;
     ZeroMemory(&startupInfo, sizeof(STARTUPINFO));
@@ -55,17 +56,17 @@ SC::Result SC::Process::launch(Options options)
     startupInfo.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
     startupInfo.hStdError  = GetStdHandle(STD_ERROR_HANDLE);
 
-    if (standardInput.isValid())
+    if (stdInFd.isValid())
     {
-        SC_TRY(standardInput.get(startupInfo.hStdInput, Result(false)));
+        SC_TRY(stdInFd.get(startupInfo.hStdInput, Result(false)));
     }
-    if (standardOutput.isValid())
+    if (stdOutFd.isValid())
     {
-        SC_TRY(standardOutput.get(startupInfo.hStdOutput, Result(false)));
+        SC_TRY(stdOutFd.get(startupInfo.hStdOutput, Result(false)));
     }
-    if (standardError.isValid())
+    if (stdErrFd.isValid())
     {
-        SC_TRY(standardError.get(startupInfo.hStdError, Result(false)));
+        SC_TRY(stdErrFd.get(startupInfo.hStdError, Result(false)));
     }
     if (someRedirection)
     {
@@ -99,8 +100,8 @@ SC::Result SC::Process::launch(Options options)
 
     processID.pid = processInfo.dwProcessId;
     SC_TRY(handle.assign(processInfo.hProcess));
-    SC_TRY(standardInput.close());
-    SC_TRY(standardOutput.close());
-    SC_TRY(standardError.close());
+    SC_TRY(stdInFd.close());
+    SC_TRY(stdOutFd.close());
+    SC_TRY(stdErrFd.close());
     return Result(true);
 }

@@ -189,6 +189,7 @@ struct SC::PipeDescriptor
         ReadInheritable,   ///< Requests read side of the pipe to be inheritable from child processes
         ReadNonInheritable ///< Requests read side of the pipe not to be inheritable from child processes
     };
+
     /// @brief Specifies a flag for write side of the pipe
     enum InheritableWriteFlag
     {
@@ -197,7 +198,6 @@ struct SC::PipeDescriptor
     };
     FileDescriptor readPipe;  ///< The read side of the pipe
     FileDescriptor writePipe; ///< The write side of the pipe
-    /// Creates a Pipe. Default is non-inheritable / blocking
 
     /// @brief Creates a Pipe. File descriptors are created with blocking mode enabled by default.
     /// @param readFlag Specifies how the read side should be created
