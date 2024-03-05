@@ -29,6 +29,18 @@ struct SC::ProcessTest : public SC::TestCase
 #else
             SC_TEST_EXPECT(process.exec({"which", "sudo"}));
 #endif
+            // Will print either /usr/bin/sudo or C:\Windows\System32\where.exe to parent console
+        }
+        if (test_section("Process ignore"))
+        {
+            // Launches a process and ignore its stdoutput
+            Process process;
+#if SC_PLATFORM_WINDOWS
+            SC_TEST_EXPECT(process.exec({"where", "where.exe"}, Process::StdOut::Ignore()));
+#else
+            SC_TEST_EXPECT(process.exec({"which", "sudo"}, Process::StdOut::Ignore()));
+#endif
+            // Nothing will be printed on the parent stdout (console / file)
         }
         if (test_section("Process redirect output"))
         {
@@ -52,22 +64,28 @@ struct SC::ProcessTest : public SC::TestCase
 #else
             SC_TEST_EXPECT(chain.pipe(p1, {"echo", "DOCTORI"}));
 #endif
-            SC_TEST_EXPECT(chain.launch());
-            SC_TEST_EXPECT(chain.waitForExitSync());
+            SC_TEST_EXPECT(chain.exec());
         }
         if (test_section("ProcessChain inherit dual"))
         {
-            // Executes two processes piping output of process p1 to input of process p2
+            // Executes two processes piping output of process p1 to input of process p2.
+            // Then reads the output of the last process in the chain and check its correctness.
             ProcessChain chain;
             Process      p1, p2;
+            // Print "Salve\nDoctori" on Windows and Posix and then grep for "Doc" (that returns "Doctori")
 #if SC_PLATFORM_WINDOWS
-            SC_TEST_EXPECT(chain.pipe(p1, {"where", "/?"}));
-            SC_TEST_EXPECT(chain.pipe(p2, {"findstr", "dir]"}));
+            StringView expectedOutput = "Doctori\r\n";
+            SC_TEST_EXPECT(chain.pipe(p1, {"cmd", "/C", "echo", "Salve", "&", "echo", "Doctori"}));
+            SC_TEST_EXPECT(chain.pipe(p2, {"findstr", "Doc"}));
 #else
-            SC_TEST_EXPECT(chain.pipe(p1, {"echo", "Doctori tuttappost?"}));
+
+            StringView expectedOutput = "Doctori\n";
+            SC_TEST_EXPECT(chain.pipe(p1, {"echo", "Salve\nDoctori"}));
             SC_TEST_EXPECT(chain.pipe(p2, {"grep", "Doc"}));
 #endif
-            SC_TEST_EXPECT(chain.exec());
+            String output;
+            SC_TEST_EXPECT(chain.exec(output));
+            SC_TEST_EXPECT(output == expectedOutput);
         }
         if (test_section("ProcessChain pipe single"))
         {

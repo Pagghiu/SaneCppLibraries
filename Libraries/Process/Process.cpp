@@ -154,7 +154,14 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         {
         case StdStream::Operation::AlreadySetup: break;
         case StdStream::Operation::Inherit: break;
-        case StdStream::Operation::Ignore: break;
+        case StdStream::Operation::Ignore: {
+#if SC_PLATFORM_WINDOWS
+            SC_TRY(fileDescriptor.open("NUL", FileDescriptor::WriteAppend));
+#else
+            SC_TRY(fileDescriptor.open("/dev/null", FileDescriptor::WriteAppend));
+#endif
+            break;
+        }
         case StdStream::Operation::FileDescriptor: {
             SC_TRY(fileDescriptor.assign(outputObject.fileDescriptor));
         }
