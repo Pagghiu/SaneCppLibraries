@@ -105,7 +105,7 @@ struct SC::FileSystemIterator
         static constexpr int Apple   = 2104;
         static constexpr int Default = 2088;
 
-        static constexpr size_t Alignment = alignof(void*);
+        static constexpr size_t Alignment = sizeof(uint64_t);
 
         using Object = Internal;
     };
