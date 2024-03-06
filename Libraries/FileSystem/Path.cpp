@@ -59,7 +59,7 @@ struct SC::Path::Internal
     // Parses a Posix root
     static StringView parsePosixRoot(StringView input)
     {
-        if (input.startsWithCodePoint('/'))
+        if (input.startsWithAnyOf({'/'}))
         {
             // we want to return a string view pointing at the "/" char of the input string
             return input.sliceStartLength(0, 1);
@@ -229,11 +229,11 @@ struct SC::Path::Internal
         directory = Internal::parseDirectory<'\\', '/'>(input, root);
         if (root.startsWith(directory))
         {
-            if (root.endsWithCodePoint('\\') or root.endsWithCodePoint('/'))
+            if (root.endsWithAnyOf({'\\', '/'}))
                 directory = root;
         }
         base              = Internal::parseBase<'\\', '/'>(input);
-        endsWithSeparator = input.endsWithCodePoint('\\') or input.endsWithCodePoint('/');
+        endsWithSeparator = input.endsWithAnyOf({'\\', '/'});
         return !(root.isEmpty() && directory.isEmpty());
     }
 
@@ -249,7 +249,7 @@ struct SC::Path::Internal
         root              = Internal::parsePosixRoot(input);
         directory         = Internal::parseDirectory<'/', '/'>(input, root);
         base              = Internal::parseBase<'/', '/'>(input);
-        endsWithSeparator = input.endsWithCodePoint('/');
+        endsWithSeparator = input.endsWithAnyOf({'/'});
         return !(root.isEmpty() && directory.isEmpty());
     }
 };
@@ -344,7 +344,7 @@ bool SC::Path::isAbsolute(StringView input, Type type)
 {
     switch (type)
     {
-    case AsPosix: return input.startsWithCodePoint('/');
+    case AsPosix: return input.startsWithAnyOf({'/'});
     case AsWindows: return not Internal::parseWindowsRoot(input).isEmpty();
     }
     Assert::unreachable();
@@ -372,10 +372,10 @@ bool SC::Path::normalizeUNCAndTrimQuotes(StringView fileLocation, Vector<StringV
                                          Type type)
 {
     // The macro escaping Library Path from defines adds escaped double quotes
-    fileLocation = fileLocation.trimStartingCodePoint('"').trimEndingCodePoint('"');
+    fileLocation = fileLocation.trimAnyOf({'"'});
 #if SC_COMPILER_MSVC
     SmallString<256> fixUncPathsOnMSVC;
-    if (fileLocation.startsWithCodePoint('\\') and not fileLocation.startsWith("\\\\"))
+    if (fileLocation.startsWithAnyOf({'\\'}) and not fileLocation.startsWith("\\\\"))
     {
         // On MSVC __FILE__ when building on UNC paths reports a single starting backslash...
         SC_TRY(StringBuilder(fixUncPathsOnMSVC).format("\\{}", fileLocation));
@@ -543,20 +543,11 @@ bool SC::Path::relativeFromTo(StringView source, StringView destination, String&
     return true;
 }
 
-SC::StringView SC::Path::removeTrailingSeparator(StringView path)
-{
-    return path.trimEndingCodePoint('/').trimEndingCodePoint('\\');
-}
+SC::StringView SC::Path::removeTrailingSeparator(StringView path) { return path.trimEndAnyOf({'/', '\\'}); }
 
-SC::StringView SC::Path::removeStartingSeparator(StringView path)
-{
-    return path.trimStartingCodePoint('/').trimStartingCodePoint('\\');
-}
+SC::StringView SC::Path::removeStartingSeparator(StringView path) { return path.trimStartAnyOf({'/', '\\'}); }
 
-bool SC::Path::endsWithSeparator(StringView path)
-{
-    return path.endsWithCodePoint('/') or path.endsWithCodePoint('\\');
-}
+bool SC::Path::endsWithSeparator(StringView path) { return path.endsWithAnyOf({'/', '\\'}); }
 
 bool SC::Path::appendTrailingSeparator(String& path, Type type)
 {

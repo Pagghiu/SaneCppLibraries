@@ -217,7 +217,7 @@ struct SC::FileSystemWatcher::Internal
 
         Notification notification;
         notification.basePath = entry.path.view();
-        while (notification.basePath.sizeInBytes() > 1 and notification.basePath.endsWithCodePoint('\\'))
+        while (notification.basePath.sizeInBytes() > 1 and notification.basePath.endsWithAnyOf({'\\'}))
         {
             notification.basePath =
                 notification.basePath.sliceStartEndBytes(0, notification.basePath.sizeInBytes() - 1);

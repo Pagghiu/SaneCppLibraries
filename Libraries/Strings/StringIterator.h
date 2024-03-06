@@ -192,15 +192,15 @@ struct SC_COMPILER_EXPORT StringIterator
     /// @return (signed) number of bytes between the two StringIterator
     [[nodiscard]] constexpr ssize_t bytesDistanceFrom(StringIterator other) const;
 
-    /// @brief Check if this Iterator ends with a given code point
-    /// @param character the code point
-    /// @return `true` if `character` exists as last code point of this StringIterator range
-    [[nodiscard]] bool endsWithCodePoint(CodePoint character) const;
+    /// @brief Check if this Iterator ends with any code point in the given span
+    /// @param codePoints A span of code points to check for
+    /// @return `true` if at least one code point of `codepoints` exists at the end of the range
+    [[nodiscard]] bool endsWithAnyOf(Span<const CodePoint> codePoints) const;
 
-    /// @brief Check if this Iterator starts with a given code point
-    /// @param character the code point
-    /// @return `true` if `character` exists as first code point of this StringIterator range
-    [[nodiscard]] bool startsWithCodePoint(CodePoint character) const;
+    /// @brief Check if this Iterator starts with any code point in the given span
+    /// @param codePoints A span of code points to check for
+    /// @return `true` if at least one code point of `codepoints` exists at the start of the range
+    [[nodiscard]] bool startsWithAnyOf(Span<const CodePoint> codePoints) const;
 
     /// @brief Check if this Iterator at its end matches entirely another Iterator's range
     /// @param other  The other iterator to match

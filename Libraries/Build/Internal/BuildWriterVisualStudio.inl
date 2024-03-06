@@ -212,7 +212,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             builder.append("    <OutDir>");
             builder.appendReplaceMultiple(configuration.outputPath.view(),
                                           {replacements, sizeof(replacements) / sizeof(replacements[0])});
-            if (not configuration.outputPath.view().endsWithCodePoint('\\'))
+            if (not configuration.outputPath.view().endsWithAnyOf({'\\'}))
             {
                 builder.append("\\");
             }
@@ -222,7 +222,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             builder.append("    <IntDir>");
             builder.appendReplaceMultiple(configuration.intermediatesPath.view(), {replacements, 8});
-            if (not configuration.outputPath.view().endsWithCodePoint('\\'))
+            if (not configuration.outputPath.view().endsWithAnyOf({'\\'}))
             {
                 builder.append("\\");
             }

@@ -204,14 +204,14 @@ bool SC::StringView::containsCodePoint(StringCodePoint c) const
     return withIterator([c](auto it) { return it.advanceUntilMatches(c); });
 }
 
-bool SC::StringView::endsWithCodePoint(StringCodePoint c) const
+bool SC::StringView::endsWithAnyOf(Span<const StringCodePoint> codePoints) const
 {
-    return withIterator([c](auto it) { return it.endsWithCodePoint(c); });
+    return withIterator([codePoints](auto it) { return it.endsWithAnyOf(codePoints); });
 }
 
-bool SC::StringView::startsWithCodePoint(StringCodePoint c) const
+bool SC::StringView::startsWithAnyOf(Span<const StringCodePoint> codePoints) const
 {
-    return withIterator([c](auto it) { return it.startsWithCodePoint(c); });
+    return withIterator([codePoints](auto it) { return it.startsWithAnyOf(codePoints); });
 }
 
 SC::StringView SC::StringView::sliceStartEnd(size_t start, size_t end) const
@@ -256,24 +256,29 @@ SC::StringView SC::StringView::sliceEnd(size_t offset) const
         });
 }
 
-SC::StringView SC::StringView::trimEndingCodePoint(StringCodePoint c) const
+SC::StringView SC::StringView::trimEndAnyOf(Span<const StringCodePoint> codePoints) const
 {
     auto sv = *this;
-    while (sv.endsWithCodePoint(c))
+    while (sv.endsWithAnyOf(codePoints))
     {
         sv = sv.sliceEnd(1);
     }
     return sv;
 }
 
-SC::StringView SC::StringView::trimStartingCodePoint(StringCodePoint c) const
+SC::StringView SC::StringView::trimStartAnyOf(Span<const StringCodePoint> codePoints) const
 {
     auto sv = *this;
-    while (sv.startsWithCodePoint(c))
+    while (sv.startsWithAnyOf(codePoints))
     {
         sv = sv.sliceStart(1);
     }
     return sv;
+}
+
+SC::StringView SC::StringView::trimAnyOf(Span<const StringCodePoint> codePoints) const
+{
+    return trimEndAnyOf(codePoints).trimStartAnyOf(codePoints);
 }
 
 SC::StringView SC::StringView::sliceStartLength(size_t start, size_t length) const

@@ -253,7 +253,7 @@ SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<Strin
                         if (overlapExisting.isEmpty())
                         {
                             // Case .5 and .3 after .2
-                            if (overlapNew.startsWithCodePoint('/'))
+                            if (overlapNew.startsWithAnyOf({'/'}))
                             {
                                 // Case .3 after 2 (can be merged)
                                 Project::File mergedFile;

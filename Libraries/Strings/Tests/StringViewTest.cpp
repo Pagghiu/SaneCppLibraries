@@ -116,23 +116,23 @@ struct SC::StringViewTest : public SC::TestCase
                     test = "Ciao_123"_a8;
                 if (i == 2)
                     test = "Ciao_123"_u8;
-                SC_TEST_EXPECT(test.startsWithCodePoint('C'));
-                SC_TEST_EXPECT(test.endsWithCodePoint('3'));
+                SC_TEST_EXPECT(test.startsWithAnyOf({'C', '_'}));
+                SC_TEST_EXPECT(test.endsWithAnyOf({'3', 'z'}));
                 SC_TEST_EXPECT(test.startsWith("Ciao"));
                 SC_TEST_EXPECT(test.startsWith("Ciao"_u8));
                 SC_TEST_EXPECT(test.startsWith("\x43\x00\x69\x00\x61\x00\x6f\x00\x00"_u16));
                 SC_TEST_EXPECT(test.endsWith("\x31\x00\x32\x00\x33\x00\x00"_u16));
                 SC_TEST_EXPECT(test.endsWith("123"));
                 SC_TEST_EXPECT(test.endsWith("123"_u8));
-                SC_TEST_EXPECT(not test.startsWithCodePoint('D'));
-                SC_TEST_EXPECT(not test.endsWithCodePoint('4'));
+                SC_TEST_EXPECT(not test.startsWithAnyOf({'D', '_'}));
+                SC_TEST_EXPECT(not test.endsWithAnyOf({'4', 'z'}));
                 SC_TEST_EXPECT(not test.startsWith("Cia_"));
                 SC_TEST_EXPECT(not test.endsWith("1_3"));
             }
 
             StringView test2;
-            SC_TEST_EXPECT(not test2.startsWithCodePoint('a'));
-            SC_TEST_EXPECT(not test2.endsWithCodePoint('a'));
+            SC_TEST_EXPECT(not test2.startsWithAnyOf({'a', '_'}));
+            SC_TEST_EXPECT(not test2.endsWithAnyOf({'a', 'z'}));
             SC_TEST_EXPECT(test2.startsWith(""));
             SC_TEST_EXPECT(not test2.startsWith("A"));
             SC_TEST_EXPECT(test2.endsWith(""));
@@ -150,10 +150,10 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(str.sliceStart(4) == "567");
             SC_TEST_EXPECT(str.sliceEnd(4) == "123");
 
-            SC_TEST_EXPECT("myTest___"_a8.trimEndingCodePoint('_') == "myTest");
-            SC_TEST_EXPECT("myTest"_a8.trimEndingCodePoint('_') == "myTest");
-            SC_TEST_EXPECT("___myTest"_a8.trimStartingCodePoint('_') == "myTest");
-            SC_TEST_EXPECT("_myTest"_a8.trimStartingCodePoint('_') == "myTest");
+            SC_TEST_EXPECT("myTest_\n__"_a8.trimEndAnyOf({'_', '\n'}) == "myTest");
+            SC_TEST_EXPECT("myTest"_a8.trimEndAnyOf({'_'}) == "myTest");
+            SC_TEST_EXPECT("_\n__myTest"_a8.trimStartAnyOf({'_', '\n'}) == "myTest");
+            SC_TEST_EXPECT("_myTest"_a8.trimStartAnyOf({'_'}) == "myTest");
         }
         if (test_section("split"))
         {

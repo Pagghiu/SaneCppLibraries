@@ -80,7 +80,7 @@ struct SC::Debugger::Internal
         SC::Vector<WCHAR> nameBuffer;
         SC_TRY(nameBuffer.resizeWithoutInitializing(USHRT_MAX));
 
-        if (theFile.startsWithCodePoint('\\'))
+        if (theFile.startsWithAnyOf({'\\'}))
         {
             theFile = theFile.sliceStart(1); // Eat one slash
         }

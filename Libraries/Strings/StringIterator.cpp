@@ -268,31 +268,45 @@ template bool StringIterator<StringIteratorUTF8>::reverseAdvanceCodePoints(size_
 template bool StringIterator<StringIteratorUTF16>::reverseAdvanceCodePoints(size_t numCodePoints);
 
 template <typename CharIterator>
-bool StringIterator<CharIterator>::endsWithCodePoint(CodePoint character) const
+bool StringIterator<CharIterator>::endsWithAnyOf(Span<const CodePoint> codePoints) const
 {
     if (start != end)
     {
-        auto last = CharIterator::getPreviousOf(end);
-        return CharIterator::decode(last) == character;
+        auto pointerToLast    = CharIterator::getPreviousOf(end);
+        auto decodedCodePoint = CharIterator::decode(pointerToLast);
+        for (CodePoint codePoint : codePoints)
+        {
+            if (codePoint == decodedCodePoint)
+            {
+                return true;
+            }
+        }
     }
     return false;
 }
-template bool StringIterator<StringIteratorASCII>::endsWithCodePoint(CodePoint character) const;
-template bool StringIterator<StringIteratorUTF8>::endsWithCodePoint(CodePoint character) const;
-template bool StringIterator<StringIteratorUTF16>::endsWithCodePoint(CodePoint character) const;
+template bool StringIterator<StringIteratorASCII>::endsWithAnyOf(Span<const CodePoint> codePoints) const;
+template bool StringIterator<StringIteratorUTF8>::endsWithAnyOf(Span<const CodePoint> codePoints) const;
+template bool StringIterator<StringIteratorUTF16>::endsWithAnyOf(Span<const CodePoint> codePoints) const;
 
 template <typename CharIterator>
-bool StringIterator<CharIterator>::startsWithCodePoint(CodePoint character) const
+bool StringIterator<CharIterator>::startsWithAnyOf(Span<const CodePoint> codePoints) const
 {
     if (start != end)
     {
-        return CharIterator::decode(start) == character;
+        auto decodedCodePoint = CharIterator::decode(start);
+        for (CodePoint codePoint : codePoints)
+        {
+            if (codePoint == decodedCodePoint)
+            {
+                return true;
+            }
+        }
     }
     return false;
 }
-template bool StringIterator<StringIteratorASCII>::startsWithCodePoint(CodePoint character) const;
-template bool StringIterator<StringIteratorUTF8>::startsWithCodePoint(CodePoint character) const;
-template bool StringIterator<StringIteratorUTF16>::startsWithCodePoint(CodePoint character) const;
+template bool StringIterator<StringIteratorASCII>::startsWithAnyOf(Span<const CodePoint> codePoints) const;
+template bool StringIterator<StringIteratorUTF8>::startsWithAnyOf(Span<const CodePoint> codePoints) const;
+template bool StringIterator<StringIteratorUTF16>::startsWithAnyOf(Span<const CodePoint> codePoints) const;
 
 template <typename CharIterator>
 template <typename IteratorType>

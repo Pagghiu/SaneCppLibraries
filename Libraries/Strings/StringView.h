@@ -225,25 +225,25 @@ struct SC::StringView
     ///         This means that it will Assert if this StringView::isNullTerminated returns `false`
     [[nodiscard]] constexpr size_t sizeInBytesIncludingTerminator() const;
 
-    /// @brief Check if StringView ends with given utf code point
-    /// @param c The utf code point to check against
-    /// @return  Returns `true` if this StringView ends with code point c
+    /// @brief Check if StringView ends with any utf code point in the given span
+    /// @param codePoints The utf code points to check against
+    /// @return Returns `true` if this StringView ends with any code point inside codePoints
     ///
     /// Example:
     /// @code{.cpp}
-    /// SC_TEST_EXPECT("123 456".endsWithCodePoint("6"));
+    /// SC_TEST_EXPECT("123 456".endsWithAnyOf({'a', '6'})); // '6' will match
     /// @endcode
-    [[nodiscard]] bool endsWithCodePoint(StringCodePoint c) const;
+    [[nodiscard]] bool endsWithAnyOf(Span<const StringCodePoint> codePoints) const;
 
-    /// @brief Check if StringView starts with given utf code point
-    /// @param c The utf code point to check against
-    /// @return  Returns `true` if this StringView starts with code point c
+    /// @brief Check if StringView starts with any utf code point in the given span
+    /// @param codePoints The utf code points to check against
+    /// @return Returns `true` if this StringView starts with any code point inside codePoints
     ///
     /// Example:
     /// @code{.cpp}
-    /// SC_TEST_EXPECT("123 456".startsWithCodePoint("1"));
+    /// SC_TEST_EXPECT("123 456".startsWithAnyOf({'1', '8'})); // '1' will match
     /// @endcode
-    [[nodiscard]] bool startsWithCodePoint(StringCodePoint c) const;
+    [[nodiscard]] bool startsWithAnyOf(Span<const StringCodePoint> codePoints) const;
 
     /// @brief Check if StringView starts with another StringView
     /// @param str The other StringView to check with current
@@ -366,27 +366,38 @@ struct SC::StringView
     /// @endcode
     [[nodiscard]] StringView sliceEnd(size_t offset) const;
 
-    /// @brief Returns a shortened StringView without utf code points matching `c` at end.
-    /// @param c The utf code point to look for
+    /// @brief Returns a shortened StringView removing ending utf code points matching the `codePoints` span
+    /// @param codePoints The span of utf code points to look for
     /// @return The trimmed StringView
     ///
     /// Example:
     /// @code{.cpp}
-    /// SC_TEST_EXPECT("myTest___"_a8.trimEndingCodePoint('_') == "myTest");
-    /// SC_TEST_EXPECT("myTest"_a8.trimEndingCodePoint('_') == "myTest");
+    /// SC_TEST_EXPECT("myTest_\n__"_a8.trimEndAnyOf({'_', '\n'}) == "myTest");
+    /// SC_TEST_EXPECT("myTest"_a8.trimEndAnyOf({'_'}) == "myTest");
     /// @endcode
-    [[nodiscard]] StringView trimEndingCodePoint(StringCodePoint c) const;
+    [[nodiscard]] StringView trimEndAnyOf(Span<const StringCodePoint> codePoints) const;
 
-    /// @brief Returns a shortened StringView without utf code points matching `c` at start.
-    /// @param c The utf code point to look for
+    /// @brief Returns a shortened StringView removing starting utf code points matching the `codePoints` span
+    /// @param codePoints The span of utf code points to look for
     /// @return The trimmed StringView
     ///
     /// Example:
     /// @code{.cpp}
-    /// SC_TEST_EXPECT("___myTest"_a8.trimStartingCodePoint('_') == "myTest");
-    /// SC_TEST_EXPECT("_myTest"_a8.trimStartingCodePoint('_') == "myTest");
+    /// SC_TEST_EXPECT("__\n_myTest"_a8.trimStartAnyOf({'_', '\n'}) == "myTest");
+    /// SC_TEST_EXPECT("_myTest"_a8.trimStartAnyOf({'_'}) == "myTest");
     /// @endcode
-    [[nodiscard]] StringView trimStartingCodePoint(StringCodePoint c) const;
+    [[nodiscard]] StringView trimStartAnyOf(Span<const StringCodePoint> codePoints) const;
+
+    /// @brief Returns a shortened StringView removing starting and ending utf code points inside the `codePoints` span
+    /// @param codePoints The span of utf code points to look for
+    /// @return The trimmed StringView
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// SC_TEST_EXPECT("__\n_myTest__\n"_a8.trimAnyOf({'_', '\n'}) == "myTest");
+    /// SC_TEST_EXPECT("_myTest"_a8.trimAnyOf({'_'}) == "myTest");
+    /// @endcode
+    [[nodiscard]] StringView trimAnyOf(Span<const StringCodePoint> codePoints) const;
 
     /// @brief Returns a shortened StringView from current cutting the first `start` bytes.
     /// @param start Offset in bytes where the slice starts.
@@ -542,7 +553,7 @@ struct SC::StringViewTokenizer
         }
         @endcode
     */
-    [[nodiscard]] bool tokenizeNext(Span<const StringCodePoint> separators, Options options);
+    [[nodiscard]] bool tokenizeNext(Span<const StringCodePoint> separators, Options options = Options::SkipEmpty);
 
     /// @brief Count the number of tokens that exist in the string view passed in constructor, when splitted along the
     /// given separators
