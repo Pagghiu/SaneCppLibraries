@@ -26,10 +26,13 @@ struct SC::ProcessID
     int32_t pid = 0;
 };
 
-/// @brief Execute a child process.
-///
+/// @brief Execute a child process with standard file descriptors redirection.
+/// @n
 /// Features:
-/// - Redirecting standard in/out/err of a child process to a Pipe
+///
+/// - Redirect standard in/out/err of a child process to a Pipe
+/// - Inherit child process file descriptors from parent process
+/// - Ignore (silence) child process standard file descriptor
 /// - Wait for the child process exit code
 ///
 /// Example: execute child process (launch and wait for it to fully execute)
@@ -237,33 +240,14 @@ struct SC::Process
 /// SC::PipeDescriptor from [File](@ref library_file) library is used to chain read / write endpoints of different
 /// processes together.
 ///
-/// @n
-/**
- * Example: print result `ls ~ | grep desktop` in current terminal
- * @code{.cpp}
-ProcessChain chain;
-Process      p1, p2;
-SC_TRY(chain.pipe(p1, {"ls", "~"}));
-SC_TRY(chain.pipe(p2, {"grep", "Desktop"}));
-SC_TRY(chain.launch());
-SC_TRY(chain.waitForExitSync());
- * @endcode
- *
- * Example: read result of `ls ~ | grep desktop` into a String
- * @code{.cpp}
-ProcessChain chain;
-Process      p1, p2;
-SC_TRY(chain.pipe(p1, {"ls", "~"}));
-SC_TRY(chain.pipe(p2, {"grep", "Desktop"}));
-ProcessChain::Options options;
-options.pipeSTDOUT = true;
-SC_TRY(chain.launch(options));
-String output(StringEncoding::Ascii);
-SC_TRY(chain.readStdOutUntilEOFSync(output));
-SC_TRY(chain.waitForExitSync());
-// ... Do something with the 'output' string
- * @endcode
- * */
+/// Example: Inherit stdout file descriptor
+/// \snippet Libraries/Process/Tests/ProcessTest.cpp processChainInheritDualSnippet
+///
+/// Example: Read stderr and stdout into a string
+/// \snippet Libraries/Process/Tests/ProcessTest.cpp processChainPipeSingleSnippet
+///
+/// Example: Read standard output into a string using a Pipe
+/// \snippet Libraries/Process/Tests/ProcessTest.cpp processChainPipeDualSnippet
 struct SC::ProcessChain
 {
     /// @brief Add a process to the chain, with given arguments
