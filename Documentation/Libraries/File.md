@@ -13,7 +13,6 @@ File library allows synchronous I/O operations on files and pipes.
 | SC::FileDescriptor::read          | @copybrief SC::FileDescriptor::read           |
 | SC::FileDescriptor::write         | @copybrief SC::FileDescriptor::write          |
 | SC::FileDescriptor::seek          | @copybrief SC::FileDescriptor::seek           |
-| SC::FileDescriptor::readAppend    | @copybrief SC::FileDescriptor::readAppend     |
 | SC::FileDescriptor::readUntilEOF  | @copybrief SC::FileDescriptor::readUntilEOF   |
 
 | SC::PipeDescriptor                | @copybrief SC::PipeDescriptor                 |

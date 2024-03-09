@@ -107,11 +107,24 @@ struct SC::FileDescriptor : public SC::UniqueHandle<SC::detail::FileDescriptorDe
     /// @return Valid result if read succeeded
     [[nodiscard]] Result read(Span<char> data, Span<char>& actuallyRead, uint64_t offset);
 
+    /// @brief Reads bytes at offset into user supplied span
+    /// @param data Span of bytes where data should be written to
+    /// @param actuallyRead A sub-span of data of the actually read bytes. A zero sized span means EOF.
+    /// @param offset Offset from begin of the file descriptor where read should be started
+    /// @return Valid result if read succeeded
+    [[nodiscard]] Result read(Span<uint8_t> data, Span<uint8_t>& actuallyRead, uint64_t offset);
+
     /// @brief Reads bytes from current position (FileDescriptor::seek) into user supplied Span
     /// @param data Span of bytes where data should be written to
     /// @param actuallyRead A sub-span of data of the actually read bytes. A zero sized span means EOF.
     /// @return Valid result if read succeeded
     [[nodiscard]] Result read(Span<char> data, Span<char>& actuallyRead);
+
+    /// @brief Reads bytes from current position (FileDescriptor::seek) into user supplied Span
+    /// @param data Span of bytes where data should be written to
+    /// @param actuallyRead A sub-span of data of the actually read bytes. A zero sized span means EOF.
+    /// @return Valid result if read succeeded
+    [[nodiscard]] Result read(Span<uint8_t> data, Span<uint8_t>& actuallyRead);
 
     /// @brief Writes bytes at offset from start of the file descriptor
     /// @param data Span of bytes containing the data to write
@@ -119,10 +132,21 @@ struct SC::FileDescriptor : public SC::UniqueHandle<SC::detail::FileDescriptorDe
     /// @return Valid result if write succeeded
     [[nodiscard]] Result write(Span<const char> data, uint64_t offset);
 
+    /// @brief Writes bytes at offset from start of the file descriptor
+    /// @param data Span of bytes containing the data to write
+    /// @param offset Offset from begin of file descriptor to start writing
+    /// @return Valid result if write succeeded
+    [[nodiscard]] Result write(Span<const uint8_t> data, uint64_t offset);
+
     /// @brief Writes bytes from current position (FileDescriptor::seek) of the file descriptor
     /// @param data Span of bytes containing the data to write
     /// @return Valid result if write succeeded
     [[nodiscard]] Result write(Span<const char> data);
+
+    /// @brief Writes bytes from current position (FileDescriptor::seek) of the file descriptor
+    /// @param data Span of bytes containing the data to write
+    /// @return Valid result if write succeeded
+    [[nodiscard]] Result write(Span<const uint8_t> data);
 
     /// @brief How the offset to FileDescriptor::seek is defined
     enum SeekMode
@@ -154,30 +178,23 @@ struct SC::FileDescriptor : public SC::UniqueHandle<SC::detail::FileDescriptorDe
     /// @return Valid result if read succeeded until EOF
     [[nodiscard]] Result readUntilEOF(Vector<char>& destination);
 
+    /// @brief Reads into a given dynamic buffer until End of File (EOF) is signaled.
+    ///         Works also for non-seekable file descriptors (stdout / in / err).
+    /// @param destination A destination buffer to write to (it will be resized as needed)
+    /// @return Valid result if read succeeded until EOF
+    [[nodiscard]] Result readUntilEOF(Vector<uint8_t>& destination);
+
     /// @brief Reads into a given string until End of File (EOF) is signaled
     ///         Works also for non-seekable file descriptors (stdout / in / err).
     /// @param destination A destination string to write to (it will be sized as needed)
     /// @return Valid result if read succeeded until EOF
     [[nodiscard]] Result readUntilEOF(String& destination);
 
-    /// @brief Results of readAppend function
-    struct ReadResult
-    {
-        size_t actuallyRead = 0;
-        bool   isEOF        = false;
-    };
-
-    /// @brief Reads bytes appending to buffer.
-    /// @param buffer Destination buffer where bytes will be written to
-    /// @param fallbackBuffer if buffer is full (capacity() == size()) then data will be read in fallbackBuffer first
-    /// and only later appended to buffer. This allows sizing the buffer only to the actually needed size without
-    /// having to resize the buffer beforehand.
-    /// @param result returns information about EOF being reached and actuallyRead bytes
-    /// @return Valid result if read succeeded
-    [[nodiscard]] Result readAppend(Vector<char>& buffer, Span<char> fallbackBuffer, ReadResult& result);
-
   private:
     struct Internal;
+    struct ReadResult;
+    template <typename T>
+    Result readUntilEOFTemplate(Vector<T>& destination);
 };
 
 /// @brief Descriptor representing a Pipe used for InterProcess Communication (IPC)

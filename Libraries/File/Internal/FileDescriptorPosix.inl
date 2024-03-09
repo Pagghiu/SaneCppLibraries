@@ -10,15 +10,13 @@
 #include <sys/stat.h> // fstat
 #include <unistd.h>   // close
 
-namespace SC
-{
-struct FileDescriptorPosixHelpers;
-}
-
 // TODO: Add check all posix calls here for EINTR
-struct SC::FileDescriptorPosixHelpers
+struct SC::FileDescriptor::Internal
 {
-  private:
+    template <typename T>
+    [[nodiscard]] static Result readAppend(FileDescriptor::Handle fileDescriptor, Vector<T>& output,
+                                           Span<T> fallbackBuffer, ReadResult& result);
+
     static Result getFileFlags(int flagRead, const int fileDescriptor, int& outFlags)
     {
         do
@@ -141,32 +139,33 @@ SC::Result SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOptions 
 
 SC::Result SC::FileDescriptor::setBlocking(bool blocking)
 {
-    return FileDescriptorPosixHelpers::setFileStatusFlags<O_NONBLOCK>(handle, not blocking);
+    return Internal::setFileStatusFlags<O_NONBLOCK>(handle, not blocking);
 }
 
 SC::Result SC::FileDescriptor::setInheritable(bool inheritable)
 {
-    return FileDescriptorPosixHelpers::setFileDescriptorFlags<FD_CLOEXEC>(handle, not inheritable);
+    return Internal::setFileDescriptorFlags<FD_CLOEXEC>(handle, not inheritable);
 }
 
 SC::Result SC::FileDescriptor::isInheritable(bool& hasValue) const
 {
-    auto res = FileDescriptorPosixHelpers::hasFileDescriptorFlags<FD_CLOEXEC>(handle, hasValue);
+    auto res = Internal::hasFileDescriptorFlags<FD_CLOEXEC>(handle, hasValue);
     hasValue = not hasValue;
     return res;
 }
 
-SC::Result SC::FileDescriptor::readAppend(Vector<char>& output, Span<char> fallbackBuffer, ReadResult& result)
+template <typename T>
+SC::Result SC::FileDescriptor::Internal::readAppend(FileDescriptor::Handle fileDescriptor, Vector<T>& output,
+                                                    Span<T> fallbackBuffer, ReadResult& result)
 {
-    ssize_t                numReadBytes;
-    const bool             useVector = output.capacity() > output.size();
-    FileDescriptor::Handle fileDescriptor;
-    SC_TRY(get(fileDescriptor, Result::Error("FileDescriptor::readAppend - Invalid Handle")));
+    ssize_t    numReadBytes;
+    const bool useVector = output.capacity() > output.size();
     if (useVector)
     {
         do
         {
-            numReadBytes = ::read(fileDescriptor, output.data() + output.size(), output.capacity() - output.size());
+            const size_t bytesToRead = (output.capacity() - output.size()) * sizeof(T);
+            numReadBytes             = ::read(fileDescriptor, output.data() + output.size(), bytesToRead);
         } while (numReadBytes == -1 && errno == EINTR); // Syscall may be interrupted and userspace must retry
     }
     else
@@ -181,13 +180,13 @@ SC::Result SC::FileDescriptor::readAppend(Vector<char>& output, Span<char> fallb
     {
         if (useVector)
         {
-            SC_TRY_MSG(output.resizeWithoutInitializing(output.size() + static_cast<size_t>(numReadBytes)),
+            SC_TRY_MSG(output.resizeWithoutInitializing(output.size() + static_cast<size_t>(numReadBytes) / sizeof(T)),
                        "FileDescriptor::readAppend - resize failed");
         }
         else
         {
             SC_TRY_MSG(
-                output.append({fallbackBuffer.data(), static_cast<size_t>(numReadBytes)}),
+                output.append({fallbackBuffer.data(), static_cast<size_t>(numReadBytes) / sizeof(T)}),
                 "FileDescriptor::readAppend - append failed. Bytes have been read from stream and will get lost");
         }
         result = ReadResult{static_cast<size_t>(numReadBytes), false};

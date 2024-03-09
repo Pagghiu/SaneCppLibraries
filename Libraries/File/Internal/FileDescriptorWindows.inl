@@ -103,6 +103,10 @@ SC::Result SC::FileDescriptor::isInheritable(bool& hasValue) const
 
 struct SC::FileDescriptor::Internal
 {
+    template <typename T>
+    [[nodiscard]] static Result readAppend(FileDescriptor::Handle fileDescriptor, Vector<T>& output,
+                                           Span<T> fallbackBuffer, ReadResult& result);
+
     [[nodiscard]] static bool isActualError(BOOL success, DWORD numReadBytes, FileDescriptor::Handle fileDescriptor)
     {
         if (success == FALSE && numReadBytes == 0 && GetFileType(fileDescriptor) == FILE_TYPE_PIPE &&
@@ -120,11 +124,10 @@ struct SC::FileDescriptor::Internal
     }
 };
 
-SC::Result SC::FileDescriptor::readAppend(Vector<char>& output, Span<char> fallbackBuffer, ReadResult& result)
+template <typename T>
+SC::Result SC::FileDescriptor::Internal::readAppend(FileDescriptor::Handle fileDescriptor, Vector<T>& output,
+                                                    Span<T> fallbackBuffer, ReadResult& result)
 {
-    FileDescriptor::Handle fileDescriptor;
-    SC_TRY(get(fileDescriptor, Result::Error("FileDescriptor::readAppend - Invalid Handle")));
-
     const bool useVector = output.capacity() > output.size();
 
     DWORD numReadBytes = 0xffffffff;
