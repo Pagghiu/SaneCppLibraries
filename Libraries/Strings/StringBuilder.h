@@ -103,13 +103,20 @@ struct StringBuilder
     /// @snippet Libraries/Strings/Tests/StringBuilderTest.cpp stringBuilderTestAppendReplaceMultipleSnippet
     [[nodiscard]] bool appendReplaceMultiple(StringView source, Span<const ReplacePair> substitutions);
 
+    /// @brief Option for StringBuilder::appendHex
+    enum class AppendHexCase
+    {
+        UpperCase,
+        LowerCase,
+    };
     /// @brief Appends given binary data escaping it as hexadecimal ASCII characters
     /// @param data Binary data to append to destination buffer
+    /// @param casing Specifies if it should be appended using upper case or lower case
     /// @return `true` if append succeeded
     ///
     /// Example:
     /// @snippet Libraries/Strings/Tests/StringBuilderTest.cpp stringBuilderTestAppendHexSnippet
-    [[nodiscard]] bool appendHex(Span<const uint8_t> data);
+    [[nodiscard]] bool appendHex(Span<const uint8_t> data, AppendHexCase casing);
 
   private:
     void clear();

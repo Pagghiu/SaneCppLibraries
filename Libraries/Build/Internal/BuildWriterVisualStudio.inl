@@ -25,7 +25,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         Hashing::Result res;
         SC_TRY(hashing.finalize(res));
         String hexString;
-        SC_TRY(StringBuilder(hexString).appendHex(res.toBytesSpan()));
+        SC_TRY(StringBuilder(hexString).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
         StringBuilder guidBuilder(projectGuid);
         SC_TRY(guidBuilder.append("{"));
         SC_TRY(guidBuilder.append(hexString.view().sliceStartEnd(0, 8)));

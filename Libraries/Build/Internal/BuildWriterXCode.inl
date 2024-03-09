@@ -40,7 +40,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         Hashing::Result res;
         SC_TRY(hashing.finalize(res));
         SmallString<64> tmpHash = StringEncoding::Ascii;
-        SC_TRY(StringBuilder(tmpHash).appendHex(res.toBytesSpan()));
+        SC_TRY(StringBuilder(tmpHash).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
         return hash.assign(tmpHash.view().sliceStartLength(0, 24));
     }
 
@@ -52,7 +52,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         Hashing::Result res;
         SC_TRY(hashing.finalize(res));
         SmallString<64> tmpHash = StringEncoding::Ascii;
-        SC_TRY(StringBuilder(tmpHash).appendHex(res.toBytesSpan()));
+        SC_TRY(StringBuilder(tmpHash).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
         return hash.assign(tmpHash.view().sliceStartLength(0, 24));
     }
 

@@ -84,18 +84,29 @@ bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf
     return append(buffer.view());
 }
 
-bool StringBuilder::appendHex(Span<const uint8_t> data)
+bool StringBuilder::appendHex(Span<const uint8_t> data, AppendHexCase casing)
 {
-    const unsigned char* bytes = data.data();
     if (encoding == StringEncoding::Utf16)
         return false; // TODO: Support appendHex for UTF16
-    const auto oldSize = stringData.size();
+    const size_t previousSize = stringData.size();
     SC_TRY(stringData.resizeWithoutInitializing(stringData.size() + data.sizeInBytes() * 2));
-    const auto sizeInBytes = data.sizeInBytes();
-    for (size_t i = 0; i < sizeInBytes; i++)
+    const size_t   sizeInBytes = data.sizeInBytes();
+    const uint8_t* sourceBytes = data.data();
+    for (size_t idx = 0; idx < sizeInBytes; idx++)
     {
-        stringData[oldSize + i * 2]     = "0123456789ABCDEF"[bytes[i] >> 4];
-        stringData[oldSize + i * 2 + 1] = "0123456789ABCDEF"[bytes[i] & 0x0F];
+        constexpr char bytesUpper[] = "0123456789ABCDEF";
+        constexpr char bytesLower[] = "0123456789abcdef";
+        switch (casing)
+        {
+        case AppendHexCase::UpperCase:
+            stringData[previousSize + idx * 2 + 0] = bytesUpper[sourceBytes[idx] >> 4];
+            stringData[previousSize + idx * 2 + 1] = bytesUpper[sourceBytes[idx] & 0x0F];
+            break;
+        case AppendHexCase::LowerCase:
+            stringData[previousSize + idx * 2 + 0] = bytesLower[sourceBytes[idx] >> 4];
+            stringData[previousSize + idx * 2 + 1] = bytesLower[sourceBytes[idx] & 0x0F];
+            break;
+        }
     }
     return StringConverter::pushNullTerm(stringData, encoding);
 }

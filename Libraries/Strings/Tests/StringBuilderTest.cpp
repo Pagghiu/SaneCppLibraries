@@ -81,7 +81,8 @@ void SC::StringBuilderTest::appendHexTest()
 
     String        buffer;
     StringBuilder builder(buffer);
-    SC_TEST_EXPECT(builder.appendHex({bytes, sizeof(bytes)}) and buffer.view() == "12345678");
+    SC_TEST_EXPECT(builder.appendHex({bytes, sizeof(bytes)}, StringBuilder::AppendHexCase::UpperCase));
+    SC_TEST_EXPECT(buffer.view() == "12345678");
     //! [stringBuilderTestAppendHexSnippet]
 }
 
