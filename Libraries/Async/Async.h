@@ -206,7 +206,6 @@ struct SC::AsyncCompletionData
 struct SC::AsyncResult
 {
     /// @brief Constructs an async result from a request and a result
-    /// @param res The result of async operation
     AsyncResult(AsyncRequest& request, SC::Result&& res) : async(request), returnCode(move(res)) {}
 
     /// @brief Constructs an async result from a request

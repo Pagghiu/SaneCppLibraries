@@ -41,11 +41,11 @@ Library is usable and can be successfully used to mix operations with strings ma
 ### StringView::fullyOverlaps
 @copydoc SC::StringView::fullyOverlaps
 
-### StringView::startsWithCodePoint
-@copydoc SC::StringView::startsWithCodePoint
+### StringView::startsWithAnyOf
+@copydoc SC::StringView::startsWithAnyOf
 
-### StringView::endsWithCodePoint
-@copydoc SC::StringView::endsWithCodePoint
+### StringView::endsWithAnyOf
+@copydoc SC::StringView::endsWithAnyOf
 
 ### StringView::startsWith
 @copydoc SC::StringView::startsWith
@@ -71,11 +71,11 @@ Library is usable and can be successfully used to mix operations with strings ma
 ### StringView::sliceEnd
 @copydoc SC::StringView::sliceEnd
 
-### StringView::trimEndingCodePoint
-@copydoc SC::StringView::trimEndingCodePoint
+### StringView::trimEndAnyOf
+@copydoc SC::StringView::trimEndAnyOf
 
-### StringView::trimStartingCodePoint
-@copydoc SC::StringView::trimStartingCodePoint
+### StringView::trimStartAnyOf
+@copydoc SC::StringView::trimStartAnyOf
 
 ## StringViewTokenizer
 @copydoc SC::StringViewTokenizer
