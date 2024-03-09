@@ -67,6 +67,12 @@ struct SC::FileSystem::Internal
         return true;
     }
 
+    [[nodiscard]] static bool createSymbolicLink(const char* sourceFileOrDirectory, const char* linkFile)
+    {
+        SC_TRY_LIBC(symlink(sourceFileOrDirectory, linkFile));
+        return true;
+    }
+
     [[nodiscard]] static bool exists(const char* path)
     {
         struct stat path_stat;

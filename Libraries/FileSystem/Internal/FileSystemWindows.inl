@@ -60,6 +60,13 @@ struct SC::FileSystem::Internal
         return true;
     }
 
+    [[nodiscard]] static bool createSymbolicLink(const wchar_t* sourceFileOrDirectory, const wchar_t* linkFile)
+    {
+        DWORD dwFlags = existsAndIsDirectory(sourceFileOrDirectory) ? SYMBOLIC_LINK_FLAG_DIRECTORY : 0;
+        dwFlags |= SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
+        return CreateSymbolicLinkW(linkFile, sourceFileOrDirectory, dwFlags) == TRUE;
+    }
+
     [[nodiscard]] static bool exists(const wchar_t* fileOrDirectory)
     {
         const DWORD res = GetFileAttributesW(fileOrDirectory);
@@ -99,7 +106,7 @@ struct SC::FileSystem::Internal
     [[nodiscard]] static bool moveDirectory(const wchar_t* sourcePath, const wchar_t* destinationPath)
     {
         // Use MOVEFILE_COPY_ALLOWED for moving across volumes
-        return ::MoveFileEx(sourcePath, destinationPath, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED) == TRUE;
+        return ::MoveFileExW(sourcePath, destinationPath, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED) == TRUE;
     }
 
     [[nodiscard]] static bool removeEmptyDirectory(const wchar_t* dir)

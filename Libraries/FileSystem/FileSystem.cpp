@@ -334,6 +334,16 @@ SC::Result SC::FileSystem::makeDirectoriesIfNotExists(Span<const StringView> dir
     return Result(true);
 }
 
+SC::Result SC::FileSystem::createSymbolicLink(StringView sourceFileOrDirectory, StringView linkFile)
+{
+    StringView sourceFileNative, linkFileNative;
+    SC_TRY(convert(sourceFileOrDirectory, fileFormatBuffer1, &sourceFileNative));
+    SC_TRY(convert(linkFile, fileFormatBuffer2, &linkFileNative));
+    SC_TRY(Internal::createSymbolicLink(sourceFileNative.getNullTerminatedNative(),
+                                        linkFileNative.getNullTerminatedNative()));
+    return Result(true);
+}
+
 [[nodiscard]] bool SC::FileSystem::exists(StringView fileOrDirectory)
 {
     StringView encodedPath;

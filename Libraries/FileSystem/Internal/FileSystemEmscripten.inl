@@ -11,6 +11,8 @@ static constexpr SC::Result getErrorCode(int errorCode) { return Result::Error("
 
 struct SC::FileSystem::Internal
 {
+    [[nodiscard]] static bool createSymbolicLink(const char*, const char*) { return false; }
+
     [[nodiscard]] static bool makeDirectory(const char* dir) { return false; }
 
     [[nodiscard]] static bool exists(const char* path) { return false; }

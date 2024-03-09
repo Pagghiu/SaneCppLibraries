@@ -222,6 +222,12 @@ struct SC::FileSystem
     /// \snippet Libraries/FileSystem/Tests/FileSystemTest.cpp makeRemoveDirectoryRecursive
     [[nodiscard]] Result makeDirectoryRecursive(StringView directory) { return makeDirectoriesRecursive({directory}); }
 
+    /// @brief Creates a symbolic link at location linkFile pointing at sourceFileOrDirectory
+    /// @param sourceFileOrDirectory The target of the link (can be a folder or directory)
+    /// @param linkFile The location where the symbolic link will be created
+    /// @return Invalid result if it's not possible creating the requested symbolic link
+    [[nodiscard]] Result createSymbolicLink(StringView sourceFileOrDirectory, StringView linkFile);
+
     /// @brief Check if a file or directory exists at a given path
     /// @param fileOrDirectory Path to check
     /// @return `true` if a file or directory exists at the given path
