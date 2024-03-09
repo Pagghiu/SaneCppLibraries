@@ -32,6 +32,7 @@ var searchData=
   ['createmember_29',['createMember',['../struct_s_c_1_1_reflection_1_1_schema_type.html#a09dfef922c7900a62aeac4acca6fb1a2',1,'SC::Reflection::SchemaType']]],
   ['createpipe_30',['createPipe',['../struct_s_c_1_1_pipe_descriptor.html#a306e3608548b24a1940ab766e89a36ac',1,'SC::PipeDescriptor']]],
   ['createstruct_31',['createStruct',['../struct_s_c_1_1_reflection_1_1_schema_type.html#ae24c16afa1c4636881128d74558b37b7',1,'SC::Reflection::SchemaType']]],
-  ['currentposition_32',['currentPosition',['../struct_s_c_1_1_file_descriptor.html#a4d177829f238df4dc41640510193a342',1,'SC::FileDescriptor']]],
-  ['currentthreadid_33',['CurrentThreadID',['../struct_s_c_1_1_thread.html#a846ffbe52975801eef54f4a05d83c4a5',1,'SC::Thread']]]
+  ['createsymboliclink_32',['createSymbolicLink',['../struct_s_c_1_1_file_system.html#a02635e23b5f5eabf29b084767ef60209',1,'SC::FileSystem']]],
+  ['currentposition_33',['currentPosition',['../struct_s_c_1_1_file_descriptor.html#a4d177829f238df4dc41640510193a342',1,'SC::FileDescriptor']]],
+  ['currentthreadid_34',['CurrentThreadID',['../struct_s_c_1_1_thread.html#a846ffbe52975801eef54f4a05d83c4a5',1,'SC::Thread']]]
 ];

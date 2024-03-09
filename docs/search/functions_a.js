@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['launch_0',['launch',['../struct_s_c_1_1_process.html#a40fe51159f0c55869269fe5c128d3c00',1,'SC::Process::launch(StringView &amp;&amp;... args)'],['../struct_s_c_1_1_process.html#ace407a6ee7d282c80f0f9acc4aba3e4c',1,'SC::Process::launch(Options options, StringView &amp;&amp;... args)'],['../struct_s_c_1_1_process.html#a87a75c72f4c4a07bfd9896aa2e1be5d5',1,'SC::Process::launch(Span&lt; const StringView &gt; cmd, Options options=Options())'],['../struct_s_c_1_1_process_chain.html#a188213c86a5b06d5f6457602aa165bcc',1,'SC::ProcessChain::launch()']]],
+  ['launch_0',['launch',['../struct_s_c_1_1_process.html#a683488dbddad13825772a7775f6ae7ab',1,'SC::Process::launch()'],['../struct_s_c_1_1_process_chain.html#a5510cd3584ad007f1083b522a0baad3b',1,'SC::ProcessChain::launch()']]],
   ['link_1',['link',['../struct_s_c_1_1_plugin_compiler.html#aafa4c0d1ecd363fd525d502d8b7ad178',1,'SC::PluginCompiler']]],
   ['listen_2',['listen',['../struct_s_c_1_1_socket_server.html#a69b0d0642b78d9eabf6888071b002dcb',1,'SC::SocketServer']]],
   ['loadexact_3',['loadExact',['../struct_s_c_1_1_serialization_binary.html#aca1c089744d4424b604c1fb1dadccc14',1,'SC::SerializationBinary::loadExact()'],['../struct_s_c_1_1_serialization_json.html#abf528263c08c287b7e6a9a089b37788d',1,'SC::SerializationJson::loadExact()'],['../struct_s_c_1_1_serialization_binary_type_erased.html#adbb1ced08a95ab78ecf69d44d85b92c7',1,'SC::SerializationBinaryTypeErased::loadExact()']]],

@@ -22,7 +22,5 @@ var group__group__foundation__compiler__macros =
     [ "SC_LANGUAGE_CPP_LESS_THAN_20", "group__group__foundation__compiler__macros.html#gad2555c8161ca8cdd8c370e30705f2073", null ],
     [ "SC_LANGUAGE_CPP_VERSION", "group__group__foundation__compiler__macros.html#ga910115b42ebeeb3c8574da5dc4433bf6", null ],
     [ "SC_LANGUAGE_LIKELY", "group__group__foundation__compiler__macros.html#gade98de21b3cfe285a18f221fee6e3b7f", null ],
-    [ "SC_LANGUAGE_UNLIKELY", "group__group__foundation__compiler__macros.html#ga4b2efc45c46474068fc341fd9d7060eb", null ],
-    [ "SC_PLATFORM_64_BIT", "group__group__foundation__compiler__macros.html#ga0c8d8c0b52de9ab2621ba929e1326532", null ],
-    [ "SC_PLATFORM_ARM64", "group__group__foundation__compiler__macros.html#ga13f0b9a8e5ef3a467f59d48e83664c3f", null ]
+    [ "SC_LANGUAGE_UNLIKELY", "group__group__foundation__compiler__macros.html#ga4b2efc45c46474068fc341fd9d7060eb", null ]
 ];

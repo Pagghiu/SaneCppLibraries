@@ -15,7 +15,7 @@ var struct_s_c_1_1_string_iterator =
     [ "advanceUntilMatchesAny", "struct_s_c_1_1_string_iterator.html#a1e744c97afce583ff5ad55d782ae084c", null ],
     [ "bytesDistanceFrom", "struct_s_c_1_1_string_iterator.html#a02ae8ef1276bb06e27eb6b1587174f91", null ],
     [ "endsWith", "struct_s_c_1_1_string_iterator.html#af67ee153589681126524ab6f688a8c63", null ],
-    [ "endsWithCodePoint", "struct_s_c_1_1_string_iterator.html#ad4e7c66dfa339c84842cabeb4c6e05d3", null ],
+    [ "endsWithAnyOf", "struct_s_c_1_1_string_iterator.html#a9aac2c24648adb9a0bc6df208d6f4acd", null ],
     [ "isAtEnd", "struct_s_c_1_1_string_iterator.html#aef9bf420c068b853eb73bef3d89a7085", null ],
     [ "isAtStart", "struct_s_c_1_1_string_iterator.html#a39c0cb6fe4ae1b432be2a4caf48d6137", null ],
     [ "isFollowedBy", "struct_s_c_1_1_string_iterator.html#aa6924428b576a45dcd83af9c44bede70", null ],
@@ -29,7 +29,7 @@ var struct_s_c_1_1_string_iterator =
     [ "setToStart", "struct_s_c_1_1_string_iterator.html#a008c681473afd985e8a00f29eaac38b5", null ],
     [ "sliceFromStartUntil", "struct_s_c_1_1_string_iterator.html#aca484657b32aa41441013b75d41c968b", null ],
     [ "startsWith", "struct_s_c_1_1_string_iterator.html#a7ec4a5f33ec7cbf55bc4d26843634625", null ],
-    [ "startsWithCodePoint", "struct_s_c_1_1_string_iterator.html#a7ca45b1e696f8280aa3d04362d933d75", null ],
+    [ "startsWithAnyOf", "struct_s_c_1_1_string_iterator.html#abece6326eecd50d5b188f9738912ed4f", null ],
     [ "stepBackward", "struct_s_c_1_1_string_iterator.html#a8f00cabd965b4a3df8dc880f8c78d7a3", null ],
     [ "stepForward", "struct_s_c_1_1_string_iterator.html#a96aa8f158d440d9ce8b5cd1c91892f07", null ]
 ];

@@ -5,7 +5,6 @@ var group__group__file =
         [ "blocking", "struct_s_c_1_1_file_descriptor_1_1_open_options.html#a4c696fe5fdc073f0efc39d47b308264a", null ],
         [ "inheritable", "struct_s_c_1_1_file_descriptor_1_1_open_options.html#ac7b9e9aea8742d7d1d659e0003a22300", null ]
       ] ],
-      [ "ReadResult", "struct_s_c_1_1_file_descriptor_1_1_read_result.html", null ],
       [ "OpenMode", "struct_s_c_1_1_file_descriptor.html#a777f74a69b78c2d0c79faa17ae268725", [
         [ "ReadOnly", "struct_s_c_1_1_file_descriptor.html#a777f74a69b78c2d0c79faa17ae268725a77c8a81de7d48fc317ab0769a86d70b8", null ],
         [ "WriteCreateTruncate", "struct_s_c_1_1_file_descriptor.html#a777f74a69b78c2d0c79faa17ae268725a84c772a43b02841758d4ea78e88d712d", null ],
@@ -23,15 +22,19 @@ var group__group__file =
       [ "open", "struct_s_c_1_1_file_descriptor.html#a87d99c72e5bc8bed8b2fc0806a45c40b", null ],
       [ "read", "struct_s_c_1_1_file_descriptor.html#a4a3a019bcd723a250f04931c4989d61f", null ],
       [ "read", "struct_s_c_1_1_file_descriptor.html#a7872531dfb1a1f7eddeb1591452f684c", null ],
-      [ "readAppend", "struct_s_c_1_1_file_descriptor.html#ab9925f941ad979790ae1a5d66f0d937d", null ],
+      [ "read", "struct_s_c_1_1_file_descriptor.html#a0fe3f4c5e8fda8b795f6d1863ac54499", null ],
+      [ "read", "struct_s_c_1_1_file_descriptor.html#ac847b6b50038713c2b4f3bb84159eeac", null ],
       [ "readUntilEOF", "struct_s_c_1_1_file_descriptor.html#ae24225f6a9e84dbec2d870ecea81f591", null ],
       [ "readUntilEOF", "struct_s_c_1_1_file_descriptor.html#a90271ecf4e2ed5586f84f66163964507", null ],
+      [ "readUntilEOF", "struct_s_c_1_1_file_descriptor.html#a337b69f0fc5c604fbcba8f44ef48420f", null ],
       [ "seek", "struct_s_c_1_1_file_descriptor.html#afdf861cbc9b07b8da0b77e74d4908d18", null ],
       [ "setBlocking", "struct_s_c_1_1_file_descriptor.html#a8cccd5b04111df5e220b8f5f3451d131", null ],
       [ "setInheritable", "struct_s_c_1_1_file_descriptor.html#a4611803900277bd969d61fa6340b6ae6", null ],
       [ "sizeInBytes", "struct_s_c_1_1_file_descriptor.html#a6c53f608a344203235e3ac29b872c4c9", null ],
       [ "write", "struct_s_c_1_1_file_descriptor.html#ae4c6c280484e23f7d2217af2cd1b0a10", null ],
-      [ "write", "struct_s_c_1_1_file_descriptor.html#a5551f0d07b77177e38dfc777fbb8aabf", null ]
+      [ "write", "struct_s_c_1_1_file_descriptor.html#a5551f0d07b77177e38dfc777fbb8aabf", null ],
+      [ "write", "struct_s_c_1_1_file_descriptor.html#a53f91df5591abbb1fa9952167f62fe05", null ],
+      [ "write", "struct_s_c_1_1_file_descriptor.html#a30873edf1831fcb89bffd94eaf326792", null ]
     ] ],
     [ "SC::PipeDescriptor", "struct_s_c_1_1_pipe_descriptor.html", [
       [ "InheritableReadFlag", "struct_s_c_1_1_pipe_descriptor.html#a3d1a8da0703ab0b42c23ed03c3430c41", [

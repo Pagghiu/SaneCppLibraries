@@ -112,6 +112,7 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_process.html',''); init
 <div class="header">
   <div class="summary">
 <a href="#nested-classes">Classes</a> &#124;
+<a href="#pub-types">Public Types</a> &#124;
 <a href="#pub-methods">Public Member Functions</a> &#124;
 <a href="#pub-attribs">Public Attributes</a> &#124;
 <a href="#friends">Friends</a> &#124;
@@ -120,42 +121,40 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_process.html',''); init
 </div><!--header-->
 <div class="contents">
 
-<p>Execute a child process.  
+<p>Execute a child process with standard file descriptors redirection.  
  <a href="struct_s_c_1_1_process.html#details">More...</a></p>
 
 <p><code>#include &lt;<a class="el" href="_process_8h_source.html">Process.h</a>&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="nested-classes" name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process_1_1_options.html">Options</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="struct_s_c_1_1_process_1_1_options.html" title="Options for SC::Process::launch.">Options</a> for <a class="el" href="struct_s_c_1_1_process.html#a40fe51159f0c55869269fe5c128d3c00" title="Launch child process with the given arguments.">SC::Process::launch</a>.  <a href="struct_s_c_1_1_process_1_1_options.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process_1_1_std_in.html">StdIn</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process_1_1_std_out.html">StdOut</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process_1_1_std_stream.html">StdStream</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-types" name="pub-types"></a>
+Public Types</h2></td></tr>
+<tr class="memitem:a5a05d1c0455489ebdc84f741725b2c00"><td class="memItemLeft" align="right" valign="top"><a id="a5a05d1c0455489ebdc84f741725b2c00" name="a5a05d1c0455489ebdc84f741725b2c00"></a>
+using&#160;</td><td class="memItemRight" valign="bottom"><b>StdErr</b> = <a class="el" href="struct_s_c_1_1_process_1_1_std_out.html">StdOut</a></td></tr>
+<tr class="separator:a5a05d1c0455489ebdc84f741725b2c00"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:ae6ab8a41869685536723d932356c6f9b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process.html#ae6ab8a41869685536723d932356c6f9b">waitForExitSync</a> ()</td></tr>
-<tr class="memdesc:ae6ab8a41869685536723d932356c6f9b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Waits (blocking) for process to exit after launch. It can only be called if <a class="el" href="struct_s_c_1_1_process.html#a40fe51159f0c55869269fe5c128d3c00" title="Launch child process with the given arguments.">Process::launch</a> succeeded.  <a href="struct_s_c_1_1_process.html#ae6ab8a41869685536723d932356c6f9b">More...</a><br /></td></tr>
+<tr class="memdesc:ae6ab8a41869685536723d932356c6f9b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Waits (blocking) for process to exit after launch. It can only be called if <a class="el" href="struct_s_c_1_1_process.html#a683488dbddad13825772a7775f6ae7ab" title="Launch child process with the given arguments.">Process::launch</a> succeeded.  <a href="struct_s_c_1_1_process.html#ae6ab8a41869685536723d932356c6f9b">More...</a><br /></td></tr>
 <tr class="separator:ae6ab8a41869685536723d932356c6f9b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a40fe51159f0c55869269fe5c128d3c00"><td class="memTemplParams" colspan="2">template&lt;typename... StringView&gt; </td></tr>
-<tr class="memitem:a40fe51159f0c55869269fe5c128d3c00"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process.html#a40fe51159f0c55869269fe5c128d3c00">launch</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> &amp;&amp;... args)</td></tr>
-<tr class="memdesc:a40fe51159f0c55869269fe5c128d3c00"><td class="mdescLeft">&#160;</td><td class="mdescRight">Launch child process with the given arguments.  <a href="struct_s_c_1_1_process.html#a40fe51159f0c55869269fe5c128d3c00">More...</a><br /></td></tr>
-<tr class="separator:a40fe51159f0c55869269fe5c128d3c00"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ace407a6ee7d282c80f0f9acc4aba3e4c"><td class="memTemplParams" colspan="2">template&lt;typename... StringView&gt; </td></tr>
-<tr class="memitem:ace407a6ee7d282c80f0f9acc4aba3e4c"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process.html#ace407a6ee7d282c80f0f9acc4aba3e4c">launch</a> (<a class="el" href="struct_s_c_1_1_process_1_1_options.html">Options</a> options, <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> &amp;&amp;... args)</td></tr>
-<tr class="memdesc:ace407a6ee7d282c80f0f9acc4aba3e4c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Launch child process with the given arguments.  <a href="struct_s_c_1_1_process.html#ace407a6ee7d282c80f0f9acc4aba3e4c">More...</a><br /></td></tr>
-<tr class="separator:ace407a6ee7d282c80f0f9acc4aba3e4c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a87a75c72f4c4a07bfd9896aa2e1be5d5"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process.html#a87a75c72f4c4a07bfd9896aa2e1be5d5">launch</a> (<a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> &gt; cmd, <a class="el" href="struct_s_c_1_1_process_1_1_options.html">Options</a> options=<a class="el" href="struct_s_c_1_1_process_1_1_options.html">Options</a>())</td></tr>
-<tr class="memdesc:a87a75c72f4c4a07bfd9896aa2e1be5d5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Launch child process with the given arguments.  <a href="struct_s_c_1_1_process.html#a87a75c72f4c4a07bfd9896aa2e1be5d5">More...</a><br /></td></tr>
-<tr class="separator:a87a75c72f4c4a07bfd9896aa2e1be5d5"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4b0cde6bdbe3e87536e41f5b6385eb50"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process.html#a4b0cde6bdbe3e87536e41f5b6385eb50">redirectStdOutTo</a> (<a class="el" href="struct_s_c_1_1_pipe_descriptor.html">PipeDescriptor</a> &amp;pipe)</td></tr>
-<tr class="memdesc:a4b0cde6bdbe3e87536e41f5b6385eb50"><td class="mdescLeft">&#160;</td><td class="mdescRight">Redirect <a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process.">Process</a> Standard Output to the given pipe.  <a href="struct_s_c_1_1_process.html#a4b0cde6bdbe3e87536e41f5b6385eb50">More...</a><br /></td></tr>
-<tr class="separator:a4b0cde6bdbe3e87536e41f5b6385eb50"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af3685a024d03f6cac17434af1e7238e3"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process.html#af3685a024d03f6cac17434af1e7238e3">redirectStdErrTo</a> (<a class="el" href="struct_s_c_1_1_pipe_descriptor.html">PipeDescriptor</a> &amp;pipe)</td></tr>
-<tr class="memdesc:af3685a024d03f6cac17434af1e7238e3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Redirect <a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process.">Process</a> Standard Error to the given pipe.  <a href="struct_s_c_1_1_process.html#af3685a024d03f6cac17434af1e7238e3">More...</a><br /></td></tr>
-<tr class="separator:af3685a024d03f6cac17434af1e7238e3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad313577c0ad7746aae25e9eaeaeaac50"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process.html#ad313577c0ad7746aae25e9eaeaeaac50">redirectStdInTo</a> (<a class="el" href="struct_s_c_1_1_pipe_descriptor.html">PipeDescriptor</a> &amp;pipe)</td></tr>
-<tr class="memdesc:ad313577c0ad7746aae25e9eaeaeaac50"><td class="mdescLeft">&#160;</td><td class="mdescRight">Redirect <a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process.">Process</a> Standard Input to the given pipe.  <a href="struct_s_c_1_1_process.html#ad313577c0ad7746aae25e9eaeaeaac50">More...</a><br /></td></tr>
-<tr class="separator:ad313577c0ad7746aae25e9eaeaeaac50"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a683488dbddad13825772a7775f6ae7ab"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process.html#a683488dbddad13825772a7775f6ae7ab">launch</a> (<a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> &gt; cmd, const <a class="el" href="struct_s_c_1_1_process_1_1_std_out.html">StdOut</a> &amp;stdOut=<a class="el" href="struct_s_c_1_1_process_1_1_std_out_1_1_inherit.html">StdOut::Inherit</a>{}, const <a class="el" href="struct_s_c_1_1_process_1_1_std_in.html">StdIn</a> &amp;stdIn=<a class="el" href="struct_s_c_1_1_process_1_1_std_in_1_1_inherit.html">StdIn::Inherit</a>{}, const <a class="el" href="struct_s_c_1_1_process_1_1_std_out.html">StdErr</a> &amp;stdErr=<a class="el" href="struct_s_c_1_1_process_1_1_std_out_1_1_inherit.html">StdErr::Inherit</a>{})</td></tr>
+<tr class="memdesc:a683488dbddad13825772a7775f6ae7ab"><td class="mdescLeft">&#160;</td><td class="mdescRight">Launch child process with the given arguments.  <a href="struct_s_c_1_1_process.html#a683488dbddad13825772a7775f6ae7ab">More...</a><br /></td></tr>
+<tr class="separator:a683488dbddad13825772a7775f6ae7ab"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a18aeb3d1a1ca464b10c514ba25c5170b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process.html#a18aeb3d1a1ca464b10c514ba25c5170b">exec</a> (<a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> &gt; cmd, const <a class="el" href="struct_s_c_1_1_process_1_1_std_out.html">StdOut</a> &amp;stdOut=<a class="el" href="struct_s_c_1_1_process_1_1_std_out_1_1_inherit.html">StdOut::Inherit</a>{}, const <a class="el" href="struct_s_c_1_1_process_1_1_std_in.html">StdIn</a> &amp;stdIn=<a class="el" href="struct_s_c_1_1_process_1_1_std_in_1_1_inherit.html">StdIn::Inherit</a>{}, const <a class="el" href="struct_s_c_1_1_process_1_1_std_out.html">StdErr</a> &amp;stdErr=<a class="el" href="struct_s_c_1_1_process_1_1_std_out_1_1_inherit.html">StdErr::Inherit</a>{})</td></tr>
+<tr class="memdesc:a18aeb3d1a1ca464b10c514ba25c5170b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Executes a child process with the given arguments, waiting (blocking) until it's fully finished.  <a href="struct_s_c_1_1_process.html#a18aeb3d1a1ca464b10c514ba25c5170b">More...</a><br /></td></tr>
+<tr class="separator:a18aeb3d1a1ca464b10c514ba25c5170b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a12f23b577863eaf5b43edeadc87fbe23"><td class="memItemLeft" align="right" valign="top"><a class="el" href="group__group__foundation__utility.html#ga11403fee7deb4e4687225278cd2c5bfc">int32_t</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process.html#a12f23b577863eaf5b43edeadc87fbe23">getExitStatus</a> () const</td></tr>
+<tr class="memdesc:a12f23b577863eaf5b43edeadc87fbe23"><td class="mdescLeft">&#160;</td><td class="mdescRight">gets the return code from the exited child process (valid only after exec or waitForExitSync)  <a href="struct_s_c_1_1_process.html#a12f23b577863eaf5b43edeadc87fbe23">More...</a><br /></td></tr>
+<tr class="separator:a12f23b577863eaf5b43edeadc87fbe23"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
@@ -163,20 +162,8 @@ Public Attributes</h2></td></tr>
 <tr class="memdesc:ad471640bf912ec0efdabb949002bb8f6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Handle to the OS process.  <a href="struct_s_c_1_1_process.html#ad471640bf912ec0efdabb949002bb8f6">More...</a><br /></td></tr>
 <tr class="separator:ad471640bf912ec0efdabb949002bb8f6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9e48b816966c9d7454dc8ddeee044f28"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_process_i_d.html">ProcessID</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process.html#a9e48b816966c9d7454dc8ddeee044f28">processID</a></td></tr>
-<tr class="memdesc:a9e48b816966c9d7454dc8ddeee044f28"><td class="mdescLeft">&#160;</td><td class="mdescRight">Id of the process.  <a href="struct_s_c_1_1_process.html#a9e48b816966c9d7454dc8ddeee044f28">More...</a><br /></td></tr>
+<tr class="memdesc:a9e48b816966c9d7454dc8ddeee044f28"><td class="mdescLeft">&#160;</td><td class="mdescRight">ID of the process (can be the same as handle on some OS)  <a href="struct_s_c_1_1_process.html#a9e48b816966c9d7454dc8ddeee044f28">More...</a><br /></td></tr>
 <tr class="separator:a9e48b816966c9d7454dc8ddeee044f28"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1877bdc5ed01b54d0fbbf72111a6ad84"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_process_descriptor_1_1_exit_status.html">ProcessDescriptor::ExitStatus</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process.html#a1877bdc5ed01b54d0fbbf72111a6ad84">exitStatus</a></td></tr>
-<tr class="memdesc:a1877bdc5ed01b54d0fbbf72111a6ad84"><td class="mdescLeft">&#160;</td><td class="mdescRight">Exit status code returned after process is finished.  <a href="struct_s_c_1_1_process.html#a1877bdc5ed01b54d0fbbf72111a6ad84">More...</a><br /></td></tr>
-<tr class="separator:a1877bdc5ed01b54d0fbbf72111a6ad84"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afa0659f9bc169880d1adab59c186a8a6"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_file_descriptor.html">FileDescriptor</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process.html#afa0659f9bc169880d1adab59c186a8a6">standardInput</a></td></tr>
-<tr class="memdesc:afa0659f9bc169880d1adab59c186a8a6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Descriptor of process stdin.  <a href="struct_s_c_1_1_process.html#afa0659f9bc169880d1adab59c186a8a6">More...</a><br /></td></tr>
-<tr class="separator:afa0659f9bc169880d1adab59c186a8a6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1fe60993c3d77b5f2f5dc9dc03e987b0"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_file_descriptor.html">FileDescriptor</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process.html#a1fe60993c3d77b5f2f5dc9dc03e987b0">standardOutput</a></td></tr>
-<tr class="memdesc:a1fe60993c3d77b5f2f5dc9dc03e987b0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Descriptor of process stdout.  <a href="struct_s_c_1_1_process.html#a1fe60993c3d77b5f2f5dc9dc03e987b0">More...</a><br /></td></tr>
-<tr class="separator:a1fe60993c3d77b5f2f5dc9dc03e987b0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afb0736fb6232143c58b2acbc77386efe"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_file_descriptor.html">FileDescriptor</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_process.html#afb0736fb6232143c58b2acbc77386efe">standardError</a></td></tr>
-<tr class="memdesc:afb0736fb6232143c58b2acbc77386efe"><td class="mdescLeft">&#160;</td><td class="mdescRight">Descriptor of process stderr.  <a href="struct_s_c_1_1_process.html#afb0736fb6232143c58b2acbc77386efe">More...</a><br /></td></tr>
-<tr class="separator:afb0736fb6232143c58b2acbc77386efe"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="friends" name="friends"></a>
 Friends</h2></td></tr>
@@ -188,51 +175,77 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>ProcessChain</b></t
 <tr class="separator:a9b2d37b8c73a3e7409fb7549a075d631"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
-<div class="textblock"><p >Execute a child process. </p>
-<p >Features:</p><ul>
-<li>Redirecting standard in/out/err of a child process to a Pipe</li>
+<div class="textblock"><p >Execute a child process with standard file descriptors redirection. </p>
+<p ><br  />
+Features:</p>
+<ul>
+<li>Redirect standard in/out/err of a child process to a Pipe</li>
+<li>Inherit child process file descriptors from parent process</li>
+<li>Ignore (silence) child process standard file descriptor</li>
 <li>Wait for the child process exit code</li>
 </ul>
-<p ><br  />
- Example: launch a process and wait for it to finish execution </p><div class="fragment"><div class="line">Process process;</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.launch(<span class="stringliteral">&quot;executable.exe&quot;</span>, <span class="stringliteral">&quot;--argument1&quot;</span>, <span class="stringliteral">&quot;--argument2&quot;</span>));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.waitForExitSync());</div>
+<p >Example: execute child process (launch and wait for it to fully execute) </p><div class="fragment"><div class="line">    <span class="comment">// Example: execute child process (launch and wait for it to fully execute)</span></div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(Process().<a class="code hl_function" href="struct_s_c_1_1_process.html#a18aeb3d1a1ca464b10c514ba25c5170b">exec</a>({<span class="stringliteral">&quot;cmd.exe&quot;</span>, <span class="stringliteral">&quot;-h&quot;</span>}));</div>
 <div class="ttc" id="agroup__group__foundation__utility_html_gae6b0d665676a4a5eedc2ad69693c04ee"><div class="ttname"><a href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a></div><div class="ttdeci">#define SC_TRY(expression)</div><div class="ttdoc">Checks the value of the given expression and if failed, returns this value to caller.</div><div class="ttdef"><b>Definition:</b> Result.h:47</div></div>
-</div><!-- fragment --><p >Example: wait for the process to fully execute </p><div class="fragment"><div class="line">Process process;</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.launch(<span class="stringliteral">&quot;executable.exe&quot;</span>, <span class="stringliteral">&quot;--argument1&quot;</span>, <span class="stringliteral">&quot;--argument2&quot;</span>));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.waitForExitSync());</div>
-</div><!-- fragment --><p >Example: read process output </p><div class="fragment"><div class="line">Process process;</div>
-<div class="line">PipeDescriptor outputPipe;</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.redirectStdOutTo(outputPipe));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.launch(<span class="stringliteral">&quot;executable.exe&quot;</span>, <span class="stringliteral">&quot;--argument1&quot;</span>, <span class="stringliteral">&quot;--argument2&quot;</span>));</div>
-<div class="line">String output = <a class="code hl_enumvalue" href="group__group__strings.html#gga394218cf32c79b0ada9bd2d4892eaf52a76b8d0dcd02ccaf203c167ced6d7ef31">StringEncoding::Ascii</a>; <span class="comment">// Could also use SmallString&lt;N&gt;</span></div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(outputPipe.readPipe.readUntilEOF(output));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.waitForExitSync());</div>
-<div class="line"><span class="comment">// ... Do something with the &#39;output&#39; string</span></div>
+<div class="ttc" id="astruct_s_c_1_1_process_html_a18aeb3d1a1ca464b10c514ba25c5170b"><div class="ttname"><a href="struct_s_c_1_1_process.html#a18aeb3d1a1ca464b10c514ba25c5170b">SC::Process::exec</a></div><div class="ttdeci">Result exec(Span&lt; const StringView &gt; cmd, const StdOut &amp;stdOut=StdOut::Inherit{}, const StdIn &amp;stdIn=StdIn::Inherit{}, const StdErr &amp;stdErr=StdErr::Inherit{})</div><div class="ttdoc">Executes a child process with the given arguments, waiting (blocking) until it's fully finished.</div><div class="ttdef"><b>Definition:</b> Process.h:186</div></div>
+</div><!-- fragment --><p >Example: execute child process, redirecting stdout to a string </p><div class="fragment"><div class="line">    <span class="comment">// Example: execute child process, redirecting stdout to a string</span></div>
+<div class="line">    SmallString&lt;256&gt; output; <span class="comment">// could be also just String</span></div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(Process().<a class="code hl_function" href="struct_s_c_1_1_process.html#a18aeb3d1a1ca464b10c514ba25c5170b">exec</a>({<span class="stringliteral">&quot;where.exe&quot;</span>, <span class="stringliteral">&quot;winver&quot;</span>}, output));</div>
+<div class="line">    <span class="comment">// Output now contains &quot;C:\Windows\System32\winver.exe\n&quot;</span></div>
+</div><!-- fragment --><p >Example: launch a child process and wait for it to finish execution </p><div class="fragment"><div class="line">    <span class="comment">// Example: launch a child process and explicitly wait for it to finish execution</span></div>
+<div class="line">    Process process;</div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.launch({<span class="stringliteral">&quot;ls&quot;</span>, <span class="stringliteral">&quot;-l&quot;</span>}));</div>
+<div class="line">    <span class="comment">// ...</span></div>
+<div class="line">    <span class="comment">// Here you can do I/O to and from the spawned process</span></div>
+<div class="line">    <span class="comment">// ...</span></div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.waitForExitSync());</div>
+<div class="line">    <span class="comment">// This is equivalent to process.exec({&quot;ls&quot;, &quot;-l&quot;)</span></div>
+</div><!-- fragment --><p >Example: execute child process, filling its stdin with a <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> </p><div class="fragment"><div class="line">    <span class="comment">// Example: execute child process, filling its stdin with a StringView</span></div>
+<div class="line">    <span class="comment">// This is equivalent of shell command:</span></div>
+<div class="line">    <span class="comment">// `echo &quot;child process&quot; | grep process`</span></div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(Process().<a class="code hl_function" href="struct_s_c_1_1_process.html#a18aeb3d1a1ca464b10c514ba25c5170b">exec</a>({<span class="stringliteral">&quot;grep&quot;</span>, <span class="stringliteral">&quot;process&quot;</span>}, Process::StdOut::Inherit(), <span class="stringliteral">&quot;child proc&quot;</span>));</div>
+</div><!-- fragment --><p >Example: read process output using a pipe, using launch + waitForExitSync </p><div class="fragment"><div class="line">    <span class="comment">// Example: read process output using a pipe, using launch + waitForExitSync</span></div>
+<div class="line">    Process        process;</div>
+<div class="line">    PipeDescriptor outputPipe;</div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.launch({<span class="stringliteral">&quot;executable.exe&quot;</span>, <span class="stringliteral">&quot;--argument1&quot;</span>, <span class="stringliteral">&quot;--argument2&quot;</span>}, outputPipe));</div>
+<div class="line">    String output = <a class="code hl_enumvalue" href="group__group__strings.html#gga394218cf32c79b0ada9bd2d4892eaf52a76b8d0dcd02ccaf203c167ced6d7ef31">StringEncoding::Ascii</a>; <span class="comment">// Could also use SmallString&lt;N&gt;</span></div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(outputPipe.readPipe.readUntilEOF(output));</div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.waitForExitSync());</div>
+<div class="line">    <span class="comment">// ... Do something with the &#39;output&#39; string</span></div>
 <div class="ttc" id="agroup__group__strings_html_gga394218cf32c79b0ada9bd2d4892eaf52a76b8d0dcd02ccaf203c167ced6d7ef31"><div class="ttname"><a href="group__group__strings.html#gga394218cf32c79b0ada9bd2d4892eaf52a76b8d0dcd02ccaf203c167ced6d7ef31">SC::StringEncoding::Ascii</a></div><div class="ttdeci">@ Ascii</div><div class="ttdoc">Encoding is ASCII.</div></div>
 </div><!-- fragment --> </div><h2 class="groupheader">Member Function Documentation</h2>
-<a id="ace407a6ee7d282c80f0f9acc4aba3e4c" name="ace407a6ee7d282c80f0f9acc4aba3e4c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ace407a6ee7d282c80f0f9acc4aba3e4c">&#9670;&nbsp;</a></span>launch() <span class="overload">[1/3]</span></h2>
+<a id="a18aeb3d1a1ca464b10c514ba25c5170b" name="a18aeb3d1a1ca464b10c514ba25c5170b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a18aeb3d1a1ca464b10c514ba25c5170b">&#9670;&nbsp;</a></span>exec()</h2>
 
 <div class="memitem">
 <div class="memproto">
-<div class="memtemplate">
-template&lt;typename... StringView&gt; </div>
 <table class="mlabels">
   <tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">Result</a> SC::Process::launch </td>
+          <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">Result</a> SC::Process::exec </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="struct_s_c_1_1_process_1_1_options.html">Options</a>&#160;</td>
-          <td class="paramname"><em>options</em>, </td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> &gt;&#160;</td>
+          <td class="paramname"><em>cmd</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> &amp;&amp;...&#160;</td>
-          <td class="paramname"><em>args</em>&#160;</td>
+          <td class="paramtype">const <a class="el" href="struct_s_c_1_1_process_1_1_std_out.html">StdOut</a> &amp;&#160;</td>
+          <td class="paramname"><em>stdOut</em> = <code><a class="el" href="struct_s_c_1_1_process_1_1_std_out_1_1_inherit.html">StdOut::Inherit</a>{}</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="struct_s_c_1_1_process_1_1_std_in.html">StdIn</a> &amp;&#160;</td>
+          <td class="paramname"><em>stdIn</em> = <code><a class="el" href="struct_s_c_1_1_process_1_1_std_in_1_1_inherit.html">StdIn::Inherit</a>{}</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="struct_s_c_1_1_process_1_1_std_out.html">StdErr</a> &amp;&#160;</td>
+          <td class="paramname"><em>stdErr</em> = <code><a class="el" href="struct_s_c_1_1_process_1_1_std_out_1_1_inherit.html">StdErr::Inherit</a>{}</code>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -247,11 +260,13 @@ template&lt;typename... StringView&gt; </div>
 </table>
 </div><div class="memdoc">
 
-<p>Launch child process with the given arguments. </p>
+<p>Executes a child process with the given arguments, waiting (blocking) until it's fully finished. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">options</td><td><a class="el" href="struct_s_c_1_1_process_1_1_options.html" title="Options for SC::Process::launch.">Options</a> for launching process (inherit file descriptors) </td></tr>
-    <tr><td class="paramname">args</td><td><a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process.">Process</a> executable path and its arguments (if any) </td></tr>
+    <tr><td class="paramname">cmd</td><td><a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process with standard file descriptors redirection.">Process</a> executable path and its arguments (if any) </td></tr>
+    <tr><td class="paramname">stdOut</td><td><a class="el" href="struct_s_c_1_1_process_1_1_std_out_1_1_ignore.html">Process::StdOut::Ignore</a>{}, <a class="el" href="struct_s_c_1_1_process_1_1_std_out_1_1_inherit.html">Process::StdOut::Inherit</a>{} or redirect stdout to String/Vector/Span </td></tr>
+    <tr><td class="paramname">stdIn</td><td>Process::StdIn::Ignore{}, <a class="el" href="struct_s_c_1_1_process_1_1_std_in_1_1_inherit.html">Process::StdIn::Inherit</a>{} or feed stdin from StringView/String/Vector/Span </td></tr>
+    <tr><td class="paramname">stdErr</td><td>Process::StdErr::Ignore{}, Process::StdErr::Inherit{} or redirect stderr to String/Vector/Span </td></tr>
   </table>
   </dd>
 </dl>
@@ -259,8 +274,35 @@ template&lt;typename... StringView&gt; </div>
 
 </div>
 </div>
-<a id="a87a75c72f4c4a07bfd9896aa2e1be5d5" name="a87a75c72f4c4a07bfd9896aa2e1be5d5"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a87a75c72f4c4a07bfd9896aa2e1be5d5">&#9670;&nbsp;</a></span>launch() <span class="overload">[2/3]</span></h2>
+<a id="a12f23b577863eaf5b43edeadc87fbe23" name="a12f23b577863eaf5b43edeadc87fbe23"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a12f23b577863eaf5b43edeadc87fbe23">&#9670;&nbsp;</a></span>getExitStatus()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="group__group__foundation__utility.html#ga11403fee7deb4e4687225278cd2c5bfc">int32_t</a> SC::Process::getExitStatus </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>gets the return code from the exited child process (valid only after exec or waitForExitSync) </p>
+
+</div>
+</div>
+<a id="a683488dbddad13825772a7775f6ae7ab" name="a683488dbddad13825772a7775f6ae7ab"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a683488dbddad13825772a7775f6ae7ab">&#9670;&nbsp;</a></span>launch()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -277,8 +319,20 @@ template&lt;typename... StringView&gt; </div>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="struct_s_c_1_1_process_1_1_options.html">Options</a>&#160;</td>
-          <td class="paramname"><em>options</em> = <code><a class="el" href="struct_s_c_1_1_process_1_1_options.html">Options</a>()</code>&#160;</td>
+          <td class="paramtype">const <a class="el" href="struct_s_c_1_1_process_1_1_std_out.html">StdOut</a> &amp;&#160;</td>
+          <td class="paramname"><em>stdOut</em> = <code><a class="el" href="struct_s_c_1_1_process_1_1_std_out_1_1_inherit.html">StdOut::Inherit</a>{}</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="struct_s_c_1_1_process_1_1_std_in.html">StdIn</a> &amp;&#160;</td>
+          <td class="paramname"><em>stdIn</em> = <code><a class="el" href="struct_s_c_1_1_process_1_1_std_in_1_1_inherit.html">StdIn::Inherit</a>{}</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="struct_s_c_1_1_process_1_1_std_out.html">StdErr</a> &amp;&#160;</td>
+          <td class="paramname"><em>stdErr</em> = <code><a class="el" href="struct_s_c_1_1_process_1_1_std_out_1_1_inherit.html">StdErr::Inherit</a>{}</code>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -296,126 +350,14 @@ template&lt;typename... StringView&gt; </div>
 <p>Launch child process with the given arguments. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">cmd</td><td><a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process.">Process</a> executable path and its arguments (if any) </td></tr>
+    <tr><td class="paramname">cmd</td><td><a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process with standard file descriptors redirection.">Process</a> executable path and its arguments (if any) </td></tr>
+    <tr><td class="paramname">stdOut</td><td><a class="el" href="struct_s_c_1_1_process_1_1_std_out_1_1_ignore.html">Process::StdOut::Ignore</a>{}, <a class="el" href="struct_s_c_1_1_process_1_1_std_out_1_1_inherit.html">Process::StdOut::Inherit</a>{} or redirect stdout to String/Vector/Span </td></tr>
+    <tr><td class="paramname">stdIn</td><td>Process::StdIn::Ignore{}, <a class="el" href="struct_s_c_1_1_process_1_1_std_in_1_1_inherit.html">Process::StdIn::Inherit</a>{} or feed stdin from StringView/String/Vector/Span </td></tr>
+    <tr><td class="paramname">stdErr</td><td>Process::StdErr::Ignore{}, Process::StdErr::Inherit{} or redirect stderr to String/Vector/Span </td></tr>
   </table>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>Error if the requested executable doesn't exist / is not accessible / it cannot be executed </dd></dl>
-
-</div>
-</div>
-<a id="a40fe51159f0c55869269fe5c128d3c00" name="a40fe51159f0c55869269fe5c128d3c00"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a40fe51159f0c55869269fe5c128d3c00">&#9670;&nbsp;</a></span>launch() <span class="overload">[3/3]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<div class="memtemplate">
-template&lt;typename... StringView&gt; </div>
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">Result</a> SC::Process::launch </td>
-          <td>(</td>
-          <td class="paramtype"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> &amp;&amp;...&#160;</td>
-          <td class="paramname"><em>args</em></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Launch child process with the given arguments. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">args</td><td><a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process.">Process</a> executable path and its arguments (if any) </td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="section return"><dt>Returns</dt><dd>Error if the requested executable doesn't exist / is not accessible / it cannot be executed </dd></dl>
-
-</div>
-</div>
-<a id="af3685a024d03f6cac17434af1e7238e3" name="af3685a024d03f6cac17434af1e7238e3"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#af3685a024d03f6cac17434af1e7238e3">&#9670;&nbsp;</a></span>redirectStdErrTo()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">Result</a> SC::Process::redirectStdErrTo </td>
-          <td>(</td>
-          <td class="paramtype"><a class="el" href="struct_s_c_1_1_pipe_descriptor.html">PipeDescriptor</a> &amp;&#160;</td>
-          <td class="paramname"><em>pipe</em></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Redirect <a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process.">Process</a> Standard Error to the given pipe. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">pipe</td><td>A reference to an empty Pipe object that will receive a pipe to read from stderr. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-</div>
-</div>
-<a id="ad313577c0ad7746aae25e9eaeaeaac50" name="ad313577c0ad7746aae25e9eaeaeaac50"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ad313577c0ad7746aae25e9eaeaeaac50">&#9670;&nbsp;</a></span>redirectStdInTo()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">Result</a> SC::Process::redirectStdInTo </td>
-          <td>(</td>
-          <td class="paramtype"><a class="el" href="struct_s_c_1_1_pipe_descriptor.html">PipeDescriptor</a> &amp;&#160;</td>
-          <td class="paramname"><em>pipe</em></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Redirect <a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process.">Process</a> Standard Input to the given pipe. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">pipe</td><td>A reference to an empty Pipe object that will receive a pipe to write to stdin. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-</div>
-</div>
-<a id="a4b0cde6bdbe3e87536e41f5b6385eb50" name="a4b0cde6bdbe3e87536e41f5b6385eb50"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a4b0cde6bdbe3e87536e41f5b6385eb50">&#9670;&nbsp;</a></span>redirectStdOutTo()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">Result</a> SC::Process::redirectStdOutTo </td>
-          <td>(</td>
-          <td class="paramtype"><a class="el" href="struct_s_c_1_1_pipe_descriptor.html">PipeDescriptor</a> &amp;&#160;</td>
-          <td class="paramname"><em>pipe</em></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Redirect <a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process.">Process</a> Standard Output to the given pipe. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">pipe</td><td>A reference to an empty Pipe object that will receive a pipe to read from stdout. </td></tr>
-  </table>
-  </dd>
-</dl>
 
 </div>
 </div>
@@ -434,27 +376,11 @@ template&lt;typename... StringView&gt; </div>
       </table>
 </div><div class="memdoc">
 
-<p>Waits (blocking) for process to exit after launch. It can only be called if <a class="el" href="struct_s_c_1_1_process.html#a40fe51159f0c55869269fe5c128d3c00" title="Launch child process with the given arguments.">Process::launch</a> succeeded. </p>
+<p>Waits (blocking) for process to exit after launch. It can only be called if <a class="el" href="struct_s_c_1_1_process.html#a683488dbddad13825772a7775f6ae7ab" title="Launch child process with the given arguments.">Process::launch</a> succeeded. </p>
 
 </div>
 </div>
 <h2 class="groupheader">Member Data Documentation</h2>
-<a id="a1877bdc5ed01b54d0fbbf72111a6ad84" name="a1877bdc5ed01b54d0fbbf72111a6ad84"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1877bdc5ed01b54d0fbbf72111a6ad84">&#9670;&nbsp;</a></span>exitStatus</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="struct_s_c_1_1_process_descriptor_1_1_exit_status.html">ProcessDescriptor::ExitStatus</a> SC::Process::exitStatus</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Exit status code returned after process is finished. </p>
-
-</div>
-</div>
 <a id="ad471640bf912ec0efdabb949002bb8f6" name="ad471640bf912ec0efdabb949002bb8f6"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ad471640bf912ec0efdabb949002bb8f6">&#9670;&nbsp;</a></span>handle</h2>
 
@@ -483,55 +409,7 @@ template&lt;typename... StringView&gt; </div>
       </table>
 </div><div class="memdoc">
 
-<p>Id of the process. </p>
-
-</div>
-</div>
-<a id="afb0736fb6232143c58b2acbc77386efe" name="afb0736fb6232143c58b2acbc77386efe"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#afb0736fb6232143c58b2acbc77386efe">&#9670;&nbsp;</a></span>standardError</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="struct_s_c_1_1_file_descriptor.html">FileDescriptor</a> SC::Process::standardError</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Descriptor of process stderr. </p>
-
-</div>
-</div>
-<a id="afa0659f9bc169880d1adab59c186a8a6" name="afa0659f9bc169880d1adab59c186a8a6"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#afa0659f9bc169880d1adab59c186a8a6">&#9670;&nbsp;</a></span>standardInput</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="struct_s_c_1_1_file_descriptor.html">FileDescriptor</a> SC::Process::standardInput</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Descriptor of process stdin. </p>
-
-</div>
-</div>
-<a id="a1fe60993c3d77b5f2f5dc9dc03e987b0" name="a1fe60993c3d77b5f2f5dc9dc03e987b0"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1fe60993c3d77b5f2f5dc9dc03e987b0">&#9670;&nbsp;</a></span>standardOutput</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="struct_s_c_1_1_file_descriptor.html">FileDescriptor</a> SC::Process::standardOutput</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Descriptor of process stdout. </p>
+<p>ID of the process (can be the same as handle on some OS) </p>
 
 </div>
 </div>

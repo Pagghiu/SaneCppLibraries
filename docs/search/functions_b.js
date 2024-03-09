@@ -11,5 +11,6 @@ var searchData=
   ['matchesheader_8',['matchesHeader',['../struct_s_c_1_1_http_parser.html#abefc08c8b6011c432ef875946e00e390',1,'SC::HttpParser']]],
   ['max_9',['max',['../group__group__algorithms.html#ga3dfa1a8f66f77ec7a1d16167d715dff6',1,'SC']]],
   ['min_10',['min',['../group__group__algorithms.html#gab1e89a850af8037f9fe0b1370e47f00f',1,'SC']]],
-  ['move_11',['move',['../group__group__foundation__utility.html#ga172de7f1b6d5f1fb4a9f6f040f8ec2aa',1,'SC']]]
+  ['move_11',['move',['../group__group__foundation__utility.html#ga172de7f1b6d5f1fb4a9f6f040f8ec2aa',1,'SC']]],
+  ['movedirectory_12',['moveDirectory',['../struct_s_c_1_1_file_system.html#ac640aaeb9beb9c9c9a6e8fd8954b5614',1,'SC::FileSystem']]]
 ];

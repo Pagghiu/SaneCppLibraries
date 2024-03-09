@@ -1,7 +1,7 @@
 var searchData=
 [
   ['language_20utilities_0',['Language Utilities',['../group__group__foundation__utility.html',1,'']]],
-  ['launch_1',['launch',['../struct_s_c_1_1_process.html#a40fe51159f0c55869269fe5c128d3c00',1,'SC::Process::launch(StringView &amp;&amp;... args)'],['../struct_s_c_1_1_process.html#ace407a6ee7d282c80f0f9acc4aba3e4c',1,'SC::Process::launch(Options options, StringView &amp;&amp;... args)'],['../struct_s_c_1_1_process.html#a87a75c72f4c4a07bfd9896aa2e1be5d5',1,'SC::Process::launch(Span&lt; const StringView &gt; cmd, Options options=Options())'],['../struct_s_c_1_1_process_chain.html#a188213c86a5b06d5f6457602aa165bcc',1,'SC::ProcessChain::launch()']]],
+  ['launch_1',['launch',['../struct_s_c_1_1_process.html#a683488dbddad13825772a7775f6ae7ab',1,'SC::Process::launch()'],['../struct_s_c_1_1_process_chain.html#a5510cd3584ad007f1083b522a0baad3b',1,'SC::ProcessChain::launch()']]],
   ['length_2',['length',['../struct_s_c_1_1_reflection_1_1_sv.html#a79309beed4cec8d459927e590338f468',1,'SC::Reflection::Sv']]],
   ['level_3',['level',['../struct_s_c_1_1_file_system_iterator_1_1_entry.html#a9b6f2f36a8a850250d8ace6b77b39091',1,'SC::FileSystemIterator::Entry']]],
   ['libraries_4',['Libraries',['../libraries.html',1,'']]],

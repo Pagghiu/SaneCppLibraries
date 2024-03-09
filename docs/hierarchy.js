@@ -6,6 +6,7 @@ var hierarchy =
     [ "SC::AlignedStorage< N, Alignment >", "struct_s_c_1_1_aligned_storage.html", null ],
     [ "SC::AlignedStorage< OpaqueCVSize, OpaqueCVAlignment >", "struct_s_c_1_1_aligned_storage.html", null ],
     [ "SC::AlignedStorage< OpaqueMutexSize, OpaqueMutexAlignment >", "struct_s_c_1_1_aligned_storage.html", null ],
+    [ "SC::Process::StdStream::AlreadySetup", "struct_s_c_1_1_process_1_1_std_stream_1_1_already_setup.html", null ],
     [ "SC::Build::Architecture", "struct_s_c_1_1_build_1_1_architecture.html", null ],
     [ "SC::ArenaMap< T >", "struct_s_c_1_1_arena_map.html", null ],
     [ "SC::ArenaMap< T >::ArenaMapIterator< MapType >", "struct_s_c_1_1_arena_map_1_1_arena_map_iterator.html", null ],
@@ -76,7 +77,6 @@ var hierarchy =
     [ "SC::TypeTraits::EnableIf< B, T >", "struct_s_c_1_1_type_traits_1_1_enable_if.html", null ],
     [ "SC::FileSystemIterator::Entry", "struct_s_c_1_1_file_system_iterator_1_1_entry.html", null ],
     [ "SC::TaggedUnion< Union >::EnumToType< wantedEnum, StartIndex >", "struct_s_c_1_1_tagged_union_1_1_enum_to_type.html", null ],
-    [ "SC::ProcessChain::Error", "struct_s_c_1_1_process_chain_1_1_error.html", null ],
     [ "SC::FileSystemWatcher::EventLoopRunner", "struct_s_c_1_1_file_system_watcher_1_1_event_loop_runner.html", null ],
     [ "SC::EventObject", "struct_s_c_1_1_event_object.html", null ],
     [ "SC::ProcessDescriptor::ExitStatus", "struct_s_c_1_1_process_descriptor_1_1_exit_status.html", null ],
@@ -100,6 +100,9 @@ var hierarchy =
       [ "SC::HttpServer", "struct_s_c_1_1_http_server.html", null ]
     ] ],
     [ "SC::HttpURLParser", "struct_s_c_1_1_http_u_r_l_parser.html", null ],
+    [ "SC::Process::StdOut::Ignore", "struct_s_c_1_1_process_1_1_std_out_1_1_ignore.html", null ],
+    [ "SC::Process::StdIn::Inherit", "struct_s_c_1_1_process_1_1_std_in_1_1_inherit.html", null ],
+    [ "SC::Process::StdOut::Inherit", "struct_s_c_1_1_process_1_1_std_out_1_1_inherit.html", null ],
     [ "SC::IntrusiveDoubleLinkedList< T >", "struct_s_c_1_1_intrusive_double_linked_list.html", null ],
     [ "SC::TypeTraits::IsConst< T >", "struct_s_c_1_1_type_traits_1_1_is_const.html", null ],
     [ "SC::TypeTraits::IsLValueReference< T >", "struct_s_c_1_1_type_traits_1_1_is_l_value_reference.html", null ],
@@ -123,8 +126,6 @@ var hierarchy =
     [ "SC::Build::Optimization", "struct_s_c_1_1_build_1_1_optimization.html", null ],
     [ "SC::AsyncEventLoop::Options", "struct_s_c_1_1_async_event_loop_1_1_options.html", null ],
     [ "SC::FileSystemIterator::Options", "struct_s_c_1_1_file_system_iterator_1_1_options.html", null ],
-    [ "SC::Process::Options", "struct_s_c_1_1_process_1_1_options.html", null ],
-    [ "SC::ProcessChain::Options", "struct_s_c_1_1_process_chain_1_1_options.html", null ],
     [ "SC::SerializationJson::Options", "struct_s_c_1_1_serialization_json_1_1_options.html", null ],
     [ "SC::Build::Parameters", "struct_s_c_1_1_build_1_1_parameters.html", null ],
     [ "SC::Path::ParsedView", "struct_s_c_1_1_path_1_1_parsed_view.html", null ],
@@ -144,7 +145,6 @@ var hierarchy =
     [ "SC::ProcessChain", "struct_s_c_1_1_process_chain.html", null ],
     [ "SC::ProcessID", "struct_s_c_1_1_process_i_d.html", null ],
     [ "SC::Build::Project", "struct_s_c_1_1_build_1_1_project.html", null ],
-    [ "SC::FileDescriptor::ReadResult", "struct_s_c_1_1_file_descriptor_1_1_read_result.html", null ],
     [ "SC::Reflection::Reflect< T >", "struct_s_c_1_1_reflection_1_1_reflect.html", null ],
     [ "SC::Reflection::ReflectPrimitive", "struct_s_c_1_1_reflection_1_1_reflect_primitive.html", null ],
     [ "SC::Reflection::ReflectStruct< Type >", "struct_s_c_1_1_reflection_1_1_reflect_struct.html", null ],
@@ -178,6 +178,10 @@ var hierarchy =
     [ "SC::SocketNetworking", "struct_s_c_1_1_socket_networking.html", null ],
     [ "SC::SocketServer", "struct_s_c_1_1_socket_server.html", null ],
     [ "SC::Span< Type >", "struct_s_c_1_1_span.html", null ],
+    [ "SC::Process::StdStream", "struct_s_c_1_1_process_1_1_std_stream.html", [
+      [ "SC::Process::StdIn", "struct_s_c_1_1_process_1_1_std_in.html", null ],
+      [ "SC::Process::StdOut", "struct_s_c_1_1_process_1_1_std_out.html", null ]
+    ] ],
     [ "SC::String", "struct_s_c_1_1_string.html", [
       [ "SC::SmallString< 30 >", "struct_s_c_1_1_small_string.html", null ],
       [ "SC::SmallString< N >", "struct_s_c_1_1_small_string.html", null ]

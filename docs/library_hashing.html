@@ -151,7 +151,7 @@ Data can be added until needed with <a class="el" href="struct_s_c_1_1_hashing.h
 <div class="line">            <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(hash.finalize(res));</div>
 <div class="line"> </div>
 <div class="line">            String test;</div>
-<div class="line">            <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(StringBuilder(test).appendHex(res.toBytesSpan()));</div>
+<div class="line">            <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(StringBuilder(test).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));</div>
 <div class="line">            <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(test == <span class="stringliteral">&quot;098F6BCD4621D373CADE4E832627B4F6&quot;</span>_a8);</div>
 <div class="line">            report.console.printLine(test.view());</div>
 <div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:104</div></div>
@@ -164,7 +164,7 @@ Data can be added until needed with <a class="el" href="struct_s_c_1_1_hashing.h
 <div class="line">            <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(hash.finalize(res));</div>
 <div class="line"> </div>
 <div class="line">            String test;</div>
-<div class="line">            <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(StringBuilder(test).appendHex(res.toBytesSpan()));</div>
+<div class="line">            <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(StringBuilder(test).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));</div>
 <div class="line">            <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(test == <span class="stringliteral">&quot;05A671C66AEFEA124CC08B76EA6D30BB&quot;</span>_a8);</div>
 </div><!-- fragment --><h1><a class="anchor" id="autotoc_md137"></a>
 Roadmap</h1>

@@ -165,6 +165,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a8b94321c1da1684303c0541feadb288f"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_system.html#a8b94321c1da1684303c0541feadb288f">removeFileIfExists</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> source)</td></tr>
 <tr class="memdesc:a8b94321c1da1684303c0541feadb288f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Remove a single file, giving no error if it doesn't exist.  <a href="struct_s_c_1_1_file_system.html#a8b94321c1da1684303c0541feadb288f">More...</a><br /></td></tr>
 <tr class="separator:a8b94321c1da1684303c0541feadb288f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a98dbf0b8a673ff6776b8c9e7d1c2034b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_system.html#a98dbf0b8a673ff6776b8c9e7d1c2034b">removeLinkIfExists</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> source)</td></tr>
+<tr class="memdesc:a98dbf0b8a673ff6776b8c9e7d1c2034b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Remove a single link, giving no error if it doesn't exist.  <a href="struct_s_c_1_1_file_system.html#a98dbf0b8a673ff6776b8c9e7d1c2034b">More...</a><br /></td></tr>
+<tr class="separator:a98dbf0b8a673ff6776b8c9e7d1c2034b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad5e16fc1e09d6ba35fc8985e33350e9f"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_system.html#ad5e16fc1e09d6ba35fc8985e33350e9f">removeDirectoriesRecursive</a> (<a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> &gt; directories)</td></tr>
 <tr class="memdesc:ad5e16fc1e09d6ba35fc8985e33350e9f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Remove multiple directories with their entire content (like posix <code>rm -rf</code>)  <a href="struct_s_c_1_1_file_system.html#ad5e16fc1e09d6ba35fc8985e33350e9f">More...</a><br /></td></tr>
 <tr class="separator:ad5e16fc1e09d6ba35fc8985e33350e9f"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -201,6 +204,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:ace46c63d387d056e12a8a49d7ce48f8b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_system.html#ace46c63d387d056e12a8a49d7ce48f8b">makeDirectoryRecursive</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> directory)</td></tr>
 <tr class="memdesc:ace46c63d387d056e12a8a49d7ce48f8b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Create a new directory, creating also intermediate non existing directories (like posix <code>mkdir -p</code>)  <a href="struct_s_c_1_1_file_system.html#ace46c63d387d056e12a8a49d7ce48f8b">More...</a><br /></td></tr>
 <tr class="separator:ace46c63d387d056e12a8a49d7ce48f8b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a02635e23b5f5eabf29b084767ef60209"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_system.html#a02635e23b5f5eabf29b084767ef60209">createSymbolicLink</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> sourceFileOrDirectory, <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> linkFile)</td></tr>
+<tr class="memdesc:a02635e23b5f5eabf29b084767ef60209"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates a symbolic link at location linkFile pointing at sourceFileOrDirectory.  <a href="struct_s_c_1_1_file_system.html#a02635e23b5f5eabf29b084767ef60209">More...</a><br /></td></tr>
+<tr class="separator:a02635e23b5f5eabf29b084767ef60209"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5d548867f2f183f166e38e70796c0458"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_system.html#a5d548867f2f183f166e38e70796c0458">exists</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> fileOrDirectory)</td></tr>
 <tr class="memdesc:a5d548867f2f183f166e38e70796c0458"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if a file or directory exists at a given path.  <a href="struct_s_c_1_1_file_system.html#a5d548867f2f183f166e38e70796c0458">More...</a><br /></td></tr>
 <tr class="separator:a5d548867f2f183f166e38e70796c0458"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -210,6 +216,12 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a2a18d0c2a48a13eb1a1ab99455c84ef4"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_system.html#a2a18d0c2a48a13eb1a1ab99455c84ef4">existsAndIsFile</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> file)</td></tr>
 <tr class="memdesc:a2a18d0c2a48a13eb1a1ab99455c84ef4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if a file exists at given path.  <a href="struct_s_c_1_1_file_system.html#a2a18d0c2a48a13eb1a1ab99455c84ef4">More...</a><br /></td></tr>
 <tr class="separator:a2a18d0c2a48a13eb1a1ab99455c84ef4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8976988dd20f82ad5b092c3fc2bebd83"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_system.html#a8976988dd20f82ad5b092c3fc2bebd83">existsAndIsLink</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> file)</td></tr>
+<tr class="memdesc:a8976988dd20f82ad5b092c3fc2bebd83"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if a link exists at given path.  <a href="struct_s_c_1_1_file_system.html#a8976988dd20f82ad5b092c3fc2bebd83">More...</a><br /></td></tr>
+<tr class="separator:a8976988dd20f82ad5b092c3fc2bebd83"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac640aaeb9beb9c9c9a6e8fd8954b5614"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_system.html#ac640aaeb9beb9c9c9a6e8fd8954b5614">moveDirectory</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> sourceDirectory, <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> destinationDirectory)</td></tr>
+<tr class="memdesc:ac640aaeb9beb9c9c9a6e8fd8954b5614"><td class="mdescLeft">&#160;</td><td class="mdescRight">Moves a directory from source to destination.  <a href="struct_s_c_1_1_file_system.html#ac640aaeb9beb9c9c9a6e8fd8954b5614">More...</a><br /></td></tr>
+<tr class="separator:ac640aaeb9beb9c9c9a6e8fd8954b5614"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a665391fc54352cc85e9ab2103a17e57f"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_system.html#a665391fc54352cc85e9ab2103a17e57f">write</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> file, <a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const char &gt; data)</td></tr>
 <tr class="memdesc:a665391fc54352cc85e9ab2103a17e57f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Writes a block of memory to a file.  <a href="struct_s_c_1_1_file_system.html#a665391fc54352cc85e9ab2103a17e57f">More...</a><br /></td></tr>
 <tr class="separator:a665391fc54352cc85e9ab2103a17e57f"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -498,6 +510,44 @@ Public Attributes</h2></td></tr>
 
 </div>
 </div>
+<a id="a02635e23b5f5eabf29b084767ef60209" name="a02635e23b5f5eabf29b084767ef60209"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a02635e23b5f5eabf29b084767ef60209">&#9670;&nbsp;</a></span>createSymbolicLink()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">Result</a> SC::FileSystem::createSymbolicLink </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td>
+          <td class="paramname"><em>sourceFileOrDirectory</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td>
+          <td class="paramname"><em>linkFile</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Creates a symbolic link at location linkFile pointing at sourceFileOrDirectory. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">sourceFileOrDirectory</td><td>The target of the link (can be a folder or directory) </td></tr>
+    <tr><td class="paramname">linkFile</td><td>The location where the symbolic link will be created </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Invalid result if it's not possible creating the requested symbolic link </dd></dl>
+
+</div>
+</div>
 <a id="a5d548867f2f183f166e38e70796c0458" name="a5d548867f2f183f166e38e70796c0458"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a5d548867f2f183f166e38e70796c0458">&#9670;&nbsp;</a></span>exists()</h2>
 
@@ -572,7 +622,7 @@ Public Attributes</h2></td></tr>
 <p>Check if a file exists at given path. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">file</td><td>Fil path to check </td></tr>
+    <tr><td class="paramname">file</td><td>File path to check </td></tr>
   </table>
   </dd>
 </dl>
@@ -613,6 +663,33 @@ Public Attributes</h2></td></tr>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.exists(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.exists(<span class="stringliteral">&quot;destinationFile.txt&quot;</span>));</div>
 </div><!-- fragment --> 
+</div>
+</div>
+<a id="a8976988dd20f82ad5b092c3fc2bebd83" name="a8976988dd20f82ad5b092c3fc2bebd83"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a8976988dd20f82ad5b092c3fc2bebd83">&#9670;&nbsp;</a></span>existsAndIsLink()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool SC::FileSystem::existsAndIsLink </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td>
+          <td class="paramname"><em>file</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Check if a link exists at given path. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">file</td><td>Link path to check </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd><code>true</code> if a file exists at the given path </dd></dl>
+
 </div>
 </div>
 <a id="a2fa57a1055ad6a1ec30fd87183fb8c73" name="a2fa57a1055ad6a1ec30fd87183fb8c73"></a>
@@ -882,6 +959,44 @@ Public Attributes</h2></td></tr>
 <div class="line">    <span class="comment">// Check that directory has been removed</span></div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.existsAndIsDirectory(<span class="stringliteral">&quot;Test3&quot;</span>));</div>
 </div><!-- fragment --> </dd></dl>
+
+</div>
+</div>
+<a id="ac640aaeb9beb9c9c9a6e8fd8954b5614" name="ac640aaeb9beb9c9c9a6e8fd8954b5614"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac640aaeb9beb9c9c9a6e8fd8954b5614">&#9670;&nbsp;</a></span>moveDirectory()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool SC::FileSystem::moveDirectory </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td>
+          <td class="paramname"><em>sourceDirectory</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td>
+          <td class="paramname"><em>destinationDirectory</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Moves a directory from source to destination. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">sourceDirectory</td><td>The source directory that will be moved to destination </td></tr>
+    <tr><td class="paramname">destinationDirectory</td><td>The destination directory </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd><code>true</code> if the move succeeded </dd></dl>
 
 </div>
 </div>
@@ -1266,6 +1381,33 @@ Public Attributes</h2></td></tr>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>Valid <a class="el" href="struct_s_c_1_1_result.html" title="An ascii string used as boolean result. SC_TRY macro forwards errors to caller.">Result</a> if file was removed </dd></dl>
+
+</div>
+</div>
+<a id="a98dbf0b8a673ff6776b8c9e7d1c2034b" name="a98dbf0b8a673ff6776b8c9e7d1c2034b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a98dbf0b8a673ff6776b8c9e7d1c2034b">&#9670;&nbsp;</a></span>removeLinkIfExists()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">Result</a> SC::FileSystem::removeLinkIfExists </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td>
+          <td class="paramname"><em>source</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Remove a single link, giving no error if it doesn't exist. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">source</td><td>The link to be removed if it exists </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Valid <a class="el" href="struct_s_c_1_1_result.html" title="An ascii string used as boolean result. SC_TRY macro forwards errors to caller.">Result</a> if the file doesn't exist or if it exists and it has been successfully removed. </dd></dl>
 
 </div>
 </div>

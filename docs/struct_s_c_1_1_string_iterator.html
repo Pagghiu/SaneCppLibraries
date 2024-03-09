@@ -223,12 +223,12 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a02ae8ef1276bb06e27eb6b1587174f91"><td class="memItemLeft" align="right" valign="top">constexpr <a class="el" href="group__group__foundation__utility.html#gaf8959f7efce4988e7458e3b144b90fa9">ssize_t</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_iterator.html#a02ae8ef1276bb06e27eb6b1587174f91">bytesDistanceFrom</a> (<a class="el" href="struct_s_c_1_1_string_iterator.html">StringIterator</a> other) const</td></tr>
 <tr class="memdesc:a02ae8ef1276bb06e27eb6b1587174f91"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get distance in bytes from current position to another <a class="el" href="struct_s_c_1_1_string_iterator.html" title="A position inside a fixed range [start, end) of UTF code points.">StringIterator</a> current position.  <a href="struct_s_c_1_1_string_iterator.html#a02ae8ef1276bb06e27eb6b1587174f91">More...</a><br /></td></tr>
 <tr class="separator:a02ae8ef1276bb06e27eb6b1587174f91"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad4e7c66dfa339c84842cabeb4c6e05d3"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_iterator.html#ad4e7c66dfa339c84842cabeb4c6e05d3">endsWithCodePoint</a> (CodePoint character) const</td></tr>
-<tr class="memdesc:ad4e7c66dfa339c84842cabeb4c6e05d3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if this Iterator ends with a given code point.  <a href="struct_s_c_1_1_string_iterator.html#ad4e7c66dfa339c84842cabeb4c6e05d3">More...</a><br /></td></tr>
-<tr class="separator:ad4e7c66dfa339c84842cabeb4c6e05d3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7ca45b1e696f8280aa3d04362d933d75"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_iterator.html#a7ca45b1e696f8280aa3d04362d933d75">startsWithCodePoint</a> (CodePoint character) const</td></tr>
-<tr class="memdesc:a7ca45b1e696f8280aa3d04362d933d75"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if this Iterator starts with a given code point.  <a href="struct_s_c_1_1_string_iterator.html#a7ca45b1e696f8280aa3d04362d933d75">More...</a><br /></td></tr>
-<tr class="separator:a7ca45b1e696f8280aa3d04362d933d75"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9aac2c24648adb9a0bc6df208d6f4acd"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_iterator.html#a9aac2c24648adb9a0bc6df208d6f4acd">endsWithAnyOf</a> (<a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const CodePoint &gt; codePoints) const</td></tr>
+<tr class="memdesc:a9aac2c24648adb9a0bc6df208d6f4acd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if this Iterator ends with any code point in the given span.  <a href="struct_s_c_1_1_string_iterator.html#a9aac2c24648adb9a0bc6df208d6f4acd">More...</a><br /></td></tr>
+<tr class="separator:a9aac2c24648adb9a0bc6df208d6f4acd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abece6326eecd50d5b188f9738912ed4f"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_iterator.html#abece6326eecd50d5b188f9738912ed4f">startsWithAnyOf</a> (<a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const CodePoint &gt; codePoints) const</td></tr>
+<tr class="memdesc:abece6326eecd50d5b188f9738912ed4f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if this Iterator starts with any code point in the given span.  <a href="struct_s_c_1_1_string_iterator.html#abece6326eecd50d5b188f9738912ed4f">More...</a><br /></td></tr>
+<tr class="separator:abece6326eecd50d5b188f9738912ed4f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af67ee153589681126524ab6f688a8c63"><td class="memTemplParams" colspan="2">template&lt;typename IteratorType &gt; </td></tr>
 <tr class="memitem:af67ee153589681126524ab6f688a8c63"><td class="memTemplItemLeft" align="right" valign="top">bool&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_iterator.html#af67ee153589681126524ab6f688a8c63">endsWith</a> (IteratorType other) const</td></tr>
 <tr class="memdesc:af67ee153589681126524ab6f688a8c63"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if this Iterator at its end matches entirely another Iterator's range.  <a href="struct_s_c_1_1_string_iterator.html#af67ee153589681126524ab6f688a8c63">More...</a><br /></td></tr>
@@ -812,8 +812,8 @@ template&lt;typename IteratorType &gt; </div>
 
 </div>
 </div>
-<a id="ad4e7c66dfa339c84842cabeb4c6e05d3" name="ad4e7c66dfa339c84842cabeb4c6e05d3"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ad4e7c66dfa339c84842cabeb4c6e05d3">&#9670;&nbsp;</a></span>endsWithCodePoint()</h2>
+<a id="a9aac2c24648adb9a0bc6df208d6f4acd" name="a9aac2c24648adb9a0bc6df208d6f4acd"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9aac2c24648adb9a0bc6df208d6f4acd">&#9670;&nbsp;</a></span>endsWithAnyOf()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -821,23 +821,23 @@ template&lt;typename IteratorType &gt; </div>
 template&lt;typename CharIterator &gt; </div>
       <table class="memname">
         <tr>
-          <td class="memname">bool <a class="el" href="struct_s_c_1_1_string_iterator.html">SC::StringIterator</a>&lt; CharIterator &gt;::endsWithCodePoint </td>
+          <td class="memname">bool <a class="el" href="struct_s_c_1_1_string_iterator.html">SC::StringIterator</a>&lt; CharIterator &gt;::endsWithAnyOf </td>
           <td>(</td>
-          <td class="paramtype">CodePoint&#160;</td>
-          <td class="paramname"><em>character</em></td><td>)</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const CodePoint &gt;&#160;</td>
+          <td class="paramname"><em>codePoints</em></td><td>)</td>
           <td> const</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Check if this Iterator ends with a given code point. </p>
+<p>Check if this Iterator ends with any code point in the given span. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">character</td><td>the code point </td></tr>
+    <tr><td class="paramname">codePoints</td><td>A span of code points to check for </td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd><code>true</code> if <code>character</code> exists as last code point of this <a class="el" href="struct_s_c_1_1_string_iterator.html" title="A position inside a fixed range [start, end) of UTF code points.">StringIterator</a> range </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd><code>true</code> if at least one code point of <code>codepoints</code> exists at the end of the range </dd></dl>
 
 </div>
 </div>
@@ -1265,8 +1265,8 @@ template&lt;typename IteratorType &gt; </div>
 
 </div>
 </div>
-<a id="a7ca45b1e696f8280aa3d04362d933d75" name="a7ca45b1e696f8280aa3d04362d933d75"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a7ca45b1e696f8280aa3d04362d933d75">&#9670;&nbsp;</a></span>startsWithCodePoint()</h2>
+<a id="abece6326eecd50d5b188f9738912ed4f" name="abece6326eecd50d5b188f9738912ed4f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#abece6326eecd50d5b188f9738912ed4f">&#9670;&nbsp;</a></span>startsWithAnyOf()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1274,23 +1274,23 @@ template&lt;typename IteratorType &gt; </div>
 template&lt;typename CharIterator &gt; </div>
       <table class="memname">
         <tr>
-          <td class="memname">bool <a class="el" href="struct_s_c_1_1_string_iterator.html">SC::StringIterator</a>&lt; CharIterator &gt;::startsWithCodePoint </td>
+          <td class="memname">bool <a class="el" href="struct_s_c_1_1_string_iterator.html">SC::StringIterator</a>&lt; CharIterator &gt;::startsWithAnyOf </td>
           <td>(</td>
-          <td class="paramtype">CodePoint&#160;</td>
-          <td class="paramname"><em>character</em></td><td>)</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const CodePoint &gt;&#160;</td>
+          <td class="paramname"><em>codePoints</em></td><td>)</td>
           <td> const</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Check if this Iterator starts with a given code point. </p>
+<p>Check if this Iterator starts with any code point in the given span. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">character</td><td>the code point </td></tr>
+    <tr><td class="paramname">codePoints</td><td>A span of code points to check for </td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd><code>true</code> if <code>character</code> exists as first code point of this <a class="el" href="struct_s_c_1_1_string_iterator.html" title="A position inside a fixed range [start, end) of UTF code points.">StringIterator</a> range </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd><code>true</code> if at least one code point of <code>codepoints</code> exists at the start of the range </dd></dl>
 
 </div>
 </div>

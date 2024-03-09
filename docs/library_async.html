@@ -286,7 +286,7 @@ AsyncProcessExit</h2>
 <div class="fragment"><div class="line"><span class="comment">// Assuming an already created (and running) AsyncEventLoop named eventLoop</span></div>
 <div class="line"><span class="comment">// ...</span></div>
 <div class="line">Process process;</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.launch(<span class="stringliteral">&quot;executable&quot;</span>, <span class="stringliteral">&quot;--parameter&quot;</span>));</div>
+<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.launch({<span class="stringliteral">&quot;executable&quot;</span>, <span class="stringliteral">&quot;--parameter&quot;</span>}));</div>
 <div class="line">ProcessDescriptor::Handle processHandle;</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.handle.get(processHandle, Result::Error(<span class="stringliteral">&quot;Invalid Handle&quot;</span>)));</div>
 <div class="line">AsyncProcessExit processExit; <span class="comment">//  Memory lifetime must be valid until callback is called</span></div>

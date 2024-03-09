@@ -16,7 +16,7 @@ var struct_s_c_1_1_string_view =
     [ "containsCodePoint", "struct_s_c_1_1_string_view.html#a6c00193fce0fba8603642a3ec7658674", null ],
     [ "containsString", "struct_s_c_1_1_string_view.html#ae59944bd39c323dde4cea38a12fd9887", null ],
     [ "endsWith", "struct_s_c_1_1_string_view.html#a89be76434b8cce5d8eb64e180f6d9f21", null ],
-    [ "endsWithCodePoint", "struct_s_c_1_1_string_view.html#a09e7078353173e6cf1b5926a6c6e8794", null ],
+    [ "endsWithAnyOf", "struct_s_c_1_1_string_view.html#aa6d4e5b143ed8a40c4623335003b32bc", null ],
     [ "fullyOverlaps", "struct_s_c_1_1_string_view.html#ab062bf9142075614d911d046c7838568", null ],
     [ "getEncoding", "struct_s_c_1_1_string_view.html#aba7a5bb023539ac71e0ada1ba45417c0", null ],
     [ "getIterator", "struct_s_c_1_1_string_view.html#a42767e89834b833beb3fd513921fc76e", null ],
@@ -42,10 +42,11 @@ var struct_s_c_1_1_string_view =
     [ "sliceStartLength", "struct_s_c_1_1_string_view.html#a9661b267e8bcddf447a01a474f23046f", null ],
     [ "sliceStartLengthBytes", "struct_s_c_1_1_string_view.html#a5ddbf0dca6176e6a03f9aec62c8033d8", null ],
     [ "startsWith", "struct_s_c_1_1_string_view.html#a485982b02e6830f9d803075cc11d0c6e", null ],
-    [ "startsWithCodePoint", "struct_s_c_1_1_string_view.html#a877f164e8cbe3ef47af78ed87cd9458c", null ],
+    [ "startsWithAnyOf", "struct_s_c_1_1_string_view.html#a0b7ee6cc375bd04fe9bb5c6594d95954", null ],
     [ "toBytesSpan", "struct_s_c_1_1_string_view.html#aea7f853cff0c3c913324c267f89773fb", null ],
     [ "toCharSpan", "struct_s_c_1_1_string_view.html#a4d91b6c3dc11916ff9642b96bbbe1c06", null ],
-    [ "trimEndingCodePoint", "struct_s_c_1_1_string_view.html#a0f91b3b8a019d1b3a02898652c1fd175", null ],
-    [ "trimStartingCodePoint", "struct_s_c_1_1_string_view.html#a1b677932258528d23cf666e85fafa694", null ],
+    [ "trimAnyOf", "struct_s_c_1_1_string_view.html#aeca8df4ff13517fcb5b4cc601d9b62ce", null ],
+    [ "trimEndAnyOf", "struct_s_c_1_1_string_view.html#a4458e122c9c214b713bb176eb1ce972e", null ],
+    [ "trimStartAnyOf", "struct_s_c_1_1_string_view.html#ab6a06b5b30bd56897c30c78d60c5d341", null ],
     [ "withIterator", "struct_s_c_1_1_string_view.html#adc35a7d8727e21e0aac644b543997de5", null ]
 ];

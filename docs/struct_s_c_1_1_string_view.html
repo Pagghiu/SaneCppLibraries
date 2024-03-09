@@ -210,12 +210,12 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:aca1b818674c12e37294ff24316976e2a"><td class="memItemLeft" align="right" valign="top">constexpr <a class="el" href="group__group__foundation__utility.html#gad084e481beb4db45cbd4160037c07774">size_t</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_view.html#aca1b818674c12e37294ff24316976e2a">sizeInBytesIncludingTerminator</a> () const</td></tr>
 <tr class="memdesc:aca1b818674c12e37294ff24316976e2a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get size of the <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> in bytes, including null terminator.  <a href="struct_s_c_1_1_string_view.html#aca1b818674c12e37294ff24316976e2a">More...</a><br /></td></tr>
 <tr class="separator:aca1b818674c12e37294ff24316976e2a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a09e7078353173e6cf1b5926a6c6e8794"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_view.html#a09e7078353173e6cf1b5926a6c6e8794">endsWithCodePoint</a> (<a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a> c) const</td></tr>
-<tr class="memdesc:a09e7078353173e6cf1b5926a6c6e8794"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> ends with given utf code point.  <a href="struct_s_c_1_1_string_view.html#a09e7078353173e6cf1b5926a6c6e8794">More...</a><br /></td></tr>
-<tr class="separator:a09e7078353173e6cf1b5926a6c6e8794"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a877f164e8cbe3ef47af78ed87cd9458c"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_view.html#a877f164e8cbe3ef47af78ed87cd9458c">startsWithCodePoint</a> (<a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a> c) const</td></tr>
-<tr class="memdesc:a877f164e8cbe3ef47af78ed87cd9458c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> starts with given utf code point.  <a href="struct_s_c_1_1_string_view.html#a877f164e8cbe3ef47af78ed87cd9458c">More...</a><br /></td></tr>
-<tr class="separator:a877f164e8cbe3ef47af78ed87cd9458c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa6d4e5b143ed8a40c4623335003b32bc"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_view.html#aa6d4e5b143ed8a40c4623335003b32bc">endsWithAnyOf</a> (<a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a> &gt; codePoints) const</td></tr>
+<tr class="memdesc:aa6d4e5b143ed8a40c4623335003b32bc"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> ends with any utf code point in the given span.  <a href="struct_s_c_1_1_string_view.html#aa6d4e5b143ed8a40c4623335003b32bc">More...</a><br /></td></tr>
+<tr class="separator:aa6d4e5b143ed8a40c4623335003b32bc"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0b7ee6cc375bd04fe9bb5c6594d95954"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_view.html#a0b7ee6cc375bd04fe9bb5c6594d95954">startsWithAnyOf</a> (<a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a> &gt; codePoints) const</td></tr>
+<tr class="memdesc:a0b7ee6cc375bd04fe9bb5c6594d95954"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> starts with any utf code point in the given span.  <a href="struct_s_c_1_1_string_view.html#a0b7ee6cc375bd04fe9bb5c6594d95954">More...</a><br /></td></tr>
+<tr class="separator:a0b7ee6cc375bd04fe9bb5c6594d95954"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a485982b02e6830f9d803075cc11d0c6e"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_view.html#a485982b02e6830f9d803075cc11d0c6e">startsWith</a> (const <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> str) const</td></tr>
 <tr class="memdesc:a485982b02e6830f9d803075cc11d0c6e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> starts with another <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a>.  <a href="struct_s_c_1_1_string_view.html#a485982b02e6830f9d803075cc11d0c6e">More...</a><br /></td></tr>
 <tr class="separator:a485982b02e6830f9d803075cc11d0c6e"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -243,12 +243,15 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:ac08e1518d926917290e023400bab66e7"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_view.html#ac08e1518d926917290e023400bab66e7">sliceEnd</a> (<a class="el" href="group__group__foundation__utility.html#gad084e481beb4db45cbd4160037c07774">size_t</a> offset) const</td></tr>
 <tr class="memdesc:ac08e1518d926917290e023400bab66e7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get slice <code>[end-offset, end]</code> measured in utf code points.  <a href="struct_s_c_1_1_string_view.html#ac08e1518d926917290e023400bab66e7">More...</a><br /></td></tr>
 <tr class="separator:ac08e1518d926917290e023400bab66e7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0f91b3b8a019d1b3a02898652c1fd175"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_view.html#a0f91b3b8a019d1b3a02898652c1fd175">trimEndingCodePoint</a> (<a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a> c) const</td></tr>
-<tr class="memdesc:a0f91b3b8a019d1b3a02898652c1fd175"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a shortened <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> without utf code points matching <code>c</code> at end.  <a href="struct_s_c_1_1_string_view.html#a0f91b3b8a019d1b3a02898652c1fd175">More...</a><br /></td></tr>
-<tr class="separator:a0f91b3b8a019d1b3a02898652c1fd175"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1b677932258528d23cf666e85fafa694"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_view.html#a1b677932258528d23cf666e85fafa694">trimStartingCodePoint</a> (<a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a> c) const</td></tr>
-<tr class="memdesc:a1b677932258528d23cf666e85fafa694"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a shortened <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> without utf code points matching <code>c</code> at start.  <a href="struct_s_c_1_1_string_view.html#a1b677932258528d23cf666e85fafa694">More...</a><br /></td></tr>
-<tr class="separator:a1b677932258528d23cf666e85fafa694"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4458e122c9c214b713bb176eb1ce972e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_view.html#a4458e122c9c214b713bb176eb1ce972e">trimEndAnyOf</a> (<a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a> &gt; codePoints) const</td></tr>
+<tr class="memdesc:a4458e122c9c214b713bb176eb1ce972e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a shortened <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> removing ending utf code points matching the <code>codePoints</code> span.  <a href="struct_s_c_1_1_string_view.html#a4458e122c9c214b713bb176eb1ce972e">More...</a><br /></td></tr>
+<tr class="separator:a4458e122c9c214b713bb176eb1ce972e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab6a06b5b30bd56897c30c78d60c5d341"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_view.html#ab6a06b5b30bd56897c30c78d60c5d341">trimStartAnyOf</a> (<a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a> &gt; codePoints) const</td></tr>
+<tr class="memdesc:ab6a06b5b30bd56897c30c78d60c5d341"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a shortened <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> removing starting utf code points matching the <code>codePoints</code> span.  <a href="struct_s_c_1_1_string_view.html#ab6a06b5b30bd56897c30c78d60c5d341">More...</a><br /></td></tr>
+<tr class="separator:ab6a06b5b30bd56897c30c78d60c5d341"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aeca8df4ff13517fcb5b4cc601d9b62ce"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_view.html#aeca8df4ff13517fcb5b4cc601d9b62ce">trimAnyOf</a> (<a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a> &gt; codePoints) const</td></tr>
+<tr class="memdesc:aeca8df4ff13517fcb5b4cc601d9b62ce"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a shortened <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> removing starting and ending utf code points inside the <code>codePoints</code> span.  <a href="struct_s_c_1_1_string_view.html#aeca8df4ff13517fcb5b4cc601d9b62ce">More...</a><br /></td></tr>
+<tr class="separator:aeca8df4ff13517fcb5b4cc601d9b62ce"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad28b6a3c7aeed701e5550ba5062975d9"><td class="memItemLeft" align="right" valign="top">constexpr <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_view.html#ad28b6a3c7aeed701e5550ba5062975d9">sliceStartBytes</a> (<a class="el" href="group__group__foundation__utility.html#gad084e481beb4db45cbd4160037c07774">size_t</a> start) const</td></tr>
 <tr class="memdesc:ad28b6a3c7aeed701e5550ba5062975d9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a shortened <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> from current cutting the first <code>start</code> bytes.  <a href="struct_s_c_1_1_string_view.html#ad28b6a3c7aeed701e5550ba5062975d9">More...</a><br /></td></tr>
 <tr class="separator:ad28b6a3c7aeed701e5550ba5062975d9"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -319,7 +322,7 @@ Static Public Member Functions</h2></td></tr>
 <div class="line"><a class="code hl_define" href="group__group__foundation__compiler__macros.html#ga6bc5136e9c6fbc77420173ccf4e32d21">SC_ASSERT_RELEASE</a>(s.sizeInBytes() == 3);</div>
 <div class="line"><a class="code hl_define" href="group__group__foundation__compiler__macros.html#ga6bc5136e9c6fbc77420173ccf4e32d21">SC_ASSERT_RELEASE</a>(s.isNullTerminated());</div>
 <div class="ttc" id="agroup__group__foundation__compiler__macros_html_ga6bc5136e9c6fbc77420173ccf4e32d21"><div class="ttname"><a href="group__group__foundation__compiler__macros.html#ga6bc5136e9c6fbc77420173ccf4e32d21">SC_ASSERT_RELEASE</a></div><div class="ttdeci">#define SC_ASSERT_RELEASE(e)</div><div class="ttdoc">Assert expression e to be true.</div><div class="ttdef"><b>Definition:</b> Assert.h:67</div></div>
-<div class="ttc" id="astruct_s_c_1_1_string_view_html_a0fa18d424eebce9edde4d66d35f777a2"><div class="ttname"><a href="struct_s_c_1_1_string_view.html#a0fa18d424eebce9edde4d66d35f777a2">SC::StringView::StringView</a></div><div class="ttdeci">constexpr StringView()</div><div class="ttdoc">Construct an emtpy StringView.</div><div class="ttdef"><b>Definition:</b> StringView.h:625</div></div>
+<div class="ttc" id="astruct_s_c_1_1_string_view_html_a0fa18d424eebce9edde4d66d35f777a2"><div class="ttname"><a href="struct_s_c_1_1_string_view.html#a0fa18d424eebce9edde4d66d35f777a2">SC::StringView::StringView</a></div><div class="ttdeci">constexpr StringView()</div><div class="ttdoc">Construct an emtpy StringView.</div><div class="ttdef"><b>Definition:</b> StringView.h:636</div></div>
 </div><!-- fragment --><p >Example (Construct from null terminated string) </p><div class="fragment"><div class="line"><span class="keyword">const</span> <span class="keywordtype">char</span>* someString = <span class="stringliteral">&quot;asdf&quot;</span>;</div>
 <div class="line"><span class="comment">// construct only &quot;asd&quot;, not null terminated (as there is &#39;f&#39; after &#39;d&#39;)</span></div>
 <div class="line"><a class="code hl_function" href="struct_s_c_1_1_string_view.html#a0fa18d424eebce9edde4d66d35f777a2">StringView</a> s({someString, strlen(asd) - 1}, <span class="keyword">false</span>, <a class="code hl_enumvalue" href="group__group__strings.html#gga394218cf32c79b0ada9bd2d4892eaf52a76b8d0dcd02ccaf203c167ced6d7ef31">StringEncoding::Ascii</a>);</div>
@@ -752,32 +755,32 @@ template&lt;<a class="el" href="group__group__foundation__utility.html#gad084e48
 </div><!-- fragment --> 
 </div>
 </div>
-<a id="a09e7078353173e6cf1b5926a6c6e8794" name="a09e7078353173e6cf1b5926a6c6e8794"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a09e7078353173e6cf1b5926a6c6e8794">&#9670;&nbsp;</a></span>endsWithCodePoint()</h2>
+<a id="aa6d4e5b143ed8a40c4623335003b32bc" name="aa6d4e5b143ed8a40c4623335003b32bc"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa6d4e5b143ed8a40c4623335003b32bc">&#9670;&nbsp;</a></span>endsWithAnyOf()</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">bool SC::StringView::endsWithCodePoint </td>
+          <td class="memname">bool SC::StringView::endsWithAnyOf </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a>&#160;</td>
-          <td class="paramname"><em>c</em></td><td>)</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a> &gt;&#160;</td>
+          <td class="paramname"><em>codePoints</em></td><td>)</td>
           <td> const</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Check if <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> ends with given utf code point. </p>
+<p>Check if <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> ends with any utf code point in the given span. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">c</td><td>The utf code point to check against </td></tr>
+    <tr><td class="paramname">codePoints</td><td>The utf code points to check against </td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd>Returns <code>true</code> if this <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> ends with code point c</dd></dl>
-<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;123 456&quot;</span>.<a class="code hl_function" href="struct_s_c_1_1_string_view.html#a09e7078353173e6cf1b5926a6c6e8794">endsWithCodePoint</a>(<span class="stringliteral">&quot;6&quot;</span>));</div>
-<div class="ttc" id="astruct_s_c_1_1_string_view_html_a09e7078353173e6cf1b5926a6c6e8794"><div class="ttname"><a href="struct_s_c_1_1_string_view.html#a09e7078353173e6cf1b5926a6c6e8794">SC::StringView::endsWithCodePoint</a></div><div class="ttdeci">bool endsWithCodePoint(StringCodePoint c) const</div><div class="ttdoc">Check if StringView ends with given utf code point.</div></div>
+<dl class="section return"><dt>Returns</dt><dd>Returns <code>true</code> if this <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> ends with any code point inside codePoints</dd></dl>
+<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;123 456&quot;</span>.<a class="code hl_function" href="struct_s_c_1_1_string_view.html#aa6d4e5b143ed8a40c4623335003b32bc">endsWithAnyOf</a>({<span class="charliteral">&#39;a&#39;</span>, <span class="charliteral">&#39;6&#39;</span>})); <span class="comment">// &#39;6&#39; will match</span></div>
+<div class="ttc" id="astruct_s_c_1_1_string_view_html_aa6d4e5b143ed8a40c4623335003b32bc"><div class="ttname"><a href="struct_s_c_1_1_string_view.html#aa6d4e5b143ed8a40c4623335003b32bc">SC::StringView::endsWithAnyOf</a></div><div class="ttdeci">bool endsWithAnyOf(Span&lt; const StringCodePoint &gt; codePoints) const</div><div class="ttdoc">Check if StringView ends with any utf code point in the given span.</div></div>
 </div><!-- fragment --> 
 </div>
 </div>
@@ -1815,32 +1818,32 @@ template&lt;typename <a class="el" href="struct_s_c_1_1_string_iterator.html">St
 </div><!-- fragment --> 
 </div>
 </div>
-<a id="a877f164e8cbe3ef47af78ed87cd9458c" name="a877f164e8cbe3ef47af78ed87cd9458c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a877f164e8cbe3ef47af78ed87cd9458c">&#9670;&nbsp;</a></span>startsWithCodePoint()</h2>
+<a id="a0b7ee6cc375bd04fe9bb5c6594d95954" name="a0b7ee6cc375bd04fe9bb5c6594d95954"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0b7ee6cc375bd04fe9bb5c6594d95954">&#9670;&nbsp;</a></span>startsWithAnyOf()</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">bool SC::StringView::startsWithCodePoint </td>
+          <td class="memname">bool SC::StringView::startsWithAnyOf </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a>&#160;</td>
-          <td class="paramname"><em>c</em></td><td>)</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a> &gt;&#160;</td>
+          <td class="paramname"><em>codePoints</em></td><td>)</td>
           <td> const</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Check if <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> starts with given utf code point. </p>
+<p>Check if <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> starts with any utf code point in the given span. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">c</td><td>The utf code point to check against </td></tr>
+    <tr><td class="paramname">codePoints</td><td>The utf code points to check against </td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd>Returns <code>true</code> if this <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> starts with code point c</dd></dl>
-<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;123 456&quot;</span>.<a class="code hl_function" href="struct_s_c_1_1_string_view.html#a877f164e8cbe3ef47af78ed87cd9458c">startsWithCodePoint</a>(<span class="stringliteral">&quot;1&quot;</span>));</div>
-<div class="ttc" id="astruct_s_c_1_1_string_view_html_a877f164e8cbe3ef47af78ed87cd9458c"><div class="ttname"><a href="struct_s_c_1_1_string_view.html#a877f164e8cbe3ef47af78ed87cd9458c">SC::StringView::startsWithCodePoint</a></div><div class="ttdeci">bool startsWithCodePoint(StringCodePoint c) const</div><div class="ttdoc">Check if StringView starts with given utf code point.</div></div>
+<dl class="section return"><dt>Returns</dt><dd>Returns <code>true</code> if this <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> starts with any code point inside codePoints</dd></dl>
+<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;123 456&quot;</span>.<a class="code hl_function" href="struct_s_c_1_1_string_view.html#a0b7ee6cc375bd04fe9bb5c6594d95954">startsWithAnyOf</a>({<span class="charliteral">&#39;1&#39;</span>, <span class="charliteral">&#39;8&#39;</span>})); <span class="comment">// &#39;1&#39; will match</span></div>
+<div class="ttc" id="astruct_s_c_1_1_string_view_html_a0b7ee6cc375bd04fe9bb5c6594d95954"><div class="ttname"><a href="struct_s_c_1_1_string_view.html#a0b7ee6cc375bd04fe9bb5c6594d95954">SC::StringView::startsWithAnyOf</a></div><div class="ttdeci">bool startsWithAnyOf(Span&lt; const StringCodePoint &gt; codePoints) const</div><div class="ttdoc">Check if StringView starts with any utf code point in the given span.</div></div>
 </div><!-- fragment --> 
 </div>
 </div>
@@ -1900,61 +1903,90 @@ template&lt;typename <a class="el" href="struct_s_c_1_1_string_iterator.html">St
 
 </div>
 </div>
-<a id="a0f91b3b8a019d1b3a02898652c1fd175" name="a0f91b3b8a019d1b3a02898652c1fd175"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0f91b3b8a019d1b3a02898652c1fd175">&#9670;&nbsp;</a></span>trimEndingCodePoint()</h2>
+<a id="aeca8df4ff13517fcb5b4cc601d9b62ce" name="aeca8df4ff13517fcb5b4cc601d9b62ce"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aeca8df4ff13517fcb5b4cc601d9b62ce">&#9670;&nbsp;</a></span>trimAnyOf()</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> SC::StringView::trimEndingCodePoint </td>
+          <td class="memname"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> SC::StringView::trimAnyOf </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a>&#160;</td>
-          <td class="paramname"><em>c</em></td><td>)</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a> &gt;&#160;</td>
+          <td class="paramname"><em>codePoints</em></td><td>)</td>
           <td> const</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Returns a shortened <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> without utf code points matching <code>c</code> at end. </p>
+<p>Returns a shortened <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> removing starting and ending utf code points inside the <code>codePoints</code> span. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">c</td><td>The utf code point to look for </td></tr>
+    <tr><td class="paramname">codePoints</td><td>The span of utf code points to look for </td></tr>
   </table>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>The trimmed <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a></dd></dl>
-<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;myTest___&quot;</span>_a8.trimEndingCodePoint(<span class="charliteral">&#39;_&#39;</span>) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
-<div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;myTest&quot;</span>_a8.trimEndingCodePoint(<span class="charliteral">&#39;_&#39;</span>) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
+<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;__\n_myTest__\n&quot;</span>_a8.trimAnyOf({<span class="stringliteral">&#39;_&#39;</span>, <span class="stringliteral">&#39;\n&#39;</span>}) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
+<div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;_myTest&quot;</span>_a8.trimAnyOf({<span class="stringliteral">&#39;_&#39;</span>}) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
 </div><!-- fragment --> 
 </div>
 </div>
-<a id="a1b677932258528d23cf666e85fafa694" name="a1b677932258528d23cf666e85fafa694"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1b677932258528d23cf666e85fafa694">&#9670;&nbsp;</a></span>trimStartingCodePoint()</h2>
+<a id="a4458e122c9c214b713bb176eb1ce972e" name="a4458e122c9c214b713bb176eb1ce972e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4458e122c9c214b713bb176eb1ce972e">&#9670;&nbsp;</a></span>trimEndAnyOf()</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> SC::StringView::trimStartingCodePoint </td>
+          <td class="memname"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> SC::StringView::trimEndAnyOf </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a>&#160;</td>
-          <td class="paramname"><em>c</em></td><td>)</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a> &gt;&#160;</td>
+          <td class="paramname"><em>codePoints</em></td><td>)</td>
           <td> const</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Returns a shortened <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> without utf code points matching <code>c</code> at start. </p>
+<p>Returns a shortened <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> removing ending utf code points matching the <code>codePoints</code> span. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">c</td><td>The utf code point to look for </td></tr>
+    <tr><td class="paramname">codePoints</td><td>The span of utf code points to look for </td></tr>
   </table>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>The trimmed <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a></dd></dl>
-<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;___myTest&quot;</span>_a8.trimStartingCodePoint(<span class="charliteral">&#39;_&#39;</span>) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
-<div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;_myTest&quot;</span>_a8.trimStartingCodePoint(<span class="charliteral">&#39;_&#39;</span>) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
+<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;myTest_\n__&quot;</span>_a8.trimEndAnyOf({<span class="stringliteral">&#39;_&#39;</span>, <span class="stringliteral">&#39;\n&#39;</span>}) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
+<div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;myTest&quot;</span>_a8.trimEndAnyOf({<span class="stringliteral">&#39;_&#39;</span>}) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
+</div><!-- fragment --> 
+</div>
+</div>
+<a id="ab6a06b5b30bd56897c30c78d60c5d341" name="ab6a06b5b30bd56897c30c78d60c5d341"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab6a06b5b30bd56897c30c78d60c5d341">&#9670;&nbsp;</a></span>trimStartAnyOf()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> SC::StringView::trimStartAnyOf </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="group__group__strings.html#ga09b4c12503be970c842aef8dab6a1621">StringCodePoint</a> &gt;&#160;</td>
+          <td class="paramname"><em>codePoints</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns a shortened <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> removing starting utf code points matching the <code>codePoints</code> span. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">codePoints</td><td>The span of utf code points to look for </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>The trimmed <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a></dd></dl>
+<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;__\n_myTest&quot;</span>_a8.trimStartAnyOf({<span class="stringliteral">&#39;_&#39;</span>, <span class="stringliteral">&#39;\n&#39;</span>}) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
+<div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;_myTest&quot;</span>_a8.trimStartAnyOf({<span class="stringliteral">&#39;_&#39;</span>}) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
 </div><!-- fragment --> 
 </div>
 </div>

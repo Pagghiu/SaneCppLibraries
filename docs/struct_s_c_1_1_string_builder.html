@@ -140,6 +140,14 @@ Public Types</h2></td></tr>
  }</td></tr>
 <tr class="memdesc:a4469f304bc2f7accc20ea5c12254e232"><td class="mdescLeft">&#160;</td><td class="mdescRight">Clearing flags used when initializing destination buffer.  <a href="struct_s_c_1_1_string_builder.html#a4469f304bc2f7accc20ea5c12254e232">More...</a><br /></td></tr>
 <tr class="separator:a4469f304bc2f7accc20ea5c12254e232"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a501a5ca9bc3c9f9c489487038ed96afe"><td class="memItemLeft" align="right" valign="top">enum class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_builder.html#a501a5ca9bc3c9f9c489487038ed96afe">AppendHexCase</a> { <br />
+&#160;&#160;<b>UpperCase</b>
+, <br />
+&#160;&#160;<b>LowerCase</b>
+<br />
+ }</td></tr>
+<tr class="memdesc:a501a5ca9bc3c9f9c489487038ed96afe"><td class="mdescLeft">&#160;</td><td class="mdescRight">Option for <a class="el" href="struct_s_c_1_1_string_builder.html#a53e8b030b266c9d55032dc62f0866292" title="Appends given binary data escaping it as hexadecimal ASCII characters.">StringBuilder::appendHex</a>.  <a href="struct_s_c_1_1_string_builder.html#a501a5ca9bc3c9f9c489487038ed96afe">More...</a><br /></td></tr>
+<tr class="separator:a501a5ca9bc3c9f9c489487038ed96afe"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
@@ -169,14 +177,38 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a79b431f1b1a30f31868dd669d2427e79"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_builder.html#a79b431f1b1a30f31868dd669d2427e79">appendReplaceMultiple</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> source, <a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="struct_s_c_1_1_string_builder_1_1_replace_pair.html">ReplacePair</a> &gt; substitutions)</td></tr>
 <tr class="memdesc:a79b431f1b1a30f31868dd669d2427e79"><td class="mdescLeft">&#160;</td><td class="mdescRight">Appends source to destination buffer, replacing multiple substitutions pairs.  <a href="struct_s_c_1_1_string_builder.html#a79b431f1b1a30f31868dd669d2427e79">More...</a><br /></td></tr>
 <tr class="separator:a79b431f1b1a30f31868dd669d2427e79"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a447ad194cfd03d2a9eada84d0f371754"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_builder.html#a447ad194cfd03d2a9eada84d0f371754">appendHex</a> (<a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="group__group__foundation__utility.html#ga463999463d674ca87f888a65b7d4a254">uint8_t</a> &gt; data)</td></tr>
-<tr class="memdesc:a447ad194cfd03d2a9eada84d0f371754"><td class="mdescLeft">&#160;</td><td class="mdescRight">Appends given binary data escaping it as hexadecimal ASCII characters.  <a href="struct_s_c_1_1_string_builder.html#a447ad194cfd03d2a9eada84d0f371754">More...</a><br /></td></tr>
-<tr class="separator:a447ad194cfd03d2a9eada84d0f371754"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a53e8b030b266c9d55032dc62f0866292"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_string_builder.html#a53e8b030b266c9d55032dc62f0866292">appendHex</a> (<a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="group__group__foundation__utility.html#ga463999463d674ca87f888a65b7d4a254">uint8_t</a> &gt; data, <a class="el" href="struct_s_c_1_1_string_builder.html#a501a5ca9bc3c9f9c489487038ed96afe">AppendHexCase</a> casing)</td></tr>
+<tr class="memdesc:a53e8b030b266c9d55032dc62f0866292"><td class="mdescLeft">&#160;</td><td class="mdescRight">Appends given binary data escaping it as hexadecimal ASCII characters.  <a href="struct_s_c_1_1_string_builder.html#a53e8b030b266c9d55032dc62f0866292">More...</a><br /></td></tr>
+<tr class="separator:a53e8b030b266c9d55032dc62f0866292"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p >Builds <a class="el" href="struct_s_c_1_1_string.html" title="A non-modifiable owning string with associated encoding.">String</a> out of a sequence of <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> or formatting through <a class="el" href="struct_s_c_1_1_string_format.html" title="Formats String with a simple DSL embedded in the format string.">StringFormat</a>. </p>
 <p >The output can be a <a class="el" href="struct_s_c_1_1_vector.html" title="A contiguous sequence of heap allocated elements.">SC::Vector</a> (or a <a class="el" href="struct_s_c_1_1_small_vector.html" title="A Vector that can hold up to N elements inline and &gt; N on heap.">SC::SmallVector</a>, see <a class="el" href="library_containers.html">Containers</a>) </p>
 </div><h2 class="groupheader">Member Enumeration Documentation</h2>
+<a id="a501a5ca9bc3c9f9c489487038ed96afe" name="a501a5ca9bc3c9f9c489487038ed96afe"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a501a5ca9bc3c9f9c489487038ed96afe">&#9670;&nbsp;</a></span>AppendHexCase</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum class <a class="el" href="struct_s_c_1_1_string_builder.html#a501a5ca9bc3c9f9c489487038ed96afe">SC::StringBuilder::AppendHexCase</a></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">strong</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Option for <a class="el" href="struct_s_c_1_1_string_builder.html#a53e8b030b266c9d55032dc62f0866292" title="Appends given binary data escaping it as hexadecimal ASCII characters.">StringBuilder::appendHex</a>. </p>
+
+</div>
+</div>
 <a id="a4469f304bc2f7accc20ea5c12254e232" name="a4469f304bc2f7accc20ea5c12254e232"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a4469f304bc2f7accc20ea5c12254e232">&#9670;&nbsp;</a></span>Flags</h2>
 
@@ -373,8 +405,8 @@ template&lt;typename... Types&gt; </div>
 
 </div>
 </div>
-<a id="a447ad194cfd03d2a9eada84d0f371754" name="a447ad194cfd03d2a9eada84d0f371754"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a447ad194cfd03d2a9eada84d0f371754">&#9670;&nbsp;</a></span>appendHex()</h2>
+<a id="a53e8b030b266c9d55032dc62f0866292" name="a53e8b030b266c9d55032dc62f0866292"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a53e8b030b266c9d55032dc62f0866292">&#9670;&nbsp;</a></span>appendHex()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -383,8 +415,18 @@ template&lt;typename... Types&gt; </div>
           <td class="memname">bool SC::StringBuilder::appendHex </td>
           <td>(</td>
           <td class="paramtype"><a class="el" href="struct_s_c_1_1_span.html">Span</a>&lt; const <a class="el" href="group__group__foundation__utility.html#ga463999463d674ca87f888a65b7d4a254">uint8_t</a> &gt;&#160;</td>
-          <td class="paramname"><em>data</em></td><td>)</td>
+          <td class="paramname"><em>data</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype"><a class="el" href="struct_s_c_1_1_string_builder.html#a501a5ca9bc3c9f9c489487038ed96afe">AppendHexCase</a>&#160;</td>
+          <td class="paramname"><em>casing</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -393,6 +435,7 @@ template&lt;typename... Types&gt; </div>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">data</td><td>Binary data to append to destination buffer </td></tr>
+    <tr><td class="paramname">casing</td><td>Specifies if it should be appended using upper case or lower case </td></tr>
   </table>
   </dd>
 </dl>
@@ -401,7 +444,8 @@ template&lt;typename... Types&gt; </div>
 <div class="line"> </div>
 <div class="line">    String        buffer;</div>
 <div class="line">    <a class="code hl_function" href="struct_s_c_1_1_string_builder.html#aa53c13af98aac1b7ccf439bfc7cd519a">StringBuilder</a> builder(buffer);</div>
-<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(builder.appendHex({bytes, sizeof(bytes)}) and buffer.view() == <span class="stringliteral">&quot;12345678&quot;</span>);</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(builder.appendHex({bytes, sizeof(bytes)}, StringBuilder::AppendHexCase::UpperCase));</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(buffer.view() == <span class="stringliteral">&quot;12345678&quot;</span>);</div>
 <div class="ttc" id="agroup__group__foundation__utility_html_ga463999463d674ca87f888a65b7d4a254"><div class="ttname"><a href="group__group__foundation__utility.html#ga463999463d674ca87f888a65b7d4a254">SC::uint8_t</a></div><div class="ttdeci">unsigned char uint8_t</div><div class="ttdoc">Platform independent (1) byte unsigned int.</div><div class="ttdef"><b>Definition:</b> PrimitiveTypes.h:36</div></div>
 <div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:104</div></div>
 </div><!-- fragment --> 

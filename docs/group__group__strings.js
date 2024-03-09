@@ -24,6 +24,10 @@ var group__group__strings =
       [ "ReplacePair", "struct_s_c_1_1_string_builder_1_1_replace_pair.html", [
         [ "replaceWith", "struct_s_c_1_1_string_builder_1_1_replace_pair.html#a110e33fa1cd5249311cbf25cf644ef6a", null ]
       ] ],
+      [ "AppendHexCase", "struct_s_c_1_1_string_builder.html#a501a5ca9bc3c9f9c489487038ed96afe", [
+        [ "UpperCase", "struct_s_c_1_1_string_builder.html#a501a5ca9bc3c9f9c489487038ed96afea4dd5882de4f7bbcb748ff15bebf21ce0", null ],
+        [ "LowerCase", "struct_s_c_1_1_string_builder.html#a501a5ca9bc3c9f9c489487038ed96afeaf3fa26b7f03932f588080f5b22d68908", null ]
+      ] ],
       [ "Flags", "struct_s_c_1_1_string_builder.html#a4469f304bc2f7accc20ea5c12254e232", [
         [ "Clear", "struct_s_c_1_1_string_builder.html#a4469f304bc2f7accc20ea5c12254e232a7dbd45bfd385e115664e81de047ef219", null ],
         [ "DoNotClear", "struct_s_c_1_1_string_builder.html#a4469f304bc2f7accc20ea5c12254e232aab15767200eb0607639accab3e72c1f7", null ]
@@ -32,7 +36,7 @@ var group__group__strings =
       [ "StringBuilder", "struct_s_c_1_1_string_builder.html#a964568515f3d2fb6b60a62e58cbf4dac", null ],
       [ "append", "struct_s_c_1_1_string_builder.html#ae3db3832b552923ff9be0ffb5166c229", null ],
       [ "append", "struct_s_c_1_1_string_builder.html#a4dd2969322e97210b77ecee6ffc36975", null ],
-      [ "appendHex", "struct_s_c_1_1_string_builder.html#a447ad194cfd03d2a9eada84d0f371754", null ],
+      [ "appendHex", "struct_s_c_1_1_string_builder.html#a53e8b030b266c9d55032dc62f0866292", null ],
       [ "appendReplaceAll", "struct_s_c_1_1_string_builder.html#a6b30ac7813be680de0bda54e7dd9b8f4", null ],
       [ "appendReplaceMultiple", "struct_s_c_1_1_string_builder.html#a79b431f1b1a30f31868dd669d2427e79", null ],
       [ "format", "struct_s_c_1_1_string_builder.html#a0f1f85a8b4393176aa1c4f96e3ee550b", null ],
@@ -77,7 +81,7 @@ var group__group__strings =
       [ "advanceUntilMatchesAny", "struct_s_c_1_1_string_iterator.html#a1e744c97afce583ff5ad55d782ae084c", null ],
       [ "bytesDistanceFrom", "struct_s_c_1_1_string_iterator.html#a02ae8ef1276bb06e27eb6b1587174f91", null ],
       [ "endsWith", "struct_s_c_1_1_string_iterator.html#af67ee153589681126524ab6f688a8c63", null ],
-      [ "endsWithCodePoint", "struct_s_c_1_1_string_iterator.html#ad4e7c66dfa339c84842cabeb4c6e05d3", null ],
+      [ "endsWithAnyOf", "struct_s_c_1_1_string_iterator.html#a9aac2c24648adb9a0bc6df208d6f4acd", null ],
       [ "isAtEnd", "struct_s_c_1_1_string_iterator.html#aef9bf420c068b853eb73bef3d89a7085", null ],
       [ "isAtStart", "struct_s_c_1_1_string_iterator.html#a39c0cb6fe4ae1b432be2a4caf48d6137", null ],
       [ "isFollowedBy", "struct_s_c_1_1_string_iterator.html#aa6924428b576a45dcd83af9c44bede70", null ],
@@ -91,7 +95,7 @@ var group__group__strings =
       [ "setToStart", "struct_s_c_1_1_string_iterator.html#a008c681473afd985e8a00f29eaac38b5", null ],
       [ "sliceFromStartUntil", "struct_s_c_1_1_string_iterator.html#aca484657b32aa41441013b75d41c968b", null ],
       [ "startsWith", "struct_s_c_1_1_string_iterator.html#a7ec4a5f33ec7cbf55bc4d26843634625", null ],
-      [ "startsWithCodePoint", "struct_s_c_1_1_string_iterator.html#a7ca45b1e696f8280aa3d04362d933d75", null ],
+      [ "startsWithAnyOf", "struct_s_c_1_1_string_iterator.html#abece6326eecd50d5b188f9738912ed4f", null ],
       [ "stepBackward", "struct_s_c_1_1_string_iterator.html#a8f00cabd965b4a3df8dc880f8c78d7a3", null ],
       [ "stepForward", "struct_s_c_1_1_string_iterator.html#a96aa8f158d440d9ce8b5cd1c91892f07", null ]
     ] ],
@@ -116,7 +120,7 @@ var group__group__strings =
       [ "containsCodePoint", "struct_s_c_1_1_string_view.html#a6c00193fce0fba8603642a3ec7658674", null ],
       [ "containsString", "struct_s_c_1_1_string_view.html#ae59944bd39c323dde4cea38a12fd9887", null ],
       [ "endsWith", "struct_s_c_1_1_string_view.html#a89be76434b8cce5d8eb64e180f6d9f21", null ],
-      [ "endsWithCodePoint", "struct_s_c_1_1_string_view.html#a09e7078353173e6cf1b5926a6c6e8794", null ],
+      [ "endsWithAnyOf", "struct_s_c_1_1_string_view.html#aa6d4e5b143ed8a40c4623335003b32bc", null ],
       [ "fullyOverlaps", "struct_s_c_1_1_string_view.html#ab062bf9142075614d911d046c7838568", null ],
       [ "getEncoding", "struct_s_c_1_1_string_view.html#aba7a5bb023539ac71e0ada1ba45417c0", null ],
       [ "getIterator", "struct_s_c_1_1_string_view.html#a42767e89834b833beb3fd513921fc76e", null ],
@@ -142,11 +146,12 @@ var group__group__strings =
       [ "sliceStartLength", "struct_s_c_1_1_string_view.html#a9661b267e8bcddf447a01a474f23046f", null ],
       [ "sliceStartLengthBytes", "struct_s_c_1_1_string_view.html#a5ddbf0dca6176e6a03f9aec62c8033d8", null ],
       [ "startsWith", "struct_s_c_1_1_string_view.html#a485982b02e6830f9d803075cc11d0c6e", null ],
-      [ "startsWithCodePoint", "struct_s_c_1_1_string_view.html#a877f164e8cbe3ef47af78ed87cd9458c", null ],
+      [ "startsWithAnyOf", "struct_s_c_1_1_string_view.html#a0b7ee6cc375bd04fe9bb5c6594d95954", null ],
       [ "toBytesSpan", "struct_s_c_1_1_string_view.html#aea7f853cff0c3c913324c267f89773fb", null ],
       [ "toCharSpan", "struct_s_c_1_1_string_view.html#a4d91b6c3dc11916ff9642b96bbbe1c06", null ],
-      [ "trimEndingCodePoint", "struct_s_c_1_1_string_view.html#a0f91b3b8a019d1b3a02898652c1fd175", null ],
-      [ "trimStartingCodePoint", "struct_s_c_1_1_string_view.html#a1b677932258528d23cf666e85fafa694", null ],
+      [ "trimAnyOf", "struct_s_c_1_1_string_view.html#aeca8df4ff13517fcb5b4cc601d9b62ce", null ],
+      [ "trimEndAnyOf", "struct_s_c_1_1_string_view.html#a4458e122c9c214b713bb176eb1ce972e", null ],
+      [ "trimStartAnyOf", "struct_s_c_1_1_string_view.html#ab6a06b5b30bd56897c30c78d60c5d341", null ],
       [ "withIterator", "struct_s_c_1_1_string_view.html#adc35a7d8727e21e0aac644b543997de5", null ]
     ] ],
     [ "SC::StringViewTokenizer", "struct_s_c_1_1_string_view_tokenizer.html", [
@@ -157,7 +162,7 @@ var group__group__strings =
       [ "StringViewTokenizer", "struct_s_c_1_1_string_view_tokenizer.html#a016d7a7e7be795c2182adf338f2ed59d", null ],
       [ "countTokens", "struct_s_c_1_1_string_view_tokenizer.html#a6a6345caf2c4edfb346cb70d4de9c2b6", null ],
       [ "isFinished", "struct_s_c_1_1_string_view_tokenizer.html#a4ed6f710bbb4fc59a0b0d05af345c87b", null ],
-      [ "tokenizeNext", "struct_s_c_1_1_string_view_tokenizer.html#a9d7015f7f8ee1f3af7ac23895f26d278", null ],
+      [ "tokenizeNext", "struct_s_c_1_1_string_view_tokenizer.html#ab90a78b619aa2b3f2f44e1e6dec2d269", null ],
       [ "component", "struct_s_c_1_1_string_view_tokenizer.html#a12e075718286ba48b21ed2dfa77ac837", null ],
       [ "numSplitsNonEmpty", "struct_s_c_1_1_string_view_tokenizer.html#a789036967257ceda469ceea7422a0c44", null ],
       [ "numSplitsTotal", "struct_s_c_1_1_string_view_tokenizer.html#a98b76543516fd814ce363627996a1e4f", null ],

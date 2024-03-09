@@ -131,7 +131,7 @@ Features</h1>
 <tr class="markdownTableHead">
 <th class="markdownTableHeadLeft">Class   </th><th class="markdownTableHeadLeft">Description    </th></tr>
 <tr class="markdownTableRowOdd">
-<td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process.">SC::Process</a>   </td><td class="markdownTableBodyLeft">Execute a child process.    </td></tr>
+<td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process with standard file descriptors redirection.">SC::Process</a>   </td><td class="markdownTableBodyLeft">Execute a child process with standard file descriptors redirection.    </td></tr>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_process_chain.html" title="Execute multiple child processes chaining input / output between them.">SC::ProcessChain</a>   </td><td class="markdownTableBodyLeft">Execute multiple child processes chaining input / output between them.   </td></tr>
 </table>
@@ -141,52 +141,125 @@ Status</h1>
  Library allows all basic operations on child processes and it's being used in <a class="el" href="library_plugin.html">Plugin</a>.</p>
 <h1><a class="anchor" id="autotoc_md150"></a>
 Description</h1>
-<p >The <a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process.">SC::Process</a> class is used when handling a process in isolation, while the <a class="el" href="struct_s_c_1_1_process_chain.html" title="Execute multiple child processes chaining input / output between them.">SC::ProcessChain</a> is used when there is need to chain inputs and outputs of multiple processes together.</p>
+<p >The <a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process with standard file descriptors redirection.">SC::Process</a> class is used when handling a process in isolation, while the <a class="el" href="struct_s_c_1_1_process_chain.html" title="Execute multiple child processes chaining input / output between them.">SC::ProcessChain</a> is used when there is need to chain inputs and outputs of multiple processes together.</p>
 <h2><a class="anchor" id="autotoc_md151"></a>
 Process</h2>
-<p >Execute a child process. Features:</p><ul>
-<li>Redirecting standard in/out/err of a child process to a Pipe</li>
+<p >Execute a child process with standard file descriptors redirection. <br  />
+Features:</p>
+<ul>
+<li>Redirect standard in/out/err of a child process to a Pipe</li>
+<li>Inherit child process file descriptors from parent process</li>
+<li>Ignore (silence) child process standard file descriptor</li>
 <li>Wait for the child process exit code</li>
 </ul>
-<p ><br  />
- Example: launch a process and wait for it to finish execution </p><div class="fragment"><div class="line">Process process;</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.launch(<span class="stringliteral">&quot;executable.exe&quot;</span>, <span class="stringliteral">&quot;--argument1&quot;</span>, <span class="stringliteral">&quot;--argument2&quot;</span>));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.waitForExitSync());</div>
+<p >Example: execute child process (launch and wait for it to fully execute) </p><div class="fragment"><div class="line">    <span class="comment">// Example: execute child process (launch and wait for it to fully execute)</span></div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(Process().exec({<span class="stringliteral">&quot;cmd.exe&quot;</span>, <span class="stringliteral">&quot;-h&quot;</span>}));</div>
 <div class="ttc" id="agroup__group__foundation__utility_html_gae6b0d665676a4a5eedc2ad69693c04ee"><div class="ttname"><a href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a></div><div class="ttdeci">#define SC_TRY(expression)</div><div class="ttdoc">Checks the value of the given expression and if failed, returns this value to caller.</div><div class="ttdef"><b>Definition:</b> Result.h:47</div></div>
-</div><!-- fragment --><p >Example: wait for the process to fully execute </p><div class="fragment"><div class="line">Process process;</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.launch(<span class="stringliteral">&quot;executable.exe&quot;</span>, <span class="stringliteral">&quot;--argument1&quot;</span>, <span class="stringliteral">&quot;--argument2&quot;</span>));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.waitForExitSync());</div>
-</div><!-- fragment --><p >Example: read process output </p><div class="fragment"><div class="line">Process process;</div>
-<div class="line">PipeDescriptor outputPipe;</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.redirectStdOutTo(outputPipe));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.launch(<span class="stringliteral">&quot;executable.exe&quot;</span>, <span class="stringliteral">&quot;--argument1&quot;</span>, <span class="stringliteral">&quot;--argument2&quot;</span>));</div>
-<div class="line">String output = StringEncoding::Ascii; <span class="comment">// Could also use SmallString&lt;N&gt;</span></div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(outputPipe.readPipe.readUntilEOF(output));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.waitForExitSync());</div>
-<div class="line"><span class="comment">// ... Do something with the &#39;output&#39; string</span></div>
+</div><!-- fragment --><p >Example: execute child process, redirecting stdout to a string </p><div class="fragment"><div class="line">    <span class="comment">// Example: execute child process, redirecting stdout to a string</span></div>
+<div class="line">    SmallString&lt;256&gt; output; <span class="comment">// could be also just String</span></div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(Process().exec({<span class="stringliteral">&quot;where.exe&quot;</span>, <span class="stringliteral">&quot;winver&quot;</span>}, output));</div>
+<div class="line">    <span class="comment">// Output now contains &quot;C:\Windows\System32\winver.exe\n&quot;</span></div>
+</div><!-- fragment --><p >Example: launch a child process and wait for it to finish execution </p><div class="fragment"><div class="line">    <span class="comment">// Example: launch a child process and explicitly wait for it to finish execution</span></div>
+<div class="line">    Process process;</div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.launch({<span class="stringliteral">&quot;ls&quot;</span>, <span class="stringliteral">&quot;-l&quot;</span>}));</div>
+<div class="line">    <span class="comment">// ...</span></div>
+<div class="line">    <span class="comment">// Here you can do I/O to and from the spawned process</span></div>
+<div class="line">    <span class="comment">// ...</span></div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.waitForExitSync());</div>
+<div class="line">    <span class="comment">// This is equivalent to process.exec({&quot;ls&quot;, &quot;-l&quot;)</span></div>
+</div><!-- fragment --><p >Example: execute child process, filling its stdin with a StringView </p><div class="fragment"><div class="line">    <span class="comment">// Example: execute child process, filling its stdin with a StringView</span></div>
+<div class="line">    <span class="comment">// This is equivalent of shell command:</span></div>
+<div class="line">    <span class="comment">// `echo &quot;child process&quot; | grep process`</span></div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(Process().exec({<span class="stringliteral">&quot;grep&quot;</span>, <span class="stringliteral">&quot;process&quot;</span>}, Process::StdOut::Inherit(), <span class="stringliteral">&quot;child proc&quot;</span>));</div>
+</div><!-- fragment --><p >Example: read process output using a pipe, using launch + waitForExitSync </p><div class="fragment"><div class="line">    <span class="comment">// Example: read process output using a pipe, using launch + waitForExitSync</span></div>
+<div class="line">    Process        process;</div>
+<div class="line">    PipeDescriptor outputPipe;</div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.launch({<span class="stringliteral">&quot;executable.exe&quot;</span>, <span class="stringliteral">&quot;--argument1&quot;</span>, <span class="stringliteral">&quot;--argument2&quot;</span>}, outputPipe));</div>
+<div class="line">    String output = StringEncoding::Ascii; <span class="comment">// Could also use SmallString&lt;N&gt;</span></div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(outputPipe.readPipe.readUntilEOF(output));</div>
+<div class="line">    <a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(process.waitForExitSync());</div>
+<div class="line">    <span class="comment">// ... Do something with the &#39;output&#39; string</span></div>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md152"></a>
 ProcessChain</h2>
 <p >Execute multiple child processes chaining input / output between them. <br  />
 Chains multiple child processes together, so that the output of a process becomes input of another (similar to what happens wit the pipe (<code>|</code>) operator on Posix shells).</p>
 <p ><a class="el" href="struct_s_c_1_1_pipe_descriptor.html" title="Descriptor representing a Pipe used for InterProcess Communication (IPC)">SC::PipeDescriptor</a> from <a class="el" href="library_file.html">File</a> library is used to chain read / write endpoints of different processes together.</p>
-<p ><br  />
- Example: print result <code>ls ~ | grep desktop</code> in current terminal </p><div class="fragment"><div class="line">ProcessChain chain([&amp;](<span class="keyword">const</span> ProcessChain::Error&amp;) { });</div>
-<div class="line">Process      p1, p2;</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(chain.pipe(p1, <span class="stringliteral">&quot;ls&quot;</span>, <span class="stringliteral">&quot;~&quot;</span>));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(chain.pipe(p2, <span class="stringliteral">&quot;grep&quot;</span>, <span class="stringliteral">&quot;Desktop&quot;</span>));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(chain.launch());</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(chain.waitForExitSync());</div>
-</div><!-- fragment --><p >Example: read result of <code>ls ~ | grep desktop</code> into a String </p><div class="fragment"><div class="line">ProcessChain chain([&amp;](<span class="keyword">const</span> ProcessChain::Error&amp;) { });</div>
-<div class="line">Process      p1, p2;</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(chain.pipe(p1, <span class="stringliteral">&quot;ls&quot;</span>, <span class="stringliteral">&quot;~&quot;</span>));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(chain.pipe(p2, <span class="stringliteral">&quot;grep&quot;</span>, <span class="stringliteral">&quot;Desktop&quot;</span>));</div>
-<div class="line">ProcessChain::Options options;</div>
-<div class="line">options.pipeSTDOUT = <span class="keyword">true</span>;</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(chain.launch(options));</div>
-<div class="line">String output(StringEncoding::Ascii);</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(chain.readStdOutUntilEOFSync(output));</div>
-<div class="line"><a class="code hl_define" href="group__group__foundation__utility.html#gae6b0d665676a4a5eedc2ad69693c04ee">SC_TRY</a>(chain.waitForExitSync());</div>
-<div class="line"><span class="comment">// ... Do something with the &#39;output&#39; string</span></div>
+<p >Example: Inherit stdout file descriptor </p><div class="fragment"><div class="line">    <span class="comment">// Executes two processes piping output of process p1 to input of process p2.</span></div>
+<div class="line">    <span class="comment">// Then reads the output of the last process in the chain and check its correctness.</span></div>
+<div class="line">    ProcessChain chain;</div>
+<div class="line">    Process      p1, p2;</div>
+<div class="line">    <span class="comment">// Print &quot;Salve\nDoctori&quot; on Windows and Posix and then grep for &quot;Doc&quot;</span></div>
+<div class="line">    StringView expectedOutput;</div>
+<div class="line">    <span class="keywordflow">switch</span> (HostPlatform)</div>
+<div class="line">    {</div>
+<div class="line">    <span class="keywordflow">case</span> Platform::Windows: {</div>
+<div class="line">        expectedOutput = <span class="stringliteral">&quot;Doctori\r\n&quot;</span>;</div>
+<div class="line">        <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(chain.pipe(p1, {<span class="stringliteral">&quot;cmd&quot;</span>, <span class="stringliteral">&quot;/C&quot;</span>, <span class="stringliteral">&quot;echo&quot;</span>, <span class="stringliteral">&quot;Salve&quot;</span>, <span class="stringliteral">&quot;&amp;&quot;</span>, <span class="stringliteral">&quot;echo&quot;</span>, <span class="stringliteral">&quot;Doctori&quot;</span>}));</div>
+<div class="line">        <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(chain.pipe(p2, {<span class="stringliteral">&quot;findstr&quot;</span>, <span class="stringliteral">&quot;Doc&quot;</span>}));</div>
+<div class="line">    }</div>
+<div class="line">    <span class="keywordflow">break</span>;</div>
+<div class="line">    <span class="keywordflow">default</span>: { <span class="comment">// Posix</span></div>
+<div class="line">        expectedOutput = <span class="stringliteral">&quot;Doctori\n&quot;</span>;</div>
+<div class="line">        <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(chain.pipe(p1, {<span class="stringliteral">&quot;echo&quot;</span>, <span class="stringliteral">&quot;Salve\nDoctori&quot;</span>}));</div>
+<div class="line">        <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(chain.pipe(p2, {<span class="stringliteral">&quot;grep&quot;</span>, <span class="stringliteral">&quot;Doc&quot;</span>}));</div>
+<div class="line">    }</div>
+<div class="line">    <span class="keywordflow">break</span>;</div>
+<div class="line">    }</div>
+<div class="line">    String output;</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(chain.exec(output));</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(output == expectedOutput);</div>
+<div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:104</div></div>
+</div><!-- fragment --><p >Example: Read stderr and stdout into a string </p><div class="fragment"><div class="line">    <span class="comment">// Executes two processes piping output of process p1 to input of process p2.</span></div>
+<div class="line">    <span class="comment">// Reads p2 stdout and stderr into a pair of Strings.</span></div>
+<div class="line">    ProcessChain chain;</div>
+<div class="line">    Process      p1;</div>
+<div class="line">    StringView   expectedOutput;</div>
+<div class="line">    <span class="keywordflow">switch</span> (HostPlatform)</div>
+<div class="line">    {</div>
+<div class="line">    <span class="keywordflow">case</span> Platform::Windows: {</div>
+<div class="line">        expectedOutput = <span class="stringliteral">&quot;C:\\Windows\\System32\\where.exe\r\n&quot;</span>;</div>
+<div class="line">        <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(chain.pipe(p1, {<span class="stringliteral">&quot;where&quot;</span>, <span class="stringliteral">&quot;where.exe&quot;</span>}));</div>
+<div class="line">    }</div>
+<div class="line">    <span class="keywordflow">break</span>;</div>
+<div class="line">    <span class="keywordflow">default</span>: { <span class="comment">// Posix</span></div>
+<div class="line">        expectedOutput = <span class="stringliteral">&quot;DOCTORI\n&quot;</span>;</div>
+<div class="line">        <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(chain.pipe(p1, {<span class="stringliteral">&quot;echo&quot;</span>, <span class="stringliteral">&quot;DOCTORI&quot;</span>}));</div>
+<div class="line">    }</div>
+<div class="line">    <span class="keywordflow">break</span>;</div>
+<div class="line">    }</div>
+<div class="line"> </div>
+<div class="line">    String stdOut(StringEncoding::Ascii);</div>
+<div class="line">    String stdErr(StringEncoding::Ascii);</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(chain.exec(stdOut, Process::StdIn::Inherit(), stdErr));</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(stdOut == expectedOutput);</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(stdErr.isEmpty());</div>
+</div><!-- fragment --><p >Example: Read standard output into a string using a Pipe </p><div class="fragment"><div class="line">    <span class="comment">// Chain two processes and read the last stdout into a String (using a pipe)</span></div>
+<div class="line">    ProcessChain chain;</div>
+<div class="line"> </div>
+<div class="line">    String  output(StringEncoding::Ascii);</div>
+<div class="line">    Process p1, p2;</div>
+<div class="line"> </div>
+<div class="line">    StringView expectedOutput;</div>
+<div class="line">    <span class="keywordflow">switch</span> (HostPlatform)</div>
+<div class="line">    {</div>
+<div class="line">    <span class="keywordflow">case</span> Platform::Windows: {</div>
+<div class="line">        expectedOutput = <span class="stringliteral">&quot;WHERE [/R dir] [/Q] [/F] [/T] pattern...\r\n&quot;</span>;</div>
+<div class="line">        <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(chain.pipe(p1, {<span class="stringliteral">&quot;where&quot;</span>, <span class="stringliteral">&quot;/?&quot;</span>}));</div>
+<div class="line">        <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(chain.pipe(p2, {<span class="stringliteral">&quot;findstr&quot;</span>, <span class="stringliteral">&quot;dir]&quot;</span>}));</div>
+<div class="line">    }</div>
+<div class="line">    <span class="keywordflow">break</span>;</div>
+<div class="line">    <span class="keywordflow">default</span>: { <span class="comment">// Posix</span></div>
+<div class="line">        expectedOutput = <span class="stringliteral">&quot;sbin\n&quot;</span>;</div>
+<div class="line">        <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(chain.pipe(p1, {<span class="stringliteral">&quot;ls&quot;</span>, <span class="stringliteral">&quot;/&quot;</span>}));</div>
+<div class="line">        <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(chain.pipe(p2, {<span class="stringliteral">&quot;grep&quot;</span>, <span class="stringliteral">&quot;sbin&quot;</span>}));</div>
+<div class="line">    }</div>
+<div class="line">    <span class="keywordflow">break</span>;</div>
+<div class="line">    }</div>
+<div class="line">    PipeDescriptor outputPipe;</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(chain.launch(outputPipe));</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(outputPipe.readPipe.readUntilEOF(output));</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(chain.waitForExitSync());</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(output == expectedOutput);</div>
 </div><!-- fragment --><h1><a class="anchor" id="autotoc_md153"></a>
 Roadmap</h1>
 <p >🟦 Complete Features:</p><ul>

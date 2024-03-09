@@ -71,6 +71,7 @@ var NAVTREE =
       [ "🚀 Speed", "page_principles.html#autotoc_md261", null ]
     ] ],
     [ "Tests", "page_tests.html", null ],
+    [ "Todo List", "todo.html", null ],
     [ "Modules", "modules.html", "modules" ],
     [ "Namespaces", "namespaces.html", [
       [ "Namespace List", "namespaces.html", "namespaces_dup" ],
@@ -103,12 +104,12 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "_algorithm_bubble_sort_8h_source.html",
-"library_async.html#autotoc_md66",
-"page_examples.html",
-"struct_s_c_1_1_build_1_1_project.html#a8737b61fd95c009a942f87280a34a754",
-"struct_s_c_1_1_pipe_descriptor.html#a306e3608548b24a1940ab766e89a36ac",
-"struct_s_c_1_1_string_builder_1_1_replace_pair.html#a110e33fa1cd5249311cbf25cf644ef6a",
-"struct_s_c_1_1_vector.html#afa7deec5ca8cd8b1bbc7399197861573"
+"library_async.html#autotoc_md68",
+"page_faq.html",
+"struct_s_c_1_1_build_1_1_project.html#a9aa5c5dcfef85f3ca30f4cb65c3d6ddc",
+"struct_s_c_1_1_path_1_1_parsed_view.html#ae3e55f6ab4e5013a3b13cca1428084f0",
+"struct_s_c_1_1_string_builder.html#a4469f304bc2f7accc20ea5c12254e232",
+"struct_s_c_1_1_vector.html#a99f58de44ad421f5fa02b6339ee76c57"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

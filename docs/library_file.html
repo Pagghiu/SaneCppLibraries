@@ -137,8 +137,6 @@ Features</h1>
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_file_descriptor.html#afdf861cbc9b07b8da0b77e74d4908d18" title="Changes the current position in the file descriptor, if seekable.">SC::FileDescriptor::seek</a>   </td><td class="markdownTableBodyLeft">Changes the current position in the file descriptor, if seekable.    </td></tr>
 <tr class="markdownTableRowOdd">
-<td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_file_descriptor.html#ab9925f941ad979790ae1a5d66f0d937d" title="Reads bytes appending to buffer.">SC::FileDescriptor::readAppend</a>   </td><td class="markdownTableBodyLeft">Reads bytes appending to buffer.    </td></tr>
-<tr class="markdownTableRowEven">
 <td class="markdownTableBodyLeft"><a class="el" href="struct_s_c_1_1_file_descriptor.html#a90271ecf4e2ed5586f84f66163964507" title="Reads into a given dynamic buffer until End of File (EOF) is signaled.">SC::FileDescriptor::readUntilEOF</a>   </td><td class="markdownTableBodyLeft">Reads into a given dynamic buffer until End of File (EOF) is signaled.   </td></tr>
 </table>
 <table class="markdownTable">
@@ -160,7 +158,7 @@ Description</h1>
  Also non-blocking mode can be controlled with <a class="el" href="struct_s_c_1_1_file_descriptor.html#a8cccd5b04111df5e220b8f5f3451d131" title="Set blocking mode (read / write waiting for I/O).">SC::FileDescriptor::setBlocking</a>. <br  />
  A file can be marked as inheritable with <a class="el" href="struct_s_c_1_1_file_descriptor.html#a4611803900277bd969d61fa6340b6ae6" title="Set inheritable flag (visibility to child processes).">SC::FileDescriptor::setInheritable</a> so that in can be accessed by child processes. <a class="el" href="struct_s_c_1_1_pipe_descriptor.html" title="Descriptor representing a Pipe used for InterProcess Communication (IPC)">SC::PipeDescriptor</a> creates a pipe for InterProcess communication. <br  />
  A pipe has read and write <a class="el" href="struct_s_c_1_1_file_descriptor.html" title="Wraps an OS File descriptor to read and write to and from it.">SC::FileDescriptor</a> endpoints and it's used by <a class="el" href="library_process.html">Process</a> library to redirect standard input, output or error to other processes. <br  />
- It can also be used to read or write the standard input, output or error from current process into a binary buffer or a string (as done by <a class="el" href="struct_s_c_1_1_process_chain.html#a70d5ca5ac518ad84dac92ff161cc075b" title="Reads stdout of last process in the chain into String.">SC::ProcessChain::readStdOutUntilEOFSync</a> or other similar methods).</p>
+ It can also be used to read or write the standard input, output or error from current process into a binary buffer or a string (as done by SC::ProcessChain::readStdOutUntilEOFSync or other similar methods).</p>
 <p >Example usage: </p><div class="fragment"><div class="line">    StringNative&lt;255&gt; filePath = StringEncoding::Native;</div>
 <div class="line">    StringNative&lt;255&gt; dirPath  = StringEncoding::Native;</div>
 <div class="line">    <span class="comment">// Setup the test</span></div>

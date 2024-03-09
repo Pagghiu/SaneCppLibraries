@@ -7,7 +7,7 @@ var struct_s_c_1_1_string_view_tokenizer =
     [ "StringViewTokenizer", "struct_s_c_1_1_string_view_tokenizer.html#a016d7a7e7be795c2182adf338f2ed59d", null ],
     [ "countTokens", "struct_s_c_1_1_string_view_tokenizer.html#a6a6345caf2c4edfb346cb70d4de9c2b6", null ],
     [ "isFinished", "struct_s_c_1_1_string_view_tokenizer.html#a4ed6f710bbb4fc59a0b0d05af345c87b", null ],
-    [ "tokenizeNext", "struct_s_c_1_1_string_view_tokenizer.html#a9d7015f7f8ee1f3af7ac23895f26d278", null ],
+    [ "tokenizeNext", "struct_s_c_1_1_string_view_tokenizer.html#ab90a78b619aa2b3f2f44e1e6dec2d269", null ],
     [ "component", "struct_s_c_1_1_string_view_tokenizer.html#a12e075718286ba48b21ed2dfa77ac837", null ],
     [ "numSplitsNonEmpty", "struct_s_c_1_1_string_view_tokenizer.html#a789036967257ceda469ceea7422a0c44", null ],
     [ "numSplitsTotal", "struct_s_c_1_1_string_view_tokenizer.html#a98b76543516fd814ce363627996a1e4f", null ],

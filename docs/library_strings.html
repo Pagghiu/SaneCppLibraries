@@ -119,8 +119,8 @@ $(document).ready(function(){initNavTree('library_strings.html',''); initResizab
 <li class="level1"><a href="#autotoc_md192">Definition</a><ul><li class="level2"><a href="#autotoc_md193">StringView</a><ul><li class="level3"><a href="#autotoc_md194">StringView::containsString</a></li>
 <li class="level3"><a href="#autotoc_md195">StringView::compare</a></li>
 <li class="level3"><a href="#autotoc_md196">StringView::fullyOverlaps</a></li>
-<li class="level3"><a href="#autotoc_md197">StringView::startsWithCodePoint</a></li>
-<li class="level3"><a href="#autotoc_md198">StringView::endsWithCodePoint</a></li>
+<li class="level3"><a href="#autotoc_md197">StringView::startsWithAnyOf</a></li>
+<li class="level3"><a href="#autotoc_md198">StringView::endsWithAnyOf</a></li>
 <li class="level3"><a href="#autotoc_md199">StringView::startsWith</a></li>
 <li class="level3"><a href="#autotoc_md200">StringView::endsWith</a></li>
 <li class="level3"><a href="#autotoc_md201">StringView::containsString</a></li>
@@ -129,8 +129,8 @@ $(document).ready(function(){initNavTree('library_strings.html',''); initResizab
 <li class="level3"><a href="#autotoc_md204">StringView::sliceStartLength</a></li>
 <li class="level3"><a href="#autotoc_md205">StringView::sliceStart</a></li>
 <li class="level3"><a href="#autotoc_md206">StringView::sliceEnd</a></li>
-<li class="level3"><a href="#autotoc_md207">StringView::trimEndingCodePoint</a></li>
-<li class="level3"><a href="#autotoc_md208">StringView::trimStartingCodePoint</a></li>
+<li class="level3"><a href="#autotoc_md207">StringView::trimEndAnyOf</a></li>
+<li class="level3"><a href="#autotoc_md208">StringView::trimStartAnyOf</a></li>
 </ul>
 </li>
 <li class="level2"><a href="#autotoc_md209">StringViewTokenizer</a><ul><li class="level3"><a href="#autotoc_md210">StringViewTokenizer::tokenizeNext</a></li>
@@ -261,25 +261,25 @@ StringView::fullyOverlaps</h3>
 <div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not asd.fullyOverlaps(<span class="stringliteral">&quot;123___&quot;</span>, overlapPoints) and overlapPoints == 3);</div>
 <div class="ttc" id="agroup__group__testing_html_gae99d5c969c290b1234140c49bb9d8cf8"><div class="ttname"><a href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a></div><div class="ttdeci">#define SC_TEST_EXPECT(e)</div><div class="ttdoc">Records a test expectation (eventually aborting or breaking o n failed test)</div><div class="ttdef"><b>Definition:</b> Testing.h:104</div></div>
 </div><!-- fragment --><h3><a class="anchor" id="autotoc_md197"></a>
-StringView::startsWithCodePoint</h3>
-<p >Check if StringView starts with given utf code point. </p><dl class="params"><dt>Parameters</dt><dd>
+StringView::startsWithAnyOf</h3>
+<p >Check if StringView starts with any utf code point in the given span. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">c</td><td>The utf code point to check against </td></tr>
+    <tr><td class="paramname">codePoints</td><td>The utf code points to check against </td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd>Returns <code>true</code> if this StringView starts with code point c</dd></dl>
-<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;123 456&quot;</span>.startsWithCodePoint(<span class="stringliteral">&quot;1&quot;</span>));</div>
+<dl class="section return"><dt>Returns</dt><dd>Returns <code>true</code> if this StringView starts with any code point inside codePoints</dd></dl>
+<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;123 456&quot;</span>.startsWithAnyOf({<span class="charliteral">&#39;1&#39;</span>, <span class="charliteral">&#39;8&#39;</span>})); <span class="comment">// &#39;1&#39; will match</span></div>
 </div><!-- fragment --><h3><a class="anchor" id="autotoc_md198"></a>
-StringView::endsWithCodePoint</h3>
-<p >Check if StringView ends with given utf code point. </p><dl class="params"><dt>Parameters</dt><dd>
+StringView::endsWithAnyOf</h3>
+<p >Check if StringView ends with any utf code point in the given span. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">c</td><td>The utf code point to check against </td></tr>
+    <tr><td class="paramname">codePoints</td><td>The utf code points to check against </td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd>Returns <code>true</code> if this StringView ends with code point c</dd></dl>
-<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;123 456&quot;</span>.endsWithCodePoint(<span class="stringliteral">&quot;6&quot;</span>));</div>
+<dl class="section return"><dt>Returns</dt><dd>Returns <code>true</code> if this StringView ends with any code point inside codePoints</dd></dl>
+<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;123 456&quot;</span>.endsWithAnyOf({<span class="charliteral">&#39;a&#39;</span>, <span class="charliteral">&#39;6&#39;</span>})); <span class="comment">// &#39;6&#39; will match</span></div>
 </div><!-- fragment --><h3><a class="anchor" id="autotoc_md199"></a>
 StringView::startsWith</h3>
 <p >Check if StringView starts with another StringView. </p><dl class="params"><dt>Parameters</dt><dd>
@@ -373,27 +373,27 @@ StringView::sliceEnd</h3>
 <p>Example: </p><div class="fragment"><div class="line">StringView str = <span class="stringliteral">&quot;123_567&quot;</span>;</div>
 <div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(str.sliceEnd(4) == <span class="stringliteral">&quot;123&quot;</span>);</div>
 </div><!-- fragment --><h3><a class="anchor" id="autotoc_md207"></a>
-StringView::trimEndingCodePoint</h3>
-<p >Returns a shortened StringView without utf code points matching <code>c</code> at end. </p><dl class="params"><dt>Parameters</dt><dd>
+StringView::trimEndAnyOf</h3>
+<p >Returns a shortened StringView removing ending utf code points matching the <code>codePoints</code> span. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">c</td><td>The utf code point to look for </td></tr>
+    <tr><td class="paramname">codePoints</td><td>The span of utf code points to look for </td></tr>
   </table>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>The trimmed StringView</dd></dl>
-<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;myTest___&quot;</span>_a8.trimEndingCodePoint(<span class="charliteral">&#39;_&#39;</span>) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
-<div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;myTest&quot;</span>_a8.trimEndingCodePoint(<span class="charliteral">&#39;_&#39;</span>) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
+<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;myTest_\n__&quot;</span>_a8.trimEndAnyOf({<span class="stringliteral">&#39;_&#39;</span>, <span class="stringliteral">&#39;\n&#39;</span>}) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
+<div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;myTest&quot;</span>_a8.trimEndAnyOf({<span class="stringliteral">&#39;_&#39;</span>}) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
 </div><!-- fragment --><h3><a class="anchor" id="autotoc_md208"></a>
-StringView::trimStartingCodePoint</h3>
-<p >Returns a shortened StringView without utf code points matching <code>c</code> at start. </p><dl class="params"><dt>Parameters</dt><dd>
+StringView::trimStartAnyOf</h3>
+<p >Returns a shortened StringView removing starting utf code points matching the <code>codePoints</code> span. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">c</td><td>The utf code point to look for </td></tr>
+    <tr><td class="paramname">codePoints</td><td>The span of utf code points to look for </td></tr>
   </table>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>The trimmed StringView</dd></dl>
-<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;___myTest&quot;</span>_a8.trimStartingCodePoint(<span class="charliteral">&#39;_&#39;</span>) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
-<div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;_myTest&quot;</span>_a8.trimStartingCodePoint(<span class="charliteral">&#39;_&#39;</span>) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
+<p>Example: </p><div class="fragment"><div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;__\n_myTest&quot;</span>_a8.trimStartAnyOf({<span class="stringliteral">&#39;_&#39;</span>, <span class="stringliteral">&#39;\n&#39;</span>}) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
+<div class="line"><a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(<span class="stringliteral">&quot;_myTest&quot;</span>_a8.trimStartAnyOf({<span class="stringliteral">&#39;_&#39;</span>}) == <span class="stringliteral">&quot;myTest&quot;</span>);</div>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md209"></a>
 StringViewTokenizer</h2>
 <p >Splits a StringView in tokens according to separators.</p>
@@ -508,6 +508,7 @@ StringBuilder::appendHex</h3>
 <p >Appends given binary data escaping it as hexadecimal ASCII characters. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">data</td><td>Binary data to append to destination buffer </td></tr>
+    <tr><td class="paramname">casing</td><td>Specifies if it should be appended using upper case or lower case </td></tr>
   </table>
   </dd>
 </dl>
@@ -516,7 +517,8 @@ StringBuilder::appendHex</h3>
 <div class="line"> </div>
 <div class="line">    String        buffer;</div>
 <div class="line">    StringBuilder builder(buffer);</div>
-<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(builder.appendHex({bytes, sizeof(bytes)}) and buffer.view() == <span class="stringliteral">&quot;12345678&quot;</span>);</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(builder.appendHex({bytes, sizeof(bytes)}, StringBuilder::AppendHexCase::UpperCase));</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(buffer.view() == <span class="stringliteral">&quot;12345678&quot;</span>);</div>
 <div class="ttc" id="agroup__group__foundation__utility_html_ga463999463d674ca87f888a65b7d4a254"><div class="ttname"><a href="group__group__foundation__utility.html#ga463999463d674ca87f888a65b7d4a254">SC::uint8_t</a></div><div class="ttdeci">unsigned char uint8_t</div><div class="ttdoc">Platform independent (1) byte unsigned int.</div><div class="ttdef"><b>Definition:</b> PrimitiveTypes.h:36</div></div>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md218"></a>
 String</h2>

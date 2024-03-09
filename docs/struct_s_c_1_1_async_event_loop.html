@@ -156,7 +156,7 @@ Public Member Functions</h2></td></tr>
 <tr class="memdesc:aeef889e7c4c8f7cbbfe974ee6be27f09"><td class="mdescLeft">&#160;</td><td class="mdescRight">Blocks until at least one request proceeds, ensuring forward progress.  <a href="struct_s_c_1_1_async_event_loop.html#aeef889e7c4c8f7cbbfe974ee6be27f09">More...</a><br /></td></tr>
 <tr class="separator:aeef889e7c4c8f7cbbfe974ee6be27f09"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1bc6365abc9c05fdbeec9c7f4519c319"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_event_loop.html#a1bc6365abc9c05fdbeec9c7f4519c319">runNoWait</a> ()</td></tr>
-<tr class="memdesc:a1bc6365abc9c05fdbeec9c7f4519c319"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process.">Process</a> active requests if they exist or returns immediately without blocking.  <a href="struct_s_c_1_1_async_event_loop.html#a1bc6365abc9c05fdbeec9c7f4519c319">More...</a><br /></td></tr>
+<tr class="memdesc:a1bc6365abc9c05fdbeec9c7f4519c319"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process with standard file descriptors redirection.">Process</a> active requests if they exist or returns immediately without blocking.  <a href="struct_s_c_1_1_async_event_loop.html#a1bc6365abc9c05fdbeec9c7f4519c319">More...</a><br /></td></tr>
 <tr class="separator:a1bc6365abc9c05fdbeec9c7f4519c319"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac08e964a25067172dea500e070c2ee42"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_async_event_loop.html#ac08e964a25067172dea500e070c2ee42">wakeUpFromExternalThread</a> (<a class="el" href="struct_s_c_1_1_async_loop_wake_up.html">AsyncLoopWakeUp</a> &amp;wakeUp)</td></tr>
 <tr class="memdesc:ac08e964a25067172dea500e070c2ee42"><td class="mdescLeft">&#160;</td><td class="mdescRight">Wake up the event loop from a thread different than the one where <a class="el" href="struct_s_c_1_1_async_event_loop.html#af77cd7ac7a1a577204e43d14debc45c5" title="Blocks until there are no more active queued requests.">run()</a> is called (and potentially blocked).  <a href="struct_s_c_1_1_async_event_loop.html#ac08e964a25067172dea500e070c2ee42">More...</a><br /></td></tr>
@@ -367,7 +367,7 @@ struct&#160;</td><td class="memItemRight" valign="bottom"><b>AsyncRequest</b></t
       </table>
 </div><div class="memdoc">
 
-<p><a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process.">Process</a> active requests if they exist or returns immediately without blocking. </p>
+<p><a class="el" href="struct_s_c_1_1_process.html" title="Execute a child process with standard file descriptors redirection.">Process</a> active requests if they exist or returns immediately without blocking. </p>
 <p >It's useful for game-like applications where the event loop runs every frame and one would like to check and dispatch its I/O callbacks in-between frames. This call allows poll-checking I/O without blocking. </p>
 
 </div>

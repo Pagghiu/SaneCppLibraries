@@ -194,8 +194,8 @@ var libraries =
           [ "StringView::containsString", "library_strings.html#autotoc_md194", null ],
           [ "StringView::compare", "library_strings.html#autotoc_md195", null ],
           [ "StringView::fullyOverlaps", "library_strings.html#autotoc_md196", null ],
-          [ "StringView::startsWithCodePoint", "library_strings.html#autotoc_md197", null ],
-          [ "StringView::endsWithCodePoint", "library_strings.html#autotoc_md198", null ],
+          [ "StringView::startsWithAnyOf", "library_strings.html#autotoc_md197", null ],
+          [ "StringView::endsWithAnyOf", "library_strings.html#autotoc_md198", null ],
           [ "StringView::startsWith", "library_strings.html#autotoc_md199", null ],
           [ "StringView::endsWith", "library_strings.html#autotoc_md200", null ],
           [ "StringView::containsString", "library_strings.html#autotoc_md201", null ],
@@ -204,8 +204,8 @@ var libraries =
           [ "StringView::sliceStartLength", "library_strings.html#autotoc_md204", null ],
           [ "StringView::sliceStart", "library_strings.html#autotoc_md205", null ],
           [ "StringView::sliceEnd", "library_strings.html#autotoc_md206", null ],
-          [ "StringView::trimEndingCodePoint", "library_strings.html#autotoc_md207", null ],
-          [ "StringView::trimStartingCodePoint", "library_strings.html#autotoc_md208", null ]
+          [ "StringView::trimEndAnyOf", "library_strings.html#autotoc_md207", null ],
+          [ "StringView::trimStartAnyOf", "library_strings.html#autotoc_md208", null ]
         ] ],
         [ "StringViewTokenizer", "library_strings.html#autotoc_md209", [
           [ "StringViewTokenizer::tokenizeNext", "library_strings.html#autotoc_md210", null ],

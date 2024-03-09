@@ -24,5 +24,6 @@ var searchData=
   ['modified_21',['Modified',['../struct_s_c_1_1_file_system_watcher.html#a97111929c4c1ba3be0f8659b9cdc3fe0a35e0c8c0b180c95d4e122e55ed62cc64',1,'SC::FileSystemWatcher']]],
   ['modifiedtime_22',['modifiedTime',['../struct_s_c_1_1_file_system_1_1_file_time.html#a90935a4c92b5a19cb625ab81ab046d71',1,'SC::FileSystem::FileTime']]],
   ['move_23',['move',['../group__group__foundation__utility.html#ga172de7f1b6d5f1fb4a9f6f040f8ec2aa',1,'SC']]],
-  ['mutex_24',['Mutex',['../struct_s_c_1_1_mutex.html',1,'SC']]]
+  ['movedirectory_24',['moveDirectory',['../struct_s_c_1_1_file_system.html#ac640aaeb9beb9c9c9a6e8fd8954b5614',1,'SC::FileSystem']]],
+  ['mutex_25',['Mutex',['../struct_s_c_1_1_mutex.html',1,'SC']]]
 ];
