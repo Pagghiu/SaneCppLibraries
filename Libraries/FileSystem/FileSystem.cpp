@@ -137,7 +137,7 @@ SC::Result SC::FileSystem::read(StringView path, Vector<char>& data)
 }
 #undef SC_TRY_FORMAT_LIBC
 
-[[nodiscard]] SC::Result SC::FileSystem::write(StringView file, StringView text)
+[[nodiscard]] SC::Result SC::FileSystem::writeString(StringView file, StringView text)
 {
     return write(file, text.toCharSpan());
 }

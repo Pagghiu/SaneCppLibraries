@@ -279,7 +279,7 @@ struct SC::FileSystem
     /// @param text Text to be written
     /// @return Valid Result if the memory was successfully written
     /// @see write (for an usage example)
-    [[nodiscard]] Result write(StringView file, StringView text);
+    [[nodiscard]] Result writeString(StringView file, StringView text);
 
     /// @brief Read contents of a file into a string with given encoding
     /// @param[in] file Path to the file to read

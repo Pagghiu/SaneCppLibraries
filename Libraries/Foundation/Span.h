@@ -21,6 +21,10 @@ struct SC::Span
     using SizeType = size_t;
     using VoidType = typename TypeTraits::SameConstnessAs<Type, void>::type;
 
+    template <size_t N>
+    constexpr Span(Type (&_items)[N]) : items(_items), sizeElements(N)
+    {}
+
     /// @brief Builds an empty Span
     constexpr Span() : items(nullptr), sizeElements(0) {}
 
@@ -133,6 +137,26 @@ struct SC::Span
     /// @brief Check if Span is empty
     /// @return `true` if Span is empty
     [[nodiscard]] constexpr bool empty() const { return sizeElements == 0; }
+
+    [[nodiscard]] constexpr bool contains(const Type& type, SizeType* index = nullptr) const
+    {
+        for (SizeType idx = 0; idx < sizeElements; ++idx)
+        {
+            if (items[idx] == type)
+            {
+                if (index)
+                {
+                    *index = idx;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    Type& operator[](SizeType idx) { return items[idx]; }
+
+    const Type& operator[](SizeType idx) const { return items[idx]; }
 
   private:
     Type*    items;

@@ -310,7 +310,7 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
             SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
             SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/project.pbxproj", filename));
             SC_TRY(fs.removeFileIfExists(prjName.view()));
-            SC_TRY(fs.write(prjName.view(), buffer.view()));
+            SC_TRY(fs.writeString(prjName.view(), buffer.view()));
         }
         {
             StringBuilder sb(buffer, StringBuilder::Clear);
@@ -323,7 +323,7 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
             SC_TRY(StringBuilder(prjName, StringBuilder::Clear)
                        .format("{}.xcodeproj/xcshareddata/xcschemes/{}.xcscheme", filename, filename));
             SC_TRY(fs.removeFileIfExists(prjName.view()));
-            SC_TRY(fs.write(prjName.view(), buffer.view()));
+            SC_TRY(fs.writeString(prjName.view(), buffer.view()));
         }
         break;
     }
@@ -339,7 +339,7 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
             StringBuilder sb1(buffer1, StringBuilder::Clear);
             SC_TRY(writer.writeProject(sb1, project, renderer));
             SC_TRY(fs.removeFileIfExists(prjName.view()));
-            SC_TRY(fs.write(prjName.view(), buffer1.view()));
+            SC_TRY(fs.writeString(prjName.view(), buffer1.view()));
         }
         {
             StringBuilder sb1(buffer1, StringBuilder::Clear);
@@ -347,7 +347,7 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
             String prjFilterName;
             SC_TRY(StringBuilder(prjFilterName, StringBuilder::Clear).format("{}.vcxproj.filters", filename));
             SC_TRY(fs.removeFileIfExists(prjFilterName.view()));
-            SC_TRY(fs.write(prjFilterName.view(), buffer1.view()));
+            SC_TRY(fs.writeString(prjFilterName.view(), buffer1.view()));
         }
         {
             StringBuilder sb1(buffer1, StringBuilder::Clear);
@@ -355,7 +355,7 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
             String slnName;
             SC_TRY(StringBuilder(slnName, StringBuilder::Clear).format("{}.sln", filename));
             SC_TRY(fs.removeFileIfExists(slnName.view()));
-            SC_TRY(fs.write(slnName.view(), buffer1.view()));
+            SC_TRY(fs.writeString(slnName.view(), buffer1.view()));
         }
         break;
     }
@@ -367,7 +367,7 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
         StringBuilder            sb1(buffer1, StringBuilder::Clear);
         SC_TRY(writer.writeMakefile(sb1, normalizedDirectory.view(), definition.workspaces[0], renderer));
         SC_TRY(fs.removeFileIfExists(prjName.view()));
-        SC_TRY(fs.write(prjName.view(), buffer1.view()));
+        SC_TRY(fs.writeString(prjName.view(), buffer1.view()));
         break;
     }
     }

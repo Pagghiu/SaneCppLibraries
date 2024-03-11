@@ -98,7 +98,7 @@ struct SC::PluginTest : public SC::TestCase
                                                  "bool isPluginOriginal() { return false; }"));
             String sourceMod2;
             SC_TEST_EXPECT(StringBuilder(sourceMod2).appendReplaceAll(sourceMod1.view(), "original", "MODIFIED"));
-            SC_TEST_EXPECT(fs.write(pluginScriptPath.view(), sourceMod2.view()));
+            SC_TEST_EXPECT(fs.writeString(pluginScriptPath.view(), sourceMod2.view()));
 
             // Reload child plugin
             SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, report.executableFile,
@@ -117,7 +117,7 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(not pluginParent->dynamicLibrary.isValid());
 
             // Cleanup
-            SC_TEST_EXPECT(fs.write(pluginScriptPath.view(), sourceContent.view()));
+            SC_TEST_EXPECT(fs.writeString(pluginScriptPath.view(), sourceContent.view()));
             SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierChild));
             SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierParent));
 

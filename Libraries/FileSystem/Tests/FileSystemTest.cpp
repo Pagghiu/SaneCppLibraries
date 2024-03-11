@@ -130,7 +130,7 @@ void SC::FileSystemTest::writeReadRemoveFile()
 
     // Check that file doesn't exists before write-ing it and then check that it exist
     SC_TEST_EXPECT(not fs.exists("file.txt"));
-    SC_TEST_EXPECT(fs.write("file.txt", content));
+    SC_TEST_EXPECT(fs.writeString("file.txt", content));
     SC_TEST_EXPECT(fs.existsAndIsFile("file.txt"));
 
     // Read the file and check its content
@@ -154,7 +154,7 @@ void SC::FileSystemTest::copyExistsFile()
     // Create a File names 'sourceFile.txt'
     StringView contentSource = "this is some content";
     SC_TEST_EXPECT(not fs.exists("sourceFile.txt"));
-    SC_TEST_EXPECT(fs.write("sourceFile.txt", contentSource));
+    SC_TEST_EXPECT(fs.writeString("sourceFile.txt", contentSource));
 
     // Check that 'sourceFile.txt' exist, but not 'destinationFile.txt'
     SC_TEST_EXPECT(fs.existsAndIsFile("sourceFile.txt"));
