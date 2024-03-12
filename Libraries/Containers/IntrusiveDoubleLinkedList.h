@@ -84,7 +84,7 @@ struct SC::IntrusiveDoubleLinkedList
             return nullptr;
         }
         T* item = front;
-        front   = item->next;
+        front   = static_cast<T*>(item->next);
         if (front)
         {
             front->prev = nullptr;
