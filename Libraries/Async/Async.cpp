@@ -470,17 +470,16 @@ SC::Result SC::AsyncEventLoop::Private::completeAndEventuallyReactivate(KernelQu
 {
     SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Active);
     bool reactivate = false;
+    removeActiveHandle(async);
     SC_TRY(completeAsync(queue, async, move(returnCode), reactivate));
     if (reactivate)
     {
-        removeActiveHandle(async);
         async.state = AsyncRequest::State::Submitting;
         submissions.queueBack(async);
     }
     else
     {
         SC_TRY(teardownAsync(queue, async));
-        removeActiveHandle(async);
     }
     if (not returnCode)
     {
