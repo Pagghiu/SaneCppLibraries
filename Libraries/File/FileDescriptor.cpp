@@ -45,6 +45,7 @@ SC::Result SC::FileDescriptor::readUntilEOF(Vector<uint8_t>& destination) { retu
 
 SC::Result SC::FileDescriptor::readUntilEOF(String& destination)
 {
+    SC_TRY(StringConverter::popNullTermIfExists(destination.data, destination.encoding));
     SC_TRY(readUntilEOF(destination.data));
     if (destination.isEmpty())
         return Result(true);
