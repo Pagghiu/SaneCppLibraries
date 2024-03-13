@@ -88,13 +88,11 @@ SC::Result SC::Process::waitForExitSync()
     pid_t waitPid;
     do
     {
-        waitPid = waitpid(processID.pid, &status, 0);
+        waitPid = ::waitpid(processID.pid, &status, 0);
     } while (waitPid == -1 and errno == EINTR);
     if (WIFEXITED(status) != 0)
     {
         exitStatus.status = WEXITSTATUS(status);
-        if (exitStatus.status == EXIT_FAILURE)
-            return Result::Error("Cannot run executable");
     }
     return Result(true);
 }
