@@ -192,7 +192,7 @@ $(document).ready(function(){initNavTree('_intrusive_double_linked_list_8h_sourc
 <div class="line"><a id="l00084" name="l00084"></a><span class="lineno">   84</span>            <span class="keywordflow">return</span> <span class="keyword">nullptr</span>;</div>
 <div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span>        }</div>
 <div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span>        T* item = front;</div>
-<div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>        front   = item-&gt;next;</div>
+<div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>        front   = <span class="keyword">static_cast&lt;</span>T*<span class="keyword">&gt;</span>(item-&gt;next);</div>
 <div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span>        <span class="keywordflow">if</span> (front)</div>
 <div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span>        {</div>
 <div class="line"><a id="l00090" name="l00090"></a><span class="lineno">   90</span>            front-&gt;prev = <span class="keyword">nullptr</span>;</div>

@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.9.2"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Sane C++ Libraries: SC::Build::ConfigurePresets Struct Reference</title>
+<title>Sane C++ Libraries: SC::Build::Actions Struct Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -91,7 +91,7 @@ $(function() {
 </div>
 <script type="text/javascript">
 /* @license magnet:?xt=urn:btih:d3d9a9a6595521f9666a5e94cc830dab83b65699&amp;dn=expat.txt MIT */
-$(document).ready(function(){initNavTree('struct_s_c_1_1_build_1_1_configure_presets.html',''); initResizable(); });
+$(document).ready(function(){initNavTree('struct_s_c_1_1_build_1_1_actions.html',''); initResizable(); });
 /* @license-end */
 </script>
 <div id="doc-content">
@@ -111,18 +111,31 @@ $(document).ready(function(){initNavTree('struct_s_c_1_1_build_1_1_configure_pre
 
 <div class="header">
   <div class="summary">
+<a href="#pub-types">Public Types</a> &#124;
 <a href="#pub-static-methods">Static Public Member Functions</a> &#124;
-<a href="struct_s_c_1_1_build_1_1_configure_presets-members.html">List of all members</a>  </div>
-  <div class="headertitle"><div class="title">SC::Build::ConfigurePresets Struct Reference</div></div>
+<a href="struct_s_c_1_1_build_1_1_actions-members.html">List of all members</a>  </div>
+  <div class="headertitle"><div class="title">SC::Build::Actions Struct Reference</div></div>
 </div><!--header-->
 <div class="contents">
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-types" name="pub-types"></a>
+Public Types</h2></td></tr>
+<tr class="memitem:a1c7cda79795c1634f15521378bc44de0"><td class="memItemLeft" align="right" valign="top"><a id="a1c7cda79795c1634f15521378bc44de0" name="a1c7cda79795c1634f15521378bc44de0"></a>enum &#160;</td><td class="memItemRight" valign="bottom"><b>Type</b> { <br />
+&#160;&#160;<b>Configure</b>
+, <br />
+&#160;&#160;<b>Compile</b>
+<br />
+ }</td></tr>
+<tr class="separator:a1c7cda79795c1634f15521378bc44de0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac1161ee46f077f0eab261aa672267b7b"><td class="memItemLeft" align="right" valign="top"><a id="ac1161ee46f077f0eab261aa672267b7b" name="ac1161ee46f077f0eab261aa672267b7b"></a>
+using&#160;</td><td class="memItemRight" valign="bottom"><b>ConfigureFunction</b> = <a class="el" href="struct_s_c_1_1_result.html">Result</a>(*)(<a class="el" href="struct_s_c_1_1_build_1_1_definition.html">Build::Definition</a> &amp;definition, <a class="el" href="struct_s_c_1_1_build_1_1_parameters.html">Build::Parameters</a> &amp;parameters, <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> rootDirectory)</td></tr>
+<tr class="separator:ac1161ee46f077f0eab261aa672267b7b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-static-methods" name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
-<tr class="memitem:ac5e8dd0e546f03c31a913cc5d9baa8c6"><td class="memTemplParams" colspan="2"><a id="ac5e8dd0e546f03c31a913cc5d9baa8c6" name="ac5e8dd0e546f03c31a913cc5d9baa8c6"></a>
-template&lt;typename ConfigureFunction &gt; </td></tr>
-<tr class="memitem:ac5e8dd0e546f03c31a913cc5d9baa8c6"><td class="memTemplItemLeft" align="right" valign="top">static <a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><b>generateAllPlatforms</b> (ConfigureFunction configure, <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> projectName, <a class="el" href="struct_s_c_1_1_build_1_1_generator.html#af8a9140d4b55d98b87926be66a28efde">Build::Generator::Type</a> generator, <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> targetDirectory, <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> sourcesDirectory)</td></tr>
-<tr class="separator:ac5e8dd0e546f03c31a913cc5d9baa8c6"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9da6b90e1b7031e286b10e1d9b9cace5"><td class="memItemLeft" align="right" valign="top"><a id="a9da6b90e1b7031e286b10e1d9b9cace5" name="a9da6b90e1b7031e286b10e1d9b9cace5"></a>
+static <a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><b>execute</b> (Type action, ConfigureFunction configure, <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> projectName, <a class="el" href="struct_s_c_1_1_build_1_1_generator.html#af8a9140d4b55d98b87926be66a28efde">Build::Generator::Type</a> generator, <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> targetDirectory, <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> sourcesDirectory)</td></tr>
+<tr class="separator:a9da6b90e1b7031e286b10e1d9b9cace5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <hr/>The documentation for this struct was generated from the following file:<ul>
 <li><a class="el" href="_build_8h_source.html">Build.h</a></li>
@@ -132,7 +145,7 @@ template&lt;typename ConfigureFunction &gt; </td></tr>
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
-    <li class="navelem"><b>SC</b></li><li class="navelem"><a class="el" href="namespace_s_c_1_1_build.html">Build</a></li><li class="navelem"><a class="el" href="struct_s_c_1_1_build_1_1_configure_presets.html">ConfigurePresets</a></li>
+    <li class="navelem"><b>SC</b></li><li class="navelem"><a class="el" href="namespace_s_c_1_1_build.html">Build</a></li><li class="navelem"><a class="el" href="struct_s_c_1_1_build_1_1_actions.html">Actions</a></li>
     <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.2 </li>
   </ul>
 </div>

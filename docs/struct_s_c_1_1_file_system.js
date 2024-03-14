@@ -36,6 +36,6 @@ var struct_s_c_1_1_file_system =
     [ "removeLinkIfExists", "struct_s_c_1_1_file_system.html#a98dbf0b8a673ff6776b8c9e7d1c2034b", null ],
     [ "setLastModifiedTime", "struct_s_c_1_1_file_system.html#a34df1357d58124237b51157ea4f640e4", null ],
     [ "write", "struct_s_c_1_1_file_system.html#a665391fc54352cc85e9ab2103a17e57f", null ],
-    [ "write", "struct_s_c_1_1_file_system.html#aab4922c7a6508f7fca4c40a86a359679", null ],
+    [ "writeString", "struct_s_c_1_1_file_system.html#a3c861ecf3a92471691058d3a0d10c205", null ],
     [ "preciseErrorMessages", "struct_s_c_1_1_file_system.html#ab4f4015b0c578f09469206286efbfb9c", null ]
 ];

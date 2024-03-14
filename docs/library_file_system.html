@@ -371,7 +371,7 @@ copyFile</h2>
 <div class="line">    <span class="comment">// Create a File names &#39;sourceFile.txt&#39;</span></div>
 <div class="line">    StringView contentSource = <span class="stringliteral">&quot;this is some content&quot;</span>;</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.exists(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>));</div>
-<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.write(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>, contentSource));</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.writeString(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>, contentSource));</div>
 <div class="line"> </div>
 <div class="line">    <span class="comment">// Check that &#39;sourceFile.txt&#39; exist, but not &#39;destinationFile.txt&#39;</span></div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.existsAndIsFile(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>));</div>
@@ -511,7 +511,7 @@ existsAndIsFile</h2>
 <div class="line">    <span class="comment">// Create a File names &#39;sourceFile.txt&#39;</span></div>
 <div class="line">    StringView contentSource = <span class="stringliteral">&quot;this is some content&quot;</span>;</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.exists(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>));</div>
-<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.write(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>, contentSource));</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.writeString(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>, contentSource));</div>
 <div class="line"> </div>
 <div class="line">    <span class="comment">// Check that &#39;sourceFile.txt&#39; exist, but not &#39;destinationFile.txt&#39;</span></div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.existsAndIsFile(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>));</div>
@@ -565,7 +565,7 @@ write</h2>
 <div class="line"> </div>
 <div class="line">    <span class="comment">// Check that file doesn&#39;t exists before write-ing it and then check that it exist</span></div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.exists(<span class="stringliteral">&quot;file.txt&quot;</span>));</div>
-<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.write(<span class="stringliteral">&quot;file.txt&quot;</span>, content));</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.writeString(<span class="stringliteral">&quot;file.txt&quot;</span>, content));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.existsAndIsFile(<span class="stringliteral">&quot;file.txt&quot;</span>));</div>
 <div class="line"> </div>
 <div class="line">    <span class="comment">// Read the file and check its content</span></div>

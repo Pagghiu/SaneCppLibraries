@@ -6,7 +6,7 @@ var group__group__build =
       [ "Type", "struct_s_c_1_1_build_1_1_generator.html#af8a9140d4b55d98b87926be66a28efde", [
         [ "XCode", "struct_s_c_1_1_build_1_1_generator.html#af8a9140d4b55d98b87926be66a28efdeafec91f58e6f050e5f800c85bb071559b", null ],
         [ "VisualStudio2022", "struct_s_c_1_1_build_1_1_generator.html#af8a9140d4b55d98b87926be66a28efdea1bc9f727e31471d09375f02b54606298", null ],
-        [ "Makefile", "struct_s_c_1_1_build_1_1_generator.html#af8a9140d4b55d98b87926be66a28efdea2842051cc99c7169f7ade858bbdad01c", null ]
+        [ "Make", "struct_s_c_1_1_build_1_1_generator.html#af8a9140d4b55d98b87926be66a28efdea07d0efba6b773b87d5d1abc14a33390b", null ]
       ] ]
     ] ],
     [ "SC::Build::Optimization", "struct_s_c_1_1_build_1_1_optimization.html", [
@@ -108,7 +108,7 @@ var group__group__build =
       [ "platforms", "struct_s_c_1_1_build_1_1_parameters.html#a64077b1e409dfb42efa9093d82893771", null ]
     ] ],
     [ "SC::Build::Definition", "struct_s_c_1_1_build_1_1_definition.html", [
-      [ "generate", "struct_s_c_1_1_build_1_1_definition.html#af3c5f7a3a790dd472587c72d887cbc5d", null ],
+      [ "configure", "struct_s_c_1_1_build_1_1_definition.html#afe96bbe51d8c2ac8d9068969e75bdb73", null ],
       [ "workspaces", "struct_s_c_1_1_build_1_1_definition.html#a98cc3234e653027bba8b68b86e016c1b", null ]
     ] ],
     [ "SC::Build::DefinitionCompiler", "struct_s_c_1_1_build_1_1_definition_compiler.html", null ]

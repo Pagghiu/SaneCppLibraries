@@ -1,10 +1,10 @@
 var namespace_s_c_1_1_build =
 [
+    [ "Actions", "struct_s_c_1_1_build_1_1_actions.html", null ],
     [ "Architecture", "struct_s_c_1_1_build_1_1_architecture.html", null ],
     [ "Compile", "struct_s_c_1_1_build_1_1_compile.html", "struct_s_c_1_1_build_1_1_compile" ],
     [ "CompileFlags", "struct_s_c_1_1_build_1_1_compile_flags.html", "struct_s_c_1_1_build_1_1_compile_flags" ],
     [ "Configuration", "struct_s_c_1_1_build_1_1_configuration.html", "struct_s_c_1_1_build_1_1_configuration" ],
-    [ "ConfigurePresets", "struct_s_c_1_1_build_1_1_configure_presets.html", null ],
     [ "Definition", "struct_s_c_1_1_build_1_1_definition.html", "struct_s_c_1_1_build_1_1_definition" ],
     [ "DefinitionCompiler", "struct_s_c_1_1_build_1_1_definition_compiler.html", null ],
     [ "Generator", "struct_s_c_1_1_build_1_1_generator.html", "struct_s_c_1_1_build_1_1_generator" ],

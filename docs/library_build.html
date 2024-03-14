@@ -137,18 +137,19 @@ Status</h1>
  Build currently used to generate test projects of this repository but still not mature enough to be used for anything else.</p>
 <h1><a class="anchor" id="autotoc_md73"></a>
 Description</h1>
-<p >Build C++ files (named by convention <code>SCBuild.cpp</code>) are compiled the fly and they generate project files for existing build systems. <br  />
+<p >Build C++ files (named by convention <code>SC-build.cpp</code>) are compiled the fly and they generate project files for existing build systems. <br  />
  In the future the plan is to allow also the system to run standalone directly invoking compilers to produce libraries and executables.</p>
-<p >This is for example the <code>SCBuild.cpp</code> file for the test suite: </p><div class="fragment"><div class="line"><span class="comment">// Copyright (c) Stefano Cristiano</span></div>
+<dl class="section note"><dt>Note</dt><dd>Check the <a class="el" href="page_tools.html">Tools</a> page for more details on <code>SC.sh build</code>.</dd></dl>
+<p>This is for example the <code>SC-build.cpp</code> file for the test suite: </p><div class="fragment"><div class="line"><span class="comment">// Copyright (c) Stefano Cristiano</span></div>
 <div class="line"><span class="comment">// SPDX-License-Identifier: MIT</span></div>
-<div class="line"><span class="preprocessor">#include &quot;Libraries/Build/Build.h&quot;</span></div>
+<div class="line"><span class="preprocessor">#include &quot;Tools/SC-build.h&quot;</span></div>
 <div class="line"><span class="preprocessor">#include &quot;Libraries/Strings/StringBuilder.h&quot;</span></div>
 <div class="line"> </div>
 <div class="line"><span class="keyword">namespace </span>SC</div>
 <div class="line">{</div>
-<div class="line"><span class="keyword">namespace </span>SCBuild</div>
+<div class="line"><span class="keyword">namespace </span>Build</div>
 <div class="line">{</div>
-<div class="line"><span class="keyword">static</span> <span class="keyword">constexpr</span> <a class="code hl_struct" href="struct_s_c_1_1_string_view.html">SC::StringView</a> PROJECT_NAME = <span class="stringliteral">&quot;SCTest&quot;</span>;</div>
+<div class="line"><span class="keyword">static</span> <span class="keyword">constexpr</span> StringView PROJECT_NAME = <span class="stringliteral">&quot;SCTest&quot;</span>;</div>
 <div class="line"> </div>
 <div class="line">Result configure(Build::Definition&amp; definition, Build::Parameters&amp; parameters, StringView rootDirectory)</div>
 <div class="line">{</div>
@@ -161,14 +162,14 @@ Description</h1>
 <div class="line"> </div>
 <div class="line">    <span class="comment">// Project</span></div>
 <div class="line">    Project project;</div>
-<div class="line">    project.targetType = TargetType::Executable;</div>
+<div class="line">    project.targetType = <a class="code hl_enumvalue" href="struct_s_c_1_1_build_1_1_target_type.html#ad357114ea742a6bb9826ae66ecc3fe26a65dfe0b2ca72c4a4133c45a7297a5b3d">TargetType::Executable</a>;</div>
 <div class="line">    project.name.assign(PROJECT_NAME);</div>
 <div class="line">    project.targetName.assign(PROJECT_NAME);</div>
 <div class="line">    project.setRootDirectory(rootDirectory);</div>
 <div class="line"> </div>
 <div class="line">    <span class="comment">// Configurations</span></div>
-<div class="line">    project.addPresetConfiguration(Configuration::Preset::Debug);</div>
-<div class="line">    project.addPresetConfiguration(Configuration::Preset::Release, <span class="stringliteral">&quot;Release&quot;</span>);</div>
+<div class="line">    project.addPresetConfiguration(<a class="code hl_enumvalue" href="struct_s_c_1_1_build_1_1_configuration.html#adaa0948e96bd738b68201ae929a371aeaa603905470e2a5b8c13e96b579ef0dba">Configuration::Preset::Debug</a>);</div>
+<div class="line">    project.addPresetConfiguration(<a class="code hl_enumvalue" href="struct_s_c_1_1_build_1_1_configuration.html#adaa0948e96bd738b68201ae929a371aeab8e7b465df7c5979dc731d06e84ce2cf">Configuration::Preset::Release</a>, <span class="stringliteral">&quot;Release&quot;</span>);</div>
 <div class="line">    project.compile.addDefines({<span class="stringliteral">&quot;SC_LIBRARY_PATH=$(PROJECT_DIR)/../../..&quot;</span>, <span class="stringliteral">&quot;SC_COMPILER_ENABLE_CONFIG=1&quot;</span>});</div>
 <div class="line">    project.getConfiguration(<span class="stringliteral">&quot;Debug&quot;</span>)-&gt;compile.addDefines({<span class="stringliteral">&quot;DEBUG=1&quot;</span>});</div>
 <div class="line">    <span class="comment">// TODO: These includes must be relative to rootDirectory</span></div>
@@ -182,21 +183,23 @@ Description</h1>
 <div class="line">    }</div>
 <div class="line">    <span class="keywordflow">if</span> (parameters.generator == <a class="code hl_enumvalue" href="struct_s_c_1_1_build_1_1_generator.html#af8a9140d4b55d98b87926be66a28efdea1bc9f727e31471d09375f02b54606298">Build::Generator::VisualStudio2022</a>)</div>
 <div class="line">    {</div>
-<div class="line">        project.addPresetConfiguration(Configuration::Preset::Debug, <span class="stringliteral">&quot;Debug Clang&quot;</span>);</div>
+<div class="line">        project.addPresetConfiguration(<a class="code hl_enumvalue" href="struct_s_c_1_1_build_1_1_configuration.html#adaa0948e96bd738b68201ae929a371aeaa603905470e2a5b8c13e96b579ef0dba">Configuration::Preset::Debug</a>, <span class="stringliteral">&quot;Debug Clang&quot;</span>);</div>
 <div class="line">        project.getConfiguration(<span class="stringliteral">&quot;Debug Clang&quot;</span>)-&gt;visualStudio.platformToolset = <span class="stringliteral">&quot;ClangCL&quot;</span>;</div>
 <div class="line">    }</div>
 <div class="line">    <span class="keywordflow">for</span> (Configuration&amp; config : project.configurations)</div>
 <div class="line">    {</div>
 <div class="line">        <span class="keyword">constexpr</span> <span class="keyword">auto</span> buildBase = <span class="stringliteral">&quot;$(PROJECT_DIR)/../..&quot;</span>;</div>
-<div class="line">        <span class="keyword">constexpr</span> <span class="keyword">auto</span> buildDir =</div>
-<div class="line">            <span class="stringliteral">&quot;$(PLATFORM_DISPLAY_NAME)-$(MACOSX_DEPLOYMENT_TARGET)-$(ARCHS)-$(SC_GENERATOR)-$(CONFIGURATION)&quot;</span>;</div>
-<div class="line">        StringBuilder(config.outputPath).format(<span class="stringliteral">&quot;{}/Output/{}&quot;</span>, buildBase, buildDir);</div>
-<div class="line">        StringBuilder(config.intermediatesPath).format(<span class="stringliteral">&quot;{}/Intermediate/$(PROJECT_NAME)/{}&quot;</span>, buildBase, buildDir);</div>
-<div class="line">        config.compile.set&lt;Compile::enableASAN&gt;(config.preset == Configuration::Preset::Debug);</div>
+<div class="line">        <span class="keyword">constexpr</span> <span class="keyword">auto</span> buildDir  = <span class="stringliteral">&quot;$(PLATFORM_DISPLAY_NAME)-$(MACOSX_DEPLOYMENT_TARGET)-$(ARCHS)-&quot;</span></div>
+<div class="line">                                   <span class="stringliteral">&quot;$(SC_GENERATOR)-$(SC_COMPILER)-$(SC_COMPILER_VERSION)-$(CONFIGURATION)&quot;</span>;</div>
+<div class="line">        StringBuilder(config.outputPath).format(<span class="stringliteral">&quot;{}/_Outputs/{}&quot;</span>, buildBase, buildDir);</div>
+<div class="line">        StringBuilder(config.intermediatesPath).format(<span class="stringliteral">&quot;{}/_Intermediates/$(PROJECT_NAME)/{}&quot;</span>, buildBase, buildDir);</div>
+<div class="line">        config.compile.set&lt;<a class="code hl_enumvalue" href="struct_s_c_1_1_build_1_1_compile.html#a37489d01615151bffa6d3ac1419ff9e8a493df1183b7335f649e58e4b7533ed83">Compile::enableASAN</a>&gt;(config.preset == <a class="code hl_enumvalue" href="struct_s_c_1_1_build_1_1_configuration.html#adaa0948e96bd738b68201ae929a371aeaa603905470e2a5b8c13e96b579ef0dba">Configuration::Preset::Debug</a>);</div>
 <div class="line">    }</div>
 <div class="line"> </div>
 <div class="line">    <span class="comment">// File overrides (order matters regarding to add / remove)</span></div>
-<div class="line">    project.addFile(<span class="stringliteral">&quot;SCBuild.cpp&quot;</span>);                            <span class="comment">// add single build files</span></div>
+<div class="line">    project.addFile(<span class="stringliteral">&quot;SC-build.cpp&quot;</span>);                           <span class="comment">// add single tool</span></div>
+<div class="line">    project.addFile(<span class="stringliteral">&quot;SC-format.cpp&quot;</span>);                          <span class="comment">// add single tool</span></div>
+<div class="line">    project.addFile(<span class="stringliteral">&quot;SC-package.cpp&quot;</span>);                         <span class="comment">// add single tool</span></div>
 <div class="line">    project.addDirectory(<span class="stringliteral">&quot;Tests/SCTest&quot;</span>, <span class="stringliteral">&quot;*.cpp&quot;</span>);             <span class="comment">// add all .cpp from SCTest directory</span></div>
 <div class="line">    project.addDirectory(<span class="stringliteral">&quot;Tests/SCTest&quot;</span>, <span class="stringliteral">&quot;*.h&quot;</span>);               <span class="comment">// add all .h from SCTest directory</span></div>
 <div class="line">    project.addDirectory(<span class="stringliteral">&quot;Libraries&quot;</span>, <span class="stringliteral">&quot;**.cpp&quot;</span>);               <span class="comment">// recursively add all cpp files</span></div>
@@ -205,6 +208,8 @@ Description</h1>
 <div class="line">    project.addDirectory(<span class="stringliteral">&quot;LibrariesExtra&quot;</span>, <span class="stringliteral">&quot;**.h&quot;</span>);            <span class="comment">// recursively add all header files</span></div>
 <div class="line">    project.addDirectory(<span class="stringliteral">&quot;LibrariesExtra&quot;</span>, <span class="stringliteral">&quot;**.cpp&quot;</span>);          <span class="comment">// recursively add all header files</span></div>
 <div class="line">    project.addDirectory(<span class="stringliteral">&quot;Support/DebugVisualizers&quot;</span>, <span class="stringliteral">&quot;*.cpp&quot;</span>); <span class="comment">// add debug visualizers</span></div>
+<div class="line">    project.addDirectory(<span class="stringliteral">&quot;Tools&quot;</span>, <span class="stringliteral">&quot;*.h&quot;</span>);                      <span class="comment">// add bootstrap headers</span></div>
+<div class="line">    project.addDirectory(<span class="stringliteral">&quot;Tools&quot;</span>, <span class="stringliteral">&quot;*Test.cpp&quot;</span>);                <span class="comment">// add bootstrap tests</span></div>
 <div class="line">    <span class="keywordflow">if</span> (parameters.generator == <a class="code hl_enumvalue" href="struct_s_c_1_1_build_1_1_generator.html#af8a9140d4b55d98b87926be66a28efdea1bc9f727e31471d09375f02b54606298">Build::Generator::VisualStudio2022</a>)</div>
 <div class="line">    {</div>
 <div class="line">        project.addDirectory(<span class="stringliteral">&quot;Support/DebugVisualizers/MSVC&quot;</span>, <span class="stringliteral">&quot;*.natvis&quot;</span>);</div>
@@ -221,19 +226,22 @@ Description</h1>
 <div class="line">    <span class="keywordflow">return</span> Result(<span class="keyword">true</span>);</div>
 <div class="line">}</div>
 <div class="line"> </div>
-<div class="line">Result generate(<a class="code hl_enumeration" href="struct_s_c_1_1_build_1_1_generator.html#af8a9140d4b55d98b87926be66a28efde">Build::Generator::Type</a> generator, StringView targetDirectory, StringView sourcesDirectory)</div>
+<div class="line">Result executeAction(Build::Actions::Type action, <a class="code hl_enumeration" href="struct_s_c_1_1_build_1_1_generator.html#af8a9140d4b55d98b87926be66a28efde">Build::Generator::Type</a> generator, StringView targetDirectory,</div>
+<div class="line">                     StringView sourcesDirectory)</div>
 <div class="line">{</div>
-<div class="line">    <span class="keywordflow">return</span> Build::ConfigurePresets::generateAllPlatforms(configure, PROJECT_NAME, generator, targetDirectory,</div>
-<div class="line">                                                         sourcesDirectory);</div>
+<div class="line">    <span class="keywordflow">return</span> Build::Actions::execute(action, configure, PROJECT_NAME, generator, targetDirectory, sourcesDirectory);</div>
 <div class="line">}</div>
-<div class="line">} <span class="comment">// namespace SCBuild</span></div>
+<div class="line">} <span class="comment">// namespace Build</span></div>
 <div class="line">} <span class="comment">// namespace SC</span></div>
 <div class="ttc" id="agroup__group__foundation__compiler__macros_html_ga04a2ef148fa8164b1a2fb0611f0d7b31"><div class="ttname"><a href="group__group__foundation__compiler__macros.html#ga04a2ef148fa8164b1a2fb0611f0d7b31">SC_COMPILER_WARNING_POP</a></div><div class="ttdeci">#define SC_COMPILER_WARNING_POP</div><div class="ttdoc">Pops warning from inside a macro.</div><div class="ttdef"><b>Definition:</b> Compiler.h:104</div></div>
 <div class="ttc" id="agroup__group__foundation__compiler__macros_html_gab61d123dc400964ff65eacdec3349ccd"><div class="ttname"><a href="group__group__foundation__compiler__macros.html#gab61d123dc400964ff65eacdec3349ccd">SC_COMPILER_WARNING_PUSH_UNUSED_RESULT</a></div><div class="ttdeci">#define SC_COMPILER_WARNING_PUSH_UNUSED_RESULT</div><div class="ttdoc">Disables unused-result warning (due to ignoring a return value marked as [[nodiscard]])</div><div class="ttdef"><b>Definition:</b> Compiler.h:143</div></div>
 <div class="ttc" id="agroup__group__foundation__utility_html_ga172de7f1b6d5f1fb4a9f6f040f8ec2aa"><div class="ttname"><a href="group__group__foundation__utility.html#ga172de7f1b6d5f1fb4a9f6f040f8ec2aa">SC::move</a></div><div class="ttdeci">constexpr T &amp;&amp; move(T &amp;value)</div><div class="ttdoc">Converts an lvalue to an rvalue reference.</div><div class="ttdef"><b>Definition:</b> Compiler.h:247</div></div>
+<div class="ttc" id="astruct_s_c_1_1_build_1_1_compile_html_a37489d01615151bffa6d3ac1419ff9e8a493df1183b7335f649e58e4b7533ed83"><div class="ttname"><a href="struct_s_c_1_1_build_1_1_compile.html#a37489d01615151bffa6d3ac1419ff9e8a493df1183b7335f649e58e4b7533ed83">SC::Build::Compile::enableASAN</a></div><div class="ttdeci">@ enableASAN</div><div class="ttdoc">Address Sanitizer.</div><div class="ttdef"><b>Definition:</b> Build.h:130</div></div>
+<div class="ttc" id="astruct_s_c_1_1_build_1_1_configuration_html_adaa0948e96bd738b68201ae929a371aeaa603905470e2a5b8c13e96b579ef0dba"><div class="ttname"><a href="struct_s_c_1_1_build_1_1_configuration.html#adaa0948e96bd738b68201ae929a371aeaa603905470e2a5b8c13e96b579ef0dba">SC::Build::Configuration::Preset::Debug</a></div><div class="ttdeci">@ Debug</div><div class="ttdoc">Debug configuration.</div></div>
+<div class="ttc" id="astruct_s_c_1_1_build_1_1_configuration_html_adaa0948e96bd738b68201ae929a371aeab8e7b465df7c5979dc731d06e84ce2cf"><div class="ttname"><a href="struct_s_c_1_1_build_1_1_configuration.html#adaa0948e96bd738b68201ae929a371aeab8e7b465df7c5979dc731d06e84ce2cf">SC::Build::Configuration::Preset::Release</a></div><div class="ttdeci">@ Release</div><div class="ttdoc">Release configuration.</div></div>
 <div class="ttc" id="astruct_s_c_1_1_build_1_1_generator_html_af8a9140d4b55d98b87926be66a28efde"><div class="ttname"><a href="struct_s_c_1_1_build_1_1_generator.html#af8a9140d4b55d98b87926be66a28efde">SC::Build::Generator::Type</a></div><div class="ttdeci">Type</div><div class="ttdef"><b>Definition:</b> Build.h:82</div></div>
 <div class="ttc" id="astruct_s_c_1_1_build_1_1_generator_html_af8a9140d4b55d98b87926be66a28efdea1bc9f727e31471d09375f02b54606298"><div class="ttname"><a href="struct_s_c_1_1_build_1_1_generator.html#af8a9140d4b55d98b87926be66a28efdea1bc9f727e31471d09375f02b54606298">SC::Build::Generator::VisualStudio2022</a></div><div class="ttdeci">@ VisualStudio2022</div><div class="ttdoc">Generate projects for Visual Studio 2022.</div><div class="ttdef"><b>Definition:</b> Build.h:84</div></div>
-<div class="ttc" id="astruct_s_c_1_1_string_view_html"><div class="ttname"><a href="struct_s_c_1_1_string_view.html">SC::StringView</a></div><div class="ttdoc">Non-owning view over a range of characters with UTF Encoding.</div><div class="ttdef"><b>Definition:</b> StringView.h:47</div></div>
+<div class="ttc" id="astruct_s_c_1_1_build_1_1_target_type_html_ad357114ea742a6bb9826ae66ecc3fe26a65dfe0b2ca72c4a4133c45a7297a5b3d"><div class="ttname"><a href="struct_s_c_1_1_build_1_1_target_type.html#ad357114ea742a6bb9826ae66ecc3fe26a65dfe0b2ca72c4a4133c45a7297a5b3d">SC::Build::TargetType::Executable</a></div><div class="ttdeci">@ Executable</div><div class="ttdoc">Create executable program.</div><div class="ttdef"><b>Definition:</b> Build.h:304</div></div>
 </div><!-- fragment --><p >The abstraction is described by the following (top-down) hierarchy:</p>
 <table class="markdownTable">
 <tr class="markdownTableHead">
@@ -271,14 +279,14 @@ Description</h1>
 <h1><a class="anchor" id="autotoc_md74"></a>
 Architecture</h1>
 <ul>
-<li>User adds a <code>SCBuild.cpp</code> files to his library</li>
-<li><code>SCBuild.cpp</code> describes the <a class="el" href="struct_s_c_1_1_build_1_1_definition.html" title="Top level build description holding all Workspace objects.">SC::Build::Definition</a> using imperative C++ code<ul>
+<li>User adds a <code>SC-build.cpp</code> files to his library</li>
+<li><code>SC-build.cpp</code> describes the <a class="el" href="struct_s_c_1_1_build_1_1_definition.html" title="Top level build description holding all Workspace objects.">SC::Build::Definition</a> using imperative C++ code<ul>
 <li>Define at least one <a class="el" href="struct_s_c_1_1_build_1_1_workspace.html" title="Groups multiple Project together with shared compile and link flags.">SC::Build::Workspace</a></li>
 <li>Define at least one <a class="el" href="struct_s_c_1_1_build_1_1_project.html" title="Groups multiple Configuration and source files with their compile and link flags.">SC::Build::Project</a></li>
 <li>Define at least one <a class="el" href="struct_s_c_1_1_build_1_1_configuration.html" title="Groups SC::Build::CompileFlags and SC::Build::LinkFlags for a given SC::Build::Architecture.">SC::Build::Configuration</a></li>
 </ul>
 </li>
-<li><code>SCBuild.cpp</code> is compiled to an executable with a single <code>clang</code> or <code>cl.exe</code> invocation</li>
+<li><code>SC-build.cpp</code> is compiled to an executable with a single <code>clang</code> or <code>cl.exe</code> invocation</li>
 <li>The unity build file <code>SC.cpp</code> is linked together in the same invocation<ul>
 <li>Provides all needed Platform abstraction features to enumerate files and directories, launch processes etc.</li>
 </ul>
@@ -290,10 +298,11 @@ Architecture</h1>
 <li><a class="el" href="struct_s_c_1_1_build_1_1_generator.html" title="Build system generator (Xcode / Visual Studio)">SC::Build::Generator</a> Build system generator (Xcode / Visual Studio)</li>
 </ul>
 </li>
-<li><code>SCBuild.cpp</code> calls SC::Build::ConfigurePresets::generateAllPlatforms or manually invokes <a class="el" href="struct_s_c_1_1_build_1_1_definition.html#af3c5f7a3a790dd472587c72d887cbc5d" title="Generates projects for all workspaces, with specified parameters at given root path.">SC::Build::Definition::generate</a></li>
+<li><code>SC-build.cpp</code> calls SC::Build::ConfigurePresets::generateAllPlatforms or manually invokes SC::Build::Definition::generate</li>
 <li>Debugging the build script means just debugging a regular C++ executable</li>
 </ul>
-<p >So far the entire build configuration is created in C++ but each invocation with a different set of "build parameters" it's building a data structure that is free of conditionals, as they've been evaluated by the imperative code. Such "post-configure" build settings could be serialized to JSON (or using binary <a class="el" href="library_serialization_binary.html">Serialization</a>) or to any other declarative format if needed. <br  />
+<dl class="section note"><dt>Note</dt><dd>Check the <a class="el" href="page_tools.html">Tools</a> page for more details on <code>SC.sh build</code>.</dd></dl>
+<p>So far the entire build configuration is created in C++ but each invocation with a different set of "build parameters" it's building a data structure that is free of conditionals, as they've been evaluated by the imperative code. Such "post-configure" build settings could be serialized to JSON (or using binary <a class="el" href="library_serialization_binary.html">Serialization</a>) or to any other declarative format if needed. <br  />
 </p>
 <h1><a class="anchor" id="autotoc_md75"></a>
 Roadmap</h1>

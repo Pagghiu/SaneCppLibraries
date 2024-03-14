@@ -1,6 +1,7 @@
 var hierarchy =
 [
     [ "SC::Time::Absolute", "struct_s_c_1_1_time_1_1_absolute.html", null ],
+    [ "SC::Build::Actions", "struct_s_c_1_1_build_1_1_actions.html", null ],
     [ "SC::TypeTraits::AddPointer< T >", "struct_s_c_1_1_type_traits_1_1_add_pointer.html", null ],
     [ "SC::TypeTraits::AddReference< T >", "struct_s_c_1_1_type_traits_1_1_add_reference.html", null ],
     [ "SC::AlignedStorage< N, Alignment >", "struct_s_c_1_1_aligned_storage.html", null ],
@@ -65,7 +66,6 @@ var hierarchy =
     [ "SC::TypeTraits::Conditional< B, T, F >", "struct_s_c_1_1_type_traits_1_1_conditional.html", null ],
     [ "SC::ConditionVariable", "struct_s_c_1_1_condition_variable.html", null ],
     [ "SC::Build::Configuration", "struct_s_c_1_1_build_1_1_configuration.html", null ],
-    [ "SC::Build::ConfigurePresets", "struct_s_c_1_1_build_1_1_configure_presets.html", null ],
     [ "SC::Console", "struct_s_c_1_1_console.html", null ],
     [ "SC::FileSystem::CopyFlags", "struct_s_c_1_1_file_system_1_1_copy_flags.html", null ],
     [ "SC::FileSystem::CopyOperation", "struct_s_c_1_1_file_system_1_1_copy_operation.html", null ],

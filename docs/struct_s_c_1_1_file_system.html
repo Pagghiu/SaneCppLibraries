@@ -228,9 +228,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a62335499841c1aa28088f1710f5f293a"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_system.html#a62335499841c1aa28088f1710f5f293a">read</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> file, <a class="el" href="struct_s_c_1_1_vector.html">Vector</a>&lt; char &gt; &amp;data)</td></tr>
 <tr class="memdesc:a62335499841c1aa28088f1710f5f293a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reads contents of a file into a <a class="el" href="struct_s_c_1_1_vector.html" title="A contiguous sequence of heap allocated elements.">SC::Vector</a> buffer.  <a href="struct_s_c_1_1_file_system.html#a62335499841c1aa28088f1710f5f293a">More...</a><br /></td></tr>
 <tr class="separator:a62335499841c1aa28088f1710f5f293a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aab4922c7a6508f7fca4c40a86a359679"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_system.html#aab4922c7a6508f7fca4c40a86a359679">write</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> file, <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> text)</td></tr>
-<tr class="memdesc:aab4922c7a6508f7fca4c40a86a359679"><td class="mdescLeft">&#160;</td><td class="mdescRight">Writes a <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> to a file.  <a href="struct_s_c_1_1_file_system.html#aab4922c7a6508f7fca4c40a86a359679">More...</a><br /></td></tr>
-<tr class="separator:aab4922c7a6508f7fca4c40a86a359679"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3c861ecf3a92471691058d3a0d10c205"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_system.html#a3c861ecf3a92471691058d3a0d10c205">writeString</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> file, <a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> text)</td></tr>
+<tr class="memdesc:a3c861ecf3a92471691058d3a0d10c205"><td class="mdescLeft">&#160;</td><td class="mdescRight">Writes a <a class="el" href="struct_s_c_1_1_string_view.html" title="Non-owning view over a range of characters with UTF Encoding.">StringView</a> to a file.  <a href="struct_s_c_1_1_file_system.html#a3c861ecf3a92471691058d3a0d10c205">More...</a><br /></td></tr>
+<tr class="separator:a3c861ecf3a92471691058d3a0d10c205"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adddc095806fab6fa9fdfa0c2cb58f63b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_s_c_1_1_result.html">Result</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_s_c_1_1_file_system.html#adddc095806fab6fa9fdfa0c2cb58f63b">read</a> (<a class="el" href="struct_s_c_1_1_string_view.html">StringView</a> file, <a class="el" href="struct_s_c_1_1_string.html">String</a> &amp;data, <a class="el" href="group__group__strings.html#ga394218cf32c79b0ada9bd2d4892eaf52">StringEncoding</a> encoding)</td></tr>
 <tr class="memdesc:adddc095806fab6fa9fdfa0c2cb58f63b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read contents of a file into a string with given encoding.  <a href="struct_s_c_1_1_file_system.html#adddc095806fab6fa9fdfa0c2cb58f63b">More...</a><br /></td></tr>
 <tr class="separator:adddc095806fab6fa9fdfa0c2cb58f63b"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -450,7 +450,7 @@ Public Attributes</h2></td></tr>
 <div class="line">    <span class="comment">// Create a File names &#39;sourceFile.txt&#39;</span></div>
 <div class="line">    StringView contentSource = <span class="stringliteral">&quot;this is some content&quot;</span>;</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.exists(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>));</div>
-<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.write(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>, contentSource));</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.writeString(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>, contentSource));</div>
 <div class="line"> </div>
 <div class="line">    <span class="comment">// Check that &#39;sourceFile.txt&#39; exist, but not &#39;destinationFile.txt&#39;</span></div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.existsAndIsFile(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>));</div>
@@ -634,7 +634,7 @@ Public Attributes</h2></td></tr>
 <div class="line">    <span class="comment">// Create a File names &#39;sourceFile.txt&#39;</span></div>
 <div class="line">    StringView contentSource = <span class="stringliteral">&quot;this is some content&quot;</span>;</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.exists(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>));</div>
-<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.write(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>, contentSource));</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.writeString(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>, contentSource));</div>
 <div class="line"> </div>
 <div class="line">    <span class="comment">// Check that &#39;sourceFile.txt&#39; exist, but not &#39;destinationFile.txt&#39;</span></div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.existsAndIsFile(<span class="stringliteral">&quot;sourceFile.txt&quot;</span>));</div>
@@ -1450,7 +1450,7 @@ Public Attributes</h2></td></tr>
 </div>
 </div>
 <a id="a665391fc54352cc85e9ab2103a17e57f" name="a665391fc54352cc85e9ab2103a17e57f"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a665391fc54352cc85e9ab2103a17e57f">&#9670;&nbsp;</a></span>write() <span class="overload">[1/2]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a665391fc54352cc85e9ab2103a17e57f">&#9670;&nbsp;</a></span>write()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1491,7 +1491,7 @@ Public Attributes</h2></td></tr>
 <div class="line"> </div>
 <div class="line">    <span class="comment">// Check that file doesn&#39;t exists before write-ing it and then check that it exist</span></div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(not fs.exists(<span class="stringliteral">&quot;file.txt&quot;</span>));</div>
-<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.write(<span class="stringliteral">&quot;file.txt&quot;</span>, content));</div>
+<div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.writeString(<span class="stringliteral">&quot;file.txt&quot;</span>, content));</div>
 <div class="line">    <a class="code hl_define" href="group__group__testing.html#gae99d5c969c290b1234140c49bb9d8cf8">SC_TEST_EXPECT</a>(fs.existsAndIsFile(<span class="stringliteral">&quot;file.txt&quot;</span>));</div>
 <div class="line"> </div>
 <div class="line">    <span class="comment">// Read the file and check its content</span></div>
@@ -1505,14 +1505,14 @@ Public Attributes</h2></td></tr>
 </div><!-- fragment --> 
 </div>
 </div>
-<a id="aab4922c7a6508f7fca4c40a86a359679" name="aab4922c7a6508f7fca4c40a86a359679"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aab4922c7a6508f7fca4c40a86a359679">&#9670;&nbsp;</a></span>write() <span class="overload">[2/2]</span></h2>
+<a id="a3c861ecf3a92471691058d3a0d10c205" name="a3c861ecf3a92471691058d3a0d10c205"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3c861ecf3a92471691058d3a0d10c205">&#9670;&nbsp;</a></span>writeString()</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">Result</a> SC::FileSystem::write </td>
+          <td class="memname"><a class="el" href="struct_s_c_1_1_result.html">Result</a> SC::FileSystem::writeString </td>
           <td>(</td>
           <td class="paramtype"><a class="el" href="struct_s_c_1_1_string_view.html">StringView</a>&#160;</td>
           <td class="paramname"><em>file</em>, </td>
