@@ -66,3 +66,30 @@ Build all projects
 ```
 ./SC.sh build configure
 ```
+
+## SC-package.cpp
+
+`SC-package` downloads third party tools that are needed for Sane C++ development (for example `clang-format`).  
+It downloads them from specific website, checking the correct variation depending on the Host Architecture (Windows/Linux/Mac and Intel/ARM).  
+All downloads are checked with an MD5 stored in the package script.  
+Downloaded files are placed and extracted in `_Build/_Packages`.  
+Once extracted, they are symlinked in `_Build/Tools`.  
+
+@note Directory naming has been chosen so that the same working copy folder can be mounted in virtual machines having different Operating Systems and architectures avoiding any clashes.  
+This is used during regular development, where each feature is tested on macOS, Windows and Linux in parallel before even committing and checking the CI.
+
+### Actions:
+
+- `install`: Downloads requires tools (LLVM / 7zip)
+
+### Packages:
+    - `LLVM 15`: Downloads LLVM from the official github repository
+    - `7zip`: 7zip executable (needed to decompress LLVM installer on windows)
+    - `7zr.exe`: 7Zip console executable (needed to decompress 7zip installer on windows)
+
+### Examples:
+
+```
+./SC.sh package install
+```
+

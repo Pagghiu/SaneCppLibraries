@@ -1,0 +1,209 @@
+// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
+#include "Tools.h"
+
+#include "../Libraries/FileSystem/FileSystem.h"
+#include "../Libraries/FileSystem/Path.h"
+#include "../Libraries/Foundation/Function.h"
+#include "../Libraries/Hashing/Hashing.h"
+#include "../Libraries/Process/Process.h"
+#include "../Libraries/Strings/Console.h"
+#include "../Libraries/Strings/StringBuilder.h"
+
+namespace SC
+{
+namespace Tools
+{
+template <typename... Types>
+inline String format(const StringView fmt, Types&&... types)
+{
+    String result = StringEncoding::Utf8;
+    (void)StringBuilder(result).format(fmt, forward<Types>(types)...);
+    return result;
+}
+
+struct Download
+{
+    SmallString<255> packagesRootDirectory;
+    SmallString<255> hostToolsDirectory;
+
+    SmallString<255> packageName;
+    SmallString<255> packageVersion;
+    SmallString<255> packagePlatform;
+    SmallString<255> url;
+    SmallString<255> fileMD5;
+
+    bool createLink = true;
+};
+
+struct Package
+{
+    SmallString<255> packageFullName;
+    SmallString<255> packageLocalDirectory;
+    SmallString<255> packageLocalFile;
+    SmallString<255> packageLocalTxt;
+    SmallString<255> packageBaseName;
+
+    SmallString<255> installDirectoryLink;
+};
+
+struct CustomFunctions
+{
+    Function<Result(const Download&, const Package&)> testFunction;
+    Function<Result(StringView, StringView)>          extractFunction;
+};
+
+[[nodiscard]] inline Result createLink(StringView sourceFileOrDirectory, StringView linkFile)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    return fs.createSymbolicLink(sourceFileOrDirectory, linkFile);
+}
+
+[[nodiscard]] inline Result removeQuarantineAttribute(StringView directory)
+{
+    Process process;
+    switch (HostPlatform)
+    {
+    case Platform::Apple:
+        SC_TRY(process.exec({"xattr", "-r", "-d", "com.apple.quarantine", directory}));
+        SC_TRY_MSG(process.getExitStatus() == 0, "xattr failed");
+        break;
+    case Platform::Linux:
+    case Platform::Windows:
+    case Platform::Emscripten:
+        // Nothing to do
+        break;
+    }
+    return Result(true);
+}
+
+[[nodiscard]] inline Result checkFileMD5(StringView fileName, StringView wantedMD5)
+{
+    FileDescriptor file;
+    SC_TRY(file.open(fileName, FileDescriptor::OpenMode::ReadOnly));
+    Hashing hashing;
+    SC_TRY(hashing.setType(Hashing::TypeMD5));
+    for (;;)
+    {
+        uint8_t       data[4096];
+        Span<uint8_t> actuallyRead;
+        SC_TRY(file.read({data, sizeof(data)}, actuallyRead));
+        if (actuallyRead.sizeInBytes() > 0)
+        {
+            SC_TRY(hashing.update(actuallyRead));
+        }
+        else
+        {
+            SC_TRY(file.close());
+            Hashing::Result res;
+            SC_TRY(hashing.finalize(res));
+            SmallString<32> result;
+            SC_TRY(StringBuilder(result).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::LowerCase));
+            SC_TRY_MSG(result.view() == wantedMD5, "MD5 doesn't match");
+            return Result(true);
+        }
+    }
+}
+
+[[nodiscard]] inline Result downloadFileMD5(StringView remoteURL, StringView localFile, StringView localFileMD5)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    if (not fs.existsAndIsFile(localFile) or not checkFileMD5(localFile, localFileMD5))
+    {
+        Process process;
+        SC_TRY(process.exec({"curl", "-L", "-o", localFile, remoteURL}));
+        SC_TRY_MSG(process.getExitStatus() == 0, "Cannot download file");
+        SC_TRY(checkFileMD5(localFile, localFileMD5));
+    }
+    return Result(true);
+}
+
+[[nodiscard]] inline Result tarExpandTo(StringView fileName, StringView directory, int stripComponents = 0)
+{
+    Process          process;
+    SmallString<255> stripString;
+    SC_TRY(StringBuilder(stripString).format("--strip-components={}", stripComponents));
+    SC_TRY(process.exec({"tar", "-xvf", fileName, "-C", directory, stripString.view()}));
+    return Result(process.getExitStatus() == 0);
+}
+
+[[nodiscard]] inline Result packageInstall(const Download& download, Package& package, CustomFunctions functions)
+{
+    SC_TRY_MSG(not download.packageName.isEmpty(), "Missing packageName");
+    SC_TRY_MSG(not download.packageVersion.isEmpty(), "Missing packageVersion");
+    SC_TRY_MSG(not download.packagePlatform.isEmpty(), "Missing packagePlatform");
+    SC_TRY_MSG(not download.url.isEmpty(), "Missing url");
+    FileSystem fs;
+    package.packageFullName =
+        format("{0}-{1}-{2}", download.packageName, download.packageVersion, download.packagePlatform);
+    package.packageBaseName = Path::basename(download.url.view(), Path::Type::AsPosix);
+
+    package.packageLocalFile =
+        format("{0}/{1}/{2}", download.packagesRootDirectory, download.packageName, package.packageBaseName);
+    package.packageLocalTxt       = format("{0}.txt", package.packageLocalFile);
+    package.packageLocalDirectory = format("{0}_extracted", package.packageLocalFile);
+
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.makeDirectoryRecursive(download.packagesRootDirectory.view()));
+    SC_TRY(fs.makeDirectoryRecursive(download.hostToolsDirectory.view()));
+    SC_TRY(fs.makeDirectoryRecursive(package.packageLocalDirectory.view())); // Creates packages/packageName
+
+    package.installDirectoryLink =
+        format("{0}/{1}_{2}", download.hostToolsDirectory, download.packageName, download.packagePlatform);
+
+    // Test if the tool works
+    Result testSucceeded = functions.testFunction(download, package);
+
+    // If test failed just try recreating the link
+    if (not testSucceeded and download.createLink and fs.existsAndIsFile(package.packageLocalTxt.view()))
+    {
+        SC_TRY(fs.removeLinkIfExists(package.installDirectoryLink.view()));
+        if (createLink(package.packageLocalDirectory.view(), package.installDirectoryLink.view()))
+        {
+            testSucceeded = functions.testFunction(download, package);
+        }
+    }
+
+    // If it's still failed let's re-download and extract + link everything
+    if (not testSucceeded)
+    {
+        SC_TRY(downloadFileMD5(download.url.view(), package.packageLocalFile.view(), download.fileMD5.view()));
+        if (fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
+        {
+            SC_TRY(fs.removeDirectoriesRecursive(package.packageLocalDirectory.view()));
+        }
+        SC_TRY(fs.makeDirectoryRecursive(package.packageLocalDirectory.view()));
+        if (functions.extractFunction.isValid())
+        {
+            SC_TRY(functions.extractFunction(package.packageLocalFile.view(), package.packageLocalDirectory.view()));
+        }
+        else
+        {
+            SC_TRY(tarExpandTo(package.packageLocalFile.view(), package.packageLocalDirectory.view(), 0));
+        }
+        SC_TRY(removeQuarantineAttribute(package.packageLocalDirectory.view()));
+        bool createPackageFile = true;
+        if (download.createLink)
+        {
+            SC_TRY(fs.removeLinkIfExists(package.installDirectoryLink.view()));
+            if (not createLink(package.packageLocalDirectory.view(), package.installDirectoryLink.view()))
+            {
+                SC_TRY(fs.moveDirectory(package.packageLocalDirectory.view(), package.installDirectoryLink.view()));
+                createPackageFile = false;
+            }
+        }
+        SC_TRY(functions.testFunction(download, package));
+        if (createPackageFile)
+        {
+            String packageTxt =
+                format("SC_PACKAGE_URL={0}\nSC_PACKAGE_MD5={1}\n", download.url.view(), download.fileMD5.view());
+            SC_TRY(fs.writeString(package.packageLocalTxt.view(), packageTxt.view()));
+        }
+    }
+    return Result(true);
+}
+
+} // namespace Tools
+} // namespace SC

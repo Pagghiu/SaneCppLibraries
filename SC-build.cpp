@@ -56,6 +56,7 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
 
     // File overrides (order matters regarding to add / remove)
     project.addFile("SC-build.cpp");                           // add single tool
+    project.addFile("SC-package.cpp");                         // add single tool
     project.addDirectory("Tests/SCTest", "*.cpp");             // add all .cpp from SCTest directory
     project.addDirectory("Tests/SCTest", "*.h");               // add all .h from SCTest directory
     project.addDirectory("Libraries", "**.cpp");               // recursively add all cpp files
