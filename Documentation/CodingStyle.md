@@ -8,12 +8,15 @@ If you really like to contribute check also [CONTRIBUTING.md](https://github.com
 ## Formatting
 All files should be formatted according to the `.clang-format` file using `clang-format` version 15.  
 
+
 Github CI will fail on PR that are not properly formatted.
 
 In some specific cases use `// clang-format off` and `// clang-format on` where a custom formatting can improve code look.
 For example many template specializations in the `SC::Reflection` library are better manually formatted/aligned to highlight the pattern.
 
 All headers must have a trailing newline.
+
+@note You can easily format files using the `SC.sh format execute` (or `SC.bat format execute`) command
 
 ## Casing
 

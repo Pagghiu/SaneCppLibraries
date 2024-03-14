@@ -10,6 +10,7 @@ jobs:
   build:
 
     runs-on: windows-latest
+    timeout-minutes: 4
 
     steps:
     - uses: actions/checkout@v4

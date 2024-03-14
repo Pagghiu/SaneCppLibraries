@@ -21,6 +21,7 @@ struct ToolsArguments
 Result RunCommand(ToolsArguments& commandArguments);
 
 // Tools
+Result runFormatCommand(ToolsArguments& arguments);
 Result runBuildCommand(ToolsArguments& arguments);
 
 } // namespace SC

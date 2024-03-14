@@ -84,6 +84,7 @@ void runAsyncTest(SC::TestReport& report);
 
 // Support
 void runDebugVisualizersTest(TestReport& report);
+void runSupportToolsTest(TestReport& report);
 
 } // namespace SC
 
@@ -199,6 +200,7 @@ int main(int argc, const char* argv[])
 
     // DebugVisualizers tests
     runDebugVisualizersTest(report);
+    // runSupportToolsTest(report);
 
     // Build tests
     runBuildTest(report);

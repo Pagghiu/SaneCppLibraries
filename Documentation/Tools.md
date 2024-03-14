@@ -93,3 +93,20 @@ This is used during regular development, where each feature is tested on macOS, 
 ./SC.sh package install
 ```
 
+## SC-format.cpp
+
+`SC-format` tool formats all files in Sane C++ repository and can check if they're formatted properly (useful for CI)
+
+### Actions:
+- `execute`: Formats all source files in the repository in-place
+- `check`: Does a dry-run format of all source files. Returns error on unformatted files (used by the CI)
+
+### Examples:
+
+```
+./SC.sh format execute
+```
+
+```
+SC.bat format check
+```
