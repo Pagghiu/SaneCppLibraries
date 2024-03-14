@@ -197,6 +197,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             builder.append("<TargetName>{}</TargetName>", project.targetName);
         }
+        // TODO: Extract actual proper MSVC version
         constexpr StringBuilder::ReplacePair replacements[] = {
             {"/", "\\"},
             {"$(PROJECT_DIR)\\", "$(ProjectDir)"},
@@ -205,7 +206,9 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             {"$(ARCHS)", "$(PlatformTarget)"},
             {"$(PLATFORM_DISPLAY_NAME)", "$(SDKIdentifier)"},
             {"$(MACOSX_DEPLOYMENT_TARGET)", "$(WindowsTargetPlatformVersion)"},
-            {"$(SC_GENERATOR)", "msvc2022"},
+            {"$(SC_GENERATOR)", "msbuild"},
+            {"$(SC_COMPILER)", "msvc"},       //
+            {"$(SC_COMPILER_VERSION)", "17"}, //
         };
         if (not configuration.outputPath.isEmpty())
         {
@@ -221,7 +224,8 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         if (not configuration.intermediatesPath.isEmpty())
         {
             builder.append("    <IntDir>");
-            builder.appendReplaceMultiple(configuration.intermediatesPath.view(), {replacements, 8});
+            builder.appendReplaceMultiple(configuration.intermediatesPath.view(),
+                                          {replacements, sizeof(replacements) / sizeof(replacements[0])});
             if (not configuration.outputPath.view().endsWithAnyOf({'\\'}))
             {
                 builder.append("\\");

@@ -9,25 +9,20 @@ Follow this guide if you're interested in building the library to contribute (ch
 The test suite uses the handmade / self-hosted [SC::Build](@ref library_build) system, that describes builds in C++
 
 - Generate test project
-    - **Linux**: `SCBuild.sh`
-    - **Windows**: `SCBuild.bat`
-    - **macOS**: `SCBuild.command`
-- Open generated projects (in `_Build/Projects`). 
+    - **Windows**: `SC.bat build`
+    - **Posix**: `SC.sh build`
+- Open generated projects (in `_Build/_Projects`). 
 
-@note These batch / bash scripts are doing the following:  
-- Two `.cpp` files are compiled with a single `clang` / `g++` / `cl.exe` invocation:
-    - `SC.cpp` unity build file encompassing the entire library
-    - `SCBuild.cpp` file defining the build
-- The resulting executable is then run to generate projects.
+@note Check the [Tools](@ref page_tools) page for more details on how it `SC.sh` works.
 
 ### Build the test suite
 
 #### Visual Studio 2022
-- Open `_Build/Projects/VisualStudio2022/SCTest.sln` 
+- Open `_Build/_Projects/VisualStudio2022/SCTest.sln` 
 - Build the default configuration target (or another one you prefer)
 
 #### XCode
-- Open `_Build/Projects/XCode/SCTest.xcodeproj/project.xcworkspace` 
+- Open `_Build/_Projects/XCode/SCTest.xcodeproj/project.xcworkspace` 
 - Build the default configuration target (or another one you prefer)
 
 #### VScode on macOS
@@ -38,8 +33,8 @@ Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 - `Build SCTest XCode Release` [2]
 
 @note
-[1] Needs only `make` and `c++` command (can be switched to be `clang` or `gcc`)  
-[2] Needs XCode installed
+[1] Needs only `make` and `c++` command (can be switched to be `clang` or `gcc`). Builds only current host architecture (`arm64` or `x86_64`).  
+[2] Needs XCode installed. Builds an universal executable in Release.
 
 #### VSCode on Linux
 Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
@@ -47,7 +42,7 @@ Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 - `Build SCTest Release` [1]
 
 @note
-[1] Needs only `make` and `c++`
+[1] Needs only `make` and `c++`. Builds only current host architecture (`arm64` or `x86_64`).
 
 #### VSCode on Windows
 Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
@@ -67,8 +62,14 @@ Running the default target should work out of the box, as paths are already gene
 
 Select one of the appropriate `Run and Debug` configuration like:
 
-- `SCTest [posix] (gdb)` [1]
-- `SCTest [posix] (lldb)` [2]
+- `SCTest x64 [apple] (gdb)` [1]
+- `SCTest x64 [apple] (lldb)` [2]
+- `SCTest ARM64 [apple] (gdb)` [1]
+- `SCTest ARM64 [apple] (lldb)` [2]
+- `SCTest x64 [linux] (gdb)` [1]
+- `SCTest x64 [linux] (lldb)` [2]
+- `SCTest ARM64 [linux] (gdb)` [1]
+- `SCTest ARM64 [linux] (lldb)` [2]
 
 @note
 [1] Uses `gdb` debugger. Implicitly invokes `Build SCTest Debug` to build the executable.  
@@ -78,8 +79,8 @@ Select one of the appropriate `Run and Debug` configuration like:
 
 Select one of the appropriate `Run and Debug` configuration like:
 
-- `SCTest x64 [win] (vsdbg)` [1]
-- `SCTest ARM64 [win] (vsdbg)` [1]
+- `SCTest x64 [windows]` [1]
+- `SCTest ARM64 [windows]` [1]
 
 @note
 [1] Needs `Visual Studio 2022` installed

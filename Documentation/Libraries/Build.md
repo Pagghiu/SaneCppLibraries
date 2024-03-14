@@ -18,11 +18,13 @@ Build currently used to generate test projects of this repository but still not 
 
 # Description
 
-Build C++ files (named by convention `SCBuild.cpp`) are compiled the fly and they generate project files for existing build systems.  
+Build C++ files (named by convention `SC-build.cpp`) are compiled the fly and they generate project files for existing build systems.  
 In the future the plan is to allow also the system to run standalone directly invoking compilers to produce libraries and executables.
 
-This is for example the `SCBuild.cpp` file for the test suite:
-\include SCBuild.cpp
+@note Check the [Tools](@ref page_tools) page for more details on `SC.sh build`.
+
+This is for example the `SC-build.cpp` file for the test suite:
+\include SC-build.cpp
 
 The abstraction is described by the following (top-down) hierarchy:
 
@@ -49,12 +51,12 @@ Some additional types allow describing detailed properties of the build:
 
 # Architecture
 
-- User adds a `SCBuild.cpp` files to his library
-- `SCBuild.cpp` describes the SC::Build::Definition using imperative C++ code
+- User adds a `SC-build.cpp` files to his library
+- `SC-build.cpp` describes the SC::Build::Definition using imperative C++ code
     - Define at least one SC::Build::Workspace
     - Define at least one SC::Build::Project 
     - Define at least one SC::Build::Configuration
-- `SCBuild.cpp` is compiled to an executable with a single `clang` or `cl.exe` invocation
+- `SC-build.cpp` is compiled to an executable with a single `clang` or `cl.exe` invocation
 - The unity build file `SC.cpp` is linked together in the same invocation
     - Provides all needed Platform abstraction features to enumerate files and directories, launch processes etc.
 - The generated executable is run as specified in SC::Build::Parameters
@@ -62,8 +64,10 @@ Some additional types allow describing detailed properties of the build:
     - SC::Build::Platform @copybrief SC::Build::Platform
     - SC::Build::Configuration @copybrief SC::Build::Configuration
     - SC::Build::Generator @copybrief SC::Build::Generator
-- `SCBuild.cpp` calls SC::Build::ConfigurePresets::generateAllPlatforms or manually invokes SC::Build::Definition::generate
+- `SC-build.cpp` calls SC::Build::ConfigurePresets::generateAllPlatforms or manually invokes SC::Build::Definition::generate
 - Debugging the build script means just debugging a regular C++ executable
+
+@note Check the [Tools](@ref page_tools) page for more details on `SC.sh build`.
 
 So far the entire build configuration is created in C++ but each invocation with a different set of "build parameters" it's building a data structure that is free of conditionals, as they've been evaluated by the imperative code.
 Such "post-configure" build settings could be serialized to JSON (or using binary [Serialization](@ref library_serialization_binary)) or to any other declarative format if needed.  

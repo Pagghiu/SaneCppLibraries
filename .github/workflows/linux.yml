@@ -21,12 +21,12 @@ jobs:
     - name: install
       run: sudo apt install -y liburing-dev
     - name: configure
-      run: ./SCBuild.sh
+      run: ./SC.sh build configure
     - name: build
-      run: make -j -C _Build/Projects/Make
+      run: ./SC.sh build compile
     - name: test
-      run: _Build/Output/Posix-Any-Any-Makefile-Debug/SCTest
+      run: _Build/_Outputs/linux-gnu-x86_64-Makefile-gcc-11-Debug/SCTest
     # - name: install gdb
     #   run: sudo apt install -y gdb
     # - name: test in gdb
-    #   run: gdb --batch -ex "run" -ex "quit" --args _Build/Output/Posix-Any-Any-Makefile-Debug/SCTest
+    #   run: gdb --batch -ex "run" -ex "quit" --args _Build/_Outputs/Posix-Any-Any-Makefile-Debug/SCTest

@@ -245,7 +245,7 @@ SC::Result SC::ProcessTest::processSnippet3()
     // Here you can do I/O to and from the spawned process
     // ...
     SC_TRY(process.waitForExitSync());
-    // This is equivalent to process.exec({"ls", "-l")
+    // This is equivalent to process.exec({"ls", "-l"})
     //! [ProcessSnippet3]
     return Result(true);
 }

@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "SCTest x64 [win] (vsdbg)",
+            "name": "SCTest x64 [windows]",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/Output/Windows-10.0-x64-msvc2022-Debug/SCTest.exe",
+            "program": "${workspaceFolder}/_Build/_Outputs/Windows-10.0-x64-msbuild-msvc-17-Debug/SCTest.exe",
             "preLaunchTask": "Build SCTest Debug",
             "args": [],
             "cwd": "${workspaceRoot}",
@@ -17,22 +17,10 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "SCTest ARM64 [win] (vsdbg)",
-            "type": "cppvsdbg",
-            "cwd": "${workspaceRoot}",
-            "request": "launch",
-            "program": "${workspaceFolder}/_Build/Output/Windows-10.0-ARM64-msvc2022-Debug/SCTest.exe",
-            "preLaunchTask": "Build SCTest Debug ARM64",
-            "args": [],
-            "stopAtEntry": false,
-            "environment": [],
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "SCTest [posix] (gdb)",
+            "name": "SCTest x64 [apple] (gdb)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/Output/Posix-Any-Any-Makefile-Debug/SCTest",
+            "program": "${workspaceFolder}/_Build/_Outputs/apple-darwin22.6.0-x86_64-Makefile-clang-15-Debug/SCTest",
             "args": [],
             "stopAtEntry": false,
             "environment": [],
@@ -55,10 +43,139 @@
         },
         {
             // Install CodeLLDB extension or similar to use this one
-            "name": "SCTest [posix] (lldb)",
+            "name": "SCTest x64 [apple] (lldb)",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/Output/Posix-Any-Any-Makefile-Debug/SCTest",
+            "program": "${workspaceFolder}/_Build/_Outputs/apple-darwin22.6.0-x86_64-Makefile-clang-15-Debug/SCTest",
+            "args": [],
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Build SCTest Debug",
+            "console": "integratedTerminal",
+            "preRunCommands": [
+                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+            ],
+        },
+        {
+            "name": "SCTest x64 [linux] (gdb)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Outputs/linux-gnu-x86_64-Makefile-gcc-11-Debug/SCTest",
+            "args": [],
+            "stopAtEntry": false,
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Build SCTest Debug",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            // Install CodeLLDB extension or similar to use this one
+            "name": "SCTest x64 [linux] (lldb)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Outputs/linux-gnu-x86_64-Makefile-gcc-11-Debug/SCTest",
+            "args": [],
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Build SCTest Debug",
+            "console": "integratedTerminal",
+            "preRunCommands": [
+                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+            ],
+        },
+        {
+            "name": "SCTest ARM64 [windows]",
+            "type": "cppvsdbg",
+            "cwd": "${workspaceRoot}",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Outputs/Windows-10.0-ARM64-msbuild-msvc-17-Debug/SCTest.exe",
+            "preLaunchTask": "Build SCTest Debug ARM64",
+            "args": [],
+            "stopAtEntry": false,
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "SCTest ARM64 [apple] (gdb)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Outputs/apple-darwin22.6.0-arm64-Makefile-clang-15-Debug/SCTest",
+            "args": [],
+            "stopAtEntry": false,
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Build SCTest Debug",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            // Install CodeLLDB extension or similar to use this one
+            "name": "SCTest ARM64 [apple] (lldb)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Outputs/apple-darwin22.6.0-arm64-Makefile-clang-15-Debug/SCTest",
+            "args": [],
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Build SCTest Debug",
+            "console": "integratedTerminal",
+            "preRunCommands": [
+                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+            ],
+        },
+        {
+            "name": "SCTest ARM64 [linux] (gdb)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Outputs/linux-gnu-aarch64-Makefile-gcc-11-Debug/SCTest",
+            "args": [],
+            "stopAtEntry": false,
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Build SCTest Debug",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            // Install CodeLLDB extension or similar to use this one
+            "name": "SCTest ARM64 [linux] (lldb)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Outputs/linux-gnu-aarch64-Makefile-gcc-11-Debug/SCTest",
             "args": [],
             "cwd": "${workspaceRoot}",
             "preLaunchTask": "Build SCTest Debug",

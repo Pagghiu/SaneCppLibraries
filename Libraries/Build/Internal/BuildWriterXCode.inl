@@ -536,11 +536,18 @@ struct SC::Build::ProjectWriter::WriterXCode
         const Configuration* configuration = project.getConfiguration(xcodeObject.name.view());
         SC_TRY(configuration != nullptr);
         builder.append("\n                       CONFIGURATION_BUILD_DIR = \"");
-        constexpr StringBuilder::ReplacePair generator = {"$(SC_GENERATOR)", "XCode"};
-        builder.appendReplaceMultiple(configuration->outputPath.view(), generator);
+        // TODO: Extract actual proper apple clang version
+        constexpr StringBuilder::ReplacePair replacements[] = {
+            {"$(SC_GENERATOR)", "XCode"},     //
+            {"$(SC_COMPILER)", "clang"},      //
+            {"$(SC_COMPILER_VERSION)", "15"}, //
+        };
+        builder.appendReplaceMultiple(configuration->outputPath.view(),
+                                      {replacements, sizeof(replacements) / sizeof(replacements[0])});
         builder.append("\";");
         builder.append("\n                       SYMROOT = \"");
-        builder.appendReplaceMultiple(configuration->intermediatesPath.view(), generator);
+        builder.appendReplaceMultiple(configuration->intermediatesPath.view(),
+                                      {replacements, sizeof(replacements) / sizeof(replacements[0])});
         builder.append("\";");
         if (configuration->compile.hasValue<Compile::enableRTTI>(true))
         {

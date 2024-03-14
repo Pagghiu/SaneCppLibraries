@@ -82,7 +82,7 @@ struct Generator
     {
         XCode,            ///< Generate projects for XCode (Version 14+)
         VisualStudio2022, ///< Generate projects for Visual Studio 2022
-        Makefile,         ///< Generate posix makefiles
+        Make,             ///< Generate posix makefiles
     };
 
     /// @brief Get StringView from Generator::Type
@@ -92,7 +92,7 @@ struct Generator
         {
         case XCode: return "XCode";
         case VisualStudio2022: return "VisualStudio2022";
-        case Makefile: return "Makefile";
+        case Make: return "Make";
         }
         Assert::unreachable();
     }
@@ -413,7 +413,7 @@ struct Definition
     /// @param projectName Name of the workspace file / directory to generate
     /// @param parameters Set of parameters with the wanted platforms, architectures and generators to generate
     /// @param rootPath The path where workspace will be generated
-    Result generate(StringView projectName, const Parameters& parameters, StringView rootPath) const;
+    Result configure(StringView projectName, const Parameters& parameters, StringView rootPath) const;
 };
 
 /// @brief Caches file paths by pre-resolving directory filter search masks
@@ -438,50 +438,21 @@ struct DefinitionCompiler
 // Implementations Details
 //-----------------------------------------------------------------------------------------------------------------------
 
-struct ConfigurePresets
+struct Actions
 {
-    template <typename ConfigureFunction>
-    static Result generateAllPlatforms(ConfigureFunction configure, StringView projectName,
-                                       Build::Generator::Type generator, StringView targetDirectory,
-                                       StringView sourcesDirectory)
+    enum Type
     {
-        using namespace SC;
-        switch (generator)
-        {
-        case Build::Generator::VisualStudio2022: {
-            Build::Parameters parameters;
-            parameters.generator     = Build::Generator::VisualStudio2022;
-            parameters.platforms     = {Build::Platform::Windows};
-            parameters.architectures = {Build::Architecture::Arm64, Build::Architecture::Intel64};
-            Build::Definition definition;
-            SC_TRY(configure(definition, parameters, sourcesDirectory));
-            SC_TRY(definition.generate(projectName, parameters, targetDirectory));
-        }
-        break;
-        case Build::Generator::XCode: {
-            Build::Parameters parameters;
-            parameters.generator     = Build::Generator::XCode;
-            parameters.platforms     = {Build::Platform::MacOS};
-            parameters.architectures = {Build::Architecture::Arm64, Build::Architecture::Intel64};
-            Build::Definition definition;
-            SC_TRY(configure(definition, parameters, sourcesDirectory));
-            SC_TRY(definition.generate(projectName, parameters, targetDirectory));
-        }
-        break;
+        Configure,
+        Compile
+    };
+    using ConfigureFunction = Result (*)(Build::Definition& definition, Build::Parameters& parameters,
+                                         StringView rootDirectory);
 
-        case Build::Generator::Makefile: {
-            Build::Parameters parameters;
-            parameters.generator     = Build::Generator::Makefile;
-            parameters.platforms     = {Build::Platform::MacOS, Build::Platform::Linux};
-            parameters.architectures = {Build::Architecture::Arm64, Build::Architecture::Intel64};
-            Build::Definition definition;
-            SC_TRY(configure(definition, parameters, sourcesDirectory));
-            SC_TRY(definition.generate(projectName, parameters, targetDirectory));
-        }
-        break;
-        }
-        return Result(true);
-    }
+    static Result execute(Type action, ConfigureFunction configure, StringView projectName,
+                          Build::Generator::Type generator, StringView targetDirectory, StringView sourcesDirectory);
+
+  private:
+    struct Internal;
 };
 
 } // namespace Build

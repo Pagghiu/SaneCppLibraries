@@ -1,6 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Build.h"
+
+#include "../Process/Process.h" // for Actions::compile
 namespace SC
 {
 namespace Build
@@ -109,21 +111,14 @@ SC::Result SC::Build::Workspace::validate() const
     return Result(true);
 }
 
-SC::Result SC::Build::Definition::generate(StringView projectFileName, const Build::Parameters& parameters,
-                                           StringView rootPath) const
+SC::Result SC::Build::Definition::configure(StringView projectFileName, const Build::Parameters& parameters,
+                                            StringView rootPath) const
 {
     Build::DefinitionCompiler definitionCompiler(*this);
     SC_TRY(definitionCompiler.validate());
     SC_TRY(definitionCompiler.build());
     Build::ProjectWriter writer(*this, definitionCompiler, parameters);
-    StringView           directory;
-    switch (parameters.generator)
-    {
-    case Build::Generator::XCode: directory = "XCode"; break;
-    case Build::Generator::VisualStudio2022: directory = "VisualStudio2022"; break;
-    case Build::Generator::Makefile: directory = "Make"; break;
-    }
-    return Result(writer.write(rootPath, projectFileName, directory));
+    return Result(writer.write(rootPath, projectFileName, Generator::toString(parameters.generator)));
 }
 
 SC::Result SC::Build::DefinitionCompiler::validate()
@@ -359,7 +354,7 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
         }
         break;
     }
-    case Generator::Makefile: {
+    case Generator::Make: {
         String buffer1;
         SC_TRY(prjName.assign("Makefile"));
         WriterMakefile           writer(definition, definitionCompiler);
@@ -371,5 +366,108 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
         break;
     }
     }
+    return Result(true);
+}
+
+struct SC::Build::Actions::Internal
+{
+    static Build::Parameters fillDefaultParameters(Generator::Type generator);
+
+    static Result configure(ConfigureFunction configure, StringView projectFileName, Generator::Type generator,
+                            StringView targetDirectory, StringView sourcesDirectory);
+    static Result compile(ConfigureFunction configure, StringView projectFileName, Generator::Type generator,
+                          StringView targetDirectory, StringView sourcesDirectory);
+};
+
+SC::Result SC::Build::Actions::execute(Type action, ConfigureFunction configure, StringView projectFileName,
+                                       Generator::Type generator, StringView targetDirectory,
+                                       StringView sourcesDirectory)
+{
+    switch (action)
+    {
+    case Compile: return Internal::compile(configure, projectFileName, generator, targetDirectory, sourcesDirectory);
+    case Configure:
+        return Internal::configure(configure, projectFileName, generator, targetDirectory, sourcesDirectory);
+    }
+    return Result::Error("Action::execute - unsupported action");
+}
+
+SC::Build::Parameters SC::Build::Actions::Internal::fillDefaultParameters(Generator::Type generator)
+{
+    switch (generator)
+    {
+    case Generator::VisualStudio2022: {
+        Build::Parameters parameters;
+        parameters.generator     = Generator::VisualStudio2022;
+        parameters.platforms     = {Platform::Windows};
+        parameters.architectures = {Architecture::Arm64, Architecture::Intel64};
+        return parameters;
+    }
+    break;
+    case Generator::XCode: {
+        Build::Parameters parameters;
+        parameters.generator     = Generator::XCode;
+        parameters.platforms     = {Platform::MacOS};
+        parameters.architectures = {Architecture::Arm64, Architecture::Intel64};
+        return parameters;
+    }
+    break;
+
+    case Generator::Make: {
+        Build::Parameters parameters;
+        parameters.generator     = Generator::Make;
+        parameters.platforms     = {Platform::MacOS, Build::Platform::Linux};
+        parameters.architectures = {Architecture::Arm64, Architecture::Intel64};
+        return parameters;
+    }
+    break;
+    }
+    SC_ASSERT_RELEASE(false);
+}
+
+SC::Result SC::Build::Actions::Internal::configure(ConfigureFunction configure, StringView projectFileName,
+                                                   Generator::Type generator, StringView targetDirectory,
+                                                   StringView sourcesDirectory)
+{
+    Build::Parameters parameters = fillDefaultParameters(generator);
+    Build::Definition definition;
+    SC_TRY(configure(definition, parameters, sourcesDirectory));
+    SC_TRY(definition.configure(projectFileName, parameters, targetDirectory));
+    return Result(true);
+}
+
+SC::Result SC::Build::Actions::Internal::compile(ConfigureFunction configure, StringView projectFileName,
+                                                 Build::Generator::Type generator, StringView targetDirectory,
+                                                 StringView sourcesDirectory)
+{
+    SC_COMPILER_UNUSED(configure);
+    SC_COMPILER_UNUSED(sourcesDirectory);
+
+    Build::Parameters parameters = fillDefaultParameters(generator);
+    SmallString<256>  solutionLocation;
+
+    Process process;
+    switch (generator)
+    {
+    case Generator::XCode: {
+        SC_TRY(Path::join(solutionLocation, {targetDirectory, Generator::toString(generator), projectFileName}));
+        SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(".xcodeproj"));
+        SC_TRY(process.exec(
+            {"xcodebuild", "-configuration", "Debug", "-project", solutionLocation.view(), "ONLY_ACTIVE_ARCH=NO"}));
+    }
+    break;
+    case Generator::VisualStudio2022: {
+        SC_TRY(Path::join(solutionLocation, {targetDirectory, Generator::toString(generator), projectFileName}));
+        SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(".sln"));
+        SC_TRY(process.exec({"msbuild", solutionLocation.view(), "/p:Configuration=Debug", "/p:Platform=x64"}));
+    }
+    break;
+    case Generator::Make: {
+        SC_TRY(Path::join(solutionLocation, {targetDirectory, Generator::toString(generator)}));
+        SC_TRY(process.exec({"make", "-j", "-C", solutionLocation.view(), "CONFIG=Debug"}));
+    }
+    break;
+    }
+
     return Result(true);
 }

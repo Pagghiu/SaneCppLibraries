@@ -36,8 +36,46 @@ endif
 
 .PHONY: clean all
 
+# Splitting the TARGET string
+TARGET := $(shell $(CXX) -v -E - </dev/null 2>&1 | sed -n 's/Target: \([^ ]*\)/\1/p')
+
+# Splitting the TARGET string
+TARGET_ARCHITECTURE := $(word 1,$(subst -, ,$(TARGET)))
+TARGET_OS_AND_VERSION := $(wordlist 2, $(words $(subst -, ,$(TARGET))), $(subst -, ,$(TARGET)))
+TARGET_OS := $(strip $(word 1, $(TARGET_OS_AND_VERSION)))
+TARGET_OS_VERSION := $(strip $(subst $(TARGET_OS),, $(TARGET_OS_AND_VERSION)))
+
 CLANG_DETECTED := $(shell $(CXX) --version 2>&1 | grep -q clang && echo "yes")
-OS_TYPE := $(shell uname)
+
+ifeq ($(CLANG_DETECTED),yes)
+COMPILER_TYPE := clang
+else
+COMPILER_TYPE := gcc
+endif
+
+# Detecting Clang Compiler Type and Version
+CLANG_VERSION := $(shell $(CXX) --version | sed -n 's/clang version \([0-9]*\)\..*/\1/p')
+CLANG_MAJOR_VERSION := $(word 2, $(CLANG_VERSION))
+
+# Detecting GCC Compiler Type and Version
+GCC_VERSION := $(shell $(CXX) -dumpversion)
+GCC_MAJOR_VERSION := $(firstword $(GCC_VERSION))
+
+# Setting Compiler Type and Version based on detection
+ifeq ($(CLANG_MAJOR_VERSION),)
+COMPILER_TYPE := gcc
+COMPILER_VERSION := $(GCC_MAJOR_VERSION)
+else
+COMPILER_TYPE := clang
+COMPILER_VERSION := $(CLANG_MAJOR_VERSION)
+endif
+
+# You can print the values to verify the result
+# $(info COMPILER_TYPE=$(COMPILER_TYPE))
+# $(info COMPILER_VERSION=$(COMPILER_VERSION))
+
+FOLDER_NAME := $(TARGET_OS)-$(TARGET_ARCHITECTURE)-$(COMPILER_TYPE)$(COMPILER_VERSION)-$(CONFIG)
+
 )delimiter");
 
         builder.append("\nall:");
@@ -194,9 +232,9 @@ Makefile.$(CONFIG).touched: Makefile
         }
         builder.append("\nendif\n");
 
-        builder.append("\nifeq ($(OS_TYPE),Darwin)\n");
+        builder.append("\nifeq ($(TARGET_OS),apple)\n");
         builder.append("     {0}_OS_LDFLAGS := $({0}_FRAMEWORKS)\n", makeTarget.view());
-        builder.append("else ifeq ($(OS_TYPE),Linux)\n");
+        builder.append("else ifeq ($(TARGET_OS),linux)\n");
         // -rdynamic is needed to resolve Plugin symbols in the executable
         builder.append("     {0}_OS_LDFLAGS := -rdynamic\n", makeTarget.view());
         builder.append("else\n");
@@ -376,10 +414,15 @@ $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
     [[nodiscard]] static bool appendVariable(StringBuilder& builder, StringView text, StringView makeTarget)
     {
         const StringBuilder::ReplacePair replacements[] = {
-            {"$(PROJECT_DIR)", "$(CURDIR)"},       {"$(CONFIGURATION)", "$(CONFIG)"},
-            {"$(PROJECT_NAME)", makeTarget},       {"$(ARCHS)", "Any"},
-            {"$(PLATFORM_DISPLAY_NAME)", "Posix"}, {"$(MACOSX_DEPLOYMENT_TARGET)", "Any"},
-            {"$(SC_GENERATOR)", "Makefile"},
+            {"$(PROJECT_DIR)", "$(CURDIR)"},                         //
+            {"$(CONFIGURATION)", "$(CONFIG)"},                       //
+            {"$(PROJECT_NAME)", makeTarget},                         //
+            {"$(ARCHS)", "$(TARGET_ARCHITECTURE)"},                  //
+            {"$(PLATFORM_DISPLAY_NAME)", "$(TARGET_OS)"},            //
+            {"$(MACOSX_DEPLOYMENT_TARGET)", "$(TARGET_OS_VERSION)"}, //
+            {"$(SC_GENERATOR)", "Makefile"},                         //
+            {"$(SC_COMPILER)", "$(COMPILER_TYPE)"},                  //
+            {"$(SC_COMPILER_VERSION)", "$(COMPILER_VERSION)"},       //
         };
         return builder.appendReplaceMultiple(text, {replacements, sizeof(replacements) / sizeof(replacements[0])});
     }

@@ -6,11 +6,12 @@
 
 namespace SC
 {
-namespace SCBuild
+namespace Build
 {
-// Defined in SCBuild.cpp
-Result generate(Build::Generator::Type generator, StringView targetDirectory, StringView sourcesDirectory);
-} // namespace SCBuild
+// Defined in SC-build.cpp
+Result executeAction(Build::Actions::Type action, Build::Generator::Type generator, StringView targetDirectory,
+                     StringView sourcesDirectory);
+} // namespace Build
 } // namespace SC
 
 namespace SC
@@ -30,17 +31,18 @@ struct SC::BuildTest : public SC::TestCase
 
         if (test_section("Visual Studio 2022"))
         {
-            SC_TEST_EXPECT(
-                SCBuild::generate(Build::Generator::VisualStudio2022, targetDirectory.view(), sourcesDirectory.view()));
+            SC_TEST_EXPECT(Build::executeAction(Build::Actions::Configure, Build::Generator::VisualStudio2022,
+                                                targetDirectory.view(), sourcesDirectory.view()));
         }
         if (test_section("XCode"))
         {
-            SC_TEST_EXPECT(SCBuild::generate(Build::Generator::XCode, targetDirectory.view(), sourcesDirectory.view()));
+            SC_TEST_EXPECT(Build::executeAction(Build::Actions::Configure, Build::Generator::XCode,
+                                                targetDirectory.view(), sourcesDirectory.view()));
         }
         if (test_section("Makefile"))
         {
-            SC_TEST_EXPECT(
-                SCBuild::generate(Build::Generator::Makefile, targetDirectory.view(), sourcesDirectory.view()));
+            SC_TEST_EXPECT(Build::executeAction(Build::Actions::Configure, Build::Generator::Make,
+                                                targetDirectory.view(), sourcesDirectory.view()));
         }
     }
 };

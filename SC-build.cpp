@@ -1,13 +1,13 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Libraries/Build/Build.h"
+#include "Tools/SC-build.h"
 #include "Libraries/Strings/StringBuilder.h"
 
 namespace SC
 {
-namespace SCBuild
+namespace Build
 {
-static constexpr SC::StringView PROJECT_NAME = "SCTest";
+static constexpr StringView PROJECT_NAME = "SCTest";
 
 Result configure(Build::Definition& definition, Build::Parameters& parameters, StringView rootDirectory)
 {
@@ -47,15 +47,15 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
     for (Configuration& config : project.configurations)
     {
         constexpr auto buildBase = "$(PROJECT_DIR)/../..";
-        constexpr auto buildDir =
-            "$(PLATFORM_DISPLAY_NAME)-$(MACOSX_DEPLOYMENT_TARGET)-$(ARCHS)-$(SC_GENERATOR)-$(CONFIGURATION)";
-        StringBuilder(config.outputPath).format("{}/Output/{}", buildBase, buildDir);
-        StringBuilder(config.intermediatesPath).format("{}/Intermediate/$(PROJECT_NAME)/{}", buildBase, buildDir);
+        constexpr auto buildDir  = "$(PLATFORM_DISPLAY_NAME)-$(MACOSX_DEPLOYMENT_TARGET)-$(ARCHS)-"
+                                   "$(SC_GENERATOR)-$(SC_COMPILER)-$(SC_COMPILER_VERSION)-$(CONFIGURATION)";
+        StringBuilder(config.outputPath).format("{}/_Outputs/{}", buildBase, buildDir);
+        StringBuilder(config.intermediatesPath).format("{}/_Intermediates/$(PROJECT_NAME)/{}", buildBase, buildDir);
         config.compile.set<Compile::enableASAN>(config.preset == Configuration::Preset::Debug);
     }
 
     // File overrides (order matters regarding to add / remove)
-    project.addFile("SCBuild.cpp");                            // add single build files
+    project.addFile("SC-build.cpp");                           // add single tool
     project.addDirectory("Tests/SCTest", "*.cpp");             // add all .cpp from SCTest directory
     project.addDirectory("Tests/SCTest", "*.h");               // add all .h from SCTest directory
     project.addDirectory("Libraries", "**.cpp");               // recursively add all cpp files
@@ -64,6 +64,7 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
     project.addDirectory("LibrariesExtra", "**.h");            // recursively add all header files
     project.addDirectory("LibrariesExtra", "**.cpp");          // recursively add all header files
     project.addDirectory("Support/DebugVisualizers", "*.cpp"); // add debug visualizers
+    project.addDirectory("Tools", "*.h");                      // add bootstrap headers
     if (parameters.generator == Build::Generator::VisualStudio2022)
     {
         project.addDirectory("Support/DebugVisualizers/MSVC", "*.natvis");
@@ -80,10 +81,10 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
     return Result(true);
 }
 
-Result generate(Build::Generator::Type generator, StringView targetDirectory, StringView sourcesDirectory)
+Result executeAction(Build::Actions::Type action, Build::Generator::Type generator, StringView targetDirectory,
+                     StringView sourcesDirectory)
 {
-    return Build::ConfigurePresets::generateAllPlatforms(configure, PROJECT_NAME, generator, targetDirectory,
-                                                         sourcesDirectory);
+    return Build::Actions::execute(action, configure, PROJECT_NAME, generator, targetDirectory, sourcesDirectory);
 }
-} // namespace SCBuild
+} // namespace Build
 } // namespace SC

@@ -17,9 +17,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: configure
-      run: ./SCBuild.sh
-    - name: build
-      run: make -j -C _Build/Projects/Make
+      run: ./SC.sh build configure
+    - name: compile
+      run: ./SC.sh build compile
     - name: test
-      run: _Build/Output/Posix-Any-Any-Makefile-Debug/SCTest
-      # run: lldb -o "run" -o "quit" -- _Build/Output/Posix-Any-Any-Makefile-Debug/SCTest
+      run: _Build/_Outputs/macOS-13.0-arm64\ x86_64-XCode-clang-15-Debug/SCTest
+      # run: lldb -o "run" -o "quit" -- _Build/_Outputs/macOS-13.0-arm64\ x86_64-XCode-clang-15-Debug/SCTest

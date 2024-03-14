@@ -15,9 +15,9 @@ jobs:
     - uses: actions/checkout@v4
     - name: configure
       shell: cmd
-      run: SCBuild.bat configure
-    - name: build
+      run: SC.bat build configure
+    - name: compile
       shell: cmd
-      run: SCBuild.bat build
+      run: SC.bat build compile
     - name: test
-      run: ./_Build/Output/Windows-10.0-x64-msvc2022-Debug/SCTest.exe
+      run: ./_Build/_Outputs/Windows-10.0-x64-msbuild-msvc-17-Debug/SCTest.exe
