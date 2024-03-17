@@ -90,6 +90,10 @@ SC::Result SC::Process::waitForExitSync()
     {
         waitPid = ::waitpid(processID.pid, &status, 0);
     } while (waitPid == -1 and errno == EINTR);
+    if (waitPid == -1)
+    {
+        return Result::Error("Process::waitForExitSync - waitPid failed");
+    }
     if (WIFEXITED(status) != 0)
     {
         exitStatus.status = WEXITSTATUS(status);

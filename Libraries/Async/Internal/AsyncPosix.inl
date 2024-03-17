@@ -367,7 +367,12 @@ struct SC::AsyncEventLoop::KernelQueuePosix
         continueProcessing = (event.flags & EV_DELETE) == 0;
         if ((event.flags & EV_ERROR) != 0)
         {
-            return Result::Error("Error in processing event (kqueue EV_ERROR)");
+            const AsyncRequest* request = getAsyncRequest(idx);
+            // Processes that exit too fast error out with ESRCH errno, but we do not consider it an error...
+            if (request->type != AsyncRequest::Type::ProcessExit or event.data != ESRCH)
+            {
+                return Result::Error("Error in processing event (kqueue EV_ERROR)");
+            }
         }
         return Result(true);
     }
@@ -711,6 +716,26 @@ struct SC::AsyncEventLoop::KernelQueuePosix
     //-------------------------------------------------------------------------------------------------------
     // Process EXIT
     //-------------------------------------------------------------------------------------------------------
+    // Used by kevent backend when Process exits too fast (generatig EV_ERROR / ESRCH) and by the io-uring backend
+    [[nodiscard]] static Result completeProcessExitWaitPid(AsyncProcessExit::Result& result)
+    {
+        int   status = -1;
+        pid_t waitPid;
+        do
+        {
+            waitPid = ::waitpid(result.getAsync().handle, &status, 0);
+        } while (waitPid == -1 and errno == EINTR);
+        if (waitPid == -1)
+        {
+            return Result::Error("waitPid");
+        }
+        if (WIFEXITED(status) != 0)
+        {
+            result.completionData.exitStatus.status = WEXITSTATUS(status);
+        }
+        return Result(true);
+    }
+
 #if SC_ASYNC_USE_EPOLL
     // On epoll AsyncProcessExit is handled inside InternalPosix (using a signalfd).
 #else
@@ -729,7 +754,13 @@ struct SC::AsyncEventLoop::KernelQueuePosix
     {
         SC_TRY_MSG(result.getAsync().eventIndex >= 0, "Invalid event Index");
         const struct kevent event = events[result.getAsync().eventIndex];
-        if ((event.fflags & (NOTE_EXIT | NOTE_EXITSTATUS)) > 0)
+        // If process exits too early it can happen that we get EV_ERROR with ESRCH
+        if ((event.flags & EV_ERROR) != 0 and (event.data == ESRCH))
+        {
+            // In this case we should just do a waitpid
+            return completeProcessExitWaitPid(result);
+        }
+        else if ((event.fflags & (NOTE_EXIT | NOTE_EXITSTATUS)) > 0)
         {
             const uint32_t data = static_cast<uint32_t>(event.data);
             if (WIFEXITED(data) != 0)

@@ -537,21 +537,7 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
 
     [[nodiscard]] Result completeAsync(AsyncProcessExit::Result& result)
     {
-        int   status = -1;
-        pid_t waitPid;
-        do
-        {
-            waitPid = ::waitpid(result.getAsync().handle, &status, 0);
-        } while (waitPid == -1 and errno == EINTR);
-        if (waitPid == -1)
-        {
-            return Result::Error("waitPid");
-        }
-        if (WIFEXITED(status) != 0)
-        {
-            result.completionData.exitStatus.status = WEXITSTATUS(status);
-        }
-        return Result(true);
+        return KernelQueuePosix::completeProcessExitWaitPid(result);
     }
 
     [[nodiscard]] Result teardownAsync(AsyncProcessExit& async) { return async.pidFd.close(); }
