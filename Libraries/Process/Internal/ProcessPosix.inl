@@ -17,6 +17,12 @@ SC::Result SC::detail::ProcessDescriptorDefinition::releaseHandle(pid_t& handle)
     return Result(true);
 }
 
+SC::size_t SC::Process::getNumberOfProcessors()
+{
+    const long numProc = sysconf(_SC_NPROCESSORS_ONLN);
+    return static_cast<size_t>(numProc);
+}
+
 struct SC::Process::Internal
 {
     static FileDescriptor::Handle getStandardInputFDS() { return fileno(stdin); };

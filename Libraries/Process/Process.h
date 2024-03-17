@@ -195,6 +195,9 @@ struct SC::Process
     /// @brief gets the return code from the exited child process (valid only after exec or waitForExitSync)
     int32_t getExitStatus() const { return exitStatus.status; }
 
+    /// @brief Returns number of (virtual) processors available
+    static size_t getNumberOfProcessors();
+
   private:
     ProcessDescriptor::ExitStatus exitStatus; ///< Exit status code returned after process is finished
 

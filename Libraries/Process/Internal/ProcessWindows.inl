@@ -16,6 +16,14 @@ SC::Result SC::detail::ProcessDescriptorDefinition::releaseHandle(HANDLE& handle
     return Result(true);
 }
 
+SC::size_t SC::Process::getNumberOfProcessors()
+{
+    SYSTEM_INFO systemInfo;
+    ::GetSystemInfo(&systemInfo);
+    DWORD numProc = systemInfo.dwNumberOfProcessors;
+    return static_cast<size_t>(numProc);
+}
+
 struct SC::Process::Internal
 {
     // TODO: this could be migrated to SystemDebug
