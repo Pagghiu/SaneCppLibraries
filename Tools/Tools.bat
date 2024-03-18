@@ -52,6 +52,7 @@ cl.exe /nologo /std:c++14 /permissive- /EHsc /Fe"SC-%TOOL%.exe" "%LIBRARY_DIR%/T
 :SkipCompiling
 
 IF %ERRORLEVEL% == 0 (
+echo Running SC-%TOOL%.cpp...
 call "SC-%TOOL%.exe" %*
 ) 
 endlocal

@@ -18,7 +18,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: clang-format
-      run: find . \( -iname \*.h -o -iname \*.cpp -o -iname \*.mm -o -iname \*.m -o -iname \*.inl \) | xargs clang-format-15 --dry-run -Werror
+      run: ./SC.sh format check
     - name: install
       run: sudo apt install -y liburing-dev
     - name: configure

@@ -27,35 +27,29 @@ static Result formatSourceFiles(FormatSources action, StringView clangFormatExec
     // or
     // | xargs "${clangFormatExecutable}" --dry-run -Werror
 
-    // Create Process::getNumberOfProcessors() processes but never more than 32
-    AsyncProcessExit processExits[32];
+    AsyncProcessExit processExits[32]; // Never launch more than 32 processes
     ProcessLimiter   processLimiter;
     SC_TRY(processLimiter.create(Process::getNumberOfProcessors(), {processExits}));
 
-    Span<StringView> clangFormatArguments;
-    StringView       commandArgument[4];
-    commandArgument[0] = clangFormatExecutable;
-    switch (action)
+    struct LambdaVariables
     {
-    case FormatSources::Execute:
-        commandArgument[2]   = "-i";
-        clangFormatArguments = {commandArgument, 3};
-        break;
-    case FormatSources::Check:
-        commandArgument[2]   = "--dry-run";
-        commandArgument[3]   = "-Werror";
-        clangFormatArguments = {commandArgument, 4};
-        break;
-    default: return Result::Error("Invalid action");
-    }
+        ProcessLimiter& processLimiter;
+        FormatSources   action;
+        StringView      clangFormatExecutable;
+    } lambda = {processLimiter, action, clangFormatExecutable};
 
-    auto clangFormatFile = [&](const StringView path)
+    auto formatSourceFile = [&lambda](const StringView path)
     {
-        clangFormatArguments[1] = path;
-        return processLimiter.launch(clangFormatArguments);
+        switch (lambda.action)
+        {
+        case FormatSources::Execute: // Executes actual formatting
+            return lambda.processLimiter.launch({lambda.clangFormatExecutable, path, "-i"});
+        case FormatSources::Check: // Just checks if files are formatted
+            return lambda.processLimiter.launch({lambda.clangFormatExecutable, path, "-dry-run", "-Werror"});
+        }
+        Assert::unreachable();
     };
-    SC_TRY(FileSystemFinder::forEachFile(libraryDirectory, {".h", ".cpp", ".inl"}, {"_Build"}, clangFormatFile));
-
+    SC_TRY(FileSystemFinder::forEachFile(libraryDirectory, {".h", ".cpp", ".inl"}, {"_Build"}, formatSourceFile));
     return processLimiter.close();
 }
 } // namespace Tools

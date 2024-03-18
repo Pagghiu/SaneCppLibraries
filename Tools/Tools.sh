@@ -27,5 +27,5 @@ if [ $? -ne 0 ]; then
 fi
 
 fi
-
+echo "Running SC-${TOOL}.cpp..."
 "${TOOL_COMMAND_LINE}" $*

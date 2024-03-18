@@ -159,17 +159,24 @@ namespace Tools
 
 [[nodiscard]] inline Result findSystemClangFormat(StringView expectedVersion, String& foundPath)
 {
+    StringView clangFormatExecutable;
     // Find the version
     {
         SmallString<255> versionBuffer;
-        if (not Process().exec({"clang-format-15", "--version"}, versionBuffer))
+        if (Process().exec({"clang-format-15", "--version"}, versionBuffer))
+        {
+            clangFormatExecutable = "clang-format-15";
+        }
+        else
         {
             SC_TRY(Process().exec({"clang-format", "--version"}, versionBuffer));
+            clangFormatExecutable = "clang-format";
         }
         StringViewTokenizer tokenizer(versionBuffer.view());
-        SC_TRY(tokenizer.tokenizeNext({' '}));
-        SC_TRY(tokenizer.tokenizeNext({' '}));
-        SC_TRY(tokenizer.tokenizeNext({' '}));
+        SC_TRY(tokenizer.tokenizeNext({'-'})); // component = "clang-"
+        SC_TRY(tokenizer.tokenizeNext({' '})); // component = "format"
+        SC_TRY(tokenizer.tokenizeNext({' '})); // component = "version"
+        SC_TRY(tokenizer.tokenizeNext({' '})); // component = "15.0.7\n"
         StringView version = tokenizer.component.trimAnyOf({'\n', '\r'});
         SC_TRY_MSG(version.startsWith(expectedVersion), "clang-format was not at required version");
     }
@@ -179,7 +186,7 @@ namespace Tools
     {
     case Platform::Windows: // Windows
     {
-        SC_TRY(Process().exec({"where", "clang-format"}, foundPath));
+        SC_TRY(Process().exec({"where", clangFormatExecutable}, foundPath));
         StringViewTokenizer tokenizer(foundPath.view());
         SC_TRY(tokenizer.tokenizeNext({'\n'}));
         SC_TRY(foundPath.assign(tokenizer.component));
@@ -187,7 +194,7 @@ namespace Tools
     break;
     default: // Posix
     {
-        SC_TRY(Process().exec({"which", "clang-format"}, foundPath));
+        SC_TRY(Process().exec({"which", clangFormatExecutable}, foundPath));
     }
     break;
     }

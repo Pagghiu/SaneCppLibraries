@@ -49,13 +49,16 @@ struct FileSystemFinder
 /// TODO: Maybe with some love this could be generalized and be added to some library
 struct ProcessLimiter
 {
-    /// @brief Create the process limiter with maximum number of processes to allow
-    [[nodiscard]] Result create(size_t maxNumProcesses, Span<AsyncProcessExit> processExitPool)
+    /// @brief Create the process limiter with an hint of maximum number of processes to allow
+    [[nodiscard]] Result create(size_t maxProcessesHint, Span<AsyncProcessExit> processExitPool)
     {
         processResult = Result(true);
-        SC_TRY_MSG(maxNumProcesses <= processExitPool.sizeInElements(), "numProcess <= processPool.sizeInElements()");
+        if (processExitPool.sizeInElements() < maxProcessesHint)
+        {
+            maxProcessesHint = processExitPool.sizeInElements();
+        }
         processMonitors = processExitPool;
-        for (size_t idx = 0; idx < maxNumProcesses; ++idx)
+        for (size_t idx = 0; idx < maxProcessesHint; ++idx)
         {
             availableProcessMonitors.queueBack(processMonitors[idx]);
         }
@@ -85,12 +88,10 @@ struct ProcessLimiter
         }
         AsyncProcessExit& processExit = *availableProcessMonitors.dequeueFront();
 
-        // launch without waiting
         Process process;
         SC_TRY(process.launch(arguments));
         // Launch does not wait for the child process to finish so we can monitor it with the event loop
-        ProcessID pid        = process.processID;
-        processExit.callback = [this, pid](AsyncProcessExit::Result& result)
+        processExit.callback = [this](AsyncProcessExit::Result& result)
         {
             ProcessDescriptor::ExitStatus exitStatus;
             processResult = result.get(exitStatus);
