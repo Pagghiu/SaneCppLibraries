@@ -25,6 +25,8 @@ var NAVTREEINDEX2 =
 "page_tools.html#autotoc_md272":[12,2,2],
 "page_tools.html#autotoc_md273":[12,2,2,0],
 "page_tools.html#autotoc_md274":[12,2,2,1],
+"page_tools.html#autotoc_md275":[12,3],
+"page_tools.html#autotoc_md276":[12,4],
 "pages.html":[],
 "struct_s_c_1_1_algorithms_1_1smaller_than.html":[14,0,0],
 "struct_s_c_1_1_algorithms_1_1smaller_than.html#a4e65939d1f9360d690c988a2dcfc0e0e":[14,0,0,0],
@@ -194,8 +196,8 @@ var NAVTREEINDEX2 =
 "struct_s_c_1_1_async_task_of.html":[14,1,5],
 "struct_s_c_1_1_atomic.html":[15,0,0,29],
 "struct_s_c_1_1_atomic.html":[16,0,0,29],
-"struct_s_c_1_1_build_1_1_actions.html":[16,0,0,1,0],
 "struct_s_c_1_1_build_1_1_actions.html":[15,0,0,1,0],
+"struct_s_c_1_1_build_1_1_actions.html":[16,0,0,1,0],
 "struct_s_c_1_1_build_1_1_architecture.html":[14,2,1],
 "struct_s_c_1_1_build_1_1_compile.html":[14,2,4],
 "struct_s_c_1_1_build_1_1_compile.html#a37489d01615151bffa6d3ac1419ff9e8":[14,2,4,1],
@@ -247,7 +249,5 @@ var NAVTREEINDEX2 =
 "struct_s_c_1_1_build_1_1_optimization.html":[14,2,3],
 "struct_s_c_1_1_build_1_1_optimization.html#a35a5d8b5bb55e2ac0e6322fc9efaf270":[14,2,3,0],
 "struct_s_c_1_1_build_1_1_optimization.html#a35a5d8b5bb55e2ac0e6322fc9efaf270ac1bd440dfff807606523cc045d22d41f":[14,2,3,0,0],
-"struct_s_c_1_1_build_1_1_optimization.html#a35a5d8b5bb55e2ac0e6322fc9efaf270ae15bf901d1442e804cd4b40944764f0c":[14,2,3,0,1],
-"struct_s_c_1_1_build_1_1_parameters.html":[14,2,12],
-"struct_s_c_1_1_build_1_1_parameters.html#a1a7571ae95179850eadca31faef568fe":[14,2,12,0]
+"struct_s_c_1_1_build_1_1_optimization.html#a35a5d8b5bb55e2ac0e6322fc9efaf270ae15bf901d1442e804cd4b40944764f0c":[14,2,3,0,1]
 };

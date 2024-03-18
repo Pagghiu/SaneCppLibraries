@@ -23,11 +23,12 @@ var searchData=
   ['getnullterminatednative_20',['getNullTerminatedNative',['../struct_s_c_1_1_string_view.html#aa3caf700c4c56139c7f324bc017460e2',1,'SC::StringView']]],
   ['getnumallocated_21',['getNumAllocated',['../struct_s_c_1_1_arena_map.html#ab7515de5d97739abb0ede5da835845d4',1,'SC::ArenaMap']]],
   ['getnumberofchildren_22',['getNumberOfChildren',['../struct_s_c_1_1_reflection_1_1_type_info.html#ae48018fc5fe0c950fbdb9184a4078fa4',1,'SC::Reflection::TypeInfo']]],
-  ['getorcreate_23',['getOrCreate',['../struct_s_c_1_1_vector_map.html#acb54c4567a8012a7b27600d14de62f7a',1,'SC::VectorMap']]],
-  ['getresponse_24',['getResponse',['../struct_s_c_1_1_http_client.html#acc679eae04cef4b15b49aa11dcd8a50f',1,'SC::HttpClient']]],
-  ['gettestreturncode_25',['getTestReturnCode',['../struct_s_c_1_1_test_report.html#a50c4cd350169ca78d685eb693937c7c5',1,'SC::TestReport']]],
-  ['gettimeout_26',['getTimeout',['../struct_s_c_1_1_async_loop_timeout.html#aaf6a2cdc60d4e0955af952c9ebf68622',1,'SC::AsyncLoopTimeout']]],
-  ['gettype_27',['getType',['../struct_s_c_1_1_tagged_union.html#a47a709259133aa47ccfa238d8b65298c',1,'SC::TaggedUnion']]],
-  ['group_5fsystem_28',['Group_system',['../group__group__system.html',1,'']]],
-  ['group_5ftime_29',['Group_time',['../group__group__time.html',1,'']]]
+  ['getnumberofprocessors_23',['getNumberOfProcessors',['../struct_s_c_1_1_process.html#aba97da7f2b1e48a415110a01136ff69d',1,'SC::Process']]],
+  ['getorcreate_24',['getOrCreate',['../struct_s_c_1_1_vector_map.html#acb54c4567a8012a7b27600d14de62f7a',1,'SC::VectorMap']]],
+  ['getresponse_25',['getResponse',['../struct_s_c_1_1_http_client.html#acc679eae04cef4b15b49aa11dcd8a50f',1,'SC::HttpClient']]],
+  ['gettestreturncode_26',['getTestReturnCode',['../struct_s_c_1_1_test_report.html#a50c4cd350169ca78d685eb693937c7c5',1,'SC::TestReport']]],
+  ['gettimeout_27',['getTimeout',['../struct_s_c_1_1_async_loop_timeout.html#aaf6a2cdc60d4e0955af952c9ebf68622',1,'SC::AsyncLoopTimeout']]],
+  ['gettype_28',['getType',['../struct_s_c_1_1_tagged_union.html#a47a709259133aa47ccfa238d8b65298c',1,'SC::TaggedUnion']]],
+  ['group_5fsystem_29',['Group_system',['../group__group__system.html',1,'']]],
+  ['group_5ftime_30',['Group_time',['../group__group__time.html',1,'']]]
 ];

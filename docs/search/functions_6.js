@@ -21,9 +21,10 @@ var searchData=
   ['getnullterminatednative_18',['getNullTerminatedNative',['../struct_s_c_1_1_string_view.html#aa3caf700c4c56139c7f324bc017460e2',1,'SC::StringView']]],
   ['getnumallocated_19',['getNumAllocated',['../struct_s_c_1_1_arena_map.html#ab7515de5d97739abb0ede5da835845d4',1,'SC::ArenaMap']]],
   ['getnumberofchildren_20',['getNumberOfChildren',['../struct_s_c_1_1_reflection_1_1_type_info.html#ae48018fc5fe0c950fbdb9184a4078fa4',1,'SC::Reflection::TypeInfo']]],
-  ['getorcreate_21',['getOrCreate',['../struct_s_c_1_1_vector_map.html#acb54c4567a8012a7b27600d14de62f7a',1,'SC::VectorMap']]],
-  ['getresponse_22',['getResponse',['../struct_s_c_1_1_http_client.html#acc679eae04cef4b15b49aa11dcd8a50f',1,'SC::HttpClient']]],
-  ['gettestreturncode_23',['getTestReturnCode',['../struct_s_c_1_1_test_report.html#a50c4cd350169ca78d685eb693937c7c5',1,'SC::TestReport']]],
-  ['gettimeout_24',['getTimeout',['../struct_s_c_1_1_async_loop_timeout.html#aaf6a2cdc60d4e0955af952c9ebf68622',1,'SC::AsyncLoopTimeout']]],
-  ['gettype_25',['getType',['../struct_s_c_1_1_tagged_union.html#a47a709259133aa47ccfa238d8b65298c',1,'SC::TaggedUnion']]]
+  ['getnumberofprocessors_21',['getNumberOfProcessors',['../struct_s_c_1_1_process.html#aba97da7f2b1e48a415110a01136ff69d',1,'SC::Process']]],
+  ['getorcreate_22',['getOrCreate',['../struct_s_c_1_1_vector_map.html#acb54c4567a8012a7b27600d14de62f7a',1,'SC::VectorMap']]],
+  ['getresponse_23',['getResponse',['../struct_s_c_1_1_http_client.html#acc679eae04cef4b15b49aa11dcd8a50f',1,'SC::HttpClient']]],
+  ['gettestreturncode_24',['getTestReturnCode',['../struct_s_c_1_1_test_report.html#a50c4cd350169ca78d685eb693937c7c5',1,'SC::TestReport']]],
+  ['gettimeout_25',['getTimeout',['../struct_s_c_1_1_async_loop_timeout.html#aaf6a2cdc60d4e0955af952c9ebf68622',1,'SC::AsyncLoopTimeout']]],
+  ['gettype_26',['getType',['../struct_s_c_1_1_tagged_union.html#a47a709259133aa47ccfa238d8b65298c',1,'SC::TaggedUnion']]]
 ];

@@ -11,8 +11,8 @@ var searchData=
   ['uniquehandle_3c_20sc_3a_3adetail_3a_3afiledescriptordefinition_20_3e_8',['UniqueHandle&lt; SC::detail::FileDescriptorDefinition &gt;',['../struct_s_c_1_1_unique_handle.html',1,'SC']]],
   ['unloadplugin_9',['unloadPlugin',['../struct_s_c_1_1_plugin_registry.html#a317867e40e733e5b9df04e8e69a6e2cc',1,'SC::PluginRegistry']]],
   ['update_10',['update',['../struct_s_c_1_1_hashing.html#add6a5ecb202fb037372345fb1d5b82de',1,'SC::Hashing']]],
-  ['url_11',['url',['../struct_s_c_1_1_http_server_base_1_1_request.html#ad596a9c0e9faefbc0d53999e1b951783',1,'SC::HttpServerBase::Request']]],
-  ['url_12',['Url',['../struct_s_c_1_1_http_parser.html#a3bc94745ed7fc4195ed6debbb12c7ee1a02a3a357710cc2a5dfdfb74ed012fb59',1,'SC::HttpParser']]],
+  ['url_11',['Url',['../struct_s_c_1_1_http_parser.html#a3bc94745ed7fc4195ed6debbb12c7ee1a02a3a357710cc2a5dfdfb74ed012fb59',1,'SC::HttpParser']]],
+  ['url_12',['url',['../struct_s_c_1_1_http_server_base_1_1_request.html#ad596a9c0e9faefbc0d53999e1b951783',1,'SC::HttpServerBase::Request']]],
   ['username_13',['username',['../struct_s_c_1_1_http_u_r_l_parser.html#aff5fd44f456e0c4c77491a53f290370c',1,'SC::HttpURLParser']]],
   ['utf16_14',['Utf16',['../group__group__strings.html#gga394218cf32c79b0ada9bd2d4892eaf52ac994d2f9df6cc845dd3cf066d2303eaf',1,'SC']]],
   ['utf8_15',['Utf8',['../group__group__strings.html#gga394218cf32c79b0ada9bd2d4892eaf52a81f91ccd37ce1d232cbfc1520374319d',1,'SC']]]
