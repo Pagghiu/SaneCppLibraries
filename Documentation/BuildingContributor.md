@@ -13,7 +13,7 @@ The test suite uses the handmade / self-hosted [SC::Build](@ref library_build) s
     - **Posix**: `SC.sh build`
 - Open generated projects (in `_Build/_Projects`). 
 
-@note Check the [Tools](@ref page_tools) page for more details on how it `SC.sh` works.
+@note Check the [Tools](@ref page_tools) page for more details on invoking `SC.sh build`.
 
 ### Build the test suite
 

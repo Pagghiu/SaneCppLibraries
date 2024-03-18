@@ -1,26 +1,24 @@
-#!/bin/bash
-COMMAND="${1:-build}"   # Command to execute (build by default)
-LIBRARY_DIR="$2"        # Directory where "Libraries" exists
-COMMAND_DIR="$3"        # Directory where SC-${COMMAND}.cpp file exists
-OUTPUT_DIR="$4/_Build"  # Directory where output subdirectories must be placed
+#!/bin/sh
+LIBRARY_DIR="$1"        # Directory where "Libraries" exists
+TOOL_SOURCE_DIR="$2"    # Directory where SC-${TOOL}.cpp file exists
+BUILD_DIR="$3"          # Directory where output subdirectories must be placed
+TOOL="${4:-build}"      # Tool to execute (build by default)
 
-CUSTOM_PARAMETERS=${@:5}
-
-OUTPUT_COMMANDS_DIR="${OUTPUT_DIR}/_Commands"   # Directory where the ${COMMAND} executable will be generated
+TOOL_OUTPUT_DIR="${BUILD_DIR}/_Tools"   # Directory where the ${TOOL} executable will be generated
 
 OS=$(uname -s)
 
-FINAL_COMMAND_PATH="$OUTPUT_COMMANDS_DIR/SC-${COMMAND}-${OS}"
+TOOL_COMMAND_LINE="$TOOL_OUTPUT_DIR/SC-${TOOL}-${OS}"
 
 # Rebuild the command if it doesn't exist or if no action has been specified
-if [ -z "$5" ] || [ ! -e "${FINAL_COMMAND_PATH}" ]; then
+if [ -z "$5" ] || [ ! -e "${TOOL_COMMAND_LINE}" ]; then
 
-mkdir -p "$OUTPUT_COMMANDS_DIR"
-echo "Building SC-${COMMAND}.cpp..."
+mkdir -p "$TOOL_OUTPUT_DIR"
+echo "Building SC-${TOOL}.cpp..."
 if [ "$OS" = "Darwin" ]; then
-clang -std=c++14 -fno-exceptions -nostdlib++ -framework CoreServices "$COMMAND_DIR/SC-${COMMAND}.cpp" "$LIBRARY_DIR/Tools/Tools.cpp" -o "${FINAL_COMMAND_PATH}"
+clang -std=c++14 -fno-exceptions -nostdlib++ -framework CoreServices "$TOOL_SOURCE_DIR/SC-${TOOL}.cpp" "$LIBRARY_DIR/Tools/Tools.cpp" -o "${TOOL_COMMAND_LINE}"
 elif [ "$OS" = "Linux" ]; then
-g++ -std=c++14 -fno-exceptions "$COMMAND_DIR/SC-${COMMAND}.cpp" "$LIBRARY_DIR/Tools/Tools.cpp" -o "${FINAL_COMMAND_PATH}"
+g++ -std=c++14 -fno-exceptions "$TOOL_SOURCE_DIR/SC-${TOOL}.cpp" "$LIBRARY_DIR/Tools/Tools.cpp" -o "${TOOL_COMMAND_LINE}"
 else
     { echo "Unsupported operating system: $OS" ; exit 1; }
 fi
@@ -30,4 +28,4 @@ fi
 
 fi
 
-"${FINAL_COMMAND_PATH}" "${LIBRARY_DIR}" "${OUTPUT_DIR}" ${CUSTOM_PARAMETERS[@]}
+"${TOOL_COMMAND_LINE}" $*

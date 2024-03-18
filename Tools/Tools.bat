@@ -14,40 +14,44 @@ if exist "%vcvarsall_path1%" (
     exit /b 1
 )
 
-rem Set default command if not provided
-set "COMMAND=%1"
-if %COMMAND% == "" set "COMMAND=build"
+rem Tool to execute (build by default)
+set "TOOL=%4"
+if "%4" == "" (
+set "TOOL=build"
+) else (
+set "TOOL=%4"
+)
 
 @REM Directory where "Libraries" exists
-set "LIBRARY_DIR=%2"
-@REM Directory where SC-COMMAND.cpp file exists
-set "COMMAND_DIR=%3"
-@REM Directory where Command outputs will be placed
-set "OUTPUT_DIR=%4\_Build"
-@REM Additional parameters to the command
-set "CUSTOM_PARAMETERS=%5"
+set "LIBRARY_DIR=%1"
+@REM Directory where SC-${TOOL}.cpp file exists
+set "TOOL_SOURCE_DIR=%2"
+@REM Directory where the ${TOOL} executable will be generated
+set "BUILD_DIR=%3"
 
 @REM Directory where the build system executable will be generated
-set "OUTPUT_COMMANDS_DIR=%OUTPUT_DIR%\_Commands"
+set "TOOL_OUTPUT_DIR=%BUILD_DIR%\_Tools"
 
-mkdir  "%OUTPUT_COMMANDS_DIR%" 2>nul
+mkdir  "%TOOL_OUTPUT_DIR%" 2>nul
 @REM We set this as current directory because cl.exe doesn't allow overriding
 @REM intermediates paths when multiple files are specified as input.
-cd /d "%OUTPUT_COMMANDS_DIR%"
+cd /d "%TOOL_OUTPUT_DIR%"
 
-if "%6" == "" (
+if "%5" == "" (
     goto :DoCompile
 )
 
-if exist "SC-%COMMAND%.exe" (
+if exist "SC-%TOOL%.exe" (
     goto :SkipCompiling
 )
 
 REM /permissive- allows usage of (and, or) operators with C++14
 :DoCompile
-echo Building SC-%COMMAND%.cpp...
-cl.exe /nologo /std:c++14 /permissive- /EHsc /Fe"SC-%COMMAND%.exe" "%LIBRARY_DIR%/Tools/Tools.cpp" "%COMMAND_DIR%/SC-%COMMAND%.cpp" /link Advapi32.lib Shell32.lib
+echo Building SC-%TOOL%.cpp...
+cl.exe /nologo /std:c++14 /permissive- /EHsc /Fe"SC-%TOOL%.exe" "%LIBRARY_DIR%/Tools/Tools.cpp" "%TOOL_SOURCE_DIR%/SC-%TOOL%.cpp" /link Advapi32.lib Shell32.lib
 :SkipCompiling
 
-call "SC-%COMMAND%.exe" "%LIBRARY_DIR%" "%OUTPUT_DIR%" %6 %7 %8 %9
+IF %ERRORLEVEL% == 0 (
+call "SC-%TOOL%.exe" %*
+) 
 endlocal

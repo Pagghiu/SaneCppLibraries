@@ -85,9 +85,9 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
 }
 
 Result executeAction(Build::Actions::Type action, Build::Generator::Type generator, StringView targetDirectory,
-                     StringView sourcesDirectory)
+                     StringView libraryDirectory)
 {
-    return Build::Actions::execute(action, configure, PROJECT_NAME, generator, targetDirectory, sourcesDirectory);
+    return Build::Actions::execute(action, configure, PROJECT_NAME, generator, targetDirectory, libraryDirectory);
 }
 } // namespace Build
 } // namespace SC

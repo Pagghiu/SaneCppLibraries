@@ -12,20 +12,19 @@ struct SupportToolsTest : public TestCase
     {
         SmallString<256> outputDirectory;
         (void)StringBuilder(outputDirectory).format("{0}/_Build", report.libraryRootDirectory);
-        ToolsArguments arguments{report.console, report.libraryRootDirectory, outputDirectory.view()};
-        if (test_section("install clang"))
+        Tool::Arguments arguments{report.console, report.libraryRootDirectory, report.libraryRootDirectory,
+                                  outputDirectory.view()};
+        if (test_section("clang-format execute"))
         {
-            const char* args[] = {"install"};
-            arguments.argv     = args;
-            arguments.argc     = sizeof(args) / sizeof(args[0]);
-            SC_TEST_EXPECT(runFormatCommand(arguments));
+            arguments.tool   = "format";
+            arguments.action = "execute";
+            SC_TEST_EXPECT(runFormatTool(arguments));
         }
-        if (test_section("format with clang-format"))
+        if (test_section("clang-format check"))
         {
-            const char* args[] = {"execute"};
-            arguments.argv     = args;
-            arguments.argc     = sizeof(args) / sizeof(args[0]);
-            SC_TEST_EXPECT(runFormatCommand(arguments));
+            arguments.tool   = "format";
+            arguments.action = "check";
+            SC_TEST_EXPECT(runFormatTool(arguments));
         }
     }
 };

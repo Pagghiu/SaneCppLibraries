@@ -8,11 +8,12 @@ namespace SC
 namespace Tools
 {
 // 7zr.exe is needed to extract 7zip installer on windows
-[[nodiscard]] inline Result install7ZipR(StringView SC_PackagesDirectory, StringView SC_TOOLS_DIR, Package& package)
+[[nodiscard]] inline Result install7ZipR(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                         Package& package)
 {
     Download download;
-    download.packagesRootDirectory = SC_PackagesDirectory;
-    download.hostToolsDirectory    = SC_TOOLS_DIR;
+    download.packagesCacheDirectory   = packagesCacheDirectory;
+    download.packagesInstallDirectory = packagesInstallDirectory;
 
     download.packageName    = "7zip";
     download.packageVersion = "23.01";
@@ -42,14 +43,15 @@ namespace Tools
     return Result(true);
 }
 
-[[nodiscard]] inline Result install7Zip(StringView SC_PackagesDirectory, StringView SC_TOOLS_DIR, Package& package)
+[[nodiscard]] inline Result install7Zip(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                        Package& package)
 {
     Package         sevenZipRPackage;
     CustomFunctions functions;
 
     Download download;
-    download.packagesRootDirectory = SC_PackagesDirectory;
-    download.hostToolsDirectory    = SC_TOOLS_DIR;
+    download.packagesCacheDirectory   = packagesCacheDirectory;
+    download.packagesInstallDirectory = packagesInstallDirectory;
 
     download.packageName    = "7zip";
     download.packageVersion = "23.01";
@@ -63,7 +65,7 @@ namespace Tools
     }
     break;
     case Platform::Windows: {
-        SC_TRY(install7ZipR(SC_PackagesDirectory, SC_TOOLS_DIR, sevenZipRPackage));
+        SC_TRY(install7ZipR(packagesCacheDirectory, packagesInstallDirectory, sevenZipRPackage));
         switch (HostInstructionSet)
         {
         case InstructionSet::ARM64:
@@ -193,7 +195,7 @@ namespace Tools
     return Result(true);
 }
 
-[[nodiscard]] inline Result installClangBinaries(StringView SC_PackagesDirectory, StringView SC_TOOLS_DIR,
+[[nodiscard]] inline Result installClangBinaries(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                                  Package& package)
 {
     Package         sevenZipPackage;
@@ -202,8 +204,8 @@ namespace Tools
     { return tarExpandTo(sourceFile, destinationDirectory, 1); };
 
     Download download;
-    download.packagesRootDirectory = SC_PackagesDirectory;
-    download.hostToolsDirectory    = SC_TOOLS_DIR;
+    download.packagesCacheDirectory   = packagesCacheDirectory;
+    download.packagesInstallDirectory = packagesInstallDirectory;
 
     download.packageName    = "clang-binaries";
     download.packageVersion = "23.01";
@@ -257,7 +259,7 @@ namespace Tools
     break;
 
     case Platform::Windows: {
-        SC_TRY(install7Zip(SC_PackagesDirectory, SC_TOOLS_DIR, sevenZipPackage));
+        SC_TRY(install7Zip(packagesCacheDirectory, packagesInstallDirectory, sevenZipPackage));
         functions.extractFunction = [&sevenZipPackage](StringView fileName, StringView directory) -> Result
         {
             Process          process;
@@ -312,58 +314,48 @@ namespace Tools
 }
 
 } // namespace Tools
-constexpr StringView PackagesDirectory = "_Packages";
-constexpr StringView ToolsDirectory    = "_Tools";
+constexpr StringView PackagesCacheDirectory   = "_PackagesCache";
+constexpr StringView PackagesInstallDirectory = "_Packages";
 
 } // namespace SC
 
-#if !defined(SC_TOOLS_IMPORT)
 namespace SC
 {
-Result runPackagesCommand(ToolsArguments& arguments)
+inline Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package = nullptr)
 {
     Console& console = arguments.console;
 
-    StringView action = "install"; // If no action is passed we assume "install"
-    if (arguments.argc > 0)
-    {
-        action = StringView::fromNullTerminated(arguments.argv[0], StringEncoding::Ascii);
-    }
-
-    StringNative<256> packagesDirectory;
-    StringNative<256> toolsDirectory;
+    StringNative<256> packagesCacheDirectory;
+    StringNative<256> packagesInstallDirectory;
     StringNative<256> buffer;
     StringBuilder     builder(buffer);
-    SC_TRY(Path::join(packagesDirectory, {arguments.outputsDirectory, PackagesDirectory}));
-    SC_TRY(Path::join(toolsDirectory, {arguments.outputsDirectory, ToolsDirectory}));
-    SC_TRY(builder.append("sourcesDirectory  = \"{}\"\n", arguments.sourcesDirectory));
-    SC_TRY(builder.append("packagesDirectory = \"{}\"\n", packagesDirectory.view()));
-    SC_TRY(builder.append("toolsDirectory    = \"{}\"", toolsDirectory.view()));
+    SC_TRY(Path::join(packagesCacheDirectory, {arguments.outputsDirectory, PackagesCacheDirectory}));
+    SC_TRY(Path::join(packagesInstallDirectory, {arguments.outputsDirectory, PackagesInstallDirectory}));
+    SC_TRY(builder.append("packagesCache    = \"{}\"\n", packagesCacheDirectory.view()));
+    SC_TRY(builder.append("packages         = \"{}\"", packagesInstallDirectory.view()));
     console.printLine(buffer.view());
 
-    SC::Time::Absolute started = SC::Time::Absolute::now();
-    SC_TRY(builder.format("SC-format \"{}\" started...", action));
-    console.printLine(buffer.view());
     Tools::Package clangPackage;
-    if (action == "install")
+    if (package == nullptr)
+    {
+        package = &clangPackage;
+    }
+    if (arguments.action == "install")
     {
         // Just install dependencies without formatting
-        SC_TRY(Tools::installClangBinaries(packagesDirectory.view(), toolsDirectory.view(), clangPackage));
+        SC_TRY(Tools::installClangBinaries(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package));
     }
     else
     {
-        SC_TRY(builder.format("SC-format no action named \"{}\" exists", action));
+        SC_TRY(builder.format("SC-format no action named \"{}\" exists", arguments.action));
         console.printLine(buffer.view());
         return Result::Error("SC-format error executing action");
     }
-
-    Time::Relative elapsed = SC::Time::Absolute::now().subtract(started);
-    SC_TRY(builder.format("SC-format \"{}\" finished (took {} ms)", action, elapsed.inRoundedUpperMilliseconds().ms));
-    console.printLine(buffer.view());
     return Result(true);
 }
-#if !defined(SC_LIBRARY_PATH)
-Result RunCommand(ToolsArguments& arguments) { return runPackagesCommand(arguments); }
+#if !defined(SC_LIBRARY_PATH) && !defined(SC_TOOLS_IMPORT)
+StringView Tool::getToolName() { return "package"; }
+StringView Tool::getDefaultAction() { return "install"; }
+Result     Tool::runTool(Tool::Arguments& arguments) { return runPackageTool(arguments); }
 #endif
 } // namespace SC
-#endif

@@ -24,8 +24,8 @@ inline String format(const StringView fmt, Types&&... types)
 
 struct Download
 {
-    SmallString<255> packagesRootDirectory;
-    SmallString<255> hostToolsDirectory;
+    SmallString<255> packagesCacheDirectory;
+    SmallString<255> packagesInstallDirectory;
 
     SmallString<255> packageName;
     SmallString<255> packageVersion;
@@ -141,17 +141,17 @@ struct CustomFunctions
     package.packageBaseName = Path::basename(download.url.view(), Path::Type::AsPosix);
 
     package.packageLocalFile =
-        format("{0}/{1}/{2}", download.packagesRootDirectory, download.packageName, package.packageBaseName);
+        format("{0}/{1}/{2}", download.packagesCacheDirectory, download.packageName, package.packageBaseName);
     package.packageLocalTxt       = format("{0}.txt", package.packageLocalFile);
     package.packageLocalDirectory = format("{0}_extracted", package.packageLocalFile);
 
     SC_TRY(fs.init("."));
-    SC_TRY(fs.makeDirectoryRecursive(download.packagesRootDirectory.view()));
-    SC_TRY(fs.makeDirectoryRecursive(download.hostToolsDirectory.view()));
+    SC_TRY(fs.makeDirectoryRecursive(download.packagesCacheDirectory.view()));
+    SC_TRY(fs.makeDirectoryRecursive(download.packagesInstallDirectory.view()));
     SC_TRY(fs.makeDirectoryRecursive(package.packageLocalDirectory.view())); // Creates packages/packageName
 
     package.installDirectoryLink =
-        format("{0}/{1}_{2}", download.hostToolsDirectory, download.packageName, download.packagePlatform);
+        format("{0}/{1}_{2}", download.packagesInstallDirectory, download.packageName, download.packagePlatform);
 
     // Test if the tool works
     Result testSucceeded = functions.testFunction(download, package);

@@ -12,12 +12,12 @@ namespace Tools
 /// TODO: Maybe with some love this could be generalized and be added to some library
 struct FileSystemFinder
 {
-    [[nodiscard]] static Result forEachFile(StringView sourcesDirectory, Span<const StringView> includeFilesEndingWith,
+    [[nodiscard]] static Result forEachFile(StringView libraryDirectory, Span<const StringView> includeFilesEndingWith,
                                             Span<const StringView>         excludeDirectories,
                                             Function<Result(StringView)>&& forEachFunc)
     {
         FileSystemIterator iterator;
-        SC_TRY(iterator.init(sourcesDirectory));
+        SC_TRY(iterator.init(libraryDirectory));
 
         while (iterator.enumerateNext())
         {
@@ -89,23 +89,23 @@ struct ProcessLimiter
         Process process;
         SC_TRY(process.launch(arguments));
         // Launch does not wait for the child process to finish so we can monitor it with the event loop
-        ProcessDescriptor::Handle processHandle = 0;
-        SC_TRY(process.handle.get(processHandle, Result::Error("Invalid Handle")));
-        processExit.callback = [this, processHandle](AsyncProcessExit::Result& result)
+        ProcessID pid        = process.processID;
+        processExit.callback = [this, pid](AsyncProcessExit::Result& result)
         {
-            Process process;
-            SC_ASSERT_RELEASE(process.handle.assign(processHandle));
-            SC_ASSERT_RELEASE(process.waitForExitSync());
-            if (process.getExitStatus() != 0)
+            ProcessDescriptor::ExitStatus exitStatus;
+            processResult = result.get(exitStatus);
+            if (processResult and exitStatus.status != 0)
             {
-                processResult = Result::Error("ProcessLimiter getExitStatus() != 0");
+                processResult = Result::Error("ProcessLimiter::callback - returned non zero");
             }
             // This child process has exited, let's make its slot available again
             availableProcessMonitors.queueBack(result.getAsync());
         };
-        process.handle.detach(); // we can't close it
         // Start monitoring process exit on the event loop
+        ProcessDescriptor::Handle processHandle = 0;
+        SC_TRY(process.handle.get(processHandle, Result::Error("Invalid Handle")));
         SC_TRY(processExit.start(eventLoop, processHandle));
+        process.handle.detach(); // we can't close it
         return Result(true);
     }
 

@@ -7,21 +7,25 @@
 namespace SC
 {
 struct Console;
-
-struct ToolsArguments
+struct Tool
 {
-    Console&   console;
-    StringView sourcesDirectory;
-    StringView outputsDirectory;
-
-    const char** argv = nullptr;
-    int          argc = 0;
+    struct Arguments
+    {
+        Console&   console;
+        StringView libraryDirectory;
+        StringView toolDirectory;
+        StringView outputsDirectory;
+        StringView tool   = StringView();
+        StringView action = StringView();
+    };
+    static StringView getToolName();
+    static StringView getDefaultAction();
+    static Result     runTool(Arguments& arguments);
 };
-// Entry point
-Result RunCommand(ToolsArguments& commandArguments);
 
 // Tools
-Result runFormatCommand(ToolsArguments& arguments);
-Result runBuildCommand(ToolsArguments& arguments);
+Result runFormatTool(Tool::Arguments& arguments);
+Result runBuildTool(Tool::Arguments& arguments);
+Result runPackageTool(Tool::Arguments& arguments);
 
 } // namespace SC
