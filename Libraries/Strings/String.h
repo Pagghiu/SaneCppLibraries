@@ -171,7 +171,10 @@ inline bool SC::String::assign(StringView sv)
     }
     else
     {
-        memcpy(data.items, sv.bytesWithoutTerminator(), length);
+        if (length > 0)
+        {
+            memcpy(data.items, sv.bytesWithoutTerminator(), length);
+        }
         for (size_t idx = 0; idx < numZero; ++idx)
         {
             data.items[length + idx] = 0;
