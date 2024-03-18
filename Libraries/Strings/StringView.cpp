@@ -11,6 +11,13 @@ SC::StringView SC::StringView::fromNullTerminated(const char* text, StringEncodi
     return StringView({text, ::strlen(text)}, true, encoding);
 }
 
+#if SC_PLATFORM_WINDOWS
+SC::StringView SC::StringView::fromNullTerminated(const wchar_t* text, StringEncoding)
+{
+    return StringView({text, ::wcslen(text)}, true);
+}
+#endif
+
 bool SC::StringView::parseInt32(int32_t& value) const
 {
     if (text == nullptr)

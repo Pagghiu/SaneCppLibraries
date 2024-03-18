@@ -80,6 +80,14 @@ struct SC::StringView
     /// @return The StringView containing text with given encoding
     static StringView fromNullTerminated(const char* text, StringEncoding encoding);
 
+#if SC_PLATFORM_WINDOWS
+    /// @brief Constructs a StringView from a null-terminated C-String
+    /// @param text The null-terminated C-String
+    /// @param encoding The encoding of the text contained in this StringView
+    /// @return The StringView containing text with given encoding
+    static StringView fromNullTerminated(const wchar_t* text, StringEncoding encoding);
+#endif
+
     /// @brief Get encoding of this StringView
     /// @return This StringView encoding
     [[nodiscard]] constexpr StringEncoding getEncoding() const { return static_cast<StringEncoding>(encoding); }
