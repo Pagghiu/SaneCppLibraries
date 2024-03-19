@@ -17,6 +17,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: clang-format
+      run: ./SC.sh format check
     - name: configure
       run: ./SC.sh build configure
     - name: compile

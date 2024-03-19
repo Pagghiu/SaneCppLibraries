@@ -60,7 +60,7 @@ namespace SC
 [[nodiscard]] Result runFormatTool(Tool::Arguments& arguments)
 {
     SmallString<256> clangFormat;
-    if (not Tools::findSystemClangFormat("15.", clangFormat))
+    if (not Tools::findSystemClangFormat(arguments.console, "15", clangFormat))
     {
         Tool::Arguments args = arguments;
         args.tool            = "packages";

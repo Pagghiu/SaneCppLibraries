@@ -157,48 +157,75 @@ namespace Tools
     return Result(true);
 }
 
-[[nodiscard]] inline Result findSystemClangFormat(StringView expectedVersion, String& foundPath)
+[[nodiscard]] inline Result findSystemClangFormat(Console& console, StringView wantedMajorVersion, String& foundPath)
 {
-    StringView clangFormatExecutable;
-    // Find the version
+    StringView       clangFormatExecutable;
+    SmallString<255> version;
+    switch (HostPlatform)
     {
-        SmallString<255> versionBuffer;
-        if (Process().exec({"clang-format-15", "--version"}, versionBuffer))
+    case Platform::Apple: {
+        SmallString<32> llvmVersion;
+        (void)StringBuilder(llvmVersion).format("llvm@{}", wantedMajorVersion);
+        if (Process().exec({"brew", "--prefix", llvmVersion.view()}, foundPath))
         {
-            clangFormatExecutable = "clang-format-15";
+            (void)foundPath.assign(foundPath.view().trimEndAnyOf('\n'));
+            if (StringBuilder(foundPath, StringBuilder::DoNotClear).append("/bin/clang-format"))
+            {
+                if (Process().exec({foundPath.view(), "--version"}, version))
+                {
+                    clangFormatExecutable = foundPath.view();
+                }
+            }
+        }
+    }
+    break;
+    default: break;
+    }
+
+    if (clangFormatExecutable.isEmpty())
+    {
+        SmallString<32> clangFormatVersion;
+        SC_TRY(StringBuilder(clangFormatVersion).format("clang-format-{}", wantedMajorVersion));
+        if (Process().exec({clangFormatVersion.view(), "--version"}, version))
+        {
+            clangFormatExecutable = clangFormatVersion.view();
         }
         else
         {
-            SC_TRY(Process().exec({"clang-format", "--version"}, versionBuffer));
+            SC_TRY(Process().exec({"clang-format", "--version"}, version));
             clangFormatExecutable = "clang-format";
         }
-        StringViewTokenizer tokenizer(versionBuffer.view());
-        SC_TRY(tokenizer.tokenizeNext({'-'})); // component = "clang-"
-        SC_TRY(tokenizer.tokenizeNext({' '})); // component = "format"
-        SC_TRY(tokenizer.tokenizeNext({' '})); // component = "version"
-        SC_TRY(tokenizer.tokenizeNext({' '})); // component = "15.0.7\n"
-        StringView version = tokenizer.component.trimAnyOf({'\n', '\r'});
-        SC_TRY_MSG(version.startsWith(expectedVersion), "clang-format was not at required version");
+        // Find the path
+        switch (HostPlatform)
+        {
+        case Platform::Windows: // Windows
+        {
+            SC_TRY(Process().exec({"where", clangFormatExecutable}, foundPath));
+            StringViewTokenizer tokenizer(foundPath.view());
+            SC_TRY(tokenizer.tokenizeNext({'\n'}));
+            SC_TRY(foundPath.assign(tokenizer.component));
+        }
+        break;
+        default: // Posix
+        {
+            SC_TRY(Process().exec({"which", clangFormatExecutable}, foundPath));
+        }
+        break;
+        }
+        SC_TRY(foundPath.assign(foundPath.view().trimAnyOf({'\n', '\r'})));
     }
-
-    // Find the path
-    switch (HostPlatform)
-    {
-    case Platform::Windows: // Windows
-    {
-        SC_TRY(Process().exec({"where", clangFormatExecutable}, foundPath));
-        StringViewTokenizer tokenizer(foundPath.view());
-        SC_TRY(tokenizer.tokenizeNext({'\n'}));
-        SC_TRY(foundPath.assign(tokenizer.component));
-    }
-    break;
-    default: // Posix
-    {
-        SC_TRY(Process().exec({"which", clangFormatExecutable}, foundPath));
-    }
-    break;
-    }
-    SC_TRY(foundPath.assign(foundPath.view().trimAnyOf({'\n', '\r'})));
+    console.print("Found \"");
+    console.print(foundPath.view());
+    console.print("\" ");
+    console.print(version.view());
+    StringViewTokenizer tokenizer(version.view());
+    SC_TRY(tokenizer.tokenizeNext({'-'})); // component = "clang-"
+    SC_TRY(tokenizer.tokenizeNext({' '})); // component = "format"
+    SC_TRY(tokenizer.tokenizeNext({' '})); // component = "version"
+    SC_TRY(tokenizer.tokenizeNext({' '})); // component = "15.0.7\n"
+    tokenizer = StringViewTokenizer(tokenizer.component.trimAnyOf({'\n', '\r'}));
+    SC_TRY(tokenizer.tokenizeNext({'.'}));
+    SC_TRY_MSG(tokenizer.component == wantedMajorVersion, "clang-format was not at required major version");
     return Result(true);
 }
 
