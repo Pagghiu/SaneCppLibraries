@@ -153,6 +153,7 @@ struct SC::AsyncEventLoop::InternalPosix
 
 #if SC_ASYNC_USE_EPOLL
     // TODO: This should be lazily created on demand
+    // TODO: Or it's probably even better migrate this one to pidfd
     [[nodiscard]] Result createProcessSignalWatcher(AsyncEventLoop& loop)
     {
         sigset_t mask;
@@ -182,30 +183,51 @@ struct SC::AsyncEventLoop::InternalPosix
 
         const InternalPosix& internal = result.getAsync().eventLoop->internalSelf.getPosix();
         (void)(internal.signalProcessExitDescriptor.get(sigHandle, Result::Error("Invalid signal handle")));
-        ssize_t size = ::read(sigHandle, &siginfo, sizeof(siginfo));
 
-        if (size == sizeof(siginfo))
+        const ssize_t size = ::read(sigHandle, &siginfo, sizeof(siginfo));
+
+        // TODO: Handle lazy deactivation for signals when no more processes exist
+        result.reactivateRequest(true);
+
+        if (size != sizeof(siginfo))
         {
-            // Check if the received signal is related to process exit
-            if (siginfo.ssi_signo == SIGCHLD)
-            {
-                // Loop all process handles to find if one of our interest has exited
-                AsyncProcessExit* current = result.getAsync().eventLoop->privateSelf.activeProcessExits.front;
+            return;
+        }
 
-                while (current)
+        // Check if the received signal is related to process exit
+        if (siginfo.ssi_signo != SIGCHLD)
+        {
+            return;
+        }
+        while (true)
+        {
+            // Multiple SIGCHLD may have been merged together, we must check all of them with waitpid(-1)
+            // https://stackoverflow.com/questions/8398298/handling-multiple-sigchld
+            int   status = -1;
+            pid_t pid;
+            do
+            {
+                pid = ::waitpid(-1, &status, 0);
+            } while (pid == -1 and errno == EINTR);
+            if (pid == -1)
+            {
+                return; // no more queued child processes
+            }
+
+            // Loop all process handles to find if one of our interest has exited
+            AsyncProcessExit* current = result.getAsync().eventLoop->privateSelf.activeProcessExits.front;
+
+            while (current)
+            {
+                if (pid == current->handle)
                 {
-                    if (siginfo.ssi_pid == current->handle)
-                    {
-                        AsyncProcessExit::Result processResult(*current, Result(true));
-                        processResult.completionData.exitStatus.status = siginfo.ssi_status;
-                        result.getAsync().eventLoop->privateSelf.removeActiveHandle(*current);
-                        current->callback(processResult);
-                        // TODO: Handle lazy deactivation for signals when no more processes exist
-                        result.reactivateRequest(true);
-                        break;
-                    }
-                    current = static_cast<AsyncProcessExit*>(current->next);
+                    AsyncProcessExit::Result processResult(*current, Result(true));
+                    processResult.completionData.exitStatus.status = WEXITSTATUS(status);
+                    result.getAsync().eventLoop->privateSelf.removeActiveHandle(*current);
+                    current->callback(processResult);
+                    break;
                 }
+                current = static_cast<AsyncProcessExit*>(current->next);
             }
         }
     }
