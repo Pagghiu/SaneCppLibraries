@@ -240,6 +240,7 @@ template <> struct StringFormatterFor<bool>         {static bool format(StringFo
 template <> struct StringFormatterFor<StringView>   {static bool format(StringFormatOutput&, const StringView, const StringView);};
 template <> struct StringFormatterFor<String>       {static bool format(StringFormatOutput&, const StringView, const String&);};
 template <> struct StringFormatterFor<const char*>  {static bool format(StringFormatOutput&, const StringView, const char*);};
+template <> struct StringFormatterFor<const void*>  {static bool format(StringFormatOutput&, const StringView, const void*);};
 #if SC_PLATFORM_WINDOWS
 template <> struct StringFormatterFor<wchar_t>        {static bool format(StringFormatOutput&, const StringView, const wchar_t);};
 template <> struct StringFormatterFor<const wchar_t*> {static bool format(StringFormatOutput&, const StringView, const wchar_t*);};

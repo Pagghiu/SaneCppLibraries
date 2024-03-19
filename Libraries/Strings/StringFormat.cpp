@@ -143,6 +143,12 @@ bool StringFormatterFor<const char*>::format(StringFormatOutput& data, const Str
     return data.append(StringView::fromNullTerminated(value, StringEncoding::Ascii));
 }
 
+bool StringFormatterFor<const void*>::format(StringFormatOutput& data, const StringView specifier, const void* value)
+{
+    constexpr char formatSpecifier[] = "p";
+    return formatSprintf(data, formatSpecifier, specifier, value);
+}
+
 #if SC_PLATFORM_WINDOWS
 bool StringFormatterFor<wchar_t>::format(StringFormatOutput& data, const StringView specifier, const wchar_t value)
 {
