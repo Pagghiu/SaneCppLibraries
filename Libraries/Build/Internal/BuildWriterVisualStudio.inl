@@ -199,16 +199,16 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         }
         // TODO: Extract actual proper MSVC version
         constexpr StringBuilder::ReplacePair replacements[] = {
-            {"/", "\\"},
-            {"$(PROJECT_DIR)\\", "$(ProjectDir)"},
-            {"$(CONFIGURATION)", "$(Configuration)"},
-            {"$(PROJECT_NAME)", "$(ProjectName)"},
-            {"$(ARCHS)", "$(PlatformTarget)"},
-            {"$(PLATFORM_DISPLAY_NAME)", "$(SDKIdentifier)"},
-            {"$(MACOSX_DEPLOYMENT_TARGET)", "$(WindowsTargetPlatformVersion)"},
-            {"$(SC_GENERATOR)", "msbuild"},
-            {"$(SC_COMPILER)", "msvc"},       //
-            {"$(SC_COMPILER_VERSION)", "17"}, //
+            {"/", "\\"},                                                 //
+            {"$(PROJECT_DIR)\\", "$(ProjectDir)"},                       //
+            {"$(CONFIGURATION)", "$(Configuration)"},                    //
+            {"$(PROJECT_NAME)", "$(ProjectName)"},                       //
+            {"$(TARGET_OS)", "windows"},                                 // $(SDKIdentifier)
+            {"$(TARGET_OS_VERSION)", "$(WindowsTargetPlatformVersion)"}, //
+            {"$(TARGET_ARCHITECTURES)", "$(PlatformTarget)"},            //
+            {"$(BUILD_SYSTEM)", "msbuild"},                              //
+            {"$(COMPILER)", "msvc"},                                     //
+            {"$(COMPILER_VERSION)", "17"},                               // TODO: Detect MSVC version
         };
         if (not configuration.outputPath.isEmpty())
         {

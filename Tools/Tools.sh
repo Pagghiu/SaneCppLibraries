@@ -16,9 +16,9 @@ if [ -z "$5" ] || [ ! -e "${TOOL_COMMAND_LINE}" ]; then
 mkdir -p "$TOOL_OUTPUT_DIR"
 echo "Building SC-${TOOL}.cpp..."
 if [ "$OS" = "Darwin" ]; then
-clang -std=c++14 -fno-exceptions -nostdlib++ -framework CoreServices "$TOOL_SOURCE_DIR/SC-${TOOL}.cpp" "$LIBRARY_DIR/Tools/Tools.cpp" -o "${TOOL_COMMAND_LINE}"
+clang -std=c++14 -fno-exceptions "-I${LIBRARY_DIR}" -nostdlib++ -framework CoreServices "$TOOL_SOURCE_DIR/SC-${TOOL}.cpp" "$LIBRARY_DIR/Tools/Tools.cpp" -o "${TOOL_COMMAND_LINE}"
 elif [ "$OS" = "Linux" ]; then
-g++ -std=c++14 -fno-exceptions "$TOOL_SOURCE_DIR/SC-${TOOL}.cpp" "$LIBRARY_DIR/Tools/Tools.cpp" -o "${TOOL_COMMAND_LINE}"
+g++ -std=c++14 -fno-exceptions "-I${LIBRARY_DIR}" "$TOOL_SOURCE_DIR/SC-${TOOL}.cpp" "$LIBRARY_DIR/Tools/Tools.cpp" -o "${TOOL_COMMAND_LINE}"
 else
     { echo "Unsupported operating system: $OS" ; exit 1; }
 fi

@@ -81,7 +81,7 @@ struct SC::AsyncEventLoop::InternalIoURing
     AsyncFilePoll  wakeUpPoll;
     FileDescriptor wakeUpEventFd;
 
-    InternalIoURing() { memset(&ring, sizeof(ring), 0); }
+    InternalIoURing() { memset(&ring, 0, sizeof(ring)); }
 
     ~InternalIoURing() { SC_TRUST_RESULT(close()); }
 

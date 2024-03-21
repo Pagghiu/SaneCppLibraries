@@ -6,7 +6,7 @@
 #include "SC-package.cpp"
 #undef SC_TOOLS_IMPORT
 
-#include "Tools/SC-format.h"
+#include "SC-format.h"
 
 namespace SC
 {
@@ -52,11 +52,6 @@ static Result formatSourceFiles(FormatSources action, StringView clangFormatExec
     SC_TRY(FileSystemFinder::forEachFile(libraryDirectory, {".h", ".cpp", ".inl"}, {"_Build"}, formatSourceFile));
     return processLimiter.close();
 }
-} // namespace Tools
-} // namespace SC
-
-namespace SC
-{
 [[nodiscard]] Result runFormatTool(Tool::Arguments& arguments)
 {
     SmallString<256> clangFormat;
@@ -89,4 +84,5 @@ StringView Tool::getToolName() { return "format"; }
 StringView Tool::getDefaultAction() { return "execute"; }
 Result     Tool::runTool(Tool::Arguments& arguments) { return runFormatTool(arguments); }
 #endif
+} // namespace Tools
 } // namespace SC

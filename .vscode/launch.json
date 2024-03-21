@@ -5,11 +5,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "SCTest x64 [windows]",
+            "name": "SCTest intel64 [windows]",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Outputs/Windows-10.0-x64-msbuild-msvc-17-Debug/SCTest.exe",
-            "preLaunchTask": "Build SCTest Debug",
+            "program": "${workspaceFolder}/_Build/_Outputs/windows-x64-msbuild-msvc-Debug/SCTest.exe",
+            "preLaunchTask": "Build SCTest Debug intel64",
             "args": [],
             "cwd": "${workspaceRoot}",
             "stopAtEntry": false,
@@ -17,17 +17,17 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "SCTest x64 [apple] (gdb)",
+            "name": "SCTest intel64 [apple] (gdb)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Outputs/apple-darwin22.6.0-x86_64-Makefile-clang-15-Debug/SCTest",
+            "program": "${workspaceFolder}/_Build/_Outputs/macOS-x86_64-make-clang-Debug/SCTest",
             "args": [],
             "stopAtEntry": false,
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
             "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Build SCTest Debug",
+            "preLaunchTask": "Build SCTest Debug intel64",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -43,30 +43,30 @@
         },
         {
             // Install CodeLLDB extension or similar to use this one
-            "name": "SCTest x64 [apple] (lldb)",
+            "name": "SCTest intel64 [apple] (lldb)",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Outputs/apple-darwin22.6.0-x86_64-Makefile-clang-15-Debug/SCTest",
+            "program": "${workspaceFolder}/_Build/_Outputs/macOS-x86_64-make-clang-Debug/SCTest",
             "args": [],
             "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Build SCTest Debug",
+            "preLaunchTask": "Build SCTest Debug intel64",
             "console": "integratedTerminal",
             "preRunCommands": [
                 "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
             ],
         },
         {
-            "name": "SCTest x64 [linux] (gdb)",
+            "name": "SCTest intel64 [linux] (gdb)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Outputs/linux-gnu-x86_64-Makefile-gcc-11-Debug/SCTest",
+            "program": "${workspaceFolder}/_Build/_Outputs/linux-x86_64-make-gcc-Debug/SCTest",
             "args": [],
             "stopAtEntry": false,
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
             "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Build SCTest Debug",
+            "preLaunchTask": "Build SCTest Debug intel64",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -82,42 +82,42 @@
         },
         {
             // Install CodeLLDB extension or similar to use this one
-            "name": "SCTest x64 [linux] (lldb)",
+            "name": "SCTest intel64 [linux] (lldb)",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Outputs/linux-gnu-x86_64-Makefile-gcc-11-Debug/SCTest",
+            "program": "${workspaceFolder}/_Build/_Outputs/linux-x86_64-make-gcc-Debug/SCTest",
             "args": [],
             "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Build SCTest Debug",
+            "preLaunchTask": "Build SCTest Debug intel64",
             "console": "integratedTerminal",
             "preRunCommands": [
                 "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
             ],
         },
         {
-            "name": "SCTest ARM64 [windows]",
+            "name": "SCTest arm64 [windows]",
             "type": "cppvsdbg",
             "cwd": "${workspaceRoot}",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Outputs/Windows-10.0-ARM64-msbuild-msvc-17-Debug/SCTest.exe",
-            "preLaunchTask": "Build SCTest Debug ARM64",
+            "program": "${workspaceFolder}/_Build/_Outputs/windows-ARM64-msbuild-msvc-Debug/SCTest.exe",
+            "preLaunchTask": "Build SCTest Debug arm64",
             "args": [],
             "stopAtEntry": false,
             "environment": [],
             "console": "integratedTerminal"
         },
         {
-            "name": "SCTest ARM64 [apple] (gdb)",
+            "name": "SCTest arm64 [apple] (gdb)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Outputs/apple-darwin22.6.0-arm64-Makefile-clang-15-Debug/SCTest",
+            "program": "${workspaceFolder}/_Build/_Outputs/macOS-arm64-make-clang-Debug/SCTest",
             "args": [],
             "stopAtEntry": false,
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
             "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Build SCTest Debug",
+            "preLaunchTask": "Build SCTest Debug arm64",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -133,30 +133,30 @@
         },
         {
             // Install CodeLLDB extension or similar to use this one
-            "name": "SCTest ARM64 [apple] (lldb)",
+            "name": "SCTest arm64 [apple] (lldb)",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Outputs/apple-darwin22.6.0-arm64-Makefile-clang-15-Debug/SCTest",
+            "program": "${workspaceFolder}/_Build/_Outputs/macOS-arm64-make-clang-Debug/SCTest",
             "args": [],
             "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Build SCTest Debug",
+            "preLaunchTask": "Build SCTest Debug arm64",
             "console": "integratedTerminal",
             "preRunCommands": [
                 "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
             ],
         },
         {
-            "name": "SCTest ARM64 [linux] (gdb)",
+            "name": "SCTest arm64 [linux] (gdb)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Outputs/linux-gnu-aarch64-Makefile-gcc-11-Debug/SCTest",
+            "program": "${workspaceFolder}/_Build/_Outputs/linux-arm64-make-gcc-Debug/SCTest",
             "args": [],
             "stopAtEntry": false,
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
             "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Build SCTest Debug",
+            "preLaunchTask": "Build SCTest Debug arm64",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -172,13 +172,13 @@
         },
         {
             // Install CodeLLDB extension or similar to use this one
-            "name": "SCTest ARM64 [linux] (lldb)",
+            "name": "SCTest arm64 [linux] (lldb)",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Outputs/linux-gnu-aarch64-Makefile-gcc-11-Debug/SCTest",
+            "program": "${workspaceFolder}/_Build/_Outputs/linux-arm64-make-gcc-Debug/SCTest",
             "args": [],
             "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Build SCTest Debug",
+            "preLaunchTask": "Build SCTest Debug arm64",
             "console": "integratedTerminal",
             "preRunCommands": [
                 "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"

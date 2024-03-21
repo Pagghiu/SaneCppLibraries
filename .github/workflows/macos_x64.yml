@@ -24,5 +24,5 @@ jobs:
     - name: compile
       run: ./SC.sh build compile
     - name: test
-      run: _Build/_Outputs/macOS-13.0-arm64\ x86_64-XCode-clang-15-Debug/SCTest
-      # run: lldb -o "run" -o "quit" -- _Build/_Outputs/macOS-13.0-arm64\ x86_64-XCode-clang-15-Debug/SCTest
+      run: _Build/_Outputs/macOS-x86_64-make-clang-Debug/SCTest
+      # run: lldb -o "run" -o "quit" -- _Build/_Outputs/macOS-x86_64-make-clang-Debug/SCTest

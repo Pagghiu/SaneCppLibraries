@@ -26,8 +26,8 @@ jobs:
     - name: build
       run: ./SC.sh build compile
     - name: test
-      run: _Build/_Outputs/linux-gnu-x86_64-Makefile-gcc-11-Debug/SCTest
+      run: _Build/_Outputs/linux-x86_64-make-gcc-Debug/SCTest
     # - name: install gdb
     #   run: sudo apt install -y gdb
     # - name: test in gdb
-    #   run: gdb --batch -ex "run" -ex "quit" --args _Build/_Outputs/Posix-Any-Any-Makefile-Debug/SCTest
+    #   run: gdb --batch -ex "run" -ex "quit" --args _Build/_Outputs/linux-x86_64-make-gcc-Debug/SCTest

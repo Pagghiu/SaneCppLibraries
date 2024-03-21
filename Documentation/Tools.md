@@ -14,9 +14,9 @@ They leverage the growing shell, system and network programming capabilities of 
 - Do shell automation / development tools or similar tasks in a real programming language
 - Allow C++ programmers to use regular C++ IDE / Debuggers when writing _automation / shell scripts_
 - Use Sane C++ Libraries for real tasks to improve them and fix bugs:
-    - Example: `SC-package.cpp` uses SC::Process library to download some third party binary 
-    - Example: `SC-package.cpp` uses SC::Hashing library to check downloads MD5 hash
-    - Example: `SC-format.cpp` uses SC::FileSystemIterator library to find all files to format in the repo
+    - Example: `Tools/SC-package.cpp` uses SC::Process library to download some third party binary 
+    - Example: `Tools/SC-package.cpp` uses SC::Hashing library to check downloads MD5 hash
+    - Example: `Tools/SC-format.cpp` uses SC::FileSystemIterator library to find all files to format in the repo
 - Create portable scripts that can be written once and run (or be debugged) on all platforms
 - Avoid introducing additional dependencies
 - Keep the percentage of C++ code in the repo as high as possible (as a consequence of the above)

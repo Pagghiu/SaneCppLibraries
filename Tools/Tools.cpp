@@ -23,6 +23,7 @@ static SC::SmallString<512>       gFormatString;
 int main(int argc, const char* argv[])
 {
     using namespace SC;
+    using namespace SC::Tools;
 
     Console         console(gConsoleBuffer);
     Tool::Arguments arguments{console};
@@ -52,6 +53,7 @@ int main(int argc, const char* argv[])
     nativeArgs              = argv;
     numArguments            = argc;
 #endif
+
     arguments.libraryDirectory = StringView::fromNullTerminated(nativeArgs[1], StringEncoding::Native);
     arguments.toolDirectory    = StringView::fromNullTerminated(nativeArgs[2], StringEncoding::Native);
     arguments.outputsDirectory = StringView::fromNullTerminated(nativeArgs[3], StringEncoding::Native);
@@ -72,6 +74,23 @@ int main(int argc, const char* argv[])
     else
     {
         arguments.action = Tool::getDefaultAction();
+    }
+    constexpr int maxAdditionalArguments = 16;
+    StringView    additionalArguments[maxAdditionalArguments];
+    if (numArguments - 4 > maxAdditionalArguments)
+    {
+        console.printLine("Error: Exceeded maximum number of additional arguments (20)");
+        return -1;
+    }
+
+    for (int idx = 6; idx < numArguments; ++idx)
+    {
+        additionalArguments[idx - 6] = StringView::fromNullTerminated(nativeArgs[idx], StringEncoding::Native);
+    }
+
+    if (numArguments >= 6)
+    {
+        arguments.arguments = {additionalArguments, static_cast<size_t>(numArguments - 6)};
     }
 
     StringBuilder builder(gFormatString);

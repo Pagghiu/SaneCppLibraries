@@ -6,16 +6,6 @@
 
 namespace SC
 {
-namespace Build
-{
-// Defined in SC-build.cpp
-Result executeAction(Build::Actions::Type action, Build::Generator::Type generator, StringView targetDirectory,
-                     StringView sourcesDirectory);
-} // namespace Build
-} // namespace SC
-
-namespace SC
-{
 struct BuildTest;
 } // namespace SC
 
@@ -29,20 +19,25 @@ struct SC::BuildTest : public SC::TestCase
         String     sourcesDirectory = report.libraryRootDirectory;
         SC_TRUST_RESULT(Path::append(targetDirectory, {"../..", projectName}, Path::AsPosix));
 
+        Build::Action action;
+        action.action           = Build::Action::Configure;
+        action.targetDirectory  = targetDirectory.view();
+        action.libraryDirectory = sourcesDirectory.view();
+
         if (test_section("Visual Studio 2022"))
         {
-            SC_TEST_EXPECT(Build::executeAction(Build::Actions::Configure, Build::Generator::VisualStudio2022,
-                                                targetDirectory.view(), sourcesDirectory.view()));
+            action.generator = Build::Generator::VisualStudio2022;
+            SC_TEST_EXPECT(Build::executeAction(action));
         }
         if (test_section("XCode"))
         {
-            SC_TEST_EXPECT(Build::executeAction(Build::Actions::Configure, Build::Generator::XCode,
-                                                targetDirectory.view(), sourcesDirectory.view()));
+            action.generator = Build::Generator::XCode;
+            SC_TEST_EXPECT(Build::executeAction(action));
         }
         if (test_section("Makefile"))
         {
-            SC_TEST_EXPECT(Build::executeAction(Build::Actions::Configure, Build::Generator::Make,
-                                                targetDirectory.view(), sourcesDirectory.view()));
+            action.generator = Build::Generator::Make;
+            SC_TEST_EXPECT(Build::executeAction(action));
         }
     }
 };

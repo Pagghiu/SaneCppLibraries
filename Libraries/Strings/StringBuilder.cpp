@@ -77,6 +77,8 @@ bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf
     SC_TRY(buffer.assign(source));
     for (auto it : substitutions)
     {
+        if (it.searchFor == it.replaceWith)
+            continue;
         StringBuilder sb(other, StringBuilder::Clear);
         SC_TRY(sb.appendReplaceAll(buffer.view(), it.searchFor, it.replaceWith));
         swap(other, buffer);

@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Tools/SC-build.h"
+#include "SC-build.h"
 #include "Libraries/Strings/StringBuilder.h"
 
 namespace SC
@@ -47,17 +47,14 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
     for (Configuration& config : project.configurations)
     {
         constexpr auto buildBase = "$(PROJECT_DIR)/../..";
-        constexpr auto buildDir  = "$(PLATFORM_DISPLAY_NAME)-$(MACOSX_DEPLOYMENT_TARGET)-$(ARCHS)-"
-                                   "$(SC_GENERATOR)-$(SC_COMPILER)-$(SC_COMPILER_VERSION)-$(CONFIGURATION)";
+        constexpr auto buildDir  = "$(TARGET_OS)-$(TARGET_ARCHITECTURES)-$(BUILD_SYSTEM)-$(COMPILER)-$(CONFIGURATION)";
         StringBuilder(config.outputPath).format("{}/_Outputs/{}", buildBase, buildDir);
         StringBuilder(config.intermediatesPath).format("{}/_Intermediates/$(PROJECT_NAME)/{}", buildBase, buildDir);
         config.compile.set<Compile::enableASAN>(config.preset == Configuration::Preset::Debug);
     }
 
     // File overrides (order matters regarding to add / remove)
-    project.addFile("SC-build.cpp");                           // add single tool
-    project.addFile("SC-format.cpp");                          // add single tool
-    project.addFile("SC-package.cpp");                         // add single tool
+    project.addDirectory("Tools", "SC-*.cpp");                 // add all tools
     project.addDirectory("Tests/SCTest", "*.cpp");             // add all .cpp from SCTest directory
     project.addDirectory("Tests/SCTest", "*.h");               // add all .h from SCTest directory
     project.addDirectory("Libraries", "**.cpp");               // recursively add all cpp files
@@ -84,10 +81,6 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
     return Result(true);
 }
 
-Result executeAction(Build::Actions::Type action, Build::Generator::Type generator, StringView targetDirectory,
-                     StringView libraryDirectory)
-{
-    return Build::Actions::execute(action, configure, PROJECT_NAME, generator, targetDirectory, libraryDirectory);
-}
+Result executeAction(const Action& action) { return Build::Action::execute(action, configure, PROJECT_NAME); }
 } // namespace Build
 } // namespace SC

@@ -21,4 +21,4 @@ jobs:
       shell: cmd
       run: SC.bat build compile
     - name: test
-      run: ./_Build/_Outputs/Windows-10.0-x64-msbuild-msvc-17-Debug/SCTest.exe
+      run: ./_Build/_Outputs/windows-x64-msbuild-msvc-Debug/SCTest.exe

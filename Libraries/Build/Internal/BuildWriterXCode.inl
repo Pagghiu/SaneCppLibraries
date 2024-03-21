@@ -538,9 +538,15 @@ struct SC::Build::ProjectWriter::WriterXCode
         builder.append("\n                       CONFIGURATION_BUILD_DIR = \"");
         // TODO: Extract actual proper apple clang version
         constexpr StringBuilder::ReplacePair replacements[] = {
-            {"$(SC_GENERATOR)", "XCode"},     //
-            {"$(SC_COMPILER)", "clang"},      //
-            {"$(SC_COMPILER_VERSION)", "15"}, //
+            {"$(PROJECT_DIR)", "$(PROJECT_DIR)"},                    // Same
+            {"$(CONFIGURATION)", "$(CONFIGURATION)"},                // Same
+            {"$(PROJECT_NAME)", "$(PROJECT_NAME)"},                  // Same
+            {"$(TARGET_OS)", "$(PLATFORM_DISPLAY_NAME)"},            //
+            {"$(TARGET_OS_VERSION)", "$(MACOSX_DEPLOYMENT_TARGET)"}, //
+            {"$(TARGET_ARCHITECTURES)", "$(ARCHS)"},                 //
+            {"$(BUILD_SYSTEM)", "xcode"},                            //
+            {"$(COMPILER)", "clang"},                                //
+            {"$(COMPILER_VERSION)", "15"},                           // TODO: Detect apple-clang version
         };
         builder.appendReplaceMultiple(configuration->outputPath.view(),
                                       {replacements, sizeof(replacements) / sizeof(replacements[0])});

@@ -27,27 +27,30 @@ The test suite uses the handmade / self-hosted [SC::Build](@ref library_build) s
 
 #### VScode on macOS
 Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
-- `Build SCTest Debug` [1]
-- `Build SCTest Release` [1]
-- `Build SCTest XCode Debug` [2]
-- `Build SCTest XCode Release` [2]
+- `Build SCTest Debug intel64` [1]
+- `Build SCTest Debug arm64` [1]
+- `Build SCTest Release intel64` [1]
+- `Build SCTest Release arm64` [1]
 
 @note
-[1] Needs only `make` and `c++` command (can be switched to be `clang` or `gcc`). Builds only current host architecture (`arm64` or `x86_64`).  
-[2] Needs XCode installed. Builds an universal executable in Release.
+[1] Uses `make` and `c++` command (can be switched to be `clang` or `gcc`). Builds only current host architecture (`arm64` or `x86_64`). Still needs XCode installed for the sysroot.  
 
 #### VSCode on Linux
 Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
-- `Build SCTest Debug` [1]
-- `Build SCTest Release` [1]
+- `Build SCTest Debug intel64` [1]
+- `Build SCTest Debug arm64` [1]
+- `Build SCTest Release intel64` [1]
+- `Build SCTest Release arm64` [1]
 
 @note
-[1] Needs only `make` and `c++`. Builds only current host architecture (`arm64` or `x86_64`).
+[1] Uses `make` and `c++` commands. Builds only current host architecture (`arm64` or `x86_64`).
 
 #### VSCode on Windows
 Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
-- `Build SCTest Debug` [1]
-- `Build SCTest Debug ARM64` [1]
+- `Build SCTest Debug intel64` [1]
+- `Build SCTest Debug arm64` [1]
+- `Build SCTest Release intel64` [1]
+- `Build SCTest Release arm64` [1]
 
 @note
 [1] Needs `Visual Studio 2022` installed
@@ -62,14 +65,14 @@ Running the default target should work out of the box, as paths are already gene
 
 Select one of the appropriate `Run and Debug` configuration like:
 
-- `SCTest x64 [apple] (gdb)` [1]
-- `SCTest x64 [apple] (lldb)` [2]
-- `SCTest ARM64 [apple] (gdb)` [1]
-- `SCTest ARM64 [apple] (lldb)` [2]
-- `SCTest x64 [linux] (gdb)` [1]
-- `SCTest x64 [linux] (lldb)` [2]
-- `SCTest ARM64 [linux] (gdb)` [1]
-- `SCTest ARM64 [linux] (lldb)` [2]
+- `SCTest intel64 [apple] (gdb)` [1]
+- `SCTest intel64 [apple] (lldb)` [2]
+- `SCTest arm64 [apple] (gdb)` [1]
+- `SCTest arm64 [apple] (lldb)` [2]
+- `SCTest intel64 [linux] (gdb)` [1]
+- `SCTest intel64 [linux] (lldb)` [2]
+- `SCTest arm64 [linux] (gdb)` [1]
+- `SCTest arm64 [linux] (lldb)` [2]
 
 @note
 [1] Uses `gdb` debugger. Implicitly invokes `Build SCTest Debug` to build the executable.  
@@ -79,8 +82,8 @@ Select one of the appropriate `Run and Debug` configuration like:
 
 Select one of the appropriate `Run and Debug` configuration like:
 
-- `SCTest x64 [windows]` [1]
-- `SCTest ARM64 [windows]` [1]
+- `SCTest intel64 [windows]` [1]
+- `SCTest arm64 [windows]` [1]
 
 @note
 [1] Needs `Visual Studio 2022` installed

@@ -10,16 +10,9 @@
 
 namespace SC
 {
-namespace Build
+namespace Tools
 {
-// Defined in SC-build.cpp
-Result executeAction(Build::Actions::Type action, Build::Generator::Type generator, StringView targetDirectory,
-                     StringView libraryDirectory);
-} // namespace Build
-} // namespace SC
 
-namespace SC
-{
 constexpr StringView PROJECTS_SUBDIR = "_Projects";
 
 [[nodiscard]] inline Result runBuildValidate(Tool::Arguments& arguments, String& projectsDirectory)
@@ -42,15 +35,20 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
 {
     StringNative<256> projectsDirectory;
     SC_TRY(runBuildValidate(arguments, projectsDirectory));
-    Result res(true);
-    res = Build::executeAction(Build::Actions::Configure, Build::Generator::VisualStudio2022, projectsDirectory.view(),
-                               arguments.libraryDirectory);
+    Result        res(true);
+    Build::Action action;
+    action.action           = Build::Action::Configure;
+    action.targetDirectory  = projectsDirectory.view();
+    action.libraryDirectory = arguments.libraryDirectory;
+
+    action.generator = Build::Generator::VisualStudio2022;
+    res              = Build::executeAction(action);
     SC_TRY_MSG(res, "Build error Visual Studio 2022");
-    res = Build::executeAction(Build::Actions::Configure, Build::Generator::XCode, projectsDirectory.view(),
-                               arguments.libraryDirectory);
+    action.generator = Build::Generator::XCode;
+    res              = Build::executeAction(action);
     SC_TRY_MSG(res, "Build error XCode");
-    res = Build::executeAction(Build::Actions::Configure, Build::Generator::Make, projectsDirectory.view(),
-                               arguments.libraryDirectory);
+    action.generator = Build::Generator::Make;
+    res              = Build::executeAction(action);
     SC_TRY_MSG(res, "Build error Makefile");
     return Result(true);
 }
@@ -59,20 +57,71 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
 {
     StringNative<256> projectsDirectory;
     SC_TRY(runBuildValidate(arguments, projectsDirectory));
+
+    Build::Action action;
+    action.action           = Build::Action::Compile;
+    action.targetDirectory  = projectsDirectory.view();
+    action.libraryDirectory = arguments.libraryDirectory;
     switch (HostPlatform)
     {
-    case Platform::Windows:
-        return Build::executeAction(Build::Actions::Compile, Build::Generator::VisualStudio2022,
-                                    projectsDirectory.view(), arguments.libraryDirectory);
-    case Platform::Apple:
-        return Build::executeAction(Build::Actions::Compile, Build::Generator::XCode, projectsDirectory.view(),
-                                    arguments.libraryDirectory);
-    case Platform::Linux:
-        return Build::executeAction(Build::Actions::Compile, Build::Generator::Make, projectsDirectory.view(),
-                                    arguments.libraryDirectory);
-    default: //
-        return Result::Error("Unsupported platform for compile");
+    case Platform::Windows: action.generator = Build::Generator::VisualStudio2022; break;
+    case Platform::Apple: action.generator = Build::Generator::Make; break;
+    case Platform::Linux: action.generator = Build::Generator::Make; break;
+    default: return Result::Error("Unsupported platform for compile");
     }
+
+    if (arguments.arguments.sizeInElements() >= 1)
+    {
+        action.configuration = arguments.arguments[0];
+    }
+    if (arguments.arguments.sizeInElements() >= 2)
+    {
+        if (arguments.arguments[1] == "xcode")
+        {
+            action.generator = Build::Generator::XCode;
+        }
+        else if (arguments.arguments[1] == "make")
+        {
+            action.generator = Build::Generator::Make;
+        }
+        else if (arguments.arguments[1] == "vs2022")
+        {
+            action.generator = Build::Generator::VisualStudio2022;
+        }
+        else if (arguments.arguments[1] == "default")
+        {
+            switch (HostPlatform)
+            {
+            case Platform::Windows: action.generator = Build::Generator::VisualStudio2022; break;
+            default: action.generator = Build::Generator::Make; break;
+            }
+        }
+    }
+    if (arguments.arguments.sizeInElements() >= 3)
+    {
+        if (arguments.arguments[2] == "arm64")
+        {
+            action.architecture = Build::Architecture::Arm64;
+        }
+        else if (arguments.arguments[2] == "intel32")
+        {
+            action.architecture = Build::Architecture::Intel32;
+        }
+        else if (arguments.arguments[2] == "intel64")
+        {
+            action.architecture = Build::Architecture::Intel64;
+        }
+        else if (arguments.arguments[2] == "wasm")
+        {
+            action.architecture = Build::Architecture::Wasm;
+        }
+        else if (arguments.arguments[2] == "any")
+        {
+            action.architecture = Build::Architecture::Any;
+        }
+    }
+
+    return Build::executeAction(action);
 }
 
 [[nodiscard]] inline Result runBuildTool(Tool::Arguments& arguments)
@@ -96,5 +145,6 @@ StringView Tool::getToolName() { return "build"; }
 StringView Tool::getDefaultAction() { return "configure"; }
 Result     Tool::runTool(Tool::Arguments& arguments) { return runBuildTool(arguments); }
 #endif
+} // namespace Tools
 
 } // namespace SC

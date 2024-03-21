@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
-#include "Tools/SC-package.h"
+#include "SC-package.h"
 
 namespace SC
 {
@@ -347,15 +347,10 @@ namespace Tools
     return Result(true);
 }
 
-} // namespace Tools
 constexpr StringView PackagesCacheDirectory   = "_PackagesCache";
 constexpr StringView PackagesInstallDirectory = "_Packages";
 
-} // namespace SC
-
-namespace SC
-{
-inline Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package = nullptr)
+inline Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
 {
     Console& console = arguments.console;
 
@@ -392,4 +387,5 @@ StringView Tool::getToolName() { return "package"; }
 StringView Tool::getDefaultAction() { return "install"; }
 Result     Tool::runTool(Tool::Arguments& arguments) { return runPackageTool(arguments); }
 #endif
+} // namespace Tools
 } // namespace SC

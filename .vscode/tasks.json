@@ -4,30 +4,21 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build SCTest Debug",
+            "label": "Build SCTest Debug intel64",
             "type": "shell",
-            "osx": {
-                "command": "make -j -C _Build/_Projects/Make"
-            },
-            "linux": {
-                "command": "make -j -C _Build/_Projects/Make"
-            },
+            "command": "${workspaceRoot}/SC.sh",
+            "args": ["build", "compile", "Debug", "default", "intel64"],
+            "problemMatcher": [
+                "$gcc"
+            ],
             "windows": {
-                "command": "${env:ProgramFiles}/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe",
-                "args": [
-                    "_Build/_Projects/VisualStudio2022/SCTest.sln",
-                    "/p:Configuration=Debug",
-                    "/p:Platform=x64",
-                ],
+                "command": "${workspaceRoot}/SC.bat",
                 "properties": {
                     "problemMatcher": [
                         "$msvc"
                     ]
                 }
             },
-            "problemMatcher": [
-                "$gcc"
-            ],
             "presentation": {
                 "echo": true,
                 "reveal": "never",
@@ -42,21 +33,15 @@
             }
         },
         {
-            "label": "Build SCTest Debug ARM64",
+            "label": "Build SCTest Debug arm64",
             "type": "shell",
-            "osx": {
-                "command": "make -j -C _Build/_Projects/Make"
-            },
-            "linux": {
-                "command": "make -j -C _Build/_Projects/Make",
-            },
+            "command": "${workspaceRoot}/SC.sh",
+            "args": ["build", "compile", "Debug", "default", "arm64"],
+            "problemMatcher": [
+                "$gcc"
+            ],
             "windows": {
-                "command": "${env:ProgramFiles}/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe",
-                "args": [
-                    "_Build/_Projects/VisualStudio2022/SCTest.sln",
-                    "/p:Configuration=Debug",
-                    "/p:Platform=ARM64",
-                ],
+                "command": "${workspaceRoot}/SC.bat",
                 "properties": {
                     "problemMatcher": [
                         "$msvc"
@@ -73,33 +58,25 @@
             },
             "group": {
                 "kind": "build",
+                "isDefault": true
             }
         },
         {
-            "label": "Build SCTest Release",
+            "label": "Build SCTest Release intel64",
             "type": "shell",
-            "osx": {
-                "command": "make -j -C _Build/_Projects/Make CONFIG=Release",
-            },
-            "linux": {
-                "command": "make -j -C _Build/_Projects/Make CONFIG=Release"
-            },
+            "command": "${workspaceRoot}/SC.sh",
+            "args": ["build", "compile", "Release", "default", "intel64"],
+            "problemMatcher": [
+                "$gcc"
+            ],
             "windows": {
-                "command": "${env:ProgramFiles}/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe",
-                "args": [
-                    "_Build/_Projects/VisualStudio2022/SCTest.sln",
-                    "/p:Configuration=Release",
-                    "/p:Platform=x64",
-                ],
+                "command": "${workspaceRoot}/SC.bat",
                 "properties": {
                     "problemMatcher": [
                         "$msvc"
                     ]
                 }
             },
-            "problemMatcher": [
-                "$gcc"
-            ],
             "presentation": {
                 "echo": true,
                 "reveal": "never",
@@ -110,17 +87,25 @@
             },
             "group": {
                 "kind": "build",
+                "isDefault": true
             }
         },
         {
-            "label": "Build SCTest XCode Debug",
+            "label": "Build SCTest Release arm64",
             "type": "shell",
-            // Building scheme for DEBUG (will use settings set in the scheme, ASAN for example)
-            // Building only a single arch because, USE_ACTIVE_ARCS is ignored when invoked from xcodebuild
-            "command": "xcodebuild -scheme SCTest -configuration Debug -project \"${workspaceFolder}/_Build/_Projects/XCode/SCTest.xcodeproj\"",
+            "command": "${workspaceRoot}/SC.sh",
+            "args": ["build", "compile", "Release", "default", "arm64"],
             "problemMatcher": [
                 "$gcc"
             ],
+            "windows": {
+                "command": "${workspaceRoot}/SC.bat",
+                "properties": {
+                    "problemMatcher": [
+                        "$msvc"
+                    ]
+                }
+            },
             "presentation": {
                 "echo": true,
                 "reveal": "never",
@@ -131,31 +116,38 @@
             },
             "group": {
                 "kind": "build",
+                "isDefault": true
             }
         },
         {
-            "label": "Build SCTest XCode Release",
+            "label": "Format Source Files",
             "type": "shell",
-            // We cannot use "archive" action as produces a broken symlink instead of proper executable (BUG)
-            // If you want to build only 1 arch add ONLY_ACTIVE_ARCH=NO AND (ARCHS=arm64 or ARCHS=x86_64)
-            "command": "xcodebuild -target SCTest -configuration Release -project \"${workspaceFolder}/_Build/_Projects/XCode/SCTest.xcodeproj\"",
+            "command": "${workspaceRoot}/SC.sh",
+            "args": [
+                "format",
+                "execute"
+            ],
+            "windows": {
+                "command": "${workspaceRoot}/SC.bat",
+            },
             "problemMatcher": [
                 "$gcc"
             ],
-            "group": {
-                "kind": "build",
-            }
         },
         {
-            "label": "Build SCTest XCode Release ARM64",
+            "label": "Generate Projects",
             "type": "shell",
-            "command": "xcodebuild -target SCTest -configuration Release -project \"${workspaceFolder}/_Build/_Projects/XCode/SCTest.xcodeproj\" ONLY_ACTIVE_ARCH=NO ARCHS=arm64",
+            "command": "${workspaceRoot}/SC.sh",
+            "args": [
+                "build",
+                "configure"
+            ],
+            "windows": {
+                "command": "${workspaceRoot}/SC.bat",
+            },
             "problemMatcher": [
                 "$gcc"
             ],
-            "group": {
-                "kind": "build",
-            }
-        },
+        }
     ]
 }

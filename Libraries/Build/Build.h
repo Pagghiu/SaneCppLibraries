@@ -438,7 +438,7 @@ struct DefinitionCompiler
 // Implementations Details
 //-----------------------------------------------------------------------------------------------------------------------
 
-struct Actions
+struct Action
 {
     enum Type
     {
@@ -448,12 +448,22 @@ struct Actions
     using ConfigureFunction = Result (*)(Build::Definition& definition, Build::Parameters& parameters,
                                          StringView rootDirectory);
 
-    static Result execute(Type action, ConfigureFunction configure, StringView projectName,
-                          Build::Generator::Type generator, StringView targetDirectory, StringView sourcesDirectory);
+    static Result execute(const Action& action, ConfigureFunction configure, StringView projectName);
+
+    Type action = Configure;
+
+    Generator::Type    generator    = Generator::Type::Make;
+    Architecture::Type architecture = Architecture::Any;
+
+    StringView targetDirectory;
+    StringView libraryDirectory;
+    StringView configuration;
 
   private:
     struct Internal;
 };
 
+// Defined inside SC-Build.cpp
+Result executeAction(const Action& action);
 } // namespace Build
 } // namespace SC

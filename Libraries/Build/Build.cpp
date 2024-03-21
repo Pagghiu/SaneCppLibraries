@@ -369,30 +369,25 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
     return Result(true);
 }
 
-struct SC::Build::Actions::Internal
+struct SC::Build::Action::Internal
 {
     static Build::Parameters fillDefaultParameters(Generator::Type generator);
 
-    static Result configure(ConfigureFunction configure, StringView projectFileName, Generator::Type generator,
-                            StringView targetDirectory, StringView sourcesDirectory);
-    static Result compile(ConfigureFunction configure, StringView projectFileName, Generator::Type generator,
-                          StringView targetDirectory, StringView sourcesDirectory);
+    static Result configure(ConfigureFunction configure, StringView projectFileName, const Action& action);
+    static Result compile(ConfigureFunction configure, StringView projectFileName, const Action& action);
 };
 
-SC::Result SC::Build::Actions::execute(Type action, ConfigureFunction configure, StringView projectFileName,
-                                       Generator::Type generator, StringView targetDirectory,
-                                       StringView sourcesDirectory)
+SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction configure, StringView projectName)
 {
-    switch (action)
+    switch (action.action)
     {
-    case Compile: return Internal::compile(configure, projectFileName, generator, targetDirectory, sourcesDirectory);
-    case Configure:
-        return Internal::configure(configure, projectFileName, generator, targetDirectory, sourcesDirectory);
+    case Compile: return Internal::compile(configure, projectName, action);
+    case Configure: return Internal::configure(configure, projectName, action);
     }
     return Result::Error("Action::execute - unsupported action");
 }
 
-SC::Build::Parameters SC::Build::Actions::Internal::fillDefaultParameters(Generator::Type generator)
+SC::Build::Parameters SC::Build::Action::Internal::fillDefaultParameters(Generator::Type generator)
 {
     switch (generator)
     {
@@ -425,49 +420,107 @@ SC::Build::Parameters SC::Build::Actions::Internal::fillDefaultParameters(Genera
     SC_ASSERT_RELEASE(false);
 }
 
-SC::Result SC::Build::Actions::Internal::configure(ConfigureFunction configure, StringView projectFileName,
-                                                   Generator::Type generator, StringView targetDirectory,
-                                                   StringView sourcesDirectory)
+SC::Result SC::Build::Action::Internal::configure(ConfigureFunction configure, StringView projectFileName,
+                                                  const Action& action)
 {
-    Build::Parameters parameters = fillDefaultParameters(generator);
+    Build::Parameters parameters = fillDefaultParameters(action.generator);
     Build::Definition definition;
-    SC_TRY(configure(definition, parameters, sourcesDirectory));
-    SC_TRY(definition.configure(projectFileName, parameters, targetDirectory));
+    SC_TRY(configure(definition, parameters, action.libraryDirectory));
+    SC_TRY(definition.configure(projectFileName, parameters, action.targetDirectory));
     return Result(true);
 }
 
-SC::Result SC::Build::Actions::Internal::compile(ConfigureFunction configure, StringView projectFileName,
-                                                 Build::Generator::Type generator, StringView targetDirectory,
-                                                 StringView sourcesDirectory)
+SC::Result SC::Build::Action::Internal::compile(ConfigureFunction configure, StringView projectFileName,
+                                                const Action& action)
 {
     SC_COMPILER_UNUSED(configure);
-    SC_COMPILER_UNUSED(sourcesDirectory);
+    StringView configuration = action.configuration.isEmpty() ? "Debug" : action.configuration;
 
-    Build::Parameters parameters = fillDefaultParameters(generator);
+    Build::Parameters parameters = fillDefaultParameters(action.generator);
     SmallString<256>  solutionLocation;
 
     Process process;
-    switch (generator)
+    switch (action.generator)
     {
     case Generator::XCode: {
-        SC_TRY(Path::join(solutionLocation, {targetDirectory, Generator::toString(generator), projectFileName}));
+        SC_TRY(Path::join(solutionLocation,
+                          {action.targetDirectory, Generator::toString(action.generator), projectFileName}));
         SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(".xcodeproj"));
-        SC_TRY(process.exec(
-            {"xcodebuild", "-configuration", "Debug", "-project", solutionLocation.view(), "ONLY_ACTIVE_ARCH=NO"}));
+        StringView architecture;
+        switch (action.architecture)
+        {
+        case Architecture::Intel64: architecture = "x86_64"; break;
+        case Architecture::Arm64: architecture = "arm64"; break;
+        case Architecture::Any: architecture = "arm64 x86_64"; break;
+        case Architecture::Intel32: // Unsupported
+        case Architecture::Wasm:    // Unsupported
+            return Result::Error("Unsupported architecture for XCode");
+        }
+
+        SmallString<32> formattedPlatform;
+        SC_TRY(StringBuilder(formattedPlatform).format("ARCHS={}", architecture));
+        SC_TRY(process.exec({"xcodebuild", "-configuration", configuration, "-project", solutionLocation.view(),
+                             "ONLY_ACTIVE_ARCH=NO", formattedPlatform.view()}));
     }
     break;
     case Generator::VisualStudio2022: {
-        SC_TRY(Path::join(solutionLocation, {targetDirectory, Generator::toString(generator), projectFileName}));
+        SC_TRY(Path::join(solutionLocation,
+                          {action.targetDirectory, Generator::toString(action.generator), projectFileName}));
         SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(".sln"));
-        SC_TRY(process.exec({"msbuild", solutionLocation.view(), "/p:Configuration=Debug", "/p:Platform=x64"}));
+        SmallString<32> platformConfiguration;
+        SC_TRY(StringBuilder(platformConfiguration).format("/p:Configuration={}", configuration));
+
+        StringView architecture;
+        switch (action.architecture)
+        {
+        case Architecture::Intel32: architecture = "x86"; break;
+        case Architecture::Intel64: architecture = "x64"; break;
+        case Architecture::Arm64: architecture = "ARM64"; break;
+        case Architecture::Any: break;
+
+        case Architecture::Wasm: // Unsupported
+            return Result::Error("Unsupported architecture for Visual Studio");
+        }
+
+        if (architecture.isEmpty())
+        {
+            SC_TRY(process.exec({"msbuild", solutionLocation.view(), platformConfiguration.view()}));
+        }
+        else
+        {
+            SmallString<32> platform;
+            SC_TRY(StringBuilder(platform).format("/p:Platform={}", architecture));
+            SC_TRY(process.exec({"msbuild", solutionLocation.view(), platformConfiguration.view(), platform.view()}));
+        }
     }
     break;
     case Generator::Make: {
-        SC_TRY(Path::join(solutionLocation, {targetDirectory, Generator::toString(generator)}));
-        SC_TRY(process.exec({"make", "-j", "-C", solutionLocation.view(), "CONFIG=Debug"}));
+        SC_TRY(Path::join(solutionLocation, {action.targetDirectory, Generator::toString(action.generator)}));
+        SmallString<32> platformConfiguration;
+        SC_TRY(StringBuilder(platformConfiguration).format("CONFIG={}", configuration));
+
+        StringView architecture;
+        switch (action.architecture)
+        {
+        case Architecture::Intel64: architecture = "TARGET_ARCHITECTURE=x86_64"; break;
+        case Architecture::Arm64: architecture = "TARGET_ARCHITECTURE=arm64"; break;
+        case Architecture::Any: break;
+        case Architecture::Intel32: // Unsupported
+        case Architecture::Wasm:    // Unsupported
+            return Result::Error("Unsupported architecture for make");
+        }
+        if (architecture.isEmpty())
+        {
+            SC_TRY(process.exec({"make", "-j", "-C", solutionLocation.view(), platformConfiguration.view()}));
+        }
+        else
+        {
+            SC_TRY(process.exec(
+                {"make", "-j", "-C", solutionLocation.view(), platformConfiguration.view(), architecture}));
+        }
     }
     break;
     }
-
+    SC_TRY_MSG(process.getExitStatus() == 0, "Compile returned error");
     return Result(true);
 }

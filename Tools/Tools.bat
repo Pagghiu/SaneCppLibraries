@@ -48,7 +48,7 @@ if exist "SC-%TOOL%.exe" (
 REM /permissive- allows usage of (and, or) operators with C++14
 :DoCompile
 echo Building SC-%TOOL%.cpp...
-cl.exe /nologo /std:c++14 /permissive- /EHsc /Fe"SC-%TOOL%.exe" "%LIBRARY_DIR%/Tools/Tools.cpp" "%TOOL_SOURCE_DIR%/SC-%TOOL%.cpp" /link Advapi32.lib Shell32.lib
+cl.exe /nologo /std:c++14 /permissive- /EHsc /I"%LIBRARY_DIR%" /Fe"SC-%TOOL%.exe" "%LIBRARY_DIR%/Tools/Tools.cpp" "%TOOL_SOURCE_DIR%/SC-%TOOL%.cpp" /link Advapi32.lib Shell32.lib
 :SkipCompiling
 
 IF %ERRORLEVEL% == 0 (
