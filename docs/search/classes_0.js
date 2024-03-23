@@ -1,7 +1,7 @@
 var searchData=
 [
   ['absolute_0',['Absolute',['../struct_s_c_1_1_time_1_1_absolute.html',1,'SC::Time']]],
-  ['actions_1',['Actions',['../struct_s_c_1_1_build_1_1_actions.html',1,'SC::Build']]],
+  ['action_1',['Action',['../struct_s_c_1_1_build_1_1_action.html',1,'SC::Build']]],
   ['addpointer_2',['AddPointer',['../struct_s_c_1_1_type_traits_1_1_add_pointer.html',1,'SC::TypeTraits']]],
   ['addreference_3',['AddReference',['../struct_s_c_1_1_type_traits_1_1_add_reference.html',1,'SC::TypeTraits']]],
   ['alignedstorage_4',['AlignedStorage',['../struct_s_c_1_1_aligned_storage.html',1,'SC']]],

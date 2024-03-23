@@ -1,7 +1,7 @@
 var hierarchy =
 [
     [ "SC::Time::Absolute", "struct_s_c_1_1_time_1_1_absolute.html", null ],
-    [ "SC::Build::Actions", "struct_s_c_1_1_build_1_1_actions.html", null ],
+    [ "SC::Build::Action", "struct_s_c_1_1_build_1_1_action.html", null ],
     [ "SC::TypeTraits::AddPointer< T >", "struct_s_c_1_1_type_traits_1_1_add_pointer.html", null ],
     [ "SC::TypeTraits::AddReference< T >", "struct_s_c_1_1_type_traits_1_1_add_reference.html", null ],
     [ "SC::AlignedStorage< N, Alignment >", "struct_s_c_1_1_aligned_storage.html", null ],

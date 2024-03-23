@@ -1,6 +1,6 @@
 var namespace_s_c_1_1_build =
 [
-    [ "Actions", "struct_s_c_1_1_build_1_1_actions.html", null ],
+    [ "Action", "struct_s_c_1_1_build_1_1_action.html", null ],
     [ "Architecture", "struct_s_c_1_1_build_1_1_architecture.html", null ],
     [ "Compile", "struct_s_c_1_1_build_1_1_compile.html", "struct_s_c_1_1_build_1_1_compile" ],
     [ "CompileFlags", "struct_s_c_1_1_build_1_1_compile_flags.html", "struct_s_c_1_1_build_1_1_compile_flags" ],

@@ -161,25 +161,29 @@ XCode</h4>
 <h4><a class="anchor" id="autotoc_md4"></a>
 VScode on macOS</h4>
 <p >Under VSCode select <code>Tasks: Run Task</code> and choose an appropriate targets like:</p><ul>
-<li><code>Build SCTest Debug</code> [1]</li>
-<li><code>Build SCTest Release</code> [1]</li>
-<li><code>Build SCTest XCode Debug</code> [2]</li>
-<li><code>Build SCTest XCode Release</code> [2]</li>
+<li><code>Build SCTest Debug intel64</code> [1]</li>
+<li><code>Build SCTest Debug arm64</code> [1]</li>
+<li><code>Build SCTest Release intel64</code> [1]</li>
+<li><code>Build SCTest Release arm64</code> [1]</li>
 </ul>
-<dl class="section note"><dt>Note</dt><dd>[1] Needs only <code>make</code> and <code>c++</code> command (can be switched to be <code>clang</code> or <code>gcc</code>). Builds only current host architecture (<code>arm64</code> or <code>x86_64</code>). <br  />
- [2] Needs XCode installed. Builds an universal executable in Release.</dd></dl>
+<dl class="section note"><dt>Note</dt><dd>[1] Uses <code>make</code> and <code>c++</code> command (can be switched to be <code>clang</code> or <code>gcc</code>). Builds only current host architecture (<code>arm64</code> or <code>x86_64</code>). Still needs XCode installed for the sysroot. <br  />
+</dd></dl>
 <h4><a class="anchor" id="autotoc_md5"></a>
 VSCode on Linux</h4>
 <p >Under VSCode select <code>Tasks: Run Task</code> and choose an appropriate targets like:</p><ul>
-<li><code>Build SCTest Debug</code> [1]</li>
-<li><code>Build SCTest Release</code> [1]</li>
+<li><code>Build SCTest Debug intel64</code> [1]</li>
+<li><code>Build SCTest Debug arm64</code> [1]</li>
+<li><code>Build SCTest Release intel64</code> [1]</li>
+<li><code>Build SCTest Release arm64</code> [1]</li>
 </ul>
-<dl class="section note"><dt>Note</dt><dd>[1] Needs only <code>make</code> and <code>c++</code>. Builds only current host architecture (<code>arm64</code> or <code>x86_64</code>).</dd></dl>
+<dl class="section note"><dt>Note</dt><dd>[1] Uses <code>make</code> and <code>c++</code> commands. Builds only current host architecture (<code>arm64</code> or <code>x86_64</code>).</dd></dl>
 <h4><a class="anchor" id="autotoc_md6"></a>
 VSCode on Windows</h4>
 <p >Under VSCode select <code>Tasks: Run Task</code> and choose an appropriate targets like:</p><ul>
-<li><code>Build SCTest Debug</code> [1]</li>
-<li><code>Build SCTest Debug ARM64</code> [1]</li>
+<li><code>Build SCTest Debug intel64</code> [1]</li>
+<li><code>Build SCTest Debug arm64</code> [1]</li>
+<li><code>Build SCTest Release intel64</code> [1]</li>
+<li><code>Build SCTest Release arm64</code> [1]</li>
 </ul>
 <dl class="section note"><dt>Note</dt><dd>[1] Needs <code>Visual Studio 2022</code> installed</dd></dl>
 <h3><a class="anchor" id="autotoc_md7"></a>
@@ -191,14 +195,14 @@ Visual Studio or XCode</h4>
 VSCode on macOS or Linux</h4>
 <p >Select one of the appropriate <code>Run and Debug</code> configuration like:</p>
 <ul>
-<li><code>SCTest x64 [apple] (gdb)</code> [1]</li>
-<li><code>SCTest x64 [apple] (lldb)</code> [2]</li>
-<li><code>SCTest ARM64 [apple] (gdb)</code> [1]</li>
-<li><code>SCTest ARM64 [apple] (lldb)</code> [2]</li>
-<li><code>SCTest x64 [linux] (gdb)</code> [1]</li>
-<li><code>SCTest x64 [linux] (lldb)</code> [2]</li>
-<li><code>SCTest ARM64 [linux] (gdb)</code> [1]</li>
-<li><code>SCTest ARM64 [linux] (lldb)</code> [2]</li>
+<li><code>SCTest intel64 [apple] (gdb)</code> [1]</li>
+<li><code>SCTest intel64 [apple] (lldb)</code> [2]</li>
+<li><code>SCTest arm64 [apple] (gdb)</code> [1]</li>
+<li><code>SCTest arm64 [apple] (lldb)</code> [2]</li>
+<li><code>SCTest intel64 [linux] (gdb)</code> [1]</li>
+<li><code>SCTest intel64 [linux] (lldb)</code> [2]</li>
+<li><code>SCTest arm64 [linux] (gdb)</code> [1]</li>
+<li><code>SCTest arm64 [linux] (lldb)</code> [2]</li>
 </ul>
 <dl class="section note"><dt>Note</dt><dd>[1] Uses <code>gdb</code> debugger. Implicitly invokes <code>Build SCTest Debug</code> to build the executable. <br  />
  [2] Uses <code>lldb</code> debugger. Implicitly invokes <code>Build SCTest Debug</code> to build the executable. You need <code>CodeLLDB</code> or similar extension installed in VSCode.</dd></dl>
@@ -206,8 +210,8 @@ VSCode on macOS or Linux</h4>
 VSCode on Windows</h4>
 <p >Select one of the appropriate <code>Run and Debug</code> configuration like:</p>
 <ul>
-<li><code>SCTest x64 [windows]</code> [1]</li>
-<li><code>SCTest ARM64 [windows]</code> [1]</li>
+<li><code>SCTest intel64 [windows]</code> [1]</li>
+<li><code>SCTest arm64 [windows]</code> [1]</li>
 </ul>
 <dl class="section note"><dt>Note</dt><dd>[1] Needs <code>Visual Studio 2022</code> installed </dd></dl>
 </div></div><!-- contents -->
