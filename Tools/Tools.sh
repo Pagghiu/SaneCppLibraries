@@ -6,26 +6,8 @@ TOOL="${4:-build}"      # Tool to execute (build by default)
 
 TOOL_OUTPUT_DIR="${BUILD_DIR}/_Tools"   # Directory where the ${TOOL} executable will be generated
 
+make -s -j --no-print-directory -C "${LIBRARY_DIR}/Tools/Build/Posix" CONFIG=Debug "TOOL=SC-${TOOL}" "TOOL_SOURCE_DIR=${TOOL_SOURCE_DIR}" "TOOL_OUTPUT_DIR=${TOOL_OUTPUT_DIR}"
+
+echo "Starting SC-${TOOL}..."
 OS=$(uname -s)
-
-TOOL_COMMAND_LINE="$TOOL_OUTPUT_DIR/SC-${TOOL}-${OS}"
-
-# Rebuild the command if it doesn't exist or if no action has been specified
-if [ -z "$5" ] || [ ! -e "${TOOL_COMMAND_LINE}" ]; then
-
-mkdir -p "$TOOL_OUTPUT_DIR"
-echo "Building SC-${TOOL}.cpp..."
-if [ "$OS" = "Darwin" ]; then
-clang -std=c++14 -fno-exceptions "-I${LIBRARY_DIR}" -nostdlib++ -framework CoreServices "$TOOL_SOURCE_DIR/SC-${TOOL}.cpp" "$LIBRARY_DIR/Tools/Tools.cpp" -o "${TOOL_COMMAND_LINE}"
-elif [ "$OS" = "Linux" ]; then
-g++ -std=c++14 -fno-exceptions "-I${LIBRARY_DIR}" "$TOOL_SOURCE_DIR/SC-${TOOL}.cpp" "$LIBRARY_DIR/Tools/Tools.cpp" -o "${TOOL_COMMAND_LINE}"
-else
-    { echo "Unsupported operating system: $OS" ; exit 1; }
-fi
-if [ $? -ne 0 ]; then
-    { echo "Error: Compilation failed." ; exit 1; }
-fi
-
-fi
-echo "Running SC-${TOOL}.cpp..."
-"${TOOL_COMMAND_LINE}" $*
+"$TOOL_OUTPUT_DIR/${OS}/SC-${TOOL}" $*

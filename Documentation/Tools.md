@@ -46,7 +46,7 @@ This is the list of tools that currently exist in the Sane C++ repository.
 
 ## SC-build.cpp
 
-`SC-build` configures (generating projects) and compiles Sane C++ repository projects.
+`SC-build` configures (generating projects) and compiles Sane C++ repository projects using [SC::Build](@ref library_build).
 
 ### Actions
 
@@ -131,8 +131,8 @@ This issue will be resolved in the future, by supporting precise out-of-date sou
 
 # Roadmap
 
-- Rebuild the executable automatically when source script (or SC.cpp) changes (dependency tracking)
-- Generate projects to debug the programs easily
+- Generate ready made .vscode configurations to debug the programs easily
+- When and if [SC::Build](@ref library_build) will be capable of launching build commands autonomously, get rid of the tool `Tools\Build\$(PLATFORM)` makefiles.
 - Investigate better way of expressing the dependencies chain between scripts
 - Do not require to have a C++ toolchain already installed on the system [*]
 

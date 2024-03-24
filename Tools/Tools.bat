@@ -5,6 +5,9 @@ set "vcvarsall_path1=C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC
 set "vcvarsall_path2=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat"
 
 @echo off
+set __VSCMD_ARG_NO_LOGO=1
+set VSCMD_SKIP_SENDTELEMETRY=1
+set VCPKG_KEEP_ENV_VARS=VSCMD_SKIP_SENDTELEMETRY
 if exist "%vcvarsall_path1%" (
     call "%vcvarsall_path1%" x86_amd64
 ) else if exist "%vcvarsall_path2%" (
@@ -32,27 +35,14 @@ set "BUILD_DIR=%3"
 @REM Directory where the build system executable will be generated
 set "TOOL_OUTPUT_DIR=%BUILD_DIR%\_Tools"
 
-mkdir  "%TOOL_OUTPUT_DIR%" 2>nul
-@REM We set this as current directory because cl.exe doesn't allow overriding
-@REM intermediates paths when multiple files are specified as input.
-cd /d "%TOOL_OUTPUT_DIR%"
+mkdir "%TOOL_OUTPUT_DIR%" 2>nul
 
-if "%5" == "" (
-    goto :DoCompile
-)
-
-if exist "SC-%TOOL%.exe" (
-    goto :SkipCompiling
-)
-
-REM /permissive- allows usage of (and, or) operators with C++14
-:DoCompile
-echo Building SC-%TOOL%.cpp...
-cl.exe /nologo /std:c++14 /permissive- /EHsc /I"%LIBRARY_DIR%" /Fe"SC-%TOOL%.exe" "%LIBRARY_DIR%/Tools/Tools.cpp" "%TOOL_SOURCE_DIR%/SC-%TOOL%.cpp" /link Advapi32.lib Shell32.lib
-:SkipCompiling
+cd /d "%LIBRARY_DIR%/Tools/Build/Windows"
+nmake /nologo /f "Makefile" CONFIG=Debug "TOOL=SC-%TOOL%" "TOOL_SOURCE_DIR=%TOOL_SOURCE_DIR%" "TOOL_OUTPUT_DIR=%TOOL_OUTPUT_DIR%"
 
 IF %ERRORLEVEL% == 0 (
-echo Running SC-%TOOL%.cpp...
-call "SC-%TOOL%.exe" %*
+cd /d "%TOOL_OUTPUT_DIR%/Windows"
+echo Starting SC-%TOOL%...
+"SC-%TOOL%.exe" %*
 ) 
 endlocal
