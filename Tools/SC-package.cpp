@@ -383,7 +383,7 @@ inline Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package
     return Result(true);
 }
 #if !defined(SC_LIBRARY_PATH) && !defined(SC_TOOLS_IMPORT)
-StringView Tool::getToolName() { return "package"; }
+StringView Tool::getToolName() { return "SC-package"; }
 StringView Tool::getDefaultAction() { return "install"; }
 Result     Tool::runTool(Tool::Arguments& arguments) { return runPackageTool(arguments); }
 #endif

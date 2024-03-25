@@ -141,7 +141,7 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
 }
 
 #if !defined(SC_LIBRARY_PATH) && !defined(SC_TOOLS_IMPORT)
-StringView Tool::getToolName() { return "build"; }
+StringView Tool::getToolName() { return "SC-build"; }
 StringView Tool::getDefaultAction() { return "configure"; }
 Result     Tool::runTool(Tool::Arguments& arguments) { return runBuildTool(arguments); }
 #endif

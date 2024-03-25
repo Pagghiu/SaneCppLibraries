@@ -30,7 +30,7 @@ int main(int argc, const char* argv[])
 
     if (argc < 4)
     {
-        console.printLine("Usage: SC-${TOOL} libraryDirectory toolDirectory outputsDirectory [tool] [action]");
+        console.printLine("Usage: ${TOOL} libraryDirectory toolDirectory outputsDirectory [tool] [action]");
         return -1;
     }
     int numArguments = 0;
@@ -58,14 +58,7 @@ int main(int argc, const char* argv[])
     arguments.toolDirectory    = StringView::fromNullTerminated(nativeArgs[2], StringEncoding::Native);
     arguments.outputsDirectory = StringView::fromNullTerminated(nativeArgs[3], StringEncoding::Native);
 
-    if (numArguments > 4)
-    {
-        arguments.tool = StringView::fromNullTerminated(argv[4], StringEncoding::Ascii);
-    }
-    else
-    {
-        arguments.tool = Tool::getToolName();
-    }
+    arguments.tool = Tool::getToolName();
 
     if (numArguments > 5)
     {
@@ -97,8 +90,7 @@ int main(int argc, const char* argv[])
 
     SC::Time::Absolute started = SC::Time::Absolute::now();
 
-    SC_TRY(builder.format("SC-{} \"{}\" started...\n", arguments.tool, arguments.action));
-
+    SC_TRY(builder.format("{} \"{}\" started\n", arguments.tool, arguments.action));
     SC_TRY(builder.append("librarySource    = \"{}\"\n", arguments.libraryDirectory));
     SC_TRY(builder.append("toolSource       = \"{}\"\n", arguments.toolDirectory));
     SC_TRY(builder.append("outputs          = \"{}\"\n", arguments.outputsDirectory));
@@ -107,7 +99,7 @@ int main(int argc, const char* argv[])
     const Result   result  = Tool::runTool(arguments);
     const uint64_t elapsed = SC::Time::Absolute::now().subtract(started).inRoundedUpperMilliseconds().ms;
 
-    SC_TRY(builder.format("SC-{} \"{}\" finished (took {} ms)\n", arguments.tool, arguments.action, elapsed));
+    SC_TRY(builder.format("{} \"{}\" finished (took {} ms)\n", arguments.tool, arguments.action, elapsed));
 
     console.print(gFormatString.view());
     if (not result)

@@ -80,7 +80,7 @@ static Result formatSourceFiles(FormatSources action, StringView clangFormatExec
     }
 }
 #if !defined(SC_LIBRARY_PATH) && !defined(SC_TOOLS_IMPORT)
-StringView Tool::getToolName() { return "format"; }
+StringView Tool::getToolName() { return "SC-format"; }
 StringView Tool::getDefaultAction() { return "execute"; }
 Result     Tool::runTool(Tool::Arguments& arguments) { return runFormatTool(arguments); }
 #endif
