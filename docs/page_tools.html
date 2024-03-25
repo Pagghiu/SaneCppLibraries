@@ -115,29 +115,34 @@ $(document).ready(function(){initNavTree('page_tools.html',''); initResizable();
 <div class="contents">
 <div class="toc"><h3>Table of Contents</h3>
 <ul><li class="level1"><a href="#autotoc_md262">Reasons</a></li>
-<li class="level1"><a href="#autotoc_md263">Usage</a></li>
-<li class="level1"><a href="#autotoc_md264">Tools</a><ul><li class="level2"><a href="#autotoc_md265">SC-build.cpp</a><ul><li class="level3"><a href="#autotoc_md266">Actions</a></li>
-<li class="level3"><a href="#autotoc_md267">Examples</a></li>
+<li class="level1"><a href="#autotoc_md263">Invoking built-in Tools</a></li>
+<li class="level1"><a href="#autotoc_md264">Invoking custom tools</a></li>
+<li class="level1"><a href="#autotoc_md265">Tools</a><ul><li class="level2"><a href="#autotoc_md266">SC-build.cpp</a><ul><li class="level3"><a href="#autotoc_md267">Actions</a></li>
+<li class="level3"><a href="#autotoc_md268">Examples</a></li>
 </ul>
 </li>
-<li class="level2"><a href="#autotoc_md268">SC-package.cpp</a><ul><li class="level3"><a href="#autotoc_md269">Actions</a></li>
-<li class="level3"><a href="#autotoc_md270">Examples</a></li>
-<li class="level3"><a href="#autotoc_md271">Packages</a></li>
+<li class="level2"><a href="#autotoc_md269">SC-package.cpp</a><ul><li class="level3"><a href="#autotoc_md270">Actions</a></li>
+<li class="level3"><a href="#autotoc_md271">Examples</a></li>
+<li class="level3"><a href="#autotoc_md272">Packages</a></li>
 </ul>
 </li>
-<li class="level2"><a href="#autotoc_md272">SC-format.cpp</a><ul><li class="level3"><a href="#autotoc_md273">Actions</a></li>
-<li class="level3"><a href="#autotoc_md274">Examples</a></li>
+<li class="level2"><a href="#autotoc_md273">SC-format.cpp</a><ul><li class="level3"><a href="#autotoc_md274">Actions</a></li>
+<li class="level3"><a href="#autotoc_md275">Examples</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li class="level1"><a href="#autotoc_md275">How does it work</a></li>
-<li class="level1"><a href="#autotoc_md276">Roadmap</a></li>
+<li class="level1"><a href="#autotoc_md276">How does it work</a></li>
+<li class="level1"><a href="#autotoc_md277">Roadmap</a></li>
 </ul>
 </div>
-<div class="textblock"><p ><code>SC::Tools</code> are self contained Sane C++ cross platform <em>scripts</em> compiled on the fly to be executed. <br  />
+<div class="textblock"><p ><code>SC::Tools</code> are self contained single C++ source files that are (automatically) compiled on the fly and linked to Sane C++ to be immediately executed. <br  />
 </p>
-<p >They leverage the growing shell, system and network programming capabilities of Sane C++ Libraries, by just including the <code>SC.cpp</code> unity build file, that has no third party dependencies (see <a class="el" href="page_building_contributor.html">Building (Contributor)</a>).</p>
+<p >They leverage the growing shell, system and network programming capabilities of Sane C++ Libraries, by just including the <code>SC.cpp</code> unity build file, that has no third party dependencies (see <a class="el" href="page_building_contributor.html">Building (Contributor)</a>). <br  />
+</p>
+<p >Another way to look at them is just as small <em>C++ scripts</em> for which you don't need to setup or maintain a build system, as long as you only use Sane C++ Libraries.</p>
+<dl class="section note"><dt>Note</dt><dd>Name is <code>SC::Tools</code> and not <code>SC::Scripts</code> because they're still just small programs. <br  />
+ If the system will be generalized even more, maybe acquiring more advanced capabilities from <a class="el" href="library_plugin.html">SC::Plugin</a> and <a class="el" href="library_build.html">SC::Build</a> or sandboxing capabilities, this naming will be re-evaluated and/or changed.</dd></dl>
 <h1><a class="anchor" id="autotoc_md262"></a>
 Reasons</h1>
 <p ><code>SC::Tools</code> has been created for the following reasons: <br  />
@@ -157,32 +162,103 @@ Reasons</h1>
 <li>Keep the percentage of C++ code in the repo as high as possible (as a consequence of the above)</li>
 </ul>
 <h1><a class="anchor" id="autotoc_md263"></a>
-Usage</h1>
-<p >All tools are invoked with the <code>SC.sh</code> or <code>SC.bat</code> bootstrap script that is located in the root of the repo.</p>
-<p >To invoke you call it with the name of the tool and some parameters. <br  />
- For Example:</p>
+Invoking built-in Tools</h1>
+<p >All built-in tools are invoked with the <code>SC.sh</code> or <code>SC.bat</code> bootstrap script that is located in the root of the repo.</p>
+<p >Such script must be called with the name of the tool and some parameters. <br  />
+</p>
+<p >For Example, invoking the <code>Tools\SC-build.cpp</code> tool with <code>configure</code> action:</p>
 <div class="fragment"><div class="line">./SC.sh build configure</div>
 </div><!-- fragment --><p >or (on Windows)</p>
 <div class="fragment"><div class="line">SC.bat build compile</div>
 </div><!-- fragment --><dl class="section note"><dt>Note</dt><dd><code>SC::Tools</code> are just regular programs being compiled on the fly when needed, so they require a working host compiler to be available in system path. This limitation could be removed if needed, as described in the Roadmap section. <br  />
 </dd></dl>
 <h1><a class="anchor" id="autotoc_md264"></a>
+Invoking custom tools</h1>
+<p >Tools can be automatically compiled and run by just passing its full path to the <code>SC</code> bootstrap.</p>
+<p >Given the following custom tool at <code>myToolDirectory/TestScript.cpp</code></p>
+<div class="fragment"><div class="line"><span class="preprocessor">#include &quot;Libraries/Strings/Console.h&quot;</span></div>
+<div class="line"><span class="preprocessor">#include &quot;Tools/Tools.h&quot;</span></div>
+<div class="line"><span class="keyword">namespace </span>SC</div>
+<div class="line">{</div>
+<div class="line"><span class="keyword">namespace </span>Tools</div>
+<div class="line">{</div>
+<div class="line">StringView Tool::getToolName() { <span class="keywordflow">return</span> <span class="stringliteral">&quot;Test&quot;</span>; }</div>
+<div class="line">StringView Tool::getDefaultAction() { <span class="keywordflow">return</span> <span class="stringliteral">&quot;test&quot;</span>; }</div>
+<div class="line">Result     Tool::runTool(Tool::Arguments&amp; toolArgs)</div>
+<div class="line">{</div>
+<div class="line">    toolArgs.console.printLine(<span class="stringliteral">&quot;Hey This is the output from My Tool!!!&quot;</span>);</div>
+<div class="line">    toolArgs.console.printLine(toolArgs.action);</div>
+<div class="line">    <span class="keywordflow">for</span>(<span class="keyword">auto</span> arg : toolArgs.arguments)</div>
+<div class="line">        toolArgs.console.printLine(arg);</div>
+<div class="line">    <span class="keywordflow">return</span> Result(<span class="keyword">true</span>);</div>
+<div class="line">}</div>
+<div class="line">} <span class="comment">// namespace Tools</span></div>
+<div class="line">} <span class="comment">// namespace SC</span></div>
+</div><!-- fragment --><p >This is how to invoke the tool with <code>action</code> and some parameters </p><div class="fragment"><div class="line">./SC.sh myToolDirectory/TestScript.cpp myAction param1 param2 ..</div>
+</div><!-- fragment --><p >or (on Windows):</p>
+<div class="fragment"><div class="line">SC.bat myToolDirectory\TestScript.cpp myAction param1 param2 ...</div>
+</div><!-- fragment --><p >Possible output (Posix): </p><div class="fragment"><div class="line"> ~/Developer/Projects/SC &gt; ./SC.sh TestScript.cpp myAction param1 param2</div>
+<div class="line">Starting TestScript</div>
+<div class="line">Test &quot;myAction&quot; started</div>
+<div class="line">librarySource    = &quot;/Users/stefano/Developer/Projects/SC&quot;</div>
+<div class="line">toolSource       = &quot;/Users/stefano/Developer/Projects/SC/Tools&quot;</div>
+<div class="line">outputs          = &quot;/Users/stefano/Developer/Projects/SC/_Build&quot;</div>
+<div class="line">Hey This is the output from My Tool!!!</div>
+<div class="line">myAction</div>
+<div class="line">param1</div>
+<div class="line">param2</div>
+<div class="line">Test &quot;myAction&quot; finished (took 1 ms)</div>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md265"></a>
 Tools</h1>
 <p >This is the list of tools that currently exist in the Sane C++ repository.</p>
-<h2><a class="anchor" id="autotoc_md265"></a>
+<h2><a class="anchor" id="autotoc_md266"></a>
 SC-build.cpp</h2>
-<p ><code>SC-build</code> configures (generating projects) and compiles Sane C++ repository projects.</p>
-<h3><a class="anchor" id="autotoc_md266"></a>
+<p ><code>SC-build</code> configures (generating projects) and compiles Sane C++ repository projects using <a class="el" href="library_build.html">SC::Build</a>.</p>
+<h3><a class="anchor" id="autotoc_md267"></a>
 Actions</h3>
 <ul>
 <li><code>configure</code>: Configure (generates) the projects into <code>_Build/_Projects</code></li>
 <li><code>compile</code>: Compiles all projects in <code>_Build/_Projects</code></li>
 </ul>
-<h3><a class="anchor" id="autotoc_md267"></a>
+<h3><a class="anchor" id="autotoc_md268"></a>
 Examples</h3>
 <p >Configure project, generating them: </p><div class="fragment"><div class="line">./SC.sh build configure</div>
+</div><!-- fragment --><p> Possible Output:</p>
+<div class="fragment"><div class="line"> ~/Developer/Projects/SC &gt; ./SC.sh build configure</div>
+<div class="line">Compiling SC-build.cpp</div>
+<div class="line">Linking SC-build</div>
+<div class="line">Starting SC-build</div>
+<div class="line">SC-build &quot;configure&quot; started</div>
+<div class="line">librarySource    = &quot;/Users/user/Developer/Projects/SC&quot;</div>
+<div class="line">toolSource       = &quot;/Users/user/Developer/Projects/SC/Tools&quot;</div>
+<div class="line">outputs          = &quot;/Users/user/Developer/Projects/SC/_Build&quot;</div>
+<div class="line">projects         = &quot;/Users/user/Developer/Projects/SC/_Build/_Projects&quot;</div>
+<div class="line">SC-build &quot;configure&quot; finished (took 72 ms)</div>
+<div class="line"> ~/Developer/Projects/SC &gt; </div>
 </div><!-- fragment --><p >Build all projects </p><div class="fragment"><div class="line">./SC.sh build compile</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md268"></a>
+</div><!-- fragment --><p >Possible Output: </p><div class="fragment"><div class="line">~/Developer/Projects/SC &gt; ./SC.sh build compile     </div>
+<div class="line">Starting SC-build</div>
+<div class="line">SC-build &quot;compile&quot; started</div>
+<div class="line">librarySource    = &quot;/Users/user/Developer/Projects/SC&quot;</div>
+<div class="line">toolSource       = &quot;/Users/user/Developer/Projects/SC/Tools&quot;</div>
+<div class="line">outputs          = &quot;/Users/user/Developer/Projects/SC/_Build&quot;</div>
+<div class="line">projects         = &quot;/Users/user/Developer/Projects/SC/_Build/_Projects&quot;</div>
+<div class="line">/Applications/Xcode.app/Contents/Developer/usr/bin/make clean</div>
+<div class="line">Cleaning SCTest</div>
+<div class="line">Creating /Users/user/Developer/Projects/SC/_Build/_Projects/Make/../../_Intermediates/SCTest/macOS-arm64-make-clang-Debug</div>
+<div class="line">Creating /Users/user/Developer/Projects/SC/_Build/_Projects/Make/../../_Outputs/macOS-arm64-make-clang-Debug</div>
+<div class="line">Compiling Async.cpp</div>
+<div class="line">Compiling AsyncTest.cpp</div>
+<div class="line">Compiling BuildTest.cpp</div>
+<div class="line">... other files..</div>
+<div class="line">Compiling DebugVisualizersTest.cpp</div>
+<div class="line">Compiling SC-format.cpp</div>
+<div class="line">Compiling ToolsTest.cpp</div>
+<div class="line">Compiling SC-package.cpp</div>
+<div class="line">Generate compile_commands.json</div>
+<div class="line">Linking SCTest</div>
+<div class="line">SC-build &quot;compile&quot; finished (took 3071 ms)</div>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md269"></a>
 SC-package.cpp</h2>
 <p ><code>SC-package</code> downloads third party tools needed for Sane C++ development (example: <code>clang-format</code>). <br  />
  Proper OS / Architecture combination is selected (Windows/Linux/Mac and Intel/ARM) and all downloaded files (<em>packages</em>) <code>MD5</code> hash is checked for correctness. <br  />
@@ -190,15 +266,15 @@ SC-package.cpp</h2>
 </p>
 <dl class="section note"><dt>Note</dt><dd>Directory naming has been chosen to avoid clashes when mounting the same working copy folder in multiple concurrent virtual machines with different Operating Systems / architectures. <br  />
  This happens during regular development, where new code is frequently tested in parallel on macOS, Windows and Linux before even committing it and pushing it to the CI system.</dd></dl>
-<h3><a class="anchor" id="autotoc_md269"></a>
+<h3><a class="anchor" id="autotoc_md270"></a>
 Actions</h3>
 <ul>
 <li><code>install</code>: Downloads requires tools (LLVM / 7zip)</li>
 </ul>
-<h3><a class="anchor" id="autotoc_md270"></a>
+<h3><a class="anchor" id="autotoc_md271"></a>
 Examples</h3>
 <div class="fragment"><div class="line">./SC.sh package install</div>
-</div><!-- fragment --><h3><a class="anchor" id="autotoc_md271"></a>
+</div><!-- fragment --><h3><a class="anchor" id="autotoc_md272"></a>
 Packages</h3>
 <p >These are the packages that are currently downloaded and extracted / symlinked by <code>SC-package.cpp</code>:</p>
 <ul>
@@ -206,29 +282,29 @@ Packages</h3>
 <li><code>7zip</code>: 7zip executable (needed to decompress LLVM installer on Windows)</li>
 <li><code>7zr.exe</code>: 7Zip console executable (needed to decompress 7zip installer on Windows)</li>
 </ul>
-<h2><a class="anchor" id="autotoc_md272"></a>
+<h2><a class="anchor" id="autotoc_md273"></a>
 SC-format.cpp</h2>
 <p ><code>SC-format</code> tool formats or checks formatting for all files in Sane C++ repository</p>
-<h3><a class="anchor" id="autotoc_md273"></a>
+<h3><a class="anchor" id="autotoc_md274"></a>
 Actions</h3>
 <ul>
 <li><code>execute</code>: Formats all source files in the repository in-place</li>
 <li><code>check</code>: Does a dry-run format of all source files. Returns error on unformatted files (used by the CI)</li>
 </ul>
-<h3><a class="anchor" id="autotoc_md274"></a>
+<h3><a class="anchor" id="autotoc_md275"></a>
 Examples</h3>
 <p >Format all source files in the repository </p><div class="fragment"><div class="line">./SC.sh format execute</div>
 </div><!-- fragment --><p >Check if all source files in the repository are properly formatted </p><div class="fragment"><div class="line">SC.bat format check</div>
-</div><!-- fragment --><h1><a class="anchor" id="autotoc_md275"></a>
+</div><!-- fragment --><h1><a class="anchor" id="autotoc_md276"></a>
 How does it work</h1>
 <p >The bootstrap batch (<code>SC.bat</code>) / bash (<code>SC.sh</code>) shell scripts are doing the following: <br  />
 </p><ul>
-<li>Two <code>.cpp</code> files are compiled with a single <code>clang</code> / <code>g++</code> / <code>cl.exe</code> invocation<ul>
+<li>Two <code>.cpp</code> files are compiled (only if they're out of date) by a <code>Makefile</code><ul>
 <li><code>Tools/Tools.cpp</code> file<ul>
 <li>Includes the <code>SC.cpp</code> unity build file, defining <code>main(argc, argv)</code></li>
 </ul>
 </li>
-<li><code>SC-$TOOL.cpp</code> file<ul>
+<li><code>$TOOL.cpp</code> file<ul>
 <li>Implements the specific tool functionality</li>
 </ul>
 </li>
@@ -240,15 +316,16 @@ How does it work</h1>
 </ul>
 <p >Example: <br  />
  <code>SC.sh $TOOL $ACTION $PARAM_1 $PARAM_2 ... $PARAM_N</code></p>
-<dl class="section warning"><dt>Warning</dt><dd>Currently there is no mechanism to check if a command must be rebuilt. <br  />
- To rebuild a tool, invoke it without any option (for example <code>./SC.sh build</code>). <br  />
- This issue will be resolved in the future, by supporting precise out-of-date source level dependency tracking.</dd></dl>
-<h1><a class="anchor" id="autotoc_md276"></a>
+<dl class="section note"><dt>Note</dt><dd><code>Tools.cpp</code> is shared between all compiled tools by the <code>Makefile</code> inside the <code>_Build/_Tools/_Intermediates</code> directory of a checkout copy of Sane C++ Libraries. <br  />
+ This allows modifying and recompiling a script, or compiling different scripts spending negligible (often sub-second) time, to just compile/link script logic. <br  />
+ This is because all Sane C++ Libraries are compiled just once (in no more than a couple of seconds) inside <code>Tools.cpp</code>.</dd></dl>
+<h1><a class="anchor" id="autotoc_md277"></a>
 Roadmap</h1>
 <ul>
-<li>Rebuild the executable automatically when source script (or SC.cpp) changes (dependency tracking)</li>
-<li>Generate projects to debug the programs easily</li>
+<li>Generate ready made .vscode configurations to debug the programs easily</li>
+<li>When and if <a class="el" href="library_build.html">SC::Build</a> will be capable of launching build commands autonomously, get rid of the tool <code>Tools\Build\</code> makefiles.</li>
 <li>Investigate better way of expressing the dependencies chain between scripts</li>
+<li>Investigate if Tools (scripts) can be sandboxed using os facilities</li>
 <li>Do not require to have a C++ toolchain already installed on the system [*]</li>
 </ul>
 <p >[*] Running the Sane C++ Tools scripts on a machine without a pre-installed compiler could be implemented by shipping a pre-compiled <code>SC-package.cpp</code> (that is already capable of downloading <code>clang</code> on all platforms) or by adding to the bootstrap script ability to download a suitable compiler (and sysroot). </p>

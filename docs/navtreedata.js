@@ -73,24 +73,25 @@ var NAVTREE =
     [ "Tests", "page_tests.html", null ],
     [ "Tools", "page_tools.html", [
       [ "Reasons", "page_tools.html#autotoc_md262", null ],
-      [ "Usage", "page_tools.html#autotoc_md263", null ],
-      [ "Tools", "page_tools.html#autotoc_md264", [
-        [ "SC-build.cpp", "page_tools.html#autotoc_md265", [
-          [ "Actions", "page_tools.html#autotoc_md266", null ],
-          [ "Examples", "page_tools.html#autotoc_md267", null ]
+      [ "Invoking built-in Tools", "page_tools.html#autotoc_md263", null ],
+      [ "Invoking custom tools", "page_tools.html#autotoc_md264", null ],
+      [ "Tools", "page_tools.html#autotoc_md265", [
+        [ "SC-build.cpp", "page_tools.html#autotoc_md266", [
+          [ "Actions", "page_tools.html#autotoc_md267", null ],
+          [ "Examples", "page_tools.html#autotoc_md268", null ]
         ] ],
-        [ "SC-package.cpp", "page_tools.html#autotoc_md268", [
-          [ "Actions", "page_tools.html#autotoc_md269", null ],
-          [ "Examples", "page_tools.html#autotoc_md270", null ],
-          [ "Packages", "page_tools.html#autotoc_md271", null ]
+        [ "SC-package.cpp", "page_tools.html#autotoc_md269", [
+          [ "Actions", "page_tools.html#autotoc_md270", null ],
+          [ "Examples", "page_tools.html#autotoc_md271", null ],
+          [ "Packages", "page_tools.html#autotoc_md272", null ]
         ] ],
-        [ "SC-format.cpp", "page_tools.html#autotoc_md272", [
-          [ "Actions", "page_tools.html#autotoc_md273", null ],
-          [ "Examples", "page_tools.html#autotoc_md274", null ]
+        [ "SC-format.cpp", "page_tools.html#autotoc_md273", [
+          [ "Actions", "page_tools.html#autotoc_md274", null ],
+          [ "Examples", "page_tools.html#autotoc_md275", null ]
         ] ]
       ] ],
-      [ "How does it work", "page_tools.html#autotoc_md275", null ],
-      [ "Roadmap", "page_tools.html#autotoc_md276", null ]
+      [ "How does it work", "page_tools.html#autotoc_md276", null ],
+      [ "Roadmap", "page_tools.html#autotoc_md277", null ]
     ] ],
     [ "Todo List", "todo.html", null ],
     [ "Modules", "modules.html", "modules" ],
@@ -127,10 +128,10 @@ var NAVTREEINDEX =
 "_algorithm_bubble_sort_8h_source.html",
 "library_async.html#autotoc_md68",
 "page_faq.html",
-"struct_s_c_1_1_build_1_1_parameters.html",
-"struct_s_c_1_1_max_value.html",
-"struct_s_c_1_1_string.html#a2db5fb73f9477b9d98dc3b43cd658df4",
-"struct_s_c_1_1_vector.html#a59070912b57fdd76cad06202ac98cbee"
+"struct_s_c_1_1_build_1_1_optimization.html#a35a5d8b5bb55e2ac0e6322fc9efaf270ae15bf901d1442e804cd4b40944764f0c",
+"struct_s_c_1_1_intrusive_double_linked_list.html",
+"struct_s_c_1_1_string.html#a2d0412d9df48cadac36fda743d7804d8",
+"struct_s_c_1_1_vector.html#a53b622a41a73c08cd42a3e6731d01f48"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';
