@@ -9,7 +9,7 @@
             "cppStandard": "c++14",
             "intelliSenseMode": "macos-clang-arm64",
             // Compile commands is only generated if one of the build task using make are run using Clang as compiler
-            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/apple-darwin22.6.0-arm64-Makefile-clang-15-Debug/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/macOS-arm64-make-clang-Debug/compile_commands.json"
         },
         {
             "name": "SCTest macOS arm64 Release",
@@ -20,7 +20,7 @@
             "cppStandard": "c++14",
             "intelliSenseMode": "macos-clang-arm64",
             // Compile commands is only generated if one of the build task using make are run using Clang as compiler
-            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/apple-darwin22.6.0-arm64-Makefile-clang-15-Release/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/macOS-arm64-make-clang-Release/compile_commands.json"
         },
         {
             "name": "SCTest macOS x64 Debug",
@@ -31,7 +31,7 @@
             "cppStandard": "c++14",
             "intelliSenseMode": "macos-clang-x64",
             // Compile commands is only generated if one of the build task using make are run using Clang as compiler
-            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/apple-darwin22.6.0-x86_64-Makefile-clang-15-Debug/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/macOS-x86_64-make-clang-Debug/compile_commands.json"
         },
         {
             "name": "SCTest macOS x64 Release",
@@ -42,7 +42,7 @@
             "cppStandard": "c++14",
             "intelliSenseMode": "macos-clang-x64",
             // Compile commands is only generated if one of the build task using make are run using Clang as compiler
-            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/apple-darwin22.6.0-x86_64-Makefile-clang-15-Release/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/macOS-x86_64-make-clang-Release/compile_commands.json"
         },
         {
             "name": "SCTest Linux arm64 Debug",
@@ -53,7 +53,7 @@
             "cppStandard": "c++14",
             "intelliSenseMode": "linux-gcc-arm64",
             // Compile commands is only generated if one of the build task using make are run using Clang as compiler
-            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/linux-gnu-aarch64-Makefile-gcc-11-Debug/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/linux-arm64-make-clang-Debug/compile_commands.json"
         },
         {
             "name": "SCTest Linux arm64 Release",
@@ -64,7 +64,7 @@
             "cppStandard": "c++14",
             "intelliSenseMode": "linux-gcc-arm64",
             // Compile commands is only generated if one of the build task using make are run using Clang as compiler
-            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/linux-gnu-aarch64-Makefile-gcc-11-Release/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/linux-arm64-make-clang-Release/compile_commands.json"
         },
         {
             "name": "SCTest Linux x64 Debug",
@@ -75,7 +75,7 @@
             "cppStandard": "c++14",
             "intelliSenseMode": "linux-gcc-x64",
             // Compile commands is only generated if one of the build task using make are run using Clang as compiler
-            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/linux-gnu-x86_64-Makefile-gcc-11-Debug/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/linux-x86_64-make-clang-Debug/compile_commands.json"
         },
         {
             "name": "SCTest Linux x64 Release",
@@ -86,7 +86,7 @@
             "cppStandard": "c++14",
             "intelliSenseMode": "linux-gcc-x64",
             // Compile commands is only generated if one of the build task using make are run using Clang as compiler
-            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/linux-gnu-x86_64-Makefile-gcc-11-Release/compile_commands.json"
+            "compileCommands": "${workspaceFolder}/_Build/_Intermediates/SCTest/linux-x86_64-make-clang-Release/compile_commands.json"
         },
         {
             "name": "SCTest Windows x64 Debug",

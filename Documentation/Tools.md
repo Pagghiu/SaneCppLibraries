@@ -8,6 +8,8 @@ They leverage the growing shell, system and network programming capabilities of 
 
 Another way to look at them is just as small _C++ scripts_ for which you don't need to setup or maintain a build system, as long as you only use Sane C++ Libraries.
 
+Check the [March 2024 Blog update post](https://pagghiu.github.io/site/blog/2024-03-27-SaneCppLibrariesUpdate.html) for more details.
+
 @note Name is `SC::Tools` and not `SC::Scripts` because they're still just small programs.  
 If the system will be generalized even more, maybe acquiring more advanced capabilities from [SC::Plugin](@ref library_plugin) and [SC::Build](@ref library_build) or sandboxing capabilities, this naming will be re-evaluated and/or changed.
 
@@ -16,7 +18,7 @@ If the system will be generalized even more, maybe acquiring more advanced capab
 `SC::Tools` has been created for the following reasons:  
 
 - Enjoy the coolness of writing _C++ scripts_
-- Do shell automation / development tools or similar tasks in a real programming language
+- Create development tools and automate shell operations in a real programming language
 - Allow C++ programmers to use regular C++ IDE / Debuggers when writing _automation / shell scripts_
 - Use Sane C++ Libraries for real tasks to improve them and fix bugs:
     - Example: `Tools/SC-package.cpp` uses SC::Process library to download some third party binary 
