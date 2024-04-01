@@ -27,6 +27,8 @@ struct SC::StringViewTest : public SC::TestCase
             StringView other("asd");
             SC_TEST_EXPECT(other == "asd");
             SC_TEST_EXPECT(other != "das");
+
+            SC_TEST_EXPECT(StringView() == "");
         }
 
         if (test_section("parseInt32"))
@@ -291,6 +293,24 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(StringAlgorithms::matchWildcard("**/myString", "myString/myString/myString"));
             SC_TEST_EXPECT(not StringAlgorithms::matchWildcard("*/String", "myString/myString/myString"));
             SC_TEST_EXPECT(StringAlgorithms::matchWildcard("*/Directory/File.cpp", "/Root/Directory/File.cpp"));
+        }
+        if (test_section("fromNullTerminated"))
+        {
+            StringView s1 = StringView::fromNullTerminated("ASD", StringEncoding::Ascii);
+            SC_TEST_EXPECT(s1.getEncoding() == StringEncoding::Ascii);
+            SC_TEST_EXPECT(s1.isNullTerminated());
+            SC_TEST_EXPECT(s1 == "ASD");
+            StringView s2 = StringView::fromNullTerminated("", StringEncoding::Ascii);
+            SC_TEST_EXPECT(s2.getEncoding() == StringEncoding::Ascii);
+            SC_TEST_EXPECT(s2.isNullTerminated());
+            SC_TEST_EXPECT(s2 == "");
+            SC_TEST_EXPECT(s2.isEmpty());
+            const char* nullstr = nullptr;
+            StringView  s3      = StringView::fromNullTerminated(nullstr, StringEncoding::Ascii);
+            SC_TEST_EXPECT(s3.getEncoding() == StringEncoding::Ascii);
+            SC_TEST_EXPECT(not s3.isNullTerminated());
+            SC_TEST_EXPECT(s3 == "");
+            SC_TEST_EXPECT(s3.isEmpty());
         }
     }
 };

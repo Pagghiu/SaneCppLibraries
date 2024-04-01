@@ -8,7 +8,14 @@
 #include <string.h> //strlen
 SC::StringView SC::StringView::fromNullTerminated(const char* text, StringEncoding encoding)
 {
-    return StringView({text, ::strlen(text)}, true, encoding);
+    if (text == nullptr)
+    {
+        return StringView({nullptr, 0}, false, encoding);
+    }
+    else
+    {
+        return StringView({text, ::strlen(text)}, true, encoding);
+    }
 }
 
 #if SC_PLATFORM_WINDOWS
@@ -89,6 +96,8 @@ bool SC::StringView::parseFloat(float& value) const
 
 bool SC::StringView::parseDouble(double& value) const
 {
+    if (text == nullptr)
+        return false;
     if (hasNullTerm)
     {
         value = atof(text);
