@@ -375,7 +375,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("  <ItemGroup>\n");
         for (auto& it : files)
         {
-            if (it.type == WriterInternal::RenderItem::CppFile)
+            if (it.type == WriterInternal::RenderItem::CppFile or it.type == WriterInternal::RenderItem::CFile)
             {
                 builder.append("    <ClCompile Include=\"{}\" />\n", it.path);
             }
@@ -584,7 +584,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         for (auto& it : renderer.renderItems)
         {
             const StringView dir = Path::removeStartingSeparator(Path::dirname(it.referencePath.view(), Path::AsPosix));
-            if (it.type == WriterInternal::RenderItem::CppFile)
+            if (it.type == WriterInternal::RenderItem::CppFile or it.type == WriterInternal::RenderItem::CFile)
             {
                 builder.append("    <ClCompile Include=\"{}\">\n", it.path);
                 builder.append("      <Filter>");

@@ -151,8 +151,11 @@ Makefile.$(CONFIG).touched: Makefile
         // -Wsign-compare
         // -Werror=sign-conversion
         // -Wmissing-field-initializers
-        builder.append("\n{0}_WARNING_FLAGS :=-Werror -Werror=return-type -Wunreachable-code -Wnon-virtual-dtor "
-                       "-Woverloaded-virtual -Wmissing-braces -Wparentheses -Wswitch -Wunused-function -Wunused-label "
+
+        builder.append("\n{0}_WARNING_FLAGS_CXX :=-Wnon-virtual-dtor -Woverloaded-virtual");
+
+        builder.append("\n{0}_WARNING_FLAGS :=-Werror -Werror=return-type -Wunreachable-code  "
+                       " -Wmissing-braces -Wparentheses -Wswitch -Wunused-function -Wunused-label "
                        "-Wunused-parameter -Wunused-variable -Wunused-value -Wempty-body -Wuninitialized "
                        "-Wunknown-pragmas -Wenum-conversion -Werror=float-conversion -Werror=implicit-fallthrough",
                        makeTarget.view());
@@ -212,7 +215,8 @@ endif
                        makeTarget.view());
 
         builder.append("\n# Flags for .cpp files");
-        builder.append("\n{0}_CXXFLAGS := $({0}_CPPFLAGS) -std=c++14 -fstrict-aliasing -fvisibility=hidden "
+        builder.append("\n{0}_CXXFLAGS := $({0}_CPPFLAGS) $({0}_WARNING_FLAGS_CXX) -std=c++14 -fstrict-aliasing "
+                       "-fvisibility=hidden "
                        "-fvisibility-inlines-hidden",
                        makeTarget.view());
         // TODO: Merge these with configuration overrides
@@ -294,11 +298,19 @@ endif
 
         for (const RenderItem& item : renderer.renderItems)
         {
-            if (item.type == RenderItem::CppFile)
+            if (item.type == RenderItem::CppFile or item.type == RenderItem::CFile)
             {
-                StringView basename = Path::basename(item.name.view(), ".cpp");
                 // TODO: We should probably add a path hash too to avoid clashes with files having same name
-                builder.append("\n$({0}_INTERMEDIATE_DIR)/{1}.o \\", makeTarget.view(), basename);
+                if (item.type == RenderItem::CppFile)
+                {
+                    builder.append("\n$({0}_INTERMEDIATE_DIR)/{1}.o \\", makeTarget.view(),
+                                   Path::basename(item.name.view(), ".cpp"));
+                }
+                else
+                {
+                    builder.append("\n$({0}_INTERMEDIATE_DIR)/{1}.o \\", makeTarget.view(),
+                                   Path::basename(item.name.view(), ".c"));
+                }
             }
         }
         builder.append(R"delimiter(
@@ -356,6 +368,17 @@ endef
 $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
 	@echo "Compiling {1}.cpp"
 	$(VRBS)$(CXX) $({0}_CXXFLAGS) -o "$@" -MMD -pthread $(call MJ_if_Clang) -c "$<"
+
+)delimiter",
+                               makeTarget.view(), basename, item.path.view());
+            }
+            if (item.type == RenderItem::CFile)
+            {
+                StringView basename = Path::basename(item.name.view(), ".c");
+                builder.append(R"delimiter(
+$({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
+	@echo "Compiling {1}.c"
+	$(VRBS)$(CC) $({0}_CFLAGS) -o "$@" -MMD -pthread $(call MJ_if_Clang) -c "$<"
 
 )delimiter",
                                makeTarget.view(), basename, item.path.view());

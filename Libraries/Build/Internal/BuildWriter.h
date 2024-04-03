@@ -22,6 +22,7 @@ struct SC::Build::WriterInternal
             HeaderFile,
             InlineFile,
             CppFile,
+            CFile,
             Framework,
             Configuration,
             DebugVisualizerFile
@@ -74,6 +75,10 @@ struct SC::Build::WriterInternal
                     else if (nameView.endsWith(".cpp"))
                     {
                         renderItem.type = RenderItem::CppFile;
+                    }
+                    else if (nameView.endsWith(".c"))
+                    {
+                        renderItem.type = RenderItem::CFile;
                     }
                     else if (nameView.endsWith(".inl"))
                     {
