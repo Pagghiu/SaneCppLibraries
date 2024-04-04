@@ -79,6 +79,14 @@ Library                                                                         
 [Threading](https://pagghiu.github.io/SaneCppLibraries/library_threading.html)                          | 🟥 Atomic, thread, thread pool, mutex, condition variable
 [Time](https://pagghiu.github.io/SaneCppLibraries/library_time.html)                                    | 🟨 Time handling (relative, absolute, high resolution)
 
+# C Bindings
+Some Libraries have C bindings
+
+Binding                                                                                 | Description
+:---------------------------------------------------------------------------------------|:----------------------------------------------------------------------------------------------------
+[sc_hashing](https://pagghiu.github.io/SaneCppLibraries/group__group__sc__hashing.html) | Bindings for the [Hashing](https://pagghiu.github.io/SaneCppLibraries/library_hashing.html) Library
+
+
 # Building
 
 Libraries can be used as is, adding a single file to your project and without needing any build system.  

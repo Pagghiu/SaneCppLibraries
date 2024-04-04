@@ -86,6 +86,8 @@ void runAsyncTest(SC::TestReport& report);
 void runDebugVisualizersTest(TestReport& report);
 void runSupportToolsTest(TestReport& report);
 
+// Bindings
+void runCBindingsTest(TestReport& report);
 } // namespace SC
 
 #include "../../Libraries/Containers/SmallVector.h"
@@ -204,6 +206,9 @@ int main(int argc, const char* argv[])
 
     // Build tests
     runBuildTest(report);
+
+    // C bindings tests
+    runCBindingsTest(report);
 
     return report.getTestReturnCode();
 }

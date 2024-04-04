@@ -25,3 +25,10 @@ Library                                     | Description
 @subpage library_testing                    | @copybrief library_testing
 @subpage library_threading                  | @copybrief library_threading
 @subpage library_time                       | @copybrief library_time
+
+
+Some libraries have [C Bindings](@ref group_c_bindings):
+
+Library                                     | Description
+:-------------------------------------------|:-----------------------------------------------
+@ref group_sc_hashing                       | @copybrief group_sc_hashing

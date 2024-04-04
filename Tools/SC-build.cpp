@@ -54,6 +54,9 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
     }
 
     // File overrides (order matters regarding to add / remove)
+    project.addDirectory("Bindings/c", "**.cpp");              // add all cpp support files for c bindings
+    project.addDirectory("Bindings/c", "**.c");                // add all c bindings
+    project.addDirectory("Bindings/c", "**.h");                // add all c bindings
     project.addDirectory("Tools", "SC-*.cpp");                 // add all tools
     project.addDirectory("Tests/SCTest", "*.cpp");             // add all .cpp from SCTest directory
     project.addDirectory("Tests/SCTest", "*.h");               // add all .h from SCTest directory
