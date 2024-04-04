@@ -20,10 +20,10 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     [[nodiscard]] static bool generateGuidFor(const StringView name, Hashing& hashing, String& projectGuid)
     {
         SC_TRY(hashing.setType(Hashing::TypeSHA1));
-        SC_TRY(hashing.update(name.toBytesSpan()));
-        SC_TRY(hashing.update("_Guid"_a8.toBytesSpan()));
+        SC_TRY(hashing.add(name.toBytesSpan()));
+        SC_TRY(hashing.add("_Guid"_a8.toBytesSpan()));
         Hashing::Result res;
-        SC_TRY(hashing.finalize(res));
+        SC_TRY(hashing.getHash(res));
         String hexString;
         SC_TRY(StringBuilder(hexString).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
         StringBuilder guidBuilder(projectGuid);

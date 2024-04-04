@@ -54,12 +54,12 @@ struct Hashing
     /// @brief Add data to be hashed. Can be called multiple times before Hashing::finalize
     /// @param data Data to be hashed
     /// @return `true` if data has been hashed successfully
-    [[nodiscard]] bool update(Span<const uint8_t> data);
+    [[nodiscard]] bool add(Span<const uint8_t> data);
 
     /// @brief Finalizes hash computation that has been pushed through Hashing::update
     /// @param[out] res Result object holding the actual Result::hash
     /// @return `true` if the final hash has been computed successfully
-    [[nodiscard]] bool finalize(Result& res);
+    [[nodiscard]] bool getHash(Result& res);
 
     /// @brief Set type of hash to compute
     /// @param newType MD5, SHA1, SHA256

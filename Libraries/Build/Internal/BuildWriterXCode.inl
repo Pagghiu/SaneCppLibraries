@@ -35,10 +35,10 @@ struct SC::Build::ProjectWriter::WriterXCode
     [[nodiscard]] bool computeReferenceHash(StringView name, String& hash)
     {
         SC_TRY(hashing.setType(Hashing::TypeSHA1));
-        SC_TRY(hashing.update("reference_"_a8.toBytesSpan()));
-        SC_TRY(hashing.update(name.toBytesSpan()));
+        SC_TRY(hashing.add("reference_"_a8.toBytesSpan()));
+        SC_TRY(hashing.add(name.toBytesSpan()));
         Hashing::Result res;
-        SC_TRY(hashing.finalize(res));
+        SC_TRY(hashing.getHash(res));
         SmallString<64> tmpHash = StringEncoding::Ascii;
         SC_TRY(StringBuilder(tmpHash).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
         return hash.assign(tmpHash.view().sliceStartLength(0, 24));
@@ -47,10 +47,10 @@ struct SC::Build::ProjectWriter::WriterXCode
     [[nodiscard]] bool computeBuildHash(StringView name, String& hash)
     {
         SC_TRY(hashing.setType(Hashing::TypeSHA1));
-        SC_TRY(hashing.update("build_"_a8.toBytesSpan()));
-        SC_TRY(hashing.update(name.toBytesSpan()));
+        SC_TRY(hashing.add("build_"_a8.toBytesSpan()));
+        SC_TRY(hashing.add(name.toBytesSpan()));
         Hashing::Result res;
-        SC_TRY(hashing.finalize(res));
+        SC_TRY(hashing.getHash(res));
         SmallString<64> tmpHash = StringEncoding::Ascii;
         SC_TRY(StringBuilder(tmpHash).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
         return hash.assign(tmpHash.view().sliceStartLength(0, 24));

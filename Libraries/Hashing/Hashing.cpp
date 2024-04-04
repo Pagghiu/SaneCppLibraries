@@ -36,7 +36,7 @@ bool SC::Hashing::setType(Type newType)
     return false;
 }
 
-bool SC::Hashing::update(Span<const uint8_t> data)
+bool SC::Hashing::add(Span<const uint8_t> data)
 {
     if (not inited)
         return false;
@@ -56,7 +56,7 @@ bool SC::Hashing::update(Span<const uint8_t> data)
     return true;
 }
 
-bool SC::Hashing::finalize(Result& res)
+bool SC::Hashing::getHash(Result& res)
 {
     if (!inited)
         return false;
@@ -140,7 +140,7 @@ bool SC::Hashing::setType(Type newType)
     return true;
 }
 
-bool SC::Hashing::update(Span<const uint8_t> data)
+bool SC::Hashing::add(Span<const uint8_t> data)
 {
     if (not inited)
         return false;
@@ -152,7 +152,7 @@ bool SC::Hashing::update(Span<const uint8_t> data)
     return true;
 }
 
-bool SC::Hashing::finalize(Result& res)
+bool SC::Hashing::getHash(Result& res)
 {
     CryptoPrivate& self     = *reinterpret_cast<CryptoPrivate*>(buffer);
     DWORD          hashSize = sizeof(Result::hash);
@@ -233,7 +233,7 @@ bool SC::Hashing::setType(Type newType)
     return true;
 }
 
-bool SC::Hashing::update(Span<const uint8_t> data)
+bool SC::Hashing::add(Span<const uint8_t> data)
 {
     if (!inited)
         return false;
@@ -246,7 +246,7 @@ bool SC::Hashing::update(Span<const uint8_t> data)
     return true;
 }
 
-bool SC::Hashing::finalize(Result& res)
+bool SC::Hashing::getHash(Result& res)
 {
     if (!inited)
         return false;
@@ -270,7 +270,7 @@ bool SC::Hashing::finalize(Result& res)
 SC::Hashing::Hashing() {}
 SC::Hashing::~Hashing() {}
 bool SC::Hashing::setType(Type newType) { return false; }
-bool SC::Hashing::update(Span<const uint8_t> data) { return false; }
-bool SC::Hashing::finalize(Result& res) { return false; }
+bool SC::Hashing::add(Span<const uint8_t> data) { return false; }
+bool SC::Hashing::getHash(Result& res) { return false; }
 
 #endif

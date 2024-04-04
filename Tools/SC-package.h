@@ -91,13 +91,13 @@ struct CustomFunctions
         SC_TRY(file.read({data, sizeof(data)}, actuallyRead));
         if (actuallyRead.sizeInBytes() > 0)
         {
-            SC_TRY(hashing.update(actuallyRead));
+            SC_TRY(hashing.add(actuallyRead));
         }
         else
         {
             SC_TRY(file.close());
             Hashing::Result res;
-            SC_TRY(hashing.finalize(res));
+            SC_TRY(hashing.getHash(res));
             SmallString<32> result;
             SC_TRY(StringBuilder(result).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::LowerCase));
             SC_TRY_MSG(result.view() == wantedMD5, "MD5 doesn't match");

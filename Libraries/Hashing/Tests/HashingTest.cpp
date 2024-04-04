@@ -22,9 +22,9 @@ struct SC::HashingTest : public SC::TestCase
             Hashing hash;
             SC_TEST_EXPECT(hash.setType(Hashing::TypeMD5));
 
-            SC_TEST_EXPECT(hash.update("test"_a8.toBytesSpan()));
+            SC_TEST_EXPECT(hash.add("test"_a8.toBytesSpan()));
             Hashing::Result res;
-            SC_TEST_EXPECT(hash.finalize(res));
+            SC_TEST_EXPECT(hash.getHash(res));
 
             String test;
             SC_TEST_EXPECT(StringBuilder(test).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
@@ -39,10 +39,10 @@ struct SC::HashingTest : public SC::TestCase
             Hashing hash;
             SC_TEST_EXPECT(hash.setType(Hashing::TypeMD5));
 
-            SC_TEST_EXPECT(hash.update("test"_a8.toBytesSpan()));
-            SC_TEST_EXPECT(hash.update("test"_a8.toBytesSpan()));
+            SC_TEST_EXPECT(hash.add("test"_a8.toBytesSpan()));
+            SC_TEST_EXPECT(hash.add("test"_a8.toBytesSpan()));
             Hashing::Result res;
-            SC_TEST_EXPECT(hash.finalize(res));
+            SC_TEST_EXPECT(hash.getHash(res));
 
             String test;
             SC_TEST_EXPECT(StringBuilder(test).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
@@ -55,9 +55,9 @@ struct SC::HashingTest : public SC::TestCase
             Hashing hash;
             SC_TEST_EXPECT(hash.setType(Hashing::TypeSHA1));
 
-            SC_TEST_EXPECT(hash.update("test"_a8.toBytesSpan()));
+            SC_TEST_EXPECT(hash.add("test"_a8.toBytesSpan()));
             Hashing::Result res;
-            SC_TEST_EXPECT(hash.finalize(res));
+            SC_TEST_EXPECT(hash.getHash(res));
 
             String test;
             SC_TEST_EXPECT(StringBuilder(test).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
@@ -70,10 +70,10 @@ struct SC::HashingTest : public SC::TestCase
             Hashing hash;
             SC_TEST_EXPECT(hash.setType(Hashing::TypeSHA1));
 
-            SC_TEST_EXPECT(hash.update("test"_a8.toBytesSpan()));
-            SC_TEST_EXPECT(hash.update("test"_a8.toBytesSpan()));
+            SC_TEST_EXPECT(hash.add("test"_a8.toBytesSpan()));
+            SC_TEST_EXPECT(hash.add("test"_a8.toBytesSpan()));
             Hashing::Result res;
-            SC_TEST_EXPECT(hash.finalize(res));
+            SC_TEST_EXPECT(hash.getHash(res));
 
             String test;
             SC_TEST_EXPECT(StringBuilder(test).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
@@ -85,9 +85,9 @@ struct SC::HashingTest : public SC::TestCase
             Hashing hash;
             SC_TEST_EXPECT(hash.setType(Hashing::TypeSHA256));
 
-            SC_TEST_EXPECT(hash.update("test"_a8.toBytesSpan()));
+            SC_TEST_EXPECT(hash.add("test"_a8.toBytesSpan()));
             Hashing::Result res;
-            SC_TEST_EXPECT(hash.finalize(res));
+            SC_TEST_EXPECT(hash.getHash(res));
 
             String test;
             SC_TEST_EXPECT(StringBuilder(test).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
@@ -100,10 +100,10 @@ struct SC::HashingTest : public SC::TestCase
             Hashing hash;
             SC_TEST_EXPECT(hash.setType(Hashing::TypeSHA256));
 
-            SC_TEST_EXPECT(hash.update("test"_a8.toBytesSpan()));
-            SC_TEST_EXPECT(hash.update("test"_a8.toBytesSpan()));
+            SC_TEST_EXPECT(hash.add("test"_a8.toBytesSpan()));
+            SC_TEST_EXPECT(hash.add("test"_a8.toBytesSpan()));
             Hashing::Result res;
-            SC_TEST_EXPECT(hash.finalize(res));
+            SC_TEST_EXPECT(hash.getHash(res));
 
             String test;
             SC_TEST_EXPECT(StringBuilder(test).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
