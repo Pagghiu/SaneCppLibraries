@@ -17,6 +17,8 @@ struct Seconds;
 } // namespace Time
 } // namespace SC
 
+//! @defgroup group_time Time
+
 //! @addtogroup group_time
 //! @copybrief library_time (see @ref library_time for more details)
 

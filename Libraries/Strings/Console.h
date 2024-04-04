@@ -9,7 +9,7 @@ namespace SC
 {
 struct String;
 
-//! @addtogroup group_system
+//! @addtogroup group_strings
 //! @{
 
 /// @brief Writes to console using SC::StringFormat.
