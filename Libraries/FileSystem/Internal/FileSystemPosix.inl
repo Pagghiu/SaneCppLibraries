@@ -158,12 +158,12 @@ struct SC::FileSystem::Internal
         const char* sourceFile      = source.getNullTerminatedNative();
         const char* destinationFile = destination.getNullTerminatedNative();
 
-        // Try clonefile and fallback to copyfile in case it fails with ENOTSUP
+        // Try clonefile and fallback to copyfile in case it fails with ENOTSUP or EXDEV
         // https://www.manpagez.com/man/2/clonefile/
         // https://www.manpagez.com/man/3/copyfile/
         if (options.useCloneIfSupported)
         {
-            int cloneRes = clonefile(sourceFile, destinationFile, CLONE_NOFOLLOW | CLONE_NOOWNERCOPY);
+            int cloneRes = ::clonefile(sourceFile, destinationFile, CLONE_NOFOLLOW | CLONE_NOOWNERCOPY);
             if (cloneRes != 0)
             {
                 if ((errno == EEXIST) and options.overwrite)
@@ -171,34 +171,35 @@ struct SC::FileSystem::Internal
                     // TODO: We should probably renaming instead of deleting...and eventually rollback on failure
                     if (isDirectory)
                     {
-                        removefile_state_t state = removefile_state_alloc();
-                        int                res   = removefile(destinationFile, state, REMOVEFILE_RECURSIVE);
-                        removefile_state_free(state);
-                        if (res != 0)
+                        removefile_state_t state = ::removefile_state_alloc();
+
+                        const int removeRes = ::removefile(destinationFile, state, REMOVEFILE_RECURSIVE);
+                        ::removefile_state_free(state);
+                        if (removeRes != 0)
                         {
                             return false;
                         }
                     }
                     else
                     {
-                        remove(destinationFile);
+                        ::remove(destinationFile);
                     }
-                    cloneRes = clonefile(sourceFile, destinationFile, CLONE_NOFOLLOW | CLONE_NOOWNERCOPY);
+                    cloneRes = ::clonefile(sourceFile, destinationFile, CLONE_NOFOLLOW | CLONE_NOOWNERCOPY);
                 }
             }
             if (cloneRes == 0)
             {
                 return true;
             }
-            else if (errno != ENOTSUP)
+            else if (errno != ENOTSUP and errno != EXDEV)
             {
-                // We only fallback in case of ENOTSUP
+                // We only fallback in case of ENOTSUP and EXDEV (cross-device link)
                 return false;
             }
         }
-        copyfile_state_t state;
-        state          = copyfile_state_alloc();
-        uint32_t flags = COPYFILE_CLONE_FORCE; // Note: clone in copyfile is best effort
+        copyfile_state_t state = ::copyfile_state_alloc();
+
+        uint32_t flags = COPYFILE_ALL; // We should not use COPYFILE_CLONE_FORCE as clonefile just failed
         if (options.overwrite)
         {
             flags |= COPYFILE_UNLINK;
@@ -208,8 +209,8 @@ struct SC::FileSystem::Internal
             flags |= COPYFILE_RECURSIVE;
         }
         // TODO: Should define flags to decide if to follow symlinks on source and destination
-        const int copyRes = copyfile(sourceFile, destinationFile, state, flags);
-        copyfile_state_free(state);
+        const int copyRes = ::copyfile(sourceFile, destinationFile, state, flags);
+        ::copyfile_state_free(state);
         return copyRes == 0;
     }
 
