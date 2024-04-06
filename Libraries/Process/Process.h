@@ -195,6 +195,9 @@ struct SC::Process
     /// @brief gets the return code from the exited child process (valid only after exec or waitForExitSync)
     int32_t getExitStatus() const { return exitStatus.status; }
 
+    /// @brief Sets the starting working directory of the process that will be launched / executed
+    [[nodiscard]] Result setWorkingDirectory(StringView processWorkingDirectory);
+
     /// @brief Returns number of (virtual) processors available
     static size_t getNumberOfProcessors();
 
@@ -209,7 +212,6 @@ struct SC::Process
 
     [[nodiscard]] Result formatArguments(Span<const StringView> cmd);
 
-    // TODO: These must be exposed and filled properly with existing values
     StringNative<255>  currentDirectory = StringEncoding::Native;
     StringNative<1024> environment      = StringEncoding::Native;
 

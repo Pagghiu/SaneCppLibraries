@@ -259,3 +259,8 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
 
     return Result(true);
 }
+
+SC::Result SC::Process::setWorkingDirectory(StringView processWorkingDirectory)
+{
+    return Result(StringConverter(currentDirectory).appendNullTerminated(processWorkingDirectory));
+}

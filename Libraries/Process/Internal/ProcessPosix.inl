@@ -173,6 +173,16 @@ SC::Result SC::Process::launchImplementation()
         SC_TRY(stdOutFd.close());
         SC_TRY(stdErrFd.close());
 
+        // Switch to wanted current directory (if provided)
+        if (not currentDirectory.isEmpty())
+        {
+            int res = ::chdir(currentDirectory.view().getNullTerminatedNative());
+            if (res < 0)
+            {
+                return Result::Error("chdir failed");
+            }
+        }
+
         // Construct the argv pointers array, from the command string, that contains the
         // executable and all arguments separated by null terminators
         // First parameter is executable path and also argv[0]
