@@ -335,7 +335,7 @@ bool SC::StringView::isFloatingNumber() const
 //-----------------------------------------------------------------------------------------------------------------------
 // StringViewTokenizer
 //-----------------------------------------------------------------------------------------------------------------------
-[[nodiscard]] bool SC::StringViewTokenizer::isFinished() const { return current.isEmpty(); }
+[[nodiscard]] bool SC::StringViewTokenizer::isFinished() const { return remaining.isEmpty(); }
 
 bool SC::StringViewTokenizer::tokenizeNext(Span<const StringCodePoint> separators, Options options)
 {
@@ -344,7 +344,7 @@ bool SC::StringViewTokenizer::tokenizeNext(Span<const StringCodePoint> separator
         return false;
     }
     auto oldNonEmpty = numSplitsNonEmpty;
-    current.withIterator(
+    remaining.withIterator(
         [&](auto iterator)
         {
             auto originalTextStart = originalText.getIterator<decltype(iterator)>();
@@ -355,7 +355,7 @@ bool SC::StringViewTokenizer::tokenizeNext(Span<const StringCodePoint> separator
                 component = StringView::fromIterators(componentStart, iterator);
                 processed = StringView::fromIterators(originalTextStart, iterator);
                 (void)iterator.stepForward();
-                current = StringView::fromIteratorUntilEnd(iterator);
+                remaining = StringView::fromIteratorUntilEnd(iterator);
                 numSplitsTotal++;
                 if (not component.isEmpty())
                 {
@@ -366,7 +366,7 @@ bool SC::StringViewTokenizer::tokenizeNext(Span<const StringCodePoint> separator
                 {
                     break;
                 }
-            } while (not current.isEmpty());
+            } while (not remaining.isEmpty());
         });
     return options == IncludeEmpty ? true : numSplitsNonEmpty > oldNonEmpty;
 }

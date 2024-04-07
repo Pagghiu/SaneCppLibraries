@@ -536,6 +536,7 @@ struct SC::StringViewTokenizer
 
     StringView component; ///< Current component that has been tokenized by tokenizeNext
     StringView processed; ///< Substring of original string passed in constructor processed so far
+    StringView remaining; ///< Substring from current position until the end of original text
 
     enum Options
     {
@@ -544,7 +545,7 @@ struct SC::StringViewTokenizer
     };
 
     /// @brief Build a tokenizer operating on the given text string view
-    StringViewTokenizer(StringView text) : originalText(text), current(text) {}
+    StringViewTokenizer(StringView text) : originalText(text), remaining(text) {}
 
     /// @brief Splits the string along a list of separators
     /// @param separators List of separators
@@ -583,7 +584,6 @@ struct SC::StringViewTokenizer
 
   private:
     StringView originalText; // Original text as passed in the constructor
-    StringView current;      // Substring from current position until the end of original text
 };
 
 /// @brief Algorithms operating on strings (glob / wildcard).
