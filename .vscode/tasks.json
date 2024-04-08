@@ -148,6 +148,27 @@
             "problemMatcher": [
                 "$gcc"
             ],
-        }
+        },
+        {
+            "label": "Build Documentation",
+            "type": "shell",
+            "command": "${workspaceRoot}/SC.sh",
+            "args": [
+                "build",
+                "documentation"
+            ],
+            "windows": {
+                "command": "${workspaceRoot}/SC.bat",
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+        },
+        {
+            "label": "Launch Documentation WebServer",
+            "type": "shell",
+            "command": "python3 -m http.server --directory ${workspaceRoot}/_Build/_Documentation/docs",
+            "problemMatcher": []
+        },
     ]
 }

@@ -20,16 +20,53 @@ struct SupportToolsTest : public TestCase
                                   StringView(),
                                   StringView(),
                                   {}};
+
+        StringView args[10];
+        if (test_section("build documentation"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "documentation";
+            arguments.arguments = {};
+            SC_TEST_EXPECT(runBuildTool(arguments));
+        }
+        if (test_section("install doxygen-awesome-css"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "doxygen-awesome-css";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+        }
+        if (test_section("install doxygen"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "doxygen";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+        }
+        if (test_section("install clang"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "clang";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+        }
         if (test_section("clang-format execute"))
         {
-            arguments.tool   = "format";
-            arguments.action = "execute";
+            arguments.tool      = "format";
+            arguments.action    = "execute";
+            args[0]             = "clang";
+            arguments.arguments = {args, 1};
             SC_TEST_EXPECT(runFormatTool(arguments));
         }
         if (test_section("clang-format check"))
         {
-            arguments.tool   = "format";
-            arguments.action = "check";
+            arguments.tool      = "format";
+            arguments.action    = "check";
+            args[0]             = "clang";
+            arguments.arguments = {args, 1};
             SC_TEST_EXPECT(runFormatTool(arguments));
         }
     }

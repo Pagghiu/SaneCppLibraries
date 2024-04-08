@@ -283,7 +283,6 @@ struct SC::ProcessChain
     /// @param process A non-launched Process object (allocated by caller, must be alive until waitForExitSync)
     /// @param cmd Path to executable and eventual args for this process
     /// @return Invalid result if given process failed to create pipes for I/O redirection
-    /// @todo Expose options to decide if to pipe also stderr
     [[nodiscard]] Result pipe(Process& process, const Span<const StringView> cmd);
 
     /// @brief Launch the entire chain of processes. Reading from pipes can be done after launching.

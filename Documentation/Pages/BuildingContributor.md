@@ -1,31 +1,47 @@
 @page page_building_contributor Building (Contributor)
 
-Follow this guide if you're interested in building the library to contribute (check [CONTRIBUTING.md](https://github.com/Pagghiu/SaneCppLibraries/blob/main/CONTRIBUTING.md)!) or you're simply curious to run the test suite.
+Follow this guide if you're interested in building the library to contribute (check [CONTRIBUTING.md](https://github.com/Pagghiu/SaneCppLibraries/blob/main/CONTRIBUTING.md)! and [Coding Style](@ref page_coding_style)) or you're simply curious to run the test suite.
 
 [TOC]
 
-### Generate test projects
+# Generate test projects
 
 The test suite uses the handmade / self-hosted [SC::Build](@ref library_build) system, that describes builds in C++
 
+## Command-line
 - Generate test project
-    - **Windows**: `SC.bat build`
-    - **Posix**: `SC.sh build`
+    - **Windows**: `SC.bat build generate`
+    - **Posix**: `SC.sh build generate`
 - Open generated projects (in `_Build/_Projects`). 
 
 @note Check the [Tools](@ref page_tools) page for more details on invoking `SC.sh build`.
 
-### Build the test suite
+## VSCode
 
-#### Visual Studio 2022
+Under VSCode select `Tasks: Run Task` and choose:
+- `Generate Projects`
+
+# Build the test suite
+
+## Command-line
+
+Intel Machines
+- **Windows**: `SC.bat compile Debug default intel64`
+- **Posix**: `SC.sh compile Debug default intel64`
+
+Arm Machines
+- **Windows**: `SC.bat compile Debug default arm64`
+- **Posix**: `SC.sh compile Debug default arm64`
+
+## Visual Studio 2022
 - Open `_Build/_Projects/VisualStudio2022/SCTest.sln` 
 - Build the default configuration target (or another one you prefer)
 
-#### XCode
+## XCode
 - Open `_Build/_Projects/XCode/SCTest.xcodeproj/project.xcworkspace` 
 - Build the default configuration target (or another one you prefer)
 
-#### VScode on macOS
+## VScode on macOS
 Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 - `Build SCTest Debug intel64` [1]
 - `Build SCTest Debug arm64` [1]
@@ -35,7 +51,7 @@ Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 @note
 [1] Uses `make` and `c++` command (can be switched to be `clang` or `gcc`). Builds only current host architecture (`arm64` or `x86_64`). Still needs XCode installed for the sysroot.  
 
-#### VSCode on Linux
+## VSCode on Linux
 Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 - `Build SCTest Debug intel64` [1]
 - `Build SCTest Debug arm64` [1]
@@ -45,7 +61,7 @@ Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 @note
 [1] Uses `make` and `c++` commands. Builds only current host architecture (`arm64` or `x86_64`).
 
-#### VSCode on Windows
+## VSCode on Windows
 Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 - `Build SCTest Debug intel64` [1]
 - `Build SCTest Debug arm64` [1]
@@ -55,13 +71,13 @@ Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 @note
 [1] Needs `Visual Studio 2022` installed
 
-### Debug the tests
+# Debug the tests
 
-#### Visual Studio or XCode
+## Visual Studio or XCode
 
 Running the default target should work out of the box, as paths are already generated accordingly.
 
-#### VSCode on macOS or Linux
+## VSCode on macOS or Linux
 
 Select one of the appropriate `Run and Debug` configuration like:
 
@@ -78,7 +94,7 @@ Select one of the appropriate `Run and Debug` configuration like:
 [1] Uses `gdb` debugger. Implicitly invokes `Build SCTest Debug` to build the executable.  
 [2] Uses `lldb` debugger. Implicitly invokes `Build SCTest Debug` to build the executable. You need `CodeLLDB` or similar extension installed in VSCode.
 
-#### VSCode on Windows
+## VSCode on Windows
 
 Select one of the appropriate `Run and Debug` configuration like:
 
@@ -87,3 +103,16 @@ Select one of the appropriate `Run and Debug` configuration like:
 
 @note
 [1] Needs `Visual Studio 2022` installed
+
+# Build the documentation
+
+The `SC-build.cpp` from [SC::Tool](@ref page_tools) downloads Doxygen and some customization themes and then builds the documentation in `_Build/_Documentation`.
+
+## Command-line
+- **Windows**: `SC.bat build documentation`
+- **Posix**: `SC.sh build documentation`
+
+## VSCode
+Under VSCode select `Tasks: Run Task` and choose:
+- `Build Documentation`
+

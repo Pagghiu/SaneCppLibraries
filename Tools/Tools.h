@@ -2,26 +2,35 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Libraries/Foundation/Result.h"
-#include "../Libraries/Strings/StringView.h"
+#include "../Libraries/Strings/SmallString.h"
+#include "../Libraries/Strings/StringBuilder.h"
 
 namespace SC
 {
 struct Console;
+struct String;
 
 namespace Tools
 {
+template <typename... Types>
+inline String format(const StringView fmt, Types&&... types)
+{
+    String result = StringEncoding::Utf8;
+    (void)StringBuilder(result).format(fmt, forward<Types>(types)...);
+    return result;
+}
 struct Tool
 {
     struct Arguments
     {
-        Console&   console;
-        StringView libraryDirectory;
-        StringView toolDirectory;
-        StringView outputsDirectory;
-        StringView tool   = StringView();
-        StringView action = StringView();
+        Console&          console;
+        SmallString<1024> libraryDirectory;
+        SmallString<1024> toolDirectory;
+        SmallString<1024> outputsDirectory;
+        StringView        tool   = StringView();
+        StringView        action = StringView();
 
-        Span<StringView> arguments;
+        Span<const StringView> arguments;
     };
     static StringView getToolName();
     static StringView getDefaultAction();
@@ -29,10 +38,10 @@ struct Tool
 };
 struct Package;
 // Tools
-Result runFormatTool(Tool::Arguments& arguments);
-Result runBuildTool(Tool::Arguments& arguments);
-
-inline Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package = nullptr);
+[[nodiscard]] Result runFormatTool(Tool::Arguments& arguments);
+[[nodiscard]] Result runBuildTool(Tool::Arguments& arguments);
+[[nodiscard]] Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package = nullptr);
+[[nodiscard]] Result findSystemClangFormat(Console& console, StringView wantedMajorVersion, String& foundPath);
 } // namespace Tools
 
 } // namespace SC

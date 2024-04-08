@@ -1,7 +1,10 @@
 @page page_examples Examples
 
+# Where can I find examples?
+
 - Currently there are no specific examples you can run.  
 - The test suite is the closest thing examples you can find.
+- The second best is looking at how [SC::Tools](@ref page_tools) have been implemented.
 - Documentation for each library has some examples and / or code snippets that you can look at.
 
 # Where can I learn more?

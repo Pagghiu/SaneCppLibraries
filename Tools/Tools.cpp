@@ -53,10 +53,16 @@ int main(int argc, const char* argv[])
     nativeArgs              = argv;
     numArguments            = argc;
 #endif
+    const StringView libraryDirectory = StringView::fromNullTerminated(nativeArgs[1], StringEncoding::Native);
+    const StringView toolDirectory    = StringView::fromNullTerminated(nativeArgs[2], StringEncoding::Native);
+    const StringView outputsDirectory = StringView::fromNullTerminated(nativeArgs[3], StringEncoding::Native);
 
-    arguments.libraryDirectory = StringView::fromNullTerminated(nativeArgs[1], StringEncoding::Native);
-    arguments.toolDirectory    = StringView::fromNullTerminated(nativeArgs[2], StringEncoding::Native);
-    arguments.outputsDirectory = StringView::fromNullTerminated(nativeArgs[3], StringEncoding::Native);
+    {
+        SmallVector<StringView, 64> components;
+        (void)Path::normalize(libraryDirectory, components, &arguments.libraryDirectory, Path::Type::AsNative);
+        (void)Path::normalize(toolDirectory, components, &arguments.toolDirectory, Path::Type::AsNative);
+        (void)Path::normalize(outputsDirectory, components, &arguments.outputsDirectory, Path::Type::AsNative);
+    }
 
     arguments.tool = Tool::getToolName();
 

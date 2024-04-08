@@ -1,7 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#pragma once
 #include "../Libraries/Async/Async.h"
 #include "../Libraries/FileSystemIterator/FileSystemIterator.h"
+#include "../Libraries/Process/Process.h"
 #include "Tools.h"
 
 namespace SC

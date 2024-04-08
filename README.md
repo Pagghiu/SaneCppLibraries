@@ -131,7 +131,7 @@ Alternatively I am also reading the following discords too:
 
 # Contributing
 
-Please take some time to read the [Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html) and [Coding Style](Documentation/CodingStyle.md).
+Please take some time to read the [Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html) and [Coding Style](https://pagghiu.github.io/SaneCppLibraries/page_coding_style.html).
 
 After that you can read the [CONTRIBUTING.md](CONTRIBUTING.md) guide.
 

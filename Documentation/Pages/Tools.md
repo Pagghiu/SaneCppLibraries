@@ -103,19 +103,19 @@ param2
 Test "myAction" finished (took 1 ms)
 ```
 
-# Tools
 This is the list of tools that currently exist in the Sane C++ repository.
 
-## SC-build.cpp
+# SC-build.cpp
 
 `SC-build` configures (generating projects) and compiles Sane C++ repository projects using [SC::Build](@ref library_build).
 
-### Actions
+## Actions
 
 - `configure`: Configure (generates) the projects into `_Build/_Projects`
 - `compile`: Compiles all projects in `_Build/_Projects`
+- `documentation`: Builds the documentation `_Build/_Documentation`
 
-### Examples
+## Examples
 Configure project, generating them:
 ```
 ./SC.sh build configure
@@ -167,7 +167,7 @@ Linking SCTest
 SC-build "compile" finished (took 3071 ms)
 ```
 
-## SC-package.cpp
+# SC-package.cpp
 
 `SC-package` downloads third party tools needed for Sane C++ development (example: `clang-format`).  
 Proper OS / Architecture combination is selected (Windows/Linux/Mac and Intel/ARM) and all downloaded files (_packages_) `MD5` hash is checked for correctness.  
@@ -176,32 +176,32 @@ _Packages_ are placed and extracted in `_Build/_Packages` and once extracted, th
 @note Directory naming has been chosen to avoid clashes when mounting the same working copy folder in multiple concurrent virtual machines with different Operating Systems / architectures.  
 This happens during regular development, where new code is frequently tested in parallel on macOS, Windows and Linux before even committing it and pushing it to the CI system.
 
-### Actions
+## Actions
 
 - `install`: Downloads requires tools (LLVM / 7zip)
 
-### Examples
+## Examples
 
 ```
 ./SC.sh package install
 ```
 
-### Packages
+## Packages
 These are the packages that are currently downloaded and extracted / symlinked by `SC-package.cpp`:
 
 - `LLVM 15`: Downloads LLVM from the official github repository
 - `7zip`: 7zip executable (needed to decompress LLVM installer on Windows)
 - `7zr.exe`: 7Zip console executable (needed to decompress 7zip installer on Windows)
 
-## SC-format.cpp
+# SC-format.cpp
 
 `SC-format` tool formats or checks formatting for all files in Sane C++ repository
 
-### Actions
+## Actions
 - `execute`: Formats all source files in the repository in-place
 - `check`: Does a dry-run format of all source files. Returns error on unformatted files (used by the CI)
 
-### Examples
+## Examples
 
 Format all source files in the repository
 ```

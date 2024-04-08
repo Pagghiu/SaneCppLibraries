@@ -1,0 +1,105 @@
+# Compile using Doxyfile 1.9.2 because:
+# - Version 1.9.5 / 1.9.6 breaks the library recap table
+# - Version 1.9.7 has a bug that prevents showing TOC on subpages
+# - Version 1.9.8 has a bug that prevents showing modules and confuses with SC::Array, SC::Span, SC::SegmentItems, SC::forward
+
+PROJECT_NAME           = "Sane C++ Libraries"
+PROJECT_NUMBER         = 
+PROJECT_BRIEF          = "C++ Platform Abstraction Libraries"
+PROJECT_LOGO           = SC.svg
+OUTPUT_DIRECTORY       = ../../_Build/_Documentation
+HTML_OUTPUT            = docs
+STRIP_FROM_PATH        = "$(STRIP_FROM_PATH)"
+ALWAYS_DETAILED_SEC    = YES
+FULL_PATH_NAMES        = NO
+JAVADOC_AUTOBRIEF      = YES
+DISTRIBUTE_GROUP_DOC   = YES
+SHOW_GROUPED_MEMB_INC  = YES
+SORT_GROUP_NAMES       = YES
+INPUT                  = ../../Documentation/Pages \
+                         ../../Documentation/Libraries \
+                         ../../Documentation/LibrariesExtra \
+                         ../../Libraries/Algorithms \
+                         ../../Libraries/Async \
+                         ../../Libraries/Build \
+                         ../../Libraries/Containers \
+                         ../../Libraries/File \
+                         ../../Libraries/FileSystem \
+                         ../../Libraries/FileSystemIterator \
+                         ../../Libraries/FileSystemWatcher \
+                         ../../Libraries/Foundation \
+                         ../../Libraries/Hashing \
+                         ../../Libraries/Http \
+                         ../../Libraries/Plugin \
+                         ../../Libraries/Process \
+                         ../../Libraries/Reflection \
+                         ../../Libraries/SerializationBinary \
+                         ../../LibrariesExtra/SerializationBinaryTypeErased \
+                         ../../Libraries/SerializationText \
+                         ../../Libraries/Socket \
+                         ../../Libraries/Strings \
+                         ../../Libraries/Testing \
+                         ../../Libraries/Threading \
+                         ../../Libraries/Time \
+                         ../../Bindings/c/sc_hashing
+EXAMPLE_PATH           = ../../
+FILE_PATTERNS          = *.h *.md
+RECURSIVE              = NO
+EXCLUDE_PATTERNS       = *Test.h \
+                         InitializerList.h
+PREDEFINED             = DOXYGEN
+EXCLUDE_SYMBOLS        = \
+TypeTraits::IsSame<*> \
+TypeTraits::AddReference<*> \
+TypeTraits::Conditional<*> \
+TypeTraits::EnableIf<*> \
+TypeTraits::IsConst<*> \
+TypeTraits::RemoveConst<*> \
+TypeTraits::RemovePointer<*> \
+TypeTraits::ReturnType<*> \
+TypeTraits::RemoveReference<*> \
+TypeTraits::IsLValueReference<*> \
+TypeTraits::IsRValueReference<*> \
+TypeTraits::TypeListGet<*> \
+Function<*> \
+TypeToEnum<*> \
+EnumToType<*> \
+Internal::* \
+PlacementNew \
+StringFormatterFor \
+StringFormat::Implementation \
+ExtendedTypeInfo<*> \
+Reflect<*> \
+IsPrimitive<*> \
+detail::* \
+Atomic<*> \
+VectorArrayVTable<*> \
+SegmentHeaderBase \
+SegmentItems  \
+SegmentOperations \
+VectorAllocator \
+ArrayAllocator \
+
+
+USE_MDFILE_AS_MAINPAGE = ../../Documentation/Pages/Index.md
+HTML_HEADER            = header.html
+HTML_EXTRA_STYLESHEET  = ../../_Build/_Packages/doxygen-awesome-css_all/doxygen-awesome.css \
+                         ../../_Build/_Packages/doxygen-awesome-css_all/doxygen-custom/custom.css \
+                         ../../_Build/_Packages/doxygen-awesome-css_all/doxygen-awesome-sidebar-only.css \
+                         ../../_Build/_Packages/doxygen-awesome-css_all/doxygen-awesome-sidebar-only-darkmode-toggle.css \
+                         ../../_Build/_Packages/doxygen-awesome-css_all/doxygen-custom/custom-alternative.css \
+                         SC.css
+HTML_EXTRA_FILES       = ../../_Build/_Packages/doxygen-awesome-css_all/doxygen-awesome-darkmode-toggle.js \
+                         ../../_Build/_Packages/doxygen-awesome-css_all/doxygen-awesome-fragment-copy-button.js \
+                         ../../_Build/_Packages/doxygen-awesome-css_all/doxygen-awesome-paragraph-link.js \
+                         ../../_Build/_Packages/doxygen-awesome-css_all/doxygen-custom/toggle-alternative-theme.js \
+                         ../../_Build/_Packages/doxygen-awesome-css_all/doxygen-awesome-interactive-toc.js \
+                         ../../_Build/_Packages/doxygen-awesome-css_all/doxygen-awesome-tabs.js\
+                         favicon.png
+GENERATE_TREEVIEW      = YES
+GENERATE_LATEX         = NO
+ENUM_VALUES_PER_LINE   = 1
+COLLABORATION_GRAPH    = NO
+DOT_IMAGE_FORMAT       = svg
+WARN_IF_UNDOCUMENTED   = NO
+USE_PDFLATEX           = NO

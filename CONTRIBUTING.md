@@ -2,7 +2,7 @@
 
 > Note: this document will be updated regularly clarifying existing rules and adding missing guidelines that will emerge from discussions or PRs being reviewed.
 
-Before deep diving in this document, please take some time to read the [Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html) and [Coding Style](Documentation/CodingStyle.md).  
+Before deep diving in this document, please take some time to read the [Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html) and [Coding Style](https://pagghiu.github.io/SaneCppLibraries/page_coding_style.html).  
 More importantly browse the existing codebase!
 
 ## TLDR

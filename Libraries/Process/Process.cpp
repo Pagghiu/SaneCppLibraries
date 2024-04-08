@@ -53,6 +53,7 @@ SC::Result SC::ProcessChain::launch(const Process::StdOut& stdOut, const Process
 
 SC::Result SC::ProcessChain::pipe(Process& process, const Span<const StringView> cmd)
 {
+    // TODO: Expose options to decide if to pipe also stderr
     SC_TRY_MSG(process.parent == nullptr, "Process::pipe - already in use");
 
     if (not processes.isEmpty())

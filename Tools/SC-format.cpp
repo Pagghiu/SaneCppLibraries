@@ -2,9 +2,14 @@
 // SPDX-License-Identifier: MIT
 
 // TODO: Figure out a way to avoid this macro
+
+#include "SC-package.h"
+
+#if !defined(SC_LIBRARY_PATH)
 #define SC_TOOLS_IMPORT
 #include "SC-package.cpp"
 #undef SC_TOOLS_IMPORT
+#endif
 
 #include "SC-format.h"
 
@@ -57,9 +62,12 @@ static Result formatSourceFiles(FormatSources action, StringView clangFormatExec
     SmallString<256> clangFormat;
     if (not Tools::findSystemClangFormat(arguments.console, "15", clangFormat))
     {
+        StringView      additionalArgs[1];
         Tool::Arguments args = arguments;
         args.tool            = "packages";
         args.action          = "install";
+        additionalArgs[0]    = "clang";
+        args.arguments       = {additionalArgs};
         // If no system installed clang-format (matching version 15) has been found, we install a local copy
         Tools::Package clangPackage;
         SC_TRY(runPackageTool(args, &clangPackage));
@@ -68,11 +76,13 @@ static Result formatSourceFiles(FormatSources action, StringView clangFormatExec
 
     if (arguments.action == "execute")
     {
-        return Tools::formatSourceFiles(Tools::FormatSources::Execute, clangFormat.view(), arguments.libraryDirectory);
+        return Tools::formatSourceFiles(Tools::FormatSources::Execute, clangFormat.view(),
+                                        arguments.libraryDirectory.view());
     }
     else if (arguments.action == "check")
     {
-        return Tools::formatSourceFiles(Tools::FormatSources::Check, clangFormat.view(), arguments.libraryDirectory);
+        return Tools::formatSourceFiles(Tools::FormatSources::Check, clangFormat.view(),
+                                        arguments.libraryDirectory.view());
     }
     else
     {

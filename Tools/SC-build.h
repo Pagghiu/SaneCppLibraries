@@ -1,12 +1,22 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#pragma once
 #include "../Libraries/Build/Build.h"
 #include "../Libraries/FileSystem/Path.h"
+#include "../Libraries/Process/Process.h"
 #include "../Libraries/Strings/Console.h"
 #include "../Libraries/Strings/SmallString.h"
 #include "../Libraries/Strings/StringBuilder.h"
 #include "../Libraries/Time/Time.h"
 #include "Tools.h"
+
+#include "SC-package.h"
+
+#if !defined(SC_LIBRARY_PATH)
+#define SC_TOOLS_IMPORT
+#include "SC-package.cpp"
+#undef SC_TOOLS_IMPORT
+#endif
 
 namespace SC
 {
@@ -20,11 +30,11 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
     Console&          console = arguments.console;
     StringNative<256> buffer;
     StringBuilder     builder(buffer);
-    SC_TRY(Path::join(projectsDirectory, {arguments.outputsDirectory, PROJECTS_SUBDIR}));
+    SC_TRY(Path::join(projectsDirectory, {arguments.outputsDirectory.view(), PROJECTS_SUBDIR}));
     SC_TRY(builder.format("projects         = \"{}\"\n", projectsDirectory));
     console.print(buffer.view());
     if (not Path::isAbsolute(projectsDirectory.view(), SC::Path::AsNative) or
-        not Path::isAbsolute(arguments.libraryDirectory, SC::Path::AsNative))
+        not Path::isAbsolute(arguments.libraryDirectory.view(), SC::Path::AsNative))
     {
         return Result::Error("Both --target and --sources must be absolute paths");
     }
@@ -39,7 +49,7 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
     Build::Action action;
     action.action           = Build::Action::Configure;
     action.targetDirectory  = projectsDirectory.view();
-    action.libraryDirectory = arguments.libraryDirectory;
+    action.libraryDirectory = arguments.libraryDirectory.view();
 
     action.generator = Build::Generator::VisualStudio2022;
     res              = Build::executeAction(action);
@@ -61,7 +71,7 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
     Build::Action action;
     action.action           = Build::Action::Compile;
     action.targetDirectory  = projectsDirectory.view();
-    action.libraryDirectory = arguments.libraryDirectory;
+    action.libraryDirectory = arguments.libraryDirectory.view();
     switch (HostPlatform)
     {
     case Platform::Windows: action.generator = Build::Generator::VisualStudio2022; break;
@@ -124,7 +134,39 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
     return Build::executeAction(action);
 }
 
-[[nodiscard]] inline Result runBuildTool(Tool::Arguments& arguments)
+[[nodiscard]] inline Result runBuildDocumentation(StringView doxygenExecutable, Tool::Arguments& arguments)
+{
+    String outputDirectory;
+    // TODO: De-hardcode the output "_Documentation" path
+    SC_TRY(Path::join(outputDirectory, {arguments.outputsDirectory.view(), "_Documentation"}));
+    {
+        FileSystem fs;
+        if (fs.init(outputDirectory.view()))
+        {
+            SC_TRY(fs.removeDirectoryRecursive(outputDirectory.view()));
+        }
+    }
+    String documentationDirectory;
+    // TODO: De-hardcode the source "Documentation" path
+    SC_TRY(Path::join(documentationDirectory, {arguments.libraryDirectory.view(), "Documentation", "Doxygen"}));
+
+    Process process;
+    SC_TRY(process.setWorkingDirectory(documentationDirectory.view()));
+    SC_TRY(process.setEnvironment("STRIP_FROM_PATH", documentationDirectory.view()));
+    SC_TRY(process.exec({doxygenExecutable}));
+
+    // TODO: Move this to the github CI file once automatic documentation publishing will been setup
+    SC_TRY(Path::join(outputDirectory, {arguments.outputsDirectory.view(), "_Documentation", "docs"}));
+    {
+        // touch .nojekyll
+        FileSystem fs;
+        SC_TRY(fs.init(outputDirectory.view()));
+        SC_TRY(fs.writeString(".nojekyll", ""));
+    }
+    return Result(true);
+}
+
+[[nodiscard]] Result runBuildTool(Tool::Arguments& arguments)
 {
     if (arguments.action == "configure")
     {
@@ -133,6 +175,28 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
     else if (arguments.action == "compile")
     {
         return runBuildCompile(arguments);
+    }
+    else if (arguments.action == "documentation")
+    {
+        switch (HostPlatform)
+        {
+        case Platform::Apple: break;
+        default: return Result::Error("build documentation is only supported on macOS (for now)");
+        }
+        StringView      additionalArgs[1];
+        Tool::Arguments args = arguments;
+        args.tool            = "packages";
+        args.action          = "install";
+        args.arguments       = {additionalArgs};
+        Tools::Package doxygenPackage;
+        additionalArgs[0] = "doxygen";
+        SC_TRY(runPackageTool(args, &doxygenPackage));
+        Tools::Package doxygenAwesomeCssPackage;
+        additionalArgs[0] = "doxygen-awesome-css";
+        SC_TRY(runPackageTool(args, &doxygenAwesomeCssPackage));
+        String doxygenExecutable;
+        SC_TRY(StringBuilder(doxygenExecutable).format("{}/doxygen", doxygenPackage.installDirectoryLink));
+        return runBuildDocumentation(doxygenExecutable.view(), arguments);
     }
     else
     {

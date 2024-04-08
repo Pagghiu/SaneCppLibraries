@@ -1,5 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#pragma once
 #include "Tools.h"
 
 #include "../Libraries/FileSystem/FileSystem.h"
@@ -14,14 +15,6 @@ namespace SC
 {
 namespace Tools
 {
-template <typename... Types>
-inline String format(const StringView fmt, Types&&... types)
-{
-    String result = StringEncoding::Utf8;
-    (void)StringBuilder(result).format(fmt, forward<Types>(types)...);
-    return result;
-}
-
 struct Download
 {
     SmallString<255> packagesCacheDirectory;
@@ -34,6 +27,7 @@ struct Download
     SmallString<255> fileMD5;
 
     bool createLink = true;
+    bool isGitClone = false;
 };
 
 struct Package
@@ -138,12 +132,22 @@ struct CustomFunctions
     FileSystem fs;
     package.packageFullName =
         format("{0}-{1}-{2}", download.packageName, download.packageVersion, download.packagePlatform);
-    package.packageBaseName = Path::basename(download.url.view(), Path::Type::AsPosix);
+    if (package.packageBaseName.isEmpty())
+    {
+        package.packageBaseName = Path::basename(download.url.view(), Path::Type::AsPosix);
+    }
 
     package.packageLocalFile =
         format("{0}/{1}/{2}", download.packagesCacheDirectory, download.packageName, package.packageBaseName);
-    package.packageLocalTxt       = format("{0}.txt", package.packageLocalFile);
-    package.packageLocalDirectory = format("{0}_extracted", package.packageLocalFile);
+    package.packageLocalTxt = format("{0}.txt", package.packageLocalFile);
+    if (download.isGitClone)
+    {
+        package.packageLocalDirectory = format("{0}_{1}", package.packageLocalFile, download.packageVersion);
+    }
+    else
+    {
+        package.packageLocalDirectory = format("{0}_extracted", package.packageLocalFile);
+    }
 
     SC_TRY(fs.init("."));
     SC_TRY(fs.makeDirectoryRecursive(download.packagesCacheDirectory.view()));
@@ -169,21 +173,34 @@ struct CustomFunctions
     // If it's still failed let's re-download and extract + link everything
     if (not testSucceeded)
     {
-        SC_TRY(downloadFileMD5(download.url.view(), package.packageLocalFile.view(), download.fileMD5.view()));
+        if (!download.isGitClone)
+        {
+            SC_TRY(downloadFileMD5(download.url.view(), package.packageLocalFile.view(), download.fileMD5.view()));
+        }
         if (fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
         {
             SC_TRY(fs.removeDirectoriesRecursive(package.packageLocalDirectory.view()));
         }
         SC_TRY(fs.makeDirectoryRecursive(package.packageLocalDirectory.view()));
-        if (functions.extractFunction.isValid())
+
+        if (download.isGitClone)
         {
-            SC_TRY(functions.extractFunction(package.packageLocalFile.view(), package.packageLocalDirectory.view()));
+            SC_TRY(Process().exec({"git", "clone", "-b", download.packageVersion.view(), download.url.view(),
+                                   package.packageLocalDirectory.view()}));
         }
         else
         {
-            SC_TRY(tarExpandTo(package.packageLocalFile.view(), package.packageLocalDirectory.view(), 0));
+            if (functions.extractFunction.isValid())
+            {
+                SC_TRY(
+                    functions.extractFunction(package.packageLocalFile.view(), package.packageLocalDirectory.view()));
+            }
+            else
+            {
+                SC_TRY(tarExpandTo(package.packageLocalFile.view(), package.packageLocalDirectory.view(), 0));
+            }
+            SC_TRY(removeQuarantineAttribute(package.packageLocalDirectory.view()));
         }
-        SC_TRY(removeQuarantineAttribute(package.packageLocalDirectory.view()));
         bool createPackageFile = true;
         if (download.createLink)
         {

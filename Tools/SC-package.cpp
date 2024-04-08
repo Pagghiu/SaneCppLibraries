@@ -2,14 +2,100 @@
 // SPDX-License-Identifier: MIT
 
 #include "SC-package.h"
-
+#include "../Libraries/Strings/String.h"
 namespace SC
 {
 namespace Tools
 {
+[[nodiscard]] Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                    Package& package)
+{
+    switch (HostPlatform)
+    {
+    case Platform::Apple: break;
+    default: return Result::Error("installDoxygen: Unsupported platform");
+    }
+
+    static constexpr StringView packageVersion = "1.9.2";
+    static constexpr StringView testVersion    = "1.9.2 (caa4e3de211fbbef2c3adf58a6bd4c86d0eb7cb8*)\n";
+    static constexpr StringView baseURL        = "https://master.dl.sourceforge.net/project/doxygen";
+
+    Download download;
+    download.packagesCacheDirectory   = packagesCacheDirectory;
+    download.packagesInstallDirectory = packagesInstallDirectory;
+
+    download.packageName     = "doxygen";
+    download.packageVersion  = packageVersion;
+    download.packagePlatform = "macOS";
+
+    download.url     = format("{0}/rel-{1}/Doxygen-{1}.dmg?viasf=1", baseURL, download.packageVersion);
+    download.fileMD5 = "dbf10cfda8f5128ce7d2b2fc1fa1ce1f";
+
+    package.packageBaseName = format("Doxygen-{0}.dmg", download.packageVersion);
+
+    CustomFunctions functions;
+    functions.extractFunction = [](StringView fileName, StringView directory) -> Result
+    {
+        String mountPoint = format("/Volumes/Doxygen-{0}", packageVersion);
+        SC_TRY(Process().exec({"hdiutil", "attach", "-nobrowse", "-readonly", "-noverify", "-noautoopen", "-mountpoint",
+                               mountPoint.view(), fileName}));
+        FileSystem fs;
+        SC_TRY(fs.init(directory));
+        String fileToCopy = format("/Volumes/Doxygen-{0}/Doxygen.app/Contents/Resources/doxygen", packageVersion);
+        SC_TRY(fs.copyFile(fileToCopy.view(), "doxygen", FileSystem::CopyFlags().setOverwrite(true)));
+        SC_TRY(Process().exec({"hdiutil", "detach", mountPoint.view()}));
+        return Result(true);
+    };
+    functions.testFunction = [](const Download& download, const Package& package)
+    {
+        SC_COMPILER_UNUSED(download);
+        String result;
+        String path = format("{0}/doxygen", package.installDirectoryLink);
+        SC_TRY(Process().exec({path.view(), "-v"}, result));
+        return Result(result == testVersion);
+    };
+    SC_TRY(packageInstall(download, package, functions));
+    return Result(true);
+}
+
+[[nodiscard]] Result installDoxygenAwesomeCss(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                              Package& package)
+{
+
+    static constexpr StringView packageVersion = "v2.2.1";
+
+    Download download;
+    download.packagesCacheDirectory   = packagesCacheDirectory;
+    download.packagesInstallDirectory = packagesInstallDirectory;
+
+    download.packageName     = "doxygen-awesome-css";
+    download.packageVersion  = packageVersion;
+    download.packagePlatform = "all";
+    download.url             = "https://github.com/jothepro/doxygen-awesome-css.git";
+    download.isGitClone      = true;
+
+    CustomFunctions functions;
+    functions.testFunction = [](const Download& download, const Package& package)
+    {
+        String  result;
+        Process process;
+        SC_TRY(process.setWorkingDirectory(package.installDirectoryLink.view()));
+        SC_TRY(process.exec(
+            {
+                "git",
+                "describe",
+                "--tags",
+            },
+            result));
+        return Result(result.view().trimAnyOf({'\n'}) == download.packageVersion.view());
+    };
+    SC_TRY(packageInstall(download, package, functions));
+    return Result(true);
+}
+
 // 7zr.exe is needed to extract 7zip installer on windows
-[[nodiscard]] inline Result install7ZipR(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
-                                         Package& package)
+[[nodiscard]] Result install7ZipR(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                  Package& package)
 {
     Download download;
     download.packagesCacheDirectory   = packagesCacheDirectory;
@@ -43,8 +129,8 @@ namespace Tools
     return Result(true);
 }
 
-[[nodiscard]] inline Result install7Zip(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
-                                        Package& package)
+[[nodiscard]] Result install7Zip(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                 Package& package)
 {
     Package         sevenZipRPackage;
     CustomFunctions functions;
@@ -157,7 +243,7 @@ namespace Tools
     return Result(true);
 }
 
-[[nodiscard]] inline Result findSystemClangFormat(Console& console, StringView wantedMajorVersion, String& foundPath)
+[[nodiscard]] Result findSystemClangFormat(Console& console, StringView wantedMajorVersion, String& foundPath)
 {
     StringView       clangFormatExecutable;
     SmallString<255> version;
@@ -229,8 +315,8 @@ namespace Tools
     return Result(true);
 }
 
-[[nodiscard]] inline Result installClangBinaries(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
-                                                 Package& package)
+[[nodiscard]] Result installClangBinaries(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                          Package& package)
 {
     Package         sevenZipPackage;
     CustomFunctions functions;
@@ -350,7 +436,7 @@ namespace Tools
 constexpr StringView PackagesCacheDirectory   = "_PackagesCache";
 constexpr StringView PackagesInstallDirectory = "_Packages";
 
-inline Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
+Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
 {
     Console& console = arguments.console;
 
@@ -358,8 +444,8 @@ inline Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package
     StringNative<256> packagesInstallDirectory;
     StringNative<256> buffer;
     StringBuilder     builder(buffer);
-    SC_TRY(Path::join(packagesCacheDirectory, {arguments.outputsDirectory, PackagesCacheDirectory}));
-    SC_TRY(Path::join(packagesInstallDirectory, {arguments.outputsDirectory, PackagesInstallDirectory}));
+    SC_TRY(Path::join(packagesCacheDirectory, {arguments.outputsDirectory.view(), PackagesCacheDirectory}));
+    SC_TRY(Path::join(packagesInstallDirectory, {arguments.outputsDirectory.view(), PackagesInstallDirectory}));
     SC_TRY(builder.append("packagesCache    = \"{}\"\n", packagesCacheDirectory.view()));
     SC_TRY(builder.append("packages         = \"{}\"", packagesInstallDirectory.view()));
     console.printLine(buffer.view());
@@ -371,8 +457,25 @@ inline Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package
     }
     if (arguments.action == "install")
     {
-        // Just install dependencies without formatting
-        SC_TRY(Tools::installClangBinaries(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package));
+        StringView packageName = arguments.arguments.sizeInElements() > 0 ? arguments.arguments[0] : "clang";
+        if (packageName == "doxygen")
+        {
+            SC_TRY(Tools::installDoxygen(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package));
+        }
+        else if (packageName == "doxygen-awesome-css")
+        {
+            SC_TRY(Tools::installDoxygenAwesomeCss(packagesCacheDirectory.view(), packagesInstallDirectory.view(),
+                                                   *package));
+        }
+        else if (packageName == "clang")
+        {
+            SC_TRY(
+                Tools::installClangBinaries(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package));
+        }
+        else
+        {
+            return Result::Error("Invalid package name");
+        }
     }
     else
     {
