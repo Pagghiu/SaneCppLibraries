@@ -12,6 +12,7 @@ namespace SC
 struct Process;
 struct ProcessChain;
 struct ProcessID;
+struct ProcessEnvironment;
 } // namespace SC
 
 //! @defgroup group_process Process
@@ -49,6 +50,15 @@ struct SC::ProcessID
 ///
 /// Example: read process output using a pipe, using launch + waitForExitSync
 /// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessSnippet5
+///
+/// Example: Add an environment variable
+/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessEnvironmentNewVar
+///
+/// Example: Redefine an environment variable
+/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessEnvironmentRedefine
+///
+/// Example: Disable environment variable inheritance
+/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessEnvironmentDisableInheritance
 
 struct SC::Process
 {
@@ -198,6 +208,12 @@ struct SC::Process
     /// @brief Sets the starting working directory of the process that will be launched / executed
     [[nodiscard]] Result setWorkingDirectory(StringView processWorkingDirectory);
 
+    /// @brief Controls if the newly spawned child process will inherit parent process environment variables
+    void inheritParentEnvironmentVariables(bool inherit) { inheritEnv = inherit; }
+
+    /// @brief Sets the environment variable for the newly spawned child process
+    [[nodiscard]] Result setEnvironment(StringView environmentVariable, StringView value);
+
     /// @brief Returns number of (virtual) processors available
     static size_t getNumberOfProcessors();
 
@@ -212,8 +228,7 @@ struct SC::Process
 
     [[nodiscard]] Result formatArguments(Span<const StringView> cmd);
 
-    StringNative<255>  currentDirectory = StringEncoding::Native;
-    StringNative<1024> environment      = StringEncoding::Native;
+    StringNative<255> currentDirectory = StringEncoding::Native;
 
     // On Windows command holds the concatenation of executable and arguments.
     // On Posix command holds the concatenation of executable and arguments SEPARATED BY null-terminators (\0).
@@ -225,6 +240,15 @@ struct SC::Process
     size_t commandArgumentsByteOffset[MAX_NUM_ARGUMENTS]; // Tracking length of each argument in the command string
     size_t commandArgumentsNumber = 0;                    // Counts number of arguments (including executable name)
 #endif
+
+    StringNative<1024> environment = StringEncoding::Native;
+
+    static constexpr size_t MAX_NUM_ENVIRONMENT = 256;
+
+    size_t environmentByteOffset[MAX_NUM_ENVIRONMENT]; // Tracking length of each environment variable
+    size_t environmentNumber = 0;                      // Counts number of environment variable
+
+    bool inheritEnv = true;
 
     friend struct IntrusiveDoubleLinkedList<Process>;
     friend struct ProcessChain;
@@ -287,4 +311,44 @@ struct SC::ProcessChain
     IntrusiveDoubleLinkedList<Process> processes;
 };
 
+/// @brief Reads current process environment variables
+///
+/// Example: Print all environment variables to stdout
+/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessEnvironmentPrint
+struct SC::ProcessEnvironment
+{
+    ProcessEnvironment();
+    ~ProcessEnvironment();
+
+    ProcessEnvironment(const ProcessEnvironment&)            = delete;
+    ProcessEnvironment(ProcessEnvironment&&)                 = delete;
+    ProcessEnvironment& operator=(const ProcessEnvironment&) = delete;
+    ProcessEnvironment& operator=(ProcessEnvironment&&)      = delete;
+
+    /// @brief Returns the total number of environment variables for current process
+    [[nodiscard]] size_t size() const { return numberOfEnvironment; }
+
+    /// @brief Get the environmnent variable at given index, returning its name and value
+    /// @param index The index of the variable to retrieve (must be less than ProcessEnvironment::size())
+    /// @param name The parsed name of the environment variable at requested index
+    /// @param value The parsed value of the environment variable at requested index
+    [[nodiscard]] bool get(size_t index, StringView& name, StringView& value) const;
+
+    /// @brief Checks if an environment variable exists in current process
+    /// @param variableName Name of the variable to check
+    /// @param index Optional pointer to a variable that will receive the index of the variable (only if found)
+    /// @returns true if variableName has been found in list of the variable
+    [[nodiscard]] bool contains(StringView variableName, size_t* index = nullptr);
+
+  private:
+    size_t numberOfEnvironment = 0;
+#if SC_PLATFORM_WINDOWS
+    static constexpr size_t MAX_ENVIRONMENTS = 256;
+
+    StringView envStrings[MAX_ENVIRONMENTS];
+    wchar_t*   environment = nullptr;
+#else
+    char** environment = nullptr;
+#endif
+};
 //! @}

@@ -4,17 +4,18 @@
 
 [TOC]
 
-Process allows launching and chaining input and output of child processes.
+Process allows launching, chaining input and output, setting working directory and environment variables of child processes.
 
 # Features
 | Class                     | Description
 |:--------------------------|:----------------------------------|
 | SC::Process               | @copybrief SC::Process            |
 | SC::ProcessChain          | @copybrief SC::ProcessChain       |
+| SC::ProcessEnvironment    | @copybrief SC::ProcessEnvironment |
 
 # Status
 🟩 Usable  
-Library allows all basic operations on child processes and it's being used in [Plugin](@ref library_plugin).
+Library is being used in [SC::Plugin](@ref library_plugin) and in [SC::Tools](@ref page_tools).
 
 # Description
 
@@ -25,6 +26,9 @@ The SC::Process class is used when handling a process in isolation, while the SC
 
 ## ProcessChain
 @copydoc SC::ProcessChain
+
+## ProcessEnvironment
+@copydoc SC::ProcessEnvironment
 
 # Roadmap
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Process.h"
+#include "EnvironmentTable.h"
 
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
@@ -57,7 +58,7 @@ SC::Result SC::Process::launchImplementation()
 
     const BOOL inheritHandles = someRedirection ? TRUE : FALSE;
 
-    DWORD creationFlags = 0; // CREATE_UNICODE_ENVIRONMENT;
+    DWORD creationFlags = CREATE_UNICODE_ENVIRONMENT;
     ZeroMemory(&startupInfo, sizeof(STARTUPINFO));
     startupInfo.cb         = sizeof(STARTUPINFO);
     startupInfo.hStdInput  = GetStdHandle(STD_INPUT_HANDLE);
@@ -84,27 +85,43 @@ SC::Result SC::Process::launchImplementation()
     // In documentation it's explicitly stated that this buffer will be modified (!?)
     LPWSTR  wideCmd = const_cast<LPWSTR>(command.view().getNullTerminatedNative());
     LPCWSTR wideDir = currentDirectory.view().isEmpty() ? nullptr : currentDirectory.view().getNullTerminatedNative();
-    LPWSTR  wideEnv =
-        const_cast<LPWSTR>(environment.view().isEmpty() ? nullptr : environment.view().getNullTerminatedNative());
+    LPWSTR  wideEnv = nullptr; // by default inherit parent environment
+
+    EnvironmentTable<MAX_NUM_ENVIRONMENT> environmenTable;
+    ProcessEnvironment                    parentEnv;
+
+    const wchar_t* const* environmentArray = nullptr;
+    StringsTable          table            = {environment, environmentNumber, environmentByteOffset};
+    SC_TRY(environmenTable.writeTo(environmentArray, inheritEnv, table, parentEnv));
+
+    if (environmentArray != nullptr)
+    {
+        for (size_t idx = environmentNumber; environmentArray[idx] != nullptr; ++idx)
+        {
+            SC_TRY(table.append(StringView({environmentArray[idx], ::wcslen(environmentArray[idx])}, true)));
+        }
+        SC_TRY(table.append({"\0"})); // add final \0
+        wideEnv = const_cast<LPWSTR>(environment.view().getNullTerminatedNative());
+    }
     PROCESS_INFORMATION processInfo;
     ZeroMemory(&processInfo, sizeof(PROCESS_INFORMATION));
     BOOL success;
-    success = CreateProcessW(nullptr,        // [in, optional]      LPCWSTR               lpApplicationName,
-                             wideCmd,        // [in, out, optional] LPWSTR                lpCommandLine,
-                             nullptr,        // [in, optional]      LPSECURITY_ATTRIBUTES lpProcessAttributes,
-                             nullptr,        // [in, optional]      LPSECURITY_ATTRIBUTES lpThreadAttributes,
-                             inheritHandles, // [in]                BOOL                  bInheritHandles,
-                             creationFlags,  // [in]                DWORD                 dwCreationFlags,
-                             wideEnv,        // [in, optional]      LPVOID                lpEnvironment,
-                             wideDir,        // [in, optional]      LPCWSTR               lpCurrentDirectory,
-                             &startupInfo,   // [in]                LPSTARTUPINFOW        lpStartupInfo,
-                             &processInfo);  // [out]               PROCESSINFORMATION    lpProcessInformation
+    success = ::CreateProcessW(nullptr,        // [in, optional]      LPCWSTR               lpApplicationName,
+                               wideCmd,        // [in, out, optional] LPWSTR                lpCommandLine,
+                               nullptr,        // [in, optional]      LPSECURITY_ATTRIBUTES lpProcessAttributes,
+                               nullptr,        // [in, optional]      LPSECURITY_ATTRIBUTES lpThreadAttributes,
+                               inheritHandles, // [in]                BOOL                  bInheritHandles,
+                               creationFlags,  // [in]                DWORD                 dwCreationFlags,
+                               wideEnv,        // [in, optional]      LPVOID                lpEnvironment,
+                               wideDir,        // [in, optional]      LPCWSTR               lpCurrentDirectory,
+                               &startupInfo,   // [in]                LPSTARTUPINFOW        lpStartupInfo,
+                               &processInfo);  // [out]               PROCESSINFORMATION    lpProcessInformation
 
     if (not success)
     {
         return Result::Error("CreateProcessW failed");
     }
-    CloseHandle(processInfo.hThread);
+    ::CloseHandle(processInfo.hThread);
 
     processID.pid = processInfo.dwProcessId;
     SC_TRY(handle.assign(processInfo.hProcess));
@@ -112,4 +129,63 @@ SC::Result SC::Process::launchImplementation()
     SC_TRY(stdOutFd.close());
     SC_TRY(stdErrFd.close());
     return Result(true);
+}
+
+SC::Result SC::Process::formatArguments(Span<const StringView> params)
+{
+    bool first = true;
+
+    StringConverter formattedCmd(command, StringConverter::Clear);
+    for (const StringView& param : params)
+    {
+        if (not first)
+        {
+            SC_TRY(formattedCmd.appendNullTerminated(" "));
+        }
+        first = false;
+        if (param.containsCodePoint(' ')) // TODO: Must escape also quotes
+        {
+            SC_TRY(formattedCmd.appendNullTerminated("\""));
+            SC_TRY(formattedCmd.appendNullTerminated(param));
+            SC_TRY(formattedCmd.appendNullTerminated("\""));
+        }
+        else
+        {
+            SC_TRY(formattedCmd.appendNullTerminated(param));
+        }
+    }
+
+    return Result(true);
+}
+
+SC::ProcessEnvironment::ProcessEnvironment()
+{
+    environment  = ::GetEnvironmentStringsW();
+    wchar_t* env = environment;
+    while (*env != L'\0')
+    {
+        size_t length                   = ::wcslen(env);
+        envStrings[numberOfEnvironment] = StringView({env, length}, true);
+        env += length + 1;
+        numberOfEnvironment++;
+    }
+}
+
+SC::ProcessEnvironment::~ProcessEnvironment() { ::FreeEnvironmentStringsW(environment); }
+
+bool SC::ProcessEnvironment::get(size_t index, StringView& name, StringView& value) const
+{
+    if (index >= numberOfEnvironment)
+    {
+        return false;
+    }
+    StringView          nameValue = envStrings[index];
+    StringViewTokenizer tokenizer(nameValue);
+    SC_TRY(tokenizer.tokenizeNext({'='}));
+    name = tokenizer.component;
+    if (not tokenizer.isFinished())
+    {
+        value = tokenizer.remaining;
+    }
+    return true;
 }

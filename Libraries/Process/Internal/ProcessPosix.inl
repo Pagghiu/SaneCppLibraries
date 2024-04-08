@@ -3,6 +3,7 @@
 #pragma once
 #include "../../Foundation/Deferred.h"
 #include "../Process.h"
+#include "EnvironmentTable.h"
 
 #include <errno.h>
 #include <signal.h>   // sigfillset / sigdelset / sigaction
@@ -11,6 +12,17 @@
 #include <sys/wait.h> // waitpid
 #include <unistd.h>   // pipe fork execl _exit
 
+#if SC_PLATFORM_APPLE
+#include <crt_externs.h>
+// https://www.gnu.org/software/gnulib/manual/html_node/environ.html
+#define environ (*_NSGetEnviron())
+#else
+extern char** environ;
+#endif
+
+namespace SC
+{
+} // namespace SC
 SC::Result SC::detail::ProcessDescriptorDefinition::releaseHandle(pid_t& handle)
 {
     handle = Invalid;
@@ -195,27 +207,68 @@ SC::Result SC::Process::launchImplementation()
             argv[idx] = commandView + commandArgumentsByteOffset[idx];
         }
         argv[commandArgumentsNumber] = nullptr; // The last item also must be a nullptr to signal "end of array"
+        // By default, let's pass current process environment
 
+        const char* const* environmentArray = environ;
+        ProcessEnvironment parentEnv;
+        StringsTable       table = {environment, environmentNumber, environmentByteOffset};
+
+        EnvironmentTable<MAX_NUM_ENVIRONMENT> environmentTable;
+        SC_TRY(environmentTable.writeTo(environmentArray, inheritEnv, table, parentEnv));
         // If execvp succeeds, this fork morphs into the new executable on the next line, and the parent communication
         // pipe, that has the CLOEXEC flags set (as it has been created as Non-inheritable) will see both sides closed,
         // allowing the pipe.readPipe.read to receive an EOF. This works also because the parent is closing the write
         // side before the read side is used for actual read.
         //
         // If execvp fails, the deferred on top of this branch will _exit(EXIT_FAILURE)
-        int childErrno = ::execvp(command.view().getNullTerminatedNative(), const_cast<char* const*>(argv));
+        int childErrno;
+
+        const size_t cmdLen = commandArgumentsNumber > 1 ? commandArgumentsByteOffset[1] : command.view().sizeInBytes();
+        const StringView cmd({command.view().getNullTerminatedNative(), cmdLen}, true, StringEncoding::Ascii);
+        if (cmd.containsCodePoint('/'))
+        {
+            // cmd holds an absolute path, let's call execve directly
+            childErrno = ::execve(cmd.getNullTerminatedNative(),               // command
+                                  const_cast<char* const*>(argv),              // arguments
+                                  const_cast<char* const*>(environmentArray)); // environment
+        }
+        else
+        {
+            // cmd holds a relative path, let's parse PATH variable to try execve prepending PATH entries (one by one)
+            StringView pathEnv = StringView::fromNullTerminated(::getenv("PATH"), StringEncoding::Ascii);
+            char       pathBuffer[1024 + 1];
+            if (pathEnv.isEmpty())
+            {
+                // This is prescribed by Posix
+                ::confstr(_CS_PATH, pathBuffer, 1024);
+                pathEnv = StringView::fromNullTerminated(pathBuffer, StringEncoding::Ascii);
+            }
+            StringViewTokenizer tokenizer = pathEnv;
+            while (tokenizer.tokenizeNext({':'}))
+            {
+                StringNative<1024> finalCommand = pathEnv.getEncoding();
+
+                StringConverter converter(finalCommand);
+                SC_TRY(converter.appendNullTerminated(tokenizer.component));
+                SC_TRY(converter.appendNullTerminated("/"));
+                SC_TRY(converter.appendNullTerminated(cmd));
+                childErrno = ::execve(finalCommand.view().getNullTerminatedNative(), // command
+                                      const_cast<char* const*>(argv),                // arguments
+                                      const_cast<char* const*>(environmentArray));   // environment
+            }
+        }
 
         // execvp failed, let's communicate errno back to parent before _exit(EXIT_FAILURE)
         childErrno = errno;
         // TODO: Add a write or Span overload that will not need to be called with a reinterpret_cast
         (void)pipe.writePipe.write({reinterpret_cast<char*>(&childErrno), sizeof(childErrno)});
-        // We should not close the writePipe because if this happens before readpipe has read, it will read 0
+        // We should not close the writePipe because if this happens before readPipe has been read, it will read 0
         // bytes thinking incorrectly that the process has succeeded.
         // (void)pipe.close();
     }
     else
     {
         // Parent branch
-
         if (pthread_sigmask(SIG_SETMASK, &previousSignals, NULL) != 0)
             abort();
         Span<char> actuallyRead;
@@ -229,7 +282,7 @@ SC::Result SC::Process::launchImplementation()
         if (actuallyRead.sizeInBytes() != 0)
         {
             // Error received inside childErrno
-            return Result::Error("execvp failed");
+            return Result::Error("execve failed");
         }
         SC_TRY(handle.assign(processID.pid));
         SC_TRY(stdInFd.close());
@@ -239,4 +292,62 @@ SC::Result SC::Process::launchImplementation()
     }
     // The exit(127) inside isChild makes this unreachable
     Assert::unreachable();
+}
+
+SC::Result SC::Process::formatArguments(Span<const StringView> params)
+{
+    StringsTable table = {command, commandArgumentsNumber, commandArgumentsByteOffset};
+    for (size_t idx = 0; idx < params.sizeInElements(); ++idx)
+    {
+        SC_TRY(table.append(params[idx]));
+    }
+    return Result(true);
+}
+
+SC::ProcessEnvironment::ProcessEnvironment()
+{
+    environment = environ;
+    char** env  = environment;
+
+    while (env[numberOfEnvironment] != nullptr)
+    {
+        numberOfEnvironment++;
+    }
+}
+
+SC::ProcessEnvironment::~ProcessEnvironment() {}
+
+bool SC::ProcessEnvironment::get(size_t index, StringView& name, StringView& value) const
+{
+    if (index >= numberOfEnvironment)
+    {
+        return false;
+    }
+    StringView          nameValue = StringView::fromNullTerminated(environment[index], StringEncoding::Ascii);
+    StringViewTokenizer tokenizer(nameValue);
+    SC_TRY(tokenizer.tokenizeNext({'='}));
+    name = tokenizer.component;
+    if (not tokenizer.isFinished())
+    {
+        value = tokenizer.remaining;
+    }
+    return true;
+}
+
+bool SC::ProcessEnvironment::contains(StringView variableName, size_t* index)
+{
+    for (size_t idx = 0; idx < numberOfEnvironment; ++idx)
+    {
+        StringView name, value;
+        SC_TRY(get(idx, name, value));
+        if (name == variableName)
+        {
+            if (index != nullptr)
+            {
+                *index = idx;
+            }
+            return true;
+        }
+    }
+    return false;
 }

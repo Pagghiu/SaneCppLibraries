@@ -67,6 +67,7 @@ SC::Result SC::ProcessChain::pipe(Process& process, const Span<const StringView>
     processes.queueBack(process);
     return Result(true);
 }
+
 SC::Result SC::ProcessChain::waitForExitSync()
 {
     for (Process* process = processes.front; process != nullptr; process = process->next)
@@ -81,44 +82,6 @@ SC::Result SC::ProcessChain::waitForExitSync()
 //-------------------------------------------------------------------------------------------------------
 // Process
 //-------------------------------------------------------------------------------------------------------
-
-SC::Result SC::Process::formatArguments(Span<const StringView> params)
-{
-#if SC_PLATFORM_WINDOWS
-    bool first = true;
-
-    StringConverter formattedCmd(command, StringConverter::Clear);
-    for (const StringView& param : params)
-    {
-        if (not first)
-        {
-            SC_TRY(formattedCmd.appendNullTerminated(" "));
-        }
-        first = false;
-        if (param.containsCodePoint(' ')) // TODO: Must escape also quotes
-        {
-            SC_TRY(formattedCmd.appendNullTerminated("\""));
-            SC_TRY(formattedCmd.appendNullTerminated(param));
-            SC_TRY(formattedCmd.appendNullTerminated("\""));
-        }
-        else
-        {
-            SC_TRY(formattedCmd.appendNullTerminated(param));
-        }
-    }
-#else
-
-    SC_TRY_MSG(params.sizeInElements() <= MAX_NUM_ARGUMENTS, "Exceeding limit of 256 arguments");
-    StringConverter formattedCmd(command, StringConverter::Clear);
-    for (size_t idx = 0; idx < params.sizeInElements(); ++idx)
-    {
-        commandArgumentsByteOffset[idx] = command.sizeInBytesIncludingTerminator();
-        SC_TRY(formattedCmd.appendNullTerminated(params.data()[idx], false)); // false == keep previous null terminator
-    }
-    commandArgumentsNumber = params.sizeInElements();
-#endif
-    return Result(true);
-}
 
 SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, const StdErr& stdError)
 {
@@ -263,4 +226,10 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
 SC::Result SC::Process::setWorkingDirectory(StringView processWorkingDirectory)
 {
     return Result(StringConverter(currentDirectory).appendNullTerminated(processWorkingDirectory));
+}
+
+SC::Result SC::Process::setEnvironment(StringView name, StringView value)
+{
+    StringsTable table = {environment, environmentNumber, environmentByteOffset};
+    return table.append({name, SC_NATIVE_STR("="), value});
 }
