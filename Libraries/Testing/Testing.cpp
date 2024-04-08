@@ -16,13 +16,19 @@ SC::TestReport::TestReport(Console& console, int argc, const char** argv) : cons
     for (int idx = 1; idx < argc; ++idx)
     {
         const auto param = StringView::fromNullTerminated(argv[idx], StringEncoding::Ascii);
+        if (param == "--quiet"_a8)
+        {
+            quietMode = true;
+        }
         if (param == "--test"_a8 && testToRun.isEmpty())
         {
             if (idx + 1 < argc)
             {
                 testToRun = StringView::fromNullTerminated(argv[idx + 1], StringEncoding::Ascii);
-
-                console.print("TestReport::Running single test \"{}\"\n"_a8, testToRun);
+                if (not quietMode)
+                {
+                    console.print("TestReport::Running single test \"{}\"\n"_a8, testToRun);
+                }
             }
         }
         if (param == "--test-section"_a8 && sectionToRun.isEmpty())
@@ -31,7 +37,10 @@ SC::TestReport::TestReport(Console& console, int argc, const char** argv) : cons
             {
                 sectionToRun = StringView::fromNullTerminated(argv[idx + 1], StringEncoding::Ascii);
 
-                console.print("TestReport::Running single section \"{}\"\n"_a8, sectionToRun);
+                if (not quietMode)
+                {
+                    console.print("TestReport::Running single section \"{}\"\n"_a8, sectionToRun);
+                }
             }
         }
     }
@@ -43,6 +52,8 @@ SC::TestReport::TestReport(Console& console, int argc, const char** argv) : cons
 
 SC::TestReport::~TestReport()
 {
+    if (quietMode)
+        return;
     if (numTestsFailed > 0)
     {
         console.print(redEMOJI);
@@ -63,7 +74,10 @@ SC::TestCase::TestCase(TestReport& report, StringView testName)
 {
     if (report.isTestEnabled(testName))
     {
-        report.console.print("[[ {} ]]\n\n"_a8, testName);
+        if (not report.quietMode)
+        {
+            report.console.print("[[ {} ]]\n\n"_a8, testName);
+        }
         report.firstFailedTest = StringView();
         report.currentSection  = StringView();
     }
@@ -77,25 +91,27 @@ SC::TestCase::~TestCase()
         {
             report.printSectionResult(*this);
         }
-
-        report.console.print("\n"_a8);
-        if (numTestsFailed > 0)
+        if (not report.quietMode)
         {
-            report.console.print(redEMOJI);
-            report.console.print(" [[ "_a8);
-            report.console.print(testName);
-            report.console.print(" ]]"_a8);
-            report.console.print(" FAILED = {} (Succeeded = {})\n"_a8, numTestsFailed, numTestsSucceeded);
+            report.console.print("\n"_a8);
+            if (numTestsFailed > 0)
+            {
+                report.console.print(redEMOJI);
+                report.console.print(" [[ "_a8);
+                report.console.print(testName);
+                report.console.print(" ]]"_a8);
+                report.console.print(" FAILED = {} (Succeeded = {})\n"_a8, numTestsFailed, numTestsSucceeded);
+            }
+            else
+            {
+                report.console.print(greenEMOJI);
+                report.console.print(" [[ "_a8);
+                report.console.print(testName);
+                report.console.print(" ]]"_a8);
+                report.console.print(" SUCCEEDED = {}\n"_a8, numTestsSucceeded);
+            }
+            report.console.print("---------------------------------------------------\n"_a8);
         }
-        else
-        {
-            report.console.print(greenEMOJI);
-            report.console.print(" [[ "_a8);
-            report.console.print(testName);
-            report.console.print(" ]]"_a8);
-            report.console.print(" SUCCEEDED = {}\n"_a8, numTestsSucceeded);
-        }
-        report.console.print("---------------------------------------------------\n"_a8);
         report.numTestsFailed += numTestsFailed;
         report.numTestsSucceeded += numTestsSucceeded;
         report.testCaseFinished(*this);
@@ -140,10 +156,21 @@ bool SC::TestCase::recordExpectation(StringView expression, Result status)
         StringView({status.message, status.message ? ::strlen(status.message) : 0}, true, StringEncoding::Ascii));
 }
 
-bool SC::TestCase::test_section(StringView sectionName)
+bool SC::TestCase::test_section(StringView sectionName, Execute execution)
 {
     numSectionTestsFailed = 0;
-    if (report.isTestEnabled(testName) && report.isSectionEnabled(sectionName))
+    bool isTestEnabled;
+    switch (execution)
+    {
+    case Execute::Default: //
+        isTestEnabled = report.isTestEnabled(testName) and report.isSectionEnabled(sectionName);
+        break;
+    case Execute::OnlyExplicit: //
+        isTestEnabled = report.sectionToRun == sectionName;
+        break;
+    default: return false;
+    }
+    if (isTestEnabled)
     {
         SC_ASSERT_DEBUG(sectionName.isNullTerminated());
         if (not report.currentSection.isEmpty())

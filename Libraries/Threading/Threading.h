@@ -102,7 +102,7 @@ struct SC::ConditionVariable
 /// thread.start([](Thread& thread)
 /// {
 ///     // It's highly recommended setting a name for the thread
-///     thread.setThreadName(SC_STR_NATIVE("My Thread"));
+///     thread.setThreadName(SC_NATIVE_STR("My Thread"));
 ///     // Do something on the thread
 ///     Thread::Sleep(1000); // Sleep for 1 second
 /// });

@@ -29,8 +29,9 @@ struct SC::TestReport
     StringView applicationRootDirectory; ///< Path to application (on macOS is different from executable path)
 
     // Options
-    bool abortOnFirstFailedTest = true; ///< If `true` will abort after first failed test
-    bool debugBreakOnFailedTest = true; ///< If `true` will issue a debugger halt when a test fails
+    bool abortOnFirstFailedTest = true;  ///< If `true` will abort after first failed test
+    bool debugBreakOnFailedTest = true;  ///< If `true` will issue a debugger halt when a test fails
+    bool quietMode              = false; ///< If `true` will not print recaps at start or end of the test
 
     /// @brief Build from a console and executable arguments
     /// @param console A Console object where to print test results
@@ -85,19 +86,27 @@ struct SC::TestCase
     /// @return `false` if `status` Result is not valid
     bool recordExpectation(StringView expression, Result status);
 
+    enum class Execute
+    {
+        Default,     ///< Test is executed if all tests are enabled or if this specific one matches --test-section
+        OnlyExplicit ///< Test is executed only if explicitly requested with --test-section
+    };
+
     /// @brief Starts a new test section
     /// @param sectionName The name of the section
+    /// @param execution Execution criteria
     /// @return `true` if the test is enabled, `false` otherwise
-    [[nodiscard]] bool test_section(StringView sectionName);
+    [[nodiscard]] bool test_section(StringView sectionName, Execute execution = Execute::Default);
 
     TestReport& report; ///< The TestReport object passed in the constructor
   private:
     friend struct TestReport;
     const StringView testName;
-    uint32_t         numTestsSucceeded;
-    uint32_t         numTestsFailed;
-    uint32_t         numSectionTestsFailed;
-    bool             printedSection;
+
+    uint32_t numTestsSucceeded;
+    uint32_t numTestsFailed;
+    uint32_t numSectionTestsFailed;
+    bool     printedSection;
 };
 
 /// Records a test expectation (eventually aborting or breaking o n failed test)
