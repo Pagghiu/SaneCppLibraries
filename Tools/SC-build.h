@@ -153,6 +153,19 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
     Process process;
     SC_TRY(process.setWorkingDirectory(documentationDirectory.view()));
     SC_TRY(process.setEnvironment("STRIP_FROM_PATH", documentationDirectory.view()));
+    switch (HostPlatform)
+    {
+    case Platform::Apple: //
+        SC_TRY(process.setEnvironment("PACKAGES_PLATFORM", "macos"));
+        break;
+    case Platform::Linux: //
+        SC_TRY(process.setEnvironment("PACKAGES_PLATFORM", "linux"));
+        break;
+    case Platform::Windows: //
+        SC_TRY(process.setEnvironment("PACKAGES_PLATFORM", "windows"));
+        break;
+    case Platform::Emscripten: return Result::Error("Unsupported platform");
+    }
     SC_TRY(process.exec({doxygenExecutable}));
 
     // TODO: Move this to the github CI file once automatic documentation publishing will been setup
@@ -178,11 +191,6 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
     }
     else if (arguments.action == "documentation")
     {
-        switch (HostPlatform)
-        {
-        case Platform::Apple: break;
-        default: return Result::Error("build documentation is only supported on macOS (for now)");
-        }
         StringView      additionalArgs[1];
         Tool::Arguments args = arguments;
         args.tool            = "packages";

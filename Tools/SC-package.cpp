@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "SC-package.h"
+#include "../Libraries/Plugin/Internal/DynamicLibrary.h"
 #include "../Libraries/Strings/String.h"
 namespace SC
 {
@@ -10,49 +11,86 @@ namespace Tools
 [[nodiscard]] Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                     Package& package)
 {
-    switch (HostPlatform)
-    {
-    case Platform::Apple: break;
-    default: return Result::Error("installDoxygen: Unsupported platform");
-    }
 
     static constexpr StringView packageVersion = "1.9.2";
-    static constexpr StringView testVersion    = "1.9.2 (caa4e3de211fbbef2c3adf58a6bd4c86d0eb7cb8*)\n";
-    static constexpr StringView baseURL        = "https://master.dl.sourceforge.net/project/doxygen";
+    static constexpr StringView testVersion    = "1.9.2 (caa4e3de211fbbef2c3adf58a6bd4c86d0eb7cb8";
+
+    static constexpr StringView baseURL = "https://master.dl.sourceforge.net/project/doxygen";
 
     Download download;
     download.packagesCacheDirectory   = packagesCacheDirectory;
     download.packagesInstallDirectory = packagesInstallDirectory;
 
-    download.packageName     = "doxygen";
-    download.packageVersion  = packageVersion;
-    download.packagePlatform = "macOS";
-
-    download.url     = format("{0}/rel-{1}/Doxygen-{1}.dmg?viasf=1", baseURL, download.packageVersion);
-    download.fileMD5 = "dbf10cfda8f5128ce7d2b2fc1fa1ce1f";
-
-    package.packageBaseName = format("Doxygen-{0}.dmg", download.packageVersion);
+    download.packageName    = "doxygen";
+    download.packageVersion = packageVersion;
 
     CustomFunctions functions;
-    functions.extractFunction = [](StringView fileName, StringView directory) -> Result
+
+    switch (HostPlatform)
     {
-        String mountPoint = format("/Volumes/Doxygen-{0}", packageVersion);
-        SC_TRY(Process().exec({"hdiutil", "attach", "-nobrowse", "-readonly", "-noverify", "-noautoopen", "-mountpoint",
-                               mountPoint.view(), fileName}));
-        FileSystem fs;
-        SC_TRY(fs.init(directory));
-        String fileToCopy = format("/Volumes/Doxygen-{0}/Doxygen.app/Contents/Resources/doxygen", packageVersion);
-        SC_TRY(fs.copyFile(fileToCopy.view(), "doxygen", FileSystem::CopyFlags().setOverwrite(true)));
-        SC_TRY(Process().exec({"hdiutil", "detach", mountPoint.view()}));
-        return Result(true);
-    };
+    case Platform::Apple:
+        download.packagePlatform = "macos";
+
+        download.url              = format("{0}/rel-{1}/Doxygen-{1}.dmg?viasf=1", baseURL, download.packageVersion);
+        download.fileMD5          = "dbf10cfda8f5128ce7d2b2fc1fa1ce1f";
+        package.packageBaseName   = format("Doxygen-{0}.dmg", download.packageVersion);
+        functions.extractFunction = [](StringView fileName, StringView directory) -> Result
+        {
+            String mountPoint = format("/Volumes/Doxygen-{0}", packageVersion);
+            SC_TRY(Process().exec({"hdiutil", "attach", "-nobrowse", "-readonly", "-noverify", "-noautoopen",
+                                   "-mountpoint", mountPoint.view(), fileName}));
+            FileSystem fs;
+            SC_TRY(fs.init(directory));
+            String fileToCopy = format("/Volumes/Doxygen-{0}/Doxygen.app/Contents/Resources/doxygen", packageVersion);
+            SC_TRY(fs.copyFile(fileToCopy.view(), "doxygen", FileSystem::CopyFlags().setOverwrite(true)));
+            SC_TRY(Process().exec({"hdiutil", "detach", mountPoint.view()}));
+            return Result(true);
+        };
+
+        break;
+    case Platform::Linux:
+        switch (HostInstructionSet)
+        {
+        case InstructionSet::ARM64: return Result::Error("Doxygen: Unsupported architecture ARM64");
+        default: break;
+        }
+        // TODO: Linux official doxygen binary dynamically links libclang-9
+        if (not SystemDynamicLibrary().load("libclang-9"))
+        {
+            return Result::Error("Doxygen: Unsupported platform (Linux) due to missing libclang-9");
+        }
+        download.packagePlatform = "linux";
+        download.url             = format("{0}/rel-{1}/doxygen-{1}.linux.bin.tar.gz", baseURL, download.packageVersion);
+        download.fileMD5         = "c0662ebb72dca6c4a83477b8d354d2fe";
+        package.packageBaseName  = format("doxygen-{0}.linux.bin.tar.gz", download.packageVersion);
+        break;
+    case Platform::Windows:
+        download.packagePlatform = "windows";
+        download.url             = format("{0}/rel-{1}/doxygen-{1}.windows.bin.zip", baseURL, download.packageVersion);
+        download.fileMD5         = "4ba3ec23f8ff28482116e53557a080c4";
+        package.packageBaseName  = format("doxygen-{0}.windows.bin.zip", download.packageVersion);
+        break;
+    case Platform::Emscripten: return Result::Error("Unsupported platform");
+    }
+
     functions.testFunction = [](const Download& download, const Package& package)
     {
         SC_COMPILER_UNUSED(download);
         String result;
-        String path = format("{0}/doxygen", package.installDirectoryLink);
+        String path;
+        switch (HostPlatform)
+        {
+        case Platform::Apple: //
+            path = format("{0}/doxygen", package.installDirectoryLink);
+            break;
+        case Platform::Linux: //
+            path = format("{0}/doxygen-{1}/bin/doxygen", package.installDirectoryLink, download.packageVersion);
+            break;
+        case Platform::Windows: path = format("{0}/doxygen.exe", package.installDirectoryLink); break;
+        case Platform::Emscripten: return Result::Error("Unsupported platform");
+        }
         SC_TRY(Process().exec({path.view(), "-v"}, result));
-        return Result(result == testVersion);
+        return Result(result.view().startsWith(testVersion));
     };
     SC_TRY(packageInstall(download, package, functions));
     return Result(true);
@@ -68,11 +106,24 @@ namespace Tools
     download.packagesCacheDirectory   = packagesCacheDirectory;
     download.packagesInstallDirectory = packagesInstallDirectory;
 
-    download.packageName     = "doxygen-awesome-css";
-    download.packageVersion  = packageVersion;
-    download.packagePlatform = "all";
-    download.url             = "https://github.com/jothepro/doxygen-awesome-css.git";
-    download.isGitClone      = true;
+    download.packageName    = "doxygen-awesome-css";
+    download.packageVersion = packageVersion;
+    switch (HostPlatform)
+    {
+    case Platform::Apple: //
+        download.packagePlatform = "macos";
+        break;
+    case Platform::Linux: //
+        download.packagePlatform = "linux";
+        break;
+    case Platform::Windows: //
+        download.packagePlatform = "windows";
+        break;
+    case Platform::Emscripten: return Result::Error("Unsupported platform");
+    }
+    download.url            = "https://github.com/jothepro/doxygen-awesome-css.git";
+    package.packageBaseName = format("doxygen-awesome-css-{0}", download.packagePlatform);
+    download.isGitClone     = true;
 
     CustomFunctions functions;
     functions.testFunction = [](const Download& download, const Package& package)

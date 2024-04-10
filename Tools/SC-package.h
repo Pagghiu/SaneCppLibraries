@@ -207,7 +207,7 @@ struct CustomFunctions
             SC_TRY(fs.removeLinkIfExists(package.installDirectoryLink.view()));
             if (not createLink(package.packageLocalDirectory.view(), package.installDirectoryLink.view()))
             {
-                SC_TRY(fs.moveDirectory(package.packageLocalDirectory.view(), package.installDirectoryLink.view()));
+                SC_TRY(fs.copyDirectory(package.packageLocalDirectory.view(), package.installDirectoryLink.view()));
                 createPackageFile = false;
             }
         }

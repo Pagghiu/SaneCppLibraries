@@ -192,6 +192,8 @@ These are the packages that are currently downloaded and extracted / symlinked b
 - `LLVM 15`: Downloads LLVM from the official github repository
 - `7zip`: 7zip executable (needed to decompress LLVM installer on Windows)
 - `7zr.exe`: 7Zip console executable (needed to decompress 7zip installer on Windows)
+- `doxygen`: Doxygen documentation generator
+- `doxygen-awesome-css`: Doxygen awesome css (Doxygen theme)
 
 # SC-format.cpp
 
