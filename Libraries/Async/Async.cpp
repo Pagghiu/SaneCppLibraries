@@ -229,7 +229,10 @@ SC::Result SC::AsyncEventLoop::runNoWait() { return privateSelf.runStep(Private:
 
 SC::Result SC::AsyncEventLoop::run()
 {
-    while (privateSelf.getTotalNumberOfActiveHandle() > 0 or not privateSelf.submissions.isEmpty())
+    // It may happen that getTotalNumberOfActiveHandle() < 0 when re-activating an async that has been calling
+    // decreaseActiveCount() during initial setup. Now that async would be in the submissions.
+    // One example that matches this case is re-activation of the FilePoll used for shared wakeups.
+    while (privateSelf.getTotalNumberOfActiveHandle() != 0 or not privateSelf.submissions.isEmpty())
     {
         SC_TRY(runOnce());
     };
@@ -508,7 +511,7 @@ SC::Result SC::AsyncEventLoop::Private::runStep(SyncMode syncMode)
         return SC::Result(true);
     }
 
-    if (getTotalNumberOfActiveHandle())
+    if (getTotalNumberOfActiveHandle() != 0)
     {
         // We may have some manualCompletions queued (for SocketClose for example) but no active handles
         SC_LOG_MESSAGE("Active Requests Before Poll = {}\n", getTotalNumberOfActiveHandle());
