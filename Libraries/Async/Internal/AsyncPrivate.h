@@ -8,6 +8,8 @@ struct SC::AsyncEventLoop::Private
 {
     AsyncEventLoop* eventLoop = nullptr;
 
+    Atomic<bool> wakeUpPending = false;
+
     int numberOfActiveHandles     = 0;
     int numberOfManualCompletions = 0;
     int numberOfExternals         = 0;

@@ -269,7 +269,16 @@ SC::Result SC::AsyncEventLoop::createAsyncTCPSocket(SocketFlags::AddressFamily f
     return associateExternallyCreatedTCPSocket(outDescriptor);
 }
 
-SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread() { return internalSelf.wakeUpFromExternalThread(); }
+SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread()
+{
+    if (not privateSelf.wakeUpPending.exchange(true))
+    {
+        // This executes if current thread is lucky enough to atomically exchange pending from false to true.
+        // This effectively allows coalescing calls from different threads into a single notification.
+        return internalSelf.wakeUpFromExternalThread();
+    }
+    return Result(true);
+}
 
 SC::Result SC::AsyncEventLoop::associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor)
 {
@@ -851,9 +860,7 @@ SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
     AsyncLoopWakeUp& notifier = *static_cast<AsyncLoopWakeUp*>(&async);
     if (not notifier.pending.exchange(true))
     {
-        // This executes if current thread is lucky enough to atomically exchange pending from false to true.
-        // This effectively allows coalescing calls from different threads into a single notification.
-        SC_TRY(wakeUpFromExternalThread());
+        return wakeUpFromExternalThread();
     }
     return Result(true);
 }
@@ -879,6 +886,8 @@ void SC::AsyncEventLoop::Private::executeWakeUps(AsyncResult& result)
             notifier->pending.exchange(false); // allow executing the notification again
         }
     }
+
+    wakeUpPending.exchange(false);
 }
 
 void SC::AsyncEventLoop::Private::removeActiveHandle(AsyncRequest& async)
