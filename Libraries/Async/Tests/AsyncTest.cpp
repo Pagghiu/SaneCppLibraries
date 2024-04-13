@@ -6,7 +6,6 @@
 #include "../../Process/Process.h"
 #include "../../Strings/String.h"
 #include "../../Testing/Testing.h"
-#include "../../Threading/ThreadPool.h"
 #include "../../Threading/Threading.h" // EventObject
 
 namespace SC
@@ -593,9 +592,7 @@ struct SC::AsyncTest : public SC::TestCase
         if (test_section("file read/write"))
         {
             // 1. Create ThreadPool and tasks
-            ThreadPool::Task readTask;
-            ThreadPool::Task writeTask;
-            ThreadPool       threadPool;
+            ThreadPool threadPool;
             if (useThreadPool)
             {
                 SC_TEST_EXPECT(threadPool.create(4));
@@ -633,7 +630,7 @@ struct SC::AsyncTest : public SC::TestCase
 
             // 5. Create and start the write operation
             AsyncFileWrite       asyncWriteFile;
-            AsyncFileWrite::Task asyncWriteTask = {threadPool, writeTask};
+            AsyncFileWrite::Task asyncWriteTask;
 
             asyncWriteFile.setDebugName("FileWrite");
             asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
@@ -642,8 +639,16 @@ struct SC::AsyncTest : public SC::TestCase
                 SC_TEST_EXPECT(res.get(writtenBytes));
                 SC_TEST_EXPECT(writtenBytes == 4);
             };
-            SC_TEST_EXPECT(asyncWriteFile.start(eventLoop, handle, StringView("test").toCharSpan(),
-                                                useThreadPool ? &asyncWriteTask : nullptr));
+            asyncWriteFile.fileDescriptor = handle;
+            asyncWriteFile.buffer         = StringView("test").toCharSpan();
+            if (useThreadPool)
+            {
+                SC_TEST_EXPECT(asyncWriteFile.start(eventLoop, threadPool, asyncWriteTask));
+            }
+            else
+            {
+                SC_TEST_EXPECT(asyncWriteFile.start(eventLoop));
+            }
 
             // 6. Run the write operation and close the file
             SC_TEST_EXPECT(eventLoop.runOnce());
@@ -665,7 +670,7 @@ struct SC::AsyncTest : public SC::TestCase
             };
             Params              params;
             AsyncFileRead       asyncReadFile;
-            AsyncFileRead::Task asyncReadTask = {threadPool, readTask};
+            AsyncFileRead::Task asyncReadTask;
             asyncReadFile.setDebugName("FileRead");
             asyncReadFile.callback = [this, &params](AsyncFileRead::Result& res)
             {
@@ -676,10 +681,17 @@ struct SC::AsyncTest : public SC::TestCase
                 res.getAsync().offset += readData.sizeInBytes();
                 res.reactivateRequest(params.readCount < 4);
             };
-            char buffer[1] = {0};
-            SC_TEST_EXPECT(asyncReadFile.start(eventLoop, handle, {buffer, sizeof(buffer)},
-                                               useThreadPool ? &asyncReadTask : nullptr));
-
+            char buffer[1]               = {0};
+            asyncReadFile.fileDescriptor = handle;
+            asyncReadFile.buffer         = {buffer, sizeof(buffer)};
+            if (useThreadPool)
+            {
+                SC_TEST_EXPECT(asyncReadFile.start(eventLoop, threadPool, asyncReadTask));
+            }
+            else
+            {
+                SC_TEST_EXPECT(asyncReadFile.start(eventLoop));
+            }
             // 9. Run the read operation and close the file
             SC_TEST_EXPECT(eventLoop.run());
             SC_TEST_EXPECT(fd.close());
@@ -1047,32 +1059,23 @@ return Result(true);
 
 SC::Result snippetForFileRead(AsyncEventLoop& eventLoop, Console& console)
 {
+ThreadPool threadPool;
+SC_TRY(threadPool.create(4));
 //! [AsyncFileReadSnippet]
 // Assuming an already created (and running) AsyncEventLoop named `eventLoop`
 // ...
 
-// Assuming an already created threadPool and a task
-// ...
-
-ThreadPoolTask task;
-ThreadPool threadPool;
-SC_TRY(threadPool.create(4));
-
+// Assuming an already created threadPool named `eventLoop
 // ...
 
 // Open the file
 FileDescriptor fd;
 FileDescriptor::OpenOptions options;
-options.blocking = true; // When using AsyncFileRead::Task you can use regular blocking descriptors
+options.blocking = true; // AsyncFileRead::Task enables using regular blocking file descriptors
 SC_TRY(fd.open("MyFile.txt", FileDescriptor::ReadOnly, options));
-FileDescriptor::Handle handle;
 
-// Obtain file descriptor handle and associate it with event loop
-SC_TRY(fd.get(handle, Result::Error("Invalid handle")));
-
-// Create the async file read request and its threadpool task
+// Create the async file read request and async task
 AsyncFileRead asyncReadFile;
-AsyncFileRead::Task asyncFileTask{threadPool, task};
 asyncReadFile.callback = [&](AsyncFileRead::Result& res)
 {
     Span<char> readData;
@@ -1083,7 +1086,18 @@ asyncReadFile.callback = [&](AsyncFileRead::Result& res)
     }
 };
 char buffer[100] = {0};
-SC_TRY(asyncReadFile.start(eventLoop, handle, {buffer, sizeof(buffer)},&asyncFileTask));
+asyncReadFile.buffer = {buffer, sizeof(buffer)};
+// Obtain file descriptor handle and associate it with event loop
+SC_TRY(fd.get(asyncReadFile.fileDescriptor, Result::Error("Invalid handle")));
+
+// Start the operation on a thread pool
+AsyncFileRead::Task asyncFileTask;
+SC_TRY(asyncReadFile.start(eventLoop, threadPool, asyncFileTask));
+
+// Alternatively if the file is opened with blocking == false, AsyncFileRead can be omitted
+// but the operation will not be fully async on regular (buffered) files, except on io_uring.
+//
+// SC_TRY(asyncReadFile.start(eventLoop));
 //! [AsyncFileReadSnippet]
 SC_TRY(eventLoop.run());
 return Result(true);
@@ -1092,32 +1106,23 @@ return Result(true);
 
 SC::Result snippetForFileWrite(AsyncEventLoop& eventLoop, Console& console)
 {
-//! [AsyncFileWriteSnippet]
-// Assuming an already created (and running) AsyncEventLoop named eventLoop
-// ...
-
-// Assuming an already created threadPool and a task
-// ...
-
-ThreadPoolTask task;
 ThreadPool threadPool;
 SC_TRY(threadPool.create(4));
+//! [AsyncFileWriteSnippet]
+// Assuming an already created (and running) AsyncEventLoop named `eventLoop`
+// ...
 
+// Assuming an already created threadPool named `threadPool`
 // ...
 
 // Open the file (for write)
 FileDescriptor::OpenOptions options;
-options.blocking = true; // When using AsyncFileWrite::Task you can use regular blocking descriptors
+options.blocking = true; // AsyncFileWrite::Task enables using regular blocking file descriptors
 FileDescriptor fd;
 SC_TRY(fd.open("MyFile.txt", FileDescriptor::WriteCreateTruncate, options));
-auto writeSpan = StringView("test").toCharSpan();
-FileDescriptor::Handle handle;
-// Obtain file descriptor handle
-SC_TRY(fd.get(handle, Result::Error("Invalid Handle")));
 
 // Create the async file write request
 AsyncFileWrite asyncWriteFile;
-AsyncFileWrite::Task asyncFileTask{threadPool, task};
 asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
 {
     size_t writtenBytes = 0;
@@ -1126,7 +1131,18 @@ asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
         console.print("{} bytes have been written", writtenBytes);
     }
 };
-SC_TRY(asyncWriteFile.start(eventLoop, handle, writeSpan, &asyncFileTask));
+// Obtain file descriptor handle
+SC_TRY(fd.get(asyncWriteFile.fileDescriptor, Result::Error("Invalid Handle")));
+asyncWriteFile.buffer = StringView("test").toCharSpan();;
+
+// Start the operation in a thread pool
+AsyncFileWrite::Task asyncFileTask;
+SC_TRY(asyncWriteFile.start(eventLoop, threadPool, asyncFileTask));
+
+// Alternatively if the file is opened with blocking == false, AsyncFileRead can be omitted
+// but the operation will not be fully async on regular (buffered) files, except on io_uring.
+//
+// SC_TRY(asyncWriteFile.start(eventLoop));
 //! [AsyncFileWriteSnippet]
 SC_TRY(eventLoop.run());
 return Result(true);
