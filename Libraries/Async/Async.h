@@ -137,6 +137,7 @@ struct SC::AsyncRequest
     {
         LoopTimeout,   ///< Request is an AsyncLoopTimeout object
         LoopWakeUp,    ///< Request is an AsyncLoopWakeUp object
+        LoopWork,      ///< Request is an AsyncLoopWork object
         ProcessExit,   ///< Request is an AsyncProcessExit object
         SocketAccept,  ///< Request is an AsyncSocketAccept object
         SocketConnect, ///< Request is an AsyncSocketConnect object
@@ -349,6 +350,33 @@ struct AsyncLoopWakeUp : public AsyncRequest
     Atomic<bool> pending     = false;
 };
 
+/// @brief Executes work in a thread pool and then invokes a callback on the event loop thread. @n
+/// AsyncLoopWork::work is invoked on one of the thread supplied by the ThreadPool passed during AsyncLoopWork::start.
+/// AsyncLoopWork::callback will be called as a completion, on the event loop thread AFTER work callback is finished.
+///
+/// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncLoopWorkSnippet1
+struct AsyncLoopWork : public AsyncRequest
+{
+    AsyncLoopWork() : AsyncRequest(Type::LoopWork) {}
+
+    /// @brief Completion data for AsyncLoopWakeUp
+    using CompletionData = AsyncCompletionData;
+
+    /// @brief Callback result for AsyncLoopWakeUp
+    using Result = AsyncResultOf<AsyncLoopWork, CompletionData>;
+
+    /// @brief Schedule work to be executed on a background thread, notifying the event loop when it's finished.
+    /// @param eventLoop The AsyncEventLoop where to schedule this work on
+    /// @param threadPool The ThreadPool that will supply the background thread
+    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, ThreadPool& threadPool);
+
+    Function<SC::Result()>  work;     /// Called to execute the work in a background threadpool thread
+    Function<void(Result&)> callback; /// Called after work is done, on the thread calling EventLoop::run()
+
+  private:
+    AsyncTaskOf<AsyncLoopWork> task;
+};
+
 /// @brief Starts monitoring a process, notifying about its termination.
 /// @ref library_process library can be used to start a process and obtain the native process handle.
 ///
@@ -390,7 +418,7 @@ struct AsyncProcessExit : public AsyncRequest
     detail::WinOverlappedOpaque overlapped;
     detail::WinWaitHandle       waitHandle;
 #elif SC_PLATFORM_LINUX
-    FileDescriptor pidFd;
+    FileDescriptor     pidFd;
 #endif
 };
 
@@ -897,9 +925,9 @@ struct SC::AsyncEventLoop
 
     struct PrivateDefinition
     {
-        static constexpr int Windows = 320;
-        static constexpr int Apple   = 344;
-        static constexpr int Default = 328;
+        static constexpr int Windows = 336;
+        static constexpr int Apple   = 360;
+        static constexpr int Default = 344;
 
         static constexpr size_t Alignment = 8;
 
@@ -950,6 +978,8 @@ struct SC::AsyncEventLoop
     InternalOpaque internal;
     Internal&      internalSelf;
     friend struct AsyncRequest;
+    friend struct AsyncFileWrite;
+    friend struct AsyncFileRead;
 };
 
 //! @}

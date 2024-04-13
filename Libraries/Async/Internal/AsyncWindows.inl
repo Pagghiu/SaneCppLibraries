@@ -240,6 +240,12 @@ struct SC::AsyncEventLoop::KernelQueue
     [[nodiscard]] static bool setupAsync(AsyncLoopWakeUp&) { return true; }
 
     //-------------------------------------------------------------------------------------------------------
+    // WORK
+    //-------------------------------------------------------------------------------------------------------
+    static bool   setupAsync(AsyncLoopWork&) { return true; }
+    static Result executeOperation(AsyncLoopWork& loopWork, AsyncLoopWork::CompletionData&) { return loopWork.work(); }
+
+    //-------------------------------------------------------------------------------------------------------
     // Socket ACCEPT
     //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] static Result activateAsync(AsyncSocketAccept& operation)

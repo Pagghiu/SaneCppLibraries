@@ -475,6 +475,11 @@ struct SC::AsyncEventLoop::KernelQueuePosix
     // Nothing to do :)
 
     //-------------------------------------------------------------------------------------------------------
+    // WORK
+    //-------------------------------------------------------------------------------------------------------
+    static Result executeOperation(AsyncLoopWork& loopWork, AsyncLoopWork::CompletionData&) { return loopWork.work(); }
+
+    //-------------------------------------------------------------------------------------------------------
     // Socket ACCEPT
     //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result setupAsync(AsyncSocketAccept& async)

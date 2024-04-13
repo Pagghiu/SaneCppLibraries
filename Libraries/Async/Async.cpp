@@ -36,6 +36,7 @@ const char* SC::AsyncRequest::TypeToString(Type type)
     {
     case Type::LoopTimeout: return "LoopTimeout";
     case Type::LoopWakeUp: return "LoopWakeUp";
+    case Type::LoopWork: return "LoopWork";
     case Type::ProcessExit: return "ProcessExit";
     case Type::SocketAccept: return "SocketAccept";
     case Type::SocketConnect: return "SocketConnect";
@@ -120,6 +121,12 @@ SC::Result SC::AsyncLoopWakeUp::start(AsyncEventLoop& loop, EventObject* eo)
 
 SC::Result SC::AsyncLoopWakeUp::wakeUp() { return getEventLoop()->wakeUpFromExternalThread(*this); }
 
+SC::Result SC::AsyncLoopWork::start(AsyncEventLoop& loop, ThreadPool& threadPool)
+{
+    SC_TRY_MSG(work.isValid(), "AsyncLoopWork::start - Invalid work callback");
+    return queueSubmission(loop, threadPool, task);
+}
+
 SC::Result SC::AsyncProcessExit::start(AsyncEventLoop& loop, ProcessDescriptor::Handle process)
 {
     handle = process;
@@ -189,8 +196,14 @@ SC::Result SC::AsyncFileRead::start(AsyncEventLoop& loop, ThreadPool& threadPool
     SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncFileRead::start - Zero sized read buffer");
     SC_TRY_MSG(fileDescriptor != FileDescriptor::Invalid, "AsyncFileRead::start - Invalid file descriptor");
     SC_TRY(validateAsync());
-    SC_TRY(queueSubmission(loop, threadPool, task));
-    return SC::Result(true);
+    if (loop.internalSelf.makesSenseToRunInThreadPool(*this))
+    {
+        return queueSubmission(loop, threadPool, task);
+    }
+    else
+    {
+        return queueSubmission(loop);
+    }
 }
 
 SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop)
@@ -207,8 +220,14 @@ SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop, ThreadPool& threadPoo
     SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncFileWrite::start - Zero sized write buffer");
     SC_TRY_MSG(fileDescriptor != FileDescriptor::Invalid, "AsyncFileWrite::start - Invalid file descriptor");
     SC_TRY(validateAsync());
-    SC_TRY(queueSubmission(loop, threadPool, task));
-    return SC::Result(true);
+    if (loop.internalSelf.makesSenseToRunInThreadPool(*this))
+    {
+        return queueSubmission(loop, threadPool, task);
+    }
+    else
+    {
+        return queueSubmission(loop);
+    }
 }
 
 SC::Result SC::AsyncFileClose::start(AsyncEventLoop& loop, FileDescriptor::Handle fd)
@@ -336,7 +355,7 @@ SC::Result SC::AsyncEventLoop::Private::queueSubmission(AsyncRequest& async, Asy
     async.state     = AsyncRequest::State::Setup;
 
     // Only set the async tasks for operations and backends that are not io_uring
-    if (task and eventLoop->internalSelf.makesSenseToRunInThreadPool(async))
+    if (task)
     {
         async.asyncTask = task;
         task->async     = &async;
@@ -934,6 +953,7 @@ void SC::AsyncEventLoop::Private::removeActiveHandle(AsyncRequest& async)
     {
         case AsyncRequest::Type::LoopTimeout:   activeLoopTimeouts.remove(*static_cast<AsyncLoopTimeout*>(&async));     break;
         case AsyncRequest::Type::LoopWakeUp:    activeLoopWakeUps.remove(*static_cast<AsyncLoopWakeUp*>(&async));       break;
+        case AsyncRequest::Type::LoopWork:      activeLoopWork.remove(*static_cast<AsyncLoopWork*>(&async));            break;
         case AsyncRequest::Type::ProcessExit:   activeProcessExits.remove(*static_cast<AsyncProcessExit*>(&async));     break;
         case AsyncRequest::Type::SocketAccept:  activeSocketAccepts.remove(*static_cast<AsyncSocketAccept*>(&async));   break;
         case AsyncRequest::Type::SocketConnect: activeSocketConnects.remove(*static_cast<AsyncSocketConnect*>(&async)); break;
@@ -970,6 +990,7 @@ void SC::AsyncEventLoop::Private::addActiveHandle(AsyncRequest& async)
     {
         case AsyncRequest::Type::LoopTimeout:   activeLoopTimeouts.queueBack(*static_cast<AsyncLoopTimeout*>(&async));      break;
         case AsyncRequest::Type::LoopWakeUp:    activeLoopWakeUps.queueBack(*static_cast<AsyncLoopWakeUp*>(&async));        break;
+        case AsyncRequest::Type::LoopWork:      activeLoopWork.queueBack(*static_cast<AsyncLoopWork*>(&async));             break;
         case AsyncRequest::Type::ProcessExit:   activeProcessExits.queueBack(*static_cast<AsyncProcessExit*>(&async));      break;
         case AsyncRequest::Type::SocketAccept:  activeSocketAccepts.queueBack(*static_cast<AsyncSocketAccept*>(&async));    break;
         case AsyncRequest::Type::SocketConnect: activeSocketConnects.queueBack(*static_cast<AsyncSocketConnect*>(&async));  break;
@@ -997,6 +1018,7 @@ SC::Result SC::AsyncEventLoop::Private::applyOnAsync(AsyncRequest& async, Lambda
     {
     case AsyncRequest::Type::LoopTimeout: SC_TRY(lambda(*static_cast<AsyncLoopTimeout*>(&async))); break;
     case AsyncRequest::Type::LoopWakeUp: SC_TRY(lambda(*static_cast<AsyncLoopWakeUp*>(&async))); break;
+    case AsyncRequest::Type::LoopWork: SC_TRY(lambda(*static_cast<AsyncLoopWork*>(&async))); break;
     case AsyncRequest::Type::ProcessExit: SC_TRY(lambda(*static_cast<AsyncProcessExit*>(&async))); break;
     case AsyncRequest::Type::SocketAccept: SC_TRY(lambda(*static_cast<AsyncSocketAccept*>(&async))); break;
     case AsyncRequest::Type::SocketConnect: SC_TRY(lambda(*static_cast<AsyncSocketConnect*>(&async))); break;

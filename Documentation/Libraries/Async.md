@@ -24,7 +24,8 @@ This is the list of supported async operations:
 | [AsyncFileClose](@ref SC::AsyncFileClose)         | @copybrief SC::AsyncFileClose     |
 | [AsyncLoopTimeout](@ref SC::AsyncLoopTimeout)     | @copybrief SC::AsyncLoopTimeout   |
 | [AsyncLoopWakeUp](@ref SC::AsyncLoopWakeUp)       | @copybrief SC::AsyncLoopWakeUp    |
-| [AsyncProcessExit](@ref SC::AsyncProcessExit)     | @copybrief SC::AsyncProcessExit    |
+| [AsyncLoopWork](@ref SC::AsyncLoopWork)           | @copybrief SC::AsyncLoopWork      |
+| [AsyncProcessExit](@ref SC::AsyncProcessExit)     | @copybrief SC::AsyncProcessExit   |
 | [AsyncFilePoll](@ref SC::AsyncFilePoll)           | @copybrief SC::AsyncFilePoll      |
 
 # Status
@@ -52,6 +53,9 @@ Event loop can be run in different ways to allow integrated it in multiple ways 
 
 ## AsyncLoopWakeUp
 @copydoc SC::AsyncLoopWakeUp
+
+## AsyncLoopWork
+@copydoc SC::AsyncLoopWork
 
 ## AsyncProcessExit
 @copydoc SC::AsyncProcessExit

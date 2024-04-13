@@ -20,6 +20,7 @@ struct SC::AsyncEventLoop::Private
     // Active phase
     IntrusiveDoubleLinkedList<AsyncLoopTimeout>   activeLoopTimeouts;
     IntrusiveDoubleLinkedList<AsyncLoopWakeUp>    activeLoopWakeUps;
+    IntrusiveDoubleLinkedList<AsyncLoopWork>      activeLoopWork;
     IntrusiveDoubleLinkedList<AsyncProcessExit>   activeProcessExits;
     IntrusiveDoubleLinkedList<AsyncSocketAccept>  activeSocketAccepts;
     IntrusiveDoubleLinkedList<AsyncSocketConnect> activeSocketConnects;
