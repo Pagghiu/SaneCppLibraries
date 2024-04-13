@@ -19,6 +19,7 @@
 
 static SC::SmallVector<char, 512> gConsoleBuffer;
 static SC::SmallString<512>       gFormatString;
+SC::Console*                      globalConsole;
 
 int main(int argc, const char* argv[])
 {
@@ -27,6 +28,8 @@ int main(int argc, const char* argv[])
 
     Console         console(gConsoleBuffer);
     Tool::Arguments arguments{console};
+
+    globalConsole = &console;
 
     if (argc < 4)
     {
