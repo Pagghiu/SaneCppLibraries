@@ -94,20 +94,29 @@ COMPILER_VERSION := $(CLANG_MAJOR_VERSION)
 endif
 
 )delimiter");
+        SmallString<255> makeTarget;
 
         builder.append("\nall:");
         for (const Project& project : workspace.projects)
         {
-            String makeTarget = project.targetName; // TODO: Make sure to sanitize this
-            builder.append(" {0}_COMPILE_COMMANDS {0}_BUILD", makeTarget);
+            SC_TRY(sanitizeName(project.targetName.view(), makeTarget));
+            builder.append(" {0}_COMPILE_COMMANDS {0}_COMPILE", makeTarget);
         }
 
         builder.append("\n\nclean:");
-        SmallString<255> makeTarget;
         for (const Project& project : workspace.projects)
         {
             SC_TRY(sanitizeName(project.targetName.view(), makeTarget));
             builder.append(" {0}_CLEAN", makeTarget.view());
+        }
+
+        builder.append("\n\ncompile: all");
+
+        builder.append("\n\nrun:");
+        for (const Project& project : workspace.projects)
+        {
+            SC_TRY(sanitizeName(project.targetName.view(), makeTarget));
+            builder.append(" {0}_RUN", makeTarget.view());
         }
 
         builder.append(R"delimiter(
@@ -329,7 +338,7 @@ $({0}_TARGET_DIR):
 	@echo Creating "$({0}_TARGET_DIR)"
 	$(VRBS)mkdir -p $@
 
-{0}_BUILD: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
+{0}_COMPILE: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 
 ifeq ($(CLANG_DETECTED),yes)
 {0}_COMPILE_COMMANDS: $({0}_INTERMEDIATE_DIR)/compile_commands.json
@@ -357,6 +366,12 @@ define MJ_if_Clang
     $(if $(CLANG_DETECTED),-MJ $@.json)
 endef
 )delimiter");
+
+        builder.append(R"delimiter(
+{0}_RUN: {0}_COMPILE
+	$({0}_TARGET_DIR)/$({0}_TARGET_NAME)
+)delimiter",
+                       makeTarget.view());
 
         for (const RenderItem& item : renderer.renderItems)
         {

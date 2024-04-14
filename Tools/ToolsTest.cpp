@@ -22,6 +22,22 @@ struct SupportToolsTest : public TestCase
                                   {}};
 
         StringView args[10];
+        if (test_section("compile"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "Debug";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runBuildTool(arguments));
+        }
+        if (test_section("run"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "run";
+            args[0]             = "Debug";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runBuildTool(arguments));
+        }
         if (test_section("build documentation"))
         {
             arguments.tool      = "build";

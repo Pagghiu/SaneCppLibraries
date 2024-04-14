@@ -3,6 +3,7 @@
 #include "Build.h"
 
 #include "../Process/Process.h" // for Actions::compile
+
 namespace SC
 {
 namespace Build
@@ -374,14 +375,59 @@ struct SC::Build::Action::Internal
     static Build::Parameters fillDefaultParameters(Generator::Type generator);
 
     static Result configure(ConfigureFunction configure, StringView projectFileName, const Action& action);
-    static Result compile(ConfigureFunction configure, StringView projectFileName, const Action& action);
+    static Result compileRun(ConfigureFunction configure, StringView projectFileName, const Action& action);
+
+    [[nodiscard]] static Result toVisualStudioArchitecture(Architecture::Type architectureType,
+                                                           StringView&        architecture)
+    {
+        switch (architectureType)
+        {
+        case Architecture::Intel32: architecture = "x86"; break;
+        case Architecture::Intel64: architecture = "x64"; break;
+        case Architecture::Arm64: architecture = "ARM64"; break;
+        case Architecture::Any: break;
+
+        case Architecture::Wasm: // Unsupported
+            return Result::Error("Unsupported architecture for Visual Studio");
+        }
+        return Result(true);
+    }
+
+    [[nodiscard]] static Result toXCodeArchitecture(Architecture::Type architectureType, StringView& architecture)
+    {
+        switch (architectureType)
+        {
+        case Architecture::Intel64: architecture = "x86_64"; break;
+        case Architecture::Arm64: architecture = "arm64"; break;
+        case Architecture::Any: architecture = "arm64 x86_64"; break;
+        case Architecture::Intel32: // Unsupported
+        case Architecture::Wasm:    // Unsupported
+            return Result::Error("Unsupported architecture for XCode");
+        }
+        return Result(true);
+    }
+
+    [[nodiscard]] static Result toMakefileArchitecture(Architecture::Type architectureType, StringView& architecture)
+    {
+        switch (architectureType)
+        {
+        case Architecture::Intel64: architecture = "TARGET_ARCHITECTURE=x86_64"; break;
+        case Architecture::Arm64: architecture = "TARGET_ARCHITECTURE=arm64"; break;
+        case Architecture::Any: break;
+        case Architecture::Intel32: // Unsupported
+        case Architecture::Wasm:    // Unsupported
+            return Result::Error("Unsupported architecture for make");
+        }
+        return Result(true);
+    }
 };
 
 SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction configure, StringView projectName)
 {
     switch (action.action)
     {
-    case Compile: return Internal::compile(configure, projectName, action);
+    case Run:
+    case Compile: return Internal::compileRun(configure, projectName, action);
     case Configure: return Internal::configure(configure, projectName, action);
     }
     return Result::Error("Action::execute - unsupported action");
@@ -430,8 +476,8 @@ SC::Result SC::Build::Action::Internal::configure(ConfigureFunction configure, S
     return Result(true);
 }
 
-SC::Result SC::Build::Action::Internal::compile(ConfigureFunction configure, StringView projectFileName,
-                                                const Action& action)
+SC::Result SC::Build::Action::Internal::compileRun(ConfigureFunction configure, StringView projectFileName,
+                                                   const Action& action)
 {
     SC_COMPILER_UNUSED(configure);
     StringView configuration = action.configuration.isEmpty() ? "Debug" : action.configuration;
@@ -447,20 +493,68 @@ SC::Result SC::Build::Action::Internal::compile(ConfigureFunction configure, Str
                           {action.targetDirectory, Generator::toString(action.generator), projectFileName}));
         SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(".xcodeproj"));
         StringView architecture;
-        switch (action.architecture)
-        {
-        case Architecture::Intel64: architecture = "x86_64"; break;
-        case Architecture::Arm64: architecture = "arm64"; break;
-        case Architecture::Any: architecture = "arm64 x86_64"; break;
-        case Architecture::Intel32: // Unsupported
-        case Architecture::Wasm:    // Unsupported
-            return Result::Error("Unsupported architecture for XCode");
-        }
-
+        SC_TRY(toXCodeArchitecture(action.architecture, architecture));
         SmallString<32> formattedPlatform;
         SC_TRY(StringBuilder(formattedPlatform).format("ARCHS={}", architecture));
-        SC_TRY(process.exec({"xcodebuild", "-configuration", configuration, "-project", solutionLocation.view(),
-                             "ONLY_ACTIVE_ARCH=NO", formattedPlatform.view()}));
+
+        StringView arguments[16];
+        size_t     numArgs   = 0;
+        arguments[numArgs++] = "xcodebuild"; // 1
+        switch (action.action)
+        {
+        case Action::Compile:
+            arguments[numArgs++] = "build"; // 2
+            break;
+        case Action::Run:
+            arguments[numArgs++] = "-showBuildSettings"; // 2
+            break;
+        default: return Result::Error("Unexpected Build::Action (supported \"compile\", \"run\")");
+        }
+        arguments[numArgs++] = "-configuration";         // 3
+        arguments[numArgs++] = configuration;            // 4
+        arguments[numArgs++] = "-project";               // 5
+        arguments[numArgs++] = solutionLocation.view();  // 6
+        arguments[numArgs++] = "ONLY_ACTIVE_ARCH=NO";    // 7
+        arguments[numArgs++] = formattedPlatform.view(); // 8
+        if (action.action == Action::Run)
+        {
+            String output = StringEncoding::Utf8;
+            SC_TRY(process.exec({arguments, numArgs}, output));
+            SC_TRY_MSG(process.getExitStatus() == 0, "Run returned error");
+            StringViewTokenizer tokenizer(output.view());
+            StringView          path, targetName;
+            while (tokenizer.tokenizeNextLine())
+            {
+                const StringView line = tokenizer.component.trimWhiteSpaces();
+                if (line.startsWith("TARGET_BUILD_DIR = "))
+                {
+                    SC_TRY(line.splitAfter(" = ", path));
+                    if (not targetName.isEmpty())
+                        break;
+                }
+                if (line.startsWith("EXECUTABLE_NAME = "))
+                {
+                    SC_TRY(line.splitAfter(" = ", targetName));
+                    if (not path.isEmpty())
+                        break;
+                }
+            }
+
+            if (path.isEmpty() or targetName.isEmpty())
+            {
+                return Result::Error("Cannot find TARGET_BUILD_DIR and EXECUTABLE_NAME");
+            }
+            String userExecutable;
+            SC_TRY(Path::join(userExecutable, {path, "/", targetName}));
+            Process testProcess;
+            SC_TRY(testProcess.exec({userExecutable.view()}));
+            SC_TRY_MSG(testProcess.getExitStatus() == 0, "Run exited with non zero status");
+        }
+        else
+        {
+            SC_TRY(process.exec({arguments, numArgs}));
+            SC_TRY_MSG(process.getExitStatus() == 0, "Compile returned error");
+        }
     }
     break;
     case Generator::VisualStudio2022: {
@@ -471,26 +565,46 @@ SC::Result SC::Build::Action::Internal::compile(ConfigureFunction configure, Str
         SC_TRY(StringBuilder(platformConfiguration).format("/p:Configuration={}", configuration));
 
         StringView architecture;
-        switch (action.architecture)
-        {
-        case Architecture::Intel32: architecture = "x86"; break;
-        case Architecture::Intel64: architecture = "x64"; break;
-        case Architecture::Arm64: architecture = "ARM64"; break;
-        case Architecture::Any: break;
+        SC_TRY(Internal::toVisualStudioArchitecture(action.architecture, architecture));
+        SmallString<32> platform;
+        SC_TRY(StringBuilder(platform).format("/p:Platform={}", architecture));
 
-        case Architecture::Wasm: // Unsupported
-            return Result::Error("Unsupported architecture for Visual Studio");
-        }
-
-        if (architecture.isEmpty())
+        StringView arguments[16];
+        size_t     numArgs   = 0;
+        arguments[numArgs++] = "msbuild";                    // 1
+        arguments[numArgs++] = solutionLocation.view();      // 2
+        arguments[numArgs++] = platformConfiguration.view(); // 3
+        if (not architecture.isEmpty())
         {
-            SC_TRY(process.exec({"msbuild", solutionLocation.view(), platformConfiguration.view()}));
+            arguments[numArgs++] = platform.view(); // 4
         }
-        else
+        switch (action.action)
         {
-            SmallString<32> platform;
-            SC_TRY(StringBuilder(platform).format("/p:Platform={}", architecture));
-            SC_TRY(process.exec({"msbuild", solutionLocation.view(), platformConfiguration.view(), platform.view()}));
+        case Action::Compile:
+            SC_TRY(process.exec({arguments, numArgs}));
+            SC_TRY_MSG(process.getExitStatus() == 0, "Compile returned error");
+            break;
+        case Action::Run: {
+            String output = StringEncoding::Utf8; // TODO: Check encoding of Visual Studio Output.
+            SC_TRY(process.exec({arguments, numArgs}, output));
+            SC_TRY_MSG(process.getExitStatus() == 0, "Compile returned error");
+            StringViewTokenizer tokenizer(output.view());
+            StringView          executablePath;
+            while (tokenizer.tokenizeNextLine())
+            {
+                if (tokenizer.component.splitAfter(".vcxproj -> ", executablePath))
+                {
+                    executablePath = executablePath.trimWhiteSpaces();
+                    break;
+                }
+            }
+            SC_TRY_MSG(not executablePath.isEmpty(), "Cannot find executable path from .vcxproj");
+            Process testProcess;
+            SC_TRY(testProcess.exec({executablePath}));
+            SC_TRY_MSG(testProcess.getExitStatus() == 0, "Run exited with non zero status");
+        }
+        break;
+        default: return Result::Error("Unexpected Build::Action (supported \"compile\", \"run\")");
         }
     }
     break;
@@ -500,27 +614,29 @@ SC::Result SC::Build::Action::Internal::compile(ConfigureFunction configure, Str
         SC_TRY(StringBuilder(platformConfiguration).format("CONFIG={}", configuration));
 
         StringView architecture;
-        switch (action.architecture)
+        SC_TRY(toMakefileArchitecture(action.architecture, architecture));
+        StringView arguments[16];
+        size_t     numArgs   = 0;
+        arguments[numArgs++] = "make"; // 1
+
+        switch (action.action)
         {
-        case Architecture::Intel64: architecture = "TARGET_ARCHITECTURE=x86_64"; break;
-        case Architecture::Arm64: architecture = "TARGET_ARCHITECTURE=arm64"; break;
-        case Architecture::Any: break;
-        case Architecture::Intel32: // Unsupported
-        case Architecture::Wasm:    // Unsupported
-            return Result::Error("Unsupported architecture for make");
+        case Action::Compile: arguments[numArgs++] = "compile"; break; // 2
+        case Action::Run: arguments[numArgs++] = "run"; break;         // 2
+        default: return Result::Error("Unexpected Build::Action (supported \"compile\", \"run\")");
         }
-        if (architecture.isEmpty())
+        arguments[numArgs++] = "-j";                         // 3
+        arguments[numArgs++] = "-C";                         // 4
+        arguments[numArgs++] = solutionLocation.view();      // 5
+        arguments[numArgs++] = platformConfiguration.view(); // 6
+        if (not architecture.isEmpty())
         {
-            SC_TRY(process.exec({"make", "-j", "-C", solutionLocation.view(), platformConfiguration.view()}));
+            arguments[numArgs++] = architecture; // 7
         }
-        else
-        {
-            SC_TRY(process.exec(
-                {"make", "-j", "-C", solutionLocation.view(), platformConfiguration.view(), architecture}));
-        }
+        SC_TRY(process.exec({arguments, numArgs}));
+        SC_TRY_MSG(process.getExitStatus() == 0, "Compile returned error");
     }
     break;
     }
-    SC_TRY_MSG(process.getExitStatus() == 0, "Compile returned error");
     return Result(true);
 }

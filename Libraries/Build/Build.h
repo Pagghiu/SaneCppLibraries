@@ -443,7 +443,8 @@ struct Action
     enum Type
     {
         Configure,
-        Compile
+        Compile,
+        Run
     };
     using ConfigureFunction = Result (*)(Build::Definition& definition, Build::Parameters& parameters,
                                          StringView rootDirectory);

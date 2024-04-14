@@ -63,13 +63,13 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
     return Result(true);
 }
 
-[[nodiscard]] inline Result runBuildCompile(Tool::Arguments& arguments)
+[[nodiscard]] inline Result runBuildAction(Build::Action::Type actionType, Tool::Arguments& arguments)
 {
     StringNative<256> projectsDirectory;
     SC_TRY(runBuildValidate(arguments, projectsDirectory));
 
     Build::Action action;
-    action.action           = Build::Action::Compile;
+    action.action           = actionType;
     action.targetDirectory  = projectsDirectory.view();
     action.libraryDirectory = arguments.libraryDirectory.view();
     switch (HostPlatform)
@@ -187,7 +187,11 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
     }
     else if (arguments.action == "compile")
     {
-        return runBuildCompile(arguments);
+        return runBuildAction(Build::Action::Compile, arguments);
+    }
+    else if (arguments.action == "run")
+    {
+        return runBuildAction(Build::Action::Run, arguments);
     }
 #if SC_XCTEST
 #else
