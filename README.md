@@ -24,36 +24,7 @@
 
 Visit the [documentation website](https://pagghiu.github.io/SaneCppLibraries/index.html) for more information.
 
-Blog posts:
-- [March 2024 Update](https://pagghiu.github.io/site/blog/2024-03-27-SaneCppLibrariesUpdate.html)
-- [February 2024 Update](https://pagghiu.github.io/site/blog/2024-02-23-SaneCppLibrariesUpdate.html)
-- [January 2024 Update](https://pagghiu.github.io/site/blog/2024-01-23-SaneCppLibrariesUpdate.html)
-- [Public Release blog post](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html)
-
-On the [Youtube Channel](https://www.youtube.com/@Pagghiu) you can find some videos showing some bits of the development process:
-- [Creating a Makefile](https://www.youtube.com/watch?v=2ccW8TBAWWE)
-- [Add Makefile backend to SC::Build](https://www.youtube.com/watch?v=wYmT3xAzMxU)
-- [Start Linux Porting](https://www.youtube.com/watch?v=DUZeu6VDGL8)
-- [Build Everything on Linux](https://www.youtube.com/watch?v=gu3x3Y1zZLI)
-- [Posix fork](https://www.youtube.com/watch?v=-OiVELMxL6Q)
-- [SC::Async Linux epoll 1/2](https://www.youtube.com/watch?v=4rC4aKCD0V8)
-- [SC::Async Linux epoll 2/2](https://www.youtube.com/watch?v=uCsGpJcF2oc)
-- [SC::FileSystemWatcher Linux inotify implementation](https://www.youtube.com/watch?v=92saVDCRnCI)
-- [A Tour of SC::Async](https://www.youtube.com/watch?v=pIGosb2D2Ro)
-- [Linux Async I/O using io_uring (1 of 2)](https://www.youtube.com/watch?v=YR935rorb3E)
-- [Linux Async I/O using io_uring (2 of 2)](https://www.youtube.com/watch?v=CgYE0YrpHt0)
-- [Simple ThreadPool](https://www.youtube.com/watch?v=e48ruImESxI)
-- [Async file read and writes using Thread Pool](https://www.youtube.com/watch?v=WF9beKyEA_E)
-
 # Libraries
-
-Many libraries are in draft state, while others are slightly more usable.  
-Click on specific page each library to know about its status.  
-
-- 🟥 Draft (incomplete, work in progress, proof of concept, works on basic case)
-- 🟨 MVP (minimum set of features have been implemented)
-- 🟩 Usable (a reasonable set of features has been implemented to make library useful)
-- 🟦 Complete (all planned features have been implemented)
 
 Library                                                                                                 | Description
 :-------------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------------------
@@ -78,6 +49,13 @@ Library                                                                         
 [Testing](https://pagghiu.github.io/SaneCppLibraries/library_testing.html)                              | 🟨 Simple testing framework used by all of the other libraries
 [Threading](https://pagghiu.github.io/SaneCppLibraries/library_threading.html)                          | 🟥 Atomic, thread, thread pool, mutex, condition variable
 [Time](https://pagghiu.github.io/SaneCppLibraries/library_time.html)                                    | 🟨 Time handling (relative, absolute, high resolution)
+
+Each library is color-coded to signal its status:
+- 🟥 Draft (incomplete, work in progress, proof of concept, works on basic case)
+- 🟨 MVP (minimum set of features have been implemented)
+- 🟩 Usable (a reasonable set of features has been implemented to make library useful)
+- 🟦 Complete (all planned features have been implemented)
+
 
 # C Bindings
 Some Libraries have C bindings
@@ -129,12 +107,35 @@ Alternatively I am also reading the following discords too:
 - [Italian C++ Discord](https://discord.gg/GPATr8QxfS) (`@Pagghiu` from any appropriate channel or just a DM, english and italian are both fine)
 - [Handmade Network discord](https://discord.gg/hmn) (`@Pagghiu` from any appropriate channel or just a DM)
 
+# Videos
+
+Blog posts:
+- [March 2024 Update](https://pagghiu.github.io/site/blog/2024-03-27-SaneCppLibrariesUpdate.html)
+- [February 2024 Update](https://pagghiu.github.io/site/blog/2024-02-23-SaneCppLibrariesUpdate.html)
+- [January 2024 Update](https://pagghiu.github.io/site/blog/2024-01-23-SaneCppLibrariesUpdate.html)
+- [Public Release blog post](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html)
+
+On the [Youtube Channel](https://www.youtube.com/@Pagghiu) you can find some videos showing some bits of the development process:
+- [Creating a Makefile](https://www.youtube.com/watch?v=2ccW8TBAWWE)
+- [Add Makefile backend to SC::Build](https://www.youtube.com/watch?v=wYmT3xAzMxU)
+- [Start Linux Porting](https://www.youtube.com/watch?v=DUZeu6VDGL8)
+- [Build Everything on Linux](https://www.youtube.com/watch?v=gu3x3Y1zZLI)
+- [Posix fork](https://www.youtube.com/watch?v=-OiVELMxL6Q)
+- [SC::Async Linux epoll 1/2](https://www.youtube.com/watch?v=4rC4aKCD0V8)
+- [SC::Async Linux epoll 2/2](https://www.youtube.com/watch?v=uCsGpJcF2oc)
+- [SC::FileSystemWatcher Linux inotify implementation](https://www.youtube.com/watch?v=92saVDCRnCI)
+- [A Tour of SC::Async](https://www.youtube.com/watch?v=pIGosb2D2Ro)
+- [Linux Async I/O using io_uring (1 of 2)](https://www.youtube.com/watch?v=YR935rorb3E)
+- [Linux Async I/O using io_uring (2 of 2)](https://www.youtube.com/watch?v=CgYE0YrpHt0)
+- [Simple ThreadPool](https://www.youtube.com/watch?v=e48ruImESxI)
+- [Async file read and writes using Thread Pool](https://www.youtube.com/watch?v=WF9beKyEA_E)
+- [Implement SC::AsyncLoopWork](https://www.youtube.com/watch?v=huavEjzflHQ)
+
 # Contributing
 
 Please take some time to read the [Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html) and [Coding Style](https://pagghiu.github.io/SaneCppLibraries/page_coding_style.html).
 
 After that you can read the [CONTRIBUTING.md](CONTRIBUTING.md) guide.
-
 
 # License
 
