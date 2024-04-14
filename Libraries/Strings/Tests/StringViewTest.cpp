@@ -156,6 +156,9 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT("myTest"_a8.trimEndAnyOf({'_'}) == "myTest");
             SC_TEST_EXPECT("_\n__myTest"_a8.trimStartAnyOf({'_', '\n'}) == "myTest");
             SC_TEST_EXPECT("_myTest"_a8.trimStartAnyOf({'_'}) == "myTest");
+
+            SC_TEST_EXPECT("  \n_myTest__\n\t"_a8.trimWhiteSpaces() == "_myTest__");
+            SC_TEST_EXPECT("\nmyTest \r"_a8.trimWhiteSpaces() == "myTest");
         }
         if (test_section("split"))
         {
@@ -185,6 +188,22 @@ struct SC::StringViewTest : public SC::TestCase
             {
                 SC_TEST_EXPECT(StringViewTokenizer("").countTokens('_').numSplitsNonEmpty == 0);
                 SC_TEST_EXPECT(StringViewTokenizer("").countTokens('_').numSplitsTotal == 0);
+            }
+            {
+                StringViewTokenizer lines("Line1\nLine2\nLine3\n");
+                SC_TEST_EXPECT(lines.tokenizeNextLine());
+                SC_TEST_EXPECT(lines.component == "Line1");
+                SC_TEST_EXPECT(lines.tokenizeNextLine());
+                SC_TEST_EXPECT(lines.component == "Line2");
+                SC_TEST_EXPECT(lines.tokenizeNextLine());
+                SC_TEST_EXPECT(lines.component == "Line3");
+                SC_TEST_EXPECT(not lines.tokenizeNextLine());
+            }
+            {
+                StringView str("KEY = VALUE");
+                StringView split;
+                SC_TEST_EXPECT(str.splitAfter(" = ", split));
+                SC_TEST_EXPECT(split == "VALUE");
             }
         }
         if (test_section("isInteger"))

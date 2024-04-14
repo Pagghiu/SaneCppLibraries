@@ -289,6 +289,20 @@ struct SC::StringView
     /// @endcode
     [[nodiscard]] bool containsString(const StringView str) const;
 
+    /// @brief Splits the remaining part of the strin after matching str
+    /// @param stringToMatch String to match inside the source string
+    /// @param remainingAfterSplit Portion of this StringView AFTER first match of stringtoMatch
+    /// @return Returns `true` if stringToMatch has been found and split has been written to remainingAfterSplit
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// StringView str("KEY = VALUE");
+    /// StringView split;
+    /// SC_TEST_EXPECT(str.splitAfter(" = ", split));
+    /// SC_TEST_EXPECT(split == "VALUE");
+    /// @endcode
+    [[nodiscard]] bool splitAfter(const StringView stringToMatch, StringView& remainingAfterSplit) const;
+
     /// @brief Check if StringView contains given utf code point
     /// @param c The utf code point to check against
     /// @return  Returns `true` if this StringView contains code point c
@@ -406,6 +420,16 @@ struct SC::StringView
     /// SC_TEST_EXPECT("_myTest"_a8.trimAnyOf({'_'}) == "myTest");
     /// @endcode
     [[nodiscard]] StringView trimAnyOf(Span<const StringCodePoint> codePoints) const;
+
+    /// @brief Returns a shortened StringView without starting / ending utf code points matching {'\r', '\n', '\t', ' '}
+    /// @return The trimmed StringView
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// SC_TEST_EXPECT("  \n_myTest__\n\t"_a8.trimWhiteSpaces() == "_myTest__");
+    /// SC_TEST_EXPECT("\nmyTest \r"_a8.trimWhiteSpaces() == "myTest");
+    /// @endcode
+    [[nodiscard]] StringView trimWhiteSpaces() const;
 
     /// @brief Returns a shortened StringView from current cutting the first `start` bytes.
     /// @param start Offset in bytes where the slice starts.
@@ -563,6 +587,25 @@ struct SC::StringViewTokenizer
         @endcode
     */
     [[nodiscard]] bool tokenizeNext(Span<const StringCodePoint> separators, Options options = Options::SkipEmpty);
+
+    /// @brief Tokenizes from current position to first newline.
+    ///
+    /// @return `true` if a new line has been found
+    /// @n
+    /**
+     * Example:
+        @code{.cpp}
+         StringViewTokenizer lines("Line1\nLine2\nLine3\n");
+         SC_TEST_EXPECT(lines.tokenizeNextLine());
+         SC_TEST_EXPECT(lines.component == "Line1");
+         SC_TEST_EXPECT(lines.tokenizeNextLine());
+         SC_TEST_EXPECT(lines.component == "Line2");
+         SC_TEST_EXPECT(lines.tokenizeNextLine());
+         SC_TEST_EXPECT(lines.component == "Line3");
+         SC_TEST_EXPECT(not lines.tokenizeNextLine());
+         @endcode
+     */
+    [[nodiscard]] bool tokenizeNextLine() { return tokenizeNext({'\n'}); }
 
     /// @brief Count the number of tokens that exist in the string view passed in constructor, when splitted along the
     /// given separators

@@ -215,6 +215,21 @@ bool SC::StringView::containsString(const StringView str) const
     return withIterator([str](auto it) { return it.advanceAfterFinding(str.getIterator<decltype(it)>()); });
 }
 
+bool SC::StringView::splitAfter(const StringView stringToMatch, StringView& remainingAfterSplit) const
+{
+    SC_ASSERT_RELEASE(hasCompatibleEncoding(stringToMatch));
+    return withIterator(
+        [&](auto it)
+        {
+            if (it.advanceAfterFinding(stringToMatch.getIterator<decltype(it)>()))
+            {
+                remainingAfterSplit = StringView::fromIteratorUntilEnd(it);
+                return true;
+            }
+            return false;
+        });
+}
+
 bool SC::StringView::containsCodePoint(StringCodePoint c) const
 {
     return withIterator([c](auto it) { return it.advanceUntilMatches(c); });
@@ -296,6 +311,8 @@ SC::StringView SC::StringView::trimAnyOf(Span<const StringCodePoint> codePoints)
 {
     return trimEndAnyOf(codePoints).trimStartAnyOf(codePoints);
 }
+
+SC::StringView SC::StringView::trimWhiteSpaces() const { return trimAnyOf({'\r', '\n', '\t', ' '}); }
 
 SC::StringView SC::StringView::sliceStartLength(size_t start, size_t length) const
 {
