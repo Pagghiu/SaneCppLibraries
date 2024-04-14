@@ -189,6 +189,8 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
     {
         return runBuildCompile(arguments);
     }
+#if SC_XCTEST
+#else
     else if (arguments.action == "documentation")
     {
         StringView      additionalArgs[1];
@@ -206,6 +208,7 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
         SC_TRY(StringBuilder(doxygenExecutable).format("{}/doxygen", doxygenPackage.installDirectoryLink));
         return runBuildDocumentation(doxygenExecutable.view(), arguments);
     }
+#endif
     else
     {
         return Result::Error("SC-format unknown action (supported \"configure\" or \"compile\")");

@@ -52,6 +52,9 @@ struct SC::ProcessTest : public SC::TestCase
         {
             processEnvironmentPrint();
         }
+#if SC_XCTEST
+#else
+        // These tests cannot be run when tests are compiled to a dylib under XCTest
         if (test_section("Process environment new environment var"))
         {
             processEnvironmentNewVar();
@@ -64,6 +67,7 @@ struct SC::ProcessTest : public SC::TestCase
         {
             processEnvironmentDisableInheritance();
         }
+#endif
     }
 
     void processError();
