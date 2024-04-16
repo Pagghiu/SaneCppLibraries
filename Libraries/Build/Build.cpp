@@ -375,7 +375,8 @@ struct SC::Build::Action::Internal
     static Build::Parameters fillDefaultParameters(Generator::Type generator);
 
     static Result configure(ConfigureFunction configure, StringView projectFileName, const Action& action);
-    static Result compileRun(ConfigureFunction configure, StringView projectFileName, const Action& action);
+    static Result coverage(StringView projectFileName, const Action& action);
+    static Result executeInternal(StringView projectFileName, const Action& action, String* outputExecutable = nullptr);
 
     [[nodiscard]] static Result toVisualStudioArchitecture(Architecture::Type architectureType,
                                                            StringView&        architecture)
@@ -426,8 +427,10 @@ SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction co
 {
     switch (action.action)
     {
+    case Print:
     case Run:
-    case Compile: return Internal::compileRun(configure, projectName, action);
+    case Compile: return Internal::executeInternal(projectName, action);
+    case Coverage: return Internal::coverage(projectName, action);
     case Configure: return Internal::configure(configure, projectName, action);
     }
     return Result::Error("Action::execute - unsupported action");
@@ -476,10 +479,90 @@ SC::Result SC::Build::Action::Internal::configure(ConfigureFunction configure, S
     return Result(true);
 }
 
-SC::Result SC::Build::Action::Internal::compileRun(ConfigureFunction configure, StringView projectFileName,
-                                                   const Action& action)
+SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, const Action& action)
 {
-    SC_COMPILER_UNUSED(configure);
+    Action newAction = action;
+    String executablePath;
+    newAction.action = Action::Compile;
+
+    // Build the configuration with coverage information
+    SC_TRY(executeInternal(projectFileName, newAction));
+    newAction.action = Action::Print;
+
+    // Get coverage configuration executable path
+    SC_TRY(executeInternal(projectFileName, newAction, &executablePath));
+    String coverageDirectory;
+    SC_TRY(Path::join(coverageDirectory, {action.targetDirectory, "..", "_Coverage"}));
+
+    FileSystem fs;
+    SC_TRY(fs.init(coverageDirectory.view()));
+
+    // Recreate Coverage Dir
+    if (fs.existsAndIsDirectory(coverageDirectory.view()))
+    {
+        SC_TRY(fs.removeDirectoryRecursive(coverageDirectory.view()));
+    }
+    SC_TRY(fs.makeDirectory(coverageDirectory.view()));
+
+    // Execute process instrumented for coverage
+    {
+        Process process;
+        SC_TRY(process.setEnvironment("LLVM_PROFILE_FILE", "profile.profraw"));
+        SC_TRY(process.setWorkingDirectory(coverageDirectory.view()));
+        SC_TRY(process.exec({executablePath.view()}));
+        SC_TRY_MSG(process.getExitStatus() == 0, "Error executing instrumented executable");
+    }
+
+    // Merge coverage files
+    StringView arguments[16];
+
+    size_t numArguments  = 0;
+    size_t baseArguments = 0;
+    switch (HostPlatform)
+    {
+    case SC::Platform::Apple:
+        arguments[numArguments++] = "xcrun"; // 1
+        baseArguments             = 1;
+        break;
+    default: break;
+    }
+    {
+        numArguments = baseArguments;
+        Process process;
+        SC_TRY(process.setWorkingDirectory(coverageDirectory.view()));
+        arguments[numArguments++] = "llvm-profdata";    // 2
+        arguments[numArguments++] = "merge";            // 3
+        arguments[numArguments++] = "-sparse";          // 4
+        arguments[numArguments++] = "profile.profraw";  // 5
+        arguments[numArguments++] = "-o";               // 6
+        arguments[numArguments++] = "profile.profdata"; // 7
+        SC_TRY(process.exec({arguments, numArguments}));
+        SC_TRY_MSG(process.getExitStatus() == 0, "Error executing llvm-profdata");
+    }
+    // Generate HTML excluding all tests and SC::Tools
+    {
+        numArguments = baseArguments;
+        Process process;
+        SC_TRY(process.setWorkingDirectory(coverageDirectory.view()));
+        arguments[numArguments++] = "llvm-cov";                                                               // 2
+        arguments[numArguments++] = "show";                                                                   // 3
+        arguments[numArguments++] = "-format";                                                                // 4
+        arguments[numArguments++] = "html";                                                                   // 5
+        arguments[numArguments++] = "-ignore-filename-regex=='^(.*\\/SC-.*\\.*|.*\\/Tools.*|.*\\Test.cpp)$'"; // 6
+        arguments[numArguments++] = "--output-dir";                                                           // 7
+        arguments[numArguments++] = "coverage";                                                               // 8
+        arguments[numArguments++] = "-instr-profile=profile.profdata";                                        // 9
+        arguments[numArguments++] = executablePath.view();                                                    // 10
+        SC_TRY(process.exec({arguments, numArguments}));
+        SC_TRY_MSG(process.getExitStatus() == 0, "Error executing llvm-profdata");
+    }
+
+    return Result(true);
+}
+
+SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileName, const Action& action,
+                                                        String* outputExecutable)
+{
     StringView configuration = action.configuration.isEmpty() ? "Debug" : action.configuration;
 
     Build::Parameters parameters = fillDefaultParameters(action.generator);
@@ -516,7 +599,7 @@ SC::Result SC::Build::Action::Internal::compileRun(ConfigureFunction configure, 
         arguments[numArgs++] = solutionLocation.view();  // 6
         arguments[numArgs++] = "ONLY_ACTIVE_ARCH=NO";    // 7
         arguments[numArgs++] = formattedPlatform.view(); // 8
-        if (action.action == Action::Run)
+        if (action.action == Action::Run or action.action == Action::Print)
         {
             String output = StringEncoding::Utf8;
             SC_TRY(process.exec({arguments, numArgs}, output));
@@ -546,9 +629,19 @@ SC::Result SC::Build::Action::Internal::compileRun(ConfigureFunction configure, 
             }
             String userExecutable;
             SC_TRY(Path::join(userExecutable, {path, "/", targetName}));
-            Process testProcess;
-            SC_TRY(testProcess.exec({userExecutable.view()}));
-            SC_TRY_MSG(testProcess.getExitStatus() == 0, "Run exited with non zero status");
+            if (action.action == Action::Run)
+            {
+                Process testProcess;
+                SC_TRY(testProcess.exec({userExecutable.view()}));
+                SC_TRY_MSG(testProcess.getExitStatus() == 0, "Run exited with non zero status");
+            }
+            else if (action.action == Action::Print)
+            {
+                if (outputExecutable)
+                {
+                    return Result(outputExecutable->assign(userExecutable.view()));
+                }
+            }
         }
         else
         {
@@ -584,6 +677,7 @@ SC::Result SC::Build::Action::Internal::compileRun(ConfigureFunction configure, 
             SC_TRY(process.exec({arguments, numArgs}));
             SC_TRY_MSG(process.getExitStatus() == 0, "Compile returned error");
             break;
+        case Action::Print:
         case Action::Run: {
             String output = StringEncoding::Utf8; // TODO: Check encoding of Visual Studio Output.
             SC_TRY(process.exec({arguments, numArgs}, output));
@@ -599,9 +693,19 @@ SC::Result SC::Build::Action::Internal::compileRun(ConfigureFunction configure, 
                 }
             }
             SC_TRY_MSG(not executablePath.isEmpty(), "Cannot find executable path from .vcxproj");
-            Process testProcess;
-            SC_TRY(testProcess.exec({executablePath}));
-            SC_TRY_MSG(testProcess.getExitStatus() == 0, "Run exited with non zero status");
+            if (action.action == Action::Run)
+            {
+                Process testProcess;
+                SC_TRY(testProcess.exec({executablePath}));
+                SC_TRY_MSG(testProcess.getExitStatus() == 0, "Run exited with non zero status");
+            }
+            else if (action.action == Action::Print)
+            {
+                if (outputExecutable)
+                {
+                    return Result(outputExecutable->assign(executablePath));
+                }
+            }
         }
         break;
         default: return Result::Error("Unexpected Build::Action (supported \"compile\", \"run\")");
@@ -621,8 +725,9 @@ SC::Result SC::Build::Action::Internal::compileRun(ConfigureFunction configure, 
 
         switch (action.action)
         {
-        case Action::Compile: arguments[numArgs++] = "compile"; break; // 2
-        case Action::Run: arguments[numArgs++] = "run"; break;         // 2
+        case Action::Compile: arguments[numArgs++] = "compile"; break;              // 2
+        case Action::Run: arguments[numArgs++] = "run"; break;                      // 2
+        case Action::Print: arguments[numArgs++] = "print-executable-paths"; break; // 2
         default: return Result::Error("Unexpected Build::Action (supported \"compile\", \"run\")");
         }
         arguments[numArgs++] = "-j";                         // 3
@@ -633,8 +738,17 @@ SC::Result SC::Build::Action::Internal::compileRun(ConfigureFunction configure, 
         {
             arguments[numArgs++] = architecture; // 7
         }
-        SC_TRY(process.exec({arguments, numArgs}));
-        SC_TRY_MSG(process.getExitStatus() == 0, "Compile returned error");
+        SC_TRY(process.setEnvironment("GNUMAKEFLAGS", "--no-print-directory"));
+        if (action.action == Action::Print)
+        {
+            SC_TRY(process.exec({arguments, numArgs}, *outputExecutable));
+            *outputExecutable = outputExecutable->view().trimWhiteSpaces();
+        }
+        else
+        {
+            SC_TRY(process.exec({arguments, numArgs}));
+            SC_TRY_MSG(process.getExitStatus() == 0, "Compile returned error");
+        }
     }
     break;
     }

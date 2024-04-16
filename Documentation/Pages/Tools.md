@@ -112,8 +112,9 @@ This is the list of tools that currently exist in the Sane C++ repository.
 ## Actions
 
 - `configure`: Configure (generates) the projects into `_Build/_Projects`
-- `compile`: Compiles all projects in `_Build/_Projects`
-- `documentation`: Builds the documentation `_Build/_Documentation`
+- `compile`: Compiles all projects into `_Build/_Projects`
+- `documentation`: Builds the documentation into `_Build/_Documentation`
+- `coverage`: Builds the clang source coverage into `_Build/_Coverage`
 
 ## Examples
 Configure project, generating them:

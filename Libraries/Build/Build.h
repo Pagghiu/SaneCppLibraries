@@ -447,7 +447,9 @@ struct Action
     {
         Configure,
         Compile,
-        Run
+        Run,
+        Print,
+        Coverage
     };
     using ConfigureFunction = Result (*)(Build::Definition& definition, Build::Parameters& parameters,
                                          StringView rootDirectory);

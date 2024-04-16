@@ -193,6 +193,10 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
     {
         return runBuildAction(Build::Action::Run, arguments);
     }
+    else if (arguments.action == "coverage")
+    {
+        return runBuildAction(Build::Action::Coverage, arguments);
+    }
 #if SC_XCTEST
 #else
     else if (arguments.action == "documentation")

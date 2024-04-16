@@ -119,16 +119,24 @@ endif
             builder.append(" {0}_RUN", makeTarget.view());
         }
 
+        builder.append("\n\nprint-executable-paths:");
+        for (const Project& project : workspace.projects)
+        {
+            SC_TRY(sanitizeName(project.targetName.view(), makeTarget));
+            builder.append(" {0}_PRINT_EXECUTABLE_PATH", makeTarget.view());
+        }
+
         builder.append(R"delimiter(
 
+ifneq ($(MAKECMDGOALS),print-executable-paths)
 # Force a clean when makefile is modified
 Makefile.$(CONFIG).touched: Makefile
 	@touch $@
-	$(MAKE) clean
+	@$(MAKE) clean
 
 # Implicitly evaluate the makefile rebuild force clean during parsing
 -include Makefile.$(CONFIG).touched
-
+endif
 )delimiter");
 
         for (const Project& project : workspace.projects)
@@ -151,6 +159,10 @@ Makefile.$(CONFIG).touched: Makefile
 # {0} Target
 
 {0}_TARGET_NAME := {0}
+
+{0}_PRINT_EXECUTABLE_PATH:
+	@echo $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
+
 )delimiter",
                        makeTarget.view());
 
