@@ -18,6 +18,8 @@ endif
 
 TARGET_OS := $(shell uname)
 
+CLANG_DETECTED := $(shell $(CXX) --version 2>&1 | grep -q clang && echo "yes")
+
 .PHONY: clean all
 all: SCTool_BUILD
 clean: SCTool_CLEAN
@@ -49,10 +51,17 @@ SCTool_CXXFLAGS := $(SCTool_CPPFLAGS) -std=c++14 -fstrict-aliasing -fvisibility=
 SCTool_FRAMEWORKS := -framework CoreFoundation -framework CoreServices
 SCTool_LIBRARIES := -ldl -lpthread
 
+
 ifeq ($(TARGET_OS),Linux)
      SCTool_OS_LDFLAGS := -rdynamic
 else 
      SCTool_OS_LDFLAGS := $(SCTool_FRAMEWORKS)
+endif
+
+ifeq ($(CLANG_DETECTED),yes)
+SCTool_OS_LDFLAGS += -nostdlib++
+else
+SCTool_OS_LDFLAGS +=
 endif
 
 SCTool_LDFLAGS := $(SCTool_TARGET_FLAGS) $(SCTool_LIBRARIES) $(SCTool_OS_LDFLAGS) $(LDFLAGS)
