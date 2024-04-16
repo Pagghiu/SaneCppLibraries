@@ -451,6 +451,11 @@ $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
         builder.append("\n\nifeq ($(CLANG_DETECTED),yes)\n");
         // Clang specific flags
         builder.append("{0}_CONFIG_COMPILER_FLAGS :=", makeTarget);
+        if (configuration.compile.hasValue<Compile::enableCoverage>(true))
+        {
+            builder.append(" -fprofile-instr-generate -fcoverage-mapping");
+        }
+
         if (configuration.compile.hasValue<Compile::enableASAN>(true))
         {
             // The following prevent a linking error of the type
@@ -465,6 +470,10 @@ $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
             builder.append(" -fno-sanitize=enum,return,float-divide-by-zero,function,vptr # Needed on macOS x64");
         }
         builder.append("\n{0}_CONFIG_COMPILER_LDFLAGS :=", makeTarget);
+        if (configuration.compile.hasValue<Compile::enableCoverage>(true))
+        {
+            builder.append(" -fprofile-instr-generate -fcoverage-mapping");
+        }
         if (configuration.compile.hasValue<Compile::enableASAN>(true))
         {
             // See previous comment

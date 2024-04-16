@@ -28,6 +28,11 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
     // Configurations
     project.addPresetConfiguration(Configuration::Preset::Debug);
     project.addPresetConfiguration(Configuration::Preset::Release, "Release");
+    if (parameters.generator != Build::Generator::VisualStudio2022)
+    {
+        project.addPresetConfiguration(Configuration::Preset::Debug, "DebugCoverage");
+        project.getConfiguration("DebugCoverage")->compile.set<Compile::enableCoverage>(true);
+    }
     project.compile.addDefines({"SC_LIBRARY_PATH=$(PROJECT_DIR)/../../..", "SC_COMPILER_ENABLE_CONFIG=1"});
     project.getConfiguration("Debug")->compile.addDefines({"DEBUG=1"});
     // TODO: These includes must be relative to rootDirectory
@@ -50,7 +55,9 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
         constexpr auto buildDir  = "$(TARGET_OS)-$(TARGET_ARCHITECTURES)-$(BUILD_SYSTEM)-$(COMPILER)-$(CONFIGURATION)";
         StringBuilder(config.outputPath).format("{}/_Outputs/{}", buildBase, buildDir);
         StringBuilder(config.intermediatesPath).format("{}/_Intermediates/$(PROJECT_NAME)/{}", buildBase, buildDir);
-        config.compile.set<Compile::enableASAN>(config.preset == Configuration::Preset::Debug);
+
+        config.compile.set<Compile::enableASAN>(config.preset == Configuration::Preset::Debug and
+                                                config.name != "DebugCoverage");
     }
 
     // File overrides (order matters regarding to add / remove)

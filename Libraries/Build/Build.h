@@ -131,6 +131,7 @@ struct Compile
         enableRTTI,          ///< Runtime Type Identification
         enableExceptions,    ///< C++ Exceptions
         enableStdCpp,        ///< C++ Standard Library
+        enableCoverage,      ///< Enables code coverage instrumentation
     };
 
     /// @brief Two StringViews representing name and description
@@ -152,6 +153,7 @@ struct Compile
         case enableRTTI: return {"enableRTTI", "Runtime Type Identification"};
         case enableExceptions: return {"enableExceptions", "C++ Exceptions"};
         case enableStdCpp: return {"enableStdCpp", "C++ Standard Library"};
+        case enableCoverage: return {"enableCoverage", "Code coverage instrumentation"};
         }
         Assert::unreachable();
     }
@@ -164,6 +166,7 @@ struct Compile
                                              Tag<enableASAN, bool>,                      //
                                              Tag<enableRTTI, bool>,                      //
                                              Tag<enableExceptions, bool>,                //
+                                             Tag<enableCoverage, bool>,                  //
                                              Tag<enableStdCpp, bool>>;
 
     using Union = TaggedUnion<Compile>;
