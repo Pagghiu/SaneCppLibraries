@@ -483,19 +483,19 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
 {
     Action newAction = action;
     String executablePath;
-    newAction.action = Action::Compile;
 
     // Build the configuration with coverage information
+    newAction.action = Action::Compile;
     SC_TRY(executeInternal(projectFileName, newAction));
-    newAction.action = Action::Print;
 
     // Get coverage configuration executable path
+    newAction.action = Action::Print;
     SC_TRY(executeInternal(projectFileName, newAction, &executablePath));
     String coverageDirectory;
     SC_TRY(Path::join(coverageDirectory, {action.targetDirectory, "..", "_Coverage"}));
 
     FileSystem fs;
-    SC_TRY(fs.init(coverageDirectory.view()));
+    SC_TRY(fs.init(action.targetDirectory));
 
     // Recreate Coverage Dir
     if (fs.existsAndIsDirectory(coverageDirectory.view()))
@@ -544,15 +544,18 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
         numArguments = baseArguments;
         Process process;
         SC_TRY(process.setWorkingDirectory(coverageDirectory.view()));
-        arguments[numArguments++] = "llvm-cov";                                                               // 2
-        arguments[numArguments++] = "show";                                                                   // 3
-        arguments[numArguments++] = "-format";                                                                // 4
-        arguments[numArguments++] = "html";                                                                   // 5
-        arguments[numArguments++] = "-ignore-filename-regex=='^(.*\\/SC-.*\\.*|.*\\/Tools.*|.*\\Test.cpp)$'"; // 6
-        arguments[numArguments++] = "--output-dir";                                                           // 7
-        arguments[numArguments++] = "coverage";                                                               // 8
-        arguments[numArguments++] = "-instr-profile=profile.profdata";                                        // 9
-        arguments[numArguments++] = executablePath.view();                                                    // 10
+        arguments[numArguments++] = "llvm-cov"; // 2
+        arguments[numArguments++] = "show";     // 3
+        arguments[numArguments++] = "-format";  // 4
+        arguments[numArguments++] = "html";     // 5
+        // TODO: De-hardcode this filter and pass it as a parameter
+        arguments[numArguments++] = "-ignore-filename-regex=" // 6
+                                    "^(.*\\/SC-.*\\.*|.*\\/Tools.*|.*\\Test.(cpp|h|c)|.*\\test.(c|h)|"
+                                    ".*\\/Tests/.*\\.*|.*\\/LibrariesExtra/.*\\.*)$";
+        arguments[numArguments++] = "--output-dir";                    // 7
+        arguments[numArguments++] = "coverage";                        // 8
+        arguments[numArguments++] = "-instr-profile=profile.profdata"; // 9
+        arguments[numArguments++] = executablePath.view();             // 10
         SC_TRY(process.exec({arguments, numArguments}));
         SC_TRY_MSG(process.getExitStatus() == 0, "Error executing llvm-profdata");
     }
