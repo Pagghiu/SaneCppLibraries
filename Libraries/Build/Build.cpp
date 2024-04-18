@@ -494,16 +494,17 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
     String coverageDirectory;
     SC_TRY(Path::join(coverageDirectory, {action.targetDirectory, "..", "_Coverage"}));
 
-    FileSystem fs;
-    SC_TRY(fs.init(action.targetDirectory));
-
-    // Recreate Coverage Dir
-    if (fs.existsAndIsDirectory(coverageDirectory.view()))
     {
-        SC_TRY(fs.removeDirectoryRecursive(coverageDirectory.view()));
-    }
-    SC_TRY(fs.makeDirectory(coverageDirectory.view()));
+        FileSystem fs;
+        SC_TRY(fs.init(action.targetDirectory));
 
+        // Recreate Coverage Dir
+        if (fs.existsAndIsDirectory(coverageDirectory.view()))
+        {
+            SC_TRY(fs.removeDirectoryRecursive(coverageDirectory.view()));
+        }
+        SC_TRY(fs.makeDirectory(coverageDirectory.view()));
+    }
     // Execute process instrumented for coverage
     {
         Process process;
@@ -557,7 +558,65 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
         arguments[numArguments++] = "-instr-profile=profile.profdata"; // 9
         arguments[numArguments++] = executablePath.view();             // 10
         SC_TRY(process.exec({arguments, numArguments}));
-        SC_TRY_MSG(process.getExitStatus() == 0, "Error executing llvm-profdata");
+        SC_TRY_MSG(process.getExitStatus() == 0, "Error executing llvm-cov show");
+    }
+    // Extract report data to generate badge
+    {
+        numArguments = baseArguments;
+
+        // Generate coverage report
+        Process process;
+        SC_TRY(process.setWorkingDirectory(coverageDirectory.view()));
+        arguments[numArguments++] = "llvm-cov"; // 2
+        arguments[numArguments++] = "report";   // 3
+        // TODO: De-hardcode this filter and pass it as a parameter
+        arguments[numArguments++] = "-ignore-filename-regex=" // 6
+                                    "^(.*\\/SC-.*\\.*|.*\\/Tools.*|.*\\Test.(cpp|h|c)|.*\\test.(c|h)|"
+                                    ".*\\/Tests/.*\\.*|.*\\/LibrariesExtra/.*\\.*)$";
+        arguments[numArguments++] = "-instr-profile=profile.profdata"; // 9
+        arguments[numArguments++] = executablePath.view();             // 10
+
+        String output;
+        SC_TRY(process.exec({arguments, numArguments}, output));
+        SC_TRY_MSG(process.getExitStatus() == 0, "Error executing llvm-cov report");
+
+        // Parse coverage report
+        StringView totals;
+        SC_TRY(output.view().splitAfter("\nTOTAL ", totals));
+        StringViewTokenizer tokenizer(totals);
+        for (int i = 0; i < 9; ++i)
+            SC_TRY(tokenizer.tokenizeNext({' '}, StringViewTokenizer::SkipEmpty));
+
+        // Generate coverage badge if not existing
+        {
+            StringView coverageString = tokenizer.component.trimEndAnyOf({'%'});
+            String     localFile;
+            SC_TRY(Path::join(localFile, {coverageDirectory.view(), "coverage", "coverage.svg"}));
+
+            // Define coverage badge color
+            StringView coverageColor;
+            float      coverageFloat;
+            SC_TRY(coverageString.parseFloat(coverageFloat));
+            if (coverageFloat < 80)
+                coverageColor = "e05d44"; // red
+            else if (coverageFloat < 90)
+                coverageColor = "dfb317"; // yellow
+            else
+                coverageColor = "97ca00"; // green
+
+            // Coverage badge SVG template
+            StringView coverageBadge =
+                R"svg(<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="114" height="20" role="img" aria-label="coverage: {0}%"><title>coverage: {0}%</title><linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="r"><rect width="114" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#r)"><rect width="61" height="20" fill="#555"/><rect x="61" width="53" height="20" fill="#{1}"/><rect width="114" height="20" fill="url(#s)"/></g><g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110"><text aria-hidden="true" x="315" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="510">coverage</text><text x="315" y="140" transform="scale(.1)" fill="#fff" textLength="510">coverage</text><text aria-hidden="true" x="865" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="430">{0}%</text><text x="865" y="140" transform="scale(.1)" fill="#fff" textLength="430">{0}%</text></g></svg>)svg";
+
+            // Compile coverage badge SVG template with proper color and percentage
+            String compiledCoverageBadge;
+            SC_TRY(StringBuilder(compiledCoverageBadge).format(coverageBadge, coverageString, coverageColor));
+
+            // Write badge svg to disk
+            FileSystem fs;
+            SC_TRY(fs.init(coverageDirectory.view()));
+            SC_TRY(fs.writeString("coverage/coverage.svg", compiledCoverageBadge.view()));
+        }
     }
 
     return Result(true);
