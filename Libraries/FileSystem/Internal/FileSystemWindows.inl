@@ -121,16 +121,6 @@ struct SC::FileSystem::Internal
         return true;
     }
 
-    [[nodiscard]] static bool openFileRead(const wchar_t* path, FILE*& file)
-    {
-        return _wfopen_s(&file, path, L"rb") == 0;
-    }
-
-    [[nodiscard]] static bool openFileWrite(const wchar_t* path, FILE*& file)
-    {
-        return _wfopen_s(&file, path, L"wb") == 0;
-    }
-
     [[nodiscard]] static bool formatError(int errorNumber, String& buffer)
     {
         buffer.encoding = StringEncoding::Utf16;

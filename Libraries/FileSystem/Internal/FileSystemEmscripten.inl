@@ -29,10 +29,6 @@ struct SC::FileSystem::Internal
 
     [[nodiscard]] static bool removeFile(const char* path) { return false; }
 
-    [[nodiscard]] static bool openFileRead(const char* path, FILE*& file) { return false; }
-
-    [[nodiscard]] static bool openFileWrite(const char* path, FILE*& file) { return false; }
-
     [[nodiscard]] static bool formatError(int errorNumber, String& buffer) { return false; }
 
     [[nodiscard]] static bool copyFile(const StringView& sourceFile, const StringView& destinationFile,

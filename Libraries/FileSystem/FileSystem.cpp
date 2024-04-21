@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "FileSystem.h"
+#include "../File/FileDescriptor.h"
 #include "../Strings/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
@@ -92,61 +93,39 @@ bool SC::FileSystem::convert(const StringView file, String& destination, StringV
         }                                                                                                              \
     }
 #endif
+
 SC::Result SC::FileSystem::write(StringView path, Span<const char> data)
 {
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
-    FILE* handle = nullptr;
-    SC_TRY_FORMAT_ERRNO(path, Internal::openFileWrite(encodedPath.getNullTerminatedNative(), handle));
-    const size_t res = fwrite(data.data(), 1, data.sizeInBytes(), handle);
-    if (ferror(handle) != 0)
-    {
-        return formatError(errno, path, false);
-    }
-    fclose(handle);
-    return Result(res == data.sizeInBytes());
+    FileDescriptor file;
+    SC_TRY(file.open(encodedPath, FileDescriptor::WriteCreateTruncate));
+    return file.write(data);
 }
 
-#define SC_TRY_FORMAT_LIBC(func)                                                                                       \
-    {                                                                                                                  \
-        if (func == -1)                                                                                                \
-        {                                                                                                              \
-            return formatError(errno, path, false);                                                                    \
-        }                                                                                                              \
-    }
 SC::Result SC::FileSystem::read(StringView path, Vector<char>& data)
 {
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
-    FILE* handle;
-    SC_TRY_FORMAT_ERRNO(path, Internal::openFileRead(encodedPath.getNullTerminatedNative(), handle));
-    SC_TRY_FORMAT_LIBC(fseek(handle, 0, SEEK_END));
-    const auto fileSizeRes = ftell(handle);
-    SC_TRY_FORMAT_LIBC(fileSizeRes);
-    SC_TRY_FORMAT_LIBC(fseek(handle, 0, SEEK_SET));
-    const size_t fileSize = static_cast<size_t>(fileSizeRes);
-    SC_TRY(data.resizeWithoutInitializing(fileSize));
-
-    const auto readBytes = fread(data.data(), 1, fileSize, handle);
-    if (ferror(handle) != 0)
-    {
-        return formatError(errno, path, false);
-    }
-    fclose(handle);
-    return Result(readBytes == fileSize);
-}
-#undef SC_TRY_FORMAT_LIBC
-
-[[nodiscard]] SC::Result SC::FileSystem::writeString(StringView file, StringView text)
-{
-    return write(file, text.toCharSpan());
+    FileDescriptor file;
+    SC_TRY(file.open(encodedPath, FileDescriptor::ReadOnly));
+    return file.readUntilEOF(data);
 }
 
-[[nodiscard]] SC::Result SC::FileSystem::read(StringView file, String& text, StringEncoding encoding)
+[[nodiscard]] SC::Result SC::FileSystem::writeString(StringView path, StringView text)
 {
+    return write(path, text.toCharSpan());
+}
+
+[[nodiscard]] SC::Result SC::FileSystem::read(StringView path, String& text, StringEncoding encoding)
+{
+    text.data.clearWithoutInitializing();
     text.encoding = encoding;
-    SC_TRY(read(file, text.data));
-    return Result(StringConverter::pushNullTerm(text.data, encoding));
+    StringView encodedPath;
+    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+    FileDescriptor file;
+    SC_TRY(file.open(encodedPath, FileDescriptor::ReadOnly));
+    return file.readUntilEOF(text);
 }
 
 SC::Result SC::FileSystem::formatError(int errorNumber, StringView item, bool isWindowsNativeError)

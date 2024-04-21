@@ -112,18 +112,6 @@ struct SC::FileSystem::Internal
 
     [[nodiscard]] static bool removeFile(const char* path) { return remove(path) == 0; }
 
-    [[nodiscard]] static bool openFileRead(const char* path, FILE*& file)
-    {
-        file = fopen(path, "rb");
-        return file != nullptr;
-    }
-
-    [[nodiscard]] static bool openFileWrite(const char* path, FILE*& file)
-    {
-        file = fopen(path, "wb");
-        return file != nullptr;
-    }
-
     [[nodiscard]] static bool formatError(int errorNumber, String& buffer)
     {
         buffer.encoding = StringEncoding::Utf8;
