@@ -230,6 +230,21 @@ bool SC::StringView::splitAfter(const StringView stringToMatch, StringView& rema
         });
 }
 
+bool SC::StringView::splitBefore(const StringView stringToMatch, StringView& stringBeforeSplit) const
+{
+    SC_ASSERT_RELEASE(hasCompatibleEncoding(stringToMatch));
+    return withIterator(
+        [&](auto it)
+        {
+            if (it.advanceBeforeFinding(stringToMatch.getIterator<decltype(it)>()))
+            {
+                stringBeforeSplit = StringView::fromIteratorFromStart(it);
+                return true;
+            }
+            return false;
+        });
+}
+
 bool SC::StringView::containsCodePoint(StringCodePoint c) const
 {
     return withIterator([c](auto it) { return it.advanceUntilMatches(c); });

@@ -205,6 +205,12 @@ struct SC::StringViewTest : public SC::TestCase
                 SC_TEST_EXPECT(str.splitAfter(" = ", split));
                 SC_TEST_EXPECT(split == "VALUE");
             }
+            {
+                StringView str("KEY = VALUE");
+                StringView split;
+                SC_TEST_EXPECT(str.splitBefore(" = ", split));
+                SC_TEST_EXPECT(split == "KEY");
+            }
         }
         if (test_section("isInteger"))
         {

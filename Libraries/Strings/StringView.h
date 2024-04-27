@@ -289,9 +289,9 @@ struct SC::StringView
     /// @endcode
     [[nodiscard]] bool containsString(const StringView str) const;
 
-    /// @brief Splits the remaining part of the strin after matching str
+    /// @brief Returns the remaining part of the string after matching stringToMatch
     /// @param stringToMatch String to match inside the source string
-    /// @param remainingAfterSplit Portion of this StringView AFTER first match of stringtoMatch
+    /// @param remainingAfterSplit Portion of this StringView AFTER first match of stringToMatch (excluding the match)
     /// @return Returns `true` if stringToMatch has been found and split has been written to remainingAfterSplit
     ///
     /// Example:
@@ -302,6 +302,20 @@ struct SC::StringView
     /// SC_TEST_EXPECT(split == "VALUE");
     /// @endcode
     [[nodiscard]] bool splitAfter(const StringView stringToMatch, StringView& remainingAfterSplit) const;
+
+    /// @brief Returns the part of the string before matching stringToMatch
+    /// @param stringToMatch String to match inside the source string
+    /// @param stringBeforeSplit Portion of this StringView BEFORE first match of stringToMatch (excluding the match)
+    /// @return Returns `true` if stringToMatch has been found and split has been written to remainingAfterSplit
+    ///
+    /// Example:
+    /// @code{.cpp}
+    /// StringView str("KEY = VALUE");
+    /// StringView split;
+    /// SC_TEST_EXPECT(str.splitBefore(" = ", split));
+    /// SC_TEST_EXPECT(split == "KEY");
+    /// @endcode
+    [[nodiscard]] bool splitBefore(const StringView stringToMatch, StringView& stringBeforeSplit) const;
 
     /// @brief Check if StringView contains given utf code point
     /// @param c The utf code point to check against
@@ -421,7 +435,7 @@ struct SC::StringView
     /// @endcode
     [[nodiscard]] StringView trimAnyOf(Span<const StringCodePoint> codePoints) const;
 
-    /// @brief Returns a shortened StringView without starting / ending utf code points matching {'\r', '\n', '\t', ' '}
+    /// @brief Returns a shortened StringView without starting/ending utf code points inside {'\\r', '\\n', '\\t', ' '}
     /// @return The trimmed StringView
     ///
     /// Example:
