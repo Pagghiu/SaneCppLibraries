@@ -189,7 +189,8 @@ All newly added code must have associated tests.
 
 # Documentation
 
-All public classes should be documented, possibly with an usage example.
+All public classes should be documented, possibly with an usage example.  
+Documentation website will be automatically updated when a PR is merged to master.
 
 # Comments
 

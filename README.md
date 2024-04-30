@@ -111,6 +111,7 @@ Alternatively I am also reading the following discords too:
 # Videos
 
 Blog posts:
+- [April 2024 Update](https://pagghiu.github.io/site/blog/2024-04-27-SaneCppLibrariesUpdate.html)
 - [March 2024 Update](https://pagghiu.github.io/site/blog/2024-03-27-SaneCppLibrariesUpdate.html)
 - [February 2024 Update](https://pagghiu.github.io/site/blog/2024-02-23-SaneCppLibrariesUpdate.html)
 - [January 2024 Update](https://pagghiu.github.io/site/blog/2024-01-23-SaneCppLibrariesUpdate.html)

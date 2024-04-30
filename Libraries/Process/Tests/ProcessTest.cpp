@@ -335,7 +335,7 @@ void SC::ProcessTest::processEnvironmentDisableInheritance()
     String output;
     // Spawn the child process writing all env variables as KEY=VALUE\n to stdout, redirected to output
     SC_TEST_EXPECT(spawnChildAndPrintEnvironmentVars(process, output));
-    // PATH env var doesn't exist because of Proces::inheritParentEnvironmentVariables(false)
+    // PATH env var doesn't exist because of Process::inheritParentEnvironmentVariables(false)
     SC_TEST_EXPECT(not output.view().containsString("PATH="));
     //! [ProcessEnvironmentDisableInheritance]
 }
