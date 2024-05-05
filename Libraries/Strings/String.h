@@ -44,6 +44,11 @@ struct SC::String
         SC_ASSERT_RELEASE(assign(StringView({text, N - 1}, true, StringEncoding::Ascii)));
     }
 
+    /// @brief Checks if the memory pointed by the StringView is owned by this String
+    /// @param view StringView to be checked
+    /// @return `true` if StringView memory belongs to this String
+    [[nodiscard]] bool owns(StringView view) const;
+
     /// @brief Assigns a StringView to this String, replacing existing contents
     /// @param sv StringView to be assigned to this string
     /// @return `true` if StringView is assigned successfully
@@ -157,6 +162,12 @@ struct SC::String
 //-----------------------------------------------------------------------------------------------------------------------
 // Implementations Details
 //-----------------------------------------------------------------------------------------------------------------------
+
+inline bool SC::String::owns(StringView view) const
+{
+    return (view.bytesWithoutTerminator() >= this->view().bytesWithoutTerminator()) and
+           (view.bytesWithoutTerminator() <= (this->view().bytesWithoutTerminator() + this->view().sizeInBytes()));
+}
 
 inline bool SC::String::assign(StringView sv)
 {
