@@ -391,6 +391,8 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
     components.clear();
     if (view.isEmpty())
         return false;
+    if (output->owns(view))
+        return false;
     auto newView = removeTrailingSeparator(view);
     if (not newView.isEmpty())
     {
@@ -514,32 +516,59 @@ bool SC::Path::relativeFromTo(StringView source, StringView destination, String&
         if (pathViewSource.root.isEmpty() or pathViewDestination.root.isEmpty())
             return false; // Relative paths are not supported
     }
-    size_t commonOverlappingPoints;
-    if (source.fullyOverlaps(destination, commonOverlappingPoints))
+
+    if (source == destination)
     {
         return output.assign(".");
     }
-    if (commonOverlappingPoints == 0)
+
+    const StringView separator =
+        outputType == AsWindows ? Windows::SeparatorStringView() : Posix::SeparatorStringView();
+    StringViewTokenizer srcTokenizer(source);
+    StringViewTokenizer dstTokenizer(destination);
+
+    size_t numMatches    = 0;
+    size_t numSeparators = 0;
+
+    StringBuilder builder(output, StringBuilder::Clear);
+    StringView    destRemaining = destination;
+
+    while (srcTokenizer.tokenizeNext({'/', '\\'}, StringViewTokenizer::IncludeEmpty))
+    {
+        if (not dstTokenizer.tokenizeNext({'/', '\\'}, StringViewTokenizer::IncludeEmpty) or
+            (srcTokenizer.component != dstTokenizer.component))
+        {
+            numSeparators++;
+            SC_TRY(builder.append(".."));
+            break;
+        }
+        destRemaining = dstTokenizer.remaining;
+        numMatches++;
+    }
+
+    if (numMatches == 0)
     {
         return false; // no common part
     }
 
-    const auto remainingSource = source.sliceStart(commonOverlappingPoints);
-    const auto slicedDest      = destination.sliceStart(commonOverlappingPoints);
-    auto       numSplits       = StringViewTokenizer(remainingSource).countTokens({'/', '\\'}).numSplitsNonEmpty;
-
-    StringBuilder builder(output, StringBuilder::Clear);
-    while (numSplits > 0)
+    while (srcTokenizer.tokenizeNext({'/', '\\'}, StringViewTokenizer::SkipEmpty))
     {
-        numSplits -= 1;
-        SC_TRY(builder.append(".."));
-        switch (outputType)
+        if (numSeparators > 0)
         {
-        case AsWindows: SC_TRY(builder.append(Windows::SeparatorStringView())); break;
-        case AsPosix: SC_TRY(builder.append(Posix::SeparatorStringView())); break;
+            SC_TRY(builder.append(separator));
         }
+        numSeparators++;
+        SC_TRY(builder.append(".."));
     }
-    SC_TRY(builder.append(Path::removeTrailingSeparator(slicedDest)));
+    StringView destToAppend = Path::removeTrailingSeparator(destRemaining);
+    if (not destToAppend.isEmpty())
+    {
+        if (numSeparators > 0)
+        {
+            SC_TRY(builder.append(separator));
+        }
+        SC_TRY(builder.append(Path::removeTrailingSeparator(destRemaining)));
+    }
     return true;
 }
 

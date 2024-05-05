@@ -197,7 +197,7 @@ struct SC::Path
     /// Path::normalize("/Users/SC/../Documents/", cmp, &path, Path::AsPosix);
     /// SC_RELEASE_ASSERT(path == "/Users/Documents");
     /// @endcode
-    /// @param view The path to be normalized
+    /// @param view The path to be normalized (but it should not be a view() of the output String)
     /// @param components The parsed components that once joined will provide the normalized string
     /// @param[out] output (Optional) pointer to String that will receive the normalized Path (if `nullptr`)
     /// @param[in] type Specify to parse as Windows or Posix path
