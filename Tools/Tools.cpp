@@ -33,7 +33,7 @@ int main(int argc, const char* argv[])
 
     if (argc < 4)
     {
-        console.printLine("Usage: ${TOOL} libraryDirectory toolDirectory outputsDirectory [tool] [action]");
+        console.printLine("Usage: ${TOOL} libraryDirectory toolSource toolDestination [tool] [action]");
         return -1;
     }
     int numArguments = 0;
@@ -57,14 +57,14 @@ int main(int argc, const char* argv[])
     numArguments            = argc;
 #endif
     const StringView libraryDirectory = StringView::fromNullTerminated(nativeArgs[1], StringEncoding::Native);
-    const StringView toolDirectory    = StringView::fromNullTerminated(nativeArgs[2], StringEncoding::Native);
-    const StringView outputsDirectory = StringView::fromNullTerminated(nativeArgs[3], StringEncoding::Native);
+    const StringView toolSource       = StringView::fromNullTerminated(nativeArgs[2], StringEncoding::Native);
+    const StringView toolDestination  = StringView::fromNullTerminated(nativeArgs[3], StringEncoding::Native);
 
     {
         SmallVector<StringView, 64> components;
         (void)Path::normalize(libraryDirectory, components, &arguments.libraryDirectory, Path::Type::AsNative);
-        (void)Path::normalize(toolDirectory, components, &arguments.toolDirectory, Path::Type::AsNative);
-        (void)Path::normalize(outputsDirectory, components, &arguments.outputsDirectory, Path::Type::AsNative);
+        (void)Path::normalize(toolSource, components, &arguments.toolSource, Path::Type::AsNative);
+        (void)Path::normalize(toolDestination, components, &arguments.toolDestination, Path::Type::AsNative);
     }
 
     arguments.tool = Tool::getToolName();
@@ -101,8 +101,8 @@ int main(int argc, const char* argv[])
 
     SC_TRY(builder.format("{} \"{}\" started\n", arguments.tool, arguments.action));
     SC_TRY(builder.append("librarySource    = \"{}\"\n", arguments.libraryDirectory));
-    SC_TRY(builder.append("toolSource       = \"{}\"\n", arguments.toolDirectory));
-    SC_TRY(builder.append("outputs          = \"{}\"\n", arguments.outputsDirectory));
+    SC_TRY(builder.append("toolSource       = \"{}\"\n", arguments.toolSource));
+    SC_TRY(builder.append("toolDestination  = \"{}\"\n", arguments.toolDestination));
     console.print(gFormatString.view());
 
     const Result   result  = Tool::runTool(arguments);

@@ -10,20 +10,25 @@
 
 struct SC::Build::ProjectWriter::WriterXCode
 {
-    const Definition&         definition;
-    const DefinitionCompiler& definitionCompiler;
-    Hashing                   hashing;
+    const Definition&          definition;
+    const DefinitionCompiler&  definitionCompiler;
+    const Directories&         directories;
+    const RelativeDirectories& relativeDirectories;
 
-    WriterXCode(const Definition& definition, const DefinitionCompiler& definitionCompiler)
-        : definition(definition), definitionCompiler(definitionCompiler)
+    Hashing hashing;
+
+    WriterXCode(const Definition& definition, const DefinitionCompiler& definitionCompiler,
+                const Directories& directories, const RelativeDirectories& relativeDirectories)
+        : definition(definition), definitionCompiler(definitionCompiler), directories(directories),
+          relativeDirectories(relativeDirectories)
     {}
     using RenderItem  = WriterInternal::RenderItem;
     using RenderGroup = WriterInternal::RenderGroup;
     using Renderer    = WriterInternal::Renderer;
 
-    [[nodiscard]] bool prepare(StringView destinationDirectory, const Project& project, Renderer& renderer)
+    [[nodiscard]] bool prepare(const Project& project, Renderer& renderer)
     {
-        SC_TRY(fillXCodeFiles(destinationDirectory, project, renderer.renderItems));
+        SC_TRY(fillXCodeFiles(directories.projectsDirectory.view(), project, renderer.renderItems));
         SC_TRY(fillXCodeFrameworks(project, renderer.renderItems));
         SC_TRY(fillXCodeConfigurations(project, renderer.renderItems));
         SC_TRY(fillFileGroups(renderer.rootGroup, renderer.renderItems));
@@ -418,7 +423,17 @@ struct SC::Build::ProjectWriter::WriterXCode
             SC_TRY(builder.append("\n                       HEADER_SEARCH_PATHS = ("));
             for (auto it : *includes)
             {
-                SC_TRY(builder.append("\n                       \"{}\",", it.view())); // TODO: Escape double quotes
+                // TODO: Escape double quotes for include paths
+                if (Path::isAbsolute(it.view(), Path::AsPosix))
+                {
+                    SC_TRY(builder.append("\n                       \"{}\",", it.view()));
+                }
+                else
+                {
+                    // Relative to project root but expressed as relative to project dir
+                    SC_TRY(builder.append("\n                       \"$(PROJECT_DIR)/{}/{}\",",
+                                          relativeDirectories.relativeProjectsToProjectRoot, it.view()));
+                }
             }
             SC_TRY(builder.append("\n                       );"));
         }
@@ -438,7 +453,9 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
             for (auto& it : *defines)
             {
-                SC_TRY(builder.append("\n                       \"{}\",", it.view())); // TODO: Escape double quotes
+                SC_TRY(builder.append("\n                       \""));
+                SC_TRY(appendVariable(builder, it.view())); // TODO: Escape double quotes
+                SC_TRY(builder.append("\","));
             }
         }
 
@@ -446,7 +463,9 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
             for (auto it : *configDefines)
             {
-                SC_TRY(builder.append("\n                       \"{}\",", it.view())); // TODO: Escape double quotes
+                SC_TRY(builder.append("\n                       \""));
+                SC_TRY(appendVariable(builder, it.view())); // TODO: Escape double quotes
+                SC_TRY(builder.append("\","));
             }
         }
         if (opened)
@@ -544,24 +563,14 @@ struct SC::Build::ProjectWriter::WriterXCode
         const Configuration* configuration = project.getConfiguration(xcodeObject.name.view());
         SC_TRY(configuration != nullptr);
         builder.append("\n                       CONFIGURATION_BUILD_DIR = \"");
-        // TODO: Extract actual proper apple clang version
-        constexpr StringBuilder::ReplacePair replacements[] = {
-            {"$(PROJECT_DIR)", "$(PROJECT_DIR)"},                    // Same
-            {"$(CONFIGURATION)", "$(CONFIGURATION)"},                // Same
-            {"$(PROJECT_NAME)", "$(PROJECT_NAME)"},                  // Same
-            {"$(TARGET_OS)", "$(PLATFORM_DISPLAY_NAME)"},            //
-            {"$(TARGET_OS_VERSION)", "$(MACOSX_DEPLOYMENT_TARGET)"}, //
-            {"$(TARGET_ARCHITECTURES)", "$(ARCHS)"},                 //
-            {"$(BUILD_SYSTEM)", "xcode"},                            //
-            {"$(COMPILER)", "clang"},                                //
-            {"$(COMPILER_VERSION)", "15"},                           // TODO: Detect apple-clang version
-        };
-        builder.appendReplaceMultiple(configuration->outputPath.view(),
-                                      {replacements, sizeof(replacements) / sizeof(replacements[0])});
+        WriterInternal::appendPrefixIfRelativePosix("$(PROJECT_DIR)", builder, configuration->outputPath.view(),
+                                                    relativeDirectories.relativeProjectsToOutputs.view());
+        appendVariable(builder, configuration->outputPath.view());
         builder.append("\";");
         builder.append("\n                       SYMROOT = \"");
-        builder.appendReplaceMultiple(configuration->intermediatesPath.view(),
-                                      {replacements, sizeof(replacements) / sizeof(replacements[0])});
+        WriterInternal::appendPrefixIfRelativePosix("$(PROJECT_DIR)", builder, configuration->intermediatesPath.view(),
+                                                    relativeDirectories.relativeProjectsToIntermediates.view());
+        appendVariable(builder, configuration->intermediatesPath.view());
         builder.append("\";");
         if (configuration->compile.hasValue<Compile::enableRTTI>(true))
         {
@@ -714,10 +723,10 @@ struct SC::Build::ProjectWriter::WriterXCode
         return true;
     }
 
-    [[nodiscard]] bool fillXCodeFiles(StringView destinationDirectory, const Project& project,
+    [[nodiscard]] bool fillXCodeFiles(StringView projectDirectory, const Project& project,
                                       Vector<RenderItem>& outputFiles)
     {
-        SC_TRY(WriterInternal::fillFiles(definitionCompiler, destinationDirectory, project, outputFiles));
+        SC_TRY(WriterInternal::getPathsRelativeTo(projectDirectory, definitionCompiler, project, outputFiles));
         for (auto& it : outputFiles)
         {
             SC_TRY(computeReferenceHash(it.name.view(), it.referenceHash));
@@ -794,9 +803,8 @@ struct SC::Build::ProjectWriter::WriterXCode
     }
 
     [[nodiscard]] Result writeScheme(StringBuilder& builder, const Project& project, Renderer& renderer,
-                                     StringView destinationDirectory, StringView filename)
+                                     StringView filename)
     {
-        SC_COMPILER_UNUSED(destinationDirectory);
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         String output;
         for (auto& item : renderer.renderItems)
@@ -905,5 +913,24 @@ struct SC::Build::ProjectWriter::WriterXCode
                        "7B00740A2A73143F00660B94", project.name.view(), project.name.view(), filename);
         SC_COMPILER_WARNING_POP;
         return Result(true);
+    }
+
+    [[nodiscard]] bool appendVariable(StringBuilder& builder, StringView text)
+    {
+        const StringView relativeRoot = relativeDirectories.projectRootRelativeToProjects.view();
+
+        const StringBuilder::ReplacePair replacements[] = {
+            {"$(PROJECT_DIR)", "$(PROJECT_DIR)"},                    // Same
+            {"$(PROJECT_ROOT)", relativeRoot},                       //
+            {"$(CONFIGURATION)", "$(CONFIGURATION)"},                // Same
+            {"$(PROJECT_NAME)", "$(PROJECT_NAME)"},                  // Same
+            {"$(TARGET_OS)", "$(PLATFORM_DISPLAY_NAME)"},            //
+            {"$(TARGET_OS_VERSION)", "$(MACOSX_DEPLOYMENT_TARGET)"}, //
+            {"$(TARGET_ARCHITECTURES)", "$(ARCHS)"},                 //
+            {"$(BUILD_SYSTEM)", "xcode"},                            //
+            {"$(COMPILER)", "clang"},                                //
+            {"$(COMPILER_VERSION)", "15"},                           // TODO: Detect apple-clang version
+        };
+        return builder.appendReplaceMultiple(text, {replacements, sizeof(replacements) / sizeof(replacements[0])});
     }
 };

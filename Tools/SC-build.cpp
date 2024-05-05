@@ -9,12 +9,11 @@ namespace Build
 {
 static constexpr StringView PROJECT_NAME = "SCTest";
 
-Result configure(Build::Definition& definition, Build::Parameters& parameters, StringView rootDirectory)
+Result configure(Build::Definition& definition, Build::Parameters& parameters)
 {
-    using namespace Build;
     SC_COMPILER_WARNING_PUSH_UNUSED_RESULT; // Doing some optimistic coding here, ignoring all failures
 
-    // Workspace overrides
+    // Workspace
     Workspace workspace;
     workspace.name.assign(PROJECT_NAME);
 
@@ -23,58 +22,61 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
     project.targetType = TargetType::Executable;
     project.name.assign(PROJECT_NAME);
     project.targetName.assign(PROJECT_NAME);
-    project.setRootDirectory(rootDirectory);
+    // All relative paths are evaluated from this project root directory.
+    project.setRootDirectory(parameters.directories.libraryDirectory.view());
 
-    // Configurations
+    // Project Configurations
     project.addPresetConfiguration(Configuration::Preset::Debug);
-    project.addPresetConfiguration(Configuration::Preset::Release, "Release");
-    if (parameters.generator != Build::Generator::VisualStudio2022)
-    {
-        project.addPresetConfiguration(Configuration::Preset::Debug, "DebugCoverage");
-        project.getConfiguration("DebugCoverage")->compile.set<Compile::enableCoverage>(true);
-    }
-    project.compile.addDefines({"SC_LIBRARY_PATH=$(PROJECT_DIR)/../../..", "SC_COMPILER_ENABLE_CONFIG=1"});
-    project.getConfiguration("Debug")->compile.addDefines({"DEBUG=1"});
-    // TODO: These includes must be relative to rootDirectory
-    project.compile.addIncludes({
-        "../../..",              // SC Root (for PluginTest)
-        "../../../Tests/SCTest", // For SCConfig.h (enabled by SC_COMPILER_ENABLE_CONFIG == 1)
-    });
-    if (parameters.platforms.contains(Build::Platform::MacOS))
-    {
-        project.link.addFrameworks({"CoreFoundation", "CoreServices"});
-    }
+    project.addPresetConfiguration(Configuration::Preset::Release);
     if (parameters.generator == Build::Generator::VisualStudio2022)
     {
         project.addPresetConfiguration(Configuration::Preset::Debug, "Debug Clang");
         project.getConfiguration("Debug Clang")->visualStudio.platformToolset = "ClangCL";
     }
+    else
+    {
+        project.addPresetConfiguration(Configuration::Preset::DebugCoverage);
+    }
+
+    // Project Configurations special flags
     for (Configuration& config : project.configurations)
     {
-        constexpr auto buildBase = "$(PROJECT_DIR)/../..";
-        constexpr auto buildDir  = "$(TARGET_OS)-$(TARGET_ARCHITECTURES)-$(BUILD_SYSTEM)-$(COMPILER)-$(CONFIGURATION)";
-        StringBuilder(config.outputPath).format("{}/_Outputs/{}", buildBase, buildDir);
-        StringBuilder(config.intermediatesPath).format("{}/_Intermediates/$(PROJECT_NAME)/{}", buildBase, buildDir);
+        config.compile.set<Compile::enableASAN>(config.preset == Configuration::Preset::Debug);
+    }
 
-        config.compile.set<Compile::enableASAN>(config.preset == Configuration::Preset::Debug and
-                                                config.name != "DebugCoverage");
+    // Defines
+    // $(PROJECT_ROOT) is the same directory set with Project::setRootDirectory
+    project.compile.addDefines({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", "SC_COMPILER_ENABLE_CONFIG=1"});
+
+    // Includes
+    project.compile.addIncludes({
+        ".",            // Libraries path (for PluginTest)
+        "Tests/SCTest", // SCConfig.h path (enabled by SC_COMPILER_ENABLE_CONFIG == 1)
+    });
+
+    // Libraries to link
+    if (parameters.platforms.contains(Build::Platform::MacOS))
+    {
+        project.link.addFrameworks({"CoreFoundation", "CoreServices"});
     }
 
     // File overrides (order matters regarding to add / remove)
     project.addDirectory("Bindings/c", "**.cpp");              // add all cpp support files for c bindings
     project.addDirectory("Bindings/c", "**.c");                // add all c bindings
     project.addDirectory("Bindings/c", "**.h");                // add all c bindings
-    project.addDirectory("Tools", "SC-*.cpp");                 // add all tools
     project.addDirectory("Tests/SCTest", "*.cpp");             // add all .cpp from SCTest directory
     project.addDirectory("Tests/SCTest", "*.h");               // add all .h from SCTest directory
     project.addDirectory("Libraries", "**.cpp");               // recursively add all cpp files
     project.addDirectory("Libraries", "**.h");                 // recursively add all header files
     project.addDirectory("Libraries", "**.inl");               // recursively add all inline files
     project.addDirectory("LibrariesExtra", "**.h");            // recursively add all header files
-    project.addDirectory("LibrariesExtra", "**.cpp");          // recursively add all header files
+    project.addDirectory("LibrariesExtra", "**.cpp");          // recursively add all cpp files
     project.addDirectory("Support/DebugVisualizers", "*.cpp"); // add debug visualizers
-    project.addDirectory("Tools", "*.h");                      // add bootstrap headers
-    project.addDirectory("Tools", "*Test.cpp");                // add bootstrap tests
+    project.addDirectory("Tools", "SC-*.cpp");                 // add all tools
+    project.addDirectory("Tools", "*.h");                      // add tools headers
+    project.addDirectory("Tools", "*Test.cpp");                // add tools tests
+
+    // Debug visualization helpers
     if (parameters.generator == Build::Generator::VisualStudio2022)
     {
         project.addDirectory("Support/DebugVisualizers/MSVC", "*.natvis");
@@ -83,6 +85,7 @@ Result configure(Build::Definition& definition, Build::Parameters& parameters, S
     {
         project.addDirectory("Support/DebugVisualizers/LLDB", "*");
     }
+
     // Adding to workspace and definition
     workspace.projects.push_back(move(project));
     definition.workspaces.push_back(move(workspace));

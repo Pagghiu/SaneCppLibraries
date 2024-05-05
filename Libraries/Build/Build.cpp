@@ -20,8 +20,8 @@ struct ProjectWriter
         : definition(definition), definitionCompiler(definitionCompiler), parameters(parameters)
     {}
 
-    /// @brief Write the Definition outputs at the destinationDirectory, with filename
-    [[nodiscard]] bool write(StringView destinationDirectory, StringView filename, StringView projectSubdirectory);
+    /// @brief Write the project file at given directories
+    [[nodiscard]] bool write(Directories directories, StringView filename);
 
   private:
     struct WriterXCode;
@@ -35,6 +35,12 @@ struct ProjectWriter
 #include "Internal/BuildWriterXCode.inl"
 
 #include "../Containers/SmallVector.h"
+
+SC::Build::Configuration::Configuration()
+{
+    (void)outputPath.assign(getStandardBuildDirectory());
+    (void)StringBuilder(intermediatesPath).format("$(PROJECT_NAME)/{}", getStandardBuildDirectory());
+}
 
 bool SC::Build::Project::setRootDirectory(StringView file)
 {
@@ -113,13 +119,22 @@ SC::Result SC::Build::Workspace::validate() const
 }
 
 SC::Result SC::Build::Definition::configure(StringView projectFileName, const Build::Parameters& parameters,
-                                            StringView rootPath) const
+                                            Directories directories) const
 {
     Build::DefinitionCompiler definitionCompiler(*this);
     SC_TRY(definitionCompiler.validate());
     SC_TRY(definitionCompiler.build());
+    String projectGeneratorSubFolder = StringEncoding::Utf8;
+    {
+        Vector<StringView> components;
+        SC_TRY(Path::normalize(directories.projectsDirectory.view(), components, &projectGeneratorSubFolder,
+                               Path::Type::AsPosix));
+        SC_TRY(
+            Path::append(projectGeneratorSubFolder, {Generator::toString(parameters.generator)}, Path::Type::AsPosix));
+    }
+    directories.projectsDirectory = move(projectGeneratorSubFolder);
     Build::ProjectWriter writer(*this, definitionCompiler, parameters);
-    return Result(writer.write(rootPath, projectFileName, Generator::toString(parameters.generator)));
+    return Result(writer.write(directories, projectFileName));
 }
 
 SC::Result SC::Build::DefinitionCompiler::validate()
@@ -275,95 +290,96 @@ SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<Strin
     return Result(true);
 }
 
-bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView filename,
-                                     StringView projectSubdirectory)
+bool SC::Build::ProjectWriter::write(Directories directories, StringView projectName)
 {
-    String normalizedDirectory = StringEncoding::Utf8;
-    {
-        Vector<StringView> components;
-        SC_TRY(Path::normalize(destinationDirectory, components, &normalizedDirectory, Path::Type::AsPosix));
-        SC_TRY(Path::append(normalizedDirectory, {projectSubdirectory}, Path::Type::AsPosix));
-    }
     FileSystem fs;
-    SC_TRY(Path::isAbsolute(destinationDirectory, Path::AsNative));
+    SC_TRY(Path::isAbsolute(directories.projectsDirectory.view(), Path::AsNative));
     SC_TRY(fs.init("."));
-    SC_TRY(fs.makeDirectoryRecursive(normalizedDirectory.view()));
-    SC_TRY(fs.init(normalizedDirectory.view()));
+    SC_TRY(fs.makeDirectoryRecursive(directories.projectsDirectory.view()));
+    SC_TRY(fs.init(directories.projectsDirectory.view()));
 
+    // TODO: Generate all projects for all workspaces
+    const Project& project = definition.workspaces[0].projects[0];
+
+    String buffer;
     String prjName;
+
     switch (parameters.generator)
     {
     case Generator::XCode: {
-        String                buffer;
-        WriterXCode           writer(definition, definitionCompiler);
-        const Project&        project = definition.workspaces[0].projects[0];
+        RelativeDirectories relativeDirectories;
+        SC_TRY(
+            relativeDirectories.computeRelativeDirectories(directories, Path::AsPosix, project, "$(PROJECT_DIR)/{}"));
+        WriterXCode           writer(definition, definitionCompiler, directories, relativeDirectories);
         WriterXCode::Renderer renderer;
-        SC_TRY(writer.prepare(normalizedDirectory.view(), project, renderer));
+        SC_TRY(writer.prepare(project, renderer));
         {
-            StringBuilder sb(buffer, StringBuilder::Clear);
-            SC_TRY(writer.writeProject(sb, project, renderer));
-            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj", filename));
+            StringBuilder builder(buffer, StringBuilder::Clear);
+            SC_TRY(writer.writeProject(builder, project, renderer));
+            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj", projectName));
             SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
-            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/project.pbxproj", filename));
+            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/project.pbxproj", projectName));
             SC_TRY(fs.removeFileIfExists(prjName.view()));
             SC_TRY(fs.writeString(prjName.view(), buffer.view()));
         }
         {
-            StringBuilder sb(buffer, StringBuilder::Clear);
-            SC_TRY(writer.writeScheme(sb, project, renderer, normalizedDirectory.view(), filename));
-            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/xcshareddata", filename));
-            SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
-            SC_TRY(
-                StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/xcshareddata/xcschemes", filename));
+            StringBuilder builder(buffer, StringBuilder::Clear);
+            SC_TRY(writer.writeScheme(builder, project, renderer, projectName));
+            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/xcshareddata", projectName));
             SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
             SC_TRY(StringBuilder(prjName, StringBuilder::Clear)
-                       .format("{}.xcodeproj/xcshareddata/xcschemes/{}.xcscheme", filename, filename));
+                       .format("{}.xcodeproj/xcshareddata/xcschemes", projectName));
+            SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
+            SC_TRY(StringBuilder(prjName, StringBuilder::Clear)
+                       .format("{}.xcodeproj/xcshareddata/xcschemes/{}.xcscheme", projectName, projectName));
             SC_TRY(fs.removeFileIfExists(prjName.view()));
             SC_TRY(fs.writeString(prjName.view(), buffer.view()));
         }
         break;
     }
     case Generator::VisualStudio2022: {
-        String buffer1;
-        SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.vcxproj", filename));
-        WriterVisualStudio           writer(definition, definitionCompiler);
+        RelativeDirectories relativeDirectories;
+        SC_TRY(
+            relativeDirectories.computeRelativeDirectories(directories, Path::AsWindows, project, "$(ProjectDir){}"));
+        SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.vcxproj", projectName));
+        WriterVisualStudio           writer(definition, definitionCompiler, directories, relativeDirectories);
         WriterVisualStudio::Renderer renderer;
-        const Project&               project = definition.workspaces[0].projects[0];
-        SC_TRY(writer.prepare(normalizedDirectory.view(), project, renderer));
+        SC_TRY(writer.prepare(project, renderer));
         SC_TRY(writer.generateGuidFor(project.name.view(), writer.hashing, writer.projectGuid));
         {
-            StringBuilder sb1(buffer1, StringBuilder::Clear);
-            SC_TRY(writer.writeProject(sb1, project, renderer));
+            StringBuilder builder(buffer, StringBuilder::Clear);
+            SC_TRY(writer.writeProject(builder, project, renderer));
             SC_TRY(fs.removeFileIfExists(prjName.view()));
-            SC_TRY(fs.writeString(prjName.view(), buffer1.view()));
+            SC_TRY(fs.writeString(prjName.view(), buffer.view()));
         }
         {
-            StringBuilder sb1(buffer1, StringBuilder::Clear);
-            SC_TRY(writer.writeFilters(sb1, renderer));
+            StringBuilder builder(buffer, StringBuilder::Clear);
+            SC_TRY(writer.writeFilters(builder, renderer));
             String prjFilterName;
-            SC_TRY(StringBuilder(prjFilterName, StringBuilder::Clear).format("{}.vcxproj.filters", filename));
+            SC_TRY(StringBuilder(prjFilterName, StringBuilder::Clear).format("{}.vcxproj.filters", projectName));
             SC_TRY(fs.removeFileIfExists(prjFilterName.view()));
-            SC_TRY(fs.writeString(prjFilterName.view(), buffer1.view()));
+            SC_TRY(fs.writeString(prjFilterName.view(), buffer.view()));
         }
         {
-            StringBuilder sb1(buffer1, StringBuilder::Clear);
-            SC_TRY(writer.writeSolution(sb1, prjName.view(), project));
+            StringBuilder builder(buffer, StringBuilder::Clear);
+            SC_TRY(writer.writeSolution(builder, prjName.view(), project));
             String slnName;
-            SC_TRY(StringBuilder(slnName, StringBuilder::Clear).format("{}.sln", filename));
+            SC_TRY(StringBuilder(slnName, StringBuilder::Clear).format("{}.sln", projectName));
             SC_TRY(fs.removeFileIfExists(slnName.view()));
-            SC_TRY(fs.writeString(slnName.view(), buffer1.view()));
+            SC_TRY(fs.writeString(slnName.view(), buffer.view()));
         }
         break;
     }
     case Generator::Make: {
-        String buffer1;
         SC_TRY(prjName.assign("Makefile"));
-        WriterMakefile           writer(definition, definitionCompiler);
+        WriterMakefile           writer(definition, definitionCompiler, directories);
         WriterMakefile::Renderer renderer;
-        StringBuilder            sb1(buffer1, StringBuilder::Clear);
-        SC_TRY(writer.writeMakefile(sb1, normalizedDirectory.view(), definition.workspaces[0], renderer));
-        SC_TRY(fs.removeFileIfExists(prjName.view()));
-        SC_TRY(fs.writeString(prjName.view(), buffer1.view()));
+        {
+            StringBuilder builder(buffer, StringBuilder::Clear);
+            SC_TRY(writer.writeMakefile(builder, definition.workspaces[0], renderer));
+            SC_TRY(fs.removeFileIfExists(prjName.view()));
+            SC_TRY(fs.writeString(prjName.view(), buffer.view()));
+        }
         break;
     }
     }
@@ -372,7 +388,7 @@ bool SC::Build::ProjectWriter::write(StringView destinationDirectory, StringView
 
 struct SC::Build::Action::Internal
 {
-    static Build::Parameters fillDefaultParameters(Generator::Type generator);
+    static Build::Parameters fillDefaultParameters(const Action& action);
 
     static Result configure(ConfigureFunction configure, StringView projectFileName, const Action& action);
     static Result coverage(StringView projectFileName, const Action& action);
@@ -436,12 +452,13 @@ SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction co
     return Result::Error("Action::execute - unsupported action");
 }
 
-SC::Build::Parameters SC::Build::Action::Internal::fillDefaultParameters(Generator::Type generator)
+SC::Build::Parameters SC::Build::Action::Internal::fillDefaultParameters(const Action& action)
 {
-    switch (generator)
+    Build::Parameters parameters;
+    parameters.directories = action.directories;
+    switch (action.generator)
     {
     case Generator::VisualStudio2022: {
-        Build::Parameters parameters;
         parameters.generator     = Generator::VisualStudio2022;
         parameters.platforms     = {Platform::Windows};
         parameters.architectures = {Architecture::Arm64, Architecture::Intel64};
@@ -449,7 +466,6 @@ SC::Build::Parameters SC::Build::Action::Internal::fillDefaultParameters(Generat
     }
     break;
     case Generator::XCode: {
-        Build::Parameters parameters;
         parameters.generator     = Generator::XCode;
         parameters.platforms     = {Platform::MacOS};
         parameters.architectures = {Architecture::Arm64, Architecture::Intel64};
@@ -458,7 +474,6 @@ SC::Build::Parameters SC::Build::Action::Internal::fillDefaultParameters(Generat
     break;
 
     case Generator::Make: {
-        Build::Parameters parameters;
         parameters.generator     = Generator::Make;
         parameters.platforms     = {Platform::MacOS, Build::Platform::Linux};
         parameters.architectures = {Architecture::Arm64, Architecture::Intel64};
@@ -472,10 +487,10 @@ SC::Build::Parameters SC::Build::Action::Internal::fillDefaultParameters(Generat
 SC::Result SC::Build::Action::Internal::configure(ConfigureFunction configure, StringView projectFileName,
                                                   const Action& action)
 {
-    Build::Parameters parameters = fillDefaultParameters(action.generator);
+    Build::Parameters parameters = fillDefaultParameters(action);
     Build::Definition definition;
-    SC_TRY(configure(definition, parameters, action.libraryDirectory));
-    SC_TRY(definition.configure(projectFileName, parameters, action.targetDirectory));
+    SC_TRY(configure(definition, parameters));
+    SC_TRY(definition.configure(projectFileName, parameters, action.directories));
     return Result(true);
 }
 
@@ -492,11 +507,11 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
     newAction.action = Action::Print;
     SC_TRY(executeInternal(projectFileName, newAction, &executablePath));
     String coverageDirectory;
-    SC_TRY(Path::join(coverageDirectory, {action.targetDirectory, "..", "_Coverage"}));
+    SC_TRY(Path::join(coverageDirectory, {action.directories.projectsDirectory.view(), "..", "_Coverage"}));
 
     {
         FileSystem fs;
-        SC_TRY(fs.init(action.targetDirectory));
+        SC_TRY(fs.init(action.directories.projectsDirectory.view()));
 
         // Recreate Coverage Dir
         if (fs.existsAndIsDirectory(coverageDirectory.view()))
@@ -627,15 +642,15 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
 {
     StringView configuration = action.configuration.isEmpty() ? "Debug" : action.configuration;
 
-    Build::Parameters parameters = fillDefaultParameters(action.generator);
+    Build::Parameters parameters = fillDefaultParameters(action);
     SmallString<256>  solutionLocation;
 
     Process process;
     switch (action.generator)
     {
     case Generator::XCode: {
-        SC_TRY(Path::join(solutionLocation,
-                          {action.targetDirectory, Generator::toString(action.generator), projectFileName}));
+        SC_TRY(Path::join(solutionLocation, {action.directories.projectsDirectory.view(),
+                                             Generator::toString(action.generator), projectFileName}));
         SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(".xcodeproj"));
         StringView architecture;
         SC_TRY(toXCodeArchitecture(action.architecture, architecture));
@@ -713,8 +728,8 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
     }
     break;
     case Generator::VisualStudio2022: {
-        SC_TRY(Path::join(solutionLocation,
-                          {action.targetDirectory, Generator::toString(action.generator), projectFileName}));
+        SC_TRY(Path::join(solutionLocation, {action.directories.projectsDirectory.view(),
+                                             Generator::toString(action.generator), projectFileName}));
         SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(".sln"));
         SmallString<32> platformConfiguration;
         SC_TRY(StringBuilder(platformConfiguration).format("/p:Configuration={}", configuration));
@@ -775,7 +790,8 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
     }
     break;
     case Generator::Make: {
-        SC_TRY(Path::join(solutionLocation, {action.targetDirectory, Generator::toString(action.generator)}));
+        SC_TRY(Path::join(solutionLocation,
+                          {action.directories.projectsDirectory.view(), Generator::toString(action.generator)}));
         SmallString<32> platformConfiguration;
         SC_TRY(StringBuilder(platformConfiguration).format("CONFIG={}", configuration));
 

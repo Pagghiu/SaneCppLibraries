@@ -495,8 +495,8 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
     StringNative<256> packagesInstallDirectory;
     StringNative<256> buffer;
     StringBuilder     builder(buffer);
-    SC_TRY(Path::join(packagesCacheDirectory, {arguments.outputsDirectory.view(), PackagesCacheDirectory}));
-    SC_TRY(Path::join(packagesInstallDirectory, {arguments.outputsDirectory.view(), PackagesInstallDirectory}));
+    SC_TRY(Path::join(packagesCacheDirectory, {arguments.toolDestination.view(), PackagesCacheDirectory}));
+    SC_TRY(Path::join(packagesInstallDirectory, {arguments.toolDestination.view(), PackagesInstallDirectory}));
     SC_TRY(builder.append("packagesCache    = \"{}\"\n", packagesCacheDirectory.view()));
     SC_TRY(builder.append("packages         = \"{}\"", packagesInstallDirectory.view()));
     console.printLine(buffer.view());

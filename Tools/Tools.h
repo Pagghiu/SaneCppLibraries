@@ -25,8 +25,8 @@ struct Tool
     {
         Console&          console;
         SmallString<1024> libraryDirectory;
-        SmallString<1024> toolDirectory;
-        SmallString<1024> outputsDirectory;
+        SmallString<1024> toolSource;
+        SmallString<1024> toolDestination;
         StringView        tool   = StringView();
         StringView        action = StringView();
 

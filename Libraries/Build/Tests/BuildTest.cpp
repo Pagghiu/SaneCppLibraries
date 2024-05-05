@@ -13,16 +13,21 @@ struct SC::BuildTest : public SC::TestCase
 {
     BuildTest(SC::TestReport& report) : TestCase(report, "BuildTest")
     {
-        using namespace SC;
-        StringView projectName      = "SCUnitTest";
-        String     targetDirectory  = report.applicationRootDirectory;
-        String     sourcesDirectory = report.libraryRootDirectory;
-        SC_TRUST_RESULT(Path::append(targetDirectory, {"../..", projectName}, Path::AsPosix));
-
+        String buildDir;
+        {
+            String             targetDirectory = report.applicationRootDirectory;
+            Vector<StringView> components;
+            SC_TRUST_RESULT(Path::append(targetDirectory, {"../..", "_Tests"}, Path::AsNative));
+            // Normalizing is not strictly necessary but it helps when debugging the test
+            SC_TRUST_RESULT(Path::normalize(targetDirectory.view(), components, &buildDir, Path::AsNative));
+        }
         Build::Action action;
-        action.action           = Build::Action::Configure;
-        action.targetDirectory  = targetDirectory.view();
-        action.libraryDirectory = sourcesDirectory.view();
+        action.action = Build::Action::Configure;
+
+        SC_TRUST_RESULT(Path::join(action.directories.projectsDirectory, {buildDir.view(), "_Projects"}));
+        SC_TRUST_RESULT(Path::join(action.directories.outputsDirectory, {buildDir.view(), "_Outputs"}));
+        SC_TRUST_RESULT(Path::join(action.directories.intermediatesDirectory, {buildDir.view(), "_Intermediates"}));
+        action.directories.libraryDirectory = report.libraryRootDirectory;
 
         if (test_section("Visual Studio 2022"))
         {

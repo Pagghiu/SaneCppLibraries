@@ -12,16 +12,17 @@ struct SC::Build::ProjectWriter::WriterMakefile
 {
     const Definition&         definition;
     const DefinitionCompiler& definitionCompiler;
+    const Directories&        directories;
 
-    WriterMakefile(const Definition& definition, const DefinitionCompiler& definitionCompiler)
-        : definition(definition), definitionCompiler(definitionCompiler)
+    WriterMakefile(const Definition& definition, const DefinitionCompiler& definitionCompiler,
+                   const Directories& directories)
+        : definition(definition), definitionCompiler(definitionCompiler), directories(directories)
     {}
     using RenderItem  = WriterInternal::RenderItem;
     using RenderGroup = WriterInternal::RenderGroup;
     using Renderer    = WriterInternal::Renderer;
 
-    [[nodiscard]] Result writeMakefile(StringBuilder& builder, const StringView destinationDirectory,
-                                       const Workspace& workspace, Renderer& renderer)
+    [[nodiscard]] Result writeMakefile(StringBuilder& builder, const Workspace& workspace, Renderer& renderer)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(R"delimiter(ifeq ($(VERBOSE), 1)
@@ -138,18 +139,21 @@ Makefile.$(CONFIG).touched: Makefile
 -include Makefile.$(CONFIG).touched
 endif
 )delimiter");
-
+        RelativeDirectories relativeDirectories;
         for (const Project& project : workspace.projects)
         {
-            SC_TRY(WriterInternal::fillFiles(definitionCompiler, destinationDirectory, project, renderer.renderItems));
-            SC_TRY(writeProject(builder, project, renderer));
+            SC_TRY(relativeDirectories.computeRelativeDirectories(directories, Path::AsPosix, project, "$(CURDIR)/{}"));
+            SC_TRY(WriterInternal::getPathsRelativeTo(directories.projectsDirectory.view(), definitionCompiler, project,
+                                                      renderer.renderItems));
+            SC_TRY(writeProject(builder, project, renderer, relativeDirectories));
         }
 
         SC_COMPILER_WARNING_POP;
         return Result(true);
     }
 
-    [[nodiscard]] Result writeProject(StringBuilder& builder, const Project& project, Renderer& renderer)
+    [[nodiscard]] Result writeProject(StringBuilder& builder, const Project& project, Renderer& renderer,
+                                      const RelativeDirectories& relativeDirectories)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         SmallString<255> makeTarget;
@@ -188,7 +192,7 @@ endif
             for (auto& it : *projectArray)
             {
                 SC_TRY(builder.append(" \"-D"));
-                SC_TRY(appendVariable(builder, it.view(), makeTarget.view()));
+                SC_TRY(appendVariable(builder, it.view(), makeTarget.view(), relativeDirectories));
                 SC_TRY(builder.append("\""));
             }
         }
@@ -198,14 +202,21 @@ endif
             for (auto& it : *includesArray)
             {
                 SC_TRY(builder.append(" \"-I"));
-                SC_TRY(appendVariable(builder, it.view(), makeTarget.view()));
+                if (Path::isAbsolute(it.view(), Path::AsPosix))
+                {
+                    builder.append(it.view());
+                }
+                else
+                {
+                    builder.append("$(CURDIR)/{}/{}", relativeDirectories.relativeProjectsToProjectRoot, it.view());
+                }
                 SC_TRY(builder.append("\""));
             }
         }
 
         for (const Configuration& configuration : project.configurations)
         {
-            SC_TRY(writeConfiguration(builder, configuration, makeTarget.view(), renderer))
+            SC_TRY(writeConfiguration(builder, configuration, relativeDirectories, makeTarget.view(), renderer))
         }
 
         builder.append(R"delimiter(
@@ -423,7 +434,8 @@ $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
     }
 
     [[nodiscard]] Result writeConfiguration(StringBuilder& builder, const Configuration& configuration,
-                                            StringView makeTarget, Renderer& renderer)
+                                            const RelativeDirectories& relativeDirectories, StringView makeTarget,
+                                            Renderer& renderer)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         SC_COMPILER_UNUSED(builder);
@@ -434,10 +446,15 @@ $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
         builder.append("\n\nifeq ($(CONFIG),{0})", configName.view());
 
         builder.append("\n{0}_INTERMEDIATE_DIR := ", makeTarget);
-        SC_TRY(appendVariable(builder, configuration.intermediatesPath.view(), makeTarget));
+        WriterInternal::appendPrefixIfRelativePosix("$(CURDIR)", builder, configuration.intermediatesPath.view(),
+                                                    relativeDirectories.relativeProjectsToIntermediates.view());
+
+        SC_TRY(appendVariable(builder, configuration.intermediatesPath.view(), makeTarget, relativeDirectories));
 
         builder.append("\n{0}_TARGET_DIR := ", makeTarget);
-        SC_TRY(appendVariable(builder, configuration.outputPath.view(), makeTarget));
+        WriterInternal::appendPrefixIfRelativePosix("$(CURDIR)", builder, configuration.outputPath.view(),
+                                                    relativeDirectories.relativeProjectsToOutputs.view());
+        SC_TRY(appendVariable(builder, configuration.outputPath.view(), makeTarget, relativeDirectories));
 
         // TODO: De-hardcode debug and release optimization levels
         if (configuration.compile.hasValue<Compile::optimizationLevel>(Optimization::Debug))
@@ -504,10 +521,14 @@ $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
         return Result(true);
     }
 
-    [[nodiscard]] static bool appendVariable(StringBuilder& builder, StringView text, StringView makeTarget)
+    [[nodiscard]] static bool appendVariable(StringBuilder& builder, StringView text, StringView makeTarget,
+                                             const RelativeDirectories& relativeDirectories)
     {
+        const StringView relativeRoot = relativeDirectories.projectRootRelativeToProjects.view();
+
         const StringBuilder::ReplacePair replacements[] = {
             {"$(PROJECT_DIR)", "$(CURDIR)"},                       //
+            {"$(PROJECT_ROOT)", relativeRoot},                     //
             {"$(CONFIGURATION)", "$(CONFIG)"},                     //
             {"$(PROJECT_NAME)", makeTarget},                       //
             {"$(TARGET_OS)", "$(TARGET_OS)"},                      //

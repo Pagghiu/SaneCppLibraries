@@ -8,13 +8,18 @@
 
 struct SC::Build::ProjectWriter::WriterVisualStudio
 {
-    const Definition&         definition;
-    const DefinitionCompiler& definitionCompiler;
-    Hashing                   hashing;
-    String                    projectGuid;
+    const Definition&          definition;
+    const DefinitionCompiler&  definitionCompiler;
+    const Directories&         directories;
+    const RelativeDirectories& relativeDirectories;
 
-    WriterVisualStudio(const Definition& definition, const DefinitionCompiler& definitionCompiler)
-        : definition(definition), definitionCompiler(definitionCompiler)
+    Hashing hashing;
+    String  projectGuid;
+
+    WriterVisualStudio(const Definition& definition, const DefinitionCompiler& definitionCompiler,
+                       const Directories& directories, const RelativeDirectories& relativeDirectories)
+        : definition(definition), definitionCompiler(definitionCompiler), directories(directories),
+          relativeDirectories(relativeDirectories)
     {}
 
     [[nodiscard]] static bool generateGuidFor(const StringView name, Hashing& hashing, String& projectGuid)
@@ -197,24 +202,13 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             builder.append("<TargetName>{}</TargetName>", project.targetName);
         }
-        // TODO: Extract actual proper MSVC version
-        constexpr StringBuilder::ReplacePair replacements[] = {
-            {"/", "\\"},                                                 //
-            {"$(PROJECT_DIR)\\", "$(ProjectDir)"},                       //
-            {"$(CONFIGURATION)", "$(Configuration)"},                    //
-            {"$(PROJECT_NAME)", "$(ProjectName)"},                       //
-            {"$(TARGET_OS)", "windows"},                                 // $(SDKIdentifier)
-            {"$(TARGET_OS_VERSION)", "$(WindowsTargetPlatformVersion)"}, //
-            {"$(TARGET_ARCHITECTURES)", "$(PlatformTarget)"},            //
-            {"$(BUILD_SYSTEM)", "msbuild"},                              //
-            {"$(COMPILER)", "msvc"},                                     //
-            {"$(COMPILER_VERSION)", "17"},                               // TODO: Detect MSVC version
-        };
+
         if (not configuration.outputPath.isEmpty())
         {
             builder.append("    <OutDir>");
-            builder.appendReplaceMultiple(configuration.outputPath.view(),
-                                          {replacements, sizeof(replacements) / sizeof(replacements[0])});
+            WriterInternal::appendPrefixIfRelativeMSVC("$(ProjectDir)", builder, configuration.outputPath.view(),
+                                                       relativeDirectories.relativeProjectsToOutputs.view());
+            appendVariable(builder, configuration.outputPath.view());
             if (not configuration.outputPath.view().endsWithAnyOf({'\\'}))
             {
                 builder.append("\\");
@@ -224,8 +218,9 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         if (not configuration.intermediatesPath.isEmpty())
         {
             builder.append("    <IntDir>");
-            builder.appendReplaceMultiple(configuration.intermediatesPath.view(),
-                                          {replacements, sizeof(replacements) / sizeof(replacements[0])});
+            WriterInternal::appendPrefixIfRelativeMSVC("$(ProjectDir)", builder, configuration.intermediatesPath.view(),
+                                                       relativeDirectories.relativeProjectsToIntermediates.view());
+            appendVariable(builder, configuration.intermediatesPath.view());
             if (not configuration.outputPath.view().endsWithAnyOf({'\\'}))
             {
                 builder.append("\\");
@@ -239,13 +234,11 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             (projectIncludePaths and not projectIncludePaths->isEmpty()))
         {
             builder.append("    <IncludePath>");
-            constexpr StringBuilder::ReplacePair includeReplacements[] = {{"$(PROJECT_DIR)\\", "$(ProjectDir)"}};
             if (includePaths)
             {
                 for (auto& it : *includePaths)
                 {
-                    builder.appendReplaceMultiple(
-                        it.view(), {includeReplacements, sizeof(includeReplacements) / sizeof(includeReplacements[0])});
+                    SC_TRY(appendProjectRelative(builder, it.view()));
                     builder.append(";");
                 }
             }
@@ -253,8 +246,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             {
                 for (auto& it : *projectIncludePaths)
                 {
-                    builder.appendReplaceMultiple(
-                        it.view(), {includeReplacements, sizeof(includeReplacements) / sizeof(includeReplacements[0])});
+                    SC_TRY(appendProjectRelative(builder, it.view()));
                     builder.append(";");
                 }
             }
@@ -292,12 +284,11 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         if ((configArray and not configArray->isEmpty()) or (projectArray and not projectArray->isEmpty()))
         {
             builder.append("    <PreprocessorDefinitions>");
-            constexpr StringBuilder::ReplacePair replacements[] = {{"/", "\\"}, {"$(PROJECT_DIR)\\", "$(ProjectDir)"}};
             if (configArray)
             {
                 for (auto& it : *configArray)
                 {
-                    builder.appendReplaceMultiple(it.view(), {replacements, 2});
+                    SC_TRY(appendVariable(builder, it.view()));
                     builder.append(";");
                 }
             }
@@ -305,7 +296,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             {
                 for (auto& it : *projectArray)
                 {
-                    builder.appendReplaceMultiple(it.view(), {replacements, 2});
+                    SC_TRY(appendVariable(builder, it.view()));
                     builder.append(";");
                 }
             }
@@ -433,15 +424,16 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         return true;
     }
 
-    [[nodiscard]] bool prepare(StringView destinationDirectory, const Project& project, Renderer& renderer)
+    [[nodiscard]] bool prepare(const Project& project, Renderer& renderer)
     {
-        SC_TRY(fillVisualStudioFiles(destinationDirectory, project, renderer.renderItems));
+        SC_TRY(fillVisualStudioFiles(directories.projectsDirectory.view(), project, renderer.renderItems));
         return true;
     }
-    [[nodiscard]] bool fillVisualStudioFiles(StringView destinationDirectory, const Project& project,
+
+    [[nodiscard]] bool fillVisualStudioFiles(StringView projectDirectory, const Project& project,
                                              Vector<RenderItem>& outputFiles)
     {
-        SC_TRY(WriterInternal::fillFiles(definitionCompiler, destinationDirectory, project, outputFiles));
+        SC_TRY(WriterInternal::getPathsRelativeTo(projectDirectory, definitionCompiler, project, outputFiles));
         return true;
     }
 
@@ -659,5 +651,34 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("</Project>");
         SC_COMPILER_WARNING_POP;
         return true;
+    }
+
+    [[nodiscard]] bool appendProjectRelative(StringBuilder& builder, StringView text)
+    {
+        if (not Path::isAbsolute(text, Path::AsWindows) and not text.startsWith("$(PROJECT_DIR)"))
+        {
+            SC_TRY(builder.append("$(ProjectDir){}\\", relativeDirectories.relativeProjectsToProjectRoot));
+        }
+        return appendVariable(builder, text);
+    }
+
+    [[nodiscard]] bool appendVariable(StringBuilder& builder, StringView text)
+    {
+        const StringView relativeRoot = relativeDirectories.projectRootRelativeToProjects.view();
+
+        const StringBuilder::ReplacePair replacements[] = {
+            {"/", "\\"},                                                 //
+            {"$(PROJECT_DIR)\\", "$(ProjectDir)"},                       //
+            {"$(PROJECT_ROOT)", relativeRoot},                           //
+            {"$(CONFIGURATION)", "$(Configuration)"},                    //
+            {"$(PROJECT_NAME)", "$(ProjectName)"},                       //
+            {"$(TARGET_OS)", "windows"},                                 // $(SDKIdentifier)
+            {"$(TARGET_OS_VERSION)", "$(WindowsTargetPlatformVersion)"}, //
+            {"$(TARGET_ARCHITECTURES)", "$(PlatformTarget)"},            //
+            {"$(BUILD_SYSTEM)", "msbuild"},                              //
+            {"$(COMPILER)", "msvc"},                                     //
+            {"$(COMPILER_VERSION)", "17"},                               // TODO: Detect MSVC version
+        };
+        return builder.appendReplaceMultiple(text, {replacements, sizeof(replacements) / sizeof(replacements[0])});
     }
 };

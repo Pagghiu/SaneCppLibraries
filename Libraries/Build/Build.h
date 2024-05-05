@@ -248,9 +248,10 @@ struct Configuration
     /// @brief A pre-made preset with pre-configured set of options
     enum class Preset
     {
-        None,    ///< Custom configuration
-        Debug,   ///< Debug configuration
-        Release, ///< Release configuration
+        None,          ///< Custom configuration
+        Debug,         ///< Debug configuration
+        DebugCoverage, ///< Debug coverage configuration
+        Release,       ///< Release configuration
     };
 
     /// @brief Visual Studio platform toolset
@@ -262,11 +263,12 @@ struct Configuration
     VisualStudio visualStudio; ///< Customize VisualStudio platformToolset
 
     /// @brief Convert Preset to StringView
-    static constexpr StringView PresetToString(Preset preset)
+    [[nodiscard]] static constexpr StringView PresetToString(Preset preset)
     {
         switch (preset)
         {
         case Configuration::Preset::Debug: return "Debug";
+        case Configuration::Preset::DebugCoverage: return "DebugCoverage";
         case Configuration::Preset::Release: return "Release";
         case Configuration::Preset::None: return "None";
         }
@@ -279,23 +281,40 @@ struct Configuration
         preset = newPreset;
         switch (preset)
         {
-        case Configuration::Preset::Debug: SC_TRY(compile.set<Compile::optimizationLevel>(Optimization::Debug)); break;
+        case Configuration::Preset::DebugCoverage:
+            SC_TRY(compile.set<Compile::enableCoverage>(true));
+            SC_TRY(compile.set<Compile::optimizationLevel>(Optimization::Debug));
+            SC_TRY(compile.addDefines({"DEBUG=1"}));
+            break;
+        case Configuration::Preset::Debug:
+            SC_TRY(compile.set<Compile::optimizationLevel>(Optimization::Debug));
+            SC_TRY(compile.addDefines({"DEBUG=1"}));
+            break;
         case Configuration::Preset::Release:
             SC_TRY(compile.set<Compile::optimizationLevel>(Optimization::Release));
+            SC_TRY(compile.addDefines({"NDEBUG=1"}));
             break;
         case Configuration::Preset::None: break;
         }
         return true;
     }
 
-    String       name;              ///< Configuration name
-    CompileFlags compile;           ///< Configuration compile flags
-    LinkFlags    link;              ///< Configuration link flags
-    String       outputPath;        ///< Path where build outputs should be created
-    String       intermediatesPath; ///< Path where build intermediate files will be created
+    [[nodiscard]] static constexpr StringView getStandardBuildDirectory()
+    {
+        return "$(TARGET_OS)-$(TARGET_ARCHITECTURES)-$(BUILD_SYSTEM)-$(COMPILER)-$(CONFIGURATION)";
+    }
+
+    String name;              ///< Configuration name
+    String outputPath;        ///< Exe path. If relative, it's appended to _Outputs relative to $(PROJECT_DIR).
+    String intermediatesPath; ///< Obj path. If relative, it's appended to _Intermediates relative to $(PROJECT_DIR).
+
+    CompileFlags compile; ///< Configuration compile flags
+    LinkFlags    link;    ///< Configuration link flags
 
     Preset             preset       = Preset::None;      ///< Build preset applied to this configuration
     Architecture::Type architecture = Architecture::Any; ///< Restrict this configuration to a specific architecture
+
+    Configuration();
 };
 
 /// @brief Type of target artifact to build (executable, library)
@@ -399,12 +418,22 @@ struct Workspace
     [[nodiscard]] Result validate() const;
 };
 
+struct Directories
+{
+    String projectsDirectory;
+    String intermediatesDirectory;
+    String outputsDirectory;
+    String libraryDirectory;
+};
+
 /// @brief Describes a specific set of platforms, architectures and build generators to generate projects for
 struct Parameters
 {
     Array<Platform::Type, 5>     platforms;     ///< Platforms to generate
     Array<Architecture::Type, 5> architectures; ///< Architectures to generate
     Generator::Type              generator;     ///< Build system types to generate
+
+    Directories directories;
 };
 
 /// @brief Top level build description holding all Workspace objects
@@ -415,8 +444,8 @@ struct Definition
     /// @brief Generates projects for all workspaces, with specified parameters at given root path.
     /// @param projectName Name of the workspace file / directory to generate
     /// @param parameters Set of parameters with the wanted platforms, architectures and generators to generate
-    /// @param rootPath The path where workspace will be generated
-    Result configure(StringView projectName, const Parameters& parameters, StringView rootPath) const;
+    /// @param directories Contains projects, outputs and intermediates paths
+    Result configure(StringView projectName, const Parameters& parameters, Directories directories) const;
 };
 
 /// @brief Caches file paths by pre-resolving directory filter search masks
@@ -451,8 +480,7 @@ struct Action
         Print,
         Coverage
     };
-    using ConfigureFunction = Result (*)(Build::Definition& definition, Build::Parameters& parameters,
-                                         StringView rootDirectory);
+    using ConfigureFunction = Result (*)(Build::Definition& definition, Build::Parameters& parameters);
 
     static Result execute(const Action& action, ConfigureFunction configure, StringView projectName);
 
@@ -461,9 +489,8 @@ struct Action
     Generator::Type    generator    = Generator::Type::Make;
     Architecture::Type architecture = Architecture::Any;
 
-    StringView targetDirectory;
-    StringView libraryDirectory;
-    StringView configuration;
+    Directories directories;
+    StringView  configuration;
 
   private:
     struct Internal;

@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Tools.h"
-#include "Libraries/Strings/SmallString.h"
-#include "Libraries/Strings/StringBuilder.h"
-#include "Libraries/Testing/Testing.h"
+#include "../Libraries/Strings/SmallString.h"
+#include "../Libraries/Strings/StringBuilder.h"
+#include "../Libraries/Testing/Testing.h"
 namespace SC
 {
 struct SupportToolsTest : public TestCase

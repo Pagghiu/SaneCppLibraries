@@ -93,9 +93,9 @@ Possible output (Posix):
  ~/Developer/Projects/SC > ./SC.sh TestScript.cpp myAction param1 param2
 Starting TestScript
 Test "myAction" started
-librarySource    = "/Users/stefano/Developer/Projects/SC"
-toolSource       = "/Users/stefano/Developer/Projects/SC/Tools"
-outputs          = "/Users/stefano/Developer/Projects/SC/_Build"
+librarySource    = "/Users/user/Developer/Projects/SC"
+toolSource       = "/Users/user/Developer/Projects/SC/Tools"
+toolDestination  = "/Users/user/Developer/Projects/SC/_Build"
 Hey This is the output from My Tool!!!
 myAction
 param1
@@ -131,8 +131,10 @@ Starting SC-build
 SC-build "configure" started
 librarySource    = "/Users/user/Developer/Projects/SC"
 toolSource       = "/Users/user/Developer/Projects/SC/Tools"
-outputs          = "/Users/user/Developer/Projects/SC/_Build"
+toolDestination  = "/Users/user/Developer/Projects/SC/_Build"
 projects         = "/Users/user/Developer/Projects/SC/_Build/_Projects"
+outputs          = "/Users/user/Developer/Projects/SC/_Build/_Outputs"
+intermediates    = "/Users/user/Developer/Projects/SC/_Build/_Intermediates"
 SC-build "configure" finished (took 72 ms)
  ~/Developer/Projects/SC > 
 ```
@@ -149,8 +151,10 @@ Starting SC-build
 SC-build "compile" started
 librarySource    = "/Users/user/Developer/Projects/SC"
 toolSource       = "/Users/user/Developer/Projects/SC/Tools"
-outputs          = "/Users/user/Developer/Projects/SC/_Build"
+toolDestination  = "/Users/user/Developer/Projects/SC/_Build"
 projects         = "/Users/user/Developer/Projects/SC/_Build/_Projects"
+outputs          = "/Users/user/Developer/Projects/SC/_Build/_Outputs"
+intermediates    = "/Users/user/Developer/Projects/SC/_Build/_Intermediates"
 /Applications/Xcode.app/Contents/Developer/usr/bin/make clean
 Cleaning SCTest
 Creating /Users/user/Developer/Projects/SC/_Build/_Projects/Make/../../_Intermediates/SCTest/macOS-arm64-make-clang-Debug

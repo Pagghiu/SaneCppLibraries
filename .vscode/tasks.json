@@ -165,6 +165,22 @@
             ],
         },
         {
+            "label": "Build Coverage",
+            "type": "shell",
+            "command": "${workspaceRoot}/SC.sh",
+            "args": [
+                "build",
+                "coverage",
+                "DebugCoverage"
+            ],
+            "windows": {
+                "command": "${workspaceRoot}/SC.bat",
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+        },
+        {
             "label": "Launch Documentation WebServer",
             "type": "shell",
             "command": "python3 -m http.server --directory ${workspaceRoot}/_Build/_Documentation/docs",

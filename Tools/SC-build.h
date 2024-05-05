@@ -23,17 +23,23 @@ namespace SC
 namespace Tools
 {
 
-constexpr StringView PROJECTS_SUBDIR = "_Projects";
+constexpr StringView PROJECTS_SUBDIR      = "_Projects";
+constexpr StringView OUTPUTS_SUBDIR       = "_Outputs";
+constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
 
-[[nodiscard]] inline Result runBuildValidate(Tool::Arguments& arguments, String& projectsDirectory)
+[[nodiscard]] inline Result runBuildValidate(Tool::Arguments& arguments, Build::Directories& directories)
 {
     Console&          console = arguments.console;
     StringNative<256> buffer;
     StringBuilder     builder(buffer);
-    SC_TRY(Path::join(projectsDirectory, {arguments.outputsDirectory.view(), PROJECTS_SUBDIR}));
-    SC_TRY(builder.format("projects         = \"{}\"\n", projectsDirectory));
+    SC_TRY(Path::join(directories.projectsDirectory, {arguments.toolDestination.view(), PROJECTS_SUBDIR}));
+    SC_TRY(Path::join(directories.outputsDirectory, {arguments.toolDestination.view(), OUTPUTS_SUBDIR}));
+    SC_TRY(Path::join(directories.intermediatesDirectory, {arguments.toolDestination.view(), INTERMEDIATES_SUBDIR}));
+    SC_TRY(builder.append("projects         = \"{}\"\n", directories.projectsDirectory));
+    SC_TRY(builder.append("outputs          = \"{}\"\n", directories.outputsDirectory));
+    SC_TRY(builder.append("intermediates    = \"{}\"\n", directories.intermediatesDirectory));
     console.print(buffer.view());
-    if (not Path::isAbsolute(projectsDirectory.view(), SC::Path::AsNative) or
+    if (not Path::isAbsolute(directories.projectsDirectory.view(), SC::Path::AsNative) or
         not Path::isAbsolute(arguments.libraryDirectory.view(), SC::Path::AsNative))
     {
         return Result::Error("Both --target and --sources must be absolute paths");
@@ -43,13 +49,12 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
 
 [[nodiscard]] inline Result runBuildConfigure(Tool::Arguments& arguments)
 {
-    StringNative<256> projectsDirectory;
-    SC_TRY(runBuildValidate(arguments, projectsDirectory));
-    Result        res(true);
     Build::Action action;
-    action.action           = Build::Action::Configure;
-    action.targetDirectory  = projectsDirectory.view();
-    action.libraryDirectory = arguments.libraryDirectory.view();
+    SC_TRY(runBuildValidate(arguments, action.directories));
+    action.directories.libraryDirectory = arguments.libraryDirectory.view();
+
+    Result res(true);
+    action.action = Build::Action::Configure;
 
     action.generator = Build::Generator::VisualStudio2022;
     res              = Build::executeAction(action);
@@ -65,13 +70,10 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
 
 [[nodiscard]] inline Result runBuildAction(Build::Action::Type actionType, Tool::Arguments& arguments)
 {
-    StringNative<256> projectsDirectory;
-    SC_TRY(runBuildValidate(arguments, projectsDirectory));
-
     Build::Action action;
-    action.action           = actionType;
-    action.targetDirectory  = projectsDirectory.view();
-    action.libraryDirectory = arguments.libraryDirectory.view();
+    action.action = actionType;
+    SC_TRY(runBuildValidate(arguments, action.directories));
+    action.directories.libraryDirectory = arguments.libraryDirectory.view();
     switch (HostPlatform)
     {
     case Platform::Windows: action.generator = Build::Generator::VisualStudio2022; break;
@@ -138,7 +140,7 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
 {
     String outputDirectory;
     // TODO: De-hardcode the output "_Documentation" path
-    SC_TRY(Path::join(outputDirectory, {arguments.outputsDirectory.view(), "_Documentation"}));
+    SC_TRY(Path::join(outputDirectory, {arguments.toolDestination.view(), "_Documentation"}));
     {
         FileSystem fs;
         if (fs.init(outputDirectory.view()))
@@ -169,7 +171,7 @@ constexpr StringView PROJECTS_SUBDIR = "_Projects";
     SC_TRY(process.exec({doxygenExecutable}));
 
     // TODO: Move this to the github CI file once automatic documentation publishing will been setup
-    SC_TRY(Path::join(outputDirectory, {arguments.outputsDirectory.view(), "_Documentation", "docs"}));
+    SC_TRY(Path::join(outputDirectory, {arguments.toolDestination.view(), "_Documentation", "docs"}));
     {
         // touch .nojekyll
         FileSystem fs;

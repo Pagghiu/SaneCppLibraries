@@ -8,8 +8,31 @@ namespace SC
 {
 namespace Build
 {
+struct RelativeDirectories
+{
+    StringNative<256> relativeProjectsToOutputs;       // _Projects ->_Outputs
+    StringNative<256> relativeProjectsToIntermediates; // _Projects ->_Intermediate
+    StringNative<256> relativeProjectsToProjectRoot;   // _Projects -> Project::setRootDirectory
+    StringNative<256> projectRootRelativeToProjects;   // Project root (expressed relative to $(PROJECT_DIR)
+
+    Result computeRelativeDirectories(Directories directories, Path::Type outputType, const Project& project,
+                                      const StringView projectDirFormatString)
+    {
+        SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), directories.outputsDirectory.view(),
+                                    relativeProjectsToOutputs, Path::AsNative, outputType));
+        SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), directories.intermediatesDirectory.view(),
+                                    relativeProjectsToIntermediates, Path::AsNative, outputType));
+
+        SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), project.rootDirectory.view(),
+                                    relativeProjectsToProjectRoot, Path::AsNative, outputType));
+        SC_TRY(StringBuilder(projectRootRelativeToProjects, StringBuilder::Clear)
+                   .format(projectDirFormatString, relativeProjectsToProjectRoot));
+
+        return Result(true);
+    }
+};
 struct WriterInternal;
-}
+} // namespace Build
 } // namespace SC
 
 struct SC::Build::WriterInternal
@@ -51,8 +74,34 @@ struct SC::Build::WriterInternal
         Vector<RenderItem> renderItems;
     };
 
-    [[nodiscard]] static bool fillFiles(const DefinitionCompiler& definitionCompiler, StringView destinationDirectory,
-                                        const Project& project, Vector<RenderItem>& outputFiles)
+    [[nodiscard]] static bool appendPrefixIfRelativePosix(StringView relativeVariable, StringBuilder& builder,
+                                                          StringView text, StringView prefix)
+    {
+        if (not text.startsWith(relativeVariable) and not Path::isAbsolute(text, Path::AsNative))
+        {
+            SC_TRY(builder.append(relativeVariable));
+            SC_TRY(builder.append(Path::Posix::SeparatorStringView()));
+            SC_TRY(builder.append(prefix));
+            SC_TRY(builder.append(Path::Posix::SeparatorStringView()));
+        }
+        return true;
+    }
+
+    [[nodiscard]] static bool appendPrefixIfRelativeMSVC(StringView relativeVariable, StringBuilder& builder,
+                                                         StringView text, StringView prefix)
+    {
+        if (not text.startsWith(relativeVariable) and not Path::isAbsolute(text, Path::AsNative))
+        {
+            SC_TRY(builder.append(relativeVariable));
+            SC_TRY(builder.append(prefix));
+            SC_TRY(builder.append(Path::Windows::SeparatorStringView()));
+        }
+        return true;
+    }
+
+    [[nodiscard]] static bool getPathsRelativeTo(StringView                referenceDirectory,
+                                                 const DefinitionCompiler& definitionCompiler, const Project& project,
+                                                 Vector<RenderItem>& outputFiles)
     {
         String renderedFile;
         for (const auto& file : project.files)
@@ -88,7 +137,7 @@ struct SC::Build::WriterInternal
                     {
                         renderItem.type = RenderItem::DebugVisualizerFile;
                     }
-                    SC_TRY(Path::relativeFromTo(destinationDirectory, it.view(), renderItem.path,
+                    SC_TRY(Path::relativeFromTo(referenceDirectory, it.view(), renderItem.path,
                                                 Path::Type::AsNative,  // input type
                                                 Path::Type::AsPosix)); // output type
                     SC_TRY(Path::relativeFromTo(project.rootDirectory.view(), it.view(), renderItem.referencePath,
