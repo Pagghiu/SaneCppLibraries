@@ -40,7 +40,7 @@ SCTool_INTERMEDIATE_DIR = $(TOOL_OUTPUT_DIR)\_Intermediates\$(TARGET_OS)
 
 # Force a clean when makefile is modified
 $(TOOL_OUTPUT_DIR)\_Intermediates\Makefile.$(TARGET_OS).$(CONFIG).touched: $(SCTool_INTERMEDIATE_DIR) Makefile
-    @copy NUL $(TOOL_OUTPUT_DIR)\_Intermediates\Makefile.$(TARGET_OS).$(CONFIG).touched > NUL
+    @copy NUL "$(TOOL_OUTPUT_DIR)\_Intermediates\Makefile.$(TARGET_OS).$(CONFIG).touched" > NUL
 	@ $(MAKE) /nologo clean
 
 # Implicitly evaluate the makefile rebuild force clean during parsing
