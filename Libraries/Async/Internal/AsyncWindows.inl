@@ -198,10 +198,7 @@ struct SC::AsyncEventLoop::KernelQueue
         OVERLAPPED_ENTRY& event = events[index];
         if (event.lpOverlapped == nullptr)
         {
-            // On Windows 10 GetQueuedCompletionStatusEx reports 1 removed entry when called on
-            // an Completion Port that has nothing scheduled on it.
-            // This happens for example during first creation of the event loop, with the runNoWait
-            // that is executed after createSharedWatchers()
+            // Just in case someone likes to PostQueuedCompletionStatus with a nullptr...
             return nullptr;
         }
         return detail::AsyncWinOverlapped::getUserDataFromOverlapped<AsyncRequest>(event.lpOverlapped);
@@ -221,12 +218,23 @@ struct SC::AsyncEventLoop::KernelQueue
                 timeout = nextTimer->subtractApproximate(self.privateSelf.loopTime).inRoundedUpperMilliseconds();
             }
         }
-        DWORD ms  = nextTimer or syncMode == Private::SyncMode::NoWait ? static_cast<ULONG>(timeout.ms) : INFINITE;
-        BOOL  res = ::GetQueuedCompletionStatusEx(loopHandle, events, totalNumEvents, &newEvents, ms, FALSE);
-        if (not res and GetLastError() != WAIT_TIMEOUT)
+        const DWORD ms = nextTimer or syncMode == Private::SyncMode::NoWait ? static_cast<ULONG>(timeout.ms) : INFINITE;
+        const BOOL  res = ::GetQueuedCompletionStatusEx(loopHandle, events, totalNumEvents, &newEvents, ms, FALSE);
+        if (res == FALSE)
         {
-            // TODO: GetQueuedCompletionStatusEx error handling
-            return Result::Error("KernelQueue::poll() - GetQueuedCompletionStatusEx error");
+            if (::GetLastError() == WAIT_TIMEOUT)
+            {
+                if (newEvents == 1 and events[0].lpOverlapped == nullptr)
+                {
+                    // On Windows 10 GetQueuedCompletionStatusEx reports 1 removed entry when timeout occurs
+                    newEvents = 0;
+                }
+            }
+            else
+            {
+                // TODO: GetQueuedCompletionStatusEx error handling
+                return Result::Error("KernelQueue::poll() - GetQueuedCompletionStatusEx error");
+            }
         }
         if (nextTimer)
         {
