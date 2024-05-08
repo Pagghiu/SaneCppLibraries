@@ -189,13 +189,21 @@ struct SC::AsyncEventLoop::KernelQueue
     OVERLAPPED_ENTRY events[totalNumEvents];
     ULONG            newEvents = 0;
 
-    KernelQueue(Internal&) { memset(events, totalNumEvents, sizeof(events[0])); }
+    KernelQueue(Internal&) { ::memset(events, 0, totalNumEvents * sizeof(events[0])); }
 
     uint32_t getNumEvents() const { return static_cast<uint32_t>(newEvents); }
 
     [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t index)
     {
         OVERLAPPED_ENTRY& event = events[index];
+        if (event.lpOverlapped == nullptr)
+        {
+            // On Windows 10 GetQueuedCompletionStatusEx reports 1 removed entry when called on
+            // an Completion Port that has nothing scheduled on it.
+            // This happens for example during first creation of the event loop, with the runNoWait
+            // that is executed after createSharedWatchers()
+            return nullptr;
+        }
         return detail::AsyncWinOverlapped::getUserDataFromOverlapped<AsyncRequest>(event.lpOverlapped);
     }
 
