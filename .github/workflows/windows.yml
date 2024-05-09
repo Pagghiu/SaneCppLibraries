@@ -8,18 +8,22 @@ on:
 
 jobs:
   build:
-
-    runs-on: windows-latest
-    timeout-minutes: 4
+    strategy:
+      matrix:
+        config: [ Debug, Release ]
+        params: [ {os: windows-2022, generator: vs2022, platform: intel64},
+                  {os: windows-2019, generator: vs2019, platform: intel64 } ]
+    runs-on: ${{ matrix.params.os }}
+    timeout-minutes: 8
 
     steps:
     - uses: actions/checkout@v4
     - name: configure
       shell: cmd
-      run: SC.bat build configure
+      run: SC.bat build configure ${{ matrix.config }} ${{ matrix.params.generator }} ${{ matrix.params.intel64 }}
     - name: compile
       shell: cmd
-      run: SC.bat build compile
+      run: SC.bat build compile ${{ matrix.config }} ${{ matrix.params.generator }} ${{ matrix.params.intel64 }}
     - name: test
       shell: cmd
-      run: SC.bat build run
+      run: SC.bat build run ${{ matrix.config }} ${{ matrix.params.generator }} ${{ matrix.params.intel64 }}
