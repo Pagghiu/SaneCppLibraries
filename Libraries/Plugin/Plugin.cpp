@@ -241,7 +241,11 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
     constexpr StringView root[] = {L"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC",
                                    L"C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC",
                                    L"C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC",
-                                   L"C:/Program Files/Microsoft Visual Studio/2022/Preview/VC/Tools/MSVC"};
+                                   L"C:/Program Files/Microsoft Visual Studio/2022/Preview/VC/Tools/MSVC",
+                                   L"C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/MSVC",
+                                   L"C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Tools/MSVC",
+                                   L"C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/VC/Tools/MSVC",
+                                   L"C:/Program Files (x86)/Microsoft Visual Studio/2019/Preview/VC/Tools/MSVC"};
 
     bool              found = false;
     Version           version, bestVersion;

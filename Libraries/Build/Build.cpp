@@ -337,12 +337,15 @@ bool SC::Build::ProjectWriter::write(Directories directories, StringView project
         }
         break;
     }
+    case Generator::VisualStudio2019:
     case Generator::VisualStudio2022: {
         RelativeDirectories relativeDirectories;
         SC_TRY(
             relativeDirectories.computeRelativeDirectories(directories, Path::AsWindows, project, "$(ProjectDir){}"));
         SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.vcxproj", projectName));
-        WriterVisualStudio           writer(definition, definitionCompiler, directories, relativeDirectories);
+        WriterVisualStudio writer(definition, definitionCompiler, directories, relativeDirectories,
+                                  parameters.generator);
+
         WriterVisualStudio::Renderer renderer;
         SC_TRY(writer.prepare(project, renderer));
         SC_TRY(writer.generateGuidFor(project.name.view(), writer.hashing, writer.projectGuid));
@@ -456,17 +459,21 @@ SC::Build::Parameters SC::Build::Action::Internal::fillDefaultParameters(const A
 {
     Build::Parameters parameters;
     parameters.directories = action.directories;
+    parameters.generator   = action.generator;
     switch (action.generator)
     {
+    case Generator::VisualStudio2019: {
+        parameters.platforms     = {Platform::Windows};
+        parameters.architectures = {Architecture::Intel64};
+        return parameters;
+    }
     case Generator::VisualStudio2022: {
-        parameters.generator     = Generator::VisualStudio2022;
         parameters.platforms     = {Platform::Windows};
         parameters.architectures = {Architecture::Arm64, Architecture::Intel64};
         return parameters;
     }
     break;
     case Generator::XCode: {
-        parameters.generator     = Generator::XCode;
         parameters.platforms     = {Platform::MacOS};
         parameters.architectures = {Architecture::Arm64, Architecture::Intel64};
         return parameters;
@@ -474,7 +481,6 @@ SC::Build::Parameters SC::Build::Action::Internal::fillDefaultParameters(const A
     break;
 
     case Generator::Make: {
-        parameters.generator     = Generator::Make;
         parameters.platforms     = {Platform::MacOS, Build::Platform::Linux};
         parameters.architectures = {Architecture::Arm64, Architecture::Intel64};
         return parameters;
@@ -727,6 +733,7 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
         }
     }
     break;
+    case Generator::VisualStudio2019:
     case Generator::VisualStudio2022: {
         SC_TRY(Path::join(solutionLocation, {action.directories.projectsDirectory.view(),
                                              Generator::toString(action.generator), projectFileName}));

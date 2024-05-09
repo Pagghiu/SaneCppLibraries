@@ -11,12 +11,13 @@ struct HttpServerTest;
 
 struct SC::HttpServerTest : public SC::TestCase
 {
+    static constexpr int wantedNumTries = 3;
+
     int numTries = 0;
     HttpServerTest(SC::TestReport& report) : TestCase(report, "HttpServerTest")
     {
         if (test_section("server async"))
         {
-            constexpr int  wantedNumTries = 3;
             AsyncEventLoop eventLoop;
             numTries = 0;
             SC_TEST_EXPECT(eventLoop.create());

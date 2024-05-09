@@ -56,6 +56,9 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
     Result res(true);
     action.action = Build::Action::Configure;
 
+    action.generator = Build::Generator::VisualStudio2019;
+    res              = Build::executeAction(action);
+    SC_TRY_MSG(res, "Build error Visual Studio 2019");
     action.generator = Build::Generator::VisualStudio2022;
     res              = Build::executeAction(action);
     SC_TRY_MSG(res, "Build error Visual Studio 2022");
@@ -99,6 +102,10 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
         else if (arguments.arguments[1] == "vs2022")
         {
             action.generator = Build::Generator::VisualStudio2022;
+        }
+        else if (arguments.arguments[1] == "vs2019")
+        {
+            action.generator = Build::Generator::VisualStudio2019;
         }
         else if (arguments.arguments[1] == "default")
         {

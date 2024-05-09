@@ -13,13 +13,16 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     const Directories&         directories;
     const RelativeDirectories& relativeDirectories;
 
+    Generator::Type generator;
+
     Hashing hashing;
     String  projectGuid;
 
     WriterVisualStudio(const Definition& definition, const DefinitionCompiler& definitionCompiler,
-                       const Directories& directories, const RelativeDirectories& relativeDirectories)
+                       const Directories& directories, const RelativeDirectories& relativeDirectories,
+                       Generator::Type generator)
         : definition(definition), definitionCompiler(definitionCompiler), directories(directories),
-          relativeDirectories(relativeDirectories)
+          relativeDirectories(relativeDirectories), generator(generator)
     {}
 
     [[nodiscard]] static bool generateGuidFor(const StringView name, Hashing& hashing, String& projectGuid)
@@ -117,13 +120,23 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                                                   StringView architecture)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-        SC_COMPILER_UNUSED(builder);
-        const bool       isDebug = configuration.compile.hasValue<Compile::optimizationLevel>(Optimization::Debug);
-        const StringView platformToolset =
-            configuration.visualStudio.platformToolset.isEmpty() ? "v143" : configuration.visualStudio.platformToolset;
+
+        StringView platformToolset = configuration.visualStudio.platformToolset;
+        if (platformToolset.isEmpty())
+        {
+            if (generator == Build::Generator::VisualStudio2022)
+            {
+                platformToolset = "v143";
+            }
+            else
+            {
+                platformToolset = "v142";
+            }
+        }
         builder.append(
             "  <PropertyGroup Condition=\"'$(Configuration)|$(Platform)'=='{}|{}'\" Label=\"Configuration\">\n",
             configuration.name, architecture);
+        const bool isDebug = configuration.compile.hasValue<Compile::optimizationLevel>(Optimization::Debug);
         if (isDebug)
         {
             builder.append("    <ConfigurationType>Application</ConfigurationType>\n"

@@ -98,9 +98,10 @@ void SC::SocketDescriptorTest::tcpClientServer()
     SocketFlags::AddressFamily invalidFamily;
     SC_TEST_EXPECT(not serverSocket.getAddressFamily(invalidFamily));
     // Look for an available port
-    constexpr int    tcpPort       = 5050;
-    const StringView serverAddress = "::1"; //"127.0.0.1"
-    SocketIPAddress  nativeAddress;
+    static constexpr uint16_t   tcpPort       = 5050;
+    static constexpr StringView serverAddress = "::1"; //"127.0.0.1"
+
+    SocketIPAddress nativeAddress;
     SC_TEST_EXPECT(nativeAddress.fromAddressPort(serverAddress, tcpPort));
     SC_TEST_EXPECT(serverSocket.create(nativeAddress.getAddressFamily()));
     SC_TEST_EXPECT(server.listen(nativeAddress, tcpPort));

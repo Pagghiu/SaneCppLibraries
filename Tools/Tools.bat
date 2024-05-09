@@ -3,6 +3,8 @@ setlocal enabledelayedexpansion enableextensions
 
 set "vcvarsall_path1=C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat"
 set "vcvarsall_path2=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat"
+set "vcvarsall_path3=C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat"
+set "vcvarsall_path4=C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat"
 
 set __VSCMD_ARG_NO_LOGO=1
 set VSCMD_SKIP_SENDTELEMETRY=1
@@ -11,6 +13,10 @@ if exist "%vcvarsall_path1%" (
     call "%vcvarsall_path1%" x86_amd64
 ) else if exist "%vcvarsall_path2%" (
     call "%vcvarsall_path2%" x86_amd64
+) else if exist "%vcvarsall_path3%" (
+    call "%vcvarsall_path3%" x86_amd64
+) else if exist "%vcvarsall_path4%" (
+    call "%vcvarsall_path4%" x86_amd64
 ) else (
     echo Error: vcvarsall.bat not found on either path.
     exit /b 1

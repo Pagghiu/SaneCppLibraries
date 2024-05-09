@@ -82,6 +82,7 @@ struct Generator
     {
         XCode,            ///< Generate projects for XCode (Version 14+)
         VisualStudio2022, ///< Generate projects for Visual Studio 2022
+        VisualStudio2019, ///< Generate projects for Visual Studio 2019
         Make,             ///< Generate posix makefiles
     };
 
@@ -92,6 +93,7 @@ struct Generator
         {
         case XCode: return "XCode";
         case VisualStudio2022: return "VisualStudio2022";
+        case VisualStudio2019: return "VisualStudio2019";
         case Make: return "Make";
         }
         Assert::unreachable();
