@@ -1,4 +1,4 @@
-name: Linux
+name: Posix
 
 on:
   push:
@@ -11,9 +11,13 @@ env:
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
-    timeout-minutes: 4
+    strategy:
+      matrix:
+        config: [ Debug, Release ]
+        params: [ { os: ubuntu-latest },
+                  { os: macos-latest  } ]
+    runs-on: ${{ matrix.params.os }}
+    timeout-minutes: 8
 
     steps:
     - uses: actions/checkout@v4
@@ -21,13 +25,16 @@ jobs:
       run: ./SC.sh format check
     - name: install
       run: sudo apt install -y liburing-dev
+      if: matrix.params.os == 'ubuntu-latest'
     - name: configure
-      run: ./SC.sh build configure
+      run: ./SC.sh build configure ${{ matrix.config }}
     - name: build
-      run: ./SC.sh build compile
+      run: ./SC.sh build compile ${{ matrix.config }}
     - name: test
-      run: ./SC.sh build run
+      run: ./SC.sh build run ${{ matrix.config }}
     # - name: install gdb
     #   run: sudo apt install -y gdb
     # - name: test in gdb
     #   run: gdb --batch -ex "run" -ex "quit" --args _Build/_Outputs/linux-x86_64-make-gcc-Debug/SCTest
+    # - name: test in lldb
+    #   run: lldb -o "run" -o "quit" -- _Build/_Outputs/macOS-x86_64-make-clang-Debug/SCTest

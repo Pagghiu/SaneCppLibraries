@@ -11,8 +11,8 @@ jobs:
     strategy:
       matrix:
         config: [ Debug, Release ]
-        params: [ {os: windows-2022, generator: vs2022 },
-                  {os: windows-2019, generator: vs2019 } ]
+        params: [ { os: windows-2022, generator: vs2022 },
+                  { os: windows-2019, generator: vs2019 } ]
     runs-on: ${{ matrix.params.os }}
     timeout-minutes: 8
 
