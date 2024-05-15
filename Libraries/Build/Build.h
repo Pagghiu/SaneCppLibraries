@@ -18,7 +18,7 @@ namespace Build
 
 //! @addtogroup group_build
 //! @{
-
+struct Parameters;
 /// @brief Build Platform (Operating System)
 struct Platform
 {
@@ -278,28 +278,7 @@ struct Configuration
     }
 
     /// @brief Set compile flags depending on the given Preset
-    [[nodiscard]] bool applyPreset(Preset newPreset)
-    {
-        preset = newPreset;
-        switch (preset)
-        {
-        case Configuration::Preset::DebugCoverage:
-            SC_TRY(compile.set<Compile::enableCoverage>(true));
-            SC_TRY(compile.set<Compile::optimizationLevel>(Optimization::Debug));
-            SC_TRY(compile.addDefines({"DEBUG=1"}));
-            break;
-        case Configuration::Preset::Debug:
-            SC_TRY(compile.set<Compile::optimizationLevel>(Optimization::Debug));
-            SC_TRY(compile.addDefines({"DEBUG=1"}));
-            break;
-        case Configuration::Preset::Release:
-            SC_TRY(compile.set<Compile::optimizationLevel>(Optimization::Release));
-            SC_TRY(compile.addDefines({"NDEBUG=1"}));
-            break;
-        case Configuration::Preset::None: break;
-        }
-        return true;
-    }
+    [[nodiscard]] bool applyPreset(Preset newPreset, const Parameters& parameters);
 
     [[nodiscard]] static constexpr StringView getStandardBuildDirectory()
     {
@@ -366,6 +345,9 @@ struct Project
         }
     };
 
+    Project() = default;
+    Project(TargetType::Type targetType, StringView name) : targetType(targetType), name(name), targetName(name) {}
+
     TargetType::Type targetType = TargetType::Executable; ///< Type of build artifact
 
     String name;          ///< Project name
@@ -382,8 +364,8 @@ struct Project
     [[nodiscard]] bool setRootDirectory(StringView file);
 
     /// @brief Add a configuration with a given name, started by cloning options of a specific Preset
-    [[nodiscard]] bool addPresetConfiguration(Configuration::Preset preset,
-                                              StringView            configurationName = StringView());
+    [[nodiscard]] bool addPresetConfiguration(Configuration::Preset preset, const Parameters& parameters,
+                                              StringView configurationName = StringView());
 
     /// @brief Get Configuration with the matching `configurationName`
     [[nodiscard]] Configuration* getConfiguration(StringView configurationName);
@@ -411,6 +393,9 @@ struct Project
 /// @brief Groups multiple Project together with shared compile and link flags
 struct Workspace
 {
+    Workspace() = default;
+    Workspace(StringView name) : name(name) {}
+
     String          name;     ///< Workspace name
     Vector<Project> projects; ///< List of projects in this workspace
     CompileFlags    compile;  ///< Global workspace compile flags for all projects
@@ -484,7 +469,7 @@ struct Action
         Print,
         Coverage
     };
-    using ConfigureFunction = Result (*)(Build::Definition& definition, Build::Parameters& parameters);
+    using ConfigureFunction = Result (*)(Build::Definition& definition, const Build::Parameters& parameters);
 
     static Result execute(const Action& action, ConfigureFunction configure, StringView projectName);
 

@@ -42,13 +42,42 @@ SC::Build::Configuration::Configuration()
     (void)StringBuilder(intermediatesPath).format("$(PROJECT_NAME)/{}", getStandardBuildDirectory());
 }
 
+bool SC::Build::Configuration::applyPreset(Preset newPreset, const Parameters& parameters)
+{
+    preset = newPreset;
+    switch (preset)
+    {
+    case Configuration::Preset::DebugCoverage:
+        SC_TRY(compile.set<Compile::enableCoverage>(true));
+        SC_TRY(compile.set<Compile::optimizationLevel>(Optimization::Debug));
+        SC_TRY(compile.addDefines({"DEBUG=1"}));
+        if (parameters.generator == Build::Generator::VisualStudio2022)
+        {
+            visualStudio.platformToolset = "ClangCL";
+        }
+        break;
+    case Configuration::Preset::Debug:
+        SC_TRY(compile.set<Compile::enableASAN>(true));
+        SC_TRY(compile.set<Compile::optimizationLevel>(Optimization::Debug));
+        SC_TRY(compile.addDefines({"DEBUG=1"}));
+        break;
+    case Configuration::Preset::Release:
+        SC_TRY(compile.set<Compile::optimizationLevel>(Optimization::Release));
+        SC_TRY(compile.addDefines({"NDEBUG=1"}));
+        break;
+    case Configuration::Preset::None: break;
+    }
+    return true;
+}
+
 bool SC::Build::Project::setRootDirectory(StringView file)
 {
     SmallVector<StringView, 256> components;
     return Path::normalize(file, components, &rootDirectory, Path::AsPosix);
 }
 
-bool SC::Build::Project::addPresetConfiguration(Configuration::Preset preset, StringView configurationName)
+bool SC::Build::Project::addPresetConfiguration(Configuration::Preset preset, const Parameters& parameters,
+                                                StringView configurationName)
 {
     Configuration configuration;
     if (configurationName.isEmpty())
@@ -59,7 +88,7 @@ bool SC::Build::Project::addPresetConfiguration(Configuration::Preset preset, St
     {
         SC_TRY(configuration.name.assign(configurationName));
     }
-    SC_TRY(configuration.applyPreset(preset));
+    SC_TRY(configuration.applyPreset(preset, parameters));
     return configurations.push_back(configuration);
 }
 

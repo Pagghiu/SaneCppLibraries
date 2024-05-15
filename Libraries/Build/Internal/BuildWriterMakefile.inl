@@ -177,7 +177,7 @@ endif
         // -Werror=sign-conversion
         // -Wmissing-field-initializers
 
-        builder.append("\n{0}_WARNING_FLAGS_CXX :=-Wnon-virtual-dtor -Woverloaded-virtual");
+        builder.append("\n{0}_WARNING_FLAGS_CXX :=-Wnon-virtual-dtor -Woverloaded-virtual", makeTarget.view());
 
         builder.append("\n{0}_WARNING_FLAGS :=-Werror -Werror=return-type -Wunreachable-code  "
                        " -Wmissing-braces -Wparentheses -Wswitch -Wunused-function -Wunused-label "
