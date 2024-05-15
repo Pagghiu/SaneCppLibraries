@@ -110,29 +110,29 @@ struct TypeInfo
 
     /// @brief Constructs an invalid type info.
     constexpr TypeInfo()
-        : type(TypeCategory::TypeInvalid), hasLink(false), numberOfChildren(0), emptyInfo(), sizeInBytes(0)
+        : hasLink(false), type(TypeCategory::TypeInvalid), numberOfChildren(0), sizeInBytes(0), emptyInfo()
     {
         static_assert(sizeof(TypeInfo) == 8, "Size must be 8 bytes");
     }
 
     /// @brief Constructs a TypeInfo used by Struct Types
     constexpr TypeInfo(TypeCategory type, uint16_t sizeInBytes, StructInfo structInfo)
-        : type(type), hasLink(false), numberOfChildren(0), sizeInBytes(sizeInBytes), structInfo(structInfo)
+        : hasLink(false), type(type), numberOfChildren(0), sizeInBytes(sizeInBytes), structInfo(structInfo)
     {}
 
     /// @brief Constructs a TypeInfo used by Struct Members (children of Struct Type)
     constexpr TypeInfo(TypeCategory type, uint16_t sizeInBytes, MemberInfo member)
-        : type(type), hasLink(true), linkIndex(0), sizeInBytes(sizeInBytes), memberInfo(member)
+        : hasLink(true), type(type), linkIndex(0), sizeInBytes(sizeInBytes), memberInfo(member)
     {}
 
     /// @brief Constructs a TypeInfo used  by Array-like Types (T[N], Array<T, N> and Vector<T>)
     constexpr TypeInfo(TypeCategory type, uint16_t sizeInBytes, uint8_t numberOfChildren, ArrayInfo arrayInfo)
-        : type(type), hasLink(false), numberOfChildren(numberOfChildren), sizeInBytes(sizeInBytes), arrayInfo(arrayInfo)
+        : hasLink(false), type(type), numberOfChildren(numberOfChildren), sizeInBytes(sizeInBytes), arrayInfo(arrayInfo)
     {}
 
     /// @brief Constructs a TypeInfo of given type and size
     constexpr TypeInfo(TypeCategory type, uint16_t sizeInBytes)
-        : type(type), hasLink(true), linkIndex(0), sizeInBytes(sizeInBytes), emptyInfo()
+        : hasLink(true), type(type), linkIndex(0), sizeInBytes(sizeInBytes), emptyInfo()
     {}
 
     /// @brief Get number of children (if any) of this info. Only valid when `hasLink` == `false`

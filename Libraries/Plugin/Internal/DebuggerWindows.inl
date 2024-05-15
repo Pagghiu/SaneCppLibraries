@@ -229,8 +229,8 @@ SC::Result SC::Debugger::unlockFileFromAllProcesses(SC::StringView fileName)
             UINT  nProcInfoNeeded;
             UINT  nProcInfo = 10;
 
-            RM_PROCESS_INFO rmProcessInfo[10] = {0};
-
+            RM_PROCESS_INFO rmProcessInfo[10];
+            memset(rmProcessInfo, 0, sizeof(rmProcessInfo));
             dwError = RmGetList(dwSession, &nProcInfoNeeded, &nProcInfo, rmProcessInfo, &dwReason);
             if (dwError == ERROR_SUCCESS)
             {

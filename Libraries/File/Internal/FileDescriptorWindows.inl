@@ -37,7 +37,7 @@ SC::Result SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOptions 
     SC_TRY(convert.convertNullTerminateFastPath(path, filePath));
     const wchar_t* widePath     = filePath.getNullTerminatedNative();
     const bool     isThreeChars = filePath.sizeInBytes() >= 3 * sizeof(native_char_t);
-    if (not isThreeChars or (widePath[0] != L'\\' and widePath[1] != L':') and filePath != L"NUL")
+    if (not isThreeChars or (widePath[0] != L'\\' and widePath[1] != L':' and filePath != L"NUL"))
     {
         return Result::Error("Path must be absolute");
     }
@@ -190,8 +190,9 @@ SC::Result SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
 
 SC::Result SC::FileDescriptor::currentPosition(size_t& position) const
 {
-    LARGE_INTEGER li;
-    if (SetFilePointerEx(handle, {0, 0}, &li, FILE_CURRENT) != 0)
+    LARGE_INTEGER li, source;
+    memset(&source, 0, sizeof(source));
+    if (::SetFilePointerEx(handle, source, &li, FILE_CURRENT) != 0)
     {
         position = static_cast<size_t>(li.QuadPart);
         return Result(true);

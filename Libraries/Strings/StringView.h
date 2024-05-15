@@ -583,7 +583,7 @@ struct SC::StringViewTokenizer
     };
 
     /// @brief Build a tokenizer operating on the given text string view
-    StringViewTokenizer(StringView text) : originalText(text), remaining(text) {}
+    StringViewTokenizer(StringView text) : remaining(text), originalText(text) {}
 
     /// @brief Splits the string along a list of separators
     /// @param separators List of separators

@@ -9,9 +9,12 @@
 
 namespace SC
 {
-struct detail::AsyncWinOverlapped;
-struct detail::WinWaitHandle;
-struct detail::AsyncWinWaitDefinition;
+namespace detail
+{
+struct AsyncWinOverlapped;
+struct WinWaitHandle;
+struct AsyncWinWaitDefinition;
+} // namespace detail
 } // namespace SC
 
 // We store a user pointer at a fixed offset from overlapped to allow getting back source object
