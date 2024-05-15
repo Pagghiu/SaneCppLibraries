@@ -165,7 +165,8 @@ struct SC::Build::ProjectWriter::WriterXCode
 )delimiter");
         for (auto& file : xcodeFiles)
         {
-            if (file.type == RenderItem::CppFile or file.type == RenderItem::CFile)
+            if (file.type == RenderItem::CppFile or file.type == RenderItem::CFile or
+                file.type == RenderItem::ObjCFile or file.type == RenderItem::ObjCppFile)
             {
                 builder.append("        {} /* {} in Sources */ = {{isa = PBXBuildFile; fileRef = {} /* {} */; }};\n",
                                file.buildHash, file.name, file.referenceHash, file.name);
@@ -231,12 +232,26 @@ struct SC::Build::ProjectWriter::WriterXCode
                     "sourcecode.cpp.cpp; name = \"{}\"; path = \"{}\"; sourceTree = \"<group>\"; }};",
                     file.referenceHash, file.name, file.name, file.path);
             }
-
             else if (file.type == RenderItem::CFile)
             {
                 builder.append(
                     "\n        {} /* {} */ = {{isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = "
                     "sourcecode.c.c; name = \"{}\"; path = \"{}\"; sourceTree = \"<group>\"; }};",
+                    file.referenceHash, file.name, file.name, file.path);
+            }
+            else if (file.type == RenderItem::ObjCFile)
+            {
+                builder.append(
+                    "\n        {} /* {} */ = {{isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = "
+                    "sourcecode.m.m; name = \"{}\"; path = \"{}\"; sourceTree = \"<group>\"; }};",
+                    file.referenceHash, file.name, file.name, file.path);
+            }
+
+            else if (file.type == RenderItem::ObjCppFile)
+            {
+                builder.append(
+                    "\n        {} /* {} */ = {{isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = "
+                    "sourcecode.mm.mm; name = \"{}\"; path = \"{}\"; sourceTree = \"<group>\"; }};",
                     file.referenceHash, file.name, file.name, file.path);
             }
             else if (file.type == RenderItem::InlineFile)
@@ -401,7 +416,8 @@ struct SC::Build::ProjectWriter::WriterXCode
             files = ()delimiter");
         for (auto& file : xcodeFiles)
         {
-            if (file.type == RenderItem::CppFile or file.type == RenderItem::CFile)
+            if (file.type == RenderItem::CppFile or file.type == RenderItem::CFile or
+                file.type == RenderItem::ObjCppFile or file.type == RenderItem::ObjCFile)
                 builder.append("\n                       {} /* {} in Sources */,", file.buildHash, file.name);
         }
 

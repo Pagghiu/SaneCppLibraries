@@ -334,7 +334,8 @@ endif
 
         for (const RenderItem& item : renderer.renderItems)
         {
-            if (item.type == RenderItem::CppFile or item.type == RenderItem::CFile)
+            if (item.type == RenderItem::CppFile or item.type == RenderItem::CFile or
+                item.type == RenderItem::ObjCFile or item.type == RenderItem::ObjCppFile)
             {
                 // TODO: We should probably add a path hash too to avoid clashes with files having same name
                 if (item.type == RenderItem::CppFile)
@@ -342,10 +343,20 @@ endif
                     builder.append("\n$({0}_INTERMEDIATE_DIR)/{1}.o \\", makeTarget.view(),
                                    Path::basename(item.name.view(), ".cpp"));
                 }
-                else
+                else if (item.type == RenderItem::CFile)
                 {
                     builder.append("\n$({0}_INTERMEDIATE_DIR)/{1}.o \\", makeTarget.view(),
                                    Path::basename(item.name.view(), ".c"));
+                }
+                else if (item.type == RenderItem::ObjCFile)
+                {
+                    builder.append("\n$({0}_INTERMEDIATE_DIR)/{1}.o \\", makeTarget.view(),
+                                   Path::basename(item.name.view(), ".m"));
+                }
+                else if (item.type == RenderItem::ObjCppFile)
+                {
+                    builder.append("\n$({0}_INTERMEDIATE_DIR)/{1}.o \\", makeTarget.view(),
+                                   Path::basename(item.name.view(), ".mm"));
                 }
             }
         }
@@ -414,12 +425,34 @@ $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
 )delimiter",
                                makeTarget.view(), basename, item.path.view());
             }
-            if (item.type == RenderItem::CFile)
+            else if (item.type == RenderItem::CFile)
             {
                 StringView basename = Path::basename(item.name.view(), ".c");
                 builder.append(R"delimiter(
 $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
 	@echo "Compiling {1}.c"
+	$(VRBS)$(CC) $({0}_CFLAGS) -o "$@" -MMD -pthread $(call MJ_if_Clang) -c "$<"
+
+)delimiter",
+                               makeTarget.view(), basename, item.path.view());
+            }
+            else if (item.type == RenderItem::ObjCFile)
+            {
+                StringView basename = Path::basename(item.name.view(), ".m");
+                builder.append(R"delimiter(
+$({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
+	@echo "Compiling {1}.m"
+	$(VRBS)$(CC) $({0}_CFLAGS) -o "$@" -MMD -pthread $(call MJ_if_Clang) -c "$<"
+
+)delimiter",
+                               makeTarget.view(), basename, item.path.view());
+            }
+            else if (item.type == RenderItem::ObjCppFile)
+            {
+                StringView basename = Path::basename(item.name.view(), ".mm");
+                builder.append(R"delimiter(
+$({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
+	@echo "Compiling {1}.mm"
 	$(VRBS)$(CC) $({0}_CFLAGS) -o "$@" -MMD -pthread $(call MJ_if_Clang) -c "$<"
 
 )delimiter",

@@ -45,6 +45,8 @@ struct SC::Build::WriterInternal
             HeaderFile,
             InlineFile,
             CppFile,
+            ObjCFile,
+            ObjCppFile,
             CFile,
             Framework,
             Configuration,
@@ -141,6 +143,14 @@ struct SC::Build::WriterInternal
                     else if (nameView.endsWith(".c"))
                     {
                         renderItem.type = RenderItem::CFile;
+                    }
+                    else if (nameView.endsWith(".m"))
+                    {
+                        renderItem.type = RenderItem::ObjCFile;
+                    }
+                    else if (nameView.endsWith(".mm"))
+                    {
+                        renderItem.type = RenderItem::ObjCppFile;
                     }
                     else if (nameView.endsWith(".inl"))
                     {
