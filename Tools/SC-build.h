@@ -35,6 +35,9 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
     SC_TRY(Path::join(directories.projectsDirectory, {arguments.toolDestination.view(), PROJECTS_SUBDIR}));
     SC_TRY(Path::join(directories.outputsDirectory, {arguments.toolDestination.view(), OUTPUTS_SUBDIR}));
     SC_TRY(Path::join(directories.intermediatesDirectory, {arguments.toolDestination.view(), INTERMEDIATES_SUBDIR}));
+    SC_TRY(Path::join(directories.packagesCacheDirectory, {arguments.toolDestination.view(), PackagesCacheDirectory}));
+    SC_TRY(
+        Path::join(directories.packagesInstallDirectory, {arguments.toolDestination.view(), PackagesInstallDirectory}));
     SC_TRY(builder.append("projects         = \"{}\"\n", directories.projectsDirectory));
     SC_TRY(builder.append("outputs          = \"{}\"\n", directories.outputsDirectory));
     SC_TRY(builder.append("intermediates    = \"{}\"\n", directories.intermediatesDirectory));

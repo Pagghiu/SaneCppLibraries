@@ -27,6 +27,9 @@ struct SC::BuildTest : public SC::TestCase
         SC_TRUST_RESULT(Path::join(action.directories.projectsDirectory, {buildDir.view(), "_Projects"}));
         SC_TRUST_RESULT(Path::join(action.directories.outputsDirectory, {buildDir.view(), "_Outputs"}));
         SC_TRUST_RESULT(Path::join(action.directories.intermediatesDirectory, {buildDir.view(), "_Intermediates"}));
+        SC_TRUST_RESULT(Path::join(action.directories.packagesCacheDirectory, {buildDir.view(), "_PackageCache"}));
+        SC_TRUST_RESULT(Path::join(action.directories.packagesInstallDirectory, {buildDir.view(), "_Packages"}));
+
         action.directories.libraryDirectory = report.libraryRootDirectory;
 
         if (test_section("Visual Studio 2022"))

@@ -28,6 +28,23 @@ struct Download
 
     bool createLink = true;
     bool isGitClone = false;
+
+    Download()
+    {
+        switch (HostPlatform)
+        {
+        case Platform::Apple: //
+            packagePlatform = "macos";
+            break;
+        case Platform::Linux: //
+            packagePlatform = "linux";
+            break;
+        case Platform::Windows: //
+            packagePlatform = "windows";
+            break;
+        case Platform::Emscripten: packagePlatform = "emscripten"; break;
+        }
+    }
 };
 
 struct Package
@@ -185,8 +202,12 @@ struct CustomFunctions
 
         if (download.isGitClone)
         {
-            SC_TRY(Process().exec({"git", "clone", "-b", download.packageVersion.view(), download.url.view(),
-                                   package.packageLocalDirectory.view()}));
+            Process process[2];
+            SC_TRY(process[0].exec({"git", "clone", download.url.view(), package.packageLocalDirectory.view()}));
+            SC_TRY_MSG(process[0].getExitStatus() == 0, "git clone failed");
+            SC_TRY(process[1].setWorkingDirectory(package.packageLocalDirectory.view()));
+            SC_TRY(process[1].exec({"git", "checkout", download.packageVersion.view()}));
+            SC_TRY_MSG(process[1].getExitStatus() == 0, "git checkout failed");
         }
         else
         {
@@ -221,6 +242,24 @@ struct CustomFunctions
     }
     return Result(true);
 }
+
+inline Result verifyGitCommitHash(const Download& download, const Package& package)
+{
+    String  result;
+    Process process;
+    SC_TRY(process.setWorkingDirectory(package.packageLocalDirectory.view()));
+    SC_TRY(process.exec(
+        {
+            "git",
+            "rev-parse",
+            "head",
+        },
+        result));
+    return Result(result.view().startsWith(download.packageVersion.view()));
+}
+
+constexpr StringView PackagesCacheDirectory   = "_PackagesCache";
+constexpr StringView PackagesInstallDirectory = "_Packages";
 
 } // namespace Tools
 } // namespace SC

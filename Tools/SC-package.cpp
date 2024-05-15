@@ -99,47 +99,18 @@ namespace Tools
 [[nodiscard]] Result installDoxygenAwesomeCss(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                               Package& package)
 {
-
-    static constexpr StringView packageVersion = "v2.2.1";
-
     Download download;
     download.packagesCacheDirectory   = packagesCacheDirectory;
     download.packagesInstallDirectory = packagesInstallDirectory;
 
     download.packageName    = "doxygen-awesome-css";
-    download.packageVersion = packageVersion;
-    switch (HostPlatform)
-    {
-    case Platform::Apple: //
-        download.packagePlatform = "macos";
-        break;
-    case Platform::Linux: //
-        download.packagePlatform = "linux";
-        break;
-    case Platform::Windows: //
-        download.packagePlatform = "windows";
-        break;
-    case Platform::Emscripten: return Result::Error("Unsupported platform");
-    }
+    download.packageVersion = "df83fbf"; //"v2.2.1";
     download.url            = "https://github.com/jothepro/doxygen-awesome-css.git";
-    package.packageBaseName = format("doxygen-awesome-css-{0}", download.packagePlatform);
     download.isGitClone     = true;
+    package.packageBaseName = format("doxygen-awesome-css-{0}", download.packagePlatform);
 
     CustomFunctions functions;
-    functions.testFunction = [](const Download& download, const Package& package)
-    {
-        String  result;
-        Process process;
-        SC_TRY(process.setWorkingDirectory(package.installDirectoryLink.view()));
-        SC_TRY(process.exec(
-            {
-                "git",
-                "describe",
-                "--tags",
-            },
-            result));
-        return Result(result.view().trimAnyOf({'\n'}) == download.packageVersion.view());
-    };
+    functions.testFunction = &verifyGitCommitHash;
     SC_TRY(packageInstall(download, package, functions));
     return Result(true);
 }
@@ -483,9 +454,6 @@ namespace Tools
     SC_TRY(packageInstall(download, package, functions));
     return Result(true);
 }
-
-constexpr StringView PackagesCacheDirectory   = "_PackagesCache";
-constexpr StringView PackagesInstallDirectory = "_Packages";
 
 Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
 {

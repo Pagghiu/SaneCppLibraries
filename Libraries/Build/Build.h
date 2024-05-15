@@ -425,6 +425,8 @@ struct Directories
     String projectsDirectory;
     String intermediatesDirectory;
     String outputsDirectory;
+    String packagesCacheDirectory;
+    String packagesInstallDirectory;
     String libraryDirectory;
 };
 
