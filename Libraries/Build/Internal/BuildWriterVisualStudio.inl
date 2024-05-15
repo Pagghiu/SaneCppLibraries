@@ -60,7 +60,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     }
 
     template <typename Lambda>
-    [[nodiscard]] Result forArchitecture(StringBuilder& builder, const Project& project, Lambda lambda)
+    [[nodiscard]] static Result forArchitecture(StringBuilder& builder, const Project& project, Lambda lambda)
     {
         for (const auto& config : project.configurations)
         {
@@ -439,6 +439,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
 
     [[nodiscard]] bool prepare(const Project& project, Renderer& renderer)
     {
+        renderer.renderItems.clear();
         SC_TRY(fillVisualStudioFiles(directories.projectsDirectory.view(), project, renderer.renderItems));
         return true;
     }
@@ -489,47 +490,66 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     }
 
     // Solution
-    [[nodiscard]] bool writeSolution(StringBuilder& builder, StringView prjName, const Project& project)
+    [[nodiscard]] static bool writeSolution(StringBuilder& builder, Span<const Project> projects,
+                                            const Span<const String> projectGuids)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-        SC_COMPILER_UNUSED(builder);
         builder.append("Microsoft Visual Studio Solution File, Format Version 12.00\n"
                        "# Visual Studio Version 17\n"
                        "VisualStudioVersion = 17.4.32916.344\n"
                        "MinimumVisualStudioVersion = 10.0.40219.1\n");
+        String prjName;
+        for (size_t idx = 0; idx < projects.sizeInElements(); ++idx)
+        {
+            const Project&   project     = projects[idx];
+            const StringView projectGuid = projectGuids[idx].view();
+            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.vcxproj", project.name));
 
-        builder.append("Project(\"{{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}}\") = \"{}\", \"{}\", \"{}\"\n"
-                       "EndProject\n",
-                       project.name, Path::basename(prjName, Path::AsPosix), projectGuid);
+            builder.append("Project(\"{{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}}\") = \"{}\", \"{}\", \"{}\"\n"
+                           "EndProject\n",
+                           project.name, Path::basename(prjName.view(), Path::AsPosix), projectGuid);
+        }
 
         builder.append("Global\n");
         builder.append("\tGlobalSection(SolutionConfigurationPlatforms) = preSolution\n");
 
-        forArchitecture(
-            builder, project,
-            [](StringBuilder& builder, const Project& project, const Configuration& configuration, StringView platform)
+        for (size_t idx = 0; idx < projects.sizeInElements(); ++idx)
+        {
+            const Project& project = projects[idx];
 
-            {
-                SC_COMPILER_UNUSED(project);
-                builder.append("\t\t{}|{} = {}|{}\n", configuration.name, platform, configuration.name, platform);
-                return true;
-            });
+            forArchitecture(builder, project,
+                            [](StringBuilder& builder, const Project& project, const Configuration& configuration,
+                               StringView platform)
+
+                            {
+                                SC_COMPILER_UNUSED(project);
+                                builder.append("\t\t{}|{} = {}|{}\n", configuration.name, platform, configuration.name,
+                                               platform);
+                                return true;
+                            });
+        }
+
         builder.append("\tEndGlobalSection\n");
 
         builder.append("\tGlobalSection(ProjectConfigurationPlatforms) = postSolution\n");
 
-        forArchitecture(builder, project,
-                        [this](StringBuilder& builder, const Project& project, const Configuration& configuration,
-                               StringView platform)
+        for (size_t idx = 0; idx < projects.sizeInElements(); ++idx)
+        {
+            const Project&   project     = projects[idx];
+            const StringView projectGuid = projectGuids[idx].view();
+            forArchitecture(builder, project,
+                            [&projectGuid](StringBuilder& builder, const Project& project,
+                                           const Configuration& configuration, StringView platform)
 
-                        {
-                            SC_COMPILER_UNUSED(project);
-                            builder.append("\t\t{}.{}|{}.ActiveCfg = {}|{}\n", projectGuid, configuration.name,
-                                           platform, configuration.name, platform);
-                            builder.append("\t\t{}.{}|{}.Build.0 = {}|{}\n", projectGuid, configuration.name, platform,
-                                           configuration.name, platform);
-                            return true;
-                        });
+                            {
+                                SC_COMPILER_UNUSED(project);
+                                builder.append("\t\t{}.{}|{}.ActiveCfg = {}|{}\n", projectGuid, configuration.name,
+                                               platform, configuration.name, platform);
+                                builder.append("\t\t{}.{}|{}.Build.0 = {}|{}\n", projectGuid, configuration.name,
+                                               platform, configuration.name, platform);
+                                return true;
+                            });
+        }
         builder.append("\tEndGlobalSection\n");
 
         builder.append("\tGlobalSection(SolutionProperties) = preSolution\n"

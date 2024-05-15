@@ -319,8 +319,9 @@ SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<Strin
     return Result(true);
 }
 
-bool SC::Build::ProjectWriter::write(Directories directories, StringView projectName)
+bool SC::Build::ProjectWriter::write(Directories directories, StringView defaultProjectName)
 {
+    (void)defaultProjectName;
     FileSystem fs;
     SC_TRY(Path::isAbsolute(directories.projectsDirectory.view(), Path::AsNative));
     SC_TRY(fs.init("."));
@@ -328,87 +329,104 @@ bool SC::Build::ProjectWriter::write(Directories directories, StringView project
     SC_TRY(fs.init(directories.projectsDirectory.view()));
 
     // TODO: Generate all projects for all workspaces
-    const Project& project = definition.workspaces[0].projects[0];
+    const Workspace& workspace = definition.workspaces[0];
 
     String buffer;
-    String prjName;
 
     switch (parameters.generator)
     {
     case Generator::XCode: {
-        RelativeDirectories relativeDirectories;
-        SC_TRY(
-            relativeDirectories.computeRelativeDirectories(directories, Path::AsPosix, project, "$(PROJECT_DIR)/{}"));
-        WriterXCode           writer(definition, definitionCompiler, directories, relativeDirectories);
-        WriterXCode::Renderer renderer;
-        SC_TRY(writer.prepare(project, renderer));
+        String prjName;
+        // Write all projects
+        for (const Project& project : workspace.projects)
         {
-            StringBuilder builder(buffer, StringBuilder::Clear);
-            SC_TRY(writer.writeProject(builder, project, renderer));
-            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj", projectName));
-            SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
-            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/project.pbxproj", projectName));
-            SC_TRY(fs.removeFileIfExists(prjName.view()));
-            SC_TRY(fs.writeString(prjName.view(), buffer.view()));
-        }
-        {
-            StringBuilder builder(buffer, StringBuilder::Clear);
-            SC_TRY(writer.writeScheme(builder, project, renderer, projectName));
-            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/xcshareddata", projectName));
-            SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
-            SC_TRY(StringBuilder(prjName, StringBuilder::Clear)
-                       .format("{}.xcodeproj/xcshareddata/xcschemes", projectName));
-            SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
-            SC_TRY(StringBuilder(prjName, StringBuilder::Clear)
-                       .format("{}.xcodeproj/xcshareddata/xcschemes/{}.xcscheme", projectName, projectName));
-            SC_TRY(fs.removeFileIfExists(prjName.view()));
-            SC_TRY(fs.writeString(prjName.view(), buffer.view()));
+            RelativeDirectories relativeDirectories;
+            SC_TRY(relativeDirectories.computeRelativeDirectories(directories, Path::AsPosix, project,
+                                                                  "$(PROJECT_DIR)/{}"));
+            WriterXCode           writer(definition, definitionCompiler, directories, relativeDirectories);
+            WriterXCode::Renderer renderer;
+            StringView            projectName = project.name.view();
+            SC_TRY(writer.prepare(project, renderer));
+            {
+                StringBuilder builder(buffer, StringBuilder::Clear);
+                SC_TRY(writer.writeProject(builder, project, renderer));
+                SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj", projectName));
+                SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
+                SC_TRY(
+                    StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/project.pbxproj", projectName));
+                SC_TRY(fs.removeFileIfExists(prjName.view()));
+                SC_TRY(fs.writeString(prjName.view(), buffer.view()));
+            }
+            {
+                StringBuilder builder(buffer, StringBuilder::Clear);
+                SC_TRY(writer.writeScheme(builder, project, renderer, projectName));
+                SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/xcshareddata", projectName));
+                SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
+                SC_TRY(StringBuilder(prjName, StringBuilder::Clear)
+                           .format("{}.xcodeproj/xcshareddata/xcschemes", projectName));
+                SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
+                SC_TRY(StringBuilder(prjName, StringBuilder::Clear)
+                           .format("{}.xcodeproj/xcshareddata/xcschemes/{}.xcscheme", projectName, projectName));
+                SC_TRY(fs.removeFileIfExists(prjName.view()));
+                SC_TRY(fs.writeString(prjName.view(), buffer.view()));
+            }
         }
         break;
     }
     case Generator::VisualStudio2019:
     case Generator::VisualStudio2022: {
-        RelativeDirectories relativeDirectories;
-        SC_TRY(
-            relativeDirectories.computeRelativeDirectories(directories, Path::AsWindows, project, "$(ProjectDir){}"));
-        SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.vcxproj", projectName));
-        WriterVisualStudio writer(definition, definitionCompiler, directories, relativeDirectories,
-                                  parameters.generator);
 
-        WriterVisualStudio::Renderer renderer;
-        SC_TRY(writer.prepare(project, renderer));
-        SC_TRY(writer.generateGuidFor(project.name.view(), writer.hashing, writer.projectGuid));
+        Vector<String> projectsGuids;
+        // Write all projects
+        for (const Project& project : workspace.projects)
         {
-            StringBuilder builder(buffer, StringBuilder::Clear);
-            SC_TRY(writer.writeProject(builder, project, renderer));
-            SC_TRY(fs.removeFileIfExists(prjName.view()));
-            SC_TRY(fs.writeString(prjName.view(), buffer.view()));
+            RelativeDirectories relativeDirectories;
+            SC_TRY(relativeDirectories.computeRelativeDirectories(directories, Path::AsWindows, project,
+                                                                  "$(ProjectDir){}"));
+            WriterVisualStudio writer(definition, definitionCompiler, directories, relativeDirectories,
+                                      parameters.generator);
+
+            WriterVisualStudio::Renderer renderer;
+            SC_TRY(writer.prepare(project, renderer));
+            SC_TRY(writer.generateGuidFor(project.name.view(), writer.hashing, writer.projectGuid));
+            {
+                StringBuilder builder(buffer, StringBuilder::Clear);
+                SC_TRY(writer.writeProject(builder, project, renderer));
+                String prjName;
+                SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.vcxproj", project.name));
+                SC_TRY(fs.removeFileIfExists(prjName.view()));
+                SC_TRY(fs.writeString(prjName.view(), buffer.view()));
+            }
+            {
+                StringBuilder builder(buffer, StringBuilder::Clear);
+                SC_TRY(writer.writeFilters(builder, renderer));
+                String prjFilterName;
+                SC_TRY(StringBuilder(prjFilterName, StringBuilder::Clear).format("{}.vcxproj.filters", project.name));
+                SC_TRY(fs.removeFileIfExists(prjFilterName.view()));
+                SC_TRY(fs.writeString(prjFilterName.view(), buffer.view()));
+            }
+            SC_TRY(projectsGuids.push_back(writer.projectGuid));
         }
+        // Write solution
         {
             StringBuilder builder(buffer, StringBuilder::Clear);
-            SC_TRY(writer.writeFilters(builder, renderer));
-            String prjFilterName;
-            SC_TRY(StringBuilder(prjFilterName, StringBuilder::Clear).format("{}.vcxproj.filters", projectName));
-            SC_TRY(fs.removeFileIfExists(prjFilterName.view()));
-            SC_TRY(fs.writeString(prjFilterName.view(), buffer.view()));
-        }
-        {
-            StringBuilder builder(buffer, StringBuilder::Clear);
-            SC_TRY(writer.writeSolution(builder, prjName.view(), project));
+            SC_TRY(WriterVisualStudio::writeSolution(builder, workspace.projects.toSpanConst(),
+                                                     projectsGuids.toSpanConst()));
             String slnName;
-            SC_TRY(StringBuilder(slnName, StringBuilder::Clear).format("{}.sln", projectName));
+            SC_TRY(StringBuilder(slnName, StringBuilder::Clear).format("{}.sln", workspace.name));
             SC_TRY(fs.removeFileIfExists(slnName.view()));
             SC_TRY(fs.writeString(slnName.view(), buffer.view()));
         }
         break;
     }
     case Generator::Make: {
+        String prjName;
         SC_TRY(prjName.assign("Makefile"));
         WriterMakefile           writer(definition, definitionCompiler, directories);
         WriterMakefile::Renderer renderer;
         {
             StringBuilder builder(buffer, StringBuilder::Clear);
-            SC_TRY(writer.writeMakefile(builder, definition.workspaces[0], renderer));
+            SC_TRY(writer.writeMakefile(builder, workspace, renderer));
             SC_TRY(fs.removeFileIfExists(prjName.view()));
             SC_TRY(fs.writeString(prjName.view(), buffer.view()));
         }

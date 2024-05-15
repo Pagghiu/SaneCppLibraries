@@ -143,6 +143,7 @@ endif
         for (const Project& project : workspace.projects)
         {
             SC_TRY(relativeDirectories.computeRelativeDirectories(directories, Path::AsPosix, project, "$(CURDIR)/{}"));
+            renderer.renderItems.clear();
             SC_TRY(WriterInternal::getPathsRelativeTo(directories.projectsDirectory.view(), definitionCompiler, project,
                                                       renderer.renderItems));
             SC_TRY(writeProject(builder, project, renderer, relativeDirectories));
