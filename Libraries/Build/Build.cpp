@@ -249,7 +249,8 @@ SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const V
 // Collects root paths to build a stat map
 SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<String, VectorSet<Project::File>>& paths)
 {
-    String buffer;
+    String                      buffer;
+    SmallVector<StringView, 16> components;
     for (const Workspace& workspace : definition.workspaces)
     {
         for (const Project& project : workspace.projects)
@@ -257,6 +258,15 @@ SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<Strin
             for (const Project::File& file : project.files)
             {
                 SC_TRY(buffer.assign(project.rootDirectory.view()));
+                if (Path::isAbsolute(file.base.view(), Path::Type::AsNative))
+                {
+                    Project::File absFile;
+                    absFile.operation = file.operation;
+                    SC_TRY(Path::normalize(file.base.view(), components, &absFile.base, Path::Type::AsPosix));
+                    SC_TRY(absFile.mask.assign(file.mask.view()));
+                    SC_TRY(paths.getOrCreate(absFile.base.view())->insert(absFile));
+                    continue;
+                }
                 if (file.base.view().isEmpty())
                 {
                     if (not file.mask.isEmpty())

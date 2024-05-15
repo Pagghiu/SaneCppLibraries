@@ -424,9 +424,12 @@ struct SC::Build::ProjectWriter::WriterXCode
             for (auto it : *includes)
             {
                 // TODO: Escape double quotes for include paths
-                if (Path::isAbsolute(it.view(), Path::AsPosix))
+                if (Path::isAbsolute(it.view(), Path::AsNative))
                 {
-                    SC_TRY(builder.append("\n                       \"{}\",", it.view()));
+                    String relative;
+                    SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), it.view(), relative,
+                                                Path::AsNative));
+                    SC_TRY(builder.append("\n                       \"$(PROJECT_DIR)/{}\",", relative));
                 }
                 else
                 {

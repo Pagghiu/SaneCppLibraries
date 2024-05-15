@@ -99,15 +99,28 @@ struct SC::Build::WriterInternal
         return true;
     }
 
-    [[nodiscard]] static bool getPathsRelativeTo(StringView                referenceDirectory,
-                                                 const DefinitionCompiler& definitionCompiler, const Project& project,
-                                                 Vector<RenderItem>& outputFiles)
+    [[nodiscard]] static Result getPathsRelativeTo(StringView                referenceDirectory,
+                                                   const DefinitionCompiler& definitionCompiler, const Project& project,
+                                                   Vector<RenderItem>& outputFiles)
     {
-        String renderedFile;
+        String             renderedFile;
+        Vector<StringView> components;
         for (const auto& file : project.files)
         {
-            SC_TRY(Path::join(renderedFile, {project.rootDirectory.view(), file.base.view(), file.mask.view()},
-                              Path::Posix::SeparatorStringView(), true)); // skipEmpty == true
+            if (Path::isAbsolute(file.base.view(), Path::AsNative))
+            {
+                SC_TRY(Path::normalize(file.base.view(), components, &renderedFile, Path::AsPosix));
+                SC_TRY(Path::append(renderedFile, {file.mask.view()}, Path::AsPosix));
+            }
+            else
+            {
+                StringView paths[3];
+                paths[0] = project.rootDirectory.view();
+                paths[1] = file.base.view();
+                paths[2] = file.mask.view();
+                SC_TRY(
+                    Path::join(renderedFile, {paths}, Path::Posix::SeparatorStringView(), true)); // skipEmpty == true
+            }
             const auto* res = definitionCompiler.resolvedPaths.get(renderedFile.view());
             if (res)
             {
@@ -156,12 +169,12 @@ struct SC::Build::WriterInternal
             }
             else
             {
-                return false;
+                return Result::Error("BuildWriter::getPathsRelativeTo - Cannot find path");
             }
         }
         Algorithms::bubbleSort(outputFiles.begin(), outputFiles.end(),
                                [](const RenderItem& a1, const RenderItem& a2)
                                { return a1.path.view().compare(a2.path.view()) == StringView::Comparison::Smaller; });
-        return true;
+        return Result(true);
     }
 };

@@ -437,18 +437,18 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         return true;
     }
 
-    [[nodiscard]] bool prepare(const Project& project, Renderer& renderer)
+    [[nodiscard]] Result prepare(const Project& project, Renderer& renderer)
     {
         renderer.renderItems.clear();
         SC_TRY(fillVisualStudioFiles(directories.projectsDirectory.view(), project, renderer.renderItems));
-        return true;
+        return Result(true);
     }
 
-    [[nodiscard]] bool fillVisualStudioFiles(StringView projectDirectory, const Project& project,
-                                             Vector<RenderItem>& outputFiles)
+    [[nodiscard]] Result fillVisualStudioFiles(StringView projectDirectory, const Project& project,
+                                               Vector<RenderItem>& outputFiles)
     {
         SC_TRY(WriterInternal::getPathsRelativeTo(projectDirectory, definitionCompiler, project, outputFiles));
-        return true;
+        return Result(true);
     }
 
     // Project
@@ -688,11 +688,19 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
 
     [[nodiscard]] bool appendProjectRelative(StringBuilder& builder, StringView text)
     {
-        if (not Path::isAbsolute(text, Path::AsWindows) and not text.startsWith("$(PROJECT_DIR)"))
+        if (Path::isAbsolute(text, Path::AsNative))
+        {
+            String relative;
+            SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), text, relative, Path::AsNative,
+                                        Path::AsWindows));
+            SC_TRY(builder.append("$(ProjectDir){}\\", relative));
+            return true;
+        }
+        else
         {
             SC_TRY(builder.append("$(ProjectDir){}\\", relativeDirectories.relativeProjectsToProjectRoot));
+            return appendVariable(builder, text);
         }
-        return appendVariable(builder, text);
     }
 
     [[nodiscard]] bool appendVariable(StringBuilder& builder, StringView text)

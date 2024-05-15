@@ -203,9 +203,12 @@ endif
             for (auto& it : *includesArray)
             {
                 SC_TRY(builder.append(" \"-I"));
-                if (Path::isAbsolute(it.view(), Path::AsPosix))
+                if (Path::isAbsolute(it.view(), Path::AsNative))
                 {
-                    builder.append(it.view());
+                    String relative;
+                    SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), it.view(), relative,
+                                                Path::AsNative));
+                    builder.append("$(CURDIR)/{}", relative);
                 }
                 else
                 {
