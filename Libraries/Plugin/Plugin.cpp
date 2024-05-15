@@ -11,6 +11,7 @@
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/DebuggerWindows.inl"
+#include "Internal/VisualStudioPathFinder.h"
 #endif
 #include "Internal/DynamicLibrary.inl"
 
@@ -237,22 +238,20 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
         bool operator<(const Version other) const { return value() < other.value(); }
     };
 #if SC_PLATFORM_WINDOWS
-    compiler.type               = Type::MicrosoftCompiler;
-    constexpr StringView root[] = {L"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC",
-                                   L"C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC",
-                                   L"C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC",
-                                   L"C:/Program Files/Microsoft Visual Studio/2022/Preview/VC/Tools/MSVC",
-                                   L"C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/MSVC",
-                                   L"C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Tools/MSVC",
-                                   L"C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/VC/Tools/MSVC",
-                                   L"C:/Program Files (x86)/Microsoft Visual Studio/2019/Preview/VC/Tools/MSVC"};
+    // TODO: can we use findLatest in order to avoid finding best compiler version...?
+    Vector<String> rootPaths;
+    SC_TRY(VisualStudioPathFinder().findAll(rootPaths))
+    for (String& base : rootPaths)
+        (void)Path::join(base, {base.view(), "VC", "Tools", "MSVC"});
 
+    compiler.type           = Type::MicrosoftCompiler;
     bool              found = false;
     Version           version, bestVersion;
     StringNative<256> bestCompiler, bestLinker;
-    for (const StringView& base : root)
+    for (const String& basePath : rootPaths)
     {
         FileSystemIterator fsIterator;
+        StringView         base = basePath.view();
         if (not fsIterator.init(base))
             continue;
         while (fsIterator.enumerateNext())

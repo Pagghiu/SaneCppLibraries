@@ -1,22 +1,23 @@
 @echo off
 setlocal enabledelayedexpansion enableextensions
 
-set "vcvarsall_path1=C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat"
-set "vcvarsall_path2=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat"
-set "vcvarsall_path3=C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat"
-set "vcvarsall_path4=C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat"
+set "vswhere_path=C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
+if not exist "%vswhere_path%" (
+    echo Error: Visual Studio Locator not found.
+    exit /b 1
+)
+
+set vcvarsall_path=""
+for /f "usebackq delims=" %%i in (`"%vswhere_path%" -latest -property installationPath`) do (
+        set "vcvarsall_path=%%i\VC\Auxiliary\Build\vcvarsall.bat"
+    )
+)
 
 set __VSCMD_ARG_NO_LOGO=1
 set VSCMD_SKIP_SENDTELEMETRY=1
 set VCPKG_KEEP_ENV_VARS=VSCMD_SKIP_SENDTELEMETRY
-if exist "%vcvarsall_path1%" (
-    call "%vcvarsall_path1%" x86_amd64
-) else if exist "%vcvarsall_path2%" (
-    call "%vcvarsall_path2%" x86_amd64
-) else if exist "%vcvarsall_path3%" (
-    call "%vcvarsall_path3%" x86_amd64
-) else if exist "%vcvarsall_path4%" (
-    call "%vcvarsall_path4%" x86_amd64
+if exist "%vcvarsall_path%" (
+    call "%vcvarsall_path%" x86_amd64
 ) else (
     echo Error: vcvarsall.bat not found on either path.
     exit /b 1
