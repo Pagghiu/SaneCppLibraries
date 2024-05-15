@@ -865,13 +865,25 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
         size_t     numArgs   = 0;
         arguments[numArgs++] = "make"; // 1
 
+        SmallString<32> targetName;
         switch (action.action)
         {
-        case Action::Compile: arguments[numArgs++] = "compile"; break;              // 2
-        case Action::Run: arguments[numArgs++] = "run"; break;                      // 2
-        case Action::Print: arguments[numArgs++] = "print-executable-paths"; break; // 2
+        case Action::Compile: {
+            SC_TRY(StringBuilder(targetName).format("{}_COMPILE", projectFileName));
+        }
+        break;
+        case Action::Run: {
+            SC_TRY(StringBuilder(targetName).format("{}_RUN", projectFileName));
+        }
+        break;
+        case Action::Print: {
+            SC_TRY(StringBuilder(targetName).format("{}_PRINT_EXECUTABLE_PATH", projectFileName));
+        }
+        break;
         default: return Result::Error("Unexpected Build::Action (supported \"compile\", \"run\")");
         }
+
+        arguments[numArgs++] = targetName.view();            // 2
         arguments[numArgs++] = "-j";                         // 3
         arguments[numArgs++] = "-C";                         // 4
         arguments[numArgs++] = solutionLocation.view();      // 5
