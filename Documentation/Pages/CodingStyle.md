@@ -138,10 +138,10 @@ Some libraries defining many related classes may group them in a nested namespac
 
 `using namespace` is only allowed inside a function or method scope.
 
-# Platform specific code
+# Platform specific or internal code
 
 Platform specific code should be isolated with proper `#ifdef` inside a specific function if it's a small amount of code.  
-Bigger platform specific re-implementation should be separated in specific `.inl` files included by the library `.cpp` file.
+Bigger platform specific re-implementation should be separated in specific `.inl` files included by the library `.cpp` file and placed into library-specific `Internal` subfolder.
 
 # Header inclusion
 

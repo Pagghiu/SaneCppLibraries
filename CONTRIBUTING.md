@@ -84,22 +84,39 @@ Any new code added should be tested with `90%`+ code coverage.
 ## Commit message format
 
 Every commit should:
-- start with the name of the library being touched followed by short description
-- Where necessary add a dot and a new line and write further paragraph describing the details of the change
-- Use imperative tone (`Use` instead of `used` etc.)
+- Start with the name of the library being touched followed by colon (`:`) and a short description (starting with Capital letter) without any dot at the end
+    - In some cases it's possible to use `Everywhere` if a group of changes is not related to a specific library
+    - Use `Documentation` for changes to the `.md` files
+    - Use `CI` for changes to the Continuous Integration files
+- Avoid use of past tense (`Use` instead of `used` etc.)
+
+Where needed add two new-lines and write further paragraph (starting with Capital letter) describing the details of the change
+
+Examples:
 
 Good:
 - `SerializationBinary: Use pointer to field directly instead of reinterpret_cast-ing`
 - `FileSystem: Add option to skip empty entries to Path::join`
+- Example of multi-line commit text with description paragraph:
+```
+Everywhere: Support Visual Studio 2019
+    
+This is needed in order to build and run tests on the GitHub Windows Server 2019 runner (that has Windows 10 kernel)
+```
 
 Bad:
-- `Fix stuff`
-- `FileSystem: Added Path::join option`
+- `Fix stuff` (missing name of the library getting touched and meaningless description)
+- `FileSystem: Added Path::join option` (use of Added instead of Add)
+- `FileSystem: Add method to list files.` (dot at the end of short description)
 
-## Git workflow
+## Git workflow and Commit Squashing
 
-The project uses a `rebase` workflow to keep linear history.  
-PRs will be rebased on top of latest master TIP when it will be merged.
+- When iteratively working on a branch / PR make it's advised squashing together related commits of the same feature or in general fixes to previous commits (in particular formatting changes etc.)
+    - The grouping criteria can be inferred from existing project history but it's still a bit arbitrary
+    - Some tips will be eventually shared during review by project maintainers
+- The project uses a `rebase` workflow to keep linear history
+    - PRs will be rebased on top of latest master TIP when it will be merged
+    - If the branch cannot be automatically rebased the contributor will need to rebase it in order for the PR to be merged 
 
 ## Naming things
 
