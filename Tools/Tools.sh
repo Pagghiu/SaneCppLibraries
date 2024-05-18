@@ -20,12 +20,26 @@ if [ ! -e "${TOOL_SOURCE_DIR}/${TOOL}.cpp" ]; then # Try looking in the TOOL_SOU
         { echo "Error: ${extension} Tool \"${TOOL_NAME}\" doesn't end with .cpp" ; exit 1; }
     fi
 fi
-make -s -j --no-print-directory -C "${LIBRARY_DIR}/Tools/Build/Posix" CONFIG=Debug "TOOL=${TOOL}" "TOOL_SOURCE_DIR=${TOOL_SOURCE_DIR}" "TOOL_OUTPUT_DIR=${TOOL_OUTPUT_DIR}"
+
+call_make () {
+    make $1 -s -j --no-print-directory -C "${LIBRARY_DIR}/Tools/Build/Posix" CONFIG=Debug "TOOL=${TOOL}" "TOOL_SOURCE_DIR=${TOOL_SOURCE_DIR}" "TOOL_OUTPUT_DIR=${TOOL_OUTPUT_DIR}"
+}
+
+call_make build
 
 if [ $? -eq 0 ]; then
-echo "Starting ${TOOL}"
-OS=$(uname -s)
-"$TOOL_OUTPUT_DIR/${OS}/${TOOL}" $*
+    echo "Starting ${TOOL}"
+    OS=$(uname -s)
+    "$TOOL_OUTPUT_DIR/${OS}/${TOOL}" $*
 else
-exit $?
+    # It could have failed because of moved files, let's re-try after cleaning
+    call_make clean
+    call_make build
+    if [ $? -eq 0 ]; then
+        echo "Starting ${TOOL}"
+        OS=$(uname -s)
+        "$TOOL_OUTPUT_DIR/${OS}/${TOOL}" $*
+    else
+        exit $?
+    fi
 fi

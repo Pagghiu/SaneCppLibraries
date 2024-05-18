@@ -59,11 +59,18 @@ mkdir "%TOOL_OUTPUT_DIR%" 2>nul
 cd /d "%LIBRARY_DIR%/Tools/Build/Windows"
 
 @rem Call NMAKE
-nmake /nologo /f "Makefile" CONFIG=Debug "TOOL=%TOOL%" "TOOL_SOURCE_DIR=%TOOL_SOURCE_DIR%" "TOOL_OUTPUT_DIR=%TOOL_OUTPUT_DIR%"
+nmake build /nologo /f "Makefile" CONFIG=Debug "TOOL=%TOOL%" "TOOL_SOURCE_DIR=%TOOL_SOURCE_DIR%" "TOOL_OUTPUT_DIR=%TOOL_OUTPUT_DIR%"
+
+IF not %ERRORLEVEL% == 0 (
+    @rem It could have failed because of moved files, let's re-try after cleaning
+    nmake clean /nologo /f "Makefile" CONFIG=Debug "TOOL=%TOOL%" "TOOL_SOURCE_DIR=%TOOL_SOURCE_DIR%" "TOOL_OUTPUT_DIR=%TOOL_OUTPUT_DIR%"
+    nmake build /nologo /f "Makefile" CONFIG=Debug "TOOL=%TOOL%" "TOOL_SOURCE_DIR=%TOOL_SOURCE_DIR%" "TOOL_OUTPUT_DIR=%TOOL_OUTPUT_DIR%"
+)
 
 IF not %ERRORLEVEL% == 0 (
     exit /b %ERRORLEVEL%
 )
+
 cd /d "%TOOL_OUTPUT_DIR%/Windows"
 @echo Starting %TOOL%
 "%TOOL%.exe" %*

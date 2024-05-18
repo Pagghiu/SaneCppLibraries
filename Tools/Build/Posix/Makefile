@@ -22,6 +22,7 @@ CLANG_DETECTED := $(shell $(CXX) --version 2>&1 | grep -q clang && echo "yes")
 
 .PHONY: clean all
 all: SCTool_BUILD
+build: SCTool_BUILD
 clean: SCTool_CLEAN
 
 # Force a clean when makefile is modified

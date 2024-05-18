@@ -31,6 +31,7 @@ all: $(TOOL_OUTPUT_DIR)\_Intermediates\Makefile.$(TARGET_OS).$(CONFIG).touched
 
 # Default target
 all: SCTool_BUILD
+build: SCTool_BUILD
 clean: SCTool_CLEAN
 
 SCTool_TARGET_NAME = $(TOOL).exe
