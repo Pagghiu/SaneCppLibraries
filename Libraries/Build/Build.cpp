@@ -416,16 +416,15 @@ bool SC::Build::ProjectWriter::write(Directories directories, StringView default
                 SC_TRY(fs.writeString(prjFilterName.view(), buffer.view()));
             }
             SC_TRY(projectsGuids.push_back(writer.projectGuid));
-        }
-        // Write solution
-        {
-            StringBuilder builder(buffer, StringBuilder::Clear);
-            SC_TRY(WriterVisualStudio::writeSolution(builder, workspace.projects.toSpanConst(),
-                                                     projectsGuids.toSpanConst()));
-            String slnName;
-            SC_TRY(StringBuilder(slnName, StringBuilder::Clear).format("{}.sln", workspace.name));
-            SC_TRY(fs.removeFileIfExists(slnName.view()));
-            SC_TRY(fs.writeString(slnName.view(), buffer.view()));
+            // Write solution
+            {
+                StringBuilder builder(buffer, StringBuilder::Clear);
+                SC_TRY(WriterVisualStudio::writeSolution(builder, {project}, projectsGuids.toSpanConst()));
+                String slnName;
+                SC_TRY(StringBuilder(slnName, StringBuilder::Clear).format("{}.sln", project.name));
+                SC_TRY(fs.removeFileIfExists(slnName.view()));
+                SC_TRY(fs.writeString(slnName.view(), buffer.view()));
+            }
         }
         break;
     }
