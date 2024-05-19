@@ -423,11 +423,19 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     [[nodiscard]] Result syncWithKernel(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode)
     {
-        const Time::HighResolutionCounter* nextTimer =
-            syncMode == Internal::SyncMode::ForcedForwardProgress ? eventLoop.internal.findEarliestTimer() : nullptr;
-        FileDescriptor::Handle loopFd;
-        SC_TRY(eventLoop.internal.kernelQueue.get().getPosix().loopFd.get(
-            loopFd, Result::Error("syncWithKernel() - Invalid Handle")));
+        AsyncLoopTimeout*                  loopTimeout = nullptr;
+        const Time::HighResolutionCounter* nextTimer   = nullptr;
+        if (syncMode == Internal::SyncMode::ForcedForwardProgress)
+        {
+            loopTimeout = eventLoop.internal.findEarliestLoopTimeout();
+            if (loopTimeout)
+            {
+                nextTimer = &loopTimeout->expirationTime;
+            }
+        }
+        static constexpr Result errorResult = Result::Error("syncWithKernel() - Invalid Handle");
+        FileDescriptor::Handle  loopFd;
+        SC_TRY(eventLoop.internal.kernelQueue.get().getPosix().loopFd.get(loopFd, errorResult));
 
         struct timespec specTimeout;
         // when nextTimer is null, specTimeout is initialized to 0, so that SyncMode::NoWait
@@ -458,9 +466,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             return Result::Error("AsyncEventLoop::KernelQueuePosix::poll() - failed");
         }
         newEvents = static_cast<int>(res);
-        if (nextTimer)
+        if (loopTimeout)
         {
-            eventLoop.internal.executeTimers(parentKernelEvents, *nextTimer);
+            eventLoop.internal.expiredTimer = loopTimeout;
         }
         return Result(true);
     }
@@ -468,7 +476,11 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     //-------------------------------------------------------------------------------------------------------
     // TIMEOUT
     //-------------------------------------------------------------------------------------------------------
-    // Nothing to do :)
+    Result activateAsync(AsyncLoopTimeout& async)
+    {
+        async.expirationTime = async.eventLoop->getLoopTime().offsetBy(async.relativeTimeout);
+        return Result(true);
+    }
 
     //-------------------------------------------------------------------------------------------------------
     // WAKEUP

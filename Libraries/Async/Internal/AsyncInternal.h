@@ -75,6 +75,8 @@ struct SC::AsyncEventLoop::Internal
 
     Time::HighResolutionCounter loopTime;
 
+    AsyncLoopTimeout* expiredTimer = nullptr;
+
     // AsyncRequest flags
     static constexpr int16_t Flag_ManualCompletion = 1 << 0;
 
@@ -89,11 +91,10 @@ struct SC::AsyncEventLoop::Internal
     void decreaseActiveCount();
 
     // Timers
-    [[nodiscard]] const Time::HighResolutionCounter* findEarliestTimer() const;
+    [[nodiscard]] AsyncLoopTimeout* findEarliestLoopTimeout() const;
 
-    void invokeExpiredTimers();
+    void invokeExpiredTimers(AsyncLoopTimeout& timeout);
     void updateTime();
-    void executeTimers(KernelEvents& kernelEvents, const Time::HighResolutionCounter& nextTimer);
 
     [[nodiscard]] Result cancelAsync(AsyncRequest& async);
 

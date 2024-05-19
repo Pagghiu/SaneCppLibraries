@@ -31,7 +31,10 @@ struct SC::AsyncTest : public SC::TestCase
             {
                 loopWork();
             }
-            loopTimeout();
+            if (test_section("loop timeout"))
+            {
+                loopTimeout();
+            }
             loopWakeUpFromExternalThread();
             loopWakeUp();
             loopWakeUpEventObject();
@@ -130,31 +133,34 @@ struct SC::AsyncTest : public SC::TestCase
 
     void loopTimeout()
     {
-        // TODO: Add AsyncEventLoop::resetTimeout
-        if (test_section("loop timeout"))
+        AsyncLoopTimeout timeout1, timeout2;
+        AsyncEventLoop   eventLoop;
+        SC_TEST_EXPECT(eventLoop.create(options));
+        int timeout1Called = 0;
+        int timeout2Called = 0;
+        timeout1.callback  = [&](AsyncLoopTimeout::Result& res)
         {
-            AsyncLoopTimeout timeout1, timeout2;
-            AsyncEventLoop   eventLoop;
-            SC_TEST_EXPECT(eventLoop.create(options));
-            int timeout1Called = 0;
-            int timeout2Called = 0;
-            timeout1.callback  = [&](AsyncLoopTimeout::Result& res)
+            SC_TEST_EXPECT(res.getAsync().relativeTimeout.ms == 1);
+            timeout1Called++;
+        };
+        SC_TEST_EXPECT(timeout1.start(eventLoop, Time::Milliseconds(1)));
+        timeout2.callback = [&](AsyncLoopTimeout::Result& res)
+        {
+            if (timeout2Called == 0)
             {
-                SC_TEST_EXPECT(res.getAsync().getTimeout().ms == 1);
-                timeout1Called++;
-            };
-            SC_TEST_EXPECT(timeout1.start(eventLoop, Time::Milliseconds(1)));
-            timeout2.callback = [&](AsyncLoopTimeout::Result&)
-            {
-                // TODO: investigate allowing dropping AsyncResultBase
-                timeout2Called++;
-            };
-            SC_TEST_EXPECT(timeout2.start(eventLoop, Time::Milliseconds(100)));
-            SC_TEST_EXPECT(eventLoop.runOnce());
-            SC_TEST_EXPECT(timeout1Called == 1 and timeout2Called == 0);
-            SC_TEST_EXPECT(eventLoop.runOnce());
-            SC_TEST_EXPECT(timeout1Called == 1 and timeout2Called == 1);
-        }
+                // Re-activate timeout2, modifying also its relative timeout to 1 ms (see SC_TEST_EXPECT below)
+                res.reactivateRequest(true);
+                res.getAsync().relativeTimeout = Time::Milliseconds(1);
+            }
+            timeout2Called++;
+        };
+        SC_TEST_EXPECT(timeout2.start(eventLoop, Time::Milliseconds(100)));
+        SC_TEST_EXPECT(eventLoop.runOnce());
+        SC_TEST_EXPECT(timeout1Called == 1 and timeout2Called == 0); // timeout1 fires after 1 ms
+        SC_TEST_EXPECT(eventLoop.runOnce());
+        SC_TEST_EXPECT(timeout1Called == 1 and timeout2Called == 1); // timeout2 fires after 100 ms
+        SC_TEST_EXPECT(eventLoop.runOnce());
+        SC_TEST_EXPECT(timeout1Called == 1 and timeout2Called == 2); // Re-activated timeout2 fires again after 1 ms
     }
 
     int  threadWasCalled = 0;
@@ -898,13 +904,20 @@ return Result(true);
 
 SC::Result snippetForTimeout(AsyncEventLoop& eventLoop, Console& console)
 {
+    bool someCondition = false;
 //! [AsyncLoopTimeoutSnippet]
 // Create a timeout that will be called after 200 milliseconds
 // AsyncLoopTimeout must be valid until callback is called
 AsyncLoopTimeout timeout;
-timeout.callback = [&](AsyncLoopTimeout::Result&)
+timeout.callback = [&](AsyncLoopTimeout::Result& res)
 {
     console.print("My timeout has been called!");
+    if (someCondition) // Optionally re-activate the timeout if needed
+    {
+        // Schedule the timeout callback to fire again 100 ms from now
+        res.getAsync().relativeTimeout = Time::Milliseconds(100);
+        res.reactivateRequest(true);
+    }
 };
 // Start the timeout, that will be called 200 ms from now
 SC_TRY(timeout.start(eventLoop, Time::Milliseconds(200)));

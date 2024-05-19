@@ -102,12 +102,11 @@ SC::Result SC::AsyncRequest::stop()
 // Async***
 //-------------------------------------------------------------------------------------------------------
 
-SC::Result SC::AsyncLoopTimeout::start(AsyncEventLoop& loop, Time::Milliseconds expiration)
+SC::Result SC::AsyncLoopTimeout::start(AsyncEventLoop& loop, Time::Milliseconds timeout)
 {
     SC_TRY(validateAsync());
     updateTime(loop);
-    expirationTime = loop.getLoopTime().offsetBy(expiration);
-    timeout        = expiration;
+    relativeTimeout = timeout;
     SC_TRY(queueSubmission(loop));
     return SC::Result(true);
 }
@@ -355,34 +354,39 @@ SC::Result SC::AsyncEventLoop::Internal::queueSubmission(AsyncRequest& async, As
     return Result(true);
 }
 
-const SC::Time::HighResolutionCounter* SC::AsyncEventLoop::Internal::findEarliestTimer() const
+SC::AsyncLoopTimeout* SC::AsyncEventLoop::Internal::findEarliestLoopTimeout() const
 {
-    const Time::HighResolutionCounter* earliestTime = nullptr;
+    AsyncLoopTimeout* earliestTime = nullptr;
     for (AsyncRequest* async = activeLoopTimeouts.front; async != nullptr; async = async->next)
     {
         SC_ASSERT_DEBUG(async->type == AsyncRequest::Type::LoopTimeout);
         const auto& expirationTime = static_cast<AsyncLoopTimeout*>(async)->expirationTime;
-        if (earliestTime == nullptr or earliestTime->isLaterThanOrEqualTo(expirationTime))
+        if (earliestTime == nullptr or earliestTime->expirationTime.isLaterThanOrEqualTo(expirationTime))
         {
-            earliestTime = &expirationTime;
+            earliestTime = static_cast<AsyncLoopTimeout*>(async);
         }
     };
     return earliestTime;
 }
 
-void SC::AsyncEventLoop::Internal::invokeExpiredTimers()
+void SC::AsyncEventLoop::Internal::invokeExpiredTimers(AsyncLoopTimeout& timeout)
 {
     AsyncLoopTimeout* async;
     for (async = activeLoopTimeouts.front; //
          async != nullptr;                 //
          async = static_cast<AsyncLoopTimeout*>(async->next))
     {
-        if (loopTime.isLaterThanOrEqualTo(async->expirationTime))
+        if (timeout.expirationTime.isLaterThanOrEqualTo(async->expirationTime))
         {
-            activeLoopTimeouts.remove(*async);
-            async->markAsFree();
+            removeActiveHandle(*async);
             AsyncLoopTimeout::Result result(*async, Result(true));
             async->callback(result);
+
+            if (result.shouldBeReactivated)
+            {
+                async->state = AsyncRequest::State::Submitting;
+                submissions.queueBack(*async);
+            }
         }
     }
 }
@@ -555,9 +559,15 @@ SC::Result SC::AsyncEventLoop::Internal::runStep(SyncMode syncMode)
         SC_LOG_MESSAGE("Active Requests After Poll = {}\n", getTotalNumberOfActiveHandle());
     }
 
+    if (expiredTimer)
+    {
+        invokeExpiredTimers(*expiredTimer);
+        expiredTimer = nullptr;
+    }
     runStepExecuteCompletions(kernelEvents);
     runStepExecuteManualCompletions(kernelEvents);
     runStepExecuteManualThreadPoolCompletions(kernelEvents);
+
     SC_LOG_MESSAGE("Active Requests After Completion = {} ( + {} manual)\n", getTotalNumberOfActiveHandle(),
                    numberOfManualCompletions);
     return SC::Result(true);
@@ -860,26 +870,6 @@ SC::Result SC::AsyncEventLoop::Internal::cancelAsync(AsyncRequest& async)
 }
 
 void SC::AsyncEventLoop::Internal::updateTime() { loopTime.snap(); }
-
-void SC::AsyncEventLoop::Internal::executeTimers(KernelEvents&                      kernelEvents,
-                                                 const Time::HighResolutionCounter& nextTimer)
-{
-    const bool timeoutOccurredWithoutIO = kernelEvents.getNumEvents() == 0;
-    const bool timeoutWasAlreadyExpired = loopTime.isLaterThanOrEqualTo(nextTimer);
-    if (timeoutOccurredWithoutIO or timeoutWasAlreadyExpired)
-    {
-        if (timeoutWasAlreadyExpired)
-        {
-            // Not sure if this is really possible.
-            updateTime();
-        }
-        else
-        {
-            loopTime = nextTimer;
-        }
-        invokeExpiredTimers();
-    }
-}
 
 SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
 {

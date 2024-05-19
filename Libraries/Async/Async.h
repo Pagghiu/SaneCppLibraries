@@ -281,7 +281,8 @@ namespace SC
 //! @addtogroup group_async
 //! @{
 
-/// @brief Starts a Timeout that is invoked after expiration (relative) time has passed.
+/// @brief Starts a Timeout that is invoked only once after expiration (relative) time has passed.
+/// @note For a peridic timeout, call AsyncLoopTimeout::Result::reactivateRequest(true) in the completion callback
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncLoopTimeoutSnippet
 struct AsyncLoopTimeout : public AsyncRequest
 {
@@ -293,20 +294,18 @@ struct AsyncLoopTimeout : public AsyncRequest
     /// @brief Callback result for AsyncLoopTimeout
     using Result = AsyncResultOf<AsyncLoopTimeout, CompletionData>;
 
-    /// @brief Starts a Timeout that is invoked after expiration (relative) time has passed.
+    /// @brief Starts a Timeout that is invoked (only once) after the specific relative expiration time has passed.
     /// @param eventLoop The event loop where queuing this async request
-    /// @param expiration Relative time in milliseconds from when start is called after which callback will be called
+    /// @param relativeTimeout Relative time in milliseconds after which callback will be called
     /// @return Valid Result if the request has been successfully queued
-    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, Time::Milliseconds expiration);
-
-    /// @brief Relative time since AsyncLoopTimeout::start after which callback will be called
-    [[nodiscard]] auto getTimeout() const { return timeout; }
+    /// @note For a peridic timeout, call AsyncLoopTimeout::Result::reactivateRequest(true) in the completion callback
+    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, Time::Milliseconds relativeTimeout);
 
     Function<void(Result&)> callback; ///< Called after given expiration time since AsyncLoopTimeout::start has passed
+    Time::Milliseconds      relativeTimeout; ///< Timer expiration (relative) time in milliseconds
 
   private:
     friend struct AsyncEventLoop;
-    Time::Milliseconds          timeout; // not needed, but keeping just for debugging
     Time::HighResolutionCounter expirationTime;
 };
 
@@ -925,9 +924,9 @@ struct SC::AsyncEventLoop
   private:
     struct InternalDefinition
     {
-        static constexpr int Windows = 520;
-        static constexpr int Apple   = 464;
-        static constexpr int Default = 680;
+        static constexpr int Windows = 528;
+        static constexpr int Apple   = 472;
+        static constexpr int Default = 688;
 
         static constexpr size_t Alignment = 8;
 

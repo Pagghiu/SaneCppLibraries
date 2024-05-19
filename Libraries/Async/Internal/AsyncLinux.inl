@@ -322,6 +322,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         static_assert(__builtin_offsetof(__kernel_timespec, tv_nsec) ==
                           __builtin_offsetof(Time::HighResolutionCounter, part2),
                       "Time::HighResolutionCounter layout changed!");
+
+        async.expirationTime = async.eventLoop->getLoopTime().offsetBy(async.relativeTimeout);
+
         struct __kernel_timespec* ts = reinterpret_cast<struct __kernel_timespec*>(&async.expirationTime);
         globalLibURing.io_uring_prep_timeout(submission, ts, 0, IORING_TIMEOUT_ABS);
         globalLibURing.io_uring_sqe_set_data(submission, &async);

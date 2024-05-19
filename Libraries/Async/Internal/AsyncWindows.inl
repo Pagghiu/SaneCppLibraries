@@ -204,24 +204,33 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         return detail::AsyncWinOverlapped::getUserDataFromOverlapped<AsyncRequest>(event.lpOverlapped);
     }
 
-    [[nodiscard]] Result syncWithKernel(AsyncEventLoop& self, Internal::SyncMode syncMode)
+    [[nodiscard]] Result syncWithKernel(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode)
     {
-        const Time::HighResolutionCounter* nextTimer = self.internal.findEarliestTimer();
+        AsyncLoopTimeout*                  loopTimeout = nullptr;
+        const Time::HighResolutionCounter* nextTimer   = nullptr;
+        if (syncMode == Internal::SyncMode::ForcedForwardProgress)
+        {
+            loopTimeout = eventLoop.internal.findEarliestLoopTimeout();
+            if (loopTimeout)
+            {
+                nextTimer = &loopTimeout->expirationTime;
+            }
+        }
+        static constexpr Result errorResult = Result::Error("syncWithKernel() - Invalid Handle");
+        FileDescriptor::Handle  loopFd;
+        SC_TRY(eventLoop.internal.kernelQueue.get().loopFd.get(loopFd, errorResult));
 
-        FileDescriptor::Handle loopHandle;
-        SC_TRY(self.internal.kernelQueue.get().loopFd.get(loopHandle,
-                                                          Result::Error("AsyncEventLoop::poll() - Invalid Handle")));
         Time::Milliseconds timeout;
         if (nextTimer)
         {
-            if (nextTimer->isLaterThanOrEqualTo(self.internal.loopTime))
+            if (nextTimer->isLaterThanOrEqualTo(eventLoop.internal.loopTime))
             {
-                timeout = nextTimer->subtractApproximate(self.internal.loopTime).inRoundedUpperMilliseconds();
+                timeout = nextTimer->subtractApproximate(eventLoop.internal.loopTime).inRoundedUpperMilliseconds();
             }
         }
         const DWORD ms =
             nextTimer or syncMode == Internal::SyncMode::NoWait ? static_cast<ULONG>(timeout.ms) : INFINITE;
-        const BOOL res = ::GetQueuedCompletionStatusEx(loopHandle, events, totalNumEvents, &newEvents, ms, FALSE);
+        const BOOL res = ::GetQueuedCompletionStatusEx(loopFd, events, totalNumEvents, &newEvents, ms, FALSE);
         if (res == FALSE)
         {
             if (::GetLastError() == WAIT_TIMEOUT)
@@ -238,9 +247,9 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 return Result::Error("KernelEvents::poll() - GetQueuedCompletionStatusEx error");
             }
         }
-        if (nextTimer)
+        if (loopTimeout)
         {
-            self.internal.executeTimers(*this, *nextTimer);
+            eventLoop.internal.expiredTimer = loopTimeout;
         }
         return Result(true);
     }
@@ -256,6 +265,12 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     // WAKEUP
     //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] static bool setupAsync(AsyncLoopWakeUp&) { return true; }
+
+    Result activateAsync(AsyncLoopTimeout& async)
+    {
+        async.expirationTime = async.eventLoop->getLoopTime().offsetBy(async.relativeTimeout);
+        return Result(true);
+    }
 
     //-------------------------------------------------------------------------------------------------------
     // WORK
