@@ -213,7 +213,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                        configuration.name.view(), architecture);
         if (not project.targetName.view().isEmpty())
         {
-            builder.append("<TargetName>{}</TargetName>", project.targetName);
+            builder.append("    <TargetName>{}</TargetName>\n", project.targetName);
         }
 
         if (not configuration.outputPath.isEmpty())
@@ -344,10 +344,18 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             builder.append("      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>\n");
         }
-        builder.append("      <MultiProcessorCompilation>true</MultiProcessorCompilation>");
+        builder.append("      <MultiProcessorCompilation>true</MultiProcessorCompilation>\n");
         builder.append("    </ClCompile>\n");
         builder.append("    <Link>\n");
-        builder.append("      <SubSystem>Console</SubSystem>\n");
+        if (configuration.link.hasValue<Link::guiApplication>(true) or
+            project.link.hasValue<Link::guiApplication>(true))
+        {
+            builder.append("      <SubSystem>Windows</SubSystem>\n");
+        }
+        else
+        {
+            builder.append("      <SubSystem>Console</SubSystem>\n");
+        }
         if (configuration.compile.hasValue<Compile::optimizationLevel>(Optimization::Debug))
         {
             builder.append("      <GenerateDebugInformation>true</GenerateDebugInformation>\n");

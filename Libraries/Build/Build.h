@@ -197,6 +197,7 @@ struct Link
     {
         libraryPaths,      ///< Library paths
         libraryFrameworks, ///< Frameworks paths
+        guiApplication,    ///< gui application
         enableLTO,         ///< Link Time Optimization
         enableASAN,        ///< Address Sanitizer
         enableStdCpp,      ///< C++ Standard Library
@@ -209,6 +210,7 @@ struct Link
         {
         case libraryPaths: return "libraryPaths";
         case libraryFrameworks: return "libraryFrameworks";
+        case guiApplication: return "guiApplication";
         case enableLTO: return "enableLTO";
         case enableASAN: return "enableASAN";
         case enableStdCpp: return "enableStdCpp";
@@ -220,6 +222,7 @@ struct Link
 
     using FieldsTypes = TypeTraits::TypeList<Tag<libraryPaths, Vector<String>>,      //
                                              Tag<libraryFrameworks, Vector<String>>, //
+                                             Tag<guiApplication, bool>,              //
                                              Tag<enableLTO, bool>,                   //
                                              Tag<enableASAN, bool>,                  //
                                              Tag<enableStdCpp, bool>                 //
