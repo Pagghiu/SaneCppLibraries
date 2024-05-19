@@ -281,22 +281,30 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
 struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 {
   private:
-    static constexpr int totalNumEvents = 1024;
-
 #if SC_ASYNC_USE_EPOLL
-    epoll_event events[totalNumEvents];
+    epoll_event* events;
 #else
-    struct kevent events[totalNumEvents];
+    struct kevent* events;
 #endif
-    int newEvents = 0;
-
     KernelEvents& parentKernelEvents;
 
+    int&      newEvents;
+    const int totalNumEvents;
+
   public:
-    KernelEventsPosix(KernelEvents& kq) : parentKernelEvents(kq) { memset(events, 0, sizeof(events)); }
 #if SC_PLATFORM_APPLE
-    KernelEventsPosix(KernelQueuePosix&) : parentKernelEvents(*this) { memset(events, 0, sizeof(events)); }
+    KernelEventsPosix(KernelQueue&, AsyncKernelEvents& kernelEvents)
+        : parentKernelEvents(*this),
+#else
+    KernelEventsPosix(KernelEvents& ke, AsyncKernelEvents& kernelEvents)
+        : parentKernelEvents(ke),
 #endif
+          newEvents(kernelEvents.numberOfEvents),
+          totalNumEvents(static_cast<int>(kernelEvents.eventsMemory.sizeInBytes() / sizeof(events[0])))
+    {
+        events = reinterpret_cast<decltype(events)>(kernelEvents.eventsMemory.data());
+    }
+
     uint32_t getNumEvents() const { return static_cast<uint32_t>(newEvents); }
 
     [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t idx) const

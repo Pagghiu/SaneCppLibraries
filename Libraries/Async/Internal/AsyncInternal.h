@@ -93,7 +93,7 @@ struct SC::AsyncEventLoop::Internal
     // Timers
     [[nodiscard]] AsyncLoopTimeout* findEarliestLoopTimeout() const;
 
-    void invokeExpiredTimers(AsyncLoopTimeout& timeout);
+    void invokeExpiredTimers(Time::HighResolutionCounter currentTime);
     void updateTime();
 
     [[nodiscard]] Result cancelAsync(AsyncRequest& async);
@@ -130,6 +130,10 @@ struct SC::AsyncEventLoop::Internal
     };
 
     [[nodiscard]] Result runStep(SyncMode syncMode);
+
+    [[nodiscard]] Result submitRequests(AsyncKernelEvents& kernelEvents);
+    [[nodiscard]] Result blockingPoll(SyncMode syncMode, AsyncKernelEvents& kernelEvents);
+    [[nodiscard]] Result dispatchCompletions(SyncMode syncMode, AsyncKernelEvents& kernelEvents);
 
     void runStepExecuteCompletions(KernelEvents& kernelEvents);
     void runStepExecuteManualCompletions(KernelEvents& kernelEvents);

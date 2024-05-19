@@ -40,13 +40,23 @@ This is usable but needs some more testing and a few more features.
 
 ### Run modes
 
-Event loop can be run in different ways to allow integrated it in multiple ways in applications that may already have an existing event loop (example GUI applications).
+Event loop can be run in different ways to allow integrated it in multiple ways in applications.
 
 | Run mode                      | Description                               |
 |:------------------------------|:------------------------------------------|
 | SC::AsyncEventLoop::run       | @copydoc SC::AsyncEventLoop::run          |
 | SC::AsyncEventLoop::runOnce   | @copydoc SC::AsyncEventLoop::runOnce      |
 | SC::AsyncEventLoop::runNoWait | @copydoc SC::AsyncEventLoop::runNoWait    |
+
+
+Alternatively user can explicitly use three methods to submit, poll and dispatch events.
+This is very useful to integrate the event loop into applications with other event loops (for example GUI applications).
+
+| Run mode                                  | Description                                       |
+|:------------------------------------------|:--------------------------------------------------|
+| SC::AsyncEventLoop::submitRequests        | @copydoc SC::AsyncEventLoop::submitRequests       |
+| SC::AsyncEventLoop::blockingPoll          | @copydoc SC::AsyncEventLoop::blockingPoll         |
+| SC::AsyncEventLoop::dispatchCompletions   | @copydoc SC::AsyncEventLoop::dispatchCompletions  |
 
 ## AsyncLoopTimeout
 @copydoc SC::AsyncLoopTimeout
@@ -105,7 +115,6 @@ SC::ArenaMap from the [Containers](@ref library_containers) can be used to preal
 # Roadmap
 
 🟩 Usable Features:
-- Implement option to do blocking poll check without dispatching callbacks (needed for efficient gui event loop integration)
 - More comprehensive test suite, testing all cancellations
 - FS operations (open stat read write unlink copyfile mkdir chmod etc.)
 - UDP Send/Receive

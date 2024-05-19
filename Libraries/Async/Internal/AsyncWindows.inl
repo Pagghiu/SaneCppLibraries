@@ -184,12 +184,18 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
 
 struct SC::AsyncEventLoop::Internal::KernelEvents
 {
-    static constexpr int totalNumEvents = 128;
 
-    OVERLAPPED_ENTRY events[totalNumEvents];
-    ULONG            newEvents = 0;
+    OVERLAPPED_ENTRY* events;
 
-    KernelEvents(KernelQueue&) { ::memset(events, 0, totalNumEvents * sizeof(events[0])); }
+    int&      newEvents;
+    const int totalNumEvents = 0;
+
+    KernelEvents(KernelQueue&, AsyncKernelEvents& kernelEvents)
+        : newEvents(kernelEvents.numberOfEvents),
+          totalNumEvents(static_cast<int>(kernelEvents.eventsMemory.sizeInBytes() / sizeof(events[0])))
+    {
+        events = reinterpret_cast<decltype(events)>(kernelEvents.eventsMemory.data());
+    }
 
     uint32_t getNumEvents() const { return static_cast<uint32_t>(newEvents); }
 
@@ -230,7 +236,9 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         }
         const DWORD ms =
             nextTimer or syncMode == Internal::SyncMode::NoWait ? static_cast<ULONG>(timeout.ms) : INFINITE;
-        const BOOL res = ::GetQueuedCompletionStatusEx(loopFd, events, totalNumEvents, &newEvents, ms, FALSE);
+        ULONG      ulongEvents = static_cast<ULONG>(newEvents);
+        const BOOL res         = ::GetQueuedCompletionStatusEx(loopFd, events, totalNumEvents, &ulongEvents, ms, FALSE);
+        newEvents              = static_cast<int>(ulongEvents);
         if (res == FALSE)
         {
             if (::GetLastError() == WAIT_TIMEOUT)

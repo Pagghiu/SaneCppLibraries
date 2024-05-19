@@ -36,7 +36,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     bool                  isEpoll = true;
     AlignedStorage<16400> storage;
 
-    KernelEvents(KernelQueue& kernelQueue);
+    KernelEvents(KernelQueue& kernelQueue, AsyncKernelEvents& asyncKernelEvents);
     ~KernelEvents();
 
     KernelEventsIoURing&       getUring();
@@ -171,15 +171,20 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
 struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 {
   private:
-    static constexpr int totalNumEvents = 256;
-
-    int          newEvents = 0;
-    io_uring_cqe events[totalNumEvents];
+    io_uring_cqe* events;
 
     KernelEvents& parentKernelEvents;
 
+    int&      newEvents;
+    const int totalNumEvents;
+
   public:
-    KernelEventsIoURing(KernelEvents& kq) : parentKernelEvents(kq) {}
+    KernelEventsIoURing(KernelEvents& kq, AsyncKernelEvents& kernelEvents)
+        : parentKernelEvents(kq), newEvents(kernelEvents.numberOfEvents),
+          totalNumEvents(static_cast<int>(kernelEvents.eventsMemory.sizeInBytes() / sizeof(events[0])))
+    {
+        events = reinterpret_cast<decltype(events)>(kernelEvents.eventsMemory.data());
+    }
 
     [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t idx)
     {
@@ -634,11 +639,11 @@ SC::Result SC::AsyncEventLoop::Internal::KernelQueue::wakeUpFromExternalThread()
 // AsyncEventLoop::Internal::KernelEvents
 //----------------------------------------------------------------------------------------
 
-SC::AsyncEventLoop::Internal::KernelEvents::KernelEvents(KernelQueue& kernelQueue)
+SC::AsyncEventLoop::Internal::KernelEvents::KernelEvents(KernelQueue& kernelQueue, AsyncKernelEvents& asyncKernelEvents)
 {
     isEpoll = kernelQueue.isEpoll;
-    isEpoll ? placementNew(storage.reinterpret_as<KernelEventsPosix>(), *this)
-            : placementNew(storage.reinterpret_as<KernelEventsIoURing>(), *this);
+    isEpoll ? placementNew(storage.reinterpret_as<KernelEventsPosix>(), *this, asyncKernelEvents)
+            : placementNew(storage.reinterpret_as<KernelEventsIoURing>(), *this, asyncKernelEvents);
 }
 
 SC::AsyncEventLoop::Internal::KernelEvents::~KernelEvents()

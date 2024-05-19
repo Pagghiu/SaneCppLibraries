@@ -45,6 +45,7 @@ struct ThreadPool;
 struct ThreadPoolTask;
 
 struct EventObject;
+struct AsyncKernelEvents;
 struct AsyncEventLoop;
 
 struct AsyncRequest;
@@ -848,6 +849,18 @@ struct AsyncFilePoll : public AsyncRequest
 
 } // namespace SC
 
+/// @brief Allows user to supply a block of memory that will store kernel I/O events retrieved from
+/// AsyncEventLoop::runOnce. Such events can then be later passed to AsyncEventLoop::dispatchCompletions.
+/// @see AsyncEventLoop::runOnce
+struct SC::AsyncKernelEvents
+{
+    Span<uint8_t> eventsMemory; ///< User supplied block of memory used to store kernel I/O events
+
+  private:
+    int numberOfEvents = 0;
+    friend struct AsyncEventLoop;
+};
+
 /// @brief Asynchronous I/O (files, sockets, timers, processes, fs events, threads wake-up) (see @ref library_async)
 /// AsyncEventLoop pushes all AsyncRequest derived classes to I/O queues in the OS.
 /// Basic lifetime for an event loop is:
@@ -876,24 +889,62 @@ struct SC::AsyncEventLoop
     /// Closes the event loop kernel object
     [[nodiscard]] Result close();
 
-    /// Blocks until there are no more active queued requests.
+    /// Blocks until there are no more active queued requests, dispatching all completions.
     /// It's useful for applications where the eventLoop is the only (or the main) loop.
     /// One example could be a console based app doing socket IO or a web server.
-    /// Waiting on requests blocks the current thread with 0% CPU utilization.
+    /// Waiting on kernel events blocks the current thread with 0% CPU utilization.
+    /// @see AsyncEventLoop::blockingPoll to integrate the loop with a GUI event loop
     [[nodiscard]] Result run();
 
-    /// Blocks until at least one request proceeds, ensuring forward progress.
-    /// It's useful for applications where the eventLoop events needs to be interleaved with other work.
-    /// For example one possible way of integrating with a UI event loop could be to schedule a recurrent timeout
-    /// timer every 1/60 seconds where calling GUI event loop  updates every 60 seconds, blocking for I/O for
-    /// the remaining time. Waiting on requests blocks the current thread with 0% CPU utilization.
+    /// Blocks until at least one request proceeds, ensuring forward progress, dispatching all completions.
+    /// It's useful for application where it's needed to run some idle work after every IO event.
+    /// Waiting on requests blocks the current thread with 0% CPU utilization.
+    ///
+    /// This function is a shortcut invoking async event loop building blocks:
+    /// - AsyncEventLoop::submitRequests
+    /// - AsyncEventLoop::blockingPoll
+    /// - AsyncEventLoop::dispatchCompletions
+    /// @see AsyncEventLoop::blockingPoll for a description on how to integrate AsyncEventLoop with another event loop
     [[nodiscard]] Result runOnce();
 
-    /// Process active requests if they exist or returns immediately without blocking.
+    /// Process active requests if any, dispatching their completions, or returns immediately without blocking.
     /// It's useful for game-like applications where the event loop runs every frame and one would like to check
     /// and dispatch its I/O callbacks in-between frames.
     /// This call allows poll-checking I/O without blocking.
+    /// @see AsyncEventLoop::blockingPoll to integrate the loop with a GUI event loop
     [[nodiscard]] Result runNoWait();
+
+    /// Submits all queued async requests.
+    /// An AsyncRequest becomes queued after user calls its specific AsyncRequest::start method.
+    ///
+    /// @see AsyncEventLoop::blockingPoll for a description on how to integrate AsyncEventLoop with another event loop
+    [[nodiscard]] Result submitRequests(AsyncKernelEvents& kernelEvents);
+
+    /// Blocks until at least one event happens, ensuring forward progress, without executing completions.
+    /// It's one of the three building blocks of AsyncEventLoop::runOnce allowing co-operation of AsyncEventLoop
+    /// within another event loop (for example a GUI event loop or another IO event loop).
+    ///
+    /// One possible example of such integration with a GUI event loop could:
+    ///
+    /// - Call AsyncEventLoop::submitRequests on the GUI thread to queue some requests
+    /// - Call AsyncEventLoop::blockingPoll on a secondary thread, storying AsyncKernelEvents
+    /// - Wake up the GUI event loop from the secondary thread after AsyncEventLoop::blockingPoll returns
+    /// - Call AsyncEventLoop:dispatchCompletions on the GUI event loop to dispatch callbacks on GUI thread
+    /// - Repeat all steps
+    ///
+    /// Waiting on requests blocks the current thread with 0% CPU utilization.
+    /// @param kernelEvents Mandatory parameter to store kernel IO events WITHOUT running their completions.
+    /// In that case user is expected to run completions passing it to AsyncEventLoop::dispatchCompletions.
+    /// @see AsyncEventLoop::submitRequests sends async requests to kernel before calling blockingPoll
+    /// @see AsyncEventLoop::dispatchCompletions invokes callbacks associated with kernel events after blockingPoll
+    [[nodiscard]] Result blockingPoll(AsyncKernelEvents& kernelEvents);
+
+    /// Invokes completions for the AsyncKernelEvents collected by a call to AsyncEventLoop::blockingPoll.
+    /// This is typically done when user wants to pool for events on a thread (calling AsyncEventLoop::blockingPoll)
+    /// and dispatch the callbacks on another thread (calling AsyncEventLoop::dispatchCompletions).
+    /// The typical example would be integrating AsyncEventLoop with a GUI event loop.
+    /// @see AsyncEventLoop::blockingPoll for a description on how to integrate AsyncEventLoop with another event loop
+    [[nodiscard]] Result dispatchCompletions(AsyncKernelEvents& kernelEvents);
 
     /// Wake up the event loop from a thread different than the one where run() is called (and potentially blocked).
     /// The parameter is an AsyncLoopWakeUp that must have been previously started (with AsyncLoopWakeUp::start).

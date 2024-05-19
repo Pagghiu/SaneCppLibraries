@@ -276,6 +276,21 @@ SC::Result SC::AsyncEventLoop::run()
     return SC::Result(true);
 }
 
+SC::Result SC::AsyncEventLoop::submitRequests(AsyncKernelEvents& kernelEvents)
+{
+    return internal.submitRequests(kernelEvents);
+}
+
+SC::Result SC::AsyncEventLoop::blockingPoll(AsyncKernelEvents& kernelEvents)
+{
+    return internal.blockingPoll(Internal::SyncMode::ForcedForwardProgress, kernelEvents);
+}
+
+SC::Result SC::AsyncEventLoop::dispatchCompletions(AsyncKernelEvents& kernelEvents)
+{
+    return internal.dispatchCompletions(Internal::SyncMode::ForcedForwardProgress, kernelEvents);
+}
+
 template <>
 void SC::AsyncEventLoop::InternalOpaque::construct(Handle& buffer)
 {
@@ -369,14 +384,14 @@ SC::AsyncLoopTimeout* SC::AsyncEventLoop::Internal::findEarliestLoopTimeout() co
     return earliestTime;
 }
 
-void SC::AsyncEventLoop::Internal::invokeExpiredTimers(AsyncLoopTimeout& timeout)
+void SC::AsyncEventLoop::Internal::invokeExpiredTimers(Time::HighResolutionCounter currentTime)
 {
     AsyncLoopTimeout* async;
     for (async = activeLoopTimeouts.front; //
          async != nullptr;                 //
          async = static_cast<AsyncLoopTimeout*>(async->next))
     {
-        if (timeout.expirationTime.isLaterThanOrEqualTo(async->expirationTime))
+        if (currentTime.isLaterThanOrEqualTo(async->expirationTime))
         {
             removeActiveHandle(*async);
             AsyncLoopTimeout::Result result(*async, Result(true));
@@ -533,7 +548,20 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndEventuallyReactivate(KernelE
 
 SC::Result SC::AsyncEventLoop::Internal::runStep(SyncMode syncMode)
 {
-    KernelEvents kernelEvents(loop->internal.kernelQueue.get());
+    alignas(uint64_t) uint8_t buffer[8 * 1024]; // 8 Kb of kernel events
+    AsyncKernelEvents         kernelEvents;
+    kernelEvents.eventsMemory = buffer;
+    SC_TRY(submitRequests(kernelEvents));
+    SC_TRY(blockingPoll(syncMode, kernelEvents));
+    return dispatchCompletions(syncMode, kernelEvents);
+}
+
+SC::Result SC::AsyncEventLoop::Internal::submitRequests(AsyncKernelEvents& asyncKernelEvents)
+{
+    KernelEvents kernelEvents(loop->internal.kernelQueue.get(), asyncKernelEvents);
+    asyncKernelEvents.numberOfEvents = 0;
+    // TODO: Check if it's possible to avoid zeroing kernel events memory
+    memset(asyncKernelEvents.eventsMemory.data(), 0, asyncKernelEvents.eventsMemory.sizeInBytes());
     SC_LOG_MESSAGE("---------------\n");
 
     while (AsyncRequest* async = submissions.dequeueFront())
@@ -545,6 +573,12 @@ SC::Result SC::AsyncEventLoop::Internal::runStep(SyncMode syncMode)
         }
     }
 
+    return SC::Result(true);
+}
+
+SC::Result SC::AsyncEventLoop::Internal::blockingPoll(SyncMode syncMode, AsyncKernelEvents& asyncKernelEvents)
+{
+    KernelEvents kernelEvents(loop->internal.kernelQueue.get(), asyncKernelEvents);
     if (getTotalNumberOfActiveHandle() <= 0 and numberOfManualCompletions == 0)
     {
         // happens when we do cancelAsync on the last active async for example
@@ -558,11 +592,27 @@ SC::Result SC::AsyncEventLoop::Internal::runStep(SyncMode syncMode)
         SC_TRY(kernelEvents.syncWithKernel(*loop, syncMode));
         SC_LOG_MESSAGE("Active Requests After Poll = {}\n", getTotalNumberOfActiveHandle());
     }
+    return SC::Result(true);
+}
 
-    if (expiredTimer)
+SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(SyncMode syncMode, AsyncKernelEvents& asyncKernelEvents)
+{
+    KernelEvents kernelEvents(loop->internal.kernelQueue.get(), asyncKernelEvents);
+    switch (syncMode)
     {
-        invokeExpiredTimers(*expiredTimer);
-        expiredTimer = nullptr;
+    case SyncMode::NoWait: {
+        updateTime();
+        invokeExpiredTimers(loopTime);
+    }
+    break;
+    case SyncMode::ForcedForwardProgress: {
+        if (expiredTimer)
+        {
+            invokeExpiredTimers(expiredTimer->expirationTime);
+            expiredTimer = nullptr;
+        }
+    }
+    break;
     }
     runStepExecuteCompletions(kernelEvents);
     runStepExecuteManualCompletions(kernelEvents);
