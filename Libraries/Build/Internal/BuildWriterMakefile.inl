@@ -14,6 +14,9 @@ struct SC::Build::ProjectWriter::WriterMakefile
     const DefinitionCompiler& definitionCompiler;
     const Directories&        directories;
 
+    VectorMap<String, String> outputDirectories;
+    VectorMap<String, String> intermediateDirectories;
+
     WriterMakefile(const Definition& definition, const DefinitionCompiler& definitionCompiler,
                    const Directories& directories)
         : definition(definition), definitionCompiler(definitionCompiler), directories(directories)
@@ -104,7 +107,8 @@ endif
             builder.append(" {0}_COMPILE_COMMANDS {0}_COMPILE", makeTarget);
         }
 
-        builder.append("\n\nclean:");
+        // Clean jobs are better done sequentially
+        builder.append("\n\nclean: |");
         for (const Project& project : workspace.projects)
         {
             SC_TRY(sanitizeName(project.targetName.view(), makeTarget));
@@ -368,13 +372,6 @@ endif
                        makeTarget.view());
 
         builder.append(R"delimiter(
-$({0}_INTERMEDIATE_DIR):
-	@echo Creating "$({0}_INTERMEDIATE_DIR)"
-	$(VRBS)mkdir -p $@
-
-$({0}_TARGET_DIR):
-	@echo Creating "$({0}_TARGET_DIR)"
-	$(VRBS)mkdir -p $@
 
 {0}_COMPILE: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 
@@ -480,27 +477,90 @@ $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
         SC_COMPILER_UNUSED(renderer);
         SmallString<255> configName;
         SC_TRY(sanitizeName(configuration.name.view(), configName)); // TODO: Sanitize the name
-        builder.append("\n\nifeq ($(CONFIG),{0})", configName.view());
+        builder.append("\n\nifeq ($(CONFIG),{0})\n", configName.view());
 
-        builder.append("\n{0}_INTERMEDIATE_DIR := ", makeTarget);
-        WriterInternal::appendPrefixIfRelativePosix("$(CURDIR)", builder, configuration.intermediatesPath.view(),
-                                                    relativeDirectories.relativeProjectsToIntermediates.view());
+        {
+            String        intermediate;
+            StringBuilder intermediateBuilder(intermediate);
 
-        SC_TRY(appendVariable(builder, configuration.intermediatesPath.view(), makeTarget, relativeDirectories));
+            WriterInternal::appendPrefixIfRelativePosix("$(CURDIR)", intermediateBuilder,
+                                                        configuration.intermediatesPath.view(),
+                                                        relativeDirectories.relativeProjectsToIntermediates.view());
 
-        builder.append("\n{0}_TARGET_DIR := ", makeTarget);
-        WriterInternal::appendPrefixIfRelativePosix("$(CURDIR)", builder, configuration.outputPath.view(),
-                                                    relativeDirectories.relativeProjectsToOutputs.view());
-        SC_TRY(appendVariable(builder, configuration.outputPath.view(), makeTarget, relativeDirectories));
+            SC_TRY(appendVariable(intermediateBuilder, configuration.intermediatesPath.view(), makeTarget,
+                                  relativeDirectories));
+
+            // Avoid Makefile warnings on intermediates and outputs directory creation.
+            //
+            // This happens when multiple projects define the same output or intermediates directory.
+            // As the Makefile rule gets redefined for these targets, make prints a warning about it.
+            // Here we are tracking if value for a previous _TARGET_DIR or _INTERMEDIATE_DIR was already
+            // written (with the same value) to avoid re-defining it.
+            // It will not work 100% of the times if the path string doesnt match 1:1 due for example to
+            // the use of makefile variables but should handle most well written build files and common cases.
+
+            String key;
+            StringBuilder(key).format("{}_{}", intermediate, configName);
+            if (intermediateDirectories.insertIfNotExists({key.view(), makeTarget}))
+            {
+                builder.append("{0}_INTERMEDIATE_DIR := ", makeTarget);
+                builder.append(intermediate.view());
+                builder.append("\n");
+
+                builder.append(R"delimiter(
+$({0}_INTERMEDIATE_DIR):
+	@echo Creating "$({0}_INTERMEDIATE_DIR)"
+	$(VRBS)mkdir -p $@
+
+)delimiter",
+                               makeTarget);
+            }
+            else if (makeTarget != intermediateDirectories.get(key.view())->view())
+            {
+                builder.append("{0}_INTERMEDIATE_DIR := $(", makeTarget);
+                builder.append(intermediateDirectories.get(key.view())->view());
+                builder.append("_INTERMEDIATE_DIR)\n");
+            }
+        }
+
+        {
+            String        output;
+            StringBuilder outputBuilder(output);
+            WriterInternal::appendPrefixIfRelativePosix("$(CURDIR)", outputBuilder, configuration.outputPath.view(),
+                                                        relativeDirectories.relativeProjectsToOutputs.view());
+            SC_TRY(appendVariable(outputBuilder, configuration.outputPath.view(), makeTarget, relativeDirectories));
+            String key;
+            StringBuilder(key).format("{}_{}", output, configName);
+            if (outputDirectories.insertIfNotExists({key.view(), makeTarget}))
+            {
+                builder.append("{0}_TARGET_DIR := ", makeTarget);
+                builder.append(output.view());
+                builder.append("\n");
+
+                builder.append(R"delimiter(
+$({0}_TARGET_DIR):
+	@echo Creating "$({0}_TARGET_DIR)"
+	$(VRBS)mkdir -p $@
+
+)delimiter",
+                               makeTarget);
+            }
+            else if (makeTarget != outputDirectories.get(key.view())->view())
+            {
+                builder.append("{0}_TARGET_DIR := $(", makeTarget);
+                builder.append(outputDirectories.get(key.view())->view());
+                builder.append("_TARGET_DIR)\n");
+            }
+        }
 
         // TODO: De-hardcode debug and release optimization levels
         if (configuration.compile.hasValue<Compile::optimizationLevel>(Optimization::Debug))
         {
-            builder.append("\n{0}_CONFIG_FLAGS := -D_DEBUG=1 -g -ggdb -O0", makeTarget);
+            builder.append("{0}_CONFIG_FLAGS := -D_DEBUG=1 -g -ggdb -O0", makeTarget);
         }
         else
         {
-            builder.append("\n{0}_CONFIG_FLAGS := -DNDEBUG=1 -O3", makeTarget);
+            builder.append("{0}_CONFIG_FLAGS := -DNDEBUG=1 -O3", makeTarget);
         }
 
         if (configuration.compile.hasValue<Compile::enableASAN>(true))
