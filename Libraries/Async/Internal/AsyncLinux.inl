@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "AsyncPrivate.h"
+#include "AsyncInternal.h"
 
 #include <arpa/inet.h>   // sockaddr_in
 #include <stdint.h>      // uint32_t
@@ -9,16 +9,16 @@
 #include <sys/syscall.h> // SYS_pidfd_open
 #include <sys/wait.h>    // waitpid
 
-struct SC::AsyncEventLoop::Internal
+struct SC::AsyncEventLoop::Internal::KernelQueue
 {
     AlignedStorage<320> storage;
 
     bool isEpoll = true;
 
-    Internal();
-    ~Internal();
-    InternalIoURing& getUring();
-    InternalPosix&   getPosix();
+    KernelQueue();
+    ~KernelQueue();
+    KernelQueueIoURing& getUring();
+    KernelQueuePosix&   getPosix();
 
     // On io_uring it doesn't make sense to run operations in a thread pool
     [[nodiscard]] bool makesSenseToRunInThreadPool(AsyncRequest&) { return isEpoll; }
@@ -31,21 +31,21 @@ struct SC::AsyncEventLoop::Internal
     [[nodiscard]] Result associateExternallyCreatedFileDescriptor(FileDescriptor&) { return Result(true); }
 };
 
-struct SC::AsyncEventLoop::KernelQueue
+struct SC::AsyncEventLoop::Internal::KernelEvents
 {
     bool                  isEpoll = true;
     AlignedStorage<16400> storage;
 
-    KernelQueue(Internal& internal);
-    ~KernelQueue();
+    KernelEvents(KernelQueue& kernelQueue);
+    ~KernelEvents();
 
-    KernelQueueIoURing&       getUring();
-    KernelQueuePosix&         getPosix();
-    const KernelQueueIoURing& getUring() const;
-    const KernelQueuePosix&   getPosix() const;
+    KernelEventsIoURing&       getUring();
+    KernelEventsPosix&         getPosix();
+    const KernelEventsIoURing& getUring() const;
+    const KernelEventsPosix&   getPosix() const;
 
     [[nodiscard]] uint32_t getNumEvents() const;
-    [[nodiscard]] Result   syncWithKernel(AsyncEventLoop&, Private::SyncMode);
+    [[nodiscard]] Result   syncWithKernel(AsyncEventLoop&, Internal::SyncMode);
     [[nodiscard]] Result   validateEvent(uint32_t&, bool&);
 
     [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t);
@@ -71,7 +71,7 @@ static AsyncLinuxLibURingLoader globalLibURing;
 
 bool SC::AsyncEventLoop::tryLoadingLiburing() { return globalLibURing.init(); }
 
-struct SC::AsyncEventLoop::InternalIoURing
+struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
 {
     static constexpr int QueueDepth = 64;
 
@@ -81,9 +81,9 @@ struct SC::AsyncEventLoop::InternalIoURing
     AsyncFilePoll  wakeUpPoll;
     FileDescriptor wakeUpEventFd;
 
-    InternalIoURing() { memset(&ring, 0, sizeof(ring)); }
+    KernelQueueIoURing() { memset(&ring, 0, sizeof(ring)); }
 
-    ~InternalIoURing() { SC_TRUST_RESULT(close()); }
+    ~KernelQueueIoURing() { SC_TRUST_RESULT(close()); }
 
     [[nodiscard]] Result close()
     {
@@ -121,7 +121,7 @@ struct SC::AsyncEventLoop::InternalIoURing
         SC_TRY(createWakeup(eventLoop));
         SC_TRY(eventLoop.runNoWait()); // Register the read handle before everything else
         // Calls to decreaseActiveCount must be after runNoWait()
-        eventLoop.privateSelf.decreaseActiveCount(); // WakeUp (poll) doesn't keep the queue active
+        eventLoop.internal.decreaseActiveCount(); // WakeUp (poll) doesn't keep the kernelEvents active
         return Result(true);
     }
 
@@ -136,7 +136,7 @@ struct SC::AsyncEventLoop::InternalIoURing
         SC_TRY(wakeUpEventFd.assign(newEventFd));
 
         // Register
-        wakeUpPoll.callback.bind<&InternalIoURing::completeWakeUp>();
+        wakeUpPoll.callback.bind<&KernelQueueIoURing::completeWakeUp>();
         SC_TRY(wakeUpPoll.start(eventLoop, newEventFd));
         return Result(true);
     }
@@ -160,7 +160,7 @@ struct SC::AsyncEventLoop::InternalIoURing
 
     static void completeWakeUp(AsyncFilePoll::Result& result)
     {
-        result.getAsync().eventLoop->privateSelf.executeWakeUps(result);
+        result.getAsync().eventLoop->internal.executeWakeUps(result);
         result.reactivateRequest(true);
     }
 
@@ -168,7 +168,7 @@ struct SC::AsyncEventLoop::InternalIoURing
     static Result associateExternallyCreatedFileDescriptor(FileDescriptor&) { return Result(true); }
 };
 
-struct SC::AsyncEventLoop::KernelQueueIoURing
+struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 {
   private:
     static constexpr int totalNumEvents = 256;
@@ -176,10 +176,10 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
     int          newEvents = 0;
     io_uring_cqe events[totalNumEvents];
 
-    KernelQueue& parentKernelQueue;
+    KernelEvents& parentKernelEvents;
 
   public:
-    KernelQueueIoURing(KernelQueue& kq) : parentKernelQueue(kq) {}
+    KernelEventsIoURing(KernelEvents& kq) : parentKernelEvents(kq) {}
 
     [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t idx)
     {
@@ -189,7 +189,7 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
 
     uint32_t getNumEvents() const { return static_cast<uint32_t>(newEvents); }
 
-    static io_uring& getRing(AsyncEventLoop& eventLoop) { return eventLoop.internalSelf.getUring().ring; }
+    static io_uring& getRing(AsyncEventLoop& eventLoop) { return eventLoop.internal.kernelQueue.get().getUring().ring; }
 
     [[nodiscard]] Result getNewSubmission(AsyncRequest& async, io_uring_sqe*& newSubmission)
     {
@@ -198,8 +198,8 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
         io_uring_sqe* kernelSubmission = globalLibURing.io_uring_get_sqe(&ring);
         if (kernelSubmission == nullptr)
         {
-            // No space in the submission queue, let's try to flush submissions and try again
-            SC_TRY(flushSubmissions(*async.eventLoop, Private::SyncMode::NoWait));
+            // No space in the submission kernelEvents, let's try to flush submissions and try again
+            SC_TRY(flushSubmissions(*async.eventLoop, Internal::SyncMode::NoWait));
             kernelSubmission = globalLibURing.io_uring_get_sqe(&ring);
             if (kernelSubmission == nullptr)
             {
@@ -224,14 +224,14 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
         globalLibURing.io_uring_cq_advance(&ring, newEvents);
     }
 
-    [[nodiscard]] Result syncWithKernel(AsyncEventLoop& eventLoop, Private::SyncMode syncMode)
+    [[nodiscard]] Result syncWithKernel(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode)
     {
         SC_TRY(flushSubmissions(eventLoop, syncMode));
         copyReadyCompletions(getRing(eventLoop));
         return Result(true);
     }
 
-    [[nodiscard]] Result flushSubmissions(AsyncEventLoop& eventLoop, Private::SyncMode syncMode)
+    [[nodiscard]] Result flushSubmissions(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode)
     {
         io_uring& ring = getRing(eventLoop);
         while (true)
@@ -239,11 +239,11 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
             int res = -1;
             switch (syncMode)
             {
-            case Private::SyncMode::NoWait: {
+            case Internal::SyncMode::NoWait: {
                 res = globalLibURing.io_uring_submit(&ring);
                 break;
             }
-            case Private::SyncMode::ForcedForwardProgress: {
+            case Internal::SyncMode::ForcedForwardProgress: {
                 res = globalLibURing.io_uring_submit_and_wait(&ring, 1);
                 break;
             }
@@ -256,13 +256,13 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
                 }
                 if (errno == EAGAIN or errno == EBUSY)
                 {
-                    // OMG the completion queue is full, so we can't submit
+                    // OMG the completion kernelEvents is full, so we can't submit
                     // anything until we free some of the completions slots :-|
                     copyReadyCompletions(ring);
                     if (newEvents > 0)
                     {
                         // We've freed some slots, let's try again
-                        eventLoop.privateSelf.runStepExecuteCompletions(parentKernelQueue);
+                        eventLoop.internal.runStepExecuteCompletions(parentKernelEvents);
                         continue;
                     }
                     else
@@ -542,7 +542,7 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
 
     [[nodiscard]] Result completeAsync(AsyncProcessExit::Result& result)
     {
-        return KernelQueuePosix::completeProcessExitWaitPid(result);
+        return KernelEventsPosix::completeProcessExitWaitPid(result);
     }
 
     [[nodiscard]] Result teardownAsync(AsyncProcessExit& async) { return async.pidFd.close(); }
@@ -569,125 +569,129 @@ struct SC::AsyncEventLoop::KernelQueueIoURing
 };
 
 //----------------------------------------------------------------------------------------
-// AsyncEventLoop::Internal
+// AsyncEventLoop::KernelQueue
 //----------------------------------------------------------------------------------------
-SC::AsyncEventLoop::Internal::Internal()
+SC::AsyncEventLoop::Internal::KernelQueue::KernelQueue()
 {
     (void)globalLibURing.init();
     isEpoll = not globalLibURing.isValid();
-    isEpoll ? placementNew(storage.reinterpret_as<InternalPosix>())
-            : placementNew(storage.reinterpret_as<InternalIoURing>());
+    isEpoll ? placementNew(storage.reinterpret_as<KernelQueuePosix>())
+            : placementNew(storage.reinterpret_as<KernelQueueIoURing>());
 }
 
-SC::AsyncEventLoop::Internal::~Internal()
-{
-    isEpoll ? storage.reinterpret_as<InternalPosix>().~InternalPosix()
-            : storage.reinterpret_as<InternalIoURing>().~InternalIoURing();
-}
-
-SC::AsyncEventLoop::InternalIoURing& SC::AsyncEventLoop::Internal::getUring()
-{
-    return storage.reinterpret_as<InternalIoURing>();
-}
-
-SC::AsyncEventLoop::InternalPosix& SC::AsyncEventLoop::Internal::getPosix()
-{
-    return storage.reinterpret_as<InternalPosix>();
-}
-
-SC::Result SC::AsyncEventLoop::Internal::close() { return isEpoll ? getPosix().close() : getUring().close(); }
-
-SC::Result SC::AsyncEventLoop::Internal::createEventLoop(AsyncEventLoop::Options options)
-{
-    if (options.apiType == AsyncEventLoop::Options::ApiType::ForceUseEpoll and not isEpoll)
-    {
-        storage.reinterpret_as<InternalIoURing>().~InternalIoURing();
-        isEpoll = true;
-        placementNew(storage.reinterpret_as<InternalPosix>());
-    }
-    else if (options.apiType == AsyncEventLoop::Options::ApiType::ForceUseEpoll and isEpoll)
-    {
-        storage.reinterpret_as<InternalPosix>().~InternalPosix();
-        isEpoll = false;
-        placementNew(storage.reinterpret_as<InternalIoURing>());
-    }
-    return isEpoll ? getPosix().createEventLoop() : getUring().createEventLoop();
-}
-
-SC::Result SC::AsyncEventLoop::Internal::createSharedWatchers(AsyncEventLoop& eventLoop)
-{
-    return isEpoll ? getPosix().createSharedWatchers(eventLoop) : getUring().createSharedWatchers(eventLoop);
-}
-
-SC::Result SC::AsyncEventLoop::Internal::wakeUpFromExternalThread()
-{
-    return isEpoll ? getPosix().wakeUpFromExternalThread() : getUring().wakeUpFromExternalThread();
-}
-
-//----------------------------------------------------------------------------------------
-// AsyncEventLoop::KernelQueue
-//----------------------------------------------------------------------------------------
-
-SC::AsyncEventLoop::KernelQueue::KernelQueue(Internal& internal)
-{
-    isEpoll = internal.isEpoll;
-    isEpoll ? placementNew(storage.reinterpret_as<KernelQueuePosix>(), *this)
-            : placementNew(storage.reinterpret_as<KernelQueueIoURing>(), *this);
-}
-
-SC::AsyncEventLoop::KernelQueue::~KernelQueue()
+SC::AsyncEventLoop::Internal::KernelQueue::~KernelQueue()
 {
     isEpoll ? storage.reinterpret_as<KernelQueuePosix>().~KernelQueuePosix()
             : storage.reinterpret_as<KernelQueueIoURing>().~KernelQueueIoURing();
 }
 
-SC::AsyncEventLoop::KernelQueueIoURing& SC::AsyncEventLoop::KernelQueue::getUring()
+SC::AsyncEventLoop::Internal::KernelQueueIoURing& SC::AsyncEventLoop::Internal::KernelQueue::getUring()
 {
     return storage.reinterpret_as<KernelQueueIoURing>();
 }
 
-SC::AsyncEventLoop::KernelQueuePosix& SC::AsyncEventLoop::KernelQueue::getPosix()
+SC::AsyncEventLoop::Internal::KernelQueuePosix& SC::AsyncEventLoop::Internal::KernelQueue::getPosix()
 {
     return storage.reinterpret_as<KernelQueuePosix>();
 }
 
-const SC::AsyncEventLoop::KernelQueueIoURing& SC::AsyncEventLoop::KernelQueue::getUring() const
+SC::Result SC::AsyncEventLoop::Internal::KernelQueue::close()
 {
-    return storage.reinterpret_as<const KernelQueueIoURing>();
+    return isEpoll ? getPosix().close() : getUring().close();
 }
 
-const SC::AsyncEventLoop::KernelQueuePosix& SC::AsyncEventLoop::KernelQueue::getPosix() const
+SC::Result SC::AsyncEventLoop::Internal::KernelQueue::createEventLoop(AsyncEventLoop::Options options)
 {
-    return storage.reinterpret_as<const KernelQueuePosix>();
+    if (options.apiType == AsyncEventLoop::Options::ApiType::ForceUseEpoll and not isEpoll)
+    {
+        storage.reinterpret_as<KernelQueueIoURing>().~KernelQueueIoURing();
+        isEpoll = true;
+        placementNew(storage.reinterpret_as<KernelQueuePosix>());
+    }
+    else if (options.apiType == AsyncEventLoop::Options::ApiType::ForceUseEpoll and isEpoll)
+    {
+        storage.reinterpret_as<KernelQueuePosix>().~KernelQueuePosix();
+        isEpoll = false;
+        placementNew(storage.reinterpret_as<KernelQueueIoURing>());
+    }
+    return isEpoll ? getPosix().createEventLoop() : getUring().createEventLoop();
 }
 
-SC::uint32_t SC::AsyncEventLoop::KernelQueue::getNumEvents() const
+SC::Result SC::AsyncEventLoop::Internal::KernelQueue::createSharedWatchers(AsyncEventLoop& eventLoop)
+{
+    return isEpoll ? getPosix().createSharedWatchers(eventLoop) : getUring().createSharedWatchers(eventLoop);
+}
+
+SC::Result SC::AsyncEventLoop::Internal::KernelQueue::wakeUpFromExternalThread()
+{
+    return isEpoll ? getPosix().wakeUpFromExternalThread() : getUring().wakeUpFromExternalThread();
+}
+
+//----------------------------------------------------------------------------------------
+// AsyncEventLoop::Internal::KernelEvents
+//----------------------------------------------------------------------------------------
+
+SC::AsyncEventLoop::Internal::KernelEvents::KernelEvents(KernelQueue& kernelQueue)
+{
+    isEpoll = kernelQueue.isEpoll;
+    isEpoll ? placementNew(storage.reinterpret_as<KernelEventsPosix>(), *this)
+            : placementNew(storage.reinterpret_as<KernelEventsIoURing>(), *this);
+}
+
+SC::AsyncEventLoop::Internal::KernelEvents::~KernelEvents()
+{
+    isEpoll ? storage.reinterpret_as<KernelEventsPosix>().~KernelEventsPosix()
+            : storage.reinterpret_as<KernelEventsIoURing>().~KernelEventsIoURing();
+}
+
+SC::AsyncEventLoop::Internal::KernelEventsIoURing& SC::AsyncEventLoop::Internal::KernelEvents::getUring()
+{
+    return storage.reinterpret_as<KernelEventsIoURing>();
+}
+
+SC::AsyncEventLoop::Internal::KernelEventsPosix& SC::AsyncEventLoop::Internal::KernelEvents::getPosix()
+{
+    return storage.reinterpret_as<KernelEventsPosix>();
+}
+
+const SC::AsyncEventLoop::Internal::KernelEventsIoURing& SC::AsyncEventLoop::Internal::KernelEvents::getUring() const
+{
+    return storage.reinterpret_as<const KernelEventsIoURing>();
+}
+
+const SC::AsyncEventLoop::Internal::KernelEventsPosix& SC::AsyncEventLoop::Internal::KernelEvents::getPosix() const
+{
+    return storage.reinterpret_as<const KernelEventsPosix>();
+}
+
+SC::uint32_t SC::AsyncEventLoop::Internal::KernelEvents::getNumEvents() const
 {
     return isEpoll ? getPosix().getNumEvents() : getUring().getNumEvents();
 }
 
-SC::Result SC::AsyncEventLoop::KernelQueue::syncWithKernel(AsyncEventLoop& eventLoop, Private::SyncMode syncMode)
+SC::Result SC::AsyncEventLoop::Internal::KernelEvents::syncWithKernel(AsyncEventLoop&    eventLoop,
+                                                                      Internal::SyncMode syncMode)
 {
     return isEpoll ? getPosix().syncWithKernel(eventLoop, syncMode) : getUring().syncWithKernel(eventLoop, syncMode);
 }
 
-SC::Result SC::AsyncEventLoop::KernelQueue::validateEvent(uint32_t& idx, bool& continueProcessing)
+SC::Result SC::AsyncEventLoop::Internal::KernelEvents::validateEvent(uint32_t& idx, bool& continueProcessing)
 {
     return isEpoll ? getPosix().validateEvent(idx, continueProcessing)
                    : getUring().validateEvent(idx, continueProcessing);
 }
 
-SC::AsyncRequest* SC::AsyncEventLoop::KernelQueue::getAsyncRequest(uint32_t idx)
+SC::AsyncRequest* SC::AsyncEventLoop::Internal::KernelEvents::getAsyncRequest(uint32_t idx)
 {
     return isEpoll ? getPosix().getAsyncRequest(idx) : getUring().getAsyncRequest(idx);
 }
 
 // clang-format off
-template <typename T>  SC::Result SC::AsyncEventLoop::KernelQueue::setupAsync(T& async)    { return isEpoll ? getPosix().setupAsync(async) : getUring().setupAsync(async); }
-template <typename T>  SC::Result SC::AsyncEventLoop::KernelQueue::teardownAsync(T& async) { return isEpoll ? getPosix().teardownAsync(async) : getUring().teardownAsync(async); }
-template <typename T>  SC::Result SC::AsyncEventLoop::KernelQueue::activateAsync(T& async) { return isEpoll ? getPosix().activateAsync(async) : getUring().activateAsync(async); }
-template <typename T>  SC::Result SC::AsyncEventLoop::KernelQueue::completeAsync(T& async) { return isEpoll ? getPosix().completeAsync(async) : getUring().completeAsync(async); }
-template <typename T>  SC::Result SC::AsyncEventLoop::KernelQueue::cancelAsync(T& async)   { return isEpoll ? getPosix().cancelAsync(async) : getUring().cancelAsync(async); }
+template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::setupAsync(T& async)    { return isEpoll ? getPosix().setupAsync(async) : getUring().setupAsync(async); }
+template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::teardownAsync(T& async) { return isEpoll ? getPosix().teardownAsync(async) : getUring().teardownAsync(async); }
+template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::activateAsync(T& async) { return isEpoll ? getPosix().activateAsync(async) : getUring().activateAsync(async); }
+template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::completeAsync(T& async) { return isEpoll ? getPosix().completeAsync(async) : getUring().completeAsync(async); }
+template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::cancelAsync(T& async)   { return isEpoll ? getPosix().cancelAsync(async) : getUring().cancelAsync(async); }
 
-template <typename T, typename P>  SC::Result SC::AsyncEventLoop::KernelQueue::executeOperation(T& async, P& param)   { return KernelQueuePosix::executeOperation(async, param); }
+template <typename T, typename P>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::executeOperation(T& async, P& param)   { return KernelEventsPosix::executeOperation(async, param); }
 // clang-format on

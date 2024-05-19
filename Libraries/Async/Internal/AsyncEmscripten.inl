@@ -1,11 +1,11 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../Async.h"
-#include "AsyncPrivate.h"
+#include "AsyncInternal.h"
 
-struct SC::AsyncEventLoop::Internal
+struct SC::AsyncEventLoop::KernelQueue
 {
-    ~Internal() { SC_TRUST_RESULT(close()); }
+    ~KernelQueue() { SC_TRUST_RESULT(close()); }
     [[nodiscard]] Result close() { return Result(true); }
     [[nodiscard]] Result createEventLoop(AsyncEventLoop::Options) { return Result(true); }
     [[nodiscard]] Result createSharedWatchers(AsyncEventLoop&) { return Result(true); }
@@ -15,12 +15,12 @@ struct SC::AsyncEventLoop::Internal
     [[nodiscard]] Result makesSenseToRunInThreadPool(AsyncRequest&) { return Result(true); }
 };
 
-struct SC::AsyncEventLoop::KernelQueue
+struct SC::AsyncEventLoop::KernelEvents
 {
-    KernelQueue(Internal&) {}
+    KernelEvents(KernelQueue&) {}
     uint32_t getNumEvents() const { return 0; }
 
-    [[nodiscard]] Result syncWithKernel(AsyncEventLoop&, Private::SyncMode) { return Result(true); }
+    [[nodiscard]] Result syncWithKernel(AsyncEventLoop&, Internal::SyncMode) { return Result(true); }
     [[nodiscard]] Result validateEvent(uint32_t, bool&) { return Result(true); }
 
     [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t) const { return nullptr; }

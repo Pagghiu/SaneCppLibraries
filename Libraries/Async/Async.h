@@ -920,53 +920,16 @@ struct SC::AsyncEventLoop
     /// @return true if liburing has been loaded, false otherwise (and on any non-Linux os)
     [[nodiscard]] static bool tryLoadingLiburing();
 
-  private:
-    struct Private;
-
-    struct PrivateDefinition
-    {
-        static constexpr int Windows = 336;
-        static constexpr int Apple   = 360;
-        static constexpr int Default = 344;
-
-        static constexpr size_t Alignment = 8;
-
-        using Object = Private;
-    };
-
-  public:
-    using PrivateOpaque = OpaqueObject<PrivateDefinition>;
+    struct Internal;
 
   private:
-    PrivateOpaque privateOpaque;
-    Private&      privateSelf;
-
-#if SC_PLATFORM_LINUX
-    struct InternalPosix;
-    struct KernelQueuePosix;
-    struct InternalIoURing;
-    struct KernelQueueIoURing;
-    struct Internal;
-    struct KernelQueue;
-#elif SC_PLATFORM_APPLE
-    struct InternalPosix;
-    struct KernelQueuePosix;
-    using Internal    = InternalPosix;
-    using KernelQueue = KernelQueuePosix;
-#elif SC_PLATFORM_WINDOWS
-    struct Internal;
-    struct KernelQueue;
-#else
-    struct Internal;
-    struct KernelQueue;
-#endif
     struct InternalDefinition
     {
-        static constexpr int Windows = 184;
-        static constexpr int Apple   = 104;
-        static constexpr int Default = 336;
+        static constexpr int Windows = 520;
+        static constexpr int Apple   = 464;
+        static constexpr int Default = 680;
 
-        static constexpr size_t Alignment = alignof(void*);
+        static constexpr size_t Alignment = 8;
 
         using Object = Internal;
     };
@@ -975,8 +938,9 @@ struct SC::AsyncEventLoop
     using InternalOpaque = OpaqueObject<InternalDefinition>;
 
   private:
-    InternalOpaque internal;
-    Internal&      internalSelf;
+    InternalOpaque internalOpaque;
+    Internal&      internal;
+
     friend struct AsyncRequest;
     friend struct AsyncFileWrite;
     friend struct AsyncFileRead;

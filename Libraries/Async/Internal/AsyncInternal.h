@@ -4,9 +4,45 @@
 #include "../../Containers/IntrusiveDoubleLinkedList.h"
 #include "ThreadSafeLinkedList.h"
 
-struct SC::AsyncEventLoop::Private
+struct SC::AsyncEventLoop::Internal
 {
-    AsyncEventLoop* eventLoop = nullptr;
+#if SC_PLATFORM_LINUX
+    struct KernelQueuePosix;
+    struct KernelEventsPosix;
+    struct KernelQueueIoURing;
+    struct KernelEventsIoURing;
+    struct KernelQueue;
+    struct KernelEvents;
+#elif SC_PLATFORM_APPLE
+    struct KernelQueuePosix;
+    struct KernelEventsPosix;
+    using KernelQueue  = KernelQueuePosix;
+    using KernelEvents = KernelEventsPosix;
+#elif SC_PLATFORM_WINDOWS
+    struct KernelQueue;
+    struct KernelEvents;
+#else
+    struct KernelQueue;
+    struct KernelEvents;
+#endif
+
+    struct KernelQueueDefinition
+    {
+        static constexpr int Windows = 184;
+        static constexpr int Apple   = 104;
+        static constexpr int Default = 336;
+
+        static constexpr size_t Alignment = alignof(void*);
+
+        using Object = KernelQueue;
+    };
+
+    using KernelQueueOpaque = OpaqueObject<KernelQueueDefinition>;
+
+    // Using opaque to allow defining KernelQueue class later
+    KernelQueueOpaque kernelQueue;
+
+    AsyncEventLoop* loop = nullptr;
 
     Atomic<bool> wakeUpPending = false;
 
@@ -57,7 +93,7 @@ struct SC::AsyncEventLoop::Private
 
     void invokeExpiredTimers();
     void updateTime();
-    void executeTimers(KernelQueue& queue, const Time::HighResolutionCounter& nextTimer);
+    void executeTimers(KernelEvents& kernelEvents, const Time::HighResolutionCounter& nextTimer);
 
     [[nodiscard]] Result cancelAsync(AsyncRequest& async);
 
@@ -68,21 +104,23 @@ struct SC::AsyncEventLoop::Private
     [[nodiscard]] Result queueSubmission(AsyncRequest& async, AsyncTask* task);
 
     // Phases
-    [[nodiscard]] Result stageSubmission(KernelQueue& queue, AsyncRequest& async);
-    [[nodiscard]] Result setupAsync(KernelQueue& queue, AsyncRequest& async);
-    [[nodiscard]] Result teardownAsync(KernelQueue& queue, AsyncRequest& async);
-    [[nodiscard]] Result activateAsync(KernelQueue& queue, AsyncRequest& async);
-    [[nodiscard]] Result cancelAsync(KernelQueue& queue, AsyncRequest& async);
-    [[nodiscard]] Result completeAsync(KernelQueue& queue, AsyncRequest& async, Result&& returnCode, bool& reactivate);
+    [[nodiscard]] Result stageSubmission(KernelEvents& kernelEvents, AsyncRequest& async);
+    [[nodiscard]] Result setupAsync(KernelEvents& kernelEvents, AsyncRequest& async);
+    [[nodiscard]] Result teardownAsync(KernelEvents& kernelEvents, AsyncRequest& async);
+    [[nodiscard]] Result activateAsync(KernelEvents& kernelEvents, AsyncRequest& async);
+    [[nodiscard]] Result cancelAsync(KernelEvents& kernelEvents, AsyncRequest& async);
+    [[nodiscard]] Result completeAsync(KernelEvents& kernelEvents, AsyncRequest& async, Result&& returnCode,
+                                       bool& reactivate);
 
     struct SetupAsyncPhase;
     struct TeardownAsyncPhase;
     struct ActivateAsyncPhase;
     struct CancelAsyncPhase;
     struct CompleteAsyncPhase;
-    [[nodiscard]] Result completeAndEventuallyReactivate(KernelQueue& queue, AsyncRequest& async, Result&& returnCode);
+    [[nodiscard]] Result completeAndEventuallyReactivate(KernelEvents& kernelEvents, AsyncRequest& async,
+                                                         Result&& returnCode);
 
-    void reportError(KernelQueue& queue, AsyncRequest& async, Result&& returnCode);
+    void reportError(KernelEvents& kernelEvents, AsyncRequest& async, Result&& returnCode);
 
     enum class SyncMode
     {
@@ -92,9 +130,9 @@ struct SC::AsyncEventLoop::Private
 
     [[nodiscard]] Result runStep(SyncMode syncMode);
 
-    void runStepExecuteCompletions(KernelQueue& queue);
-    void runStepExecuteManualCompletions(KernelQueue& queue);
-    void runStepExecuteManualThreadPoolCompletions(KernelQueue& queue);
+    void runStepExecuteCompletions(KernelEvents& kernelEvents);
+    void runStepExecuteManualCompletions(KernelEvents& kernelEvents);
+    void runStepExecuteManualThreadPoolCompletions(KernelEvents& kernelEvents);
 
     friend struct AsyncRequest;
 

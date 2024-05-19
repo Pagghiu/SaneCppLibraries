@@ -5,18 +5,6 @@
 #include <Windows.h>
 #include <stddef.h> // offsetof
 
-#include "../../File/FileDescriptor.h"
-
-namespace SC
-{
-namespace detail
-{
-struct AsyncWinOverlapped;
-struct WinWaitHandle;
-struct AsyncWinWaitDefinition;
-} // namespace detail
-} // namespace SC
-
 // We store a user pointer at a fixed offset from overlapped to allow getting back source object
 // with results from GetQueuedCompletionStatusEx.
 // We must do it because there is no void* userData pointer in the OVERLAPPED struct

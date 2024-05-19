@@ -8,7 +8,7 @@
 #include <Ws2tcpip.h> // sockadd_in6
 
 #include "../../Foundation/Deferred.h"
-#include "AsyncPrivate.h"
+#include "AsyncInternal.h"
 #include "AsyncWindows.h"
 #include "AsyncWindowsAPI.h"
 
@@ -31,7 +31,7 @@ SC::Result SC::detail::AsyncWinWaitDefinition::releaseHandle(Handle& waitHandle)
     return Result(true);
 }
 
-struct SC::AsyncEventLoop::Internal
+struct SC::AsyncEventLoop::Internal::KernelQueue
 {
     FileDescriptor          loopFd;
     AsyncFilePoll           asyncWakeUp;
@@ -40,7 +40,7 @@ struct SC::AsyncEventLoop::Internal
     LPFN_ACCEPTEX           pAcceptEx             = nullptr;
     LPFN_DISCONNECTEX       pDisconnectEx         = nullptr;
 
-    Internal()
+    KernelQueue()
     {
         HMODULE ntdll = GetModuleHandleA("ntdll.dll");
         pNtSetInformationFile =
@@ -108,7 +108,7 @@ struct SC::AsyncEventLoop::Internal
         return Result(true);
     }
 
-    ~Internal() { SC_TRUST_RESULT(close()); }
+    ~KernelQueue() { SC_TRUST_RESULT(close()); }
 
     [[nodiscard]] Result close() { return loopFd.close(); }
 
@@ -122,7 +122,7 @@ struct SC::AsyncEventLoop::Internal
         if (newQueue == INVALID_HANDLE_VALUE)
         {
             // TODO: Better CreateIoCompletionPort error handling
-            return Result::Error("AsyncEventLoop::Internal::createEventLoop() - CreateIoCompletionPort");
+            return Result::Error("AsyncEventLoop::KernelQueue::createEventLoop() - CreateIoCompletionPort");
         }
         SC_TRY(loopFd.assign(newQueue));
         return Result(true);
@@ -133,20 +133,20 @@ struct SC::AsyncEventLoop::Internal
         SC_TRY(createWakeup(eventLoop));
         SC_TRY(eventLoop.runNoWait()); // Register the read handle before everything else
         // Calls to decreaseActiveCount must be after runNoWait()
-        eventLoop.privateSelf.decreaseActiveCount(); // WakeUp (poll) doesn't keep the queue active
+        eventLoop.internal.decreaseActiveCount(); // WakeUp (poll) doesn't keep the kernelEvents active
         return Result(true);
     }
 
     [[nodiscard]] Result createWakeup(AsyncEventLoop& eventLoop)
     {
         asyncWakeUp.setDebugName("SharedWakeUp");
-        asyncWakeUp.callback.bind<Internal, &Internal::completeWakeUp>(*this);
+        asyncWakeUp.callback.bind<KernelQueue, &KernelQueue::completeWakeUp>(*this);
         return asyncWakeUp.start(eventLoop, 0);
     }
 
     void completeWakeUp(AsyncFilePoll::Result& result)
     {
-        result.getAsync().eventLoop->privateSelf.executeWakeUps(result);
+        result.getAsync().eventLoop->internal.executeWakeUps(result);
         result.reactivateRequest(true);
     }
 
@@ -182,14 +182,14 @@ struct SC::AsyncEventLoop::Internal
     }
 };
 
-struct SC::AsyncEventLoop::KernelQueue
+struct SC::AsyncEventLoop::Internal::KernelEvents
 {
     static constexpr int totalNumEvents = 128;
 
     OVERLAPPED_ENTRY events[totalNumEvents];
     ULONG            newEvents = 0;
 
-    KernelQueue(Internal&) { ::memset(events, 0, totalNumEvents * sizeof(events[0])); }
+    KernelEvents(KernelQueue&) { ::memset(events, 0, totalNumEvents * sizeof(events[0])); }
 
     uint32_t getNumEvents() const { return static_cast<uint32_t>(newEvents); }
 
@@ -204,22 +204,24 @@ struct SC::AsyncEventLoop::KernelQueue
         return detail::AsyncWinOverlapped::getUserDataFromOverlapped<AsyncRequest>(event.lpOverlapped);
     }
 
-    [[nodiscard]] Result syncWithKernel(AsyncEventLoop& self, Private::SyncMode syncMode)
+    [[nodiscard]] Result syncWithKernel(AsyncEventLoop& self, Internal::SyncMode syncMode)
     {
-        const Time::HighResolutionCounter* nextTimer = self.privateSelf.findEarliestTimer();
+        const Time::HighResolutionCounter* nextTimer = self.internal.findEarliestTimer();
 
         FileDescriptor::Handle loopHandle;
-        SC_TRY(self.internalSelf.loopFd.get(loopHandle, Result::Error("AsyncEventLoop::poll() - Invalid Handle")));
+        SC_TRY(self.internal.kernelQueue.get().loopFd.get(loopHandle,
+                                                          Result::Error("AsyncEventLoop::poll() - Invalid Handle")));
         Time::Milliseconds timeout;
         if (nextTimer)
         {
-            if (nextTimer->isLaterThanOrEqualTo(self.privateSelf.loopTime))
+            if (nextTimer->isLaterThanOrEqualTo(self.internal.loopTime))
             {
-                timeout = nextTimer->subtractApproximate(self.privateSelf.loopTime).inRoundedUpperMilliseconds();
+                timeout = nextTimer->subtractApproximate(self.internal.loopTime).inRoundedUpperMilliseconds();
             }
         }
-        const DWORD ms = nextTimer or syncMode == Private::SyncMode::NoWait ? static_cast<ULONG>(timeout.ms) : INFINITE;
-        const BOOL  res = ::GetQueuedCompletionStatusEx(loopHandle, events, totalNumEvents, &newEvents, ms, FALSE);
+        const DWORD ms =
+            nextTimer or syncMode == Internal::SyncMode::NoWait ? static_cast<ULONG>(timeout.ms) : INFINITE;
+        const BOOL res = ::GetQueuedCompletionStatusEx(loopHandle, events, totalNumEvents, &newEvents, ms, FALSE);
         if (res == FALSE)
         {
             if (::GetLastError() == WAIT_TIMEOUT)
@@ -233,12 +235,12 @@ struct SC::AsyncEventLoop::KernelQueue
             else
             {
                 // TODO: GetQueuedCompletionStatusEx error handling
-                return Result::Error("KernelQueue::poll() - GetQueuedCompletionStatusEx error");
+                return Result::Error("KernelEvents::poll() - GetQueuedCompletionStatusEx error");
             }
         }
         if (nextTimer)
         {
-            self.privateSelf.executeTimers(*this, *nextTimer);
+            self.internal.executeTimers(*this, *nextTimer);
         }
         return Result(true);
     }
@@ -280,9 +282,9 @@ struct SC::AsyncEventLoop::KernelQueue
 
         DWORD sync_bytes_read = 0;
 
-        SC_TRY(eventLoop.internalSelf.ensureAcceptFunction(operation.handle));
+        SC_TRY(eventLoop.internal.kernelQueue.get().ensureAcceptFunction(operation.handle));
         BOOL res;
-        res = eventLoop.internalSelf.pAcceptEx(
+        res = eventLoop.internal.kernelQueue.get().pAcceptEx(
             operation.handle, clientSocket, operation.acceptBuffer, 0, sizeof(struct sockaddr_storage) + 16,
             sizeof(struct sockaddr_storage) + 16, &sync_bytes_read, &overlapped.overlapped);
         if (res == FALSE and WSAGetLastError() != WSA_IO_PENDING)
@@ -298,14 +300,15 @@ struct SC::AsyncEventLoop::KernelQueue
     [[nodiscard]] static Result completeAsync(AsyncSocketAccept::Result& result)
     {
         AsyncSocketAccept& operation = result.getAsync();
-        SC_TRY(Internal::checkWSAResult(operation.handle, operation.overlapped.get().overlapped));
+        SC_TRY(KernelQueue::checkWSAResult(operation.handle, operation.overlapped.get().overlapped));
         SOCKET clientSocket;
         SC_TRY(operation.clientSocket.get(clientSocket, Result::Error("clientSocket error")));
         const int socketOpRes = ::setsockopt(clientSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
                                              reinterpret_cast<char*>(&operation.handle), sizeof(operation.handle));
         SC_TRY_MSG(socketOpRes == 0, "setsockopt SO_UPDATE_ACCEPT_CONTEXT failed");
         HANDLE loopHandle;
-        SC_TRY(result.getAsync().eventLoop->internalSelf.loopFd.get(loopHandle, Result::Error("completeAsync handle")));
+        SC_TRY(result.getAsync().eventLoop->internal.kernelQueue.get().loopFd.get(
+            loopHandle, Result::Error("completeAsync handle")));
         HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(clientSocket), loopHandle, 0, 0);
         SC_TRY_MSG(iocp == loopHandle, "completeAsync ACCEPT CreateIoCompletionPort failed");
         return result.completionData.acceptedClient.assign(move(operation.clientSocket));
@@ -323,7 +326,7 @@ struct SC::AsyncEventLoop::KernelQueue
         memset(&status_block, 0, sizeof(status_block));
 
         AsyncEventLoop& eventLoop = *asyncAccept.eventLoop;
-        NTSTATUS        status    = eventLoop.internalSelf.pNtSetInformationFile(
+        NTSTATUS        status    = eventLoop.internal.kernelQueue.get().pNtSetInformationFile(
             listenHandle, &status_block, &file_completion_info, sizeof(file_completion_info),
             FileReplaceCompletionInformation);
         if (status != STATUS_SUCCESS)
@@ -369,15 +372,15 @@ struct SC::AsyncEventLoop::KernelQueue
         {
             return Result::Error("bind failed");
         }
-        SC_TRY(eventLoop.internalSelf.ensureConnectFunction(asyncConnect.handle));
+        SC_TRY(eventLoop.internal.kernelQueue.get().ensureConnectFunction(asyncConnect.handle));
 
         const struct sockaddr* sockAddr = &asyncConnect.ipAddress.handle.reinterpret_as<const struct sockaddr>();
 
         const int sockAddrLen = asyncConnect.ipAddress.sizeOfHandle();
 
         DWORD dummyTransferred;
-        BOOL  connectRes = eventLoop.internalSelf.pConnectEx(asyncConnect.handle, sockAddr, sockAddrLen, nullptr, 0,
-                                                             &dummyTransferred, &overlapped);
+        BOOL  connectRes = eventLoop.internal.kernelQueue.get().pConnectEx(asyncConnect.handle, sockAddr, sockAddrLen,
+                                                                           nullptr, 0, &dummyTransferred, &overlapped);
         if (connectRes == FALSE and WSAGetLastError() != WSA_IO_PENDING)
         {
             return Result::Error("ConnectEx failed");
@@ -389,7 +392,7 @@ struct SC::AsyncEventLoop::KernelQueue
     [[nodiscard]] static Result completeAsync(AsyncSocketConnect::Result& result)
     {
         AsyncSocketConnect& operation = result.getAsync();
-        SC_TRY(Internal::checkWSAResult(operation.handle, operation.overlapped.get().overlapped));
+        SC_TRY(KernelQueue::checkWSAResult(operation.handle, operation.overlapped.get().overlapped));
         return Result(true);
     }
 
@@ -412,8 +415,8 @@ struct SC::AsyncEventLoop::KernelQueue
 
     [[nodiscard]] static Result completeAsync(AsyncSocketSend::Result& result)
     {
-        return Internal::checkWSAResult(result.getAsync().handle, result.getAsync().overlapped.get().overlapped,
-                                        &result.completionData.numBytes);
+        return KernelQueue::checkWSAResult(result.getAsync().handle, result.getAsync().overlapped.get().overlapped,
+                                           &result.completionData.numBytes);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -435,8 +438,8 @@ struct SC::AsyncEventLoop::KernelQueue
 
     [[nodiscard]] static Result completeAsync(AsyncSocketReceive::Result& result)
     {
-        return Internal::checkWSAResult(result.getAsync().handle, result.getAsync().overlapped.get().overlapped,
-                                        &result.completionData.numBytes);
+        return KernelQueue::checkWSAResult(result.getAsync().handle, result.getAsync().overlapped.get().overlapped,
+                                           &result.completionData.numBytes);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -445,7 +448,7 @@ struct SC::AsyncEventLoop::KernelQueue
     [[nodiscard]] static Result setupAsync(AsyncSocketClose& async)
     {
         // TODO: Allow running close on thread pool
-        async.flags |= Private::Flag_ManualCompletion;
+        async.flags |= Internal::Flag_ManualCompletion;
         async.code = ::closesocket(async.handle);
         SC_TRY_MSG(async.code == 0, "Close returned error");
         return Result(true);
@@ -554,7 +557,7 @@ struct SC::AsyncEventLoop::KernelQueue
     [[nodiscard]] Result setupAsync(AsyncFileClose& async)
     {
         // TODO: Allow running close on thread pool
-        async.flags |= Private::Flag_ManualCompletion;
+        async.flags |= Internal::Flag_ManualCompletion;
         async.code = ::CloseHandle(async.fileDescriptor) == FALSE ? -1 : 0;
         SC_TRY_MSG(async.code == 0, "Close returned error");
         return Result(true);
@@ -569,7 +572,7 @@ struct SC::AsyncEventLoop::KernelQueue
         SC_COMPILER_UNUSED(timeoutOccurred);
         AsyncProcessExit&      async = *static_cast<AsyncProcessExit*>(data);
         FileDescriptor::Handle loopHandle;
-        SC_TRUST_RESULT(async.eventLoop->internalSelf.loopFd.get(loopHandle, Result::Error("loopFd")));
+        SC_TRUST_RESULT(async.eventLoop->internal.kernelQueue.get().loopFd.get(loopHandle, Result::Error("loopFd")));
 
         if (PostQueuedCompletionStatus(loopHandle, 0, 0, &async.overlapped.get().overlapped) == FALSE)
         {
@@ -583,7 +586,7 @@ struct SC::AsyncEventLoop::KernelQueue
         const ProcessDescriptor::Handle processHandle = async.handle;
 
         HANDLE waitHandle;
-        BOOL result = RegisterWaitForSingleObject(&waitHandle, processHandle, KernelQueue::processExitCallback, &async,
+        BOOL result = RegisterWaitForSingleObject(&waitHandle, processHandle, KernelEvents::processExitCallback, &async,
                                                   INFINITE, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE);
         if (result == FALSE)
         {
