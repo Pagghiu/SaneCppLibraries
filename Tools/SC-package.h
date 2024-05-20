@@ -252,7 +252,7 @@ inline Result verifyGitCommitHash(const Download& download, const Package& packa
         {
             "git",
             "rev-parse",
-            "head",
+            "HEAD",
         },
         result));
     return Result(result.view().startsWith(download.packageVersion.view()));
