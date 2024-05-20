@@ -131,6 +131,7 @@ On the [Youtube Channel](https://www.youtube.com/@Pagghiu) you can find some vid
 - [Simple ThreadPool](https://www.youtube.com/watch?v=e48ruImESxI)
 - [Async file read and writes using Thread Pool](https://www.youtube.com/watch?v=WF9beKyEA_E)
 - [Implement SC::AsyncLoopWork](https://www.youtube.com/watch?v=huavEjzflHQ)
+- [BREAK SC::Async IO Event Loop](https://www.youtube.com/watch?v=3lbyx11qDxM)
 
 # Contributing
 
