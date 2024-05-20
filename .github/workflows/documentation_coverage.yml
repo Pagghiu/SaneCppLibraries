@@ -48,7 +48,10 @@ jobs:
     - name: fix documentation permissions
       run: chmod -v -R +rX "_Build/_Documentation/docs"
     - name: Setup Pages
-      if: github.ref == 'refs/heads/main'
+      # Skip documentation deployment step on forks
+      # This may fail because forks may not have enabled pages.
+      # Probably a better way to handle this would be by using a CI variable.
+      if: github.ref == 'refs/heads/main' && github.repository == 'Pagghiu/SaneCppLibraries'
       uses: actions/configure-pages@v4
     - name: Upload Artifact
       if: github.ref == 'refs/heads/main' && github.repository == 'Pagghiu/SaneCppLibraries'
