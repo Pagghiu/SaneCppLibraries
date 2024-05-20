@@ -45,7 +45,7 @@ else
 SCTool_CONFIG_FLAGS := -DNDEBUG=1 -O3
 endif
 
-SCTool_COMMON_FLAGS := "-I../../.." -DSC_COMPILER_ENABLE_STD_CPP=1
+SCTool_COMMON_FLAGS := "-I../../.."
 SCTool_CPPFLAGS := $(SCTool_COMMON_FLAGS) $(SCTool_CONFIG_FLAGS) $(CPPFLAGS)
 SCTool_CXXFLAGS := $(SCTool_CPPFLAGS) -std=c++14 -fstrict-aliasing -fvisibility=hidden -fvisibility-inlines-hidden -fno-rtti -nostdinc++ -fno-exceptions $(CXXFLAGS)
 

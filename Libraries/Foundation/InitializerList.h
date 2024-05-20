@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/PrimitiveTypes.h"
+#if SC_COMPILER_ENABLE_STD_CPP
+#include <initializer_list>
+#else
 namespace std
 {
 template <class _Ep>
@@ -43,3 +46,4 @@ inline constexpr const _Ep* end(initializer_list<_Ep> __il) noexcept
 }
 
 } // namespace std
+#endif

@@ -213,6 +213,12 @@ T& fieldOffset(R& object)
 #else
 #define SC_LANGUAGE_IF_CONSTEXPR
 #endif
+
+#if __cpp_exceptions == 199711 || _EXCEPTIONS
+#define SC_LANGUAGE_EXCEPTIONS 1
+#else
+#define SC_LANGUAGE_EXCEPTIONS 0
+#endif
 //! @}
 // clang-format off
 namespace SC
