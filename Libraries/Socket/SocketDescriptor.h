@@ -11,8 +11,6 @@
 namespace SC
 {
 struct String;
-template <typename T>
-struct Vector;
 } // namespace SC
 
 namespace SC
@@ -21,6 +19,9 @@ struct SocketDescriptor;
 struct SocketFlags;
 struct SocketIPAddress;
 struct SocketNetworking;
+struct SocketClient;
+struct SocketServer;
+struct SocketDNS;
 namespace detail
 {
 struct SocketDescriptorDefinition;
@@ -101,7 +102,7 @@ struct SC::SocketFlags
 
   private:
     friend struct SocketDescriptor;
-    friend struct NetworkingInternal;
+    friend struct SocketIPAddressInternal;
     [[nodiscard]] static AddressFamily AddressFamilyFromInt(int value);
     [[nodiscard]] static unsigned char toNative(AddressFamily family);
     [[nodiscard]] static SocketType    SocketTypeFromInt(int value);
@@ -142,6 +143,7 @@ struct SC::SocketIPAddress
 
   private:
     SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
+    struct Internal;
 };
 
 /// @brief Low-level OS socket handle.
@@ -183,13 +185,6 @@ struct SC::SocketDescriptor : public UniqueHandle<detail::SocketDescriptorDefini
     /// @return Valid Result the address family for this socket has been queried successfully
     [[nodiscard]] Result getAddressFamily(SocketFlags::AddressFamily& addressFamily) const;
 };
-
-namespace SC
-{
-struct SocketClient;
-struct SocketServer;
-struct DNSResolver;
-} // namespace SC
 
 /// @brief Use a SocketDescriptor as a Server (example TCP Socket Server).
 ///
@@ -331,8 +326,11 @@ struct SC::SocketClient
     SocketDescriptor& socket;
 };
 
-/// @brief DNS Resolution and globals initialization (Winsock2 WSAStartup)
-struct SC::SocketNetworking
+/// @brief Synchronous DNS Resolution
+///
+/// Example:
+/// @snippet Libraries/Socket/Tests/SocketDescriptorTest.cpp resolveDNSSnippet
+struct SC::SocketDNS
 {
     /// @brief Resolve an host string to an ip address (blocking until DNS response arrives)
     /// @param[in] host The host string (example.com)
@@ -342,7 +340,11 @@ struct SC::SocketNetworking
     /// Example:
     /// @snippet Libraries/Socket/Tests/SocketDescriptorTest.cpp resolveDNSSnippet
     [[nodiscard]] static Result resolveDNS(StringView host, String& ipAddress);
+};
 
+/// @brief Networking globals initialization (Winsock2 WSAStartup)
+struct SC::SocketNetworking
+{
     /// @brief Initializes Winsock2 on Windows (WSAStartup)
     /// @return Valid Result if Winsock2 has been successfully initialized
     [[nodiscard]] static Result initNetworking();
@@ -358,4 +360,5 @@ struct SC::SocketNetworking
   private:
     struct Internal;
 };
+
 //! @}

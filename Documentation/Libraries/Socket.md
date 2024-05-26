@@ -12,6 +12,7 @@
 | SC::SocketServer          | @copybrief SC::SocketServer       |
 | SC::SocketClient          | @copybrief SC::SocketClient       |
 | SC::SocketIPAddress       | @copybrief SC::SocketIPAddress    |
+| SC::SocketDNS             | @copybrief SC::SocketDNS          |
 | SC::SocketNetworking      | @copybrief SC::SocketNetworking   |
 
 # Status
@@ -20,12 +21,11 @@
 Simple synchronous TCP client / server workflow is supported, but it would need better testing.  
 
 # Description
-SC::SocketServer can SC::SocketServer::listen on a given port / address and SC::SocketServer::accept a new client socket.
-SC::SocketClient can SC::SocketClient::connect, SC::SocketClient::write, SC::SocketClient::read and SC::SocketClient::readWithTimeout.
-
-SC::SocketIPAddress allows creating an ip address native object from a SC::StringView and port.
-
-SC::SocketNetworking class allow resolving a StringView to an IP address.
+- SC::SocketServer can SC::SocketServer::listen on a given port / address and SC::SocketServer::accept a new client socket.
+- SC::SocketClient can SC::SocketClient::connect, SC::SocketClient::write, SC::SocketClient::read and SC::SocketClient::readWithTimeout.
+- SC::SocketIPAddress allows creating an ip address native object from a SC::StringView and port.
+- SC::SocketDNS class allow resolving a StringView to an IP address.
+- SC::SocketNetworking initializes WinSock2 for current process.
 
 ## SocketServer
 
@@ -39,9 +39,9 @@ SC::SocketNetworking class allow resolving a StringView to an IP address.
 
 @copydetails SC::SocketIPAddress 
 
-## SocketNetworking::resolveDNS
+## SocketDNS
 
-@copydetails SC::SocketNetworking::resolveDNS
+@copydetails SC::SocketDNS
 
 # Roadmap
 

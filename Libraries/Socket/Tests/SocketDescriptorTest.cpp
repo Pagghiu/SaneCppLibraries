@@ -52,7 +52,7 @@ void SC::SocketDescriptorTest::resolveDNS()
 {
     //! [resolveDNSSnippet]
     SmallString<256> ipAddress;
-    SC_TEST_EXPECT(SocketNetworking::resolveDNS("localhost", ipAddress));
+    SC_TEST_EXPECT(SocketDNS::resolveDNS("localhost", ipAddress));
     SC_TEST_EXPECT(ipAddress.view() == "127.0.0.1");
     //! [resolveDNSSnippet]
 }

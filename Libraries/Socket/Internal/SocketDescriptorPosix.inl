@@ -4,11 +4,16 @@
 #include "../../Foundation/Deferred.h"
 #include "../SocketDescriptor.h"
 
-#include <errno.h>  // errno
-#include <fcntl.h>  // fcntl
-#include <netdb.h>  // AF_INET / IPPROTO_TCP / AF_UNSPEC
-#include <unistd.h> // close
+#include <arpa/inet.h> // inet_pton
+#include <errno.h>     // errno
+#include <fcntl.h>     // fcntl
+#include <netdb.h>     // AF_INET / IPPROTO_TCP / AF_UNSPEC
+#include <unistd.h>    // close
+
+namespace SC
+{
 constexpr int SOCKET_ERROR = -1;
+}
 
 SC::Result SC::detail::SocketDescriptorDefinition::releaseHandle(Handle& handle)
 {
@@ -81,8 +86,12 @@ SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily
 #if defined(SO_NOSIGPIPE)
     {
         int active = 1;
-        setsockopt(handle, SOL_SOCKET, SO_NOSIGPIPE, &active, sizeof(active));
+        ::setsockopt(handle, SOL_SOCKET, SO_NOSIGPIPE, &active, sizeof(active));
     }
 #endif // defined(SO_NOSIGPIPE)
     return Result(isValid());
 }
+
+SC::Result SC::SocketNetworking::initNetworking() { return Result(true); }
+SC::Result SC::SocketNetworking::shutdownNetworking() { return Result(true); }
+bool       SC::SocketNetworking::isNetworkingInited() { return Result(true); }

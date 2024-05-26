@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "HttpClient.h"
-#include "../Socket/SocketDescriptor.h" // DNSResolver
+#include "../Socket/SocketDescriptor.h" // SocketDNS
 #include "HttpURLParser.h"
 
 #include "../Strings/SmallString.h"
@@ -17,7 +17,7 @@ SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringView url)
     SC_TRY(parser.parse(url));
     SC_TRY_MSG(parser.protocol == "http", "Invalid protocol");
     // TODO: Make DNS Resolution asynchronous
-    SC_TRY(SocketNetworking::resolveDNS(parser.hostname, ipAddress))
+    SC_TRY(SocketDNS::resolveDNS(parser.hostname, ipAddress))
     port = parser.port;
     SocketIPAddress localHost;
     SC_TRY(localHost.fromAddressPort(ipAddress.view(), port));
