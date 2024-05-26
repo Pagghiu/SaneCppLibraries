@@ -10,10 +10,6 @@ SC::Result SC::SocketClient::connect(StringView address, uint16_t port)
 {
     SocketIPAddress nativeAddress;
     SC_TRY(nativeAddress.fromAddressPort(address, port));
-    if (not socket.isValid())
-    {
-        SC_TRY(socket.create(nativeAddress.getAddressFamily(), SocketFlags::SocketStream, SocketFlags::ProtocolTcp));
-    }
     return connect(nativeAddress);
 }
 

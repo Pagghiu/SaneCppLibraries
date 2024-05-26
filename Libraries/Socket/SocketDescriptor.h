@@ -302,6 +302,7 @@ struct SC::SocketClient
     /// @param address Address as string
     /// @param port Port to start listening to
     /// @return Valid Result if this client successfully connected to the specified address and port
+    /// @note Socket descriptor MUST have already been created with SocketDescriptor::create
     [[nodiscard]] Result connect(StringView address, uint16_t port);
 
     /// @brief Connect to a given address and port combination

@@ -406,6 +406,8 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(accept.start(eventLoop, serverSocket));
 
             SocketDescriptor client1, client2;
+            SC_TEST_EXPECT(client1.create(nativeAddress.getAddressFamily()));
+            SC_TEST_EXPECT(client2.create(nativeAddress.getAddressFamily()));
             SC_TEST_EXPECT(SocketClient(client1).connect("127.0.0.1", tcpPort));
             SC_TEST_EXPECT(SocketClient(client2).connect("127.0.0.1", tcpPort));
             SC_TEST_EXPECT(not acceptedClient[0].isValid());
@@ -427,6 +429,7 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.runNoWait());
 
             SocketDescriptor client3;
+            SC_TEST_EXPECT(client3.create(nativeAddress.getAddressFamily()));
             SC_TEST_EXPECT(SocketClient(client3).connect("127.0.0.1", tcpPort));
 
             // Now we need a runNoWait for both because there are for sure no other events to be dequeued
@@ -533,6 +536,7 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(server.listen(0));
         }
 
+        SC_TEST_EXPECT(client.create(nativeAddress.getAddressFamily()));
         SC_TEST_EXPECT(SocketClient(client).connect(connectAddress, tcpPort));
         SC_TEST_EXPECT(SocketServer(serverSocket).accept(nativeAddress.getAddressFamily(), serverSideClient));
         SC_TEST_EXPECT(client.setBlocking(false));
