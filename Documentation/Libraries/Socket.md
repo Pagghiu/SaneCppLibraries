@@ -46,7 +46,7 @@ Simple synchronous TCP client / server workflow is supported, but it would need 
 # Roadmap
 
 🟩 Usable
-- UDP Sockets
+- Add UDP specific socket operations
 
 🟦 Complete Features:
 - To be decided

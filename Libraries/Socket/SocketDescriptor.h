@@ -189,29 +189,7 @@ struct SC::SocketDescriptor : public UniqueHandle<detail::SocketDescriptorDefini
 /// @brief Use a SocketDescriptor as a Server (example TCP or UDP Socket Server).
 ///
 /// Example:
-/**
- * @code{.cpp}
-    SocketDescriptor serverSocket;
-    SocketServer     server(serverSocket);
-
-    // Look for an available port
-    constexpr int    tcpPort       = 5050;
-    const StringView serverAddress = "::1"; // or "127.0.0.1"
-    SocketIPAddress  nativeAddress;
-    SC_TRY(nativeAddress.fromAddressPort(serverAddress, tcpPort));
-
-    // Create socket and start listening
-    SC_TRY(serverSocket.create(nativeAddress.getAddressFamily()));
-    SC_TRY(server.listen(nativeAddress, tcpPort));
-
-    // Accept a client
-    SocketDescriptor acceptedClientSocket;
-    SC_TRY(server.accept(family, acceptedClientSocket));
-    SC_TRY(acceptedClientSocket.isValid());
-
-    // ... Do something with acceptedClientSocket
-    @endcode
-*/
+/// @snippet Libraries/Socket/Tests/SocketDescriptorTest.cpp socketServerSnippet
 struct SC::SocketServer
 {
     /// @brief Build a SocketServer from a SocketDescriptor (already created with SocketDescriptor::create)
@@ -230,7 +208,7 @@ struct SC::SocketServer
     /// @brief Start listening for incoming connections at a specific address / port combination (after bind)
     /// @param numberOfWaitingConnections How many connections can be queued before `accept`
     /// @return Valid Result if this socket has successfully been put in listening mode
-    /// @note listening will fail on socket where SocketServer::bind was not called (or if it failed)
+    /// @note UDP socket cannot be listened. TCP socket need a successful SocketServer::bind before SocketServer::listen
     [[nodiscard]] Result listen(uint32_t numberOfWaitingConnections);
 
     /// @brief Accepts a new client, blocking while waiting for it
@@ -243,51 +221,16 @@ struct SC::SocketServer
     SocketDescriptor& socket;
 };
 
-/// @brief Use a SocketDescriptor as a client (example TCP Socket Client).
+/// @brief Use a SocketDescriptor as a client (example a TCP or UDP socket client).
 ///
 /// The socket client can be obtained via SC::SocketServer::accept or connected to an endpoint
-/// through SC::SocketClient::connect
+/// through SC::SocketClient::connect.
+///
 /// Example (accepted client from server, doing a synchronous read):
-/**
- * @code{.cpp}
-    SocketDescriptor acceptedClientSocket;
-    // ... assuming acceptedClientSocket has been obtained with SocketServer::accept
-    SC_TRY(server.accept(family, acceptedClientSocket));
-    SC_TRY(acceptedClientSocket.isValid());
-
-    // Read some data blocking until it's available
-    SocketClient acceptedClient(acceptedClientSocket);
-    Span<char>   readData;
-    SC_TRY(acceptedClient.read({buf, sizeof(buf)}, readData));
-    SC_TRY(buf[0] == testValue and testValue != 0);
-
-    // Read again blocking but with a timeout of 10 seconds
-    SC_TRY(acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, 10000_ms));
-    SC_TRY(buf[0] == testValue + 1);
-
-    // Close the client
-    SC_TRY(acceptedClient.close());
-    @endcode
-*/
+/// @snippet Libraries/Socket/Tests/SocketDescriptorTest.cpp socketClientAcceptSnippet
+///
 /// Example (connecting client to server, doing two synchronous writes):
-/**
- * @code{.cpp}
-    SocketDescriptor clientSocket;
-    SocketClient     client(clientSocket);
-
-    // Connect to the server
-    SC_TRY(client.connect(serverAddress, tcpPort));
-
-    // Write some data to the socket
-    char buf[1] = {testValue};
-    SC_TRY(client.write({buf, sizeof(buf)}));
-    buf[0]++; // change the value and write again
-    SC_TRY(client.write({buf, sizeof(buf)}));
-
-    // Close the socket
-    SC_TRY(client.close());
-    @endcode
-*/
+/// @snippet Libraries/Socket/Tests/SocketDescriptorTest.cpp socketClientConnectSnippet
 struct SC::SocketClient
 {
     /// @brief Constructs this SocketClient from a SocketDescriptor (already created with SocketDescriptor::create)

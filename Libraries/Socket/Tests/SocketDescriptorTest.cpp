@@ -16,6 +16,11 @@ struct SC::SocketDescriptorTest : public SC::TestCase
     inline void resolveDNS();
     inline void socketDescriptor();
     inline void socketClientServer(SocketFlags::SocketType socketType, SocketFlags::ProtocolType protocol);
+
+    inline Result socketServerSnippet();
+    inline Result socketClientAcceptSnippet();
+    inline Result socketClientConnectSnippet();
+
     SocketDescriptorTest(SC::TestReport& report) : TestCase(report, "SocketDescriptorTest")
     {
         using namespace SC;
@@ -35,7 +40,7 @@ struct SC::SocketDescriptorTest : public SC::TestCase
         {
             socketClientServer(SocketFlags::SocketStream, SocketFlags::ProtocolTcp);
         }
-        if (test_section("udp client server"))
+        if (test_section("udp client server (connected)"))
         {
             socketClientServer(SocketFlags::SocketDgram, SocketFlags::ProtocolUdp);
         }
@@ -162,6 +167,126 @@ void SC::SocketDescriptorTest::socketClientServer(SocketFlags::SocketType   sock
     params.eventObject.signal();
     SC_TEST_EXPECT(thread.join());
     SC_TEST_EXPECT(params.connectRes and params.writeRes and params.closeRes);
+}
+
+SC::Result SC::SocketDescriptorTest::socketServerSnippet()
+{
+    //! [socketServerSnippet]
+    SocketDescriptor serverSocket;
+    SocketServer     server(serverSocket);
+
+    // Look for an available port
+    constexpr int    tcpPort       = 5050;
+    const StringView serverAddress = "::1"; // or "127.0.0.1"
+    SocketIPAddress  nativeAddress;
+    SC_TRY(nativeAddress.fromAddressPort(serverAddress, tcpPort));
+    SocketFlags::AddressFamily family = nativeAddress.getAddressFamily();
+
+    // Create socket and start listening
+    SC_TRY(serverSocket.create(family)); // By default creates a TCP Server
+
+    // [Alternatively] Create an UDP socket instead
+    // SC_TRY(serverSocket.create(family, SocketFlags::SocketDgram, SocketFlags::ProtocolUdp));
+
+    SC_TRY(server.bind(nativeAddress)); // Bind the socket to the given address
+    SC_TRY(server.listen(1));           // Start listening (skip this for UDP sockets)
+
+    // Accept a client
+    SocketDescriptor acceptedClientSocket;
+    SC_TRY(server.accept(family, acceptedClientSocket));
+    SC_TRY(acceptedClientSocket.isValid());
+
+    // ... Do something with acceptedClientSocket
+    //! [socketServerSnippet]
+    return Result(true);
+}
+
+SC::Result SC::SocketDescriptorTest::socketClientAcceptSnippet()
+{
+    SocketDescriptor serverSocket;
+    SocketServer     server(serverSocket);
+
+    // Look for an available port
+    constexpr int    tcpPort       = 5050;
+    const StringView serverAddress = "::1"; // or "127.0.0.1"
+    SocketIPAddress  nativeAddress;
+    SC_TRY(nativeAddress.fromAddressPort(serverAddress, tcpPort));
+
+    // Create (TCP) socket and start listening
+    SC_TRY(serverSocket.create(nativeAddress.getAddressFamily()));
+    SC_TRY(server.bind(nativeAddress));
+    SC_TRY(server.listen(1)); // Start listening (skip this for UDP sockets)
+
+    SocketFlags::AddressFamily family;
+    SC_TEST_EXPECT(serverSocket.getAddressFamily(family));
+
+    //! [socketClientAcceptSnippet]
+    SocketDescriptor acceptedClientSocket;
+    // ... assuming to obtain a TCP socket using SocketServer::accept
+    SC_TRY(server.accept(family, acceptedClientSocket));
+    SC_TRY(acceptedClientSocket.isValid());
+
+    // Read some data blocking until it's available
+    char buf[256];
+
+    SocketClient acceptedClient(acceptedClientSocket);
+    Span<char>   readData;
+    SC_TRY(acceptedClient.read({buf, sizeof(buf)}, readData));
+
+    // ... later on
+
+    // Read again blocking but with a timeout of 10 seconds
+    SC_TRY(acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, Time::Milliseconds(10000)));
+
+    // Close the client
+    SC_TRY(acceptedClient.close());
+    //! [socketClientAcceptSnippet]
+    return Result(true);
+}
+
+SC::Result SC::SocketDescriptorTest::socketClientConnectSnippet()
+{
+    SocketDescriptor serverSocket;
+    SocketServer     server(serverSocket);
+
+    // Look for an available port
+    constexpr int    tcpPort       = 5050;
+    const StringView serverAddress = "::1"; // or "127.0.0.1"
+    SocketIPAddress  nativeAddress;
+    SC_TRY(nativeAddress.fromAddressPort(serverAddress, tcpPort));
+
+    // Create a (TCP) socket and start listening
+    SocketFlags::AddressFamily family = nativeAddress.getAddressFamily();
+    SC_TRY(serverSocket.create(family));
+    SC_TRY(server.bind(nativeAddress));
+    SC_TRY(server.listen(1)); // Start listening (skip this for UDP sockets)
+
+    //! [socketClientConnectSnippet]
+
+    // ...assuming there is a socket listening at given serverAddress and tcpPort
+    SocketDescriptor clientSocket;
+    SocketClient     client(clientSocket);
+
+    // Create a (TCP) socket
+    SC_TRY(clientSocket.create(family));
+
+    // [Alternatively] Create an UDP socket instead
+    // SC_TRY(clientSocket.create(family, SocketFlags::SocketDgram, SocketFlags::ProtocolUdp));
+
+    // Connect to the server
+    SC_TRY(client.connect(serverAddress, tcpPort));
+
+    // Write some data to the socket
+    const int testValue = 1;
+    char      buf[1]    = {testValue};
+    SC_TRY(client.write({buf, sizeof(buf)}));
+    buf[0]++; // change the value and write again
+    SC_TRY(client.write({buf, sizeof(buf)}));
+
+    // Close the socket
+    SC_TRY(client.close());
+    //! [socketClientConnectSnippet]
+    return Result(true);
 }
 
 namespace SC
