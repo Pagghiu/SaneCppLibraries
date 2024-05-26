@@ -98,7 +98,10 @@ SC::Result SC::HttpServer::start(AsyncEventLoop& eventLoop, uint32_t maxConnecti
     SocketIPAddress nativeAddress;
     SC_TRY(nativeAddress.fromAddressPort(address, port));
     SC_TRY(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
-    SC_TRY(SocketServer(serverSocket).listen(nativeAddress));
+    SocketServer server(serverSocket);
+    SC_TRY(server.bind(nativeAddress));
+    SC_TRY(server.listen(511));
+
     asyncAccept.setDebugName("HttpServer");
     asyncAccept.callback.bind<HttpServer, &HttpServer::onNewClient>(*this);
     return asyncAccept.start(eventLoop, serverSocket);

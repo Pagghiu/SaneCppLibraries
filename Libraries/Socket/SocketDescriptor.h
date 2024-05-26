@@ -186,7 +186,7 @@ struct SC::SocketDescriptor : public UniqueHandle<detail::SocketDescriptorDefini
     [[nodiscard]] Result getAddressFamily(SocketFlags::AddressFamily& addressFamily) const;
 };
 
-/// @brief Use a SocketDescriptor as a Server (example TCP Socket Server).
+/// @brief Use a SocketDescriptor as a Server (example TCP or UDP Socket Server).
 ///
 /// Example:
 /**
@@ -222,11 +222,16 @@ struct SC::SocketServer
     /// @return The Result of SocketDescriptor::close
     [[nodiscard]] Result close();
 
-    /// @brief Start listening for incoming connections at a specific address / port combination
+    /// @brief Binds this socket to a given address / port combination
     /// @param nativeAddress The interface ip address and port to start listening to
+    /// @return Valid Result if this socket has successfully been bound
+    [[nodiscard]] Result bind(SocketIPAddress nativeAddress);
+
+    /// @brief Start listening for incoming connections at a specific address / port combination (after bind)
     /// @param numberOfWaitingConnections How many connections can be queued before `accept`
-    /// @return Valid Result if this socket has successfully been put in listening mode (bind + listen)
-    [[nodiscard]] Result listen(SocketIPAddress nativeAddress, uint32_t numberOfWaitingConnections = 511);
+    /// @return Valid Result if this socket has successfully been put in listening mode
+    /// @note listening will fail on socket where SocketServer::bind was not called (or if it failed)
+    [[nodiscard]] Result listen(uint32_t numberOfWaitingConnections);
 
     /// @brief Accepts a new client, blocking while waiting for it
     /// @param[in] addressFamily The address family of the SocketDescriptor that will be created

@@ -77,10 +77,19 @@ struct SC::AsyncTest : public SC::TestCase
         SocketIPAddress    serverAddress[2];
         SC_TEST_EXPECT(serverAddress[0].fromAddressPort("127.0.0.1", 5052));
         SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(serverAddress[0].getAddressFamily(), serverSocket[0]));
-        SC_TEST_EXPECT(SocketServer(serverSocket[0]).listen(serverAddress[0], numWaitingConnections));
+        {
+            SocketServer server(serverSocket[0]);
+            SC_TEST_EXPECT(server.bind(serverAddress[0]));
+            SC_TEST_EXPECT(server.listen(numWaitingConnections));
+        }
+
         SC_TEST_EXPECT(serverAddress[1].fromAddressPort("127.0.0.1", 5053));
         SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(serverAddress[1].getAddressFamily(), serverSocket[1]));
-        SC_TEST_EXPECT(SocketServer(serverSocket[1]).listen(serverAddress[1], numWaitingConnections));
+        {
+            SocketServer server(serverSocket[1]);
+            SC_TEST_EXPECT(server.bind(serverAddress[1]));
+            SC_TEST_EXPECT(server.listen(numWaitingConnections));
+        }
 
         SC_TEST_EXPECT(socketAccept[0].start(eventLoop, serverSocket[0]));
         SC_TEST_EXPECT(socketAccept[1].start(eventLoop, serverSocket[1]));
@@ -111,10 +120,20 @@ struct SC::AsyncTest : public SC::TestCase
         SocketIPAddress    serverAddress[2];
         SC_TEST_EXPECT(serverAddress[0].fromAddressPort("127.0.0.1", 5052));
         SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(serverAddress[0].getAddressFamily(), serverSocket[0]));
-        SC_TEST_EXPECT(SocketServer(serverSocket[0]).listen(serverAddress[0], numWaitingConnections));
+        {
+            SocketServer server(serverSocket[0]);
+            SC_TEST_EXPECT(server.bind(serverAddress[0]));
+            SC_TEST_EXPECT(server.listen(numWaitingConnections));
+        }
+
         SC_TEST_EXPECT(serverAddress[1].fromAddressPort("127.0.0.1", 5053));
         SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(serverAddress[1].getAddressFamily(), serverSocket[1]));
-        SC_TEST_EXPECT(SocketServer(serverSocket[1]).listen(serverAddress[1], numWaitingConnections));
+
+        {
+            SocketServer server(serverSocket[1]);
+            SC_TEST_EXPECT(server.bind(serverAddress[1]));
+            SC_TEST_EXPECT(server.listen(numWaitingConnections));
+        }
 
         AsyncSocketAccept asyncAccept[2];
         SC_TEST_EXPECT(asyncAccept[0].start(eventLoop, serverSocket[0]));
@@ -367,7 +386,11 @@ struct SC::AsyncTest : public SC::TestCase
             SocketIPAddress    nativeAddress;
             SC_TEST_EXPECT(nativeAddress.fromAddressPort("127.0.0.1", tcpPort));
             SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
-            SC_TEST_EXPECT(SocketServer(serverSocket).listen(nativeAddress, numWaitingConnections));
+            {
+                SocketServer server(serverSocket);
+                SC_TEST_EXPECT(server.bind(nativeAddress));
+                SC_TEST_EXPECT(server.listen(numWaitingConnections));
+            }
 
             acceptedCount = 0;
 
@@ -428,7 +451,12 @@ struct SC::AsyncTest : public SC::TestCase
             SocketIPAddress  nativeAddress;
             SC_TEST_EXPECT(nativeAddress.fromAddressPort(connectAddress, tcpPort));
             SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
-            SC_TEST_EXPECT(SocketServer(serverSocket).listen(nativeAddress, 2)); // 2 waiting connection
+
+            {
+                SocketServer server(serverSocket);
+                SC_TEST_EXPECT(server.bind(nativeAddress));
+                SC_TEST_EXPECT(server.listen(2)); // 2 waiting connections
+            }
 
             acceptedCount = 0;
 
@@ -498,7 +526,12 @@ struct SC::AsyncTest : public SC::TestCase
         SocketIPAddress  nativeAddress;
         SC_TEST_EXPECT(nativeAddress.fromAddressPort(connectAddress, tcpPort));
         SC_TEST_EXPECT(serverSocket.create(nativeAddress.getAddressFamily()));
-        SC_TEST_EXPECT(SocketServer(serverSocket).listen(nativeAddress, 0));
+
+        {
+            SocketServer server(serverSocket);
+            SC_TEST_EXPECT(server.bind(nativeAddress));
+            SC_TEST_EXPECT(server.listen(0));
+        }
 
         SC_TEST_EXPECT(SocketClient(client).connect(connectAddress, tcpPort));
         SC_TEST_EXPECT(SocketServer(serverSocket).accept(nativeAddress.getAddressFamily(), serverSideClient));
@@ -999,7 +1032,9 @@ uint16_t           tcpPort = 5050;
 SocketIPAddress    nativeAddress;
 SC_TRY(nativeAddress.fromAddressPort("127.0.0.1", tcpPort));
 SC_TRY(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
-SC_TRY(SocketServer(serverSocket).listen(nativeAddress, numWaitingConnections));
+SocketServer server(serverSocket);
+SC_TRY(server.bind(nativeAddress));
+SC_TRY(server.listen(numWaitingConnections));
 // Accept connect for new clients
 AsyncSocketAccept accept;
 accept.callback = [&](AsyncSocketAccept::Result& res)

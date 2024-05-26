@@ -6,7 +6,7 @@ SC::Result SC::SocketServer::close() { return socket.close(); }
 
 // TODO: Add EINTR checks for all SocketServer/SocketClient os calls.
 
-SC::Result SC::SocketServer::listen(SocketIPAddress nativeAddress, uint32_t numberOfWaitingConnections)
+SC::Result SC::SocketServer::bind(SocketIPAddress nativeAddress)
 {
     SC_TRY(SocketNetworking::isNetworkingInited());
     SC_TRY_MSG(socket.isValid(), "Invalid socket");
@@ -28,6 +28,15 @@ SC::Result SC::SocketServer::listen(SocketIPAddress nativeAddress, uint32_t numb
         SC_TRUST_RESULT(socket.close());
         return Result::Error("Could not bind socket to port");
     }
+    return Result(true);
+}
+
+SC::Result SC::SocketServer::listen(uint32_t numberOfWaitingConnections)
+{
+    SC_TRY(SocketNetworking::isNetworkingInited());
+    SC_TRY_MSG(socket.isValid(), "Invalid socket");
+    SocketDescriptor::Handle listenSocket;
+    SC_TRUST_RESULT(socket.get(listenSocket, Result::Error("invalid listen socket")));
     if (::listen(listenSocket, static_cast<int>(numberOfWaitingConnections)) == SOCKET_ERROR)
     {
         SC_TRUST_RESULT(socket.close());

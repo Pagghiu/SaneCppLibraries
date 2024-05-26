@@ -15,7 +15,7 @@ struct SC::SocketDescriptorTest : public SC::TestCase
     inline void parseAddress();
     inline void resolveDNS();
     inline void socketDescriptor();
-    inline void tcpClientServer();
+    inline void socketClientServer(SocketFlags::SocketType socketType, SocketFlags::ProtocolType protocol);
     SocketDescriptorTest(SC::TestReport& report) : TestCase(report, "SocketDescriptorTest")
     {
         using namespace SC;
@@ -33,7 +33,11 @@ struct SC::SocketDescriptorTest : public SC::TestCase
         }
         if (test_section("tcp client server"))
         {
-            tcpClientServer();
+            socketClientServer(SocketFlags::SocketStream, SocketFlags::ProtocolTcp);
+        }
+        if (test_section("udp client server"))
+        {
+            socketClientServer(SocketFlags::SocketDgram, SocketFlags::ProtocolUdp);
         }
     }
 };
@@ -91,7 +95,8 @@ void SC::SocketDescriptorTest::socketDescriptor()
     //! [socketDescriptorSnippet]
 }
 
-void SC::SocketDescriptorTest::tcpClientServer()
+void SC::SocketDescriptorTest::socketClientServer(SocketFlags::SocketType   socketType,
+                                                  SocketFlags::ProtocolType protocol)
 {
     SocketDescriptor           serverSocket;
     SocketServer               server(serverSocket);
@@ -103,9 +108,13 @@ void SC::SocketDescriptorTest::tcpClientServer()
 
     SocketIPAddress nativeAddress;
     SC_TEST_EXPECT(nativeAddress.fromAddressPort(serverAddress, tcpPort));
-    SC_TEST_EXPECT(serverSocket.create(nativeAddress.getAddressFamily()));
-    SC_TEST_EXPECT(server.listen(nativeAddress, tcpPort));
-    constexpr char testValue = 123;
+    SC_TEST_EXPECT(serverSocket.create(nativeAddress.getAddressFamily(), socketType, protocol));
+    SC_TEST_EXPECT(server.bind(nativeAddress));
+    if (protocol == SocketFlags::ProtocolTcp)
+    {
+        SC_TEST_EXPECT(server.listen(0));
+    }
+    static constexpr char testValue = 123;
     struct Params
     {
         Result      connectRes = Result(false);
@@ -113,11 +122,12 @@ void SC::SocketDescriptorTest::tcpClientServer()
         Result      closeRes   = Result(false);
         EventObject eventObject;
     } params;
-    auto func = [&](Thread& thread)
+    SocketDescriptor clientSocket;
+    SC_TEST_EXPECT(clientSocket.create(nativeAddress.getAddressFamily(), socketType, protocol));
+    auto func = [&clientSocket, &params](Thread& thread)
     {
         thread.setThreadName(SC_NATIVE_STR("func"));
-        SocketDescriptor clientSocket;
-        SocketClient     client(clientSocket);
+        SocketClient client(clientSocket);
         params.connectRes = client.connect(serverAddress, tcpPort);
         char buf[1]       = {testValue};
         params.writeRes   = client.write({buf, sizeof(buf)});
@@ -132,11 +142,15 @@ void SC::SocketDescriptorTest::tcpClientServer()
     SocketFlags::AddressFamily family;
     SC_TEST_EXPECT(serverSocket.getAddressFamily(family));
     SocketDescriptor acceptedClientSocket;
-    SC_TEST_EXPECT(server.accept(family, acceptedClientSocket));
-    SC_TEST_EXPECT(acceptedClientSocket.isValid());
-    char         buf[1] = {0};
-    SocketClient acceptedClient(acceptedClientSocket);
+    if (protocol == SocketFlags::ProtocolTcp)
+    {
+        SC_TEST_EXPECT(server.accept(family, acceptedClientSocket));
+        SC_TEST_EXPECT(acceptedClientSocket.isValid());
+    }
+
+    SocketClient acceptedClient(protocol == SocketFlags::ProtocolTcp ? acceptedClientSocket : serverSocket);
     Span<char>   readData;
+    char         buf[1] = {0};
     SC_TEST_EXPECT(acceptedClient.read({buf, sizeof(buf)}, readData));
     SC_TEST_EXPECT(buf[0] == testValue and testValue != 0);
     SC_TEST_EXPECT(not acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, Time::Milliseconds(10)));
