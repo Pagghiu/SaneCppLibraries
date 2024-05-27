@@ -30,6 +30,9 @@ struct SC::Time::Milliseconds
     constexpr Milliseconds() : ms(0) {}
     constexpr explicit Milliseconds(int64_t ms) : ms(ms){};
     int64_t ms;
+
+    bool operator>(const Milliseconds other) const { return ms > other.ms; }
+    bool operator<(const Milliseconds other) const { return ms < other.ms; }
 };
 
 /// @brief Type-safe wrapper of uint64 used to represent seconds
@@ -158,6 +161,8 @@ struct SC::Time::HighResolutionCounter
     /// @param other The HighResolutionCounter to be subtracted
     /// @return A HighResolutionCounter holding the time interval between the two HighResolutionCounter
     [[nodiscard]] HighResolutionCounter subtractExact(HighResolutionCounter other) const;
+
+    Relative getRelative() const;
 
     int64_t part1;
     int64_t part2;

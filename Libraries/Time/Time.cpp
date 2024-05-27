@@ -147,12 +147,16 @@ bool SC::Time::HighResolutionCounter::isLaterThanOrEqualTo(HighResolutionCounter
 
 SC::Time::Relative SC::Time::HighResolutionCounter::subtractApproximate(HighResolutionCounter other) const
 {
-    HighResolutionCounter res = subtractExact(other);
+    return subtractExact(other).getRelative();
+}
+
+SC::Time::Relative SC::Time::HighResolutionCounter::getRelative() const
+{
 #if SC_PLATFORM_WINDOWS
-    return Relative::fromSeconds(static_cast<double>(res.part1) / res.part2);
+    return Relative::fromSeconds(static_cast<double>(part1) / part2);
 #else
     constexpr int32_t secondsToNanoseconds = 1e9;
-    return Relative::fromSeconds(res.part1 + static_cast<double>(res.part2) / secondsToNanoseconds);
+    return Relative::fromSeconds(part1 + static_cast<double>(part2) / secondsToNanoseconds);
 #endif
 }
 
