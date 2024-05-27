@@ -115,6 +115,7 @@ struct SC::AsyncEventLoop::Internal
 
     struct SetupAsyncPhase;
     struct TeardownAsyncPhase;
+    struct ReactivateAsyncPhase;
     struct ActivateAsyncPhase;
     struct CancelAsyncPhase;
     struct CompleteAsyncPhase;

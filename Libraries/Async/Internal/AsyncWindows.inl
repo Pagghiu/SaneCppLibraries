@@ -269,16 +269,16 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] static bool setupAsync(AsyncLoopTimeout&) { return true; }
 
-    //-------------------------------------------------------------------------------------------------------
-    // WAKEUP
-    //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] static bool setupAsync(AsyncLoopWakeUp&) { return true; }
-
     Result activateAsync(AsyncLoopTimeout& async)
     {
         async.expirationTime = async.eventLoop->getLoopTime().offsetBy(async.relativeTimeout);
         return Result(true);
     }
+
+    //-------------------------------------------------------------------------------------------------------
+    // WAKEUP
+    //-------------------------------------------------------------------------------------------------------
+    [[nodiscard]] static bool setupAsync(AsyncLoopWakeUp&) { return true; }
 
     //-------------------------------------------------------------------------------------------------------
     // WORK
@@ -649,6 +649,13 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     template <typename T> [[nodiscard]] bool completeAsync(T&)  { return true; }
     template <typename T> [[nodiscard]] bool cancelAsync(T&)    { return true; }
 
+    // If False, makes re-activation a no-op, that is a lightweight optimization.
+    // More importantly it prevents an assert about being Submitting state when async completes during re-activation run cycle.
+    template<typename T> static bool needsSubmissionWhenReactivating(T&)
+    {
+        return true;
+    }
+    
     template <typename T, typename P> [[nodiscard]] static Result executeOperation(T&, P&) { return Result::Error("Implement executeOperation"); }
     // clang-format on
 };

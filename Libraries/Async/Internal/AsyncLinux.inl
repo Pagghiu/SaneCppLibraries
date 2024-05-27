@@ -57,6 +57,13 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     template <typename T> [[nodiscard]] Result completeAsync(T&);
     template <typename T> [[nodiscard]] Result cancelAsync(T&);
 
+    // If False, makes re-activation a no-op, that is a lightweight optimization.
+    // More importantly it prevents an assert about being Submitting state when async completes during re-activation run cycle.
+    template<typename T> static bool needsSubmissionWhenReactivating(T&)
+    {
+        return true;
+    }
+    
     template <typename T, typename P> [[nodiscard]] static Result executeOperation(T&, P& p);
     // clang-format on
 };

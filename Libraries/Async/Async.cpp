@@ -523,6 +523,24 @@ int SC::AsyncEventLoop::Internal::getTotalNumberOfActiveHandle() const
     return numberOfActiveHandles + numberOfExternals;
 }
 
+struct SC::AsyncEventLoop::Internal::ReactivateAsyncPhase
+{
+    template <typename T>
+    SC::Result operator()(T& async)
+    {
+        async.state = AsyncRequest::State::Submitting;
+        if (KernelEvents::needsSubmissionWhenReactivating(async))
+        {
+            async.eventLoop->internal.submissions.queueBack(async);
+        }
+        else
+        {
+            async.eventLoop->internal.addActiveHandle(async);
+        }
+        return Result(true);
+    }
+};
+
 SC::Result SC::AsyncEventLoop::Internal::completeAndEventuallyReactivate(KernelEvents& kernelEvents,
                                                                          AsyncRequest& async, Result&& returnCode)
 {
@@ -532,8 +550,7 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndEventuallyReactivate(KernelE
     SC_TRY(completeAsync(kernelEvents, async, move(returnCode), reactivate));
     if (reactivate)
     {
-        async.state = AsyncRequest::State::Submitting;
-        submissions.queueBack(async);
+        SC_TRY(Internal::applyOnAsync(async, ReactivateAsyncPhase()));
     }
     else
     {
