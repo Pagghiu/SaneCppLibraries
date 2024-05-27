@@ -166,8 +166,6 @@ struct SC::AsyncRequest
     [[nodiscard]] Result queueSubmission(AsyncEventLoop& eventLoop);
     [[nodiscard]] Result queueSubmission(AsyncEventLoop& eventLoop, ThreadPool& threadPool, AsyncTask& task);
 
-    static void updateTime(AsyncEventLoop& loop);
-
     AsyncEventLoop* eventLoop = nullptr;
     AsyncTask*      asyncTask = nullptr;
 

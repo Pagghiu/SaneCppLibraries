@@ -89,8 +89,6 @@ SC::Result SC::AsyncRequest::queueSubmission(AsyncEventLoop& loop, ThreadPool& t
     return loop.internal.queueSubmission(*this, &task);
 }
 
-void SC::AsyncRequest::updateTime(AsyncEventLoop& loop) { loop.internal.updateTime(); }
-
 SC::Result SC::AsyncRequest::stop()
 {
     if (eventLoop)
@@ -105,7 +103,6 @@ SC::Result SC::AsyncRequest::stop()
 SC::Result SC::AsyncLoopTimeout::start(AsyncEventLoop& loop, Time::Milliseconds timeout)
 {
     SC_TRY(validateAsync());
-    updateTime(loop);
     relativeTimeout = timeout;
     SC_TRY(queueSubmission(loop));
     return SC::Result(true);
@@ -581,6 +578,7 @@ SC::Result SC::AsyncEventLoop::Internal::submitRequests(AsyncKernelEvents& async
     memset(asyncKernelEvents.eventsMemory.data(), 0, asyncKernelEvents.eventsMemory.sizeInBytes());
     SC_LOG_MESSAGE("---------------\n");
 
+    updateTime();
     while (AsyncRequest* async = submissions.dequeueFront())
     {
         auto res = stageSubmission(kernelEvents, *async);
@@ -618,15 +616,15 @@ SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(SyncMode syncMode, 
     switch (syncMode)
     {
     case SyncMode::NoWait: {
-        updateTime();
         invokeExpiredTimers(loopTime);
     }
     break;
     case SyncMode::ForcedForwardProgress: {
         if (expiredTimer)
         {
-            invokeExpiredTimers(expiredTimer->expirationTime);
             expiredTimer = nullptr;
+            updateTime();
+            invokeExpiredTimers(loopTime);
         }
     }
     break;
