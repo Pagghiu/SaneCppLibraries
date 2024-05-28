@@ -24,27 +24,37 @@ struct SC::BuildTest : public SC::TestCase
         Build::Action action;
         action.action = Build::Action::Configure;
 
-        SC_TRUST_RESULT(Path::join(action.directories.projectsDirectory, {buildDir.view(), "_Projects"}));
-        SC_TRUST_RESULT(Path::join(action.directories.outputsDirectory, {buildDir.view(), "_Outputs"}));
-        SC_TRUST_RESULT(Path::join(action.directories.intermediatesDirectory, {buildDir.view(), "_Intermediates"}));
-        SC_TRUST_RESULT(Path::join(action.directories.packagesCacheDirectory, {buildDir.view(), "_PackageCache"}));
-        SC_TRUST_RESULT(Path::join(action.directories.packagesInstallDirectory, {buildDir.view(), "_Packages"}));
+        Build::Directories& directories = action.parameters.directories;
+        SC_TRUST_RESULT(Path::join(directories.projectsDirectory, {buildDir.view(), "_Projects"}));
+        SC_TRUST_RESULT(Path::join(directories.outputsDirectory, {buildDir.view(), "_Outputs"}));
+        SC_TRUST_RESULT(Path::join(directories.intermediatesDirectory, {buildDir.view(), "_Intermediates"}));
+        SC_TRUST_RESULT(Path::join(directories.packagesCacheDirectory, {buildDir.view(), "_PackageCache"}));
+        SC_TRUST_RESULT(Path::join(directories.packagesInstallDirectory, {buildDir.view(), "_Packages"}));
 
-        action.directories.libraryDirectory = report.libraryRootDirectory;
+        directories.libraryDirectory = report.libraryRootDirectory;
 
         if (test_section("Visual Studio 2022"))
         {
-            action.generator = Build::Generator::VisualStudio2022;
+            action.parameters.generator = Build::Generator::VisualStudio2022;
+            action.parameters.platform  = Build::Platform::Windows;
             SC_TEST_EXPECT(Build::executeAction(action));
         }
         if (test_section("XCode"))
         {
-            action.generator = Build::Generator::XCode;
+            action.parameters.generator = Build::Generator::XCode;
+            action.parameters.platform  = Build::Platform::MacOS;
             SC_TEST_EXPECT(Build::executeAction(action));
         }
-        if (test_section("Makefile"))
+        if (test_section("Makefile (macOS)"))
         {
-            action.generator = Build::Generator::Make;
+            action.parameters.generator = Build::Generator::Make;
+            action.parameters.platform  = Build::Platform::MacOS;
+            SC_TEST_EXPECT(Build::executeAction(action));
+        }
+        if (test_section("Makefile (Linux)"))
+        {
+            action.parameters.generator = Build::Generator::Make;
+            action.parameters.platform  = Build::Platform::Linux;
             SC_TEST_EXPECT(Build::executeAction(action));
         }
     }

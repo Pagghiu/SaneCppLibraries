@@ -37,12 +37,12 @@ struct Platform
     {
         switch (type)
         {
-        case Unknown: return "Unknown";
-        case Windows: return "Windows";
-        case MacOS: return "MacOS";
+        case Unknown: return "unknown";
+        case Windows: return "windows";
+        case MacOS: return "macOS";
         case iOS: return "iOS";
-        case Linux: return "Linux";
-        case Wasm: return "Wasm";
+        case Linux: return "linux";
+        case Wasm: return "wasm";
         }
         Assert::unreachable();
     }
@@ -421,10 +421,16 @@ struct Directories
 /// @brief Describes a specific set of platforms, architectures and build generators to generate projects for
 struct Parameters
 {
-    Array<Platform::Type, 5>     platforms;     ///< Platforms to generate
-    Array<Architecture::Type, 5> architectures; ///< Architectures to generate
-    Generator::Type              generator;     ///< Build system types to generate
+    Platform::Type     platform;     ///< Platform to generate
+    Architecture::Type architecture; ///< Architecture to generate
+    Generator::Type    generator;    ///< Build system types to generate
 
+    Parameters()
+    {
+        platform     = Platform::Linux;
+        architecture = Architecture::Any;
+        generator    = Generator::Make;
+    }
     Directories directories;
 };
 
@@ -436,8 +442,7 @@ struct Definition
     /// @brief Generates projects for all workspaces, with specified parameters at given root path.
     /// @param projectName Name of the workspace file / directory to generate
     /// @param parameters Set of parameters with the wanted platforms, architectures and generators to generate
-    /// @param directories Contains projects, outputs and intermediates paths
-    Result configure(StringView projectName, const Parameters& parameters, Directories directories) const;
+    Result configure(StringView projectName, const Parameters& parameters) const;
 };
 
 /// @brief Caches file paths by pre-resolving directory filter search masks
@@ -478,11 +483,8 @@ struct Action
 
     Type action = Configure;
 
-    Generator::Type    generator    = Generator::Type::Make;
-    Architecture::Type architecture = Architecture::Any;
-
-    Directories directories;
-    StringView  configuration;
+    Parameters parameters;
+    StringView configuration;
 
   private:
     struct Internal;

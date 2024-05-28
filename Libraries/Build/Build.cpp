@@ -21,7 +21,7 @@ struct ProjectWriter
     {}
 
     /// @brief Write the project file at given directories
-    [[nodiscard]] bool write(Directories directories, StringView filename);
+    [[nodiscard]] bool write(StringView filename);
 
   private:
     struct WriterXCode;
@@ -147,8 +147,7 @@ SC::Result SC::Build::Workspace::validate() const
     return Result(true);
 }
 
-SC::Result SC::Build::Definition::configure(StringView projectFileName, const Build::Parameters& parameters,
-                                            Directories directories) const
+SC::Result SC::Build::Definition::configure(StringView projectFileName, const Build::Parameters& parameters) const
 {
     Build::DefinitionCompiler definitionCompiler(*this);
     SC_TRY(definitionCompiler.validate());
@@ -156,14 +155,15 @@ SC::Result SC::Build::Definition::configure(StringView projectFileName, const Bu
     String projectGeneratorSubFolder = StringEncoding::Utf8;
     {
         Vector<StringView> components;
-        SC_TRY(Path::normalize(directories.projectsDirectory.view(), components, &projectGeneratorSubFolder,
+        SC_TRY(Path::normalize(parameters.directories.projectsDirectory.view(), components, &projectGeneratorSubFolder,
                                Path::Type::AsPosix));
         SC_TRY(
             Path::append(projectGeneratorSubFolder, {Generator::toString(parameters.generator)}, Path::Type::AsPosix));
     }
-    directories.projectsDirectory = move(projectGeneratorSubFolder);
-    Build::ProjectWriter writer(*this, definitionCompiler, parameters);
-    return Result(writer.write(directories, projectFileName));
+    Build::Parameters newParameters             = parameters;
+    newParameters.directories.projectsDirectory = move(projectGeneratorSubFolder);
+    Build::ProjectWriter writer(*this, definitionCompiler, newParameters);
+    return Result(writer.write(projectFileName));
 }
 
 SC::Result SC::Build::DefinitionCompiler::validate()
@@ -329,8 +329,9 @@ SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<Strin
     return Result(true);
 }
 
-bool SC::Build::ProjectWriter::write(Directories directories, StringView defaultProjectName)
+bool SC::Build::ProjectWriter::write(StringView defaultProjectName)
 {
+    const Directories& directories = parameters.directories;
     (void)defaultProjectName;
     FileSystem fs;
     SC_TRY(Path::isAbsolute(directories.projectsDirectory.view(), Path::AsNative));
@@ -430,8 +431,9 @@ bool SC::Build::ProjectWriter::write(Directories directories, StringView default
     }
     case Generator::Make: {
         String prjName;
-        SC_TRY(prjName.assign("Makefile"));
-        WriterMakefile           writer(definition, definitionCompiler, directories);
+        SC_TRY(StringBuilder(prjName).format("Makefile.{}", Platform::toString(parameters.platform)));
+        WriterMakefile writer(definition, definitionCompiler, directories);
+
         WriterMakefile::Renderer renderer;
         {
             StringBuilder builder(buffer, StringBuilder::Clear);
@@ -447,8 +449,6 @@ bool SC::Build::ProjectWriter::write(Directories directories, StringView default
 
 struct SC::Build::Action::Internal
 {
-    static Build::Parameters fillDefaultParameters(const Action& action);
-
     static Result configure(ConfigureFunction configure, StringView projectFileName, const Action& action);
     static Result coverage(StringView projectFileName, const Action& action);
     static Result executeInternal(StringView projectFileName, const Action& action, String* outputExecutable = nullptr);
@@ -511,48 +511,12 @@ SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction co
     return Result::Error("Action::execute - unsupported action");
 }
 
-SC::Build::Parameters SC::Build::Action::Internal::fillDefaultParameters(const Action& action)
-{
-    Build::Parameters parameters;
-    parameters.directories = action.directories;
-    parameters.generator   = action.generator;
-    switch (action.generator)
-    {
-    case Generator::VisualStudio2019: {
-        parameters.platforms     = {Platform::Windows};
-        parameters.architectures = {Architecture::Intel64};
-        return parameters;
-    }
-    case Generator::VisualStudio2022: {
-        parameters.platforms     = {Platform::Windows};
-        parameters.architectures = {Architecture::Arm64, Architecture::Intel64};
-        return parameters;
-    }
-    break;
-    case Generator::XCode: {
-        parameters.platforms     = {Platform::MacOS};
-        parameters.architectures = {Architecture::Arm64, Architecture::Intel64};
-        return parameters;
-    }
-    break;
-
-    case Generator::Make: {
-        parameters.platforms     = {Platform::MacOS, Build::Platform::Linux};
-        parameters.architectures = {Architecture::Arm64, Architecture::Intel64};
-        return parameters;
-    }
-    break;
-    }
-    SC_ASSERT_RELEASE(false);
-}
-
 SC::Result SC::Build::Action::Internal::configure(ConfigureFunction configure, StringView projectFileName,
                                                   const Action& action)
 {
-    Build::Parameters parameters = fillDefaultParameters(action);
     Build::Definition definition;
-    SC_TRY(configure(definition, parameters));
-    SC_TRY(definition.configure(projectFileName, parameters, action.directories));
+    SC_TRY(configure(definition, action.parameters));
+    SC_TRY(definition.configure(projectFileName, action.parameters));
     return Result(true);
 }
 
@@ -569,11 +533,11 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
     newAction.action = Action::Print;
     SC_TRY(executeInternal(projectFileName, newAction, &executablePath));
     String coverageDirectory;
-    SC_TRY(Path::join(coverageDirectory, {action.directories.projectsDirectory.view(), "..", "_Coverage"}));
+    SC_TRY(Path::join(coverageDirectory, {action.parameters.directories.projectsDirectory.view(), "..", "_Coverage"}));
 
     {
         FileSystem fs;
-        SC_TRY(fs.init(action.directories.projectsDirectory.view()));
+        SC_TRY(fs.init(action.parameters.directories.projectsDirectory.view()));
 
         // Recreate Coverage Dir
         if (fs.existsAndIsDirectory(coverageDirectory.view()))
@@ -704,18 +668,17 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
 {
     StringView configuration = action.configuration.isEmpty() ? "Debug" : action.configuration;
 
-    Build::Parameters parameters = fillDefaultParameters(action);
-    SmallString<256>  solutionLocation;
+    SmallString<256> solutionLocation;
 
     Process process;
-    switch (action.generator)
+    switch (action.parameters.generator)
     {
     case Generator::XCode: {
-        SC_TRY(Path::join(solutionLocation, {action.directories.projectsDirectory.view(),
-                                             Generator::toString(action.generator), projectFileName}));
+        SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),
+                                             Generator::toString(action.parameters.generator), projectFileName}));
         SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(".xcodeproj"));
         StringView architecture;
-        SC_TRY(toXCodeArchitecture(action.architecture, architecture));
+        SC_TRY(toXCodeArchitecture(action.parameters.architecture, architecture));
         SmallString<32> formattedPlatform;
         SC_TRY(StringBuilder(formattedPlatform).format("ARCHS={}", architecture));
 
@@ -791,14 +754,14 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
     break;
     case Generator::VisualStudio2019:
     case Generator::VisualStudio2022: {
-        SC_TRY(Path::join(solutionLocation, {action.directories.projectsDirectory.view(),
-                                             Generator::toString(action.generator), projectFileName}));
+        SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),
+                                             Generator::toString(action.parameters.generator), projectFileName}));
         SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(".sln"));
         SmallString<32> platformConfiguration;
         SC_TRY(StringBuilder(platformConfiguration).format("/p:Configuration={}", configuration));
 
         StringView architecture;
-        SC_TRY(Internal::toVisualStudioArchitecture(action.architecture, architecture));
+        SC_TRY(Internal::toVisualStudioArchitecture(action.parameters.architecture, architecture));
         SmallString<32> platform;
         SC_TRY(StringBuilder(platform).format("/p:Platform={}", architecture));
 
@@ -853,13 +816,15 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
     }
     break;
     case Generator::Make: {
-        SC_TRY(Path::join(solutionLocation,
-                          {action.directories.projectsDirectory.view(), Generator::toString(action.generator)}));
+        SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),
+                                             Generator::toString(action.parameters.generator)}));
+        String makeFileLocation;
+        SC_TRY(StringBuilder(makeFileLocation).append("Makefile.{}", Platform::toString(action.parameters.platform)));
         SmallString<32> platformConfiguration;
         SC_TRY(StringBuilder(platformConfiguration).format("CONFIG={}", configuration));
 
         StringView architecture;
-        SC_TRY(toMakefileArchitecture(action.architecture, architecture));
+        SC_TRY(toMakefileArchitecture(action.parameters.architecture, architecture));
         StringView arguments[16];
         size_t     numArgs   = 0;
         arguments[numArgs++] = "make"; // 1
@@ -886,10 +851,12 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
         arguments[numArgs++] = "-j";                         // 3
         arguments[numArgs++] = "-C";                         // 4
         arguments[numArgs++] = solutionLocation.view();      // 5
-        arguments[numArgs++] = platformConfiguration.view(); // 6
+        arguments[numArgs++] = "-f";                         // 6
+        arguments[numArgs++] = makeFileLocation.view();      // 7
+        arguments[numArgs++] = platformConfiguration.view(); // 8
         if (not architecture.isEmpty())
         {
-            arguments[numArgs++] = architecture; // 7
+            arguments[numArgs++] = architecture; // 9
         }
         SC_TRY(process.setEnvironment("GNUMAKEFLAGS", "--no-print-directory"));
         if (action.action == Action::Print)

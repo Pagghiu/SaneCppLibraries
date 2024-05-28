@@ -53,24 +53,27 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
 [[nodiscard]] inline Result runBuildConfigure(Tool::Arguments& arguments)
 {
     Build::Action action;
-    SC_TRY(runBuildValidate(arguments, action.directories));
-    action.directories.libraryDirectory = arguments.libraryDirectory.view();
-
-    Result res(true);
+    SC_TRY(runBuildValidate(arguments, action.parameters.directories));
     action.action = Build::Action::Configure;
 
-    action.generator = Build::Generator::VisualStudio2019;
-    res              = Build::executeAction(action);
-    SC_TRY_MSG(res, "Build error Visual Studio 2019");
-    action.generator = Build::Generator::VisualStudio2022;
-    res              = Build::executeAction(action);
-    SC_TRY_MSG(res, "Build error Visual Studio 2022");
-    action.generator = Build::Generator::XCode;
-    res              = Build::executeAction(action);
-    SC_TRY_MSG(res, "Build error XCode");
-    action.generator = Build::Generator::Make;
-    res              = Build::executeAction(action);
-    SC_TRY_MSG(res, "Build error Makefile");
+    action.parameters.directories.libraryDirectory = arguments.libraryDirectory.view();
+
+    // TODO: We should run a matrix of all generators / platforms / architectures
+    action.parameters.generator = Build::Generator::VisualStudio2019;
+    action.parameters.platform  = Build::Platform::Windows;
+    SC_TRY_MSG(Build::executeAction(action), "Build error Visual Studio 2019");
+    action.parameters.generator = Build::Generator::VisualStudio2022;
+    action.parameters.platform  = Build::Platform::Windows;
+    SC_TRY_MSG(Build::executeAction(action), "Build error Visual Studio 2022");
+    action.parameters.generator = Build::Generator::XCode;
+    action.parameters.platform  = Build::Platform::MacOS;
+    SC_TRY_MSG(Build::executeAction(action), "Build error XCode");
+    action.parameters.generator = Build::Generator::Make;
+    action.parameters.platform  = Build::Platform::Linux;
+    SC_TRY_MSG(Build::executeAction(action), "Build error Makefile (Linux)");
+    action.parameters.generator = Build::Generator::Make;
+    action.parameters.platform  = Build::Platform::MacOS;
+    SC_TRY_MSG(Build::executeAction(action), "Build error Makefile (macOS");
     return Result(true);
 }
 
@@ -78,13 +81,25 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
 {
     Build::Action action;
     action.action = actionType;
-    SC_TRY(runBuildValidate(arguments, action.directories));
-    action.directories.libraryDirectory = arguments.libraryDirectory.view();
+    SC_TRY(runBuildValidate(arguments, action.parameters.directories));
+    action.parameters.directories.libraryDirectory = arguments.libraryDirectory.view();
     switch (HostPlatform)
     {
-    case Platform::Windows: action.generator = Build::Generator::VisualStudio2022; break;
-    case Platform::Apple: action.generator = Build::Generator::Make; break;
-    case Platform::Linux: action.generator = Build::Generator::Make; break;
+    case Platform::Windows: {
+        action.parameters.generator = Build::Generator::VisualStudio2022;
+        action.parameters.platform  = Build::Platform::Windows;
+    }
+    break;
+    case Platform::Apple: {
+        action.parameters.generator = Build::Generator::Make;
+        action.parameters.platform  = Build::Platform::MacOS;
+    }
+    break;
+    case Platform::Linux: {
+        action.parameters.generator = Build::Generator::Make;
+        action.parameters.platform  = Build::Platform::Linux;
+    }
+    break;
     default: return Result::Error("Unsupported platform for compile");
     }
 
@@ -96,50 +111,46 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
     {
         if (arguments.arguments[1] == "xcode")
         {
-            action.generator = Build::Generator::XCode;
+            action.parameters.generator = Build::Generator::XCode;
         }
         else if (arguments.arguments[1] == "make")
         {
-            action.generator = Build::Generator::Make;
+            action.parameters.generator = Build::Generator::Make;
         }
         else if (arguments.arguments[1] == "vs2022")
         {
-            action.generator = Build::Generator::VisualStudio2022;
+            action.parameters.generator = Build::Generator::VisualStudio2022;
         }
         else if (arguments.arguments[1] == "vs2019")
         {
-            action.generator = Build::Generator::VisualStudio2019;
+            action.parameters.generator = Build::Generator::VisualStudio2019;
         }
         else if (arguments.arguments[1] == "default")
         {
-            switch (HostPlatform)
-            {
-            case Platform::Windows: action.generator = Build::Generator::VisualStudio2022; break;
-            default: action.generator = Build::Generator::Make; break;
-            }
+            // Defaults already set
         }
     }
     if (arguments.arguments.sizeInElements() >= 3)
     {
         if (arguments.arguments[2] == "arm64")
         {
-            action.architecture = Build::Architecture::Arm64;
+            action.parameters.architecture = Build::Architecture::Arm64;
         }
         else if (arguments.arguments[2] == "intel32")
         {
-            action.architecture = Build::Architecture::Intel32;
+            action.parameters.architecture = Build::Architecture::Intel32;
         }
         else if (arguments.arguments[2] == "intel64")
         {
-            action.architecture = Build::Architecture::Intel64;
+            action.parameters.architecture = Build::Architecture::Intel64;
         }
         else if (arguments.arguments[2] == "wasm")
         {
-            action.architecture = Build::Architecture::Wasm;
+            action.parameters.architecture = Build::Architecture::Wasm;
         }
         else if (arguments.arguments[2] == "any")
         {
-            action.architecture = Build::Architecture::Any;
+            action.parameters.architecture = Build::Architecture::Any;
         }
     }
 
