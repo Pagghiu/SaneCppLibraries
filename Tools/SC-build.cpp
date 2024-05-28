@@ -23,9 +23,14 @@ void addSaneCppLibraries(Project& project, const Parameters& parameters)
     project.addDirectory("Support/DebugVisualizers", "*.cpp"); // add debug visualizers
 
     // Libraries to link
-    if (parameters.platforms.contains(Platform::MacOS))
+    if (parameters.platform == Platform::MacOS)
     {
         project.link.addFrameworks({"CoreFoundation", "CoreServices"});
+    }
+
+    if (parameters.platform != Platform::Windows)
+    {
+        project.link.addLibraries({"dl", "pthread"});
     }
 
     // Debug visualization helpers

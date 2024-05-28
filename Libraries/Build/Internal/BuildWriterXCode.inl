@@ -756,7 +756,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     [[nodiscard]] bool fillXCodeFrameworks(const Project& project, Vector<RenderItem>& xcodeObjects)
     {
-        auto frameworks = project.link.get<Link::libraryFrameworks>();
+        auto frameworks = project.link.get<Link::linkFrameworks>();
         SC_TRY(frameworks != nullptr);
         for (auto it : *frameworks)
         {

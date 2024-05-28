@@ -195,12 +195,13 @@ struct Link
 {
     enum Type
     {
-        libraryPaths,      ///< Library paths
-        libraryFrameworks, ///< Frameworks paths
-        guiApplication,    ///< gui application
-        enableLTO,         ///< Link Time Optimization
-        enableASAN,        ///< Address Sanitizer
-        enableStdCpp,      ///< C++ Standard Library
+        libraryPaths,   ///< Library paths
+        linkFrameworks, ///< Frameworks to link
+        linkLibraries,  ///< Libraries to link
+        guiApplication, ///< gui application
+        enableLTO,      ///< Link Time Optimization
+        enableASAN,     ///< Address Sanitizer
+        enableStdCpp,   ///< C++ Standard Library
     };
 
     /// @brief Get StringView describing Link::Type
@@ -209,7 +210,8 @@ struct Link
         switch (type)
         {
         case libraryPaths: return "libraryPaths";
-        case libraryFrameworks: return "libraryFrameworks";
+        case linkFrameworks: return "linkFrameworks";
+        case linkLibraries: return "linkLibraries";
         case guiApplication: return "guiApplication";
         case enableLTO: return "enableLTO";
         case enableASAN: return "enableASAN";
@@ -220,12 +222,13 @@ struct Link
     template <Type E, typename T>
     using Tag = TaggedType<Type, E, T>; // Helper to save some typing
 
-    using FieldsTypes = TypeTraits::TypeList<Tag<libraryPaths, Vector<String>>,      //
-                                             Tag<libraryFrameworks, Vector<String>>, //
-                                             Tag<guiApplication, bool>,              //
-                                             Tag<enableLTO, bool>,                   //
-                                             Tag<enableASAN, bool>,                  //
-                                             Tag<enableStdCpp, bool>                 //
+    using FieldsTypes = TypeTraits::TypeList<Tag<libraryPaths, Vector<String>>,   //
+                                             Tag<linkFrameworks, Vector<String>>, //
+                                             Tag<linkLibraries, Vector<String>>,  //
+                                             Tag<guiApplication, bool>,           //
+                                             Tag<enableLTO, bool>,                //
+                                             Tag<enableASAN, bool>,               //
+                                             Tag<enableStdCpp, bool>              //
                                              >;
 
     using Union = TaggedUnion<Link>;
@@ -235,7 +238,7 @@ struct Link
 struct LinkFlags : public TaggedMap<Link::Type, Link::Union>
 {
     /// @brief Add the given paths to the library search paths list
-    [[nodiscard]] bool addLibraryPath(Span<const StringView> libraries)
+    [[nodiscard]] bool addSearchPath(Span<const StringView> libraries)
     {
         return getOrCreate<Link::libraryPaths>()->append(libraries);
     }
@@ -243,7 +246,13 @@ struct LinkFlags : public TaggedMap<Link::Type, Link::Union>
     /// @brief Add framework to list of frameworks to link
     [[nodiscard]] bool addFrameworks(Span<const StringView> frameworks)
     {
-        return getOrCreate<Link::libraryFrameworks>()->append(frameworks);
+        return getOrCreate<Link::linkFrameworks>()->append(frameworks);
+    }
+
+    /// @brief Add more libraries to list of libraries to link
+    [[nodiscard]] bool addLibraries(Span<const StringView> libraries)
+    {
+        return getOrCreate<Link::linkLibraries>()->append(libraries);
     }
 };
 

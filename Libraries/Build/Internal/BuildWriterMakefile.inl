@@ -276,7 +276,7 @@ endif
         builder.append(" $(CXXFLAGS)");
 
         builder.append("\n{0}_FRAMEWORKS :=", makeTarget.view());
-        auto frameworks = project.link.get<Link::libraryFrameworks>();
+        auto frameworks = project.link.get<Link::linkFrameworks>();
         if (frameworks != nullptr)
         {
             for (auto it : *frameworks)
@@ -285,8 +285,15 @@ endif
             }
         }
 
-        // TODO: De-hardcode LIBRARIES
-        builder.append("\n{0}_LIBRARIES := -ldl -lpthread", makeTarget.view());
+        builder.append("\n{0}_LIBRARIES :=", makeTarget.view());
+        auto libraries = project.link.get<Link::linkLibraries>();
+        if (libraries != nullptr)
+        {
+            for (auto it : *libraries)
+            {
+                builder.append(" -l{}", it.view());
+            }
+        }
 
         builder.append("\n\nifeq ($(CLANG_DETECTED),yes)\n");
         // Clang specific flags
