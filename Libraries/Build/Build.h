@@ -494,6 +494,7 @@ struct Action
 
     Parameters parameters;
     StringView configuration;
+    StringView target;
 
   private:
     struct Internal;

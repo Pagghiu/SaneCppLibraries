@@ -105,50 +105,54 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
 
     if (arguments.arguments.sizeInElements() >= 1)
     {
-        action.configuration = arguments.arguments[0];
+        action.target = arguments.arguments[0];
     }
     if (arguments.arguments.sizeInElements() >= 2)
     {
-        if (arguments.arguments[1] == "xcode")
+        action.configuration = arguments.arguments[1];
+    }
+    if (arguments.arguments.sizeInElements() >= 3)
+    {
+        if (arguments.arguments[2] == "xcode")
         {
             action.parameters.generator = Build::Generator::XCode;
         }
-        else if (arguments.arguments[1] == "make")
+        else if (arguments.arguments[2] == "make")
         {
             action.parameters.generator = Build::Generator::Make;
         }
-        else if (arguments.arguments[1] == "vs2022")
+        else if (arguments.arguments[2] == "vs2022")
         {
             action.parameters.generator = Build::Generator::VisualStudio2022;
         }
-        else if (arguments.arguments[1] == "vs2019")
+        else if (arguments.arguments[2] == "vs2019")
         {
             action.parameters.generator = Build::Generator::VisualStudio2019;
         }
-        else if (arguments.arguments[1] == "default")
+        else if (arguments.arguments[2] == "default")
         {
             // Defaults already set
         }
     }
-    if (arguments.arguments.sizeInElements() >= 3)
+    if (arguments.arguments.sizeInElements() >= 4)
     {
-        if (arguments.arguments[2] == "arm64")
+        if (arguments.arguments[3] == "arm64")
         {
             action.parameters.architecture = Build::Architecture::Arm64;
         }
-        else if (arguments.arguments[2] == "intel32")
+        else if (arguments.arguments[3] == "intel32")
         {
             action.parameters.architecture = Build::Architecture::Intel32;
         }
-        else if (arguments.arguments[2] == "intel64")
+        else if (arguments.arguments[3] == "intel64")
         {
             action.parameters.architecture = Build::Architecture::Intel64;
         }
-        else if (arguments.arguments[2] == "wasm")
+        else if (arguments.arguments[3] == "wasm")
         {
             action.parameters.architecture = Build::Architecture::Wasm;
         }
-        else if (arguments.arguments[2] == "any")
+        else if (arguments.arguments[3] == "any")
         {
             action.parameters.architecture = Build::Architecture::Any;
         }

@@ -38,11 +38,11 @@ jobs:
     - name: build documentation
       run: ./SC.sh build documentation
     - name: configure
-      run: ./SC.sh build configure
+      run: ./SC.sh build configure SCTest
     - name: compile
-      run: ./SC.sh build compile DebugCoverage
+      run: ./SC.sh build compile SCTest DebugCoverage
     - name: coverage
-      run: ./SC.sh build coverage DebugCoverage
+      run: ./SC.sh build coverage SCTest DebugCoverage
     - name: move coverage to documentation
       run: mv _Build/_Coverage/coverage _Build/_Documentation/docs
     - name: fix documentation permissions

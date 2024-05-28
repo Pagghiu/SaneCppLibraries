@@ -7,7 +7,7 @@
             "label": "Build SCTest Debug intel64",
             "type": "shell",
             "command": "${workspaceRoot}/SC.sh",
-            "args": ["build", "compile", "Debug", "default", "intel64"],
+            "args": ["build", "compile", "SCTest", "Debug", "default", "intel64"],
             "problemMatcher": [
                 "$gcc"
             ],
@@ -36,7 +36,7 @@
             "label": "Build SCTest Debug arm64",
             "type": "shell",
             "command": "${workspaceRoot}/SC.sh",
-            "args": ["build", "compile", "Debug", "default", "arm64"],
+            "args": ["build", "compile", "SCTest", "Debug", "default", "arm64"],
             "problemMatcher": [
                 "$gcc"
             ],
@@ -65,7 +65,7 @@
             "label": "Build SCTest Release intel64",
             "type": "shell",
             "command": "${workspaceRoot}/SC.sh",
-            "args": ["build", "compile", "Release", "default", "intel64"],
+            "args": ["build", "compile", "SCTest", "Release", "default", "intel64"],
             "problemMatcher": [
                 "$gcc"
             ],
@@ -94,7 +94,7 @@
             "label": "Build SCTest Release arm64",
             "type": "shell",
             "command": "${workspaceRoot}/SC.sh",
-            "args": ["build", "compile", "Release", "default", "arm64"],
+            "args": ["build", "compile", "SCTest", "Release", "default", "arm64"],
             "problemMatcher": [
                 "$gcc"
             ],

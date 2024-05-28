@@ -27,11 +27,11 @@ jobs:
       run: sudo apt install -y liburing-dev
       if: matrix.params.os == 'ubuntu-latest'
     - name: configure
-      run: ./SC.sh build configure ${{ matrix.config }}
+      run: ./SC.sh build configure SCTest ${{ matrix.config }}
     - name: build
-      run: ./SC.sh build compile ${{ matrix.config }}
+      run: ./SC.sh build compile SCTest ${{ matrix.config }}
     - name: test
-      run: ./SC.sh build run ${{ matrix.config }}
+      run: ./SC.sh build run SCTest ${{ matrix.config }}
     # - name: install gdb
     #   run: sudo apt install -y gdb
     # - name: test in gdb

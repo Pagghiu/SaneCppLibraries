@@ -666,7 +666,8 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
 SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileName, const Action& action,
                                                         String* outputExecutable)
 {
-    StringView configuration = action.configuration.isEmpty() ? "Debug" : action.configuration;
+    const StringView configuration  = action.configuration.isEmpty() ? "Debug" : action.configuration;
+    const StringView selectedTarget = action.target.isEmpty() ? projectFileName : action.target;
 
     SmallString<256> solutionLocation;
 
@@ -675,7 +676,7 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
     {
     case Generator::XCode: {
         SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),
-                                             Generator::toString(action.parameters.generator), projectFileName}));
+                                             Generator::toString(action.parameters.generator), selectedTarget}));
         SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(".xcodeproj"));
         StringView architecture;
         SC_TRY(toXCodeArchitecture(action.parameters.architecture, architecture));
@@ -755,7 +756,7 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
     case Generator::VisualStudio2019:
     case Generator::VisualStudio2022: {
         SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),
-                                             Generator::toString(action.parameters.generator), projectFileName}));
+                                             Generator::toString(action.parameters.generator), selectedTarget}));
         SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(".sln"));
         SmallString<32> platformConfiguration;
         SC_TRY(StringBuilder(platformConfiguration).format("/p:Configuration={}", configuration));
@@ -833,15 +834,15 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
         switch (action.action)
         {
         case Action::Compile: {
-            SC_TRY(StringBuilder(targetName).format("{}_COMPILE", projectFileName));
+            SC_TRY(StringBuilder(targetName).format("{}_COMPILE", selectedTarget));
         }
         break;
         case Action::Run: {
-            SC_TRY(StringBuilder(targetName).format("{}_RUN", projectFileName));
+            SC_TRY(StringBuilder(targetName).format("{}_RUN", selectedTarget));
         }
         break;
         case Action::Print: {
-            SC_TRY(StringBuilder(targetName).format("{}_PRINT_EXECUTABLE_PATH", projectFileName));
+            SC_TRY(StringBuilder(targetName).format("{}_PRINT_EXECUTABLE_PATH", selectedTarget));
         }
         break;
         default: return Result::Error("Unexpected Build::Action (supported \"compile\", \"run\")");

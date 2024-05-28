@@ -26,24 +26,27 @@ struct SupportToolsTest : public TestCase
         {
             arguments.tool      = "build";
             arguments.action    = "coverage";
-            args[0]             = "DebugCoverage";
-            arguments.arguments = {args, 1};
+            args[0]             = "SCTest";
+            args[1]             = "DebugCoverage";
+            arguments.arguments = {args, 2};
             SC_TEST_EXPECT(runBuildTool(arguments));
         }
         if (test_section("compile"))
         {
             arguments.tool      = "build";
             arguments.action    = "compile";
-            args[0]             = "Debug";
-            arguments.arguments = {args, 1};
+            args[0]             = "SCTest";
+            args[1]             = "Debug";
+            arguments.arguments = {args, 2};
             SC_TEST_EXPECT(runBuildTool(arguments));
         }
         if (test_section("run"))
         {
             arguments.tool      = "build";
             arguments.action    = "run";
-            args[0]             = "Debug";
-            arguments.arguments = {args, 1};
+            args[0]             = "SCTest";
+            args[1]             = "Debug";
+            arguments.arguments = {args, 2};
             SC_TEST_EXPECT(runBuildTool(arguments));
         }
         if (test_section("build documentation"))
