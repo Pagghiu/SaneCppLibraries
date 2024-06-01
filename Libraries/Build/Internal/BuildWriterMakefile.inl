@@ -67,6 +67,8 @@ ifndef TARGET_OS
  TARGET_OS := $(HOST_OS)
  ifeq ($(TARGET_OS),apple)
    TARGET_OS := macOS
+ else
+   TARGET_OS := linux
  endif
 endif
 
