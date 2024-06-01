@@ -131,7 +131,7 @@ struct SC::Time::HighResolutionCounter
     /// @n
     /// Example:
     /// @snippet Libraries/Time/Tests/TimeTest.cpp highResolutionCounterSnapSnippet
-    void snap();
+    HighResolutionCounter& snap();
 
     /// @brief Returns a HighResolutionCounter offset by a given number of Milliseconds
     /// @param ms How many Milliseconds the returned HighResolutionCounter must be offset of

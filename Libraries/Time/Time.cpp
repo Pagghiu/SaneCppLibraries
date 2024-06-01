@@ -102,7 +102,7 @@ SC::Time::HighResolutionCounter::HighResolutionCounter()
 #endif
 }
 
-void SC::Time::HighResolutionCounter::snap()
+SC::Time::HighResolutionCounter& SC::Time::HighResolutionCounter::snap()
 {
 #if SC_PLATFORM_WINDOWS
     LARGE_INTEGER performanceCounter;
@@ -121,6 +121,7 @@ void SC::Time::HighResolutionCounter::snap()
     part1                                       = ts.tv_sec;
     part2                                       = ts.tv_nsec;
 #endif
+    return *this;
 }
 
 SC::Time::HighResolutionCounter SC::Time::HighResolutionCounter::offsetBy(Milliseconds other) const
