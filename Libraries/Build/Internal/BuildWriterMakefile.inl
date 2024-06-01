@@ -136,13 +136,14 @@ endif
         builder.append(R"delimiter(
 
 ifneq ($(MAKECMDGOALS),print-executable-paths)
+CURRENT_MAKEFILE := $(firstword $(MAKEFILE_LIST))
 # Force a clean when makefile is modified
-Makefile.$(CONFIG).touched: Makefile
+$(CURRENT_MAKEFILE).$(CONFIG).touched: $(CURRENT_MAKEFILE)
 	@touch $@
-	@$(MAKE) clean
+	@$(MAKE) -f $(CURRENT_MAKEFILE) clean
 
 # Implicitly evaluate the makefile rebuild force clean during parsing
--include Makefile.$(CONFIG).touched
+-include $(CURRENT_MAKEFILE).$(CONFIG).touched
 endif
 )delimiter");
         RelativeDirectories relativeDirectories;
