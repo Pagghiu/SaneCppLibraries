@@ -388,10 +388,11 @@ endif
 ifeq ($(CLANG_DETECTED),yes)
 {0}_COMPILE_COMMANDS: $({0}_INTERMEDIATE_DIR)/compile_commands.json
 else
-{0}_COMPILE_COMMANDS: # On GCC This is not supported
+# On GCC generating compile_commands.json is not supported but it's expected for _COMPILE_COMMANDS to compile the executable too
+{0}_COMPILE_COMMANDS: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 endif
 
-$({0}_INTERMEDIATE_DIR)/compile_commands.json: $({0}_OBJECT_FILES)
+$({0}_INTERMEDIATE_DIR)/compile_commands.json: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 	@echo Generate compile_commands.json
 	$(VRBS)sed -e '1s/^/[\'$$'\n''/' -e '$$s/,$$/\'$$'\n'']/' "$({0}_INTERMEDIATE_DIR)/"*.o.json > "$({0}_INTERMEDIATE_DIR)/"compile_commands.json
 # Under GNU sed

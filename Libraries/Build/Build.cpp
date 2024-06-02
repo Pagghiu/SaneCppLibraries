@@ -834,7 +834,7 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
         switch (action.action)
         {
         case Action::Compile: {
-            SC_TRY(StringBuilder(targetName).format("{}_COMPILE", selectedTarget));
+            SC_TRY(StringBuilder(targetName).format("{}_COMPILE_COMMANDS", selectedTarget));
         }
         break;
         case Action::Run: {
