@@ -71,13 +71,13 @@ Libraries can be used as is, adding a single file to your project and without ne
 See [Building (user)](https://pagghiu.github.io/SaneCppLibraries/page_building_user.html) to just use the library
 
 Shortly:
-- Add [SC.cpp](Bindings/cpp/SC.cpp) to your build system of choice
+- Add [Bindings/cpp/SC.cpp](Bindings/cpp/SC.cpp) to your build system of choice
 - Define `SC_COMPILER_ENABLE_STD_CPP=1` if you plan to use the Standard C++ library
 - Include any public header (`Libraries/[Library]/*.h`)
 
 ## macOS
 - Link `CoreFoundation.framework`
-- Link `CoreFoundation.framework`
+- Link `CoreServices.framework`
 
 ## Linux
 - Link `libdl` (`-ldl`)
@@ -110,6 +110,7 @@ Alternatively I am also reading the following discords too:
 # Videos
 
 Blog posts:
+- [May 2024 Update](https://pagghiu.github.io/site/blog/2024-05-31-SaneCppLibrariesUpdate.html)
 - [April 2024 Update](https://pagghiu.github.io/site/blog/2024-04-27-SaneCppLibrariesUpdate.html)
 - [March 2024 Update](https://pagghiu.github.io/site/blog/2024-03-27-SaneCppLibrariesUpdate.html)
 - [February 2024 Update](https://pagghiu.github.io/site/blog/2024-02-23-SaneCppLibrariesUpdate.html)
