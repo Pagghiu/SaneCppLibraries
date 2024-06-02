@@ -500,9 +500,10 @@ struct SC::Build::ProjectWriter::WriterXCode
     {
         return builder.append(R"delimiter(
                        ALWAYS_SEARCH_USER_PATHS = NO;
+                       ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
                        CLANG_ANALYZER_NONNULL = YES;
                        CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-                       CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+                       CLANG_CXX_LANGUAGE_STANDARD = "c++14";
                        CLANG_ENABLE_MODULES = YES;
                        CLANG_ENABLE_OBJC_ARC = YES;
                        CLANG_ENABLE_OBJC_WEAK = YES;
@@ -515,8 +516,10 @@ struct SC::Build::ProjectWriter::WriterXCode
                        CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
                        CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
                        CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+                       CLANG_WARN_DUPLICATE_METHOD_MATCH = YES;
                        CLANG_WARN_EMPTY_BODY = YES;
                        CLANG_WARN_ENUM_CONVERSION = YES;
+                       CLANG_WARN_EXIT_TIME_DESTRUCTORS = YES;
                        CLANG_WARN_FLOAT_CONVERSION = YES_ERROR;
                        CLANG_WARN_IMPLICIT_FALLTHROUGH = YES_ERROR;
                        CLANG_WARN_IMPLICIT_SIGN_CONVERSION = YES_ERROR;
@@ -535,7 +538,11 @@ struct SC::Build::ProjectWriter::WriterXCode
                        CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
                        CLANG_WARN_UNREACHABLE_CODE = YES;
                        CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-                       CLANG_WARN__EXIT_TIME_DESTRUCTORS = YES;
+                       DEAD_CODE_STRIPPING = YES;
+                       ENABLE_STRICT_OBJC_MSGSEND = YES;
+                       ENABLE_USER_SCRIPT_SANDBOXING = NO;
+                       GCC_C_LANGUAGE_STANDARD = gnu11;
+                       GCC_NO_COMMON_BLOCKS = YES;
                        GCC_TREAT_IMPLICIT_FUNCTION_DECLARATIONS_AS_ERRORS = YES;
                        GCC_TREAT_INCOMPATIBLE_POINTER_TYPE_WARNINGS_AS_ERRORS = YES;
                        GCC_TREAT_WARNINGS_AS_ERRORS = YES;
@@ -556,14 +563,9 @@ struct SC::Build::ProjectWriter::WriterXCode
                        GCC_WARN_UNUSED_LABEL = YES;
                        GCC_WARN_UNUSED_PARAMETER = YES;
                        GCC_WARN_UNUSED_VARIABLE = YES;
-                       CLANG_CXX_LANGUAGE_STANDARD = "c++14";
-                       ENABLE_STRICT_OBJC_MSGSEND = YES;
-                       GCC_C_LANGUAGE_STANDARD = gnu11;
-                       GCC_NO_COMMON_BLOCKS = YES;
                        MACOSX_DEPLOYMENT_TARGET = 13.0;
                        MTL_ENABLE_DEBUG_INFO = NO;
                        MTL_FAST_MATH = YES;
-                       DEAD_CODE_STRIPPING = NO;
                        SDKROOT = macosx;)delimiter");
     }
 
@@ -593,39 +595,40 @@ struct SC::Build::ProjectWriter::WriterXCode
         builder.append("\";");
         if (configuration->compile.hasValue<Compile::enableRTTI>(true))
         {
-            builder.append("\n            GCC_ENABLE_CPP_RTTI = YES;");
+            builder.append("\n                       GCC_ENABLE_CPP_RTTI = YES;");
         }
         else
         {
-            builder.append("\n            GCC_ENABLE_CPP_RTTI = NO;");
+            builder.append("\n                       GCC_ENABLE_CPP_RTTI = NO;");
         }
         if (configuration->compile.hasValue<Compile::enableExceptions>(true))
         {
-            builder.append("\n            GCC_ENABLE_CPP_EXCEPTIONS = YES;");
+            builder.append("\n                       GCC_ENABLE_CPP_EXCEPTIONS = YES;");
         }
         else
         {
-            builder.append("\n            GCC_ENABLE_CPP_EXCEPTIONS = NO;");
+            builder.append("\n                       GCC_ENABLE_CPP_EXCEPTIONS = NO;");
         }
         builder.append(R"delimiter(
-        OTHER_CFLAGS = (
-            "$(inherited)",
-            "-gen-cdb-fragment-path \"$(SYMROOT)/CompilationDatabase\"",
-        );)delimiter");
+                       OTHER_CFLAGS = (
+                         "$(inherited)",
+                         "-gen-cdb-fragment-path",
+                         "\"$(SYMROOT)/CompilationDatabase\"",
+                       );)delimiter");
 
         if (not configuration->compile.hasValue<Compile::enableStdCpp>(true))
         {
             builder.append(R"delimiter(
-        OTHER_CPLUSPLUSFLAGS = (
-            "$(OTHER_CFLAGS)",
-            "-nostdinc++",
-        );)delimiter");
+                       OTHER_CPLUSPLUSFLAGS = (
+                         "$(OTHER_CFLAGS)",
+                         "-nostdinc++",
+                       );)delimiter");
         }
 
         if (not configuration->link.hasValue<Link::enableStdCpp>(true))
         {
 
-            builder.append("        OTHER_LDFLAGS = \"-nostdlib++\";");
+            builder.append("\n                       OTHER_LDFLAGS = \"-nostdlib++\";");
         }
 
         if (configuration->compile.hasValue<Compile::optimizationLevel>(Optimization::Debug))
@@ -680,6 +683,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             isa = XCBuildConfiguration;
             buildSettings = {{
                 CODE_SIGN_STYLE = Automatic;
+                DEAD_CODE_STRIPPING = YES;
                 PRODUCT_NAME = "$(TARGET_NAME)";
             }};
             name = {};
