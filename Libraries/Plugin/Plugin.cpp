@@ -341,7 +341,7 @@ SC::Result SC::PluginCompiler::compileFile(StringView sourceFile, StringView obj
     SC_TRY(includeBuilder.append(L"\""));
     SC_TRY(process.launch({compilerPath.view(), includes.view(), destFile.view(), L"/std:c++17",
                            L"/DSC_DISABLE_CONFIG=1", L"/GR-", L"/WX", L"/W4", L"/permissive-", L"/GS-", L"/Zi",
-                           L"/DSC_PLUGIN_LIBRARY=1", L"/EHsc-", L"/c", sourceFile}));
+                           L"/DSC_PLUGIN_LIBRARY=1", L"/D_HAS_EXCEPTIONS=0", L"/c", sourceFile}));
 #else
     SC_TRY(includeBuilder.append("-I"));
     SC_TRY(includeBuilder.append(includePath.view()));
