@@ -85,7 +85,7 @@ struct SchemaCompiler
 
         SchemaBuilder container(result.types.values, MAX_TOTAL_TYPES);
 
-#if SC_COMPILER_GCC && __GNUC__ <= 11 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=77911
+#if SC_COMPILER_GCC && __GNUC__ <= 13 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=77911
         ArrayWithSize<TypeStringView, MAX_LINK_BUFFER_SIZE> alreadyVisitedTypes;
 #else
         ArrayWithSize<TypeBuildFunction, MAX_LINK_BUFFER_SIZE> alreadyVisitedTypes;
@@ -104,7 +104,7 @@ struct SchemaCompiler
             if (not type.typeInfo.isPrimitiveType() and type.typeInfo.needsLinking())
             {
                 uint32_t outIndex = 0;
-#if SC_COMPILER_GCC && __GNUC__ <= 11 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=77911
+#if SC_COMPILER_GCC && __GNUC__ <= 13 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=77911
                 if (alreadyVisitedTypes.contains(type.typeName, &outIndex))
 #else
                 if (alreadyVisitedTypes.contains(type.typeBuild, &outIndex))
@@ -119,7 +119,7 @@ struct SchemaCompiler
                         return {};
                     if (not alreadyVisitedLinkID.push_back(result.types.size))
                         return {};
-#if SC_COMPILER_GCC && __GNUC__ <= 11 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=77911
+#if SC_COMPILER_GCC && __GNUC__ <= 13 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=77911
                     if (not alreadyVisitedTypes.push_back(type.typeName))
 #else
                     if (not alreadyVisitedTypes.push_back(type.typeBuild))
