@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Strings/StringConverter.h" // popNullTermIfExists
+#include "../Strings/StringConverter.h" // popNullTermIfNotEmpty
 #include "../Strings/StringFormat.h"
 namespace SC
 {
@@ -141,17 +141,25 @@ inline bool SC::StringBuilder::format(StringView fmt, Types&&... args)
 template <typename... Types>
 inline bool SC::StringBuilder::append(StringView fmt, Types&&... args)
 {
-    if (not StringConverter::popNullTermIfExists(stringData, encoding))
+    if (fmt.getEncoding() == StringEncoding::Utf16)
     {
+        return false; // UTF16 format strings are not supported
+    }
+    const bool hadNullTerminator = StringConverter::popNullTermIfNotEmpty(stringData, encoding);
+    // It's ok parsing format string '{' and '}' both for utf8 and ascii with StringIteratorASCII
+    // because on a valid UTF8 string, these chars are unambiguously recognizable
+    StringFormatOutput sfo(encoding, stringData);
+    if (StringFormat<StringIteratorASCII>::format(sfo, fmt, forward<Types>(args)...))
+    {
+        return true;
+    }
+    else
+    {
+        if (hadNullTerminator)
+        {
+            // Even if format failed, let's not leave a broken string without a null-terminator
+            (void)StringConverter::pushNullTerm(stringData, encoding);
+        }
         return false;
     }
-
-    StringFormatOutput sfo(encoding, stringData);
-    if (fmt.getEncoding() == StringEncoding::Ascii || fmt.getEncoding() == StringEncoding::Utf8)
-    {
-        // It's ok parsing format string '{' and '}' both for utf8 and ascii with StringIteratorASCII
-        // because on a valid UTF8 string, these chars are unambiguously recognizable
-        return StringFormat<StringIteratorASCII>::format(sfo, fmt, forward<Types>(args)...);
-    }
-    return false; // UTF16/32 format strings are not supported
 }

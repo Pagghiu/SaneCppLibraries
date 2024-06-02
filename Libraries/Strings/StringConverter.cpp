@@ -224,7 +224,7 @@ bool SC::StringConverter::appendNullTerminated(StringView input, bool popExistin
 {
     if (popExistingNullTerminator)
     {
-        SC_TRY(StringConverter::popNullTermIfExists(data, encoding));
+        (void)StringConverter::popNullTermIfNotEmpty(data, encoding);
     }
     return internalAppend(input, nullptr);
 }
@@ -258,11 +258,19 @@ bool SC::StringConverter::ensureZeroTermination(Vector<char>& data, StringEncodi
     return true;
 }
 
-bool SC::StringConverter::popNullTermIfExists(Vector<char>& stringData, StringEncoding encoding)
+bool SC::StringConverter::popNullTermIfNotEmpty(Vector<char>& stringData, StringEncoding encoding)
 {
     const auto sizeOfZero = StringEncodingGetSize(encoding);
     const auto dataSize   = stringData.size();
-    return dataSize >= sizeOfZero ? stringData.resizeWithoutInitializing(dataSize - sizeOfZero) : true;
+    if (dataSize >= sizeOfZero)
+    {
+        (void)stringData.resizeWithoutInitializing(dataSize - sizeOfZero);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 bool SC::StringConverter::pushNullTerm(Vector<char>& stringData, StringEncoding encoding)

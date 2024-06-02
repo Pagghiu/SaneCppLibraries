@@ -78,14 +78,12 @@ struct SC::StringConverter
     /// @param encoding The encoding to be used
     StringConverter(Vector<char>& text, StringEncoding encoding);
 
-    /// @brief Converts a given input StringView to null-terminated version. Will use buffer supplied in constructor if
-    /// needed.
+    /// @brief Converts a given input StringView to null-terminated version.
+    /// Uses supplied buffer in constructor if an actual conversion is needed.
     /// @param input The StringView to be converted
     /// @param encodedText The converted output StringView
     /// @return `true` if the conversion succeeded
     [[nodiscard]] bool convertNullTerminateFastPath(StringView input, StringView& encodedText);
-
-    /// Appends the input string null terminated
 
     /// @brief Appends the given StringView and adds null-terminator.
     /// If existing null-terminator was already last inserted code point, it will be removed before appending input.
@@ -94,11 +92,12 @@ struct SC::StringConverter
     /// @return `true` if the StringView has been successfully appended
     [[nodiscard]] bool appendNullTerminated(StringView input, bool popExistingNullTerminator = true);
 
-    /// @brief Removes ending null-terminator from stringData if it exists
+  private:
+    /// @brief Removes ending null-terminator from stringData if stringData is not empty
     /// @param stringData The buffer to be modified
     /// @param encoding The requested encoding, that determines how many null-termination bytes exist
-    /// @return `true`
-    [[nodiscard]] static bool popNullTermIfExists(Vector<char>& stringData, StringEncoding encoding);
+    /// @return `false` if the stringData is empty or its size is insufficient considering the given encoding
+    [[nodiscard]] static bool popNullTermIfNotEmpty(Vector<char>& stringData, StringEncoding encoding);
 
     /// @brief Will unconditionally add a null-terminator to given buffer.
     /// @param stringData The destination buffer
@@ -112,10 +111,14 @@ struct SC::StringConverter
     /// @return `true` if null-terminator was successfully pushed
     [[nodiscard]] static bool ensureZeroTermination(Vector<char>& data, StringEncoding encoding);
 
-  private:
     void internalClear();
     // TODO: FileSystemIterator should just use a Vector<char>
     friend struct FileSystemIterator;
+    template <int N>
+    friend struct SmallString;
+    friend struct StringBuilder;
+    friend struct FileDescriptor;
+
     [[nodiscard]] bool        setTextLengthInBytesIncludingTerminator(size_t newDataSize);
     [[nodiscard]] static bool convertSameEncoding(StringView text, Vector<char>& buffer, StringView* encodedText,
                                                   NullTermination terminate);
