@@ -184,5 +184,93 @@
                 "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
             ],
         },
+        {
+            "name": "SCExample intel64 [windows]",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Outputs/windows-x64-msbuild-msvc-Debug/SCExample.exe",
+            "preLaunchTask": "Build SCExample Debug intel64",
+            "args": [],
+            "cwd": "${workspaceRoot}",
+            "stopAtEntry": false,
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            // Install CodeLLDB extension or similar to use this one
+            "name": "SCExample intel64 [apple] (lldb)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Outputs/macOS-x86_64-make-clang-Debug/SCExample",
+            "args": [],
+            "env": {},
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Build SCExample Debug intel64",
+            "console": "integratedTerminal",
+            "preRunCommands": [
+                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+            ],
+        },
+        {
+            // Install CodeLLDB extension or similar to use this one
+            "name": "SCExample intel64 [linux] (lldb)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Outputs/linux-x86_64-make-gcc-Debug/SCExample",
+            "args": [],
+            "env": {
+                "DISPLAY": ":0.0"
+            },
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Build SCExample Debug intel64",
+            "console": "integratedTerminal",
+            "preRunCommands": [
+                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+            ],
+        },
+        {
+            "name": "SCExample arm64 [windows]",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Outputs/windows-arm64-msbuild-msvc-Debug/SCExample.exe",
+            "preLaunchTask": "Build SCExample Debug arm64",
+            "args": [],
+            "cwd": "${workspaceRoot}",
+            "stopAtEntry": false,
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            // Install CodeLLDB extension or similar to use this one
+            "name": "SCExample arm64 [apple] (lldb)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Outputs/macOS-arm64-make-clang-Debug/SCExample",
+            "args": [],
+            "env": {},
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Build SCExample Debug arm64",
+            "console": "integratedTerminal",
+            "preRunCommands": [
+                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+            ],
+        },
+        {
+            // Install CodeLLDB extension or similar to use this one
+            "name": "SCExample arm64 [linux] (lldb)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Outputs/linux-arm64-make-gcc-Debug/SCExample",
+            "args": [],
+            "env": {
+                "DISPLAY": ":0.0"
+            },
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Build SCExample Debug arm64",
+            "console": "integratedTerminal",
+            "preRunCommands": [
+                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+            ],
+        },
     ]
 }

@@ -7,7 +7,14 @@
             "label": "Build SCTest Debug intel64",
             "type": "shell",
             "command": "${workspaceRoot}/SC.sh",
-            "args": ["build", "compile", "SCTest", "Debug", "default", "intel64"],
+            "args": [
+                "build",
+                "compile",
+                "SCTest",
+                "Debug",
+                "default",
+                "intel64"
+            ],
             "problemMatcher": [
                 "$gcc"
             ],
@@ -18,25 +25,20 @@
                         "$msvc"
                     ]
                 }
-            },
-            "presentation": {
-                "echo": true,
-                "reveal": "never",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "group": {
-                "kind": "build",
-                "isDefault": true
             }
         },
         {
             "label": "Build SCTest Debug arm64",
             "type": "shell",
             "command": "${workspaceRoot}/SC.sh",
-            "args": ["build", "compile", "SCTest", "Debug", "default", "arm64"],
+            "args": [
+                "build",
+                "compile",
+                "SCTest",
+                "Debug",
+                "default",
+                "arm64"
+            ],
             "problemMatcher": [
                 "$gcc"
             ],
@@ -47,25 +49,20 @@
                         "$msvc"
                     ]
                 }
-            },
-            "presentation": {
-                "echo": true,
-                "reveal": "never",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "group": {
-                "kind": "build",
-                "isDefault": true
             }
         },
         {
             "label": "Build SCTest Release intel64",
             "type": "shell",
             "command": "${workspaceRoot}/SC.sh",
-            "args": ["build", "compile", "SCTest", "Release", "default", "intel64"],
+            "args": [
+                "build",
+                "compile",
+                "SCTest",
+                "Release",
+                "default",
+                "intel64"
+            ],
             "problemMatcher": [
                 "$gcc"
             ],
@@ -76,25 +73,20 @@
                         "$msvc"
                     ]
                 }
-            },
-            "presentation": {
-                "echo": true,
-                "reveal": "never",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "group": {
-                "kind": "build",
-                "isDefault": true
             }
         },
         {
             "label": "Build SCTest Release arm64",
             "type": "shell",
             "command": "${workspaceRoot}/SC.sh",
-            "args": ["build", "compile", "SCTest", "Release", "default", "arm64"],
+            "args": [
+                "build",
+                "compile",
+                "SCTest",
+                "Release",
+                "default",
+                "arm64"
+            ],
             "problemMatcher": [
                 "$gcc"
             ],
@@ -105,18 +97,102 @@
                         "$msvc"
                     ]
                 }
-            },
-            "presentation": {
-                "echo": true,
-                "reveal": "never",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "group": {
-                "kind": "build",
-                "isDefault": true
+            }
+        },
+        {
+            "label": "Build SCExample Debug intel64",
+            "type": "shell",
+            "command": "${workspaceRoot}/SC.sh",
+            "args": [
+                "build",
+                "compile",
+                "SCExample",
+                "Debug",
+                "default",
+                "intel64"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "windows": {
+                "command": "${workspaceRoot}/SC.bat",
+                "properties": {
+                    "problemMatcher": [
+                        "$msvc"
+                    ]
+                }
+            }
+        },
+        {
+            "label": "Build SCExample Debug arm64",
+            "type": "shell",
+            "command": "${workspaceRoot}/SC.sh",
+            "args": [
+                "build",
+                "compile",
+                "SCExample",
+                "Debug",
+                "default",
+                "arm64"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "windows": {
+                "command": "${workspaceRoot}/SC.bat",
+                "properties": {
+                    "problemMatcher": [
+                        "$msvc"
+                    ]
+                }
+            }
+        },
+        {
+            "label": "Build SCExample Release intel64",
+            "type": "shell",
+            "command": "${workspaceRoot}/SC.sh",
+            "args": [
+                "build",
+                "compile",
+                "SCExample",
+                "Release",
+                "default",
+                "intel64"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "windows": {
+                "command": "${workspaceRoot}/SC.bat",
+                "properties": {
+                    "problemMatcher": [
+                        "$msvc"
+                    ]
+                }
+            }
+        },
+        {
+            "label": "Build SCExample Release arm64",
+            "type": "shell",
+            "command": "${workspaceRoot}/SC.sh",
+            "args": [
+                "build",
+                "compile",
+                "SCExample",
+                "Release",
+                "default",
+                "arm64"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "windows": {
+                "command": "${workspaceRoot}/SC.bat",
+                "properties": {
+                    "problemMatcher": [
+                        "$msvc"
+                    ]
+                }
             }
         },
         {
@@ -128,11 +204,11 @@
                 "execute"
             ],
             "windows": {
-                "command": "${workspaceRoot}/SC.bat",
+                "command": "${workspaceRoot}/SC.bat"
             },
             "problemMatcher": [
                 "$gcc"
-            ],
+            ]
         },
         {
             "label": "Generate Projects",
@@ -143,11 +219,15 @@
                 "configure"
             ],
             "windows": {
-                "command": "${workspaceRoot}/SC.bat",
+                "command": "${workspaceRoot}/SC.bat"
             },
             "problemMatcher": [
                 "$gcc"
             ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         },
         {
             "label": "Build Documentation",
@@ -158,11 +238,11 @@
                 "documentation"
             ],
             "windows": {
-                "command": "${workspaceRoot}/SC.bat",
+                "command": "${workspaceRoot}/SC.bat"
             },
             "problemMatcher": [
                 "$gcc"
-            ],
+            ]
         },
         {
             "label": "Build Coverage",
@@ -174,17 +254,17 @@
                 "DebugCoverage"
             ],
             "windows": {
-                "command": "${workspaceRoot}/SC.bat",
+                "command": "${workspaceRoot}/SC.bat"
             },
             "problemMatcher": [
                 "$gcc"
-            ],
+            ]
         },
         {
             "label": "Launch Documentation WebServer",
             "type": "shell",
             "command": "python3 -m http.server --directory ${workspaceRoot}/_Build/_Documentation/docs",
             "problemMatcher": []
-        },
+        }
     ]
 }

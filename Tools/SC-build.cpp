@@ -2,9 +2,53 @@
 // SPDX-License-Identifier: MIT
 #include "SC-build.h"
 #include "Libraries/Strings/StringBuilder.h"
+#include "SC-package.h"
 
 namespace SC
 {
+namespace Tools
+{
+[[nodiscard]] Result installSokol(const Build::Directories& directories, Package& package)
+{
+    Download download;
+    download.packagesCacheDirectory   = directories.packagesCacheDirectory;
+    download.packagesInstallDirectory = directories.packagesInstallDirectory;
+
+    download.packageName    = "sokol";
+    download.packageVersion = "7b5cfa7";
+    download.url            = "https://github.com/floooh/sokol.git";
+    download.isGitClone     = true;
+    download.createLink     = false;
+    package.packageBaseName = "sokol";
+
+    CustomFunctions functions;
+    functions.testFunction = &verifyGitCommitHash;
+
+    SC_TRY(packageInstall(download, package, functions));
+    return Result(true);
+}
+
+[[nodiscard]] Result installDearImGui(const Build::Directories& directories, Package& package)
+{
+    Download download;
+    download.packagesCacheDirectory   = directories.packagesCacheDirectory;
+    download.packagesInstallDirectory = directories.packagesInstallDirectory;
+
+    download.packageName    = "dear-imgui";
+    download.packageVersion = "00ad3c6";
+    download.url            = "https://github.com/ocornut/imgui.git";
+    download.isGitClone     = true;
+    download.createLink     = false;
+    package.packageBaseName = "dear-imgui";
+
+    CustomFunctions functions;
+    functions.testFunction = &verifyGitCommitHash;
+
+    SC_TRY(packageInstall(download, package, functions));
+    return Result(true);
+}
+
+} // namespace Tools
 namespace Build
 {
 SC_COMPILER_WARNING_PUSH_UNUSED_RESULT; // Doing some optimistic coding here, ignoring all failures
@@ -46,9 +90,9 @@ void addSaneCppLibraries(Project& project, const Parameters& parameters)
 
 static constexpr StringView TEST_PROJECT_NAME = "SCTest";
 
-Project buildTestProject(const Parameters& parameters)
+Result buildTestProject(const Parameters& parameters, Project& project)
 {
-    Project project = {TargetType::Executable, TEST_PROJECT_NAME};
+    project = {TargetType::Executable, TEST_PROJECT_NAME};
 
     // All relative paths are evaluated from this project root directory.
     project.setRootDirectory(parameters.directories.libraryDirectory.view());
@@ -74,13 +118,65 @@ Project buildTestProject(const Parameters& parameters)
     project.addDirectory("Tools", "SC-*.cpp");     // add all tools
     project.addDirectory("Tools", "*.h");          // add tools headers
     project.addDirectory("Tools", "*Test.cpp");    // add tools tests
-    return project;
+    return Result(true);
+}
+
+static constexpr StringView EXAMPLE_PROJECT_NAME = "SCExample";
+
+Result buildExampleProject(const Parameters& parameters, Project& project)
+{
+    project = {TargetType::Executable, EXAMPLE_PROJECT_NAME};
+
+    // All relative paths are evaluated from this project root directory.
+    project.setRootDirectory(parameters.directories.libraryDirectory.view());
+
+    // Install dependencies
+    Tools::Package sokol;
+    SC_TRY(Tools::installSokol(parameters.directories, sokol));
+    Tools::Package dearImGui;
+    SC_TRY(Tools::installDearImGui(parameters.directories, dearImGui));
+
+    // Add includes
+    project.compile.addIncludes({".", sokol.packageLocalDirectory.view(), dearImGui.packageLocalDirectory.view()});
+
+    // Project Configurations
+    project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
+    project.addPresetConfiguration(Configuration::Preset::Release, parameters);
+    project.addPresetConfiguration(Configuration::Preset::DebugCoverage, parameters);
+
+    addSaneCppLibraries(project, parameters);            // add all SC Libraries
+    project.removeFiles("Bindings/c", "*");              // remove all bindings
+    project.removeFiles("Libraries", "**Test.cpp");      // remove all tests
+    project.removeFiles("LibrariesExtra", "**Test.cpp"); // remove all tests
+    project.removeFiles("Support", "**Test.cpp");        // remove all tests
+
+    project.addDirectory(dearImGui.packageLocalDirectory.view(), "*.cpp");
+    project.addDirectory(sokol.packageLocalDirectory.view(), "*.h");
+    project.link.set<Link::guiApplication>(true);
+    if (parameters.platform == Platform::MacOS or parameters.platform == Platform::iOS)
+    {
+        project.addDirectory("Examples/SCExample", "*.m"); // add all .m from SCExample directory
+        project.link.addFrameworks({"Metal", "MetalKit", "QuartzCore", "Cocoa"});
+    }
+    else
+    {
+        project.addDirectory("Examples/SCExample", "*.c"); // add all .c from SCExample directory
+        if (parameters.platform == Platform::Linux)
+        {
+            project.link.addLibraries({"GL", "EGL", "X11", "Xi", "Xcursor"});
+        }
+    }
+    project.addDirectory("Examples/SCExample", "*.h");   // add all .h from SCExample directory
+    project.addDirectory("Examples/SCExample", "*.cpp"); // add all .cpp from SCExample directory
+    return Result(true);
 }
 
 Result configure(Definition& definition, const Parameters& parameters)
 {
     Workspace workspace = {"SCTest"};
-    workspace.projects.push_back(buildTestProject(parameters));
+    SC_TRY(workspace.projects.resize(2));
+    SC_TRY(buildTestProject(parameters, workspace.projects[0]));
+    SC_TRY(buildExampleProject(parameters, workspace.projects[1]));
     definition.workspaces.push_back(move(workspace));
     return Result(true);
 }
