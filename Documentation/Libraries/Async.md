@@ -58,6 +58,14 @@ This is very useful to integrate the event loop into applications with other eve
 | SC::AsyncEventLoop::blockingPoll          | @copydoc SC::AsyncEventLoop::blockingPoll         |
 | SC::AsyncEventLoop::dispatchCompletions   | @copydoc SC::AsyncEventLoop::dispatchCompletions  |
 
+## AsyncEventLoopMonitor
+@copydoc SC::AsyncEventLoopMonitor
+
+| Functions                                                         | Description                                                               |
+|:------------------------------------------------------------------|:--------------------------------------------------------------------------|
+| SC::AsyncEventLoopMonitor::startMonitoring                        | @copydoc SC::AsyncEventLoopMonitor::startMonitoring                       |
+| SC::AsyncEventLoopMonitor::stopMonitoringAndDispatchCompletions   | @copydoc SC::AsyncEventLoopMonitor::stopMonitoringAndDispatchCompletions  |
+
 ## AsyncLoopTimeout
 @copydoc SC::AsyncLoopTimeout
 

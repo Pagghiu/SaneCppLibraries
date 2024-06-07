@@ -47,6 +47,7 @@ struct ThreadPoolTask;
 struct EventObject;
 struct AsyncKernelEvents;
 struct AsyncEventLoop;
+struct AsyncEventLoopMonitor;
 
 struct AsyncRequest;
 struct AsyncResult;
@@ -861,6 +862,8 @@ struct SC::AsyncKernelEvents
 
 /// @brief Asynchronous I/O (files, sockets, timers, processes, fs events, threads wake-up) (see @ref library_async)
 /// AsyncEventLoop pushes all AsyncRequest derived classes to I/O queues in the OS.
+/// @see AsyncEventLoopMonitor can be used to integrate AsyncEventLoop with a GUI event loop
+///
 /// Basic lifetime for an event loop is:
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncEventLoopSnippet
 struct SC::AsyncEventLoop
@@ -992,6 +995,52 @@ struct SC::AsyncEventLoop
     friend struct AsyncRequest;
     friend struct AsyncFileWrite;
     friend struct AsyncFileRead;
+};
+
+/// @brief Monitors Async I/O events from a background thread using a blocking kernel function (no CPU usage on idle).
+/// AsyncEventLoopMonitor makes it easy to integrate AsyncEventLoop within a GUI event loop or another I/O event loop.
+/// This pattern avoids constantly polling the kernel, using virtually 0% of CPU time when waiting for events.
+struct SC::AsyncEventLoopMonitor
+{
+    Function<void(void)> onNewEventsAvailable; ///< Informs to call dispatchCompletions on GUI Event Loop
+
+    /// @brief Create the monitoring thread for an AsyncEventLoop.
+    /// To start monitoring events call AsyncEventLoopMonitor::startMonitoring.
+    Result create(AsyncEventLoop& loop);
+
+    /// @brief Stop monitoring the AsyncEventLoop, disposing all resources
+    Result close();
+
+    /// @brief Queue all async requests submissions and start monitoring loop events on a background thread.
+    /// On the background thread AsyncEventLoop::blockingPoll will block (with 0% CPU usage) and return only when
+    /// it will be informed by the kernel of some new events.
+    /// Immediately after AsyncEventLoopMonitor::onNewEventsAvailable will be called (on the background thread).
+    /// In the code handler associated with this event, the user/caller should inform its main thread to call
+    /// AsyncEventLoopMonitor::stopMonitoringAndDispatchCompletions.
+    Result startMonitoring();
+
+    /// @brief Stops monitoring events on the background thread and dispatches callbacks for completed requests.
+    /// This is typically called by the user of this class on the _main thread_ or in general on the thread where
+    /// the event loop that coordinates the application lives (GUI thread typically or another I/O Event Loop thread).
+    /// @note In some cases this method will also immediately submit new requests that have been queued by callbacks.
+    Result stopMonitoringAndDispatchCompletions();
+
+  private:
+    alignas(uint64_t) uint8_t eventsMemory[8 * 1024]; // 8 Kb of kernel events
+    AsyncKernelEvents asyncKernelEvents;
+    AsyncEventLoop*   eventLoop = nullptr;
+    AsyncLoopWakeUp   eventLoopWakeUp;
+
+    Thread      eventLoopThread;
+    EventObject eventObjectEnterBlockingMode;
+    EventObject eventObjectExitBlockingMode;
+
+    Atomic<bool> finished    = false;
+    Atomic<bool> needsWakeUp = true;
+
+    bool wakeUpHasBeenCalled = false;
+
+    Result monitoringLoopThread(Thread& thread);
 };
 
 //! @}

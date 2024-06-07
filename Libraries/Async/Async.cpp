@@ -336,6 +336,95 @@ bool SC::AsyncEventLoop::tryLoadingLiburing() { return false; }
 #endif
 
 //-------------------------------------------------------------------------------------------------------
+// AsyncEventLoopMonitor
+//-------------------------------------------------------------------------------------------------------
+
+SC::Result SC::AsyncEventLoopMonitor::create(AsyncEventLoop& loop)
+{
+    if (eventLoop)
+    {
+        return Result::Error("Already initialized");
+    }
+    eventLoop = &loop;
+
+    asyncKernelEvents.eventsMemory = eventsMemory;
+    SC_TRY(eventLoopWakeUp.start(*eventLoop));
+    eventLoopWakeUp.callback = [this](AsyncLoopWakeUp::Result& result)
+    {
+        result.reactivateRequest(true);
+        wakeUpHasBeenCalled = true;
+    };
+    SC_TRY(eventLoopThread.start([this](Thread& thread) { SC_TRUST_RESULT(monitoringLoopThread(thread)); }));
+    return Result(true);
+}
+
+SC::Result SC::AsyncEventLoopMonitor::startMonitoring()
+{
+    // Submit all requests made so far before entering polling mode
+    SC_TRY(eventLoop->submitRequests(asyncKernelEvents));
+    eventObjectEnterBlockingMode.signal();
+    return Result(true);
+}
+
+SC::Result SC::AsyncEventLoopMonitor::monitoringLoopThread(Thread& thread)
+{
+    thread.setThreadName(SC_NATIVE_STR("Monitoring Loop thread"));
+    do
+    {
+        eventObjectEnterBlockingMode.wait();
+        // Block to poll for events and store them into asyncKernelEvents
+        Result res = eventLoop->blockingPoll(asyncKernelEvents);
+        needsWakeUp.exchange(false);
+        onNewEventsAvailable();
+        eventObjectExitBlockingMode.signal();
+        if (not res)
+        {
+            return res;
+        }
+    } while (not finished.load());
+    return Result(true);
+}
+
+SC::Result SC::AsyncEventLoopMonitor::stopMonitoringAndDispatchCompletions()
+{
+    SC_TRY_MSG(eventLoop != nullptr, "Not initialized");
+    SC_TRY_MSG(not finished.load(), "Finished == true");
+    // Unblock the blocking poll on the other thread, even if it could be already unblocked
+    const bool wakeUpMustBeSent = needsWakeUp.load();
+    if (wakeUpMustBeSent)
+    {
+        wakeUpHasBeenCalled = false;
+        SC_TRY(eventLoopWakeUp.wakeUp());
+    }
+    eventObjectExitBlockingMode.wait();
+    needsWakeUp.exchange(true);
+    // Dispatch the callbacks associated with the IO events signaled by AsyncEventLoop::blockingPoll
+    SC_TRY(eventLoop->dispatchCompletions(asyncKernelEvents));
+    if (wakeUpMustBeSent and not wakeUpHasBeenCalled)
+    {
+        // We need one more event loop step to consume the earlier wakeUpFromExternalThread().
+        // Note: runOnce will also submit new async requests potentially queued by the callbacks.
+        return eventLoop->runOnce();
+    }
+    return Result(true);
+}
+
+SC::Result SC::AsyncEventLoopMonitor::close()
+{
+    if (eventLoop == nullptr)
+    {
+        return Result::Error("Not initialized");
+    }
+    finished.exchange(true);
+    eventObjectEnterBlockingMode.signal();
+    eventObjectExitBlockingMode.signal();
+    SC_TRY(eventLoop->wakeUpFromExternalThread());
+    SC_TRY(eventLoopThread.join());
+    eventLoop = nullptr;
+    return Result(true);
+}
+
+//-------------------------------------------------------------------------------------------------------
 // AsyncEventLoop::Internal
 //-------------------------------------------------------------------------------------------------------
 
