@@ -219,7 +219,7 @@
             "program": "${workspaceFolder}/_Build/_Outputs/linux-x86_64-make-gcc-Debug/SCExample",
             "args": [],
             "env": {
-                "DISPLAY": ":0.0"
+                "DISPLAY": ":0.0" // If ssh-remoting into a VM you should configure X-auth (or disable it with "xhost +")
             },
             "cwd": "${workspaceRoot}",
             "preLaunchTask": "Build SCExample Debug intel64",
@@ -263,7 +263,7 @@
             "program": "${workspaceFolder}/_Build/_Outputs/linux-arm64-make-gcc-Debug/SCExample",
             "args": [],
             "env": {
-                "DISPLAY": ":0.0"
+                "DISPLAY": ":0.0" // If ssh-remoting into a VM you should configure X-auth (or disable it with "xhost +")
             },
             "cwd": "${workspaceRoot}",
             "preLaunchTask": "Build SCExample Debug arm64",

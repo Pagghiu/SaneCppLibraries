@@ -37,6 +37,7 @@ extern "C"
 #endif
 
     void sokol_sleep(void);
+    void sokol_wake_up(void);
 
 #ifdef __cplusplus
 }
