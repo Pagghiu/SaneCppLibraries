@@ -1,11 +1,35 @@
 @page page_examples Examples
+# Examples
 
-# Where can I find examples?
+@note All of the examples assume build configure to be already run, as described in [Building  Contributor](@ref page_building_contributor):
+- Windows: `./SC.sh build configure`
+- Posix: `SC.bat build configure`
 
-- Currently there are no specific examples you can run.  
-- The test suite is the closest thing examples you can find.
-- The second best is looking at how [SC::Tools](@ref page_tools) have been implemented.
+## SCExample
+
+| Property      | Value                                                                                                                     |
+|:--------------|:--------------------------------------------------------------------------------------------------------------------------|
+| Location      | `Examples/SCExample`                                                                                                      |
+| Description   | Simple immediate mode gui application using sokol and dear imgui libraries pausing in absence of inputs to save CPU time  |
+| Purpose       | Use `SC::Build` to generate projects for macOS, windows and linux .                                                       |
+| Run (Posix)   | `./SC.sh build run SCExample`                                                                                             |
+| Run (Windows) | `SC.bat build run SCExample`                                                                                              |
+| Debug (VSCode)| Select correct `SCExample $ARCH ($PLATFORM)` for your system and press `Start Debugging` (F5)                             |
+| Debug (XCode) | Open `_Build/_Projects/XCode/SCExample.xcodeproj` and choose `Product` --> `Run`                                          |
+| Debug (VS2022)| Open `_Build/_Projects/VisualStudio2022/SCExample.sln` and start Debugging (F5)                                           |
+
+https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/946684f2-b0c5-436b-b472-c34f07021d03
+
+\htmlonly
+<iframe width="700" height="400" src="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/946684f2-b0c5-436b-b472-c34f07021d03" frameborder="0" allowfullscreen>
+\endhtmlonly
+
+# Where can I find more examples?
+
+- The test suite is the closest thing to additional examples you can find in this project.
+- The second best thing to do is looking at [SC::Tools](@ref page_tools) implementation.
 - Documentation for each library has some examples and / or code snippets that you can look at.
+
 
 # Where can I learn more?
 

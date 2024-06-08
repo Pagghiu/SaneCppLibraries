@@ -90,6 +90,8 @@ Shortly:
 
 Check the [Examples](https://pagghiu.github.io/SaneCppLibraries/page_examples.html) page.
 
+https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/946684f2-b0c5-436b-b472-c34f07021d03
+
 # Tests
 
 Tests are built with the self-hosted [SC::Build](https://pagghiu.github.io/SaneCppLibraries/library_build.html) project generator, describing the builds in C++.    
@@ -133,6 +135,8 @@ On the [Youtube Channel](https://www.youtube.com/@Pagghiu) you can find some vid
 - [Async file read and writes using Thread Pool](https://www.youtube.com/watch?v=WF9beKyEA_E)
 - [Implement SC::AsyncLoopWork](https://www.youtube.com/watch?v=huavEjzflHQ)
 - [BREAK SC::Async IO Event Loop](https://www.youtube.com/watch?v=3lbyx11qDxM)
+- [Pause Immediate Mode UI - Save CPU Time](https://www.youtube.com/watch?v=4acqdGcUQnE)
+
 
 # Contributing
 

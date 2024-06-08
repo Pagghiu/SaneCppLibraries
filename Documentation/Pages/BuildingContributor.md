@@ -4,12 +4,12 @@ Follow this guide if you're interested in building the library to contribute (ch
 
 [TOC]
 
-# Generate test projects
+# Generate projects
 
-The test suite uses the handmade / self-hosted [SC::Build](@ref library_build) system, that describes builds in C++
+The test suite and example projects uses the handmade / self-hosted [SC::Build](@ref library_build) system, that describes builds in C++
 
 ## Command-line
-- Generate test project
+- Generate projects
     - **Windows**: `SC.bat build generate`
     - **Posix**: `SC.sh build generate`
 - Open generated projects (in `_Build/_Projects`). 
