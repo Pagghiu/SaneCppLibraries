@@ -90,7 +90,7 @@ Shortly:
 
 Check the [Examples](https://pagghiu.github.io/SaneCppLibraries/page_examples.html) page.
 
-https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/946684f2-b0c5-436b-b472-c34f07021d03
+https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/f12f3cd5-0c25-47ab-a22d-e37ac138b0db
 
 # Tests
 

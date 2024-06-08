@@ -7,21 +7,26 @@
 
 ## SCExample
 
-| Property      | Value                                                                                                                     |
-|:--------------|:--------------------------------------------------------------------------------------------------------------------------|
-| Location      | `Examples/SCExample`                                                                                                      |
-| Description   | Simple immediate mode gui application using sokol and dear imgui libraries pausing in absence of inputs to save CPU time  |
-| Purpose       | Use `SC::Build` to generate projects for macOS, windows and linux .                                                       |
-| Run (Posix)   | `./SC.sh build run SCExample`                                                                                             |
-| Run (Windows) | `SC.bat build run SCExample`                                                                                              |
-| Debug (VSCode)| Select correct `SCExample $ARCH ($PLATFORM)` for your system and press `Start Debugging` (F5)                             |
-| Debug (XCode) | Open `_Build/_Projects/XCode/SCExample.xcodeproj` and choose `Product` --> `Run`                                          |
-| Debug (VS2022)| Open `_Build/_Projects/VisualStudio2022/SCExample.sln` and start Debugging (F5)                                           |
+| Property      | Value                                                                                                                             |
+|:--------------|:----------------------------------------------------------------------------------------------------------------------------------|
+| Location      | `Examples/SCExample`                                                                                                              |
+| Description   | Simple immediate mode gui application using sokol and dear imgui libraries pausing in absence of inputs and I/O to save CPU time  |
+| Purpose       | Use [SC::Build](@ref library_build) to build on macOS, windows and linux and [SC::Async](@ref library_async) as I/O event Loop    |
+| Prerequisites | Linux - Fedora: `sudo dnf install mesa-libGL-devel mesa-libEGL-devel libX11-devel libXi-devel libXcursor-devel`                   |
+|               | Linux - Ubuntu: `sudo apt-get install libgles2-mesa-dev libx11-dev libxi-dev libxcursor-dev`                                      |
+|               | Windows: None                                                                                                                     |
+|               | macOS: None                                                                                                                       |
+| Dependencies  | `sokol` and `dear-imgui` are automatically downloaded during `./SC.sh build configure` or  `SC.bat build configure`               |
+| Run (Posix)   | `./SC.sh build run SCExample`                                                                                                     |
+| Run (Windows) | `SC.bat build run SCExample`                                                                                                      |
+| Debug (VSCode)| Select correct `SCExample $ARCH ($PLATFORM)` for your system and press `Start Debugging` (F5)                                     |
+| Debug (XCode) | Open `_Build/_Projects/XCode/SCExample.xcodeproj` and choose `Product` --> `Run`                                                  |
+| Debug (VS2022)| Open `_Build/_Projects/VisualStudio2022/SCExample.sln` and start Debugging (F5)                                                   |
 
-https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/946684f2-b0c5-436b-b472-c34f07021d03
+https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/f12f3cd5-0c25-47ab-a22d-e37ac138b0db
 
 \htmlonly
-<iframe width="700" height="400" src="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/946684f2-b0c5-436b-b472-c34f07021d03" frameborder="0" allowfullscreen>
+<iframe width="700" height="400" src="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/f12f3cd5-0c25-47ab-a22d-e37ac138b0db" frameborder="0" allowfullscreen>
 \endhtmlonly
 
 # Where can I find more examples?
