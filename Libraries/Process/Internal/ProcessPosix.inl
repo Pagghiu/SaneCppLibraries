@@ -211,7 +211,7 @@ SC::Result SC::Process::launchImplementation()
 
         const char* const* environmentArray = environ;
         ProcessEnvironment parentEnv;
-        StringsTable       table = {environment, environmentNumber, environmentByteOffset};
+        StringsArena       table = {environment, environmentNumber, environmentByteOffset};
 
         EnvironmentTable<MAX_NUM_ENVIRONMENT> environmentTable;
         SC_TRY(environmentTable.writeTo(environmentArray, inheritEnv, table, parentEnv));
@@ -296,10 +296,10 @@ SC::Result SC::Process::launchImplementation()
 
 SC::Result SC::Process::formatArguments(Span<const StringView> params)
 {
-    StringsTable table = {command, commandArgumentsNumber, commandArgumentsByteOffset};
+    StringsArena table = {command, commandArgumentsNumber, commandArgumentsByteOffset};
     for (size_t idx = 0; idx < params.sizeInElements(); ++idx)
     {
-        SC_TRY(table.append(params[idx]));
+        SC_TRY(table.appendAsSingleString(params[idx]));
     }
     return Result(true);
 }

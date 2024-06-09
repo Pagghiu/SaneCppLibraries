@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "StringsTable.h"
+#include "StringsArena.h"
 namespace SC
 {
 template <int MAX_NUM_ENVIRONMENT>
@@ -14,7 +14,7 @@ struct SC::EnvironmentTable
     using environment_ptr = const native_char_t* const*;
     const native_char_t* childEnvs[MAX_NUM_ENVIRONMENT];
 
-    Result writeTo(environment_ptr& environmentArray, bool inheritEnvironment, const StringsTable& table,
+    Result writeTo(environment_ptr& environmentArray, bool inheritEnvironment, const StringsArena& table,
                    const ProcessEnvironment& parentEnv)
     {
         if (table.bufferString.view().isEmpty())

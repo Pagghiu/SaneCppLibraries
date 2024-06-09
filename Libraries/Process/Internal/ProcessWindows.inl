@@ -87,20 +87,25 @@ SC::Result SC::Process::launchImplementation()
     LPCWSTR wideDir = currentDirectory.view().isEmpty() ? nullptr : currentDirectory.view().getNullTerminatedNative();
     LPWSTR  wideEnv = nullptr; // by default inherit parent environment
 
-    EnvironmentTable<MAX_NUM_ENVIRONMENT> environmenTable;
-    ProcessEnvironment                    parentEnv;
+    EnvironmentTable<MAX_NUM_ENVIRONMENT> environmentTable;
 
     const wchar_t* const* environmentArray = nullptr;
-    StringsTable          table            = {environment, environmentNumber, environmentByteOffset};
-    SC_TRY(environmenTable.writeTo(environmentArray, inheritEnv, table, parentEnv));
+
+    StringsArena arena = {environment, environmentNumber, environmentByteOffset};
+
+    ProcessEnvironment parentEnv;
+    SC_TRY(environmentTable.writeTo(environmentArray, inheritEnv, arena, parentEnv));
 
     if (environmentArray != nullptr)
     {
         for (size_t idx = environmentNumber; environmentArray[idx] != nullptr; ++idx)
         {
-            SC_TRY(table.append(StringView({environmentArray[idx], ::wcslen(environmentArray[idx])}, true)));
+            const StringView environmentString({environmentArray[idx], ::wcslen(environmentArray[idx])}, true);
+            SC_TRY(arena.appendAsSingleString(environmentString));
         }
-        SC_TRY(table.append({"\0"})); // add final \0
+        SC_TRY(arena.appendAsSingleString({"\0"})); // add final \0 (CreateProcessW requires it to signal end of array)
+
+        // const_cast is required by CreateProcessW signature unfortunately
         wideEnv = const_cast<LPWSTR>(environment.view().getNullTerminatedNative());
     }
     PROCESS_INFORMATION processInfo;

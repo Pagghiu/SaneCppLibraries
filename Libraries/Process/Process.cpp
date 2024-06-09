@@ -231,6 +231,6 @@ SC::Result SC::Process::setWorkingDirectory(StringView processWorkingDirectory)
 
 SC::Result SC::Process::setEnvironment(StringView name, StringView value)
 {
-    StringsTable table = {environment, environmentNumber, environmentByteOffset};
-    return table.append({name, SC_NATIVE_STR("="), value});
+    StringsArena table = {environment, environmentNumber, environmentByteOffset};
+    return table.appendAsSingleString({name, SC_NATIVE_STR("="), value});
 }
