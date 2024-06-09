@@ -15,7 +15,6 @@ struct PluginIdentity;
 struct PluginDynamicLibrary;
 struct PluginCompiler;
 struct PluginRegistry;
-struct PluginNetwork;
 using PluginIdentifier = SmallString<30>;
 } // namespace SC
 
@@ -126,7 +125,8 @@ struct SC::PluginCompiler
     Type              type         = Type::ClangCompiler;    ///< Compile Type
     StringNative<256> compilerPath = StringEncoding::Native; ///< Path to the compiler
     StringNative<256> linkerPath   = StringEncoding::Native; ///< Path to the linker
-    StringNative<256> includePath  = StringEncoding::Native; ///< Path to include directory used to compile plugin
+
+    SmallVector<StringNative<256>, 8> includePaths; ///< Path to include directories used to compile plugin
 
     /// @brief Compiles a single source file to an object file, using PluginCompiler::compilerPath and
     /// PluginCompiler::linkerPath
@@ -162,10 +162,10 @@ struct SC::PluginDynamicLibrary
 /// @brief Holds a registry of plugins, loading and compiling them on the fly
 struct SC::PluginRegistry
 {
-    /// @brief Inits the Registry with found plugins
+    /// @brief Appends the definitions to registry
     /// @param definitions found plugin definitions
     /// @return Valid Result if the given definitions can be added to the libraries registry
-    [[nodiscard]] Result init(Vector<PluginDefinition>&& definitions);
+    [[nodiscard]] Result appendDefinitions(Vector<PluginDefinition>&& definitions);
 
     /// @brief Instructs loadPlugin to Load or Reload the plugin
     enum class LoadMode
@@ -197,6 +197,15 @@ struct SC::PluginRegistry
     /// @param identifier Identifier of the Plugin to find
     /// @return Pointer to the found PluginDynamicLibrary if found (or `nullptr`)
     [[nodiscard]] const PluginDynamicLibrary* findPlugin(const StringView identifier);
+
+    /// @brief Returns the total number of registry entries (counting both loaded and unloaded plugins)
+    [[nodiscard]] size_t getNumberOfEntries() const { return libraries.size(); }
+
+    /// @brief Returns the PluginIdentifier corresponding to the index entry of the registry
+    [[nodiscard]] const PluginIdentifier& getIdentifierAt(size_t index) const { return libraries.items[index].key; }
+
+    /// @brief Returns the PluginIdentifier corresponding to the index entry of the registry
+    [[nodiscard]] PluginDynamicLibrary& getPluginDynamicLibraryAt(size_t index) { return libraries.items[index].value; }
 
   private:
     VectorMap<PluginIdentifier, PluginDynamicLibrary> libraries;

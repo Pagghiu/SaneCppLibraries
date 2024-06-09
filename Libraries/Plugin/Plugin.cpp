@@ -5,6 +5,7 @@
 #include "../FileSystem/FileSystem.h"
 #include "../FileSystem/Path.h"
 #include "../FileSystemIterator/FileSystemIterator.h"
+#include "../Process/Internal/StringsArena.h"
 #include "../Process/Process.h"
 #include "../Strings/StringBuilder.h"
 #include "../Threading/Threading.h"
@@ -327,28 +328,35 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
 
 SC::Result SC::PluginCompiler::compileFile(StringView sourceFile, StringView objectFile) const
 {
-    Process process;
+    static constexpr size_t MAX_PROCESS_ARGUMENTS = 24;
 
-    StringNative<256> includes = StringEncoding::Native;
-    StringBuilder     includeBuilder(includes);
+    size_t            argumentsLengths[MAX_PROCESS_ARGUMENTS];
+    StringNative<512> argumentsBuffer   = StringEncoding::Native;
+    size_t            numberOfArguments = 0;
+    StringsArena      argumentsArena{argumentsBuffer, numberOfArguments, {argumentsLengths}};
+    SC_TRY(argumentsArena.appendAsSingleString(compilerPath.view()));
 #if SC_PLATFORM_WINDOWS
-    StringNative<256> destFile = StringEncoding::Native;
-    StringBuilder     destBuilder(destFile);
-    SC_TRY(destBuilder.append(L"/Fo:"));
-    SC_TRY(destBuilder.append(objectFile));
-    SC_TRY(includeBuilder.append(L"/I\""));
-    SC_TRY(includeBuilder.append(includePath.view()));
-    SC_TRY(includeBuilder.append(L"\""));
-    SC_TRY(process.launch({compilerPath.view(), includes.view(), destFile.view(), L"/std:c++17",
-                           L"/DSC_DISABLE_CONFIG=1", L"/GR-", L"/WX", L"/W4", L"/permissive-", L"/GS-", L"/Zi",
-                           L"/DSC_PLUGIN_LIBRARY=1", L"/D_HAS_EXCEPTIONS=0", L"/c", sourceFile}));
+    for (size_t idx = 0; idx < includePaths.size(); ++idx)
+    {
+        SC_TRY(argumentsArena.appendAsSingleString({L"/I\"", includePaths[idx].view(), L"\""}));
+    }
+    SC_TRY(argumentsArena.appendAsSingleString({L"/Fo:", objectFile}));
+    SC_TRY(argumentsArena.appendMultipleStrings({L"/std:c++17", L"/DSC_DISABLE_CONFIG=1", L"/GR-", L"/WX", L"/W4",
+                                                 L"/permissive-", L"/GS-", L"/Zi", L"/DSC_PLUGIN_LIBRARY=1",
+                                                 L"/D_HAS_EXCEPTIONS=0", L"/c", sourceFile}));
 #else
-    SC_TRY(includeBuilder.append("-I"));
-    SC_TRY(includeBuilder.append(includePath.view()));
-    SC_TRY(process.launch({compilerPath.view(), "-DSC_DISABLE_CONFIG=1", "-DSC_PLUGIN_LIBRARY=1", "-nostdinc++",
-                           "-nostdinc", "-fno-stack-protector", "-std=c++14", includes.view(), "-fno-exceptions",
-                           "-fno-rtti", "-g", "-c", "-fpic", sourceFile, "-o", objectFile}));
+    for (size_t idx = 0; idx < includePaths.size(); ++idx)
+    {
+        SC_TRY(argumentsArena.appendAsSingleString({"-I", includePaths[idx].view()}));
+    }
+    SC_TRY(argumentsArena.appendMultipleStrings({"-DSC_DISABLE_CONFIG=1", "-DSC_PLUGIN_LIBRARY=1", "-nostdinc++",
+                                                 "-nostdinc", "-fno-stack-protector", "-std=c++14", "-fno-exceptions",
+                                                 "-fno-rtti", "-g", "-c", "-fpic", sourceFile, "-o", objectFile}));
 #endif
+    StringView arguments[MAX_PROCESS_ARGUMENTS];
+    SC_TRY(argumentsArena.writeTo(arguments));
+    Process process;
+    SC_TRY(process.launch({arguments, numberOfArguments}));
     SC_TRY(process.waitForExitSync());
     return Result(process.getExitStatus() == 0);
 }
@@ -482,7 +490,7 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, String
     return Result(true);
 }
 
-SC::Result SC::PluginRegistry::init(Vector<PluginDefinition>&& definitions)
+SC::Result SC::PluginRegistry::appendDefinitions(Vector<PluginDefinition>&& definitions)
 {
     for (auto& definition : definitions)
     {
@@ -496,8 +504,7 @@ SC::Result SC::PluginRegistry::init(Vector<PluginDefinition>&& definitions)
 
 const SC::PluginDynamicLibrary* SC::PluginRegistry::findPlugin(const StringView identifier)
 {
-    auto result = libraries.get(identifier);
-    return result ? result : nullptr;
+    return libraries.get(identifier);
 }
 
 SC::Result SC::PluginRegistry::loadPlugin(const StringView identifier, const PluginCompiler& compiler,
