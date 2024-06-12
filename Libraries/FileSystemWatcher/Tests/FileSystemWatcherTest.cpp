@@ -97,7 +97,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             FileSystemWatcher::FolderWatcher watcher;
             // We save the results and expect them after the wait to avoid Thread Sanitizer issues
             // due to the SC_TEST_EXPECT calls inside the lambda that runs in the thread
-            const Result res        = fileEventsWatcher.watch(watcher, path.view(), move(lambda));
+            watcher.notifyCallback  = lambda;
+            const Result res        = fileEventsWatcher.watch(watcher, path.view());
             const bool   fsWriteRes = fs.write("test.txt", "content");
             params.eventObject.wait();
             SC_TEST_EXPECT(fsWriteRes);
@@ -118,8 +119,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
             FileSystemWatcher fileEventsWatcher;
 
-            FileSystemWatcher::EventLoopRunner runner{eventLoop};
-            SC_TEST_EXPECT(fileEventsWatcher.init(runner));
+            FileSystemWatcher::EventLoopRunner runner;
+            SC_TEST_EXPECT(fileEventsWatcher.init(runner, eventLoop));
 
             struct Params
             {
@@ -167,7 +168,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(path.assign(appDirectory));
             FileSystemWatcher::FolderWatcher watcher;
             Thread::Sleep(200); // on macOS watch latency is 500 ms, so we sleep to avoid report of 'dir' creation
-            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view(), move(lambda)));
+            watcher.notifyCallback = lambda;
+            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view()));
             SC_TEST_EXPECT(fs.write("dir/test.txt", "content"));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(params.changes == 1);
@@ -196,8 +198,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             FileSystem        fs;
             SC_TEST_EXPECT(fs.init(appDirectory));
 
-            FileSystemWatcher::EventLoopRunner runner{eventLoop};
-            SC_TEST_EXPECT(fileEventsWatcher.init(runner));
+            FileSystemWatcher::EventLoopRunner runner;
+            SC_TEST_EXPECT(fileEventsWatcher.init(runner, eventLoop));
             StringNative<1024> path;
             SC_TEST_EXPECT(path.assign(appDirectory));
             FileSystemWatcher::FolderWatcher watcher;
@@ -205,8 +207,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             {
                 int changes = 0;
             } params;
-            auto lambda = [&](const FileSystemWatcher::Notification&) { params.changes++; };
-            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view(), move(lambda)));
+            watcher.notifyCallback = [&](const FileSystemWatcher::Notification&) { params.changes++; };
+            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view()));
             SC_TEST_EXPECT(fs.write("salve.txt", "content"));
             SC_TEST_EXPECT(fs.write("a_tutti.txt", "content"));
             Thread::Sleep(100);
@@ -228,8 +230,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.create());
 
             FileSystemWatcher                  fileEventsWatcher;
-            FileSystemWatcher::EventLoopRunner runner{eventLoop};
-            SC_TEST_EXPECT(fileEventsWatcher.init(runner));
+            FileSystemWatcher::EventLoopRunner runner;
+            SC_TEST_EXPECT(fileEventsWatcher.init(runner, eventLoop));
             StringNative<1024> path1, path2;
             SC_TEST_EXPECT(Path::join(path1, {appDirectory, "__test1"}));
             SC_TEST_EXPECT(Path::join(path2, {appDirectory, "__test2"}));
@@ -259,7 +261,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                     params.changes1++;
                 }
             };
-            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher1, path1.view(), move(lambda1)));
+            watcher1.notifyCallback = lambda1;
+            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher1, path1.view()));
             auto lambda2 = [&](const FileSystemWatcher::Notification& notification)
             {
                 if (notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
@@ -275,7 +278,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 #else
             constexpr int waitForEventsTimeout = 100;
 #endif
-            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2.view(), move(lambda2)));
+            watcher2.notifyCallback = lambda2;
+            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2.view()));
             FileSystem fs1;
             FileSystem fs2;
             SC_TEST_EXPECT(fs1.init(path1.view()));
@@ -314,7 +318,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                     params.changes2++;
                 }
             };
-            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2.view(), move(lambda3)));
+            watcher2.notifyCallback = lambda3;
+            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2.view()));
             SC_TEST_EXPECT(fs2.removeFile("a_tutti.txt"));
             Thread::Sleep(waitForEventsTimeout);
             SC_TEST_EXPECT(eventLoop.runOnce());
@@ -342,8 +347,8 @@ Result fileSystemWatcherEventLoopRunnerSnippet(AsyncEventLoop& eventLoop, Consol
     // Initialize the FileSystemWatcher
     FileSystemWatcher fileSystemWatcher;
 
-    FileSystemWatcher::EventLoopRunner eventLoopRunner(eventLoop);
-    SC_TRY(fileSystemWatcher.init(eventLoopRunner));
+    FileSystemWatcher::EventLoopRunner eventLoopRunner;
+    SC_TRY(fileSystemWatcher.init(eventLoopRunner, eventLoop));
 
     // Setup notification callback
     auto onFileModified = [&](const FileSystemWatcher::Notification& notification)
@@ -367,7 +372,8 @@ Result fileSystemWatcherEventLoopRunnerSnippet(AsyncEventLoop& eventLoop, Consol
 
     // Start watching a specific folder
     FileSystemWatcher::FolderWatcher folderWatcher;
-    SC_TRY(fileSystemWatcher.watch(folderWatcher, "/path/to/dir", onFileModified));
+    folderWatcher.notifyCallback = onFileModified;
+    SC_TRY(fileSystemWatcher.watch(folderWatcher, "/path/to/dir"));
 
     // ...
     // At a later point when there is no more need of watching the folder
@@ -412,7 +418,8 @@ Result fileSystemWatcherThreadRunnerSnippet(Console& console)
 
     // Start watching a specific folder
     FileSystemWatcher::FolderWatcher folderWatcher;
-    SC_TRY(fileSystemWatcher.watch(folderWatcher, "/path/to/dir", onFileModified));
+    folderWatcher.notifyCallback = onFileModified;
+    SC_TRY(fileSystemWatcher.watch(folderWatcher, "/path/to/dir"));
 
     // ...
     // At a later point when there is no more need of watching the folder

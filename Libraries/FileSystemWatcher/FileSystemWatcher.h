@@ -143,11 +143,10 @@ struct SC::FileSystemWatcher
     /// @brief Delivers notifications using @ref library_async (SC::AsyncEventLoop).
     struct EventLoopRunner
     {
-        AsyncEventLoop& eventLoop;
-        EventLoopRunner(AsyncEventLoop& eventLoop) : eventLoop(eventLoop) {}
 
       private:
         friend struct FileSystemWatcher;
+        AsyncEventLoop* eventLoop = nullptr;
 #if SC_PLATFORM_APPLE
         AsyncLoopWakeUp eventLoopAsync = {};
         EventObject     eventObject    = {};
@@ -166,21 +165,20 @@ struct SC::FileSystemWatcher
 
     /// @brief Setup watcher to receive async notifications on SC::AsyncEventLoop
     /// @param runner Address of a ThreadRunner object that must be valid until close()
+    /// @param eventLoop A valid AsyncEventLoop
     /// @return Valid Result if the watcher has been initialized correctly
-    [[nodiscard]] Result init(EventLoopRunner& runner);
+    [[nodiscard]] Result init(EventLoopRunner& runner, AsyncEventLoop& eventLoop);
 
     /// @brief Stops all watchers and frees the ThreadRunner or EventLoopRunner passed in init
     /// @return Valid Result if resources have been freed successfully
     [[nodiscard]] Result close();
 
-    /// @brief Watch a single directory
-    /// @param watcher Reference to a (not already used) watcher. Its address must not change until
-    /// FolderWatcher::stopWatching or FileSystemWatcher::close
+    /// @brief Starts watching a single directory, calling FolderWatcher::notifyCallback on file events.
+    /// @param watcher Reference to a (not already used) watcher, with a valid FolderWatcher::notifyCallback.
+    /// Its address must not change until FolderWatcher::stopWatching or FileSystemWatcher::close
     /// @param path The directory being monitored
-    /// @param notifyCallback A callback that will be invoked by the given runner
     /// @return Valid Result if directory is accessible and the watcher is initialized properly.
-    [[nodiscard]] Result watch(FolderWatcher& watcher, StringView path,
-                               Function<void(const Notification&)>&& notifyCallback);
+    [[nodiscard]] Result watch(FolderWatcher& watcher, StringView path);
 
   private:
     friend decltype(internal);

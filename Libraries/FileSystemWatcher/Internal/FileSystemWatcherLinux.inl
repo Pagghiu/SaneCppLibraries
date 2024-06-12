@@ -63,9 +63,9 @@ struct SC::FileSystemWatcher::Internal
         int notifyHandle = ::inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
         SC_TRY(notifyFd.assign(notifyHandle));
 
-        SC_TRY(eventLoopRunner->eventLoop.associateExternallyCreatedFileDescriptor(notifyFd));
+        SC_TRY(eventLoopRunner->eventLoop->associateExternallyCreatedFileDescriptor(notifyFd));
         runner.asyncPoll.callback.bind<Internal, &Internal::onEventLoopNotification>(*this);
-        return runner.asyncPoll.start(eventLoopRunner->eventLoop, notifyHandle);
+        return runner.asyncPoll.start(*eventLoopRunner->eventLoop, notifyHandle);
     }
 
     [[nodiscard]] Result close()

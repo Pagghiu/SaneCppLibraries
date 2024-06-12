@@ -12,18 +12,21 @@
 #include "Internal/FileSystemWatcherEmscripten.inl"
 #endif
 
-SC::Result SC::FileSystemWatcher::init(EventLoopRunner& runner) { return internal.get().init(*this, runner); }
+SC::Result SC::FileSystemWatcher::init(EventLoopRunner& runner, AsyncEventLoop& eventLoop)
+{
+    runner.eventLoop = &eventLoop;
+    return internal.get().init(*this, runner);
+}
 
 SC::Result SC::FileSystemWatcher::init(ThreadRunner& runner) { return internal.get().init(*this, runner); }
 
 SC::Result SC::FileSystemWatcher::close() { return internal.get().close(); }
-SC::Result SC::FileSystemWatcher::watch(FolderWatcher& watcher, StringView path,
-                                        Function<void(const Notification&)>&& notifyCallback)
+
+SC::Result SC::FileSystemWatcher::watch(FolderWatcher& watcher, StringView path)
 {
     SC_TRY_MSG(watcher.parent == nullptr, "Watcher belongs to other FileSystemWatcher");
     watcher.parent = this;
     SC_TRY(watcher.path.assign(path));
-    watcher.notifyCallback = move(notifyCallback);
     watchers.queueBack(watcher);
     return internal.get().startWatching(&watcher);
 }
