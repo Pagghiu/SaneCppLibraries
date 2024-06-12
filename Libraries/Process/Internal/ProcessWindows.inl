@@ -58,7 +58,7 @@ SC::Result SC::Process::launchImplementation()
 
     const BOOL inheritHandles = someRedirection ? TRUE : FALSE;
 
-    DWORD creationFlags = CREATE_UNICODE_ENVIRONMENT;
+    DWORD creationFlags = CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW;
     ZeroMemory(&startupInfo, sizeof(STARTUPINFO));
     startupInfo.cb         = sizeof(STARTUPINFO);
     startupInfo.hStdInput  = GetStdHandle(STD_INPUT_HANDLE);
@@ -148,7 +148,7 @@ SC::Result SC::Process::formatArguments(Span<const StringView> params)
             SC_TRY(formattedCmd.appendNullTerminated(" "));
         }
         first = false;
-        if (param.containsCodePoint(' ')) // TODO: Must escape also quotes
+        if (param.containsCodePoint(' ') and not param.containsCodePoint('"'))
         {
             SC_TRY(formattedCmd.appendNullTerminated("\""));
             SC_TRY(formattedCmd.appendNullTerminated(param));
