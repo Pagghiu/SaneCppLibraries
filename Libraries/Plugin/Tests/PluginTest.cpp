@@ -30,6 +30,7 @@ struct SC::PluginTest : public SC::TestCase
                 // Description:   A Simple text plugin
                 // Category:      Generic
                 // Dependencies:  TestPluginChild,TestPlugin02
+                // Build:         libc,libc++
                 // SC_END_PLUGIN
             )";
             PluginDefinition definition;
@@ -42,6 +43,8 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(definition.category == "Generic");
             SC_TEST_EXPECT(definition.dependencies[0] == "TestPluginChild");
             SC_TEST_EXPECT(definition.dependencies[1] == "TestPlugin02");
+            SC_TEST_EXPECT(definition.build[0] == "libc");
+            SC_TEST_EXPECT(definition.build[1] == "libc++");
         }
         if (test_section("PluginScanner/PluginCompiler/PluginRegistry"))
         {
@@ -65,15 +68,17 @@ struct SC::PluginTest : public SC::TestCase
             const StringView identifierChild  = identifierChildString.view();
             const StringView identifierParent = identifierParentString.view();
 
-            // Init compiler
+            // Init compiler and sysroot
             PluginCompiler compiler;
             SC_TEST_EXPECT(PluginCompiler::findBestCompiler(compiler));
+            PluginSysroot sysroot;
+            SC_TEST_EXPECT(PluginSysroot::findBestSysroot(compiler.type, sysroot));
             SC_TEST_EXPECT(compiler.includePaths.push_back(report.libraryRootDirectory));
 
             // Setup registry
             PluginRegistry registry;
             SC_TEST_EXPECT(registry.appendDefinitions(move(definitions)));
-            SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, report.executableFile));
+            SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, sysroot, report.executableFile));
 
             // Check that plugins have been compiled and are valid
             const PluginDynamicLibrary* pluginChild  = registry.findPlugin(identifierChild);
@@ -101,7 +106,7 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(fs.writeString(pluginScriptPath.view(), sourceMod2.view()));
 
             // Reload child plugin
-            SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, report.executableFile,
+            SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, sysroot, report.executableFile,
                                                PluginRegistry::LoadMode::Reload));
 
             // Check child plugin modified

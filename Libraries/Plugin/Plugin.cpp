@@ -95,6 +95,14 @@ bool SC::PluginDefinition::parse(StringView text, PluginDefinition& pluginDefini
                 SC_TRY(pluginDefinition.dependencies.push_back(tokenizer.component));
             }
         }
+        else if (key == "Build") // Optional
+        {
+            StringViewTokenizer tokenizer = value;
+            while (tokenizer.tokenizeNext(',', StringViewTokenizer::SkipEmpty))
+            {
+                SC_TRY(pluginDefinition.build.push_back(tokenizer.component));
+            }
+        }
     }
     for (size_t i = 0; i < sizeof(gotFields) / sizeof(bool); ++i)
     {
@@ -299,6 +307,20 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
                             bestVersion = version;
                             SC_TRY(compiler.compilerPath.assign(bestCompiler.view()));
                             SC_TRY(compiler.linkerPath.assign(bestLinker.view()));
+                            String sysrootInclude;
+                            SC_TRY(StringBuilder(sysrootInclude).format("{0}/{1}/include", base, candidate));
+                            SC_TRY(compiler.compilerIncludePaths.push_back(sysrootInclude));
+                            String     sysrootLib;
+                            StringView instructionSet = "x86_64";
+                            switch (HostInstructionSet)
+                            {
+                            case InstructionSet::Intel32: instructionSet = "x86"; break;
+                            case InstructionSet::Intel64: instructionSet = "x64"; break;
+                            case InstructionSet::ARM64: instructionSet = "arm64"; break;
+                            }
+                            SC_TRY(
+                                StringBuilder(sysrootLib).format("{0}/{1}/lib/{2}", base, candidate, instructionSet));
+                            SC_TRY(compiler.compilerLibraryPaths.push_back(sysrootLib));
                         }
                         found = true;
                     }
@@ -326,7 +348,8 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
     return Result(true);
 }
 
-SC::Result SC::PluginCompiler::compileFile(StringView sourceFile, StringView objectFile) const
+SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
+                                           StringView sourceFile, StringView objectFile) const
 {
     static constexpr size_t MAX_PROCESS_ARGUMENTS = 24;
 
@@ -340,18 +363,48 @@ SC::Result SC::PluginCompiler::compileFile(StringView sourceFile, StringView obj
     {
         SC_TRY(argumentsArena.appendAsSingleString({L"/I\"", includePaths[idx].view(), L"\""}));
     }
+
+    if (definition.build.contains("libc"))
+    {
+        for (size_t idx = 0; idx < compilerIncludePaths.size(); ++idx)
+        {
+            SC_TRY(argumentsArena.appendAsSingleString({L"/I\"", compilerIncludePaths[idx].view(), L"\""}));
+        }
+
+        for (size_t idx = 0; idx < sysroot.includePaths.size(); ++idx)
+        {
+            SC_TRY(argumentsArena.appendAsSingleString({L"/I\"", sysroot.includePaths[idx].view(), L"\""}));
+        }
+    }
+
     SC_TRY(argumentsArena.appendAsSingleString({L"/Fo:", objectFile}));
-    SC_TRY(argumentsArena.appendMultipleStrings({L"/std:c++17", L"/DSC_DISABLE_CONFIG=1", L"/GR-", L"/WX", L"/W4",
-                                                 L"/permissive-", L"/GS-", L"/Zi", L"/DSC_PLUGIN_LIBRARY=1",
-                                                 L"/D_HAS_EXCEPTIONS=0", L"/c", sourceFile}));
+    SC_TRY(
+        argumentsArena.appendMultipleStrings({L"/std:c++17", L"/GR-", L"/WX", L"/W4", L"/permissive-", L"/GS-", L"/Zi",
+                                              L"/DSC_PLUGIN_LIBRARY=1", L"/D_HAS_EXCEPTIONS=0", L"/c", sourceFile}));
 #else
+    (void)sysroot;
     for (size_t idx = 0; idx < includePaths.size(); ++idx)
     {
         SC_TRY(argumentsArena.appendAsSingleString({"-I", includePaths[idx].view()}));
     }
-    SC_TRY(argumentsArena.appendMultipleStrings({"-DSC_DISABLE_CONFIG=1", "-DSC_PLUGIN_LIBRARY=1", "-nostdinc++",
-                                                 "-nostdinc", "-fno-stack-protector", "-std=c++14", "-fno-exceptions",
-                                                 "-fno-rtti", "-g", "-c", "-fpic", sourceFile, "-o", objectFile}));
+    if (not definition.build.contains("libc"))
+    {
+        SC_TRY(argumentsArena.appendMultipleStrings({"-nostdinc", "-nostdinc++", "-fno-stack-protector"}));
+    }
+    else if (not definition.build.contains("libc++"))
+    {
+        SC_TRY(argumentsArena.appendMultipleStrings({"-nostdinc++"}));
+    }
+    if (not definition.build.contains("exceptions"))
+    {
+        SC_TRY(argumentsArena.appendMultipleStrings({"-fno-exceptions"}));
+    }
+    if (not definition.build.contains("rtti"))
+    {
+        SC_TRY(argumentsArena.appendMultipleStrings({"-fno-rtti"}));
+    }
+    SC_TRY(argumentsArena.appendMultipleStrings(
+        {"-DSC_PLUGIN_LIBRARY=1", "-std=c++14", "-g", "-c", "-fpic", sourceFile, "-o", objectFile}));
 #endif
     StringView arguments[MAX_PROCESS_ARGUMENTS];
     SC_TRY(argumentsArena.writeTo(arguments));
@@ -361,90 +414,101 @@ SC::Result SC::PluginCompiler::compileFile(StringView sourceFile, StringView obj
     return Result(process.getExitStatus() == 0);
 }
 
-SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin) const
+SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin, const PluginSysroot& sysroot) const
 {
     // TODO: Spawn parallel tasks
+    StringNative<256> destFile = StringEncoding::Native;
     for (auto& file : plugin.files)
     {
-        StringView        dirname    = Path::dirname(file.absolutePath.view(), Path::AsNative);
-        StringView        outputName = Path::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
-        StringNative<256> destFile   = StringEncoding::Native;
+        StringView dirname    = Path::dirname(file.absolutePath.view(), Path::AsNative);
+        StringView outputName = Path::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
         SC_TRY(Path::join(destFile, {dirname, outputName}));
         StringBuilder builder(destFile);
-        SC_TRY(builder.append(".o"));
-        SC_TRY(compileFile(file.absolutePath.view(), destFile.view()));
+        SC_TRY(builder.append(SC_NATIVE_STR(".o")));
+        SC_TRY(compileFile(plugin, sysroot, file.absolutePath.view(), destFile.view()));
     }
     return Result(true);
 }
 
-SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, StringView executablePath) const
+SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const PluginSysroot& sysroot,
+                                    StringView executablePath) const
 {
-    Process process;
-    String  destFile = StringEncoding::Native;
-    SC_TRY(definition.getDynamicLibraryAbsolutePath(destFile));
-    Vector<StringNative<256>> objectFiles;
-    SC_TRY(objectFiles.reserve(definition.files.size()));
-    for (auto& file : definition.files)
-    {
-        StringNative<256> objectPath = StringEncoding::Native;
-        StringBuilder     b(objectPath);
-        StringView        dirname    = Path::dirname(file.absolutePath.view(), Path::AsNative);
-        StringView        outputName = Path::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
-        SC_TRY(b.append(dirname));
-        SC_TRY(b.append("/"));
-        SC_TRY(b.append(outputName));
-        SC_TRY(b.append(".o"));
-        SC_TRY(objectFiles.push_back(move(objectPath)));
-    }
-    SmallVector<StringView, 256> args;
+    static constexpr size_t MAX_PROCESS_ARGUMENTS = 24;
+
+    String buffer;
+    size_t numberOfStrings = 0;
+    size_t stringLengths[MAX_PROCESS_ARGUMENTS];
+
+    StringsArena arena = {buffer, numberOfStrings, {stringLengths}};
+
 #if SC_PLATFORM_WINDOWS
-    StringNative<256> outFile = StringEncoding::Native;
-    StringBuilder     outFileBuilder(outFile);
-    SC_TRY(outFileBuilder.append(L"/OUT:"));
-    SC_TRY(outFileBuilder.append(destFile.view()));
 
-    StringNative<256> libPath = StringEncoding::Native;
-    StringBuilder     libPathBuilder(libPath);
-    SC_TRY(libPathBuilder.append(L"/LIBPATH:"));
-    SC_TRY(libPathBuilder.append(Path::dirname(executablePath, Path::AsNative)));
-    StringView exeName = Path::basename(executablePath, ".exe"_u8);
-
-    StringNative<256> libName = StringEncoding::Native;
-    StringBuilder     libNameBuilder(libName);
-    SC_TRY(libNameBuilder.append(exeName));
-    SC_TRY(libNameBuilder.append(L".lib"));
-
-    SC_TRY(args.append({linkerPath.view(), L"/DLL", L"/DEBUG", L"/NODEFAULTLIB", L"/ENTRY:DllMain", "/SAFESEH:NO",
-                        libPath.view(), libName.view()}));
-    for (auto& obj : objectFiles)
+    SC_TRY(arena.appendAsSingleString({linkerPath.view()}));
+    if (not definition.build.contains("libc") and not definition.build.contains("libc++"))
     {
-        SC_TRY(args.push_back(obj.view()));
+        SC_TRY(arena.appendAsSingleString({SC_NATIVE_STR("/NODEFAULTLIB")}));
     }
-    SC_TRY(args.push_back(outFile.view()));
-    SC_COMPILER_UNUSED(executablePath);
+    SC_TRY(arena.appendMultipleStrings({SC_NATIVE_STR("/DLL"), SC_NATIVE_STR("/DEBUG"), SC_NATIVE_STR("/ENTRY:DllMain"),
+                                        SC_NATIVE_STR("/SAFESEH:NO")}));
+
+    for (size_t idx = 0; idx < compilerLibraryPaths.size(); ++idx)
+    {
+        SC_TRY(arena.appendAsSingleString({SC_NATIVE_STR("/LIBPATH:"), compilerLibraryPaths[idx].view()}));
+    }
+
+    for (size_t idx = 0; idx < sysroot.libraryPaths.size(); ++idx)
+    {
+        SC_TRY(arena.appendAsSingleString({SC_NATIVE_STR("/LIBPATH:"), sysroot.libraryPaths[idx].view()}));
+    }
+
+    SC_TRY(arena.appendAsSingleString({SC_NATIVE_STR("/LIBPATH:"), Path::dirname(executablePath, Path::AsNative)}));
+
+    StringView exeName = Path::basename(executablePath, ".exe"_u8);
+    SC_TRY(arena.appendAsSingleString({exeName, SC_NATIVE_STR(".lib")}));
+
 #else
-#if SC_PLATFORM_APPLE
-    SC_TRY(args.append(
-        {linkerPath.view(), "-bundle_loader", executablePath, "-bundle", "-fpic", "-nostdlib++", "-nostdlib"}));
-#else
-    SC_COMPILER_UNUSED(executablePath);
+    SC_COMPILER_UNUSED(sysroot);
+    SC_TRY(arena.appendMultipleStrings({linkerPath.view(), "-fpic"}));
+    if (not definition.build.contains("libc"))
+    {
+        SC_TRY(arena.appendMultipleStrings({"-nostdlib"}));
+    }
     if (type == Type::ClangCompiler)
     {
-        SC_TRY(args.append({linkerPath.view(), "-shared", "-fpic", "-nostdlib++", "-nostdlib"}));
+        if (not definition.build.contains("libc++"))
+        {
+            SC_TRY(arena.appendMultipleStrings({"-nostdlib++"}));
+        }
     }
-    else
-    {
-        SC_TRY(args.append({linkerPath.view(), "-shared", "-fpic", "-nostdlib"}));
-    }
+
+#if SC_PLATFORM_APPLE
+    SC_TRY(arena.appendMultipleStrings({"-bundle_loader", executablePath, "-bundle"}));
+#else
+    SC_COMPILER_UNUSED(executablePath);
+    SC_TRY(arena.appendMultipleStrings({"-shared"}));
 #endif
-    SC_TRY(objectFiles.reserve(definition.files.size()));
-    for (auto& obj : objectFiles)
-    {
-        SC_TRY(args.push_back(obj.view()));
-    }
-    SC_TRY(args.append({"-o", destFile.view()}));
 #endif
-    SC_TRY(process.launch(args.toSpanConst()));
+
+    for (auto& file : definition.files)
+    {
+        const StringView dirname    = Path::dirname(file.absolutePath.view(), Path::AsNative);
+        const StringView outputName = Path::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
+        SC_TRY(arena.appendAsSingleString({dirname, SC_NATIVE_STR("/"), outputName, SC_NATIVE_STR(".o")}));
+    }
+
+    String destFile = StringEncoding::Native;
+    SC_TRY(definition.getDynamicLibraryAbsolutePath(destFile));
+#if SC_PLATFORM_WINDOWS
+    SC_TRY(arena.appendAsSingleString({SC_NATIVE_STR("/OUT:"), destFile.view()}));
+#else
+    SC_TRY(arena.appendMultipleStrings({"-o", destFile.view()}));
+#endif
+
+    StringView       args[MAX_PROCESS_ARGUMENTS];
+    Span<StringView> argsSpan = {args};
+    SC_TRY_MSG(arena.writeTo(argsSpan), "Excessive number of arguments");
+    Process process;
+    SC_TRY(process.launch({args, numberOfStrings}));
     SC_TRY(process.waitForExitSync());
     return Result(process.getExitStatus() == 0);
 }
@@ -468,15 +532,70 @@ SC::Result SC::PluginDynamicLibrary::unload()
     return Result(true);
 }
 
-SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, StringView executablePath)
+SC::Result SC::PluginSysroot::findBestSysroot(PluginCompiler::Type compilerType, PluginSysroot& sysroot)
+{
+#if SC_PLATFORM_WINDOWS
+    // TODO: This is clearly semi-hardcoded, and we could get the installed directory by looking at registry
+    StringView         baseDirectory = SC_NATIVE_STR("C:\\Program Files (x86)\\Windows Kits\\10");
+    StringView         baseInclude   = SC_NATIVE_STR("C:\\Program Files (x86)\\Windows Kits\\10\\include");
+    FileSystemIterator fsIterator;
+    SC_TRY_MSG(fsIterator.init(baseInclude), "Missing Windows Kits 10 directory");
+    String windowsSdkVersion;
+    while (fsIterator.enumerateNext())
+    {
+        if (fsIterator.get().isDirectory())
+        {
+            SC_TRY(windowsSdkVersion.assign(fsIterator.get().name));
+            break;
+        }
+    }
+    SC_TRY_MSG(not windowsSdkVersion.isEmpty(), "Cannot find Windows Kits 10 include directory")
+    switch (compilerType)
+    {
+    case PluginCompiler::Type::MicrosoftCompiler: {
+        for (auto it : {SC_NATIVE_STR("ucrt"), SC_NATIVE_STR("um"), SC_NATIVE_STR("shared"), SC_NATIVE_STR("winrt"),
+                        SC_NATIVE_STR("cppwinrt")})
+        {
+            String str;
+            SC_TRY(StringBuilder(str).format("{0}\\include\\{1}\\{2}", baseDirectory, windowsSdkVersion, it));
+            SC_TRY(sysroot.includePaths.push_back(move(str)));
+        }
+        StringView instructionSet = "x64";
+        switch (HostInstructionSet)
+        {
+        case InstructionSet::Intel32: instructionSet = "x86"; break;
+        case InstructionSet::Intel64: instructionSet = "x64"; break;
+        case InstructionSet::ARM64: instructionSet = "arm64"; break;
+        }
+
+        for (auto it : {SC_NATIVE_STR("ucrt"), SC_NATIVE_STR("um")})
+        {
+            String str;
+            SC_TRY(StringBuilder(str).format("{0}\\lib\\{1}\\{2}\\{3}", baseDirectory, windowsSdkVersion, it,
+                                             instructionSet));
+            SC_TRY(sysroot.libraryPaths.push_back(move(str)));
+        }
+    }
+    break;
+    default: break;
+    }
+#else
+    (void)compilerType;
+    (void)sysroot;
+#endif
+    return Result(true);
+}
+
+SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const PluginSysroot& sysroot,
+                                          StringView executablePath)
 {
     SC_TRY_MSG(not dynamicLibrary.isValid(), "Dynamic Library must be unloaded first");
-    SC_TRY(compiler.compile(definition));
+    SC_TRY(compiler.compile(definition, sysroot));
 #if SC_PLATFORM_WINDOWS
     Thread::Sleep(400); // Sometimes file is locked...
-    SC_TRY(compiler.link(definition, executablePath));
+    SC_TRY(compiler.link(definition, sysroot, executablePath));
 #else
-    SC_TRY(compiler.link(definition, executablePath));
+    SC_TRY(compiler.link(definition, sysroot, executablePath));
 #endif
 
     StringNative<256> buffer;
@@ -508,7 +627,7 @@ const SC::PluginDynamicLibrary* SC::PluginRegistry::findPlugin(const StringView 
 }
 
 SC::Result SC::PluginRegistry::loadPlugin(const StringView identifier, const PluginCompiler& compiler,
-                                          StringView executablePath, LoadMode loadMode)
+                                          const PluginSysroot& sysroot, StringView executablePath, LoadMode loadMode)
 {
     PluginDynamicLibrary* res = libraries.get(identifier);
     SC_TRY(res != nullptr);
@@ -518,13 +637,13 @@ SC::Result SC::PluginRegistry::loadPlugin(const StringView identifier, const Plu
         // TODO: Shield against circular dependencies
         for (const auto& dependency : lib.definition.dependencies)
         {
-            SC_TRY(loadPlugin(dependency.view(), compiler, executablePath, LoadMode::Load));
+            SC_TRY(loadPlugin(dependency.view(), compiler, sysroot, executablePath, LoadMode::Load));
         }
         if (lib.dynamicLibrary.isValid())
         {
             SC_TRY(unloadPlugin(identifier));
         }
-        SC_TRY(lib.load(compiler, executablePath));
+        SC_TRY(lib.load(compiler, sysroot, executablePath));
         SC_TRY_MSG(lib.pluginInit(lib.instance), "PluginInit failed"); // TODO: Return actual failure strings
         return Result(true);
     }

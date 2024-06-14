@@ -51,7 +51,8 @@
     int __stdcall DllMain(void*, unsigned int, void*)                                                                  \
     {                                                                                                                  \
         return 1;                                                                                                      \
-    }
+    }                                                                                                                  \
+    extern "C" int _fltused = 0;
 #else
 // Cannot use builtin like __builtin_bzero as they will generate an infinite loop
 // We also use inline asm to disable optimizations

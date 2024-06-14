@@ -14,6 +14,7 @@ struct PluginFile;
 struct PluginIdentity;
 struct PluginDynamicLibrary;
 struct PluginCompiler;
+struct PluginSysroot;
 struct PluginRegistry;
 using PluginIdentifier = SmallString<30>;
 } // namespace SC
@@ -51,8 +52,9 @@ struct SC::PluginDefinition
     SmallString<10>  category;    ///< Category where plugin belongs to
     SmallString<255> directory;   ///< Path to the directory holding the plugin
 
-    SmallVector<PluginIdentifier, 10> dependencies; ///< Dependencies necessary to load this plugin
-    SmallVector<PluginFile, 10>       files;        ///< Source files that compose this plugin
+    SmallVector<PluginIdentifier, 8> dependencies; ///< Dependencies necessary to load this plugin
+    SmallVector<SmallString<10>, 8>  build;        ///< Build options
+    SmallVector<PluginFile, 10>      files;        ///< Source files that compose this plugin
 
     /// @brief Get main plugin file, holding plugin definition
     /// @return File holding main plugin definition
@@ -106,14 +108,16 @@ struct SC::PluginCompiler
 {
     /// @brief Compiles a Definition to an object file
     /// @param definition A valid Definition parsed by Definition::parse
+    /// @param sysroot A sysroot used (if requested) holding include / library paths to libc/libc++
     /// @return Valid result if all files of given definition can be compiled to valid object files
-    Result compile(const PluginDefinition& definition) const;
+    Result compile(const PluginDefinition& definition, const PluginSysroot& sysroot) const;
 
     /// @brief Links a Definition into a dynamic library, with symbols from `executablePath`
     /// @param definition A valid Definition already compiled with PluginCompiler::compile
+    /// @param sysroot A sysroot used (if requested) holding include / library paths to libc/libc++
     /// @param executablePath Path to the executable loading the given plugin, exposing symbols used by Plugin
     /// @return Valid result if the Definition can be compiled to a dynamic library linking executablePath
-    Result link(const PluginDefinition& definition, StringView executablePath) const;
+    Result link(const PluginDefinition& definition, const PluginSysroot& sysroot, StringView executablePath) const;
 
     /// @brief Compiler type (clang/gcc/msvc)
     enum class Type
@@ -128,12 +132,18 @@ struct SC::PluginCompiler
 
     SmallVector<StringNative<256>, 8> includePaths; ///< Path to include directories used to compile plugin
 
+    SmallVector<StringNative<256>, 8> compilerIncludePaths; ///< Path to compiler include directories
+    SmallVector<StringNative<256>, 8> compilerLibraryPaths; ///< Path to compiler library directories
+
     /// @brief Compiles a single source file to an object file, using PluginCompiler::compilerPath and
     /// PluginCompiler::linkerPath
+    /// @param definition A valid definition that will provide "build options" (libc, libc++ etc)
+    /// @param sysroot A sysroot used (if requested) holding include / library paths to libc/libc++
     /// @param sourceFile Source .cpp file
     /// @param objectFile Location of object file
     /// @return valid Result if file can be compiled successfully
-    [[nodiscard]] Result compileFile(StringView sourceFile, StringView objectFile) const;
+    [[nodiscard]] Result compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
+                                     StringView sourceFile, StringView objectFile) const;
 
     /// @brief Look for best compiler on current system
     /// @param[out] compiler Best compiler found
@@ -142,6 +152,14 @@ struct SC::PluginCompiler
 
   private:
     struct Internal;
+};
+
+struct SC::PluginSysroot
+{
+    SmallVector<StringNative<256>, 8> includePaths; ///< Path to system include directories
+    SmallVector<StringNative<256>, 8> libraryPaths; ///< Path to system library directories
+
+    [[nodiscard]] static Result findBestSysroot(PluginCompiler::Type compiler, PluginSysroot& sysroot);
 };
 
 /// @brief A plugin dynamic library loaded from a SC::PluginRegistry
@@ -155,7 +173,7 @@ struct SC::PluginDynamicLibrary
     bool (*pluginClose)(void* instance) = nullptr;
 
     friend struct PluginRegistry;
-    [[nodiscard]] Result load(const PluginCompiler& compiler, StringView executablePath);
+    [[nodiscard]] Result load(const PluginCompiler& compiler, const PluginSysroot& sysroot, StringView executablePath);
     [[nodiscard]] Result unload();
 };
 
@@ -176,12 +194,14 @@ struct SC::PluginRegistry
 
     /// @brief Loads a plugin with given identifier, compiling it with given PluginCompiler
     /// @param identifier The Plugin identifier that must be loaded
-    /// @param compiler The PluginCompiler used to compile the plugin
+    /// @param compiler The compiler used
+    /// @param sysroot The sysroot (library / include files) used
     /// @param executablePath The loader executable path holding symbols used by the plugin
     /// @param loadMode If to load or force reload of the plugin
     /// @return Valid Result if the plugin has been found, compiled, loaded and inited successfully
     [[nodiscard]] Result loadPlugin(const StringView identifier, const PluginCompiler& compiler,
-                                    StringView executablePath, LoadMode loadMode = LoadMode::Load);
+                                    const PluginSysroot& sysroot, StringView executablePath,
+                                    LoadMode loadMode = LoadMode::Load);
 
     /// @brief Unloads an already loaded plugin by its identifier
     /// @param identifier Identifier of a plugin that must be unloaded
