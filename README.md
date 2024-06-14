@@ -136,6 +136,7 @@ On the [Youtube Channel](https://www.youtube.com/@Pagghiu) you can find some vid
 - [Implement SC::AsyncLoopWork](https://www.youtube.com/watch?v=huavEjzflHQ)
 - [BREAK SC::Async IO Event Loop](https://www.youtube.com/watch?v=3lbyx11qDxM)
 - [Pause Immediate Mode UI - Save CPU Time](https://www.youtube.com/watch?v=4acqdGcUQnE)
+- [Add Async IO to Immediate Mode GUI](https://www.youtube.com/watch?v=z7QaTa7drFo)
 
 
 # Contributing
