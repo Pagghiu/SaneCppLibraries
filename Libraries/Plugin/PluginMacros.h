@@ -11,7 +11,7 @@
 #if SC_COMPILER_MSVC
 #define SC_PLUGIN_EXPORT __declspec(dllexport)
 #else
-#define SC_PLUGIN_EXPORT
+#define SC_PLUGIN_EXPORT __attribute__((visibility("default")))
 #endif
 
 #if SC_PLUGIN_LIBRARY

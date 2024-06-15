@@ -213,8 +213,8 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Vector<P
                     if (pluginDefinition.identity.identifier.isEmpty())
                     {
                         const StringView identifier = Path::basename(pluginDefinition.directory.view(), Path::AsNative);
-                        pluginDefinition.identity.identifier = identifier;
-                        pluginDefinition.pluginFileIndex     = pluginDefinition.files.size() - 1;
+                        SC_TRY(StringConverter(pluginDefinition.identity.identifier).appendNullTerminated(identifier));
+                        pluginDefinition.pluginFileIndex = pluginDefinition.files.size() - 1;
                     }
                     else
                     {
@@ -403,6 +403,12 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
     {
         SC_TRY(argumentsArena.appendMultipleStrings({"-fno-rtti"}));
     }
+
+    // This is really important on macOS because otherwise symbols exported on some plugin .dylib that
+    // match the signature and assembly content, will be re-used by other plugin.dylib making the first
+    // plugin .dylib not re-loadable until the other .dylibs having references to it are unloaded too...
+    SC_TRY(argumentsArena.appendMultipleStrings({"-fvisibility=hidden", "-fvisibility-inlines-hidden"}));
+
     SC_TRY(argumentsArena.appendMultipleStrings(
         {"-DSC_PLUGIN_LIBRARY=1", "-std=c++14", "-g", "-c", "-fpic", sourceFile, "-o", objectFile}));
 #endif
@@ -440,10 +446,10 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
     size_t stringLengths[MAX_PROCESS_ARGUMENTS];
 
     StringsArena arena = {buffer, numberOfStrings, {stringLengths}};
+    SC_TRY(arena.appendAsSingleString({linkerPath.view()}));
 
 #if SC_PLATFORM_WINDOWS
 
-    SC_TRY(arena.appendAsSingleString({linkerPath.view()}));
     if (not definition.build.contains("libc") and not definition.build.contains("libc++"))
     {
         SC_TRY(arena.appendAsSingleString({SC_NATIVE_STR("/NODEFAULTLIB")}));
@@ -468,7 +474,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
 
 #else
     SC_COMPILER_UNUSED(sysroot);
-    SC_TRY(arena.appendMultipleStrings({linkerPath.view(), "-fpic"}));
+    SC_TRY(arena.appendMultipleStrings({"-fpic"}));
     if (not definition.build.contains("libc"))
     {
         SC_TRY(arena.appendMultipleStrings({"-nostdlib"}));
@@ -529,6 +535,8 @@ SC::Result SC::PluginDynamicLibrary::unload()
         }
     }
 #endif
+    pluginInit  = nullptr;
+    pluginClose = nullptr;
     return Result(true);
 }
 
