@@ -77,7 +77,7 @@ struct SC::PluginTest : public SC::TestCase
 
             // Setup registry
             PluginRegistry registry;
-            SC_TEST_EXPECT(registry.appendDefinitions(move(definitions)));
+            SC_TEST_EXPECT(registry.replaceDefinitions(move(definitions)));
             SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, sysroot, report.executableFile));
 
             // Check that plugins have been compiled and are valid

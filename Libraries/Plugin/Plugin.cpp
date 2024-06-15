@@ -617,13 +617,32 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
     return Result(true);
 }
 
-SC::Result SC::PluginRegistry::appendDefinitions(Vector<PluginDefinition>&& definitions)
+SC::Result SC::PluginRegistry::replaceDefinitions(Vector<PluginDefinition>&& definitions)
 {
-    for (auto& definition : definitions)
+    SmallVector<String, 16> librariesToUnload;
+    // Unload libraries that have no match in the definitions
+    for (auto& item : libraries.items)
+    {
+        StringView libraryId = item.key.view();
+        if (not definitions.find([&](const PluginDefinition& it)
+                                 { return it.identity.identifier.view() == libraryId; }))
+        {
+            SC_TRY(librariesToUnload.push_back(libraryId));
+        }
+    }
+
+    for (String& identifier : librariesToUnload)
+    {
+        SC_TRY(unloadPlugin(identifier.view()));
+        SC_TRY(libraries.remove(identifier));
+    }
+
+    for (PluginDefinition& definition : definitions)
     {
         PluginDynamicLibrary pdl;
         pdl.definition = move(definition);
-        SC_TRY(libraries.insertIfNotExists({pdl.definition.identity.identifier, move(pdl)}));
+        // If the plugin already exists, it's fine, there's no need to return error
+        (void)libraries.insertIfNotExists({pdl.definition.identity.identifier, move(pdl)});
     }
     definitions.clear();
     return Result(true);

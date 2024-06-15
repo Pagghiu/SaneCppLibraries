@@ -182,8 +182,8 @@ struct SC::PluginRegistry
 {
     /// @brief Appends the definitions to registry
     /// @param definitions found plugin definitions
-    /// @return Valid Result if the given definitions can be added to the libraries registry
-    [[nodiscard]] Result appendDefinitions(Vector<PluginDefinition>&& definitions);
+    /// @return Valid Result if definitions have been replaced successfully
+    Result replaceDefinitions(Vector<PluginDefinition>&& definitions);
 
     /// @brief Instructs loadPlugin to Load or Reload the plugin
     enum class LoadMode
