@@ -92,11 +92,11 @@ struct SC::VectorMap
         size_t idx = 0;
         for (auto& item : items)
         {
-            ++idx;
             if (item.key == key)
             {
                 return items.removeAt(idx);
             }
+            ++idx;
         }
         return false;
     }
