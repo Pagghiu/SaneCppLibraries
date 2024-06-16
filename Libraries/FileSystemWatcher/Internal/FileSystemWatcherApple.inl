@@ -166,7 +166,7 @@ struct SC::FileSystemWatcher::Internal
         deferFreeMalloc.disarm();
 
         // Create Stream
-        constexpr CFAbsoluteTime           watchLatency = 0.5;
+        constexpr CFAbsoluteTime           watchLatency = 0.2;
         constexpr FSEventStreamCreateFlags watchFlags =
             kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer;
         FSEventStreamContext fsEventContext;
@@ -226,6 +226,23 @@ struct SC::FileSystemWatcher::Internal
         wakeUpFSEventThread();
         return signalReturnCode;
     }
+    static constexpr int EVENT_MODIFIED = kFSEventStreamEventFlagItemChangeOwner |   //
+                                          kFSEventStreamEventFlagItemFinderInfoMod | //
+                                          kFSEventStreamEventFlagItemInodeMetaMod |  //
+                                          kFSEventStreamEventFlagItemModified |      //
+                                          kFSEventStreamEventFlagItemXattrMod;
+
+    static constexpr int EVENT_RENAMED = kFSEventStreamEventFlagItemCreated | //
+                                         kFSEventStreamEventFlagItemRemoved | //
+                                         kFSEventStreamEventFlagItemRenamed;
+
+    static constexpr int EVENT_SYSTEM = kFSEventStreamEventFlagUserDropped |     //
+                                        kFSEventStreamEventFlagKernelDropped |   //
+                                        kFSEventStreamEventFlagEventIdsWrapped | //
+                                        kFSEventStreamEventFlagHistoryDone |     //
+                                        kFSEventStreamEventFlagMount |           //
+                                        kFSEventStreamEventFlagUnmount |         //
+                                        kFSEventStreamEventFlagRootChanged;
 
     static void threadOnNewFSEvent(ConstFSEventStreamRef          streamRef,  //
                                    void*                          info,       //
@@ -240,101 +257,96 @@ struct SC::FileSystemWatcher::Internal
         const char** paths    = reinterpret_cast<const char**>(eventPaths);
         for (size_t idx = 0; idx < numEvents; ++idx)
         {
-
-            static constexpr int EVENT_MODIFIED = kFSEventStreamEventFlagItemChangeOwner |   //
-                                                  kFSEventStreamEventFlagItemFinderInfoMod | //
-                                                  kFSEventStreamEventFlagItemInodeMetaMod |  //
-                                                  kFSEventStreamEventFlagItemModified |      //
-                                                  kFSEventStreamEventFlagItemXattrMod;
-
-            static constexpr int EVENT_RENAMED = kFSEventStreamEventFlagItemCreated | //
-                                                 kFSEventStreamEventFlagItemRemoved | //
-                                                 kFSEventStreamEventFlagItemRenamed;
-
-            static constexpr int EVENT_SYSTEM = kFSEventStreamEventFlagUserDropped |     //
-                                                kFSEventStreamEventFlagKernelDropped |   //
-                                                kFSEventStreamEventFlagEventIdsWrapped | //
-                                                kFSEventStreamEventFlagHistoryDone |     //
-                                                kFSEventStreamEventFlagMount |           //
-                                                kFSEventStreamEventFlagUnmount |         //
-                                                kFSEventStreamEventFlagRootChanged;
-
             const FSEventStreamEventFlags flags = eventFlags[idx];
             if (flags & EVENT_SYSTEM)
                 continue;
 
-            const StringView path          = StringView::fromNullTerminated(paths[idx], StringEncoding::Utf8);
-            internal.notification.fullPath = path;
-
-            const bool isDirectory = flags & kFSEventStreamEventFlagItemIsDir;
-            const bool isRenamed   = flags & EVENT_RENAMED;
-            const bool isModified  = flags & EVENT_MODIFIED;
-
-            // FSEvent coalesces events in ways that makes it impossible to figure out exactly what happened
-            // see https://github.com/atom/watcher/blob/master/docs/macos.md
-            if (isRenamed)
+            const StringView path             = StringView::fromNullTerminated(paths[idx], StringEncoding::Utf8);
+            bool             sendNotification = true;
+            for (size_t prevIdx = 0; prevIdx < idx; ++prevIdx)
             {
-                internal.notification.operation = Operation::AddRemoveRename;
-            }
-            else
-            {
-                if (isModified or not isDirectory)
+                const StringView otherPath = StringView::fromNullTerminated(paths[prevIdx], StringEncoding::Utf8);
+                if (path == otherPath)
                 {
-                    internal.notification.operation = Operation::Modified;
-                }
-                else
-                {
-                    internal.notification.operation = Operation::AddRemoveRename;
+                    // Filter out multiple events for the same file in this batch
+                    sendNotification = false;
+                    break;
                 }
             }
-
-            internal.mutex.lock();
-            FolderWatcher* watcher = internal.self->watchers.front;
-            internal.mutex.unlock();
-            while (watcher != nullptr)
+            if (sendNotification)
             {
-                if (path.startsWith(watcher->path.view())) // TODO: This works only if encodings are the same
-                {
-                    internal.notification.basePath = watcher->path.view();
-                    StringView relativePath        = path.sliceStartBytes(watcher->path.view().sizeInBytes());
-
-                    // TODO: Refactor into a 'trimEnd'
-                    while (relativePath.sizeInBytes() > 1 and relativePath.startsWithAnyOf({'/'}))
-                    {
-                        // Remove initial '/'
-                        relativePath = relativePath.sliceStart(1);
-                    }
-                    internal.notification.relativePath = relativePath;
-
-                    if (internal.eventLoopRunner)
-                    {
-                        internal.watcher = watcher;
-                        const Result res = internal.eventLoopRunner->eventLoopAsync.wakeUp();
-                        internal.eventLoopRunner->eventObject.wait();
-                        if (internal.closing.load())
-                        {
-                            break;
-                        }
-                        if (not res)
-                        {
-                            // TODO: print error for wakeup
-                        }
-                    }
-                    else
-                    {
-                        watcher->notifyCallback(internal.notification);
-                    }
-                }
-                // TODO: This is not right. If someone removes this watcher in the callback we will skip notifying
-                // remaining ones.
-                internal.mutex.lock();
-                watcher = watcher->next;
-                internal.mutex.unlock();
+                notify(path, internal, flags);
             }
             if (internal.closing.load())
             {
                 break;
             }
+        }
+    }
+
+    static void notify(const StringView path, Internal& internal, const FSEventStreamEventFlags flags)
+    {
+        internal.notification.fullPath = path;
+
+        const bool isDirectory = flags & kFSEventStreamEventFlagItemIsDir;
+        const bool isRenamed   = flags & EVENT_RENAMED;
+        const bool isModified  = flags & EVENT_MODIFIED;
+
+        // FSEvent coalesces events in ways that makes it impossible to figure out exactly what happened
+        // see https://github.com/atom/watcher/blob/master/docs/macos.md
+        if (isRenamed)
+        {
+            internal.notification.operation = Operation::AddRemoveRename;
+        }
+        else
+        {
+            if (isModified or not isDirectory)
+            {
+                internal.notification.operation = Operation::Modified;
+            }
+            else
+            {
+                internal.notification.operation = Operation::AddRemoveRename;
+            }
+        }
+
+        internal.mutex.lock();
+        FolderWatcher* watcher = internal.self->watchers.front;
+        internal.mutex.unlock();
+        while (watcher != nullptr)
+        {
+            if (path.startsWith(watcher->path.view())) // TODO: This works only if encodings are the same
+            {
+                internal.notification.basePath = watcher->path.view();
+
+                {
+                    const StringView relativePath      = path.sliceStartBytes(watcher->path.view().sizeInBytes());
+                    internal.notification.relativePath = relativePath.trimStartAnyOf({'/'});
+                }
+
+                if (internal.eventLoopRunner)
+                {
+                    internal.watcher = watcher;
+                    const Result res = internal.eventLoopRunner->eventLoopAsync.wakeUp();
+                    internal.eventLoopRunner->eventObject.wait();
+                    if (internal.closing.load())
+                    {
+                        break;
+                    }
+                    if (not res)
+                    {
+                        // TODO: print error for wakeup
+                    }
+                }
+                else
+                {
+                    watcher->notifyCallback(internal.notification);
+                }
+            }
+            // TODO: If someone removes this watcher in the callback we will skip notifying remaining ones.
+            internal.mutex.lock();
+            watcher = watcher->next;
+            internal.mutex.unlock();
         }
     }
 
