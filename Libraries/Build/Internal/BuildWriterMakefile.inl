@@ -645,6 +645,7 @@ $({0}_TARGET_DIR):
             {"$(BUILD_SYSTEM)", "make"},                           //
             {"$(COMPILER)", "$(COMPILER_TYPE)"},                   //
             {"$(COMPILER_VERSION)", "$(COMPILER_VERSION)"},        //
+            {"\"", "\\\""},                                        // Escape double quotes
         };
         return builder.appendReplaceMultiple(text, {replacements, sizeof(replacements) / sizeof(replacements[0])});
     }

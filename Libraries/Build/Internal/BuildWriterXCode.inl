@@ -953,6 +953,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             {"$(BUILD_SYSTEM)", "xcode"},                            //
             {"$(COMPILER)", "clang"},                                //
             {"$(COMPILER_VERSION)", "15"},                           // TODO: Detect apple-clang version
+            {"\"", "\\\\\\\""},                                      // Escape double quotes
         };
         return builder.appendReplaceMultiple(text, {replacements, sizeof(replacements) / sizeof(replacements[0])});
     }
