@@ -52,7 +52,7 @@
             "preLaunchTask": "Build SCTest Debug intel64",
             "console": "integratedTerminal",
             "preRunCommands": [
-                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+                "command source \"${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit\""
             ],
         },
         {
@@ -91,7 +91,7 @@
             "preLaunchTask": "Build SCTest Debug intel64",
             "console": "integratedTerminal",
             "preRunCommands": [
-                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+                "command source \"${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit\""
             ],
         },
         {
@@ -142,7 +142,7 @@
             "preLaunchTask": "Build SCTest Debug arm64",
             "console": "integratedTerminal",
             "preRunCommands": [
-                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+                "command source \"${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit\""
             ],
         },
         {
@@ -181,7 +181,7 @@
             "preLaunchTask": "Build SCTest Debug arm64",
             "console": "integratedTerminal",
             "preRunCommands": [
-                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+                "command source \"${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit\""
             ],
         },
         {
@@ -208,7 +208,7 @@
             "preLaunchTask": "Build SCExample Debug intel64",
             "console": "integratedTerminal",
             "preRunCommands": [
-                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+                "command source \"${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit\""
             ],
         },
         {
@@ -225,7 +225,7 @@
             "preLaunchTask": "Build SCExample Debug intel64",
             "console": "integratedTerminal",
             "preRunCommands": [
-                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+                "command source \"${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit\""
             ],
         },
         {
@@ -252,7 +252,7 @@
             "preLaunchTask": "Build SCExample Debug arm64",
             "console": "integratedTerminal",
             "preRunCommands": [
-                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+                "command source \"${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit\""
             ],
         },
         {
@@ -269,7 +269,7 @@
             "preLaunchTask": "Build SCExample Debug arm64",
             "console": "integratedTerminal",
             "preRunCommands": [
-                "command source ${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit"
+                "command source \"${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit\""
             ],
         },
     ]

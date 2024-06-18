@@ -60,6 +60,26 @@ struct SC::Build::WriterInternal
         // Hashes
         String buildHash;
         String referenceHash;
+
+        [[nodiscard]] static StringView getExtension(RenderItem::Type type)
+        {
+            switch (type)
+            {
+            case RenderItem::CppFile: {
+                return ".cpp";
+            }
+            case RenderItem::CFile: {
+                return ".c";
+            }
+            case RenderItem::ObjCFile: {
+                return ".m";
+            }
+            case RenderItem::ObjCppFile: {
+                return ".mm";
+            }
+            default: return StringView();
+            }
+        }
     };
 
     struct RenderGroup

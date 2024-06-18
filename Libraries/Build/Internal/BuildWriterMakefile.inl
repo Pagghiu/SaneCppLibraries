@@ -38,6 +38,10 @@ ifndef CONFIG
  CONFIG=Debug
 endif
 
+space := $(null) $(null)
+
+CURDIR_ESCAPED = $(subst $(space),\$(space),$(CURDIR))
+
 .PHONY: clean all
 
 CLANG_DETECTED := $(shell $(CXX) --version 2>&1 | grep -q clang && echo "yes")
@@ -98,6 +102,10 @@ else
 COMPILER_TYPE := clang
 COMPILER_VERSION := $(CLANG_MAJOR_VERSION)
 endif
+
+define MJ_if_Clang
+    $(if $(CLANG_DETECTED),-MJ "$@.json")
+endef
 
 )delimiter");
         SmallString<255> makeTarget;
@@ -348,31 +356,12 @@ endif
 
         for (const RenderItem& item : renderer.renderItems)
         {
-            if (item.type == RenderItem::CppFile or item.type == RenderItem::CFile or
-                item.type == RenderItem::ObjCFile or item.type == RenderItem::ObjCppFile)
-            {
-                // TODO: We should probably add a path hash too to avoid clashes with files having same name
-                if (item.type == RenderItem::CppFile)
-                {
-                    builder.append("\n$({0}_INTERMEDIATE_DIR)/{1}.o \\", makeTarget.view(),
-                                   Path::basename(item.name.view(), ".cpp"));
-                }
-                else if (item.type == RenderItem::CFile)
-                {
-                    builder.append("\n$({0}_INTERMEDIATE_DIR)/{1}.o \\", makeTarget.view(),
-                                   Path::basename(item.name.view(), ".c"));
-                }
-                else if (item.type == RenderItem::ObjCFile)
-                {
-                    builder.append("\n$({0}_INTERMEDIATE_DIR)/{1}.o \\", makeTarget.view(),
-                                   Path::basename(item.name.view(), ".m"));
-                }
-                else if (item.type == RenderItem::ObjCppFile)
-                {
-                    builder.append("\n$({0}_INTERMEDIATE_DIR)/{1}.o \\", makeTarget.view(),
-                                   Path::basename(item.name.view(), ".mm"));
-                }
-            }
+            const StringView extension = RenderItem::getExtension(item.type);
+            if (extension.isEmpty())
+                continue;
+            builder.append("\n$({0}_INTERMEDIATE_DIR)/", makeTarget.view());
+            builder.appendReplaceAll(Path::basename(item.name.view(), extension), " ", "\\ ");
+            builder.append(".o \\");
         }
         builder.append(R"delimiter(
 
@@ -394,7 +383,7 @@ endif
 
 $({0}_INTERMEDIATE_DIR)/compile_commands.json: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 	@echo Generate compile_commands.json
-	$(VRBS)sed -e '1s/^/[\'$$'\n''/' -e '$$s/,$$/\'$$'\n'']/' "$({0}_INTERMEDIATE_DIR)/"*.o.json > "$({0}_INTERMEDIATE_DIR)/"compile_commands.json
+	$(VRBS)sed -e '1s/^/[\'$$'\n''/' -e '$$s/,$$/\'$$'\n'']/' $({0}_INTERMEDIATE_DIR)/*.o.json > $({0}_INTERMEDIATE_DIR)/compile_commands.json
 # Under GNU sed
 # gsed -e '1s/^/[\n/' -e '$$s/,$$/\n]/' *.o.json > compile_commands.json
 )delimiter",
@@ -408,63 +397,41 @@ $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
                        makeTarget.view());
 
         builder.append(R"delimiter(
-define MJ_if_Clang
-    $(if $(CLANG_DETECTED),-MJ $@.json)
-endef
-)delimiter");
-
-        builder.append(R"delimiter(
 {0}_RUN: {0}_COMPILE
 	$({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 )delimiter",
                        makeTarget.view());
 
+        SmallString<32> escapedPath;
+        SmallString<32> escapedName;
         for (const RenderItem& item : renderer.renderItems)
         {
-            if (item.type == RenderItem::CppFile)
+            const StringView extension = RenderItem::getExtension(item.type);
+            if (extension.isEmpty())
+                continue;
+            StringBuilder(escapedPath, StringBuilder::Clear).appendReplaceAll(item.path.view(), " ", "\\ ");
+            StringView itemName = Path::basename(item.name.view(), extension);
+            StringBuilder(escapedName, StringBuilder::Clear).appendReplaceAll(itemName, " ", "\\ ");
+
+            if (item.type == RenderItem::CppFile or item.type == RenderItem::ObjCppFile)
             {
-                // TODO: De-hardcode .cpp in case extension is different
-                StringView basename = Path::basename(item.name.view(), ".cpp");
                 builder.append(R"delimiter(
-$({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
-	@echo "Compiling {1}.cpp"
+$({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
+	@echo "Compiling {4}{3}"
 	$(VRBS)$(CXX) $({0}_CXXFLAGS) -o "$@" -MMD -pthread $(call MJ_if_Clang) -c "$<"
 
-)delimiter",
-                               makeTarget.view(), basename, item.path.view());
+    )delimiter",
+                               makeTarget.view(), escapedName, escapedPath, extension, itemName);
             }
-            else if (item.type == RenderItem::CFile)
+            else
             {
-                StringView basename = Path::basename(item.name.view(), ".c");
                 builder.append(R"delimiter(
-$({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
-	@echo "Compiling {1}.c"
+$({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
+	@echo "Compiling {1}{3}"
 	$(VRBS)$(CC) $({0}_CFLAGS) -o "$@" -MMD -pthread $(call MJ_if_Clang) -c "$<"
 
-)delimiter",
-                               makeTarget.view(), basename, item.path.view());
-            }
-            else if (item.type == RenderItem::ObjCFile)
-            {
-                StringView basename = Path::basename(item.name.view(), ".m");
-                builder.append(R"delimiter(
-$({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
-	@echo "Compiling {1}.m"
-	$(VRBS)$(CC) $({0}_CFLAGS) -o "$@" -MMD -pthread $(call MJ_if_Clang) -c "$<"
-
-)delimiter",
-                               makeTarget.view(), basename, item.path.view());
-            }
-            else if (item.type == RenderItem::ObjCppFile)
-            {
-                StringView basename = Path::basename(item.name.view(), ".mm");
-                builder.append(R"delimiter(
-$({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
-	@echo "Compiling {1}.mm"
-	$(VRBS)$(CC) $({0}_CFLAGS) -o "$@" -MMD -pthread $(call MJ_if_Clang) -c "$<"
-
-)delimiter",
-                               makeTarget.view(), basename, item.path.view());
+    )delimiter",
+                               makeTarget.view(), escapedName, escapedPath, extension, itemName);
             }
         }
 
@@ -494,7 +461,7 @@ $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
             String        intermediate;
             StringBuilder intermediateBuilder(intermediate);
 
-            WriterInternal::appendPrefixIfRelativePosix("$(CURDIR)", intermediateBuilder,
+            WriterInternal::appendPrefixIfRelativePosix("$(CURDIR_ESCAPED)", intermediateBuilder,
                                                         configuration.intermediatesPath.view(),
                                                         relativeDirectories.relativeProjectsToIntermediates.view());
 
@@ -521,7 +488,7 @@ $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR)/{2} | $({0}_INTERMEDIATE_DIR)
                 builder.append(R"delimiter(
 $({0}_INTERMEDIATE_DIR):
 	@echo Creating "$({0}_INTERMEDIATE_DIR)"
-	$(VRBS)mkdir -p $@
+	$(VRBS)mkdir -p "$@"
 
 )delimiter",
                                makeTarget);
@@ -537,7 +504,8 @@ $({0}_INTERMEDIATE_DIR):
         {
             String        output;
             StringBuilder outputBuilder(output);
-            WriterInternal::appendPrefixIfRelativePosix("$(CURDIR)", outputBuilder, configuration.outputPath.view(),
+            WriterInternal::appendPrefixIfRelativePosix("$(CURDIR_ESCAPED)", outputBuilder,
+                                                        configuration.outputPath.view(),
                                                         relativeDirectories.relativeProjectsToOutputs.view());
             SC_TRY(appendVariable(outputBuilder, configuration.outputPath.view(), makeTarget, relativeDirectories));
             String key;
@@ -551,7 +519,7 @@ $({0}_INTERMEDIATE_DIR):
                 builder.append(R"delimiter(
 $({0}_TARGET_DIR):
 	@echo Creating "$({0}_TARGET_DIR)"
-	$(VRBS)mkdir -p $@
+	$(VRBS)mkdir -p "$@"
 
 )delimiter",
                                makeTarget);
