@@ -1,8 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 LIBRARY_DIR="$1"        # Directory where "Libraries" exists
 TOOL_SOURCE_DIR="$2"    # Directory where SC-${TOOL}.cpp file exists
 BUILD_DIR="$3"          # Directory where output subdirectories must be placed
-TOOL_NAME="${4:-build}"      # Tool to execute (build by default)
+TOOL_NAME="${4:-build}" # Tool to execute (build by default)
 
 TOOL_OUTPUT_DIR="${BUILD_DIR}/_Tools"   # Directory where the ${TOOL} executable will be generated
 
@@ -25,20 +25,32 @@ call_make () {
     make $1 -s -j --no-print-directory -C "${LIBRARY_DIR}/Tools/Build/Posix" CONFIG=Debug "TOOL=${TOOL}" "TOOL_SOURCE_DIR=${TOOL_SOURCE_DIR}" "TOOL_OUTPUT_DIR=${TOOL_OUTPUT_DIR}"
 }
 
+execute_tool () {
+    echo "Starting ${TOOL}"
+    # Construct the command with properly quoted arguments
+    cmd="\"$TOOL_OUTPUT_DIR/${OS}/${TOOL}\""
+    for arg in "$@"; do
+        if [[ "$arg" =~ \  ]]; then
+            cmd+=" \"$arg\""
+        else
+            cmd+=" $arg"
+        fi
+    done
+    # Execute the constructed command
+    eval "$cmd"
+}
+
 call_make build
 
+OS=$(uname -s)
 if [ $? -eq 0 ]; then
-    echo "Starting ${TOOL}"
-    OS=$(uname -s)
-    "$TOOL_OUTPUT_DIR/${OS}/${TOOL}" $*
+    execute_tool "$@"
 else
     # It could have failed because of moved files, let's re-try after cleaning
     call_make clean
     call_make build
     if [ $? -eq 0 ]; then
-        echo "Starting ${TOOL}"
-        OS=$(uname -s)
-        "$TOOL_OUTPUT_DIR/${OS}/${TOOL}" $*
+        execute_tool "$@"
     else
         exit $?
     fi

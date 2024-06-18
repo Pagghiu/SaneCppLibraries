@@ -12,6 +12,11 @@ ifndef TOOL_OUTPUT_DIR
 $(error "TOOL_OUTPUT_DIR is required")
 endif
 
+space := $(null) $(null)
+TOOL_SOURCE_DIR_ESCAPED = $(subst $(space),\$(space),$(TOOL_SOURCE_DIR))
+TOOL_OUTPUT_DIR_ESCAPED = $(subst $(space),\$(space),$(TOOL_OUTPUT_DIR))
+CURDIR_ESCAPED = $(subst $(space),\$(space),$(CURDIR))
+
 ifndef TOOL
 $(error "TOOL is required")
 endif
@@ -26,18 +31,20 @@ build: SCTool_BUILD
 clean: SCTool_CLEAN
 
 # Force a clean when makefile is modified
-$(TOOL_OUTPUT_DIR)/_Intermediates/Makefile.$(TARGET_OS).$(CONFIG).touched: Makefile
-	@mkdir -p "$(TOOL_OUTPUT_DIR)/_Intermediates"
-	@touch $@
+$(TOOL_OUTPUT_DIR_ESCAPED)/_Intermediates/Makefile.$(TARGET_OS).$(CONFIG).touched: Makefile
+	@mkdir -p $(TOOL_OUTPUT_DIR_ESCAPED)/_Intermediates
+	@touch "$@"
 	@$(MAKE) clean
 
 # Implicitly evaluate the makefile rebuild force clean during parsing
--include $(TOOL_OUTPUT_DIR)/_Intermediates/Makefile.$(TARGET_OS).$(CONFIG).touched
+-include $(TOOL_OUTPUT_DIR_ESCAPED)/_Intermediates/Makefile.$(TARGET_OS).$(CONFIG).touched
 
 SCTool_TARGET_NAME := $(TOOL)
 
-SCTool_TARGET_DIR := $(TOOL_OUTPUT_DIR)/$(TARGET_OS)
-SCTool_INTERMEDIATE_DIR := $(TOOL_OUTPUT_DIR)/_Intermediates/$(TARGET_OS)
+SCTool_TARGET_DIR := $(TOOL_OUTPUT_DIR_ESCAPED)/$(TARGET_OS)
+SCTool_INTERMEDIATE_DIR := $(TOOL_OUTPUT_DIR_ESCAPED)/_Intermediates/$(TARGET_OS)
+SCTool_TARGET_DIR_UNESCAPED := $(TOOL_OUTPUT_DIR)/$(TARGET_OS)
+SCTool_INTERMEDIATE_DIR_UNESCAPED := $(TOOL_OUTPUT_DIR)/_Intermediates/$(TARGET_OS)
 
 ifeq ($(CONFIG),Debug)
 SCTool_CONFIG_FLAGS := -D_DEBUG=1 -g -ggdb -O0
@@ -78,12 +85,12 @@ $(SCTool_INTERMEDIATE_DIR)/$(TOOL).o
 -include $(SCTool_OBJECT_FILES:.o=.d)
 
 $(SCTool_INTERMEDIATE_DIR):
-	@echo Creating "$(SCTool_INTERMEDIATE_DIR)"
-	@mkdir -p $@
+	@echo Creating \"$(SCTool_INTERMEDIATE_DIR_UNESCAPED)\"
+	@mkdir -p $(SCTool_INTERMEDIATE_DIR)
 
 $(SCTool_TARGET_DIR):
-	@echo Creating "$(SCTool_TARGET_DIR)"
-	@mkdir -p $@
+	@echo Creating \"$(SCTool_TARGET_DIR_UNESCAPED)\"
+	@mkdir -p $(SCTool_TARGET_DIR)
 
 SCTool_BUILD: $(SCTool_TARGET_DIR)/$(SCTool_TARGET_NAME)
 
@@ -91,10 +98,11 @@ $(SCTool_TARGET_DIR)/$(SCTool_TARGET_NAME): $(SCTool_OBJECT_FILES) | $(SCTool_TA
 	@echo Linking "$(SCTool_TARGET_NAME)"
 	@$(CXX) -o $(SCTool_TARGET_DIR)/$(SCTool_TARGET_NAME) $(SCTool_OBJECT_FILES) $(SCTool_LDFLAGS)
 
-$(SCTool_INTERMEDIATE_DIR)/Tools.o: $(CURDIR)/../../../Tools/Tools.cpp | $(SCTool_INTERMEDIATE_DIR)
+$(SCTool_INTERMEDIATE_DIR)/Tools.o: $(CURDIR_ESCAPED)/../../../Tools/Tools.cpp | $(SCTool_INTERMEDIATE_DIR)
 	@echo "Compiling Tools.cpp"
-	@$(CXX) $(SCTool_CXXFLAGS) -o "$@" -MMD -pthread -c "$<"
+	@$(CXX) $(SCTool_CXXFLAGS) -o "$@" -MMD -pthread -c "$(subst \$(space),$(space),$<)"
 
-$(SCTool_INTERMEDIATE_DIR)/$(TOOL).o: $(TOOL_SOURCE_DIR)/$(TOOL).cpp | $(SCTool_INTERMEDIATE_DIR)
+$(SCTool_INTERMEDIATE_DIR)/$(TOOL).o: $(TOOL_SOURCE_DIR_ESCAPED)/$(TOOL).cpp | $(SCTool_INTERMEDIATE_DIR)
 	@echo "Compiling $(TOOL).cpp"
-	@$(CXX) $(SCTool_CXXFLAGS) -o "$@" -MMD -pthread -c "$<"
+	@$(CXX) $(SCTool_CXXFLAGS) -o "$@" -MMD -pthread -c "$(subst \$(space),$(space),$<)"
+
