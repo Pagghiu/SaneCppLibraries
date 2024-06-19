@@ -15,7 +15,7 @@
 
 namespace SC
 {
-struct ModelData
+struct ApplicationState
 {
     static constexpr int NumPauseFrames = 2;
 
@@ -31,9 +31,9 @@ struct ModelData
     Time::Milliseconds loopTime;
 };
 
-struct ModelBehaviour
+struct ApplicationSystem
 {
-    ModelData modelData;
+    ApplicationState state;
 
     Result create()
     {
@@ -42,9 +42,10 @@ struct ModelBehaviour
 
         SC_TRY(eventLoop.create());
         timeout.callback = [this](AsyncLoopTimeout::Result& result) { onTimeout(result); };
-        SC_TRY(timeout.start(eventLoop, Time::Milliseconds(modelData.timeoutOccursEveryMs)));
+        SC_TRY(timeout.start(eventLoop, Time::Milliseconds(state.timeoutOccursEveryMs)));
         eventLoopMonitor.onNewEventsAvailable = [this]() { sokol_wake_up(); };
-        return eventLoopMonitor.create(eventLoop);
+        SC_TRY(eventLoopMonitor.create(eventLoop));
+        return Result(true);
     }
 
     void resetLastEventTime() { lastEventTime.snap(); }
@@ -53,16 +54,16 @@ struct ModelBehaviour
     Result runLoopStepInsideSokolApp()
     {
         // Update loop time, mainly to display it in the GUI
-        modelData.loopTime = eventLoop.getLoopTime().getRelative().inRoundedUpperMilliseconds();
+        state.loopTime = eventLoop.getLoopTime().getRelative().inRoundedUpperMilliseconds();
 
         // Check if enough time has passed since last user input event
         const Time::Relative sinceLastEvent = Time::HighResolutionCounter().snap().subtractApproximate(lastEventTime);
-        if (sinceLastEvent.inRoundedUpperMilliseconds() > Time::Milliseconds(modelData.continueDrawingForMs))
+        if (sinceLastEvent.inRoundedUpperMilliseconds() > Time::Milliseconds(state.continueDrawingForMs))
         {
             // Enough time has passed such that we need to pause execution to avoid unnecessary cpu usage
-            if (modelData.pausedCounter < ModelData::NumPauseFrames)
+            if (state.pausedCounter < ApplicationState::NumPauseFrames)
             {
-                modelData.pausedCounter++;
+                state.pausedCounter++;
                 return Result(true); // Additional frames are needed to draw "paused" before entering sleep
             }
             // If we are here we really want to sleep the app until a new input event OR an I/O event arrives
@@ -81,7 +82,7 @@ struct ModelBehaviour
         {
             // Keep the application running, but use the occasion to check if some I/O event has been queued by the OS.
             // This also updates the loop time, that is needed to fire AsyncLoopTimeouts events with decent precision.
-            modelData.pausedCounter = 0;
+            state.pausedCounter = 0;
             return eventLoop.runNoWait();
         }
     }
@@ -89,7 +90,8 @@ struct ModelBehaviour
     Result close()
     {
         SC_TRY(eventLoopMonitor.close())
-        return eventLoop.close();
+        SC_TRY(eventLoop.close());
+        return Result(true);
     }
 
   private:
@@ -104,49 +106,61 @@ struct ModelBehaviour
     {
         // The entire point of runStep is to run this callback in the main thread, so let's assert that
         SC_ASSERT_RELEASE(currentThreadID == Thread::CurrentThreadID());
-        (void)StringBuilder(modelData.loopMessage).format("I/O WakeUp {}", modelData.loopTimeouts);
-        modelData.loopTimeouts++;
-        result.getAsync().relativeTimeout = Time::Milliseconds(modelData.timeoutOccursEveryMs);
+        (void)StringBuilder(state.loopMessage).format("I/O WakeUp {}", state.loopTimeouts);
+        state.loopTimeouts++;
+        result.getAsync().relativeTimeout = Time::Milliseconds(state.timeoutOccursEveryMs);
         result.reactivateRequest(true);
     }
 };
 
 struct ApplicationView
 {
-    ModelData& modelData;
-    ApplicationView(ModelData& model) : modelData(model) {}
+    ApplicationSystem& system;
+    ApplicationState&  state;
+    ApplicationView(ApplicationSystem& system, ApplicationState& data) : system(system), state(data) {}
 
     void draw()
     {
-        if (ImGui::Begin("Test"))
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(350, ImGui::GetIO().DisplaySize.y));
+        if (ImGui::Begin("Test", nullptr,
+                         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar))
         {
             ImGui::Text("SCExample");
-            if (modelData.pausedCounter == 0)
+            if (ImGui::CollapsingHeader("SC::Async Integration", ImGuiTreeNodeFlags_DefaultOpen))
             {
-                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Running");
+                drawSCAsync();
             }
-            else
-            {
-                ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Paused");
-            }
-            ImGui::Text("%s", modelData.loopMessage.view().bytesIncludingTerminator());
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
-                        ImGui::GetIO().Framerate);
-            ImGui::Text("Frame %d", modelData.numberOfFrames++);
-            ImGui::Text("Time %.3f", modelData.loopTime.ms / 1000.0f);
-            ImGui::PushItemWidth(100);
-            ImGui::InputInt("Continue drawing for (ms)", &modelData.continueDrawingForMs);
-            ImGui::InputInt("Timeout occurs every (ms)", &modelData.timeoutOccursEveryMs);
-            ImGui::PopItemWidth();
-            modelData.continueDrawingForMs = max(0, modelData.continueDrawingForMs);
-            modelData.timeoutOccursEveryMs = max(0, modelData.timeoutOccursEveryMs);
         }
         ImGui::End();
+    }
+
+    void drawSCAsync()
+    {
+        if (state.pausedCounter == 0)
+        {
+            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Running");
+        }
+        else
+        {
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Paused");
+        }
+        ImGui::Text("%s", state.loopMessage.view().bytesIncludingTerminator());
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
+                    ImGui::GetIO().Framerate);
+        ImGui::Text("Frame %d", state.numberOfFrames++);
+        ImGui::Text("Time %.3f", state.loopTime.ms / 1000.0f);
+        ImGui::PushItemWidth(100);
+        ImGui::InputInt("Continue drawing for (ms)", &state.continueDrawingForMs);
+        ImGui::InputInt("Timeout occurs every (ms)", &state.timeoutOccursEveryMs);
+        ImGui::PopItemWidth();
+        state.continueDrawingForMs = max(0, state.continueDrawingForMs);
+        state.timeoutOccursEveryMs = max(0, state.timeoutOccursEveryMs);
     }
 };
 } // namespace SC
 
-SC::ModelBehaviour* gModelBehaviour = nullptr;
+SC::ApplicationSystem* gModelSystem = nullptr;
 
 static sg_pass_action gGlobalPassAction;
 
@@ -161,8 +175,8 @@ sapp_desc sokol_main(int, char*[])
 
     desc.init_cb = []()
     {
-        gModelBehaviour = new ModelBehaviour();
-        if (not gModelBehaviour->create())
+        gModelSystem = new ApplicationSystem();
+        if (not gModelSystem->create())
         {
             sapp_quit();
         }
@@ -181,8 +195,9 @@ sapp_desc sokol_main(int, char*[])
     desc.frame_cb = []()
     {
         simgui_new_frame({sapp_width(), sapp_height(), sapp_frame_duration(), sapp_dpi_scale()});
-        ApplicationView applicationView(gModelBehaviour->modelData);
+        ApplicationView applicationView(*gModelSystem, gModelSystem->state);
         applicationView.draw();
+
         sg_pass pass   = {};
         pass.action    = gGlobalPassAction;
         pass.swapchain = sglue_swapchain();
@@ -191,7 +206,7 @@ sapp_desc sokol_main(int, char*[])
         sg_end_pass();
         sg_commit();
 
-        if (not gModelBehaviour->runLoopStepInsideSokolApp())
+        if (not gModelSystem->runLoopStepInsideSokolApp())
         {
             sapp_quit();
         }
@@ -199,12 +214,12 @@ sapp_desc sokol_main(int, char*[])
 
     desc.cleanup_cb = []()
     {
-        if (not gModelBehaviour->close())
+        if (not gModelSystem->close())
         {
             sapp_quit();
         }
-        delete gModelBehaviour;
-        gModelBehaviour = nullptr;
+        delete gModelSystem;
+        gModelSystem = nullptr;
         simgui_shutdown();
         sg_shutdown();
     };
@@ -213,7 +228,7 @@ sapp_desc sokol_main(int, char*[])
     {
         simgui_handle_event(ev);
         // Reset redraw time counter
-        gModelBehaviour->resetLastEventTime();
+        gModelSystem->resetLastEventTime();
     };
     return desc;
 }
