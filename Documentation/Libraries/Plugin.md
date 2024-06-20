@@ -43,8 +43,8 @@ Doing the wrong thing with memory or forgetting to clean everything during shutd
 
 # Examples
 
-No examples are provided so far as the API is very likely to change drastically going towards MVP.  
-If you like to see where we are just a take a look at the associated unit test.
+- [SCExample](@ref page_examples) uses `Plugin` library for a simple hot-reload system
+- Unit test inside `PluginTest.cpp` show how the API is meant to be used
 
 # Roadmap
 

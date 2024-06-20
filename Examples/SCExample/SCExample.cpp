@@ -13,6 +13,8 @@
 #define SOKOL_IMGUI_IMPL
 #include "util/sokol_imgui.h"
 
+#include "HotReloadSystem.h"
+
 namespace SC
 {
 struct ApplicationState
@@ -35,6 +37,8 @@ struct ApplicationSystem
 {
     ApplicationState state;
 
+    HotReloadSystem hotReloadSystem;
+
     Result create()
     {
         currentThreadID = Thread::CurrentThreadID();
@@ -45,6 +49,7 @@ struct ApplicationSystem
         SC_TRY(timeout.start(eventLoop, Time::Milliseconds(state.timeoutOccursEveryMs)));
         eventLoopMonitor.onNewEventsAvailable = [this]() { sokol_wake_up(); };
         SC_TRY(eventLoopMonitor.create(eventLoop));
+        SC_TRY(hotReloadSystem.create(eventLoop));
         return Result(true);
     }
 
@@ -89,6 +94,7 @@ struct ApplicationSystem
 
     Result close()
     {
+        SC_TRY(hotReloadSystem.close());
         SC_TRY(eventLoopMonitor.close())
         SC_TRY(eventLoop.close());
         return Result(true);
@@ -130,6 +136,11 @@ struct ApplicationView
             if (ImGui::CollapsingHeader("SC::Async Integration", ImGuiTreeNodeFlags_DefaultOpen))
             {
                 drawSCAsync();
+            }
+            if (ImGui::CollapsingHeader("SC::Plugin + SC::FileSystemWatcher", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                HotReloadView hotReloadView{system.hotReloadSystem, system.hotReloadSystem.state};
+                hotReloadView.draw();
             }
         }
         ImGui::End();

@@ -27,6 +27,11 @@ The class tries to unify differences between OS specific API to deliver folder c
 
 The behavior between these different system also depends on the file system where the watched directory resides.
 
+# Examples
+
+- [SCExample](@ref page_examples) uses SC::FileSystemWatcher for a simple hot-reload system
+- Unit test inside `FileSystemWatcherTest.cpp` show how the API is meant to be used
+
 # Roadmap
 
 🟦 Complete Features:

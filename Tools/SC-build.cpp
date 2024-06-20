@@ -152,6 +152,11 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
 
     project.addDirectory(dearImGui.packageLocalDirectory.view(), "*.cpp");
     project.addDirectory(sokol.packageLocalDirectory.view(), "*.h");
+    String imguiRelative, imguiDefine;
+    SC_TRY(Path::relativeFromTo(project.rootDirectory.view(), dearImGui.packageLocalDirectory.view(), imguiRelative,
+                                Path::AsNative));
+    SC_TRY(StringBuilder(imguiDefine).format("SC_IMGUI_PATH=$(PROJECT_ROOT)/{}", imguiRelative));
+    project.compile.addDefines({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", imguiDefine.view()});
     project.link.set<Link::guiApplication>(true);
     if (parameters.platform == Platform::MacOS or parameters.platform == Platform::iOS)
     {
@@ -166,8 +171,16 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
             project.link.addLibraries({"GL", "EGL", "X11", "Xi", "Xcursor"});
         }
     }
-    project.addDirectory("Examples/SCExample", "*.h");   // add all .h from SCExample directory
-    project.addDirectory("Examples/SCExample", "*.cpp"); // add all .cpp from SCExample directory
+    if (parameters.platform == Platform::Windows)
+    {
+        project.compile.addDefines({"IMGUI_API=__declspec( dllexport )"});
+    }
+    else
+    {
+        project.compile.addDefines({"IMGUI_API=__attribute__((visibility(\"default\")))"});
+    }
+    project.addDirectory("Examples/SCExample", "**.h");   // add all .h from SCExample directory recursively
+    project.addDirectory("Examples/SCExample", "**.cpp"); // add all .cpp from SCExample directory recursively
     return Result(true);
 }
 
