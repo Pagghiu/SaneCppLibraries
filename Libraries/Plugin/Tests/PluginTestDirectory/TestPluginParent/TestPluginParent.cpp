@@ -36,4 +36,4 @@ struct TestPluginParent
 //
 // SC_END_PLUGIN
 
-SC_DEFINE_PLUGIN(TestPluginParent)
+SC_PLUGIN_DEFINE(TestPluginParent)

@@ -39,7 +39,7 @@ Library                                                                         
 [Foundation](https://pagghiu.github.io/SaneCppLibraries/library_foundation.html)                        | 🟩 Primitive types, asserts, limits, Function, Span, Result, Tagged Union
 [Hashing](https://pagghiu.github.io/SaneCppLibraries/library_hashing.html)                              | 🟩 Compute `MD5`, `SHA1` or `SHA256` hashes for a stream of bytes
 [Http](https://pagghiu.github.io/SaneCppLibraries/library_http.html)                                    | 🟥 HTTP parser, client and server
-[Plugin](https://pagghiu.github.io/SaneCppLibraries/library_plugin.html)                                | 🟥 Minimal dependency based plugin system with hot-reload
+[Plugin](https://pagghiu.github.io/SaneCppLibraries/library_plugin.html)                                | 🟨 Minimal dependency based plugin system with hot-reload
 [Process](https://pagghiu.github.io/SaneCppLibraries/library_process.html)                              | 🟩 Create child processes and chain them (also usable with [Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html) library)
 [Reflection](https://pagghiu.github.io/SaneCppLibraries/library_reflection.html)                        | 🟩 Describe C++ types at compile time for serialization
 [Serialization Binary](https://pagghiu.github.io/SaneCppLibraries/library_serialization_binary.html)    | 🟨 Serialize to and from a binary format using [Reflection](https://pagghiu.github.io/SaneCppLibraries/library_reflection.html)

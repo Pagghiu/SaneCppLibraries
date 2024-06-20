@@ -537,6 +537,8 @@ SC::Result SC::PluginDynamicLibrary::unload()
 #endif
     pluginInit  = nullptr;
     pluginClose = nullptr;
+
+    pluginQueryInterface = nullptr;
     return Result(true);
 }
 
@@ -614,6 +616,8 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
     SC_TRY_MSG(dynamicLibrary.getSymbol(buffer.view(), pluginInit), "Missing #PluginName#Init");
     SC_TRY(StringBuilder(buffer).format("{}Close", definition.identity.identifier.view()));
     SC_TRY_MSG(dynamicLibrary.getSymbol(buffer.view(), pluginClose), "Missing #PluginName#Close");
+    SC_TRY(StringBuilder(buffer).format("{}QueryInterface", definition.identity.identifier.view()));
+    SC_COMPILER_UNUSED(dynamicLibrary.getSymbol(buffer.view(), pluginQueryInterface)); // QueryInterface is optional
     return Result(true);
 }
 

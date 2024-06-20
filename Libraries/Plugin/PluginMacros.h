@@ -3,6 +3,7 @@
 #pragma once
 #include "../Foundation/Memory.h"
 #include "../Foundation/PrimitiveTypes.h"
+#include "../Strings/StringHashFNV.h"
 
 //
 // SC_PLUGIN_EXPORT
@@ -92,9 +93,9 @@
 #endif
 
 //
-// SC_DEFINE_PLUGIN
+// SC_PLUGIN_DEFINE
 //
-#define SC_DEFINE_PLUGIN(PluginName)                                                                                   \
+#define SC_PLUGIN_DEFINE(PluginName)                                                                                   \
     SC_PLUGIN_LINKER_DEFINITIONS                                                                                       \
     extern "C" SC_PLUGIN_EXPORT bool PluginName##Init(PluginName*& instance)                                           \
     {                                                                                                                  \
@@ -108,3 +109,36 @@
         delete instance;                                                                                               \
         return res;                                                                                                    \
     }
+
+#define SC_PLUGIN_EXPORT_INTERFACES(PluginName, ...)                                                                   \
+    extern "C" SC_PLUGIN_EXPORT bool PluginName##QueryInterface(PluginName* plugin, SC::uint32_t hash,                 \
+                                                                void** pluginInterface)                                \
+    {                                                                                                                  \
+        return SC::PluginCastInterface<PluginName, __VA_ARGS__>()(plugin, hash, pluginInterface);                      \
+    }
+
+namespace SC
+{
+template <typename PluginClass, typename... InterfaceClasses>
+struct PluginCastInterface;
+
+template <typename PluginClass>
+struct PluginCastInterface<PluginClass>
+{
+    bool operator()(PluginClass*, uint32_t, void**) { return false; }
+};
+
+template <typename PluginClass, typename InterfaceClass, typename... InterfaceClasses>
+struct PluginCastInterface<PluginClass, InterfaceClass, InterfaceClasses...>
+{
+    bool operator()(PluginClass* plugin, uint32_t hash, void** pluginInterface)
+    {
+        if (hash == InterfaceClass::InterfaceHash)
+        {
+            *pluginInterface = static_cast<InterfaceClass*>(plugin);
+            return true;
+        }
+        return PluginCastInterface<PluginClass, InterfaceClasses...>()(plugin, hash, pluginInterface);
+    }
+};
+} // namespace SC

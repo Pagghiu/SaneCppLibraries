@@ -7,6 +7,7 @@
 #include "../../Strings/StringBuilder.h"
 #include "../../Testing/Testing.h"
 #include "../../Threading/Threading.h"
+#include "PluginTestDirectory/TestPluginChild/Interfaces.h"
 
 namespace SC
 {
@@ -85,12 +86,24 @@ struct SC::PluginTest : public SC::TestCase
             const PluginDynamicLibrary* pluginParent = registry.findPlugin(identifierParent);
             SC_TEST_EXPECT(pluginChild->dynamicLibrary.isValid());
             SC_TEST_EXPECT(pluginParent->dynamicLibrary.isValid());
+
+            // Query two interfaces from the child plugins and check their expected behaviour
+            ITestInterface1* interface1 = nullptr;
+            SC_TEST_EXPECT(pluginChild->queryInterface(interface1));
+            SC_TEST_EXPECT(interface1 != nullptr);
+            SC_TEST_EXPECT(interface1->multiplyInt(2) == 4);
+            ITestInterface2* interface2 = nullptr;
+            SC_TEST_EXPECT(pluginChild->queryInterface(interface2));
+            SC_TEST_EXPECT(interface2 != nullptr);
+            SC_TEST_EXPECT(interface2->divideFloat(4.0) == 2.0);
+
+            // Manually grab an exported function and check its return value
             using FunctionIsPluginOriginal = bool (*)();
             FunctionIsPluginOriginal isPluginOriginal;
             SC_TEST_EXPECT(pluginChild->dynamicLibrary.getSymbol("isPluginOriginal", isPluginOriginal));
             SC_TEST_EXPECT(isPluginOriginal());
 
-            // Modify child plugin
+            // Modify child plugin to change return value of the exported function
             String     sourceContent;
             FileSystem fs;
             SC_TEST_EXPECT(fs.read(pluginScriptPath.view(), sourceContent, StringEncoding::Ascii));
@@ -109,7 +122,7 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, sysroot, report.executableFile,
                                                PluginRegistry::LoadMode::Reload));
 
-            // Check child plugin modified
+            // Check child return value of the exported function for the modified plugin
             SC_TEST_EXPECT(pluginChild->dynamicLibrary.isValid());
             SC_TEST_EXPECT(pluginChild->dynamicLibrary.getSymbol("isPluginOriginal", isPluginOriginal));
             SC_TEST_EXPECT(not isPluginOriginal());

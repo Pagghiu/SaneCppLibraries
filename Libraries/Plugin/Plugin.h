@@ -154,11 +154,16 @@ struct SC::PluginCompiler
     struct Internal;
 };
 
+/// @brief Holds include and library paths for a system toolchain, used to let plugins link to libc and libc++
 struct SC::PluginSysroot
 {
     SmallVector<StringNative<256>, 8> includePaths; ///< Path to system include directories
     SmallVector<StringNative<256>, 8> libraryPaths; ///< Path to system library directories
 
+    /// @brief Finds a reasonable sysroot for the given compiler
+    /// @param compiler The PluginCompiler::Type to constrain the compatible PluginSysroot to look for
+    /// @param[out] sysroot The PluginSysroot with filled in include and library path
+    /// @return Valid Result if sysroot has been found
     [[nodiscard]] static Result findBestSysroot(PluginCompiler::Type compiler, PluginSysroot& sysroot);
 };
 
@@ -167,10 +172,26 @@ struct SC::PluginDynamicLibrary
 {
     PluginDefinition     definition;     ///< Definition of the loaded plugin
     SystemDynamicLibrary dynamicLibrary; ///< System handle of plugin's dynamic library
+
+    /// @brief Try to obtain a given interface as exported by a plugin through SC_PLUGIN_EXPORT_INTERFACES macro
+    /// @param[out] outInterface Pointer to the interface that will be returned by the plugin, if it exists
+    /// @return true if the plugin is loaded and the requested interface is implemented by the plugin itself
+    template <typename T>
+    [[nodiscard]] bool queryInterface(T*& outInterface) const
+    {
+        if (pluginQueryInterface and instance != nullptr)
+        {
+            return pluginQueryInterface(instance, T::InterfaceHash, reinterpret_cast<void**>(&outInterface));
+        }
+        return false;
+    }
+
   private:
     void* instance                      = nullptr;
     bool (*pluginInit)(void*& instance) = nullptr;
     bool (*pluginClose)(void* instance) = nullptr;
+
+    bool (*pluginQueryInterface)(void* instance, uint32_t hash, void** instanceInterface) = nullptr;
 
     friend struct PluginRegistry;
     [[nodiscard]] Result load(const PluginCompiler& compiler, const PluginSysroot& sysroot, StringView executablePath);
