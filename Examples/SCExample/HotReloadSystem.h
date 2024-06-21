@@ -91,13 +91,18 @@ struct HotReloadSystem
             const size_t numberOfPlugins = registry.getNumberOfEntries();
             for (size_t idx = 0; idx < numberOfPlugins; ++idx)
             {
-                for (PluginFile& file : registry.getPluginDynamicLibraryAt(idx).definition.files)
+                const PluginDynamicLibrary& library = registry.getPluginDynamicLibraryAt(idx);
+                for (const PluginFile& file : library.definition.files)
                 {
                     if (file.absolutePath.view().endsWith(notification.relativePath))
                     {
-                        Result res = registry.loadPlugin(registry.getIdentifierAt(idx).view(), compiler, sysroot,
-                                                         state.executablePath.view(), PluginRegistry::LoadMode::Reload);
-                        SC_COMPILER_UNUSED(res); // TODO: Implement some form of error reporting
+                        const Time::Relative elapsed = Time::Absolute::now().subtract(library.lastLoadTime);
+                        if (elapsed.inRoundedUpperMilliseconds().ms > 500)
+                        {
+                            // Only reload if at least 500ms have passed, as sometimes FSEvents on macOS
+                            // likes to send multiple events that are difficult to filter properly
+                            load(registry.getIdentifierAt(idx).view());
+                        }
                         return;
                     }
                 }
@@ -120,23 +125,51 @@ struct HotReloadView
             SC_TRY(system.syncRegistry(state.pluginsPath.view()));
         }
         const size_t numberOfEntries = system.registry.getNumberOfEntries();
-        for (size_t idx = 0; idx < numberOfEntries; ++idx)
+        if (ImGui::BeginTable("Table", 4))
         {
-            ImGui::PushID(static_cast<int>(idx));
-            const PluginIdentifier& identifier = system.registry.getIdentifierAt(idx);
-            SC_ASSERT_RELEASE(identifier.view().getEncoding() != StringEncoding::Utf16);
-            ImGui::Text("[%d] %s", static_cast<int>(idx), identifier.view().bytesIncludingTerminator());
-            ImGui::SameLine();
-            if (ImGui::Button("Load"))
+            ImGui::TableSetupColumn("Name");
+            ImGui::TableSetupColumn("Reloads", ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn("Time", ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn("Actions");
+            ImGui::TableHeadersRow();
+
+            for (size_t idx = 0; idx < numberOfEntries; ++idx)
             {
-                system.load(identifier.view());
+                ImGui::PushID(static_cast<int>(idx));
+                const PluginIdentifier&     identifier = system.registry.getIdentifierAt(idx);
+                const PluginDynamicLibrary& library    = system.registry.getPluginDynamicLibraryAt(idx);
+                SC_ASSERT_RELEASE(identifier.view().getEncoding() != StringEncoding::Utf16);
+
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", identifier.view().bytesIncludingTerminator());
+
+                ImGui::TableNextColumn();
+                ImGui::Text("%d", library.numReloads);
+
+                ImGui::TableNextColumn();
+                SmallString<128>            formattedTime;
+                Time::Absolute::ParseResult local;
+                SC_TRY(library.lastLoadTime.parseLocal(local));
+                SC_TRY(
+                    StringBuilder(formattedTime).format("{:02}:{:02}:{:02}", local.hour, local.minutes, local.seconds));
+                ImGui::Text("%s", formattedTime.view().bytesIncludingTerminator());
+
+                ImGui::TableNextColumn();
+                if (ImGui::Button("Load"))
+                {
+                    system.load(identifier.view());
+                }
+                if (library.dynamicLibrary.isValid())
+                {
+                    ImGui::SameLine();
+                    if (ImGui::Button("Unload"))
+                    {
+                        system.unload(identifier.view());
+                    }
+                }
+                ImGui::PopID();
             }
-            ImGui::SameLine();
-            if (ImGui::Button("Unload"))
-            {
-                system.unload(identifier.view());
-            }
-            ImGui::PopID();
+            ImGui::EndTable();
         }
 
         for (size_t idx = 0; idx < numberOfEntries; ++idx)
