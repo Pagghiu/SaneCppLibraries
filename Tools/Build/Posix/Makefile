@@ -53,12 +53,14 @@ SCTool_CONFIG_FLAGS := -DNDEBUG=1 -O3
 endif
 
 SCTool_COMMON_FLAGS := "-I../../.."
-SCTool_CPPFLAGS := $(SCTool_COMMON_FLAGS) $(SCTool_CONFIG_FLAGS) $(CPPFLAGS)
-SCTool_CXXFLAGS := $(SCTool_CPPFLAGS) -std=c++14 -fstrict-aliasing -fvisibility=hidden -fvisibility-inlines-hidden -fno-rtti -nostdinc++ -fno-exceptions $(CXXFLAGS)
+
+SCTool_CPPFLAGS := $(CFLAGS) $(SCTool_COMMON_FLAGS) $(SCTool_CONFIG_FLAGS) $(CPPFLAGS)
+SCTool_CXXFLAGS := $(CFLAGS) $(SCTool_COMMON_FLAGS) $(SCTool_CONFIG_FLAGS) $(CXXFLAGS)
+
+SCTool_CXXFLAGS += -std=c++14 -fstrict-aliasing -fvisibility=hidden -fvisibility-inlines-hidden -fno-rtti -nostdinc++ -fno-exceptions -MMD -pthread
 
 SCTool_FRAMEWORKS := -framework CoreFoundation -framework CoreServices
 SCTool_LIBRARIES := -ldl -lpthread
-
 
 ifeq ($(TARGET_OS),Linux)
      SCTool_OS_LDFLAGS := -rdynamic
@@ -100,9 +102,9 @@ $(SCTool_TARGET_DIR)/$(SCTool_TARGET_NAME): $(SCTool_OBJECT_FILES) | $(SCTool_TA
 
 $(SCTool_INTERMEDIATE_DIR)/Tools.o: $(CURDIR_ESCAPED)/../../../Tools/Tools.cpp | $(SCTool_INTERMEDIATE_DIR)
 	@echo "Compiling Tools.cpp"
-	@$(CXX) $(SCTool_CXXFLAGS) -o "$@" -MMD -pthread -c "$(subst \$(space),$(space),$<)"
+	@$(CXX) $(SCTool_CXXFLAGS) -o "$@" -c "$(subst \$(space),$(space),$<)"
 
 $(SCTool_INTERMEDIATE_DIR)/$(TOOL).o: $(TOOL_SOURCE_DIR_ESCAPED)/$(TOOL).cpp | $(SCTool_INTERMEDIATE_DIR)
 	@echo "Compiling $(TOOL).cpp"
-	@$(CXX) $(SCTool_CXXFLAGS) -o "$@" -MMD -pthread -c "$(subst \$(space),$(space),$<)"
+	@$(CXX) $(SCTool_CXXFLAGS) -o "$@" -c "$(subst \$(space),$(space),$<)"
 
