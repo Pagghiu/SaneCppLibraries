@@ -234,3 +234,25 @@ SC::Result SC::Process::setEnvironment(StringView name, StringView value)
     StringsArena table = {environment, environmentNumber, environmentByteOffset};
     return table.appendAsSingleString({name, SC_NATIVE_STR("="), value});
 }
+
+//-------------------------------------------------------------------------------------------------------
+// ProcessEnvironment
+//-------------------------------------------------------------------------------------------------------
+
+bool SC::ProcessEnvironment::contains(StringView variableName, size_t* index)
+{
+    for (size_t idx = 0; idx < numberOfEnvironment; ++idx)
+    {
+        StringView name, value;
+        SC_TRY(get(idx, name, value));
+        if (name == variableName)
+        {
+            if (index != nullptr)
+            {
+                *index = idx;
+            }
+            return true;
+        }
+    }
+    return false;
+}

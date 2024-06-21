@@ -109,7 +109,7 @@ void SC::ProcessTest::processInheritStdout()
     }
     break;
     default: { // Posix
-        SC_TEST_EXPECT(Process().exec({"which", "sudo"}));
+        SC_TEST_EXPECT(Process().exec({"which", "su"}));
     }
     break;
     }
@@ -127,7 +127,7 @@ void SC::ProcessTest::processIgnoreStdout()
     }
     break;
     default: { // Posix
-        SC_TEST_EXPECT(Process().exec({"which", "sudo"}, Process::StdOut::Ignore()));
+        SC_TEST_EXPECT(Process().exec({"which", "su"}, Process::StdOut::Ignore()));
     }
     break;
     }
@@ -146,8 +146,8 @@ void SC::ProcessTest::processRedirectStdout()
     }
     break;
     default: { // Posix
-        SC_TEST_EXPECT(Process().exec({"which", "sudo"}, output));
-        SC_TEST_EXPECT(output.view() == "/usr/bin/sudo\n");
+        SC_TEST_EXPECT(Process().exec({"which", "su"}, output));
+        SC_TEST_EXPECT(output.view() == "/bin/su\n" or output.view() == "/usr/bin/su\n");
     }
     break;
     }

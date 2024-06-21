@@ -333,21 +333,3 @@ bool SC::ProcessEnvironment::get(size_t index, StringView& name, StringView& val
     }
     return true;
 }
-
-bool SC::ProcessEnvironment::contains(StringView variableName, size_t* index)
-{
-    for (size_t idx = 0; idx < numberOfEnvironment; ++idx)
-    {
-        StringView name, value;
-        SC_TRY(get(idx, name, value));
-        if (name == variableName)
-        {
-            if (index != nullptr)
-            {
-                *index = idx;
-            }
-            return true;
-        }
-    }
-    return false;
-}
