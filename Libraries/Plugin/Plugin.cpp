@@ -618,6 +618,8 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
     SC_TRY_MSG(dynamicLibrary.getSymbol(buffer.view(), pluginClose), "Missing #PluginName#Close");
     SC_TRY(StringBuilder(buffer).format("{}QueryInterface", definition.identity.identifier.view()));
     SC_COMPILER_UNUSED(dynamicLibrary.getSymbol(buffer.view(), pluginQueryInterface)); // QueryInterface is optional
+    numReloads += 1;
+    lastLoadTime = Time::Absolute::now();
     return Result(true);
 }
 

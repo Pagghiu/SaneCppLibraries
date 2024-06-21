@@ -4,6 +4,7 @@
 #include "../Containers/SmallVector.h"
 #include "../Containers/VectorMap.h"
 #include "../Strings/SmallString.h"
+#include "../Time/Time.h"
 #include "Internal/DynamicLibrary.h"
 
 namespace SC
@@ -172,7 +173,8 @@ struct SC::PluginDynamicLibrary
 {
     PluginDefinition     definition;     ///< Definition of the loaded plugin
     SystemDynamicLibrary dynamicLibrary; ///< System handle of plugin's dynamic library
-
+    Time::Absolute       lastLoadTime;   ///< time when this plugin was last loaded
+    uint32_t             numReloads;     ///< Number of times that the plugin has been hot-reloaded
     /// @brief Try to obtain a given interface as exported by a plugin through SC_PLUGIN_EXPORT_INTERFACES macro
     /// @param[out] outInterface Pointer to the interface that will be returned by the plugin, if it exists
     /// @return true if the plugin is loaded and the requested interface is implemented by the plugin itself
@@ -185,6 +187,8 @@ struct SC::PluginDynamicLibrary
         }
         return false;
     }
+
+    PluginDynamicLibrary() : lastLoadTime(Time::Absolute::now()) { numReloads = 0; }
 
   private:
     void* instance                      = nullptr;
