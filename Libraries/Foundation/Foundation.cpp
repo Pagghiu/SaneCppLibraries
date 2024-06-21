@@ -22,9 +22,31 @@ using ssize_t = SSIZE_T;
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #else
+
+#if SC_PLATFORM_APPLE
+#include <TargetConditionals.h>
+#endif
+
 #include <execinfo.h> // backtrace
 #include <unistd.h>   // _exit
 #endif
+
+SC::OperatingSystem::Type SC::OperatingSystem::getHostOS()
+{
+#if SC_PLATFORM_WINDOWS
+    return Windows;
+#elif SC_PLATFORM_LINUX
+    return Linux;
+#elif SC_PLATFORM_EMSCRIPTEN
+    return emscripten;
+#elif SC_PLATFORM_APPLE
+#if TARGET_OS_IPHONE
+    return iOS;
+#else
+    return macOS;
+#endif
+#endif
+}
 
 //--------------------------------------------------------------------
 // Assert
@@ -103,8 +125,8 @@ bool SC::Assert::printBacktrace(void** backtraceBuffer, size_t backtraceBufferSi
 SC::size_t SC::Assert::captureBacktrace(size_t framesToSkip, void** backtraceBuffer, size_t backtraceBufferSizeInBytes,
                                         uint32_t* hash)
 {
-    const size_t   framesToCapture = backtraceBufferSizeInBytes / sizeof(void*);
-    constexpr auto maxVal          = static_cast<size_t>(static_cast<int>(MaxValue()));
+    const size_t framesToCapture = backtraceBufferSizeInBytes / sizeof(void*);
+    constexpr auto maxVal = static_cast<size_t>(static_cast<int>(MaxValue()));
     if (framesToCapture > maxVal || (backtraceBuffer == nullptr))
     {
         return 0;

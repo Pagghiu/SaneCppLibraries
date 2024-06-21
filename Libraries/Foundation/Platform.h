@@ -24,6 +24,22 @@ enum class Platform
     Emscripten,
 };
 
+/// @brief Holds information about operating system
+struct OperatingSystem
+{
+    enum Type
+    {
+        macOS,
+        iOS,
+        Emscripten,
+        Windows,
+        Linux,
+    };
+
+    /// @brief Returns the currently active host operating system
+    [[nodiscard]] static Type getHostOS();
+};
+
 #if defined(__APPLE__)
 
 #define SC_PLATFORM_APPLE      1 ///< True (1) when code is compiled on macOS and iOS
