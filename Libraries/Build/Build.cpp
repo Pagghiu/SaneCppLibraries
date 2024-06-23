@@ -381,6 +381,14 @@ bool SC::Build::ProjectWriter::write(StringView defaultProjectName)
                 SC_TRY(fs.removeFileIfExists(prjName.view()));
                 SC_TRY(fs.writeString(prjName.view(), buffer.view()));
             }
+            if (writer.shouldWriteEntitlements(project))
+            {
+                StringBuilder builder(buffer, StringBuilder::Clear);
+                SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{0}.entitlements", projectName));
+                SC_TRY(writer.writeEntitlements(builder, project));
+                SC_TRY(fs.removeFileIfExists(prjName.view()));
+                SC_TRY(fs.writeString(prjName.view(), buffer.view()));
+            }
         }
         break;
     }

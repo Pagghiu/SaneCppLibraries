@@ -34,6 +34,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         SC_TRY(fillFileGroups(renderer.rootGroup, renderer.renderItems));
         SC_TRY(fillProductGroup(project, renderer.rootGroup));
         SC_TRY(fillFrameworkGroup(project, renderer.rootGroup, renderer.renderItems));
+        SC_TRY(fillResourcesGroup(project, renderer.rootGroup, renderer.renderItems));
         return true;
     }
 
@@ -120,6 +121,23 @@ struct SC::Build::ProjectWriter::WriterXCode
                 SC_TRY(framework->referenceHash.assign(it.referenceHash.view()));
             }
         }
+        return true;
+    }
+
+    [[nodiscard]] bool fillResourcesGroup(const Project& project, RenderGroup& group, Vector<RenderItem>& xcodeFiles)
+    {
+        if (not project.link.hasValue<Link::guiApplication>(true))
+            return true;
+        SC_COMPILER_UNUSED(xcodeFiles);
+        auto resourcesGroup = group.children.getOrCreate("Resources"_a8);
+        SC_TRY(resourcesGroup != nullptr);
+        SC_TRY(resourcesGroup->name.assign("Resources"));
+        SC_TRY(resourcesGroup->referenceHash.assign("7A3A0EF12979DAEB00AE0312"));
+
+        auto entitlement = resourcesGroup->children.getOrCreate("7B5A4A5A2C20D35E00EB8229");
+        SC_TRY(entitlement != nullptr);
+        SC_TRY(StringBuilder(entitlement->name).format("{0}.entitlements", project.name.view()));
+        SC_TRY(entitlement->referenceHash.assign("7B5A4A5A2C20D35E00EB8229"));
         return true;
     }
 
@@ -212,9 +230,29 @@ struct SC::Build::ProjectWriter::WriterXCode
 /* Begin PBXFileReference section */)delimiter");
 
         // Target
+        StringView productType;
+        StringView productExtension;
+        if (project.link.hasValue<Link::guiApplication>(true))
+        {
+            productType      = "wrapper.application";
+            productExtension = ".app";
+        }
+        else
+        {
+            productType = "compiled.mach-o.executable";
+        }
+
         builder.append(R"delimiter(
-        7B0074122A73143F00660B94 /* {} */ = {{isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "{}"; sourceTree = BUILT_PRODUCTS_DIR; }};)delimiter",
-                       project.targetName.view(), project.targetName.view());
+        7B0074122A73143F00660B94 /* {0}{1} */ = {{isa = PBXFileReference; explicitFileType = "{2}"; includeInIndex = 0; path = "{0}{1}"; sourceTree = BUILT_PRODUCTS_DIR; }};)delimiter",
+                       project.targetName.view(), productExtension, productType);
+
+        // Entitlements
+        if (project.link.hasValue<Link::guiApplication>(true))
+        {
+            builder.append(R"delimiter(
+        7B5A4A5A2C20D35E00EB8229 /* {0}.entitlements */ = {{isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = {0}.entitlements; sourceTree = "<group>"; }};)delimiter",
+                           project.name.view());
+        }
 
         for (auto& file : xcodeFiles)
         {
@@ -303,12 +341,24 @@ struct SC::Build::ProjectWriter::WriterXCode
     }
     [[nodiscard]] bool writePBXNativeTarget(StringBuilder& builder, const Project& project)
     {
+        StringView productType;
+        StringView productExtension;
+        if (project.link.hasValue<Link::guiApplication>(true))
+        {
+            productType      = "com.apple.product-type.application";
+            productExtension = ".app";
+        }
+        else
+        {
+            productType = "com.apple.product-type.tool";
+        }
+
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(R"delimiter(
 /* Begin PBXNativeTarget section */
-        7B0074112A73143F00660B94 /* {} */ = {{
+        7B0074112A73143F00660B94 /* {0} */ = {{
             isa = PBXNativeTarget;
-            buildConfigurationList = 7B0074192A73143F00660B94 /* Build configuration list for PBXNativeTarget "{}" */;
+            buildConfigurationList = 7B0074192A73143F00660B94 /* Build configuration list for PBXNativeTarget "{0}" */;
             buildPhases = (
                 7B00740E2A73143F00660B94 /* Sources */,
                 7B00740F2A73143F00660B94 /* Frameworks */,
@@ -319,15 +369,14 @@ struct SC::Build::ProjectWriter::WriterXCode
             );
             dependencies = (
             );
-            name = {};
-            productName = {};
-            productReference = 7B0074122A73143F00660B94 /* {} */;
-            productType = "com.apple.product-type.tool";
+            name = {0};
+            productName = {0};
+            productReference = 7B0074122A73143F00660B94 /* {0}{1} */;
+            productType = "{2}";
         }};
 /* End PBXNativeTarget section */
 )delimiter",
-                       project.targetName.view(), project.targetName.view(), project.targetName.view(),
-                       project.targetName.view(), project.targetName.view());
+                       project.targetName.view(), productExtension, productType);
         SC_COMPILER_WARNING_POP;
         return true;
     }
@@ -458,6 +507,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         }
         return true;
     }
+
     [[nodiscard]] bool writeDefines(StringBuilder& builder, const Project& project, const Configuration& configuration)
     {
         auto defines       = project.compile.get<Compile::preprocessorDefines>();
@@ -496,14 +546,31 @@ struct SC::Build::ProjectWriter::WriterXCode
         return true;
     }
 
-    [[nodiscard]] bool writeCommonOptions(StringBuilder& builder)
+    [[nodiscard]] bool writeCommonOptions(StringBuilder& builder, const Project& project)
     {
-        return builder.append(R"delimiter(
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        builder.append(R"delimiter(
                        ALWAYS_SEARCH_USER_PATHS = NO;
                        ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
                        CLANG_ANALYZER_NONNULL = YES;
                        CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-                       CLANG_CXX_LANGUAGE_STANDARD = "c++14";
+                       CLANG_CXX_LANGUAGE_STANDARD = "c++14";)delimiter");
+
+        if (project.link.hasValue<Link::guiApplication>(true))
+        {
+            builder.append(R"delimiter(
+                       CODE_SIGN_ENTITLEMENTS = {0}.entitlements;
+                       CODE_SIGN_STYLE = Automatic;
+                       GENERATE_INFOPLIST_FILE = YES;
+                       INFOPLIST_KEY_NSHumanReadableCopyright = "";
+                       LD_RUNPATH_SEARCH_PATHS = (
+                           "$(inherited)",
+                           "@executable_path/../Frameworks",
+                       );)delimiter",
+                           project.name.view());
+        }
+
+        builder.append(R"delimiter(
                        CLANG_ENABLE_MODULES = YES;
                        CLANG_ENABLE_OBJC_ARC = YES;
                        CLANG_ENABLE_OBJC_WEAK = YES;
@@ -567,6 +634,8 @@ struct SC::Build::ProjectWriter::WriterXCode
                        MTL_ENABLE_DEBUG_INFO = NO;
                        MTL_FAST_MATH = YES;
                        SDKROOT = macosx;)delimiter");
+        SC_COMPILER_WARNING_POP;
+        return true;
     }
 
     [[nodiscard]] bool writeConfiguration(StringBuilder& builder, const Project& project, const RenderItem& xcodeObject)
@@ -579,7 +648,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             buildSettings = {{)delimiter",
             xcodeObject.referenceHash.view(), xcodeObject.name.view());
 
-        writeCommonOptions(builder);
+        writeCommonOptions(builder, project);
 
         const Configuration* configuration = project.getConfiguration(xcodeObject.name.view());
         SC_TRY(configuration != nullptr);
@@ -934,6 +1003,30 @@ struct SC::Build::ProjectWriter::WriterXCode
                        "7B00740A2A73143F00660B94", project.name.view(), project.name.view(), filename, lldbinit, //
                        "7B00740A2A73143F00660B94", project.name.view(), project.name.view(), filename,           //
                        "7B00740A2A73143F00660B94", project.name.view(), project.name.view(), filename);
+        SC_COMPILER_WARNING_POP;
+        return Result(true);
+    }
+
+    [[nodiscard]] bool shouldWriteEntitlements(const Project& project) const
+    {
+        return project.link.hasValue<Link::guiApplication>(true);
+    }
+
+    Result writeEntitlements(StringBuilder& builder, const Project& project)
+    {
+        SC_COMPILER_UNUSED(project);
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        builder.append(R"delimiter(<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.app-sandbox</key>
+    <false/>
+    <key>com.apple.security.files.user-selected.read-only</key>
+    <true/>
+</dict>
+</plist>
+)delimiter");
         SC_COMPILER_WARNING_POP;
         return Result(true);
     }
