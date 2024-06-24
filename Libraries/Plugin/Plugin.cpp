@@ -16,6 +16,19 @@
 #endif
 #include "Internal/DynamicLibrary.inl"
 
+struct SC::PluginCompilerEnvironment::Internal
+{
+    [[nodiscard]] static bool writeFlags(const StringView flags, StringsArena& arena)
+    {
+        StringViewTokenizer tokenizer(flags);
+        while (tokenizer.tokenizeNext({' '}))
+        {
+            SC_TRY(arena.appendAsSingleString(tokenizer.component));
+        }
+        return true;
+    }
+};
+
 bool SC::PluginDefinition::find(const StringView text, StringView& extracted)
 {
     auto       it          = text.getIterator<StringIteratorASCII>();
@@ -349,7 +362,8 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
 }
 
 SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
-                                           StringView sourceFile, StringView objectFile) const
+                                           const PluginCompilerEnvironment& compilerEnvironment, StringView sourceFile,
+                                           StringView objectFile) const
 {
     static constexpr size_t MAX_PROCESS_ARGUMENTS = 24;
 
@@ -412,6 +426,7 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
     SC_TRY(argumentsArena.appendMultipleStrings(
         {"-DSC_PLUGIN_LIBRARY=1", "-std=c++14", "-g", "-c", "-fpic", sourceFile, "-o", objectFile}));
 #endif
+    SC_TRY(PluginCompilerEnvironment::Internal::writeFlags(compilerEnvironment.cFlags, argumentsArena));
     StringView arguments[MAX_PROCESS_ARGUMENTS];
     SC_TRY(argumentsArena.writeTo(arguments));
     Process process;
@@ -420,7 +435,8 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
     return Result(process.getExitStatus() == 0);
 }
 
-SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin, const PluginSysroot& sysroot) const
+SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin, const PluginSysroot& sysroot,
+                                       const PluginCompilerEnvironment& compilerEnvironment) const
 {
     // TODO: Spawn parallel tasks
     StringNative<256> destFile = StringEncoding::Native;
@@ -431,13 +447,14 @@ SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin, const Plu
         SC_TRY(Path::join(destFile, {dirname, outputName}));
         StringBuilder builder(destFile);
         SC_TRY(builder.append(SC_NATIVE_STR(".o")));
-        SC_TRY(compileFile(plugin, sysroot, file.absolutePath.view(), destFile.view()));
+        SC_TRY(compileFile(plugin, sysroot, compilerEnvironment, file.absolutePath.view(), destFile.view()));
     }
     return Result(true);
 }
 
 SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const PluginSysroot& sysroot,
-                                    StringView executablePath) const
+                                    const PluginCompilerEnvironment& compilerEnvironment,
+                                    StringView                       executablePath) const
 {
     static constexpr size_t MAX_PROCESS_ARGUMENTS = 24;
 
@@ -449,6 +466,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
     SC_TRY(arena.appendAsSingleString({linkerPath.view()}));
 
 #if SC_PLATFORM_WINDOWS
+    SC_COMPILER_UNUSED(compilerEnvironment);
 
     if (not definition.build.contains("libc") and not definition.build.contains("libc++"))
     {
@@ -475,9 +493,14 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
 #else
     SC_COMPILER_UNUSED(sysroot);
     SC_TRY(arena.appendMultipleStrings({"-fpic"}));
-    if (not definition.build.contains("libc"))
+
+    SC_TRY(PluginCompilerEnvironment::Internal::writeFlags(compilerEnvironment.ldFlags, arena));
+    if (OperatingSystem::getHostOS() == OperatingSystem::macOS)
     {
-        SC_TRY(arena.appendMultipleStrings({"-nostdlib"}));
+        if (not definition.build.contains("libc"))
+        {
+            SC_TRY(arena.appendMultipleStrings({"-nostdlib"}));
+        }
     }
     if (type == Type::ClangCompiler)
     {
@@ -600,12 +623,24 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
                                           StringView executablePath)
 {
     SC_TRY_MSG(not dynamicLibrary.isValid(), "Dynamic Library must be unloaded first");
-    SC_TRY(compiler.compile(definition, sysroot));
+    ProcessEnvironment        environment;
+    size_t                    index;
+    StringView                name;
+    PluginCompilerEnvironment compilerEnvironment;
+    if (environment.contains("CFLAGS", &index))
+    {
+        SC_TRY(environment.get(index, name, compilerEnvironment.cFlags));
+    }
+    if (environment.contains("LDFLAGS", &index))
+    {
+        SC_TRY(environment.get(index, name, compilerEnvironment.ldFlags));
+    }
+    SC_TRY(compiler.compile(definition, sysroot, compilerEnvironment));
 #if SC_PLATFORM_WINDOWS
     Thread::Sleep(400); // Sometimes file is locked...
-    SC_TRY(compiler.link(definition, sysroot, executablePath));
+    SC_TRY(compiler.link(definition, sysroot, compilerEnvironment, executablePath));
 #else
-    SC_TRY(compiler.link(definition, sysroot, executablePath));
+    SC_TRY(compiler.link(definition, sysroot, compilerEnvironment, executablePath));
 #endif
 
     StringNative<256> buffer;

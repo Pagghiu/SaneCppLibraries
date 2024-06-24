@@ -15,6 +15,7 @@ struct PluginFile;
 struct PluginIdentity;
 struct PluginDynamicLibrary;
 struct PluginCompiler;
+struct PluginCompilerEnvironment;
 struct PluginSysroot;
 struct PluginRegistry;
 using PluginIdentifier = SmallString<30>;
@@ -110,15 +111,19 @@ struct SC::PluginCompiler
     /// @brief Compiles a Definition to an object file
     /// @param definition A valid Definition parsed by Definition::parse
     /// @param sysroot A sysroot used (if requested) holding include / library paths to libc/libc++
+    /// @param environment An environment used to populate CFLAGS and LDFLAGS from environment variables
     /// @return Valid result if all files of given definition can be compiled to valid object files
-    Result compile(const PluginDefinition& definition, const PluginSysroot& sysroot) const;
+    Result compile(const PluginDefinition& definition, const PluginSysroot& sysroot,
+                   const PluginCompilerEnvironment& environment) const;
 
     /// @brief Links a Definition into a dynamic library, with symbols from `executablePath`
     /// @param definition A valid Definition already compiled with PluginCompiler::compile
     /// @param sysroot A sysroot used (if requested) holding include / library paths to libc/libc++
+    /// @param environment An environment used to populate CFLAGS and LDFLAGS from environment variables
     /// @param executablePath Path to the executable loading the given plugin, exposing symbols used by Plugin
     /// @return Valid result if the Definition can be compiled to a dynamic library linking executablePath
-    Result link(const PluginDefinition& definition, const PluginSysroot& sysroot, StringView executablePath) const;
+    Result link(const PluginDefinition& definition, const PluginSysroot& sysroot,
+                const PluginCompilerEnvironment& environment, StringView executablePath) const;
 
     /// @brief Compiler type (clang/gcc/msvc)
     enum class Type
@@ -136,22 +141,15 @@ struct SC::PluginCompiler
     SmallVector<StringNative<256>, 8> compilerIncludePaths; ///< Path to compiler include directories
     SmallVector<StringNative<256>, 8> compilerLibraryPaths; ///< Path to compiler library directories
 
-    /// @brief Compiles a single source file to an object file, using PluginCompiler::compilerPath and
-    /// PluginCompiler::linkerPath
-    /// @param definition A valid definition that will provide "build options" (libc, libc++ etc)
-    /// @param sysroot A sysroot used (if requested) holding include / library paths to libc/libc++
-    /// @param sourceFile Source .cpp file
-    /// @param objectFile Location of object file
-    /// @return valid Result if file can be compiled successfully
-    [[nodiscard]] Result compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
-                                     StringView sourceFile, StringView objectFile) const;
-
     /// @brief Look for best compiler on current system
     /// @param[out] compiler Best compiler found
     /// @return Valid Result if best compiler has been found
     [[nodiscard]] static Result findBestCompiler(PluginCompiler& compiler);
 
   private:
+    [[nodiscard]] Result compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
+                                     const PluginCompilerEnvironment& compilerEnvironment, StringView sourceFile,
+                                     StringView objectFile) const;
     struct Internal;
 };
 
@@ -168,6 +166,16 @@ struct SC::PluginSysroot
     [[nodiscard]] static Result findBestSysroot(PluginCompiler::Type compiler, PluginSysroot& sysroot);
 };
 
+/// @brief Reads and holds CFLAGS and LDFLAGS environment variables, mainly to pass down sysroot location
+struct SC::PluginCompilerEnvironment
+{
+    StringView cFlags;
+    StringView ldFlags;
+
+  private:
+    struct Internal;
+    friend struct PluginCompiler;
+};
 /// @brief A plugin dynamic library loaded from a SC::PluginRegistry
 struct SC::PluginDynamicLibrary
 {
