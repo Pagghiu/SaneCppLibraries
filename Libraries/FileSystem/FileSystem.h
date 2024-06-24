@@ -274,12 +274,18 @@ struct SC::FileSystem
     /// @see write (for an usage example)
     [[nodiscard]] Result read(StringView file, Vector<char>& data);
 
-    /// @brief Writes a StringView to a file
+    /// @brief Replace the entire content of a file with the provided StringView
     /// @param file Path to the file that is meant to be written
     /// @param text Text to be written
     /// @return Valid Result if the memory was successfully written
     /// @see write (for an usage example)
     [[nodiscard]] Result writeString(StringView file, StringView text);
+
+    /// @brief Appends a StringView to a file
+    /// @param file Path to the file that is meant to be appended
+    /// @param text Text to be appended
+    /// @return Valid Result if the memory was successfully appended
+    [[nodiscard]] Result writeStringAppend(StringView file, StringView text);
 
     /// @brief Read contents of a file into a string with given encoding
     /// @param[in] file Path to the file to read
