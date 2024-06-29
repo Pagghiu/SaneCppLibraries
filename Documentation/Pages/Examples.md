@@ -24,10 +24,10 @@
 | Debug (XCode) | Open `_Build/_Projects/XCode/SCExample.xcodeproj` and choose `Product` --> `Run`                                                  |
 | Debug (VS2022)| Open `_Build/_Projects/VisualStudio2022/SCExample.sln` and start Debugging (F5)                                                   |
 
-https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/f12f3cd5-0c25-47ab-a22d-e37ac138b0db
+https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/4ad12058-6bc2-4316-90f8-4ba4c05e28de
 
 \htmlonly
-<iframe width="700" height="400" src="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/f12f3cd5-0c25-47ab-a22d-e37ac138b0db" frameborder="0" allowfullscreen>
+<iframe width="700" height="400" src="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/4ad12058-6bc2-4316-90f8-4ba4c05e28de" frameborder="0" allowfullscreen>
 \endhtmlonly
 
 # Where can I find more examples?

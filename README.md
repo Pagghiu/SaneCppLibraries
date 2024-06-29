@@ -90,7 +90,7 @@ Shortly:
 
 Check the [Examples](https://pagghiu.github.io/SaneCppLibraries/page_examples.html) page.
 
-https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/f12f3cd5-0c25-47ab-a22d-e37ac138b0db
+https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/4ad12058-6bc2-4316-90f8-4ba4c05e28de
 
 # Tests
 
@@ -112,6 +112,7 @@ Alternatively I am also reading the following discords too:
 # Videos
 
 Blog posts:
+- [June 2024 Update](https://pagghiu.github.io/site/blog/2024-06-30-SaneCppLibrariesUpdate.html)
 - [May 2024 Update](https://pagghiu.github.io/site/blog/2024-05-31-SaneCppLibrariesUpdate.html)
 - [April 2024 Update](https://pagghiu.github.io/site/blog/2024-04-27-SaneCppLibrariesUpdate.html)
 - [March 2024 Update](https://pagghiu.github.io/site/blog/2024-03-27-SaneCppLibrariesUpdate.html)
@@ -137,6 +138,7 @@ On the [Youtube Channel](https://www.youtube.com/@Pagghiu) you can find some vid
 - [BREAK SC::Async IO Event Loop](https://www.youtube.com/watch?v=3lbyx11qDxM)
 - [Pause Immediate Mode UI - Save CPU Time](https://www.youtube.com/watch?v=4acqdGcUQnE)
 - [Add Async IO to Immediate Mode GUI](https://www.youtube.com/watch?v=z7QaTa7drFo)
+- [Hot-Reload dear imgui](https://www.youtube.com/watch?v=BXybEWvSpGU)
 
 
 # Contributing
