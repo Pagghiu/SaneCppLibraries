@@ -30,7 +30,7 @@ jobs:
   build:
     # TODO: To use Linux we should figure out how to install libclang-9 for Doxygen 1.9.6 to work
     runs-on: macos-latest
-    timeout-minutes: 6
+    timeout-minutes: 40
     steps:
     - uses: actions/checkout@v4
     - name: clang-format
