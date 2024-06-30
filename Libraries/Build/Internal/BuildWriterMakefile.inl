@@ -70,7 +70,11 @@ endif
 ifndef TARGET_OS
  TARGET_OS := $(HOST_OS)
  ifeq ($(TARGET_OS),apple)
-   TARGET_OS := macOS
+	ifneq (,$(findstring ios,$(HOST_OS_VERSION)))
+	   TARGET_OS := iOS
+	else
+	   TARGET_OS := macOS
+	endif
  else
    TARGET_OS := linux
  endif
@@ -286,15 +290,45 @@ endif
 
         builder.append(" $(CXXFLAGS)");
 
-        builder.append("\n{0}_FRAMEWORKS :=", makeTarget.view());
-        auto frameworks = project.link.get<Link::linkFrameworks>();
-        if (frameworks != nullptr)
+        builder.append("\n{0}_FRAMEWORKS_ANY :=", makeTarget.view());
         {
-            for (auto it : *frameworks)
+            auto frameworks = project.link.get<Link::linkFrameworksAny>();
+            if (frameworks != nullptr)
             {
-                builder.append(" -framework {0}", it.view());
+                for (auto it : *frameworks)
+                {
+                    builder.append(" -framework {0}", it.view());
+                }
             }
         }
+        builder.append("\n{0}_FRAMEWORKS_MACOS :=", makeTarget.view());
+        {
+            auto frameworks = project.link.get<Link::linkFrameworksMacOS>();
+            if (frameworks != nullptr)
+            {
+                for (auto it : *frameworks)
+                {
+                    builder.append(" -framework {0}", it.view());
+                }
+            }
+        }
+        builder.append("\n{0}_FRAMEWORKS_IOS :=", makeTarget.view());
+        {
+            auto frameworks = project.link.get<Link::linkFrameworksIOS>();
+            if (frameworks != nullptr)
+            {
+                for (auto it : *frameworks)
+                {
+                    builder.append(" -framework {0}", it.view());
+                }
+            }
+        }
+
+        builder.append("\nifeq ($(TARGET_OS),macOS)\n");
+        builder.append("     {0}_FRAMEWORKS := $({0}_FRAMEWORKS_ANY) $({0}_FRAMEWORKS_MACOS)\n", makeTarget.view());
+        builder.append("else\n");
+        builder.append("     {0}_FRAMEWORKS := $({0}_FRAMEWORKS_ANY) $({0}_FRAMEWORKS_IOS)\n", makeTarget.view());
+        builder.append("endif\n");
 
         builder.append("\n{0}_LIBRARIES :=", makeTarget.view());
         auto libraries = project.link.get<Link::linkLibraries>();
@@ -328,6 +362,8 @@ endif
         builder.append("\nendif\n");
 
         builder.append("\nifeq ($(TARGET_OS),macOS)\n");
+        builder.append("     {0}_OS_LDFLAGS := $({0}_FRAMEWORKS)\n", makeTarget.view());
+        builder.append("else ifeq ($(TARGET_OS),iOS)\n");
         builder.append("     {0}_OS_LDFLAGS := $({0}_FRAMEWORKS)\n", makeTarget.view());
         builder.append("else ifeq ($(TARGET_OS),linux)\n");
         // -rdynamic is needed to resolve Plugin symbols in the executable
@@ -532,26 +568,36 @@ $({0}_TARGET_DIR):
             }
         }
 
-        // TODO: De-hardcode debug and release optimization levels
-        if (configuration.compile.hasValue<Compile::optimizationLevel>(Optimization::Debug))
+        if (configuration.compile.hasValue<Compile::enableASAN>(true))
         {
-            builder.append("{0}_CONFIG_FLAGS := -D_DEBUG=1 -g -ggdb -O0", makeTarget);
+            builder.append("\nifeq ($(TARGET_OS),iOS)");
+            builder.append("\n{0}_SANITIZE_FLAGS :=", makeTarget);
+            builder.append("\n{0}_NO_SANITIZE_FLAGS :=", makeTarget);
+            builder.append("\nelse");
+            builder.append("\n{0}_SANITIZE_FLAGS := -fsanitize=address,undefined",
+                           makeTarget); // TODO: Split the UBSAN flag
+            builder.append("\n{0}_NO_SANITIZE_FLAGS := -fno-sanitize=enum,return,float-divide-by-zero,function,vptr # "
+                           "Needed on macOS x64",
+                           makeTarget); // TODO: Split the UBSAN flag
+            builder.append("\nendif");
         }
         else
         {
-            builder.append("{0}_CONFIG_FLAGS := -DNDEBUG=1 -O3", makeTarget);
+            builder.append("\n{0}_SANITIZE_FLAGS :=", makeTarget);
+            builder.append("\n{0}_NO_SANITIZE_FLAGS :=", makeTarget);
         }
 
-        if (configuration.compile.hasValue<Compile::enableASAN>(true))
+        // TODO: De-hardcode debug and release optimization levels
+        if (configuration.compile.hasValue<Compile::optimizationLevel>(Optimization::Debug))
         {
-            builder.append(" -fsanitize=address,undefined"); // TODO: Split the UBSAN flag
+            builder.append("\n{0}_CONFIG_FLAGS := -D_DEBUG=1 -g -ggdb -O0 $({0}_SANITIZE_FLAGS)", makeTarget);
+        }
+        else
+        {
+            builder.append("\n{0}_CONFIG_FLAGS := -DNDEBUG=1 -O3", makeTarget);
         }
 
-        builder.append("\n{0}_CONFIG_LDFLAGS :=", makeTarget);
-        if (configuration.compile.hasValue<Compile::enableASAN>(true))
-        {
-            builder.append(" -fsanitize=address,undefined"); // TODO: Split the UBSAN flag
-        }
+        builder.append("\n{0}_CONFIG_LDFLAGS := $({0}_SANITIZE_FLAGS)", makeTarget);
 
         builder.append("\n\nifeq ($(CLANG_DETECTED),yes)\n");
         // Clang specific flags
@@ -561,7 +607,6 @@ $({0}_TARGET_DIR):
             builder.append(" -fprofile-instr-generate -fcoverage-mapping");
         }
 
-        if (configuration.compile.hasValue<Compile::enableASAN>(true))
         {
             // The following prevent a linking error of the type
             // ...
@@ -572,18 +617,14 @@ $({0}_TARGET_DIR):
             // This happens on macOS (Intel only) with some combination of ASAN/UBSAN if standard library is not linked.
             // Note:
             // It's important that these flags come AFTER -fsanitize=address,undefined otherwise they will be overridden
-            builder.append(" -fno-sanitize=enum,return,float-divide-by-zero,function,vptr # Needed on macOS x64");
+            builder.append(" $({0}_NO_SANITIZE_FLAGS)", makeTarget);
         }
         builder.append("\n{0}_CONFIG_COMPILER_LDFLAGS :=", makeTarget);
         if (configuration.compile.hasValue<Compile::enableCoverage>(true))
         {
             builder.append(" -fprofile-instr-generate -fcoverage-mapping");
         }
-        if (configuration.compile.hasValue<Compile::enableASAN>(true))
-        {
-            // See previous comment
-            builder.append(" -fno-sanitize=enum,return,float-divide-by-zero,function,vptr # Needed on macOS x64");
-        }
+        builder.append(" $({0}_NO_SANITIZE_FLAGS)", makeTarget);
 
         builder.append("\nelse\n");
         // Non Clang specific flags

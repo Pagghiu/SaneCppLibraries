@@ -66,14 +66,14 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
     action.parameters.platform  = Build::Platform::Windows;
     SC_TRY_MSG(Build::executeAction(action), "Build error Visual Studio 2022");
     action.parameters.generator = Build::Generator::XCode;
-    action.parameters.platform  = Build::Platform::MacOS;
+    action.parameters.platform  = Build::Platform::Apple;
     SC_TRY_MSG(Build::executeAction(action), "Build error XCode");
     action.parameters.generator = Build::Generator::Make;
     action.parameters.platform  = Build::Platform::Linux;
     SC_TRY_MSG(Build::executeAction(action), "Build error Makefile (Linux)");
     action.parameters.generator = Build::Generator::Make;
-    action.parameters.platform  = Build::Platform::MacOS;
-    SC_TRY_MSG(Build::executeAction(action), "Build error Makefile (macOS");
+    action.parameters.platform  = Build::Platform::Apple;
+    SC_TRY_MSG(Build::executeAction(action), "Build error Makefile (Apple)");
     return Result(true);
 }
 
@@ -92,7 +92,7 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
     break;
     case Platform::Apple: {
         action.parameters.generator = Build::Generator::Make;
-        action.parameters.platform  = Build::Platform::MacOS;
+        action.parameters.platform  = Build::Platform::Apple;
     }
     break;
     case Platform::Linux: {

@@ -67,7 +67,7 @@ void addSaneCppLibraries(Project& project, const Parameters& parameters)
     project.addDirectory("Support/DebugVisualizers", "*.cpp"); // add debug visualizers
 
     // Libraries to link
-    if (parameters.platform == Platform::MacOS)
+    if (parameters.platform == Platform::Apple)
     {
         project.link.addFrameworks({"CoreFoundation", "CoreServices"});
     }
@@ -158,7 +158,7 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
     SC_TRY(StringBuilder(imguiDefine).format("SC_IMGUI_PATH=$(PROJECT_ROOT)/{}", imguiRelative));
     project.compile.addDefines({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", imguiDefine.view()});
     project.link.set<Link::guiApplication>(true);
-    if (parameters.platform == Platform::MacOS or parameters.platform == Platform::iOS)
+    if (parameters.platform == Platform::Apple)
     {
         project.addDirectory("Examples/SCExample", "*.m"); // add all .m from SCExample directory
         project.link.addFrameworks({"Metal", "MetalKit", "QuartzCore", "Cocoa"});

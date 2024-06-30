@@ -192,8 +192,21 @@ struct SC::Build::ProjectWriter::WriterXCode
             else if (file.type == RenderItem::Framework)
             {
 
-                builder.append("        {} /* {} in Frameworks */ = {{isa = PBXBuildFile; fileRef = {} /* {} */; }};\n",
-                               file.buildHash, file.name, file.referenceHash, file.name);
+                String platformFilters;
+                if (not file.platformFilters.isEmpty())
+                {
+                    platformFilters = "platformFilters = (";
+                    StringBuilder sb(platformFilters, StringBuilder::DoNotClear);
+                    for (size_t idx = 0; idx < file.platformFilters.size(); ++idx)
+                    {
+                        sb.append(file.platformFilters[idx].view());
+                        sb.append(", ");
+                    }
+                    sb.append(");");
+                }
+                builder.append(
+                    "        {0} /* {1} in Frameworks */ = {{isa = PBXBuildFile; fileRef = {2} /* {1} */;{3} }};\n",
+                    file.buildHash, file.name, file.referenceHash, platformFilters);
             }
         }
 
@@ -554,7 +567,8 @@ struct SC::Build::ProjectWriter::WriterXCode
                        ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
                        CLANG_ANALYZER_NONNULL = YES;
                        CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-                       CLANG_CXX_LANGUAGE_STANDARD = "c++14";)delimiter");
+                       CLANG_CXX_LANGUAGE_STANDARD = "c++14";
+                       CURRENT_PROJECT_VERSION = 1;)delimiter");
 
         if (project.link.hasValue<Link::guiApplication>(true))
         {
@@ -631,6 +645,8 @@ struct SC::Build::ProjectWriter::WriterXCode
                        GCC_WARN_UNUSED_PARAMETER = YES;
                        GCC_WARN_UNUSED_VARIABLE = YES;
                        MACOSX_DEPLOYMENT_TARGET = 13.0;
+                       IPHONEOS_DEPLOYMENT_TARGET = 14.3;
+                       MARKETING_VERSION = 1.0;
                        MTL_ENABLE_DEBUG_INFO = NO;
                        MTL_FAST_MATH = YES;
                        SDKROOT = macosx;)delimiter");
@@ -748,16 +764,22 @@ struct SC::Build::ProjectWriter::WriterXCode
             if (configuration.type == RenderItem::Configuration)
             {
                 builder.append(R"delimiter(
-        {} /* {} */ = {{
+        {0} /* {1} */ = {{
             isa = XCBuildConfiguration;
             buildSettings = {{
                 CODE_SIGN_STYLE = Automatic;
                 DEAD_CODE_STRIPPING = YES;
                 PRODUCT_NAME = "$(TARGET_NAME)";
+                INFOPLIST_KEY_NSHumanReadableCopyright = "";
+                PRODUCT_BUNDLE_IDENTIFIER = "{2}";
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+                SUPPORTS_MACCATALYST = NO;
+                SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+                TARGETED_DEVICE_FAMILY = "1,2";
             }};
-            name = {};
+            name = {1};
         }};)delimiter",
-                               configuration.buildHash.view(), configuration.name.view(), configuration.name.view());
+                               configuration.buildHash.view(), configuration.name.view(), project.name.view());
             }
         }
         builder.append("\n/* End XCBuildConfiguration section */\n");
@@ -829,20 +851,35 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     [[nodiscard]] bool fillXCodeFrameworks(const Project& project, Vector<RenderItem>& xcodeObjects)
     {
-        auto frameworks = project.link.get<Link::linkFrameworks>();
-        SC_TRY(frameworks != nullptr);
-        for (auto it : *frameworks)
+        auto fillFrameworks = [this, &xcodeObjects](auto* frameworks, StringView platformFilter)
         {
-            RenderItem xcodeFile;
-            xcodeFile.name = Path::basename(it.view(), Path::AsPosix);
-            SC_TRY(StringBuilder(xcodeFile.name, StringBuilder::DoNotClear).append(".framework"));
-            xcodeFile.type = RenderItem::Framework;
-            SC_TRY(Path::join(xcodeFile.path, {"System/Library/Frameworks", xcodeFile.name.view()}, "/"));
-            SC_TRY(computeBuildHash(xcodeFile.name.view(), xcodeFile.buildHash));
-            SC_TRY(computeReferenceHash(xcodeFile.name.view(), xcodeFile.referenceHash));
-            SC_TRY(xcodeObjects.push_back(move(xcodeFile)));
-        }
-        return true;
+            if (frameworks == nullptr)
+            {
+                return Result(true);
+            }
+            for (auto it : *frameworks)
+            {
+                RenderItem xcodeFile;
+                xcodeFile.name = Path::basename(it.view(), Path::AsPosix);
+                SC_TRY(StringBuilder(xcodeFile.name, StringBuilder::DoNotClear).append(".framework"));
+                xcodeFile.type = RenderItem::Framework;
+                SC_TRY(Path::join(xcodeFile.path, {"System/Library/Frameworks", xcodeFile.name.view()}, "/"));
+                SC_TRY(computeBuildHash(xcodeFile.name.view(), xcodeFile.buildHash));
+                SC_TRY(computeReferenceHash(xcodeFile.name.view(), xcodeFile.referenceHash));
+
+                // TODO: De-hardcode thse ones
+                if (not platformFilter.isEmpty())
+                {
+                    SC_TRY(xcodeFile.platformFilters.push_back(platformFilter));
+                }
+                SC_TRY(xcodeObjects.push_back(move(xcodeFile)));
+            }
+            return Result(true);
+        };
+        SC_TRY(fillFrameworks(project.link.get<Link::linkFrameworksAny>(), StringView()));
+        SC_TRY(fillFrameworks(project.link.get<Link::linkFrameworksMacOS>(), "macos"));
+        SC_TRY(fillFrameworks(project.link.get<Link::linkFrameworksIOS>(), "ios"));
+        return Result(true);
     }
 
     [[nodiscard]] bool fillXCodeConfigurations(const Project& project, Vector<RenderItem>& xcodeObjects)

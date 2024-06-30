@@ -42,13 +42,13 @@ struct SC::BuildTest : public SC::TestCase
         if (test_section("XCode"))
         {
             action.parameters.generator = Build::Generator::XCode;
-            action.parameters.platform  = Build::Platform::MacOS;
+            action.parameters.platform  = Build::Platform::Apple;
             SC_TEST_EXPECT(Build::executeAction(action));
         }
         if (test_section("Makefile (macOS)"))
         {
             action.parameters.generator = Build::Generator::Make;
-            action.parameters.platform  = Build::Platform::MacOS;
+            action.parameters.platform  = Build::Platform::Apple;
             SC_TEST_EXPECT(Build::executeAction(action));
         }
         if (test_section("Makefile (Linux)"))

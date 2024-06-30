@@ -26,8 +26,7 @@ struct Platform
     {
         Unknown = 0,
         Windows,
-        MacOS,
-        iOS,
+        Apple,
         Linux,
         Wasm
     };
@@ -39,8 +38,7 @@ struct Platform
         {
         case Unknown: return "unknown";
         case Windows: return "windows";
-        case MacOS: return "macOS";
-        case iOS: return "iOS";
+        case Apple: return "apple";
         case Linux: return "linux";
         case Wasm: return "wasm";
         }
@@ -195,13 +193,15 @@ struct Link
 {
     enum Type
     {
-        libraryPaths,   ///< Library paths
-        linkFrameworks, ///< Frameworks to link
-        linkLibraries,  ///< Libraries to link
-        guiApplication, ///< gui application
-        enableLTO,      ///< Link Time Optimization
-        enableASAN,     ///< Address Sanitizer
-        enableStdCpp,   ///< C++ Standard Library
+        libraryPaths,        ///< Library paths
+        linkFrameworksAny,   ///< Frameworks to link on any Apple Platform
+        linkFrameworksMacOS, ///< Frameworks to link on macOS
+        linkFrameworksIOS,   ///< Frameworks to link on iOS
+        linkLibraries,       ///< Libraries to link
+        guiApplication,      ///< gui application
+        enableLTO,           ///< Link Time Optimization
+        enableASAN,          ///< Address Sanitizer
+        enableStdCpp,        ///< C++ Standard Library
     };
 
     /// @brief Get StringView describing Link::Type
@@ -210,7 +210,9 @@ struct Link
         switch (type)
         {
         case libraryPaths: return "libraryPaths";
-        case linkFrameworks: return "linkFrameworks";
+        case linkFrameworksAny: return "linkFrameworksAny";
+        case linkFrameworksMacOS: return "linkFrameworksMacOS";
+        case linkFrameworksIOS: return "linkFrameworksIOS";
         case linkLibraries: return "linkLibraries";
         case guiApplication: return "guiApplication";
         case enableLTO: return "enableLTO";
@@ -222,18 +224,26 @@ struct Link
     template <Type E, typename T>
     using Tag = TaggedType<Type, E, T>; // Helper to save some typing
 
-    using FieldsTypes = TypeTraits::TypeList<Tag<libraryPaths, Vector<String>>,   //
-                                             Tag<linkFrameworks, Vector<String>>, //
-                                             Tag<linkLibraries, Vector<String>>,  //
-                                             Tag<guiApplication, bool>,           //
-                                             Tag<enableLTO, bool>,                //
-                                             Tag<enableASAN, bool>,               //
-                                             Tag<enableStdCpp, bool>              //
+    using FieldsTypes = TypeTraits::TypeList<Tag<libraryPaths, Vector<String>>,        //
+                                             Tag<linkFrameworksAny, Vector<String>>,   //
+                                             Tag<linkFrameworksMacOS, Vector<String>>, //
+                                             Tag<linkFrameworksIOS, Vector<String>>,   //
+                                             Tag<linkLibraries, Vector<String>>,       //
+                                             Tag<guiApplication, bool>,                //
+                                             Tag<enableLTO, bool>,                     //
+                                             Tag<enableASAN, bool>,                    //
+                                             Tag<enableStdCpp, bool>                   //
                                              >;
 
     using Union = TaggedUnion<Link>;
 };
 
+enum class PlatformApple
+{
+    Any,
+    macOS,
+    iOS
+};
 /// @brief Map of SC::Build::Link flags (library paths, LTO switch etc.)
 struct LinkFlags : public TaggedMap<Link::Type, Link::Union>
 {
@@ -244,9 +254,14 @@ struct LinkFlags : public TaggedMap<Link::Type, Link::Union>
     }
 
     /// @brief Add framework to list of frameworks to link
-    [[nodiscard]] bool addFrameworks(Span<const StringView> frameworks)
+    [[nodiscard]] bool addFrameworks(Span<const StringView> frameworks, PlatformApple appleOS = PlatformApple::Any)
     {
-        return getOrCreate<Link::linkFrameworks>()->append(frameworks);
+        switch (appleOS)
+        {
+        case PlatformApple::macOS: return getOrCreate<Link::linkFrameworksMacOS>()->append(frameworks);
+        case PlatformApple::iOS: return getOrCreate<Link::linkFrameworksIOS>()->append(frameworks);
+        default: return getOrCreate<Link::linkFrameworksAny>()->append(frameworks);
+        }
     }
 
     /// @brief Add more libraries to list of libraries to link

@@ -61,6 +61,8 @@ struct SC::Build::WriterInternal
         String buildHash;
         String referenceHash;
 
+        Vector<String> platformFilters;
+
         [[nodiscard]] static StringView getExtension(RenderItem::Type type)
         {
             switch (type)
