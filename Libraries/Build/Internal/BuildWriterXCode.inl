@@ -138,6 +138,11 @@ struct SC::Build::ProjectWriter::WriterXCode
         SC_TRY(entitlement != nullptr);
         SC_TRY(StringBuilder(entitlement->name).format("{0}.entitlements", project.name.view()));
         SC_TRY(entitlement->referenceHash.assign("7B5A4A5A2C20D35E00EB8229"));
+
+        auto storyboard = resourcesGroup->children.getOrCreate("7B375FE92C2F16B1007D27E7");
+        SC_TRY(storyboard != nullptr);
+        SC_TRY(StringBuilder(storyboard->name).format("{0}.storyboard", project.name.view()));
+        SC_TRY(storyboard->referenceHash.assign("7B375FE92C2F16B1007D27E7"));
         return true;
     }
 
@@ -264,6 +269,9 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
             builder.append(R"delimiter(
         7B5A4A5A2C20D35E00EB8229 /* {0}.entitlements */ = {{isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = {0}.entitlements; sourceTree = "<group>"; }};)delimiter",
+                           project.name.view());
+            builder.append(R"delimiter(
+        7B375FE92C2F16B1007D27E7 /* {0}.storyboard */ = {{isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; path = {0}.storyboard; sourceTree = "<group>"; }};)delimiter",
                            project.name.view());
         }
 
@@ -577,6 +585,9 @@ struct SC::Build::ProjectWriter::WriterXCode
                        CODE_SIGN_STYLE = Automatic;
                        GENERATE_INFOPLIST_FILE = YES;
                        INFOPLIST_KEY_NSHumanReadableCopyright = "";
+                       INFOPLIST_KEY_UIRequiresFullScreen = NO;
+                       INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+                       INFOPLIST_KEY_UILaunchStoryboardName = {0};
                        LD_RUNPATH_SEARCH_PATHS = (
                            "$(inherited)",
                            "@executable_path/../Frameworks",
@@ -1044,7 +1055,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         return Result(true);
     }
 
-    [[nodiscard]] bool shouldWriteEntitlements(const Project& project) const
+    [[nodiscard]] bool isGUIApplication(const Project& project) const
     {
         return project.link.hasValue<Link::guiApplication>(true);
     }
@@ -1063,6 +1074,40 @@ struct SC::Build::ProjectWriter::WriterXCode
     <true/>
 </dict>
 </plist>
+)delimiter");
+        SC_COMPILER_WARNING_POP;
+        return Result(true);
+    }
+
+    Result writeStoryboard(StringBuilder& builder, const Project& project)
+    {
+        SC_COMPILER_UNUSED(project);
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        builder.append(R"delimiter(<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+        <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="13122.16" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
+            <dependencies>
+                <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="13104.12"/>
+                <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+                <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+            </dependencies>
+            <scenes>
+                <!--View Controller-->
+                <scene sceneID="EHf-IW-A2E">
+                    <objects>
+                        <viewController id="01J-lp-oVM" sceneMemberID="viewController">
+                            <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
+                                <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
+                                <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                <color key="backgroundColor" xcode11CocoaTouchSystemColor="systemBackgroundColor" cocoaTouchSystemColor="whiteColor"/>
+                                <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
+                            </view>
+                        </viewController>
+                        <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
+                    </objects>
+                    <point key="canvasLocation" x="53" y="375"/>
+                </scene>
+            </scenes>
+        </document>
 )delimiter");
         SC_COMPILER_WARNING_POP;
         return Result(true);
