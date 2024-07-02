@@ -50,7 +50,8 @@ struct SC::Build::WriterInternal
             CFile,
             Framework,
             Configuration,
-            DebugVisualizerFile
+            DebugVisualizerFile,
+            XCAsset
         };
         Type   type = Unknown;
         String name;

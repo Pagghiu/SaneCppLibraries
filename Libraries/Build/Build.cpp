@@ -397,6 +397,10 @@ bool SC::Build::ProjectWriter::write(StringView defaultProjectName)
                 SC_TRY(fs.removeFileIfExists(prjName.view()));
                 SC_TRY(fs.writeString(prjName.view(), buffer.view()));
             }
+            if (writer.isGUIApplication(project))
+            {
+                SC_TRY(writer.writeAssets(fs, project));
+            }
         }
         break;
     }

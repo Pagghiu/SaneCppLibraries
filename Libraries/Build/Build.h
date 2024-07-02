@@ -380,6 +380,7 @@ struct Project
     String name;          ///< Project name
     String rootDirectory; ///< Project root directory
     String targetName;    ///< Project target name
+    String iconPath;      ///< Icon location
 
     Vector<File> files;   ///< Files that belong to the project
     CompileFlags compile; ///< Shared CompileFlags for all files in the project

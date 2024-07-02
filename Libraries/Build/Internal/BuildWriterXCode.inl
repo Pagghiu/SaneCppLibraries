@@ -128,7 +128,7 @@ struct SC::Build::ProjectWriter::WriterXCode
     {
         if (not project.link.hasValue<Link::guiApplication>(true))
             return true;
-        SC_COMPILER_UNUSED(xcodeFiles);
+
         auto resourcesGroup = group.children.getOrCreate("Resources"_a8);
         SC_TRY(resourcesGroup != nullptr);
         SC_TRY(resourcesGroup->name.assign("Resources"));
@@ -143,7 +143,20 @@ struct SC::Build::ProjectWriter::WriterXCode
         SC_TRY(storyboard != nullptr);
         SC_TRY(StringBuilder(storyboard->name).format("{0}.storyboard", project.name.view()));
         SC_TRY(storyboard->referenceHash.assign("7B375FE92C2F16B1007D27E7"));
-        return true;
+
+        auto xcasset = resourcesGroup->children.getOrCreate("7A4F78E229662D25000D7EE4");
+        SC_TRY(xcasset != nullptr);
+        SC_TRY(StringBuilder(xcasset->name).format("{0}.xcassets", project.name.view()));
+        SC_TRY(xcasset->referenceHash.assign("7A4F78E229662D25000D7EE4"));
+
+        RenderItem xcodeFile;
+        SC_TRY(StringBuilder(xcodeFile.name).format("{0}.xcassets", project.name.view()));
+        xcodeFile.type          = RenderItem::XCAsset;
+        xcodeFile.buildHash     = "7BEC30AF2C31BCF000961B17";
+        xcodeFile.referenceHash = "7A4F78E229662D25000D7EE4";
+        xcodeFile.referencePath = "Resources";
+        SC_TRY(StringBuilder(xcodeFile.path).format("{0}.xcassets", project.name.view()));
+        return xcodeFiles.push_back(xcodeFile);
     }
 
     [[nodiscard]] bool printGroupRecursive(StringBuilder& builder, const RenderGroup& parentGroup)
@@ -212,6 +225,11 @@ struct SC::Build::ProjectWriter::WriterXCode
                 builder.append(
                     "        {0} /* {1} in Frameworks */ = {{isa = PBXBuildFile; fileRef = {2} /* {1} */;{3} }};\n",
                     file.buildHash, file.name, file.referenceHash, platformFilters);
+            }
+            else if (file.type == RenderItem::XCAsset)
+            {
+                builder.append("        {} /* {} in Resources */ = {{isa = PBXBuildFile; fileRef = {} /* {} */; }};\n",
+                               file.buildHash, file.name, file.referenceHash, file.name);
             }
         }
 
@@ -326,6 +344,12 @@ struct SC::Build::ProjectWriter::WriterXCode
                                "wrapper.framework; name = \"{}\"; path = \"{}\"; sourceTree = SDKROOT; }};",
                                file.referenceHash, file.name, file.name, file.path);
             }
+            else if (file.type == RenderItem::XCAsset)
+            {
+                builder.append("\n        {} /* {} */ = {{isa = PBXFileReference; lastKnownFileType = "
+                               "folder.assetcatalog; name = \"{}\"; path = \"{}\"; sourceTree = \"<group>\"; }};",
+                               file.referenceHash, file.name, file.name, file.path);
+            }
         }
 
         builder.append("\n/* End PBXFileReference section */");
@@ -385,6 +409,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                 7B00740F2A73143F00660B94 /* Frameworks */,
                 7B0074102A73143F00660B94 /* CopyFiles */,
                 7B6078112B3CEF9400680265 /* ShellScript */,
+				7BEC30B42C31C33D00961B17 /* Resources */,
             );
             buildRules = (
             );
@@ -442,6 +467,26 @@ struct SC::Build::ProjectWriter::WriterXCode
         };
 /* End PBXProject section */
 )delimiter");
+        SC_COMPILER_WARNING_POP;
+        return true;
+    }
+
+    [[nodiscard]] bool writePBXResourcesBuildPhase(StringBuilder& builder, const Project& project)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        builder.append(R"delimiter(
+/* Begin PBXResourcesBuildPhase section */
+		7BEC30B42C31C33D00961B17 /* Resources */ = {{
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7BEC30AF2C31BCF000961B17 /* {0}.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		}};
+/* End PBXResourcesBuildPhase section */
+)delimiter",
+                       project.name.view());
         SC_COMPILER_WARNING_POP;
         return true;
     }
@@ -581,6 +626,10 @@ struct SC::Build::ProjectWriter::WriterXCode
         if (project.link.hasValue<Link::guiApplication>(true))
         {
             builder.append(R"delimiter(
+                       ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+                       ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+                       ASSETCATALOG_NOTICES = NO;
+                       ASSETCATALOG_WARNINGS = NO;
                        CODE_SIGN_ENTITLEMENTS = {0}.entitlements;
                        CODE_SIGN_STYLE = Automatic;
                        GENERATE_INFOPLIST_FILE = YES;
@@ -930,6 +979,10 @@ struct SC::Build::ProjectWriter::WriterXCode
 
         writePBXNativeTarget(builder, project);
         writePBXProject(builder, project);
+        if (isGUIApplication(project))
+        {
+            writePBXResourcesBuildPhase(builder, project);
+        }
         writePBXShellScriptBuildPhase(builder);
         writePBXSourcesBuildPhase(builder, renderer.renderItems);
         writeXCBuildConfiguration(builder, project, renderer.renderItems);
@@ -1110,6 +1163,77 @@ struct SC::Build::ProjectWriter::WriterXCode
         </document>
 )delimiter");
         SC_COMPILER_WARNING_POP;
+        return Result(true);
+    }
+
+    Result writeAssets(FileSystem& fs, const Project& project)
+    {
+        SmallString<255> buffer;
+        StringBuilder    sb(buffer);
+        SC_TRY(sb.format("{0}.xcassets", project.name));
+        if (fs.existsAndIsDirectory(buffer.view()))
+        {
+            SC_TRY(fs.removeDirectoryRecursive(buffer.view()));
+        }
+        else
+        {
+            SC_TRY(fs.makeDirectory(buffer.view()));
+        }
+        SC_TRY(sb.format("{0}.xcassets/AccentColor.colorset", project.name));
+        SC_TRY(fs.makeDirectoryRecursive(buffer.view()));
+        SC_TRY(sb.format("{0}.xcassets/AccentColor.colorset/Contents.json", project.name));
+        SC_TRY(fs.writeString(buffer.view(), R"delimiter(
+{
+  "colors" : [
+    {
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
+)delimiter"));
+        SC_TRY(sb.format("{0}.xcassets/AppIcon.appiconset", project.name));
+        SC_TRY(fs.makeDirectoryRecursive(buffer.view()));
+        SC_TRY(sb.format("{0}.xcassets/AppIcon.appiconset/Contents.json", project.name));
+        SC_TRY(fs.writeString(buffer.view(),
+                              R"delimiter({
+  "images" : [
+    {
+      "filename" : "AppIcon.svg",
+      "idiom" : "universal",
+      "platform" : "ios",
+      "size" : "1024x1024"
+    },
+    {
+      "filename" : "AppIcon.svg",
+      "idiom" : "mac",
+      "scale" : "2x",
+      "size" : "512x512"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
+)delimiter"));
+        SC_TRY(sb.format("{0}.xcassets/Contents.json", project.name));
+        SC_TRY(fs.writeString(buffer.view(), R"delimiter(
+{
+    "info" : {
+      "author" : "xcode",
+      "version" : 1
+    }
+})delimiter"));
+
+        SC_TRY(sb.format("{0}.xcassets/AppIcon.appiconset/AppIcon.svg", project.name));
+        String fullIconPath;
+        SC_TRY(Path::join(fullIconPath, {project.rootDirectory.view(), project.iconPath.view()}));
+        SC_TRY(fs.copyFile(fullIconPath.view(), buffer.view()));
+
         return Result(true);
     }
 

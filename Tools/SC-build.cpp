@@ -130,6 +130,9 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
     // All relative paths are evaluated from this project root directory.
     project.setRootDirectory(parameters.directories.libraryDirectory.view());
 
+    // Project icon (currently used only by Xcode backend)
+    project.iconPath = "Documentation/Doxygen/SC.svg";
+
     // Install dependencies
     Tools::Package sokol;
     SC_TRY(Tools::installSokol(parameters.directories, sokol));
