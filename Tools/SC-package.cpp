@@ -11,11 +11,10 @@ namespace Tools
 [[nodiscard]] Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                     Package& package)
 {
-
-    static constexpr StringView packageVersion = "1.9.2";
-    static constexpr StringView testVersion    = "1.9.2 (caa4e3de211fbbef2c3adf58a6bd4c86d0eb7cb8";
-
-    static constexpr StringView baseURL = "https://master.dl.sourceforge.net/project/doxygen";
+    static constexpr StringView packageVersion     = "1.9.2";
+    static constexpr StringView packageVersionDash = "1_9_2";
+    static constexpr StringView testVersion        = "1.9.2 (caa4e3de211fbbef2c3adf58a6bd4c86d0eb7cb8";
+    static constexpr StringView baseURL            = "https://github.com/doxygen/doxygen/releases/download";
 
     Download download;
     download.packagesCacheDirectory   = packagesCacheDirectory;
@@ -24,14 +23,16 @@ namespace Tools
     download.packageName    = "doxygen";
     download.packageVersion = packageVersion;
 
+    StringBuilder sb(download.url);
+    SC_TRY(sb.format("{0}/Release_{1}/", baseURL, packageVersionDash));
+
     CustomFunctions functions;
 
     switch (HostPlatform)
     {
     case Platform::Apple:
-        download.packagePlatform = "macos";
-
-        download.url              = format("{0}/rel-{1}/Doxygen-{1}.dmg?viasf=1", baseURL, download.packageVersion);
+        SC_TRY(sb.append("Doxygen-{0}.dmg", download.packageVersion));
+        download.packagePlatform  = "macos";
         download.fileMD5          = "dbf10cfda8f5128ce7d2b2fc1fa1ce1f";
         package.packageBaseName   = format("Doxygen-{0}.dmg", download.packageVersion);
         functions.extractFunction = [](StringView fileName, StringView directory) -> Result
@@ -59,16 +60,16 @@ namespace Tools
         {
             return Result::Error("Doxygen: Unsupported platform (Linux) due to missing libclang-9");
         }
+        SC_TRY(sb.append("doxygen-{0}.linux.bin.tar.gz", download.packageVersion));
         download.packagePlatform = "linux";
-        download.url             = format("{0}/rel-{1}/doxygen-{1}.linux.bin.tar.gz", baseURL, download.packageVersion);
         download.fileMD5         = "c0662ebb72dca6c4a83477b8d354d2fe";
         package.packageBaseName  = format("doxygen-{0}.linux.bin.tar.gz", download.packageVersion);
         break;
     case Platform::Windows:
+        SC_TRY(sb.append("doxygen-{0}.windows.x64.bin.zip", download.packageVersion));
         download.packagePlatform = "windows";
-        download.url             = format("{0}/rel-{1}/doxygen-{1}.windows.bin.zip", baseURL, download.packageVersion);
-        download.fileMD5         = "4ba3ec23f8ff28482116e53557a080c4";
-        package.packageBaseName  = format("doxygen-{0}.windows.bin.zip", download.packageVersion);
+        download.fileMD5         = "9a85b8c746af5133852975fc54d74d51";
+        package.packageBaseName  = format("doxygen-{0}.windows.x64.bin.zip", download.packageVersion);
         break;
     case Platform::Emscripten: return Result::Error("Unsupported platform");
     }
