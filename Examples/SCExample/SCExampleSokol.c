@@ -5,10 +5,26 @@
 
 #include "SCExampleSokol.h"
 
+
 void sokol_sleep(void)
 {
 #if defined(__APPLE__)
+#if TARGET_OS_IPHONE
+    
+    _sapp.ios.view.paused = YES;
+    // Not sure why we need 6 run loop to "eat" the pause event, probably they're used by MTKView
+    for(int i =0 ; i < 6; ++i)
+    {
+        CFRunLoopRunResult res = CFRunLoopRunInMode(kCFRunLoopDefaultMode, DBL_MAX, YES);
+        if(res == kCFRunLoopRunStopped)
+        {
+            break;
+        }
+    }
+    _sapp.ios.view.paused = NO;
+#else
     CFRunLoopRunInMode(kCFRunLoopDefaultMode, DBL_MAX, 1);
+#endif
 #elif defined(_WIN32)
     HWND hwnd = (HWND)sapp_win32_get_hwnd();
     MSG  msg;
@@ -34,6 +50,10 @@ void sokol_sleep(void)
 void sokol_wake_up(void)
 {
 #if defined(__APPLE__)
+#if TARGET_OS_IPHONE
+
+    CFRunLoopStop(CFRunLoopGetMain());
+#else
     NSEvent* event = [NSEvent otherEventWithType: NSEventTypeApplicationDefined
                                                          location: NSMakePoint(0,0)
                                                    modifierFlags: 0
@@ -44,7 +64,7 @@ void sokol_wake_up(void)
                                                            data1: 0
                                                            data2: 0];
     [NSApp postEvent: event atStart: YES];
-    
+#endif
 #elif defined(_WIN32)
     HWND hwnd = (HWND)sapp_win32_get_hwnd();
     PostMessage(hwnd, WM_USER + 1, 0, 0);

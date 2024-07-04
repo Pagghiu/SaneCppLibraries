@@ -164,7 +164,9 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
     if (parameters.platform == Platform::Apple)
     {
         project.addDirectory("Examples/SCExample", "*.m"); // add all .m from SCExample directory
-        project.link.addFrameworks({"Metal", "MetalKit", "QuartzCore", "Cocoa"});
+        project.link.addFrameworks({"Metal", "MetalKit", "QuartzCore"});
+        project.link.addFrameworks({"Cocoa"}, PlatformApple::macOS);
+        project.link.addFrameworks({"UIKit", "Foundation"}, PlatformApple::iOS);
     }
     else
     {
