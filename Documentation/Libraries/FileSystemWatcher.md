@@ -22,10 +22,12 @@ Library does have basic capabilities and it can be used just fine.
 
 The class tries to unify differences between OS specific API to deliver folder change notifications
 
-- On Apple `FSEvents` by `CoreServices` is used.  
+- On macOS and iOS `FSEvents` by `CoreServices` is used.  
 - On Windows `ReadDirectoryChangesW` is used.  
 
 The behavior between these different system also depends on the file system where the watched directory resides.
+
+@note On iOS `FSEvents` api is private so using SC::FileSystemWatcher will be very likely causing your app to be rejected from the app store.
 
 # Examples
 

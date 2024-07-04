@@ -8,6 +8,13 @@
 #include "../../Threading/Threading.h"
 #include <CoreServices/CoreServices.h> // FSEvents
 
+#include <AvailabilityMacros.h>
+#include <TargetConditionals.h>
+#if TARGET_OS_IPHONE
+// TODO: Figure out another API for ios as this is a private API and it will not be accepted on app store.
+#include "FSEventsIOS.h"
+#endif
+
 struct SC::FileSystemWatcher::ThreadRunnerInternal
 {
 };
