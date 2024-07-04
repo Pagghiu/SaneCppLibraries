@@ -426,6 +426,10 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
     SC_TRY(argumentsArena.appendMultipleStrings(
         {"-DSC_PLUGIN_LIBRARY=1", "-std=c++14", "-g", "-c", "-fpic", sourceFile, "-o", objectFile}));
 #endif
+    if (not sysroot.isysroot.isEmpty())
+    {
+        SC_TRY(argumentsArena.appendMultipleStrings({"-isysroot", sysroot.isysroot.view()}));
+    }
     SC_TRY(PluginCompilerEnvironment::Internal::writeFlags(compilerEnvironment.cFlags, argumentsArena));
     StringView arguments[MAX_PROCESS_ARGUMENTS];
     SC_TRY(argumentsArena.writeTo(arguments));
@@ -494,6 +498,10 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
     SC_COMPILER_UNUSED(sysroot);
     SC_TRY(arena.appendMultipleStrings({"-fpic"}));
 
+    if (not sysroot.isysroot.isEmpty())
+    {
+        SC_TRY(arena.appendMultipleStrings({"-isysroot", sysroot.isysroot.view()}));
+    }
     SC_TRY(PluginCompilerEnvironment::Internal::writeFlags(compilerEnvironment.ldFlags, arena));
     if (OperatingSystem::getHostOS() == OperatingSystem::macOS)
     {

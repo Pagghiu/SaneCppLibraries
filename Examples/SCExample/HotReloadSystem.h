@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystem/FileSystemDirectories.h"
 #include "Libraries/FileSystem/Path.h"
 #include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
@@ -18,6 +19,8 @@ struct HotReloadState
     String imguiPath;
     String pluginsPath;
     String executablePath;
+
+    char isysroot[255];
 };
 
 /// @brief Implements a simple hot reload system using the Plugin and FileSystemWatcher library
@@ -38,6 +41,12 @@ struct HotReloadSystem
         constexpr const StringView imguiPath = SC_COMPILER_MACRO_TO_LITERAL(SC_COMPILER_MACRO_ESCAPE(SC_IMGUI_PATH));
         SC_TRY(Path::normalizeUNCAndTrimQuotes(imguiPath, components, state.imguiPath, Path::AsNative));
         SC_TRY(Path::join(state.pluginsPath, {state.libraryRootDirectory.view(), "Examples", "SCExample", "Plugins"}));
+        StringView iosSysroot = "/var/mobile/theos/sdks/iPhoneOS14.4.sdk";
+        if (FileSystem().existsAndIsDirectory(iosSysroot))
+        {
+            memcpy(state.isysroot, iosSysroot.bytesIncludingTerminator(), iosSysroot.sizeInBytesIncludingTerminator());
+            setSysroot(iosSysroot);
+        }
 
         // Setup Compiler
         SC_TRY(PluginCompiler::findBestCompiler(compiler));
@@ -74,6 +83,8 @@ struct HotReloadSystem
         // TODO: Implement some form of error reporting
         (void)registry.unloadPlugin(identifier);
     }
+
+    void setSysroot(StringView isysroot) { sysroot.isysroot = isysroot; }
 
   private:
     PluginCompiler compiler;
@@ -120,6 +131,18 @@ struct HotReloadView
 
     Result drawInternal()
     {
+        ImGui::Text("Sysroot Location:");
+        ImGui::PushItemWidth(ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x * 2);
+        if (ImGui::InputText("##-isysroot", state.isysroot, sizeof(state.isysroot)))
+        {
+            StringView text = StringView::fromNullTerminated(state.isysroot, StringEncoding::Utf8);
+            if (FileSystem().existsAndIsDirectory(text) or text.isEmpty())
+            {
+                system.setSysroot(text);
+            }
+        }
+        ImGui::PopItemWidth();
+
         if (ImGui::Button("Sync Registry"))
         {
             SC_TRY(system.syncRegistry(state.pluginsPath.view()));

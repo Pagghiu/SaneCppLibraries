@@ -159,6 +159,8 @@ struct SC::PluginSysroot
     SmallVector<StringNative<256>, 8> includePaths; ///< Path to system include directories
     SmallVector<StringNative<256>, 8> libraryPaths; ///< Path to system library directories
 
+    StringNative<256> isysroot; ///< Path to sysroot include (optional)
+
     /// @brief Finds a reasonable sysroot for the given compiler
     /// @param compiler The PluginCompiler::Type to constrain the compatible PluginSysroot to look for
     /// @param[out] sysroot The PluginSysroot with filled in include and library path
