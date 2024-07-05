@@ -30,7 +30,7 @@ Library                                                                         
 :-------------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------------------
 [Algorithms](https://pagghiu.github.io/SaneCppLibraries/library_algorithms.html)                        | 🟥 Placeholder library templated algorithms will be placed
 [Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html)                                  | 🟨 Async I/O (files, sockets, timers, processes, fs events, threads wake-up)
-[Build](https://pagghiu.github.io/SaneCppLibraries/library_build.html)                                  | 🟥 Minimal build system where builds are described in C++
+[Build](https://pagghiu.github.io/SaneCppLibraries/library_build.html)                                  | 🟨 Minimal build system where builds are described in C++
 [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html)                        | 🟨 Generic containers (SC::Vector, SC::SmallVector, SC::Array etc.)
 [File](https://pagghiu.github.io/SaneCppLibraries/library_file.html)                                    | 🟩 Synchronous Disk File I/O
 [File System](https://pagghiu.github.io/SaneCppLibraries/library_file_system.html)                      | 🟩 File System operations { exists | copy | delete } for { files | directories }
@@ -75,16 +75,16 @@ Shortly:
 - Define `SC_COMPILER_ENABLE_STD_CPP=1` if you plan to use the Standard C++ library
 - Include any public header (`Libraries/[Library]/*.h`)
 
-## macOS
+## Windows
+- Nothing else to link (in addition to default libs)
+
+## macOS / iOS
 - Link `CoreFoundation.framework`
 - Link `CoreServices.framework`
 
 ## Linux
 - Link `libdl` (`-ldl`)
 - Link `libpthread` (`-lpthread`)
-
-## Windows
-- Nothing else to link (in addition to default libs)
 
 # Examples
 
