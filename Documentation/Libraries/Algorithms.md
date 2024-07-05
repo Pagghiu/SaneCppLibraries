@@ -1,6 +1,6 @@
 @page library_algorithms Algorithms
 
-@brief 🟥 Placeholder library templated algorithms will be placed
+@brief 🟥 Placeholder library templated where algorithms will be placed
 
 [TOC]
 

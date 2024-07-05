@@ -282,7 +282,8 @@ namespace SC
 //! @{
 
 /// @brief Starts a Timeout that is invoked only once after expiration (relative) time has passed.
-/// @note For a peridic timeout, call AsyncLoopTimeout::Result::reactivateRequest(true) in the completion callback
+/// @note For a periodic timeout, call AsyncLoopTimeout::Result::reactivateRequest(true) in the completion callback
+///
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncLoopTimeoutSnippet
 struct AsyncLoopTimeout : public AsyncRequest
 {

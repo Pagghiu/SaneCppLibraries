@@ -1,6 +1,6 @@
 @page library_file_system File System
 
-@brief 🟩 File System operations { exists | copy | delete } for { files | directories }
+@brief 🟩 File System operations { exists, copy, delete } for { files and directories }
 
 [TOC]
 

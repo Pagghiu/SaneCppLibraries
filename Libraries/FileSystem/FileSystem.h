@@ -17,7 +17,7 @@ struct StringConverter;
 //! @addtogroup group_file_system
 //! @{
 
-/// @brief Execute fs operations { exists | copy | delete } for { files | directories }.
+/// @brief Execute fs operations { exists, copy, delete } for { files and directories }.
 /// It will scope all operations on relative paths to the `initialWorkingDirectory` passed in SC::FileSystem::init.
 /// All methods can always return failure due to access or disk I/O errors, and they will be omitted in the return
 /// clauses for each method. Only the specific returned result behaviour of the given method will be described.
