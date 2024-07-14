@@ -50,6 +50,7 @@ struct ApplicationSystem
         eventLoopMonitor.onNewEventsAvailable = [this]() { sokol_wake_up(); };
         SC_TRY(eventLoopMonitor.create(eventLoop));
         SC_TRY(hotReloadSystem.create(eventLoop));
+        SC_TRY(hotReloadSystem.syncRegistry());
         return Result(true);
     }
 
@@ -119,34 +120,83 @@ struct ApplicationSystem
     }
 };
 
+enum class ApplicationPage
+{
+    Settings,
+    Examples,
+};
+
+struct ApplicationViewState
+{
+    ApplicationPage page = ApplicationPage::Settings;
+
+    HotReloadViewState exampleViewState;
+};
+
 struct ApplicationView
 {
-    ApplicationSystem& system;
-    ApplicationState&  state;
-    ApplicationView(ApplicationSystem& system, ApplicationState& data) : system(system), state(data) {}
+    ApplicationSystem&    system;
+    ApplicationState&     state;
+    ApplicationViewState& viewState;
 
     void draw()
     {
-        ImGui::SetNextWindowPos(ImVec2(0, 0));
-        ImGui::SetNextWindowSize(ImVec2(350, ImGui::GetIO().DisplaySize.y));
-        if (ImGui::Begin("Test", nullptr,
-                         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar))
+        drawToolbar();
+        ImGui::SetNextWindowPos(ImVec2(0, ToolbarHeight));
+        const float width = viewState.page == ApplicationPage::Settings ? 350 : ImGui::GetIO().DisplaySize.x;
+        ImGui::SetNextWindowSize(ImVec2(width, ImGui::GetIO().DisplaySize.y - ToolbarHeight));
+        constexpr auto flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar |
+                               ImGuiWindowFlags_NoScrollbar;
+        if (ImGui::Begin("Body", nullptr, flags))
         {
-            ImGui::Text("SCExample");
-            if (ImGui::CollapsingHeader("SC::Async Integration", ImGuiTreeNodeFlags_DefaultOpen))
+            if (viewState.page == ApplicationPage::Settings)
             {
-                drawSCAsync();
+                drawSettings();
             }
-            if (ImGui::CollapsingHeader("SC::Plugin + SC::FileSystemWatcher", ImGuiTreeNodeFlags_DefaultOpen))
+            else
             {
-                HotReloadView hotReloadView{system.hotReloadSystem, system.hotReloadSystem.state};
-                hotReloadView.draw();
+                HotReloadView view{system.hotReloadSystem, system.hotReloadSystem.state, viewState.exampleViewState};
+                view.drawBody();
             }
         }
         ImGui::End();
     }
 
-    void drawSCAsync()
+    void drawToolbar()
+    {
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x, ToolbarHeight));
+        constexpr auto flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar |
+                               ImGuiWindowFlags_NoScrollbar;
+        if (ImGui::Begin("Toolbar", nullptr, flags))
+        {
+            if (ImGui::Button("Settings..."))
+            {
+                viewState.page = ApplicationPage::Settings;
+            }
+            HotReloadView view{system.hotReloadSystem, system.hotReloadSystem.state, viewState.exampleViewState};
+            if (view.drawToolbar())
+            {
+                viewState.page = ApplicationPage::Examples;
+            }
+        }
+        ImGui::End();
+    }
+
+    void drawSettings()
+    {
+        if (ImGui::CollapsingHeader("SC::Async", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            drawSettingsAsync();
+        }
+        if (ImGui::CollapsingHeader("SC::Plugin", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            HotReloadView view{system.hotReloadSystem, system.hotReloadSystem.state, viewState.exampleViewState};
+            view.drawSettings();
+        }
+    }
+
+    void drawSettingsAsync()
     {
         if (state.pausedCounter == 0)
         {
@@ -172,6 +222,8 @@ struct ApplicationView
 } // namespace SC
 
 SC::ApplicationSystem* gModelSystem = nullptr;
+
+SC::ApplicationViewState gViewState;
 
 static sg_pass_action gGlobalPassAction;
 
@@ -206,7 +258,7 @@ sapp_desc sokol_main(int, char*[])
     desc.frame_cb = []()
     {
         simgui_new_frame({sapp_width(), sapp_height(), sapp_frame_duration(), sapp_dpi_scale()});
-        ApplicationView applicationView(*gModelSystem, gModelSystem->state);
+        ApplicationView applicationView = {*gModelSystem, gModelSystem->state, gViewState};
         applicationView.draw();
 
         sg_pass pass   = {};

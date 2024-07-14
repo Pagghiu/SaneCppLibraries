@@ -6,9 +6,9 @@
 
 namespace SC
 {
-struct IExampleDrawing
+struct ISCExample
 {
-    static constexpr unsigned int InterfaceHash = SC::StringHashFNV("IExampleDrawing");
+    static constexpr unsigned int InterfaceHash = SC::StringHashFNV("ISCExample");
 
     Function<void(void)> onDraw;
 };

@@ -4,14 +4,14 @@
 #include "Libraries/Plugin/PluginMacros.h"
 #include "Libraries/Strings/String.h"
 
-#include "../Interfaces/IExampleDrawing.h"
+#include "../ISCExample.h"
 #include "imgui.h"
 
-struct Plugin1 : public SC::IExampleDrawing
+struct Example1 : public SC::ISCExample
 {
-    Plugin1() { IExampleDrawing::onDraw.bind<Plugin1, &Plugin1::draw>(*this); }
+    Example1() { ISCExample::onDraw.bind<Example1, &Example1::draw>(*this); }
 
-    void draw() { ImGui::Text("Plugin 1"); }
+    void draw() { ImGui::Text("Example 1"); }
 
     [[nodiscard]] bool init() { return true; }
 
@@ -20,14 +20,14 @@ struct Plugin1 : public SC::IExampleDrawing
 
 // SC_BEGIN_PLUGIN
 //
-// Name:          Plugin 1
+// Name:          Example 1
 // Version:       1
-// Description:   First plugin
+// Description:   First example
 // Category:      Generic
 // Build:         libc
 // Dependencies:
 //
 // SC_END_PLUGIN
 
-SC_PLUGIN_DEFINE(Plugin1)
-SC_PLUGIN_EXPORT_INTERFACES(Plugin1, SC::IExampleDrawing)
+SC_PLUGIN_DEFINE(Example1)
+SC_PLUGIN_EXPORT_INTERFACES(Example1, SC::ISCExample)

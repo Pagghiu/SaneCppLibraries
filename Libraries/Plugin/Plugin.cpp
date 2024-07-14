@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Plugin.h"
 
+#include "../Algorithms/AlgorithmBubbleSort.h"
 #include "../FileSystem/FileSystem.h"
 #include "../FileSystem/Path.h"
 #include "../FileSystemIterator/FileSystemIterator.h"
@@ -246,6 +247,9 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Vector<P
             SC_TRY(definitions.pop_back());
         }
     }
+    Algorithms::bubbleSort(definitions.begin(), definitions.end(),
+                           [](const PluginDefinition& a, const PluginDefinition& b)
+                           { return a.identity.name.view() < b.identity.name.view(); });
     return fsIterator.checkErrors();
 }
 

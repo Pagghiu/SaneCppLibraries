@@ -6,12 +6,12 @@
 #include "Libraries/FileSystem/Path.h"
 #include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
 #include "Libraries/Plugin/Plugin.h"
-#include "Plugins/Interfaces/IExampleDrawing.h"
 
-#include "imgui.h"
+#include "Examples/ISCExample.h"
 
 namespace SC
 {
+static constexpr int ToolbarHeight = 35;
 
 struct HotReloadState
 {
@@ -40,7 +40,7 @@ struct HotReloadSystem
                                                Path::AsNative));
         constexpr const StringView imguiPath = SC_COMPILER_MACRO_TO_LITERAL(SC_COMPILER_MACRO_ESCAPE(SC_IMGUI_PATH));
         SC_TRY(Path::normalizeUNCAndTrimQuotes(imguiPath, components, state.imguiPath, Path::AsNative));
-        SC_TRY(Path::join(state.pluginsPath, {state.libraryRootDirectory.view(), "Examples", "SCExample", "Plugins"}));
+        SC_TRY(Path::join(state.pluginsPath, {state.libraryRootDirectory.view(), "Examples", "SCExample", "Examples"}));
         StringView iosSysroot = "/var/mobile/theos/sdks/iPhoneOS14.4.sdk";
         if (FileSystem().existsAndIsDirectory(iosSysroot))
         {
@@ -63,10 +63,10 @@ struct HotReloadSystem
 
     Result close() { return fileSystemWatcher.close(); }
 
-    Result syncRegistry(StringView pluginsPath)
+    Result syncRegistry()
     {
         Vector<PluginDefinition> definitions;
-        SC_TRY(PluginScanner::scanDirectory(pluginsPath, definitions))
+        SC_TRY(PluginScanner::scanDirectory(state.pluginsPath.view(), definitions))
         SC_TRY(registry.replaceDefinitions(move(definitions)));
         return Result(true);
     }
@@ -122,12 +122,18 @@ struct HotReloadSystem
     }
 };
 
+struct HotReloadViewState
+{
+    size_t page = 0;
+};
+
 struct HotReloadView
 {
-    HotReloadSystem& system;
-    HotReloadState&  state;
+    HotReloadSystem&    system;
+    HotReloadState&     state;
+    HotReloadViewState& viewState;
 
-    void draw() { SC_TRUST_RESULT(drawInternal()); }
+    void drawSettings() { SC_TRUST_RESULT(drawInternal()); }
 
     Result drawInternal()
     {
@@ -145,7 +151,7 @@ struct HotReloadView
 
         if (ImGui::Button("Sync Registry"))
         {
-            SC_TRY(system.syncRegistry(state.pluginsPath.view()));
+            SC_TRY(system.syncRegistry());
         }
         const size_t numberOfEntries = system.registry.getNumberOfEntries();
         if (ImGui::BeginTable("Table", 4))
@@ -194,37 +200,41 @@ struct HotReloadView
             }
             ImGui::EndTable();
         }
-
-        for (size_t idx = 0; idx < numberOfEntries; ++idx)
-        {
-            const float entrySize = ImGui::GetIO().DisplaySize.y / numberOfEntries;
-            ImGui::SetNextWindowPos(ImVec2(350, entrySize * idx));
-            ImGui::SetNextWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x - 350, entrySize));
-            if (idx % 2 == 0)
-            {
-                ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(30, 30, 30, 255));
-            }
-            else
-            {
-                ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(60, 60, 60, 255));
-            }
-            SmallString<16> label;
-            SC_TRY(StringBuilder(label).format("Content{}", idx));
-            if (ImGui::Begin(label.view().bytesIncludingTerminator(), nullptr,
-                             ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar))
-            {
-                const PluginDynamicLibrary& library = system.registry.getPluginDynamicLibraryAt(idx);
-
-                IExampleDrawing* drawingInterface = nullptr;
-                if (library.queryInterface(drawingInterface))
-                {
-                    drawingInterface->onDraw();
-                }
-            }
-            ImGui::End();
-            ImGui::PopStyleColor();
-        }
         return Result(true);
     }
+
+    [[nodiscard]] bool drawToolbar()
+    {
+        bool res = false;
+        for (size_t idx = 0; idx < system.registry.getNumberOfEntries(); ++idx)
+        {
+            const PluginIdentifier&     identifier = system.registry.getIdentifierAt(idx);
+            const PluginDynamicLibrary& library    = system.registry.getPluginDynamicLibraryAt(idx);
+            ImGui::SameLine();
+
+            if (ImGui::Button(identifier.view().bytesIncludingTerminator()))
+            {
+                res            = true;
+                viewState.page = idx;
+                if (not library.dynamicLibrary.isValid())
+                {
+                    system.load(identifier.view());
+                }
+            }
+        }
+        return res;
+    }
+
+    void drawBody()
+    {
+        const PluginDynamicLibrary& library = system.registry.getPluginDynamicLibraryAt(viewState.page);
+
+        ISCExample* drawingInterface = nullptr;
+        if (library.queryInterface(drawingInterface))
+        {
+            drawingInterface->onDraw();
+        }
+    }
 };
+
 } // namespace SC
