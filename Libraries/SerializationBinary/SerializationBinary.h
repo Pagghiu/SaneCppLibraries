@@ -154,6 +154,53 @@ struct SerializationBinary
             *numberOfReads = readerBuffer.numberOfOperations;
         return readerBuffer.positionIsAtEnd();
     }
+
+    /// @brief Writes the reflection schema of object `T` followed by contents of object `T` to a binary buffer.
+    /// The serialized buffer can be used with SerializationBinary::loadVersionedWithSchema to allow a "best effort"
+    /// de-serialization trying to match fields with corresponding `memberTag`.
+    /// @see SerializationBinary::write
+    /// @see SerializationBinary::loadVersionedWithSchema
+    template <typename T>
+    [[nodiscard]] static bool writeWithSchema(T& value, Vector<uint8_t>& buffer, size_t* numberOfWrites = nullptr)
+    {
+        constexpr auto     typeInfos = Reflection::Schema::template compile<T>().typeInfos;
+        constexpr uint32_t numInfos  = typeInfos.size;
+        static_assert(alignof(Reflection::TypeInfo) == sizeof(uint32_t), "Alignof TypeInfo");
+        // Implying same endianness when reading here
+        SC_TRY(buffer.append(Span<const uint8_t>::reinterpret_bytes(&numInfos, sizeof(numInfos))));
+        SC_TRY(buffer.append(
+            Span<const uint8_t>::reinterpret_bytes(typeInfos.values, typeInfos.size * sizeof(Reflection::TypeInfo))));
+        return write(value, buffer, numberOfWrites);
+    }
+
+    /// @brief Loads object `T` using the schema information that has been prepended by
+    /// SerializationBinary::writeWithSchema. The schema allows a "best effort" de-serialization trying to match fields
+    /// with corresponding `memberTag`.
+    /// @see SerializationBinary::loadVersioned
+    /// @see SerializationBinary::writeWithSchema
+    template <typename T>
+    [[nodiscard]] static bool loadVersionedWithSchema(T& value, Span<const uint8_t> buffer,
+                                                      SerializationBinaryOptions options       = {},
+                                                      size_t*                    numberOfReads = nullptr)
+    {
+        uint32_t numInfos = 0;
+        // Read number of type info
+        Span<const uint8_t> numInfosSlice;
+        SC_TRY(buffer.sliceStartLength(0, sizeof(numInfos), numInfosSlice));
+        memcpy(&numInfos, numInfosSlice.data(), sizeof(numInfos));
+
+        // Cast first part of the buffer to a Span of TypeInfo.
+        // It's possible as we've been serializing it with correct alignment (currently 32 bits).
+        static_assert(alignof(Reflection::TypeInfo) == sizeof(uint32_t), "Alignof TypeInfo");
+        Span<const uint8_t> typeInfosSlice;
+        SC_TRY(buffer.sliceStartLength(sizeof(numInfos), numInfos * sizeof(Reflection::TypeInfo), typeInfosSlice));
+        Span<const Reflection::TypeInfo> typeInfos = typeInfosSlice.reinterpret_as_array_of<Reflection::TypeInfo>();
+
+        // Get the slice of bytes where actual serialization data has been written by writeWithSchema
+        Span<const uint8_t> serializedDataSlice;
+        SC_TRY(buffer.sliceStart(sizeof(numInfos) + numInfos * sizeof(Reflection::TypeInfo), serializedDataSlice));
+        return loadVersioned(value, serializedDataSlice, typeInfos, options, numberOfReads);
+    }
 };
 
 //! @}

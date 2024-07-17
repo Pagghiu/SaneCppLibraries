@@ -7,6 +7,7 @@
 #include "../../Reflection/ReflectionSchemaCompiler.h"
 #include "SerializationBinarySchema.h"
 
+#include "../../Foundation/Result.h"
 namespace SC
 {
 
