@@ -68,6 +68,13 @@ struct SC::Span
         return Span(reinterpret_cast<Type*>(rawMemory), sizeInBytes / sizeof(Type));
     }
 
+    /// @brief Reinterprets the current span as an array of the specified type
+    template <typename T>
+    [[nodiscard]] Span<const T> reinterpret_as_array_of() const
+    {
+        return Span<const T>(reinterpret_cast<const T*>(items), sizeInBytes() / sizeof(T));
+    }
+
     /// @brief Returns pointer to first element of the span
     /// @return pointer to first element of the span
     [[nodiscard]] constexpr const Type* begin() const { return items; }
