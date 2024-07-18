@@ -12,6 +12,7 @@ inline const StringView typeCategoryToStringView(Reflection::TypeCategory type)
     switch (type)
     {
     case Reflection::TypeCategory::TypeInvalid: return "TypeInvalid ";
+    case Reflection::TypeCategory::TypeBOOL: return "TypeBOOL   ";
     case Reflection::TypeCategory::TypeUINT8: return "TypeUINT8   ";
     case Reflection::TypeCategory::TypeUINT16: return "TypeUINT16  ";
     case Reflection::TypeCategory::TypeUINT32: return "TypeUINT32  ";

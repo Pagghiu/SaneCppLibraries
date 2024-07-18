@@ -33,21 +33,22 @@ enum class TypeCategory : uint8_t
     TypeInvalid = 0, ///< Invalid type sentinel
 
     // Primitive types
-    TypeUINT8    = 1,  ///< Type is `uint8_t`
-    TypeUINT16   = 2,  ///< Type is `uint16_t`
-    TypeUINT32   = 3,  ///< Type is `uint32_t`
-    TypeUINT64   = 4,  ///< Type is `uint64_t`
-    TypeINT8     = 5,  ///< Type is `int8_t`
-    TypeINT16    = 6,  ///< Type is `int16_t`
-    TypeINT32    = 7,  ///< Type is `int32_t`
-    TypeINT64    = 8,  ///< Type is `int64_t`
-    TypeFLOAT32  = 9,  ///< Type is `float`
-    TypeDOUBLE64 = 10, ///< Type is `double`
+    TypeBOOL     = 1,  ///< Type is `bool`
+    TypeUINT8    = 2,  ///< Type is `uint8_t`
+    TypeUINT16   = 3,  ///< Type is `uint16_t`
+    TypeUINT32   = 4,  ///< Type is `uint32_t`
+    TypeUINT64   = 5,  ///< Type is `uint64_t`
+    TypeINT8     = 6,  ///< Type is `int8_t`
+    TypeINT16    = 7,  ///< Type is `int16_t`
+    TypeINT32    = 8,  ///< Type is `int32_t`
+    TypeINT64    = 9,  ///< Type is `int64_t`
+    TypeFLOAT32  = 10, ///< Type is `float`
+    TypeDOUBLE64 = 11, ///< Type is `double`
 
     // Non primitive types
-    TypeStruct = 11, ///< Type is a struct type
-    TypeArray  = 12, ///< Type is an array type
-    TypeVector = 13, ///< Type is a vector type
+    TypeStruct = 12, ///< Type is a struct type
+    TypeArray  = 13, ///< Type is an array type
+    TypeVector = 14, ///< Type is a vector type
 };
 //! [reflectionSnippet3]
 
@@ -183,7 +184,7 @@ struct TypeInfo
 
     [[nodiscard]] static constexpr bool isPrimitiveCategory(TypeCategory category)
     {
-        return category >= TypeCategory::TypeUINT8 and category <= TypeCategory::TypeDOUBLE64;
+        return category >= TypeCategory::TypeBOOL and category <= TypeCategory::TypeDOUBLE64;
     }
 };
 //! @}
@@ -223,6 +224,7 @@ template <> struct Reflect<int32_t>  : public ReflectPrimitive {static constexpr
 template <> struct Reflect<int64_t>  : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeINT64;}};
 template <> struct Reflect<float>    : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeFLOAT32;}};
 template <> struct Reflect<double>   : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeDOUBLE64;}};
+template <> struct Reflect<bool>     : public ReflectPrimitive {static constexpr auto getCategory(){return TypeCategory::TypeBOOL;}};
 
 /// @brief Checks if a given type is primitive
 template <typename T> struct IsPrimitive { static constexpr bool value = TypeInfo::isPrimitiveCategory(Reflect<T>::getCategory()); };
