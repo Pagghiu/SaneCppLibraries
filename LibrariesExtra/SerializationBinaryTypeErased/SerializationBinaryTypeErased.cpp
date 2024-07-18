@@ -571,7 +571,18 @@ template <typename T>
         }
         break;
     }
-    default: break;
+    case Reflection::TypeCategory::TypeBOOL: //
+    {
+        if (sinkType.type == Reflection::TypeCategory::TypeBOOL or options.allowBoolConversions)
+        {
+            return tryReadPrimitiveValue<bool>(sourceObject, sinkType, sinkObject);
+        }
+        break;
+    }
+    case Reflection::TypeCategory::TypeInvalid:
+    case Reflection::TypeCategory::TypeStruct:
+    case Reflection::TypeCategory::TypeArray:
+    case Reflection::TypeCategory::TypeVector: break;
     }
     return false;
 }

@@ -240,11 +240,23 @@ struct SerializerBinaryReadVersioned<BinaryStream, T,
                 }
                 return false;
             }
-            default:
-                SC_ASSERT_DEBUG(false);
+            case Reflection::TypeCategory::TypeBOOL:
+            {
+                if(schema.options.allowBoolConversions or TypeTraits::IsSame<T, bool>::value)
+                {
+                    return readCastValue<bool>(object, stream);
+                }
                 return false;
+            }
+            case Reflection::TypeCategory::TypeInvalid:
+            case Reflection::TypeCategory::TypeStruct:
+            case Reflection::TypeCategory::TypeArray:
+            case Reflection::TypeCategory::TypeVector:
+            break;
         }
         // clang-format on
+        SC_ASSERT_DEBUG(false);
+        return false;
     }
 };
 } // namespace detail
