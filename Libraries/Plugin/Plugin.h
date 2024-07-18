@@ -112,18 +112,20 @@ struct SC::PluginCompiler
     /// @param definition A valid Definition parsed by Definition::parse
     /// @param sysroot A sysroot used (if requested) holding include / library paths to libc/libc++
     /// @param environment An environment used to populate CFLAGS and LDFLAGS from environment variables
+    /// @param compilerLog If provided, will receive the log output produced by the compiler
     /// @return Valid result if all files of given definition can be compiled to valid object files
     Result compile(const PluginDefinition& definition, const PluginSysroot& sysroot,
-                   const PluginCompilerEnvironment& environment) const;
+                   const PluginCompilerEnvironment& environment, String& compilerLog) const;
 
     /// @brief Links a Definition into a dynamic library, with symbols from `executablePath`
     /// @param definition A valid Definition already compiled with PluginCompiler::compile
     /// @param sysroot A sysroot used (if requested) holding include / library paths to libc/libc++
     /// @param environment An environment used to populate CFLAGS and LDFLAGS from environment variables
     /// @param executablePath Path to the executable loading the given plugin, exposing symbols used by Plugin
+    /// @param linkerLog If provided, will receive the log output produced by the linker
     /// @return Valid result if the Definition can be compiled to a dynamic library linking executablePath
     Result link(const PluginDefinition& definition, const PluginSysroot& sysroot,
-                const PluginCompilerEnvironment& environment, StringView executablePath) const;
+                const PluginCompilerEnvironment& environment, StringView executablePath, String& linkerLog) const;
 
     /// @brief Compiler type (clang/gcc/msvc)
     enum class Type
@@ -149,7 +151,7 @@ struct SC::PluginCompiler
   private:
     [[nodiscard]] Result compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
                                      const PluginCompilerEnvironment& compilerEnvironment, StringView sourceFile,
-                                     StringView objectFile) const;
+                                     StringView objectFile, String& compilerLog) const;
     struct Internal;
 };
 
@@ -183,8 +185,10 @@ struct SC::PluginDynamicLibrary
 {
     PluginDefinition     definition;     ///< Definition of the loaded plugin
     SystemDynamicLibrary dynamicLibrary; ///< System handle of plugin's dynamic library
-    Time::Absolute       lastLoadTime;   ///< time when this plugin was last loaded
+    Time::Absolute       lastLoadTime;   ///< Last time when this plugin was last loaded
     uint32_t             numReloads;     ///< Number of times that the plugin has been hot-reloaded
+    String               lastErrorLog;   ///< Last error log of compiler / linker (if any)
+
     /// @brief Try to obtain a given interface as exported by a plugin through SC_PLUGIN_EXPORT_INTERFACES macro
     /// @param[out] outInterface Pointer to the interface that will be returned by the plugin, if it exists
     /// @return true if the plugin is loaded and the requested interface is implemented by the plugin itself
@@ -260,7 +264,10 @@ struct SC::PluginRegistry
     [[nodiscard]] const PluginIdentifier& getIdentifierAt(size_t index) const { return libraries.items[index].key; }
 
     /// @brief Returns the PluginIdentifier corresponding to the index entry of the registry
-    [[nodiscard]] PluginDynamicLibrary& getPluginDynamicLibraryAt(size_t index) { return libraries.items[index].value; }
+    [[nodiscard]] const PluginDynamicLibrary& getPluginDynamicLibraryAt(size_t index)
+    {
+        return libraries.items[index].value;
+    }
 
   private:
     VectorMap<PluginIdentifier, PluginDynamicLibrary> libraries;
