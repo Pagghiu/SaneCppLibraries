@@ -7,12 +7,12 @@
 
 namespace SC
 {
-struct ProcessDescriptor;
+struct SC_COMPILER_EXPORT ProcessDescriptor;
 namespace detail
 {
 #if SC_PLATFORM_WINDOWS
 
-struct ProcessDescriptorDefinition
+struct SC_COMPILER_EXPORT ProcessDescriptorDefinition
 {
     using Handle = void*; // HANDLE
 #ifdef __clang__
@@ -25,7 +25,7 @@ struct ProcessDescriptorDefinition
 
 #else
 
-struct ProcessDescriptorDefinition
+struct SC_COMPILER_EXPORT ProcessDescriptorDefinition
 {
     using Handle = int; // pid_t
     static Result releaseHandle(Handle& handle);

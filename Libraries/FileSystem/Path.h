@@ -7,7 +7,7 @@
 
 namespace SC
 {
-struct Path;
+struct SC_COMPILER_EXPORT Path;
 struct String;
 template <typename T>
 struct Vector;

@@ -12,7 +12,7 @@ struct String;
 /// @brief Builds String out of a sequence of StringView or formatting through StringFormat
 ///
 /// The output can be a SC::Vector (or a SC::SmallVector, see [Containers](@ref library_containers))
-struct StringBuilder
+struct SC_COMPILER_EXPORT StringBuilder
 {
     /// @brief Clearing flags used when initializing destination buffer
     enum Flags

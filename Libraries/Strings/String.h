@@ -6,12 +6,14 @@
 
 namespace SC
 {
-struct String;
+struct SC_COMPILER_EXPORT String;
 namespace Reflection
 {
 template <typename T>
 struct Reflect;
 }
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Vector<char>;
+
 } // namespace SC
 
 //! @addtogroup group_strings

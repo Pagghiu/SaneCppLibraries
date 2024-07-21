@@ -8,7 +8,7 @@
 
 namespace SC
 {
-struct Assert;
+struct SC_COMPILER_EXPORT Assert;
 }
 //! @addtogroup group_foundation_utility
 //! @{

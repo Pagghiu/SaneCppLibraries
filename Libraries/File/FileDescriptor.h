@@ -14,11 +14,11 @@ struct String;
 template <typename T>
 struct Vector;
 
-struct FileDescriptor;
-struct PipeDescriptor;
+struct SC_COMPILER_EXPORT FileDescriptor;
+struct SC_COMPILER_EXPORT PipeDescriptor;
 namespace detail
 {
-struct FileDescriptorDefinition;
+struct SC_COMPILER_EXPORT FileDescriptorDefinition;
 }
 } // namespace SC
 

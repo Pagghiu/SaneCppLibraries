@@ -7,7 +7,7 @@ namespace SC
 {
 template <typename T>
 struct Vector;
-struct StringConverter;
+struct SC_COMPILER_EXPORT StringConverter;
 struct String;
 } // namespace SC
 

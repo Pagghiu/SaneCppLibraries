@@ -63,12 +63,15 @@
 
 #if defined(SC_PLUGIN_LIBRARY)
 #define SC_COMPILER_EXPORT __declspec(dllimport) ///< Macro for importing symbols from DLL in MSVC.
+#define SC_COMPILER_EXTERN extern
 #else
 #define SC_COMPILER_EXPORT __declspec(dllexport) ///< Macro for exporting symbols from DLL in MSVC.
+#define SC_COMPILER_EXTERN
 #endif
 
 #else
 
+#define SC_COMPILER_EXTERN
 #if defined(SC_PLUGIN_LIBRARY)
 #define SC_COMPILER_EXPORT ///< Macro for handling symbol visibility for plugin library.
 #else

@@ -8,7 +8,7 @@
 
 namespace SC
 {
-struct SerializationJson;
+struct SC_COMPILER_EXPORT SerializationJson;
 } // namespace SC
 
 //! @defgroup group_serialization_text Serialization Text
@@ -44,7 +44,7 @@ struct SerializationJson;
 struct SC::SerializationJson
 {
     /// @brief Formatting options
-    struct Options
+    struct SC_COMPILER_EXPORT Options
     {
         uint8_t floatDigits; ///< How many digits should be used when printing floating points
         Options() { floatDigits = 2; }
@@ -102,7 +102,7 @@ struct SC::SerializationJson
   private:
     /// @brief Writer interface for Serializer that generates output JSON from C++ types.
     /// Its methods are meant to be called by Serializer
-    struct Writer
+    struct SC_COMPILER_EXPORT Writer
     {
         StringFormatOutput& output;
 
@@ -157,7 +157,7 @@ struct SC::SerializationJson
 
     /// @brief Writer interface for Serializer that parses JSON into C++ types.
     /// Its methods are meant to be called by Serializer
-    struct Reader
+    struct SC_COMPILER_EXPORT Reader
     {
         Reader(StringView text) : iteratorText(text), iterator(text.getIterator<StringIteratorASCII>()) {}
 

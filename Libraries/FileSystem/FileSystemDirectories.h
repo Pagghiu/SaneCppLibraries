@@ -5,7 +5,7 @@
 
 namespace SC
 {
-struct FileSystemDirectories;
+struct SC_COMPILER_EXPORT FileSystemDirectories;
 } // namespace SC
 
 //! @addtogroup group_file_system

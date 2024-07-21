@@ -9,8 +9,8 @@
 
 namespace SC
 {
-struct Process;
-struct ProcessChain;
+struct SC_COMPILER_EXPORT Process;
+struct SC_COMPILER_EXPORT ProcessChain;
 struct ProcessID;
 struct ProcessEnvironment;
 } // namespace SC

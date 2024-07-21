@@ -7,7 +7,7 @@
 
 namespace SC
 {
-struct FileSystem;
+struct SC_COMPILER_EXPORT FileSystem;
 struct StringConverter;
 } // namespace SC
 
