@@ -102,6 +102,7 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(StringView("-.0").parseFloat(value) and value == -0.0f);
             SC_TEST_EXPECT(StringView("0").parseFloat(value) and value == 0.0f);
             SC_TEST_EXPECT(StringView("-0").parseFloat(value) and value == -0.0f);
+            SC_TEST_EXPECT(StringView("0.00").parseFloat(value) and value == 0.0f);
             SC_TEST_EXPECT(not StringView("-.").parseFloat(value));
             SC_TEST_EXPECT(not StringView("-..0").parseFloat(value));
             SC_TEST_EXPECT(not StringView("").parseFloat(value));

@@ -121,7 +121,8 @@ bool SC::StringView::parseDouble(double& value) const
         {
             return false;
         }
-        if (it.advanceIfMatches('.')) // optional
+        (void)it.advanceUntilDifferentFrom('0'); // any number of 0s
+        if (it.advanceIfMatches('.'))            // optional
         {
             if (it.isAtEnd()) // but if it exists now we need at least a number
             {
