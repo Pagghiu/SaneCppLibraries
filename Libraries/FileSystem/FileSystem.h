@@ -266,6 +266,7 @@ struct SC::FileSystem
     /// Example:
     /// \snippet Libraries/FileSystem/Tests/FileSystemTest.cpp writeReadRemoveFileSnippet
     [[nodiscard]] Result write(StringView file, Span<const char> data);
+    [[nodiscard]] Result write(StringView file, Span<const uint8_t> data);
 
     /// @brief Reads contents of a file into a SC::Vector buffer
     /// @param file Path to the file to read
@@ -273,6 +274,7 @@ struct SC::FileSystem
     /// @return Valid Result if file was fully read successfully
     /// @see write (for an usage example)
     [[nodiscard]] Result read(StringView file, Vector<char>& data);
+    [[nodiscard]] Result read(StringView file, Vector<uint8_t>& data);
 
     /// @brief Replace the entire content of a file with the provided StringView
     /// @param file Path to the file that is meant to be written
