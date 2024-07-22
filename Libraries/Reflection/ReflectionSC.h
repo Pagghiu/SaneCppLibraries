@@ -25,6 +25,17 @@ template <typename T, int N>
 struct ExtendedTypeInfo<SC::Array<T, N>>
 {
     static constexpr bool IsPacked = false;
+
+    [[nodiscard]] static auto size(const SC::Array<T, N>& object) { return object.size(); }
+    [[nodiscard]] static auto data(SC::Array<T, N>& object) { return object.data(); }
+    [[nodiscard]] static bool resizeWithoutInitializing(SC::Array<T, N>& object, size_t newSize)
+    {
+        return object.resizeWithoutInitializing(min(newSize, static_cast<size_t>(N)));
+    }
+    [[nodiscard]] static bool resize(SC::Array<T, N>& object, size_t newSize)
+    {
+        return object.resize(min(newSize, static_cast<size_t>(N)));
+    }
 };
 
 template <typename T, int N>
@@ -35,21 +46,17 @@ struct Reflect<SC::Array<T, N>>
     template <typename MemberVisitor>
     [[nodiscard]] static constexpr bool build(MemberVisitor& builder)
     {
-        using Type = typename MemberVisitor::Type;
-
         // TODO: Figure out a way to get rid of calling VectorArrayVTable here
         if (not VectorArrayVTable<MemberVisitor, SC::Array<T, N>, T, N>::build(builder))
             return false;
 
         // Add Array type
-        if (not builder.addType(
-                Type::template createArray<SC::Array<T, N>>("SC::Array<T, N>", 1, TypeInfo::ArrayInfo{false, N})))
+        constexpr TypeInfo::ArrayInfo arrayInfo = {false, N}; // false == not packed
+        if (not builder.addType(MemberVisitor::Type::template createArray<SC::Array<T, N>>("SC::Array", 1, arrayInfo)))
             return false;
 
         // Add dependent item type
-        if (not builder.addType(Type::template createGeneric<T>()))
-            return false;
-        return true;
+        return builder.addType(MemberVisitor::Type::template createGeneric<T>());
     }
 };
 
@@ -61,22 +68,17 @@ struct Reflect<SC::Vector<T>>
     template <typename MemberVisitor>
     [[nodiscard]] static constexpr bool build(MemberVisitor& builder)
     {
-        using Type = typename MemberVisitor::Type;
-
         // TODO: Figure out a way to get rid of calling VectorArrayVTable here
         if (not VectorArrayVTable<MemberVisitor, SC::Vector<T>, T, -1>::build(builder))
             return false;
 
         // Add Vector type
-        if (not builder.addType(
-                Type::template createArray<SC::Vector<T>>("SC::Vector", 1, TypeInfo::ArrayInfo{false, 0})))
+        constexpr TypeInfo::ArrayInfo arrayInfo = {false, 0}; // false == not packed
+        if (not builder.addType(MemberVisitor::Type::template createArray<SC::Vector<T>>("SC::Vector", 1, arrayInfo)))
             return false;
 
         // Add dependent item type
-        if (not builder.addType(Type::template createGeneric<T>()))
-            return false;
-
-        return true;
+        return builder.addType(MemberVisitor::Type::template createGeneric<T>());
     }
 };
 
@@ -84,6 +86,14 @@ template <typename T>
 struct ExtendedTypeInfo<SC::Vector<T>>
 {
     static constexpr bool IsPacked = false;
+
+    [[nodiscard]] static auto size(const SC::Vector<T>& object) { return object.size(); }
+    [[nodiscard]] static auto data(SC::Vector<T>& object) { return object.data(); }
+    [[nodiscard]] static bool resizeWithoutInitializing(SC::Vector<T>& object, size_t newSize)
+    {
+        return object.resizeWithoutInitializing(newSize);
+    }
+    [[nodiscard]] static bool resize(SC::Vector<T>& object, size_t newSize) { return object.resize(newSize); }
 };
 
 template <typename Key, typename Value, typename Container>
