@@ -151,7 +151,7 @@ struct SC::SerializationJson
       private:
         bool eventuallyAddComma(uint32_t index);
 
-        SmallString<10> floatFormat;
+        SmallString<64> floatFormat;
         Options         options;
     };
 

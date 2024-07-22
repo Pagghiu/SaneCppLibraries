@@ -12,6 +12,7 @@ namespace Reflection
 template <typename T>
 struct Reflect;
 }
+// Allows using this type across Plugin boundaries
 SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Vector<char>;
 
 } // namespace SC

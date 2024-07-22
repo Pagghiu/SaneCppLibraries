@@ -754,3 +754,9 @@ bool SC::SegmentItems<T>::removeAll(T* items, size_t indexStart, const size_t nu
     segment.setSize(static_cast<size_t>(it - items));
     return it != end;
 }
+
+namespace SC
+{
+// Allows using this type across Plugin boundaries
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SegmentItems<char>;
+} // namespace SC

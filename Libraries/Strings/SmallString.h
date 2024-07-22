@@ -111,4 +111,11 @@ namespace SC
 {
 template <int N>
 using StringNative = SmallString<N * sizeof(native_char_t)>;
+
+// Allows using this type across Plugin boundaries
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<64>;
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<128 * sizeof(native_char_t)>;
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<255 * sizeof(native_char_t)>;
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<512 * sizeof(native_char_t)>;
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<1024 * sizeof(native_char_t)>;
 } // namespace SC

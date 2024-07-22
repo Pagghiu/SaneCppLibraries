@@ -593,3 +593,13 @@ bool SC::Array<T, N>::insertMove(size_t idx, T* src, size_t srcSize)
     T* oldItems = items;
     return Operations::template insert<false>(oldItems, idx, src, srcSize);
 }
+
+namespace SC
+{
+// Allows using this type across Plugin boundaries
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Array<char, 64>;
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Array<char, 128 * sizeof(native_char_t)>;
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Array<char, 255 * sizeof(native_char_t)>;
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Array<char, 512 * sizeof(native_char_t)>;
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Array<char, 1024 * sizeof(native_char_t)>;
+} // namespace SC
