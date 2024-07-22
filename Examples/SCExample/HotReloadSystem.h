@@ -23,7 +23,7 @@ struct HotReloadState
     char isysroot[255];
 };
 
-/// @brief Implements a simple hot reload system using the Plugin and FileSystemWatcher library
+// A simple hot reload system using the Plugin and FileSystemWatcher library
 struct HotReloadSystem
 {
     HotReloadState state;
@@ -71,18 +71,13 @@ struct HotReloadSystem
         return Result(true);
     }
 
-    void load(StringView identifier)
+    Result load(StringView identifier)
     {
-        // TODO: Implement some form of error reporting
-        (void)registry.loadPlugin(identifier, compiler, sysroot, state.executablePath.view(),
-                                  PluginRegistry::LoadMode::Reload);
+        return registry.loadPlugin(identifier, compiler, sysroot, state.executablePath.view(),
+                                   PluginRegistry::LoadMode::Reload);
     }
 
-    void unload(StringView identifier)
-    {
-        // TODO: Implement some form of error reporting
-        (void)registry.unloadPlugin(identifier);
-    }
+    void unload(StringView identifier) { (void)registry.unloadPlugin(identifier); }
 
     void setSysroot(StringView isysroot) { sysroot.isysroot = isysroot; }
 
@@ -112,7 +107,7 @@ struct HotReloadSystem
                         {
                             // Only reload if at least 500ms have passed, as sometimes FSEvents on macOS
                             // likes to send multiple events that are difficult to filter properly
-                            load(registry.getIdentifierAt(idx).view());
+                            (void)load(registry.getIdentifierAt(idx).view());
                         }
                         return;
                     }
@@ -156,7 +151,7 @@ struct HotReloadView
         const size_t numberOfEntries = system.registry.getNumberOfEntries();
         if (ImGui::BeginTable("Table", 4))
         {
-            ImGui::TableSetupColumn("Name");
+            ImGui::TableSetupColumn("Example");
             ImGui::TableSetupColumn("Reloads", ImGuiTableColumnFlags_WidthFixed);
             ImGui::TableSetupColumn("Time", ImGuiTableColumnFlags_WidthFixed);
             ImGui::TableSetupColumn("Actions");
@@ -165,12 +160,29 @@ struct HotReloadView
             for (size_t idx = 0; idx < numberOfEntries; ++idx)
             {
                 ImGui::PushID(static_cast<int>(idx));
-                const PluginIdentifier&     identifier = system.registry.getIdentifierAt(idx);
-                const PluginDynamicLibrary& library    = system.registry.getPluginDynamicLibraryAt(idx);
-                SC_ASSERT_RELEASE(identifier.view().getEncoding() != StringEncoding::Utf16);
+                const PluginDynamicLibrary& library = system.registry.getPluginDynamicLibraryAt(idx);
 
                 ImGui::TableNextColumn();
-                ImGui::Text("%s", identifier.view().bytesIncludingTerminator());
+                if (not library.lastErrorLog.isEmpty())
+                {
+                    ImGui::PushStyleColor(ImGuiCol_Text, 0xff0000ff);
+                }
+                ImGui::Text("%s", library.definition.identity.name.view().bytesIncludingTerminator());
+                if (library.lastErrorLog.isEmpty())
+                {
+                    if (ImGui::IsItemHovered())
+                    {
+                        ImGui::SetTooltip("%s", library.definition.description.view().bytesIncludingTerminator());
+                    }
+                }
+                else
+                {
+                    ImGui::PopStyleColor();
+                    if (ImGui::IsItemHovered())
+                    {
+                        ImGui::SetTooltip("%s", library.lastErrorLog.view().bytesIncludingTerminator());
+                    }
+                }
 
                 ImGui::TableNextColumn();
                 ImGui::Text("%d", library.numReloads);
@@ -186,14 +198,14 @@ struct HotReloadView
                 ImGui::TableNextColumn();
                 if (ImGui::Button("Load"))
                 {
-                    system.load(identifier.view());
+                    (void)system.load(library.definition.identity.identifier.view());
                 }
                 if (library.dynamicLibrary.isValid())
                 {
                     ImGui::SameLine();
                     if (ImGui::Button("Unload"))
                     {
-                        system.unload(identifier.view());
+                        system.unload(library.definition.identity.identifier.view());
                     }
                 }
                 ImGui::PopID();
@@ -208,17 +220,16 @@ struct HotReloadView
         bool res = false;
         for (size_t idx = 0; idx < system.registry.getNumberOfEntries(); ++idx)
         {
-            const PluginIdentifier&     identifier = system.registry.getIdentifierAt(idx);
-            const PluginDynamicLibrary& library    = system.registry.getPluginDynamicLibraryAt(idx);
+            const PluginDynamicLibrary& library = system.registry.getPluginDynamicLibraryAt(idx);
             ImGui::SameLine();
 
-            if (ImGui::Button(identifier.view().bytesIncludingTerminator()))
+            if (ImGui::Button(library.definition.identity.name.view().bytesIncludingTerminator()))
             {
                 res            = true;
                 viewState.page = idx;
                 if (not library.dynamicLibrary.isValid())
                 {
-                    system.load(identifier.view());
+                    (void)system.load(library.definition.identity.identifier.view());
                 }
             }
         }
@@ -233,6 +244,14 @@ struct HotReloadView
         if (library.queryInterface(drawingInterface))
         {
             drawingInterface->onDraw();
+        }
+        else if (not library.lastErrorLog.isEmpty())
+        {
+            ImGui::Text("Example %s failed to compile:",
+                        library.definition.identity.name.view().bytesIncludingTerminator());
+            ImGui::PushStyleColor(ImGuiCol_Text, 0xff0000ff);
+            ImGui::Text("%s", library.lastErrorLog.view().bytesIncludingTerminator());
+            ImGui::PopStyleColor();
         }
     }
 };
