@@ -6,7 +6,7 @@
 
 namespace SC
 {
-namespace detail
+namespace Serialization
 {
 /// @brief Binary serializer using Reflect
 template <typename BinaryStream, typename T, typename SFINAESelector = void>
@@ -78,12 +78,12 @@ struct SerializerBinaryReadWriteExact<BinaryStream, T,
 
 /// @brief Generic serializer for `Vector<T>`-like objects
 template <typename BinaryStream, typename Container, typename T>
-struct SerializerVector
+struct SerializerBinaryExactVector
 {
     [[nodiscard]] static constexpr bool serialize(Container& object, BinaryStream& stream)
     {
-        constexpr size_t itemSize    = sizeof(T);
-        uint64_t         sizeInBytes = static_cast<uint64_t>(object.size() * itemSize);
+        constexpr size_t itemSize = sizeof(T);
+        uint64_t sizeInBytes = static_cast<uint64_t>(Reflection::ExtendedTypeInfo<Container>::size(object)) * itemSize;
         if (not SerializerBinaryReadWriteExact<BinaryStream, uint64_t>::serialize(sizeInBytes, stream))
             return false;
 
@@ -91,19 +91,17 @@ struct SerializerVector
 
         if SC_LANGUAGE_IF_CONSTEXPR (Reflection::ExtendedTypeInfo<T>::IsPacked)
         {
+            // TODO: C++ 14 mode would need SFINAE as it lacks "if constexpr"
 #if SC_LANGUAGE_CPP_AT_LEAST_17
-            if (not object.resizeWithoutInitializing(numElements))
-                return false;
+            SC_TRY((Reflection::ExtendedTypeInfo<Container>::resizeWithoutInitializing(object, numElements)));
 #else
-            if (not object.resize(numElements)) // TODO: C++ 14 mode would need SFINAE as it lacks "if constexpr"
-                return false;
+            SC_TRY((Reflection::ExtendedTypeInfo<Container>::resize(object, numElements)));
 #endif
-            return stream.serializeBytes(object.data(), itemSize * numElements);
+            return stream.serializeBytes(Reflection::ExtendedTypeInfo<Container>::data(object), itemSize * numElements);
         }
         else
         {
-            if (not object.resize(numElements))
-                return false;
+            SC_TRY((Reflection::ExtendedTypeInfo<Container>::resize(object, numElements)));
             for (auto& item : object)
             {
                 if (not SerializerBinaryReadWriteExact<BinaryStream, T>::serialize(item, stream))
@@ -117,12 +115,12 @@ struct SerializerVector
 // clang-format off
 /// @brief Specialization for `SC::Vector<T>` types
 template <typename BinaryStream, typename T>
-struct SerializerBinaryReadWriteExact<BinaryStream, SC::Vector<T>> : public SerializerVector<BinaryStream, SC::Vector<T>, T> { };
+struct SerializerBinaryReadWriteExact<BinaryStream, SC::Vector<T>> : public SerializerBinaryExactVector<BinaryStream, SC::Vector<T>, T> { };
 
 /// @brief Specialization for `SC::Array<T, N>` types
 template <typename BinaryStream, typename T, int N>
-struct SerializerBinaryReadWriteExact<BinaryStream, SC::Array<T, N>> : public SerializerVector<BinaryStream, SC::Array<T, N>, T> { };
+struct SerializerBinaryReadWriteExact<BinaryStream, SC::Array<T, N>> : public SerializerBinaryExactVector<BinaryStream, SC::Array<T, N>, T> { };
 // clang-format on
-} // namespace detail
+} // namespace Serialization
 
 } // namespace SC

@@ -50,7 +50,7 @@ struct SerializationBinary
     [[nodiscard]] static bool write(T& value, Vector<uint8_t>& buffer, size_t* numberOfWrites = nullptr)
     {
         SerializationBinaryBufferWriter writer(buffer);
-        using Writer = detail::SerializerBinaryReadWriteExact<SerializationBinaryBufferWriter, T>;
+        using Writer = Serialization::SerializerBinaryReadWriteExact<SerializationBinaryBufferWriter, T>;
         if (not Writer::serialize(value, writer))
             return false;
         if (numberOfWrites)
@@ -96,7 +96,7 @@ struct SerializationBinary
     [[nodiscard]] static bool loadExact(T& value, Span<const uint8_t> buffer, size_t* numberOfReads = nullptr)
     {
         SerializationBinaryBufferReader bufferReader(buffer);
-        using Reader = detail::SerializerBinaryReadWriteExact<SerializationBinaryBufferReader, T>;
+        using Reader = Serialization::SerializerBinaryReadWriteExact<SerializationBinaryBufferReader, T>;
         if (not Reader::serialize(value, bufferReader))
             return false;
         if (numberOfReads)
@@ -145,7 +145,7 @@ struct SerializationBinary
                                             SerializationBinaryOptions options = {}, size_t* numberOfReads = nullptr)
     {
         SerializationBinaryBufferReader readerBuffer(buffer);
-        using Reader = detail::SerializerBinaryReadVersioned<SerializationBinaryBufferReader, T>;
+        using Reader = Serialization::SerializerBinaryReadVersioned<SerializationBinaryBufferReader, T>;
         SerializationSchema versionSchema(schema);
         versionSchema.options = options;
         if (not Reader::readVersioned(value, readerBuffer, versionSchema))

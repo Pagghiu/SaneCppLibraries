@@ -11,7 +11,7 @@
 namespace SC
 {
 
-namespace detail
+namespace Serialization
 {
 template <typename BinaryStream, typename T, typename SFINAESelector = void>
 struct SerializerBinaryReadVersioned;
@@ -80,7 +80,7 @@ template <typename BinaryStream, typename T>
 struct SerializerReadVersionedItems
 {
     [[nodiscard]] static constexpr bool readVersioned(T* object, BinaryStream& stream, SerializationSchema& schema,
-                                                      uint32_t numSourceItems, uint32_t numDestinationItems)
+                                                      size_t numSourceItems, size_t numDestinationItems)
     {
         schema.resolveLink();
         const auto commonSubsetItems  = min(numSourceItems, numDestinationItems);
@@ -140,10 +140,10 @@ struct SerializerBinaryReadVersioned<BinaryStream, T[N]>
     }
 };
 
-template <typename BinaryStream, typename T>
-struct SerializerBinaryReadVersioned<BinaryStream, SC::Vector<T>>
+template <typename BinaryStream, typename Container, typename T, size_t NumMaxItems>
+struct SerializationBinaryVersionedVector
 {
-    [[nodiscard]] static constexpr bool readVersioned(SC::Vector<T>& object, BinaryStream& stream,
+    [[nodiscard]] static constexpr bool readVersioned(Container& object, BinaryStream& stream,
                                                       SerializationSchema& schema)
     {
         uint64_t sizeInBytes = 0;
@@ -151,50 +151,32 @@ struct SerializerBinaryReadVersioned<BinaryStream, SC::Vector<T>>
         schema.advance();
         const bool isPacked =
             Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::Reflect<T>::getCategory();
-        const size_t   sourceItemSize = schema.current().sizeInBytes;
-        const uint32_t numSourceItems = static_cast<uint32_t>(sizeInBytes / sourceItemSize);
+        const size_t sourceItemSize = schema.current().sizeInBytes;
+        const size_t numSourceItems = static_cast<size_t>(sizeInBytes / sourceItemSize);
+        const size_t numValidItems  = min(numSourceItems, NumMaxItems);
         if (isPacked)
         {
-            SC_TRY(object.resizeWithoutInitializing(numSourceItems));
+            SC_TRY((Reflection::ExtendedTypeInfo<Container>::resizeWithoutInitializing(object, numValidItems)));
         }
         else
         {
-            SC_TRY(object.resize(numSourceItems));
+            SC_TRY((Reflection::ExtendedTypeInfo<Container>::resize(object, numValidItems)));
         }
-        return SerializerReadVersionedItems<BinaryStream, T>::readVersioned(object.data(), stream, schema,
-                                                                            numSourceItems, numSourceItems);
+        return SerializerReadVersionedItems<BinaryStream, T>::readVersioned(
+            Reflection::ExtendedTypeInfo<Container>::data(object), stream, schema, numSourceItems, NumMaxItems);
     }
+};
+
+template <typename BinaryStream, typename T>
+struct SerializerBinaryReadVersioned<BinaryStream, SC::Vector<T>>
+    : public SerializationBinaryVersionedVector<BinaryStream, SC::Vector<T>, T, 0xffffffff>
+{
 };
 
 template <typename BinaryStream, typename T, int N>
 struct SerializerBinaryReadVersioned<BinaryStream, SC::Array<T, N>>
+    : public SerializationBinaryVersionedVector<BinaryStream, SC::Array<T, N>, T, N>
 {
-    [[nodiscard]] static constexpr bool readVersioned(SC::Array<T, N>& object, BinaryStream& stream,
-                                                      SerializationSchema& schema)
-    {
-        uint64_t sizeInBytes = 0;
-        if (not stream.serializeBytes(&sizeInBytes, sizeof(sizeInBytes)))
-            return false;
-        schema.advance();
-        const bool isPacked =
-            Reflection::IsPrimitive<T>::value && schema.current().type == Reflection::Reflect<T>::getCategory();
-
-        const size_t   sourceItemSize      = schema.current().sizeInBytes;
-        const uint32_t numSourceItems      = static_cast<uint32_t>(sizeInBytes / sourceItemSize);
-        const uint32_t numDestinationItems = static_cast<uint32_t>(N);
-        if (isPacked)
-        {
-            if (not object.resizeWithoutInitializing(min(numSourceItems, numDestinationItems)))
-                return false;
-        }
-        else
-        {
-            if (not object.resize(min(numSourceItems, numDestinationItems)))
-                return false;
-        }
-        return SerializerReadVersionedItems<BinaryStream, T>::readVersioned(object.data(), stream, schema,
-                                                                            numSourceItems, numDestinationItems);
-    }
 };
 
 template <typename BinaryStream, typename T>
@@ -259,6 +241,6 @@ struct SerializerBinaryReadVersioned<BinaryStream, T,
         return false;
     }
 };
-} // namespace detail
+} // namespace Serialization
 
 } // namespace SC
