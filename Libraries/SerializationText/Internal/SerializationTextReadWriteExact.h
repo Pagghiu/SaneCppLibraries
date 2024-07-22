@@ -6,15 +6,15 @@
 namespace SC
 {
 /// @brief Serializes structured formats mostly text based, like JSON (see @ref library_serialization_text).
-namespace detail
+namespace Serialization
 {
-template <typename SerializerStream, typename T, typename SFINAESelector = void>
+template <typename TextStream, typename T, typename SFINAESelector = void>
 struct SerializationTextReadWriteExact;
 
-template <typename SerializerStream, typename T, typename SFINAESelector>
+template <typename TextStream, typename T, typename SFINAESelector>
 struct SerializationTextReadWriteExact
 {
-    [[nodiscard]] static constexpr bool serialize(uint32_t index, T& object, SerializerStream& stream)
+    [[nodiscard]] static constexpr bool serialize(uint32_t index, T& object, TextStream& stream)
     {
         if (not stream.startObject(index))
             return false;
@@ -26,8 +26,8 @@ struct SerializationTextReadWriteExact
   private:
     struct MemberIterator
     {
-        SerializerStream& stream;
-        T&                object;
+        TextStream& stream;
+        T&          object;
 
         uint32_t index = 0;
 
@@ -37,49 +37,51 @@ struct SerializationTextReadWriteExact
             const StringView fieldName = StringView({name, N - 1}, true, StringEncoding::Ascii);
             if (not stream.startObjectField(index++, fieldName))
                 return false;
-            return SerializationTextReadWriteExact<SerializerStream, R>::serialize(0, object.*field, stream);
+            return SerializationTextReadWriteExact<TextStream, R>::serialize(0, object.*field, stream);
         }
     };
 };
 
-template <typename SerializerStream, typename T, int N>
-struct SerializationTextReadWriteExact<SerializerStream, T[N]>
+template <typename TextStream, typename T, int N>
+struct SerializationTextReadWriteExact<TextStream, T[N]>
 {
-    [[nodiscard]] static constexpr bool serialize(uint32_t index, T (&object)[N], SerializerStream& stream)
+    [[nodiscard]] static constexpr bool serialize(uint32_t index, T (&object)[N], TextStream& stream)
     {
         if (not stream.startArray(index))
             return false;
         uint32_t arrayIndex = 0;
         for (auto& item : object)
         {
-            if (not SerializationTextReadWriteExact<SerializerStream, T>::serialize(arrayIndex++, item, stream))
+            if (not SerializationTextReadWriteExact<TextStream, T>::serialize(arrayIndex++, item, stream))
                 return false;
         }
         return stream.endArray();
     }
 };
 
-template <typename SerializerStream, typename T>
-struct SerializationTextReadWriteExact<SerializerStream, T,
+template <typename TextStream, typename T>
+struct SerializationTextReadWriteExact<TextStream, T,
                                        typename SC::TypeTraits::EnableIf<Reflection::IsPrimitive<T>::value>::type>
 {
-    [[nodiscard]] static constexpr bool serialize(uint32_t index, T& object, SerializerStream& stream)
+    [[nodiscard]] static constexpr bool serialize(uint32_t index, T& object, TextStream& stream)
     {
         return stream.serialize(index, object);
     }
 };
 
-template <typename SerializerStream, typename Container, typename T>
-struct SerializationTextReaderVector
+template <typename TextStream, typename Container, typename T>
+struct SerializationTextExactVector
 {
-    [[nodiscard]] static constexpr bool serialize(uint32_t index, Container& object, SerializerStream& stream)
+    [[nodiscard]] static constexpr bool serialize(uint32_t index, Container& object, TextStream& stream)
     {
         uint32_t arraySize = 0;
         if (not stream.startArray(index, object, arraySize))
             return false;
-        for (uint32_t idx = 0; idx < arraySize; ++idx)
+        for (decltype(object.size()) idx = 0; idx < static_cast<decltype(idx)>(arraySize); ++idx)
         {
-            if (not SerializationTextReadWriteExact<SerializerStream, T>::serialize(idx, object[idx], stream))
+            auto data            = Reflection::ExtendedTypeInfo<Container>::data(object);
+            using SerializerForT = SerializationTextReadWriteExact<TextStream, T>;
+            if (not SerializerForT::serialize(static_cast<uint32_t>(idx), data[idx], stream))
                 return false;
             if (not stream.endArrayItem(object, arraySize))
                 return false;
@@ -88,26 +90,26 @@ struct SerializationTextReaderVector
     }
 };
 
-template <typename SerializerStream>
-struct SerializationTextReadWriteExact<SerializerStream, String>
+template <typename TextStream>
+struct SerializationTextReadWriteExact<TextStream, String>
 {
-    [[nodiscard]] static constexpr bool serialize(uint32_t index, String& object, SerializerStream& stream)
+    [[nodiscard]] static constexpr bool serialize(uint32_t index, String& object, TextStream& stream)
     {
         return stream.serialize(index, object);
     }
 };
 
-template <typename SerializerStream, typename T>
-struct SerializationTextReadWriteExact<SerializerStream, SC::Vector<T>>
-    : public SerializationTextReaderVector<SerializerStream, SC::Vector<T>, T>
+template <typename TextStream, typename T>
+struct SerializationTextReadWriteExact<TextStream, SC::Vector<T>>
+    : public SerializationTextExactVector<TextStream, SC::Vector<T>, T>
 {
 };
 
-template <typename SerializerStream, typename T, int N>
-struct SerializationTextReadWriteExact<SerializerStream, SC::Array<T, N>>
-    : public SerializationTextReaderVector<SerializerStream, SC::Array<T, N>, T>
+template <typename TextStream, typename T, int N>
+struct SerializationTextReadWriteExact<TextStream, SC::Array<T, N>>
+    : public SerializationTextExactVector<TextStream, SC::Array<T, N>, T>
 {
 };
-} // namespace detail
+} // namespace Serialization
 
 } // namespace SC

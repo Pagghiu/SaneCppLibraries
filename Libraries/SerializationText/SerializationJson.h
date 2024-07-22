@@ -65,7 +65,7 @@ struct SC::SerializationJson
         Writer stream(output, options);
         if (not stream.onSerializationStart())
             return false;
-        if (not detail::SerializationTextReadWriteExact<Writer, T>::serialize(0, object, stream))
+        if (not Serialization::SerializationTextReadWriteExact<Writer, T>::serialize(0, object, stream))
             return false;
         return stream.onSerializationEnd();
     }
@@ -83,7 +83,7 @@ struct SC::SerializationJson
     [[nodiscard]] static bool loadExact(T& object, StringView text)
     {
         Reader stream(text);
-        return detail::SerializationTextReadWriteExact<Reader, T>::serialize(0, object, stream);
+        return Serialization::SerializationTextReadWriteExact<Reader, T>::serialize(0, object, stream);
     }
 
     /// @brief Parses a JSON buffer and writes C++ objects supporting reordered or missing fields.
@@ -96,7 +96,7 @@ struct SC::SerializationJson
     [[nodiscard]] static bool loadVersioned(T& object, StringView text)
     {
         Reader stream(text);
-        return detail::SerializationTextReadVersioned<Reader, T>::loadVersioned(0, object, stream);
+        return Serialization::SerializationTextReadVersioned<Reader, T>::loadVersioned(0, object, stream);
     }
 
   private:
@@ -185,7 +185,7 @@ struct SC::SerializationJson
             if (not tokenizeArrayEnd(size))
                 return false;
             if (oldSize != size)
-                return container.resize(size);
+                return Reflection::ExtendedTypeInfo<Container>::resize(container, size);
             return true;
         }
 

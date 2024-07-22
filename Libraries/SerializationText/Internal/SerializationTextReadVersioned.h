@@ -6,7 +6,7 @@
 namespace SC
 {
 /// @brief Serializes structured formats mostly text based, like JSON (see @ref library_serialization_text).
-namespace detail
+namespace Serialization
 {
 template <typename SerializerStream, typename T, typename SFINAESelector = void>
 struct SerializationTextReadVersioned;
@@ -83,12 +83,12 @@ struct SerializationTextReadVersioned<SerializerStream, T,
 };
 
 template <typename SerializerStream, typename Container, typename T>
-struct SerializationTextReaderVersionedVector
+struct SerializationTextVersionedVector
 {
     [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, Container& object, SerializerStream& stream)
     {
         // TODO: Allow customizing allowed conversions
-        return SerializationTextReaderVector<SerializerStream, Container, T>::serialize(index, object, stream);
+        return SerializationTextExactVector<SerializerStream, Container, T>::serialize(index, object, stream);
     }
 };
 
@@ -103,16 +103,16 @@ struct SerializationTextReadVersioned<SerializerStream, String>
 
 template <typename SerializerStream, typename T>
 struct SerializationTextReadVersioned<SerializerStream, SC::Vector<T>>
-    : public SerializationTextReaderVersionedVector<SerializerStream, SC::Vector<T>, T>
+    : public SerializationTextVersionedVector<SerializerStream, SC::Vector<T>, T>
 {
 };
 
 template <typename SerializerStream, typename T, int N>
 struct SerializationTextReadVersioned<SerializerStream, SC::Array<T, N>>
-    : public SerializationTextReaderVersionedVector<SerializerStream, SC::Array<T, N>, T>
+    : public SerializationTextVersionedVector<SerializerStream, SC::Array<T, N>, T>
 {
 };
 
-} // namespace detail
+} // namespace Serialization
 
 } // namespace SC
