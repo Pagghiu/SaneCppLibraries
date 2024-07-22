@@ -124,7 +124,7 @@ struct SC::Array
     /// @brief Moves an element in front of the Array, at position 0
     /// @param element The element to be moved in front of the Array
     /// @return `true` if operation succeeded
-    [[nodiscard]] bool push_front(T&& element) { return insertMove(0, {&element, 1}); }
+    [[nodiscard]] bool push_front(T&& element) { return insertMove(0, &element, 1); }
 
     /// @brief Appends an element copying it at the end of the Array
     /// @param element The element to be copied at the end of the Array
@@ -370,7 +370,7 @@ SC::Array<T, N>::Array(const Array& other)
 {
     segmentHeader.sizeBytes     = 0;
     segmentHeader.capacityBytes = sizeof(T) * N;
-    (void)append(other.items, other.size());
+    (void)append({other.items, other.size()});
 }
 
 template <typename T, int N>
@@ -563,7 +563,7 @@ bool SC::Array<T, N>::find(Lambda&& lambda, size_t* foundIndex) const
 template <typename T, int N>
 bool SC::Array<T, N>::removeAt(size_t index)
 {
-    return SegmentItems<T>::removeAt(items, index);
+    return Operations::removeAt(items, index);
 }
 
 template <typename T, int N>
