@@ -1,23 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
-  <Type Name="SC::Vector&lt;*&gt;">
-    <DisplayString>{{ size={reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->sizeBytes / sizeof(*items)}, capacity={reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->capacityBytes / sizeof(*items)} }}</DisplayString>
+  <Type Name="SC::SegmentItems&lt;*&gt;">
+    <Intrinsic Name="size" Expression="sizeBytes / sizeof($T1)" />
+    <Intrinsic Name="capacity" Expression="capacityBytes / sizeof($T1)" />
+    <DisplayString>{{ size={sizeBytes / sizeof($T1)}, capacity={capacityBytes / sizeof($T1)} }}</DisplayString>
     <Expand>
-      <Item Name="[size]">reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->sizeBytes / sizeof(*items)</Item>
-      <Item Name="[capacity]">reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->capacityBytes / sizeof(*items)</Item>
+      <Item Name="[size]">size()</Item>
+      <Item Name="[capacity]">capacity()</Item>
+    </Expand>
+  </Type>
+  <Type Name="SC::Vector&lt;*&gt;">
+    <Intrinsic Name="getSegmentItems" Expression="(SegmentItems&lt;$T1&gt;*)((uint8_t*)items - sizeof(SegmentHeader))" />
+    <DisplayString>{ getSegmentItems() }</DisplayString>
+    <Expand>
+      <ExpandedItem>*getSegmentItems()</ExpandedItem>
       <ArrayItems>
-        <Size>reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->sizeBytes / sizeof(*items)</Size>
+        <Size>getSegmentItems()->size()</Size>
         <ValuePointer>items</ValuePointer>
       </ArrayItems>
     </Expand>
   </Type>
   <Type Name="SC::SmallVector&lt;*&gt;">
-    <DisplayString>{{ size={reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->sizeBytes / sizeof(*items)}, capacity={reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->capacityBytes / sizeof(*items)} }}</DisplayString>
+    <DisplayString>{*(SC::Vector&lt;$T1&gt;*)this}</DisplayString>
     <Expand>
-      <Item Name="[size]">reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->sizeBytes / sizeof(*items)</Item>
-      <Item Name="[capacity]">reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->capacityBytes / sizeof(*items)</Item>
+      <ExpandedItem>*(SC::Vector&lt;$T1&gt;*)this</ExpandedItem>
+    </Expand>
+  </Type>
+  <Type Name="SC::Array&lt;*&gt;">
+    <DisplayString>{segmentHeader}</DisplayString>
+    <Expand>
+      <ExpandedItem>segmentHeader</ExpandedItem>
       <ArrayItems>
-        <Size>reinterpret_cast&lt;const SegmentHeader*&gt;(reinterpret_cast&lt;const uint8_t*&gt;(items) - sizeof(SegmentHeader))->sizeBytes / sizeof(*items)</Size>
+        <Size>segmentHeader.size()</Size>
         <ValuePointer>items</ValuePointer>
       </ArrayItems>
     </Expand>
