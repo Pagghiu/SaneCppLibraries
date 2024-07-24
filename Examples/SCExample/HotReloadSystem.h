@@ -73,8 +73,31 @@ struct HotReloadSystem
 
     Result load(StringView identifier)
     {
-        return registry.loadPlugin(identifier, compiler, sysroot, state.executablePath.view(),
-                                   PluginRegistry::LoadMode::Reload);
+        const PluginDynamicLibrary* existingLibrary = registry.findPlugin(identifier);
+
+        Vector<uint8_t> serializedModelState, serializedViewState;
+        if (existingLibrary)
+        {
+            ISCExample* drawingInterface = nullptr;
+            if (existingLibrary->queryInterface(drawingInterface) and drawingInterface->serialize.isValid())
+            {
+                SC_TRY(drawingInterface->serialize(serializedModelState, serializedViewState));
+            }
+        }
+
+        SC_TRY(registry.loadPlugin(identifier, compiler, sysroot, state.executablePath.view(),
+                                   PluginRegistry::LoadMode::Reload));
+
+        if (not serializedModelState.isEmpty())
+        {
+            ISCExample* drawingInterface = nullptr;
+            if (existingLibrary->queryInterface(drawingInterface) and drawingInterface->deserialize.isValid())
+            {
+                SC_TRY(drawingInterface->deserialize(serializedModelState.toSpanConst(),
+                                                     serializedViewState.toSpanConst()));
+            }
+        }
+        return Result(true);
     }
 
     void unload(StringView identifier) { (void)registry.unloadPlugin(identifier); }
