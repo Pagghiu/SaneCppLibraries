@@ -88,10 +88,10 @@ Shortly:
 
 # Examples
 
-Check the [Examples](https://pagghiu.github.io/SaneCppLibraries/page_examples.html) page.
+SCExample showcases integration of Sane C++ Libraries together with [Dear ImGui](https://github.com/ocornut/imgui) and [sokol](https://github.com/floooh/sokol) libraries (see [Examples](https://pagghiu.github.io/SaneCppLibraries/page_examples.html) page).
 
 ## macOS
-https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/4ad12058-6bc2-4316-90f8-4ba4c05e28de
+https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d
 
 ## iOS
 https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717
@@ -151,6 +151,7 @@ You can find some [YouTube Videos](https://www.youtube.com/@Pagghiu) and [Blog p
 - [June 2024 Update](https://pagghiu.github.io/site/blog/2024-06-30-SaneCppLibrariesUpdate.html)
 
 - [Ep.24 - Hot-Reload C++ on iOS](https://www.youtube.com/watch?v=6DfykfYCQdY)
+- [Ep.25 - C++ Serialization and Reflection (with Hot-Reload)](https://www.youtube.com/watch?v=d7DXxC6xG_A)
 
 
 # Contributing
