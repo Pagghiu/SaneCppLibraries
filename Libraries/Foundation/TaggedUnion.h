@@ -32,47 +32,7 @@ struct SC::TaggedType
 /// @tparam Union with `FieldTypes` = `TypeList<TaggedType<EnumType, EnumValue, Type>, ...>`
 ///
 /// Example:
-/**
- * @code{.cpp}
-    // ... Declaration
-    enum TestType
-    {
-        TypeString = 10,
-        TypeInt    = 110,
-    };
-
-    // Associate each enumeration value with some Type
-    struct TestUnion
-    {
-        template <TestType E, typename T>
-        using Tag = TaggedType<TestType, E, T>; // Helper to save some typing
-
-        using FieldsTypes = TypeTraits::TypeList
- *          <
-                Tag<TypeString, String>,    // Associate String to TypeString
-                Tag<TypeInt, int>           // Associate int to TypeInt
- *          >;
-    };
-
-    // ... Usage
-    TaggedUnion<TestUnion> test; // default initialized to first type (String)
-
-    // Access / Change type
-    String* ptr = test.field<TypeString>();
-    if(ptr) // If TypeString is not active type, ptr will be == nullptr
-    {
-        *ptr = "SomeValue";
-    }
-    test.changeTo<TypeInt>() = 2; // Change active type to TypeInt
-
-    // Switch on currently active type
-    switch(test.getType())
-    {
-        case TestString: console.print("String = {}", *test.field<TestString>()); break;
-        case TestInt:    console.print("Int = {}",    *test.field<TestInt>());    break;
-    }
- * @endcode
-*/
+/// \snippet Libraries/Foundation/Tests/TaggedUnionTest.cpp TaggedUnionTestSnippet
 template <typename Union>
 struct SC::TaggedUnion
 {
@@ -90,14 +50,14 @@ struct SC::TaggedUnion
     }
 
     /// @brief Destroys the TaggedUnion object
-    ~TaggedUnion() { destruct(); }
+    ~TaggedUnion() { visit(Destruct()); }
 
     /// @brief Copy constructor
     /// @param other Another tagged union
     TaggedUnion(const TaggedUnion& other)
     {
         type = other.type;
-        RuntimeEnumVisit<CopyConstruct, TaggedUnion, const TaggedUnion>::visit(this, &other, type);
+        visit(CopyConstruct(), other);
     }
 
     /// @brief Move constructor
@@ -105,7 +65,7 @@ struct SC::TaggedUnion
     TaggedUnion(TaggedUnion&& other)
     {
         type = other.type;
-        RuntimeEnumVisit<MoveConstruct, TaggedUnion, TaggedUnion>::visit(this, &other, type);
+        visit(MoveConstruct(), other);
     }
 
     /// @brief Copy assignment operator
@@ -114,13 +74,13 @@ struct SC::TaggedUnion
     {
         if (type == other.type)
         {
-            RuntimeEnumVisit<CopyAssign, TaggedUnion, const TaggedUnion>::visit(this, &other, type);
+            visit<CopyAssign>(other);
         }
         else
         {
-            destruct();
+            visit(Destruct());
             type = other.type;
-            RuntimeEnumVisit<CopyConstruct, TaggedUnion, const TaggedUnion>::visit(this, &other, type);
+            visit(CopyConstruct(), other);
         }
         return *this;
     }
@@ -131,13 +91,13 @@ struct SC::TaggedUnion
     {
         if (type == other.type)
         {
-            RuntimeEnumVisit<MoveAssign, TaggedUnion, TaggedUnion>::visit(this, &other, type);
+            visit(MoveAssign(), other);
         }
         else
         {
-            destruct();
+            visit(Destruct());
             type = other.type;
-            RuntimeEnumVisit<MoveConstruct, TaggedUnion, TaggedUnion>::visit(this, &other, type);
+            visit(MoveConstruct(), other);
         }
         return *this;
     }
@@ -167,10 +127,18 @@ struct SC::TaggedUnion
     /// @brief Returns enumeration value of currently active union type
     EnumType getType() const { return type; }
 
-    bool operator==(const TaggedUnion& other) const
+    /// @brief Sets the currently active type at runtime, destructing and (default) constructing the new type
+    void setType(EnumType newType)
     {
-        return type == other.type and RuntimeEnumVisit<Equals, TaggedUnion, TaggedUnion>::visit(this, &other, type);
+        if (newType != type)
+        {
+            visit(Destruct());
+            type = newType;
+            visit(Construct());
+        }
     }
+
+    bool operator==(const TaggedUnion& other) const { return type == other.type and visit<Equals>(other); }
 
     /// @brief Assigns a compile time known enum type with an object U
     /// @tparam U Type of object to be assigned.
@@ -187,7 +155,7 @@ struct SC::TaggedUnion
         else
         {
             using T = typename EnumToType<wantedType>::type;
-            destruct();
+            visit(Destruct());
             type = wantedType;
             new (&field, PlacementNew()) T(forward<U>(other));
         }
@@ -205,7 +173,7 @@ struct SC::TaggedUnion
         auto& field = fieldAt<EnumToType<wantedType>::index>();
         if (type != wantedType)
         {
-            destruct();
+            visit(Destruct());
             type = wantedType;
             new (&field, PlacementNew()) T();
         }
@@ -244,84 +212,104 @@ struct SC::TaggedUnion
     struct Destruct
     {
         template <int Index>
-        static void visit(TaggedUnion* t1, TaggedUnion* t2)
+        void operator()(TaggedUnion& t1)
         {
-            SC_COMPILER_UNUSED(t2);
             using T = typename TypeAt<Index>::type;
-            t1->fieldAt<Index>().~T();
+            t1.fieldAt<Index>().~T();
+        }
+    };
+
+    struct Construct
+    {
+        template <int Index>
+        void operator()(TaggedUnion& t1)
+        {
+            using T = typename TypeAt<Index>::type;
+            new (&t1.fieldAt<Index>(), PlacementNew()) T();
         }
     };
 
     struct CopyConstruct
     {
         template <int Index>
-        static void visit(TaggedUnion* t1, const TaggedUnion* t2)
+        void operator()(TaggedUnion& t1, const TaggedUnion& t2)
         {
             using T = typename TypeAt<Index>::type;
-            new (&t1->fieldAt<Index>(), PlacementNew()) T(t2->fieldAt<Index>());
+            new (&t1.fieldAt<Index>(), PlacementNew()) T(t2.fieldAt<Index>());
         }
     };
 
     struct MoveConstruct
     {
         template <int Index>
-        static void visit(TaggedUnion* t1, TaggedUnion* t2)
+        void operator()(TaggedUnion& t1, TaggedUnion& t2)
         {
             using T = typename TypeAt<Index>::type;
-            new (&t1->fieldAt<Index>(), PlacementNew()) T(move(t2->fieldAt<Index>()));
+            new (&t1.fieldAt<Index>(), PlacementNew()) T(move(t2.fieldAt<Index>()));
         }
     };
+
     struct CopyAssign
     {
-        template <int Index, typename T>
-        static void visit(TaggedUnion* t1, const TaggedUnion* t2)
+        template <int Index>
+        void operator()(TaggedUnion& t1, const TaggedUnion& t2)
         {
-            t1->fieldAt<Index>() = t2->fieldAt<Index>();
+            t1.fieldAt<Index>() = t2.fieldAt<Index>();
         }
     };
+
     struct MoveAssign
     {
         template <int Index>
-        static void visit(TaggedUnion* t1, TaggedUnion* t2)
+        void operator()(TaggedUnion& t1, TaggedUnion& t2)
         {
-            t1->fieldAt<Index>() = move(t2->fieldAt<Index>());
+            t1.fieldAt<Index>() = move(t2.fieldAt<Index>());
         }
     };
 
     struct Equals
     {
         template <int Index>
-        static auto visit(TaggedUnion* t1, TaggedUnion* t2)
+        static auto visit(TaggedUnion& t1, TaggedUnion& t2)
         {
-            return t1->fieldAt<Index>() == move(t2->fieldAt<Index>());
+            return t1.fieldAt<Index>() == move(t2.fieldAt<Index>());
         }
     };
 
-    template <typename Visitor, typename T1, typename T2, size_t StartIndex = NumTypes>
+    template <typename Visitor, typename... Arguments>
+    auto visit(Visitor&& visitor, Arguments&&... args)
+    {
+        return RuntimeEnumVisit<Visitor>::visit(forward<Visitor>(visitor), type, *this, forward<Arguments>(args)...);
+    }
+
+    template <typename Visitor, size_t StartIndex = NumTypes>
     struct RuntimeEnumVisit
     {
         static constexpr auto Index = StartIndex - 1;
 
-        static auto visit(T1* t1, T2* t2, EnumType enumType)
+        template <typename... Args>
+        static auto visit(Visitor&& visitor, EnumType enumType, Args&... args)
         {
             if (enumType == TypeAt<Index>::value)
             {
-                return Visitor::template visit<Index>(t1, t2);
+                return visitor.template operator()<Index>(args...);
             }
             else
             {
-                return RuntimeEnumVisit<Visitor, T1, T2, StartIndex - 1>::visit(t1, t2, enumType);
+                return RuntimeEnumVisit<Visitor, Index>::visit(forward<Visitor>(visitor), enumType, args...);
             }
         }
     };
 
-    template <typename Visitor, typename T1, typename T2>
-    struct RuntimeEnumVisit<Visitor, T1, T2, 0>
+    template <typename Visitor>
+    struct RuntimeEnumVisit<Visitor, 0>
     {
-        static auto visit(T1* t1, T2* t2, EnumType) { return Visitor::template visit<0>(t1, t2); }
+        template <typename... Args>
+        static auto visit(Visitor&& visitor, EnumType, Args&... args)
+        {
+            return visitor.template operator()<0>(args...);
+        }
     };
-
-    void destruct() { RuntimeEnumVisit<Destruct, TaggedUnion, TaggedUnion>::visit(this, this, type); }
 
     template <int index>
     [[nodiscard]] auto& fieldAt()
@@ -351,6 +339,7 @@ struct SC::TaggedUnion
 
         return largest;
     }
+
     template <class T>
     static constexpr T MaxElement(std::initializer_list<T> list)
     {

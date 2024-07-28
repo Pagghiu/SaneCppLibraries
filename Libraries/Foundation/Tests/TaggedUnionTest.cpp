@@ -4,25 +4,57 @@
 #include "../../Strings/String.h"
 #include "../../Testing/Testing.h"
 
+//! [TaggedUnionTestSnippet]
 namespace SC
 {
 struct TaggedUnionTest;
 
+// Create an arbitrary enumeration with some values
 enum TestType
 {
     TypeString = 10,
     TypeInt    = 110,
 };
 
+// Create the union definition containing a FieldTypes nested type
 struct TestUnion
 {
+    // Helper to save some typing
     template <TestType E, typename T>
-    using AssociateTag = TaggedType<TestType, E, T>; // Helper to save some typing
-    using FieldsTypes  = TypeTraits::TypeList<       // List of types for the union
-        AssociateTag<TypeString, String>,           // Associate String to TypeString
-        AssociateTag<TypeInt, int>>;                // Associate int to TypeInt
+    using Tag = TaggedType<TestType, E, T>;
+
+    // FieldsTypes MUST be defined to be a TypeList of TaggedType(s)
+    using FieldsTypes = TypeTraits::TypeList< // List all TargetType associations
+        Tag<TypeString, String>,              // Associate TypeString with String
+        Tag<TypeInt, int>>;                   // Associate TypeInt with init
 };
+
+void taggedUnionUsageSnippet(Console& console)
+{
+    // Create the tagged union on the TestUnion definition
+    TaggedUnion<TestUnion> test; // default initialized to first type (String)
+
+    // Access / Change type
+    String* ptr = test.field<TypeString>();
+    if (ptr) // If TypeString is not active type, ptr will be == nullptr
+    {
+        *ptr = "SomeValue";
+    }
+    test.changeTo<TypeInt>() = 2; // Change active type to TypeInt (compile time known)
+
+    // Switch on currently active type (TypeInt)
+    switch (test.getType())
+    {
+    case TypeString: console.print("String = {}", *test.field<TypeString>()); break;
+    case TypeInt: console.print("Int = {}", *test.field<TypeInt>()); break;
+    }
+
+    // Set current active type at runtime back to TypeString
+    test.setType(TypeString);
+    *test.field<TypeString>() = "Some new string";
+}
 } // namespace SC
+//! [TaggedUnionTestSnippet]
 
 struct SC::TaggedUnionTest : public SC::TestCase
 {
@@ -93,6 +125,10 @@ struct SC::TaggedUnionTest : public SC::TestCase
             const TaggedUnion<TestUnion> constAssigned = moveAssigned;
 
             SC_TEST_EXPECT(constAssigned.field<TypeString>()->view() == "yo");
+
+            // Change type at runtime
+            moveAssigned.setType(TypeInt);
+            SC_TEST_EXPECT(*moveAssigned.field<TypeInt>() == 0);
         }
     }
 };
