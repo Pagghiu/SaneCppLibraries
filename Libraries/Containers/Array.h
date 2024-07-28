@@ -100,11 +100,11 @@ struct SC::Array
 
     /// @brief Returns a Span wrapping the entire of current array
     /// @return a Span wrapping the entire of current array
-    [[nodiscard]] Span<const T> toSpanConst() const { return {items, size()}; }
+    [[nodiscard]] Span<const T> toSpanConst() const SC_LANGUAGE_LIFETIME_BOUND { return {items, size()}; }
 
     /// @brief Returns a Span wrapping the entire of current array
     /// @return a Span wrapping the entire of current array
-    [[nodiscard]] Span<T> toSpan() { return {items, size()}; }
+    [[nodiscard]] Span<T> toSpan() SC_LANGUAGE_LIFETIME_BOUND { return {items, size()}; }
 
     /// @brief Access item at index. Bounds checked in debug.
     /// @param index index of the item to be accessed
@@ -203,22 +203,22 @@ struct SC::Array
 
     /// @brief Gets pointer to first element of the array
     /// @return pointer to first element of the array
-    [[nodiscard]] T* begin() { return items; }
+    [[nodiscard]] T* begin() SC_LANGUAGE_LIFETIME_BOUND { return items; }
     /// @brief Gets pointer to first element of the array
     /// @return pointer to first element of the array
-    [[nodiscard]] const T* begin() const { return items; }
+    [[nodiscard]] const T* begin() const SC_LANGUAGE_LIFETIME_BOUND { return items; }
     /// @brief Gets pointer to one after last element of the array
     /// @return pointer to one after last element of the array
-    [[nodiscard]] T* end() { return items + size(); }
+    [[nodiscard]] T* end() SC_LANGUAGE_LIFETIME_BOUND { return items + size(); }
     /// @brief Gets pointer to one after last element of the array
     /// @return pointer to one after last element of the array
-    [[nodiscard]] const T* end() const { return items + size(); }
+    [[nodiscard]] const T* end() const SC_LANGUAGE_LIFETIME_BOUND { return items + size(); }
     /// @brief Gets pointer to first element of the array
     /// @return pointer to first element of the array
-    [[nodiscard]] T* data() { return items; }
+    [[nodiscard]] T* data() SC_LANGUAGE_LIFETIME_BOUND { return items; }
     /// @brief Gets pointer to first element of the array
     /// @return pointer to first element of the array
-    [[nodiscard]] const T* data() const { return items; }
+    [[nodiscard]] const T* data() const SC_LANGUAGE_LIFETIME_BOUND { return items; }
 
     /// @brief Inserts a range of items copying them at given index
     /// @param idx Index where to start inserting the range of items

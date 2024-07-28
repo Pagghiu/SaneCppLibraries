@@ -91,21 +91,21 @@ struct SC::Vector
 
     /// @brief Returns a Span wrapping the entire of current vector
     /// @return a Span wrapping the entire of current vector
-    [[nodiscard]] Span<const T> toSpanConst() const { return {items, size()}; }
+    [[nodiscard]] Span<const T> toSpanConst() const SC_LANGUAGE_LIFETIME_BOUND { return {items, size()}; }
 
     /// @brief Returns a Span wrapping the entire of current vector
     /// @return a Span wrapping the entire of current vector
-    [[nodiscard]] Span<T> toSpan() { return {items, size()}; }
+    [[nodiscard]] Span<T> toSpan() SC_LANGUAGE_LIFETIME_BOUND { return {items, size()}; }
 
     /// @brief Access item at index. Bounds checked in debug.
     /// @param index index of the item to be accessed
     /// @return Value at index in the vector
-    [[nodiscard]] T& operator[](size_t index);
+    [[nodiscard]] T& operator[](size_t index) SC_LANGUAGE_LIFETIME_BOUND;
 
     /// @brief Access item at index. Bounds checked in debug.
     /// @param index index of the item to be accessed
     /// @return Value at index in the vector
-    [[nodiscard]] const T& operator[](size_t index) const;
+    [[nodiscard]] const T& operator[](size_t index) const SC_LANGUAGE_LIFETIME_BOUND;
 
     /// @brief Copies an element in front of the Vector, at position 0
     /// @param element The element to be copied in front of the Vector
@@ -137,19 +137,19 @@ struct SC::Vector
 
     /// @brief Access the first element of the Vector
     /// @return A reference to the first element of the Vector
-    [[nodiscard]] T& front();
+    [[nodiscard]] T& front() SC_LANGUAGE_LIFETIME_BOUND;
 
     /// @brief Access the first element of the Vector
     /// @return A reference to the first element of the Vector
-    [[nodiscard]] const T& front() const;
+    [[nodiscard]] const T& front() const SC_LANGUAGE_LIFETIME_BOUND;
 
     /// @brief Access the last element of the Vector
     /// @return A reference to the last element of the Vector
-    [[nodiscard]] T& back();
+    [[nodiscard]] T& back() SC_LANGUAGE_LIFETIME_BOUND;
 
     /// @brief Access the last element of the Vector
     /// @return A reference to the last element of the Vector
-    [[nodiscard]] const T& back() const;
+    [[nodiscard]] const T& back() const SC_LANGUAGE_LIFETIME_BOUND;
 
     /// @brief Reserves memory for newCapacity elements, allocating memory if necessary.
     /// @param newCapacity The wanted new capacity for this Vector
@@ -194,22 +194,22 @@ struct SC::Vector
 
     /// @brief Gets pointer to first element of the vector
     /// @return pointer to first element of the vector
-    [[nodiscard]] T* begin() { return items; }
+    [[nodiscard]] T* begin() SC_LANGUAGE_LIFETIME_BOUND { return items; }
     /// @brief Gets pointer to first element of the vector
     /// @return pointer to first element of the vector
-    [[nodiscard]] const T* begin() const { return items; }
+    [[nodiscard]] const T* begin() const SC_LANGUAGE_LIFETIME_BOUND { return items; }
     /// @brief Gets pointer to one after last element of the vector
     /// @return pointer to one after last element of the vector
-    [[nodiscard]] T* end() { return items + size(); }
+    [[nodiscard]] T* end() SC_LANGUAGE_LIFETIME_BOUND { return items + size(); }
     /// @brief Gets pointer to one after last element of the vector
     /// @return pointer to one after last element of the vector
-    [[nodiscard]] const T* end() const { return items + size(); }
+    [[nodiscard]] const T* end() const SC_LANGUAGE_LIFETIME_BOUND { return items + size(); }
     /// @brief Gets pointer to first element of the vector
     /// @return pointer to first element of the vector
-    [[nodiscard]] T* data() { return items; }
+    [[nodiscard]] T* data() SC_LANGUAGE_LIFETIME_BOUND { return items; }
     /// @brief Gets pointer to first element of the vector
     /// @return pointer to first element of the vector
-    [[nodiscard]] const T* data() const { return items; }
+    [[nodiscard]] const T* data() const SC_LANGUAGE_LIFETIME_BOUND { return items; }
 
     /// @brief Inserts a range of items copying them at given index
     /// @param idx Index where to start inserting the range of items
@@ -414,21 +414,21 @@ SC::Vector<T>& SC::Vector<T>::operator=(const Vector& other)
 }
 
 template <typename T>
-T& SC::Vector<T>::operator[](size_t index)
+T& SC::Vector<T>::operator[](size_t index) SC_LANGUAGE_LIFETIME_BOUND
 {
     SC_ASSERT_DEBUG(index < size());
     return items[index];
 }
 
 template <typename T>
-const T& SC::Vector<T>::operator[](size_t index) const
+const T& SC::Vector<T>::operator[](size_t index) const SC_LANGUAGE_LIFETIME_BOUND
 {
     SC_ASSERT_DEBUG(index < size());
     return items[index];
 }
 
 template <typename T>
-T& SC::Vector<T>::front()
+T& SC::Vector<T>::front() SC_LANGUAGE_LIFETIME_BOUND
 {
     const size_t numElements = size();
     SC_ASSERT_RELEASE(numElements > 0);
@@ -436,7 +436,7 @@ T& SC::Vector<T>::front()
 }
 
 template <typename T>
-const T& SC::Vector<T>::front() const
+const T& SC::Vector<T>::front() const SC_LANGUAGE_LIFETIME_BOUND
 {
     const size_t numElements = size();
     SC_ASSERT_RELEASE(numElements > 0);
@@ -444,7 +444,7 @@ const T& SC::Vector<T>::front() const
 }
 
 template <typename T>
-T& SC::Vector<T>::back()
+T& SC::Vector<T>::back() SC_LANGUAGE_LIFETIME_BOUND
 {
     const size_t numElements = size();
     SC_ASSERT_RELEASE(numElements > 0);
@@ -452,7 +452,7 @@ T& SC::Vector<T>::back()
 }
 
 template <typename T>
-const T& SC::Vector<T>::back() const
+const T& SC::Vector<T>::back() const SC_LANGUAGE_LIFETIME_BOUND
 {
     const size_t numElements = size();
     SC_ASSERT_RELEASE(numElements > 0);

@@ -31,7 +31,7 @@ struct Hashing
         uint8_t hash[32] = {0};
         size_t  size     = 0;
 
-        Span<const uint8_t> toBytesSpan() const { return {hash, size}; }
+        Span<const uint8_t> toBytesSpan() const SC_LANGUAGE_LIFETIME_BOUND { return {hash, size}; }
     };
     enum Type
     {

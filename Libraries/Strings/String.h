@@ -76,7 +76,7 @@ struct SC::String
 
     /// @brief Obtain a null-terminated StringView from current String
     /// @return a null-terminated StringView from current String
-    [[nodiscard]] StringView view() const;
+    [[nodiscard]] StringView view() const SC_LANGUAGE_LIFETIME_BOUND;
 
     /// @brief Check if current String is same as other String
     /// @param other String to be checked
@@ -197,7 +197,7 @@ inline bool SC::String::assign(StringView sv)
     return true;
 }
 
-inline SC::StringView SC::String::view() const
+inline SC::StringView SC::String::view() const SC_LANGUAGE_LIFETIME_BOUND
 {
     const bool  isEmpty = data.isEmpty();
     const char* items   = isEmpty ? nullptr : data.items;

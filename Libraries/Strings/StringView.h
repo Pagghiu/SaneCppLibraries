@@ -112,11 +112,14 @@ struct SC::StringView
 
     /// @brief Obtain a `const char` Span from this StringView
     /// @return Span representing this StringView
-    constexpr Span<const char> toCharSpan() const { return {text, textSizeInBytes}; }
+    constexpr Span<const char> toCharSpan() const SC_LANGUAGE_LIFETIME_BOUND { return {text, textSizeInBytes}; }
 
     /// @brief Obtain a `const uint8_t` Span from this StringView
     /// @return Span representing this StringView
-    Span<const uint8_t> toBytesSpan() const { return Span<const uint8_t>::reinterpret_bytes(text, textSizeInBytes); }
+    Span<const uint8_t> toBytesSpan() const SC_LANGUAGE_LIFETIME_BOUND
+    {
+        return Span<const uint8_t>::reinterpret_bytes(text, textSizeInBytes);
+    }
 
     /// @brief Result of ordering comparison done by StringView::compare
     enum class Comparison

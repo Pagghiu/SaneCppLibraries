@@ -222,6 +222,19 @@ T& fieldOffset(R& object)
 #else
 #define SC_LANGUAGE_EXCEPTIONS 0
 #endif
+
+#ifndef __has_cpp_attribute
+#define SC_LANGUAGE_LIFETIME_BOUND
+#elif __has_cpp_attribute(msvc::lifetimebound)
+#define SC_LANGUAGE_LIFETIME_BOUND [[msvc::lifetimebound]]
+#elif __has_cpp_attribute(clang::lifetimebound)
+#define SC_LANGUAGE_LIFETIME_BOUND [[clang::lifetimebound]]
+#elif __has_cpp_attribute(lifetimebound)
+#define SC_LANGUAGE_LIFETIME_BOUND [[lifetimebound]]
+#else
+#define SC_LANGUAGE_LIFETIME_BOUND
+#endif
+
 //! @}
 // clang-format off
 namespace SC
