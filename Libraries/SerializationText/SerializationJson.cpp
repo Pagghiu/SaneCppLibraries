@@ -148,6 +148,25 @@ bool SC::SerializationJson::Reader::getNextField(uint32_t index, StringView& tex
     return token.getType() == JsonTokenizer::Token::Colon;
 }
 
+bool SC::SerializationJson::Reader::serialize(uint32_t index, bool& value)
+{
+    SC_COMPILER_UNUSED(value);
+    SC_TRY(eventuallyExpectComma(index));
+    JsonTokenizer::Token token;
+    SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
+    if (token.getType() == JsonTokenizer::Token::True)
+    {
+        value = true;
+        return true;
+    }
+    if (token.getType() == JsonTokenizer::Token::False)
+    {
+        value = false;
+        return true;
+    }
+    return false;
+}
+
 bool SC::SerializationJson::Reader::serialize(uint32_t index, float& value)
 {
     SC_COMPILER_UNUSED(value);
