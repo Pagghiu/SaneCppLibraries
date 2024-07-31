@@ -192,14 +192,25 @@ struct SerializationBinary
         // Cast first part of the buffer to a Span of TypeInfo.
         // It's possible as we've been serializing it with correct alignment (currently 32 bits).
         static_assert(alignof(Reflection::TypeInfo) == sizeof(uint32_t), "Alignof TypeInfo");
-        Span<const uint8_t> typeInfosSlice;
-        SC_TRY(buffer.sliceStartLength(sizeof(numInfos), numInfos * sizeof(Reflection::TypeInfo), typeInfosSlice));
-        Span<const Reflection::TypeInfo> typeInfos = typeInfosSlice.reinterpret_as_array_of<Reflection::TypeInfo>();
+        Span<const uint8_t> typeInfos;
+        SC_TRY(buffer.sliceStartLength(sizeof(numInfos), numInfos * sizeof(Reflection::TypeInfo), typeInfos));
+        Span<const Reflection::TypeInfo> serializedSchema = typeInfos.reinterpret_as_array_of<Reflection::TypeInfo>();
+
+        constexpr auto sourceSchema = Reflection::Schema::template compile<T>().typeInfos;
 
         // Get the slice of bytes where actual serialization data has been written by writeWithSchema
         Span<const uint8_t> serializedDataSlice;
         SC_TRY(buffer.sliceStart(sizeof(numInfos) + numInfos * sizeof(Reflection::TypeInfo), serializedDataSlice));
-        return loadVersioned(value, serializedDataSlice, typeInfos, options, numberOfReads);
+        if (sourceSchema.equals(serializedSchema))
+        {
+            // If the serialized schema matches current object schema, we can run the fast "loadExact" path
+            return loadExact(value, serializedDataSlice);
+        }
+        else
+        {
+            // The two schemas differs, so resort to the "slower" versioned loader that tries to match field order
+            return loadVersioned(value, serializedDataSlice, serializedSchema, options, numberOfReads);
+        }
     }
 };
 

@@ -66,6 +66,11 @@ struct ArrayWithSize
         }
         return false;
     }
+
+    bool equals(Span<const T> other) const
+    {
+        return size == other.sizeInElements() and ::memcmp(values, other.data(), other.sizeInBytes()) == 0;
+    }
 };
 
 /// @brief A writable span of objects
