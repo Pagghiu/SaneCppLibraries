@@ -594,9 +594,37 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     [[nodiscard]] static Result completeAsync(AsyncSocketSend::Result& result)
     {
         AsyncSocketSend& async = result.getAsync();
-        const ssize_t    res   = ::send(async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
-        SC_TRY_MSG(res >= 0, "error in send");
-        result.completionData.numBytes = static_cast<size_t>(res);
+
+        while (async.totalBytesSent < async.buffer.sizeInBytes())
+        {
+            const ssize_t numBytesSent = ::send(async.handle, async.buffer.data() + async.totalBytesSent,
+                                                async.buffer.sizeInBytes() - async.totalBytesSent, 0);
+
+            if (numBytesSent < 0)
+            {
+                if (errno == EWOULDBLOCK || errno == EAGAIN)
+                {
+                    // Partial write case:
+                    // Socket is not writable right now, we should wait for it to be writable again, to finish
+                    // writing the remaining part of the data.
+                    // This would typically involve waiting for next EVFILT_WRITE or EPOLLOUT event again.
+                    // To achieve that let's skip user callback and manually re-activate this request.
+                    result.shouldCallCallback  = false;
+                    result.shouldBeReactivated = true;
+                    return Result(true);
+                }
+                else
+                {
+                    break; // Error, cannot send all data
+                }
+            }
+            else
+            {
+                async.totalBytesSent += static_cast<size_t>(numBytesSent);
+            }
+        }
+
+        result.completionData.numBytes = async.totalBytesSent;
         SC_TRY_MSG(result.completionData.numBytes == async.buffer.sizeInBytes(), "send didn't send all data");
         return Result(true);
     }

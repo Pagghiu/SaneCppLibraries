@@ -582,6 +582,7 @@ struct SC::AsyncTest : public SC::TestCase
             {
                 int  receiveCount                     = 0;
                 char receivedData[sizeof(sendBuffer)] = {0};
+                int  sizeOfSendBuffer                 = sizeof(sendBuffer); // Need this for vs2019
             };
             Params params;
             receiveAsync.callback = [this, &params](AsyncSocketReceive::Result& res)
@@ -591,13 +592,37 @@ struct SC::AsyncTest : public SC::TestCase
                 SC_TEST_EXPECT(readData.sizeInBytes() == 1);
                 params.receivedData[params.receiveCount] = readData.data()[0];
                 params.receiveCount++;
-                res.reactivateRequest(size_t(params.receiveCount) < sizeof(sendBuffer));
+                res.reactivateRequest(params.receiveCount < params.sizeOfSendBuffer);
             };
             SC_TEST_EXPECT(receiveAsync.start(eventLoop, serverSideClient, receiveData));
             SC_TEST_EXPECT(params.receiveCount == 0); // make sure we receive after run, in case of sync results
             SC_TEST_EXPECT(eventLoop.run());
             SC_TEST_EXPECT(params.receiveCount == 2);
             SC_TEST_EXPECT(memcmp(params.receivedData, sendBuffer, sizeof(sendBuffer)) == 0);
+
+            // Test sending large data
+            constexpr size_t largeBufferSize = 1024 * 1024; // 1Mb
+            Vector<char>     sendBufferLarge, receiveBufferLarge;
+            SC_TEST_EXPECT(sendBufferLarge.resize(largeBufferSize));
+            SC_TEST_EXPECT(receiveBufferLarge.resizeWithoutInitializing(sendBufferLarge.size()));
+            sendAsync.callback = {};
+            SC_TEST_EXPECT(sendAsync.start(eventLoop, client, sendBufferLarge.toSpanConst()));
+            struct Context
+            {
+                size_t bufferSize          = largeBufferSize; // Need this for vs2019
+                int    largeCallbackCalled = 0;
+                size_t totalNumBytesRead   = 0;
+            } context;
+            receiveAsync.callback = [this, &context](AsyncSocketReceive::Result& res)
+            {
+                context.largeCallbackCalled++;
+                context.totalNumBytesRead += res.completionData.numBytes;
+                res.reactivateRequest(context.totalNumBytesRead < context.bufferSize);
+            };
+            SC_TEST_EXPECT(receiveAsync.start(eventLoop, serverSideClient, receiveBufferLarge.toSpan()));
+            SC_TEST_EXPECT(eventLoop.run());
+            SC_TEST_EXPECT(context.largeCallbackCalled >= 1);
+            SC_TEST_EXPECT(context.totalNumBytesRead == largeBufferSize);
         }
     }
 

@@ -154,7 +154,8 @@ SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop, const SocketDescript
 {
     SC_TRY(validateAsync());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
-    buffer = dataToSend;
+    buffer         = dataToSend;
+    totalBytesSent = 0;
     SC_TRY(queueSubmission(loop));
     return SC::Result(true);
 }

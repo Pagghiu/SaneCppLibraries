@@ -560,6 +560,7 @@ struct AsyncSocketSend : public AsyncRequest
 
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
     Span<const char>         buffer;
+    size_t                   totalBytesSent = 0;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
 #endif
