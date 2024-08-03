@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "../Foundation/Platform.h"
 
+#include <string.h> // strncpy
+
 #if SC_PLATFORM_WINDOWS
 #include "Internal/AsyncWindows.inl"
 #elif SC_PLATFORM_APPLE
@@ -63,11 +65,9 @@ void SC::AsyncRequest::setDebugName(const char* newDebugName)
 
 SC::Result SC::AsyncRequest::validateAsync()
 {
-    const bool asyncStateIsFree      = state == AsyncRequest::State::Free;
-    const bool asyncIsNotOwnedByLoop = eventLoop == nullptr;
+    const bool asyncStateIsFree = state == AsyncRequest::State::Free;
     SC_LOG_MESSAGE("{} {} QUEUE\n", debugName, AsyncRequest::TypeToString(type));
     SC_TRY_MSG(asyncStateIsFree, "Trying to stage AsyncRequest that is in use");
-    SC_TRY_MSG(asyncIsNotOwnedByLoop, "Trying to add AsyncRequest belonging to another Loop");
     return Result(true);
 }
 
@@ -152,7 +152,6 @@ SC::Result SC::AsyncSocketConnect::start(AsyncEventLoop& loop, const SocketDescr
 SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop, const SocketDescriptor& socketDescriptor,
                                       Span<const char> dataToSend)
 {
-
     SC_TRY(validateAsync());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
     buffer = dataToSend;
@@ -584,11 +583,15 @@ SC::Result SC::AsyncEventLoop::Internal::stageSubmission(KernelEvents& kernelEve
     break;
     case AsyncRequest::State::Cancelling: {
         SC_TRY(cancelAsync(kernelEvents, async));
-        SC_TRY(teardownAsync(kernelEvents, async));
+        AsyncTeardown teardown;
+        prepareTeardown(async, teardown);
+        SC_TRY(teardownAsync(kernelEvents, teardown));
     }
     break;
     case AsyncRequest::State::Teardown: {
-        SC_TRY(teardownAsync(kernelEvents, async));
+        AsyncTeardown teardown;
+        prepareTeardown(async, teardown);
+        SC_TRY(teardownAsync(kernelEvents, teardown));
     }
     break;
     case AsyncRequest::State::Active: {
@@ -633,6 +636,8 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndEventuallyReactivate(KernelE
     SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Active);
     bool reactivate = false;
     removeActiveHandle(async);
+    AsyncTeardown teardown;
+    prepareTeardown(async, teardown);
     SC_TRY(completeAsync(kernelEvents, async, move(returnCode), reactivate));
     if (reactivate)
     {
@@ -640,7 +645,7 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndEventuallyReactivate(KernelE
     }
     else
     {
-        SC_TRY(teardownAsync(kernelEvents, async));
+        SC_TRY(teardownAsync(kernelEvents, teardown));
     }
     if (not returnCode)
     {
@@ -786,7 +791,12 @@ void SC::AsyncEventLoop::Internal::runStepExecuteCompletions(KernelEvents& kerne
         else
         {
             SC_ASSERT_RELEASE(async.state != AsyncRequest::State::Free);
-            async.markAsFree();
+            // If it's in cancelling state then it's also in submission queue
+            // and it must stay there to continue with teardown
+            if (async.state != AsyncRequest::State::Cancelling)
+            {
+                async.markAsFree();
+            }
         }
     }
 }
@@ -875,18 +885,6 @@ struct SC::AsyncEventLoop::Internal::CancelAsyncPhase
     }
 };
 
-struct SC::AsyncEventLoop::Internal::TeardownAsyncPhase
-{
-    KernelEvents& kernelEvents;
-    TeardownAsyncPhase(KernelEvents& kernelEvents) : kernelEvents(kernelEvents) {}
-
-    template <typename T>
-    SC::Result operator()(T& async)
-    {
-        return Result(kernelEvents.teardownAsync(async));
-    }
-};
-
 struct SC::AsyncEventLoop::Internal::CompleteAsyncPhase
 {
     KernelEvents& kernelEvents;
@@ -921,15 +919,58 @@ struct SC::AsyncEventLoop::Internal::CompleteAsyncPhase
                 result.returnCode = Result(kernelEvents.completeAsync(result));
             }
         }
-        if (result.getAsync().callback.isValid())
+        auto callback = result.getAsync().callback; // copy callback to allow it releasing the request
+        if (result.shouldCallCallback and callback.isValid())
         {
-            result.getAsync().callback(result);
+            callback(result);
         }
         reactivate = result.shouldBeReactivated;
         return SC::Result(true);
     }
 };
 
+void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncRequest& async, AsyncTeardown& teardown)
+{
+    teardown.eventLoop = async.eventLoop;
+    teardown.type      = async.type;
+#if SC_CONFIGURATION_DEBUG
+#if SC_COMPILER_MSVC
+    ::strncpy_s(teardown.debugName, async.debugName, sizeof(teardown.debugName));
+#else
+    ::strncpy(teardown.debugName, async.debugName, sizeof(teardown.debugName));
+#endif
+#endif
+    // clang-format off
+    switch (async.type)
+    {
+    // Loop
+    case AsyncRequest::Type::LoopTimeout: break;
+    case AsyncRequest::Type::LoopWakeUp: break;
+    case AsyncRequest::Type::LoopWork: break;
+
+    // Process
+    case AsyncRequest::Type::ProcessExit:
+#if SC_PLATFORM_LINUX
+        (void)static_cast<AsyncProcessExit&>(async).pidFd.get(teardown.fileHandle, Result::Error("missing pidfd"));
+#endif
+        teardown.processHandle = static_cast<AsyncProcessExit&>(async).handle;
+        break;
+
+    // Socket
+    case AsyncRequest::Type::SocketAccept:  teardown.socketHandle = static_cast<AsyncSocketAccept&>(async).handle; break;
+    case AsyncRequest::Type::SocketConnect: teardown.socketHandle = static_cast<AsyncSocketConnect&>(async).handle; break;
+    case AsyncRequest::Type::SocketSend:    teardown.socketHandle = static_cast<AsyncSocketSend&>(async).handle; break;
+    case AsyncRequest::Type::SocketReceive: teardown.socketHandle = static_cast<AsyncSocketReceive&>(async).handle; break;
+    case AsyncRequest::Type::SocketClose:   teardown.socketHandle = static_cast<AsyncSocketClose&>(async).handle; break;
+
+    // File
+    case AsyncRequest::Type::FileRead:      teardown.fileHandle = static_cast<AsyncFileRead&>(async).fileDescriptor; break;
+    case AsyncRequest::Type::FileWrite:     teardown.fileHandle = static_cast<AsyncFileWrite&>(async).fileDescriptor; break;
+    case AsyncRequest::Type::FileClose:     teardown.fileHandle = static_cast<AsyncFileClose&>(async).fileDescriptor; break;
+    case AsyncRequest::Type::FilePoll:      teardown.fileHandle = static_cast<AsyncFilePoll&>(async).fileDescriptor; break;
+    }
+    // clang-format on
+}
 SC::Result SC::AsyncEventLoop::Internal::setupAsync(KernelEvents& kernelEvents, AsyncRequest& async)
 {
     SC_LOG_MESSAGE("{} {} SETUP\n", async.debugName, AsyncRequest::TypeToString(async.type));
@@ -945,10 +986,53 @@ SC::Result SC::AsyncEventLoop::Internal::activateAsync(KernelEvents& kernelEvent
     return Result(true);
 }
 
-SC::Result SC::AsyncEventLoop::Internal::teardownAsync(KernelEvents& kernelEvents, AsyncRequest& async)
+SC::Result SC::AsyncEventLoop::Internal::teardownAsync(KernelEvents& kernelEvents, AsyncTeardown& teardown)
 {
-    SC_LOG_MESSAGE("{} {} TEARDOWN\n", async.debugName, AsyncRequest::TypeToString(async.type));
-    SC_TRY(Internal::applyOnAsync(async, TeardownAsyncPhase(kernelEvents)));
+    SC_LOG_MESSAGE("{} {} TEARDOWN\n", teardown.debugName, AsyncRequest::TypeToString(teardown.type));
+
+    switch (teardown.type)
+    {
+    case AsyncRequest::Type::LoopTimeout:
+        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncLoopTimeout*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::LoopWakeUp:
+        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncLoopWakeUp*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::LoopWork:
+        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncLoopWork*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::ProcessExit:
+        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncProcessExit*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::SocketAccept:
+        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncSocketAccept*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::SocketConnect:
+        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncSocketConnect*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::SocketSend:
+        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncSocketSend*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::SocketReceive:
+        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncSocketReceive*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::SocketClose:
+        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncSocketClose*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::FileRead:
+        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncFileRead*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::FileWrite:
+        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncFileWrite*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::FileClose:
+        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncFileClose*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::FilePoll:
+        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncFilePoll*>(nullptr), teardown));
+        break;
+    }
+
     return Result(true);
 }
 

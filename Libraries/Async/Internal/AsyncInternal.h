@@ -107,14 +107,12 @@ struct SC::AsyncEventLoop::Internal
     // Phases
     [[nodiscard]] Result stageSubmission(KernelEvents& kernelEvents, AsyncRequest& async);
     [[nodiscard]] Result setupAsync(KernelEvents& kernelEvents, AsyncRequest& async);
-    [[nodiscard]] Result teardownAsync(KernelEvents& kernelEvents, AsyncRequest& async);
     [[nodiscard]] Result activateAsync(KernelEvents& kernelEvents, AsyncRequest& async);
     [[nodiscard]] Result cancelAsync(KernelEvents& kernelEvents, AsyncRequest& async);
     [[nodiscard]] Result completeAsync(KernelEvents& kernelEvents, AsyncRequest& async, Result&& returnCode,
                                        bool& reactivate);
 
     struct SetupAsyncPhase;
-    struct TeardownAsyncPhase;
     struct ReactivateAsyncPhase;
     struct ActivateAsyncPhase;
     struct CancelAsyncPhase;
@@ -150,4 +148,19 @@ struct SC::AsyncEventLoop::Internal
 
     template <typename Lambda>
     [[nodiscard]] static Result applyOnAsync(AsyncRequest& async, Lambda&& lambda);
+
+    struct AsyncTeardown
+    {
+        AsyncRequest::Type        type          = AsyncRequest::Type::LoopTimeout;
+        AsyncEventLoop*           eventLoop     = nullptr;
+        FileDescriptor::Handle    fileHandle    = FileDescriptor::Invalid;
+        SocketDescriptor::Handle  socketHandle  = SocketDescriptor::Invalid;
+        ProcessDescriptor::Handle processHandle = ProcessDescriptor::Invalid;
+#if SC_CONFIGURATION_DEBUG
+        char debugName[128] = "None";
+#endif
+    };
+
+    void                 prepareTeardown(AsyncRequest& async, AsyncTeardown& teardown);
+    [[nodiscard]] Result teardownAsync(KernelEvents& kernelEvents, AsyncTeardown& async);
 };

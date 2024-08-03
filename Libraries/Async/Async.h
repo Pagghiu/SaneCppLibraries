@@ -97,8 +97,12 @@ struct WinWaitHandle : public UniqueHandle<AsyncWinWaitDefinition>
 /// in case of success and in case of any error. @n
 /// If the function returns an invalid Return code or if the operation is manually cancelled with
 /// SC::AsyncRequest::stop, then the user callback will not be called.
-/// @note The memory address of all AsyncRequest derived objects must be stable for the entire duration of a started
-/// async request. This means that they can be freed / moved after the user callback is executed.
+///
+/// @note The memory address of all AsyncRequest derived objects must be stable until user callback is executed.
+/// - If request is not re-activated (i.e. `result.reactivateRequest(true)` **is NOT** called) then the async request
+/// can be freed as soon as the user callback is called (even inside the callback itself).
+/// - If request is re-activated (i.e. `result.reactivateRequest(true)` **is** called) then the async cannot be freed
+/// as it's still in use.
 ///
 /// Some implementation details:
 /// SC::AsyncRequest::state dictates the lifetime of the async request according to a state machine.
@@ -162,6 +166,8 @@ struct SC::AsyncRequest
     /// @return `true` if the stop request has been successfully queued
     [[nodiscard]] Result stop();
 
+    [[nodiscard]] bool isFree() const { return state == State::Free; }
+
   protected:
     [[nodiscard]] Result validateAsync();
     [[nodiscard]] Result queueSubmission(AsyncEventLoop& eventLoop);
@@ -222,8 +228,10 @@ struct SC::AsyncResult
   protected:
     friend struct AsyncEventLoop;
 
-    bool       shouldBeReactivated = false;
-    SC::Result returnCode          = SC::Result(true);
+    bool shouldBeReactivated = false;
+    bool shouldCallCallback  = true;
+
+    SC::Result returnCode = SC::Result(true);
 };
 
 /// @brief Helper holding CompletionData for a specific AsyncRequest-derived class

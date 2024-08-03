@@ -644,10 +644,11 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     }
 
     // clang-format off
-    template <typename T> [[nodiscard]] bool teardownAsync(T&)  { return true; }
     template <typename T> [[nodiscard]] bool activateAsync(T&)  { return true; }
     template <typename T> [[nodiscard]] bool completeAsync(T&)  { return true; }
     template <typename T> [[nodiscard]] bool cancelAsync(T&)    { return true; }
+
+    template <typename T> [[nodiscard]] bool teardownAsync(T*, AsyncTeardown&)  { return true; }
 
     // If False, makes re-activation a no-op, that is a lightweight optimization.
     // More importantly it prevents an assert about being Submitting state when async completes during re-activation run cycle.

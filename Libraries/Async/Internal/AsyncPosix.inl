@@ -251,16 +251,16 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
 
 #endif
 
-    [[nodiscard]] static Result stopSingleWatcherImmediate(AsyncRequest& async, SocketDescriptor::Handle handle,
+    [[nodiscard]] static Result stopSingleWatcherImmediate(AsyncEventLoop& eventLoop, SocketDescriptor::Handle handle,
                                                            int32_t filter)
     {
         FileDescriptor::Handle loopFd;
-        SC_TRY(async.eventLoop->internal.kernelQueue.get().getPosix().loopFd.get(
+        SC_TRY(eventLoop.internal.kernelQueue.get().getPosix().loopFd.get(
             loopFd, Result::Error("AsyncEventLoop::KernelQueuePosix::syncWithKernel() - Invalid Handle")));
 #if SC_ASYNC_USE_EPOLL
         struct epoll_event event;
         event.events   = filter;
-        event.data.ptr = &async;
+        event.data.ptr = nullptr;
         const int res  = ::epoll_ctl(loopFd, EPOLL_CTL_DEL, handle, &event);
 #else
         struct kevent kev;
@@ -508,9 +508,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return setEventWatcher(async, async.handle, INPUT_EVENTS_MASK);
     }
 
-    [[nodiscard]] static Result teardownAsync(AsyncSocketAccept& async)
+    [[nodiscard]] static Result teardownAsync(AsyncSocketAccept*, AsyncTeardown& teardown)
     {
-        return KernelQueuePosix::stopSingleWatcherImmediate(async, async.handle, INPUT_EVENTS_MASK);
+        return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.socketHandle,
+                                                            INPUT_EVENTS_MASK);
     }
 
     [[nodiscard]] static Result completeAsync(AsyncSocketAccept::Result& result)
@@ -531,9 +532,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return setEventWatcher(async, async.handle, OUTPUT_EVENTS_MASK);
     }
 
-    static Result teardownAsync(AsyncSocketConnect& async)
+    static Result teardownAsync(AsyncSocketConnect*, AsyncTeardown& teardown)
     {
-        return KernelQueuePosix::stopSingleWatcherImmediate(async, async.handle, OUTPUT_EVENTS_MASK);
+        return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.socketHandle,
+                                                            OUTPUT_EVENTS_MASK);
     }
 
     [[nodiscard]] static Result activateAsync(AsyncSocketConnect& async)
@@ -565,8 +567,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         // TODO: This is making a syscall for each connected socket, we should probably aggregate them
         // And additionally it's stupid as probably WRITE will be subscribed again anyway
         // But probably this means to review the entire process of async stop
-        SC_TRUST_RESULT(
-            KernelQueuePosix::stopSingleWatcherImmediate(result.getAsync(), async.handle, OUTPUT_EVENTS_MASK));
+        AsyncEventLoop& eventLoop = *result.getAsync().eventLoop;
+        SC_TRUST_RESULT(KernelQueuePosix::stopSingleWatcherImmediate(eventLoop, async.handle, OUTPUT_EVENTS_MASK));
         if (socketRes == 0)
         {
             SC_TRY_MSG(errorCode == 0, "connect SO_ERROR");
@@ -583,9 +585,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return Result(setEventWatcher(async, async.handle, OUTPUT_EVENTS_MASK));
     }
 
-    [[nodiscard]] static Result teardownAsync(AsyncSocketSend& async)
+    [[nodiscard]] static Result teardownAsync(AsyncSocketSend*, AsyncTeardown& teardown)
     {
-        return KernelQueuePosix::stopSingleWatcherImmediate(async, async.handle, OUTPUT_EVENTS_MASK);
+        return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.socketHandle,
+                                                            OUTPUT_EVENTS_MASK);
     }
 
     [[nodiscard]] static Result completeAsync(AsyncSocketSend::Result& result)
@@ -610,12 +613,13 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 #endif
     }
 
-    [[nodiscard]] static Result teardownAsync(AsyncSocketReceive& async)
+    [[nodiscard]] static Result teardownAsync(AsyncSocketReceive*, AsyncTeardown& teardown)
     {
 #if SC_ASYNC_USE_EPOLL
-        return KernelQueuePosix::stopSingleWatcherImmediate(async, async.handle, EPOLLIN | EPOLLRDHUP);
+        return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.socketHandle,
+                                                            EPOLLIN | EPOLLRDHUP);
 #else
-        return KernelQueuePosix::stopSingleWatcherImmediate(async, async.handle, EVFILT_READ);
+        return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.socketHandle, EVFILT_READ);
 #endif
     }
 
@@ -665,7 +669,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     [[nodiscard]] static Result cancelAsync(AsyncFileRead& async)
     {
-        return KernelQueuePosix::stopSingleWatcherImmediate(async, async.fileDescriptor, INPUT_EVENTS_MASK);
+        return KernelQueuePosix::stopSingleWatcherImmediate(*async.eventLoop, async.fileDescriptor, INPUT_EVENTS_MASK);
     }
 
     [[nodiscard]] static Result executeOperation(AsyncFileRead& async, AsyncFileRead::CompletionData& completionData)
@@ -714,7 +718,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     [[nodiscard]] static Result cancelAsync(AsyncFileWrite& async)
     {
-        return KernelQueuePosix::stopSingleWatcherImmediate(async, async.fileDescriptor, OUTPUT_EVENTS_MASK);
+        return KernelQueuePosix::stopSingleWatcherImmediate(*async.eventLoop, async.fileDescriptor, OUTPUT_EVENTS_MASK);
     }
 
     [[nodiscard]] static Result executeOperation(AsyncFileWrite& async, AsyncFileWrite::CompletionData& completionData)
@@ -745,9 +749,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return setEventWatcher(async, async.fileDescriptor, INPUT_EVENTS_MASK);
     }
 
-    [[nodiscard]] static Result teardownAsync(AsyncFilePoll& async)
+    [[nodiscard]] static Result teardownAsync(AsyncFilePoll*, AsyncTeardown& teardown)
     {
-        return KernelQueuePosix::stopSingleWatcherImmediate(async, async.fileDescriptor, INPUT_EVENTS_MASK);
+        return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.fileHandle,
+                                                            INPUT_EVENTS_MASK);
     }
 
     static bool needsSubmissionWhenReactivating(AsyncFilePoll&) { return false; }
@@ -796,9 +801,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return setEventWatcher(async, async.handle, EVFILT_PROC, NOTE_EXIT | NOTE_EXITSTATUS);
     }
 
-    [[nodiscard]] static Result teardownAsync(AsyncProcessExit& async)
+    [[nodiscard]] static Result teardownAsync(AsyncProcessExit*, AsyncTeardown& teardown)
     {
-        return KernelQueuePosix::stopSingleWatcherImmediate(async, async.handle, EVFILT_PROC);
+        return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.processHandle, EVFILT_PROC);
     }
 
     [[nodiscard]] Result completeAsync(AsyncProcessExit::Result& result)
@@ -830,10 +835,11 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     // clang-format off
     template <typename T> [[nodiscard]] Result setupAsync(T&)     { return Result(true); }
-    template <typename T> [[nodiscard]] Result teardownAsync(T&)  { return Result(true); }
     template <typename T> [[nodiscard]] Result activateAsync(T&)  { return Result(true); }
     template <typename T> [[nodiscard]] Result completeAsync(T&)  { return Result(true); }
     template <typename T> [[nodiscard]] Result cancelAsync(T&)    { return Result(true); }
+
+    template <typename T> [[nodiscard]] Result teardownAsync(T*, AsyncTeardown&)  { return Result(true); }
 
     // If False, makes re-activation a no-op, that is a lightweight optimization.
     // More importantly it prevents an assert about being Submitting state when async completes during re-activation run cycle.

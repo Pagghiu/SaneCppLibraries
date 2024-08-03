@@ -52,7 +52,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
     // clang-format off
     template <typename T> [[nodiscard]] Result setupAsync(T&);
-    template <typename T> [[nodiscard]] Result teardownAsync(T&);
+    template <typename T> [[nodiscard]] Result teardownAsync(T*, AsyncTeardown&);
     template <typename T> [[nodiscard]] Result activateAsync(T&);
     template <typename T> [[nodiscard]] Result completeAsync(T&);
     template <typename T> [[nodiscard]] Result cancelAsync(T&);
@@ -560,7 +560,11 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return KernelEventsPosix::completeProcessExitWaitPid(result);
     }
 
-    [[nodiscard]] Result teardownAsync(AsyncProcessExit& async) { return async.pidFd.close(); }
+    [[nodiscard]] Result teardownAsync(AsyncProcessExit*, AsyncTeardown& teardown)
+    {
+        // pidfd is copied to fileHandle inside prepareTeardown
+        return Result(::close(teardown.fileHandle) == 0);
+    }
 
     //-------------------------------------------------------------------------------------------------------
     // Templates
@@ -577,9 +581,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     // clang-format off
     template <typename T> [[nodiscard]] Result setupAsync(T&)     { return Result(true); }
-    template <typename T> [[nodiscard]] Result teardownAsync(T&)  { return Result(true); }
     template <typename T> [[nodiscard]] Result activateAsync(T&)  { return Result(true); }
     template <typename T> [[nodiscard]] Result completeAsync(T&)  { return Result(true); }
+
+    template <typename T> [[nodiscard]] Result teardownAsync(T*, AsyncTeardown&)  { return Result(true); }
     // clang-format on
 };
 
@@ -703,10 +708,11 @@ SC::AsyncRequest* SC::AsyncEventLoop::Internal::KernelEvents::getAsyncRequest(ui
 
 // clang-format off
 template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::setupAsync(T& async)    { return isEpoll ? getPosix().setupAsync(async) : getUring().setupAsync(async); }
-template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::teardownAsync(T& async) { return isEpoll ? getPosix().teardownAsync(async) : getUring().teardownAsync(async); }
 template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::activateAsync(T& async) { return isEpoll ? getPosix().activateAsync(async) : getUring().activateAsync(async); }
 template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::completeAsync(T& async) { return isEpoll ? getPosix().completeAsync(async) : getUring().completeAsync(async); }
 template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::cancelAsync(T& async)   { return isEpoll ? getPosix().cancelAsync(async) : getUring().cancelAsync(async); }
+
+template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::teardownAsync(T* async, AsyncTeardown& teardown) { return isEpoll ? getPosix().teardownAsync(async, teardown) : getUring().teardownAsync(async, teardown); }
 
 template <typename T, typename P>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::executeOperation(T& async, P& param)   { return KernelEventsPosix::executeOperation(async, param); }
 // clang-format on
