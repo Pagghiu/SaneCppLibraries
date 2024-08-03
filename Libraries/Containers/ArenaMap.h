@@ -219,6 +219,12 @@ struct SC::ArenaMap
     /// @brief Get the number of used slots in the arena
     [[nodiscard]] size_t size() const { return numUsed; }
 
+    /// @brief Get the total number slots in the arena
+    [[nodiscard]] size_t capacity() const { return itemsSize; }
+
+    /// @brief Returns true if size() == capacity(), that means the arena is full
+    [[nodiscard]] bool isFull() const { return itemsSize == numUsed; }
+
     /// @brief Changes the size of the arena.
     /// @note Can only be called on empty arena (SC::ArenaMap::size == 0)
     /// @param newSize The new wanted number of elements to be stored in the arena
