@@ -72,6 +72,11 @@ struct SC::Time::Relative
 /// @brief Absolute time represented with milliseconds since epoch
 struct SC::Time::Absolute
 {
+  private:
+    struct Internal;
+    int64_t millisecondsSinceEpoch;
+
+  public:
     /// @brief Construct an Absolute from milliseconds since epoch
     /// @param millisecondsSinceEpoch Number of milliseconds since epoch
     Absolute(int64_t millisecondsSinceEpoch) : millisecondsSinceEpoch(millisecondsSinceEpoch) {}
@@ -92,7 +97,14 @@ struct SC::Time::Absolute
         uint8_t  minutes    = 0;
         uint8_t  seconds    = 0;
 
-        bool isDaylightSaving = false;
+        const char* getMonth() const;
+        const char* getDay() const;
+        bool        isDaylightSaving = false;
+
+      private:
+        friend struct Internal;
+        char monthName[16];
+        char dayName[16];
     };
 
     /// @brief Parses local time to a Parsed structure
@@ -116,10 +128,6 @@ struct SC::Time::Absolute
     /// @brief Return given time as milliseconds since epoch
     /// @return Time in milliseconds since epoch
     [[nodiscard]] int64_t getMillisecondsSinceEpoch() const { return millisecondsSinceEpoch; }
-
-  private:
-    struct Internal;
-    int64_t millisecondsSinceEpoch;
 };
 
 /// @brief An high resolution time counter

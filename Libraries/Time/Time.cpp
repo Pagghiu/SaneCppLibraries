@@ -15,19 +15,31 @@
 
 struct SC::Time::Absolute::Internal
 {
-    static void tmToParsed(const struct tm& result, ParseResult& local)
+    [[nodiscard]] static bool tmToParsed(const struct tm& result, ParseResult& local)
     {
-        local.year             = static_cast<decltype(local.year)>(1900 + result.tm_year);
-        local.month            = static_cast<decltype(local.month)>(result.tm_mon);
-        local.dayOfMonth       = static_cast<decltype(local.dayOfMonth)>(result.tm_mday);
-        local.dayOfWeek        = static_cast<decltype(local.dayOfWeek)>(result.tm_wday);
-        local.dayOfYear        = static_cast<decltype(local.dayOfYear)>(result.tm_yday);
-        local.hour             = static_cast<decltype(local.hour)>(result.tm_hour);
-        local.minutes          = static_cast<decltype(local.minutes)>(result.tm_min);
-        local.seconds          = static_cast<decltype(local.seconds)>(result.tm_sec);
+        local.year       = static_cast<decltype(local.year)>(1900 + result.tm_year);
+        local.month      = static_cast<decltype(local.month)>(result.tm_mon);
+        local.dayOfMonth = static_cast<decltype(local.dayOfMonth)>(result.tm_mday);
+        local.dayOfWeek  = static_cast<decltype(local.dayOfWeek)>(result.tm_wday);
+        local.dayOfYear  = static_cast<decltype(local.dayOfYear)>(result.tm_yday);
+        local.hour       = static_cast<decltype(local.hour)>(result.tm_hour);
+        local.minutes    = static_cast<decltype(local.minutes)>(result.tm_min);
+        local.seconds    = static_cast<decltype(local.seconds)>(result.tm_sec);
+
         local.isDaylightSaving = result.tm_isdst > 0;
+
+        if (::strftime(local.monthName, sizeof(local.monthName), "%b", &result) == 0)
+            return false;
+        if (::strftime(local.dayName, sizeof(local.dayName), "%a", &result) == 0)
+            return false;
+
+        return true;
     }
 };
+
+const char* SC::Time::Absolute::ParseResult::getMonth() const { return monthName; }
+
+const char* SC::Time::Absolute::ParseResult::getDay() const { return dayName; }
 
 SC::Time::Absolute SC::Time::Absolute::now()
 {
@@ -57,8 +69,7 @@ bool SC::Time::Absolute::parseLocal(ParseResult& result) const
         return false;
     }
 #endif
-    Internal::tmToParsed(parsedTm, result);
-    return true;
+    return Internal::tmToParsed(parsedTm, result);
 }
 
 bool SC::Time::Absolute::parseUTC(ParseResult& result) const
@@ -76,8 +87,7 @@ bool SC::Time::Absolute::parseUTC(ParseResult& result) const
         return false;
     }
 #endif
-    Internal::tmToParsed(parsedTm, result);
-    return true;
+    return Internal::tmToParsed(parsedTm, result);
 }
 
 SC::Time::Relative SC::Time::Absolute::subtract(Absolute other)

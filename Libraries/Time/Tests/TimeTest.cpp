@@ -43,8 +43,8 @@ void SC::TimeTest::testAbsoluteParseLocal()
     SC_TEST_EXPECT(Time::Absolute::now().parseLocal(local));
     SC_TEST_EXPECT(local.year > 2022);
 
-    report.console.print("{:02}/{:02}/{} {:02}:{:02}:{:02} {}", local.dayOfMonth, local.month, local.year, local.hour,
-                         local.minutes, local.seconds,
+    report.console.print("{} {:02}/{:02}/{} {:02}:{:02}:{:02} {}", local.getDay(), local.dayOfMonth, local.getMonth(),
+                         local.year, local.hour, local.minutes, local.seconds,
                          local.isDaylightSaving ? "DAYLIGHT SAVING" : "NO DAYLIGHT SAVING");
     //! [absoluteParseLocalSnippet]
 }
