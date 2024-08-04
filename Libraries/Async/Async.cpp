@@ -587,12 +587,14 @@ SC::Result SC::AsyncEventLoop::Internal::stageSubmission(KernelEvents& kernelEve
         AsyncTeardown teardown;
         prepareTeardown(async, teardown);
         SC_TRY(teardownAsync(kernelEvents, teardown));
+        async.markAsFree(); // This may still come up in kernel events
     }
     break;
     case AsyncRequest::State::Teardown: {
         AsyncTeardown teardown;
         prepareTeardown(async, teardown);
         SC_TRY(teardownAsync(kernelEvents, teardown));
+        async.markAsFree(); // This may still come up in kernel events
     }
     break;
     case AsyncRequest::State::Active: {
@@ -791,9 +793,12 @@ void SC::AsyncEventLoop::Internal::runStepExecuteCompletions(KernelEvents& kerne
         }
         else
         {
-            SC_ASSERT_RELEASE(async.state != AsyncRequest::State::Free);
-            // If it's in cancelling state then it's also in submission queue
-            // and it must stay there to continue with teardown
+            // We cannot assert that this is free because it may happen to get one
+            // more kernel event if it has been marked as free inside stageSubmission
+            // SC_ASSERT_RELEASE(async.state != AsyncRequest::State::Free);
+
+            // An async that is in cancelling state here, means it's also in submission
+            // queue and it must stay there to continue with teardown.
             if (async.state != AsyncRequest::State::Cancelling)
             {
                 async.markAsFree();
