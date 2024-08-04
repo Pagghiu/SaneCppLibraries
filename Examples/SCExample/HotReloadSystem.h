@@ -29,8 +29,9 @@ struct HotReloadSystem
     HotReloadState state;
     PluginRegistry registry;
 
-    Result create(AsyncEventLoop& eventLoop)
+    Result create(AsyncEventLoop& loop)
     {
+        eventLoop = &loop;
         // Setup Paths
         FileSystemDirectories directories;
         SC_TRY(directories.init());
@@ -55,13 +56,18 @@ struct HotReloadSystem
         SC_TRY(compiler.includePaths.push_back(state.imguiPath.view()));
 
         // Setup File System Watcher
-        SC_TRY(fileSystemWatcher.init(fileSystemWatcherRunner, eventLoop));
+        SC_TRY(fileSystemWatcher.init(fileSystemWatcherRunner, *eventLoop));
         folderWatcher.notifyCallback.bind<HotReloadSystem, &HotReloadSystem::onFileChange>(*this);
         SC_TRY(fileSystemWatcher.watch(folderWatcher, state.pluginsPath.view()));
         return Result(true);
     }
 
-    Result close() { return fileSystemWatcher.close(); }
+    Result close()
+    {
+        SC_TRY(fileSystemWatcher.close());
+        eventLoop = nullptr;
+        return Result(true);
+    }
 
     Result syncRegistry()
     {
@@ -73,28 +79,36 @@ struct HotReloadSystem
 
     Result load(StringView identifier)
     {
-        const PluginDynamicLibrary* existingLibrary = registry.findPlugin(identifier);
+        const PluginDynamicLibrary* exampleLibrary = registry.findPlugin(identifier);
 
         Vector<uint8_t> serializedModelState, serializedViewState;
-        if (existingLibrary)
+        if (exampleLibrary)
         {
-            ISCExample* drawingInterface = nullptr;
-            if (existingLibrary->queryInterface(drawingInterface) and drawingInterface->serialize.isValid())
+            ISCExample* example = nullptr;
+            if (exampleLibrary->queryInterface(example) and example->serialize.isValid())
             {
-                SC_TRY(drawingInterface->serialize(serializedModelState, serializedViewState));
+                SC_TRY(example->serialize(serializedModelState, serializedViewState));
+            }
+            if (example and example->closeAsync.isValid())
+            {
+                SC_TRY(example->closeAsync(*eventLoop));
             }
         }
 
         SC_TRY(registry.loadPlugin(identifier, compiler, sysroot, state.executablePath.view(),
                                    PluginRegistry::LoadMode::Reload));
 
-        if (not serializedModelState.isEmpty())
+        ISCExample* example = nullptr;
+        SC_TRY(exampleLibrary->queryInterface(example));
+        if (example)
         {
-            ISCExample* drawingInterface = nullptr;
-            if (existingLibrary->queryInterface(drawingInterface) and drawingInterface->deserialize.isValid())
+            if (example->deserialize.isValid() and not serializedModelState.isEmpty())
             {
-                SC_TRY(drawingInterface->deserialize(serializedModelState.toSpanConst(),
-                                                     serializedViewState.toSpanConst()));
+                SC_TRY(example->deserialize(serializedModelState.toSpanConst(), serializedViewState.toSpanConst()));
+            }
+            if (example->initAsync.isValid())
+            {
+                SC_TRY(example->initAsync(*eventLoop));
             }
         }
         return Result(true);
@@ -105,6 +119,8 @@ struct HotReloadSystem
     void setSysroot(StringView isysroot) { sysroot.isysroot = isysroot; }
 
   private:
+    AsyncEventLoop* eventLoop = nullptr;
+
     PluginCompiler compiler;
     PluginSysroot  sysroot;
 
@@ -263,10 +279,10 @@ struct HotReloadView
     {
         const PluginDynamicLibrary& library = system.registry.getPluginDynamicLibraryAt(viewState.page);
 
-        ISCExample* drawingInterface = nullptr;
-        if (library.queryInterface(drawingInterface))
+        ISCExample* example = nullptr;
+        if (library.queryInterface(example))
         {
-            drawingInterface->onDraw();
+            example->onDraw();
         }
         else if (not library.lastErrorLog.isEmpty())
         {

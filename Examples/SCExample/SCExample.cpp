@@ -43,7 +43,7 @@ struct ApplicationSystem
     {
         currentThreadID = Thread::CurrentThreadID();
         lastEventTime.snap();
-
+        SC_TRY(SocketNetworking::initNetworking());
         SC_TRY(eventLoop.create());
         timeout.callback = [this](AsyncLoopTimeout::Result& result) { onTimeout(result); };
         SC_TRY(timeout.start(eventLoop, Time::Milliseconds(state.timeoutOccursEveryMs)));
