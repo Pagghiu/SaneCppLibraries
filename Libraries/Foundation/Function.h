@@ -258,7 +258,6 @@ struct Function<R(Args...)>
 
     /// @brief Invokes the wrapped function. If no function is bound, this is UB.
     /// @param args Arguments to be passed to the wrapped function
-    /// @return the return value of the invoked function.
     [[nodiscard]] R operator()(Args... args) const { return (*functionStub)(&classInstance, &args...); }
 
   private:
