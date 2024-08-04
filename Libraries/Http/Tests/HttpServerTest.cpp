@@ -1,83 +1,108 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../HttpServer.h"
+#include "../../Strings/SmallString.h"
 #include "../../Strings/StringBuilder.h"
 #include "../../Testing/Testing.h"
 #include "../HttpClient.h"
 namespace SC
 {
 struct HttpServerTest;
-}
+} // namespace SC
 
 struct SC::HttpServerTest : public SC::TestCase
 {
-    static constexpr int wantedNumTries = 3;
-
-    int numTries = 0;
     HttpServerTest(SC::TestReport& report) : TestCase(report, "HttpServerTest")
     {
-        if (test_section("server async"))
+        if (test_section("HttpServer"))
         {
-            AsyncEventLoop eventLoop;
-            numTries = 0;
-            SC_TEST_EXPECT(eventLoop.create());
-            HttpServer server;
-            SC_TEST_EXPECT(server.start(eventLoop, 10, "127.0.0.1", 6152));
-            server.onClient = [this, &server](HttpServer::ClientChannel& client)
-            {
-                auto& res = client.response;
-                SC_TEST_EXPECT(client.request.headersEndReceived);
-                if (client.request.parser.method != HttpParser::Method::HttpGET)
-                {
-                    SC_TEST_EXPECT(res.startResponse(405));
-                    SC_TEST_EXPECT(client.response.end(""));
-                    return;
-                }
-                if (client.request.url != "/index.html" and client.request.url != "/")
-                {
-                    SC_TEST_EXPECT(res.startResponse(404));
-                    SC_TEST_EXPECT(client.response.end(""));
-                    return;
-                }
-                numTries++;
-                if (numTries == wantedNumTries)
-                {
-                    SC_TEST_EXPECT(server.stop());
-                }
-                SC_TEST_EXPECT(res.startResponse(200));
-                SC_TEST_EXPECT(res.addHeader("Connection", "Closed"));
-                SC_TEST_EXPECT(res.addHeader("Content-Type", "text/html"));
-                SC_TEST_EXPECT(res.addHeader("Server", "SC"));
-                SC_TEST_EXPECT(res.addHeader("Date", "Mon, 27 Aug 2023 16:37:00 GMT"));
-                SC_TEST_EXPECT(res.addHeader("Last-Modified", "Wed, 27 Aug 2023 16:37:00 GMT"));
-                String        str;
-                StringBuilder sb(str);
-                const char    sampleHtml[] = "<html>\r\n"
-                                             "<body bgcolor=\"#000000\" text=\"#ffffff\">\r\n"
-                                             "<h1>This is a title {}!</h1>\r\n"
-                                             "We must start from somewhere\r\n"
-                                             "</body>\r\n"
-                                             "</html>\r\n";
-                SC_TEST_EXPECT(sb.format(sampleHtml, numTries));
-                SC_TEST_EXPECT(client.response.end(str.view()));
-            };
-            HttpClient       client[3];
-            SmallString<255> buffer;
-            for (int i = 0; i < wantedNumTries; ++i)
-            {
-                StringBuilder sb(buffer, StringBuilder::Clear);
-                SC_TEST_EXPECT(sb.format("HttpClient [{}]", i));
-                SC_TEST_EXPECT(client[i].setCustomDebugName(buffer.view()));
-                client[i].callback = [this](HttpClient& result)
-                { SC_TEST_EXPECT(result.getResponse().containsString("This is a title")); };
-                SC_TEST_EXPECT(client[i].get(eventLoop, "http://localhost:6152/index.html"));
-            }
-            SC_TEST_EXPECT(eventLoop.run());
-            SC_TEST_EXPECT(numTries == wantedNumTries);
-            SC_TEST_EXPECT(eventLoop.close());
+            httpServerTest();
         }
     }
+    void httpServerTest();
 };
+
+void SC::HttpServerTest::httpServerTest()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create());
+
+    //! [HttpServerSnippet]
+    HttpServer server;
+    SC_TEST_EXPECT(server.start(eventLoop, 10, "127.0.0.1", 6152));
+
+    struct ServerContext
+    {
+        int         numRequests;
+        HttpServer& server;
+    } serverContext = {0, server};
+
+    server.onClient = [this, &serverContext](HttpClientChannel& client)
+    {
+        auto& res = client.response;
+        SC_TEST_EXPECT(client.request.headersEndReceived);
+        if (client.request.parser.method != HttpParser::Method::HttpGET)
+        {
+            SC_TEST_EXPECT(res.startResponse(405));
+            SC_TEST_EXPECT(client.response.end(""));
+            return;
+        }
+        if (client.request.url != "/index.html" and client.request.url != "/")
+        {
+            SC_TEST_EXPECT(res.startResponse(404));
+            SC_TEST_EXPECT(client.response.end(""));
+            return;
+        }
+        serverContext.numRequests++;
+        SC_TEST_EXPECT(res.startResponse(200));
+        SC_TEST_EXPECT(res.addHeader("Connection", "Closed"));
+        SC_TEST_EXPECT(res.addHeader("Content-Type", "text/html"));
+        SC_TEST_EXPECT(res.addHeader("Server", "SC"));
+        SC_TEST_EXPECT(res.addHeader("Date", "Mon, 27 Aug 2023 16:37:00 GMT"));
+        SC_TEST_EXPECT(res.addHeader("Last-Modified", "Wed, 27 Aug 2023 16:37:00 GMT"));
+        String        str;
+        StringBuilder sb(str);
+        const char    sampleHtml[] = "<html>\r\n"
+                                     "<body bgcolor=\"#000000\" text=\"#ffffff\">\r\n"
+                                     "<h1>This is a title {}!</h1>\r\n"
+                                     "We must start from somewhere\r\n"
+                                     "</body>\r\n"
+                                     "</html>\r\n";
+        SC_TEST_EXPECT(sb.format(sampleHtml, serverContext.numRequests));
+        SC_TEST_EXPECT(client.response.end(str.view().toCharSpan()));
+    };
+
+    //! [HttpServerSnippet]
+
+    HttpClient       client[3];
+    SmallString<255> buffer;
+    struct ClientContext
+    {
+        int         numRequests;
+        HttpServer& server;
+        int         wantedNumRequests = 3;
+    } clientContext = {0, server};
+    for (int idx = 0; idx < clientContext.wantedNumRequests; ++idx)
+    {
+        StringBuilder sb(buffer, StringBuilder::Clear);
+        SC_TEST_EXPECT(sb.format("HttpClient [{}]", idx));
+        SC_TEST_EXPECT(client[idx].setCustomDebugName(buffer.view()));
+        client[idx].callback = [this, &clientContext](HttpClient& result)
+        {
+            SC_TEST_EXPECT(result.getResponse().containsString("This is a title"));
+            clientContext.numRequests++;
+            if (clientContext.numRequests == clientContext.wantedNumRequests)
+            {
+                SC_TEST_EXPECT(clientContext.server.stopAsync());
+            }
+        };
+        SC_TEST_EXPECT(client[idx].get(eventLoop, "http://localhost:6152/index.html"));
+    }
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(serverContext.numRequests == clientContext.wantedNumRequests);
+    SC_TEST_EXPECT(clientContext.numRequests == clientContext.wantedNumRequests);
+    SC_TEST_EXPECT(eventLoop.close());
+}
 
 namespace SC
 {

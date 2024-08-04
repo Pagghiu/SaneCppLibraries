@@ -21,6 +21,11 @@ This allows handling incomplete responses without needing holding it entirely in
 
 The HTTP client and server are for now just some toy implementations missing almost everything needed for real usage.  
 They only contain what's used in the test so far, so really can't be defined as more than a Draft.
+## HttpServer
+@copydoc SC::HttpServer
+
+## HttpClient
+@copydoc SC::HttpClient
 
 # Examples
 

@@ -6,7 +6,7 @@
 
 namespace SC
 {
-struct HttpParser;
+struct SC_COMPILER_EXPORT HttpParser;
 } // namespace SC
 
 //! @addtogroup group_http
