@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/Compiler.h" // SC_COMPILER_DEBUG_BREAK
-#include "../Foundation/Compiler.h" // SC_LANGUAGE_UNLIKELY
 #include "../Foundation/LibC.h"     // exit
 #include "../Foundation/Platform.h" // SC_CONFIGURATION_DEBUG
 
