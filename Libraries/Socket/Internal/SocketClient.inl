@@ -31,8 +31,6 @@ SC::Result SC::SocketClient::connect(SocketIPAddress ipAddress)
     return Result(true);
 }
 
-SC::Result SC::SocketClient::close() { return socket.close(); }
-
 SC::Result SC::SocketClient::write(Span<const char> data)
 {
     SocketDescriptor::Handle nativeSocket;

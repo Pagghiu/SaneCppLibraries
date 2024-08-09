@@ -15,7 +15,7 @@ struct String;
 
 namespace SC
 {
-struct SocketDescriptor;
+struct SC_COMPILER_EXPORT SocketDescriptor;
 struct SocketFlags;
 struct SocketIPAddress;
 struct SocketNetworking;
@@ -235,11 +235,7 @@ struct SC::SocketClient
 {
     /// @brief Constructs this SocketClient from a SocketDescriptor (already created with SocketDescriptor::create)
     /// @param socket A socket descriptor created with SocketDescriptor::create to be used as client
-    SocketClient(SocketDescriptor& socket) : socket(socket) {}
-
-    /// @brief Calls SocketDescriptor::close
-    /// @return The Result of SocketDescriptor::close
-    [[nodiscard]] Result close();
+    SocketClient(const SocketDescriptor& socket) : socket(socket) {}
 
     /// @brief Connect to a given address and port combination
     /// @param address Address as string
@@ -272,7 +268,7 @@ struct SC::SocketClient
     [[nodiscard]] Result readWithTimeout(Span<char> data, Span<char>& readData, Time::Milliseconds timeout);
 
   private:
-    SocketDescriptor& socket;
+    const SocketDescriptor& socket;
 };
 
 /// @brief Synchronous DNS Resolution

@@ -140,7 +140,7 @@ void SC::SocketDescriptorTest::socketClientServer(SocketFlags::SocketType   sock
         buf[0]++;
         params.writeRes = client.write({buf, sizeof(buf)});
         params.eventObject.wait();
-        params.closeRes = client.close();
+        params.closeRes = clientSocket.close();
     };
     Thread thread;
     SC_TEST_EXPECT(thread.start(func));
@@ -153,16 +153,17 @@ void SC::SocketDescriptorTest::socketClientServer(SocketFlags::SocketType   sock
         SC_TEST_EXPECT(acceptedClientSocket.isValid());
     }
 
-    SocketClient acceptedClient(protocol == SocketFlags::ProtocolTcp ? acceptedClientSocket : serverSocket);
-    Span<char>   readData;
-    char         buf[1] = {0};
+    SocketDescriptor& socket = protocol == SocketFlags::ProtocolTcp ? acceptedClientSocket : serverSocket;
+    SocketClient      acceptedClient(socket);
+    Span<char>        readData;
+    char              buf[1] = {0};
     SC_TEST_EXPECT(acceptedClient.read({buf, sizeof(buf)}, readData));
     SC_TEST_EXPECT(buf[0] == testValue and testValue != 0);
     SC_TEST_EXPECT(not acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, Time::Milliseconds(10)));
     params.eventObject.signal();
     SC_TEST_EXPECT(acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, Time::Seconds(10)));
     SC_TEST_EXPECT(buf[0] == testValue + 1);
-    SC_TEST_EXPECT(acceptedClient.close());
+    SC_TEST_EXPECT(socket.close());
     SC_TEST_EXPECT(server.close());
     params.eventObject.signal();
     SC_TEST_EXPECT(thread.join());
@@ -239,7 +240,7 @@ SC::Result SC::SocketDescriptorTest::socketClientAcceptSnippet()
     SC_TRY(acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, Time::Milliseconds(10000)));
 
     // Close the client
-    SC_TRY(acceptedClient.close());
+    SC_TRY(acceptedClientSocket.close());
     //! [socketClientAcceptSnippet]
     return Result(true);
 }
@@ -284,7 +285,7 @@ SC::Result SC::SocketDescriptorTest::socketClientConnectSnippet()
     SC_TRY(client.write({buf, sizeof(buf)}));
 
     // Close the socket
-    SC_TRY(client.close());
+    SC_TRY(clientSocket.close());
     //! [socketClientConnectSnippet]
     return Result(true);
 }
