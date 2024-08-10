@@ -383,11 +383,11 @@ bool SC::FileSystem::existsAndIsDirectory(StringView directory)
     return Internal::moveDirectory(encodedPath1.getNullTerminatedNative(), encodedPath2.getNullTerminatedNative());
 }
 
-SC::Result SC::FileSystem::getFileTime(StringView file, FileTime& fileTime)
+SC::Result SC::FileSystem::getFileStat(StringView file, FileStat& fileTime)
 {
     StringView encodedPath;
     SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
-    return Internal::getFileTime(encodedPath.getNullTerminatedNative(), fileTime);
+    return Internal::getFileStat(encodedPath.getNullTerminatedNative(), fileTime);
 }
 
 SC::Result SC::FileSystem::setLastModifiedTime(StringView file, Time::Absolute time)

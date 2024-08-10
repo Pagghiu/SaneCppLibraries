@@ -277,16 +277,17 @@ struct SC::FileSystem::Internal
     }
 #endif
 
-    [[nodiscard]] static Result getFileTime(const char* file, FileTime& time)
+    [[nodiscard]] static Result getFileStat(const char* file, FileStat& fileStat)
     {
         struct stat st;
         if (::stat(file, &st) == 0)
         {
+            fileStat.fileSize = static_cast<size_t>(st.st_size);
 #if SC_PLATFORM_APPLE
-            time.modifiedTime = Time::Absolute(
+            fileStat.modifiedTime = Time::Absolute(
                 static_cast<int64_t>(::round(st.st_mtimespec.tv_nsec / 1.0e6) + st.st_mtimespec.tv_sec * 1000));
 #else
-            time.modifiedTime =
+            fileStat.modifiedTime =
                 Time::Absolute(static_cast<int64_t>(::round(st.st_mtim.tv_nsec / 1.0e6) + st.st_mtim.tv_sec * 1000));
 #endif
             return Result(true);

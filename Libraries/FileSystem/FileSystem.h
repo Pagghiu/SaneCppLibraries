@@ -298,15 +298,16 @@ struct SC::FileSystem
     [[nodiscard]] Result read(StringView file, String& data, StringEncoding encoding);
 
     /// @brief A structure to describe modified time
-    struct FileTime
+    struct FileStat
     {
+        size_t         fileSize     = 0;
         Time::Absolute modifiedTime = 0; ///< Time when file was last modified
     };
-    /// @brief Reads a FileTime structure for a given file
+    /// @brief Obtains stats (size, modified time) about a file
     /// @param file Path to the file of interest
-    /// @param[out] fileTime Destination FileTime structure that will receive results
-    /// @return Valid Result if file time for the given file was successfully read
-    [[nodiscard]] Result getFileTime(StringView file, FileTime& fileTime);
+    /// @param[out] fileStat Destination structure that will receive statistics about the file
+    /// @return Valid Result if file stats for the given file was successfully read
+    [[nodiscard]] Result getFileStat(StringView file, FileStat& fileStat);
 
     /// @brief Change last modified time of a given file
     /// @param file Path to the file of interest

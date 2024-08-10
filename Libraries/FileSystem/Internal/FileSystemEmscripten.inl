@@ -44,7 +44,7 @@ struct SC::FileSystem::Internal
 
     static bool removeDirectoryRecursive(String& directory) { return false; }
 
-    [[nodiscard]] static Result getFileTime(const char* file, FileTime& time) { return Result(false); }
+    [[nodiscard]] static Result getFileStat(const char* file, FileStat& fileStat) { return Result(false); }
 
     [[nodiscard]] static Result setLastModifiedTime(const char* file, Time::Absolute time) { return Result(false); }
 };

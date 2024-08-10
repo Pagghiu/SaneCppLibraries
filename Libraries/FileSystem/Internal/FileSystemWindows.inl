@@ -190,21 +190,26 @@ struct SC::FileSystem::Internal
     }
 #endif
 
-    [[nodiscard]] static Result getFileTime(const wchar_t* file, FileTime& time)
+    [[nodiscard]] static Result getFileStat(const wchar_t* file, FileStat& fileStat)
     {
         HANDLE hFile =
             CreateFileW(file, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         FileDescriptor deferFileClose = hFile;
         SC_TRY_MSG(deferFileClose.isValid(), "getFileTime: Invalid file");
         FILETIME creationTime, lastAccessTime, modifiedTime;
-        if (GetFileTime(hFile, &creationTime, &lastAccessTime, &modifiedTime))
+        if (::GetFileTime(hFile, &creationTime, &lastAccessTime, &modifiedTime))
         {
             ULARGE_INTEGER fileTimeValue;
             fileTimeValue.LowPart  = modifiedTime.dwLowDateTime;
             fileTimeValue.HighPart = modifiedTime.dwHighDateTime;
             fileTimeValue.QuadPart -= 116444736000000000ULL;
-            time.modifiedTime = Time::Absolute(fileTimeValue.QuadPart / 10000ULL);
-            return Result(true);
+            fileStat.modifiedTime = Time::Absolute(fileTimeValue.QuadPart / 10000ULL);
+            LARGE_INTEGER fileSize;
+            if (::GetFileSizeEx(hFile, &fileSize))
+            {
+                fileStat.fileSize = static_cast<size_t>(fileSize.QuadPart);
+                return Result(true);
+            }
         }
         return Result(false);
     }

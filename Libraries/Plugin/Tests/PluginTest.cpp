@@ -107,8 +107,8 @@ struct SC::PluginTest : public SC::TestCase
             String     sourceContent;
             FileSystem fs;
             SC_TEST_EXPECT(fs.read(pluginScriptPath.view(), sourceContent, StringEncoding::Ascii));
-            FileSystem::FileTime scriptFileStat;
-            SC_TEST_EXPECT(fs.getFileTime(pluginScriptPath.view(), scriptFileStat));
+            FileSystem::FileStat scriptFileStat;
+            SC_TEST_EXPECT(fs.getFileStat(pluginScriptPath.view(), scriptFileStat));
             String sourceMod1;
             SC_TEST_EXPECT(StringBuilder(sourceMod1)
                                .appendReplaceAll(sourceContent.view(), //
