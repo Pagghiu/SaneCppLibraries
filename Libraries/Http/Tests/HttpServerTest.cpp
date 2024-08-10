@@ -37,29 +37,27 @@ void SC::HttpServerTest::httpServerTest()
         HttpServer& server;
     } serverContext = {0, server};
 
-    server.onClient = [this, &serverContext](HttpClientChannel& client)
+    server.onRequest = [this, &serverContext](HttpRequest& request, HttpResponse& response)
     {
-        auto& res = client.response;
-        SC_TEST_EXPECT(client.request.headersEndReceived);
-        if (client.request.parser.method != HttpParser::Method::HttpGET)
+        if (request.getParser().method != HttpParser::Method::HttpGET)
         {
-            SC_TEST_EXPECT(res.startResponse(405));
-            SC_TEST_EXPECT(client.response.end(""));
+            SC_TEST_EXPECT(response.startResponse(405));
+            SC_TEST_EXPECT(response.end(""));
             return;
         }
-        if (client.request.url != "/index.html" and client.request.url != "/")
+        if (request.getURL() != "/index.html" and request.getURL() != "/")
         {
-            SC_TEST_EXPECT(res.startResponse(404));
-            SC_TEST_EXPECT(client.response.end(""));
+            SC_TEST_EXPECT(response.startResponse(404));
+            SC_TEST_EXPECT(response.end(""));
             return;
         }
         serverContext.numRequests++;
-        SC_TEST_EXPECT(res.startResponse(200));
-        SC_TEST_EXPECT(res.addHeader("Connection", "Closed"));
-        SC_TEST_EXPECT(res.addHeader("Content-Type", "text/html"));
-        SC_TEST_EXPECT(res.addHeader("Server", "SC"));
-        SC_TEST_EXPECT(res.addHeader("Date", "Mon, 27 Aug 2023 16:37:00 GMT"));
-        SC_TEST_EXPECT(res.addHeader("Last-Modified", "Wed, 27 Aug 2023 16:37:00 GMT"));
+        SC_TEST_EXPECT(response.startResponse(200));
+        SC_TEST_EXPECT(response.addHeader("Connection", "Closed"));
+        SC_TEST_EXPECT(response.addHeader("Content-Type", "text/html"));
+        SC_TEST_EXPECT(response.addHeader("Server", "SC"));
+        SC_TEST_EXPECT(response.addHeader("Date", "Mon, 27 Aug 2023 16:37:00 GMT"));
+        SC_TEST_EXPECT(response.addHeader("Last-Modified", "Wed, 27 Aug 2023 16:37:00 GMT"));
         String        str;
         StringBuilder sb(str);
         const char    sampleHtml[] = "<html>\r\n"
@@ -69,7 +67,7 @@ void SC::HttpServerTest::httpServerTest()
                                      "</body>\r\n"
                                      "</html>\r\n";
         SC_TEST_EXPECT(sb.format(sampleHtml, serverContext.numRequests));
-        SC_TEST_EXPECT(client.response.end(str.view().toCharSpan()));
+        SC_TEST_EXPECT(response.end(str.view().toCharSpan()));
     };
 
     //! [HttpServerSnippet]

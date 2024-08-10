@@ -75,6 +75,6 @@ void SC::HttpClient::onAfterSend(AsyncSocketSend::Result& result)
 void SC::HttpClient::onAfterRead(AsyncSocketReceive::Result& result)
 {
     SC_COMPILER_UNUSED(result);
-    SC_ASSERT_RELEASE(SocketClient(clientSocket).close());
+    SC_ASSERT_RELEASE(clientSocket.close());
     callback(*this);
 }
