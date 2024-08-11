@@ -14,6 +14,7 @@
 #include "../../Libraries/Http/HttpParser.cpp"
 #include "../../Libraries/Http/HttpServer.cpp"
 #include "../../Libraries/Http/HttpURLParser.cpp"
+#include "../../Libraries/Http/HttpWebServer.cpp"
 #include "../../Libraries/Plugin/Plugin.cpp"
 #include "../../Libraries/Process/Process.cpp"
 #include "../../Libraries/SerializationText/SerializationJson.cpp"

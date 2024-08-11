@@ -13,30 +13,33 @@ Http library contains a hand-written http 1.1 parser, client and server.
 
 # Status
 🟥 Draft  
-In current state the library is not even able to host a simple static website.  
+In current state the library is able to host simple static website but it cannot be used for any internet facing application.  
 
 # Description
 The HTTP parser is an incremental parser, that will emit events as soon as a valid element has been successfully parsed.
 This allows handling incomplete responses without needing holding it entirely in memory.
 
-The HTTP client and server are for now just some toy implementations missing almost everything needed for real usage.  
-They only contain what's used in the test so far, so really can't be defined as more than a Draft.
+The HTTP client and server are for now just some basic implementations and are missing some important feature.  
+
 ## HttpServer
 @copydoc SC::HttpServer
+
+## HttpWebServer
+@copydoc SC::HttpWebServer
 
 ## HttpClient
 @copydoc SC::HttpClient
 
 # Examples
 
-No examples are provided so far as the API is very likely to change drastically going towards MVP.  
-If you like to see where we are just a take a look at the associated unit test.
+- [SCExample](@ref page_examples) features the `WebServerExample` sample showing how to use SC::HttpWebServer and SC::HttpServer
+- Unit tests show how to use SC::HttpWebServer, SC::HttpServer and SC::HttpClient
 
 # Roadmap
 
 🟨 MVP
 - Server+Client: Support mostly used HTTP verbs / methods
-- Server: Ability to host a local website (handle content encoding)
+- Server+Client: HTTP 1.1 Chunked Encoding
 
 🟩 Usable Features:
 - Implement ([Web Streams API](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API))
