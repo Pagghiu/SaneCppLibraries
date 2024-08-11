@@ -13,7 +13,6 @@
 | Description   | Simple immediate mode gui application using sokol and dear imgui libraries pausing in absence of inputs and I/O to save CPU time  |
 | Purposes      | Use [SC::Build](@ref library_build) to build on macOS, windows and linux and [SC::Async](@ref library_async) as I/O event Loop    |
 |               | Use [Plugin](@ref library_plugin) and [FileSystemWatcher](@ref library_file_system_watcher) libraries implementing hot-reload     |
-|               | Use [Reflection](@ref library_reflection) and [Serialization](@ref library_serialization_binary) to persist application state     |
 | Prerequisites | Linux - Fedora: `sudo dnf install mesa-libGL-devel mesa-libEGL-devel libX11-devel libXi-devel libXcursor-devel`                   |
 |               | Linux - Ubuntu: `sudo apt-get install libgles2-mesa-dev libx11-dev libxi-dev libxcursor-dev`                                      |
 |               | Windows: None                                                                                                                     |
@@ -25,16 +24,12 @@
 | Debug (XCode) | Open `_Build/_Projects/XCode/SCExample.xcodeproj` and choose `Product` --> `Run`                                                  |
 | Debug (VS2022)| Open `_Build/_Projects/VisualStudio2022/SCExample.sln` and start Debugging (F5)                                                   |
 
-https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d
-https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717
+### Examples
 
-\htmlonly
-<iframe width="700" height="400" src="https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d" frameborder="0" allowfullscreen>
-\endhtmlonly
-
-\htmlonly
-<iframe width="700" height="400" src="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717" frameborder="0" allowfullscreen>
-\endhtmlonly
+| Example       | Description                                                                                                                       |
+|:--------------|:----------------------------------------------------------------------------------------------------------------------------------|
+| Serialization | Use [Reflection](@ref library_reflection) and [Serialization](@ref library_serialization_binary) to persist application state     |
+| WebServer     | Use [Http](@ref library_http) to statically host a website from a specified directory                                             |
 
 # Where can I find more examples?
 
@@ -50,3 +45,17 @@ There are many way to learn about the library:
 - Take a look at videos from [Youtube Channel](https://www.youtube.com/@Pagghiu)
 - Read and / or step through the extensive set of unit tests (current test code coverage is > 90%).
 - Ask in the [Discord](https://discord.gg/tyBfFp33Z6)
+
+https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d
+https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717
+
+\htmlonly
+<iframe width="700" height="400" src="https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d" frameborder="0" allowfullscreen>
+</iframe>
+\endhtmlonly
+
+\htmlonly
+<iframe width="700" height="400" src="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717" frameborder="0" allowfullscreen>
+</iframe>
+\endhtmlonly
+
