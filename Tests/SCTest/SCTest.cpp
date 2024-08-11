@@ -102,8 +102,9 @@ SC::Console* globalConsole;
 
 int main(int argc, const char* argv[])
 {
-    SC::SmallVector<char, 1024 * sizeof(SC::native_char_t)> globalConsoleConversionBuffer;
     using namespace SC;
+    SmallVector<char, 1024 * sizeof(SC::native_char_t)> globalConsoleConversionBuffer;
+    Console::tryAttachingToParentConsole();
     FileSystemDirectories directories;
     if (not directories.init())
         return -2;

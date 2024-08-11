@@ -25,7 +25,7 @@ int main(int argc, const char* argv[])
 {
     using namespace SC;
     using namespace SC::Tools;
-
+    Console::tryAttachingToParentConsole();
     Console         console(gConsoleBuffer);
     Tool::Arguments arguments{console};
 

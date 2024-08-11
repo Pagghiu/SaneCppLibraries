@@ -55,6 +55,13 @@ struct SC_COMPILER_EXPORT Console
     /// @param str The StringView to print
     void printLine(const StringView str);
 
+    /// @brief Tries attaching current process to parent console (Windows only, has no effect elsewhere)
+    /// @returns `true` if the parent console has been attached (Windows only, returns true elsewhere)
+    static bool tryAttachingToParentConsole();
+
+    /// @brief Returns true if current process has an active console (Windows only, returns true elsewhere)
+    static bool isAttachedToConsole();
+
   private:
     Vector<char>& encodingConversionBuffer;
 #if SC_PLATFORM_WINDOWS

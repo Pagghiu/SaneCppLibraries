@@ -22,6 +22,25 @@ SC::Console::Console(Vector<char>& encodingConversionBuffer) : encodingConversio
     isDebugger = ::IsDebuggerPresent() == TRUE;
 #endif
 }
+
+bool SC::Console::tryAttachingToParentConsole()
+{
+#if SC_PLATFORM_WINDOWS
+    return ::AttachConsole(ATTACH_PARENT_PROCESS) == TRUE;
+#else
+    return true;
+#endif
+}
+
+bool SC::Console::isAttachedToConsole()
+{
+#if SC_PLATFORM_WINDOWS
+    return ::GetConsoleWindow() != 0;
+#else
+    return true;
+#endif
+}
+
 void SC::Console::printLine(const StringView str)
 {
     print(str);
