@@ -17,6 +17,8 @@ SC::Result SC::detail::ProcessDescriptorDefinition::releaseHandle(HANDLE& handle
     return Result(true);
 }
 
+bool SC::Process::isWindowsConsoleSubsystem() { return ::GetStdHandle(STD_OUTPUT_HANDLE) == NULL; }
+
 SC::size_t SC::Process::getNumberOfProcessors()
 {
     SYSTEM_INFO systemInfo;
@@ -58,12 +60,17 @@ SC::Result SC::Process::launchImplementation()
 
     const BOOL inheritHandles = someRedirection ? TRUE : FALSE;
 
-    DWORD creationFlags = CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW;
+    DWORD creationFlags = CREATE_UNICODE_ENVIRONMENT;
+
+    if (options.windowsHide)
+    {
+        creationFlags |= CREATE_NO_WINDOW;
+    }
     ZeroMemory(&startupInfo, sizeof(STARTUPINFO));
     startupInfo.cb         = sizeof(STARTUPINFO);
-    startupInfo.hStdInput  = GetStdHandle(STD_INPUT_HANDLE);
-    startupInfo.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-    startupInfo.hStdError  = GetStdHandle(STD_ERROR_HANDLE);
+    startupInfo.hStdInput  = ::GetStdHandle(STD_INPUT_HANDLE);
+    startupInfo.hStdOutput = ::GetStdHandle(STD_OUTPUT_HANDLE);
+    startupInfo.hStdError  = ::GetStdHandle(STD_ERROR_HANDLE);
 
     if (stdInFd.isValid())
     {

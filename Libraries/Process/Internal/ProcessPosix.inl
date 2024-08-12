@@ -35,6 +35,8 @@ SC::size_t SC::Process::getNumberOfProcessors()
     return static_cast<size_t>(numProc);
 }
 
+bool SC::Process::isWindowsConsoleSubsystem() { return false; }
+
 struct SC::Process::Internal
 {
     static FileDescriptor::Handle getStandardInputFDS() { return fileno(stdin); };
@@ -121,6 +123,7 @@ SC::Result SC::Process::waitForExitSync()
 
 SC::Result SC::Process::launchImplementation()
 {
+    SC_COMPILER_UNUSED(options);
     sigset_t emptySignals;
     sigset_t previousSignals;
 

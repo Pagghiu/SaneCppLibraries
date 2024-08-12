@@ -24,6 +24,7 @@ SC::Result SC::ProcessChain::launch(const Process::StdOut& stdOut, const Process
     }
     for (Process* process = processes.front; process != nullptr; process = process->next)
     {
+        process->options = options;
         if (process == processes.front)
         {
             if (process == processes.back)
@@ -83,6 +84,7 @@ SC::Result SC::ProcessChain::waitForExitSync()
 //-------------------------------------------------------------------------------------------------------
 // Process
 //-------------------------------------------------------------------------------------------------------
+SC::Process::Options::Options() { windowsHide = Process::isWindowsConsoleSubsystem(); }
 
 SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, const StdErr& stdError)
 {

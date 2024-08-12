@@ -62,6 +62,12 @@ struct SC::ProcessID
 
 struct SC::Process
 {
+    struct SC_COMPILER_EXPORT Options
+    {
+        bool windowsHide; ///< [Windows] Hides child process window (default == Process::isWindowsConsoleSubsystem)
+        Options();
+    };
+
     struct StdStream
     {
         // clang-format off
@@ -166,6 +172,7 @@ struct SC::Process
 
     ProcessDescriptor handle;    ///< Handle to the OS process
     ProcessID         processID; ///< ID of the process (can be the same as handle on some OS)
+    Options           options;   ///< Options for the child process (hide console window etc.)
 
     /// @brief Waits (blocking) for process to exit after launch. It can only be called if Process::launch succeeded.
     [[nodiscard]] Result waitForExitSync();
@@ -216,6 +223,9 @@ struct SC::Process
 
     /// @brief Returns number of (virtual) processors available
     static size_t getNumberOfProcessors();
+
+    /// @brief Returns true only under Windows if executable is compiled with `/SUBSYSTEM:Console`
+    static bool isWindowsConsoleSubsystem();
 
   private:
     ProcessDescriptor::ExitStatus exitStatus; ///< Exit status code returned after process is finished
@@ -279,6 +289,7 @@ struct SC::Process
 /// \snippet Libraries/Process/Tests/ProcessTest.cpp processChainPipeDualSnippet
 struct SC::ProcessChain
 {
+    Process::Options options;
     /// @brief Add a process to the chain, with given arguments
     /// @param process A non-launched Process object (allocated by caller, must be alive until waitForExitSync)
     /// @param cmd Path to executable and eventual args for this process
