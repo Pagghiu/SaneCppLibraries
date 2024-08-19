@@ -434,7 +434,12 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     [[nodiscard]] Result completeAsync(AsyncSocketReceive::Result& result)
     {
-        result.completionData.numBytes = static_cast<size_t>(events[result.getAsync().eventIndex].res);
+        io_uring_cqe& completion       = events[result.getAsync().eventIndex];
+        result.completionData.numBytes = static_cast<size_t>(completion.res);
+        if (completion.res == 0)
+        {
+            result.completionData.disconnected = true;
+        }
         return Result(true);
     }
 

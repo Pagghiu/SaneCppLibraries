@@ -609,15 +609,28 @@ struct SC::AsyncTest : public SC::TestCase
             SC_TEST_EXPECT(sendAsync.start(eventLoop, client, sendBufferLarge.toSpanConst()));
             struct Context
             {
-                size_t bufferSize          = largeBufferSize; // Need this for vs2019
-                int    largeCallbackCalled = 0;
-                size_t totalNumBytesRead   = 0;
-            } context;
+                SocketDescriptor& client;
+                size_t            bufferSize          = largeBufferSize; // Need this for vs2019
+                int               largeCallbackCalled = 0;
+                size_t            totalNumBytesRead   = 0;
+            } context             = {client};
             receiveAsync.callback = [this, &context](AsyncSocketReceive::Result& res)
             {
                 context.largeCallbackCalled++;
-                context.totalNumBytesRead += res.completionData.numBytes;
-                res.reactivateRequest(context.totalNumBytesRead < context.bufferSize);
+                if (context.totalNumBytesRead < context.bufferSize)
+                {
+                    context.totalNumBytesRead += res.completionData.numBytes;
+                    if (context.totalNumBytesRead == context.bufferSize)
+                    {
+                        SC_TEST_EXPECT(context.client.close()); // Causes EOF
+                    }
+                    res.reactivateRequest(true);
+                }
+                else
+                {
+                    SC_TEST_EXPECT(res.completionData.disconnected);
+                    SC_TEST_EXPECT(res.completionData.numBytes == 0); // EOF
+                }
             };
             SC_TEST_EXPECT(receiveAsync.start(eventLoop, serverSideClient, receiveBufferLarge.toSpan()));
             SC_TEST_EXPECT(eventLoop.run());
@@ -1152,18 +1165,33 @@ SocketDescriptor client;
 // Assuming an already created (and running) AsyncEventLoop named `eventLoop`
 // and a connected or accepted socket named `client`
 // ...
+char receivedData[100] = {0}; // A buffer to hold data read from the socket
 AsyncSocketReceive receiveAsync;
-char receivedData[100] = {0};
 receiveAsync.callback = [&](AsyncSocketReceive::Result& res)
 {
     Span<char> readData;
     if(res.get(readData))
     {
-        // readData now contains a slice of receivedData with the received bytes
-        console.print("{} bytes have been read", readData.sizeInBytes());
+        if(res.completionData.disconnected)
+        {
+            // Last callback invocation done when other side of the socket has disconnected.
+            // - completionData.disconnected is == true
+            // - readData.sizeInBytes() is == 0
+            console.print("Client disconnected");
+        }
+        else
+        {
+            // readData is a slice of receivedData with the received bytes
+            console.print("{} bytes have been read", readData.sizeInBytes());
+            
+            // IMPORTANT: Reactivate the request to receive more data
+            res.reactivateRequest(true);
+        }
     }
-    // Ask to reactivate the request if we want to receive more data
-    res.reactivateRequest(true);
+    else
+    {
+        // Some error occurred, check res.returnCode
+    }
 };
 SC_TRY(receiveAsync.start(eventLoop, client, {receivedData, sizeof(receivedData)}));
 //! [AsyncSocketReceiveSnippet]

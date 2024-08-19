@@ -651,12 +651,31 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 #endif
     }
 
-    [[nodiscard]] static Result completeAsync(AsyncSocketReceive::Result& result)
+    [[nodiscard]] Result completeAsync(AsyncSocketReceive::Result& result)
     {
         AsyncSocketReceive& async = result.getAsync();
         const ssize_t       res   = ::recv(async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
         SC_TRY_MSG(res >= 0, "error in recv");
         result.completionData.numBytes = static_cast<size_t>(res);
+        // It can happen that async.disconnectedReceived == true when reading the last trail of bytes.
+        // To unify differences between different posix-es, let's set disconnected flag only after
+        // the final zero read, possibly on next loop run.
+        if (async.disconnectedReceived)
+        {
+            if (res == 0)
+            {
+                result.completionData.disconnected = true;
+            }
+        }
+        else
+        {
+            const auto& event = events[result.getAsync().eventIndex];
+#if SC_ASYNC_USE_EPOLL
+            async.disconnectedReceived = (event.events & EPOLLRDHUP) != 0;
+#else
+            async.disconnectedReceived = (event.flags & EV_EOF) != 0;
+#endif
+        }
         return Result(true);
     }
 

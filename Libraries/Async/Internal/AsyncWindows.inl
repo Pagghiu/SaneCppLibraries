@@ -461,8 +461,16 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
     [[nodiscard]] static Result completeAsync(AsyncSocketReceive::Result& result)
     {
-        return KernelQueue::checkWSAResult(result.getAsync().handle, result.getAsync().overlapped.get().overlapped,
-                                           &result.completionData.numBytes);
+        Result res = KernelQueue::checkWSAResult(
+            result.getAsync().handle, result.getAsync().overlapped.get().overlapped, &result.completionData.numBytes);
+        if (res)
+        {
+            if (result.completionData.numBytes == 0)
+            {
+                result.completionData.disconnected = true;
+            }
+        }
+        return res;
     }
 
     //-------------------------------------------------------------------------------------------------------

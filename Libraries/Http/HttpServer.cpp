@@ -286,7 +286,7 @@ void SC::HttpServer::Internal::onReceive(AsyncSocketReceive::Result& result)
             return;
         }
     }
-    else
+    else if (not result.completionData.disconnected)
     {
         result.reactivateRequest(true);
     }

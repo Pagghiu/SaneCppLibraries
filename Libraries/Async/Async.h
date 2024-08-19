@@ -574,6 +574,9 @@ struct AsyncSocketReceive;
 /// SC::AsyncEventLoop::associateExternallyCreatedTCPSocket or though AsyncSocketAccept. @n
 /// Alternatively SC::AsyncEventLoop::createAsyncTCPSocket creates and associates the socket to the loop.
 ///
+/// Additional notes:
+/// - SC::AsyncSocketReceive::CompletionData::disconnected will be set to true when client disconnects
+///
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncSocketReceiveSnippet
 struct AsyncSocketReceive : public AsyncRequest
 {
@@ -582,7 +585,8 @@ struct AsyncSocketReceive : public AsyncRequest
     /// @brief Completion data for AsyncSocketReceive
     struct CompletionData : public AsyncCompletionData
     {
-        size_t numBytes = 0;
+        size_t numBytes     = 0;
+        bool   disconnected = false;
     };
 
     /// @brief Callback result for AsyncSocketReceive
@@ -618,6 +622,8 @@ struct AsyncSocketReceive : public AsyncRequest
     Span<char>               buffer;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
+#else
+    bool               disconnectedReceived = true;
 #endif
 };
 

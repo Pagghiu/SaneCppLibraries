@@ -74,7 +74,10 @@ void SC::HttpClient::onAfterSend(AsyncSocketSend::Result& result)
 
 void SC::HttpClient::onAfterRead(AsyncSocketReceive::Result& result)
 {
-    SC_COMPILER_UNUSED(result);
+    // TODO: parse response and re-arm receive to read it entirely
     SC_ASSERT_RELEASE(clientSocket.close());
-    callback(*this);
+    if (not result.completionData.disconnected)
+    {
+        callback(*this);
+    }
 }
