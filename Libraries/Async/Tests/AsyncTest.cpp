@@ -750,10 +750,18 @@ struct SC::AsyncTest : public SC::TestCase
             {
                 Span<char> readData;
                 SC_TEST_EXPECT(res.get(readData));
-                SC_TEST_EXPECT(readData.sizeInBytes() == 1);
-                params.readBuffer[params.readCount++] = readData.data()[0];
-                res.getAsync().offset += readData.sizeInBytes();
-                res.reactivateRequest(params.readCount < 4);
+                if (params.readCount < 4)
+                {
+                    SC_TEST_EXPECT(readData.sizeInBytes() == 1);
+                    params.readBuffer[params.readCount++] = readData.data()[0];
+                    res.getAsync().offset += readData.sizeInBytes();
+                    res.reactivateRequest(true);
+                }
+                else
+                {
+                    SC_TEST_EXPECT(res.completionData.endOfFile);
+                    SC_TEST_EXPECT(readData.empty()); // EOF
+                }
             };
             char buffer[1]               = {0};
             asyncReadFile.fileDescriptor = handle;
@@ -1210,8 +1218,28 @@ asyncReadFile.callback = [&](AsyncFileRead::Result& res)
     Span<char> readData;
     if(res.get(readData))
     {
-        console.print("Read {} bytes from file", readData.sizeInBytes());
-        res.reactivateRequest(true); // Ask to receive more data
+        if(res.completionData.endOfFile)
+        {
+            // Last callback invocation done when end of file has been reached
+            // - completionData.endOfFile is == true
+            // - readData.sizeInBytes() is == 0
+            console.print("End of file reached");
+        }
+        else
+        {
+            // readData is a slice of receivedData with the received bytes
+            console.print("Read {} bytes from file", readData.sizeInBytes());
+            
+            // IMPORTANT: Update file offset to receive next range of bytes
+            res.getAsync().offset += readData.sizeInBytes();
+            
+            // IMPORTANT: Reactivate the request to receive more data
+            res.reactivateRequest(true);
+        }
+    }
+    else
+    {
+        // Some error occurred, check res.returnCode
     }
 };
 char buffer[100] = {0};

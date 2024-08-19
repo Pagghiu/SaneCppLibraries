@@ -690,7 +690,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         }
     }
 
-    [[nodiscard]] static Result completeAsync(AsyncFileRead::Result& result)
+    [[nodiscard]] Result completeAsync(AsyncFileRead::Result& result)
     {
         return executeOperation(result.getAsync(), result.completionData);
     }
@@ -718,6 +718,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
         SC_TRY_MSG(res >= 0, "::read failed");
         completionData.numBytes = static_cast<size_t>(res);
+        if (not span.empty() and res == 0)
+        {
+            completionData.endOfFile = true;
+        }
         return Result(true);
     }
 

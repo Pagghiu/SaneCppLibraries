@@ -668,6 +668,10 @@ struct AsyncSocketClose : public AsyncRequest
 /// - Open the file descriptor for non-blocking IO (SC::FileDescriptor::OpenOptions::blocking == `false`)
 /// - Call SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor on the file descriptor
 ///
+/// Additional notes:
+/// - When reactivating the AsyncRequest, rembember to increment the offset (SC::AsyncFileRead::offset)
+/// - SC::AsyncFileRead::CompletionData::endOfFile signals end of file reached
+///
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncFileReadSnippet
 struct AsyncFileRead : public AsyncRequest
 {
@@ -676,7 +680,8 @@ struct AsyncFileRead : public AsyncRequest
     /// @brief Completion data for AsyncFileRead
     struct CompletionData : public AsyncCompletionData
     {
-        size_t numBytes = 0;
+        size_t numBytes  = 0;
+        bool   endOfFile = false;
     };
 
     /// @brief Callback result for AsyncFileRead

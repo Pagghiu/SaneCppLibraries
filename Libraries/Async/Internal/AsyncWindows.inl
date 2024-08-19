@@ -482,7 +482,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     template <typename Func, typename T>
     [[nodiscard]] static Result executeFileOperation(Func func, T& async, typename T::CompletionData& completionData,
-                                                     bool synchronous)
+                                                     bool synchronous, bool* endOfFile)
     {
         OVERLAPPED& overlapped = async.overlapped.get().overlapped;
         overlapped.Offset      = static_cast<DWORD>(async.offset & 0xffffffff);
@@ -495,16 +495,30 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         DWORD numBytes;
         if (func(fileDescriptor, async.buffer.data(), bufSize, &numBytes, &overlapped) == FALSE)
         {
-            if (::GetLastError() == ERROR_IO_PENDING) // ERROR_IO_PENDING just indicates async operation is in progress
+            const DWORD lastError = ::GetLastError();
+            if (lastError == ERROR_IO_PENDING) // ERROR_IO_PENDING just indicates async operation is in progress
             {
                 if (synchronous)
                 {
                     // If we have been requested to do a synchronous operation on an async file, wait for completion
                     if (::GetOverlappedResult(fileDescriptor, &overlapped, &numBytes, TRUE) == FALSE) // bWait == TRUE
                     {
-                        return Result::Error("ReadFile/WriteFile (GetOverlappedResult) error");
+                        if (::GetLastError() == ERROR_HANDLE_EOF)
+                        {
+                            if (endOfFile)
+                                *endOfFile = true;
+                        }
+                        else
+                        {
+                            return Result::Error("ReadFile/WriteFile (GetOverlappedResult) error");
+                        }
                     }
                 }
+            }
+            else if (lastError == ERROR_HANDLE_EOF)
+            {
+                if (endOfFile)
+                    *endOfFile = true;
             }
             else
             {
@@ -527,14 +541,21 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     }
 
     template <typename ResultType>
-    static Result completeFileOperation(ResultType& result)
+    static Result completeFileOperation(ResultType& result, bool* endOfFile)
     {
         OVERLAPPED& overlapped  = result.getAsync().overlapped.get().overlapped;
         DWORD       transferred = 0;
         if (::GetOverlappedResult(result.getAsync().fileDescriptor, &overlapped, &transferred, FALSE) == FALSE)
         {
-            // TODO: report error
-            return Result::Error("GetOverlappedResult error");
+            if (::GetLastError() == ERROR_HANDLE_EOF)
+            {
+                if (endOfFile)
+                    *endOfFile = true;
+            }
+            else
+            {
+                return Result::Error("GetOverlappedResult error");
+            }
         }
         result.completionData.numBytes = transferred;
         return Result(true);
@@ -552,10 +573,13 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     [[nodiscard]] static Result executeOperation(AsyncFileRead& async, AsyncFileRead::CompletionData& completionData,
                                                  bool synchronous = true)
     {
-        return executeFileOperation(&::ReadFile, async, completionData, synchronous);
+        return executeFileOperation(&::ReadFile, async, completionData, synchronous, &completionData.endOfFile);
     }
 
-    [[nodiscard]] static Result completeAsync(AsyncFileRead::Result& result) { return completeFileOperation(result); }
+    [[nodiscard]] static Result completeAsync(AsyncFileRead::Result& result)
+    {
+        return completeFileOperation(result, &result.completionData.endOfFile);
+    }
 
     //-------------------------------------------------------------------------------------------------------
     // File WRITE
@@ -569,10 +593,13 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     [[nodiscard]] static Result executeOperation(AsyncFileWrite& async, AsyncFileWrite::CompletionData& completionData,
                                                  bool synchronous = true)
     {
-        return executeFileOperation(&::WriteFile, async, completionData, synchronous);
+        return executeFileOperation(&::WriteFile, async, completionData, synchronous, nullptr);
     }
 
-    [[nodiscard]] static Result completeAsync(AsyncFileWrite::Result& result) { return completeFileOperation(result); }
+    [[nodiscard]] static Result completeAsync(AsyncFileWrite::Result& result)
+    {
+        return completeFileOperation(result, nullptr);
+    }
 
     //-------------------------------------------------------------------------------------------------------
     // File CLOSE

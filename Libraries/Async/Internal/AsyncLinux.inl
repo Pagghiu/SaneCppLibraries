@@ -471,7 +471,12 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     [[nodiscard]] Result completeAsync(AsyncFileRead::Result& result)
     {
-        result.completionData.numBytes = static_cast<size_t>(events[result.getAsync().eventIndex].res);
+        io_uring_cqe& completion       = events[result.getAsync().eventIndex];
+        result.completionData.numBytes = static_cast<size_t>(completion.res);
+        if (completion.res == 0)
+        {
+            result.completionData.endOfFile = true;
+        }
         return Result(true);
     }
 
