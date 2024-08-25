@@ -602,7 +602,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
             if (numBytesSent < 0)
             {
-                if (errno == EWOULDBLOCK || errno == EAGAIN)
+                const auto sendError = errno;
+                if (sendError == EWOULDBLOCK || sendError == EAGAIN)
                 {
                     // Partial write case:
                     // Socket is not writable right now, we should wait for it to be writable again, to finish
@@ -657,24 +658,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         const ssize_t       res   = ::recv(async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
         SC_TRY_MSG(res >= 0, "error in recv");
         result.completionData.numBytes = static_cast<size_t>(res);
-        // It can happen that async.disconnectedReceived == true when reading the last trail of bytes.
-        // To unify differences between different posix-es, let's set disconnected flag only after
-        // the final zero read, possibly on next loop run.
-        if (async.disconnectedReceived)
+        if (res == 0)
         {
-            if (res == 0)
-            {
-                result.completionData.disconnected = true;
-            }
-        }
-        else
-        {
-            const auto& event = events[result.getAsync().eventIndex];
-#if SC_ASYNC_USE_EPOLL
-            async.disconnectedReceived = (event.events & EPOLLRDHUP) != 0;
-#else
-            async.disconnectedReceived = (event.flags & EV_EOF) != 0;
-#endif
+            result.completionData.disconnected = true;
         }
         return Result(true);
     }

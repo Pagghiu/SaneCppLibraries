@@ -622,8 +622,6 @@ struct AsyncSocketReceive : public AsyncRequest
     Span<char>               buffer;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
-#else
-    bool               disconnectedReceived = true;
 #endif
 };
 
