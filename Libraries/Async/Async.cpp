@@ -713,7 +713,10 @@ SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(SyncMode syncMode, 
     switch (syncMode)
     {
     case SyncMode::NoWait: {
-        invokeExpiredTimers(loopTime);
+        if (kernelEvents.needsManualTimersProcessing())
+        {
+            invokeExpiredTimers(loopTime);
+        }
     }
     break;
     case SyncMode::ForcedForwardProgress: {
@@ -721,7 +724,10 @@ SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(SyncMode syncMode, 
         {
             expiredTimer = nullptr;
             updateTime();
-            invokeExpiredTimers(loopTime);
+            if (kernelEvents.needsManualTimersProcessing())
+            {
+                invokeExpiredTimers(loopTime);
+            }
         }
     }
     break;

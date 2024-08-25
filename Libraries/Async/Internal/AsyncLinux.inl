@@ -63,7 +63,9 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     {
         return true;
     }
-    
+
+    bool needsManualTimersProcessing() { return isEpoll; }
+
     template <typename T, typename P> [[nodiscard]] static Result executeOperation(T&, P& p);
     // clang-format on
 };

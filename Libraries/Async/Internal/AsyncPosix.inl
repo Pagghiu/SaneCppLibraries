@@ -808,6 +808,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     static bool needsSubmissionWhenReactivating(AsyncFilePoll&) { return false; }
 
+    static bool needsManualTimersProcessing() { return true; }
+
     //-------------------------------------------------------------------------------------------------------
     // File CLOSE
     //-------------------------------------------------------------------------------------------------------

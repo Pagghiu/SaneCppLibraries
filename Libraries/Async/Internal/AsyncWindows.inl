@@ -687,10 +687,9 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
     // If False, makes re-activation a no-op, that is a lightweight optimization.
     // More importantly it prevents an assert about being Submitting state when async completes during re-activation run cycle.
-    template<typename T> static bool needsSubmissionWhenReactivating(T&)
-    {
-        return true;
-    }
+    template<typename T> static bool needsSubmissionWhenReactivating(T&) { return true; }
+    
+    static bool needsManualTimersProcessing() { return true; }
     
     template <typename T, typename P> [[nodiscard]] static Result executeOperation(T&, P&) { return Result::Error("Implement executeOperation"); }
     // clang-format on
