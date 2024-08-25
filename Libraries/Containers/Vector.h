@@ -91,11 +91,11 @@ struct SC::Vector
 
     /// @brief Returns a Span wrapping the entire of current vector
     /// @return a Span wrapping the entire of current vector
-    [[nodiscard]] Span<const T> toSpanConst() const SC_LANGUAGE_LIFETIME_BOUND { return {items, size()}; }
+    [[nodiscard]] Span<const T> toSpanConst() const SC_LANGUAGE_LIFETIME_BOUND { return Span<const T>(items, size()); }
 
     /// @brief Returns a Span wrapping the entire of current vector
     /// @return a Span wrapping the entire of current vector
-    [[nodiscard]] Span<T> toSpan() SC_LANGUAGE_LIFETIME_BOUND { return {items, size()}; }
+    [[nodiscard]] Span<T> toSpan() SC_LANGUAGE_LIFETIME_BOUND { return Span<T>(items, size()); }
 
     /// @brief Access item at index. Bounds checked in debug.
     /// @param index index of the item to be accessed

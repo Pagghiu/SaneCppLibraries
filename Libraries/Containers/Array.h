@@ -100,11 +100,11 @@ struct SC::Array
 
     /// @brief Returns a Span wrapping the entire of current array
     /// @return a Span wrapping the entire of current array
-    [[nodiscard]] Span<const T> toSpanConst() const SC_LANGUAGE_LIFETIME_BOUND { return {items, size()}; }
+    [[nodiscard]] Span<const T> toSpanConst() const SC_LANGUAGE_LIFETIME_BOUND { return Span<const T>(items, size()); }
 
     /// @brief Returns a Span wrapping the entire of current array
     /// @return a Span wrapping the entire of current array
-    [[nodiscard]] Span<T> toSpan() SC_LANGUAGE_LIFETIME_BOUND { return {items, size()}; }
+    [[nodiscard]] Span<T> toSpan() SC_LANGUAGE_LIFETIME_BOUND { return Span<T>(items, size()); }
 
     /// @brief Access item at index. Bounds checked in debug.
     /// @param index index of the item to be accessed
@@ -370,7 +370,7 @@ SC::Array<T, N>::Array(const Array& other)
 {
     segmentHeader.sizeBytes     = 0;
     segmentHeader.capacityBytes = sizeof(T) * N;
-    (void)append({other.items, other.size()});
+    (void)append(other.toSpanConst());
 }
 
 template <typename T, int N>
