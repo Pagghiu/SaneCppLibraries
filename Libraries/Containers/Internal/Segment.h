@@ -110,31 +110,33 @@ struct SC::SegmentItems : public SegmentHeader
     static typename TypeTraits::EnableIf<not IsCopy, void>::type constructItems(U* destination, size_t indexStart,
                                                                                 size_t numElements, U* sourceValue);
 
-    template <typename Q = T>
-    static typename TypeTraits::EnableIf<not TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
-    moveItems(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN);
+    template <bool IsTrivial>
+    static typename TypeTraits::EnableIf<IsTrivial, void>::type moveItems(T* oldItems, T* newItems,
+                                                                          const size_t oldSize,
+                                                                          const size_t keepFirstN);
 
-    template <typename Q = T>
-    static typename TypeTraits::EnableIf<TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
-    moveItems(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN);
+    template <bool IsTrivial>
+    static typename TypeTraits::EnableIf<not IsTrivial, void>::type moveItems(T* oldItems, T* newItems,
+                                                                              const size_t oldSize,
+                                                                              const size_t keepFirstN);
 
-    template <typename U, typename Q = T>
-    static typename TypeTraits::EnableIf<not TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
+    template <bool IsTrivial, typename U>
+    static typename TypeTraits::EnableIf<not IsTrivial, void>::type //
     copyItems(T* oldItems, const size_t numToAssign, const size_t numToCopyConstruct, const size_t numToDestroy,
               U* other, size_t otherSize);
 
-    template <typename U, typename Q = T>
-    static typename TypeTraits::EnableIf<TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
+    template <bool IsTrivial, typename U>
+    static typename TypeTraits::EnableIf<IsTrivial, void>::type //
     copyItems(T* oldItems, const size_t numToAssign, const size_t numToCopyConstruct, const size_t numToDestroy,
               U* other, size_t otherSize);
 
-    template <bool IsCopy, typename U, typename Q = T>
-    static typename TypeTraits::EnableIf<not TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
+    template <bool IsTrivial, bool IsCopy, typename U>
+    static typename TypeTraits::EnableIf<not IsTrivial, void>::type //
     insertItems(T*& oldItems, size_t position, const size_t numElements, const size_t newSize, U* other,
                 size_t otherSize);
 
-    template <bool IsCopy, typename U, typename Q = T>
-    static typename TypeTraits::EnableIf<TypeTraits::IsTriviallyCopyable<U>::value, void>::type //
+    template <bool IsTrivial, bool IsCopy, typename U>
+    static typename TypeTraits::EnableIf<IsTrivial, void>::type //
     insertItems(T*& oldItems, size_t position, const size_t numElements, const size_t newSize, U* other,
                 size_t otherSize);
 
@@ -174,12 +176,12 @@ struct SC::SegmentOperations
 
     [[nodiscard]] static bool ensureCapacity(T*& oldItems, size_t newCapacity, const size_t keepFirstN);
 
-    template <bool initialize, typename Q = T>
-    [[nodiscard]] static typename TypeTraits::EnableIf<TypeTraits::IsTriviallyCopyable<Q>::value, bool>::type //
+    template <bool IsTrivial, bool initialize>
+    [[nodiscard]] static typename TypeTraits::EnableIf<IsTrivial, bool>::type //
     resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue);
 
-    template <bool initialize, typename Q = T>
-    [[nodiscard]] static typename TypeTraits::EnableIf<not TypeTraits::IsTriviallyCopyable<Q>::value, bool>::type //
+    template <bool IsTrivial, bool initialize>
+    [[nodiscard]] static typename TypeTraits::EnableIf<not IsTrivial, bool>::type //
     resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue);
 
     [[nodiscard]] static bool shrink_to_fit(T*& oldItems);
@@ -274,8 +276,8 @@ SC::SegmentItems<T>::constructItems(U* destination, size_t indexStart, size_t nu
 }
 
 template <typename T>
-template <typename Q>
-typename SC::TypeTraits::EnableIf<not SC::TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
+template <bool IsTrivial>
+typename SC::TypeTraits::EnableIf<not IsTrivial, void>::type //
 SC::SegmentItems<T>::moveItems(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN)
 {
     moveConstruct(newItems, 0, keepFirstN, oldItems);
@@ -283,8 +285,8 @@ SC::SegmentItems<T>::moveItems(T* oldItems, T* newItems, const size_t oldSize, c
 }
 
 template <typename T>
-template <typename Q>
-typename SC::TypeTraits::EnableIf<SC::TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
+template <bool IsTrivial>
+typename SC::TypeTraits::EnableIf<IsTrivial, void>::type //
 SC::SegmentItems<T>::moveItems(T* oldItems, T* newItems, const size_t oldSize, const size_t keepFirstN)
 {
     SC_COMPILER_UNUSED(oldSize);
@@ -293,8 +295,8 @@ SC::SegmentItems<T>::moveItems(T* oldItems, T* newItems, const size_t oldSize, c
 }
 
 template <typename T>
-template <typename U, typename Q>
-typename SC::TypeTraits::EnableIf<not SC::TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
+template <bool IsTrivial, typename U>
+typename SC::TypeTraits::EnableIf<not IsTrivial, void>::type //
 SC::SegmentItems<T>::copyItems(T* oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
                                const size_t numToDestroy, U* other, size_t otherSize)
 {
@@ -305,8 +307,8 @@ SC::SegmentItems<T>::copyItems(T* oldItems, const size_t numToAssign, const size
 }
 
 template <typename T>
-template <typename U, typename Q>
-typename SC::TypeTraits::EnableIf<SC::TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
+template <bool IsTrivial, typename U>
+typename SC::TypeTraits::EnableIf<IsTrivial, void>::type //
 SC::SegmentItems<T>::copyItems(T* oldItems, const size_t numToAssign, const size_t numToCopyConstruct,
                                const size_t numToDestroy, U* other, size_t otherSize)
 {
@@ -318,8 +320,8 @@ SC::SegmentItems<T>::copyItems(T* oldItems, const size_t numToAssign, const size
 }
 
 template <typename T>
-template <bool IsCopy, typename U, typename Q>
-typename SC::TypeTraits::EnableIf<not SC::TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
+template <bool IsTrivial, bool IsCopy, typename U>
+typename SC::TypeTraits::EnableIf<not IsTrivial, void>::type //
 SC::SegmentItems<T>::insertItems(T*& oldItems, size_t position, const size_t numElements, const size_t newSize,
                                  U* other, size_t otherSize)
 {
@@ -330,8 +332,8 @@ SC::SegmentItems<T>::insertItems(T*& oldItems, size_t position, const size_t num
 }
 
 template <typename T>
-template <bool IsCopy, typename U, typename Q>
-typename SC::TypeTraits::EnableIf<SC::TypeTraits::IsTriviallyCopyable<U>::value, void>::type //
+template <bool IsTrivial, bool IsCopy, typename U>
+typename SC::TypeTraits::EnableIf<IsTrivial, void>::type //
 SC::SegmentItems<T>::insertItems(T*& oldItems, size_t position, const size_t numElements, const size_t newSize,
                                  U* other, size_t otherSize)
 {
@@ -490,7 +492,10 @@ bool SC::SegmentOperations<Allocator, T>::assign(T*& oldItems, U* other, size_t 
         const size_t numToAssign        = min(numElements, otherSize);
         const size_t numToCopyConstruct = otherSize > numElements ? otherSize - numElements : 0;
         const size_t numToDestroy       = numElements > otherSize ? numElements - otherSize : 0;
-        SegmentItems<T>::copyItems(oldItems, numToAssign, numToCopyConstruct, numToDestroy, other, otherSize);
+
+        static constexpr bool IsTrivial = TypeTraits::IsTriviallyCopyable<T>::value;
+        SegmentItems<T>::template copyItems<IsTrivial>(oldItems, numToAssign, numToCopyConstruct, numToDestroy, other,
+                                                       otherSize);
         SegmentItems<T>::getSegment(oldItems)->setSize(otherSize);
         return true;
     }
@@ -536,8 +541,10 @@ bool SC::SegmentOperations<Allocator, T>::insert(T*& oldItems, size_t position, 
         }
     }
     // Segment may have been reallocated
-    selfSegment = SegmentItems<T>::getSegment(oldItems);
-    SegmentItems<T>::template insertItems<IsCopy, U, T>(oldItems, position, numElements, newSize, other, otherSize);
+    selfSegment                     = SegmentItems<T>::getSegment(oldItems);
+    static constexpr bool IsTrivial = TypeTraits::IsTriviallyCopyable<T>::value;
+    SegmentItems<T>::template insertItems<IsTrivial, IsCopy>(oldItems, position, numElements, newSize, other,
+                                                             otherSize);
     selfSegment->setSize(newSize);
     return true;
 }
@@ -566,8 +573,10 @@ bool SC::SegmentOperations<Allocator, T>::ensureCapacity(T*& oldItems, size_t ne
     newSegment->setSize(oldSize);
     if (oldSize > 0)
     {
-        SegmentItems<T>::moveItems(Allocator::template getItems<T>(oldSegment),
-                                   Allocator::template getItems<T>(newSegment), oldSize, keepFirstN);
+        static constexpr bool IsTrivial = TypeTraits::IsTriviallyCopyable<T>::value;
+        SegmentItems<T>::template moveItems<IsTrivial>(Allocator::template getItems<T>(oldSegment),
+                                                       Allocator::template getItems<T>(newSegment), oldSize,
+                                                       keepFirstN);
     }
     if (oldSegment != nullptr)
     {
@@ -578,8 +587,8 @@ bool SC::SegmentOperations<Allocator, T>::ensureCapacity(T*& oldItems, size_t ne
 }
 
 template <typename Allocator, typename T>
-template <bool initialize, typename Q>
-typename SC::TypeTraits::EnableIf<SC::TypeTraits::IsTriviallyCopyable<Q>::value, bool>::type //
+template <bool IsTrivial, bool initialize>
+typename SC::TypeTraits::EnableIf<IsTrivial, bool>::type //
 SC::SegmentOperations<Allocator, T>::resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue)
 {
     const auto oldSize = oldItems == nullptr ? 0 : SegmentItems<T>::getSegment(oldItems)->size();
@@ -599,8 +608,8 @@ SC::SegmentOperations<Allocator, T>::resizeInternal(T*& oldItems, size_t newSize
 }
 
 template <typename Allocator, typename T>
-template <bool initialize, typename Q>
-typename SC::TypeTraits::EnableIf<not SC::TypeTraits::IsTriviallyCopyable<Q>::value, bool>::type //
+template <bool IsTrivial, bool initialize>
+typename SC::TypeTraits::EnableIf<not IsTrivial, bool>::type //
 SC::SegmentOperations<Allocator, T>::resizeInternal(T*& oldItems, size_t newSize, const T* defaultValue)
 {
     static_assert(initialize, "There is no logical reason to skip initializing non trivially copyable class on resize");

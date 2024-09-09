@@ -468,13 +468,15 @@ bool SC::Vector<T>::reserve(size_t newCapacity)
 template <typename T>
 bool SC::Vector<T>::resize(size_t newSize, const T& value)
 {
-    return Operations::template resizeInternal<true>(items, newSize, &value);
+    static constexpr bool IsTrivial = TypeTraits::IsTriviallyCopyable<T>::value;
+    return Operations::template resizeInternal<IsTrivial, true>(items, newSize, &value);
 }
 
 template <typename T>
 bool SC::Vector<T>::resizeWithoutInitializing(size_t newSize)
 {
-    return Operations::template resizeInternal<false>(items, newSize, nullptr);
+    static constexpr bool IsTrivial = TypeTraits::IsTriviallyCopyable<T>::value;
+    return Operations::template resizeInternal<IsTrivial, false>(items, newSize, nullptr);
 }
 
 template <typename T>

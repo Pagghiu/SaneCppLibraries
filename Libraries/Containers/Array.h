@@ -500,15 +500,17 @@ bool SC::Array<T, N>::pop_front()
 template <typename T, int N>
 bool SC::Array<T, N>::resize(size_t newSize, const T& value)
 {
-    T* oldItems = items;
-    return Operations::template resizeInternal<true>(oldItems, newSize, &value);
+    T*                    oldItems  = items;
+    static constexpr bool IsTrivial = TypeTraits::IsTriviallyCopyable<T>::value;
+    return Operations::template resizeInternal<IsTrivial, true>(oldItems, newSize, &value);
 }
 
 template <typename T, int N>
 bool SC::Array<T, N>::resizeWithoutInitializing(size_t newSize)
 {
-    T* oldItems = items;
-    return Operations::template resizeInternal<false>(oldItems, newSize, nullptr);
+    T*                    oldItems  = items;
+    static constexpr bool IsTrivial = TypeTraits::IsTriviallyCopyable<T>::value;
+    return Operations::template resizeInternal<IsTrivial, false>(oldItems, newSize, nullptr);
 }
 
 template <typename T, int N>
