@@ -152,10 +152,20 @@ SC::Result SC::AsyncSocketConnect::start(AsyncEventLoop& loop, const SocketDescr
 SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop, const SocketDescriptor& socketDescriptor,
                                       Span<const char> dataToSend)
 {
-    SC_TRY(validateAsync());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
-    buffer         = dataToSend;
+    buffer = dataToSend;
+    return start(loop);
+}
+
+SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop)
+{
+    SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncSocketSend::start - Zero sized write buffer");
+    SC_TRY_MSG(handle != SocketDescriptor::Invalid, "AsyncSocketSend::start - Invalid file descriptor");
+    SC_TRY(validateAsync());
+#if SC_PLATFORM_WINDOWS
+#else
     totalBytesSent = 0;
+#endif
     SC_TRY(queueSubmission(loop));
     return SC::Result(true);
 }
@@ -163,9 +173,14 @@ SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop, const SocketDescript
 SC::Result SC::AsyncSocketReceive::start(AsyncEventLoop& loop, const SocketDescriptor& socketDescriptor,
                                          Span<char> receiveData)
 {
-    SC_TRY(validateAsync());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
     buffer = receiveData;
+    return start(loop);
+}
+
+SC::Result SC::AsyncSocketReceive::start(AsyncEventLoop& loop)
+{
+    SC_TRY(validateAsync());
     SC_TRY(queueSubmission(loop));
     return SC::Result(true);
 }
@@ -652,6 +667,7 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndEventuallyReactivate(KernelE
     }
     if (not returnCode)
     {
+        // TODO: We shouldn't probably access async if it has not been reactivated...
         reportError(kernelEvents, async, move(returnCode));
     }
     return Result(true);
@@ -701,7 +717,9 @@ SC::Result SC::AsyncEventLoop::Internal::blockingPoll(SyncMode syncMode, AsyncKe
     {
         // We may have some manualCompletions queued (for SocketClose for example) but no active handles
         SC_LOG_MESSAGE("Active Requests Before Poll = {}\n", getTotalNumberOfActiveHandle());
-        SC_TRY(kernelEvents.syncWithKernel(*loop, syncMode));
+
+        // If there are manual completions the loop can't block waiting for I/O, to dispatch them immediately
+        SC_TRY(kernelEvents.syncWithKernel(*loop, numberOfManualCompletions == 0 ? syncMode : SyncMode::NoWait));
         SC_LOG_MESSAGE("Active Requests After Poll = {}\n", getTotalNumberOfActiveHandle());
     }
     return SC::Result(true);
@@ -986,6 +1004,7 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncRequest& async, AsyncTea
 SC::Result SC::AsyncEventLoop::Internal::setupAsync(KernelEvents& kernelEvents, AsyncRequest& async)
 {
     SC_LOG_MESSAGE("{} {} SETUP\n", async.debugName, AsyncRequest::TypeToString(async.type));
+    async.flags = 0; // Reset flags that may have been left by previous activations
     return Internal::applyOnAsync(async, SetupAsyncPhase(kernelEvents));
 }
 

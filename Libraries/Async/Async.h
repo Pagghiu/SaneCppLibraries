@@ -138,6 +138,10 @@ struct SC::AsyncRequest
     /// @brief Get the event loop associated with this AsyncRequest
     [[nodiscard]] AsyncEventLoop* getEventLoop() const { return eventLoop; }
 
+    /// @brief Caches the event loop associated with this AsyncRequest.
+    /// Used to cache eventLoop pointer before starting the AsyncRequest.
+    void cacheInternalEventLoop(AsyncEventLoop& loop) { eventLoop = &loop; }
+
     /// @brief Type of async request
     enum class Type : uint8_t
     {
@@ -553,16 +557,25 @@ struct AsyncSocketSend : public AsyncRequest
     [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& socketDescriptor,
                                    Span<const char> data);
 
+    /// @brief Starts a socket send operation.
+    /// Callback will be called when the given socket is ready to send more data.
+    /// @param eventLoop The event loop where queuing this async request
+    /// @return Valid Result if the request has been successfully queued
+    /// @note Remeber to fill AsyncSocketSend::buffer and AsyncSocketSend::handle before calling start
+    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop);
+
     Function<void(Result&)> callback; ///< Called when socket is ready to send more data.
+
+    Span<const char>         buffer;                             ///< Span of bytes to send
+    SocketDescriptor::Handle handle = SocketDescriptor::Invalid; ///< The socket to send data to
 
   private:
     friend struct AsyncEventLoop;
 
-    SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
-    Span<const char>         buffer;
-    size_t                   totalBytesSent = 0;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
+#else
+    size_t             totalBytesSent = 0;
 #endif
 };
 struct AsyncSocketReceive;
@@ -613,14 +626,21 @@ struct AsyncSocketReceive : public AsyncRequest
     [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& socketDescriptor,
                                    Span<char> data);
 
+    /// @brief Starts a socket receive operation.
+    /// Callback will be called when some data is read from socket.
+    /// @param eventLoop The event loop where queuing this async request
+    /// @return Valid Result if the request has been successfully queued
+    /// @note Remeber to fill AsyncSocketReceive::buffer and AsyncSocketReceive::handle before calling start
+    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop);
+
     Function<void(Result&)> callback; ///< Called after data has been received
 
-  private:
-    friend struct AsyncEventLoop;
+    Span<char>               buffer; ///< The writeable span of memory where to data will be written
+    SocketDescriptor::Handle handle = SocketDescriptor::Invalid; /// The Socket Descriptor handle to read data from.
 
-    SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
-    Span<char>               buffer;
+  private:
 #if SC_PLATFORM_WINDOWS
+    friend struct AsyncEventLoop;
     detail::WinOverlappedOpaque overlapped;
 #endif
 };
