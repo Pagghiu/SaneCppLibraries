@@ -471,7 +471,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(async, submission));
         globalLibURing.io_uring_prep_read(submission, async.fileDescriptor, async.buffer.data(),
-                                          async.buffer.sizeInBytes(), async.offset);
+                                          async.buffer.sizeInBytes(), async.useOffset ? async.offset : -1);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
     }
@@ -495,7 +495,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(async, submission));
         globalLibURing.io_uring_prep_write(submission, async.fileDescriptor, async.buffer.data(),
-                                           async.buffer.sizeInBytes(), 0);
+                                           async.buffer.sizeInBytes(), async.useOffset ? async.offset : -1);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
     }

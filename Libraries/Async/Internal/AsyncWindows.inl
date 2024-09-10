@@ -581,7 +581,13 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     [[nodiscard]] static Result executeOperation(AsyncFileRead& async, AsyncFileRead::CompletionData& completionData,
                                                  bool synchronous = true)
     {
-        return executeFileOperation(&::ReadFile, async, completionData, synchronous, &completionData.endOfFile);
+        if (not async.useOffset)
+        {
+            async.offset = async.readCursor;
+        }
+        SC_TRY(executeFileOperation(&::ReadFile, async, completionData, synchronous, &completionData.endOfFile));
+        async.readCursor = async.offset + async.buffer.sizeInBytes();
+        return Result(true);
     }
 
     [[nodiscard]] static Result completeAsync(AsyncFileRead::Result& result)
@@ -601,6 +607,10 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     [[nodiscard]] static Result executeOperation(AsyncFileWrite& async, AsyncFileWrite::CompletionData& completionData,
                                                  bool synchronous = true)
     {
+        // TODO: Do the same as AsyncFileRead
+        // To write to the end of file, specify both the Offset and OffsetHigh members of the OVERLAPPED structure as
+        // 0xFFFFFFFF. This is functionally equivalent to previously calling the CreateFile function to open hFile using
+        // FILE_APPEND_DATA access.
         return executeFileOperation(&::WriteFile, async, completionData, synchronous, nullptr);
     }
 

@@ -740,15 +740,27 @@ struct AsyncFileRead : public AsyncRequest
     Function<void(Result&)> callback; /// Callback called when some data has been read from the file into the buffer
 
     Span<char>             buffer;         /// The writeable span of memory where to data will be written
-    uint64_t               offset = 0;     /// Offset from file start where to start reading. Not supported on pipes.
     FileDescriptor::Handle fileDescriptor; /// The file/pipe descriptor handle to read data from.
                                            /// Use SC::FileDescriptor or SC::PipeDescriptor to open it, with
                                            /// SC::FileDescriptorOpenOptions::blocking == false
 
+    /// @brief Returns the last offset set with AsyncFileRead::setOffset
+    uint64_t getOffset() const { return offset; }
+
+    /// @brief Sets the offset in bytes at which start reading.
+    /// @note Setting file offset when reading is only possible on seekable files
+    void setOffset(uint64_t fileOffset)
+    {
+        useOffset = true;
+        offset    = fileOffset;
+    }
+
   private:
     friend struct AsyncEventLoop;
-
+    bool     useOffset = false;
+    uint64_t offset    = 0; /// Offset from file start where to start reading. Not supported on pipes.
 #if SC_PLATFORM_WINDOWS
+    uint64_t                    readCursor = 0;
     detail::WinOverlappedOpaque overlapped;
 #endif
 };
@@ -812,13 +824,25 @@ struct AsyncFileWrite : public AsyncRequest
     Function<void(Result&)> callback; /// Callback called when descriptor is ready to be written with more data
 
     Span<const char>       buffer;         /// The read-only span of memory where to read the data from
-    uint64_t               offset = 0;     /// Offset to start writing from. Not supported on pipes.
     FileDescriptor::Handle fileDescriptor; /// The file/pipe descriptor to write data to.
                                            /// Use SC::FileDescriptor or SC::PipeDescriptor to open it, with
                                            /// SC::FileDescriptorOpenOptions::blocking == false
 
+    /// @brief Returns the last offset set with AsyncFileWrite::setOffset
+    uint64_t getOffset() const { return offset; }
+
+    /// @brief Sets the offset in bytes at which start writing.
+    /// @note Setting write file offset when reading is only possible on seekable files
+    void setOffset(uint64_t fileOffset)
+    {
+        useOffset = true;
+        offset    = fileOffset;
+    }
+
   private:
     friend struct AsyncEventLoop;
+    bool     useOffset = false;
+    uint64_t offset    = 0xffffffffffffffff; /// Offset to start writing from. Not supported on pipes.
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
 #endif

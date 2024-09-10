@@ -84,6 +84,11 @@ struct SC::AsyncTest : public SC::TestCase
                 fileReadWrite(false); // do not use thread-pool
                 fileReadWrite(true);  // use thread-pool
             }
+            if (test_section("file endOfFile"))
+            {
+                fileEndOfFile(false); // do not use thread-pool
+                fileEndOfFile(true);  // use thread-pool
+            }
             if (test_section("file close"))
             {
                 fileClose();
@@ -111,6 +116,7 @@ struct SC::AsyncTest : public SC::TestCase
     void socketClose();
     void socketSendReceiveError();
     void fileReadWrite(bool useThreadPool);
+    void fileEndOfFile(bool useThreadPool);
     void fileClose();
 };
 
@@ -914,7 +920,7 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
         {
             SC_TEST_EXPECT(readData.sizeInBytes() == 1);
             params.readBuffer[params.readCount++] = readData.data()[0];
-            res.getAsync().offset += readData.sizeInBytes();
+            res.getAsync().setOffset(res.getAsync().getOffset() + readData.sizeInBytes());
             res.reactivateRequest(true);
         }
         else
@@ -944,6 +950,114 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
 
     // 11. Remove test files
     SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
+    SC_TEST_EXPECT(fs.removeFile(fileName));
+    SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
+}
+
+void SC::AsyncTest::fileEndOfFile(bool useThreadPool)
+{
+    // This tests a weird edge case where doing a single file read of the entire size of file
+    // will not produce end of file flag
+
+    // 1. Create ThreadPool and tasks
+    ThreadPool threadPool;
+    if (useThreadPool)
+    {
+        SC_TEST_EXPECT(threadPool.create(4));
+    }
+
+    // 2. Create EventLoop
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    // 3. Create some files on disk
+    StringNative<255> filePath = StringEncoding::Native;
+    StringNative<255> dirPath  = StringEncoding::Native;
+    const StringView  name     = "AsyncTest";
+    const StringView  fileName = "test.txt";
+    SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory, name}));
+    SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
+
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
+    SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
+    {
+        char data[1024] = {0};
+        SC_TEST_EXPECT(fs.write(fileName, {data, sizeof(data)}));
+    }
+
+    FileDescriptor::OpenOptions openOptions;
+    openOptions.blocking = useThreadPool;
+
+    FileDescriptor::Handle handle = FileDescriptor::Invalid;
+    FileDescriptor         fd;
+    SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::ReadOnly, openOptions));
+    if (not useThreadPool)
+    {
+        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
+    }
+    SC_TEST_EXPECT(fd.get(handle, Result::Error("asd")));
+
+    struct Context
+    {
+        int    readCount = 0;
+        size_t readSize  = 0;
+    } context;
+    AsyncFileRead       asyncReadFile;
+    AsyncFileRead::Task asyncReadTask;
+    asyncReadFile.setDebugName("FileRead");
+    asyncReadFile.callback = [this, &context](AsyncFileRead::Result& res)
+    {
+        Span<char> readData;
+        SC_TEST_EXPECT(res.get(readData));
+        if (context.readCount == 0)
+        {
+            context.readSize += readData.sizeInBytes();
+            res.reactivateRequest(true);
+        }
+        else if (context.readCount == 1)
+        {
+            context.readSize += readData.sizeInBytes();
+        }
+        else if (context.readCount == 2)
+        {
+            SC_TEST_EXPECT(res.completionData.endOfFile);
+            SC_TEST_EXPECT(readData.empty()); // EOF
+        }
+        else
+        {
+            SC_TEST_EXPECT(context.readCount <= 3);
+        }
+        context.readCount++;
+    };
+    char buffer[512]             = {0};
+    asyncReadFile.fileDescriptor = handle;
+    asyncReadFile.buffer         = {buffer, sizeof(buffer)};
+    if (useThreadPool)
+    {
+        SC_TEST_EXPECT(asyncReadFile.start(eventLoop, threadPool, asyncReadTask));
+    }
+    else
+    {
+        SC_TEST_EXPECT(asyncReadFile.start(eventLoop));
+    }
+
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(context.readCount == 2);
+    if (useThreadPool)
+    {
+        SC_TEST_EXPECT(asyncReadFile.start(eventLoop, threadPool, asyncReadTask));
+    }
+    else
+    {
+        SC_TEST_EXPECT(asyncReadFile.start(eventLoop));
+    }
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(context.readCount == 3);
+    SC_TEST_EXPECT(fd.close());
+
     SC_TEST_EXPECT(fs.removeFile(fileName));
     SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory));
     SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
@@ -1287,8 +1401,8 @@ asyncReadFile.callback = [&](AsyncFileRead::Result& res)
             // readData is a slice of receivedData with the received bytes
             console.print("Read {} bytes from file", readData.sizeInBytes());
             
-            // IMPORTANT: Update file offset to receive next range of bytes
-            res.getAsync().offset += readData.sizeInBytes();
+            // OPTIONAL: Update file offset to receive a different range of bytes
+            res.getAsync().setOffset(res.getAsync().getOffset()  + readData.sizeInBytes());
             
             // IMPORTANT: Reactivate the request to receive more data
             res.reactivateRequest(true);

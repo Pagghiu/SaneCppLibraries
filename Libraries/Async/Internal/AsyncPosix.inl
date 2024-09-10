@@ -20,9 +20,10 @@
 #include <errno.h>     // For error handling
 #include <netdb.h>     // socketlen_t/getsocketopt/send/recv
 #include <sys/event.h> // kqueue
-#include <sys/time.h>  // timespec
-#include <sys/wait.h>  // WIFEXITED / WEXITSTATUS
-#include <unistd.h>    // read/write/pread/pwrite
+#include <sys/stat.h>
+#include <sys/time.h> // timespec
+#include <sys/wait.h> // WIFEXITED / WEXITSTATUS
+#include <unistd.h>   // read/write/pread/pwrite
 
 #endif
 
@@ -327,7 +328,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return KernelQueuePosix::setEventWatcher(async, fileDescriptor, filter);
     }
 
-    [[nodiscard]] static bool isDescriptorWatchable(int fd, bool& canBeWatched)
+    [[nodiscard]] static bool isDescriptorWriteWatchable(int fd, bool& canBeWatched)
     {
         struct stat file_stat;
         if (::fstat(fd, &file_stat) == -1)
@@ -386,7 +387,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return Result(true);
     }
 
-    [[nodiscard]] static constexpr bool isDescriptorWatchable(int, bool& canBeWatched)
+    [[nodiscard]] static constexpr bool isDescriptorWriteWatchable(int, bool& canBeWatched)
     {
         canBeWatched = true; // kevent can also watch regular buffered files (differently from epoll)
         return true;
@@ -408,6 +409,19 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return Result(true);
     }
 #endif
+
+    [[nodiscard]] static bool isDescriptorReadWatchable(int fd, bool& canBeWatched)
+    {
+        struct stat file_stat;
+        if (::fstat(fd, &file_stat) == -1)
+        {
+            return false;
+        }
+        // epoll doesn't support regular file descriptors
+        // kqueue doesn't report EOF on vnodes (regular files) for EVFILT_READ
+        canBeWatched = S_ISREG(file_stat.st_mode) == 0;
+        return true;
+    }
 
     static struct timespec timerToTimespec(const Time::HighResolutionCounter& loopTime,
                                            const Time::HighResolutionCounter* nextTimer)
@@ -683,7 +697,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     [[nodiscard]] Result setupAsync(AsyncFileRead& async)
     {
         bool canBeWatched;
-        SC_TRY(isDescriptorWatchable(async.fileDescriptor, canBeWatched));
+        SC_TRY(isDescriptorReadWatchable(async.fileDescriptor, canBeWatched));
         if (canBeWatched)
         {
             return setEventWatcher(async, async.fileDescriptor, INPUT_EVENTS_MASK);
@@ -705,19 +719,25 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return KernelQueuePosix::stopSingleWatcherImmediate(*async.eventLoop, async.fileDescriptor, INPUT_EVENTS_MASK);
     }
 
+    [[nodiscard]] static Result teardownAsync(AsyncFileRead*, AsyncTeardown& teardown)
+    {
+        return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.fileHandle,
+                                                            INPUT_EVENTS_MASK);
+    }
+
     [[nodiscard]] static Result executeOperation(AsyncFileRead& async, AsyncFileRead::CompletionData& completionData)
     {
         auto    span = async.buffer;
         ssize_t res;
         do
         {
-            if (async.offset == 0)
+            if (async.useOffset)
             {
-                res = ::read(async.fileDescriptor, span.data(), span.sizeInBytes());
+                res = ::pread(async.fileDescriptor, span.data(), span.sizeInBytes(), static_cast<off_t>(async.offset));
             }
             else
             {
-                res = ::pread(async.fileDescriptor, span.data(), span.sizeInBytes(), static_cast<off_t>(async.offset));
+                res = ::read(async.fileDescriptor, span.data(), span.sizeInBytes());
             }
         } while ((res == -1) and (errno == EINTR));
 
@@ -736,7 +756,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     [[nodiscard]] Result setupAsync(AsyncFileWrite& async)
     {
         bool canBeWatched;
-        SC_TRY(isDescriptorWatchable(async.fileDescriptor, canBeWatched));
+        SC_TRY(isDescriptorWriteWatchable(async.fileDescriptor, canBeWatched));
         if (canBeWatched)
         {
             return setEventWatcher(async, async.fileDescriptor, OUTPUT_EVENTS_MASK);
@@ -758,19 +778,25 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return KernelQueuePosix::stopSingleWatcherImmediate(*async.eventLoop, async.fileDescriptor, OUTPUT_EVENTS_MASK);
     }
 
+    [[nodiscard]] static Result teardownAsync(AsyncFileWrite*, AsyncTeardown& teardown)
+    {
+        return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.fileHandle,
+                                                            OUTPUT_EVENTS_MASK);
+    }
+
     [[nodiscard]] static Result executeOperation(AsyncFileWrite& async, AsyncFileWrite::CompletionData& completionData)
     {
         auto    span = async.buffer;
         ssize_t res;
         do
         {
-            if (async.offset == 0)
+            if (async.useOffset)
             {
-                res = ::write(async.fileDescriptor, span.data(), span.sizeInBytes());
+                res = ::pwrite(async.fileDescriptor, span.data(), span.sizeInBytes(), static_cast<off_t>(async.offset));
             }
             else
             {
-                res = ::pwrite(async.fileDescriptor, span.data(), span.sizeInBytes(), static_cast<off_t>(async.offset));
+                res = ::write(async.fileDescriptor, span.data(), span.sizeInBytes());
             }
         } while ((res == -1) and (errno == EINTR));
         SC_TRY_MSG(res >= 0, "::write failed");
