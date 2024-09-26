@@ -165,6 +165,24 @@ struct SC::Span
 
     const Type& operator[](SizeType idx) const { return items[idx]; }
 
+    /// @brief Gets the item at given index or nullptr if index is negative or bigger than size
+    template <typename IntType>
+    Type* get(IntType idx)
+    {
+        if (idx >= 0 and idx < static_cast<IntType>(sizeElements))
+            return items + idx;
+        return nullptr;
+    }
+
+    /// @brief Gets the item at given index or nullptr if index is negative or bigger than size
+    template <typename IntType>
+    const Type* get(IntType idx) const
+    {
+        if (idx >= 0 and idx < static_cast<IntType>(sizeElements))
+            return items + idx;
+        return nullptr;
+    }
+
   private:
     Type*    items;
     SizeType sizeElements;
