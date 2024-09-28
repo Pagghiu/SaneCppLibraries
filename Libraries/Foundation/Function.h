@@ -162,6 +162,11 @@ struct Function<R(Args...)>
     /// @return `true` if current wrapper is bound to a function
     bool isValid() const { return functionStub != nullptr; }
 
+    bool operator==(const Function& other) const
+    {
+        return functionStub == other.functionStub and functionOperation == other.functionOperation and
+               classInstance == other.classInstance;
+    }
     /// @brief Binds a Lambda to current function wrapper
     /// @tparam Lambda type of Lambda to be wrapped in current function wrapper
     /// @param lambda Instance of Lambda to be wrapped
