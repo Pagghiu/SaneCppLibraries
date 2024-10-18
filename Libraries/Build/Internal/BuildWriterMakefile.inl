@@ -151,7 +151,8 @@ ifneq ($(MAKECMDGOALS),print-executable-paths)
 CURRENT_MAKEFILE := $(firstword $(MAKEFILE_LIST))
 # Force a clean when makefile is modified
 $(CURRENT_MAKEFILE).$(CONFIG).touched: $(CURRENT_MAKEFILE)
-	@touch $@
+	@touch "$@"
+	@echo " " > $@ # touch doesn't set proper modification date on hgfs (VMWare)
 	@$(MAKE) -f $(CURRENT_MAKEFILE) clean
 
 # Implicitly evaluate the makefile rebuild force clean during parsing

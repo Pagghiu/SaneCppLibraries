@@ -34,6 +34,7 @@ clean: SCTool_CLEAN
 $(TOOL_OUTPUT_DIR_ESCAPED)/_Intermediates/Makefile.$(TARGET_OS).$(CONFIG).touched: Makefile
 	@mkdir -p $(TOOL_OUTPUT_DIR_ESCAPED)/_Intermediates
 	@touch "$@"
+	@echo " " >> "$@" # touch doesn't set proper modification date on hgfs (VMWare)
 	@$(MAKE) clean
 
 # Implicitly evaluate the makefile rebuild force clean during parsing
