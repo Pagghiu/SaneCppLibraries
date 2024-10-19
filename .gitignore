@@ -1,5 +1,6 @@
 **/xcuserdata
 **/.DS_Store
+**/.sync
 _*/
 .vs
 x64
@@ -17,3 +18,4 @@ Dependencies/*/*.txt
 *.so
 *.pdb
 *.ilk
+Icon?
