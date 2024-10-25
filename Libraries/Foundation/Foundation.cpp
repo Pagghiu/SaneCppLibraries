@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../Foundation/Assert.h"
+#include "../Foundation/HeapBuffer.h"
 #include "../Foundation/Limits.h"
 #include "../Foundation/Memory.h"
 
@@ -184,6 +185,48 @@ void* SC::Memory::reallocate(void* memory, size_t numBytes) { return ::realloc(m
 void* SC::Memory::allocate(size_t numBytes) { return ::malloc(numBytes); }
 void  SC::Memory::release(void* allocatedMemory) { return ::free(allocatedMemory); }
 
+//--------------------------------------------------------------------
+// HeapBuffer
+//--------------------------------------------------------------------
+
+SC::HeapBuffer::~HeapBuffer() { Memory::release(data.data()); }
+
+SC::HeapBuffer::HeapBuffer() = default;
+
+SC::HeapBuffer::HeapBuffer(HeapBuffer&& other)
+{
+    data       = other.data;
+    other.data = {};
+}
+
+SC::HeapBuffer& SC::HeapBuffer::operator=(HeapBuffer&& other)
+{
+    data       = other.data;
+    other.data = {};
+    return *this;
+}
+
+bool SC::HeapBuffer::allocate(size_t numBytes)
+{
+    Memory::release(data.data());
+    char* memory = reinterpret_cast<char*>(Memory::allocate(numBytes));
+    if (memory != nullptr)
+    {
+        data = {memory, numBytes};
+        return true;
+    }
+    else
+    {
+        data = {};
+        return false;
+    }
+}
+
+void SC::HeapBuffer::release()
+{
+    Memory::release(data.data());
+    data = {};
+}
 //--------------------------------------------------------------------
 // Standard C++ Library support
 //--------------------------------------------------------------------
