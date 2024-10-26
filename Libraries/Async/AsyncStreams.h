@@ -1,0 +1,158 @@
+// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
+#pragma once
+
+#include "../Foundation/Function.h"
+#include "../Foundation/Result.h"
+#include "../Foundation/Span.h"
+#include "../Foundation/StrongID.h"
+#include "Internal/CircularQueue.h"
+#include "Internal/Event.h"
+
+//! @defgroup group_async_streams Async Streams
+//! Async Streams streams data from an async source to one or more async destinations.
+//!
+/// Read and writes happen in parallel if sources and destinations are asynchronous.
+/// This library does not allocate any memory, all buffers are supplied by the caller.
+
+//! @addtogroup group_async_streams
+//! @{
+namespace SC
+{
+
+/// @brief A Span of bytes memory to be read or written by async streams
+struct AsyncBufferView
+{
+    struct Tag
+    {
+    };
+    using ID = StrongID<Tag>;
+    Span<char> data;
+
+  private:
+    Span<char> originalData;
+    friend struct AsyncBuffersPool;
+
+    int32_t refs = 0; // Counts AsyncReadable (single) or AsyncWritable (multiple) using it
+};
+
+/// @brief Holds a Span of AsyncBufferView (allocated by user) holding available memory for the streams
+/// @note User must fill the AsyncBuffersPool::buffers with a `Span` of AsyncBufferView
+struct AsyncBuffersPool
+{
+    /// @brief Span of buffers to be filled in by the user
+    Span<AsyncBufferView> buffers;
+
+    /// @brief Increments a buffer reference count
+    void refBuffer(AsyncBufferView::ID bufferID);
+
+    /// @brief Decrements a buffer reference count.
+    /// When reference count becomes zero the buffer will be re-used
+    void unrefBuffer(AsyncBufferView::ID bufferID);
+
+    /// @brief Access data span owned by the buffer
+    Result getData(AsyncBufferView::ID bufferID, Span<const char>& data);
+
+    /// @brief Access data span owned by the buffer
+    Result getData(AsyncBufferView::ID bufferID, Span<char>& data);
+
+    /// @brief Access the raw AsyncBufferView (if any) at a given bufferID (or nullptr if invalid)
+    AsyncBufferView* getBuffer(AsyncBufferView::ID bufferID);
+
+    /// @brief Requests a new available buffer that is at least minimumSizeInBytes, incrementing its refcount
+    Result requestNewBuffer(size_t minimumSizeInBytes, AsyncBufferView::ID& bufferID, Span<char>& data);
+
+    /// @brief Sets the new size in bytes for the buffer
+    void setNewBufferSize(AsyncBufferView::ID bufferID, size_t newSizeInBytes);
+};
+
+/// @brief Async source abstraction emitting data events in caller provided byte buffers.
+/// After AsyncReadableStream::start it will start emitting AsyncReadableStream::eventData with buffers.
+/// User must provide a custom async red implementation in AsyncReadableStream::asyncRead.
+/// The stream must be paused when the AsyncBuffersPool is full (use AsyncReadableStream::getBufferOrPause).
+/// Once the stream is ended, it will emit AsyncReadableStream::eventEnd and it cannot be used further.
+/// AsyncReadableStream::eventError will be emitted when an error occurs in any phase.
+struct AsyncReadableStream
+{
+    struct Request
+    {
+        AsyncBufferView::ID bufferID;
+    };
+    /// @brief Function that every stream must define to implement its custom read operation
+    Function<Result()> asyncRead;
+
+    static constexpr int MaxListeners = 8;
+
+    Event<MaxListeners, Result>              eventError; /// Emitted when an error occurs
+    Event<MaxListeners, AsyncBufferView::ID> eventData;  /// Emitted when a new buffer has been read
+    Event<MaxListeners>                      eventEnd;   /// Emitted when there is no more data
+    Event<MaxListeners>                      eventClose; /// Emitted when the underlying resource has been closed
+
+    /// @brief Inits the readable stream with an AsyncBuffersPool instance that will provide memory for it
+    /// @param buffersPool An instance of AsyncBuffersPool providing read buffers
+    /// @param requests User owned memory to hold a circular buffer for read requests
+    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests);
+
+    /// @brief Starts the readable stream, that will emit eventData
+    Result start();
+
+    /// @brief Pauses the readable stream (that can be later resumed)
+    void pause();
+
+    /// @brief Resumes the readable stream paused by AsyncReadableStream::pause
+    void resume();
+
+    /// @brief Forcefully destroys the readable stream before it's end event releasing all resources
+    void destroy();
+
+    /// @brief Returns true if the stream is ended (AsyncReadableStream::end has been called)
+    [[nodiscard]] bool isEnded() const { return state == State::Ended; }
+
+    /// @brief Obtains the AsyncBuffersPool to request more buffers
+    AsyncBuffersPool& getBuffersPool();
+
+    /// @brief Use push from inside AsyncReadableStream::asyncRead function to queue received data
+    void push(AsyncBufferView::ID bufferID, size_t newSize);
+
+    /// @brief Use pushEnd from inside AsyncReadableStream::asyncRead to signal production end
+    void pushEnd();
+
+    /// @brief Use reactivate(true) from inside AsyncReadableStream::asyncRead function to ask the
+    /// state machine to invoke asyncRead again.
+    void reactivate(bool doReactivate);
+
+    /// @brief Signals an async error received
+    void emitError(Result error);
+
+    /// @brief Returns an unused buffer from pool or pauses the stream if none is available
+    [[nodiscard]] bool getBufferOrPause(size_t minumumSizeInBytes, AsyncBufferView::ID& bufferID, Span<char>& data);
+
+  private:
+    void emitOnData();
+    void executeRead();
+
+    enum class State
+    {
+        Stopped,      // Stream must be inited
+        CanRead,      // Stream is ready to issue a read ( AsyncReadableStream::start / AsyncReadableStream::resume)
+        Reading,      // A read is being issued (may be sync or async)
+        SyncPushing,  // One or multiple AsyncReadableStream::push have been received (sync)
+        SyncReadMore, // SyncPushing + AsyncReadableStream::reactivate(true)
+        AsyncReading, // An async read is in flight
+        AsyncPushing, // AsyncReading + AsyncReadableStream::push
+        Pausing,      // Pause requested while read in flight
+        Paused,       // Actually paused with no read in flight
+        Ended,        // Emitted all data, no more data will be emitted
+        Destroying,   // Readable is waiting for async call before
+        Destroyed,    // Readable has been destroyed before emitting all data
+        Errored,      // Error occurred
+    };
+    State state = State::Stopped;
+
+    AsyncBuffersPool* buffers = nullptr;
+
+    CircularQueue<Request> readQueue;
+};
+
+} // namespace SC
+//! @}

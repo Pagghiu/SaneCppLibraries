@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../../Libraries/Async/Async.cpp"
+#include "../../Libraries/Async/AsyncStreams.cpp"
 #include "../../Libraries/Build/Build.cpp"
 #include "../../Libraries/File/FileDescriptor.cpp"
 #include "../../Libraries/FileSystem/FileSystem.cpp"
