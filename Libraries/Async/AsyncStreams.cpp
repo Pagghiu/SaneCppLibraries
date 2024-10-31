@@ -324,3 +324,138 @@ bool SC::AsyncReadableStream::getBufferOrPause(size_t minumumSizeInBytes, AsyncB
         return false;
     }
 }
+
+//-------------------------------------------------------------------------------------------------------
+// AsyncWritableStream
+//-------------------------------------------------------------------------------------------------------
+
+SC::Result SC::AsyncWritableStream::init(AsyncBuffersPool& buffersPool, Span<Request> requests)
+{
+    SC_TRY_MSG(state == State::Stopped, "AsyncWritableStream::init - can only be called when stopped");
+    buffers    = &buffersPool;
+    writeQueue = requests;
+    return Result(true);
+}
+
+SC::Result SC::AsyncWritableStream::write(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb)
+{
+    if (state == State::Ended or state == State::Ending)
+    {
+        return Result::Error("AsyncWritableStream::write - failed (ending or ended state)");
+    }
+    Request request;
+    request.bufferID = bufferID;
+    request.cb       = move(cb);
+    if (not writeQueue.pushBack(request))
+    {
+        return Result::Error("AsyncWritableStream::write - queue is full");
+    }
+    buffers->refBuffer(bufferID); // 2a. unrefBuffer below or in finishedWriting
+    switch (state)
+    {
+    case State::Stopped: {
+        state = State::Writing;
+        SC_ASSERT_RELEASE(writeQueue.popFront(request));
+        tryAsync(asyncWrite(request.bufferID, request.cb));
+        buffers->unrefBuffer(request.bufferID); // 2b. refBuffer above
+    }
+    break;
+    case State::Writing: {
+        // This is fine, it has already been queued
+    }
+    break;
+    case State::Ending:
+    case State::Ended: Assert::unreachable(); break;
+    }
+    return Result(true);
+}
+
+SC::Result SC::AsyncWritableStream::write(Span<const char> data, Function<void(AsyncBufferView::ID)> cb)
+{
+    AsyncBufferView::ID bufferID;
+    Span<char>          bufferData;
+    SC_TRY(buffers->requestNewBuffer(data.sizeInBytes(), bufferID, bufferData)); // 3a. unrefBuffer below
+    memcpy(bufferData.data(), data.data(), data.sizeInBytes());
+    buffers->setNewBufferSize(bufferID, data.sizeInBytes());
+    auto deferredUnref = MakeDeferred([this, bufferID] { buffers->unrefBuffer(bufferID); }); // 3b. requestNewBuffer
+    return write(bufferID, cb);
+}
+
+bool SC::AsyncWritableStream::tryAsync(Result potentialError)
+{
+    if (potentialError)
+    {
+        eventError.emit(potentialError);
+        return false;
+    }
+    return true;
+}
+
+void SC::AsyncWritableStream::finishedWriting(AsyncBufferView::ID                   bufferID,
+                                              Function<void(AsyncBufferView::ID)>&& callback, Result res)
+{
+    SC_ASSERT_RELEASE(state == State::Writing or state == State::Ending);
+
+    if (not res)
+    {
+        eventError.emit(res);
+    }
+
+    bool    emitDrain = false;
+    Request request;
+    if (writeQueue.popFront(request))
+    {
+        tryAsync(asyncWrite(request.bufferID, request.cb));
+        buffers->unrefBuffer(request.bufferID); // 2c. refbuffer in AsyncWritable::write
+    }
+    else
+    {
+        // Queue is empty
+        if (state == State::Ending)
+        {
+            state = State::Ended;
+        }
+        else
+        {
+            state     = State::Stopped;
+            emitDrain = true;
+        }
+    }
+    if (callback.isValid())
+    {
+        callback(bufferID);
+    }
+
+    if (state == State::Ended)
+    {
+        eventFinish.emit();
+    }
+    else if (emitDrain)
+    {
+        eventDrain.emit();
+    }
+}
+
+void SC::AsyncWritableStream::end()
+{
+    switch (state)
+    {
+    case State::Stopped:
+        // Can just jump to ended state
+        state = State::Ended;
+        eventFinish.emit();
+        break;
+    case State::Writing:
+        // We need to wait for current in-flight write to end
+        state = State::Ending;
+        break;
+    case State::Ending:
+    case State::Ended: {
+        // Invalid state, already ended or already ending
+        eventError.emit(Result::Error("AsyncWritableStream::end - already called"));
+    }
+    break;
+    }
+}
+
+SC::AsyncBuffersPool& SC::AsyncWritableStream::getBuffersPool() { return *buffers; }

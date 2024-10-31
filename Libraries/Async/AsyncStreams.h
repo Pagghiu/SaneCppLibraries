@@ -154,5 +154,81 @@ struct AsyncReadableStream
     CircularQueue<Request> readQueue;
 };
 
+/// @brief Async destination abstraction where bytes can be written to.
+/// When buffers are pushed faster than the stream can handle, they will get queued.
+/// Queuing process happens with a linked list stored in the AsyncBufferView itself.
+/// As AsyncBufferView contains a fixed (at init) number of buffers, the queue is bounded
+/// by the fact that user will be unable to allocate buffers to write until at least one
+/// will be made available again (i.e. a write finishes).
+/// User can listen to AsyncWritableStream::eventWritten to know when a buffer is written
+/// (and its refcount decreased) or AsyncWritableStream::eventDrain when the queue is empty.
+struct AsyncWritableStream
+{
+    /// @brief Function that every stream must define to implement its custom write operation
+    Function<Result(AsyncBufferView::ID, Function<void(AsyncBufferView::ID)>)> asyncWrite;
+
+    struct Request
+    {
+        AsyncBufferView::ID bufferID;
+
+        Function<void(AsyncBufferView::ID)> cb;
+    };
+    static constexpr int MaxListeners = 8;
+
+    Event<MaxListeners, Result> eventError;  /// Emitted when an error occurs
+    Event<MaxListeners>         eventDrain;  /// Emitted when write queue is empty
+    Event<MaxListeners>         eventFinish; /// Emitted when no more data can be written
+
+    /// @brief Inits the writable stream
+    /// @param buffersPool An instance of AsyncBuffersPool providing write buffers
+    /// @param requests User owned memory to hold a circular buffer for write requests
+    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests);
+
+    /// @brief Writes a buffer (that must be allocated by the AsyncBuffersPool passed in AsyncWritableStream)
+    /// When the buffer it will be actually written, AsyncWritableStream::eventWritten will be raised and
+    /// its reference count will be decreased.
+    /// @param bufferID Buffer allocated from the associated AsyncBuffersPool (AsyncWritableStream::getBuffersPool)
+    /// @param cb Callback that will be invoked when the write is finished
+    /// @return Invalid Result if write queue is full
+    Result write(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb = {});
+
+    /// @brief Try requesting a buffer big enough and copy data into it
+    /// @return Invalid Result if write queue is full or if there are no available buffers in the pool
+    Result write(Span<const char> data, Function<void(AsyncBufferView::ID)> cb = {});
+
+    /// @brief Write a C-string literal in the stream
+    /// @return Invalid Result if write queue is full or if there are no available buffers in the pool
+    template <size_t N>
+    [[nodiscard]] Result write(const char (&str)[N])
+    {
+        return write(Span<const char>(str, N - 1));
+    }
+
+    /// @brief Ends the writable stream, waiting for all in-flight and queued writes to finish.
+    /// After this happens, AsyncWritableStream::eventFinished will be raised
+    void end();
+
+    /// @brief Obtains the buffers pool to access its data
+    AsyncBuffersPool& getBuffersPool();
+
+    /// @brief Signals that the given buffer (previously queued by write) has been fully written
+    void finishedWriting(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)>&& cb, Result res);
+
+  private:
+    bool tryAsync(Result potentialError);
+
+    enum class State
+    {
+        Stopped,
+        Writing,
+        Ending,
+        Ended
+    };
+    State state = State::Stopped;
+
+    AsyncBuffersPool* buffers = nullptr;
+
+    CircularQueue<Request> writeQueue;
+};
 } // namespace SC
 //! @}
