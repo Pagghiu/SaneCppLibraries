@@ -35,8 +35,10 @@ struct SC_COMPILER_EXPORT HttpHeaderOffset
 };
 } // namespace detail
 
+#if !DOXYGEN
 SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Vector<detail::HttpHeaderOffset>;
 SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT ArenaMapKey<HttpServerClient>;
+#endif
 } // namespace SC
 
 /// @brief Http request received from a client
@@ -109,6 +111,7 @@ SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Function<void(HttpRequest&
 
 /// @brief Async Http server
 ///
+/// Usage:
 /// - Use the SC::HttpServer::onRequest callback to intercept new clients connecting
 /// - Write to SC::HttpResponse or use SC::HttpWebServer to statically serve files
 ///

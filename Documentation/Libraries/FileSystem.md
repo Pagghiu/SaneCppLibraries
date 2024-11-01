@@ -45,7 +45,7 @@ Path is able to parse and manipulate windows and posix paths.
 | SC::FileSystem::existsAndIsFile               | @copybrief SC::FileSystem::existsAndIsFile                |
 | SC::FileSystem::existsAndIsDirectory          | @copybrief SC::FileSystem::existsAndIsDirectory           |
 | **Read / Change modification time**           |                                                           |
-| SC::FileSystem::getFileTime                   | @copybrief SC::FileSystem::getFileTime                    |
+| SC::FileSystem::getFileStat                   | @copybrief SC::FileSystem::getFileStat                    |
 | SC::FileSystem::setLastModifiedTime           | @copybrief SC::FileSystem::setLastModifiedTime            |
 
 | Miscellaneous Classes                         |                                                           |

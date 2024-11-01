@@ -194,6 +194,7 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
     case Platform::Emscripten: return Result::Error("Unsupported platform");
     }
     SC_TRY(process.exec({doxygenExecutable}));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Build documentation failed");
 
     // TODO: Move this to the github CI file once automatic documentation publishing will been setup
     SC_TRY(Path::join(outputDirectory, {arguments.toolDestination.view(), "_Documentation", "docs"}));

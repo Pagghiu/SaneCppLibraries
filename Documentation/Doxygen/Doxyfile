@@ -16,6 +16,7 @@ JAVADOC_AUTOBRIEF      = YES
 DISTRIBUTE_GROUP_DOC   = YES
 SHOW_GROUPED_MEMB_INC  = YES
 SORT_GROUP_NAMES       = YES
+WARN_AS_ERROR          = YES
 INPUT                  = ../../Documentation/Pages \
                          ../../Documentation/Libraries \
                          ../../Documentation/LibrariesExtra \
