@@ -40,9 +40,10 @@ execute_tool () {
     eval "$cmd"
 }
 
+OS=$(uname -s)
+
 call_make build
 
-OS=$(uname -s)
 if [ $? -eq 0 ]; then
     execute_tool "$@"
 else

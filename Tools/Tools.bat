@@ -65,6 +65,7 @@ nmake build /nologo /f "Makefile" CONFIG=Debug "TOOL=%TOOL%" "TOOL_SOURCE_DIR=%T
 IF not %ERRORLEVEL% == 0 (
     @rem It could have failed because of moved files, let's re-try after cleaning
     nmake clean /nologo /f "Makefile" CONFIG=Debug "TOOL=%TOOL%" "TOOL_SOURCE_DIR=%TOOL_SOURCE_DIR%" "TOOL_OUTPUT_DIR=%TOOL_OUTPUT_DIR%"
+    timeout /t 1 /nobreak >nul
     nmake build /nologo /f "Makefile" CONFIG=Debug "TOOL=%TOOL%" "TOOL_SOURCE_DIR=%TOOL_SOURCE_DIR%" "TOOL_OUTPUT_DIR=%TOOL_OUTPUT_DIR%"
 )
 
