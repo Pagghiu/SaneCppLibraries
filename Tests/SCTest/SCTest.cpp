@@ -83,6 +83,7 @@ void runThreadPoolTest(TestReport& report);
 // Async
 void runAsyncTest(SC::TestReport& report);
 void runAsyncStreamTest(SC::TestReport& report);
+void runAsyncRequestStreamTest(SC::TestReport& report);
 
 // Support
 void runDebugVisualizersTest(TestReport& report);
@@ -204,6 +205,7 @@ int main(int argc, const char* argv[])
     // Async tests
     runAsyncTest(report);
     runAsyncStreamTest(report);
+    runAsyncRequestStreamTest(report);
 
     // DebugVisualizers tests
     runDebugVisualizersTest(report);
