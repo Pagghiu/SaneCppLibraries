@@ -230,5 +230,36 @@ struct AsyncWritableStream
 
     CircularQueue<Request> writeQueue;
 };
+
+/// @brief Pipes reads on SC::AsyncReadableStream to SC::AsyncWritableStream.
+/// Back-pressure happens when the source provides data at a faster rate than what the sink (writable)
+/// is able to process.
+/// When this happens, AsyncPipeline will AsyncReadableStream::pause the (source).
+/// It will also AsyncReadableStream::resume it when some writable has finished writing, freeing one buffer.
+/// Caller needs to set AsyncPipeline::source field and AsyncPipeline::sinks with valid streams.
+/// @note It's crucial to use the same AsyncBuffersPool for the AsyncReadableStream and all AsyncWritableStream
+struct AsyncPipeline
+{
+    static constexpr int        MaxListeners = 8;
+    Event<MaxListeners, Result> eventError; /// Emitted when an error occurs
+
+    // TODO: Make all these private
+    AsyncReadableStream* source = nullptr; /// User specified source
+
+    struct Sink
+    {
+        AsyncWritableStream* sink = nullptr;
+    };
+    Span<Sink> sinks; /// User specified sinks
+
+    /// @brief Starts the pipeline
+    /// @note Both source and sinks must have been already setup by the caller
+    Result start();
+
+    // TODO: Add a pause and cancel/step
+  private:
+    void onBufferRead(AsyncBufferView::ID bufferID);
+    void onBufferWritten(AsyncBufferView::ID bufferID);
+};
 } // namespace SC
 //! @}

@@ -6,6 +6,7 @@ Library                                     | Description
 :-------------------------------------------|:-----------------------------------------------
 @subpage library_algorithms                 | @copybrief library_algorithms
 @subpage library_async                      | @copybrief library_async
+@subpage library_async_streams              | @copybrief library_async_streams
 @subpage library_build                      | @copybrief library_build
 @subpage library_containers                 | @copybrief library_containers
 @subpage library_file                       | @copybrief library_file

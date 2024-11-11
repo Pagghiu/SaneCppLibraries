@@ -8,6 +8,9 @@ Async is a multi-platform / event-driven asynchronous I/O library.
 
 @copydetails group_async
 
+@note
+Check @ref library_async_streams for an higher level construct when streaming data
+
 # Features
 
 This is the list of supported async operations:
