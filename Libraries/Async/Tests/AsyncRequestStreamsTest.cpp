@@ -24,6 +24,32 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
         }
     }
     void fileToFile();
+    
+    void createTCPSocketPair(AsyncEventLoop& eventLoop, SocketDescriptor& client,
+                                            SocketDescriptor& serverSideClient)
+    {
+        SocketDescriptor serverSocket;
+        uint16_t         tcpPort        = 5050;
+        StringView       connectAddress = "::1";
+        SocketIPAddress  nativeAddress;
+        SC_TEST_EXPECT(nativeAddress.fromAddressPort(connectAddress, tcpPort));
+        SC_TEST_EXPECT(serverSocket.create(nativeAddress.getAddressFamily()));
+
+        {
+            SocketServer server(serverSocket);
+            SC_TEST_EXPECT(server.bind(nativeAddress));
+            SC_TEST_EXPECT(server.listen(0));
+        }
+
+        SC_TEST_EXPECT(client.create(nativeAddress.getAddressFamily()));
+        SC_TEST_EXPECT(SocketClient(client).connect(connectAddress, tcpPort));
+        SC_TEST_EXPECT(SocketServer(serverSocket).accept(nativeAddress.getAddressFamily(), serverSideClient));
+        SC_TEST_EXPECT(client.setBlocking(false));
+        SC_TEST_EXPECT(serverSideClient.setBlocking(false));
+
+        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedTCPSocket(client));
+        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedTCPSocket(serverSideClient));
+    }
 };
 
 namespace SC
@@ -81,22 +107,34 @@ struct AsyncPipeline
     }
 };
 
+template<typename RequestType>
 struct AsyncRequestReadableStream : public AsyncReadableStream
 {
+    struct Internal
+    {
+        [[nodiscard]] static bool isEnded(AsyncFileRead::Result& result) { return result.completionData.endOfFile; }
+        [[nodiscard]] static bool isEnded(AsyncSocketReceive::Result& result) { return result.completionData.disconnected; }
+        
+        [[nodiscard]] static SocketDescriptor::Handle& getDescriptor(AsyncSocketReceive& request){ return request.handle; }
+        [[nodiscard]] static FileDescriptor::Handle& getDescriptor(AsyncFileRead& request){ return request.fileDescriptor; }
+    };
+    
     AsyncRequestReadableStream()
     {
         AsyncReadableStream::asyncRead.bind<AsyncRequestReadableStream, &AsyncRequestReadableStream::read>(*this);
     }
 
+    template<typename DescriptorType>
     Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
-                FileDescriptor& descriptor)
+                DescriptorType& descriptor)
     {
-        SC_TRY(descriptor.get(request.fileDescriptor, Result::Error("no descriptor")));
+        SC_TRY(descriptor.get(Internal::getDescriptor(request), Result::Error("no descriptor")));
         request.cacheInternalEventLoop(eventLoop);
         return AsyncReadableStream::init(buffersPool, requests);
     }
 
-    AsyncFileRead request;
+
+    RequestType request;
 
   private:
     Result read()
@@ -106,7 +144,7 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
         if (getBufferOrPause(0, bufferID, data))
         {
             request.buffer   = data;
-            request.callback = [this, bufferID](AsyncFileRead::Result& result) { onRead(result, bufferID); };
+            request.callback = [this, bufferID](typename RequestType::Result& result) { onRead(result, bufferID); };
             const Result res = request.start(*request.getEventLoop());
             if (not res)
             {
@@ -117,53 +155,61 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
         return Result::Error("no buffers");
     }
 
-    void onRead(AsyncFileRead::Result& result, AsyncBufferView::ID bufferID)
+    void onRead(typename RequestType::Result& result, AsyncBufferView::ID bufferID)
     {
-        Span<char>   data;
-        const Result res = result.get(data);
-        if (res)
+        if (Internal::isEnded(result))
         {
-            if (result.completionData.endOfFile)
-            {
-                getBuffersPool().unrefBuffer(bufferID);
-                AsyncRequestReadableStream::pushEnd();
-            }
-            else
+            getBuffersPool().unrefBuffer(bufferID);
+            AsyncRequestReadableStream::pushEnd();
+        }
+        else
+        {
+            Span<char>   data;
+            const Result res = result.get(data);
+            if (res)
             {
                 AsyncRequestReadableStream::push(bufferID, data.sizeInBytes());
                 getBuffersPool().unrefBuffer(bufferID);
                 if (AsyncRequestReadableStream::getBufferOrPause(0, bufferID, data))
                 {
                     request.buffer   = data;
-                    request.callback = [this, bufferID](AsyncFileRead::Result& result) { onRead(result, bufferID); };
+                    request.callback = [this, bufferID](typename RequestType::Result& result) { onRead(result, bufferID); };
                     result.reactivateRequest(true);
                 }
             }
-        }
-        else
-        {
-            getBuffersPool().unrefBuffer(bufferID);
-            emitError(res);
+            else
+            {
+                getBuffersPool().unrefBuffer(bufferID);
+                emitError(res);
+            }
         }
     }
 };
 
+
+template<typename RequestType>
 struct AsyncRequestWritableStream : public AsyncWritableStream
 {
+    struct Internal
+    {
+        [[nodiscard]] static SocketDescriptor::Handle& getDescriptor(AsyncSocketSend& request){ return request.handle; }
+        [[nodiscard]] static FileDescriptor::Handle& getDescriptor(AsyncFileWrite& request){ return request.fileDescriptor; }
+    };
     AsyncRequestWritableStream()
     {
         AsyncWritableStream::asyncWrite.bind<AsyncRequestWritableStream, &AsyncRequestWritableStream::write>(*this);
     }
 
+    template<typename DescriptorType>
     Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
-                FileDescriptor& fileDescriptor)
+                DescriptorType& descriptor)
     {
-        SC_TRY(fileDescriptor.get(request.fileDescriptor, Result::Error("no descriptor")));
+        SC_TRY(descriptor.get(Internal::getDescriptor(request), Result::Error("no descriptor")));
         request.cacheInternalEventLoop(eventLoop);
         return AsyncWritableStream::init(buffersPool, requests);
     }
 
-    AsyncFileWrite request;
+    RequestType request;
 
   private:
     Function<void(AsyncBufferView::ID)> callback;
@@ -174,7 +220,7 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
         if (getBuffersPool().getData(bufferID, data))
         {
             callback         = cb;
-            request.callback = [this, bufferID](AsyncFileWrite::Result& result) { afterWrite(result, bufferID); };
+            request.callback = [this, bufferID](typename RequestType::Result& result) { afterWrite(result, bufferID); };
             request.buffer   = data;
             const Result res = request.start(*request.getEventLoop());
             if (res)
@@ -186,16 +232,19 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
         return Result::Error("no data");
     }
 
-    void afterWrite(AsyncFileWrite::Result& result, AsyncBufferView::ID bufferID)
+    void afterWrite(typename RequestType::Result& result, AsyncBufferView::ID bufferID)
     {
         getBuffersPool().unrefBuffer(bufferID);
-        size_t       sizeInBytes  = 0;
-        const Result res          = result.get(sizeInBytes);
         auto         callbackCopy = move(callback);
         callback                  = {};
-        AsyncWritableStream::finishedWriting(bufferID, move(callbackCopy), res);
+        AsyncWritableStream::finishedWriting(bufferID, move(callbackCopy), result.isValid());
     }
 };
+
+using AsyncFileReadableStream = AsyncRequestReadableStream<AsyncFileRead>;
+using AsyncFileWritableStream = AsyncRequestWritableStream<AsyncFileWrite>;
+using AsyncSocketReadableStream = AsyncRequestReadableStream<AsyncSocketReceive>;
+using AsyncSocketWritableStream = AsyncRequestWritableStream<AsyncSocketSend>;
 
 } // namespace SC
 
@@ -222,22 +271,22 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create());
 
-    constexpr size_t numberOfBuffers = 2;
-    constexpr size_t bufferBytesSize = 16;
-    AsyncBufferView  buffers[numberOfBuffers];
-    HeapBuffer       buffer;
-    SC_TEST_EXPECT(buffer.allocate(bufferBytesSize * numberOfBuffers));
-    for (size_t idx = 0; idx < numberOfBuffers; ++idx)
+    constexpr size_t numberOfBuffers1 = 2;
+    constexpr size_t buffer1BytesSize = 16;
+    AsyncBufferView  buffers1[numberOfBuffers1];
+    HeapBuffer       buffer1;
+    SC_TEST_EXPECT(buffer1.allocate(buffer1BytesSize * numberOfBuffers1));
+    for (size_t idx = 0; idx < numberOfBuffers1; ++idx)
     {
-        SC_TEST_EXPECT(buffer.data.sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
+        SC_TEST_EXPECT(buffer1.data.sliceStartLength(idx * buffer1BytesSize, buffer1BytesSize, buffers1[idx].data));
     }
-    AsyncBuffersPool pool;
-    pool.buffers = {buffers, numberOfBuffers};
-
-    AsyncRequestReadableStream   readable;
-    AsyncReadableStream::Request readableRequests[numberOfBuffers + 1]; // Only N-1 slots will be used
-    AsyncRequestWritableStream   writable;
-    AsyncWritableStream::Request writableRequests[numberOfBuffers + 1]; // Only N-1 slots will be used
+    AsyncBuffersPool pool1;
+    pool1.buffers = {buffers1, numberOfBuffers1};
+    
+    AsyncFileReadableStream   fileReadableStream;
+    AsyncReadableStream::Request fileReadableRequests[numberOfBuffers1 + 1]; // Only N-1 slots will be used
+    AsyncFileWritableStream   fileWritableStream;
+    AsyncWritableStream::Request fileWritableRequests[numberOfBuffers1 + 1]; // Only N-1 slots will be used
 
     FileDescriptor::OpenOptions openOptions;
     openOptions.blocking = false; // Windows needs non-blocking flags set
@@ -253,24 +302,69 @@ void SC::AsyncRequestStreamsTest::fileToFile()
         writeDescriptor.open(writeablePath.view(), FileDescriptor::OpenMode::WriteCreateTruncate, openOptions));
     SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(writeDescriptor));
 
-    SC_TEST_EXPECT(readable.init(pool, readableRequests, eventLoop, readDescriptor));
-    SC_TEST_EXPECT(writable.init(pool, writableRequests, eventLoop, writeDescriptor));
+    
+    
+    constexpr size_t numberOfBuffers2 = 2;
+    constexpr size_t buffer2BytesSize = 16;
+    AsyncBufferView  buffers2[numberOfBuffers2];
+    HeapBuffer       buffer2;
+    SC_TEST_EXPECT(buffer2.allocate(buffer2BytesSize * numberOfBuffers2));
+    for (size_t idx = 0; idx < numberOfBuffers2; ++idx)
+    {
+        SC_TEST_EXPECT(buffer2.data.sliceStartLength(idx * buffer2BytesSize, buffer2BytesSize, buffers2[idx].data));
+    }
+    AsyncBuffersPool pool2;
+    pool2.buffers = {buffers2, numberOfBuffers2};
+    
+    AsyncSocketReadableStream   socketReadableStream;
+    AsyncReadableStream::Request socketReadableRequests[numberOfBuffers2 + 1]; // Only N-1 slots will be used
+    AsyncSocketWritableStream   socketWritableStream;
+    AsyncWritableStream::Request socketWritableRequests[numberOfBuffers2 + 1]; // Only N-1 slots will be used
+
+    SocketDescriptor client[2];
+    createTCPSocketPair(eventLoop, client[0], client[1]);
+
+    SC_TEST_EXPECT(fileReadableStream.init(pool1, fileReadableRequests, eventLoop, readDescriptor));
+    SC_TEST_EXPECT(socketWritableStream.init(pool1, socketWritableRequests, eventLoop, client[0]));
+    (void)fileReadableStream.eventEnd.addListener([&socketWritableStream](){
+        socketWritableStream.end();
+    });
+    
+    (void)socketWritableStream.eventFinish.addListener([&client](){
+        (void)client[0].close();
+    });
+    
+    
+    SC_TEST_EXPECT(socketReadableStream.init(pool2, socketReadableRequests, eventLoop, client[1]));
+    (void)socketReadableStream.eventEnd.addListener([&fileWritableStream](){
+        fileWritableStream.end();
+    });
+    SC_TEST_EXPECT(fileWritableStream.init(pool2, fileWritableRequests, eventLoop, writeDescriptor));
 
     // Create Pipeline
-    AsyncPipeline pipeline;
+    AsyncPipeline pipeline[2];
 
-    AsyncPipeline::Sink destinations[1];
-    pipeline.source      = &readable;
-    pipeline.destination = {destinations, 1};
-    destinations[0].sink = &writable;
+    AsyncPipeline::Sink destinations1[1];
+    pipeline[0].source      = &fileReadableStream;
+    pipeline[0].destination = {destinations1, 1};
+    destinations1[0].sink = &socketWritableStream;
 
-    SC_TEST_EXPECT(pipeline.init());
-    SC_TEST_EXPECT(pipeline.start());
+    AsyncPipeline::Sink destinations2[1];
+    pipeline[1].source      = &socketReadableStream;
+    pipeline[1].destination = {destinations2, 1};
+    destinations2[0].sink = &fileWritableStream;
+
+    SC_TEST_EXPECT(pipeline[0].init());
+    SC_TEST_EXPECT(pipeline[0].start());
+    SC_TEST_EXPECT(pipeline[1].init());
+    SC_TEST_EXPECT(pipeline[1].start());
 
     SC_TEST_EXPECT(eventLoop.run());
 
     SC_TEST_EXPECT(writeDescriptor.close());
     SC_TEST_EXPECT(readDescriptor.close());
+    SC_TEST_EXPECT(client[0].close());
+    SC_TEST_EXPECT(client[0].close());
 
     // Final Check
     FileSystem   fs;
