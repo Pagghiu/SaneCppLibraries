@@ -106,6 +106,7 @@ Check [Building (contributor)](https://pagghiu.github.io/SaneCppLibraries/page_b
 
 - [Sane Coding Discord](https://discord.gg/tyBfFp33Z6)  
 ![Discord](https://img.shields.io/discord/1195076118307426384)
+- [Bluesky](https://pagghiu.bsky.social) `@pagghiu.bsky.social`
 - [Twitter](https://twitter.com/pagghiu_) `@pagghiu_`
 - [Mastodon](https://mastodon.gamedev.place/@pagghiu) `@pagghiu`
 - [Github Discussion](https://github.com/Pagghiu/SaneCppLibraries/discussions)
@@ -113,6 +114,16 @@ Check [Building (contributor)](https://pagghiu.github.io/SaneCppLibraries/page_b
 Alternatively I am also reading the following discords too:
 - [Italian C++ Discord](https://discord.gg/GPATr8QxfS) (`@Pagghiu` from any appropriate channel or just a DM, english and italian are both fine)
 - [Handmade Network discord](https://discord.gg/hmn) (`@Pagghiu` from any appropriate channel or just a DM)
+
+# Contributing
+
+Please take some time to read the [Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html) and [Coding Style](https://pagghiu.github.io/SaneCppLibraries/page_coding_style.html).
+
+After that you can read the [CONTRIBUTING.md](CONTRIBUTING.md) guide.
+
+# License
+
+Sane C++ Libraries are licensed under the MIT License, see [LICENSE.txt](LICENSE.txt) for more information.
 
 # Videos
 
@@ -157,13 +168,7 @@ You can find some [YouTube Videos](https://www.youtube.com/@Pagghiu) and [Blog p
 
 - [Ep.27 - C++ Async Http Web Server](https://www.youtube.com/watch?v=yg438A9Db50)
 
-
-# Contributing
-
-Please take some time to read the [Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html) and [Coding Style](https://pagghiu.github.io/SaneCppLibraries/page_coding_style.html).
-
-After that you can read the [CONTRIBUTING.md](CONTRIBUTING.md) guide.
-
-# License
-
-Sane C++ Libraries are licensed under the MIT License, see [LICENSE.txt](LICENSE.txt) for more information.
+- [Ep.28 - C++ Async Readable Streams](https://www.youtube.com/watch?v=MFPjoOUTlBo)
+- [Ep.29 - C++ Async Writable Streams](https://www.youtube.com/watch?v=0OXLxIDvmOU)
+- [Ep.30 - C++ Async Streams Pipeline](https://www.youtube.com/watch?v=8rYQ2ApxnwA)
+- [Ep.31 - C++ Async Socket Streams](https://www.youtube.com/watch?v=0x6TLV_ig-A)
