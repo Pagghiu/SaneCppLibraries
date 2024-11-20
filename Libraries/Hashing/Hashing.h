@@ -12,8 +12,8 @@ namespace SC
 
 /// @brief Compute MD5, SHA1 or SHA256 hash for stream of data.
 /// @n
-/// Data can be added until needed with SC::Hashing::update call.
-/// SC::Hashing::finalize will generate an actual SC::Hashing::Result holding the computed *hash*.
+/// Data can be added until needed with SC::Hashing::add call.
+/// SC::Hashing::getHash will generate an actual SC::Hashing::Result holding the computed *hash*.
 ///
 /// Example:
 /// \snippet Libraries/Hashing/Tests/HashingTest.cpp HashingSnippet
@@ -51,12 +51,12 @@ struct Hashing
     Hashing& operator=(const Hashing&) = delete;
     Hashing& operator=(Hashing&&)      = delete;
 
-    /// @brief Add data to be hashed. Can be called multiple times before Hashing::finalize
+    /// @brief Add data to be hashed. Can be called multiple times before Hashing::getHash
     /// @param data Data to be hashed
     /// @return `true` if data has been hashed successfully
     [[nodiscard]] bool add(Span<const uint8_t> data);
 
-    /// @brief Finalizes hash computation that has been pushed through Hashing::update
+    /// @brief Finalize hash computation that has been pushed through Hashing::add
     /// @param[out] res Result object holding the actual Result::hash
     /// @return `true` if the final hash has been computed successfully
     [[nodiscard]] bool getHash(Result& res);
