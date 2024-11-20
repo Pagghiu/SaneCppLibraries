@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/InitializerList.h"
+#include "../Foundation/LibC.h"       // memcmp
 #include "../Foundation/TypeTraits.h" // SameConstnessAs
 
 namespace SC
@@ -181,6 +182,15 @@ struct SC::Span
         if (idx >= 0 and idx < static_cast<IntType>(sizeElements))
             return items + idx;
         return nullptr;
+    }
+
+    [[nodiscard]] bool equals(const Span other) const
+    {
+        if (sizeInBytes() != other.sizeInBytes())
+            return false;
+        if (sizeInBytes() == 0)
+            return true;
+        return ::memcmp(other.items, other.items, sizeInBytes()) == 0;
     }
 
   private:
