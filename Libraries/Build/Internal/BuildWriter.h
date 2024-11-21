@@ -49,6 +49,7 @@ struct SC::Build::WriterInternal
             ObjCppFile,
             CFile,
             Framework,
+            SystemLibrary,
             Configuration,
             DebugVisualizerFile,
             XCAsset

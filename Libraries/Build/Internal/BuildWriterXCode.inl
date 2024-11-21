@@ -113,7 +113,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 
         for (auto it : xcodeFiles)
         {
-            if (it.type == RenderItem::Framework)
+            if (it.type == RenderItem::Framework or it.type == RenderItem::SystemLibrary)
             {
                 auto framework = frameworksGroup->children.getOrCreate(it.name);
                 SC_TRY(framework != nullptr);
@@ -207,7 +207,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                 builder.append("        {} /* {} in Sources */ = {{isa = PBXBuildFile; fileRef = {} /* {} */; }};\n",
                                file.buildHash, file.name, file.referenceHash, file.name);
             }
-            else if (file.type == RenderItem::Framework)
+            else if (file.type == RenderItem::Framework or file.type == RenderItem::SystemLibrary)
             {
 
                 String platformFilters;
@@ -344,6 +344,14 @@ struct SC::Build::ProjectWriter::WriterXCode
                                "wrapper.framework; name = \"{}\"; path = \"{}\"; sourceTree = SDKROOT; }};",
                                file.referenceHash, file.name, file.name, file.path);
             }
+
+            else if (file.type == RenderItem::SystemLibrary)
+            {
+                builder.append(
+                    "\n        {} /* {} */ = {{isa = PBXFileReference; lastKnownFileType = "
+                    "sourcecode.text-based-dylib-definition; name = \"{}\"; path = \"{}\"; sourceTree = SDKROOT; }};",
+                    file.referenceHash, file.name, file.name, file.path);
+            }
             else if (file.type == RenderItem::XCAsset)
             {
                 builder.append("\n        {} /* {} */ = {{isa = PBXFileReference; lastKnownFileType = "
@@ -369,7 +377,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             files = ()delimiter");
         for (const auto& it : xcodeObjects)
         {
-            if (it.type == RenderItem::Framework)
+            if (it.type == RenderItem::Framework or it.type == RenderItem::SystemLibrary)
             {
                 SC_TRY(builder.append("\n                {} /* {} in Frameworks */,", it.buildHash.view(),
                                       it.name.view()));
@@ -911,19 +919,32 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     [[nodiscard]] bool fillXCodeFrameworks(const Project& project, Vector<RenderItem>& xcodeObjects)
     {
-        auto fillFrameworks = [this, &xcodeObjects](auto* frameworks, StringView platformFilter)
+        auto fillFrameworks =
+            [this, &xcodeObjects](const Vector<String>* frameworks, StringView platformFilter, bool framework)
         {
             if (frameworks == nullptr)
             {
                 return Result(true);
             }
-            for (auto it : *frameworks)
+            for (const String& it : *frameworks)
             {
                 RenderItem xcodeFile;
-                xcodeFile.name = Path::basename(it.view(), Path::AsPosix);
-                SC_TRY(StringBuilder(xcodeFile.name, StringBuilder::DoNotClear).append(".framework"));
-                xcodeFile.type = RenderItem::Framework;
-                SC_TRY(Path::join(xcodeFile.path, {"System/Library/Frameworks", xcodeFile.name.view()}, "/"));
+                if (framework)
+                {
+                    xcodeFile.name = Path::basename(it.view(), Path::AsPosix);
+                    SC_TRY(StringBuilder(xcodeFile.name, StringBuilder::DoNotClear).append(".framework"));
+                    xcodeFile.type = RenderItem::Framework;
+                    SC_TRY(Path::join(xcodeFile.path, {"System/Library/Frameworks", xcodeFile.name.view()}, "/"));
+                }
+                else
+                {
+                    xcodeFile.name = "lib";
+                    StringBuilder sb(xcodeFile.name, StringBuilder::DoNotClear);
+                    SC_TRY(sb.append(Path::basename(it.view(), Path::AsPosix)));
+                    SC_TRY(sb.append(".tbd"));
+                    xcodeFile.type = RenderItem::SystemLibrary;
+                    SC_TRY(Path::join(xcodeFile.path, {"usr/lib", xcodeFile.name.view()}, "/"));
+                }
                 SC_TRY(computeBuildHash(xcodeFile.name.view(), xcodeFile.buildHash));
                 SC_TRY(computeReferenceHash(xcodeFile.name.view(), xcodeFile.referenceHash));
 
@@ -936,9 +957,11 @@ struct SC::Build::ProjectWriter::WriterXCode
             }
             return Result(true);
         };
-        SC_TRY(fillFrameworks(project.link.get<Link::linkFrameworksAny>(), StringView()));
-        SC_TRY(fillFrameworks(project.link.get<Link::linkFrameworksMacOS>(), "macos"));
-        SC_TRY(fillFrameworks(project.link.get<Link::linkFrameworksIOS>(), "ios"));
+        SC_TRY(fillFrameworks(project.link.get<Link::linkFrameworksAny>(), StringView(), true));
+        SC_TRY(fillFrameworks(project.link.get<Link::linkFrameworksMacOS>(), "macos", true));
+        SC_TRY(fillFrameworks(project.link.get<Link::linkFrameworksIOS>(), "ios", true));
+        // TODO: Must differentiate between regular link libraries and "system link libraries" (.tbd)
+        SC_TRY(fillFrameworks(project.link.get<Link::linkLibraries>(), StringView(), false));
         return Result(true);
     }
 
