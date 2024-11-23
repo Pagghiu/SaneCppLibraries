@@ -469,9 +469,9 @@ SC::Result SC::AsyncPipeline::start()
     SC_TRY_MSG(source != nullptr, "AsyncPipeline::start - Missing source");
 
     AsyncBuffersPool& buffers = source->getBuffersPool();
-    for (Sink sink : sinks)
+    for (const Pipe& pipe : pipes)
     {
-        if (&sink.sink->getBuffersPool() != &buffers)
+        if (&pipe.sink->getBuffersPool() != &buffers)
         {
             return Result::Error("AsyncPipeline::start - all streams must use the same AsyncBuffersPool");
         }
@@ -484,12 +484,12 @@ SC::Result SC::AsyncPipeline::start()
 
 void SC::AsyncPipeline::onBufferRead(AsyncBufferView::ID bufferID)
 {
-    for (Sink sink : sinks)
+    for (const Pipe& pipe : pipes)
     {
         source->getBuffersPool().refBuffer(bufferID); // 4a. AsyncPipeline::onBufferWritten
         Function<void(AsyncBufferView::ID)> cb;
         cb.bind<AsyncPipeline, &AsyncPipeline::onBufferWritten>(*this);
-        Result res = sink.sink->write(bufferID, move(cb));
+        Result res = pipe.sink->write(bufferID, move(cb));
         if (not res)
         {
             eventError.emit(res);

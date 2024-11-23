@@ -240,17 +240,18 @@ struct AsyncWritableStream
 /// @note It's crucial to use the same AsyncBuffersPool for the AsyncReadableStream and all AsyncWritableStream
 struct AsyncPipeline
 {
-    static constexpr int        MaxListeners = 8;
+    static constexpr int MaxListeners = 8;
+
     Event<MaxListeners, Result> eventError; /// Emitted when an error occurs
 
     // TODO: Make all these private
     AsyncReadableStream* source = nullptr; /// User specified source
 
-    struct Sink
+    struct Pipe
     {
         AsyncWritableStream* sink = nullptr;
     };
-    Span<Sink> sinks; /// User specified sinks
+    Span<Pipe> pipes; /// User specified sinks
 
     /// @brief Starts the pipeline
     /// @note Both source and sinks must have been already setup by the caller
