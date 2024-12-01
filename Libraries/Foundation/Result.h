@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "Compiler.h" // SC_LANGUAGE_LIKELY
 namespace SC
 {
 //! @addtogroup group_foundation_utility

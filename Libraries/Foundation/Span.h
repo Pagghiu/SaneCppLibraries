@@ -71,9 +71,9 @@ struct SC::Span
 
     /// @brief Reinterprets the current span as an array of the specified type
     template <typename T>
-    [[nodiscard]] Span<const T> reinterpret_as_array_of() const
+    [[nodiscard]] Span<T> reinterpret_as_array_of() const
     {
-        return Span<const T>(reinterpret_cast<const T*>(items), sizeInBytes() / sizeof(T));
+        return Span<T>(reinterpret_cast<T*>(items), sizeInBytes() / sizeof(T));
     }
 
     /// @brief Returns pointer to first element of the span
