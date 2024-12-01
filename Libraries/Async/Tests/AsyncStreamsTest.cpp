@@ -229,6 +229,10 @@ void SC::AsyncStreamsTest::readableAsyncStream()
     {
         if (context.idx < context.max)
         {
+            if (not timeout.isFree())
+            {
+                SC_TRY(timeout.stop());
+            }
             Result res = timeout.start(*timeout.getEventLoop(), Time::Milliseconds(1));
             if (not res)
             {

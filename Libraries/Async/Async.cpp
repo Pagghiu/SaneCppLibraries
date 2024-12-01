@@ -1126,6 +1126,7 @@ SC::Result SC::AsyncEventLoop::Internal::cancelAsync(AsyncRequest& async)
     }
     case AsyncRequest::State::Setup: {
         submissions.remove(async);
+        async.state = AsyncRequest::State::Free;
         break;
     }
     case AsyncRequest::State::Teardown: //
