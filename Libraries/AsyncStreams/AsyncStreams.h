@@ -10,9 +10,9 @@
 #include "Internal/Event.h"
 
 //! @defgroup group_async_streams Async Streams
-//! Async Streams streams data from an async source to one or more async destinations.
+//! Async Streams read, transform and write data from async sources to destinations.
 //!
-/// Read and writes happen in parallel if sources and destinations are asynchronous.
+/// Read, writes and transforms happen in parallel if sources and destinations are asynchronous.
 /// This library does not allocate any memory, all buffers are supplied by the caller.
 
 //! @addtogroup group_async_streams
