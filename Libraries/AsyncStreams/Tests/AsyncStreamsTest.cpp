@@ -83,7 +83,11 @@ void SC::AsyncStreamsTest::event()
     SC_TEST_EXPECT((event.addListener<AsyncStreamsTest, &AsyncStreamsTest::funcCallback>(*this, &memberIndex)));
     event.emit(1);
     SC_TEST_EXPECT(memberCalls == 1); // +1
+    SC_TEST_EXPECT((event.removeListener<AsyncStreamsTest, &AsyncStreamsTest::funcCallback>(*this)));
+    event.emit(1);
+    SC_TEST_EXPECT(memberCalls == 1); // +0
     int value = 1;
+    SC_TEST_EXPECT((event.addListener<AsyncStreamsTest, &AsyncStreamsTest::funcCallback>(*this, &memberIndex)));
     event.emit(value);
     SC_TEST_EXPECT(memberCalls == 2); // +1
     event.emit(move(value));

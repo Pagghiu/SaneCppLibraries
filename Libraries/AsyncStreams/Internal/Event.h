@@ -68,6 +68,21 @@ struct Event
         }
     }
 
+    template <typename Class, void (Class::*MemberFunction)(T...)>
+    [[nodiscard]] bool removeListener(Class& pself)
+    {
+        Function<void(T...)> func;
+        func.template bind<Class, MemberFunction>(pself);
+        for (int idx = 0; idx < numListeners; ++idx)
+        {
+            if (listeners[idx] == func)
+            {
+                return removeListenerAt(idx);
+            }
+        }
+        return false;
+    }
+
     /// @brief Removes a listener where operator == evaluates to true for the passed in func
     template <typename Func>
     [[nodiscard]] bool removeListener(Func& func)
