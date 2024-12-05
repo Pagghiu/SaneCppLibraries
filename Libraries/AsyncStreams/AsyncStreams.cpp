@@ -460,6 +460,7 @@ void SC::AsyncWritableStream::end()
 
 SC::AsyncBuffersPool& SC::AsyncWritableStream::getBuffersPool() { return *buffers; }
 
+void SC::AsyncWritableStream::emitError(Result error) { eventError.emit(error); }
 //-------------------------------------------------------------------------------------------------------
 // AsyncPipeline
 //-------------------------------------------------------------------------------------------------------

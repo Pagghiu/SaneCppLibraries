@@ -17,12 +17,17 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
     Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
                 const DescriptorType& descriptor);
 
+    /// @brief Registers or unregisters a listener to AsyncReadableStream::eventEnd to close descriptor
+    Result registerAutoCloseDescriptor(bool value);
+
   private:
     struct Internal;
     AsyncRequestType request;
 
     Result read();
-    void   afterRead(typename AsyncRequestType::Result& result, AsyncBufferView::ID bufferID);
+
+    void afterRead(typename AsyncRequestType::Result& result, AsyncBufferView::ID bufferID);
+    void onEndCloseDescriptor();
 };
 
 template <typename AsyncRequestType>
@@ -34,6 +39,9 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
     Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
                 const DescriptorType& descriptor);
 
+    /// @brief Registers or unregisters a listener to AsyncWritableStream::eventFinish to close descriptor
+    Result registerAutoCloseDescriptor(bool value);
+
   private:
     struct Internal;
     AsyncRequestType request;
@@ -41,6 +49,8 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
     Function<void(AsyncBufferView::ID)> callback;
 
     Result write(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb);
+
+    void onEndCloseDescriptor();
 };
 
 using ReadableFileStream   = AsyncRequestReadableStream<AsyncFileRead>;

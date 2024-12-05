@@ -273,26 +273,27 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     AsyncWritableStream::Request writeSocketRequests[numberOfBuffers1 + 1];
     SC_TEST_EXPECT(writeSocketStream.init(buffersPool1, writeSocketRequests, eventLoop, client[0]));
     (void)writeSocketStream.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
-    // TODO: We should probably make this automatically in the pipeline, maybe under an option
+    // Autoclose socket after write stream receives an ::end()
+    SC_TEST_EXPECT(writeSocketStream.registerAutoCloseDescriptor(true));
+    client[0].detach(); // Taken care by registerAutoCloseDescriptor(true)
+
     // Hook events to end the write socket stream once the readable stream is ended
     (void)readFileStream.eventEnd.addListener([&]() { writeSocketStream.end(); });
-    // After write socket is finished, let's close the associated socket
-    (void)writeSocketStream.eventFinish.addListener([&]() { SC_TEST_EXPECT(client[0].close()); });
 
     // Create Readable Socket Stream
     ReadableSocketStream         readSocketStream;
     AsyncReadableStream::Request readSocketRequests[numberOfBuffers2 + 1];
     SC_TEST_EXPECT(readSocketStream.init(buffersPool2, readSocketRequests, eventLoop, client[1]));
+    // Autoclose socket when socket stream receives an end event signaling socket disconnected
+    SC_TEST_EXPECT(readSocketStream.registerAutoCloseDescriptor(true));
+    client[1].detach(); // Taken care by registerAutoCloseDescriptor(true)
     (void)readSocketStream.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
 
     AsyncWritableStream::Request writeFileRequests[numberOfBuffers2 + 1];
     SC_TEST_EXPECT(writeFileStream.init(buffersPool2, writeFileRequests, eventLoop, writeFd));
 
-    // TODO: We should probably make this automatically in the pipeline, maybe under an option
     // Close the write file stream once the reading socket has disconnected
     (void)readSocketStream.eventEnd.addListener([&]() { writeFileStream.end(); });
-    // Once write stream is finished (after end) also close the socket (even if it's already disconnected).
-    (void)writeFileStream.eventFinish.addListener([&]() { SC_TEST_EXPECT(client[1].close()); });
 
     // Create Pipelines
     AsyncPipeline pipelines[2];

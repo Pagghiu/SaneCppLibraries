@@ -12,6 +12,16 @@ struct SC::AsyncRequestReadableStream<AsyncReadRequest>::Internal
     static bool isEnded(AsyncSocketReceive::Result& result) { return result.completionData.disconnected; }
     static SocketDescriptor::Handle& getDescriptor(AsyncSocketReceive& async) { return async.handle; }
     static FileDescriptor::Handle&   getDescriptor(AsyncFileRead& async) { return async.fileDescriptor; }
+
+    static Result closeDescriptor(AsyncFileRead& async)
+    {
+        return detail::FileDescriptorDefinition::releaseHandle(async.fileDescriptor);
+    }
+
+    static Result closeDescriptor(AsyncSocketReceive& async)
+    {
+        return detail::SocketDescriptorDefinition::releaseHandle(async.handle);
+    }
 };
 
 template <typename AsyncReadRequest>
@@ -29,6 +39,30 @@ SC::Result SC::AsyncRequestReadableStream<AsyncReadRequest>::init(AsyncBuffersPo
     request.cacheInternalEventLoop(loop);
     SC_TRY(descriptor.get(Internal::getDescriptor(request), Result::Error("Missing descriptor")));
     return AsyncReadableStream::init(buffersPool, requests);
+}
+
+template <typename AsyncReadRequest>
+void SC::AsyncRequestReadableStream<AsyncReadRequest>::onEndCloseDescriptor()
+{
+    Result res = Internal::closeDescriptor(request);
+    if (not res)
+    {
+        emitError(res);
+    }
+}
+
+template <typename AsyncReadRequest>
+SC::Result SC::AsyncRequestReadableStream<AsyncReadRequest>::registerAutoCloseDescriptor(bool value)
+{
+    using Self = AsyncRequestReadableStream;
+    if (value)
+    {
+        return Result(eventEnd.addListener<Self, &Self::onEndCloseDescriptor>(*this));
+    }
+    else
+    {
+        return Result(eventEnd.removeListener<Self, &Self::onEndCloseDescriptor>(*this));
+    }
 }
 
 template <typename AsyncReadRequest>
@@ -101,6 +135,16 @@ struct SC::AsyncRequestWritableStream<AsyncWriteRequest>::Internal
 {
     static SocketDescriptor::Handle& getDescriptor(AsyncSocketSend& async) { return async.handle; }
     static FileDescriptor::Handle&   getDescriptor(AsyncFileWrite& async) { return async.fileDescriptor; }
+
+    static Result closeDescriptor(AsyncFileWrite& async)
+    {
+        return detail::FileDescriptorDefinition::releaseHandle(async.fileDescriptor);
+    }
+
+    static Result closeDescriptor(AsyncSocketSend& async)
+    {
+        return detail::SocketDescriptorDefinition::releaseHandle(async.handle);
+    }
 };
 
 template <typename AsyncWriteRequest>
@@ -118,6 +162,30 @@ SC::Result SC::AsyncRequestWritableStream<AsyncWriteRequest>::init(AsyncBuffersP
     request.cacheInternalEventLoop(loop);
     SC_TRY(descriptor.get(Internal::getDescriptor(request), Result::Error("Missing descriptor")));
     return AsyncWritableStream::init(buffersPool, requests);
+}
+
+template <typename AsyncWriteRequest>
+void SC::AsyncRequestWritableStream<AsyncWriteRequest>::onEndCloseDescriptor()
+{
+    Result res = Internal::closeDescriptor(request);
+    if (not res)
+    {
+        emitError(res);
+    }
+}
+
+template <typename AsyncWriteRequest>
+SC::Result SC::AsyncRequestWritableStream<AsyncWriteRequest>::registerAutoCloseDescriptor(bool value)
+{
+    using Self = AsyncRequestWritableStream;
+    if (value)
+    {
+        return Result(eventFinish.addListener<Self, &Self::onEndCloseDescriptor>(*this));
+    }
+    else
+    {
+        return Result(eventFinish.removeListener<Self, &Self::onEndCloseDescriptor>(*this));
+    }
 }
 
 template <typename AsyncWriteRequest>

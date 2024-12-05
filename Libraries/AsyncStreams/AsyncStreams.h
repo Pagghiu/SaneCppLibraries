@@ -214,6 +214,9 @@ struct AsyncWritableStream
     /// @brief Signals that the given buffer (previously queued by write) has been fully written
     void finishedWriting(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)>&& cb, Result res);
 
+    /// @brief Signals an async error received
+    void emitError(Result error);
+
   private:
     bool tryAsync(Result potentialError);
 
