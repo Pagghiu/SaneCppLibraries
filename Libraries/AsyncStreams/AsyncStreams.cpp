@@ -478,8 +478,13 @@ SC::Result SC::AsyncPipeline::start()
         }
     }
 
+    AsyncReadableStream* readable = source;
     // TODO: Register also onErrors
-    SC_TRY((source->eventData.addListener<AsyncPipeline, &AsyncPipeline::onBufferRead>(*this)));
+    bool res;
+    res = readable->eventData.addListener<AsyncPipeline, &AsyncPipeline::onBufferRead>(*this);
+    SC_TRY_MSG(res, "AsyncPipeline::start() run out of eventData");
+    res = readable->eventEnd.addListener<AsyncPipeline, &AsyncPipeline::endPipes>(*this);
+    SC_TRY_MSG(res, "AsyncPipeline::start() run out of eventEnd");
     return source->start();
 }
 
@@ -502,4 +507,12 @@ void SC::AsyncPipeline::onBufferWritten(AsyncBufferView::ID bufferID)
 {
     source->getBuffersPool().unrefBuffer(bufferID); // 4b. AsyncPipeline::onBufferRead
     source->resume();
+}
+
+void SC::AsyncPipeline::endPipes()
+{
+    for (const Pipe& pipe : pipes)
+    {
+        pipe.sink->end();
+    }
 }

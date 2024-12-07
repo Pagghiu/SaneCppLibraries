@@ -277,9 +277,6 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     SC_TEST_EXPECT(writeSocketStream.registerAutoCloseDescriptor(true));
     client[0].detach(); // Taken care by registerAutoCloseDescriptor(true)
 
-    // Hook events to end the write socket stream once the readable stream is ended
-    (void)readFileStream.eventEnd.addListener([&]() { writeSocketStream.end(); });
-
     // Create Readable Socket Stream
     ReadableSocketStream         readSocketStream;
     AsyncReadableStream::Request readSocketRequests[numberOfBuffers2 + 1];
@@ -291,9 +288,6 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
 
     AsyncWritableStream::Request writeFileRequests[numberOfBuffers2 + 1];
     SC_TEST_EXPECT(writeFileStream.init(buffersPool2, writeFileRequests, eventLoop, writeFd));
-
-    // Close the write file stream once the reading socket has disconnected
-    (void)readSocketStream.eventEnd.addListener([&]() { writeFileStream.end(); });
 
     // Create Pipelines
     AsyncPipeline pipelines[2];

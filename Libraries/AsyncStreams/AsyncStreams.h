@@ -288,6 +288,8 @@ struct AsyncPipeline
   private:
     void onBufferRead(AsyncBufferView::ID bufferID);
     void onBufferWritten(AsyncBufferView::ID bufferID);
+
+    void endPipes();
 };
 } // namespace SC
 //! @}
