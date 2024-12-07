@@ -10,10 +10,34 @@
 #include "Internal/Event.h"
 
 //! @defgroup group_async_streams Async Streams
-//! Async Streams read, transform and write data from async sources to destinations.
+//! Read, transform and write data concurrently from async sources to destinations.
 //!
 /// Read, writes and transforms happen in parallel if sources and destinations are asynchronous.
 /// This library does not allocate any memory, all buffers are supplied by the caller.
+///
+/// Async Streams are largely inspired by [node.js Streams](https://nodejs.org/api/stream.html), a very powerful tool to
+/// process large amounts of data concurrently.
+///
+/// The basic idea about an async stream is to create a Source / Sink abstraction (also called Readable and Writable)
+/// and process small buffers of data at time.
+///
+/// The state machine that coordinates this interaction handles data buffering and more importantly handles also
+/// back-pressure, that means:
+///
+/// - **Pausing** the readable stream when a connected writable stream cannot process data fast enough
+/// - **Resuming** the readable stream when a connected writable stream is finally able to receive more data
+///
+/// By implementing streams on top of async operations it's possible to run many of them concurrently very efficiently.
+/// When properly implemented for example an async pipeline can concurrently read from disk, write to a socket while
+/// compressing data.
+///
+///
+/// Most notable differences with node.js streams are for now:
+///
+/// - No allocation (designed to work inside user-provided list of buffers)
+/// - No object mode
+/// - Fixed Layout to create data pipelines (AsyncPipeline)
+/// - onData support only (no readable event)
 
 //! @addtogroup group_async_streams
 //! @{

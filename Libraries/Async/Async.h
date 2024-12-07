@@ -311,7 +311,7 @@ struct AsyncLoopTimeout : public AsyncRequest
     /// @param eventLoop The event loop where queuing this async request
     /// @param relativeTimeout Relative time in milliseconds after which callback will be called
     /// @return Valid Result if the request has been successfully queued
-    /// @note For a peridic timeout, call AsyncLoopTimeout::Result::reactivateRequest(true) in the completion callback
+    /// @note For a periodic timeout, call AsyncLoopTimeout::Result::reactivateRequest(true) in the completion callback
     [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, Time::Milliseconds relativeTimeout);
 
     Function<void(Result&)> callback; ///< Called after given expiration time since AsyncLoopTimeout::start has passed
@@ -561,7 +561,7 @@ struct AsyncSocketSend : public AsyncRequest
     /// Callback will be called when the given socket is ready to send more data.
     /// @param eventLoop The event loop where queuing this async request
     /// @return Valid Result if the request has been successfully queued
-    /// @note Remeber to fill AsyncSocketSend::buffer and AsyncSocketSend::handle before calling start
+    /// @note Remember to fill AsyncSocketSend::buffer and AsyncSocketSend::handle before calling start
     [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop);
 
     Function<void(Result&)> callback; ///< Called when socket is ready to send more data.
@@ -630,7 +630,7 @@ struct AsyncSocketReceive : public AsyncRequest
     /// Callback will be called when some data is read from socket.
     /// @param eventLoop The event loop where queuing this async request
     /// @return Valid Result if the request has been successfully queued
-    /// @note Remeber to fill AsyncSocketReceive::buffer and AsyncSocketReceive::handle before calling start
+    /// @note Remember to fill AsyncSocketReceive::buffer and AsyncSocketReceive::handle before calling start
     [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop);
 
     Function<void(Result&)> callback; ///< Called after data has been received
@@ -693,7 +693,7 @@ struct AsyncSocketClose : public AsyncRequest
 /// - Call SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor on the file descriptor
 ///
 /// Additional notes:
-/// - When reactivating the AsyncRequest, rembember to increment the offset (SC::AsyncFileRead::offset)
+/// - When reactivating the AsyncRequest, remember to increment the offset (SC::AsyncFileRead::offset)
 /// - SC::AsyncFileRead::CompletionData::endOfFile signals end of file reached
 ///
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncFileReadSnippet

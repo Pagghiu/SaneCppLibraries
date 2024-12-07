@@ -1,6 +1,6 @@
 @page library_async_streams Async Streams
 
-@brief 🟨 Concurrently read and write a byte stream staying inside fixed buffers
+@brief 🟥 Concurrently read and write a byte stream staying inside fixed buffers
 
 [TOC]
 
@@ -12,31 +12,47 @@ Async Streams read and write data concurrently from async sources to destination
 
 # Features
 
-Async Streams support reading from an async source and placing such reads in a request queue. This queue is bounded, so it will pause the stream when it becomes full.
-Data is pushed downstream to listeners of data events.
-Such listeners can be for example writers and they will eventually emit a `drain` event that resumes the readable streams that may have been paused.
+This is the list of implemented objects stream types
 
 | Async Stream                                          | Description                           |
 |-------------------------------------------------------|---------------------------------------|
 | [AsyncReadableStream](@ref SC::AsyncReadableStream)   | @copybrief SC::AsyncReadableStream    | 
 | [AsyncWritableStream](@ref SC::AsyncWritableStream)   | @copybrief SC::AsyncWritableStream    |
 | [AsyncPipeline](@ref SC::AsyncPipeline)               | @copybrief SC::AsyncPipeline          |
+| [ReadableFileStream](@ref SC::ReadableFileStream)     | @copybrief SC::ReadableFileStream     |
+| [WritableFileStream](@ref SC::WritableFileStream)     | @copybrief SC::WritableFileStream     |
+| [ReadableSocketStream](@ref SC::ReadableSocketStream) | @copybrief SC::ReadableSocketStream   |
+| [WritableSocketStream](@ref SC::WritableSocketStream) | @copybrief SC::WritableSocketStream   |
+
+
+# Status
+🟥 Draft  
+
+Async Streams are for now in Draft state.
+It's also possible that its API will evolve a little bit to be less verbose and there is also lack of nice examples, aside from the tests.
 
 # Implementation
 
-Async streams is heavily inspired by [Node.js streams](https://nodejs.org/api/stream.html) but drops a few features to concentrate on the most useful abstraction.
-
+Async Streams support reading from an async source and placing such reads in a bounded request queue that will pause the stream when it becomes full or when there are no available buffers.
+Data is pushed downstream to listeners of data events, that are either transform streams or writers streams.
+Writers will eventually emit a `drain` event to signal that they can write more data. 
+Such event can be used to resume the readable streams that may have been paused.
+AsyncPipeline doesn't use the `drain` event but it just resumes readable streams after every successful write.
+This works because the Readable will pause when running out of buffers, allowing them to resume when a new one is made available.
 
 ## Memory allocation
 Async streams do not allocate any memory, but use caller provided buffers for handling data and request queues.
 
 # Roadmap
 
-🟩 Usable features:
+🟨 MVP features
 - Transform Streams
 
+🟩 Usable features:
+- Per Sink T
+
 🟦 Complete Features:
-- Duplex Streams
+- 
 
 💡 Unplanned Features:
 - Object Mode
