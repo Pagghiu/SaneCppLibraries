@@ -18,6 +18,18 @@ Library does have basic capabilities and it can be used just fine.
 
 @copydetails SC::FileSystemWatcher
 
+# Videos
+
+This is the list of videos that have been recorded showing some of the internal thoughts that have been going into this library:
+
+- [Ep.09 - SC::FileSystemWatcher Linux inotify implementation](https://www.youtube.com/watch?v=92saVDCRnCI)
+
+# Blog
+
+Some relevant blog posts are:
+
+- [June 2024 Update](https://pagghiu.github.io/site/blog/2024-06-30-SaneCppLibrariesUpdate.html)
+
 # Details
 
 The class tries to unify differences between OS specific API to deliver folder change notifications

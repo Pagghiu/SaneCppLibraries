@@ -35,6 +35,31 @@ This is the list of supported async operations:
 🟨 MVP  
 This is usable but needs some more testing and a few more features.
 
+# Videos
+
+This is the list of videos that have been recorded showing some of the internal thoughts that have been going into this library:
+
+- [Ep.07 - SC::Async Linux epoll 1/2](https://www.youtube.com/watch?v=4rC4aKCD0V8)
+- [Ep.08 - SC::Async Linux epoll 2/2](https://www.youtube.com/watch?v=uCsGpJcF2oc)
+- [Ep.10 - A Tour of SC::Async](https://www.youtube.com/watch?v=pIGosb2D2Ro)
+- [Ep.11 - Linux Async I/O using io_uring (1 of 2)](https://www.youtube.com/watch?v=YR935rorb3E)
+- [Ep.12 - Linux Async I/O using io_uring (2 of 2)](https://www.youtube.com/watch?v=CgYE0YrpHt0)
+- [Ep.14 - Async file read and writes using Thread Pool](https://www.youtube.com/watch?v=WF9beKyEA_E)
+- [Ep.16 - Implement SC::AsyncLoopWork](https://www.youtube.com/watch?v=huavEjzflHQ)
+- [Ep.18 - BREAK SC::Async IO Event Loop](https://www.youtube.com/watch?v=3lbyx11qDxM)
+- [Ep.20 - Pause Immediate Mode UI - Save CPU Time](https://www.youtube.com/watch?v=4acqdGcUQnE)
+- [Ep.21 - Add Async IO to Immediate Mode GUI](https://www.youtube.com/watch?v=z7QaTa7drFo)
+
+# Blog
+
+Some relevant blog posts are:
+
+- [April 2024 Update](https://pagghiu.github.io/site/blog/2024-04-27-SaneCppLibrariesUpdate.html)
+- [May 2024 Update](https://pagghiu.github.io/site/blog/2024-05-31-SaneCppLibrariesUpdate.html)
+- [June 2024 Update](https://pagghiu.github.io/site/blog/2024-06-30-SaneCppLibrariesUpdate.html)
+- [July 2024 Update](https://pagghiu.github.io/site/blog/2024-07-31-SaneCppLibrariesUpdate.html)
+- [August 2024 Update](https://pagghiu.github.io/site/blog/2024-08-30-SaneCppLibrariesUpdate.html)
+
 # Description
 @copydetails SC::AsyncRequest
 

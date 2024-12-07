@@ -41,6 +41,21 @@ On Windows, some extra care has been taken to force-unlock the `.pdb` file from 
 As of today this is all implemented using native dynamic library mechanisms that are being loaded directly in the process.  
 Doing the wrong thing with memory or forgetting to clean everything during shutdown can quickly crash the main executable.
 
+# Videos
+
+This is the list of videos that have been recorded showing some usages of the library:
+
+- [Ep.22 - Hot-Reload dear imgui](https://www.youtube.com/watch?v=BXybEWvSpGU)
+- [Ep.24 - Hot-Reload C++ on iOS](https://www.youtube.com/watch?v=6DfykfYCQdY)
+- [Ep.25 - C++ Serialization and Reflection (with Hot-Reload)](https://www.youtube.com/watch?v=d7DXxC6xG_A)
+
+# Blog
+
+Some relevant blog posts are:
+
+- [June 2024 Update](https://pagghiu.github.io/site/blog/2024-06-30-SaneCppLibrariesUpdate.html)
+- [July 2024 Update](https://pagghiu.github.io/site/blog/2024-07-31-SaneCppLibrariesUpdate.html)
+
 # Examples
 
 - [SCExample](@ref page_examples) uses `Plugin` library for a simple hot-reload system

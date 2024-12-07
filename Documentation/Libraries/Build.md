@@ -57,6 +57,23 @@ Some additional types allow describing detailed properties of the build:
 | SC::Build::Link               | @copybrief SC::Build::Link            |
 | SC::Build::LinkFlags          | @copybrief SC::Build::LinkFlags       |
 
+# Videos
+
+This is the list of videos that have been recorded showing some of the internal thoughts that have been going into this library:
+
+- [Ep.02 - Creating a Makefile](https://www.youtube.com/watch?v=2ccW8TBAWWE)
+- [Ep.03 - Add Makefile backend to SC::Build](https://www.youtube.com/watch?v=wYmT3xAzMxU)
+- [Ep.04 - Start Linux Porting](https://www.youtube.com/watch?v=DUZeu6VDGL8)
+- [Ep.05 - Build Everything on Linux](https://www.youtube.com/watch?v=gu3x3Y1zZLI)
+
+# Blog
+
+Some relevant blog posts are:
+
+- [March 2024 Update](https://pagghiu.github.io/site/blog/2024-03-27-SaneCppLibrariesUpdate.html)
+- [May 2024 Update](https://pagghiu.github.io/site/blog/2024-05-31-SaneCppLibrariesUpdate.html)
+- [June 2024 Update](https://pagghiu.github.io/site/blog/2024-06-30-SaneCppLibrariesUpdate.html)
+- [July 2024 Update](https://pagghiu.github.io/site/blog/2024-07-31-SaneCppLibrariesUpdate.html)
 
 # Architecture
 

@@ -43,6 +43,21 @@ This works because the Readable will pause when running out of buffers, allowing
 ## Memory allocation
 Async streams do not allocate any memory, but use caller provided buffers for handling data and request queues.
 
+# Videos
+
+This is the list of videos that have been recorded showing some of the internal thoughts that have been going into this library:
+
+- [Ep.28 - C++ Async Readable Streams](https://www.youtube.com/watch?v=MFPjoOUTlBo)
+- [Ep.29 - C++ Async Writable Streams](https://www.youtube.com/watch?v=0OXLxIDvmOU)
+- [Ep.30 - C++ Async Streams Pipeline](https://www.youtube.com/watch?v=8rYQ2ApxnwA)
+- [Ep.31 - C++ Async Socket Streams](https://www.youtube.com/watch?v=0x6TLV_ig-A)
+
+# Blog
+
+Some relevant blog posts are:
+
+- [November 2024 Update](https://pagghiu.github.io/site/blog/2024-11-30-SaneCppLibrariesUpdate.html)
+
 # Roadmap
 
 🟨 MVP features

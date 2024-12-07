@@ -73,6 +73,12 @@ This can really condense a large number of operations in a single one on types o
 
 @note It's possible to `static_assert` the `Packed` property of a type, if one wants to be sure not to accidentally introduce padding bytes in serialized types.
 
+# Blog
+
+Some relevant blog posts are:
+
+- [July 2024 Update](https://pagghiu.github.io/site/blog/2024-07-31-SaneCppLibrariesUpdate.html)
+
 # Alternative implementation
 The binary serializer has an additional parallel implementation implementations, see [SerializationBinaryTypeErased](@ref library_serialization_binary_type_erased) in Libraries Extra.  
 This is just an experiment to check if with some more runtime-code and less compile-time-code we can further bring down compile times, but we still need to build a proper benchmark for it.

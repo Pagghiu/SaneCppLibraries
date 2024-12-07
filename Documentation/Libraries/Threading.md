@@ -21,7 +21,11 @@ Threading is a library defining basic primitives for user-space threading and sy
 Only the features needed for other libraries have been implemented so far.
 The Atomic header is really only being implemented for a few data types and needs some love to extend and improve it.
 
-# Description
+# Videos
+
+This is the list of videos that have been recorded showing some of the internal thoughts that have been going into this library:
+
+- [Ep.13 - Simple ThreadPool](https://www.youtube.com/watch?v=e48ruImESxI)
 
 ## SC::Thread
 @copydoc SC::Thread

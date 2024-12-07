@@ -21,6 +21,18 @@ This allows handling incomplete responses without needing holding it entirely in
 
 The HTTP client and server are for now just some basic implementations and are missing some important feature.  
 
+# Videos
+
+This is the list of videos that have been recorded showing some of the internal thoughts that have been going into this library:
+
+- [Ep.27 - C++ Async Http Web Server](https://www.youtube.com/watch?v=yg438A9Db50)
+
+# Blog
+
+Some relevant blog posts are:
+
+- [August 2024 Update](https://pagghiu.github.io/site/blog/2024-08-30-SaneCppLibrariesUpdate.html)
+
 ## HttpServer
 @copydoc SC::HttpServer
 
