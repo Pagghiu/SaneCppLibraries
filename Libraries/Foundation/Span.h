@@ -142,6 +142,23 @@ struct SC::Span
         return false;
     }
 
+    /// @brief Creates another Span shorter or equal than the current one such that its end equals other.data().
+    /// @param other The other Span that defines length of output slice
+    /// @param output The slice extracted from current span
+    [[nodiscard]] const bool sliceFromStartUntil(Span other, Span& output) const
+    {
+        const auto diff = other.items - items;
+        if (diff < 0 or static_cast<SizeType>(diff) > sizeInBytes())
+        {
+            return false;
+        }
+        else
+        {
+            output = Span(items, static_cast<SizeType>(diff) / sizeof(Type));
+            return true;
+        }
+    }
+
     /// @brief Check if Span is empty
     /// @return `true` if Span is empty
     [[nodiscard]] constexpr bool empty() const { return sizeElements == 0; }
@@ -184,13 +201,14 @@ struct SC::Span
         return nullptr;
     }
 
-    [[nodiscard]] bool equals(const Span other) const
+    template <typename U>
+    [[nodiscard]] bool equals(const Span<U> other) const
     {
         if (sizeInBytes() != other.sizeInBytes())
             return false;
         if (sizeInBytes() == 0)
             return true;
-        return ::memcmp(other.items, other.items, sizeInBytes()) == 0;
+        return ::memcmp(items, other.data(), sizeInBytes()) == 0;
     }
 
   private:
