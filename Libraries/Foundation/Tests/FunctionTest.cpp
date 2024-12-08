@@ -59,6 +59,10 @@ struct SC::FunctionTest : public SC::TestCase
             auto setValue = Function<void(int)>::fromMember<TestClass, &TestClass::setValue>(tc);
             auto getValue = Function<int()>::fromMember<TestClass, &TestClass::getValue>(tc);
 
+            TestClass tc2;
+            SC_TEST_EXPECT(setValue.isBoundToClassInstance(&tc));
+            SC_TEST_EXPECT(not setValue.isBoundToClassInstance(&tc2));
+
             Function<int(int)> lambdaFreeFunc  = &TestClass::freeFunc;
             Function<int(int)> lambdaFreeFunc2 = lambdaFreeFunc;        // Copy Construct
             Function<int(int)> lambdaFreeFunc3 = move(lambdaFreeFunc2); // Move Construct

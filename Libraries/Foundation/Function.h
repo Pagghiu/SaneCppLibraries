@@ -160,7 +160,10 @@ struct Function<R(Args...)>
 
     /// @brief Check if current wrapper is bound to a function
     /// @return `true` if current wrapper is bound to a function
-    bool isValid() const { return functionStub != nullptr; }
+    [[nodiscard]] bool isValid() const { return functionStub != nullptr; }
+
+    /// @brief Returns true if this function was bound to a member function of a specific class instance
+    [[nodiscard]] bool isBoundToClassInstance(void* instance) const { return classInstance == instance; }
 
     bool operator==(const Function& other) const
     {
