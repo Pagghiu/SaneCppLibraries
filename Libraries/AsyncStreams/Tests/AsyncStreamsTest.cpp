@@ -68,8 +68,14 @@ void SC::AsyncStreamsTest::circularQueue()
     SC_TEST_EXPECT(circularBuffer.popFront(res));
     SC_TEST_EXPECT(res == 1);
     SC_TEST_EXPECT(circularBuffer.pushBack(3));
+    SC_TEST_EXPECT(not circularBuffer.pushFront(res));
     SC_TEST_EXPECT(circularBuffer.popFront(res));
     SC_TEST_EXPECT(res == 2);
+    res = 4;
+    SC_TEST_EXPECT(circularBuffer.pushFront(res));
+    res = 0;
+    SC_TEST_EXPECT(circularBuffer.popFront(res));
+    SC_TEST_EXPECT(res == 4);
     SC_TEST_EXPECT(circularBuffer.popFront(res));
     SC_TEST_EXPECT(res == 3);
     SC_TEST_EXPECT(not circularBuffer.popFront(res));

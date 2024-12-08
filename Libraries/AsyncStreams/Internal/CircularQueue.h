@@ -16,6 +16,7 @@ struct CircularQueue
     [[nodiscard]] bool isEmpty() const { return readIndex == writeIndex; }
 
     [[nodiscard]] bool pushBack(T&& request) { return pushBack(request); }
+
     [[nodiscard]] bool pushBack(T& request)
     {
         const uint32_t nextWriteIndex = (writeIndex + 1) % buffer.sizeInElements();
@@ -38,6 +39,20 @@ struct CircularQueue
             }
         request   = move(buffer[readIndex]);
         readIndex = (readIndex + 1) % buffer.sizeInElements();
+        return true;
+    }
+
+    [[nodiscard]] bool pushFront(T& request)
+    {
+        const uint32_t nextReadIndex =
+            readIndex == 0 ? static_cast<uint32_t>(buffer.sizeInElements()) - 1 : readIndex - 1;
+        if (nextReadIndex == writeIndex)
+            SC_LANGUAGE_UNLIKELY
+            {
+                return false; // Ring is full
+            }
+        buffer[nextReadIndex] = move(request);
+        readIndex             = nextReadIndex;
         return true;
     }
 
