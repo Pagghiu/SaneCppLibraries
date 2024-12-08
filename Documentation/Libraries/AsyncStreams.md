@@ -64,10 +64,11 @@ Some relevant blog posts are:
 - Transform Streams
 
 🟩 Usable features:
-- Per Sink T
+- Pipeline pause
+- Pipeline resume
 
 🟦 Complete Features:
-- 
+- writev style asyncWrite
 
 💡 Unplanned Features:
 - Object Mode

@@ -83,6 +83,20 @@ struct Event
         return false;
     }
 
+    template <typename Class>
+    [[nodiscard]] bool removeAllListenersBoundTo(Class& pself)
+    {
+        bool someRemoved = false;
+        for (int idx = 0; idx < numListeners; ++idx)
+        {
+            if (listeners[idx].isBoundToClassInstance(&pself))
+            {
+                someRemoved |= removeListenerAt(idx);
+            }
+        }
+        return someRemoved;
+    }
+
     /// @brief Removes a listener where operator == evaluates to true for the passed in func
     template <typename Func>
     [[nodiscard]] bool removeListener(Func& func)

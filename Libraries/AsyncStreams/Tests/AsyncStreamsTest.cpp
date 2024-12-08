@@ -90,6 +90,10 @@ void SC::AsyncStreamsTest::event()
     SC_TEST_EXPECT((event.addListener<AsyncStreamsTest, &AsyncStreamsTest::funcCallback>(*this, &memberIndex)));
     event.emit(value);
     SC_TEST_EXPECT(memberCalls == 2); // +1
+    SC_TEST_EXPECT((event.removeAllListenersBoundTo(*this)));
+    event.emit(value);
+    SC_TEST_EXPECT(memberCalls == 2); // +0
+    SC_TEST_EXPECT((event.addListener<AsyncStreamsTest, &AsyncStreamsTest::funcCallback>(*this, &memberIndex)));
     event.emit(move(value));
     SC_TEST_EXPECT(memberCalls == 3); // +1
     int  lambdaCalls = 0;
