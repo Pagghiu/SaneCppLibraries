@@ -145,10 +145,10 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     // Create Pipeline
     AsyncPipeline pipeline;
 
-    AsyncPipeline::Pipe pipe[1];
+    AsyncWritableStream* writables[1];
     pipeline.source = &readable;
-    pipeline.pipes  = {pipe, 1};
-    pipe[0].sink    = &writable;
+    pipeline.sinks  = {writables, 1};
+    writables[0]    = &writable;
 
     SC_TEST_EXPECT(pipeline.start());
 
@@ -292,19 +292,19 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     // Create Pipelines
     AsyncPipeline pipelines[2];
 
-    AsyncPipeline::Pipe pipes[2];
+    AsyncWritableStream* sinks[2];
 
     // Create first Async Pipeline (file to socket)
     pipelines[0].source = &readFileStream;
-    pipelines[0].pipes  = {&pipes[0], 1};
+    pipelines[0].sinks  = {&sinks[0], 1};
 
-    pipelines[0].pipes[0].sink = &writeSocketStream;
+    pipelines[0].sinks[0] = &writeSocketStream;
 
     // Create second Async Pipeline (socket to file)
     pipelines[1].source = &readSocketStream;
-    pipelines[1].pipes  = {&pipes[1], 1};
+    pipelines[1].sinks  = {&sinks[1], 1};
 
-    pipelines[1].pipes[0].sink = &writeFileStream;
+    pipelines[1].sinks[0] = &writeFileStream;
 
     // Start Async Pipeline
     SC_TEST_EXPECT(pipelines[0].start());

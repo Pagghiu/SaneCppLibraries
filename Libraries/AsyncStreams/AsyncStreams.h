@@ -274,11 +274,7 @@ struct AsyncPipeline
     // TODO: Make all these private
     AsyncReadableStream* source = nullptr; /// User specified source
 
-    struct Pipe
-    {
-        AsyncWritableStream* sink = nullptr;
-    };
-    Span<Pipe> pipes; /// User specified sinks
+    Span<AsyncWritableStream*> sinks; /// User specified sinks
 
     /// @brief Starts the pipeline
     /// @note Both source and sinks must have been already setup by the caller
