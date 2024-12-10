@@ -241,9 +241,15 @@ struct AsyncWritableStream
     /// @brief Signals an async error received
     void emitError(Result error);
 
-  private:
-    bool tryAsync(Result potentialError);
+    /// @brief Allows keeping a writable in ENDING state until it has finished flushing all pending data.
+    /// If a writable stream redefines this function it should return true to allow transitioning to ENDED
+    /// state and return false to keep staying in ENDING state.
+    Function<bool()> canEndWritable;
 
+    /// @brief Will emit error if the passed in Result is false
+    void tryAsync(Result potentialError);
+
+  private:
     enum class State
     {
         Stopped,

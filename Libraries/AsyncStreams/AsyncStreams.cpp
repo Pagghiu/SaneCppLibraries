@@ -113,6 +113,11 @@ void SC::AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
         state = State::Destroyed;
         return;
     }
+    if (newSize == 0)
+    {
+        emitError(Result::Error("AsyncReadableStream::push zero sized buffer is not allowed"));
+        return;
+    }
     // Push buffer to the queue
     buffers->setNewBufferSize(bufferID, newSize);
     Request request;
@@ -365,7 +370,13 @@ SC::Result SC::AsyncWritableStream::write(AsyncBufferView::ID bufferID, Function
     }
     break;
     case State::Ending:
-    case State::Ended: Assert::unreachable(); break;
+        if (not canEndWritable.isValid() or canEndWritable())
+        {
+            eventFinish.emit();
+            state = State::Ended;
+        }
+        break;
+    case State::Ended: break;
     }
     return Result(true);
 }
@@ -381,14 +392,12 @@ SC::Result SC::AsyncWritableStream::write(Span<const char> data, Function<void(A
     return write(bufferID, cb);
 }
 
-bool SC::AsyncWritableStream::tryAsync(Result potentialError)
+void SC::AsyncWritableStream::tryAsync(Result potentialError)
 {
     if (potentialError)
     {
         eventError.emit(potentialError);
-        return false;
     }
-    return true;
 }
 
 void SC::AsyncWritableStream::finishedWriting(AsyncBufferView::ID                   bufferID,
@@ -413,7 +422,10 @@ void SC::AsyncWritableStream::finishedWriting(AsyncBufferView::ID               
         // Queue is empty
         if (state == State::Ending)
         {
-            state = State::Ended;
+            if (not canEndWritable.isValid() or canEndWritable())
+            {
+                state = State::Ended;
+            }
         }
         else
         {
@@ -441,9 +453,24 @@ void SC::AsyncWritableStream::end()
     switch (state)
     {
     case State::Stopped:
-        // Can just jump to ended state
-        state = State::Ended;
-        eventFinish.emit();
+        if (canEndWritable.isValid())
+        {
+            if (canEndWritable())
+            {
+                state = State::Ended;
+                eventFinish.emit();
+            }
+            else
+            {
+                state = State::Ending;
+            }
+        }
+        else
+        {
+            // Can just jump to ended state
+            state = State::Ended;
+            eventFinish.emit();
+        }
         break;
     case State::Writing:
         // We need to wait for current in-flight write to end
