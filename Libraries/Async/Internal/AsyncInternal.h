@@ -102,7 +102,7 @@ struct SC::AsyncEventLoop::Internal
     void executeWakeUps(AsyncResult& result);
 
     // Setup
-    [[nodiscard]] Result queueSubmission(AsyncRequest& async, AsyncTask* task);
+    void queueSubmission(AsyncRequest& async);
 
     // Phases
     [[nodiscard]] Result stageSubmission(KernelEvents& kernelEvents, AsyncRequest& async);

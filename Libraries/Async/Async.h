@@ -142,6 +142,14 @@ struct SC::AsyncRequest
     /// Used to cache eventLoop pointer before starting the AsyncRequest.
     void cacheInternalEventLoop(AsyncEventLoop& loop) { eventLoop = &loop; }
 
+    /// @brief Sets the thread pool and task to use for this request
+    /// @see AsyncFileRead
+    /// @see AsyncFileWrite
+    Result setThreadPoolAndTask(ThreadPool& pool, AsyncTask& task);
+
+    /// @brief Resets anything previously set with setThreadPoolAndTask
+    void resetThreadPoolAndTask();
+
     /// @brief Type of async request
     enum class Type : uint8_t
     {
@@ -174,8 +182,8 @@ struct SC::AsyncRequest
 
   protected:
     [[nodiscard]] Result validateAsync();
-    [[nodiscard]] Result queueSubmission(AsyncEventLoop& eventLoop);
-    [[nodiscard]] Result queueSubmission(AsyncEventLoop& eventLoop, ThreadPool& threadPool, AsyncTask& task);
+
+    void queueSubmission(AsyncEventLoop& eventLoop);
 
     AsyncEventLoop* eventLoop = nullptr;
     AsyncTask*      asyncTask = nullptr;
@@ -680,7 +688,7 @@ struct AsyncSocketClose : public AsyncRequest
 /// @brief Starts a file read operation, reading bytes from a file (or pipe).
 /// Callback will be called when the data read from the file (or pipe) is available. @n
 ///
-/// Use the start overload with `ThreadPool` / `Task` parameters to execute file read on a background thread.
+/// Call AsyncRequest::setThreadPoolAndTask to set a thread pool if this is a buffered file and not a pipe.
 /// This is important on APIs with blocking behaviour on buffered file I/O (all apis with the exception of `io_uring`).
 ///
 /// @ref library_file library can be used to open the file and obtain a file (or pipe) descriptor handle.
@@ -724,25 +732,19 @@ struct AsyncFileRead : public AsyncRequest
 
     /// @brief Starts a file receive operation, that completes when data has been read from file / pipe.
     /// @param eventLoop The EventLoop to run this operation on
-    /// @note SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor must have been called on the
-    /// AsyncFileRead::fileDescriptor
+    /// @note
+    /// - Use AsyncRequest::setThreadPoolAndTask to set a thread pool and task prior to start.
+    /// - Only files opened for direct IO (`O_DIRECT` / `FILE_FLAG_WRITE_THROUGH` & `FILE_FLAG_NO_BUFFERING`)
+    /// can be used in non-blocking mode (`OpenOptions::blocking` == `false`) without a thread pool and
+    /// SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor must have been called on the passed in handle.
+    /// - `io_uring` backend will not use thread pool because that API allows proper async file read/writes.
     [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop);
-
-    /// @brief Starts a file receive operation on thread pool, that completes when data has been read from file / pipe.
-    /// @param eventLoop The EventLoop to run this operation on
-    /// @param threadPool The ThreadPool where to run this background operation
-    /// @param task The task used to run the operation on background thread.
-    /// It's useful for any file not opened for direct IO (`O_DIRECT` / `FILE_FLAG_WRITE_THROUGH` &
-    /// `FILE_FLAG_NO_BUFFERING`).
-    /// @note Task will not be used on the `io_uring` backend, because that API allows proper async file read/writes.
-    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, ThreadPool& threadPool, Task& task);
 
     Function<void(Result&)> callback; /// Callback called when some data has been read from the file into the buffer
 
     Span<char>             buffer;         /// The writeable span of memory where to data will be written
     FileDescriptor::Handle fileDescriptor; /// The file/pipe descriptor handle to read data from.
-                                           /// Use SC::FileDescriptor or SC::PipeDescriptor to open it, with
-                                           /// SC::FileDescriptorOpenOptions::blocking == false
+                                           /// Use SC::FileDescriptor or SC::PipeDescriptor to open it.
 
     /// @brief Returns the last offset set with AsyncFileRead::setOffset
     uint64_t getOffset() const { return offset; }
@@ -768,7 +770,7 @@ struct AsyncFileRead : public AsyncRequest
 /// @brief Starts a file write operation, writing bytes to a file (or pipe).
 /// Callback will be called when the file is ready to receive more bytes to write. @n
 ///
-/// Use the start overload with `ThreadPool` / `Task` parameters to execute file read on a background thread.
+/// Call AsyncRequest::setThreadPoolAndTask to set a thread pool if this is a buffered file and not a pipe.
 /// This is important on APIs with blocking behaviour on buffered file I/O (all apis with the exception of `io_uring`).
 ///
 /// @ref library_file library can be used to open the file and obtain a blocking or non-blocking file descriptor handle.
@@ -808,25 +810,19 @@ struct AsyncFileWrite : public AsyncRequest
 
     /// @brief Starts a file write operation that completes when it's ready to receive more bytes.
     /// @param eventLoop The EventLoop to run this operation on
-    /// @note SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor must have been called on the
-    /// AsyncFileWrite::fileDescriptor
+    /// @note
+    /// - Use AsyncRequest::setThreadPoolAndTask to set a thread pool and task prior to start.
+    /// - Only files opened for direct IO (`O_DIRECT` / `FILE_FLAG_WRITE_THROUGH` & `FILE_FLAG_NO_BUFFERING`)
+    /// can be used in non-blocking mode (`OpenOptions::blocking` == `false`) without a thread pool and
+    /// SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor must have been called on the passed in handle.
+    /// - `io_uring` backend will not use thread pool because that API allows proper async file read/writes.
     [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop);
-
-    /// @brief Starts a file write operation on thread pool that completes when it's ready to receive more bytes.
-    /// @param eventLoop The EventLoop to run this operation on
-    /// @param threadPool The ThreadPool where to run this background operation
-    /// @param task The task used to run the operation on background thread.
-    /// It's useful for any file not opened for direct IO (`O_DIRECT` / `FILE_FLAG_WRITE_THROUGH` &
-    /// `FILE_FLAG_NO_BUFFERING`).
-    /// @note Task will not be used on the `io_uring` backend, because that API allows proper async file read/writes.
-    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, ThreadPool& threadPool, Task& task);
 
     Function<void(Result&)> callback; /// Callback called when descriptor is ready to be written with more data
 
     Span<const char>       buffer;         /// The read-only span of memory where to read the data from
     FileDescriptor::Handle fileDescriptor; /// The file/pipe descriptor to write data to.
-                                           /// Use SC::FileDescriptor or SC::PipeDescriptor to open it, with
-                                           /// SC::FileDescriptorOpenOptions::blocking == false
+                                           /// Use SC::FileDescriptor or SC::PipeDescriptor to open it.
 
     /// @brief Returns the last offset set with AsyncFileWrite::setOffset
     uint64_t getOffset() const { return offset; }

@@ -63,6 +63,28 @@ void SC::AsyncRequest::setDebugName(const char* newDebugName)
 #endif
 }
 
+SC::Result SC::AsyncRequest::setThreadPoolAndTask(ThreadPool& pool, AsyncTask& task)
+{
+    if (task.async != nullptr)
+    {
+        return Result::Error("AsyncTask is bound to a different async being started");
+    }
+    task.threadPool = &pool;
+    asyncTask       = &task;
+    task.async      = this;
+    return Result(true);
+}
+
+void SC::AsyncRequest::resetThreadPoolAndTask()
+{
+    if (asyncTask)
+    {
+        asyncTask->async      = nullptr;
+        asyncTask->threadPool = nullptr;
+        asyncTask             = nullptr;
+    }
+}
+
 SC::Result SC::AsyncRequest::validateAsync()
 {
     const bool asyncStateIsFree = state == AsyncRequest::State::Free;
@@ -78,16 +100,7 @@ void SC::AsyncRequest::markAsFree()
     flags     = 0;
 }
 
-SC::Result SC::AsyncRequest::queueSubmission(AsyncEventLoop& loop)
-{
-    return loop.internal.queueSubmission(*this, nullptr);
-}
-
-SC::Result SC::AsyncRequest::queueSubmission(AsyncEventLoop& loop, ThreadPool& threadPool, AsyncTask& task)
-{
-    task.threadPool = &threadPool;
-    return loop.internal.queueSubmission(*this, &task);
-}
+void SC::AsyncRequest::queueSubmission(AsyncEventLoop& loop) { loop.internal.queueSubmission(*this); }
 
 SC::Result SC::AsyncRequest::stop()
 {
@@ -104,14 +117,14 @@ SC::Result SC::AsyncLoopTimeout::start(AsyncEventLoop& loop, Time::Milliseconds 
 {
     SC_TRY(validateAsync());
     relativeTimeout = timeout;
-    SC_TRY(queueSubmission(loop));
+    queueSubmission(loop);
     return SC::Result(true);
 }
 
 SC::Result SC::AsyncLoopWakeUp::start(AsyncEventLoop& loop, EventObject* eo)
 {
     eventObject = eo;
-    SC_TRY(queueSubmission(loop));
+    queueSubmission(loop);
     return SC::Result(true);
 }
 
@@ -120,13 +133,15 @@ SC::Result SC::AsyncLoopWakeUp::wakeUp() { return getEventLoop()->wakeUpFromExte
 SC::Result SC::AsyncLoopWork::start(AsyncEventLoop& loop, ThreadPool& threadPool)
 {
     SC_TRY_MSG(work.isValid(), "AsyncLoopWork::start - Invalid work callback");
-    return queueSubmission(loop, threadPool, task);
+    SC_TRY(setThreadPoolAndTask(threadPool, task));
+    queueSubmission(loop);
+    return SC::Result(true);
 }
 
 SC::Result SC::AsyncProcessExit::start(AsyncEventLoop& loop, ProcessDescriptor::Handle process)
 {
     handle = process;
-    SC_TRY(queueSubmission(loop));
+    queueSubmission(loop);
     return SC::Result(true);
 }
 
@@ -135,7 +150,7 @@ SC::Result SC::AsyncSocketAccept::start(AsyncEventLoop& loop, const SocketDescri
     SC_TRY(validateAsync());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
     SC_TRY(socketDescriptor.getAddressFamily(addressFamily));
-    SC_TRY(queueSubmission(loop));
+    queueSubmission(loop);
     return SC::Result(true);
 }
 
@@ -145,7 +160,7 @@ SC::Result SC::AsyncSocketConnect::start(AsyncEventLoop& loop, const SocketDescr
     SC_TRY(validateAsync());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
     ipAddress = socketIpAddress;
-    SC_TRY(queueSubmission(loop));
+    queueSubmission(loop);
     return SC::Result(true);
 }
 
@@ -166,7 +181,7 @@ SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop)
 #else
     totalBytesSent = 0;
 #endif
-    SC_TRY(queueSubmission(loop));
+    queueSubmission(loop);
     return SC::Result(true);
 }
 
@@ -181,7 +196,7 @@ SC::Result SC::AsyncSocketReceive::start(AsyncEventLoop& loop, const SocketDescr
 SC::Result SC::AsyncSocketReceive::start(AsyncEventLoop& loop)
 {
     SC_TRY(validateAsync());
-    SC_TRY(queueSubmission(loop));
+    queueSubmission(loop);
     return SC::Result(true);
 }
 
@@ -189,7 +204,7 @@ SC::Result SC::AsyncSocketClose::start(AsyncEventLoop& loop, const SocketDescrip
 {
     SC_TRY(validateAsync());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
-    SC_TRY(queueSubmission(loop));
+    queueSubmission(loop);
     return SC::Result(true);
 }
 
@@ -198,23 +213,13 @@ SC::Result SC::AsyncFileRead::start(AsyncEventLoop& loop)
     SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncFileRead::start - Zero sized read buffer");
     SC_TRY_MSG(fileDescriptor != FileDescriptor::Invalid, "AsyncFileRead::start - Invalid file descriptor");
     SC_TRY(validateAsync());
-    SC_TRY(queueSubmission(loop));
+    // Only use the async tasks for operations and backends that are not io_uring
+    if (not loop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    {
+        resetThreadPoolAndTask();
+    }
+    queueSubmission(loop);
     return SC::Result(true);
-}
-
-SC::Result SC::AsyncFileRead::start(AsyncEventLoop& loop, ThreadPool& threadPool, Task& task)
-{
-    SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncFileRead::start - Zero sized read buffer");
-    SC_TRY_MSG(fileDescriptor != FileDescriptor::Invalid, "AsyncFileRead::start - Invalid file descriptor");
-    SC_TRY(validateAsync());
-    if (loop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
-    {
-        return queueSubmission(loop, threadPool, task);
-    }
-    else
-    {
-        return queueSubmission(loop);
-    }
 }
 
 SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop)
@@ -222,30 +227,20 @@ SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop)
     SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncFileWrite::start - Zero sized write buffer");
     SC_TRY_MSG(fileDescriptor != FileDescriptor::Invalid, "AsyncFileWrite::start - Invalid file descriptor");
     SC_TRY(validateAsync());
-    SC_TRY(queueSubmission(loop));
+    // Only use the async tasks for operations and backends that are not io_uring
+    if (not loop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    {
+        resetThreadPoolAndTask();
+    }
+    queueSubmission(loop);
     return SC::Result(true);
-}
-
-SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop, ThreadPool& threadPool, Task& task)
-{
-    SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncFileWrite::start - Zero sized write buffer");
-    SC_TRY_MSG(fileDescriptor != FileDescriptor::Invalid, "AsyncFileWrite::start - Invalid file descriptor");
-    SC_TRY(validateAsync());
-    if (loop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
-    {
-        return queueSubmission(loop, threadPool, task);
-    }
-    else
-    {
-        return queueSubmission(loop);
-    }
 }
 
 SC::Result SC::AsyncFileClose::start(AsyncEventLoop& loop, FileDescriptor::Handle fd)
 {
     SC_TRY(validateAsync());
     fileDescriptor = fd;
-    SC_TRY(queueSubmission(loop));
+    queueSubmission(loop);
     return SC::Result(true);
 }
 
@@ -253,7 +248,7 @@ SC::Result SC::AsyncFilePoll::start(AsyncEventLoop& loop, FileDescriptor::Handle
 {
     SC_TRY(validateAsync());
     fileDescriptor = fd;
-    SC_TRY(queueSubmission(loop));
+    queueSubmission(loop);
     return SC::Result(true);
 }
 
@@ -443,31 +438,11 @@ SC::Result SC::AsyncEventLoopMonitor::close()
 // AsyncEventLoop::Internal
 //-------------------------------------------------------------------------------------------------------
 
-SC::Result SC::AsyncEventLoop::Internal::queueSubmission(AsyncRequest& async, AsyncTask* task)
+void SC::AsyncEventLoop::Internal::queueSubmission(AsyncRequest& async)
 {
-    if (task)
-    {
-        if (task->async != nullptr)
-        {
-            return Result::Error("AsyncTask is bound to a different async being started");
-        }
-    }
     async.eventLoop = loop;
     async.state     = AsyncRequest::State::Setup;
-
-    // Only set the async tasks for operations and backends that are not io_uring
-    if (task)
-    {
-        async.asyncTask = task;
-        task->async     = &async;
-    }
-    else
-    {
-        async.asyncTask = nullptr;
-    }
-
     submissions.queueBack(async);
-    return Result(true);
 }
 
 SC::AsyncLoopTimeout* SC::AsyncEventLoop::Internal::findEarliestLoopTimeout() const

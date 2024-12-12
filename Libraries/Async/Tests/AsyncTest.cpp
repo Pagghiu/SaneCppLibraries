@@ -883,12 +883,9 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     asyncWriteFile.buffer         = StringView("test").toCharSpan();
     if (useThreadPool)
     {
-        SC_TEST_EXPECT(asyncWriteFile.start(eventLoop, threadPool, asyncWriteTask));
+        SC_TEST_EXPECT(asyncWriteFile.setThreadPoolAndTask(threadPool, asyncWriteTask));
     }
-    else
-    {
-        SC_TEST_EXPECT(asyncWriteFile.start(eventLoop));
-    }
+    SC_TEST_EXPECT(asyncWriteFile.start(eventLoop));
 
     // 6. Run the write operation and close the file
     SC_TEST_EXPECT(eventLoop.runOnce());
@@ -934,12 +931,10 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     asyncReadFile.buffer         = {buffer, sizeof(buffer)};
     if (useThreadPool)
     {
-        SC_TEST_EXPECT(asyncReadFile.start(eventLoop, threadPool, asyncReadTask));
+        SC_TEST_EXPECT(asyncReadFile.setThreadPoolAndTask(threadPool, asyncReadTask));
     }
-    else
-    {
-        SC_TEST_EXPECT(asyncReadFile.start(eventLoop));
-    }
+    SC_TEST_EXPECT(asyncReadFile.start(eventLoop));
+
     // 9. Run the read operation and close the file
     SC_TEST_EXPECT(eventLoop.run());
     SC_TEST_EXPECT(fd.close());
@@ -1037,23 +1032,17 @@ void SC::AsyncTest::fileEndOfFile(bool useThreadPool)
     asyncReadFile.buffer         = {buffer, sizeof(buffer)};
     if (useThreadPool)
     {
-        SC_TEST_EXPECT(asyncReadFile.start(eventLoop, threadPool, asyncReadTask));
+        SC_TEST_EXPECT(asyncReadFile.setThreadPoolAndTask(threadPool, asyncReadTask));
     }
-    else
-    {
-        SC_TEST_EXPECT(asyncReadFile.start(eventLoop));
-    }
+    SC_TEST_EXPECT(asyncReadFile.start(eventLoop));
 
     SC_TEST_EXPECT(eventLoop.run());
     SC_TEST_EXPECT(context.readCount == 2);
     if (useThreadPool)
     {
-        SC_TEST_EXPECT(asyncReadFile.start(eventLoop, threadPool, asyncReadTask));
+        SC_TEST_EXPECT(asyncReadFile.setThreadPoolAndTask(threadPool, asyncReadTask));
     }
-    else
-    {
-        SC_TEST_EXPECT(asyncReadFile.start(eventLoop));
-    }
+    SC_TEST_EXPECT(asyncReadFile.start(eventLoop));
     SC_TEST_EXPECT(eventLoop.run());
     SC_TEST_EXPECT(context.readCount == 3);
     SC_TEST_EXPECT(fd.close());
@@ -1420,7 +1409,8 @@ SC_TRY(fd.get(asyncReadFile.fileDescriptor, Result::Error("Invalid handle")));
 
 // Start the operation on a thread pool
 AsyncFileRead::Task asyncFileTask;
-SC_TRY(asyncReadFile.start(eventLoop, threadPool, asyncFileTask));
+SC_TRY(asyncReadFile.setThreadPoolAndTask(threadPool, asyncFileTask));
+SC_TRY(asyncReadFile.start(eventLoop));
 
 // Alternatively if the file is opened with blocking == false, AsyncFileRead can be omitted
 // but the operation will not be fully async on regular (buffered) files, except on io_uring.
@@ -1465,7 +1455,8 @@ asyncWriteFile.buffer = StringView("test").toCharSpan();;
 
 // Start the operation in a thread pool
 AsyncFileWrite::Task asyncFileTask;
-SC_TRY(asyncWriteFile.start(eventLoop, threadPool, asyncFileTask));
+SC_TRY(asyncWriteFile.setThreadPoolAndTask(threadPool, asyncFileTask));
+SC_TRY(asyncWriteFile.start(eventLoop));
 
 // Alternatively if the file is opened with blocking == false, AsyncFileRead can be omitted
 // but the operation will not be fully async on regular (buffered) files, except on io_uring.
