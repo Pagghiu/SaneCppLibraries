@@ -190,7 +190,6 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     // First pipeline is: FileStream --> WriteSocketStream
     // Second pipeline is: ReadSocketStream --> WriteFileStream
 
-    const bool useThreadPool = false;
     // Generate data and write it to source.txt
     Vector<uint64_t> source;
     constexpr auto   numElements = 1 * 1024 / sizeof(uint64_t);
@@ -224,7 +223,10 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     }
 
     FileDescriptor::OpenOptions openOptions;
-    openOptions.blocking = false; // useThreadPool
+    openOptions.blocking = true;
+
+    ThreadPool fileThreadPool;
+    SC_TEST_EXPECT(fileThreadPool.create(2));
 
     // Create Readable File Stream
     ReadableFileStream readFileStream;
@@ -233,10 +235,8 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     String         fileName;
     SC_TEST_EXPECT(Path::join(fileName, {report.applicationRootDirectory, "source.txt"}));
     SC_TEST_EXPECT(readFd.open(fileName.view(), FileDescriptor::OpenMode::ReadOnly, openOptions));
-    if (not useThreadPool)
-    {
-        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(readFd));
-    }
+    AsyncFileRead::Task readFileTask;
+    SC_TEST_EXPECT(readFileStream.request.setThreadPoolAndTask(fileThreadPool, readFileTask));
     AsyncReadableStream::Request readFileRequests[numberOfBuffers1 + 1];
     SC_TEST_EXPECT(readFileStream.init(buffersPool1, readFileRequests, eventLoop, readFd));
 
@@ -246,10 +246,8 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     FileDescriptor writeFd;
     SC_TEST_EXPECT(Path::join(fileName, {report.applicationRootDirectory, "destination.txt"}));
     SC_TEST_EXPECT(writeFd.open(fileName.view(), FileDescriptor::OpenMode::WriteCreateTruncate, openOptions));
-    if (not useThreadPool)
-    {
-        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(writeFd));
-    }
+    AsyncFileWrite::Task writeFileTask;
+    SC_TEST_EXPECT(writeFileStream.request.setThreadPoolAndTask(fileThreadPool, writeFileTask));
 
     // Allocate transient buffers
     AsyncBuffersPool buffersPool2;
