@@ -385,10 +385,14 @@ struct AsyncLoopWork : public AsyncRequest
     /// @brief Callback result for AsyncLoopWakeUp
     using Result = AsyncResultOf<AsyncLoopWork, CompletionData>;
 
+    /// @brief Sets the ThreadPool that will supply the thread to run the async work on
+    /// @note Always call this method at least once before AsyncLoopWork::start
+    [[nodiscard]] SC::Result setThreadPool(ThreadPool& threadPool);
+
     /// @brief Schedule work to be executed on a background thread, notifying the event loop when it's finished.
     /// @param eventLoop The AsyncEventLoop where to schedule this work on
-    /// @param threadPool The ThreadPool that will supply the background thread
-    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, ThreadPool& threadPool);
+    /// @note Remember to call AsyncLoopWork::setThreadPool at least once before calling AsyncLoopWork::start
+    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop);
 
     Function<SC::Result()>  work;     /// Called to execute the work in a background threadpool thread
     Function<void(Result&)> callback; /// Called after work is done, on the thread calling EventLoop::run()

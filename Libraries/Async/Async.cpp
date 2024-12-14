@@ -130,13 +130,16 @@ SC::Result SC::AsyncLoopWakeUp::start(AsyncEventLoop& loop, EventObject* eo)
 
 SC::Result SC::AsyncLoopWakeUp::wakeUp() { return getEventLoop()->wakeUpFromExternalThread(*this); }
 
-SC::Result SC::AsyncLoopWork::start(AsyncEventLoop& loop, ThreadPool& threadPool)
+SC::Result SC::AsyncLoopWork::start(AsyncEventLoop& loop)
 {
     SC_TRY_MSG(work.isValid(), "AsyncLoopWork::start - Invalid work callback");
-    SC_TRY(setThreadPoolAndTask(threadPool, task));
+    SC_TRY_MSG(asyncTask != nullptr, "AsyncLoopWork::start - setThreadPool not called");
+    SC_TRY(validateAsync());
     queueSubmission(loop);
     return SC::Result(true);
 }
+
+SC::Result SC::AsyncLoopWork::setThreadPool(ThreadPool& threadPool) { return setThreadPoolAndTask(threadPool, task); }
 
 SC::Result SC::AsyncProcessExit::start(AsyncEventLoop& loop, ProcessDescriptor::Handle process)
 {

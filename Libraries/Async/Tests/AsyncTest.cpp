@@ -274,7 +274,9 @@ void SC::AsyncTest::loopWork()
             // More precisely this runs on the thread calling eventLoop.run().
             numAfterWorkCallbackCalls++; // No need for atomics here, callback is run inside loop thread
         };
-        SC_TEST_EXPECT(works[idx].start(eventLoop, threadPool));
+        // Must always call setThreadPool at least once before start
+        SC_TEST_EXPECT(works[idx].setThreadPool(threadPool));
+        SC_TEST_EXPECT(works[idx].start(eventLoop));
     }
     SC_TEST_EXPECT(eventLoop.run());
 
