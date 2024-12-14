@@ -37,6 +37,10 @@ struct ThreadSafeLinkedList
         {
             tail = nullptr;
         }
+        if (item)
+        {
+            item->next = nullptr;
+        }
         mutex.unlock();
         return item;
     }
