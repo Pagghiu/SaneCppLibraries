@@ -394,7 +394,7 @@ SC::Result SC::AsyncWritableStream::write(Span<const char> data, Function<void(A
 
 void SC::AsyncWritableStream::tryAsync(Result potentialError)
 {
-    if (potentialError)
+    if (not potentialError)
     {
         eventError.emit(potentialError);
     }

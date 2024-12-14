@@ -68,34 +68,26 @@ SC::Result SC::AsyncRequestReadableStream<AsyncReadRequest>::registerAutoCloseDe
 template <typename AsyncReadRequest>
 SC::Result SC::AsyncRequestReadableStream<AsyncReadRequest>::read()
 {
-    if (request.isFree())
+    SC_ASSERT_RELEASE(request.isFree());
+    AsyncBufferView::ID bufferID;
+    if (getBufferOrPause(0, bufferID, request.buffer))
     {
-        AsyncBufferView::ID bufferID;
-        SC_TRY(getBuffersPool().requestNewBuffer(0, bufferID, request.buffer))
         request.callback = [this, bufferID](typename AsyncReadRequest::Result& result) { afterRead(result, bufferID); };
         const Result startResult = request.start(*request.getEventLoop());
-        if (startResult)
-        {
-            return Result(true); // started successfully
-        }
-        else
+        if (not startResult)
         {
             getBuffersPool().unrefBuffer(bufferID);
             return startResult; // Error occurred during request start
         }
     }
-    else
-    {
-        // read is already in progress from a previous callback that has called reactivateRequest(true)
-        return Result(true);
-    }
+    return Result(true);
 }
 
 template <typename AsyncReadRequest>
 void SC::AsyncRequestReadableStream<AsyncReadRequest>::afterRead(typename AsyncReadRequest::Result& result,
                                                                  AsyncBufferView::ID                bufferID)
 {
-    SC_ASSERT_RELEASE(result.getAsync().isFree());
+    SC_ASSERT_RELEASE(request.isFree());
     Span<char> data;
     if (result.get(data))
     {
