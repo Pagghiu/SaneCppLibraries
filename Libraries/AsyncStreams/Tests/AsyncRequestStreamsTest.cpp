@@ -143,12 +143,12 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     SC_TEST_EXPECT(writable.init(pool, writableRequests, eventLoop, writeDescriptor));
 
     // Create Pipeline
+
+    AsyncWritableStream* sinks[1];
+    sinks[0] = &writable;
+
     AsyncPipeline pipeline;
-
-    AsyncWritableStream* writables[1];
-    writables[0] = &writable;
-    SC_TEST_EXPECT(pipeline.pipe(readable, writables));
-
+    SC_TEST_EXPECT(pipeline.pipe(readable, {sinks, 1}));
     SC_TEST_EXPECT(pipeline.start());
 
     SC_TEST_EXPECT(eventLoop.run());
@@ -229,9 +229,8 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
 
     // Create Readable File Stream
     ReadableFileStream readFileStream;
-    (void)readFileStream.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
-    FileDescriptor readFd;
-    String         fileName;
+    FileDescriptor     readFd;
+    String             fileName;
     SC_TEST_EXPECT(Path::join(fileName, {report.applicationRootDirectory, "source.txt"}));
     SC_TEST_EXPECT(readFd.open(fileName.view(), FileDescriptor::OpenMode::ReadOnly, openOptions));
     AsyncFileRead::Task readFileTask;
@@ -241,8 +240,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
 
     // Create Writable File Stream
     WritableFileStream writeFileStream;
-    (void)writeFileStream.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
-    FileDescriptor writeFd;
+    FileDescriptor     writeFd;
     SC_TEST_EXPECT(Path::join(fileName, {report.applicationRootDirectory, "destination.txt"}));
     SC_TEST_EXPECT(writeFd.open(fileName.view(), FileDescriptor::OpenMode::WriteCreateTruncate, openOptions));
     AsyncFileWrite::Task writeFileTask;
@@ -269,7 +267,6 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     WritableSocketStream         writeSocketStream;
     AsyncWritableStream::Request writeSocketRequests[numberOfBuffers1 + 1];
     SC_TEST_EXPECT(writeSocketStream.init(buffersPool1, writeSocketRequests, eventLoop, client[0]));
-    (void)writeSocketStream.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
     // Autoclose socket after write stream receives an ::end()
     SC_TEST_EXPECT(writeSocketStream.registerAutoCloseDescriptor(true));
     client[0].detach(); // Taken care by registerAutoCloseDescriptor(true)
@@ -286,22 +283,21 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     AsyncWritableStream::Request writeFileRequests[numberOfBuffers2 + 1];
     SC_TEST_EXPECT(writeFileStream.init(buffersPool2, writeFileRequests, eventLoop, writeFd));
 
-    // Create Pipelines
-    AsyncPipeline pipelines[2];
-
-    AsyncWritableStream* sinks[2];
-
     // Create first Async Pipeline (file to socket)
-    sinks[0] = &writeSocketStream;
-    SC_TEST_EXPECT(pipelines[0].pipe(readFileStream, {&sinks[0], 1}));
+    AsyncWritableStream* sinks1[1] = {&writeSocketStream};
+    AsyncPipeline        pipeline0;
+    (void)pipeline0.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
+    SC_TEST_EXPECT(pipeline0.pipe(readFileStream, {sinks1}));
 
     // Create second Async Pipeline (socket to file)
-    sinks[1] = &writeFileStream;
-    SC_TEST_EXPECT(pipelines[1].pipe(readSocketStream, {&sinks[1], 1}));
+    AsyncWritableStream* sinks2[1] = {&writeFileStream};
+    AsyncPipeline        pipeline1;
+    (void)pipeline1.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
+    SC_TEST_EXPECT(pipeline1.pipe(readSocketStream, {sinks2}));
 
-    // Start Async Pipeline
-    SC_TEST_EXPECT(pipelines[0].start());
-    SC_TEST_EXPECT(pipelines[1].start());
+    // Start both pipelines
+    SC_TEST_EXPECT(pipeline0.start());
+    SC_TEST_EXPECT(pipeline1.start());
 
     // Run Event Loop
     SC_TEST_EXPECT(eventLoop.run());
