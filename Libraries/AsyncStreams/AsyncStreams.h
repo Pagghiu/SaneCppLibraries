@@ -124,7 +124,7 @@ struct AsyncReadableStream
     void pause();
 
     /// @brief Resumes the readable stream paused by AsyncReadableStream::pause
-    void resume();
+    void resumeReading();
 
     /// @brief Forcefully destroys the readable stream before it's end event releasing all resources
     void destroy();
@@ -237,6 +237,12 @@ struct AsyncWritableStream
 
     /// @brief Signals that the given buffer (previously queued by write) has been fully written
     void finishedWriting(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)>&& cb, Result res);
+
+    /// @brief Resumes writing queued requests for this stream
+    void resumeWriting();
+
+    /// @brief Puts back a buffer at the top of the write queue
+    Result unshift(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)>&& cb);
 
     /// @brief Signals an async error received
     void emitError(Result error);

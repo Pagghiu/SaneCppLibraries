@@ -200,7 +200,7 @@ void SC::AsyncReadableStream::pause()
     }
 }
 
-void SC::AsyncReadableStream::resume()
+void SC::AsyncReadableStream::resumeReading()
 {
     switch (state)
     {
@@ -356,13 +356,22 @@ SC::Result SC::AsyncWritableStream::write(AsyncBufferView::ID bufferID, Function
         return Result::Error("AsyncWritableStream::write - queue is full");
     }
     buffers->refBuffer(bufferID); // 2a. unrefBuffer below or in finishedWriting
+    resumeWriting();
+    return Result(true);
+}
+
+void SC::AsyncWritableStream::resumeWriting()
+{
     switch (state)
     {
     case State::Stopped: {
-        state = State::Writing;
-        SC_ASSERT_RELEASE(writeQueue.popFront(request));
-        tryAsync(asyncWrite(request.bufferID, request.cb));
-        buffers->unrefBuffer(request.bufferID); // 2b. refBuffer above
+        Request request;
+        if (writeQueue.popFront(request))
+        {
+            state = State::Writing;
+            tryAsync(asyncWrite(request.bufferID, request.cb));
+            buffers->unrefBuffer(request.bufferID); // 2b. refBuffer above
+        }
     }
     break;
     case State::Writing: {
@@ -378,6 +387,16 @@ SC::Result SC::AsyncWritableStream::write(AsyncBufferView::ID bufferID, Function
         break;
     case State::Ended: break;
     }
+}
+
+SC::Result SC::AsyncWritableStream::unshift(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)>&& cb)
+{
+    Request request;
+    request.cb       = move(cb);
+    request.bufferID = bufferID;
+    buffers->refBuffer(bufferID);
+    // Let's push this request in front instead of to the back
+    SC_TRY_MSG(writeQueue.pushFront(request), "unshift failed");
     return Result(true);
 }
 
@@ -533,7 +552,7 @@ void SC::AsyncPipeline::onBufferRead(AsyncBufferView::ID bufferID)
 void SC::AsyncPipeline::onBufferWritten(AsyncBufferView::ID bufferID)
 {
     source->getBuffersPool().unrefBuffer(bufferID); // 4b. AsyncPipeline::onBufferRead
-    source->resume();
+    source->resumeReading();
 }
 
 void SC::AsyncPipeline::endPipes()
