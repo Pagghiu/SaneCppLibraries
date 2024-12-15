@@ -507,20 +507,44 @@ void SC::AsyncWritableStream::end()
 SC::AsyncBuffersPool& SC::AsyncWritableStream::getBuffersPool() { return *buffers; }
 
 void SC::AsyncWritableStream::emitError(Result error) { eventError.emit(error); }
+//-------------------------------------------------------------------------------------------------------
+// AsyncTransformStream
+//-------------------------------------------------------------------------------------------------------
+
+SC::AsyncTransformStream::AsyncTransformStream()
+{
+    asyncRead.bind([] { return Result(true); });
+}
+
+SC::Result SC::AsyncTransformStream::init(AsyncBuffersPool&                  buffersPool,
+                                          Span<AsyncReadableStream::Request> readableRequests,
+                                          Span<AsyncWritableStream::Request> writableRequests)
+{
+    SC_TRY(AsyncReadableStream::init(buffersPool, readableRequests));
+    SC_TRY(AsyncWritableStream::init(buffersPool, writableRequests));
+    return Result(true);
+}
 
 //-------------------------------------------------------------------------------------------------------
 // AsyncPipeline
 //-------------------------------------------------------------------------------------------------------
-
 SC::Result SC::AsyncPipeline::pipe(AsyncReadableStream& asyncSource, Span<AsyncWritableStream*> asyncSinks)
 {
-    source = &asyncSource;
-    sinks  = asyncSinks;
+    return pipe(asyncSource, {}, asyncSinks);
+}
+
+SC::Result SC::AsyncPipeline::pipe(AsyncReadableStream& asyncSource, Span<AsyncTransformStream*> asyncTransforms,
+                                   Span<AsyncWritableStream*> asyncSinks)
+{
+    source     = &asyncSource;
+    transforms = asyncTransforms;
+    sinks      = asyncSinks;
     SC_TRY_MSG(asyncSinks.sizeInElements(), "AsyncPipeline::pipe() invalid 0 sized list of sinks");
 
     SC_TRY(checkBuffersPool());
 
     AsyncReadableStream* readable = source;
+    SC_TRY(chainTransforms(readable));
 
     bool res;
     res = readable->eventData.addListener<AsyncPipeline, &AsyncPipeline::dispatchToPipes>(*this);
@@ -540,6 +564,10 @@ SC::Result SC::AsyncPipeline::pipe(AsyncReadableStream& asyncSource, Span<AsyncW
 SC::Result SC::AsyncPipeline::start()
 {
     SC_TRY_MSG(source != nullptr and sinks.sizeInElements() > 0, "AsyncPipeline::pipe has not been called");
+    for (auto transform : transforms)
+    {
+        SC_TRY(transform->start());
+    }
     SC_TRY(source->start());
     return Result(true);
 }
@@ -556,6 +584,61 @@ SC::Result SC::AsyncPipeline::checkBuffersPool()
         {
             return Result::Error("AsyncPipeline::start - all streams must use the same AsyncBuffersPool");
         }
+    }
+    for (AsyncTransformStream* transform : transforms)
+    {
+        if (transform == nullptr)
+        {
+            break;
+        }
+        if ((&transform->AsyncReadableStream::getBuffersPool() != &buffers) and
+            (&transform->AsyncWritableStream::getBuffersPool() != &buffers))
+        {
+            return Result::Error("AsyncPipeline::start - all streams must use the same AsyncBuffersPool");
+        }
+    }
+    return Result(true);
+}
+
+bool SC::AsyncPipeline::listenToEventData(AsyncReadableStream& readable, AsyncTransformStream& transform, bool listen)
+{
+    AsyncTransformStream* pTransform = &transform;
+
+    auto lambda = [this, pTransform](AsyncBufferView::ID bufferID)
+    {
+        // Write readable to transform
+        asyncWriteWritable(bufferID, *pTransform);
+    };
+    if (listen)
+    {
+        return readable.eventData.addListener(lambda);
+    }
+    else
+    {
+        return readable.eventData.removeListener(lambda);
+    }
+}
+
+SC::Result SC::AsyncPipeline::chainTransforms(AsyncReadableStream*& readable)
+{
+    for (AsyncTransformStream* transform : transforms)
+    {
+        bool res;
+        res = listenToEventData(*readable, *transform, true);
+        SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventData");
+        AsyncWritableStream& writable = *transform;
+        res = readable->eventEnd.addListener<AsyncWritableStream, &AsyncWritableStream::end>(writable);
+        SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventEnd");
+        res = readable->eventError.addListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
+        SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventError");
+
+        readable = transform;
+
+        res = transform->AsyncReadableStream::eventError.addListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
+        SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventError");
+
+        res = transform->AsyncWritableStream::eventError.addListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
+        SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventError");
     }
     return Result(true);
 }
@@ -576,6 +659,13 @@ void SC::AsyncPipeline::asyncWriteWritable(AsyncBufferView::ID bufferID, AsyncWr
 void SC::AsyncPipeline::afterWrite(AsyncBufferView::ID bufferID)
 {
     source->getBuffersPool().unrefBuffer(bufferID);
+    // Try resume in reverse
+    for (size_t idx = 0; idx < transforms.sizeInElements(); ++idx)
+    {
+        AsyncTransformStream* transform = transforms[transforms.sizeInElements() - 1 - idx];
+        transform->resumeWriting();
+        transform->resumeReading();
+    }
     source->resumeReading();
 }
 

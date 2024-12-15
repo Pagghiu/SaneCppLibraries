@@ -5,7 +5,7 @@
 #include "../../Strings/String.h"
 #include "../../Strings/StringBuilder.h"
 #include "../../Testing/Testing.h"
-#include "../Internal/ZLibStream.inl"
+
 namespace SC
 {
 struct ZLibStreamTest;

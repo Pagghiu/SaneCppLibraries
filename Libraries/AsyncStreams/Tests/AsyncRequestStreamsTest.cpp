@@ -4,6 +4,7 @@
 #include "../../AsyncStreams/AsyncRequestStreams.h"
 #include "../../Async/Async.h"
 #include "../../AsyncStreams/AsyncStreams.h"
+#include "../../AsyncStreams/ZLibTransformStreams.h"
 #include "../../FileSystem/FileSystem.h"
 #include "../../FileSystem/Path.h"
 #include "../../Foundation/HeapBuffer.h"
@@ -179,15 +180,15 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     // 1. Creates a "source.txt" file on disk filling it with some test data pattern
     // 2. Creates a readable file stream from  "source.txt"
     // 3. Creates a TCP socket pair (client server)
-    // 4. Pipes the readable file into one of the two sockets. This is the first "pipeline".
-    // 5. Creates second pipeline with receiving side of the socket, piped into a "destination.txt" file
+    // 4. Pipes the readable file into one of the two sockets, through a compression transform stream
+    // 5. Pipe the receiving socket into a decompression transform stream, writing to a "destination.txt" file
     // 6. Once the entire file is read, the first pipeline is forcefully ended by disconnecting the socket
     // 7. This action triggers also ending the second pipeline (as we listen to the disconnected event)
     // 8. Once both pipelines are finished, the event loop has no more active handles ::run() will return
     // 9. Finally the test checks that the written file matches the original one.
 
-    // First pipeline is: FileStream --> WriteSocketStream
-    // Second pipeline is: ReadSocketStream --> WriteFileStream
+    // First pipeline is: FileStream --> Compression --> WriteSocketStream
+    // Second pipeline is: ReadSocketStream --> Decompression --> WriteFileStream
 
     // Generate data and write it to source.txt
     Vector<uint64_t> source;
@@ -210,7 +211,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
 
     // Allocate transient buffers
     AsyncBuffersPool buffersPool1;
-    constexpr size_t numberOfBuffers1 = 2; // Need at least 2
+    constexpr size_t numberOfBuffers1 = 3; // Need at least 3
     constexpr size_t buffers1Size     = 512;
     AsyncBufferView  buffers1[numberOfBuffers1];
     buffersPool1.buffers = {buffers1, numberOfBuffers1};
@@ -248,7 +249,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
 
     // Allocate transient buffers
     AsyncBuffersPool buffersPool2;
-    constexpr size_t numberOfBuffers2 = 2; // Need at least 2
+    constexpr size_t numberOfBuffers2 = 3; // Need at least 3
     constexpr size_t buffers2Size     = 512;
     AsyncBufferView  buffers2[numberOfBuffers2 + 1];
     buffersPool2.buffers = {buffers2, numberOfBuffers2};
@@ -283,17 +284,33 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     AsyncWritableStream::Request writeFileRequests[numberOfBuffers2 + 1];
     SC_TEST_EXPECT(writeFileStream.init(buffersPool2, writeFileRequests, eventLoop, writeFd));
 
+    // Create first transform stream (compression)
+    SyncZLibTransformStream      compressStream;
+    AsyncWritableStream::Request compressWriteRequests[numberOfBuffers1 + 1];
+    AsyncReadableStream::Request compressReadRequests[numberOfBuffers1 + 1];
+    SC_TEST_EXPECT(compressStream.init(buffersPool1, compressReadRequests, compressWriteRequests));
+    SC_TEST_EXPECT(compressStream.stream.init(ZLibStream::CompressZLib));
+
     // Create first Async Pipeline (file to socket)
-    AsyncWritableStream* sinks1[1] = {&writeSocketStream};
-    AsyncPipeline        pipeline0;
+    AsyncTransformStream* transforms1[1] = {&compressStream};
+    AsyncWritableStream*  sinks1[1]      = {&writeSocketStream};
+    AsyncPipeline         pipeline0;
     (void)pipeline0.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
-    SC_TEST_EXPECT(pipeline0.pipe(readFileStream, {sinks1}));
+    SC_TEST_EXPECT(pipeline0.pipe(readFileStream, transforms1, {sinks1}));
+
+    // Create second transform stream (decompression)
+    SyncZLibTransformStream      decompressStream;
+    AsyncWritableStream::Request decompressWriteRequests[numberOfBuffers2 + 1];
+    AsyncReadableStream::Request decompressReadRequests[numberOfBuffers2 + 1];
+    SC_TEST_EXPECT(decompressStream.init(buffersPool2, decompressReadRequests, decompressWriteRequests));
+    SC_TEST_EXPECT(decompressStream.stream.init(ZLibStream::DecompressZLib));
 
     // Create second Async Pipeline (socket to file)
-    AsyncWritableStream* sinks2[1] = {&writeFileStream};
-    AsyncPipeline        pipeline1;
+    AsyncTransformStream* transforms2[1] = {&decompressStream};
+    AsyncWritableStream*  sinks2[1]      = {&writeFileStream};
+    AsyncPipeline         pipeline1;
     (void)pipeline1.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
-    SC_TEST_EXPECT(pipeline1.pipe(readSocketStream, {sinks2}));
+    SC_TEST_EXPECT(pipeline1.pipe(readSocketStream, transforms2, {sinks2}));
 
     // Start both pipelines
     SC_TEST_EXPECT(pipeline0.start());

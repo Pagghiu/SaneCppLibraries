@@ -255,6 +255,8 @@ struct AsyncWritableStream
     /// @brief Will emit error if the passed in Result is false
     void tryAsync(Result potentialError);
 
+    void stop() { state = State::Stopped; }
+
   private:
     enum class State
     {
@@ -270,6 +272,14 @@ struct AsyncWritableStream
     CircularQueue<Request> writeQueue;
 };
 
+struct AsyncTransformStream : public AsyncReadableStream, public AsyncWritableStream
+{
+    AsyncTransformStream();
+
+    Result init(AsyncBuffersPool& buffersPool, Span<AsyncReadableStream::Request> readableRequests,
+                Span<AsyncWritableStream::Request> writableRequests);
+};
+
 /// @brief Pipes reads on SC::AsyncReadableStream to SC::AsyncWritableStream.
 /// Back-pressure happens when the source provides data at a faster rate than what the sink (writable)
 /// is able to process.
@@ -281,10 +291,14 @@ struct AsyncPipeline
 {
     static constexpr int MaxListeners = 8;
 
-    Event<MaxListeners, Result> eventError; /// Reports errors by source or sinks
+    Event<MaxListeners, Result> eventError; /// Reports errors by source, transforms or sinks
 
-    /// @brief Inits the pipeline
+    /// @brief Inits the pipeline with a source and some writable sinks
     Result pipe(AsyncReadableStream& asyncSource, Span<AsyncWritableStream*> asyncSinks);
+
+    /// @brief Inits the pipeline with a source, transforms and some writable sinks
+    Result pipe(AsyncReadableStream& asyncSource, Span<AsyncTransformStream*> asyncTransforms,
+                Span<AsyncWritableStream*> asyncSinks);
 
     /// @brief Starts the pipeline
     /// @note Both source and sinks must have been already setup by the caller
@@ -296,13 +310,17 @@ struct AsyncPipeline
 
     Span<AsyncWritableStream*> sinks; /// User specified sinks
 
+    Span<AsyncTransformStream*> transforms;
+
     void   emitError(Result res);
     Result checkBuffersPool();
+    Result chainTransforms(AsyncReadableStream*& readable);
 
     void asyncWriteWritable(AsyncBufferView::ID bufferID, AsyncWritableStream& writable);
     void dispatchToPipes(AsyncBufferView::ID bufferID);
     void endPipes();
     void afterWrite(AsyncBufferView::ID bufferID);
+    bool listenToEventData(AsyncReadableStream& readable, AsyncTransformStream& transform, bool listen);
 };
 } // namespace SC
 //! @}
