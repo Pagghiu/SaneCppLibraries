@@ -281,12 +281,10 @@ struct AsyncPipeline
 {
     static constexpr int MaxListeners = 8;
 
-    Event<MaxListeners, Result> eventError; /// Emitted when an error occurs
+    Event<MaxListeners, Result> eventError; /// Reports errors by source or sinks
 
-    // TODO: Make all these private
-    AsyncReadableStream* source = nullptr; /// User specified source
-
-    Span<AsyncWritableStream*> sinks; /// User specified sinks
+    /// @brief Inits the pipeline
+    Result pipe(AsyncReadableStream& asyncSource, Span<AsyncWritableStream*> asyncSinks);
 
     /// @brief Starts the pipeline
     /// @note Both source and sinks must have been already setup by the caller
@@ -294,10 +292,17 @@ struct AsyncPipeline
 
     // TODO: Add a pause and cancel/step
   private:
-    void onBufferRead(AsyncBufferView::ID bufferID);
-    void onBufferWritten(AsyncBufferView::ID bufferID);
+    AsyncReadableStream* source = nullptr; /// User specified source
 
+    Span<AsyncWritableStream*> sinks; /// User specified sinks
+
+    void   emitError(Result res);
+    Result checkBuffersPool();
+
+    void asyncWriteWritable(AsyncBufferView::ID bufferID, AsyncWritableStream& writable);
+    void dispatchToPipes(AsyncBufferView::ID bufferID);
     void endPipes();
+    void afterWrite(AsyncBufferView::ID bufferID);
 };
 } // namespace SC
 //! @}

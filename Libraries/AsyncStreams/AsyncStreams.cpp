@@ -507,15 +507,49 @@ void SC::AsyncWritableStream::end()
 SC::AsyncBuffersPool& SC::AsyncWritableStream::getBuffersPool() { return *buffers; }
 
 void SC::AsyncWritableStream::emitError(Result error) { eventError.emit(error); }
+
 //-------------------------------------------------------------------------------------------------------
 // AsyncPipeline
 //-------------------------------------------------------------------------------------------------------
 
+SC::Result SC::AsyncPipeline::pipe(AsyncReadableStream& asyncSource, Span<AsyncWritableStream*> asyncSinks)
+{
+    source = &asyncSource;
+    sinks  = asyncSinks;
+    SC_TRY_MSG(asyncSinks.sizeInElements(), "AsyncPipeline::pipe() invalid 0 sized list of sinks");
+
+    SC_TRY(checkBuffersPool());
+
+    AsyncReadableStream* readable = source;
+
+    bool res;
+    res = readable->eventData.addListener<AsyncPipeline, &AsyncPipeline::dispatchToPipes>(*this);
+    SC_TRY_MSG(res, "AsyncPipeline::pipe() run out of eventData");
+    res = readable->eventEnd.addListener<AsyncPipeline, &AsyncPipeline::endPipes>(*this);
+    SC_TRY_MSG(res, "AsyncPipeline::pipe() run out of eventEnd");
+    res = readable->eventError.addListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
+    SC_TRY_MSG(res, "AsyncPipeline::pipe() run out of eventError");
+    for (AsyncWritableStream* sink : sinks)
+    {
+        res = sink->eventError.addListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
+        SC_TRY_MSG(res, "AsyncPipeline::pipe() pipe run out of eventError");
+    }
+    return Result(true);
+}
+
 SC::Result SC::AsyncPipeline::start()
 {
-    SC_TRY_MSG(source != nullptr, "AsyncPipeline::start - Missing source");
+    SC_TRY_MSG(source != nullptr and sinks.sizeInElements() > 0, "AsyncPipeline::pipe has not been called");
+    SC_TRY(source->start());
+    return Result(true);
+}
 
+void SC::AsyncPipeline::emitError(Result res) { eventError.emit(res); }
+
+SC::Result SC::AsyncPipeline::checkBuffersPool()
+{
     AsyncBuffersPool& buffers = source->getBuffersPool();
+
     for (AsyncWritableStream* sink : sinks)
     {
         if (&sink->getBuffersPool() != &buffers)
@@ -523,36 +557,34 @@ SC::Result SC::AsyncPipeline::start()
             return Result::Error("AsyncPipeline::start - all streams must use the same AsyncBuffersPool");
         }
     }
-
-    AsyncReadableStream* readable = source;
-    // TODO: Register also onErrors
-    bool res;
-    res = readable->eventData.addListener<AsyncPipeline, &AsyncPipeline::onBufferRead>(*this);
-    SC_TRY_MSG(res, "AsyncPipeline::start() run out of eventData");
-    res = readable->eventEnd.addListener<AsyncPipeline, &AsyncPipeline::endPipes>(*this);
-    SC_TRY_MSG(res, "AsyncPipeline::start() run out of eventEnd");
-    return source->start();
+    return Result(true);
 }
 
-void SC::AsyncPipeline::onBufferRead(AsyncBufferView::ID bufferID)
+void SC::AsyncPipeline::asyncWriteWritable(AsyncBufferView::ID bufferID, AsyncWritableStream& writable)
 {
-    for (AsyncWritableStream* sink : sinks)
+    source->getBuffersPool().refBuffer(bufferID);
+    Function<void(AsyncBufferView::ID)> func;
+    func.template bind<AsyncPipeline, &AsyncPipeline::afterWrite>(*this);
+    // TODO: We should probably block when closing for in-flight writes
+    Result res = writable.write(bufferID, func);
+    if (not res)
     {
-        source->getBuffersPool().refBuffer(bufferID); // 4a. AsyncPipeline::onBufferWritten
-        Function<void(AsyncBufferView::ID)> cb;
-        cb.bind<AsyncPipeline, &AsyncPipeline::onBufferWritten>(*this);
-        Result res = sink->write(bufferID, move(cb));
-        if (not res)
-        {
-            eventError.emit(res);
-        }
+        eventError.emit(res);
     }
 }
 
-void SC::AsyncPipeline::onBufferWritten(AsyncBufferView::ID bufferID)
+void SC::AsyncPipeline::afterWrite(AsyncBufferView::ID bufferID)
 {
-    source->getBuffersPool().unrefBuffer(bufferID); // 4b. AsyncPipeline::onBufferRead
+    source->getBuffersPool().unrefBuffer(bufferID);
     source->resumeReading();
+}
+
+void SC::AsyncPipeline::dispatchToPipes(AsyncBufferView::ID bufferID)
+{
+    for (AsyncWritableStream* sink : sinks)
+    {
+        asyncWriteWritable(bufferID, *sink);
+    }
 }
 
 void SC::AsyncPipeline::endPipes()
