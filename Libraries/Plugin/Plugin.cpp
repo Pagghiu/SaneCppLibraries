@@ -732,6 +732,29 @@ const SC::PluginDynamicLibrary* SC::PluginRegistry::findPlugin(const StringView 
     return libraries.get(identifier);
 }
 
+void SC::PluginRegistry::getPluginsToReloadBecauseOf(StringView relativePath, Time::Milliseconds tolerance,
+                                                     Function<void(const PluginIdentifier&)> onPlugin)
+{
+    const size_t numberOfPlugins = getNumberOfEntries();
+    for (size_t idx = 0; idx < numberOfPlugins; ++idx)
+    {
+        const PluginDynamicLibrary& library = getPluginDynamicLibraryAt(idx);
+        for (const PluginFile& file : library.definition.files)
+        {
+            if (file.absolutePath.view().endsWith(relativePath))
+            {
+                const Time::Relative elapsed = Time::Absolute::now().subtract(library.lastLoadTime);
+                if (elapsed.inRoundedUpperMilliseconds() > tolerance)
+                {
+                    // Only reload if at least tolerance ms have passed, as sometimes FSEvents on
+                    // macOS likes to send multiple events that are difficult to filter properly
+                    onPlugin(getIdentifierAt(idx));
+                }
+            }
+        }
+    }
+}
+
 SC::Result SC::PluginRegistry::loadPlugin(const StringView identifier, const PluginCompiler& compiler,
                                           const PluginSysroot& sysroot, StringView executablePath, LoadMode loadMode)
 {

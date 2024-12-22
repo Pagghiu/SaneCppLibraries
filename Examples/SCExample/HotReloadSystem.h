@@ -133,25 +133,8 @@ struct HotReloadSystem
     {
         if (notification.relativePath.endsWith(".cpp"))
         {
-            const size_t numberOfPlugins = registry.getNumberOfEntries();
-            for (size_t idx = 0; idx < numberOfPlugins; ++idx)
-            {
-                const PluginDynamicLibrary& library = registry.getPluginDynamicLibraryAt(idx);
-                for (const PluginFile& file : library.definition.files)
-                {
-                    if (file.absolutePath.view().endsWith(notification.relativePath))
-                    {
-                        const Time::Relative elapsed = Time::Absolute::now().subtract(library.lastLoadTime);
-                        if (elapsed.inRoundedUpperMilliseconds().ms > 500)
-                        {
-                            // Only reload if at least 500ms have passed, as sometimes FSEvents on macOS
-                            // likes to send multiple events that are difficult to filter properly
-                            (void)load(registry.getIdentifierAt(idx).view());
-                        }
-                        return;
-                    }
-                }
-            }
+            auto reload = [this](const PluginIdentifier& plugin) { (void)load(plugin.view()); };
+            registry.getPluginsToReloadBecauseOf(notification.relativePath, Time::Milliseconds(500), reload);
         }
     }
 };

@@ -3,6 +3,7 @@
 #pragma once
 #include "../Containers/SmallVector.h"
 #include "../Containers/VectorMap.h"
+#include "../Foundation/Function.h"
 #include "../Strings/SmallString.h"
 #include "../Time/Time.h"
 #include "Internal/DynamicLibrary.h"
@@ -268,6 +269,13 @@ struct SC::PluginRegistry
     {
         return libraries.items[index].value;
     }
+
+    /// @brief Enumerates all plugins that must be reloaded when relativePath is modified
+    /// @param relativePath A relative path of the file that has been modified
+    /// @param tolerance How many milliseconds must be passed to consider a file as modified
+    /// @param onPlugin Callback that will be called with Plugins affected by the modification
+    void getPluginsToReloadBecauseOf(StringView relativePath, Time::Milliseconds tolerance,
+                                     Function<void(const PluginIdentifier&)> onPlugin);
 
   private:
     VectorMap<PluginIdentifier, PluginDynamicLibrary> libraries;
