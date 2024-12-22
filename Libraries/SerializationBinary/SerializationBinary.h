@@ -194,7 +194,8 @@ struct SerializationBinary
         static_assert(alignof(Reflection::TypeInfo) == sizeof(uint32_t), "Alignof TypeInfo");
         Span<const uint8_t> typeInfos;
         SC_TRY(buffer.sliceStartLength(sizeof(numInfos), numInfos * sizeof(Reflection::TypeInfo), typeInfos));
-        Span<const Reflection::TypeInfo> serializedSchema = typeInfos.reinterpret_as_array_of<Reflection::TypeInfo>();
+        Span<const Reflection::TypeInfo> serializedSchema =
+            typeInfos.reinterpret_as_array_of<const Reflection::TypeInfo>();
 
         constexpr auto sourceSchema = Reflection::Schema::template compile<T>().typeInfos;
 
