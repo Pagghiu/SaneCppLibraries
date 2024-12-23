@@ -51,6 +51,7 @@ This is the list of videos that have been recorded showing some of the internal 
 - [Ep.29 - C++ Async Writable Streams](https://www.youtube.com/watch?v=0OXLxIDvmOU)
 - [Ep.30 - C++ Async Streams Pipeline](https://www.youtube.com/watch?v=8rYQ2ApxnwA)
 - [Ep.31 - C++ Async Socket Streams](https://www.youtube.com/watch?v=0x6TLV_ig-A)
+- [Ep.32 - C++ Async Transform Streams - Part 1](https://www.youtube.com/watch?v=Ul7DdQGrETo)
 
 # Blog
 

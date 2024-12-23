@@ -5,10 +5,10 @@
 @brief
 ✅ Fast compile times  
 ✅ Bloat free  
-✅ Simple readable code  
+✅ Simple and readable code  
 ✅ Easy to integrate  
 ⛔️ No C++ Standard Library / Exceptions / RTTI  
-⛔️ No third party dependencies (prefer OS API)
+⛔️ No third party build dependencies (prefer OS API)
 
 # 📖 Readability
 - Common:

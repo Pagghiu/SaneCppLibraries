@@ -7,6 +7,41 @@
 FileSystem executed executing operations on files and directories.  
 Path is able to parse and manipulate windows and posix paths.
 
+# Quick Sheet
+
+```cpp
+FileSystem fs;
+// Make all operations relative to applicationRootDirectory
+SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+
+// Create a nested directory structure with some files too
+SC_TEST_EXPECT(fs.makeDirectoryRecursive("copyDirectory/subdirectory"));
+SC_TEST_EXPECT(fs.write("copyDirectory/testFile.txt", "asdf"));
+SC_TEST_EXPECT(fs.existsAndIsFile("copyDirectory/testFile.txt"));
+SC_TEST_EXPECT(fs.write("copyDirectory/subdirectory/testFile.txt", "asdf"));
+
+// Copy the directory (recursively)
+SC_TEST_EXPECT(fs.copyDirectory("copyDirectory", "COPY_copyDirectory"));
+
+// Check that file exists in the new copied directory
+SC_TEST_EXPECT(fs.existsAndIsFile("COPY_copyDirectory/testFile.txt"));
+SC_TEST_EXPECT(fs.existsAndIsFile("COPY_copyDirectory/subdirectory/testFile.txt"));
+
+// Copying again fails (because we're not overwriting)
+SC_TEST_EXPECT(not fs.copyDirectory("copyDirectory", "COPY_copyDirectory"));
+
+// Try copying again but now we ask to overwrite destination
+SC_TEST_EXPECT(fs.copyDirectory("copyDirectory", "COPY_copyDirectory",
+                FileSystem::CopyFlags().setOverwrite(true)));
+
+// Remove all files created
+SC_TEST_EXPECT(fs.removeFile("copyDirectory/testFile.txt"));
+SC_TEST_EXPECT(fs.removeFile("copyDirectory/subdirectory/testFile.txt"));
+SC_TEST_EXPECT(fs.removeEmptyDirectory("copyDirectory/subdirectory"));
+SC_TEST_EXPECT(fs.removeEmptyDirectory("copyDirectory"));
+// Remove the entire tree of directories for the copy
+SC_TEST_EXPECT(fs.removeDirectoryRecursive("COPY_copyDirectory"));
+```
 # Features
 
 | SC::Path                          | @copybrief SC::Path                           |

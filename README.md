@@ -11,18 +11,21 @@
 
 **Sane C++ Libraries** is a set of C++ platform abstraction libraries for macOS, Windows and Linux.
 
-![Sane Cpp](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease/article.svg)
+![Sane Cpp](https://pagghiu.github.io/images/2023-12-23-SaneCppLibrariesRelease/article.svg)
 
 [Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html):
 
 ✅ Fast compile times  
 ✅ Bloat free  
-✅ Simple readable code  
+✅ Simple and readable code  
 ✅ Easy to integrate  
 ⛔️ No C++ Standard Library / Exceptions / RTTI  
-⛔️ No third party dependencies (prefer OS API)
+⛔️ No third party build dependencies (prefer OS API)
 
 Visit the [documentation website](https://pagghiu.github.io/SaneCppLibraries/index.html) for more information.
+
+- [Blog Post - Sane C++ Libraries (Open Sourcing)](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html)
+- [Blog Post - 1st Year of Sane C++ Libraries](https://pagghiu.github.io/site/blog/2024-12-23-SaneCpp1Year.html)
 
 # Libraries
 
@@ -51,11 +54,11 @@ Library                                                                         
 [Threading](https://pagghiu.github.io/SaneCppLibraries/library_threading.html)                          | 🟥 Atomic, thread, thread pool, mutex, condition variable
 [Time](https://pagghiu.github.io/SaneCppLibraries/library_time.html)                                    | 🟨 Time handling (relative, absolute, high resolution)
 
-Each library is color-coded to signal its status:
-- 🟥 Draft (incomplete, work in progress, proof of concept, works on basic case)
-- 🟨 MVP (minimum set of features have been implemented)
-- 🟩 Usable (a reasonable set of features has been implemented to make library useful)
-- 🟦 Complete (all planned features have been implemented)
+Each library is color-coded to signal its status:  
+🟥 Draft (incomplete, WIP, works on basic case)  
+🟨 MVP (minimum set of features have been implemented)  
+🟩 Usable (a reasonable set of useful features has been implemented)  
+🟦 Complete (all planned features have been implemented)  
 
 
 # C Bindings
