@@ -532,6 +532,7 @@ SC::Result SC::AsyncPipeline::pipe(AsyncReadableStream& asyncSource, Span<AsyncW
 {
     return pipe(asyncSource, {}, asyncSinks);
 }
+SC::AsyncPipeline::~AsyncPipeline() { SC_ASSERT_DEBUG(unpipe()); }
 
 SC::Result SC::AsyncPipeline::pipe(AsyncReadableStream& asyncSource, Span<AsyncTransformStream*> asyncTransforms,
                                    Span<AsyncWritableStream*> asyncSinks)
@@ -559,6 +560,72 @@ SC::Result SC::AsyncPipeline::pipe(AsyncReadableStream& asyncSource, Span<AsyncT
         SC_TRY_MSG(res, "AsyncPipeline::pipe() pipe run out of eventError");
     }
     return Result(true);
+}
+
+bool SC::AsyncPipeline::unpipe()
+{
+    bool res = true;
+    // Deregister all source events
+    if (source)
+    {
+        if (transforms.empty())
+        {
+            res = source->eventData.removeAllListenersBoundTo(*this);
+            SC_TRY(res);
+            res = source->eventEnd.removeAllListenersBoundTo(*this);
+            SC_TRY(res);
+        }
+        else
+        {
+            AsyncWritableStream& writable = *transforms[0];
+
+            res = listenToEventData(*source, *transforms[0], false);
+            SC_TRY(res);
+            res = source->eventEnd.removeAllListenersBoundTo(writable);
+            SC_TRY(res);
+        }
+        res = source->eventError.removeAllListenersBoundTo(*this);
+        SC_TRY(res);
+        source = nullptr;
+    }
+
+    // Deregister all transforms events
+    size_t transformIndex = 0;
+    for (AsyncTransformStream* transform : transforms)
+    {
+        if (transformIndex + 1 == transforms.sizeInElements())
+        {
+            res = transform->eventData.removeAllListenersBoundTo(*this);
+            SC_TRY(res);
+            res = transform->eventEnd.removeAllListenersBoundTo(*this);
+            SC_TRY(res);
+        }
+        else
+        {
+            AsyncTransformStream& nextTransform = *transforms[transformIndex + 1];
+            AsyncWritableStream&  nextWritable  = nextTransform;
+
+            res = listenToEventData(*transform, nextTransform, false);
+            SC_TRY(res);
+            res = source->eventEnd.removeAllListenersBoundTo(nextWritable);
+            SC_TRY(res);
+        }
+        res = transform->AsyncReadableStream::eventError.removeAllListenersBoundTo(*this);
+        SC_TRY(res);
+        res = transform->AsyncWritableStream::eventError.removeAllListenersBoundTo(*this);
+        SC_TRY(res);
+        transformIndex++;
+    }
+    transforms = {};
+
+    // Deregister all sinks events
+    for (AsyncWritableStream* sink : sinks)
+    {
+        res = sink->eventError.removeListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
+        SC_TRY(res);
+    }
+    sinks = {};
+    return true;
 }
 
 SC::Result SC::AsyncPipeline::start()

@@ -291,6 +291,12 @@ struct AsyncPipeline
 {
     static constexpr int MaxListeners = 8;
 
+    AsyncPipeline()                                = default;
+    AsyncPipeline(const AsyncPipeline&)            = delete;
+    AsyncPipeline(AsyncPipeline&&)                 = delete;
+    AsyncPipeline& operator=(const AsyncPipeline&) = delete;
+    AsyncPipeline& operator=(AsyncPipeline&&)      = delete;
+    ~AsyncPipeline();
     Event<MaxListeners, Result> eventError; /// Reports errors by source, transforms or sinks
 
     /// @brief Inits the pipeline with a source and some writable sinks
@@ -299,6 +305,9 @@ struct AsyncPipeline
     /// @brief Inits the pipeline with a source, transforms and some writable sinks
     Result pipe(AsyncReadableStream& asyncSource, Span<AsyncTransformStream*> asyncTransforms,
                 Span<AsyncWritableStream*> asyncSinks);
+
+    /// @brief Unregisters all events from source, transforms ans sinks
+    [[nodiscard]] bool unpipe();
 
     /// @brief Starts the pipeline
     /// @note Both source and sinks must have been already setup by the caller
