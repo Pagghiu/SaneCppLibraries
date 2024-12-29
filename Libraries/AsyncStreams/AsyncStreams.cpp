@@ -508,21 +508,161 @@ SC::AsyncBuffersPool& SC::AsyncWritableStream::getBuffersPool() { return *buffer
 
 void SC::AsyncWritableStream::emitError(Result error) { eventError.emit(error); }
 //-------------------------------------------------------------------------------------------------------
-// AsyncTransformStream
+// AsyncDuplexStream
 //-------------------------------------------------------------------------------------------------------
 
-SC::AsyncTransformStream::AsyncTransformStream()
+SC::AsyncDuplexStream::AsyncDuplexStream()
 {
     asyncRead.bind([] { return Result(true); });
 }
 
-SC::Result SC::AsyncTransformStream::init(AsyncBuffersPool&                  buffersPool,
-                                          Span<AsyncReadableStream::Request> readableRequests,
-                                          Span<AsyncWritableStream::Request> writableRequests)
+SC::Result SC::AsyncDuplexStream::init(AsyncBuffersPool&                  buffersPool,
+                                       Span<AsyncReadableStream::Request> readableRequests,
+                                       Span<AsyncWritableStream::Request> writableRequests)
 {
     SC_TRY(AsyncReadableStream::init(buffersPool, readableRequests));
     SC_TRY(AsyncWritableStream::init(buffersPool, writableRequests));
     return Result(true);
+}
+
+//-------------------------------------------------------------------------------------------------------
+// AsyncTransformStream
+//-------------------------------------------------------------------------------------------------------
+SC::AsyncTransformStream::AsyncTransformStream()
+{
+    using Self = AsyncTransformStream;
+    AsyncWritableStream::asyncWrite.bind<Self, &Self::transform>(*this);
+    AsyncWritableStream::canEndWritable.bind<Self, &Self::canEndTransform>(*this);
+}
+
+SC::Result SC::AsyncTransformStream::transform(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb)
+{
+    switch (state)
+    {
+    case State::None: {
+        SC_TRY(AsyncReadableStream::getBuffersPool().getData(bufferID, inputData));
+        return prepare(bufferID, cb);
+    }
+    case State::Paused: {
+        SC_TRY_MSG(bufferID == inputBufferID, "Logical Error")
+        return prepare(bufferID, cb);
+    }
+    case State::Finalized: {
+        return Result::Error("Transform cannot be called during Finalized State");
+    }
+    case State::Processing: {
+        return Result::Error("Transform cannot be called during Processing State");
+    }
+    case State::Finalizing: {
+        return Result::Error("Transform cannot be called during Finalizing State");
+    }
+    }
+    return Result(true);
+}
+
+SC::Result SC::AsyncTransformStream::prepare(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb)
+{
+    inputCallback = move(cb);
+    inputBufferID = bufferID;
+    if (getBufferOrPause(0, outputBufferID, outputData))
+    {
+        state = State::Processing;
+        return onProcess(inputData, outputData);
+    }
+    else
+    {
+        state = State::Paused;
+        SC_TRY(AsyncWritableStream::unshift(inputBufferID, move(inputCallback)));
+        AsyncWritableStream::stop();
+        return Result(true);
+    }
+}
+
+void SC::AsyncTransformStream::afterProcess(Span<const char> inputAfter, Span<char> outputAfter)
+{
+    const size_t consumedOutput = outputData.sizeInBytes() - outputAfter.sizeInBytes();
+    if (consumedOutput > 0)
+    {
+        AsyncReadableStream::push(outputBufferID, consumedOutput);
+    }
+    AsyncReadableStream::getBuffersPool().unrefBuffer(outputBufferID);
+    if (inputAfter.empty())
+    {
+        auto cb        = move(inputCallback);
+        auto bufferID  = inputBufferID;
+        inputCallback  = {};
+        inputBufferID  = {};
+        inputData      = {};
+        outputBufferID = {};
+        outputData     = {};
+        state          = State::None;
+        AsyncWritableStream::finishedWriting(bufferID, move(cb), Result(true));
+    }
+    else
+    {
+        inputData = inputAfter;
+
+        state = State::Paused;
+        tryAsync(transform(inputBufferID, inputCallback));
+    }
+}
+
+void SC::AsyncTransformStream::afterFinalize(Span<char> outputAfter, bool streamEnded)
+{
+    const size_t consumedOutput = outputData.sizeInBytes() - outputAfter.sizeInBytes();
+    if (consumedOutput > 0)
+    {
+        AsyncReadableStream::push(outputBufferID, consumedOutput);
+    }
+    AsyncReadableStream::getBuffersPool().unrefBuffer(outputBufferID);
+    if (streamEnded)
+    {
+        AsyncReadableStream::pushEnd();
+        state = State::Finalized; // --> Transition to ENDED (all data written)
+    }
+    else
+    {
+        state = State::Paused;
+        tryFinalize();
+    }
+}
+
+void SC::AsyncTransformStream::tryFinalize()
+{
+    if (getBufferOrPause(0, outputBufferID, outputData))
+    {
+        state      = State::Finalizing; // Retry later when we can get some memory
+        Result res = onFinalize(outputData);
+        if (not res)
+        {
+            AsyncWritableStream::emitError(Result::Error("AsyncTransformStream::onFinalize error"));
+            state = State::None; // --> Transition to ENDED (unrecoverable error)
+        }
+    }
+    else
+    {
+        state = State::Paused; // Retry later when we can get some memory
+    }
+}
+
+bool SC::AsyncTransformStream::canEndTransform()
+{
+    switch (state)
+    {
+    case State::None:
+    case State::Paused: {
+        tryFinalize();
+        return state == State::Finalized;
+    }
+    case State::Finalized: {
+        return true;
+    }
+    case State::Finalizing:
+    case State::Processing: {
+        return false; // Still processing stuff
+    }
+    }
+    Assert::unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -534,7 +674,7 @@ SC::Result SC::AsyncPipeline::pipe(AsyncReadableStream& asyncSource, Span<AsyncW
 }
 SC::AsyncPipeline::~AsyncPipeline() { SC_ASSERT_DEBUG(unpipe()); }
 
-SC::Result SC::AsyncPipeline::pipe(AsyncReadableStream& asyncSource, Span<AsyncTransformStream*> asyncTransforms,
+SC::Result SC::AsyncPipeline::pipe(AsyncReadableStream& asyncSource, Span<AsyncDuplexStream*> asyncTransforms,
                                    Span<AsyncWritableStream*> asyncSinks)
 {
     source     = &asyncSource;
@@ -591,7 +731,7 @@ bool SC::AsyncPipeline::unpipe()
 
     // Deregister all transforms events
     size_t transformIndex = 0;
-    for (AsyncTransformStream* transform : transforms)
+    for (AsyncDuplexStream* transform : transforms)
     {
         if (transformIndex + 1 == transforms.sizeInElements())
         {
@@ -602,8 +742,8 @@ bool SC::AsyncPipeline::unpipe()
         }
         else
         {
-            AsyncTransformStream& nextTransform = *transforms[transformIndex + 1];
-            AsyncWritableStream&  nextWritable  = nextTransform;
+            AsyncDuplexStream&   nextTransform = *transforms[transformIndex + 1];
+            AsyncWritableStream& nextWritable  = nextTransform;
 
             res = listenToEventData(*transform, nextTransform, false);
             SC_TRY(res);
@@ -652,7 +792,7 @@ SC::Result SC::AsyncPipeline::checkBuffersPool()
             return Result::Error("AsyncPipeline::start - all streams must use the same AsyncBuffersPool");
         }
     }
-    for (AsyncTransformStream* transform : transforms)
+    for (AsyncDuplexStream* transform : transforms)
     {
         if (transform == nullptr)
         {
@@ -667,9 +807,9 @@ SC::Result SC::AsyncPipeline::checkBuffersPool()
     return Result(true);
 }
 
-bool SC::AsyncPipeline::listenToEventData(AsyncReadableStream& readable, AsyncTransformStream& transform, bool listen)
+bool SC::AsyncPipeline::listenToEventData(AsyncReadableStream& readable, AsyncDuplexStream& transform, bool listen)
 {
-    AsyncTransformStream* pTransform = &transform;
+    AsyncDuplexStream* pTransform = &transform;
 
     auto lambda = [this, pTransform](AsyncBufferView::ID bufferID)
     {
@@ -688,7 +828,7 @@ bool SC::AsyncPipeline::listenToEventData(AsyncReadableStream& readable, AsyncTr
 
 SC::Result SC::AsyncPipeline::chainTransforms(AsyncReadableStream*& readable)
 {
-    for (AsyncTransformStream* transform : transforms)
+    for (AsyncDuplexStream* transform : transforms)
     {
         bool res;
         res = listenToEventData(*readable, *transform, true);
@@ -729,7 +869,7 @@ void SC::AsyncPipeline::afterWrite(AsyncBufferView::ID bufferID)
     // Try resume in reverse
     for (size_t idx = 0; idx < transforms.sizeInElements(); ++idx)
     {
-        AsyncTransformStream* transform = transforms[transforms.sizeInElements() - 1 - idx];
+        AsyncDuplexStream* transform = transforms[transforms.sizeInElements() - 1 - idx];
         transform->resumeWriting();
         transform->resumeReading();
     }

@@ -272,12 +272,50 @@ struct AsyncWritableStream
     CircularQueue<Request> writeQueue;
 };
 
-struct AsyncTransformStream : public AsyncReadableStream, public AsyncWritableStream
+/// @brief A stream that can both produce and consume buffers
+struct AsyncDuplexStream : public AsyncReadableStream, public AsyncWritableStream
 {
-    AsyncTransformStream();
+    AsyncDuplexStream();
 
     Result init(AsyncBuffersPool& buffersPool, Span<AsyncReadableStream::Request> readableRequests,
                 Span<AsyncWritableStream::Request> writableRequests);
+};
+
+/// @brief A duplex stream that produces new buffers transforming received buffers
+struct AsyncTransformStream : public AsyncDuplexStream
+{
+    AsyncTransformStream();
+
+    void afterProcess(Span<const char> inputAfter, Span<char> outputAfter);
+    void afterFinalize(Span<char> outputAfter, bool streamEnded);
+
+    Function<Result(Span<const char>, Span<char>)> onProcess;
+    Function<Result(Span<char>)>                   onFinalize;
+
+  private:
+    Function<void(AsyncBufferView::ID)> inputCallback;
+
+    Span<const char> inputData;
+    Span<char>       outputData;
+
+    AsyncBufferView::ID inputBufferID;
+    AsyncBufferView::ID outputBufferID;
+
+    Result transform(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb);
+    Result prepare(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb);
+
+    bool canEndTransform();
+    void tryFinalize();
+
+    enum class State
+    {
+        None,
+        Paused,
+        Processing,
+        Finalizing,
+        Finalized,
+    };
+    State state = State::None;
 };
 
 /// @brief Pipes reads on SC::AsyncReadableStream to SC::AsyncWritableStream.
@@ -303,7 +341,7 @@ struct AsyncPipeline
     Result pipe(AsyncReadableStream& asyncSource, Span<AsyncWritableStream*> asyncSinks);
 
     /// @brief Inits the pipeline with a source, transforms and some writable sinks
-    Result pipe(AsyncReadableStream& asyncSource, Span<AsyncTransformStream*> asyncTransforms,
+    Result pipe(AsyncReadableStream& asyncSource, Span<AsyncDuplexStream*> asyncTransforms,
                 Span<AsyncWritableStream*> asyncSinks);
 
     /// @brief Unregisters all events from source, transforms ans sinks
@@ -319,7 +357,7 @@ struct AsyncPipeline
 
     Span<AsyncWritableStream*> sinks; /// User specified sinks
 
-    Span<AsyncTransformStream*> transforms;
+    Span<AsyncDuplexStream*> transforms;
 
     void   emitError(Result res);
     Result checkBuffersPool();
@@ -329,7 +367,7 @@ struct AsyncPipeline
     void dispatchToPipes(AsyncBufferView::ID bufferID);
     void endPipes();
     void afterWrite(AsyncBufferView::ID bufferID);
-    bool listenToEventData(AsyncReadableStream& readable, AsyncTransformStream& transform, bool listen);
+    bool listenToEventData(AsyncReadableStream& readable, AsyncDuplexStream& transform, bool listen);
 };
 } // namespace SC
 //! @}

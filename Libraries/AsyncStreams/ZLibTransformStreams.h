@@ -5,7 +5,7 @@
 #include "Internal/ZLibStream.h"
 namespace SC
 {
-struct SyncZLibTransformStream : public AsyncTransformStream
+struct SyncZLibTransformStream : public AsyncDuplexStream
 {
     SyncZLibTransformStream();
     ZLibStream stream;
@@ -15,6 +15,12 @@ struct SyncZLibTransformStream : public AsyncTransformStream
 
     Result transform(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb);
     bool   canEndTransform();
+};
+
+struct AsyncZLibTransformStream : public AsyncTransformStream
+{
+    ZLibStream stream;
+    AsyncZLibTransformStream();
 };
 
 } // namespace SC

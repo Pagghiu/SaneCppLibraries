@@ -18,6 +18,8 @@ This is the list of implemented objects stream types
 |-------------------------------------------------------|---------------------------------------|
 | [AsyncReadableStream](@ref SC::AsyncReadableStream)   | @copybrief SC::AsyncReadableStream    | 
 | [AsyncWritableStream](@ref SC::AsyncWritableStream)   | @copybrief SC::AsyncWritableStream    |
+| [AsyncDuplexStream](@ref SC::AsyncDuplexStream)       | @copybrief SC::AsyncDuplexStream      |
+| [AsyncTransformStream](@ref SC::AsyncTransformStream) | @copybrief SC::AsyncTransformStream   |
 | [AsyncPipeline](@ref SC::AsyncPipeline)               | @copybrief SC::AsyncPipeline          |
 | [ReadableFileStream](@ref SC::ReadableFileStream)     | @copybrief SC::ReadableFileStream     |
 | [WritableFileStream](@ref SC::WritableFileStream)     | @copybrief SC::WritableFileStream     |

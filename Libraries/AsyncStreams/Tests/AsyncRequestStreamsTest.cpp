@@ -285,30 +285,30 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     SC_TEST_EXPECT(writeFileStream.init(buffersPool2, writeFileRequests, eventLoop, writeFd));
 
     // Create first transform stream (compression)
-    SyncZLibTransformStream      compressStream;
+    AsyncZLibTransformStream     compressStream;
     AsyncWritableStream::Request compressWriteRequests[numberOfBuffers1 + 1];
     AsyncReadableStream::Request compressReadRequests[numberOfBuffers1 + 1];
     SC_TEST_EXPECT(compressStream.init(buffersPool1, compressReadRequests, compressWriteRequests));
     SC_TEST_EXPECT(compressStream.stream.init(ZLibStream::CompressZLib));
 
     // Create first Async Pipeline (file to socket)
-    AsyncTransformStream* transforms1[1] = {&compressStream};
-    AsyncWritableStream*  sinks1[1]      = {&writeSocketStream};
-    AsyncPipeline         pipeline0;
+    AsyncDuplexStream*   transforms1[1] = {&compressStream};
+    AsyncWritableStream* sinks1[1]      = {&writeSocketStream};
+    AsyncPipeline        pipeline0;
     (void)pipeline0.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
     SC_TEST_EXPECT(pipeline0.pipe(readFileStream, transforms1, {sinks1}));
 
     // Create second transform stream (decompression)
-    SyncZLibTransformStream      decompressStream;
+    AsyncZLibTransformStream     decompressStream;
     AsyncWritableStream::Request decompressWriteRequests[numberOfBuffers2 + 1];
     AsyncReadableStream::Request decompressReadRequests[numberOfBuffers2 + 1];
     SC_TEST_EXPECT(decompressStream.init(buffersPool2, decompressReadRequests, decompressWriteRequests));
     SC_TEST_EXPECT(decompressStream.stream.init(ZLibStream::DecompressZLib));
 
     // Create second Async Pipeline (socket to file)
-    AsyncTransformStream* transforms2[1] = {&decompressStream};
-    AsyncWritableStream*  sinks2[1]      = {&writeFileStream};
-    AsyncPipeline         pipeline1;
+    AsyncDuplexStream*   transforms2[1] = {&decompressStream};
+    AsyncWritableStream* sinks2[1]      = {&writeFileStream};
+    AsyncPipeline        pipeline1;
     (void)pipeline1.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
     SC_TEST_EXPECT(pipeline1.pipe(readSocketStream, transforms2, {sinks2}));
 
