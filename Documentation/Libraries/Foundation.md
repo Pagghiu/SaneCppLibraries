@@ -14,6 +14,8 @@ Detailed documentation is in the @ref group_foundation topic.
 | Class                     | Description
 |:--------------------------|:--------------------------------|
 | SC::Span                  | @copybrief SC::Span
+| SC::SpanString            | @copybrief SC::SpanString
+| SC::SpanStringView        | @copybrief SC::SpanStringView
 | SC::Result                | @copybrief SC::Result
 | SC::Function              | @copybrief SC::Function
 | SC::Deferred              | @copybrief SC::Deferred

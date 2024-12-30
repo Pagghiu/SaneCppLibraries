@@ -93,7 +93,7 @@ void SC::ZLibStreamTest::syncCompression(ZLibStream::Algorithm compressionAlgori
     {
         output[9] = static_cast<char>(compressedReference[9]); // Operating System ID will differ on different OS.
     }
-    SC_TEST_EXPECT(compressedReference.equals(output));
+    SC_TEST_EXPECT(compressedReference.memcmpWith(output));
 }
 
 void SC::ZLibStreamTest::syncDecompression(ZLibStream::Algorithm algorithm, const StringView referenceString,

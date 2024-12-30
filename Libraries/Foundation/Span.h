@@ -9,6 +9,9 @@ namespace SC
 {
 template <typename Type>
 struct Span;
+
+struct SpanStringView;
+struct SpanString;
 } // namespace SC
 
 //! @addtogroup group_foundation_utility
@@ -208,8 +211,9 @@ struct SC::Span
         return nullptr;
     }
 
+    /// @brief Compares this span with another one byte by byte
     template <typename U>
-    [[nodiscard]] bool equals(const Span<U> other) const
+    [[nodiscard]] bool memcmpWith(const Span<U> other) const
     {
         if (sizeInBytes() != other.sizeInBytes())
             return false;
@@ -218,9 +222,65 @@ struct SC::Span
         return ::memcmp(items, other.data(), sizeInBytes()) == 0;
     }
 
+    /// @brief Bitwise copies contents of this Span over another (non-overlapping)
+    template <typename U>
+    [[nodiscard]] bool memcpyTo(Span<U>& other) const
+    {
+        if (other.sizeInBytes() < sizeInBytes())
+            return false;
+        ::memcpy(other.data(), items, sizeInBytes());
+        other = {other.data(), sizeInBytes() / sizeof(U)};
+        return true;
+    }
+
   private:
     Type*    items;
     SizeType sizeElements;
 };
 
+#if SC_PLATFORM_WINDOWS
+#define SC_NATIVE_STR(str) L##str
+#else
+#define SC_NATIVE_STR(str) str
+#endif
+
+/// @brief An read-only view over an ASCII string (to avoid including @ref group_strings library)
+struct SC::SpanStringView
+{
+    constexpr SpanStringView() = default;
+    constexpr SpanStringView(const char* string, size_t stringLength) : text(string, stringLength) {}
+    template <size_t N>
+    constexpr SpanStringView(const char (&charLiteral)[N]) : text(charLiteral)
+    {}
+
+    /// @brief Writes current string view over a sized char array buffer, adding a null terminator
+    template <int N>
+    [[nodiscard]] bool writeNullTerminated(char (&buffer)[N]) const
+    {
+        if (N < text.sizeInElements() + 1)
+            return false;
+        ::memcpy(&buffer[0], text.data(), text.sizeInElements());
+        buffer[N - 1] = 0;
+        return true;
+    }
+
+    Span<const char> text;
+};
+
+/// @brief An writable view over an ASCII string (to avoid including @ref group_strings library)
+struct SC::SpanString
+{
+    template <size_t N>
+    constexpr SpanString(char (&buffer)[N]) : text(buffer)
+    {}
+
+    operator SpanStringView() const
+    {
+        SpanStringView sv;
+        sv.text = text;
+        return sv;
+    }
+
+    SC::Span<char> text;
+};
 //! @}

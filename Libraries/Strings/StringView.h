@@ -114,6 +114,13 @@ struct SC::StringView
     /// @return Span representing this StringView
     constexpr Span<const char> toCharSpan() const SC_LANGUAGE_LIFETIME_BOUND { return {text, textSizeInBytes}; }
 
+    constexpr operator SpanStringView() const SC_LANGUAGE_LIFETIME_BOUND
+    {
+        if (getEncoding() == StringEncoding::Ascii)
+            return {text, textSizeInBytes};
+        return {};
+    }
+
     /// @brief Obtain a `const uint8_t` Span from this StringView
     /// @return Span representing this StringView
     Span<const uint8_t> toBytesSpan() const SC_LANGUAGE_LIFETIME_BOUND
@@ -694,12 +701,6 @@ constexpr SC::StringView operator""_u16(const char* txt, size_t sz)
     return SC::StringView({txt, isNullTerminated ? sz - 1 : sz}, isNullTerminated, SC::StringEncoding::Utf16);
 }
 } // namespace SC
-
-#if SC_PLATFORM_WINDOWS
-#define SC_NATIVE_STR(str) L##str
-#else
-#define SC_NATIVE_STR(str) str
-#endif
 
 constexpr SC::StringView::StringView()
     : text(nullptr), textSizeInBytes(0), encoding(static_cast<SizeType>(StringEncoding::Ascii)), hasNullTerm(false)
