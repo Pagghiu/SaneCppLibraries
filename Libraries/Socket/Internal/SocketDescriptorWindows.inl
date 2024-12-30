@@ -9,6 +9,7 @@ using socklen_t = int;
 #include <Windows.h>
 #pragma comment(lib, "Ws2_32.lib")
 
+#include "../../Foundation/Assert.h"
 #include "../../Threading/Atomic.h"
 #include "../SocketDescriptor.h"
 

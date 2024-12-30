@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../SocketDescriptor.h"
+#include "../Socket.h"
 
 SC::Result SC::SocketServer::close() { return socket.close(); }
 

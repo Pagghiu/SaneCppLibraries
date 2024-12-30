@@ -1,12 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../SocketDescriptor.h"
+#include "../Socket.h"
 
 #if SC_PLATFORM_EMSCRIPTEN
 #include <sys/select.h> // fd_set for emscripten
 #endif
 
-SC::Result SC::SocketClient::connect(StringView address, uint16_t port)
+SC::Result SC::SocketClient::connect(SpanStringView address, uint16_t port)
 {
     SocketIPAddress nativeAddress;
     SC_TRY(nativeAddress.fromAddressPort(address, port));

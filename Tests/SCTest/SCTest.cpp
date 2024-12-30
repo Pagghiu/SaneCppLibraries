@@ -61,7 +61,7 @@ void runSerializationJsonTest(TestReport& report);
 void runSerializationJsonTokenizerTest(TestReport& report);
 
 // Socket
-void runSocketDescriptorTest(TestReport& report);
+void runSocketTest(TestReport& report);
 
 // Strings
 void runConsoleTest(TestReport& report);
@@ -97,7 +97,7 @@ void runCBindingsTest(TestReport& report);
 #include "../../Libraries/Containers/SmallVector.h"
 #include "../../Libraries/FileSystem/FileSystemDirectories.h"
 #include "../../Libraries/FileSystem/Path.h"
-#include "../../Libraries/Socket/SocketDescriptor.h"
+#include "../../Libraries/Socket/Socket.h"
 #include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Testing/Testing.h"
 
@@ -184,7 +184,7 @@ int main(int argc, const char* argv[])
     runSerializationJsonTest(report);
 
     // Socket tests
-    runSocketDescriptorTest(report);
+    runSocketTest(report);
 
     // Strings tests
     runConsoleTest(report);

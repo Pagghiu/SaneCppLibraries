@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../HttpClient.h"
-#include "../../Socket/SocketDescriptor.h"
+#include "../../Socket/Socket.h"
 #include "../../Testing/Testing.h"
 
 namespace SC

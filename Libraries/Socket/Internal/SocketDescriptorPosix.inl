@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../File/FileDescriptor.h"
+#include "../../File/FileDescriptor.h" // TODO: Remove dependency of File library
+#include "../../Foundation/Assert.h"
 #include "../../Foundation/Deferred.h"
 #include "../SocketDescriptor.h"
 

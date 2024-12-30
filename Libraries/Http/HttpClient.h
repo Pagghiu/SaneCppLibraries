@@ -3,6 +3,7 @@
 #pragma once
 #include "../Async/Async.h"
 #include "../Containers/SmallVector.h"
+#include "../Socket/Socket.h"
 #include "../Strings/String.h"
 namespace SC
 {

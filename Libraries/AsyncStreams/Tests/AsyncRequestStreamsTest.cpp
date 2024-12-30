@@ -8,6 +8,7 @@
 #include "../../FileSystem/FileSystem.h"
 #include "../../FileSystem/Path.h"
 #include "../../Foundation/HeapBuffer.h"
+#include "../../Socket/Socket.h"
 #include "../../Testing/Testing.h"
 
 namespace SC

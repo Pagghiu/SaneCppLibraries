@@ -3,6 +3,7 @@
 #include "HttpServer.h"
 #include "../Async/Async.h"
 #include "../Containers/ArenaMap.h"
+#include "../Socket/Socket.h"
 #include "../Strings/SmallString.h"
 #include "../Strings/StringBuilder.h"
 

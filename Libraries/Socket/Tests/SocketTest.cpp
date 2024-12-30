@@ -1,27 +1,26 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../SocketDescriptor.h"
-#include "../../Strings/SmallString.h"
+#include "../Socket.h"
 #include "../../Testing/Testing.h"
 #include "../../Threading/Threading.h"
 
 namespace SC
 {
-struct SocketDescriptorTest;
+struct SocketTest;
 }
 
-struct SC::SocketDescriptorTest : public SC::TestCase
+struct SC::SocketTest : public SC::TestCase
 {
     inline void parseAddress();
     inline void resolveDNS();
-    inline void socketDescriptor();
+    inline void socketCreate();
     inline void socketClientServer(SocketFlags::SocketType socketType, SocketFlags::ProtocolType protocol);
 
     inline Result socketServerSnippet();
     inline Result socketClientAcceptSnippet();
     inline Result socketClientConnectSnippet();
 
-    SocketDescriptorTest(SC::TestReport& report) : TestCase(report, "SocketDescriptorTest")
+    SocketTest(SC::TestReport& report) : TestCase(report, "SocketTest")
     {
         using namespace SC;
         if (test_section("parseAddress"))
@@ -32,9 +31,9 @@ struct SC::SocketDescriptorTest : public SC::TestCase
         {
             resolveDNS();
         }
-        if (test_section("socket"))
+        if (test_section("socket base"))
         {
-            socketDescriptor();
+            socketCreate();
         }
         if (test_section("tcp client server"))
         {
@@ -47,7 +46,7 @@ struct SC::SocketDescriptorTest : public SC::TestCase
     }
 };
 
-void SC::SocketDescriptorTest::parseAddress()
+void SC::SocketTest::parseAddress()
 {
     //! [socketIpAddressSnippet]
     SocketIPAddress address;
@@ -57,18 +56,19 @@ void SC::SocketDescriptorTest::parseAddress()
     //! [socketIpAddressSnippet]
 }
 
-void SC::SocketDescriptorTest::resolveDNS()
+void SC::SocketTest::resolveDNS()
 {
     //! [resolveDNSSnippet]
-    SmallString<256> ipAddress;
+    char       buffer[256] = {0};
+    SpanString ipAddress   = buffer;
     SC_TEST_EXPECT(SocketDNS::resolveDNS("localhost", ipAddress));
-    SC_TEST_EXPECT(ipAddress.view() == "127.0.0.1");
+    SC_TEST_EXPECT(StringView(ipAddress.text, true, StringEncoding::Ascii) == "127.0.0.1");
     //! [resolveDNSSnippet]
 }
 
-void SC::SocketDescriptorTest::socketDescriptor()
+void SC::SocketTest::socketCreate()
 {
-    //! [socketDescriptorSnippet]
+    //! [socketCreateSnippet]
     bool isInheritable;
 
     // We are testing only the inheritable because on windows there is no reliable
@@ -97,11 +97,10 @@ void SC::SocketDescriptorTest::socketDescriptor()
     SC_TEST_EXPECT(socket.isInheritable(isInheritable));
     SC_TEST_EXPECT(isInheritable);
     SC_TEST_EXPECT(socket.close());
-    //! [socketDescriptorSnippet]
+    //! [socketCreateSnippet]
 }
 
-void SC::SocketDescriptorTest::socketClientServer(SocketFlags::SocketType   socketType,
-                                                  SocketFlags::ProtocolType protocol)
+void SC::SocketTest::socketClientServer(SocketFlags::SocketType socketType, SocketFlags::ProtocolType protocol)
 {
     SocketDescriptor           serverSocket;
     SocketServer               server(serverSocket);
@@ -170,7 +169,7 @@ void SC::SocketDescriptorTest::socketClientServer(SocketFlags::SocketType   sock
     SC_TEST_EXPECT(params.connectRes and params.writeRes and params.closeRes);
 }
 
-SC::Result SC::SocketDescriptorTest::socketServerSnippet()
+SC::Result SC::SocketTest::socketServerSnippet()
 {
     //! [socketServerSnippet]
     SocketDescriptor serverSocket;
@@ -202,7 +201,7 @@ SC::Result SC::SocketDescriptorTest::socketServerSnippet()
     return Result(true);
 }
 
-SC::Result SC::SocketDescriptorTest::socketClientAcceptSnippet()
+SC::Result SC::SocketTest::socketClientAcceptSnippet()
 {
     SocketDescriptor serverSocket;
     SocketServer     server(serverSocket);
@@ -245,7 +244,7 @@ SC::Result SC::SocketDescriptorTest::socketClientAcceptSnippet()
     return Result(true);
 }
 
-SC::Result SC::SocketDescriptorTest::socketClientConnectSnippet()
+SC::Result SC::SocketTest::socketClientConnectSnippet()
 {
     SocketDescriptor serverSocket;
     SocketServer     server(serverSocket);
@@ -292,5 +291,5 @@ SC::Result SC::SocketDescriptorTest::socketClientConnectSnippet()
 
 namespace SC
 {
-void runSocketDescriptorTest(SC::TestReport& report) { SocketDescriptorTest test(report); }
+void runSocketTest(SC::TestReport& report) { SocketTest test(report); }
 } // namespace SC

@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../Foundation/Platform.h"
+#include "../Socket/Socket.h"
 
 #include <string.h> // strncpy
 

@@ -21,7 +21,7 @@
 #include "../../Libraries/Plugin/Plugin.cpp"
 #include "../../Libraries/Process/Process.cpp"
 #include "../../Libraries/SerializationText/SerializationJson.cpp"
-#include "../../Libraries/Socket/SocketDescriptor.cpp"
+#include "../../Libraries/Socket/Socket.cpp"
 #include "../../Libraries/Strings/Console.cpp"
 #include "../../Libraries/Strings/StringBuilder.cpp"
 #include "../../Libraries/Strings/StringConverter.cpp"

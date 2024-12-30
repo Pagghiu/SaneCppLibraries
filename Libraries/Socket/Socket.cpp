@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
-#include "SocketDescriptor.h"
+#include "Socket.h"
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/SocketDescriptorWindows.inl"

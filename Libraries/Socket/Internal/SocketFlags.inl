@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../SocketDescriptor.h"
+#include "../../Foundation/Assert.h"
+#include "../Socket.h"
 
 SC::SocketFlags::AddressFamily SC::SocketFlags::AddressFamilyFromInt(int value)
 {

@@ -5,6 +5,7 @@
 
 #include "Libraries/Async/Async.h"
 #include "Libraries/Foundation/Deferred.h"
+#include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/String.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Time/Time.h"
