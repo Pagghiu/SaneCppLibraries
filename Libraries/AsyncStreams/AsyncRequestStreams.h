@@ -13,10 +13,6 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
 {
     AsyncRequestReadableStream();
 
-    template <typename DescriptorType>
-    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
-                const DescriptorType& descriptor);
-
     /// @brief Registers or unregisters a listener to AsyncReadableStream::eventEnd to close descriptor
     Result registerAutoCloseDescriptor(bool value);
 
@@ -55,16 +51,33 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
     void onEndCloseDescriptor();
 };
 
-// clang-format off
 /// @brief Uses an SC::AsyncFileRead to stream data from a file
-struct ReadableFileStream : public AsyncRequestReadableStream<AsyncFileRead>{};
+struct ReadableFileStream : public AsyncRequestReadableStream<AsyncFileRead>
+{
+    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
+                const FileDescriptor& descriptor);
+};
+
 /// @brief Uses an SC::AsyncFileWrite to stream data to a file
-struct WritableFileStream : public AsyncRequestWritableStream<AsyncFileWrite>{};
+struct WritableFileStream : public AsyncRequestWritableStream<AsyncFileWrite>
+{
+    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
+                const FileDescriptor& descriptor);
+};
+
 /// @brief Uses an SC::AsyncFileWrite to stream data from a socket
-struct ReadableSocketStream : public AsyncRequestReadableStream<AsyncSocketReceive>{};
+struct ReadableSocketStream : public AsyncRequestReadableStream<AsyncSocketReceive>
+{
+    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
+                const SocketDescriptor& descriptor);
+};
+
 /// @brief Uses an SC::AsyncFileWrite to stream data to a socket
-struct WritableSocketStream : public AsyncRequestWritableStream<AsyncSocketSend>{};
-// clang-format on
+struct WritableSocketStream : public AsyncRequestWritableStream<AsyncSocketSend>
+{
+    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
+                const SocketDescriptor& descriptor);
+};
 
 } // namespace SC
 //! @}

@@ -1,18 +1,18 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../FileDescriptor.h"
+#include "../File.h"
 #include "../../FileSystem/FileSystem.h"
 #include "../../FileSystem/Path.h"
 #include "../../Testing/Testing.h"
 
 namespace SC
 {
-struct FileDescriptorTest;
+struct FileTest;
 }
 
-struct SC::FileDescriptorTest : public SC::TestCase
+struct SC::FileTest : public SC::TestCase
 {
-    FileDescriptorTest(SC::TestReport& report) : TestCase(report, "FileDescriptorTest")
+    FileTest(SC::TestReport& report) : TestCase(report, "FileTest")
     {
         using namespace SC;
         if (test_section("open"))
@@ -23,7 +23,7 @@ struct SC::FileDescriptorTest : public SC::TestCase
     inline void testOpen();
 };
 
-void SC::FileDescriptorTest::testOpen()
+void SC::FileTest::testOpen()
 {
     //! [FileSnippet]
     StringNative<255> filePath = StringEncoding::Native;
@@ -31,7 +31,7 @@ void SC::FileDescriptorTest::testOpen()
     // Setup the test
     FileSystem fs;
 
-    const StringView name     = "FileDescriptorTest";
+    const StringView name     = "FileTest";
     const StringView fileName = "test.txt";
     SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory, name}));
     SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
@@ -41,12 +41,12 @@ void SC::FileDescriptorTest::testOpen()
 
     // Open a file, write and close it
     FileDescriptor fd;
-    SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate));
+    SC_TEST_EXPECT(File(fd).open(filePath.view(), File::WriteCreateTruncate));
     SC_TEST_EXPECT(fd.write(StringView("test").toCharSpan()));
     SC_TEST_EXPECT(fd.close());
 
     // Re-open the file for read
-    SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::ReadOnly));
+    SC_TEST_EXPECT(File(fd).open(filePath.view(), File::ReadOnly));
 
     // Read some data from the file
     char       buffer[4] = {0};
@@ -67,5 +67,5 @@ void SC::FileDescriptorTest::testOpen()
 
 namespace SC
 {
-void runFileDescriptorTest(SC::TestReport& report) { FileDescriptorTest test(report); }
+void runFileTest(SC::TestReport& report) { FileTest test(report); }
 } // namespace SC

@@ -4,22 +4,19 @@
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
 #include "../Foundation/UniqueHandle.h"
-#include "../Strings/StringView.h"
+
 //! @defgroup group_file File
 //! @copybrief library_file (see @ref library_file for more details)
 
 namespace SC
 {
-struct String;
-template <typename T>
-struct Vector;
-
 struct SC_COMPILER_EXPORT FileDescriptor;
 struct SC_COMPILER_EXPORT PipeDescriptor;
 namespace detail
 {
 struct SC_COMPILER_EXPORT FileDescriptorDefinition;
 }
+struct SC_COMPILER_EXPORT File;
 } // namespace SC
 
 #if SC_PLATFORM_WINDOWS
@@ -50,40 +47,14 @@ struct SC::detail::FileDescriptorDefinition
 //! @addtogroup group_file
 //! @{
 
-/// @brief Wraps an OS File descriptor to read and write to and from it.
-/// Example usage:
-/// \snippet Libraries/File/Tests/FileDescriptorTest.cpp FileSnippet
+/// @brief File Descriptor (use SC::File to open and use it with strings and containers).
 struct SC::FileDescriptor : public SC::UniqueHandle<SC::detail::FileDescriptorDefinition>
 {
     using UniqueHandle::UniqueHandle;
-    /// @brief Define mode for opening the file (read, write etc.)
-    enum OpenMode
-    {
-        ReadOnly,            ///< Opens in read-only mode
-        WriteCreateTruncate, ///< Opens in write mode, creating or truncating it if another file exists at same location
-        WriteAppend,         ///< Opens write mode, appending to existing file that must exist at the same location.
-        ReadAndWrite         ///< Opens file for read / write mode
-    };
 
-    /// @brief Additional flags to be set when opening files
-    struct OpenOptions
-    {
-        bool inheritable = false; ///< Set to true to make the file visible to child processes
-        bool blocking    = true;  ///< Set to false if file will be used for Async I/O (see @ref library_async)
-    };
-
-    /// @brief Opens file at `path` with a given `mode`
-    /// @param path The path to file
-    /// @param mode The mode used to open file (read-only, write-append etc.)
-    /// @return Valid Result if file is opened successfully
-    [[nodiscard]] Result open(StringView path, OpenMode mode);
-
-    /// @brief Opens file at `path` with a given `mode`
-    /// @param path The path to file
-    /// @param mode The mode used to open file
-    /// @param options Options that can be applied when opening the file (inheritable, blocking etc.)
-    /// @return Valid Result if file is opened successfully
-    [[nodiscard]] Result open(StringView path, OpenMode mode, OpenOptions options);
+    /// @brief Opens a file descriptor handle for writing to /dev/null or equivalent on current OS.
+    /// @return `true` if file has been opened successfully
+    [[nodiscard]] Result openForWriteToDevNull();
 
     /// @brief Set blocking mode (read / write waiting for I/O). Can be set also during open with OpenOptions.
     /// @param blocking `true` to set file to blocking mode
@@ -172,32 +143,12 @@ struct SC::FileDescriptor : public SC::UniqueHandle<SC::detail::FileDescriptorDe
     /// @return Valid result if seek succeeds
     [[nodiscard]] Result sizeInBytes(size_t& sizeInBytes) const;
 
-    /// @brief Reads into a given dynamic buffer until End of File (EOF) is signaled.
-    ///         Works also for non-seekable file descriptors (stdout / in / err).
-    /// @param destination A destination buffer to write to (it will be resized as needed)
-    /// @return Valid result if read succeeded until EOF
-    [[nodiscard]] Result readUntilEOF(Vector<char>& destination);
-
-    /// @brief Reads into a given dynamic buffer until End of File (EOF) is signaled.
-    ///         Works also for non-seekable file descriptors (stdout / in / err).
-    /// @param destination A destination buffer to write to (it will be resized as needed)
-    /// @return Valid result if read succeeded until EOF
-    [[nodiscard]] Result readUntilEOF(Vector<uint8_t>& destination);
-
-    /// @brief Reads into a given string until End of File (EOF) is signaled
-    ///         Works also for non-seekable file descriptors (stdout / in / err).
-    /// @param destination A destination string to write to (it will be sized as needed)
-    /// @return Valid result if read succeeded until EOF
-    [[nodiscard]] Result readUntilEOF(String& destination);
-
   private:
+    friend struct File;
     struct Internal;
-    struct ReadResult;
-    template <typename T>
-    Result readUntilEOFTemplate(Vector<T>& destination);
 };
 
-/// @brief Descriptor representing a Pipe used for InterProcess Communication (IPC)
+/// @brief Read / Write pipe (Process stdin/stdout and IPC communication)
 struct SC::PipeDescriptor
 {
     /// @brief Specifies a flag for read side of the pipe

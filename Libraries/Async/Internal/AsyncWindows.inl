@@ -535,11 +535,10 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 // In the sync case (threadpool) we try a regular sync call to support files opened with async == false.
                 if (not synchronous or func(fileDescriptor, async.buffer.data(), bufSize, &numBytes, nullptr) == FALSE)
                 {
-                    // File must have FileDescriptor::OpenOptions::async == true +
+                    // File must have File::OpenOptions::async == true +
                     // associateExternallyCreatedFileDescriptor
-                    return Result::Error(
-                        "ReadFile/WriteFile failed (forgot setting FileDescriptor::OpenOptions::async = true or "
-                        "AsyncEventLoop::associateExternallyCreatedFileDescriptor?)");
+                    return Result::Error("ReadFile/WriteFile failed (forgot setting File::OpenOptions::async = true or "
+                                         "AsyncEventLoop::associateExternallyCreatedFileDescriptor?)");
                 }
             }
         }

@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../Async.h"
+#include "../../File/File.h"
 #include "../../FileSystem/FileSystem.h"
 #include "../../FileSystem/Path.h"
 #include "../../Process/Process.h"
@@ -858,11 +859,12 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
 
     // 4. Open the destination file and associate it with the event loop
-    FileDescriptor::OpenOptions openOptions;
+    File::OpenOptions openOptions;
     openOptions.blocking = useThreadPool;
 
     FileDescriptor fd;
-    SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, openOptions));
+    File           file(fd);
+    SC_TEST_EXPECT(file.open(filePath.view(), File::WriteCreateTruncate, openOptions));
     if (not useThreadPool)
     {
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
@@ -895,7 +897,7 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     SC_TEST_EXPECT(fd.close());
 
     // 7. Open the file for read now
-    SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::ReadOnly, openOptions));
+    SC_TEST_EXPECT(file.open(filePath.view(), File::ReadOnly, openOptions));
     if (not useThreadPool)
     {
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
@@ -986,12 +988,12 @@ void SC::AsyncTest::fileEndOfFile(bool useThreadPool)
         SC_TEST_EXPECT(fs.write(fileName, {data, sizeof(data)}));
     }
 
-    FileDescriptor::OpenOptions openOptions;
+    File::OpenOptions openOptions;
     openOptions.blocking = useThreadPool;
 
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
     FileDescriptor         fd;
-    SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::ReadOnly, openOptions));
+    SC_TEST_EXPECT(File(fd).open(filePath.view(), File::ReadOnly, openOptions));
     if (not useThreadPool)
     {
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
@@ -1071,11 +1073,11 @@ void SC::AsyncTest::fileClose()
     SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
     SC_TEST_EXPECT(fs.write(filePath.view(), "test"));
 
-    FileDescriptor::OpenOptions openOptions;
+    File::OpenOptions openOptions;
     openOptions.blocking = false;
 
     FileDescriptor fd;
-    SC_TEST_EXPECT(fd.open(filePath.view(), FileDescriptor::WriteCreateTruncate, openOptions));
+    SC_TEST_EXPECT(File(fd).open(filePath.view(), File::WriteCreateTruncate, openOptions));
     SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
 
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
@@ -1089,7 +1091,7 @@ void SC::AsyncTest::fileClose()
     SC_TEST_EXPECT(fs.removeFile(fileName));
     SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory));
     SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
-    // fd.close() will fail as the file was already closed but it also throws a Win32 exception that will
+    // file.close() will fail as the file was already closed but it also throws a Win32 exception that will
     // stop the debugger by default. Opting for a .detach()
     // SC_TEST_EXPECT(not fd.close());
     fd.detach();
@@ -1370,9 +1372,9 @@ SC_TRY(threadPool.create(4));
 
 // Open the file
 FileDescriptor fd;
-FileDescriptor::OpenOptions options;
+File::OpenOptions options;
 options.blocking = true; // AsyncFileRead::Task enables using regular blocking file descriptors
-SC_TRY(fd.open("MyFile.txt", FileDescriptor::ReadOnly, options));
+SC_TRY(File(fd).open("MyFile.txt", File::ReadOnly, options));
 
 // Create the async file read request and async task
 AsyncFileRead asyncReadFile;
@@ -1437,10 +1439,10 @@ SC_TRY(threadPool.create(4));
 // ...
 
 // Open the file (for write)
-FileDescriptor::OpenOptions options;
+File::OpenOptions options;
 options.blocking = true; // AsyncFileWrite::Task enables using regular blocking file descriptors
 FileDescriptor fd;
-SC_TRY(fd.open("MyFile.txt", FileDescriptor::WriteCreateTruncate, options));
+SC_TRY(File(fd).open("MyFile.txt", File::WriteCreateTruncate, options));
 
 // Create the async file write request
 AsyncFileWrite asyncWriteFile;
@@ -1478,9 +1480,9 @@ SC::Result snippetForFileClose(AsyncEventLoop& eventLoop, Console& console)
 
 // Open a file and associated it with event loop
 FileDescriptor fd;
-FileDescriptor::OpenOptions options;
+File::OpenOptions options;
 options.blocking = false;
-SC_TRY(fd.open("MyFile.txt", FileDescriptor::WriteCreateTruncate, options));
+SC_TRY(File(fd).open("MyFile.txt", File::WriteCreateTruncate, options));
 SC_TRY(eventLoop.associateExternallyCreatedFileDescriptor(fd));
 
 // Create the file close request

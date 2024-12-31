@@ -143,7 +143,7 @@ struct SC::String
     friend struct SmallStringTest;
     friend struct StringBuilder;
     friend struct StringConverter;
-    friend struct FileDescriptor;
+    friend struct File;
     friend struct FileSystem;
     template <int>
     friend struct SmallString;

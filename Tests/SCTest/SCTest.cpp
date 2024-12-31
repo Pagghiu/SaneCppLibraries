@@ -22,7 +22,7 @@ void runOptionalTest(TestReport& report);
 void runTaggedUnionTest(TestReport& report);
 
 // File
-void runFileDescriptorTest(TestReport& report);
+void runFileTest(TestReport& report);
 
 // FileSystem
 void runFileSystemDirectoriesTest(TestReport& report);
@@ -145,7 +145,7 @@ int main(int argc, const char* argv[])
     runVectorSetTest(report);
 
     // File tests
-    runFileDescriptorTest(report);
+    runFileTest(report);
 
     // FileSystem tests
     runFileSystemTest(report);

@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Process.h"
+#include "../File/File.h"
 #include "../Strings/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
@@ -121,11 +122,7 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         case StdStream::Operation::AlreadySetup: break;
         case StdStream::Operation::Inherit: break;
         case StdStream::Operation::Ignore: {
-#if SC_PLATFORM_WINDOWS
-            SC_TRY(fileDescriptor.open("NUL", FileDescriptor::WriteAppend));
-#else
-            SC_TRY(fileDescriptor.open("/dev/null", FileDescriptor::WriteAppend));
-#endif
+            SC_TRY(fileDescriptor.openForWriteToDevNull());
             break;
         }
         case StdStream::Operation::FileDescriptor: {
@@ -199,12 +196,12 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         case StdStream::Operation::ExternalPipe: break;
         case StdStream::Operation::FileDescriptor: break;
         case StdStream::Operation::Vector: {
-            SC_TRY(pipe.readPipe.readUntilEOF(*outputObject.vector));
+            SC_TRY(File(pipe.readPipe).readUntilEOF(*outputObject.vector));
             return pipe.close();
         }
         break;
         case StdStream::Operation::String: {
-            SC_TRY(pipe.readPipe.readUntilEOF(*outputObject.string));
+            SC_TRY(File(pipe.readPipe).readUntilEOF(*outputObject.string));
             return pipe.close();
         }
         case StdStream::Operation::WritableSpan: {

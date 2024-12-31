@@ -6,13 +6,13 @@
 #include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Span.h"
 #include "../Threading/Atomic.h"
+#include "../Threading/ThreadPool.h"
 #include "../Time/Time.h"
 
 // Descriptors
 #include "../File/FileDescriptor.h"
 #include "../Process/ProcessDescriptor.h"
 #include "../Socket/SocketDescriptor.h"
-#include "../Threading/ThreadPool.h"
 
 //! @defgroup group_async Async
 //! @copybrief library_async (see @ref library_async for more details)
@@ -701,7 +701,7 @@ struct AsyncSocketClose : public AsyncRequest
 /// should instead avoid using the `Task` parameter for best performance.
 ///
 /// When not using the `Task` remember to:
-/// - Open the file descriptor for non-blocking IO (SC::FileDescriptor::OpenOptions::blocking == `false`)
+/// - Open the file descriptor for non-blocking IO (SC::File::OpenOptions::blocking == `false`)
 /// - Call SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor on the file descriptor
 ///
 /// Additional notes:
@@ -784,7 +784,7 @@ struct AsyncFileRead : public AsyncRequest
 /// should instead avoid using the `Task` parameter for best performance.
 ///
 /// When not using the `Task` remember to:
-/// - Open the file descriptor for non-blocking IO (SC::FileDescriptor::OpenOptions::blocking == `false`)
+/// - Open the file descriptor for non-blocking IO (SC::File::OpenOptions::blocking == `false`)
 /// - Call SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor on the file descriptor
 ///
 /// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncFileWriteSnippet

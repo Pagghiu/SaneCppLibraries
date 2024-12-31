@@ -117,7 +117,7 @@ struct SC::StringConverter
     template <int N>
     friend struct SmallString;
     friend struct StringBuilder;
-    friend struct FileDescriptor;
+    friend struct File;
 
     [[nodiscard]] bool        setTextLengthInBytesIncludingTerminator(size_t newDataSize);
     [[nodiscard]] static bool convertSameEncoding(StringView text, Vector<char>& buffer, StringView* encodedText,

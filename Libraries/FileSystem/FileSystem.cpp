@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "FileSystem.h"
-#include "../File/FileDescriptor.h"
+#include "../File/File.h"
 #include "../Strings/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
@@ -98,9 +98,9 @@ SC::Result SC::FileSystem::write(StringView path, Span<const char> data)
 {
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
-    FileDescriptor file;
-    SC_TRY(file.open(encodedPath, FileDescriptor::WriteCreateTruncate));
-    return file.write(data);
+    FileDescriptor fd;
+    SC_TRY(File(fd).open(encodedPath, File::WriteCreateTruncate));
+    return fd.write(data);
 }
 
 SC::Result SC::FileSystem::write(StringView path, Span<const uint8_t> data)
@@ -112,8 +112,9 @@ SC::Result SC::FileSystem::read(StringView path, Vector<char>& data)
 {
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
-    FileDescriptor file;
-    SC_TRY(file.open(encodedPath, FileDescriptor::ReadOnly));
+    FileDescriptor fd;
+    File           file(fd);
+    SC_TRY(file.open(encodedPath, File::ReadOnly));
     return file.readUntilEOF(data);
 }
 
@@ -121,8 +122,9 @@ SC::Result SC::FileSystem::read(StringView path, Vector<uint8_t>& data)
 {
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
-    FileDescriptor file;
-    SC_TRY(file.open(encodedPath, FileDescriptor::ReadOnly));
+    FileDescriptor fd;
+    File           file(fd);
+    SC_TRY(file.open(encodedPath, File::ReadOnly));
     return file.readUntilEOF(data);
 }
 
@@ -135,9 +137,9 @@ SC::Result SC::FileSystem::read(StringView path, Vector<uint8_t>& data)
 {
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
-    FileDescriptor file;
-    SC_TRY(file.open(encodedPath, FileDescriptor::WriteAppend));
-    return file.write(text.toCharSpan());
+    FileDescriptor fd;
+    SC_TRY(File(fd).open(encodedPath, File::WriteAppend));
+    return fd.write(text.toCharSpan());
 }
 
 [[nodiscard]] SC::Result SC::FileSystem::read(StringView path, String& text, StringEncoding encoding)
@@ -146,8 +148,9 @@ SC::Result SC::FileSystem::read(StringView path, Vector<uint8_t>& data)
     text.encoding = encoding;
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
-    FileDescriptor file;
-    SC_TRY(file.open(encodedPath, FileDescriptor::ReadOnly));
+    FileDescriptor fd;
+    File           file(fd);
+    SC_TRY(file.open(encodedPath, File::ReadOnly));
     return file.readUntilEOF(text);
 }
 

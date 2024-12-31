@@ -3,20 +3,30 @@
 #include "../../Containers/Vector.h"
 #include "../../Strings/SmallString.h"
 #include "../../Strings/StringConverter.h"
-#include "../FileDescriptor.h"
+#include "../File.h"
 
 #include <errno.h>    // errno
 #include <fcntl.h>    // fcntl
 #include <sys/stat.h> // fstat
 #include <unistd.h>   // close
 
-// TODO: Add check all posix calls here for EINTR
+//-------------------------------------------------------------------------------------------------------
+// FileDescriptorDefinition
+//-------------------------------------------------------------------------------------------------------
+SC::Result SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handle)
+{
+    if (::close(handle) != 0)
+    {
+        return Result::Error("FileDescriptorDefinition::releaseHandle - close failed");
+    }
+    return Result(true);
+}
+
+//-------------------------------------------------------------------------------------------------------
+// FileDescriptor
+//-------------------------------------------------------------------------------------------------------
 struct SC::FileDescriptor::Internal
 {
-    template <typename T>
-    [[nodiscard]] static Result readAppend(FileDescriptor::Handle fileDescriptor, Vector<T>& output,
-                                           Span<T> fallbackBuffer, ReadResult& result);
-
     static Result getFileFlags(int flagRead, const int fileDescriptor, int& outFlags)
     {
         do
@@ -29,6 +39,7 @@ struct SC::FileDescriptor::Internal
         }
         return Result(true);
     }
+
     static Result setFileFlags(int flagRead, int flagWrite, const int fileDescriptor, const bool setFlag,
                                const int flag)
     {
@@ -57,7 +68,6 @@ struct SC::FileDescriptor::Internal
         return Result(true);
     }
 
-  public:
     template <int flag>
     static Result hasFileDescriptorFlags(int fileDescriptor, bool& hasFlag)
     {
@@ -67,6 +77,7 @@ struct SC::FileDescriptor::Internal
         hasFlag = (flags & flag) != 0;
         return Result(true);
     }
+
     template <int flag>
     static Result hasFileStatusFlags(int fileDescriptor, bool& hasFlag)
     {
@@ -76,6 +87,7 @@ struct SC::FileDescriptor::Internal
         hasFlag = (flags & flag) != 0;
         return Result(true);
     }
+
     template <int flag>
     static Result setFileDescriptorFlags(int fileDescriptor, bool setFlag)
     {
@@ -93,18 +105,7 @@ struct SC::FileDescriptor::Internal
     }
 };
 
-// FileDescriptor
-
-SC::Result SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handle)
-{
-    if (::close(handle) != 0)
-    {
-        return Result::Error("FileDescriptorDefinition::releaseHandle - close failed");
-    }
-    return Result(true);
-}
-
-SC::Result SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOptions options)
+SC::Result SC::File::open(StringView path, OpenMode mode, OpenOptions options)
 {
     StringNative<1024> buffer = StringEncoding::Native;
     StringConverter    convert(buffer);
@@ -129,10 +130,10 @@ SC::Result SC::FileDescriptor::open(StringView path, OpenMode mode, OpenOptions 
     const int access         = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
     const int fileDescriptor = ::open(filePath.getNullTerminatedNative(), flags, access);
     SC_TRY_MSG(fileDescriptor != -1, "open failed");
-    SC_TRY(assign(fileDescriptor));
+    SC_TRY(fd.assign(fileDescriptor));
     if (not options.blocking)
     {
-        SC_TRY(setBlocking(false));
+        SC_TRY(fd.setBlocking(false));
     }
     return Result(true);
 }
@@ -152,57 +153,6 @@ SC::Result SC::FileDescriptor::isInheritable(bool& hasValue) const
     auto res = Internal::hasFileDescriptorFlags<FD_CLOEXEC>(handle, hasValue);
     hasValue = not hasValue;
     return res;
-}
-
-template <typename T>
-SC::Result SC::FileDescriptor::Internal::readAppend(FileDescriptor::Handle fileDescriptor, Vector<T>& output,
-                                                    Span<T> fallbackBuffer, ReadResult& result)
-{
-    ssize_t    numReadBytes;
-    const bool useVector = output.capacity() > output.size();
-    if (useVector)
-    {
-        do
-        {
-            const size_t bytesToRead = (output.capacity() - output.size()) * sizeof(T);
-            numReadBytes             = ::read(fileDescriptor, output.data() + output.size(), bytesToRead);
-        } while (numReadBytes == -1 && errno == EINTR); // Syscall may be interrupted and userspace must retry
-    }
-    else
-    {
-        SC_TRY_MSG(fallbackBuffer.sizeInBytes() != 0, "FileDescriptor::readAppend - buffer must be bigger than zero");
-        do
-        {
-            numReadBytes = ::read(fileDescriptor, fallbackBuffer.data(), fallbackBuffer.sizeInBytes());
-        } while (numReadBytes == -1 && errno == EINTR); // Syscall may be interrupted and userspace must retry
-    }
-    if (numReadBytes > 0)
-    {
-        if (useVector)
-        {
-            SC_TRY_MSG(output.resizeWithoutInitializing(output.size() + static_cast<size_t>(numReadBytes) / sizeof(T)),
-                       "FileDescriptor::readAppend - resize failed");
-        }
-        else
-        {
-            SC_TRY_MSG(
-                output.append({fallbackBuffer.data(), static_cast<size_t>(numReadBytes) / sizeof(T)}),
-                "FileDescriptor::readAppend - append failed. Bytes have been read from stream and will get lost");
-        }
-        result = ReadResult{static_cast<size_t>(numReadBytes), false};
-        return Result(true);
-    }
-    else if (numReadBytes == 0)
-    {
-        // EOF
-        result = ReadResult{0, true};
-        return Result(true);
-    }
-    else
-    {
-        // TODO: Parse read result errno
-        return Result::Error("read failed");
-    }
 }
 
 SC::Result SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
@@ -285,8 +235,68 @@ SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
     return Result(data.sliceStartLength(0, static_cast<size_t>(res), actuallyRead));
 }
 
-// PipeDescriptor
+//-------------------------------------------------------------------------------------------------------
+// File
+//-------------------------------------------------------------------------------------------------------
+struct SC::File::Internal
+{
+    template <typename T>
+    [[nodiscard]] static Result readAppend(FileDescriptor::Handle fileDescriptor, Vector<T>& output,
+                                           Span<T> fallbackBuffer, ReadResult& result)
+    {
+        ssize_t    numReadBytes;
+        const bool useVector = output.capacity() > output.size();
+        if (useVector)
+        {
+            do
+            {
+                const size_t bytesToRead = (output.capacity() - output.size()) * sizeof(T);
+                numReadBytes             = ::read(fileDescriptor, output.data() + output.size(), bytesToRead);
+            } while (numReadBytes == -1 && errno == EINTR); // Syscall may be interrupted and userspace must retry
+        }
+        else
+        {
+            SC_TRY_MSG(fallbackBuffer.sizeInBytes() != 0,
+                       "FileDescriptor::readAppend - buffer must be bigger than zero");
+            do
+            {
+                numReadBytes = ::read(fileDescriptor, fallbackBuffer.data(), fallbackBuffer.sizeInBytes());
+            } while (numReadBytes == -1 && errno == EINTR); // Syscall may be interrupted and userspace must retry
+        }
+        if (numReadBytes > 0)
+        {
+            if (useVector)
+            {
+                SC_TRY_MSG(
+                    output.resizeWithoutInitializing(output.size() + static_cast<size_t>(numReadBytes) / sizeof(T)),
+                    "FileDescriptor::readAppend - resize failed");
+            }
+            else
+            {
+                SC_TRY_MSG(
+                    output.append({fallbackBuffer.data(), static_cast<size_t>(numReadBytes) / sizeof(T)}),
+                    "FileDescriptor::readAppend - append failed. Bytes have been read from stream and will get lost");
+            }
+            result = ReadResult{static_cast<size_t>(numReadBytes), false};
+            return Result(true);
+        }
+        else if (numReadBytes == 0)
+        {
+            // EOF
+            result = ReadResult{0, true};
+            return Result(true);
+        }
+        else
+        {
+            // TODO: Parse read result errno
+            return Result::Error("read failed");
+        }
+    }
+};
 
+//-------------------------------------------------------------------------------------------------------
+// PipeDescriptor
+//-------------------------------------------------------------------------------------------------------
 SC::Result SC::PipeDescriptor::createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag)
 {
     int pipes[2];

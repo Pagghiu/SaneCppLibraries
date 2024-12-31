@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "../Process.h"
 #include "../../Async/Async.h"
+#include "../../File/File.h"
 #include "../../Testing/Testing.h"
 
 namespace SC
@@ -261,7 +262,7 @@ void SC::ProcessTest::processChainPipeDual()
     }
     PipeDescriptor outputPipe;
     SC_TEST_EXPECT(chain.launch(outputPipe));
-    SC_TEST_EXPECT(outputPipe.readPipe.readUntilEOF(output));
+    SC_TEST_EXPECT(File(outputPipe.readPipe).readUntilEOF(output));
     SC_TEST_EXPECT(chain.waitForExitSync());
     SC_TEST_EXPECT(output == expectedOutput);
     //! [processChainPipeDualSnippet]
@@ -394,7 +395,7 @@ SC::Result SC::ProcessTest::processSnippet5()
     PipeDescriptor outputPipe;
     SC_TRY(process.launch({"executable.exe", "--argument1", "--argument2"}, outputPipe));
     String output = StringEncoding::Ascii; // Could also use SmallString<N>
-    SC_TRY(outputPipe.readPipe.readUntilEOF(output));
+    SC_TRY(File(outputPipe.readPipe).readUntilEOF(output));
     SC_TRY(process.waitForExitSync());
     // ... Do something with the 'output' string
     //! [ProcessSnippet5]

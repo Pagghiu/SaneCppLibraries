@@ -8,6 +8,7 @@
 #include <sys/stat.h>    // fstat
 #include <unistd.h>      // read
 
+#include "../../File/File.h"
 #include "../../FileSystemIterator/FileSystemIterator.h"
 #include "../../Strings/SmallString.h"
 #include "../../Strings/StringConverter.h"

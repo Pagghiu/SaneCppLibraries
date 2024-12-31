@@ -3,6 +3,7 @@
 #pragma once
 #include "Tools.h"
 
+#include "../Libraries/File/File.h"
 #include "../Libraries/FileSystem/FileSystem.h"
 #include "../Libraries/FileSystem/Path.h"
 #include "../Libraries/Foundation/Function.h"
@@ -91,22 +92,22 @@ struct CustomFunctions
 
 [[nodiscard]] inline Result checkFileMD5(StringView fileName, StringView wantedMD5)
 {
-    FileDescriptor file;
-    SC_TRY(file.open(fileName, FileDescriptor::OpenMode::ReadOnly));
+    FileDescriptor fd;
+    SC_TRY(File(fd).open(fileName, File::OpenMode::ReadOnly));
     Hashing hashing;
     SC_TRY(hashing.setType(Hashing::TypeMD5));
     for (;;)
     {
         uint8_t       data[4096];
         Span<uint8_t> actuallyRead;
-        SC_TRY(file.read({data, sizeof(data)}, actuallyRead));
+        SC_TRY(fd.read({data, sizeof(data)}, actuallyRead));
         if (actuallyRead.sizeInBytes() > 0)
         {
             SC_TRY(hashing.add(actuallyRead));
         }
         else
         {
-            SC_TRY(file.close());
+            SC_TRY(fd.close());
             Hashing::Result res;
             SC_TRY(hashing.getHash(res));
             SmallString<32> result;

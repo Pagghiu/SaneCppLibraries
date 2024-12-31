@@ -5,6 +5,7 @@
 #include "../../Async/Async.h"
 #include "../../AsyncStreams/AsyncStreams.h"
 #include "../../AsyncStreams/ZLibTransformStreams.h"
+#include "../../File/File.h"
 #include "../../FileSystem/FileSystem.h"
 #include "../../FileSystem/Path.h"
 #include "../../Foundation/HeapBuffer.h"
@@ -127,18 +128,17 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     WritableFileStream           writable;
     AsyncWritableStream::Request writableRequests[numberOfBuffers + 1]; // Only N-1 slots will be used
 
-    FileDescriptor::OpenOptions openOptions;
+    File::OpenOptions openOptions;
     openOptions.blocking = false; // Windows needs non-blocking flags set
 
     FileDescriptor readDescriptor;
-    SC_TEST_EXPECT(readDescriptor.open(readablePath.view(), FileDescriptor::OpenMode::ReadOnly, openOptions));
+    SC_TEST_EXPECT(File(readDescriptor).open(readablePath.view(), File::OpenMode::ReadOnly, openOptions));
     SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(readDescriptor));
 
     FileDescriptor writeDescriptor;
     String         writeablePath;
     (void)Path::join(writeablePath, {report.applicationRootDirectory, "writeable.txt"});
-    SC_TEST_EXPECT(
-        writeDescriptor.open(writeablePath.view(), FileDescriptor::OpenMode::WriteCreateTruncate, openOptions));
+    SC_TEST_EXPECT(File(writeDescriptor).open(writeablePath.view(), File::OpenMode::WriteCreateTruncate, openOptions));
     SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(writeDescriptor));
 
     SC_TEST_EXPECT(readable.init(pool, readableRequests, eventLoop, readDescriptor));
@@ -223,7 +223,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
         SC_TEST_EXPECT(buffer1.data.sliceStartLength(idx * buffers1Size, buffers1Size, buffers1[idx].data));
     }
 
-    FileDescriptor::OpenOptions openOptions;
+    File::OpenOptions openOptions;
     openOptions.blocking = true;
 
     ThreadPool fileThreadPool;
@@ -234,7 +234,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     FileDescriptor     readFd;
     String             fileName;
     SC_TEST_EXPECT(Path::join(fileName, {report.applicationRootDirectory, "source.txt"}));
-    SC_TEST_EXPECT(readFd.open(fileName.view(), FileDescriptor::OpenMode::ReadOnly, openOptions));
+    SC_TEST_EXPECT(File(readFd).open(fileName.view(), File::OpenMode::ReadOnly, openOptions));
     AsyncFileRead::Task readFileTask;
     SC_TEST_EXPECT(readFileStream.request.setThreadPoolAndTask(fileThreadPool, readFileTask));
     AsyncReadableStream::Request readFileRequests[numberOfBuffers1 + 1];
@@ -244,7 +244,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     WritableFileStream writeFileStream;
     FileDescriptor     writeFd;
     SC_TEST_EXPECT(Path::join(fileName, {report.applicationRootDirectory, "destination.txt"}));
-    SC_TEST_EXPECT(writeFd.open(fileName.view(), FileDescriptor::OpenMode::WriteCreateTruncate, openOptions));
+    SC_TEST_EXPECT(File(writeFd).open(fileName.view(), File::OpenMode::WriteCreateTruncate, openOptions));
     AsyncFileWrite::Task writeFileTask;
     SC_TEST_EXPECT(writeFileStream.request.setThreadPoolAndTask(fileThreadPool, writeFileTask));
 
