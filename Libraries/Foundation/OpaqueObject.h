@@ -31,7 +31,8 @@ namespace SC
     {
         static constexpr int Windows = 224;
         static constexpr int Apple   = 144;
-        static constexpr int Default = sizeof(void*);
+        static constexpr int Linux   = sizeof(void*);
+        static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);
 
@@ -97,6 +98,8 @@ struct OpaqueObject
     static constexpr int Size = Definition::Windows;
 #elif SC_PLATFORM_APPLE
     static constexpr int Size = Definition::Apple;
+#elif SC_PLATFORM_LINUX
+    static constexpr int Size = Definition::Linux;
 #else
     static constexpr int Size = Definition::Default;
 #endif

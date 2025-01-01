@@ -1041,7 +1041,8 @@ struct SC::AsyncEventLoop
     {
         static constexpr int Windows = 528;
         static constexpr int Apple   = 472;
-        static constexpr int Default = 688;
+        static constexpr int Linux   = 688;
+        static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = 8;
 

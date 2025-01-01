@@ -103,7 +103,8 @@ struct SC::FileSystemIterator
     {
         static constexpr int Windows = 4272;
         static constexpr int Apple   = 2104;
-        static constexpr int Default = 2088;
+        static constexpr int Linux   = 2088;
+        static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = sizeof(uint64_t);
 

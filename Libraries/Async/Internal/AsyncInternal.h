@@ -30,7 +30,8 @@ struct SC::AsyncEventLoop::Internal
     {
         static constexpr int Windows = 184;
         static constexpr int Apple   = 104;
-        static constexpr int Default = 336;
+        static constexpr int Linux   = 336;
+        static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);
 
