@@ -19,7 +19,7 @@ struct SC::detail::AsyncWinOverlapped
     [[nodiscard]] static T* getUserDataFromOverlapped(LPOVERLAPPED lpOverlapped)
     {
         constexpr size_t offsetOfOverlapped = offsetof(AsyncWinOverlapped, overlapped);
-        constexpr size_t offsetOfAsync      = offsetof(AsyncWinOverlapped, userData);
-        return *reinterpret_cast<T**>(reinterpret_cast<uint8_t*>(lpOverlapped) - offsetOfOverlapped + offsetOfAsync);
+        constexpr size_t offsetOfUserData   = offsetof(AsyncWinOverlapped, userData);
+        return *reinterpret_cast<T**>(reinterpret_cast<uint8_t*>(lpOverlapped) - offsetOfOverlapped + offsetOfUserData);
     }
 };

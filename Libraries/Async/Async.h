@@ -67,7 +67,7 @@ namespace detail
 struct AsyncWinOverlapped;
 struct AsyncWinOverlappedDefinition
 {
-    static constexpr int    Windows   = sizeof(void*) * 7;
+    static constexpr int    Windows   = sizeof(void*) * 4 + sizeof(uint64_t);
     static constexpr size_t Alignment = alignof(void*);
 
     using Object = AsyncWinOverlapped;
@@ -491,10 +491,10 @@ struct AsyncSocketAccept : public AsyncRequest
     SocketDescriptor::Handle   handle        = SocketDescriptor::Invalid;
     SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
 #if SC_PLATFORM_WINDOWS
+    void (*pAcceptEx)() = nullptr;
     detail::WinOverlappedOpaque overlapped;
-
-    SocketDescriptor clientSocket;
-    uint8_t          acceptBuffer[288] = {0};
+    SocketDescriptor            clientSocket;
+    uint8_t                     acceptBuffer[288] = {0};
 #elif SC_PLATFORM_LINUX
     AlignedStorage<28> sockAddrHandle;
     uint32_t           sockAddrLen;
@@ -535,6 +535,7 @@ struct AsyncSocketConnect : public AsyncRequest
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
     SocketIPAddress          ipAddress;
 #if SC_PLATFORM_WINDOWS
+    void (*pConnectEx)() = nullptr;
     detail::WinOverlappedOpaque overlapped;
 #endif
 };
@@ -1039,9 +1040,9 @@ struct SC::AsyncEventLoop
   private:
     struct InternalDefinition
     {
-        static constexpr int Windows = 528;
-        static constexpr int Apple   = 472;
-        static constexpr int Linux   = 688;
+        static constexpr int Windows = 464;
+        static constexpr int Apple   = 456;
+        static constexpr int Linux   = 664;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = 8;

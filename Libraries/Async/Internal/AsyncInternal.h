@@ -28,9 +28,9 @@ struct SC::AsyncEventLoop::Internal
 
     struct KernelQueueDefinition
     {
-        static constexpr int Windows = 184;
+        static constexpr int Windows = 136;
         static constexpr int Apple   = 104;
-        static constexpr int Linux   = 336;
+        static constexpr int Linux   = 328;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);
@@ -43,9 +43,8 @@ struct SC::AsyncEventLoop::Internal
     // Using opaque to allow defining KernelQueue class later
     KernelQueueOpaque kernelQueue;
 
-    AsyncEventLoop* loop = nullptr;
-
-    Atomic<bool> wakeUpPending = false;
+    Atomic<bool> wakeUpPending   = false;
+    bool         gotExpiredTimer = false;
 
     int numberOfActiveHandles     = 0;
     int numberOfManualCompletions = 0;
@@ -76,12 +75,10 @@ struct SC::AsyncEventLoop::Internal
 
     Time::HighResolutionCounter loopTime;
 
-    AsyncLoopTimeout* expiredTimer = nullptr;
-
     // AsyncRequest flags
     static constexpr int16_t Flag_ManualCompletion = 1 << 0;
 
-    [[nodiscard]] Result close();
+    [[nodiscard]] Result close(AsyncEventLoop& loop);
 
     [[nodiscard]] int getTotalNumberOfActiveHandle() const;
 
@@ -97,13 +94,13 @@ struct SC::AsyncEventLoop::Internal
     void invokeExpiredTimers(Time::HighResolutionCounter currentTime);
     void updateTime();
 
-    [[nodiscard]] Result cancelAsync(AsyncRequest& async);
+    [[nodiscard]] Result cancelAsync(AsyncEventLoop& loop, AsyncRequest& async);
 
     // LoopWakeUp
     void executeWakeUps(AsyncResult& result);
 
     // Setup
-    void queueSubmission(AsyncRequest& async);
+    void queueSubmission(AsyncEventLoop& loop, AsyncRequest& async);
 
     // Phases
     [[nodiscard]] Result stageSubmission(KernelEvents& kernelEvents, AsyncRequest& async);
@@ -129,11 +126,11 @@ struct SC::AsyncEventLoop::Internal
         ForcedForwardProgress
     };
 
-    [[nodiscard]] Result runStep(SyncMode syncMode);
+    [[nodiscard]] Result runStep(AsyncEventLoop& loop, SyncMode syncMode);
 
-    [[nodiscard]] Result submitRequests(AsyncKernelEvents& kernelEvents);
-    [[nodiscard]] Result blockingPoll(SyncMode syncMode, AsyncKernelEvents& kernelEvents);
-    [[nodiscard]] Result dispatchCompletions(SyncMode syncMode, AsyncKernelEvents& kernelEvents);
+    [[nodiscard]] Result submitRequests(AsyncEventLoop& loop, AsyncKernelEvents& kernelEvents);
+    [[nodiscard]] Result blockingPoll(AsyncEventLoop& loop, SyncMode syncMode, AsyncKernelEvents& kernelEvents);
+    [[nodiscard]] Result dispatchCompletions(AsyncEventLoop& loop, SyncMode syncMode, AsyncKernelEvents& kernelEvents);
 
     void runStepExecuteCompletions(KernelEvents& kernelEvents);
     void runStepExecuteManualCompletions(KernelEvents& kernelEvents);

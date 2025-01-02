@@ -101,12 +101,12 @@ void SC::AsyncRequest::markAsFree()
     flags     = 0;
 }
 
-void SC::AsyncRequest::queueSubmission(AsyncEventLoop& loop) { loop.internal.queueSubmission(*this); }
+void SC::AsyncRequest::queueSubmission(AsyncEventLoop& loop) { loop.internal.queueSubmission(loop, *this); }
 
 SC::Result SC::AsyncRequest::stop()
 {
     if (eventLoop)
-        return eventLoop->internal.cancelAsync(*this);
+        return eventLoop->internal.cancelAsync(*eventLoop, *this);
     return SC::Result::Error("stop failed. eventLoop is nullptr");
 }
 
@@ -260,7 +260,7 @@ SC::Result SC::AsyncFilePoll::start(AsyncEventLoop& loop, FileDescriptor::Handle
 // AsyncEventLoop
 //-------------------------------------------------------------------------------------------------------
 
-SC::AsyncEventLoop::AsyncEventLoop() : internal(internalOpaque.get()) { internal.loop = this; }
+SC::AsyncEventLoop::AsyncEventLoop() : internal(internalOpaque.get()) {}
 
 SC::Result SC::AsyncEventLoop::create(Options options)
 {
@@ -269,11 +269,11 @@ SC::Result SC::AsyncEventLoop::create(Options options)
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncEventLoop::close() { return internal.close(); }
+SC::Result SC::AsyncEventLoop::close() { return internal.close(*this); }
 
-SC::Result SC::AsyncEventLoop::runOnce() { return internal.runStep(Internal::SyncMode::ForcedForwardProgress); }
+SC::Result SC::AsyncEventLoop::runOnce() { return internal.runStep(*this, Internal::SyncMode::ForcedForwardProgress); }
 
-SC::Result SC::AsyncEventLoop::runNoWait() { return internal.runStep(Internal::SyncMode::NoWait); }
+SC::Result SC::AsyncEventLoop::runNoWait() { return internal.runStep(*this, Internal::SyncMode::NoWait); }
 
 SC::Result SC::AsyncEventLoop::run()
 {
@@ -289,17 +289,17 @@ SC::Result SC::AsyncEventLoop::run()
 
 SC::Result SC::AsyncEventLoop::submitRequests(AsyncKernelEvents& kernelEvents)
 {
-    return internal.submitRequests(kernelEvents);
+    return internal.submitRequests(*this, kernelEvents);
 }
 
 SC::Result SC::AsyncEventLoop::blockingPoll(AsyncKernelEvents& kernelEvents)
 {
-    return internal.blockingPoll(Internal::SyncMode::ForcedForwardProgress, kernelEvents);
+    return internal.blockingPoll(*this, Internal::SyncMode::ForcedForwardProgress, kernelEvents);
 }
 
 SC::Result SC::AsyncEventLoop::dispatchCompletions(AsyncKernelEvents& kernelEvents)
 {
-    return internal.dispatchCompletions(Internal::SyncMode::ForcedForwardProgress, kernelEvents);
+    return internal.dispatchCompletions(*this, Internal::SyncMode::ForcedForwardProgress, kernelEvents);
 }
 
 template <>
@@ -442,9 +442,9 @@ SC::Result SC::AsyncEventLoopMonitor::close()
 // AsyncEventLoop::Internal
 //-------------------------------------------------------------------------------------------------------
 
-void SC::AsyncEventLoop::Internal::queueSubmission(AsyncRequest& async)
+void SC::AsyncEventLoop::Internal::queueSubmission(AsyncEventLoop& loop, AsyncRequest& async)
 {
-    async.eventLoop = loop;
+    async.eventLoop = &loop;
     async.state     = AsyncRequest::State::Setup;
     submissions.queueBack(async);
 }
@@ -515,7 +515,7 @@ SC::Result SC::AsyncEventLoop::Internal::waitForThreadPoolTasks(IntrusiveDoubleL
     return res;
 }
 
-SC::Result SC::AsyncEventLoop::Internal::close()
+SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& loop)
 {
     Result res = Result(true);
 
@@ -553,7 +553,7 @@ SC::Result SC::AsyncEventLoop::Internal::close()
     freeAsyncRequests(manualCompletions);
     numberOfActiveHandles = 0;
     numberOfExternals     = 0;
-    SC_TRY(loop->internal.kernelQueue.get().close());
+    SC_TRY(loop.internal.kernelQueue.get().close());
     return res;
 }
 
@@ -652,19 +652,19 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndEventuallyReactivate(KernelE
     return Result(true);
 }
 
-SC::Result SC::AsyncEventLoop::Internal::runStep(SyncMode syncMode)
+SC::Result SC::AsyncEventLoop::Internal::runStep(AsyncEventLoop& loop, SyncMode syncMode)
 {
     alignas(uint64_t) uint8_t buffer[8 * 1024]; // 8 Kb of kernel events
     AsyncKernelEvents         kernelEvents;
     kernelEvents.eventsMemory = buffer;
-    SC_TRY(submitRequests(kernelEvents));
-    SC_TRY(blockingPoll(syncMode, kernelEvents));
-    return dispatchCompletions(syncMode, kernelEvents);
+    SC_TRY(submitRequests(loop, kernelEvents));
+    SC_TRY(blockingPoll(loop, syncMode, kernelEvents));
+    return dispatchCompletions(loop, syncMode, kernelEvents);
 }
 
-SC::Result SC::AsyncEventLoop::Internal::submitRequests(AsyncKernelEvents& asyncKernelEvents)
+SC::Result SC::AsyncEventLoop::Internal::submitRequests(AsyncEventLoop& loop, AsyncKernelEvents& asyncKernelEvents)
 {
-    KernelEvents kernelEvents(loop->internal.kernelQueue.get(), asyncKernelEvents);
+    KernelEvents kernelEvents(loop.internal.kernelQueue.get(), asyncKernelEvents);
     asyncKernelEvents.numberOfEvents = 0;
     // TODO: Check if it's possible to avoid zeroing kernel events memory
     memset(asyncKernelEvents.eventsMemory.data(), 0, asyncKernelEvents.eventsMemory.sizeInBytes());
@@ -683,9 +683,10 @@ SC::Result SC::AsyncEventLoop::Internal::submitRequests(AsyncKernelEvents& async
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncEventLoop::Internal::blockingPoll(SyncMode syncMode, AsyncKernelEvents& asyncKernelEvents)
+SC::Result SC::AsyncEventLoop::Internal::blockingPoll(AsyncEventLoop& loop, SyncMode syncMode,
+                                                      AsyncKernelEvents& asyncKernelEvents)
 {
-    KernelEvents kernelEvents(loop->internal.kernelQueue.get(), asyncKernelEvents);
+    KernelEvents kernelEvents(loop.internal.kernelQueue.get(), asyncKernelEvents);
     if (getTotalNumberOfActiveHandle() <= 0 and numberOfManualCompletions == 0)
     {
         // happens when we do cancelAsync on the last active async for example
@@ -698,15 +699,16 @@ SC::Result SC::AsyncEventLoop::Internal::blockingPoll(SyncMode syncMode, AsyncKe
         SC_LOG_MESSAGE("Active Requests Before Poll = {}\n", getTotalNumberOfActiveHandle());
 
         // If there are manual completions the loop can't block waiting for I/O, to dispatch them immediately
-        SC_TRY(kernelEvents.syncWithKernel(*loop, numberOfManualCompletions == 0 ? syncMode : SyncMode::NoWait));
+        SC_TRY(kernelEvents.syncWithKernel(loop, numberOfManualCompletions == 0 ? syncMode : SyncMode::NoWait));
         SC_LOG_MESSAGE("Active Requests After Poll = {}\n", getTotalNumberOfActiveHandle());
     }
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(SyncMode syncMode, AsyncKernelEvents& asyncKernelEvents)
+SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(AsyncEventLoop& loop, SyncMode syncMode,
+                                                             AsyncKernelEvents& asyncKernelEvents)
 {
-    KernelEvents kernelEvents(loop->internal.kernelQueue.get(), asyncKernelEvents);
+    KernelEvents kernelEvents(loop.internal.kernelQueue.get(), asyncKernelEvents);
     switch (syncMode)
     {
     case SyncMode::NoWait: {
@@ -717,9 +719,9 @@ SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(SyncMode syncMode, 
     }
     break;
     case SyncMode::ForcedForwardProgress: {
-        if (expiredTimer)
+        if (gotExpiredTimer)
         {
-            expiredTimer = nullptr;
+            gotExpiredTimer = false;
             updateTime();
             if (kernelEvents.needsManualTimersProcessing())
             {
@@ -1084,11 +1086,11 @@ SC::Result SC::AsyncEventLoop::Internal::cancelAsync(KernelEvents& kernelEvents,
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncEventLoop::Internal::cancelAsync(AsyncRequest& async)
+SC::Result SC::AsyncEventLoop::Internal::cancelAsync(AsyncEventLoop& loop, AsyncRequest& async)
 {
     SC_LOG_MESSAGE("{} {} STOP\n", async.debugName, AsyncRequest::TypeToString(async.type));
     const bool asyncStateIsNotFree    = async.state != AsyncRequest::State::Free;
-    const bool asyncIsOwnedByThisLoop = async.eventLoop == loop;
+    const bool asyncIsOwnedByThisLoop = async.eventLoop == &loop;
     SC_TRY_MSG(asyncStateIsNotFree, "Trying to stop AsyncRequest that is not active");
     SC_TRY_MSG(asyncIsOwnedByThisLoop, "Trying to add AsyncRequest belonging to another Loop");
     switch (async.state)

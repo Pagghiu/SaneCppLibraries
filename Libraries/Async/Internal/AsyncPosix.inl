@@ -490,7 +490,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         newEvents = static_cast<int>(res);
         if (loopTimeout)
         {
-            eventLoop.internal.expiredTimer = loopTimeout;
+            eventLoop.internal.gotExpiredTimer = true;
         }
         return Result(true);
     }
@@ -624,8 +624,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                     // writing the remaining part of the data.
                     // This would typically involve waiting for next EVFILT_WRITE or EPOLLOUT event again.
                     // To achieve that let's skip user callback and manually re-activate this request.
-                    result.shouldCallCallback  = false;
-                    result.shouldBeReactivated = true;
+                    result.shouldCallCallback = false;
+                    result.reactivateRequest(true);
                     return Result(true);
                 }
                 else
