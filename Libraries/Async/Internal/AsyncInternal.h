@@ -97,7 +97,7 @@ struct SC::AsyncEventLoop::Internal
     [[nodiscard]] Result cancelAsync(AsyncEventLoop& loop, AsyncRequest& async);
 
     // LoopWakeUp
-    void executeWakeUps(AsyncResult& result);
+    void executeWakeUps();
 
     // Setup
     void queueSubmission(AsyncEventLoop& loop, AsyncRequest& async);

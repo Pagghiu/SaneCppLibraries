@@ -100,7 +100,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
 
     void completeWakeUp(AsyncFilePoll::Result& result)
     {
-        result.getAsync().eventLoop->internal.executeWakeUps(result);
+        result.getAsync().eventLoop->internal.executeWakeUps();
         result.reactivateRequest(true);
     }
 

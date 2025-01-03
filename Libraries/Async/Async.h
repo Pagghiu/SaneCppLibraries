@@ -172,13 +172,18 @@ struct SC::AsyncRequest
     /// @param type Type of this specific request
     AsyncRequest(Type type) : state(State::Free), type(type), flags(0), eventIndex(-1) {}
 
-    /// Stops the async operation
-
     /// @brief Ask to stop current async operation
     /// @return `true` if the stop request has been successfully queued
     [[nodiscard]] Result stop();
 
-    [[nodiscard]] bool isFree() const { return state == State::Free; }
+    /// @brief Returns `true` if this request is free
+    [[nodiscard]] bool isFree() const;
+
+    /// @brief Returns `true` if this request is being cancelled
+    [[nodiscard]] bool isCancelling() const;
+
+    /// @brief Returns `true` if this request is active or being reactivated
+    [[nodiscard]] bool isActive() const;
 
   protected:
     [[nodiscard]] Result validateAsync();
@@ -190,6 +195,7 @@ struct SC::AsyncRequest
 
   private:
     friend struct AsyncEventLoop;
+    friend struct AsyncResult;
 
     void markAsFree();
 
@@ -198,8 +204,9 @@ struct SC::AsyncRequest
     {
         Free,       // not in any queue, this can be started with an async.start(...)
         Setup,      // when in submission queue waiting to be setup (after an async.start(...))
-        Submitting, // when in submission queue waiting to be activated (after a result.reactivateRequest(true))
+        Submitting, // when in submission queue waiting to be activated or re-activated
         Active,     // when monitored by OS syscall or in activeLoopWakeUps / activeTimeouts queues
+        Reactivate, // when flagged for reactivation inside the callback (after a result.reactivateRequest(true))
         Cancelling, // when in cancellation queue waiting for a cancelAsync (on active async)
         Teardown    // when in cancellation queue waiting for a teardownAsync (on non-active, already setup async)
     };
@@ -230,7 +237,7 @@ struct SC::AsyncResult
 
     /// @brief Ask the event loop to re-activate this request after it was already completed
     /// @param value `true` will reactivate the request
-    void reactivateRequest(bool value) { shouldBeReactivated = value; }
+    void reactivateRequest(bool value);
 
     /// @brief Check if the returnCode of this result is valid
     [[nodiscard]] const SC::Result& isValid() const { return returnCode; }
@@ -322,8 +329,15 @@ struct AsyncLoopTimeout : public AsyncRequest
     /// @note For a periodic timeout, call AsyncLoopTimeout::Result::reactivateRequest(true) in the completion callback
     [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop, Time::Milliseconds relativeTimeout);
 
+    /// @brief Starts a Timeout that is invoked (only once) after the specific relative expiration time has passed.
+    /// @param eventLoop The event loop where queuing this async request
+    /// @return Valid Result if the request has been successfully queued
+    /// @note For a periodic timeout, call AsyncLoopTimeout::Result::reactivateRequest(true) in the completion callback
+    [[nodiscard]] SC::Result start(AsyncEventLoop& eventLoop);
+
     Function<void(Result&)> callback; ///< Called after given expiration time since AsyncLoopTimeout::start has passed
-    Time::Milliseconds      relativeTimeout; ///< Timer expiration (relative) time in milliseconds
+
+    Time::Milliseconds relativeTimeout; ///< First timer expiration (relative) time in milliseconds
 
   private:
     friend struct AsyncEventLoop;
@@ -1027,6 +1041,9 @@ struct SC::AsyncEventLoop
 
     /// Associates a File descriptor created externally with the eventLoop.
     [[nodiscard]] Result associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor);
+
+    /// Updates loop time to "now"
+    void updateTime();
 
     /// Get Loop time
     [[nodiscard]] Time::HighResolutionCounter getLoopTime() const;

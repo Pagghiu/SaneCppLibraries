@@ -110,20 +110,49 @@ SC::Result SC::AsyncRequest::stop()
     return SC::Result::Error("stop failed. eventLoop is nullptr");
 }
 
+bool SC::AsyncRequest::isFree() const { return state == State::Free; }
+
+bool SC::AsyncRequest::isCancelling() const { return state == State::Cancelling or state == State::Teardown; }
+
+bool SC::AsyncRequest::isActive() const { return state == State::Active or state == State::Reactivate; }
+
+//-------------------------------------------------------------------------------------------------------
+// AsyncResult
+//-------------------------------------------------------------------------------------------------------
+
+void SC::AsyncResult::reactivateRequest(bool value)
+{
+    shouldBeReactivated = value;
+    if (shouldBeReactivated)
+    {
+        async.state = AsyncRequest::State::Reactivate;
+    }
+    else if (async.state == AsyncRequest::State::Reactivate)
+    {
+        async.state = AsyncRequest::State::Free;
+    }
+}
+
 //-------------------------------------------------------------------------------------------------------
 // Async***
 //-------------------------------------------------------------------------------------------------------
 
-SC::Result SC::AsyncLoopTimeout::start(AsyncEventLoop& loop, Time::Milliseconds timeout)
+SC::Result SC::AsyncLoopTimeout::start(AsyncEventLoop& loop)
 {
     SC_TRY(validateAsync());
-    relativeTimeout = timeout;
     queueSubmission(loop);
     return SC::Result(true);
 }
 
+SC::Result SC::AsyncLoopTimeout::start(AsyncEventLoop& loop, Time::Milliseconds timeout)
+{
+    relativeTimeout = timeout;
+    return start(loop);
+}
+
 SC::Result SC::AsyncLoopWakeUp::start(AsyncEventLoop& loop, EventObject* eo)
 {
+    SC_TRY(validateAsync());
     eventObject = eo;
     queueSubmission(loop);
     return SC::Result(true);
@@ -341,7 +370,8 @@ SC::Result SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor(FileDesc
 {
     return internal.kernelQueue.get().associateExternallyCreatedFileDescriptor(outDescriptor);
 }
-/// Get Loop time
+void SC::AsyncEventLoop::updateTime() { return internal.updateTime(); }
+
 SC::Time::HighResolutionCounter SC::AsyncEventLoop::getLoopTime() const { return internal.loopTime; }
 
 #if SC_PLATFORM_LINUX
@@ -434,6 +464,7 @@ SC::Result SC::AsyncEventLoopMonitor::close()
     eventObjectExitBlockingMode.signal();
     SC_TRY(eventLoop->wakeUpFromExternalThread());
     SC_TRY(eventLoopThread.join());
+    SC_TRY(eventLoopWakeUp.stop());
     eventLoop = nullptr;
     return Result(true);
 }
@@ -466,21 +497,24 @@ SC::AsyncLoopTimeout* SC::AsyncEventLoop::Internal::findEarliestLoopTimeout() co
 
 void SC::AsyncEventLoop::Internal::invokeExpiredTimers(Time::HighResolutionCounter currentTime)
 {
-    AsyncLoopTimeout* async;
-    for (async = activeLoopTimeouts.front; //
-         async != nullptr;                 //
-         async = static_cast<AsyncLoopTimeout*>(async->next))
+    AsyncLoopTimeout* async = activeLoopTimeouts.front;
+    while (async != nullptr)
     {
-        if (currentTime.isLaterThanOrEqualTo(async->expirationTime))
+        AsyncLoopTimeout* current = async;
+        async                     = static_cast<AsyncLoopTimeout*>(async->next);
+        if (currentTime.isLaterThanOrEqualTo(current->expirationTime))
         {
-            removeActiveHandle(*async);
-            AsyncLoopTimeout::Result result(*async, Result(true));
-            async->callback(result);
-
-            if (result.shouldBeReactivated)
+            removeActiveHandle(*current);
+            AsyncLoopTimeout::Result result(*current, Result(true));
+            if (current->callback.isValid())
             {
-                async->state = AsyncRequest::State::Submitting;
-                submissions.queueBack(*async);
+                current->callback(result);
+            }
+
+            if (result.shouldBeReactivated and current->state == AsyncRequest::State::Reactivate)
+            {
+                current->state = AsyncRequest::State::Submitting;
+                submissions.queueBack(*current);
             }
         }
     }
@@ -571,6 +605,7 @@ SC::Result SC::AsyncEventLoop::Internal::stageSubmission(KernelEvents& kernelEve
         SC_TRY(activateAsync(kernelEvents, async));
     }
     break;
+    case AsyncRequest::State::Reactivate:
     case AsyncRequest::State::Free: {
         // TODO: Stop the completion, it has been cancelled before being submitted
         SC_ASSERT_RELEASE(false);
@@ -636,7 +671,7 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndEventuallyReactivate(KernelE
     AsyncTeardown teardown;
     prepareTeardown(async, teardown);
     SC_TRY(completeAsync(kernelEvents, async, move(returnCode), reactivate));
-    if (reactivate)
+    if (reactivate and async.state == AsyncRequest::State::Reactivate)
     {
         SC_TRY(Internal::applyOnAsync(async, ReactivateAsyncPhase()));
     }
@@ -1110,6 +1145,10 @@ SC::Result SC::AsyncEventLoop::Internal::cancelAsync(AsyncEventLoop& loop, Async
         async.state = AsyncRequest::State::Free;
         break;
     }
+    case AsyncRequest::State::Reactivate: {
+        async.state = AsyncRequest::State::Free;
+        break;
+    }
     case AsyncRequest::State::Teardown: //
         return SC::Result::Error("Trying to stop AsyncRequest that is already being cancelled (teardown)");
     case AsyncRequest::State::Free: //
@@ -1135,28 +1174,33 @@ SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
     return Result(true);
 }
 
-void SC::AsyncEventLoop::Internal::executeWakeUps(AsyncResult& result)
+void SC::AsyncEventLoop::Internal::executeWakeUps()
 {
-    AsyncLoopWakeUp* async;
-    for (async = activeLoopWakeUps.front; //
-         async != nullptr;                //
-         async = static_cast<AsyncLoopWakeUp*>(async->next))
+    AsyncLoopWakeUp* async = activeLoopWakeUps.front;
+    while (async != nullptr)
     {
         SC_ASSERT_DEBUG(async->type == AsyncRequest::Type::LoopWakeUp);
-        AsyncLoopWakeUp* notifier = async;
-        if (notifier->pending.load() == true)
+        AsyncLoopWakeUp* current = async;
+        async                    = static_cast<AsyncLoopWakeUp*>(async->next);
+        if (current->pending.load() == true)
         {
-            AsyncLoopWakeUp::Result asyncResult(*notifier, Result(true));
-            asyncResult.getAsync().callback(asyncResult);
-            if (notifier->eventObject)
+            AsyncLoopWakeUp::Result result(*current, Result(true));
+            removeActiveHandle(*current);
+            current->callback(result);
+
+            if (result.shouldBeReactivated and current->state == AsyncRequest::State::Reactivate)
             {
-                notifier->eventObject->signal();
+                current->state = AsyncRequest::State::Submitting;
+                current->eventLoop->internal.addActiveHandle(*current);
             }
-            result.reactivateRequest(asyncResult.shouldBeReactivated);
-            notifier->pending.exchange(false); // allow executing the notification again
+
+            if (current->eventObject)
+            {
+                current->eventObject->signal();
+            }
+            current->pending.exchange(false); // allow executing the notification again
         }
     }
-
     wakeUpPending.exchange(false);
 }
 

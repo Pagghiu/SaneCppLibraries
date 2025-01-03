@@ -131,7 +131,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
             if (errno == EWOULDBLOCK or errno == EAGAIN)
                 break;
         }
-        result.getAsync().eventLoop->internal.executeWakeUps(result);
+        result.getAsync().eventLoop->internal.executeWakeUps();
         result.reactivateRequest(true);
     }
 

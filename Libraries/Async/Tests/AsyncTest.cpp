@@ -298,6 +298,9 @@ void SC::AsyncTest::loopTimeout()
     timeout1.callback  = [&](AsyncLoopTimeout::Result& res)
     {
         SC_TEST_EXPECT(res.getAsync().relativeTimeout.ms == 1);
+        SC_TEST_EXPECT(res.getAsync().isFree());
+        SC_TEST_EXPECT(not res.getAsync().isActive());
+        SC_TEST_EXPECT(not res.getAsync().isCancelling());
         timeout1Called++;
     };
     SC_TEST_EXPECT(timeout1.start(eventLoop, Time::Milliseconds(1)));
@@ -306,7 +309,10 @@ void SC::AsyncTest::loopTimeout()
         if (timeout2Called == 0)
         {
             // Re-activate timeout2, modifying also its relative timeout to 1 ms (see SC_TEST_EXPECT below)
+            SC_TEST_EXPECT(res.getAsync().isFree());
+            SC_TEST_EXPECT(not res.getAsync().isActive());
             res.reactivateRequest(true);
+            SC_TEST_EXPECT(res.getAsync().isActive());
             res.getAsync().relativeTimeout = Time::Milliseconds(1);
         }
         timeout2Called++;
@@ -370,7 +376,7 @@ void SC::AsyncTest::loopWakeUp()
     {
         context.wakeUp1ThreadID = Thread::CurrentThreadID();
         context.wakeUp1Called++;
-        SC_TEST_EXPECT(res.getAsync().stop());
+        SC_TEST_EXPECT(not res.getAsync().isActive());
     };
     SC_TEST_EXPECT(wakeUp1.start(eventLoop));
     wakeUp2.setDebugName("wakeUp2");
@@ -1154,9 +1160,10 @@ SC::Result snippetForWakeUp1(AsyncEventLoop& eventLoop, Console& console)
 // This code runs on some different thread from the one calling SC::AsyncEventLoop::run.
 // The callback is invoked from the thread calling SC::AsyncEventLoop::run
 AsyncLoopWakeUp wakeUp; // Memory lifetime must be valid until callback is called
-wakeUp.callback = [&](AsyncLoopWakeUp::Result&)
+wakeUp.callback = [&](AsyncLoopWakeUp::Result& result)
 {
     console.print("My wakeUp has been called!");
+    result.reactivateRequest(true); // To allow waking-up again later
 };
 SC_TRY(wakeUp.start(eventLoop));
 //! [AsyncLoopWakeUpSnippet1]
@@ -1171,9 +1178,10 @@ SC::Result snippetForWakeUp2(AsyncEventLoop& eventLoop, Console& console)
 // This code runs on some different thread from the one calling SC::AsyncEventLoop::run.
 // The callback is invoked from the thread calling SC::AsyncEventLoop::run
 AsyncLoopWakeUp wakeUpWaiting; // Memory lifetime must be valid until callback is called
-wakeUpWaiting.callback = [&](AsyncLoopWakeUp::Result&)
+wakeUpWaiting.callback = [&](AsyncLoopWakeUp::Result& result)
 {
     console.print("My wakeUp has been called!");
+    result.reactivateRequest(true); // To allow waking-up it again later
 };
 EventObject eventObject;
 SC_TRY(wakeUpWaiting.start(eventLoop, &eventObject));
