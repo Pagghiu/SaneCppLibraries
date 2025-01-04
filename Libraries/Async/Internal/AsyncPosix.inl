@@ -81,10 +81,13 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
 #endif
         SC_TRY(createWakeup(eventLoop));
         SC_TRY(eventLoop.runNoWait()); // Register the read handle before everything else
-        // Calls to decreaseActiveCount must be after runNoWait()
-        eventLoop.internal.decreaseActiveCount(); // WakeUp (poll) doesn't keep the kernelEvents active
+        // Calls to excludeFromActiveCount must be after runNoWait()
+
+        // WakeUp (poll) doesn't keep the kernelEvents active
+        eventLoop.excludeFromActiveCount(wakeupPoll);
 #if SC_ASYNC_USE_EPOLL
-        eventLoop.internal.decreaseActiveCount(); // Process watcher doesn't keep the kernelEvents active
+        // Process watcher doesn't keep the kernelEvents active
+        eventLoop.excludeFromActiveCount(signalProcessExit);
 #endif
         return Result(true);
     }

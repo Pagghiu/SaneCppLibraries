@@ -76,7 +76,8 @@ struct SC::AsyncEventLoop::Internal
     Time::HighResolutionCounter loopTime;
 
     // AsyncRequest flags
-    static constexpr int16_t Flag_ManualCompletion = 1 << 0;
+    static constexpr int16_t Flag_ManualCompletion       = 1 << 0;
+    static constexpr int16_t Flag_ExcludeFromActiveCount = 1 << 1;
 
     [[nodiscard]] Result close(AsyncEventLoop& loop);
 
@@ -85,8 +86,6 @@ struct SC::AsyncEventLoop::Internal
     void removeActiveHandle(AsyncRequest& async);
     void addActiveHandle(AsyncRequest& async);
     void scheduleManualCompletion(AsyncRequest& async);
-    void increaseActiveCount();
-    void decreaseActiveCount();
 
     // Timers
     [[nodiscard]] AsyncLoopTimeout* findEarliestLoopTimeout() const;
@@ -139,7 +138,7 @@ struct SC::AsyncEventLoop::Internal
     friend struct AsyncRequest;
 
     template <typename T>
-    void freeAsyncRequests(IntrusiveDoubleLinkedList<T>& linkedList);
+    void stopRequests(IntrusiveDoubleLinkedList<T>& linkedList);
 
     template <typename T>
     [[nodiscard]] Result waitForThreadPoolTasks(IntrusiveDoubleLinkedList<T>& linkedList);
@@ -150,6 +149,7 @@ struct SC::AsyncEventLoop::Internal
     struct AsyncTeardown
     {
         AsyncRequest::Type        type          = AsyncRequest::Type::LoopTimeout;
+        int16_t                   flags         = 0;
         AsyncEventLoop*           eventLoop     = nullptr;
         FileDescriptor::Handle    fileHandle    = FileDescriptor::Invalid;
         SocketDescriptor::Handle  socketHandle  = SocketDescriptor::Invalid;

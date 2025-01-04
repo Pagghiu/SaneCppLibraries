@@ -129,8 +129,9 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
     {
         SC_TRY(createWakeup(eventLoop));
         SC_TRY(eventLoop.runNoWait()); // Register the read handle before everything else
-        // Calls to decreaseActiveCount must be after runNoWait()
-        eventLoop.internal.decreaseActiveCount(); // WakeUp (poll) doesn't keep the kernelEvents active
+        // Calls to excludeFromActiveCount() must be after runNoWait()
+        // WakeUp (poll) doesn't keep the kernelEvents active
+        eventLoop.excludeFromActiveCount(wakeUpPoll);
         return Result(true);
     }
 

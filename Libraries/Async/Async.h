@@ -1048,6 +1048,15 @@ struct SC::AsyncEventLoop
     /// Get Loop time
     [[nodiscard]] Time::HighResolutionCounter getLoopTime() const;
 
+    /// @brief Excludes the request from active handles count (to avoid it keeping event loop alive)
+    void excludeFromActiveCount(AsyncRequest& async);
+
+    /// @brief Reverses the effect of excludeFromActiveCount for the request
+    void includeInActiveCount(AsyncRequest& async);
+
+    /// @brief Checks if excludeFromActiveCount() has been called on the given request
+    [[nodiscard]] static bool isExcludedFromActiveCount(const AsyncRequest& async);
+
     /// Check if liburing is loadable (only on Linux)
     /// @return true if liburing has been loaded, false otherwise (and on any non-Linux os)
     [[nodiscard]] static bool tryLoadingLiburing();

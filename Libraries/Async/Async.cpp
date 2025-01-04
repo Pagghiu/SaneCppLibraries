@@ -307,7 +307,7 @@ SC::Result SC::AsyncEventLoop::runNoWait() { return internal.runStep(*this, Inte
 SC::Result SC::AsyncEventLoop::run()
 {
     // It may happen that getTotalNumberOfActiveHandle() < 0 when re-activating an async that has been calling
-    // decreaseActiveCount() during initial setup. Now that async would be in the submissions.
+    // excludeFromActiveCount() during initial setup. Now that async would be in the submissions.
     // One example that matches this case is re-activation of the FilePoll used for shared wakeups.
     while (internal.getTotalNumberOfActiveHandle() != 0 or not internal.submissions.isEmpty())
     {
@@ -373,6 +373,29 @@ SC::Result SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor(FileDesc
 void SC::AsyncEventLoop::updateTime() { return internal.updateTime(); }
 
 SC::Time::HighResolutionCounter SC::AsyncEventLoop::getLoopTime() const { return internal.loopTime; }
+
+void SC::AsyncEventLoop::excludeFromActiveCount(AsyncRequest& async)
+{
+    if (not async.isFree() and not isExcludedFromActiveCount(async))
+    {
+        async.flags |= Internal::Flag_ExcludeFromActiveCount;
+        internal.numberOfExternals -= 1;
+    }
+}
+
+void SC::AsyncEventLoop::includeInActiveCount(AsyncRequest& async)
+{
+    if (not async.isFree() and isExcludedFromActiveCount(async))
+    {
+        async.flags &= ~Internal::Flag_ExcludeFromActiveCount;
+        internal.numberOfExternals += 1;
+    }
+}
+
+bool SC::AsyncEventLoop::isExcludedFromActiveCount(const AsyncRequest& async)
+{
+    return (async.flags & Internal::Flag_ExcludeFromActiveCount) != 0;
+}
 
 #if SC_PLATFORM_LINUX
 #else
@@ -521,13 +544,20 @@ void SC::AsyncEventLoop::Internal::invokeExpiredTimers(Time::HighResolutionCount
 }
 
 template <typename T>
-void SC::AsyncEventLoop::Internal::freeAsyncRequests(IntrusiveDoubleLinkedList<T>& linkedList)
+void SC::AsyncEventLoop::Internal::stopRequests(IntrusiveDoubleLinkedList<T>& linkedList)
 {
-    for (auto async = linkedList.front; async != nullptr; async = static_cast<T*>(async->next))
+    auto async = linkedList.front;
+    while (async != nullptr)
     {
-        async->markAsFree();
+        auto asyncNext = static_cast<T*>(async->next);
+        if (!async->isCancelling() and not async->isFree())
+        {
+            Result res = async->stop();
+            (void)res;
+            SC_ASSERT_DEBUG(res);
+        }
+        async = asyncNext;
     }
-    linkedList.clear();
 }
 
 template <typename T>
@@ -563,31 +593,37 @@ SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& loop)
     if (not threadPoolRes2)
         res = threadPoolRes2;
 
+    stopRequests(submissions);
+
     while (AsyncRequest* async = manualThreadPoolCompletions.pop())
     {
-        async->state     = AsyncRequest::State::Free;
-        async->eventLoop = nullptr;
+        Result stopRes = async->stop();
+        (void)stopRes;
+        SC_ASSERT_DEBUG(stopRes);
     }
 
-    freeAsyncRequests(submissions);
+    stopRequests(activeLoopTimeouts);
+    stopRequests(activeLoopWakeUps);
+    stopRequests(activeProcessExits);
+    stopRequests(activeSocketAccepts);
+    stopRequests(activeSocketConnects);
+    stopRequests(activeSocketSends);
+    stopRequests(activeSocketReceives);
+    stopRequests(activeSocketCloses);
+    stopRequests(activeFileReads);
+    stopRequests(activeFileWrites);
+    stopRequests(activeFileCloses);
+    stopRequests(activeFilePolls);
 
-    freeAsyncRequests(activeLoopTimeouts);
-    freeAsyncRequests(activeLoopWakeUps);
-    freeAsyncRequests(activeProcessExits);
-    freeAsyncRequests(activeSocketAccepts);
-    freeAsyncRequests(activeSocketConnects);
-    freeAsyncRequests(activeSocketSends);
-    freeAsyncRequests(activeSocketReceives);
-    freeAsyncRequests(activeSocketCloses);
-    freeAsyncRequests(activeFileReads);
-    freeAsyncRequests(activeFileWrites);
-    freeAsyncRequests(activeFileCloses);
-    freeAsyncRequests(activeFilePolls);
+    stopRequests(manualCompletions);
 
-    freeAsyncRequests(manualCompletions);
-    numberOfActiveHandles = 0;
-    numberOfExternals     = 0;
+    SC_TRY(loop.run());
     SC_TRY(loop.internal.kernelQueue.get().close());
+
+    if (numberOfExternals != 0 or numberOfActiveHandles != 0 or numberOfManualCompletions != 0)
+    {
+        return Result::Error("Non-Zero active count after close");
+    }
     return res;
 }
 
@@ -634,10 +670,6 @@ SC::Result SC::AsyncEventLoop::Internal::stageSubmission(KernelEvents& kernelEve
     }
     return SC::Result(true);
 }
-
-void SC::AsyncEventLoop::Internal::increaseActiveCount() { numberOfExternals += 1; }
-
-void SC::AsyncEventLoop::Internal::decreaseActiveCount() { numberOfExternals -= 1; }
 
 int SC::AsyncEventLoop::Internal::getTotalNumberOfActiveHandle() const
 {
@@ -979,6 +1011,7 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncRequest& async, AsyncTea
 {
     teardown.eventLoop = async.eventLoop;
     teardown.type      = async.type;
+    teardown.flags     = async.flags;
 #if SC_CONFIGURATION_DEBUG
 #if SC_COMPILER_MSVC
     ::strncpy_s(teardown.debugName, async.debugName, sizeof(teardown.debugName));
@@ -1080,6 +1113,10 @@ SC::Result SC::AsyncEventLoop::Internal::teardownAsync(KernelEvents& kernelEvent
         break;
     }
 
+    if ((teardown.flags & Internal::Flag_ExcludeFromActiveCount) != 0)
+    {
+        numberOfExternals += 1;
+    }
     return Result(true);
 }
 
