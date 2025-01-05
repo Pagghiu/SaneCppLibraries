@@ -141,6 +141,9 @@ struct SC::AsyncEventLoop::Internal
     void stopRequests(IntrusiveDoubleLinkedList<T>& linkedList);
 
     template <typename T>
+    void enumerateRequests(IntrusiveDoubleLinkedList<T>& linkedList, Function<void(AsyncRequest&)>& callback);
+
+    template <typename T>
     [[nodiscard]] Result waitForThreadPoolTasks(IntrusiveDoubleLinkedList<T>& linkedList);
 
     template <typename Lambda>

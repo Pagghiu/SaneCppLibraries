@@ -1054,6 +1054,9 @@ struct SC::AsyncEventLoop
     /// @brief Reverses the effect of excludeFromActiveCount for the request
     void includeInActiveCount(AsyncRequest& async);
 
+    /// @brief Enumerates all requests objects associated with this loop
+    void enumerateRequests(Function<void(AsyncRequest&)> enumerationCallback);
+
     /// @brief Checks if excludeFromActiveCount() has been called on the given request
     [[nodiscard]] static bool isExcludedFromActiveCount(const AsyncRequest& async);
 

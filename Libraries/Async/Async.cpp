@@ -397,6 +397,26 @@ bool SC::AsyncEventLoop::isExcludedFromActiveCount(const AsyncRequest& async)
     return (async.flags & Internal::Flag_ExcludeFromActiveCount) != 0;
 }
 
+/// @brief Enumerates all requests objects associated with this loop
+void SC::AsyncEventLoop::enumerateRequests(Function<void(AsyncRequest&)> enumerationCallback)
+{
+    // TODO: Consolidate this list with stopAsync
+    internal.enumerateRequests(internal.submissions, enumerationCallback);
+    internal.enumerateRequests(internal.activeLoopTimeouts, enumerationCallback);
+    internal.enumerateRequests(internal.activeLoopWakeUps, enumerationCallback);
+    internal.enumerateRequests(internal.activeProcessExits, enumerationCallback);
+    internal.enumerateRequests(internal.activeSocketAccepts, enumerationCallback);
+    internal.enumerateRequests(internal.activeSocketConnects, enumerationCallback);
+    internal.enumerateRequests(internal.activeSocketSends, enumerationCallback);
+    internal.enumerateRequests(internal.activeSocketReceives, enumerationCallback);
+    internal.enumerateRequests(internal.activeSocketCloses, enumerationCallback);
+    internal.enumerateRequests(internal.activeFileReads, enumerationCallback);
+    internal.enumerateRequests(internal.activeFileWrites, enumerationCallback);
+    internal.enumerateRequests(internal.activeFileCloses, enumerationCallback);
+    internal.enumerateRequests(internal.activeFilePolls, enumerationCallback);
+    internal.enumerateRequests(internal.manualCompletions, enumerationCallback);
+}
+
 #if SC_PLATFORM_LINUX
 #else
 bool SC::AsyncEventLoop::tryLoadingLiburing() { return false; }
@@ -561,6 +581,19 @@ void SC::AsyncEventLoop::Internal::stopRequests(IntrusiveDoubleLinkedList<T>& li
 }
 
 template <typename T>
+void SC::AsyncEventLoop::Internal::enumerateRequests(IntrusiveDoubleLinkedList<T>&  linkedList,
+                                                     Function<void(AsyncRequest&)>& callback)
+{
+    auto async = linkedList.front;
+    while (async != nullptr)
+    {
+        auto asyncNext = static_cast<T*>(async->next);
+        callback(*async);
+        async = asyncNext;
+    }
+}
+
+template <typename T>
 SC::Result SC::AsyncEventLoop::Internal::waitForThreadPoolTasks(IntrusiveDoubleLinkedList<T>& linkedList)
 {
     Result res = Result(true);
@@ -593,6 +626,7 @@ SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& loop)
     if (not threadPoolRes2)
         res = threadPoolRes2;
 
+    // TODO: Consolidate this list with enumerateRequests
     stopRequests(submissions);
 
     while (AsyncRequest* async = manualThreadPoolCompletions.pop())
