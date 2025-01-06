@@ -388,7 +388,7 @@ struct AsyncLoopWakeUp : public AsyncRequest
 /// AsyncLoopWork::work is invoked on one of the thread supplied by the ThreadPool passed during AsyncLoopWork::start.
 /// AsyncLoopWork::callback will be called as a completion, on the event loop thread AFTER work callback is finished.
 ///
-/// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncLoopWorkSnippet1
+/// \snippet Libraries/Async/Tests/AsyncTestLoopWork.inl AsyncLoopWorkSnippet
 struct AsyncLoopWork : public AsyncRequest
 {
     AsyncLoopWork() : AsyncRequest(Type::LoopWork) {}
