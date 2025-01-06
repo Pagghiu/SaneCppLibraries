@@ -293,12 +293,22 @@ SC::AsyncEventLoop::AsyncEventLoop() : internal(internalOpaque.get()) {}
 
 SC::Result SC::AsyncEventLoop::create(Options options)
 {
+    SC_TRY_MSG(not internal.initialized, "already created");
     SC_TRY(internal.kernelQueue.get().createEventLoop(options));
     SC_TRY(internal.kernelQueue.get().createSharedWatchers(*this));
+    internal.initialized = true;
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncEventLoop::close() { return internal.close(*this); }
+SC::Result SC::AsyncEventLoop::close()
+{
+    SC_TRY_MSG(internal.initialized, "already closed");
+    SC_TRY(internal.close(*this));
+    internal.initialized = false;
+    return SC::Result(true);
+}
+
+bool SC::AsyncEventLoop::isInitialized() const { return internal.initialized; }
 
 SC::Result SC::AsyncEventLoop::runOnce() { return internal.runStep(*this, Internal::SyncMode::ForcedForwardProgress); }
 

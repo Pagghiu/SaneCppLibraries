@@ -968,6 +968,9 @@ struct SC::AsyncEventLoop
     /// Closes the event loop kernel object
     [[nodiscard]] Result close();
 
+    /// @brief Returns `true` if create has been already called (successfully)
+    [[nodiscard]] bool isInitialized() const;
+
     /// Blocks until there are no more active queued requests, dispatching all completions.
     /// It's useful for applications where the eventLoop is the only (or the main) loop.
     /// One example could be a console based app doing socket IO or a web server.
