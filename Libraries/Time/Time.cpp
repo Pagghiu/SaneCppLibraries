@@ -143,6 +143,13 @@ SC::Time::HighResolutionCounter SC::Time::HighResolutionCounter::offsetBy(Millis
     constexpr int32_t millisecondsToNanoseconds = 1e6;
     newCounter.part1 += other.ms / 1000;
     newCounter.part2 += (other.ms % 1000) * millisecondsToNanoseconds;
+    // Normalization
+    constexpr int32_t secondsToNanoseconds = 1e9;
+    while (newCounter.part2 >= secondsToNanoseconds)
+    {
+        newCounter.part1 += 1;
+        newCounter.part2 -= secondsToNanoseconds;
+    }
 #endif
     return newCounter;
 }
@@ -179,10 +186,11 @@ SC::Time::Relative SC::Time::HighResolutionCounter::getRelative() const
     res.part1 = part1 - other.part1;
     res.part2 = part2;
 #else
-    int64_t           newSeconds           = part1 - other.part1;
-    int64_t           newNanoseconds       = part2 - other.part2;
+    int64_t newSeconds     = part1 - other.part1;
+    int64_t newNanoseconds = part2 - other.part2;
+    // Normalization
     constexpr int32_t secondsToNanoseconds = 1e9;
-    if (newNanoseconds < 0)
+    while (newNanoseconds < 0)
     {
         newNanoseconds += secondsToNanoseconds;
         newSeconds -= 1;
