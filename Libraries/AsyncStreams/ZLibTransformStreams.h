@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Async/Async.h"
 #include "AsyncStreams.h"
 #include "Internal/ZLibStream.h"
 namespace SC
@@ -19,8 +20,22 @@ struct SyncZLibTransformStream : public AsyncDuplexStream
 
 struct AsyncZLibTransformStream : public AsyncTransformStream
 {
-    ZLibStream stream;
     AsyncZLibTransformStream();
+
+    ZLibStream    stream;
+    AsyncLoopWork asyncWork;
+
+  private:
+    Result compressExecute(Span<const char> input, Span<char> output);
+    Result compressFinalize(Span<char> output);
+    void   afterWork(AsyncLoopWork::Result& result);
+    Result work();
+
+    bool finalizing  = false;
+    bool streamEnded = false;
+
+    Span<const char> savedInput;
+    Span<char>       savedOutput;
 };
 
 } // namespace SC

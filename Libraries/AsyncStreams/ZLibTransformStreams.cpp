@@ -98,17 +98,48 @@ bool SC::SyncZLibTransformStream::canEndTransform()
 
 SC::AsyncZLibTransformStream::AsyncZLibTransformStream()
 {
-    AsyncTransformStream::onProcess = [this](Span<const char> input, Span<char> output)
+    AsyncTransformStream::onProcess.bind<AsyncZLibTransformStream, &AsyncZLibTransformStream::compressExecute>(*this);
+    AsyncTransformStream::onFinalize.bind<AsyncZLibTransformStream, &AsyncZLibTransformStream::compressFinalize>(*this);
+    asyncWork.work.bind<AsyncZLibTransformStream, &AsyncZLibTransformStream::work>(*this);
+    asyncWork.callback.bind<AsyncZLibTransformStream, &AsyncZLibTransformStream::afterWork>(*this);
+}
+
+SC::Result SC::AsyncZLibTransformStream::compressExecute(Span<const char> input, Span<char> output)
+{
+    savedInput  = input;
+    savedOutput = output;
+    finalizing  = false;
+    return asyncWork.start(*asyncWork.getEventLoop());
+}
+
+SC::Result SC::AsyncZLibTransformStream::compressFinalize(Span<char> output)
+{
+    savedInput  = {};
+    savedOutput = output;
+    finalizing  = true;
+    return asyncWork.start(*asyncWork.getEventLoop());
+}
+
+SC::Result SC::AsyncZLibTransformStream::work()
+{
+    if (finalizing)
     {
-        SC_TRY(stream.process(input, output));
-        AsyncTransformStream::afterProcess(input, output);
-        return Result(true);
-    };
-    AsyncTransformStream::onFinalize = [this](Span<char> output)
+        return stream.finalize(savedOutput, streamEnded);
+    }
+    else
     {
-        bool streamEnded = false;
-        SC_TRY(stream.finalize(output, streamEnded));
-        AsyncTransformStream::afterFinalize(output, streamEnded);
-        return Result(true);
-    };
+        return stream.process(savedInput, savedOutput);
+    }
+}
+
+void SC::AsyncZLibTransformStream::afterWork(AsyncLoopWork::Result&)
+{
+    if (finalizing)
+    {
+        AsyncTransformStream::afterFinalize(savedOutput, streamEnded);
+    }
+    else
+    {
+        AsyncTransformStream::afterProcess(savedInput, savedOutput);
+    }
 }

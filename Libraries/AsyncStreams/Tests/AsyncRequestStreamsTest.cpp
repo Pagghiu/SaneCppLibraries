@@ -102,7 +102,7 @@ void SC::AsyncRequestStreamsTest::fileToFile()
 
     for (uint64_t idx = 0; idx < 1024 / sizeof(uint64_t); ++idx)
     {
-        referenceData[idx] = idx;
+        referenceData[size_t(idx)] = idx;
     }
     const auto spanOfChars = referenceData.toSpanConst().reinterpret_as_array_of<const char>();
     SC_TEST_EXPECT(fs.write(readablePath.view(), spanOfChars));
@@ -229,6 +229,9 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     ThreadPool fileThreadPool;
     SC_TEST_EXPECT(fileThreadPool.create(2));
 
+    ThreadPool compressionThreadPool;
+    SC_TEST_EXPECT(compressionThreadPool.create(2));
+
     // Create Readable File Stream
     ReadableFileStream readFileStream;
     FileDescriptor     readFd;
@@ -291,6 +294,9 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     AsyncReadableStream::Request compressReadRequests[numberOfBuffers1 + 1];
     SC_TEST_EXPECT(compressStream.init(buffersPool1, compressReadRequests, compressWriteRequests));
     SC_TEST_EXPECT(compressStream.stream.init(ZLibStream::CompressZLib));
+    SC_TEST_EXPECT(compressStream.asyncWork.setThreadPool(compressionThreadPool));
+    compressStream.asyncWork.cacheInternalEventLoop(eventLoop);
+    compressStream.asyncWork.setDebugName("CompressStream");
 
     // Create first Async Pipeline (file to socket)
     AsyncDuplexStream*   transforms1[1] = {&compressStream};
@@ -305,6 +311,9 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     AsyncReadableStream::Request decompressReadRequests[numberOfBuffers2 + 1];
     SC_TEST_EXPECT(decompressStream.init(buffersPool2, decompressReadRequests, decompressWriteRequests));
     SC_TEST_EXPECT(decompressStream.stream.init(ZLibStream::DecompressZLib));
+    SC_TEST_EXPECT(decompressStream.asyncWork.setThreadPool(compressionThreadPool));
+    decompressStream.asyncWork.cacheInternalEventLoop(eventLoop);
+    decompressStream.asyncWork.setDebugName("DecompressStream");
 
     // Create second Async Pipeline (socket to file)
     AsyncDuplexStream*   transforms2[1] = {&decompressStream};

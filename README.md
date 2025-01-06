@@ -24,16 +24,13 @@
 
 Visit the [documentation website](https://pagghiu.github.io/SaneCppLibraries/index.html) for more information.
 
-- [Blog Post - Sane C++ Libraries (Open Sourcing)](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html)
-- [Blog Post - 1st Year of Sane C++ Libraries](https://pagghiu.github.io/site/blog/2024-12-23-SaneCpp1Year.html)
-
 # Libraries
 
 Library                                                                                                 | Description
 :-------------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------------------
 [Algorithms](https://pagghiu.github.io/SaneCppLibraries/library_algorithms.html)                        | 🟥 Placeholder library where templated algorithms will be placed
 [Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html)                                  | 🟨 Async I/O (files, sockets, timers, processes, fs events, threads wake-up)
-[Async Streams](https://pagghiu.github.io/SaneCppLibraries/library_async_streams.html)                  | 🟥 Read, transform and write data concurrently from async sources to destinations.
+[Async Streams](https://pagghiu.github.io/SaneCppLibraries/library_async_streams.html)                  | 🟥 Concurrently read, write and transform byte streams
 [Build](https://pagghiu.github.io/SaneCppLibraries/library_build.html)                                  | 🟨 Minimal build system where builds are described in C++
 [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html)                        | 🟨 Generic containers (SC::Vector, SC::SmallVector, SC::Array etc.)
 [File](https://pagghiu.github.io/SaneCppLibraries/library_file.html)                                    | 🟩 Synchronous Disk File I/O
@@ -134,4 +131,9 @@ On this [YouTube Channel](https://www.youtube.com/@Pagghiu) there are some video
 
 # Blog posts
 
-On [Sane Coding Blog](https://pagghiu.github.io) there is a series of blog posts about this project.
+On [Sane Coding Blog](https://pagghiu.github.io) there is a series of posts about this project.
+
+Relevant yearly posts:
+
+- [Blog Post - Sane C++ Libraries (Open Sourcing)](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html)
+- [Blog Post - 1st Year of Sane C++ Libraries](https://pagghiu.github.io/site/blog/2024-12-23-SaneCpp1Year.html)

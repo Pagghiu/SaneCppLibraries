@@ -1,6 +1,6 @@
 @page library_async_streams Async Streams
 
-@brief 🟥 Concurrently read and write a byte stream staying inside fixed buffers
+@brief 🟥 Concurrently read, write and transform byte streams
 
 [TOC]
 
@@ -54,17 +54,21 @@ This is the list of videos that have been recorded showing some of the internal 
 - [Ep.30 - C++ Async Streams Pipeline](https://www.youtube.com/watch?v=8rYQ2ApxnwA)
 - [Ep.31 - C++ Async Socket Streams](https://www.youtube.com/watch?v=0x6TLV_ig-A)
 - [Ep.32 - C++ Async Transform Streams - Part 1](https://www.youtube.com/watch?v=Ul7DdQGrETo)
+- [Ep.33 - C++ Async Transform Streams - Part 2](https://www.youtube.com/watch?v=KKwohFmAUCk)
+- [Ep.34 - C++ Async Transform Streams - Part 3](https://www.youtube.com/watch?v=vCh6vEfiISI)
 
 # Blog
 
 Some relevant blog posts are:
 
 - [November 2024 Update](https://pagghiu.github.io/site/blog/2024-11-30-SaneCppLibrariesUpdate.html)
+- [December 2024 Update](https://pagghiu.github.io/site/blog/2024-12-31-SaneCppLibrariesUpdate.html)
 
 # Roadmap
 
 🟨 MVP features
-- Transform Streams
+- Socket Stream
+- Pipe Stream
 
 🟩 Usable features:
 - Pipeline pause
