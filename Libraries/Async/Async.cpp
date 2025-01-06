@@ -813,6 +813,8 @@ SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(AsyncEventLoop& loo
     switch (syncMode)
     {
     case SyncMode::NoWait: {
+        // No need to update time as it was already updated in submitRequests and syncing
+        // with kernel has not been blocking (as we are in NoWait mode)
         if (kernelEvents.needsManualTimersProcessing())
         {
             invokeExpiredTimers(loopTime);
@@ -820,14 +822,12 @@ SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(AsyncEventLoop& loo
     }
     break;
     case SyncMode::ForcedForwardProgress: {
+        // Update loop time unconditionally after a (potentially blocking) sync kernel operation
+        updateTime();
         if (gotExpiredTimer)
         {
             gotExpiredTimer = false;
-            updateTime();
-            if (kernelEvents.needsManualTimersProcessing())
-            {
-                invokeExpiredTimers(loopTime);
-            }
+            invokeExpiredTimers(loopTime);
         }
     }
     break;
