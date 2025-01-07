@@ -173,8 +173,37 @@ SC::Time::Relative SC::Time::HighResolutionCounter::getRelative() const
 #if SC_PLATFORM_WINDOWS
     return Relative::fromSeconds(static_cast<double>(part1) / part2);
 #else
-    constexpr int32_t secondsToNanoseconds = 1e9;
+    constexpr int32_t secondsToNanoseconds = 1000000000;
     return Relative::fromSeconds(part1 + static_cast<double>(part2) / secondsToNanoseconds);
+#endif
+}
+
+SC::Time::Nanoseconds SC::Time::HighResolutionCounter::toNanoseconds() const
+{
+#if SC_PLATFORM_WINDOWS
+    return Nanoseconds(static_cast<uint64_t>(part1 * 100000 / part2 * 10000));
+#else
+    constexpr uint32_t secondsToNanoseconds = 1000000000;
+    return Nanoseconds(static_cast<int64_t>(part1) * secondsToNanoseconds + static_cast<int64_t>(part2));
+#endif
+}
+
+SC::Time::Milliseconds SC::Time::HighResolutionCounter::toMilliseconds() const
+{
+#if SC_PLATFORM_WINDOWS
+    return Milliseconds(static_cast<int64_t>(part1 * 1000 / part2));
+#else
+    return Milliseconds(static_cast<int64_t>(part1) * 1000 + static_cast<int64_t>(part2) / 1000000);
+#endif
+}
+
+SC::Time::Seconds SC::Time::HighResolutionCounter::toSeconds() const
+{
+#if SC_PLATFORM_WINDOWS
+    return Seconds(static_cast<int64_t>(part1 / part2));
+#else
+    constexpr uint32_t secondsToNanoseconds = 1e9;
+    return Seconds(static_cast<int64_t>(part1) + static_cast<int64_t>(part2) / secondsToNanoseconds);
 #endif
 }
 

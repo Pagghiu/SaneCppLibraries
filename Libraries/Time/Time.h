@@ -13,6 +13,7 @@ struct Relative;
 struct HighResolutionCounter;
 
 struct Milliseconds;
+struct Nanoseconds;
 struct Seconds;
 } // namespace Time
 } // namespace SC
@@ -24,6 +25,18 @@ struct Seconds;
 
 //! @{
 
+/// @brief Type-safe wrapper of uint64 used to represent nanoseconds
+struct SC::Time::Nanoseconds
+{
+    constexpr Nanoseconds() : ns(0) {}
+    constexpr explicit Nanoseconds(int64_t ns) : ns(ns){};
+    int64_t ns;
+
+    [[nodiscard]] bool operator>(const Nanoseconds other) const { return ns > other.ns; }
+    [[nodiscard]] bool operator<(const Nanoseconds other) const { return ns < other.ns; }
+    [[nodiscard]] bool operator==(const Nanoseconds other) const { return ns == other.ns; }
+};
+
 /// @brief Type-safe wrapper of uint64 used to represent milliseconds
 struct SC::Time::Milliseconds
 {
@@ -31,8 +44,9 @@ struct SC::Time::Milliseconds
     constexpr explicit Milliseconds(int64_t ms) : ms(ms){};
     int64_t ms;
 
-    bool operator>(const Milliseconds other) const { return ms > other.ms; }
-    bool operator<(const Milliseconds other) const { return ms < other.ms; }
+    [[nodiscard]] bool operator>(const Milliseconds other) const { return ms > other.ms; }
+    [[nodiscard]] bool operator<(const Milliseconds other) const { return ms < other.ms; }
+    [[nodiscard]] bool operator==(const Milliseconds other) const { return ms == other.ms; }
 };
 
 /// @brief Type-safe wrapper of uint64 used to represent seconds
@@ -40,34 +54,56 @@ struct SC::Time::Seconds
 {
     constexpr Seconds() : sec(0) {}
     constexpr explicit Seconds(int64_t sec) : sec(sec){};
+    int64_t sec;
+
+    [[nodiscard]] bool operator>(const Seconds other) const { return sec > other.sec; }
+    [[nodiscard]] bool operator<(const Seconds other) const { return sec < other.sec; }
+    [[nodiscard]] bool operator==(const Seconds other) const { return sec == other.sec; }
 
     constexpr operator Milliseconds() { return Milliseconds(sec * 1000); }
-    int64_t   sec;
 };
 
 /// @brief Interval of time represented with 64 bit double precision float
 struct SC::Time::Relative
 {
     /// @brief how many seconds have elapsed in
-    Relative() : floatingSeconds(0.0) {}
+    Relative() : seconds(0.0) {}
+
+    /// @brief Construct a Relative from milliseconds
+    Relative(Milliseconds time) : seconds(static_cast<double>(time.ms / 1e3)) {}
+
+    /// @brief Construct a Relative from nanoseconds
+    Relative(Nanoseconds time) : seconds(static_cast<double>(time.ns / 1e9)) {}
 
     /// @brief Construct a Relative from seconds
-    /// @param seconds A double representing an interval of time in seconds
-    /// @return A Relative representing the given interval in seconds
+    Relative(Seconds time) : seconds(static_cast<double>(time.sec)) {}
+
     static Relative fromSeconds(double seconds) { return Relative(seconds); }
 
-    /// @brief Converts current time to Milliseconds, rounding to upper integer
-    /// @return An Milliseconds struct holding the time converted to milliseconds
-    Milliseconds inRoundedUpperMilliseconds() const
-    {
-        return Milliseconds(static_cast<int64_t>(floatingSeconds * 1000.0 + 0.5f));
-    }
-    Seconds inSeconds() const { return Seconds(static_cast<int64_t>(floatingSeconds)); }
+    [[nodiscard]] bool operator>(const Relative other) const { return seconds > other.seconds; }
+    [[nodiscard]] bool operator<(const Relative other) const { return seconds < other.seconds; }
+    [[nodiscard]] bool operator==(const Relative other) const { return toNanoseconds() == other.toNanoseconds(); }
+
+    Seconds      toSeconds() const { return Seconds(static_cast<int64_t>(seconds + 0.5)); }
+    Nanoseconds  toNanoseconds() const { return Nanoseconds(static_cast<int64_t>(seconds * 1e9 + 0.5)); }
+    Milliseconds toMilliseconds() const { return Milliseconds(static_cast<int64_t>(seconds * 1e3 + 0.5)); }
 
   private:
-    Relative(double floatingSeconds) : floatingSeconds(floatingSeconds) {}
-    double floatingSeconds = 0;
+    Relative(double seconds) : seconds(seconds) {}
+    double seconds = 0;
 };
+
+// User defined literals
+// Using "unsigned long long int" instead of int64_t because it's mandated by the standard.
+namespace SC
+{
+// clang-format off
+inline Time::Nanoseconds  operator""_ns(unsigned long long int ns) { return Time::Nanoseconds(static_cast<int64_t>(ns)); }
+inline Time::Milliseconds operator""_ms(unsigned long long int ms) { return Time::Milliseconds(static_cast<int64_t>(ms)); }
+inline Time::Seconds      operator""_sec(unsigned long long int sec) { return Time::Seconds(static_cast<int64_t>(sec)); }
+// clang-format on
+
+} // namespace SC
 
 /// @brief Absolute time represented with milliseconds since epoch
 struct SC::Time::Absolute
@@ -171,6 +207,10 @@ struct SC::Time::HighResolutionCounter
     [[nodiscard]] HighResolutionCounter subtractExact(HighResolutionCounter other) const;
 
     Relative getRelative() const;
+
+    Nanoseconds  toNanoseconds() const;
+    Milliseconds toMilliseconds() const;
+    Seconds      toSeconds() const;
 
     int64_t part1;
     int64_t part2;

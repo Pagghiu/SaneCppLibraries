@@ -186,7 +186,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         {
             if (nextTimer->isLaterThanOrEqualTo(eventLoop.internal.loopTime))
             {
-                timeout = nextTimer->subtractApproximate(eventLoop.internal.loopTime).inRoundedUpperMilliseconds();
+                timeout = nextTimer->subtractApproximate(eventLoop.internal.loopTime).toMilliseconds();
             }
         }
         const DWORD ms =

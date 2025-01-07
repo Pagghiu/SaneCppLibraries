@@ -138,7 +138,7 @@ timeout.callback = [&](AsyncLoopTimeout::Result& res)
     }
 };
 // Start the timeout, that will be called 200 ms from now
-SC_TRY(timeout.start(eventLoop, Time::Milliseconds(200)));
+SC_TRY(timeout.start(eventLoop, 200_ms));
 //! [AsyncLoopTimeoutSnippet]
 SC_TRY(eventLoop.run());
 return Result(true);

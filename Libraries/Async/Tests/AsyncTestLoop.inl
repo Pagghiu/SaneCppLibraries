@@ -11,8 +11,8 @@ void SC::AsyncTest::loopFreeSubmittingOnClose()
 
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create());
-    SC_TEST_EXPECT(loopTimeout[0].start(eventLoop, Time::Milliseconds(12)));
-    SC_TEST_EXPECT(loopTimeout[1].start(eventLoop, Time::Milliseconds(122)));
+    SC_TEST_EXPECT(loopTimeout[0].start(eventLoop, 12_ms));
+    SC_TEST_EXPECT(loopTimeout[1].start(eventLoop, 122_ms));
     SC_TEST_EXPECT(loopWakeUp[0].start(eventLoop));
     SC_TEST_EXPECT(loopWakeUp[1].start(eventLoop));
     constexpr uint32_t numWaitingConnections = 2;
@@ -42,8 +42,8 @@ void SC::AsyncTest::loopFreeSubmittingOnClose()
 
     // So let's try using them again, and we should get no errors of anything "in use"
     SC_TEST_EXPECT(eventLoop.create());
-    SC_TEST_EXPECT(loopTimeout[0].start(eventLoop, Time::Milliseconds(12)));
-    SC_TEST_EXPECT(loopTimeout[1].start(eventLoop, Time::Milliseconds(123)));
+    SC_TEST_EXPECT(loopTimeout[0].start(eventLoop, 12_ms));
+    SC_TEST_EXPECT(loopTimeout[1].start(eventLoop, 123_ms));
     SC_TEST_EXPECT(loopWakeUp[0].start(eventLoop));
     SC_TEST_EXPECT(loopWakeUp[1].start(eventLoop));
     SC_TEST_EXPECT(socketAccept[0].start(eventLoop, serverSocket[0]));

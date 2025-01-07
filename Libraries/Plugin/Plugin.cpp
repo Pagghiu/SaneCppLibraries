@@ -744,7 +744,7 @@ void SC::PluginRegistry::getPluginsToReloadBecauseOf(StringView relativePath, Ti
             if (file.absolutePath.view().endsWith(relativePath))
             {
                 const Time::Relative elapsed = Time::Absolute::now().subtract(library.lastLoadTime);
-                if (elapsed.inRoundedUpperMilliseconds() > tolerance)
+                if (elapsed > tolerance)
                 {
                     // Only reload if at least tolerance ms have passed, as sometimes FSEvents on
                     // macOS likes to send multiple events that are difficult to filter properly

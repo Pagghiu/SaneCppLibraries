@@ -56,7 +56,7 @@ void SC::TimeTest::testHighResolutionCounterSnap()
     Thread::Sleep(100);
     end.snap();
     Time::Relative elapsed = end.subtractApproximate(start);
-    SC_TEST_EXPECT(elapsed.inRoundedUpperMilliseconds().ms < 300 and elapsed.inRoundedUpperMilliseconds().ms > 0);
+    SC_TEST_EXPECT(elapsed < 300_ms and elapsed > 0_ms);
     //! [highResolutionCounterSnapSnippet]
 }
 
@@ -67,7 +67,7 @@ void SC::TimeTest::testHighResolutionCounterOffseBy()
     start.snap();
     end                    = start.offsetBy(Time::Milliseconds(321));
     Time::Relative elapsed = end.subtractApproximate(start);
-    SC_TEST_EXPECT(elapsed.inRoundedUpperMilliseconds().ms == 321);
+    SC_TEST_EXPECT(elapsed == 321_ms);
     //! [highResolutionCounterOffsetBySnippet]
 }
 void SC::TimeTest::testHighResolutionCounterIsLaterOn()
@@ -75,7 +75,7 @@ void SC::TimeTest::testHighResolutionCounterIsLaterOn()
     //! [highResolutionCounterIsLaterOnSnippet]
     Time::HighResolutionCounter start;
     start.snap();
-    const Time::HighResolutionCounter end = start.offsetBy(Time::Milliseconds(123));
+    const Time::HighResolutionCounter end = start.offsetBy(123_ms);
     SC_TEST_EXPECT(end.isLaterThanOrEqualTo(start));
     SC_TEST_EXPECT(not start.isLaterThanOrEqualTo(end));
     //! [highResolutionCounterIsLaterOnSnippet]

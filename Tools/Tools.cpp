@@ -106,7 +106,7 @@ int main(int argc, const char* argv[])
     console.print(gFormatString.view());
 
     const Result   result  = Tool::runTool(arguments);
-    const uint64_t elapsed = SC::Time::Absolute::now().subtract(started).inRoundedUpperMilliseconds().ms;
+    const uint64_t elapsed = SC::Time::Absolute::now().subtract(started).toMilliseconds().ms;
 
     SC_TRY(builder.format("{} \"{}\" finished (took {} ms)\n", arguments.tool, arguments.action, elapsed));
 

@@ -158,9 +158,9 @@ void SC::SocketTest::socketClientServer(SocketFlags::SocketType socketType, Sock
     char              buf[1] = {0};
     SC_TEST_EXPECT(acceptedClient.read({buf, sizeof(buf)}, readData));
     SC_TEST_EXPECT(buf[0] == testValue and testValue != 0);
-    SC_TEST_EXPECT(not acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, Time::Milliseconds(10)));
+    SC_TEST_EXPECT(not acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, 10_ms));
     params.eventObject.signal();
-    SC_TEST_EXPECT(acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, Time::Seconds(10)));
+    SC_TEST_EXPECT(acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, 10_sec));
     SC_TEST_EXPECT(buf[0] == testValue + 1);
     SC_TEST_EXPECT(socket.close());
     SC_TEST_EXPECT(server.close());
@@ -236,7 +236,7 @@ SC::Result SC::SocketTest::socketClientAcceptSnippet()
     // ... later on
 
     // Read again blocking but with a timeout of 10 seconds
-    SC_TRY(acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, Time::Milliseconds(10000)));
+    SC_TRY(acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, 10_sec));
 
     // Close the client
     SC_TRY(acceptedClientSocket.close());

@@ -61,11 +61,11 @@ struct ApplicationSystem
     Result runLoopStepInsideSokolApp()
     {
         // Update loop time, mainly to display it in the GUI
-        state.loopTime = eventLoop.getLoopTime().getRelative().inRoundedUpperMilliseconds();
+        state.loopTime = eventLoop.getLoopTime().toMilliseconds();
 
         // Check if enough time has passed since last user input event
         const Time::Relative sinceLastEvent = Time::HighResolutionCounter().snap().subtractApproximate(lastEventTime);
-        if (sinceLastEvent.inRoundedUpperMilliseconds() > Time::Milliseconds(state.continueDrawingForMs))
+        if (sinceLastEvent > Time::Milliseconds(state.continueDrawingForMs))
         {
             // Enough time has passed such that we need to pause execution to avoid unnecessary cpu usage
             if (state.pausedCounter < ApplicationState::NumPauseFrames)
