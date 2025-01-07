@@ -96,6 +96,10 @@ struct ApplicationSystem
 
     Result close()
     {
+        if (timeout.isActive())
+        {
+            SC_TRY(timeout.stop());
+        }
         SC_TRY(hotReloadSystem.close());
         SC_TRY(eventLoopMonitor.close())
         SC_TRY(eventLoop.close());
