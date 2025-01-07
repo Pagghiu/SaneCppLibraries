@@ -146,7 +146,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
         SC_TRY(wakeUpEventFd.assign(newEventFd));
 
         // Register
-        wakeUpPoll.callback.bind<&KernelQueueIoURing::completeWakeUp>();
+        wakeUpPoll.callback.bind<&KernelQueuePosix::completeWakeUp>();
         SC_TRY(wakeUpPoll.start(eventLoop, newEventFd));
         return Result(true);
     }
@@ -166,12 +166,6 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
             return Result::Error("AsyncEventLoop::wakeUpFromExternalThread - Error in write");
         }
         return Result(true);
-    }
-
-    static void completeWakeUp(AsyncFilePoll::Result& result)
-    {
-        result.getAsync().eventLoop->internal.executeWakeUps();
-        result.reactivateRequest(true);
     }
 
     static Result associateExternallyCreatedTCPSocket(SocketDescriptor&) { return Result(true); }
