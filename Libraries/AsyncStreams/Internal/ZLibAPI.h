@@ -104,15 +104,20 @@ struct SC::ZLibAPI
     }
 
   private:
+#if SC_PLATFORM_WINDOWS
+#define SC_ZLIB_API_CC __stdcall
+#else
+#define SC_ZLIB_API_CC
+#endif
     // Function pointers for zlib functions
-    Error (*pDeflate)(void* strm, Flush flush)                                               = nullptr;
-    Error (*pDeflateEnd)(void* strm)                                                         = nullptr;
-    Error (*pInflate)(void* strm, Flush flush)                                               = nullptr;
-    Error (*pInflateEnd)(void* strm)                                                         = nullptr;
-    Error (*pDeflateInit2)(void* strm, Compression level, Method method, int windowBits, int memLevel,
-                           Strategy strategy, const char* version, int stream_size)          = nullptr;
-    Error (*pInflateInit2)(void* strm, int windowBits, const char* version, int stream_size) = nullptr;
-
+    Error(SC_ZLIB_API_CC* pDeflate)(void* strm, Flush flush)                                               = nullptr;
+    Error(SC_ZLIB_API_CC* pDeflateEnd)(void* strm)                                                         = nullptr;
+    Error(SC_ZLIB_API_CC* pInflate)(void* strm, Flush flush)                                               = nullptr;
+    Error(SC_ZLIB_API_CC* pInflateEnd)(void* strm)                                                         = nullptr;
+    Error(SC_ZLIB_API_CC* pDeflateInit2)(void* strm, Compression level, Method method, int windowBits, int memLevel,
+                                         Strategy strategy, const char* version, int stream_size)          = nullptr;
+    Error(SC_ZLIB_API_CC* pInflateInit2)(void* strm, int windowBits, const char* version, int stream_size) = nullptr;
+#undef SC_ZLIB_API_CC
     // Handle for dynamic library
     void* library = nullptr;
 
