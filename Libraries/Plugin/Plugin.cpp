@@ -397,7 +397,7 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
 
     SC_TRY(argumentsArena.appendAsSingleString({L"/Fo:", objectFile}));
     SC_TRY(argumentsArena.appendMultipleStrings({L"/std:c++17", L"/GR-", L"/WX", L"/W4", L"/permissive-", L"/GS-",
-                                                 L"/Zi", L"/DSC_PLUGIN_LIBRARY=1", L"/D_HAS_EXCEPTIONS=0", L"/NOLOGO",
+                                                 L"/Zi", L"/DSC_PLUGIN_LIBRARY=1", L"/D_HAS_EXCEPTIONS=0", L"/nologo",
                                                  L"/c", sourceFile}));
 #else
     (void)sysroot;
@@ -498,7 +498,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
         SC_TRY(arena.appendMultipleStrings({SC_NATIVE_STR("/NODEFAULTLIB"), SC_NATIVE_STR("/ENTRY:DllMain")}));
     }
     SC_TRY(arena.appendMultipleStrings(
-        {SC_NATIVE_STR("/NOLOGO"), SC_NATIVE_STR("/DLL"), SC_NATIVE_STR("/DEBUG"), SC_NATIVE_STR("/SAFESEH:NO")}));
+        {SC_NATIVE_STR("/nologo"), SC_NATIVE_STR("/DLL"), SC_NATIVE_STR("/DEBUG"), SC_NATIVE_STR("/SAFESEH:NO")}));
 
     for (size_t idx = 0; idx < compilerLibraryPaths.size(); ++idx)
     {
