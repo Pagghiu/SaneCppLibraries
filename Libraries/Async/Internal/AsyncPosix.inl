@@ -907,7 +907,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     template <typename T> [[nodiscard]] Result completeAsync(T&)  { return Result(true); }
     template <typename T> [[nodiscard]] Result cancelAsync(T&)    { return Result(true); }
 
-    template <typename T> [[nodiscard]] Result teardownAsync(T*, AsyncTeardown&)  { return Result(true); }
+    template <typename T> [[nodiscard]] static Result teardownAsync(T*, AsyncTeardown&)  { return Result(true); }
 
     // If False, makes re-activation a no-op, that is a lightweight optimization.
     // More importantly it prevents an assert about being Submitting state when async completes during re-activation run cycle.

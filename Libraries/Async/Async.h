@@ -949,7 +949,7 @@ struct SC::AsyncEventLoop
     /// @brief Options given to AsyncEventLoop::create
     struct Options
     {
-        enum class ApiType
+        enum class ApiType : uint8_t
         {
             Automatic = 0,   ///< Platform specific backend chooses the best API.
             ForceUseIOURing, ///< (Linux only) Tries to use `io_uring` (failing if it's not found on the system)

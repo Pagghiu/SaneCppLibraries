@@ -46,6 +46,7 @@ struct SC::AsyncEventLoop::Internal
     Atomic<bool> wakeUpPending   = false;
     bool         gotExpiredTimer = false;
     bool         initialized     = false;
+    Options      createOptions;
 
     int numberOfActiveHandles     = 0;
     int numberOfManualCompletions = 0;
@@ -164,5 +165,5 @@ struct SC::AsyncEventLoop::Internal
     };
 
     void                 prepareTeardown(AsyncRequest& async, AsyncTeardown& teardown);
-    [[nodiscard]] Result teardownAsync(KernelEvents& kernelEvents, AsyncTeardown& async);
+    [[nodiscard]] Result teardownAsync(AsyncTeardown& async);
 };

@@ -27,11 +27,12 @@ struct SC::AsyncEventLoop::KernelEvents
 
     // clang-format off
     template <typename T> [[nodiscard]] bool setupAsync(T&)     { return true; }
-    template <typename T> [[nodiscard]] bool teardownAsync(T&)  { return true; }
     template <typename T> [[nodiscard]] bool activateAsync(T&)  { return true; }
     template <typename T> [[nodiscard]] bool completeAsync(T&)  { return true; }
     template <typename T> [[nodiscard]] bool cancelAsync(T&)    { return true; }
 
+
+    template <typename T> [[nodiscard]] static bool teardownAsync(T&)  { return true; }
     template <typename T, typename P>
     [[nodiscard]] static Result executeOperation(T&, P&)        { return Result(true); }
     // clang-format on

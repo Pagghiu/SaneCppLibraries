@@ -296,7 +296,8 @@ SC::Result SC::AsyncEventLoop::create(Options options)
     SC_TRY_MSG(not internal.initialized, "already created");
     SC_TRY(internal.kernelQueue.get().createEventLoop(options));
     SC_TRY(internal.kernelQueue.get().createSharedWatchers(*this));
-    internal.initialized = true;
+    internal.initialized   = true;
+    internal.createOptions = options;
     return SC::Result(true);
 }
 
@@ -695,14 +696,14 @@ SC::Result SC::AsyncEventLoop::Internal::stageSubmission(KernelEvents& kernelEve
         SC_TRY(cancelAsync(kernelEvents, async));
         AsyncTeardown teardown;
         prepareTeardown(async, teardown);
-        SC_TRY(teardownAsync(kernelEvents, teardown));
+        SC_TRY(teardownAsync(teardown));
         async.markAsFree(); // This may still come up in kernel events
     }
     break;
     case AsyncRequest::State::Teardown: {
         AsyncTeardown teardown;
         prepareTeardown(async, teardown);
-        SC_TRY(teardownAsync(kernelEvents, teardown));
+        SC_TRY(teardownAsync(teardown));
         async.markAsFree(); // This may still come up in kernel events
     }
     break;
@@ -753,7 +754,7 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndEventuallyReactivate(KernelE
     }
     else
     {
-        SC_TRY(teardownAsync(kernelEvents, teardown));
+        SC_TRY(teardownAsync(teardown));
     }
     if (not returnCode)
     {
@@ -1110,50 +1111,50 @@ SC::Result SC::AsyncEventLoop::Internal::activateAsync(KernelEvents& kernelEvent
     return Result(true);
 }
 
-SC::Result SC::AsyncEventLoop::Internal::teardownAsync(KernelEvents& kernelEvents, AsyncTeardown& teardown)
+SC::Result SC::AsyncEventLoop::Internal::teardownAsync(AsyncTeardown& teardown)
 {
     SC_LOG_MESSAGE("{} {} TEARDOWN\n", teardown.debugName, AsyncRequest::TypeToString(teardown.type));
 
     switch (teardown.type)
     {
     case AsyncRequest::Type::LoopTimeout:
-        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncLoopTimeout*>(nullptr), teardown));
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncLoopTimeout*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::LoopWakeUp:
-        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncLoopWakeUp*>(nullptr), teardown));
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncLoopWakeUp*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::LoopWork:
-        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncLoopWork*>(nullptr), teardown));
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncLoopWork*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::ProcessExit:
-        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncProcessExit*>(nullptr), teardown));
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncProcessExit*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::SocketAccept:
-        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncSocketAccept*>(nullptr), teardown));
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncSocketAccept*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::SocketConnect:
-        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncSocketConnect*>(nullptr), teardown));
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncSocketConnect*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::SocketSend:
-        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncSocketSend*>(nullptr), teardown));
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncSocketSend*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::SocketReceive:
-        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncSocketReceive*>(nullptr), teardown));
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncSocketReceive*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::SocketClose:
-        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncSocketClose*>(nullptr), teardown));
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncSocketClose*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::FileRead:
-        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncFileRead*>(nullptr), teardown));
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncFileRead*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::FileWrite:
-        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncFileWrite*>(nullptr), teardown));
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncFileWrite*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::FileClose:
-        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncFileClose*>(nullptr), teardown));
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncFileClose*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::FilePoll:
-        SC_TRY(kernelEvents.teardownAsync(static_cast<AsyncFilePoll*>(nullptr), teardown));
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncFilePoll*>(nullptr), teardown));
         break;
     }
 
