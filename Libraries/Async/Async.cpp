@@ -112,7 +112,7 @@ SC::Result SC::AsyncRequest::stop()
 
 bool SC::AsyncRequest::isFree() const { return state == State::Free; }
 
-bool SC::AsyncRequest::isCancelling() const { return state == State::Cancelling or state == State::Teardown; }
+bool SC::AsyncRequest::isCancelling() const { return state == State::Cancelling; }
 
 bool SC::AsyncRequest::isActive() const { return state == State::Active or state == State::Reactivate; }
 
@@ -700,13 +700,6 @@ SC::Result SC::AsyncEventLoop::Internal::stageSubmission(KernelEvents& kernelEve
         async.markAsFree(); // This may still come up in kernel events
     }
     break;
-    case AsyncRequest::State::Teardown: {
-        AsyncTeardown teardown;
-        prepareTeardown(async, teardown);
-        SC_TRY(teardownAsync(teardown));
-        async.markAsFree(); // This may still come up in kernel events
-    }
-    break;
     case AsyncRequest::State::Active: {
         SC_ASSERT_DEBUG(false);
         return SC::Result::Error("AsyncEventLoop::processSubmissions() got Active handle");
@@ -1219,7 +1212,11 @@ SC::Result SC::AsyncEventLoop::Internal::cancelAsync(AsyncEventLoop& loop, Async
         break;
     }
     case AsyncRequest::State::Submitting: {
-        async.state = AsyncRequest::State::Teardown;
+        submissions.remove(async);
+        AsyncTeardown teardown;
+        prepareTeardown(async, teardown);
+        SC_TRY(teardownAsync(teardown));
+        async.markAsFree(); // This may still come up in kernel events
         break;
     }
     case AsyncRequest::State::Setup: {
@@ -1231,8 +1228,6 @@ SC::Result SC::AsyncEventLoop::Internal::cancelAsync(AsyncEventLoop& loop, Async
         async.state = AsyncRequest::State::Free;
         break;
     }
-    case AsyncRequest::State::Teardown: //
-        return SC::Result::Error("Trying to stop AsyncRequest that is already being cancelled (teardown)");
     case AsyncRequest::State::Free: //
         return SC::Result::Error("Trying to stop AsyncRequest that is not active");
     case AsyncRequest::State::Cancelling: //

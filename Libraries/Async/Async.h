@@ -208,7 +208,6 @@ struct SC::AsyncRequest
         Active,     // when monitored by OS syscall or in activeLoopWakeUps / activeTimeouts queues
         Reactivate, // when flagged for reactivation inside the callback (after a result.reactivateRequest(true))
         Cancelling, // when in cancellation queue waiting for a cancelAsync (on active async)
-        Teardown    // when in cancellation queue waiting for a teardownAsync (on non-active, already setup async)
     };
 
 #if SC_CONFIGURATION_DEBUG
