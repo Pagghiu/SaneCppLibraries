@@ -93,3 +93,24 @@ void SC::AsyncTest::loopFreeActiveOnClose()
     SC_TEST_EXPECT(eventLoop.runNoWait());
     SC_TEST_EXPECT(eventLoop.close());
 }
+
+void SC::AsyncTest::loopInterrupt()
+{
+    AsyncEventLoop   eventLoop;
+    AsyncLoopTimeout timeout;
+
+    SC_TEST_EXPECT(eventLoop.create());
+    int numTimeouts  = 0;
+    timeout.callback = [&](AsyncLoopTimeout::Result& res)
+    {
+        res.reactivateRequest(true);
+        numTimeouts++;
+        if (numTimeouts == 2)
+        {
+            res.getAsync().getEventLoop()->interrupt();
+        }
+    };
+    SC_TEST_EXPECT(timeout.start(eventLoop, 1_ms));
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(numTimeouts == 2);
+}

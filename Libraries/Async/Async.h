@@ -604,7 +604,6 @@ struct AsyncSocketSend : public AsyncRequest
     size_t             totalBytesSent = 0;
 #endif
 };
-struct AsyncSocketReceive;
 
 /// @brief Starts a socket receive operation, receiving bytes from a remote endpoint.
 /// Callback will be called when some data is read from socket. @n
@@ -967,6 +966,9 @@ struct SC::AsyncEventLoop
     /// Closes the event loop kernel object
     [[nodiscard]] Result close();
 
+    /// Interrupts the event loop even if it has active request on it
+    void interrupt();
+
     /// @brief Returns `true` if create has been already called (successfully)
     [[nodiscard]] bool isInitialized() const;
 
@@ -1071,9 +1073,9 @@ struct SC::AsyncEventLoop
   private:
     struct InternalDefinition
     {
-        static constexpr int Windows = 464;
-        static constexpr int Apple   = 456;
-        static constexpr int Linux   = 664;
+        static constexpr int Windows = 472;
+        static constexpr int Apple   = 464;
+        static constexpr int Linux   = 672;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = 8;

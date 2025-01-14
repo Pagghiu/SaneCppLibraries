@@ -26,6 +26,7 @@ struct SC::AsyncTest : public SC::TestCase
 
     void loopFreeSubmittingOnClose();
     void loopFreeActiveOnClose();
+    void loopInterrupt();
     void loopWork();
     void loopTimeout();
     void loopWakeUpFromExternalThread();

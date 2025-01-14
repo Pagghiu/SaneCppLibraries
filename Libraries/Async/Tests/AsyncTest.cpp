@@ -29,6 +29,10 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             loopFreeActiveOnClose();
         }
+        if (test_section("loop interrupt"))
+        {
+            loopInterrupt();
+        }
         if (test_section("loop work"))
         {
             loopWork();

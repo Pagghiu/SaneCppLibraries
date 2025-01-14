@@ -309,6 +309,8 @@ SC::Result SC::AsyncEventLoop::close()
     return SC::Result(true);
 }
 
+void SC::AsyncEventLoop::interrupt() { internal.interrupted = true; }
+
 bool SC::AsyncEventLoop::isInitialized() const { return internal.initialized; }
 
 SC::Result SC::AsyncEventLoop::runOnce() { return internal.runStep(*this, Internal::SyncMode::ForcedForwardProgress); }
@@ -323,6 +325,11 @@ SC::Result SC::AsyncEventLoop::run()
     while (internal.getTotalNumberOfActiveHandle() != 0 or not internal.submissions.isEmpty())
     {
         SC_TRY(runOnce());
+        if (internal.interrupted)
+        {
+            internal.interrupted = false;
+            break;
+        }
     };
     return SC::Result(true);
 }

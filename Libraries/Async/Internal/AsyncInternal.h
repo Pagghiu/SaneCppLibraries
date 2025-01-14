@@ -46,6 +46,7 @@ struct SC::AsyncEventLoop::Internal
     Atomic<bool> wakeUpPending   = false;
     bool         gotExpiredTimer = false;
     bool         initialized     = false;
+    bool         interrupted     = false;
     Options      createOptions;
 
     int numberOfActiveHandles     = 0;
