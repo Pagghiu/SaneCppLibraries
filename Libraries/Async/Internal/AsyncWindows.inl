@@ -212,7 +212,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         }
         if (loopTimeout)
         {
-            eventLoop.internal.gotExpiredTimer = true;
+            eventLoop.internal.runTimers = true;
         }
         return Result(true);
     }

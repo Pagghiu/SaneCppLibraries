@@ -113,4 +113,5 @@ void SC::AsyncTest::loopInterrupt()
     SC_TEST_EXPECT(timeout.start(eventLoop, 1_ms));
     SC_TEST_EXPECT(eventLoop.run());
     SC_TEST_EXPECT(numTimeouts == 2);
+    SC_TEST_EXPECT(eventLoop.getNumberOfActiveRequests() + eventLoop.getNumberOfSubmittedRequests() == 1);
 }

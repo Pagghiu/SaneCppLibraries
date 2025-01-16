@@ -77,12 +77,18 @@ void SC::AsyncTest::socketAccept()
     SC_TEST_EXPECT(context.acceptedClient[0].close());
     SC_TEST_EXPECT(context.acceptedClient[1].close());
 
-    SC_TEST_EXPECT(accept.stop());
+    int afterStopCalled = 0;
+
+    Function<void(AsyncResult&)> afterStopped = [&](AsyncResult&) { afterStopCalled++; };
+
+    SC_TEST_EXPECT(accept.stop(&afterStopped));
+    SC_TEST_EXPECT(afterStopCalled == 0);
 
     // on Windows stopAsync generates one more event loop run because
     // of the closing of the client socket used for acceptex, so to unify
     // the behaviors in the test we do a runNoWait
     SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(afterStopCalled == 1);
 
     SocketDescriptor client3;
     SC_TEST_EXPECT(client3.create(nativeAddress.getAddressFamily()));

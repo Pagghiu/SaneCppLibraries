@@ -493,7 +493,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         newEvents = static_cast<int>(res);
         if (loopTimeout)
         {
-            eventLoop.internal.gotExpiredTimer = true;
+            eventLoop.internal.runTimers = true;
         }
         return Result(true);
     }

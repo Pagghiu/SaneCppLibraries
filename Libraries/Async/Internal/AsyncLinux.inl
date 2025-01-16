@@ -11,7 +11,7 @@
 
 struct SC::AsyncEventLoop::Internal::KernelQueue
 {
-    AlignedStorage<320> storage;
+    AlignedStorage<328> storage;
 
     bool isEpoll = true;
 

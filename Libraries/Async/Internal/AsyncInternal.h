@@ -28,9 +28,9 @@ struct SC::AsyncEventLoop::Internal
 
     struct KernelQueueDefinition
     {
-        static constexpr int Windows = 136;
-        static constexpr int Apple   = 104;
-        static constexpr int Linux   = 328;
+        static constexpr int Windows = 144;
+        static constexpr int Apple   = 112;
+        static constexpr int Linux   = 336;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);
@@ -43,18 +43,23 @@ struct SC::AsyncEventLoop::Internal
     // Using opaque to allow defining KernelQueue class later
     KernelQueueOpaque kernelQueue;
 
-    Atomic<bool> wakeUpPending   = false;
-    bool         gotExpiredTimer = false;
-    bool         initialized     = false;
-    bool         interrupted     = false;
+    Atomic<bool> wakeUpPending = false;
     Options      createOptions;
 
+    bool runTimers   = false;
+    bool initialized = false;
+    bool interrupted = false;
+
+    int numberOfSubmissions       = 0;
     int numberOfActiveHandles     = 0;
     int numberOfManualCompletions = 0;
     int numberOfExternals         = 0;
 
     // Submitting phase
     IntrusiveDoubleLinkedList<AsyncRequest> submissions;
+
+    // Cancellation phase
+    IntrusiveDoubleLinkedList<AsyncRequest> cancellations;
 
     // Active phase
     IntrusiveDoubleLinkedList<AsyncLoopTimeout>   activeLoopTimeouts;
@@ -96,7 +101,7 @@ struct SC::AsyncEventLoop::Internal
     void invokeExpiredTimers(Time::HighResolutionCounter currentTime);
     void updateTime();
 
-    [[nodiscard]] Result cancelAsync(AsyncEventLoop& loop, AsyncRequest& async);
+    [[nodiscard]] Result stop(AsyncEventLoop& loop, AsyncRequest& async, Function<void(AsyncResult&)>* onClose);
 
     // LoopWakeUp
     void executeWakeUps();
@@ -134,6 +139,7 @@ struct SC::AsyncEventLoop::Internal
     [[nodiscard]] Result blockingPoll(AsyncEventLoop& loop, SyncMode syncMode, AsyncKernelEvents& kernelEvents);
     [[nodiscard]] Result dispatchCompletions(AsyncEventLoop& loop, SyncMode syncMode, AsyncKernelEvents& kernelEvents);
 
+    void executeCancellationCallbacks();
     void runStepExecuteCompletions(KernelEvents& kernelEvents);
     void runStepExecuteManualCompletions(KernelEvents& kernelEvents);
     void runStepExecuteManualThreadPoolCompletions(KernelEvents& kernelEvents);

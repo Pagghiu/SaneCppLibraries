@@ -173,8 +173,11 @@ struct SC::AsyncRequest
     AsyncRequest(Type type) : state(State::Free), type(type), flags(0), eventIndex(-1) {}
 
     /// @brief Ask to stop current async operation
+    /// @param afterStopped Optional pointer to a callback called after request is fully stopped.
     /// @return `true` if the stop request has been successfully queued
-    [[nodiscard]] Result stop();
+    /// @note When stopping the request must be valid until afterStopped will be called.
+    /// This AsyncRequest cannot be re-used before this callback will be called.
+    [[nodiscard]] Result stop(Function<void(AsyncResult&)>* afterStopped = nullptr);
 
     /// @brief Returns `true` if this request is free
     [[nodiscard]] bool isFree() const;
@@ -185,6 +188,9 @@ struct SC::AsyncRequest
     /// @brief Returns `true` if this request is active or being reactivated
     [[nodiscard]] bool isActive() const;
 
+    /// @brief Returns request type
+    [[nodiscard]] Type getType() const { return type; }
+
   protected:
     [[nodiscard]] Result validateAsync();
 
@@ -194,6 +200,8 @@ struct SC::AsyncRequest
     AsyncTask*      asyncTask = nullptr;
 
   private:
+    Function<void(AsyncResult&)>* closeCallback = nullptr;
+
     friend struct AsyncEventLoop;
     friend struct AsyncResult;
 
@@ -337,6 +345,8 @@ struct AsyncLoopTimeout : public AsyncRequest
     Function<void(Result&)> callback; ///< Called after given expiration time since AsyncLoopTimeout::start has passed
 
     Time::Milliseconds relativeTimeout; ///< First timer expiration (relative) time in milliseconds
+
+    Time::HighResolutionCounter getExpirationTime() const { return expirationTime; }
 
   private:
     friend struct AsyncEventLoop;
@@ -1052,6 +1062,12 @@ struct SC::AsyncEventLoop
     /// Get Loop time
     [[nodiscard]] Time::HighResolutionCounter getLoopTime() const;
 
+    /// Obtain the total number of active requests
+    [[nodiscard]] int getNumberOfActiveRequests() const;
+
+    /// Obtain the total number of submitted requests
+    [[nodiscard]] int getNumberOfSubmittedRequests() const;
+
     /// @brief Excludes the request from active handles count (to avoid it keeping event loop alive)
     void excludeFromActiveCount(AsyncRequest& async);
 
@@ -1073,9 +1089,9 @@ struct SC::AsyncEventLoop
   private:
     struct InternalDefinition
     {
-        static constexpr int Windows = 472;
-        static constexpr int Apple   = 464;
-        static constexpr int Linux   = 672;
+        static constexpr int Windows = 496;
+        static constexpr int Apple   = 488;
+        static constexpr int Linux   = 696;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = 8;
