@@ -582,6 +582,15 @@ void SC::AsyncEventLoop::Internal::invokeExpiredTimers(Time::HighResolutionCount
                 submissions.queueBack(*current);
                 numberOfSubmissions += 1;
             }
+            if (async != nullptr and not async->isActive())
+            {
+                // Our "next" timeout to check could have been Cancelled during the callback
+                // and it could be in the submission queue now.
+                // It's possible detecting this case by checking the active state.
+                // In this case it makes sense to re-check the entire active timers list.
+                async = activeLoopTimeouts.front;
+                SC_ASSERT_DEBUG(async == nullptr or async->isActive()); // Should not be possible
+            }
         }
     }
 }
