@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../../Foundation/Assert.h"
+#include "../../Foundation/HeapBuffer.h"
 #include "../../Foundation/Memory.h"
 #include "../../Testing/Testing.h"
 
@@ -41,6 +42,24 @@ struct SC::BaseTest : public SC::TestCase
             constexpr auto maxVal = static_cast<size_t>(static_cast<int>(MaxValue())) + 1;
             frames                = Assert::captureBacktrace(2, nullptr, maxVal * sizeof(void*), &hash);
             SC_TEST_EXPECT(frames == 0);
+        }
+        if (test_section("HeapBuffer"))
+        {
+            HeapBuffer buffer;
+            SC_TEST_EXPECT(buffer.allocate(16));
+            SC_TEST_EXPECT(buffer.data.sizeInBytes() == 16);
+            for (size_t i = 0; i < 16; ++i)
+            {
+                buffer.data[i] = static_cast<char>(i);
+            }
+            SC_TEST_EXPECT(buffer.reallocate(32));
+            SC_TEST_EXPECT(buffer.data.sizeInBytes() == 32);
+            bool asExpected = true;
+            for (size_t i = 0; i < 16; ++i)
+            {
+                asExpected = asExpected and (buffer.data[i] == static_cast<char>(i));
+            }
+            SC_TEST_EXPECT(asExpected);
         }
     }
 };

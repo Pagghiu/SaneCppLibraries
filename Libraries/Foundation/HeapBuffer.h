@@ -26,6 +26,9 @@ struct SC::HeapBuffer
     /// @brief Allocates numBytes releasing previously allocated memory
     [[nodiscard]] bool allocate(size_t numBytes);
 
+    /// @brief Allocates numBytes coping the existing contents of previously allocated memory
+    [[nodiscard]] bool reallocate(size_t numBytes);
+
     /// @brief Releases any previously allocated memory
     void release();
 };

@@ -222,6 +222,21 @@ bool SC::HeapBuffer::allocate(size_t numBytes)
     }
 }
 
+bool SC::HeapBuffer::reallocate(size_t numBytes)
+{
+    char* memory = reinterpret_cast<char*>(Memory::reallocate(data.data(), numBytes));
+    if (memory != nullptr)
+    {
+        data = {memory, numBytes};
+        return true;
+    }
+    else
+    {
+        data = {};
+        return false;
+    }
+}
+
 void SC::HeapBuffer::release()
 {
     Memory::release(data.data());
