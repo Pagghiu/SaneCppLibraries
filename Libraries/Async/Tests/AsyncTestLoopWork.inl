@@ -17,8 +17,6 @@ void SC::AsyncTest::loopWork()
 
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create());
-    int numRequestsBase = 0;
-    eventLoop.enumerateRequests([&](AsyncRequest&) { numRequestsBase++; });
 
     AsyncLoopWork works[NUM_WORKS];
 
@@ -47,7 +45,7 @@ void SC::AsyncTest::loopWork()
     int numRequests = 0;
     eventLoop.enumerateRequests([&](AsyncRequest&) { numRequests++; });
     SC_TEST_EXPECT(eventLoop.run());
-    SC_TEST_EXPECT(numRequests == NUM_WORKS + numRequestsBase);
+    SC_TEST_EXPECT(numRequests == NUM_WORKS);
 
     // Check that callbacks have been actually called
     SC_TEST_EXPECT(numWorkCallbackCalls.load() == NUM_WORKS);

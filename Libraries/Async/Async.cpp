@@ -619,8 +619,11 @@ void SC::AsyncEventLoop::Internal::enumerateRequests(IntrusiveDoubleLinkedList<T
     auto async = linkedList.front;
     while (async != nullptr)
     {
-        auto asyncNext = static_cast<T*>(async->next);
-        callback(*async);
+        T* asyncNext = static_cast<T*>(async->next);
+        if ((async->flags & Flag_Internal) == 0) // Exclude internal requests
+        {
+            callback(*async);
+        }
         async = asyncNext;
     }
 }

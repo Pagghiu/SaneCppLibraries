@@ -31,7 +31,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
 {
     FileDescriptor loopFd;
 
-    AsyncFilePoll  wakeupPoll;
+    AsyncFilePoll  wakeUpPoll;
     PipeDescriptor wakeupPipe;
 #if SC_ASYNC_USE_EPOLL
     FileDescriptor signalProcessExitDescriptor;
@@ -84,10 +84,12 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
         // Calls to excludeFromActiveCount must be after runNoWait()
 
         // WakeUp (poll) doesn't keep the kernelEvents active
-        eventLoop.excludeFromActiveCount(wakeupPoll);
+        eventLoop.excludeFromActiveCount(wakeUpPoll);
+        wakeUpPoll.flags |= Flag_Internal;
 #if SC_ASYNC_USE_EPOLL
         // Process watcher doesn't keep the kernelEvents active
         eventLoop.excludeFromActiveCount(signalProcessExit);
+        signalProcessExit.flags |= Flag_Internal;
 #endif
         return Result(true);
     }
@@ -105,9 +107,9 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
             wakeUpPipeDescriptor,
             Result::Error(
                 "AsyncEventLoop::KernelQueuePosix::createSharedWatchers() - AsyncRequest read handle invalid")));
-        wakeupPoll.callback.bind<&KernelQueuePosix::completeWakeUp>();
-        wakeupPoll.setDebugName("SharedWakeUpPoll");
-        SC_TRY(wakeupPoll.start(eventLoop, wakeUpPipeDescriptor));
+        wakeUpPoll.callback.bind<&KernelQueuePosix::completeWakeUp>();
+        wakeUpPoll.setDebugName("SharedWakeUpPoll");
+        SC_TRY(wakeUpPoll.start(eventLoop, wakeUpPipeDescriptor));
         return Result(true);
     }
 

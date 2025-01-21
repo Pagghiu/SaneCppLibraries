@@ -89,6 +89,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
         // Calls to excludeFromActiveCount must be after runNoWait()
         // WakeUp (poll) doesn't keep the kernelEvents active
         eventLoop.excludeFromActiveCount(asyncWakeUp);
+        asyncWakeUp.flags |= Flag_Internal;
         return Result(true);
     }
 
