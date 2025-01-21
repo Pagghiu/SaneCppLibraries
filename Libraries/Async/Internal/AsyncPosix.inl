@@ -189,8 +189,11 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
         FileDescriptor::Handle  sigHandle;
 
         const KernelQueuePosix& kernelQueue = result.getAsync().eventLoop->internal.kernelQueue.get().getPosix();
-        (void)(kernelQueue.signalProcessExitDescriptor.get(sigHandle, Result::Error("Invalid signal handle")));
-
+        Result res = kernelQueue.signalProcessExitDescriptor.get(sigHandle, Result::Error("Invalid signal handle"));
+        if (not res)
+        {
+            return;
+        }
         const ssize_t size = ::read(sigHandle, &siginfo, sizeof(siginfo));
 
         // TODO: Handle lazy deactivation for signals when no more processes exist

@@ -200,7 +200,7 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Vector<P
             const StringView pluginDirectory = item.path;
             if (definitions.isEmpty() or not definitions.back().identity.identifier.isEmpty())
             {
-                SC_TRY(definitions.resize(definitions.size() + 1));
+                SC_TRY(definitions.push_back({}));
             }
             definitions.back().files.clear();
             SC_TRY(definitions.back().directory.assign(pluginDirectory));

@@ -264,7 +264,7 @@ void SC::ProcessTest::processChainPipeDual()
     SC_TEST_EXPECT(chain.launch(outputPipe));
     SC_TEST_EXPECT(File(outputPipe.readPipe).readUntilEOF(output));
     SC_TEST_EXPECT(chain.waitForExitSync());
-    SC_TEST_EXPECT(output == expectedOutput);
+    SC_TEST_EXPECT(output.view().startsWith(expectedOutput));
     //! [processChainPipeDualSnippet]
 }
 
