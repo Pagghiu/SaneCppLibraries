@@ -251,6 +251,7 @@
             "args": [
                 "build",
                 "coverage",
+                "SCTest",
                 "DebugCoverage"
             ],
             "windows": {

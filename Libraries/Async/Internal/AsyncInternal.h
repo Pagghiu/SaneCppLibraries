@@ -83,6 +83,8 @@ struct SC::AsyncEventLoop::Internal
 
     Time::HighResolutionCounter loopTime;
 
+    AsyncEventLoopListeners* listeners = nullptr;
+
     // AsyncRequest flags
     static constexpr int16_t Flag_ManualCompletion       = 1 << 0;
     static constexpr int16_t Flag_ExcludeFromActiveCount = 1 << 1;

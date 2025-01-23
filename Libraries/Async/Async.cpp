@@ -438,6 +438,8 @@ void SC::AsyncEventLoop::enumerateRequests(Function<void(AsyncRequest&)> enumera
     internal.enumerateRequests(internal.manualCompletions, enumerationCallback);
 }
 
+void SC::AsyncEventLoop::setListeners(AsyncEventLoopListeners* listeners) { internal.listeners = listeners; }
+
 #if SC_PLATFORM_LINUX
 #else
 bool SC::AsyncEventLoop::tryLoadingLiburing() { return false; }
@@ -821,14 +823,14 @@ SC::Result SC::AsyncEventLoop::Internal::submitRequests(AsyncEventLoop& loop, As
 SC::Result SC::AsyncEventLoop::Internal::blockingPoll(AsyncEventLoop& loop, SyncMode syncMode,
                                                       AsyncKernelEvents& asyncKernelEvents)
 {
-    KernelEvents kernelEvents(loop.internal.kernelQueue.get(), asyncKernelEvents);
-    if (getTotalNumberOfActiveHandle() <= 0 and numberOfManualCompletions == 0)
+    if (listeners and listeners->beforeBlockingPoll.isValid())
     {
-        // happens when we do cancelAsync on the last active async for example
-        return SC::Result(true);
+        listeners->beforeBlockingPoll(loop);
     }
-
-    if (getTotalNumberOfActiveHandle() != 0)
+    KernelEvents kernelEvents(loop.internal.kernelQueue.get(), asyncKernelEvents);
+    const auto   numActiveHandles = getTotalNumberOfActiveHandle();
+    SC_ASSERT_RELEASE(numActiveHandles >= 0);
+    if (numActiveHandles > 0 or numberOfManualCompletions != 0)
     {
         // We may have some manualCompletions queued (for SocketClose for example) but no active handles
         SC_LOG_MESSAGE("Active Requests Before Poll = {}\n", getTotalNumberOfActiveHandle());
@@ -837,6 +839,10 @@ SC::Result SC::AsyncEventLoop::Internal::blockingPoll(AsyncEventLoop& loop, Sync
         const bool canBlockForIO = numberOfManualCompletions == 0;
         SC_TRY(kernelEvents.syncWithKernel(loop, canBlockForIO ? syncMode : SyncMode::NoWait));
         SC_LOG_MESSAGE("Active Requests After Poll = {}\n", getTotalNumberOfActiveHandle());
+    }
+    if (listeners and listeners->afterBlockingPoll.isValid())
+    {
+        listeners->afterBlockingPoll(loop);
     }
     return SC::Result(true);
 }

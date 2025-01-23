@@ -46,6 +46,7 @@ struct ThreadPoolTask;
 
 struct EventObject;
 struct AsyncKernelEvents;
+struct AsyncEventLoopListeners;
 struct AsyncEventLoop;
 struct AsyncEventLoopMonitor;
 
@@ -946,6 +947,13 @@ struct SC::AsyncKernelEvents
     friend struct AsyncEventLoop;
 };
 
+/// @brief Allow library user to provide callbacks signaling different phases of async event loop cycle
+struct SC::AsyncEventLoopListeners
+{
+    Function<void(AsyncEventLoop&)> beforeBlockingPoll;
+    Function<void(AsyncEventLoop&)> afterBlockingPoll;
+};
+
 /// @brief Asynchronous I/O (files, sockets, timers, processes, fs events, threads wake-up) (see @ref library_async)
 /// AsyncEventLoop pushes all AsyncRequest derived classes to I/O queues in the OS.
 /// @see AsyncEventLoopMonitor can be used to integrate AsyncEventLoop with a GUI event loop
@@ -1030,6 +1038,7 @@ struct SC::AsyncEventLoop
     /// In that case user is expected to run completions passing it to AsyncEventLoop::dispatchCompletions.
     /// @see AsyncEventLoop::submitRequests sends async requests to kernel before calling blockingPoll
     /// @see AsyncEventLoop::dispatchCompletions invokes callbacks associated with kernel events after blockingPoll
+    /// @see AsyncEventLoop::setListeners sets function called before and after entering kernel poll
     [[nodiscard]] Result blockingPoll(AsyncKernelEvents& kernelEvents);
 
     /// Invokes completions for the AsyncKernelEvents collected by a call to AsyncEventLoop::blockingPoll.
@@ -1077,6 +1086,10 @@ struct SC::AsyncEventLoop
     /// @brief Enumerates all requests objects associated with this loop
     void enumerateRequests(Function<void(AsyncRequest&)> enumerationCallback);
 
+    /// @brief Sets reference to listeners that will signal different events in loop lifetime
+    /// @note The structure pointed by this pointer must be valid throughout loop lifetime
+    void setListeners(AsyncEventLoopListeners* listeners);
+
     /// @brief Checks if excludeFromActiveCount() has been called on the given request
     [[nodiscard]] static bool isExcludedFromActiveCount(const AsyncRequest& async);
 
@@ -1089,9 +1102,9 @@ struct SC::AsyncEventLoop
   private:
     struct InternalDefinition
     {
-        static constexpr int Windows = 496;
-        static constexpr int Apple   = 488;
-        static constexpr int Linux   = 696;
+        static constexpr int Windows = 504;
+        static constexpr int Apple   = 496;
+        static constexpr int Linux   = 704;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = 8;

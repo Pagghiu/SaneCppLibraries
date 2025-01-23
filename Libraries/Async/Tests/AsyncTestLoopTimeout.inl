@@ -32,7 +32,34 @@ void SC::AsyncTest::loopTimeout()
         timeout2Called++;
     };
     SC_TEST_EXPECT(timeout2.start(eventLoop, 100_ms));
+
+    struct Context
+    {
+        int& timeout1Called;
+        int& timeout2Called;
+        int  beforePollIOCounter = 0;
+        int  afterPollIOCounter  = 0;
+    } context{timeout1Called, timeout2Called};
+    AsyncEventLoopListeners listeners;
+    listeners.beforeBlockingPoll = [this, &context](AsyncEventLoop&)
+    {
+        context.beforePollIOCounter++;
+        SC_TEST_EXPECT(context.afterPollIOCounter == 0);
+        SC_TEST_EXPECT(context.timeout1Called == 0);
+        SC_TEST_EXPECT(context.timeout2Called == 0);
+    };
+    listeners.afterBlockingPoll = [this, &context](AsyncEventLoop&)
+    {
+        context.afterPollIOCounter++;
+        SC_TEST_EXPECT(context.beforePollIOCounter == 1);
+        SC_TEST_EXPECT(context.timeout1Called == 0);
+        SC_TEST_EXPECT(context.timeout2Called == 0);
+    };
+    eventLoop.setListeners(&listeners);
     SC_TEST_EXPECT(eventLoop.runOnce());
+    eventLoop.setListeners(nullptr);
+    SC_TEST_EXPECT(context.beforePollIOCounter == 1);
+    SC_TEST_EXPECT(context.afterPollIOCounter == 1);
     SC_TEST_EXPECT(timeout1Called == 1 and timeout2Called == 0); // timeout1 fires after 1 ms
     SC_TEST_EXPECT(eventLoop.runOnce());
     SC_TEST_EXPECT(timeout1Called == 1 and timeout2Called == 1); // timeout2 fires after 100 ms
