@@ -850,6 +850,10 @@ SC::Result SC::AsyncEventLoop::Internal::blockingPoll(AsyncEventLoop& loop, Sync
 SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(AsyncEventLoop& loop, SyncMode syncMode,
                                                              AsyncKernelEvents& asyncKernelEvents)
 {
+    if (interrupted)
+    {
+        return SC::Result(true);
+    }
     executeCancellationCallbacks();
     KernelEvents kernelEvents(loop.internal.kernelQueue.get(), asyncKernelEvents);
     switch (syncMode)
