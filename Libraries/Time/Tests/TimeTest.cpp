@@ -13,7 +13,7 @@ struct SC::TimeTest : public SC::TestCase
 {
     inline void testAbsoluteParseLocal();
     inline void testHighResolutionCounterSnap();
-    inline void testHighResolutionCounterOffseBy();
+    inline void testHighResolutionCounterOffsetBy();
     inline void testHighResolutionCounterIsLaterOn();
     TimeTest(SC::TestReport& report) : TestCase(report, "TimeTest")
     {
@@ -27,7 +27,7 @@ struct SC::TimeTest : public SC::TestCase
         }
         if (test_section("HighResolutionCounter::offsetBy"))
         {
-            testHighResolutionCounterOffseBy();
+            testHighResolutionCounterOffsetBy();
         }
         if (test_section("HighResolutionCounter::isLaterOnOrEqual"))
         {
@@ -40,7 +40,7 @@ void SC::TimeTest::testAbsoluteParseLocal()
 {
     //! [absoluteParseLocalSnippet]
     Time::Absolute::ParseResult local;
-    SC_TEST_EXPECT(Time::Absolute::now().parseLocal(local));
+    SC_TEST_EXPECT(Time::Realtime::now().parseLocal(local));
     SC_TEST_EXPECT(local.year > 2022);
 
     report.console.print("{} {:02}/{:02}/{} {:02}:{:02}:{:02} {}", local.getDay(), local.dayOfMonth, local.getMonth(),
@@ -48,6 +48,7 @@ void SC::TimeTest::testAbsoluteParseLocal()
                          local.isDaylightSaving ? "DAYLIGHT SAVING" : "NO DAYLIGHT SAVING");
     //! [absoluteParseLocalSnippet]
 }
+
 void SC::TimeTest::testHighResolutionCounterSnap()
 {
     //! [highResolutionCounterSnapSnippet]
@@ -55,21 +56,23 @@ void SC::TimeTest::testHighResolutionCounterSnap()
     start.snap();
     Thread::Sleep(100);
     end.snap();
-    Time::Relative elapsed = end.subtractApproximate(start);
+    Time::Milliseconds elapsed = end.subtractExact(start).toMilliseconds();
     SC_TEST_EXPECT(elapsed < 300_ms and elapsed > 0_ms);
     //! [highResolutionCounterSnapSnippet]
 }
 
-void SC::TimeTest::testHighResolutionCounterOffseBy()
+void SC::TimeTest::testHighResolutionCounterOffsetBy()
 {
     //! [highResolutionCounterOffsetBySnippet]
     Time::HighResolutionCounter start, end;
     start.snap();
-    end                    = start.offsetBy(Time::Milliseconds(321));
-    Time::Relative elapsed = end.subtractApproximate(start);
+    end = start.offsetBy(Time::Milliseconds(321));
+
+    Time::Milliseconds elapsed = end.subtractExact(start).toMilliseconds();
     SC_TEST_EXPECT(elapsed == 321_ms);
     //! [highResolutionCounterOffsetBySnippet]
 }
+
 void SC::TimeTest::testHighResolutionCounterIsLaterOn()
 {
     //! [highResolutionCounterIsLaterOnSnippet]

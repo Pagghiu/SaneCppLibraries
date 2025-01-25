@@ -97,7 +97,7 @@ int main(int argc, const char* argv[])
 
     StringBuilder builder(gFormatString);
 
-    SC::Time::Absolute started = SC::Time::Absolute::now();
+    SC::Time::Realtime started = SC::Time::Realtime::now();
 
     SC_TRY(builder.format("{} \"{}\" started\n", arguments.tool, arguments.action));
     SC_TRY(builder.append("librarySource    = \"{}\"\n", arguments.libraryDirectory));
@@ -106,7 +106,7 @@ int main(int argc, const char* argv[])
     console.print(gFormatString.view());
 
     const Result   result  = Tool::runTool(arguments);
-    const uint64_t elapsed = SC::Time::Absolute::now().subtract(started).toMilliseconds().ms;
+    const uint64_t elapsed = SC::Time::Realtime::now().subtractExact(started).ms;
 
     SC_TRY(builder.format("{} \"{}\" finished (took {} ms)\n", arguments.tool, arguments.action, elapsed));
 

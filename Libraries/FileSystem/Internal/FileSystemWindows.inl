@@ -203,7 +203,7 @@ struct SC::FileSystem::Internal
             fileTimeValue.LowPart  = modifiedTime.dwLowDateTime;
             fileTimeValue.HighPart = modifiedTime.dwHighDateTime;
             fileTimeValue.QuadPart -= 116444736000000000ULL;
-            fileStat.modifiedTime = Time::Absolute(fileTimeValue.QuadPart / 10000ULL);
+            fileStat.modifiedTime = Time::Realtime(fileTimeValue.QuadPart / 10000ULL);
             LARGE_INTEGER fileSize;
             if (::GetFileSizeEx(hFile, &fileSize))
             {
@@ -214,7 +214,7 @@ struct SC::FileSystem::Internal
         return Result(false);
     }
 
-    [[nodiscard]] static Result setLastModifiedTime(const wchar_t* file, Time::Absolute time)
+    [[nodiscard]] static Result setLastModifiedTime(const wchar_t* file, Time::Realtime time)
     {
         HANDLE hFile = CreateFileW(file, FILE_WRITE_ATTRIBUTES, FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
                                    FILE_ATTRIBUTE_NORMAL, NULL);

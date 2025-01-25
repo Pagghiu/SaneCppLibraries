@@ -58,7 +58,7 @@ SC::Result SC::HttpWebServer::Internal::readFile(StringView directory, HttpReque
         SC_TRY(response.addHeader("Content-Type", Internal::getContentType(extension)));
         SC_TRY(response.addHeader("Server", "SC"));
         Time::Absolute::ParseResult local;
-        SC_TRY(Time::Absolute::now().parseUTC(local));
+        SC_TRY(Time::Realtime::now().parseUTC(local));
         SC_TRY(Internal::writeGMTHeaderTime("Date", response, local));
         SC_TRY(fileStat.modifiedTime.parseUTC(local));
         SC_TRY(Internal::writeGMTHeaderTime("Last-Modified", response, local));

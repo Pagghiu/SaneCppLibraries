@@ -301,7 +301,7 @@ struct SC::FileSystem
     struct FileStat
     {
         size_t         fileSize     = 0;
-        Time::Absolute modifiedTime = 0; ///< Time when file was last modified
+        Time::Realtime modifiedTime = 0; ///< Time when file was last modified
     };
     /// @brief Obtains stats (size, modified time) about a file
     /// @param file Path to the file of interest
@@ -313,7 +313,7 @@ struct SC::FileSystem
     /// @param file Path to the file of interest
     /// @param time The new last modified time, as specified in the AbsoluteTime struct
     /// @return Valid Result if file time for the given file was successfully set
-    [[nodiscard]] Result setLastModifiedTime(StringView file, Time::Absolute time);
+    [[nodiscard]] Result setLastModifiedTime(StringView file, Time::Realtime time);
 
   private:
     [[nodiscard]] bool convert(const StringView file, String& destination, StringView* encodedPath = nullptr);

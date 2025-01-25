@@ -284,18 +284,18 @@ struct SC::FileSystem::Internal
         {
             fileStat.fileSize = static_cast<size_t>(st.st_size);
 #if SC_PLATFORM_APPLE
-            fileStat.modifiedTime = Time::Absolute(
+            fileStat.modifiedTime = Time::Realtime(
                 static_cast<int64_t>(::round(st.st_mtimespec.tv_nsec / 1.0e6) + st.st_mtimespec.tv_sec * 1000));
 #else
             fileStat.modifiedTime =
-                Time::Absolute(static_cast<int64_t>(::round(st.st_mtim.tv_nsec / 1.0e6) + st.st_mtim.tv_sec * 1000));
+                Time::Realtime(static_cast<int64_t>(::round(st.st_mtim.tv_nsec / 1.0e6) + st.st_mtim.tv_sec * 1000));
 #endif
             return Result(true);
         }
         return Result(false);
     }
 
-    [[nodiscard]] static Result setLastModifiedTime(const char* file, Time::Absolute time)
+    [[nodiscard]] static Result setLastModifiedTime(const char* file, Time::Realtime time)
     {
         struct timespec times[2];
         times[0].tv_sec  = time.getMillisecondsSinceEpoch() / 1000;

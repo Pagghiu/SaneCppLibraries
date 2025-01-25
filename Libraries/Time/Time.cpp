@@ -41,7 +41,7 @@ const char* SC::Time::Absolute::ParseResult::getMonth() const { return monthName
 
 const char* SC::Time::Absolute::ParseResult::getDay() const { return dayName; }
 
-SC::Time::Absolute SC::Time::Absolute::now()
+SC::Time::Realtime SC::Time::Realtime::now()
 {
 #if SC_PLATFORM_WINDOWS
     struct _timeb t;
@@ -54,9 +54,28 @@ SC::Time::Absolute SC::Time::Absolute::now()
 #endif
 }
 
+SC::Time::Monotonic SC::Time::Monotonic::now()
+{
+#if SC_PLATFORM_WINDOWS
+    LARGE_INTEGER queryPerformanceFrequency;
+    LARGE_INTEGER performanceCounter;
+    // Since WinXP this is guaranteed to succeed
+    QueryPerformanceFrequency(&queryPerformanceFrequency);
+    QueryPerformanceCounter(&performanceCounter);
+    return static_cast<int64_t>(performanceCounter.QuadPart * 1000 / queryPerformanceFrequency.QuadPart);
+
+#else
+    struct timespec nowTimeSpec;
+    clock_gettime(CLOCK_MONOTONIC, &nowTimeSpec);
+    int64_t ms = static_cast<int64_t>(nowTimeSpec.tv_sec) * 1000;
+    ms += static_cast<int64_t>(nowTimeSpec.tv_nsec / (1000 * 1000));
+    return ms;
+#endif
+}
+
 bool SC::Time::Absolute::parseLocal(ParseResult& result) const
 {
-    const time_t seconds = static_cast<time_t>(millisecondsSinceEpoch / 1000);
+    const time_t seconds = static_cast<time_t>(milliseconds / 1000);
     struct tm    parsedTm;
 #if SC_PLATFORM_WINDOWS
     if (_localtime64_s(&parsedTm, &seconds) != 0)
@@ -74,7 +93,7 @@ bool SC::Time::Absolute::parseLocal(ParseResult& result) const
 
 bool SC::Time::Absolute::parseUTC(ParseResult& result) const
 {
-    const time_t seconds = static_cast<time_t>(millisecondsSinceEpoch / 1000);
+    const time_t seconds = static_cast<time_t>(milliseconds / 1000);
     struct tm    parsedTm;
 #if SC_PLATFORM_WINDOWS
     if (_gmtime64_s(&parsedTm, &seconds) != 0)
@@ -90,10 +109,23 @@ bool SC::Time::Absolute::parseUTC(ParseResult& result) const
     return Internal::tmToParsed(parsedTm, result);
 }
 
-SC::Time::Relative SC::Time::Absolute::subtract(Absolute other)
+bool SC::Time::Absolute::isLaterThanOrEqualTo(Absolute other) const { return milliseconds >= other.milliseconds; }
+
+bool SC::Time::Absolute::isLaterThan(Absolute other) const { return milliseconds > other.milliseconds; }
+
+SC::Time::Milliseconds SC::Time::Absolute::subtractExact(Time::Absolute other) const
 {
-    const auto diff = millisecondsSinceEpoch - other.millisecondsSinceEpoch;
-    return Relative::fromSeconds(diff / 1000.0);
+    return Milliseconds(milliseconds - other.milliseconds);
+}
+
+SC::Time::Absolute SC::Time::Absolute::offsetBy(Milliseconds other) const
+{
+    constexpr auto maxValue = static_cast<decltype(milliseconds)>(MaxValue());
+    if (milliseconds > maxValue - other.ms)
+    {
+        return Time::Absolute(maxValue);
+    }
+    return Time::Absolute(milliseconds + other.ms);
 }
 
 SC::Time::HighResolutionCounter::HighResolutionCounter()

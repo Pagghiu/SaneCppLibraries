@@ -203,7 +203,7 @@ struct SC::PluginDynamicLibrary
         return false;
     }
 
-    PluginDynamicLibrary() : lastLoadTime(Time::Absolute::now()) { numReloads = 0; }
+    PluginDynamicLibrary() : lastLoadTime(Time::Realtime::now()) { numReloads = 0; }
 
   private:
     void* instance                      = nullptr;

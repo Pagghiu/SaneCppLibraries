@@ -692,7 +692,7 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
     SC_TRY(StringBuilder(buffer).format("{}QueryInterface", definition.identity.identifier.view()));
     SC_COMPILER_UNUSED(dynamicLibrary.getSymbol(buffer.view(), pluginQueryInterface)); // QueryInterface is optional
     numReloads += 1;
-    lastLoadTime = Time::Absolute::now();
+    lastLoadTime = Time::Realtime::now();
     return Result(true);
 }
 
@@ -743,7 +743,7 @@ void SC::PluginRegistry::getPluginsToReloadBecauseOf(StringView relativePath, Ti
         {
             if (file.absolutePath.view().endsWith(relativePath))
             {
-                const Time::Relative elapsed = Time::Absolute::now().subtract(library.lastLoadTime);
+                const Time::Milliseconds elapsed = Time::Realtime::now().subtractExact(library.lastLoadTime);
                 if (elapsed > tolerance)
                 {
                     // Only reload if at least tolerance ms have passed, as sometimes FSEvents on

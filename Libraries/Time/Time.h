@@ -9,6 +9,8 @@ namespace SC
 namespace Time
 {
 struct Absolute;
+struct Monotonic;
+struct Realtime;
 struct Relative;
 struct HighResolutionCounter;
 
@@ -105,21 +107,22 @@ inline Time::Seconds      operator""_sec(unsigned long long int sec) { return Ti
 
 } // namespace SC
 
-/// @brief Absolute time represented with milliseconds since epoch
+/// @brief Absolute time as realtime or monotonically increasing clock
+/// @see Monotonic
+/// @see Realtime
 struct SC::Time::Absolute
 {
-  private:
+  protected:
     struct Internal;
-    int64_t millisecondsSinceEpoch;
+    int64_t milliseconds;
 
   public:
-    /// @brief Construct an Absolute from milliseconds since epoch
-    /// @param millisecondsSinceEpoch Number of milliseconds since epoch
-    Absolute(int64_t millisecondsSinceEpoch) : millisecondsSinceEpoch(millisecondsSinceEpoch) {}
+    /// @brief Construct an Absolute time equal to epoch
+    Absolute() : milliseconds(0) {}
 
-    /// @brief Obtain Absolute representing current time
-    /// @return An Absolute representing current time
-    [[nodiscard]] static Absolute now();
+    /// @brief Construct an Absolute from milliseconds since epoch
+    /// @param milliseconds Number of milliseconds since epoch
+    Absolute(int64_t milliseconds) : milliseconds(milliseconds) {}
 
     /// @brief Holds information on a parsed absolute time from Absolute::parseLocal
     struct ParseResult
@@ -156,14 +159,44 @@ struct SC::Time::Absolute
     /// @return `true` if time has been parsed successfully
     [[nodiscard]] bool parseUTC(ParseResult& result) const;
 
-    /// @brief Obtain the Relative by subtracting this Absolute with another one
-    /// @param other Another Absolute to be subtracted
-    /// @return A Relative representing the time interval between the two Absolute
-    [[nodiscard]] Relative subtract(Absolute other);
+    /// @brief Check if this Absolute time is later or equal to another Absolute time
+    /// @note Comparing Absolute times obtained with different clock sources (monotonic/realtime) is meaningless
+    [[nodiscard]] bool isLaterThanOrEqualTo(Absolute other) const;
+
+    /// @brief Check if this Absolute time is lather than another Absolute time
+    /// @note Comparing Absolute times obtained with different clock sources (monotonic/realtime) is meaningless
+    [[nodiscard]] bool isLaterThan(Absolute other) const;
+
+    /// @brief Obtains the difference between this time and the other time
+    /// @note Subtracting Absolute times obtained with different clock sources (monotonic/realtime) is meaningless
+    [[nodiscard]] Milliseconds subtractExact(Absolute other) const;
+
+    /// @brief Offset this absolute time with a relative time in milliseconds
+    [[nodiscard]] Absolute offsetBy(Milliseconds other) const;
+};
+
+/// @brief Represent monotonically increasing time (use Monotonic::now for current time)
+struct SC::Time::Monotonic : public Absolute
+{
+    using Absolute::Absolute;
+
+    /// @brief Obtain time according to monotonic clock
+    [[nodiscard]] static Monotonic now();
+
+    /// @brief Return given time as monotonically incrementing milliseconds
+    [[nodiscard]] int64_t getMonotonicMilliseconds() const { return milliseconds; }
+};
+
+/// @brief Represents a realtime clock in milliseconds since epoch (use Realtime::now for current time)
+struct SC::Time::Realtime : public Absolute
+{
+    using Absolute::Absolute;
+
+    /// @brief Obtain time according to realtime clock
+    [[nodiscard]] static Realtime now();
 
     /// @brief Return given time as milliseconds since epoch
-    /// @return Time in milliseconds since epoch
-    [[nodiscard]] int64_t getMillisecondsSinceEpoch() const { return millisecondsSinceEpoch; }
+    [[nodiscard]] int64_t getMillisecondsSinceEpoch() const { return milliseconds; }
 };
 
 /// @brief An high resolution time counter
@@ -206,11 +239,17 @@ struct SC::Time::HighResolutionCounter
     /// @return A HighResolutionCounter holding the time interval between the two HighResolutionCounter
     [[nodiscard]] HighResolutionCounter subtractExact(HighResolutionCounter other) const;
 
+    /// @brief Converts to a Relative struct
     Relative getRelative() const;
 
-    Nanoseconds  toNanoseconds() const;
+    /// @brief Converts to Nanoseconds
+    Nanoseconds toNanoseconds() const;
+
+    /// @brief Converts to Milliseconds
     Milliseconds toMilliseconds() const;
-    Seconds      toSeconds() const;
+
+    /// @brief Converts to Seconds
+    Seconds toSeconds() const;
 
     int64_t part1;
     int64_t part2;
