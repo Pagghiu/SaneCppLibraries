@@ -9,43 +9,12 @@ namespace SC
 //! @{
 
 /// @brief Wraps function pointers, member functions and lambdas without ever allocating. @n
+/// @tparam FuncType Type of function to be wrapped (Lambda, free function or pointer to member function)
+/// @note Size of lambdas or less than LAMBDA_SIZE (currently `2 * sizeof(void*)`). @n
+///  If lambda is bigger than `LAMBDA_SIZE` the constructor will static assert.
 ///
 /// Example:
-/**
- * @code{.cpp}
-    struct MyClass
-    {
-        float memberValue = 2.0;
-        int memberFunc(float a) { return static_cast<int>(a + memberValue); }
-    };
-    int someFunc(float a) { return static_cast<int>(a * 2); }
-
-    struct BigClass
-    {
-        uint64_t values[4];
-    };
-
-    // ... somewhere later
-    MyClass myClass;
-
-    Function<int(float)> func;
-
-    func = &someFunc;                                                   // Bind free func
-    func.bind<MyClass, &MyClass::memberFunc>(myClass);                  // Bind member func
-    func = [](float a) -> int { return static_cast<int>(a + 1.5); };    // Bind lambda func
-
-    BigClass bigClass;
-
-    // This will static_assert because sizeof(BigClass) (grabbed by copy) exceeds LAMBDA_SIZE
-    // func = [bigClass](float a) -> int { return static_cast<int>(a);};
-
-    @endcode
-
-    Size of lambdas or less than LAMBDA_SIZE (currently `2 * sizeof(void*)`). @n
-    If lambda is bigger than `LAMBDA_SIZE` the constructor will static assert.
-    @tparam FuncType Type of function to be wrapped (Lambda, free function or pointer to member function)
-
- * */
+/// \snippet Libraries/Foundation/Tests/FunctionTest.cpp FunctionMainSnippet
 template <typename FuncType>
 struct Function;
 
@@ -53,19 +22,24 @@ template <typename R, typename... Args>
 struct Function<R(Args...)>
 {
   private:
-    enum class FunctionErasedOperation
+    enum class Operation
     {
         Destruct,
         CopyConstruct,
         MoveConstruct
     };
-    using StubFunction      = R (*)(const void* const*, typename TypeTraits::AddPointer<Args>::type...);
-    using OperationFunction = void (*)(FunctionErasedOperation operation, const void** other, const void* const*);
+    using ExecuteFunction   = R (*)(const void* const*, typename TypeTraits::AddPointer<Args>::type...);
+    using OperationFunction = void (*)(Operation operation, const void** other, const void* const*);
+
+    struct VTable
+    {
+        ExecuteFunction   execute;
+        OperationFunction operation;
+    };
 
     static const int LAMBDA_SIZE = sizeof(void*) * 2;
 
-    StubFunction      functionStub;
-    OperationFunction functionOperation;
+    const VTable* vtable;
 
     union
     {
@@ -73,26 +47,18 @@ struct Function<R(Args...)>
         char        lambdaMemory[LAMBDA_SIZE] = {0};
     };
 
-    void executeOperation(FunctionErasedOperation operation, const void** other) const
+    void checkedOperation(Operation operation, const void** other) const
     {
-        if (functionOperation)
-            (*functionOperation)(operation, other, &classInstance);
+        if (vtable)
+            vtable->operation(operation, other, &classInstance);
     }
-
-    Function(const void* instance, StubFunction stub, OperationFunction operation)
-        : functionStub(stub), functionOperation(operation)
-    {
-        classInstance = instance;
-    }
-    using FreeFunction = R (*)(Args...);
 
   public:
     /// @brief Constructs an empty Function
     Function()
     {
-        static_assert(sizeof(Function) == sizeof(void*) * 4, "Function Size");
-        functionStub      = nullptr;
-        functionOperation = nullptr;
+        static_assert(sizeof(Function) == sizeof(void*) * 3, "Function Size");
+        vtable = nullptr;
     }
 
     /// Constructs a function from a lambda with a compatible size (equal or less than LAMBDA_SIZE)
@@ -104,44 +70,39 @@ struct Function<R(Args...)>
             not TypeTraits::IsSame<typename TypeTraits::RemoveReference<Lambda>::type, Function>::value, void>::type>
     Function(Lambda&& lambda)
     {
-        functionStub      = nullptr;
-        functionOperation = nullptr;
+        vtable = nullptr;
         bind(forward<typename TypeTraits::RemoveReference<Lambda>::type>(lambda));
     }
 
     /// @brief Destroys the function wrapper
-    ~Function() { executeOperation(FunctionErasedOperation::Destruct, nullptr); }
+    ~Function() { checkedOperation(Operation::Destruct, nullptr); }
 
     /// @brief Move constructor for Function wrapper
     /// @param other The moved from function
     Function(Function&& other)
     {
-        functionStub      = other.functionStub;
-        functionOperation = other.functionOperation;
-        classInstance     = other.classInstance;
-        other.executeOperation(FunctionErasedOperation::MoveConstruct, &classInstance);
-        other.executeOperation(FunctionErasedOperation::Destruct, nullptr);
-        other.functionStub      = nullptr;
-        other.functionOperation = nullptr;
+        vtable        = other.vtable;
+        classInstance = other.classInstance;
+        other.checkedOperation(Operation::MoveConstruct, &classInstance);
+        other.checkedOperation(Operation::Destruct, nullptr);
+        other.vtable = nullptr;
     }
 
     /// @brief Copy constructor for Function wrapper
     /// @param other The function to be copied
     Function(const Function& other)
     {
-        functionStub      = other.functionStub;
-        functionOperation = other.functionOperation;
-        other.executeOperation(FunctionErasedOperation::CopyConstruct, &classInstance);
+        vtable = other.vtable;
+        other.checkedOperation(Operation::CopyConstruct, &classInstance);
     }
 
     /// @brief Copy assign a function to current function wrapper. Destroys existing wrapper.
     /// @param other The function to be assigned to current function
     Function& operator=(const Function& other)
     {
-        executeOperation(FunctionErasedOperation::Destruct, nullptr);
-        functionStub      = other.functionStub;
-        functionOperation = other.functionOperation;
-        other.executeOperation(FunctionErasedOperation::CopyConstruct, &classInstance);
+        checkedOperation(Operation::Destruct, nullptr);
+        vtable = other.vtable;
+        other.checkedOperation(Operation::CopyConstruct, &classInstance);
         return *this;
     }
 
@@ -149,60 +110,74 @@ struct Function<R(Args...)>
     /// @param other The function to be move-assigned to current function
     Function& operator=(Function&& other) noexcept
     {
-        executeOperation(FunctionErasedOperation::Destruct, nullptr);
-        functionStub      = other.functionStub;
-        functionOperation = other.functionOperation;
-        other.executeOperation(FunctionErasedOperation::MoveConstruct, &classInstance);
-        other.executeOperation(FunctionErasedOperation::Destruct, nullptr);
-        other.functionStub = nullptr;
+        checkedOperation(Operation::Destruct, nullptr);
+        vtable = other.vtable;
+        other.checkedOperation(Operation::MoveConstruct, &classInstance);
+        other.checkedOperation(Operation::Destruct, nullptr);
+        other.vtable = nullptr;
         return *this;
     }
 
     /// @brief Check if current wrapper is bound to a function
     /// @return `true` if current wrapper is bound to a function
-    [[nodiscard]] bool isValid() const { return functionStub != nullptr; }
+    [[nodiscard]] bool isValid() const { return vtable != nullptr; }
 
     /// @brief Returns true if this function was bound to a member function of a specific class instance
     [[nodiscard]] bool isBoundToClassInstance(void* instance) const { return classInstance == instance; }
 
     bool operator==(const Function& other) const
     {
-        return functionStub == other.functionStub and functionOperation == other.functionOperation and
-               classInstance == other.classInstance;
+        return vtable == other.vtable and classInstance == other.classInstance;
     }
+
     /// @brief Binds a Lambda to current function wrapper
     /// @tparam Lambda type of Lambda to be wrapped in current function wrapper
     /// @param lambda Instance of Lambda to be wrapped
     template <typename Lambda>
     void bind(Lambda&& lambda)
     {
-        executeOperation(FunctionErasedOperation::Destruct, nullptr);
-        functionStub      = nullptr;
-        functionOperation = nullptr;
-
+        checkedOperation(Operation::Destruct, nullptr);
+        vtable = nullptr;
         new (&classInstance, PlacementNew()) Lambda(forward<Lambda>(lambda));
+        vtable = getVTableForLambda<Lambda>();
+    }
+
+  private:
+    template <typename Lambda>
+    static auto getVTableForLambda()
+    {
         static_assert(sizeof(Lambda) <= sizeof(lambdaMemory), "Lambda is too big");
-        functionStub = [](const void* const* p, typename TypeTraits::AddPointer<Args>::type... args) -> R
-        {
-            Lambda& lambda = *reinterpret_cast<Lambda*>(const_cast<void**>(p));
-            return lambda(*args...);
-        };
-        functionOperation = [](FunctionErasedOperation operation, const void** other, const void* const* p)
-        {
-            Lambda& lambda = *reinterpret_cast<Lambda*>(const_cast<void**>(p));
-            if (operation == FunctionErasedOperation::Destruct)
-                lambda.~Lambda();
-            else if (operation == FunctionErasedOperation::CopyConstruct)
-                new (other, PlacementNew()) Lambda(lambda);
-            else if (operation == FunctionErasedOperation::MoveConstruct)
-                new (other, PlacementNew()) Lambda(move(lambda));
-            else
-#if SC_COMPILER_MSVC
-                __assume(false);
-#else
-                __builtin_unreachable();
-#endif
-        };
+        static SC_LANGUAGE_IF_CONSTEXPR const VTable staticVTable = {
+            [](const void* const* p, typename TypeTraits::AddPointer<Args>::type... args) SC_LANGUAGE_IF_CONSTEXPR
+            {
+                Lambda& lambda = *reinterpret_cast<Lambda*>(const_cast<void**>(p));
+                return lambda(*args...);
+            },
+            [](Operation operation, const void** other, const void* const* p) SC_LANGUAGE_IF_CONSTEXPR
+            {
+                Lambda& lambda = *reinterpret_cast<Lambda*>(const_cast<void**>(p));
+                if (operation == Operation::Destruct)
+                    lambda.~Lambda();
+                else if (operation == Operation::CopyConstruct)
+                    new (other, PlacementNew()) Lambda(lambda);
+                else if (operation == Operation::MoveConstruct)
+                    new (other, PlacementNew()) Lambda(move(lambda));
+            }};
+        return &staticVTable;
+    }
+
+  public:
+    /// @brief Unsafely retrieve the functor bound previously bound to this function
+    /// @tparam Lambda type of Lambda passed to  Function::bind or Function::operator=
+    /// @return Pointer to functor or null if Lambda is not the same type bound in bind()
+    /// \snippet Libraries/Foundation/Tests/FunctionTest.cpp FunctionFunctorSnippet
+    template <typename Lambda>
+    Lambda* dynamicCastTo() const
+    {
+        if (getVTableForLambda<Lambda>() != vtable)
+            return nullptr;
+        else
+            return &const_cast<Lambda&>(reinterpret_cast<const Lambda&>(classInstance));
     }
 
     /// @brief Binds a free function to function wrapper
@@ -210,10 +185,13 @@ struct Function<R(Args...)>
     template <R (*FreeFunction)(Args...)>
     void bind()
     {
-        executeOperation(FunctionErasedOperation::Destruct, nullptr);
-        classInstance     = nullptr;
-        functionStub      = &FunctionWrapper<FreeFunction>;
-        functionOperation = &FunctionOperation;
+        checkedOperation(Operation::Destruct, nullptr);
+        static SC_LANGUAGE_IF_CONSTEXPR const VTable staticVTable = {
+            [](const void* const*, typename TypeTraits::RemoveReference<Args>::type*... args) SC_LANGUAGE_IF_CONSTEXPR
+            { return FreeFunction(*args...); },
+            [](Operation, const void**, const void* const*) SC_LANGUAGE_IF_CONSTEXPR {}};
+        vtable        = &staticVTable;
+        classInstance = nullptr;
     }
 
     /// @brief Binds a class member function to function wrapper
@@ -223,10 +201,20 @@ struct Function<R(Args...)>
     template <typename Class, R (Class::*MemberFunction)(Args...) const>
     void bind(const Class& c)
     {
-        executeOperation(FunctionErasedOperation::Destruct, nullptr);
-        classInstance     = &c;
-        functionStub      = &MemberWrapper<Class, MemberFunction>;
-        functionOperation = &MemberOperation;
+        checkedOperation(Operation::Destruct, nullptr);
+        static SC_LANGUAGE_IF_CONSTEXPR const VTable staticVTable = {
+            [](const void* const* p, typename TypeTraits::RemoveReference<Args>::type*... args) SC_LANGUAGE_IF_CONSTEXPR
+            {
+                const Class* cls = static_cast<const Class*>(*p);
+                return (cls->*MemberFunction)(*args...);
+            },
+            [](Operation operation, const void** other, const void* const* p) SC_LANGUAGE_IF_CONSTEXPR
+            {
+                if (operation != Operation::Destruct)
+                    *other = *p;
+            }};
+        vtable        = &staticVTable;
+        classInstance = &c;
     }
 
     /// @brief Binds a class member function to function wrapper
@@ -236,66 +224,25 @@ struct Function<R(Args...)>
     template <typename Class, R (Class::*MemberFunction)(Args...)>
     void bind(Class& c)
     {
-        executeOperation(FunctionErasedOperation::Destruct, nullptr);
-        classInstance     = &c;
-        functionStub      = &MemberWrapper<Class, MemberFunction>;
-        functionOperation = &MemberOperation;
-    }
-
-    /// @brief Binds a class member function to function wrapper
-    /// @tparam Class Type of the Class holding MemberFunction
-    /// @tparam MemberFunction Pointer to member function with a matching signature
-    /// @param c Reference to the instance of class where the method must be bound to
-    /// @return The function wrapper
-    template <typename Class, R (Class::*MemberFunction)(Args...)>
-    static Function fromMember(Class& c)
-    {
-        return Function(&c, &MemberWrapper<Class, MemberFunction>, &MemberOperation);
-    }
-
-    /// @brief Binds a class member function to function wrapper
-    /// @tparam Class Type of the Class holding MemberFunction
-    /// @tparam MemberFunction Pointer to member function with a matching signature
-    /// @param c Reference to the instance of class where the method must be bound to
-    /// @return The function wrapper
-    template <typename Class, R (Class::*MemberFunction)(Args...) const>
-    static Function fromMember(const Class& c)
-    {
-        return Function(&c, &MemberWrapper<Class, MemberFunction>, &MemberOperation);
+        checkedOperation(Operation::Destruct, nullptr);
+        static SC_LANGUAGE_IF_CONSTEXPR const VTable staticVTable = {
+            [](const void* const* p, typename TypeTraits::RemoveReference<Args>::type*... args) SC_LANGUAGE_IF_CONSTEXPR
+            {
+                Class* cls = const_cast<Class*>(static_cast<const Class*>(*p));
+                return (cls->*MemberFunction)(*args...);
+            },
+            [](Operation operation, const void** other, const void* const* p) SC_LANGUAGE_IF_CONSTEXPR
+            {
+                if (operation != Operation::Destruct)
+                    *other = *p;
+            }};
+        vtable        = &staticVTable;
+        classInstance = &c;
     }
 
     /// @brief Invokes the wrapped function. If no function is bound, this is UB.
     /// @param args Arguments to be passed to the wrapped function
-    [[nodiscard]] R operator()(Args... args) const { return (*functionStub)(&classInstance, &args...); }
-
-  private:
-    static void MemberOperation(FunctionErasedOperation operation, const void** other, const void* const* p)
-    {
-        if (operation == FunctionErasedOperation::CopyConstruct or operation == FunctionErasedOperation::MoveConstruct)
-            *other = *p;
-    }
-
-    template <typename Class, R (Class::*MemberFunction)(Args...)>
-    static R MemberWrapper(const void* const* p, typename TypeTraits::RemoveReference<Args>::type*... args)
-    {
-        Class* cls = const_cast<Class*>(static_cast<const Class*>(*p));
-        return (cls->*MemberFunction)(*args...);
-    }
-
-    template <typename Class, R (Class::*MemberFunction)(Args...) const>
-    static R MemberWrapper(const void* const* p, typename TypeTraits::RemoveReference<Args>::type*... args)
-    {
-        const Class* cls = static_cast<const Class*>(*p);
-        return (cls->*MemberFunction)(*args...);
-    }
-
-    template <R (*FreeFunction)(Args...)>
-    static R FunctionWrapper(const void* const* p, typename TypeTraits::RemoveReference<Args>::type*... args)
-    {
-        SC_COMPILER_UNUSED(p);
-        return FreeFunction(*args...);
-    }
-    static void FunctionOperation(FunctionErasedOperation, const void**, const void* const*) {}
+    [[nodiscard]] R operator()(Args... args) const { return vtable->execute(&classInstance, &args...); }
 };
 
 template <typename T>

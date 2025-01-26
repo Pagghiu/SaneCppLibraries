@@ -85,6 +85,16 @@
             }                                                                                                          \
         }                                                                                                              \
         return 0;                                                                                                      \
+    }                                                                                                                  \
+    extern "C" int __cxa_guard_acquire(SC::uint64_t* guard_object)                                                     \
+    {                                                                                                                  \
+        if (*reinterpret_cast<const SC::uint8_t*>(guard_object) != 0)                                                  \
+            return 0;                                                                                                  \
+        return 1;                                                                                                      \
+    }                                                                                                                  \
+    extern "C" void __cxa_guard_release(SC::uint64_t* guard_object)                                                    \
+    {                                                                                                                  \
+        *reinterpret_cast<SC::uint8_t*>(guard_object) = 1;                                                             \
     }
 
 #endif
