@@ -1077,6 +1077,10 @@ struct SC::AsyncEventLoop
     /// Obtain the total number of submitted requests
     [[nodiscard]] int getNumberOfSubmittedRequests() const;
 
+    /// @brief Returns the next AsyncLoopTimeout that will be executed (shortest relativeTimeout)
+    /// @returns `nullptr` if no AsyncLoopTimeout has been started or scheduled
+    [[nodiscard]] AsyncLoopTimeout* findEarliestLoopTimeout() const;
+
     /// @brief Excludes the request from active handles count (to avoid it keeping event loop alive)
     void excludeFromActiveCount(AsyncRequest& async);
 

@@ -17,7 +17,6 @@ void SC::AsyncTest::loopTimeout()
         SC_TEST_EXPECT(not res.getAsync().isCancelling());
         timeout1Called++;
     };
-    SC_TEST_EXPECT(timeout1.start(eventLoop, Time::Milliseconds(1)));
     timeout2.callback = [&](AsyncLoopTimeout::Result& res)
     {
         if (timeout2Called == 0)
@@ -32,7 +31,10 @@ void SC::AsyncTest::loopTimeout()
         timeout2Called++;
     };
     SC_TEST_EXPECT(timeout2.start(eventLoop, 100_ms));
+    SC_TEST_EXPECT(timeout1.start(eventLoop, 1_ms));
 
+    AsyncLoopTimeout* earliestTimeout = eventLoop.findEarliestLoopTimeout();
+    SC_TEST_EXPECT(earliestTimeout == &timeout1);
     struct Context
     {
         int& timeout1Called;

@@ -395,6 +395,29 @@ int SC::AsyncEventLoop::getNumberOfActiveRequests() const { return internal.getT
 
 int SC::AsyncEventLoop::getNumberOfSubmittedRequests() const { return internal.numberOfSubmissions; }
 
+SC::AsyncLoopTimeout* SC::AsyncEventLoop::findEarliestLoopTimeout() const
+{
+    // activeLoopTimeouts are ordered by expiration time
+    AsyncLoopTimeout* earliestTime = internal.activeLoopTimeouts.front;
+    // Unfortunately we have to still manually find any potential submissions that could be earlier...
+    for (AsyncRequest* async = internal.submissions.front; async != nullptr; async = async->next)
+    {
+        if (async->type == AsyncRequest::Type::LoopTimeout)
+        {
+            AsyncLoopTimeout& timeout = *static_cast<AsyncLoopTimeout*>(async);
+            // We need to store computed expiration time, even if it will be recomputed later
+            // in order to compare the ones that are still on the submission queue.
+            timeout.expirationTime = internal.loopTime.offsetBy(timeout.relativeTimeout);
+            if (earliestTime == nullptr or earliestTime->expirationTime.isLaterThanOrEqualTo(timeout.expirationTime))
+            {
+                earliestTime = &timeout;
+            }
+        }
+    }
+
+    return earliestTime;
+}
+
 void SC::AsyncEventLoop::excludeFromActiveCount(AsyncRequest& async)
 {
     if (not async.isFree() and not isExcludedFromActiveCount(async))
@@ -547,20 +570,7 @@ void SC::AsyncEventLoop::Internal::queueSubmission(AsyncEventLoop& loop, AsyncRe
     numberOfSubmissions += 1;
 }
 
-SC::AsyncLoopTimeout* SC::AsyncEventLoop::Internal::findEarliestLoopTimeout() const
-{
-    AsyncLoopTimeout* earliestTime = nullptr;
-    for (AsyncRequest* async = activeLoopTimeouts.front; async != nullptr; async = async->next)
-    {
-        SC_ASSERT_DEBUG(async->type == AsyncRequest::Type::LoopTimeout);
-        const auto& expirationTime = static_cast<AsyncLoopTimeout*>(async)->expirationTime;
-        if (earliestTime == nullptr or earliestTime->expirationTime.isLaterThanOrEqualTo(expirationTime))
-        {
-            earliestTime = static_cast<AsyncLoopTimeout*>(async);
-        }
-    };
-    return earliestTime;
-}
+SC::AsyncLoopTimeout* SC::AsyncEventLoop::Internal::findEarliestLoopTimeout() const { return activeLoopTimeouts.front; }
 
 void SC::AsyncEventLoop::Internal::invokeExpiredTimers(Time::HighResolutionCounter currentTime)
 {
@@ -593,6 +603,11 @@ void SC::AsyncEventLoop::Internal::invokeExpiredTimers(Time::HighResolutionCount
                 async = activeLoopTimeouts.front;
                 SC_ASSERT_DEBUG(async == nullptr or async->isActive()); // Should not be possible
             }
+        }
+        else
+        {
+            // Timers are ordered by expirationTime so we can safely break out of this loop
+            break;
         }
     }
 }
@@ -1387,22 +1402,61 @@ void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
     {
         return; // Async flagged to be manually completed for thread pool, are not added to active handles
     }
-    // clang-format off
     switch (async.type)
     {
-        case AsyncRequest::Type::LoopTimeout:   activeLoopTimeouts.queueBack(*static_cast<AsyncLoopTimeout*>(&async));      break;
-        case AsyncRequest::Type::LoopWakeUp:    activeLoopWakeUps.queueBack(*static_cast<AsyncLoopWakeUp*>(&async));        break;
-        case AsyncRequest::Type::LoopWork:      activeLoopWork.queueBack(*static_cast<AsyncLoopWork*>(&async));             break;
-        case AsyncRequest::Type::ProcessExit:   activeProcessExits.queueBack(*static_cast<AsyncProcessExit*>(&async));      break;
-        case AsyncRequest::Type::SocketAccept:  activeSocketAccepts.queueBack(*static_cast<AsyncSocketAccept*>(&async));    break;
-        case AsyncRequest::Type::SocketConnect: activeSocketConnects.queueBack(*static_cast<AsyncSocketConnect*>(&async));  break;
-        case AsyncRequest::Type::SocketSend:    activeSocketSends.queueBack(*static_cast<AsyncSocketSend*>(&async));        break;
-        case AsyncRequest::Type::SocketReceive: activeSocketReceives.queueBack(*static_cast<AsyncSocketReceive*>(&async));  break;
-        case AsyncRequest::Type::SocketClose:   activeSocketCloses.queueBack(*static_cast<AsyncSocketClose*>(&async));      break;
-        case AsyncRequest::Type::FileRead:      activeFileReads.queueBack(*static_cast<AsyncFileRead*>(&async));            break;
-        case AsyncRequest::Type::FileWrite:     activeFileWrites.queueBack(*static_cast<AsyncFileWrite*>(&async));          break;
-        case AsyncRequest::Type::FileClose:     activeFileCloses.queueBack(*static_cast<AsyncFileClose*>(&async));          break;
-        case AsyncRequest::Type::FilePoll: 	    activeFilePolls.queueBack(*static_cast<AsyncFilePoll*>(&async));            break;
+    case AsyncRequest::Type::LoopTimeout: {
+        // Timeouts needs to be ordered
+        AsyncLoopTimeout& timeout = *static_cast<AsyncLoopTimeout*>(&async);
+
+        AsyncLoopTimeout* iterator = activeLoopTimeouts.front;
+        // TODO: Replace code below with a heap or some sorted data structure...
+        while (iterator)
+        {
+            // isLaterThan ensures items with same expiration time to be sub-ordered by their scheduling order
+            if (iterator->expirationTime.isLaterThan(timeout.expirationTime))
+            {
+                // middle
+                timeout.prev = iterator->prev;
+                timeout.next = iterator;
+                if (timeout.prev)
+                {
+                    timeout.prev->next = &timeout;
+                }
+                else
+                {
+                    activeLoopTimeouts.front = &timeout;
+                }
+                if (timeout.next)
+                {
+                    timeout.next->prev = &timeout;
+                }
+                else
+                {
+                    activeLoopTimeouts.back = &timeout;
+                }
+                break;
+            }
+            iterator = static_cast<AsyncLoopTimeout*>(iterator->next);
+        }
+        if (iterator == nullptr)
+        {
+            activeLoopTimeouts.queueBack(timeout);
+        }
+    }
+    break;
+    // clang-format off
+    case AsyncRequest::Type::LoopWakeUp:    activeLoopWakeUps.queueBack(*static_cast<AsyncLoopWakeUp*>(&async));        break;
+    case AsyncRequest::Type::LoopWork:      activeLoopWork.queueBack(*static_cast<AsyncLoopWork*>(&async));             break;
+    case AsyncRequest::Type::ProcessExit:   activeProcessExits.queueBack(*static_cast<AsyncProcessExit*>(&async));      break;
+    case AsyncRequest::Type::SocketAccept:  activeSocketAccepts.queueBack(*static_cast<AsyncSocketAccept*>(&async));    break;
+    case AsyncRequest::Type::SocketConnect: activeSocketConnects.queueBack(*static_cast<AsyncSocketConnect*>(&async));  break;
+    case AsyncRequest::Type::SocketSend:    activeSocketSends.queueBack(*static_cast<AsyncSocketSend*>(&async));        break;
+    case AsyncRequest::Type::SocketReceive: activeSocketReceives.queueBack(*static_cast<AsyncSocketReceive*>(&async));  break;
+    case AsyncRequest::Type::SocketClose:   activeSocketCloses.queueBack(*static_cast<AsyncSocketClose*>(&async));      break;
+    case AsyncRequest::Type::FileRead:      activeFileReads.queueBack(*static_cast<AsyncFileRead*>(&async));            break;
+    case AsyncRequest::Type::FileWrite:     activeFileWrites.queueBack(*static_cast<AsyncFileWrite*>(&async));          break;
+    case AsyncRequest::Type::FileClose:     activeFileCloses.queueBack(*static_cast<AsyncFileClose*>(&async));          break;
+    case AsyncRequest::Type::FilePoll: 	    activeFilePolls.queueBack(*static_cast<AsyncFilePoll*>(&async));            break;
     }
     // clang-format on
 }
