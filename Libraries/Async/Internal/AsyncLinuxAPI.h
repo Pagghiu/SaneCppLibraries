@@ -82,6 +82,7 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
 
     void (*io_uring_prep_timeout)(struct io_uring_sqe* sqe, struct __kernel_timespec* ts, unsigned count, unsigned flags) = nullptr;
     void (*io_uring_prep_timeout_remove)(struct io_uring_sqe* sqe, __u64 user_data, unsigned flags) = nullptr;
+    void (*io_uring_prep_timeout_update)(struct io_uring_sqe *sqe, struct __kernel_timespec *ts, __u64 user_data, unsigned flags) = nullptr;
     void (*io_uring_prep_accept)(struct io_uring_sqe* sqe, int fd, struct sockaddr* addr, socklen_t* addrlen, int flags) = nullptr;
                                            
     void (*io_uring_prep_connect)(struct io_uring_sqe* sqe, int fd, const struct sockaddr* addr, socklen_t addrlen) = nullptr;
@@ -104,6 +105,7 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
         this->io_uring_cq_advance          = &::io_uring_cq_advance;
         this->io_uring_prep_timeout        = &::io_uring_prep_timeout;
         this->io_uring_prep_timeout_remove = &::io_uring_prep_timeout_remove;
+        this->io_uring_prep_timeout_update = &::io_uring_prep_timeout_update;
         this->io_uring_prep_accept         = &::io_uring_prep_accept;
         this->io_uring_prep_connect        = &::io_uring_prep_connect;
         this->io_uring_prep_send           = &::io_uring_prep_send;
@@ -237,6 +239,14 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
     {
         io_uring_prep_rw(IORING_OP_TIMEOUT_REMOVE, sqe, -1, (void*)(unsigned long)user_data, 0, 0);
         sqe->timeout_flags = flags;
+    }
+
+    static inline void io_uring_prep_timeout_update(struct io_uring_sqe* sqe, struct __kernel_timespec* ts,
+                                                    __u64 user_data, unsigned flags)
+    {
+        io_uring_prep_rw(IORING_OP_TIMEOUT_REMOVE, sqe, -1, NULL, 0, (uintptr_t)ts);
+        sqe->addr          = user_data;
+        sqe->timeout_flags = flags | IORING_TIMEOUT_UPDATE;
     }
 
     static inline void io_uring_prep_accept(struct io_uring_sqe* sqe, int fd, struct sockaddr* addr, socklen_t* addrlen,

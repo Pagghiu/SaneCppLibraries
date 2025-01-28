@@ -11,7 +11,7 @@
 
 struct SC::AsyncEventLoop::Internal::KernelQueue
 {
-    AlignedStorage<328> storage;
+    AlignedStorage<320> storage;
 
     bool isEpoll = true;
 
@@ -85,7 +85,9 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
 {
     static constexpr int QueueDepth = 64;
 
-    bool     ringInited = false;
+    bool ringInited = false;
+    bool timerIsSet = false;
+
     io_uring ring;
 
     AsyncFilePoll  wakeUpPoll;
@@ -200,17 +202,20 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     uint32_t getNumEvents() const { return static_cast<uint32_t>(newEvents); }
 
-    static io_uring& getRing(AsyncEventLoop& eventLoop) { return eventLoop.internal.kernelQueue.get().getUring().ring; }
+    static KernelQueueIoURing& getKernelQueue(AsyncEventLoop& eventLoop)
+    {
+        return eventLoop.internal.kernelQueue.get().getUring();
+    }
 
     [[nodiscard]] Result getNewSubmission(AsyncRequest& async, io_uring_sqe*& newSubmission)
     {
-        io_uring& ring = getRing(*async.eventLoop);
+        io_uring& ring = getKernelQueue(*async.eventLoop).ring;
         // Request a new submission slot
         io_uring_sqe* kernelSubmission = globalLibURing.io_uring_get_sqe(&ring);
         if (kernelSubmission == nullptr)
         {
             // No space in the submission kernelEvents, let's try to flush submissions and try again
-            SC_TRY(flushSubmissions(*async.eventLoop, Internal::SyncMode::NoWait));
+            SC_TRY(flushSubmissions(*async.eventLoop, Internal::SyncMode::NoWait, nullptr));
             kernelSubmission = globalLibURing.io_uring_get_sqe(&ring);
             if (kernelSubmission == nullptr)
             {
@@ -222,40 +227,117 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    void copyReadyCompletions(io_uring& ring)
+    void copyReadyCompletions(AsyncEventLoop& eventLoop, const Time::Absolute* nextTimer)
     {
+        KernelQueueIoURing& kq = getKernelQueue(eventLoop);
         // Read up to totalNumEvents completions, copy them into a local array and
         // advance the ring buffer pointers to free ring slots.
         io_uring_cqe* eventPointers[totalNumEvents];
-        newEvents = globalLibURing.io_uring_peek_batch_cqe(&ring, &eventPointers[0], totalNumEvents);
-        for (int idx = 0; idx < newEvents; ++idx)
+        newEvents = globalLibURing.io_uring_peek_batch_cqe(&kq.ring, &eventPointers[0], totalNumEvents);
+
+        int writeIdx = 0;
+        int readIdx  = 0;
+
+        while (readIdx < newEvents)
         {
-            events[idx] = *eventPointers[idx];
+            const io_uring_cqe cqe = *eventPointers[readIdx];
+            if (cqe.user_data == reinterpret_cast<__u64>(&kq.timerIsSet))
+            {
+                kq.timerIsSet = false;
+                // Sanity check: expired timeouts are reported with ETIME errno
+                SC_ASSERT_RELEASE(cqe.res == -ETIME);
+            }
+            else
+            {
+                events[writeIdx] = cqe;
+                writeIdx++;
+            }
+            readIdx++;
         }
-        globalLibURing.io_uring_cq_advance(&ring, newEvents);
+        globalLibURing.io_uring_cq_advance(&kq.ring, newEvents);
+
+        if (nextTimer)
+        {
+            if (readIdx != writeIdx)
+            {
+                // A custom timeout timer was set and it has expired
+                eventLoop.internal.runTimers = true;
+            }
+        }
     }
 
     [[nodiscard]] Result syncWithKernel(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode)
     {
-        SC_TRY(flushSubmissions(eventLoop, syncMode));
-        copyReadyCompletions(getRing(eventLoop));
+        AsyncLoopTimeout*     loopTimeout = nullptr;
+        const Time::Absolute* nextTimer   = nullptr;
+        if (syncMode == Internal::SyncMode::ForcedForwardProgress)
+        {
+            loopTimeout = eventLoop.internal.findEarliestLoopTimeout();
+            if (loopTimeout)
+            {
+                nextTimer = &loopTimeout->expirationTime;
+            }
+        }
+        SC_TRY(flushSubmissions(eventLoop, syncMode, nextTimer));
+        copyReadyCompletions(eventLoop, nextTimer);
         return Result(true);
     }
 
-    [[nodiscard]] Result flushSubmissions(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode)
+    [[nodiscard]] Result flushSubmissions(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode,
+                                          const Time::Absolute* nextTimer)
     {
-        io_uring& ring = getRing(eventLoop);
+        KernelQueueIoURing& kq = getKernelQueue(eventLoop);
         while (true)
         {
             int res = -1;
             switch (syncMode)
             {
             case Internal::SyncMode::NoWait: {
-                res = globalLibURing.io_uring_submit(&ring);
+                res = globalLibURing.io_uring_submit(&kq.ring);
                 break;
             }
             case Internal::SyncMode::ForcedForwardProgress: {
-                res = globalLibURing.io_uring_submit_and_wait(&ring, 1);
+                __kernel_timespec kts; // Must stay here to be valid until submit
+                if (nextTimer)
+                {
+                    io_uring_sqe* sqe = globalLibURing.io_uring_get_sqe(&kq.ring);
+                    if (sqe == nullptr)
+                    {
+                        // TODO: is it correct returning if failing to get a new sqe?
+                        return Result::Error("io_uring_get_sqe timeout failed");
+                    }
+                    auto timespec = KernelEventsPosix::timerToRelativeTimespec(eventLoop.internal.loopTime, nextTimer);
+                    kts.tv_sec    = timespec.tv_sec;
+                    kts.tv_nsec   = timespec.tv_nsec;
+                    if (kq.timerIsSet)
+                    {
+                        // Timer was already added earlier let's just update it
+                        const __u64 userData = reinterpret_cast<__u64>(&kq.timerIsSet);
+                        globalLibURing.io_uring_prep_timeout_update(sqe, &kts, userData, 0);
+                    }
+                    else
+                    {
+                        // We need to add a new timeout
+                        globalLibURing.io_uring_prep_timeout(sqe, &kts, 0, 0);
+                        globalLibURing.io_uring_sqe_set_data(sqe, &kq.timerIsSet);
+                        kq.timerIsSet = true;
+                    }
+                }
+                else if (kq.timerIsSet)
+                {
+                    // Timer was set earlier, but it's not anymore needed, and it must be removed
+                    io_uring_sqe* sqe = globalLibURing.io_uring_get_sqe(&kq.ring);
+                    if (sqe == nullptr)
+                    {
+                        // TODO: is it correct returning if failing to get a new sqe?
+                        return Result::Error("io_uring_get_sqe timeout failed");
+                    }
+                    const __u64 userData = reinterpret_cast<__u64>(&kq.timerIsSet);
+                    globalLibURing.io_uring_prep_timeout_remove(sqe, userData, 0);
+                    kq.timerIsSet = false;
+                }
+
+                res = globalLibURing.io_uring_submit_and_wait(&kq.ring, 1);
                 break;
             }
             }
@@ -269,7 +351,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
                 {
                     // OMG the completion kernelEvents is full, so we can't submit
                     // anything until we free some of the completions slots :-|
-                    copyReadyCompletions(ring);
+                    copyReadyCompletions(eventLoop, nextTimer);
                     if (newEvents > 0)
                     {
                         // We've freed some slots, let's try again
@@ -300,13 +382,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         continueProcessing = completion.user_data != 0;
         if (continueProcessing and completion.res < 0)
         {
-            const AsyncRequest* request = getAsyncRequest(idx);
-            // Expired LoopTimeout are reported with ETIME errno, but we do not consider it an error...
-            if (request->type != AsyncRequest::Type::LoopTimeout or completion.res != -ETIME)
-            {
-                continueProcessing = false;
-                return Result::Error("Error in processing event");
-            }
+            continueProcessing = false;
+            return Result::Error("Error in processing event");
         }
         return Result(true);
     }
@@ -314,40 +391,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // TIMEOUT
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncLoopTimeout& async)
+    Result activateAsync(AsyncLoopTimeout& async)
     {
-        io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(async, submission));
-
-        // The issue with io_uring_prep_timeout is that the timespec passed with the offset must be valid
-        // for the entire duration of the enter ring syscall.
-        // This means that we either place it somewhere in the AsyncLoopTimeout or we take advantage of the
-        // fact that the binary layout of Time::HighResolutionCounter is the same as __kernel_timespec.
-        // Choosing the latter solution but with a few asserts that shield us from any eventual changes
-        // in HighResolutionCounter binary layouts.
-        static_assert(sizeof(__kernel_timespec::tv_sec) == sizeof(Time::HighResolutionCounter::part1), "");
-        static_assert(sizeof(__kernel_timespec::tv_nsec) == sizeof(Time::HighResolutionCounter::part1), "");
-        static_assert(__builtin_offsetof(__kernel_timespec, tv_sec) ==
-                          __builtin_offsetof(Time::HighResolutionCounter, part1),
-                      "Time::HighResolutionCounter layout changed!");
-        static_assert(__builtin_offsetof(__kernel_timespec, tv_nsec) ==
-                          __builtin_offsetof(Time::HighResolutionCounter, part2),
-                      "Time::HighResolutionCounter layout changed!");
-
         async.expirationTime = async.eventLoop->getLoopTime().offsetBy(async.relativeTimeout);
-
-        struct __kernel_timespec* ts = reinterpret_cast<struct __kernel_timespec*>(&async.expirationTime);
-        globalLibURing.io_uring_prep_timeout(submission, ts, 0, IORING_TIMEOUT_ABS);
-        globalLibURing.io_uring_sqe_set_data(submission, &async);
-        return Result(true);
-    }
-
-    [[nodiscard]] Result cancelAsync(AsyncLoopTimeout& async)
-    {
-        // Note: Expired timeouts are reported with ETIME error (see validateEvent)
-        io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(async, submission));
-        globalLibURing.io_uring_prep_timeout_remove(submission, reinterpret_cast<__u64>(&async), 0);
         return Result(true);
     }
 

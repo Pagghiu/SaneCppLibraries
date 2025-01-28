@@ -28,9 +28,9 @@ struct SC::AsyncEventLoop::Internal
 
     struct KernelQueueDefinition
     {
-        static constexpr int Windows = 144;
-        static constexpr int Apple   = 112;
-        static constexpr int Linux   = 336;
+        static constexpr int Windows = 136;
+        static constexpr int Apple   = 104;
+        static constexpr int Linux   = 328;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);
@@ -81,7 +81,7 @@ struct SC::AsyncEventLoop::Internal
 
     ThreadSafeLinkedList<AsyncRequest> manualThreadPoolCompletions;
 
-    Time::HighResolutionCounter loopTime;
+    Time::Monotonic loopTime;
 
     AsyncEventLoopListeners* listeners = nullptr;
 
@@ -101,7 +101,7 @@ struct SC::AsyncEventLoop::Internal
     // Timers
     [[nodiscard]] AsyncLoopTimeout* findEarliestLoopTimeout() const;
 
-    void invokeExpiredTimers(Time::HighResolutionCounter currentTime);
+    void invokeExpiredTimers(Time::Absolute currentTime);
     void updateTime();
 
     [[nodiscard]] Result stop(AsyncEventLoop& loop, AsyncRequest& async, Function<void(AsyncResult&)>* onClose);

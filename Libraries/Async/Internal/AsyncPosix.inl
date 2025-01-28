@@ -431,18 +431,17 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return true;
     }
 
-    static struct timespec timerToTimespec(const Time::HighResolutionCounter& loopTime,
-                                           const Time::HighResolutionCounter* nextTimer)
+    static struct timespec timerToRelativeTimespec(const Time::Absolute& loopTime, const Time::Absolute* nextTimer)
     {
         struct timespec specTimeout;
         if (nextTimer)
         {
             if (nextTimer->isLaterThanOrEqualTo(loopTime))
             {
-                const Time::HighResolutionCounter diff = nextTimer->subtractExact(loopTime);
+                const Time::Milliseconds diff = nextTimer->subtractExact(loopTime);
 
-                specTimeout.tv_sec  = diff.part1;
-                specTimeout.tv_nsec = diff.part2;
+                specTimeout.tv_sec  = diff.ms / 1000;
+                specTimeout.tv_nsec = (diff.ms % 1000) * 1000 * 1000;
                 return specTimeout;
             }
         }
@@ -453,8 +452,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     [[nodiscard]] Result syncWithKernel(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode)
     {
-        AsyncLoopTimeout*                  loopTimeout = nullptr;
-        const Time::HighResolutionCounter* nextTimer   = nullptr;
+        AsyncLoopTimeout*     loopTimeout = nullptr;
+        const Time::Absolute* nextTimer   = nullptr;
         if (syncMode == Internal::SyncMode::ForcedForwardProgress)
         {
             loopTimeout = eventLoop.internal.findEarliestLoopTimeout();
@@ -469,7 +468,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
         struct timespec specTimeout;
         // when nextTimer is null, specTimeout is initialized to 0, so that SyncMode::NoWait
-        specTimeout = timerToTimespec(eventLoop.internal.loopTime, nextTimer);
+        specTimeout = timerToRelativeTimespec(eventLoop.internal.loopTime, nextTimer);
         int res;
         do
         {
@@ -485,7 +484,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                 if (nextTimer)
                 {
                     eventLoop.internal.updateTime();
-                    specTimeout = timerToTimespec(eventLoop.internal.loopTime, nextTimer);
+                    specTimeout = timerToRelativeTimespec(eventLoop.internal.loopTime, nextTimer);
                 }
                 continue;
             }
@@ -845,7 +844,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     //-------------------------------------------------------------------------------------------------------
     // Process EXIT
     //-------------------------------------------------------------------------------------------------------
-    // Used by kevent backend when Process exits too fast (generatig EV_ERROR / ESRCH) and by the io-uring backend
+    // Used by kevent backend when Process exits too fast (EV_ERROR / ESRCH) and by the io-uring backend
     [[nodiscard]] static Result completeProcessExitWaitPid(AsyncProcessExit::Result& result)
     {
         int   status = -1;

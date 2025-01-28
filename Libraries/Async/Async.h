@@ -347,11 +347,12 @@ struct AsyncLoopTimeout : public AsyncRequest
 
     Time::Milliseconds relativeTimeout; ///< First timer expiration (relative) time in milliseconds
 
-    Time::HighResolutionCounter getExpirationTime() const { return expirationTime; }
+    /// @brief Gets computed absolute expiration time that determines when this timeout get executed
+    Time::Absolute getExpirationTime() const { return expirationTime; }
 
   private:
     friend struct AsyncEventLoop;
-    Time::HighResolutionCounter expirationTime;
+    Time::Absolute expirationTime;
 };
 
 /// @brief Starts a wake-up operation, allowing threads to execute callbacks on loop thread. @n
@@ -1069,7 +1070,7 @@ struct SC::AsyncEventLoop
     void updateTime();
 
     /// Get Loop time
-    [[nodiscard]] Time::HighResolutionCounter getLoopTime() const;
+    [[nodiscard]] Time::Monotonic getLoopTime() const;
 
     /// Obtain the total number of active requests
     [[nodiscard]] int getNumberOfActiveRequests() const;
@@ -1106,9 +1107,9 @@ struct SC::AsyncEventLoop
   private:
     struct InternalDefinition
     {
-        static constexpr int Windows = 504;
-        static constexpr int Apple   = 496;
-        static constexpr int Linux   = 704;
+        static constexpr int Windows = 488;
+        static constexpr int Apple   = 480;
+        static constexpr int Linux   = 688;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = 8;

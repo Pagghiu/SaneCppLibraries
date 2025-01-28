@@ -251,10 +251,10 @@ struct SC::Time::HighResolutionCounter
     /// @brief Converts to Seconds
     Seconds toSeconds() const;
 
+  private:
     int64_t part1;
     int64_t part2;
 
-  private:
     struct Internal;
 };
 

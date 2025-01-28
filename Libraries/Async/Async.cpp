@@ -389,7 +389,7 @@ SC::Result SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor(FileDesc
 }
 void SC::AsyncEventLoop::updateTime() { return internal.updateTime(); }
 
-SC::Time::HighResolutionCounter SC::AsyncEventLoop::getLoopTime() const { return internal.loopTime; }
+SC::Time::Monotonic SC::AsyncEventLoop::getLoopTime() const { return internal.loopTime; }
 
 int SC::AsyncEventLoop::getNumberOfActiveRequests() const { return internal.getTotalNumberOfActiveHandle(); }
 
@@ -572,7 +572,7 @@ void SC::AsyncEventLoop::Internal::queueSubmission(AsyncEventLoop& loop, AsyncRe
 
 SC::AsyncLoopTimeout* SC::AsyncEventLoop::Internal::findEarliestLoopTimeout() const { return activeLoopTimeouts.front; }
 
-void SC::AsyncEventLoop::Internal::invokeExpiredTimers(Time::HighResolutionCounter currentTime)
+void SC::AsyncEventLoop::Internal::invokeExpiredTimers(Time::Absolute currentTime)
 {
     AsyncLoopTimeout* async = activeLoopTimeouts.front;
     while (async != nullptr)
@@ -876,7 +876,7 @@ SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(AsyncEventLoop& loo
     case SyncMode::NoWait: {
         // No need to update time as it was already updated in submitRequests and syncing
         // with kernel has not been blocking (as we are in NoWait mode)
-        if (kernelEvents.needsManualTimersProcessing())
+        // if (kernelEvents.needsManualTimersProcessing())
         {
             invokeExpiredTimers(loopTime);
         }
@@ -1303,7 +1303,12 @@ SC::Result SC::AsyncEventLoop::Internal::stop(AsyncEventLoop& loop, AsyncRequest
     return Result(true);
 }
 
-void SC::AsyncEventLoop::Internal::updateTime() { loopTime.snap(); }
+void SC::AsyncEventLoop::Internal::updateTime()
+{
+    Time::Monotonic newTime = Time::Monotonic::now();
+    SC_ASSERT_RELEASE(newTime.isLaterThanOrEqualTo(loopTime));
+    loopTime = newTime;
+}
 
 SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
 {

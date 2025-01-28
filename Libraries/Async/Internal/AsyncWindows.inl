@@ -168,8 +168,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
     [[nodiscard]] Result syncWithKernel(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode)
     {
-        AsyncLoopTimeout*                  loopTimeout = nullptr;
-        const Time::HighResolutionCounter* nextTimer   = nullptr;
+        AsyncLoopTimeout*     loopTimeout = nullptr;
+        const Time::Absolute* nextTimer   = nullptr;
         if (syncMode == Internal::SyncMode::ForcedForwardProgress)
         {
             loopTimeout = eventLoop.internal.findEarliestLoopTimeout();
@@ -187,7 +187,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         {
             if (nextTimer->isLaterThanOrEqualTo(eventLoop.internal.loopTime))
             {
-                timeout = nextTimer->subtractApproximate(eventLoop.internal.loopTime).toMilliseconds();
+                timeout = nextTimer->subtractExact(eventLoop.internal.loopTime);
             }
         }
         const DWORD ms =
