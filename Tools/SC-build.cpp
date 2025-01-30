@@ -15,7 +15,7 @@ namespace Tools
     download.packagesInstallDirectory = directories.packagesInstallDirectory;
 
     download.packageName    = "sokol";
-    download.packageVersion = "7b5cfa7";
+    download.packageVersion = "9148922";
     download.url            = "https://github.com/floooh/sokol.git";
     download.isGitClone     = true;
     download.createLink     = false;
@@ -35,7 +35,7 @@ namespace Tools
     download.packagesInstallDirectory = directories.packagesInstallDirectory;
 
     download.packageName    = "dear-imgui";
-    download.packageVersion = "00ad3c6";
+    download.packageVersion = "ae6cfd3";
     download.url            = "https://github.com/ocornut/imgui.git";
     download.isGitClone     = true;
     download.createLink     = false;

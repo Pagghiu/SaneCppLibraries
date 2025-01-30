@@ -31,7 +31,7 @@ struct ApplicationState
     String loopMessage  = "Waiting for first timeout...";
     int    loopTimeouts = 1;
 
-    Time::Milliseconds loopTime;
+    Time::Monotonic loopTime;
 };
 
 struct ApplicationSystem
@@ -61,7 +61,7 @@ struct ApplicationSystem
     Result runLoopStepInsideSokolApp()
     {
         // Update loop time, mainly to display it in the GUI
-        state.loopTime = eventLoop.getLoopTime().toMilliseconds();
+        state.loopTime = eventLoop.getLoopTime();
 
         // Check if enough time has passed since last user input event
         const Time::Relative sinceLastEvent = Time::HighResolutionCounter().snap().subtractApproximate(lastEventTime);
@@ -215,7 +215,7 @@ struct ApplicationView
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                     ImGui::GetIO().Framerate);
         ImGui::Text("Frame %d", state.numberOfFrames++);
-        ImGui::Text("Time %.3f", state.loopTime.ms / 1000.0f);
+        ImGui::Text("Time %.3f", state.loopTime.getMonotonicMilliseconds() / 1000.0f);
         ImGui::PushItemWidth(100);
         ImGui::InputInt("Continue drawing for (ms)", &state.continueDrawingForMs);
         ImGui::InputInt("Timeout occurs every (ms)", &state.timeoutOccursEveryMs);

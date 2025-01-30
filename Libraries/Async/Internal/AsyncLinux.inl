@@ -245,7 +245,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             {
                 kq.timerIsSet = false;
                 // Sanity check: expired timeouts are reported with ETIME errno
-                SC_ASSERT_RELEASE(cqe.res == -ETIME);
+                SC_ASSERT_RELEASE(cqe.res == -ETIME or cqe.res == -ECANCELED);
             }
             else
             {
