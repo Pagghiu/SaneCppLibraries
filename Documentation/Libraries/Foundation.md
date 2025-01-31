@@ -60,6 +60,12 @@ Foundation provides all primitive types to be used in headers and classes like S
 ## UniqueHandle
 @copydoc SC::UniqueHandle
 
+# Blog
+
+Some relevant blog posts are:
+
+- [January 2022 Update](https://pagghiu.github.io/site/blog/2025-01-31-SaneCppLibrariesUpdate.html)
+
 # Roadmap
 
 🟦 Complete Features:
