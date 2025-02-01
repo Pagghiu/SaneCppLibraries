@@ -47,6 +47,8 @@ jobs:
       run: mv _Build/_Coverage/coverage _Build/_Documentation/docs
     - name: fix documentation permissions
       run: chmod -v -R +rX "_Build/_Documentation/docs"
+    - name: build SCExample
+      run: ./SC.sh build compile SCExample
     - name: Setup Pages
       # Skip documentation deployment step on forks
       # This may fail because forks may not have enabled pages.
