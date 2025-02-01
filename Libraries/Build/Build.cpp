@@ -382,25 +382,25 @@ bool SC::Build::ProjectWriter::write(StringView defaultProjectName)
                 SC_TRY(fs.removeFileIfExists(prjName.view()));
                 SC_TRY(fs.writeString(prjName.view(), buffer.view()));
             }
-            if (writer.isGUIApplication(project))
+            switch (project.targetType)
             {
-                StringBuilder builder(buffer, StringBuilder::Clear);
+            case TargetType::ConsoleExecutable: break;
+            case TargetType::GUIApplication: {
+                StringBuilder builderEntitlements(buffer, StringBuilder::Clear);
                 SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{0}.entitlements", projectName));
-                SC_TRY(writer.writeEntitlements(builder, project));
+                SC_TRY(writer.writeEntitlements(builderEntitlements, project));
                 SC_TRY(fs.removeFileIfExists(prjName.view()));
                 SC_TRY(fs.writeString(prjName.view(), buffer.view()));
-            }
-            if (writer.isGUIApplication(project))
-            {
-                StringBuilder builder(buffer, StringBuilder::Clear);
+
+                StringBuilder builderStoryboard(buffer, StringBuilder::Clear);
                 SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{0}.storyboard", projectName));
-                SC_TRY(writer.writeStoryboard(builder, project));
+                SC_TRY(writer.writeStoryboard(builderStoryboard, project));
                 SC_TRY(fs.removeFileIfExists(prjName.view()));
                 SC_TRY(fs.writeString(prjName.view(), buffer.view()));
-            }
-            if (writer.isGUIApplication(project))
-            {
+
                 SC_TRY(writer.writeAssets(fs, project));
+            }
+            break;
             }
         }
         break;

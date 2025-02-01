@@ -330,14 +330,12 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("      <MultiProcessorCompilation>true</MultiProcessorCompilation>\n");
         builder.append("    </ClCompile>\n");
         builder.append("    <Link>\n");
-        if (configuration.link.guiApplication or project.link.guiApplication)
+        switch (project.targetType)
         {
-            builder.append("      <SubSystem>Windows</SubSystem>\n");
+        case TargetType::ConsoleExecutable: builder.append("      <SubSystem>Console</SubSystem>\n"); break;
+        case TargetType::GUIApplication: builder.append("      <SubSystem>Windows</SubSystem>\n"); break;
         }
-        else
-        {
-            builder.append("      <SubSystem>Console</SubSystem>\n");
-        }
+
         switch (configuration.compile.optimizationLevel)
         {
         case Optimization::Debug:

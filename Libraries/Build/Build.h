@@ -139,10 +139,9 @@ struct LinkFlags
     Vector<String> frameworksIOS;   ///< Frameworks to link on iOS only
     Vector<String> frameworksMacOS; ///< Frameworks to link on macOS only
 
-    bool guiApplication = false; ///< Link target as GUI application
-    bool enableLTO      = false; ///< Enable Link Time Optimization
-    bool enableASAN     = false; ///< Enable linking Address Sanitizer
-    bool enableStdCpp   = false; ///< Enable and link C++ Standard Library
+    bool enableLTO    = false; ///< Enable Link Time Optimization
+    bool enableASAN   = false; ///< Enable linking Address Sanitizer
+    bool enableStdCpp = false; ///< Enable and link C++ Standard Library
 };
 
 /// @brief Groups SC::Build::CompileFlags and SC::Build::LinkFlags for a given SC::Build::Architecture
@@ -205,9 +204,8 @@ struct TargetType
     /// @brief Type of artifact
     enum Type
     {
-        Executable,     ///< Create executable program
-        DynamicLibrary, ///< Create dynamic library
-        StaticLibrary   ///< Create static library
+        ConsoleExecutable, ///< Create console executable program
+        GUIApplication,    ///< Create graphical application program
     };
 };
 
@@ -237,7 +235,7 @@ struct Project
     Project() = default;
     Project(TargetType::Type targetType, StringView name) : targetType(targetType), name(name), targetName(name) {}
 
-    TargetType::Type targetType = TargetType::Executable; ///< Type of build artifact
+    TargetType::Type targetType = TargetType::ConsoleExecutable; ///< Type of build artifact
 
     String name;          ///< Project name
     String rootDirectory; ///< Project root directory

@@ -126,8 +126,10 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     [[nodiscard]] bool fillResourcesGroup(const Project& project, RenderGroup& group, Vector<RenderItem>& xcodeFiles)
     {
-        if (not project.link.guiApplication)
+        if (project.targetType == TargetType::ConsoleExecutable)
+        {
             return true;
+        }
 
         auto resourcesGroup = group.children.getOrCreate("Resources"_a8);
         SC_TRY(resourcesGroup != nullptr);
@@ -268,14 +270,13 @@ struct SC::Build::ProjectWriter::WriterXCode
         // Target
         StringView productType;
         StringView productExtension;
-        if (project.link.guiApplication)
+        switch (project.targetType)
         {
+        case TargetType::ConsoleExecutable: productType = "compiled.mach-o.executable"; break;
+        case TargetType::GUIApplication:
             productType      = "wrapper.application";
             productExtension = ".app";
-        }
-        else
-        {
-            productType = "compiled.mach-o.executable";
+            break;
         }
 
         builder.append(R"delimiter(
@@ -283,7 +284,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                        project.targetName.view(), productExtension, productType);
 
         // Entitlements
-        if (project.link.guiApplication)
+        if (project.targetType != TargetType::ConsoleExecutable)
         {
             builder.append(R"delimiter(
         7B5A4A5A2C20D35E00EB8229 /* {0}.entitlements */ = {{isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = {0}.entitlements; sourceTree = "<group>"; }};)delimiter",
@@ -396,14 +397,13 @@ struct SC::Build::ProjectWriter::WriterXCode
     {
         StringView productType;
         StringView productExtension;
-        if (project.link.guiApplication)
+        switch (project.targetType)
         {
+        case TargetType::ConsoleExecutable: productType = "com.apple.product-type.tool"; break;
+        case TargetType::GUIApplication:
             productType      = "com.apple.product-type.application";
             productExtension = ".app";
-        }
-        else
-        {
-            productType = "com.apple.product-type.tool";
+            break;
         }
 
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
@@ -622,7 +622,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                        CLANG_CXX_LANGUAGE_STANDARD = "c++14";
                        CURRENT_PROJECT_VERSION = 1;)delimiter");
 
-        if (project.link.guiApplication)
+        if (project.targetType == TargetType::GUIApplication)
         {
             builder.append(R"delimiter(
                        ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -990,10 +990,13 @@ struct SC::Build::ProjectWriter::WriterXCode
 
         writePBXNativeTarget(builder, project);
         writePBXProject(builder, project);
-        if (isGUIApplication(project))
+
+        switch (project.targetType)
         {
-            writePBXResourcesBuildPhase(builder, project);
+        case TargetType::ConsoleExecutable: break;
+        case TargetType::GUIApplication: writePBXResourcesBuildPhase(builder, project); break;
         }
+
         writePBXShellScriptBuildPhase(builder);
         writePBXSourcesBuildPhase(builder, renderer.renderItems);
         writeXCBuildConfiguration(builder, project, renderer.renderItems);
@@ -1118,8 +1121,6 @@ struct SC::Build::ProjectWriter::WriterXCode
         SC_COMPILER_WARNING_POP;
         return Result(true);
     }
-
-    [[nodiscard]] bool isGUIApplication(const Project& project) const { return project.link.guiApplication; }
 
     Result writeEntitlements(StringBuilder& builder, const Project& project)
     {

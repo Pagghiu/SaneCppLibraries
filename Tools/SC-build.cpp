@@ -90,7 +90,7 @@ static constexpr StringView TEST_PROJECT_NAME = "SCTest";
 
 Result buildTestProject(const Parameters& parameters, Project& project)
 {
-    project = {TargetType::Executable, TEST_PROJECT_NAME};
+    project = {TargetType::ConsoleExecutable, TEST_PROJECT_NAME};
 
     // All relative paths are evaluated from this project root directory.
     project.setRootDirectory(parameters.directories.libraryDirectory.view());
@@ -123,7 +123,7 @@ static constexpr StringView EXAMPLE_PROJECT_NAME = "SCExample";
 
 Result buildExampleProject(const Parameters& parameters, Project& project)
 {
-    project = {TargetType::Executable, EXAMPLE_PROJECT_NAME};
+    project = {TargetType::GUIApplication, EXAMPLE_PROJECT_NAME};
 
     // All relative paths are evaluated from this project root directory.
     project.setRootDirectory(parameters.directories.libraryDirectory.view());
@@ -158,7 +158,7 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
                                 Path::AsNative));
     SC_TRY(StringBuilder(imguiDefine).format("SC_IMGUI_PATH=$(PROJECT_ROOT)/{}", imguiRelative));
     project.compile.defines.append({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", imguiDefine.view()});
-    project.link.guiApplication = true;
+
     if (parameters.platform == Platform::Apple)
     {
         project.addDirectory("Examples/SCExample", "*.m"); // add all .m from SCExample directory
