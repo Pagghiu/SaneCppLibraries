@@ -1,12 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Containers/Array.h"
-#include "../Containers/VectorSet.h"
 #include "../Foundation/Result.h"
-#include "../Foundation/TaggedUnion.h"
 #include "../Strings/String.h"
-#include "Internal/TaggedMap.h"
 
 namespace SC
 {
@@ -119,156 +115,34 @@ struct Optimization
     }
 };
 
-/// @brief Compilation switches (include paths, preprocessor defines, etc.)
-struct Compile
+/// @brief Compile flags (include paths, preprocessor defines etc.)
+struct CompileFlags
 {
-    enum Type
-    {
-        includePaths = 0,    ///< Include paths
-        preprocessorDefines, ///< Preprocessor defines
-        optimizationLevel,   ///< Optimization Level (debug / release)
-        enableASAN,          ///< Address Sanitizer
-        enableRTTI,          ///< Runtime Type Identification
-        enableExceptions,    ///< C++ Exceptions
-        enableStdCpp,        ///< C++ Standard Library
-        enableCoverage,      ///< Enables code coverage instrumentation
-    };
+    Vector<String> includePaths; ///< Include search paths list
+    Vector<String> defines;      ///< Preprocessor defines
 
-    /// @brief Two StringViews representing name and description
-    struct NameDescription
-    {
-        StringView name;
-        StringView description;
-    };
+    Optimization::Type optimizationLevel = Optimization::Release; ///< Optimization level
 
-    /// @brief Get name and description from Compile::Type
-    static constexpr NameDescription typeToString(Type type)
-    {
-        switch (type)
-        {
-        case includePaths: return {"includePaths", "Include paths"};
-        case preprocessorDefines: return {"preprocessorDefines", "Preprocessor defines"};
-        case optimizationLevel: return {"optimizationLevel", "Optimization level"};
-        case enableASAN: return {"enableASAN", "Address Sanitizer"};
-        case enableRTTI: return {"enableRTTI", "Runtime Type Identification"};
-        case enableExceptions: return {"enableExceptions", "C++ Exceptions"};
-        case enableStdCpp: return {"enableStdCpp", "C++ Standard Library"};
-        case enableCoverage: return {"enableCoverage", "Code coverage instrumentation"};
-        }
-        Assert::unreachable();
-    }
-    template <Type E, typename T>
-    using Tag = TaggedType<Type, E, T>; // Helper to save some typing
-
-    using FieldsTypes = TypeTraits::TypeList<Tag<includePaths, Vector<String>>,          //
-                                             Tag<preprocessorDefines, Vector<String>>,   //
-                                             Tag<optimizationLevel, Optimization::Type>, //
-                                             Tag<enableASAN, bool>,                      //
-                                             Tag<enableRTTI, bool>,                      //
-                                             Tag<enableExceptions, bool>,                //
-                                             Tag<enableCoverage, bool>,                  //
-                                             Tag<enableStdCpp, bool>>;
-
-    using Union = TaggedUnion<Compile>;
+    bool enableASAN       = false; ///< Enable Address Sanitizer
+    bool enableRTTI       = false; ///< Enable C++ Runtime Type Identification
+    bool enableExceptions = false; ///< Enable C++ Exceptions
+    bool enableStdCpp     = false; ///< Enable and include C++ Standard Library
+    bool enableCoverage   = false; ///< Enables code coverage instrumentation
 };
 
-/// @brief Map of SC::Build::Compile flags (include paths, preprocessor defines etc.)
-struct CompileFlags : public TaggedMap<Compile::Type, Compile::Union>
+/// @brief Link flags (library paths, libraries to link, etc.)
+struct LinkFlags
 {
-    /// @brief Add paths to includes search paths list
-    [[nodiscard]] bool addIncludes(Span<const StringView> includes)
-    {
-        return getOrCreate<Compile::includePaths>()->append(includes);
-    }
+    Vector<String> libraryPaths;    ///< Libraries search paths list
+    Vector<String> libraries;       ///< Names of libraries to link
+    Vector<String> frameworks;      ///< Frameworks to link on both iOS and macOS
+    Vector<String> frameworksIOS;   ///< Frameworks to link on iOS only
+    Vector<String> frameworksMacOS; ///< Frameworks to link on macOS only
 
-    /// @brief Add define to preprocessor definitions
-    [[nodiscard]] bool addDefines(Span<const StringView> defines)
-    {
-        return getOrCreate<Compile::preprocessorDefines>()->append(defines);
-    }
-};
-
-/// @brief Linking switches (library paths, LTO etc.)
-struct Link
-{
-    enum Type
-    {
-        libraryPaths,        ///< Library paths
-        linkFrameworksAny,   ///< Frameworks to link on any Apple Platform
-        linkFrameworksMacOS, ///< Frameworks to link on macOS
-        linkFrameworksIOS,   ///< Frameworks to link on iOS
-        linkLibraries,       ///< Libraries to link
-        guiApplication,      ///< gui application
-        enableLTO,           ///< Link Time Optimization
-        enableASAN,          ///< Address Sanitizer
-        enableStdCpp,        ///< C++ Standard Library
-    };
-
-    /// @brief Get StringView describing Link::Type
-    static constexpr StringView typeToString(Type type)
-    {
-        switch (type)
-        {
-        case libraryPaths: return "libraryPaths";
-        case linkFrameworksAny: return "linkFrameworksAny";
-        case linkFrameworksMacOS: return "linkFrameworksMacOS";
-        case linkFrameworksIOS: return "linkFrameworksIOS";
-        case linkLibraries: return "linkLibraries";
-        case guiApplication: return "guiApplication";
-        case enableLTO: return "enableLTO";
-        case enableASAN: return "enableASAN";
-        case enableStdCpp: return "enableStdCpp";
-        }
-        Assert::unreachable();
-    }
-    template <Type E, typename T>
-    using Tag = TaggedType<Type, E, T>; // Helper to save some typing
-
-    using FieldsTypes = TypeTraits::TypeList<Tag<libraryPaths, Vector<String>>,        //
-                                             Tag<linkFrameworksAny, Vector<String>>,   //
-                                             Tag<linkFrameworksMacOS, Vector<String>>, //
-                                             Tag<linkFrameworksIOS, Vector<String>>,   //
-                                             Tag<linkLibraries, Vector<String>>,       //
-                                             Tag<guiApplication, bool>,                //
-                                             Tag<enableLTO, bool>,                     //
-                                             Tag<enableASAN, bool>,                    //
-                                             Tag<enableStdCpp, bool>                   //
-                                             >;
-
-    using Union = TaggedUnion<Link>;
-};
-
-enum class PlatformApple
-{
-    Any,
-    macOS,
-    iOS
-};
-/// @brief Map of SC::Build::Link flags (library paths, LTO switch etc.)
-struct LinkFlags : public TaggedMap<Link::Type, Link::Union>
-{
-    /// @brief Add the given paths to the library search paths list
-    [[nodiscard]] bool addSearchPath(Span<const StringView> libraries)
-    {
-        return getOrCreate<Link::libraryPaths>()->append(libraries);
-    }
-
-    /// @brief Add framework to list of frameworks to link
-    [[nodiscard]] bool addFrameworks(Span<const StringView> frameworks, PlatformApple appleOS = PlatformApple::Any)
-    {
-        switch (appleOS)
-        {
-        case PlatformApple::macOS: return getOrCreate<Link::linkFrameworksMacOS>()->append(frameworks);
-        case PlatformApple::iOS: return getOrCreate<Link::linkFrameworksIOS>()->append(frameworks);
-        default: return getOrCreate<Link::linkFrameworksAny>()->append(frameworks);
-        }
-    }
-
-    /// @brief Add more libraries to list of libraries to link
-    [[nodiscard]] bool addLibraries(Span<const StringView> libraries)
-    {
-        return getOrCreate<Link::linkLibraries>()->append(libraries);
-    }
+    bool guiApplication = false; ///< Link target as GUI application
+    bool enableLTO      = false; ///< Enable Link Time Optimization
+    bool enableASAN     = false; ///< Enable linking Address Sanitizer
+    bool enableStdCpp   = false; ///< Enable and link C++ Standard Library
 };
 
 /// @brief Groups SC::Build::CompileFlags and SC::Build::LinkFlags for a given SC::Build::Architecture
@@ -335,18 +209,6 @@ struct TargetType
         DynamicLibrary, ///< Create dynamic library
         StaticLibrary   ///< Create static library
     };
-
-    /// @brief Convert TargetType to StringView
-    static constexpr StringView typeToString(Type type)
-    {
-        switch (type)
-        {
-        case Executable: return "Executable";
-        case DynamicLibrary: return "DynamicLibrary";
-        case StaticLibrary: return "StaticLibrary";
-        }
-        Assert::unreachable();
-    }
 };
 
 /// @brief Groups multiple Configuration and source files with their compile and link flags
@@ -470,22 +332,6 @@ struct Definition
     Result configure(StringView projectName, const Parameters& parameters) const;
 };
 
-/// @brief Caches file paths by pre-resolving directory filter search masks
-struct DefinitionCompiler
-{
-    VectorMap<String, Vector<String>> resolvedPaths;
-
-    const Build::Definition& definition;
-    DefinitionCompiler(const Build::Definition& definition) : definition(definition) {}
-
-    [[nodiscard]] Result validate();
-    [[nodiscard]] Result build();
-
-  private:
-    [[nodiscard]] static Result fillPathsList(StringView path, const VectorSet<Project::File>& filters,
-                                              VectorMap<String, Vector<String>>& filtersToFiles);
-    [[nodiscard]] Result        collectUniqueRootPaths(VectorMap<String, VectorSet<Project::File>>& paths);
-};
 //! @}
 
 //-----------------------------------------------------------------------------------------------------------------------

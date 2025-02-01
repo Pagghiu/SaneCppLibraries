@@ -8,6 +8,7 @@ namespace SC
 {
 namespace Build
 {
+struct DefinitionCompiler;
 /// @brief Writes all project files for a given Definition with some Parameters using the provided DefinitionCompiler
 struct ProjectWriter
 {
@@ -48,22 +49,22 @@ bool SC::Build::Configuration::applyPreset(Preset newPreset, const Parameters& p
     switch (preset)
     {
     case Configuration::Preset::DebugCoverage:
-        SC_TRY(compile.set<Compile::enableCoverage>(true));
-        SC_TRY(compile.set<Compile::optimizationLevel>(Optimization::Debug));
-        SC_TRY(compile.addDefines({"DEBUG=1"}));
+        compile.enableCoverage    = true;
+        compile.optimizationLevel = Optimization::Debug;
+        SC_TRY(compile.defines.append({"DEBUG=1"}));
         if (parameters.generator == Build::Generator::VisualStudio2022)
         {
             visualStudio.platformToolset = "ClangCL";
         }
         break;
     case Configuration::Preset::Debug:
-        SC_TRY(compile.set<Compile::enableASAN>(true));
-        SC_TRY(compile.set<Compile::optimizationLevel>(Optimization::Debug));
-        SC_TRY(compile.addDefines({"DEBUG=1"}));
+        compile.enableASAN        = true;
+        compile.optimizationLevel = Optimization::Debug;
+        SC_TRY(compile.defines.append({"DEBUG=1"}));
         break;
     case Configuration::Preset::Release:
-        SC_TRY(compile.set<Compile::optimizationLevel>(Optimization::Release));
-        SC_TRY(compile.addDefines({"NDEBUG=1"}));
+        compile.optimizationLevel = Optimization::Release;
+        SC_TRY(compile.defines.append({"NDEBUG=1"}));
         break;
     case Configuration::Preset::None: break;
     }
@@ -175,17 +176,6 @@ SC::Result SC::Build::DefinitionCompiler::validate()
     return Result(true);
 }
 
-SC::Result SC::Build::DefinitionCompiler::build()
-{
-    VectorMap<String, VectorSet<Project::File>> uniquePaths;
-    SC_TRY(collectUniqueRootPaths(uniquePaths));
-    for (auto& it : uniquePaths)
-    {
-        SC_TRY(fillPathsList(it.key.view(), it.value, resolvedPaths));
-    }
-    return Result(true);
-}
-
 SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const VectorSet<Project::File>& filters,
                                                         VectorMap<String, Vector<String>>& filtersToFiles)
 {
@@ -244,6 +234,17 @@ SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const V
         }
     }
     return fsIterator.checkErrors();
+}
+
+SC::Result SC::Build::DefinitionCompiler::build()
+{
+    VectorMap<String, VectorSet<Project::File>> uniquePaths;
+    SC_TRY(collectUniqueRootPaths(uniquePaths));
+    for (auto& it : uniquePaths)
+    {
+        SC_TRY(fillPathsList(it.key.view(), it.value, resolvedPaths));
+    }
+    return Result(true);
 }
 
 // Collects root paths to build a stat map

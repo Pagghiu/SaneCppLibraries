@@ -126,7 +126,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     [[nodiscard]] bool fillResourcesGroup(const Project& project, RenderGroup& group, Vector<RenderItem>& xcodeFiles)
     {
-        if (not project.link.hasValue<Link::guiApplication>(true))
+        if (not project.link.guiApplication)
             return true;
 
         auto resourcesGroup = group.children.getOrCreate("Resources"_a8);
@@ -268,7 +268,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         // Target
         StringView productType;
         StringView productExtension;
-        if (project.link.hasValue<Link::guiApplication>(true))
+        if (project.link.guiApplication)
         {
             productType      = "wrapper.application";
             productExtension = ".app";
@@ -283,7 +283,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                        project.targetName.view(), productExtension, productType);
 
         // Entitlements
-        if (project.link.hasValue<Link::guiApplication>(true))
+        if (project.link.guiApplication)
         {
             builder.append(R"delimiter(
         7B5A4A5A2C20D35E00EB8229 /* {0}.entitlements */ = {{isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = {0}.entitlements; sourceTree = "<group>"; }};)delimiter",
@@ -396,7 +396,7 @@ struct SC::Build::ProjectWriter::WriterXCode
     {
         StringView productType;
         StringView productExtension;
-        if (project.link.hasValue<Link::guiApplication>(true))
+        if (project.link.guiApplication)
         {
             productType      = "com.apple.product-type.application";
             productExtension = ".app";
@@ -554,13 +554,12 @@ struct SC::Build::ProjectWriter::WriterXCode
         SC_COMPILER_WARNING_POP;
         return true;
     }
-    [[nodiscard]] bool writeIncludePaths(StringBuilder& builder, const Project& project)
+    [[nodiscard]] bool writeincludes(StringBuilder& builder, const Project& project)
     {
-        auto includes = project.compile.get<Compile::includePaths>();
-        if (includes and not includes->isEmpty())
+        if (not project.compile.includePaths.isEmpty())
         {
             SC_TRY(builder.append("\n                       HEADER_SEARCH_PATHS = ("));
-            for (auto it : *includes)
+            for (const String& it : project.compile.includePaths)
             {
                 // TODO: Escape double quotes for include paths
                 if (Path::isAbsolute(it.view(), Path::AsNative))
@@ -584,32 +583,24 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     [[nodiscard]] bool writeDefines(StringBuilder& builder, const Project& project, const Configuration& configuration)
     {
-        auto defines       = project.compile.get<Compile::preprocessorDefines>();
-        auto configDefines = configuration.compile.get<Compile::preprocessorDefines>();
-        bool opened        = false;
-        if ((defines and not defines->isEmpty()) or (configDefines and not configDefines->isEmpty()))
+        bool opened = false;
+        if (not project.compile.defines.isEmpty() or not configuration.compile.defines.isEmpty())
         {
             opened = true;
             SC_TRY(builder.append("\n                       GCC_PREPROCESSOR_DEFINITIONS = ("));
         }
-        if (defines)
+        for (const String& it : project.compile.defines)
         {
-            for (auto& it : *defines)
-            {
-                SC_TRY(builder.append("\n                       \""));
-                SC_TRY(appendVariable(builder, it.view())); // TODO: Escape double quotes
-                SC_TRY(builder.append("\","));
-            }
+            SC_TRY(builder.append("\n                       \""));
+            SC_TRY(appendVariable(builder, it.view())); // TODO: Escape double quotes
+            SC_TRY(builder.append("\","));
         }
 
-        if (configDefines)
+        for (const String& it : configuration.compile.defines)
         {
-            for (auto it : *configDefines)
-            {
-                SC_TRY(builder.append("\n                       \""));
-                SC_TRY(appendVariable(builder, it.view())); // TODO: Escape double quotes
-                SC_TRY(builder.append("\","));
-            }
+            SC_TRY(builder.append("\n                       \""));
+            SC_TRY(appendVariable(builder, it.view())); // TODO: Escape double quotes
+            SC_TRY(builder.append("\","));
         }
         if (opened)
         {
@@ -631,7 +622,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                        CLANG_CXX_LANGUAGE_STANDARD = "c++14";
                        CURRENT_PROJECT_VERSION = 1;)delimiter");
 
-        if (project.link.hasValue<Link::guiApplication>(true))
+        if (project.link.guiApplication)
         {
             builder.append(R"delimiter(
                        ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -746,7 +737,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                                                     relativeDirectories.relativeProjectsToIntermediates.view());
         appendVariable(builder, configuration->intermediatesPath.view());
         builder.append("\";");
-        if (configuration->compile.hasValue<Compile::enableRTTI>(true))
+        if (configuration->compile.enableRTTI)
         {
             builder.append("\n                       GCC_ENABLE_CPP_RTTI = YES;");
         }
@@ -754,7 +745,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
             builder.append("\n                       GCC_ENABLE_CPP_RTTI = NO;");
         }
-        if (configuration->compile.hasValue<Compile::enableExceptions>(true))
+        if (configuration->compile.enableExceptions)
         {
             builder.append("\n                       GCC_ENABLE_CPP_EXCEPTIONS = YES;");
         }
@@ -769,7 +760,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                          "\"$(SYMROOT)/CompilationDatabase\"",
                        );)delimiter");
 
-        if (not configuration->compile.hasValue<Compile::enableStdCpp>(true))
+        if (not configuration->compile.enableStdCpp)
         {
             builder.append(R"delimiter(
                        OTHER_CPLUSPLUSFLAGS = (
@@ -778,32 +769,32 @@ struct SC::Build::ProjectWriter::WriterXCode
                        );)delimiter");
         }
 
-        if (not configuration->link.hasValue<Link::enableStdCpp>(true))
+        if (not configuration->link.enableStdCpp)
         {
 
             builder.append("\n                       OTHER_LDFLAGS = \"-nostdlib++\";");
         }
-
-        if (configuration->compile.hasValue<Compile::optimizationLevel>(Optimization::Debug))
+        switch (configuration->compile.optimizationLevel)
         {
+        case Optimization::Debug:
             builder.append(R"delimiter(
-                       COPY_PHASE_STRIP = NO;
-                       ONLY_ACTIVE_ARCH = YES;
-                       DEBUG_INFORMATION_FORMAT = dwarf;
-                       ENABLE_TESTABILITY = YES;
-                       GCC_DYNAMIC_NO_PIC = NO;
-                       GCC_OPTIMIZATION_LEVEL = 0;)delimiter");
-        }
-        else
-        {
+                           COPY_PHASE_STRIP = NO;
+                           ONLY_ACTIVE_ARCH = YES;
+                           DEBUG_INFORMATION_FORMAT = dwarf;
+                           ENABLE_TESTABILITY = YES;
+                           GCC_DYNAMIC_NO_PIC = NO;
+                           GCC_OPTIMIZATION_LEVEL = 0;)delimiter");
+            break;
+        case Optimization::Release:
             builder.append(R"delimiter(
-                       COPY_PHASE_STRIP = YES;
-                       DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-                       ENABLE_NS_ASSERTIONS = NO;)delimiter");
+                           COPY_PHASE_STRIP = YES;
+                           DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+                           ENABLE_NS_ASSERTIONS = NO;)delimiter");
+            break;
         }
 
         writeDefines(builder, project, *configuration);
-        writeIncludePaths(builder, project);
+        writeincludes(builder, project);
         builder.append(R"delimiter(
             }};
             name = {};
@@ -917,51 +908,48 @@ struct SC::Build::ProjectWriter::WriterXCode
         return true;
     }
 
+    [[nodiscard]] bool fillFrameworks(Vector<RenderItem>& xcodeObjects, const Vector<String>& frameworks,
+                                      StringView platformFilter, bool framework)
+    {
+        for (const String& it : frameworks)
+        {
+            RenderItem xcodeFile;
+            if (framework)
+            {
+                xcodeFile.name = Path::basename(it.view(), Path::AsPosix);
+                SC_TRY(StringBuilder(xcodeFile.name, StringBuilder::DoNotClear).append(".framework"));
+                xcodeFile.type = RenderItem::Framework;
+                SC_TRY(Path::join(xcodeFile.path, {"System/Library/Frameworks", xcodeFile.name.view()}, "/"));
+            }
+            else
+            {
+                xcodeFile.name = "lib";
+                StringBuilder sb(xcodeFile.name, StringBuilder::DoNotClear);
+                SC_TRY(sb.append(Path::basename(it.view(), Path::AsPosix)));
+                SC_TRY(sb.append(".tbd"));
+                xcodeFile.type = RenderItem::SystemLibrary;
+                SC_TRY(Path::join(xcodeFile.path, {"usr/lib", xcodeFile.name.view()}, "/"));
+            }
+            SC_TRY(computeBuildHash(xcodeFile.name.view(), xcodeFile.buildHash));
+            SC_TRY(computeReferenceHash(xcodeFile.name.view(), xcodeFile.referenceHash));
+
+            // TODO: De-hardcode thse ones
+            if (not platformFilter.isEmpty())
+            {
+                SC_TRY(xcodeFile.platformFilters.push_back(platformFilter));
+            }
+            SC_TRY(xcodeObjects.push_back(move(xcodeFile)));
+        }
+        return Result(true);
+    }
+
     [[nodiscard]] bool fillXCodeFrameworks(const Project& project, Vector<RenderItem>& xcodeObjects)
     {
-        auto fillFrameworks =
-            [this, &xcodeObjects](const Vector<String>* frameworks, StringView platformFilter, bool framework)
-        {
-            if (frameworks == nullptr)
-            {
-                return Result(true);
-            }
-            for (const String& it : *frameworks)
-            {
-                RenderItem xcodeFile;
-                if (framework)
-                {
-                    xcodeFile.name = Path::basename(it.view(), Path::AsPosix);
-                    SC_TRY(StringBuilder(xcodeFile.name, StringBuilder::DoNotClear).append(".framework"));
-                    xcodeFile.type = RenderItem::Framework;
-                    SC_TRY(Path::join(xcodeFile.path, {"System/Library/Frameworks", xcodeFile.name.view()}, "/"));
-                }
-                else
-                {
-                    xcodeFile.name = "lib";
-                    StringBuilder sb(xcodeFile.name, StringBuilder::DoNotClear);
-                    SC_TRY(sb.append(Path::basename(it.view(), Path::AsPosix)));
-                    SC_TRY(sb.append(".tbd"));
-                    xcodeFile.type = RenderItem::SystemLibrary;
-                    SC_TRY(Path::join(xcodeFile.path, {"usr/lib", xcodeFile.name.view()}, "/"));
-                }
-                SC_TRY(computeBuildHash(xcodeFile.name.view(), xcodeFile.buildHash));
-                SC_TRY(computeReferenceHash(xcodeFile.name.view(), xcodeFile.referenceHash));
-
-                // TODO: De-hardcode thse ones
-                if (not platformFilter.isEmpty())
-                {
-                    SC_TRY(xcodeFile.platformFilters.push_back(platformFilter));
-                }
-                SC_TRY(xcodeObjects.push_back(move(xcodeFile)));
-            }
-            return Result(true);
-        };
-        SC_TRY(fillFrameworks(project.link.get<Link::linkFrameworksAny>(), StringView(), true));
-        SC_TRY(fillFrameworks(project.link.get<Link::linkFrameworksMacOS>(), "macos", true));
-        SC_TRY(fillFrameworks(project.link.get<Link::linkFrameworksIOS>(), "ios", true));
+        SC_TRY(fillFrameworks(xcodeObjects, project.link.frameworks, StringView(), true));
+        SC_TRY(fillFrameworks(xcodeObjects, project.link.frameworksMacOS, "macos", true));
+        SC_TRY(fillFrameworks(xcodeObjects, project.link.frameworksIOS, "ios", true));
         // TODO: Must differentiate between regular link libraries and "system link libraries" (.tbd)
-        SC_TRY(fillFrameworks(project.link.get<Link::linkLibraries>(), StringView(), false));
+        SC_TRY(fillFrameworks(xcodeObjects, project.link.libraries, StringView(), false));
         return Result(true);
     }
 
@@ -1131,10 +1119,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         return Result(true);
     }
 
-    [[nodiscard]] bool isGUIApplication(const Project& project) const
-    {
-        return project.link.hasValue<Link::guiApplication>(true);
-    }
+    [[nodiscard]] bool isGUIApplication(const Project& project) const { return project.link.guiApplication; }
 
     Result writeEntitlements(StringBuilder& builder, const Project& project)
     {

@@ -1,8 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "SC-build.h"
-#include "Libraries/Strings/StringBuilder.h"
-#include "SC-package.h"
 
 namespace SC
 {
@@ -69,12 +67,12 @@ void addSaneCppLibraries(Project& project, const Parameters& parameters)
     // Libraries to link
     if (parameters.platform == Platform::Apple)
     {
-        project.link.addFrameworks({"CoreFoundation", "CoreServices"});
+        project.link.frameworks.append({"CoreFoundation", "CoreServices"});
     }
 
     if (parameters.platform != Platform::Windows)
     {
-        project.link.addLibraries({"dl", "pthread"});
+        project.link.libraries.append({"dl", "pthread"});
     }
 
     // Debug visualization helpers
@@ -104,10 +102,10 @@ Result buildTestProject(const Parameters& parameters, Project& project)
 
     // Defines
     // $(PROJECT_ROOT) expands to Project::setRootDirectory expressed relative to $(PROJECT_DIR)
-    project.compile.addDefines({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", "SC_COMPILER_ENABLE_CONFIG=1"});
+    project.compile.defines.append({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", "SC_COMPILER_ENABLE_CONFIG=1"});
 
     // Includes
-    project.compile.addIncludes({
+    project.compile.includePaths.append({
         ".",            // Libraries path (for PluginTest)
         "Tests/SCTest", // SCConfig.h path (enabled by SC_COMPILER_ENABLE_CONFIG == 1)
     });
@@ -136,11 +134,11 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
     // Install dependencies
     Tools::Package sokol;
     SC_TRY(Tools::installSokol(parameters.directories, sokol));
-    Tools::Package dearImGui;
-    SC_TRY(Tools::installDearImGui(parameters.directories, dearImGui));
+    Tools::Package imgui;
+    SC_TRY(Tools::installDearImGui(parameters.directories, imgui));
 
     // Add includes
-    project.compile.addIncludes({".", sokol.packageLocalDirectory.view(), dearImGui.packageLocalDirectory.view()});
+    project.compile.includePaths.append({".", sokol.packageLocalDirectory.view(), imgui.packageLocalDirectory.view()});
 
     // Project Configurations
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
@@ -153,36 +151,36 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
     project.removeFiles("LibrariesExtra", "**Test.cpp"); // remove all tests
     project.removeFiles("Support", "**Test.cpp");        // remove all tests
 
-    project.addDirectory(dearImGui.packageLocalDirectory.view(), "*.cpp");
+    project.addDirectory(imgui.packageLocalDirectory.view(), "*.cpp");
     project.addDirectory(sokol.packageLocalDirectory.view(), "*.h");
     String imguiRelative, imguiDefine;
-    SC_TRY(Path::relativeFromTo(project.rootDirectory.view(), dearImGui.packageLocalDirectory.view(), imguiRelative,
+    SC_TRY(Path::relativeFromTo(project.rootDirectory.view(), imgui.packageLocalDirectory.view(), imguiRelative,
                                 Path::AsNative));
     SC_TRY(StringBuilder(imguiDefine).format("SC_IMGUI_PATH=$(PROJECT_ROOT)/{}", imguiRelative));
-    project.compile.addDefines({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", imguiDefine.view()});
-    project.link.set<Link::guiApplication>(true);
+    project.compile.defines.append({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", imguiDefine.view()});
+    project.link.guiApplication = true;
     if (parameters.platform == Platform::Apple)
     {
         project.addDirectory("Examples/SCExample", "*.m"); // add all .m from SCExample directory
-        project.link.addFrameworks({"Metal", "MetalKit", "QuartzCore"});
-        project.link.addFrameworks({"Cocoa"}, PlatformApple::macOS);
-        project.link.addFrameworks({"UIKit", "Foundation"}, PlatformApple::iOS);
+        project.link.frameworks.append({"Metal", "MetalKit", "QuartzCore"});
+        project.link.frameworksMacOS.append({"Cocoa"});
+        project.link.frameworksIOS.append({"UIKit", "Foundation"});
     }
     else
     {
         project.addDirectory("Examples/SCExample", "*.c"); // add all .c from SCExample directory
         if (parameters.platform == Platform::Linux)
         {
-            project.link.addLibraries({"GL", "EGL", "X11", "Xi", "Xcursor"});
+            project.link.libraries.append({"GL", "EGL", "X11", "Xi", "Xcursor"});
         }
     }
     if (parameters.platform == Platform::Windows)
     {
-        project.compile.addDefines({"IMGUI_API=__declspec( dllexport )"});
+        project.compile.defines.append({"IMGUI_API=__declspec( dllexport )"});
     }
     else
     {
-        project.compile.addDefines({"IMGUI_API=__attribute__((visibility(\"default\")))"});
+        project.compile.defines.append({"IMGUI_API=__attribute__((visibility(\"default\")))"});
     }
     project.addDirectory("Examples/SCExample", "**.h");   // add all .h from SCExample directory recursively
     project.addDirectory("Examples/SCExample", "**.cpp"); // add all .cpp from SCExample directory recursively

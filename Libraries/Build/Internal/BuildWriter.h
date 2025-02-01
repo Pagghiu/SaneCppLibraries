@@ -2,12 +2,31 @@
 //
 #pragma once
 #include "../../Algorithms/AlgorithmBubbleSort.h"
+#include "../../Containers/VectorMap.h"
+#include "../../Containers/VectorSet.h"
 #include "../Build.h"
 
 namespace SC
 {
 namespace Build
 {
+/// @brief Caches file paths by pre-resolving directory filter search masks
+struct DefinitionCompiler
+{
+    VectorMap<String, Vector<String>> resolvedPaths;
+
+    const Build::Definition& definition;
+    DefinitionCompiler(const Build::Definition& definition) : definition(definition) {}
+
+    [[nodiscard]] Result validate();
+    [[nodiscard]] Result build();
+
+  private:
+    static SC::Result    fillPathsList(StringView path, const VectorSet<Project::File>& filters,
+                                       VectorMap<String, Vector<String>>& filtersToFiles);
+    [[nodiscard]] Result collectUniqueRootPaths(VectorMap<String, VectorSet<Project::File>>& paths);
+};
+
 struct RelativeDirectories
 {
     StringNative<256> relativeProjectsToOutputs;       // _Projects ->_Outputs

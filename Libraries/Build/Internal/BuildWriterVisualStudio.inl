@@ -136,24 +136,26 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append(
             "  <PropertyGroup Condition=\"'$(Configuration)|$(Platform)'=='{}|{}'\" Label=\"Configuration\">\n",
             configuration.name, architecture);
-        const bool isDebug = configuration.compile.hasValue<Compile::optimizationLevel>(Optimization::Debug);
-        if (isDebug)
+
+        switch (configuration.compile.optimizationLevel)
         {
+        case Optimization::Debug:
             builder.append("    <ConfigurationType>Application</ConfigurationType>\n"
                            "    <UseDebugLibraries>true</UseDebugLibraries>\n"
                            "    <PlatformToolset>{}</PlatformToolset>\n"
                            "    <CharacterSet>Unicode</CharacterSet>\n",
                            platformToolset);
-        }
-        else
-        {
+            break;
+        case Optimization::Release:
             builder.append("    <ConfigurationType>Application</ConfigurationType>\n"
                            "    <UseDebugLibraries>false</UseDebugLibraries>\n"
                            "    <PlatformToolset>{}</PlatformToolset>\n"
                            "    <WholeProgramOptimization>true</WholeProgramOptimization>\n"
                            "    <CharacterSet>Unicode</CharacterSet>\n",
                            platformToolset);
+            break;
         }
+
 #if 0
         // TODO: Temporarily disabled as ASAN crashes at startup in VS2022 17.7.1
         if(configuration.compile.hasValue<Compile::enableASAN>(true))
@@ -240,28 +242,19 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             }
             builder.append("</IntDir>\n");
         }
-        const auto includePaths        = configuration.compile.get<Compile::includePaths>();
-        const auto projectIncludePaths = project.compile.get<Compile::includePaths>();
 
-        if ((includePaths and not includePaths->isEmpty()) or
-            (projectIncludePaths and not projectIncludePaths->isEmpty()))
+        if (not configuration.compile.includePaths.isEmpty() or not project.compile.includePaths.isEmpty())
         {
             builder.append("    <IncludePath>");
-            if (includePaths)
+            for (const String& it : configuration.compile.includePaths)
             {
-                for (auto& it : *includePaths)
-                {
-                    SC_TRY(appendProjectRelative(builder, it.view()));
-                    builder.append(";");
-                }
+                SC_TRY(appendProjectRelative(builder, it.view()));
+                builder.append(";");
             }
-            if (projectIncludePaths)
+            for (const String& it : project.compile.includePaths)
             {
-                for (auto& it : *projectIncludePaths)
-                {
-                    SC_TRY(appendProjectRelative(builder, it.view()));
-                    builder.append(";");
-                }
+                SC_TRY(appendProjectRelative(builder, it.view()));
+                builder.append(";");
             }
             builder.append("$(IncludePath)</IncludePath>\n");
         }
@@ -290,28 +283,20 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("    <ClCompile>\n");
         builder.append("      <WarningLevel>Level4</WarningLevel>\n");
         builder.append("      <SDLCheck>true</SDLCheck>\n");
-        //  TODO: This can be refactored
-        const auto configArray  = configuration.compile.get<Compile::preprocessorDefines>();
-        const auto projectArray = project.compile.get<Compile::preprocessorDefines>();
 
-        if ((configArray and not configArray->isEmpty()) or (projectArray and not projectArray->isEmpty()))
+        //  TODO: This can be refactored
+        if (not configuration.compile.defines.isEmpty() or not project.compile.defines.isEmpty())
         {
             builder.append("    <PreprocessorDefinitions>");
-            if (configArray)
+            for (const String& it : configuration.compile.defines)
             {
-                for (auto& it : *configArray)
-                {
-                    SC_TRY(appendVariable(builder, it.view()));
-                    builder.append(";");
-                }
+                SC_TRY(appendVariable(builder, it.view()));
+                builder.append(";");
             }
-            if (projectArray)
+            for (const String& it : project.compile.defines)
             {
-                for (auto& it : *projectArray)
-                {
-                    SC_TRY(appendVariable(builder, it.view()));
-                    builder.append(";");
-                }
+                SC_TRY(appendVariable(builder, it.view()));
+                builder.append(";");
             }
             builder.append("%(PreprocessorDefinitions)</PreprocessorDefinitions>\n");
         }
@@ -320,7 +305,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("      <ExceptionHandling>false</ExceptionHandling>\n");
         builder.append("      <UseFullPaths>false</UseFullPaths>\n");
         builder.append("      <TreatWarningAsError>true</TreatWarningAsError>\n");
-        if (configuration.compile.hasValue<Compile::enableExceptions>(true))
+        if (configuration.compile.enableExceptions)
         {
             builder.append("      <ExceptionHandling>true</ExceptionHandling>\n");
         }
@@ -328,7 +313,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             builder.append("      <ExceptionHandling>false</ExceptionHandling>\n");
         }
-        if (configuration.compile.hasValue<Compile::enableRTTI>(true))
+        if (configuration.compile.enableRTTI)
         {
             builder.append("      <RuntimeTypeInfo>true</RuntimeTypeInfo>\n");
         }
@@ -336,19 +321,16 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             builder.append("      <RuntimeTypeInfo>false</RuntimeTypeInfo>\n");
         }
-        if (configuration.compile.hasValue<Compile::optimizationLevel>(Optimization::Debug))
+        switch (configuration.compile.optimizationLevel)
         {
-            builder.append("      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>\n");
+        case Optimization::Debug: builder.append("      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>\n"); break;
+        case Optimization::Release: builder.append("      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>\n"); break;
         }
-        else
-        {
-            builder.append("      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>\n");
-        }
+
         builder.append("      <MultiProcessorCompilation>true</MultiProcessorCompilation>\n");
         builder.append("    </ClCompile>\n");
         builder.append("    <Link>\n");
-        if (configuration.link.hasValue<Link::guiApplication>(true) or
-            project.link.hasValue<Link::guiApplication>(true))
+        if (configuration.link.guiApplication or project.link.guiApplication)
         {
             builder.append("      <SubSystem>Windows</SubSystem>\n");
         }
@@ -356,9 +338,12 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             builder.append("      <SubSystem>Console</SubSystem>\n");
         }
-        if (configuration.compile.hasValue<Compile::optimizationLevel>(Optimization::Debug))
+        switch (configuration.compile.optimizationLevel)
         {
+        case Optimization::Debug:
             builder.append("      <GenerateDebugInformation>true</GenerateDebugInformation>\n");
+            break;
+        case Optimization::Release: break;
         }
         builder.append("    </Link>\n");
         builder.append("  </ItemDefinitionGroup>\n");

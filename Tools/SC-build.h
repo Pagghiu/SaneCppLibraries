@@ -5,9 +5,7 @@
 #include "../Libraries/FileSystem/Path.h"
 #include "../Libraries/Process/Process.h"
 #include "../Libraries/Strings/Console.h"
-#include "../Libraries/Strings/SmallString.h"
 #include "../Libraries/Strings/StringBuilder.h"
-#include "../Libraries/Time/Time.h"
 #include "Tools.h"
 
 #include "SC-package.h"

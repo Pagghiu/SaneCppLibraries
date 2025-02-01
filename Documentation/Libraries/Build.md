@@ -52,9 +52,7 @@ Some additional types allow describing detailed properties of the build:
 | SC::Build::Architecture       | @copybrief SC::Build::Architecture    |
 | SC::Build::Generator          | @copybrief SC::Build::Generator       |
 | SC::Build::Optimization       | @copybrief SC::Build::Optimization    |
-| SC::Build::Compile            | @copybrief SC::Build::Compile         |
 | SC::Build::CompileFlags       | @copybrief SC::Build::CompileFlags    |
-| SC::Build::Link               | @copybrief SC::Build::Link            |
 | SC::Build::LinkFlags          | @copybrief SC::Build::LinkFlags       |
 
 # Videos
@@ -105,6 +103,7 @@ Such "post-configure" build settings could be serialized to JSON (or using binar
 - Describe more project types (dynamic libraries, static libraries etc.)
 - Describe dependencies between targets
 - Allow nested builds (where the root script should compile child scripts found down the path)
+- Allow different compile flags per each single file
 
 🟦 Complete Features:
 - `ninja` backend

@@ -207,35 +207,26 @@ endif
                        makeTarget.view());
 
         builder.append("\n{0}_COMMON_FLAGS := $({0}_WARNING_FLAGS)", makeTarget.view());
-        const auto projectArray = project.compile.get<Compile::preprocessorDefines>();
-        if ((projectArray and not projectArray->isEmpty()))
+        for (const String& it : project.compile.defines)
         {
-            for (auto& it : *projectArray)
-            {
-                SC_TRY(builder.append(" \"-D"));
-                SC_TRY(appendVariable(builder, it.view(), makeTarget.view(), relativeDirectories));
-                SC_TRY(builder.append("\""));
-            }
+            SC_TRY(builder.append(" \"-D"));
+            SC_TRY(appendVariable(builder, it.view(), makeTarget.view(), relativeDirectories));
+            SC_TRY(builder.append("\""));
         }
-        const auto includesArray = project.compile.get<Compile::includePaths>();
-        if ((includesArray and not includesArray->isEmpty()))
+        for (auto& it : project.compile.includePaths)
         {
-            for (auto& it : *includesArray)
+            SC_TRY(builder.append(" \"-I"));
+            if (Path::isAbsolute(it.view(), Path::AsNative))
             {
-                SC_TRY(builder.append(" \"-I"));
-                if (Path::isAbsolute(it.view(), Path::AsNative))
-                {
-                    String relative;
-                    SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), it.view(), relative,
-                                                Path::AsNative));
-                    builder.append("$(CURDIR)/{}", relative);
-                }
-                else
-                {
-                    builder.append("$(CURDIR)/{}/{}", relativeDirectories.relativeProjectsToProjectRoot, it.view());
-                }
-                SC_TRY(builder.append("\""));
+                String relative;
+                SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), it.view(), relative, Path::AsNative));
+                builder.append("$(CURDIR)/{}", relative);
             }
+            else
+            {
+                builder.append("$(CURDIR)/{}/{}", relativeDirectories.relativeProjectsToProjectRoot, it.view());
+            }
+            SC_TRY(builder.append("\""));
         }
 
         for (const Configuration& configuration : project.configurations)
@@ -276,15 +267,15 @@ endif
                        "-fvisibility-inlines-hidden",
                        makeTarget.view());
         // TODO: Merge these with configuration overrides
-        if (not project.compile.hasValue<Compile::enableRTTI>(true))
+        if (not project.compile.enableRTTI)
         {
             builder.append(" -fno-rtti");
         }
-        if (not project.compile.hasValue<Compile::enableStdCpp>(true))
+        if (not project.compile.enableStdCpp)
         {
             builder.append(" -nostdinc++");
         }
-        if (not project.compile.hasValue<Compile::enableExceptions>(true))
+        if (not project.compile.enableExceptions)
         {
             builder.append(" -fno-exceptions");
         }
@@ -293,35 +284,23 @@ endif
 
         builder.append("\n{0}_FRAMEWORKS_ANY :=", makeTarget.view());
         {
-            auto frameworks = project.link.get<Link::linkFrameworksAny>();
-            if (frameworks != nullptr)
+            for (const String& it : project.link.frameworks)
             {
-                for (auto it : *frameworks)
-                {
-                    builder.append(" -framework {0}", it.view());
-                }
+                builder.append(" -framework {0}", it.view());
             }
         }
         builder.append("\n{0}_FRAMEWORKS_MACOS :=", makeTarget.view());
         {
-            auto frameworks = project.link.get<Link::linkFrameworksMacOS>();
-            if (frameworks != nullptr)
+            for (const String& it : project.link.frameworksMacOS)
             {
-                for (auto it : *frameworks)
-                {
-                    builder.append(" -framework {0}", it.view());
-                }
+                builder.append(" -framework {0}", it.view());
             }
         }
         builder.append("\n{0}_FRAMEWORKS_IOS :=", makeTarget.view());
         {
-            auto frameworks = project.link.get<Link::linkFrameworksIOS>();
-            if (frameworks != nullptr)
+            for (const String& it : project.link.frameworksIOS)
             {
-                for (auto it : *frameworks)
-                {
-                    builder.append(" -framework {0}", it.view());
-                }
+                builder.append(" -framework {0}", it.view());
             }
         }
 
@@ -332,10 +311,8 @@ endif
         builder.append("endif\n");
 
         builder.append("\n{0}_LIBRARIES :=", makeTarget.view());
-        auto libraries = project.link.get<Link::linkLibraries>();
-        if (libraries != nullptr)
         {
-            for (auto it : *libraries)
+            for (const String& it : project.link.libraries)
             {
                 builder.append(" -l{}", it.view());
             }
@@ -344,11 +321,11 @@ endif
         builder.append("\n\nifeq ($(CLANG_DETECTED),yes)\n");
         // Clang specific flags
         builder.append("{0}_COMPILER_LDFLAGS :=", makeTarget.view());
-        if (not project.link.hasValue<Link::enableStdCpp>(true))
+        if (not project.link.enableStdCpp)
         {
             builder.append(" -nostdlib++");
         }
-        if (project.compile.hasValue<Compile::enableASAN>(true))
+        if (project.compile.enableASAN)
         {
             builder.append(" -fsanitize=address,undefined"); // TODO: Split the UBSAN flag
         }
@@ -356,7 +333,7 @@ endif
         builder.append("\nelse\n");
         // Non Clang specific flags
         builder.append("{0}_COMPILER_LDFLAGS :=", makeTarget.view());
-        if (project.compile.hasValue<Compile::enableASAN>(true))
+        if (project.compile.enableASAN)
         {
             builder.append(" -fsanitize=address,undefined"); // TODO: Split the UBSAN flag
         }
@@ -569,7 +546,7 @@ $({0}_TARGET_DIR):
             }
         }
 
-        if (configuration.compile.hasValue<Compile::enableASAN>(true))
+        if (configuration.compile.enableASAN)
         {
             builder.append("\nifeq ($(TARGET_OS),iOS)");
             builder.append("\n{0}_SANITIZE_FLAGS :=", makeTarget);
@@ -589,13 +566,12 @@ $({0}_TARGET_DIR):
         }
 
         // TODO: De-hardcode debug and release optimization levels
-        if (configuration.compile.hasValue<Compile::optimizationLevel>(Optimization::Debug))
+        switch (configuration.compile.optimizationLevel)
         {
+        case Optimization::Debug:
             builder.append("\n{0}_CONFIG_FLAGS := -D_DEBUG=1 -g -ggdb -O0 $({0}_SANITIZE_FLAGS)", makeTarget);
-        }
-        else
-        {
-            builder.append("\n{0}_CONFIG_FLAGS := -DNDEBUG=1 -O3", makeTarget);
+            break;
+        case Optimization::Release: builder.append("\n{0}_CONFIG_FLAGS := -DNDEBUG=1 -O3", makeTarget); break;
         }
 
         builder.append("\n{0}_CONFIG_LDFLAGS := $({0}_SANITIZE_FLAGS)", makeTarget);
@@ -603,7 +579,7 @@ $({0}_TARGET_DIR):
         builder.append("\n\nifeq ($(CLANG_DETECTED),yes)\n");
         // Clang specific flags
         builder.append("{0}_CONFIG_COMPILER_FLAGS :=", makeTarget);
-        if (configuration.compile.hasValue<Compile::enableCoverage>(true))
+        if (configuration.compile.enableCoverage)
         {
             builder.append(" -fprofile-instr-generate -fcoverage-mapping");
         }
@@ -621,7 +597,7 @@ $({0}_TARGET_DIR):
             builder.append(" $({0}_NO_SANITIZE_FLAGS)", makeTarget);
         }
         builder.append("\n{0}_CONFIG_COMPILER_LDFLAGS :=", makeTarget);
-        if (configuration.compile.hasValue<Compile::enableCoverage>(true))
+        if (configuration.compile.enableCoverage)
         {
             builder.append(" -fprofile-instr-generate -fcoverage-mapping");
         }
