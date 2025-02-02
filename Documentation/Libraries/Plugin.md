@@ -16,7 +16,7 @@ namespace SC
 // CLIENT - HOST Contract (Interface)
 struct IPluginContract
 {
-    static constexpr auto InterfaceHash = StringHashFNV("IPluginContract");
+    static constexpr auto InterfaceHash = PluginHash("IPluginContract");
 
     Function<void(void)> onDraw;
 };

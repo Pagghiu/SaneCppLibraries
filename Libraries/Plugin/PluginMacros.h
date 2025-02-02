@@ -3,7 +3,7 @@
 #pragma once
 #include "../Foundation/Memory.h"
 #include "../Foundation/PrimitiveTypes.h"
-#include "../Strings/StringHashFNV.h"
+#include "PluginHash.h"
 
 //
 // SC_PLUGIN_EXPORT

@@ -7,16 +7,16 @@ namespace SC
 namespace detail
 {
 template <unsigned int N, unsigned int I>
-struct StringHashFNVImpl
+struct PluginHashImpl
 {
     static constexpr unsigned int Hash(const char (&str)[N])
     {
-        return (StringHashFNVImpl<N, I - 1>::Hash(str) ^ static_cast<unsigned int>(str[I - 1])) * 16777619u;
+        return (PluginHashImpl<N, I - 1>::Hash(str) ^ static_cast<unsigned int>(str[I - 1])) * 16777619u;
     }
 };
 
 template <unsigned int N>
-struct StringHashFNVImpl<N, 1>
+struct PluginHashImpl<N, 1>
 {
     static constexpr unsigned int Hash(const char (&str)[N])
     {
@@ -30,9 +30,9 @@ struct StringHashFNVImpl<N, 1>
 
 /// @brief Compute compile time FNV hash for a char array
 template <unsigned int N>
-constexpr unsigned int StringHashFNV(const char (&str)[N])
+constexpr unsigned int PluginHash(const char (&str)[N])
 {
-    return detail::StringHashFNVImpl<N, N>::Hash(str);
+    return detail::PluginHashImpl<N, N>::Hash(str);
 }
 //! @}
 

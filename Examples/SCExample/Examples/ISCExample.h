@@ -3,14 +3,14 @@
 #pragma once
 #include "Libraries/Foundation/Function.h"
 #include "Libraries/Foundation/Result.h"
-#include "Libraries/Strings/StringHashFNV.h"
+#include "Libraries/Plugin/PluginHash.h"
 
 namespace SC
 {
 struct AsyncEventLoop;
 struct ISCExample
 {
-    static constexpr unsigned int InterfaceHash = SC::StringHashFNV("ISCExample");
+    static constexpr auto InterfaceHash = SC::PluginHash("ISCExample");
 
     Function<void(void)> onDraw;
 
