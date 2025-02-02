@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../TaggedUnion.h"
-#include "../../Strings/String.h"
-#include "../../Testing/Testing.h"
+#include "../../Libraries/Strings/String.h"
+#include "../../Libraries/Testing/Testing.h"
 
 //! [TaggedUnionTestSnippet]
 namespace SC

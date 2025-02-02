@@ -45,7 +45,6 @@ trivially done by just pushing the outputs of the tokenizer into a hierarchical 
 🟩 Usable  
 - JSON Escape Strings
 - JSON UTF Escapes
-- SC::TaggedUnion serialization
 - SC::ArenaMap serialization
 - SC::SmallVector serialization
 - SC::SmallString serialization

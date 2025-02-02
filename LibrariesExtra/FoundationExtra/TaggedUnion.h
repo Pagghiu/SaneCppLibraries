@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/AlignedStorage.h"
-#include "../Foundation/InitializerList.h"
-#include "../Foundation/TypeList.h"
+#include "../../Libraries/Foundation/AlignedStorage.h"
+#include "../../Libraries/Foundation/InitializerList.h"
+#include "TypeList.h"
 namespace SC
 {
 template <typename Tag>
@@ -12,7 +12,8 @@ template <typename EnumType, EnumType enumValue, typename MemberType>
 struct TaggedType;
 } // namespace SC
 
-//! @addtogroup group_foundation_utility
+//! @defgroup group_foundation_extra Foundation Extra
+//! @copybrief library_foundation_extra (see @ref library_foundation_extra for more details)
 //! @{
 
 /// @brief Associate a Type to an Enum, as required by TaggedUnion
@@ -22,8 +23,7 @@ struct TaggedType;
 template <typename EnumType, EnumType enumValue, typename MemberType>
 struct SC::TaggedType
 {
-    using type     = MemberType;
-    using enumType = EnumType;
+    using type = MemberType;
 
     static constexpr EnumType value = enumValue;
 };
@@ -32,7 +32,7 @@ struct SC::TaggedType
 /// @tparam Union with `FieldTypes` = `TypeList<TaggedType<EnumType, EnumValue, Type>, ...>`
 ///
 /// Example:
-/// \snippet Libraries/Foundation/Tests/TaggedUnionTest.cpp TaggedUnionTestSnippet
+/// \snippet LibrariesExtra/FoundationExtra/Tests/TaggedUnionTest.cpp TaggedUnionTestSnippet
 template <typename Union>
 struct SC::TaggedUnion
 {
@@ -102,7 +102,7 @@ struct SC::TaggedUnion
         return *this;
     }
 
-    using EnumType = typename TypeAt<0>::enumType;
+    using EnumType = typename TypeTraits::RemoveConst<decltype(TypeAt<0>::value)>::type;
 
     /// @brief Extracts type `T` corresponding to enumeration wantedEnum at compile time
     template <EnumType wantedEnum, int StartIndex = NumTypes>

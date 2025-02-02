@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Compiler.h"
-#include "../Foundation/TypeTraits.h"
+#include "../../Libraries/Foundation/Compiler.h"
+#include "../../Libraries/Foundation/TypeTraits.h"
 
 namespace SC
 {

@@ -37,7 +37,7 @@ Library                                                                         
 [File System](https://pagghiu.github.io/SaneCppLibraries/library_file_system.html)                      | 🟩 File System operations { exists, copy, delete } for { files and directories }
 [File System Iterator](https://pagghiu.github.io/SaneCppLibraries/library_file_system_iterator.html)    | 🟩 Enumerates files and directories inside a given path
 [File System Watcher](https://pagghiu.github.io/SaneCppLibraries/library_file_system_watcher.html)      | 🟩 Notifications {add, remove, rename, modified} for files and directories
-[Foundation](https://pagghiu.github.io/SaneCppLibraries/library_foundation.html)                        | 🟩 Primitive types, asserts, limits, Function, Span, Result, Tagged Union
+[Foundation](https://pagghiu.github.io/SaneCppLibraries/library_foundation.html)                        | 🟩 Primitive types, asserts, limits, Function, Span, Result
 [Hashing](https://pagghiu.github.io/SaneCppLibraries/library_hashing.html)                              | 🟩 Compute `MD5`, `SHA1` or `SHA256` hashes for a stream of bytes
 [Http](https://pagghiu.github.io/SaneCppLibraries/library_http.html)                                    | 🟥 HTTP parser, client and server
 [Plugin](https://pagghiu.github.io/SaneCppLibraries/library_plugin.html)                                | 🟨 Minimal dependency based plugin system with hot-reload

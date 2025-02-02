@@ -1,6 +1,6 @@
 @page library_foundation Foundation
 
-@brief 🟩 Primitive types, asserts, limits, Function, Span, Result, Tagged Union
+@brief 🟩 Primitive types, asserts, limits, Function, Span, Result
 
 [TOC]
 
@@ -20,7 +20,6 @@ Detailed documentation is in the @ref group_foundation topic.
 | SC::Function              | @copybrief SC::Function
 | SC::Deferred              | @copybrief SC::Deferred
 | SC::OpaqueObject          | @copybrief SC::OpaqueObject
-| SC::TaggedUnion           | @copybrief SC::TaggedUnion
 | SC::UniqueHandle          | @copybrief SC::UniqueHandle
 
 ## Macros
@@ -50,9 +49,6 @@ Foundation provides all primitive types to be used in headers and classes like S
 
 ## Deferred
 @copydoc SC::Deferred
-
-## TaggedUnion
-@copydoc SC::TaggedUnion
 
 ## OpaqueObject
 @copydoc SC::OpaqueObject

@@ -88,7 +88,6 @@ The binary serializer is not a streaming one, so loading a large data structure 
 This can be solved implementing streaming binary serializer or experimenting with memory mapped files to support really large binary data structures.
 
 🟩 Usable  
-- SC::TaggedUnion serialization
 - SC::ArenaMap serialization
 - SC::SmallVector serialization
 - SC::SmallString serialization

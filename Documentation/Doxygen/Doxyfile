@@ -36,6 +36,7 @@ INPUT                  = ../../Documentation/Pages \
                          ../../Libraries/Process \
                          ../../Libraries/Reflection \
                          ../../Libraries/SerializationBinary \
+                         ../../LibrariesExtra/FoundationExtra \
                          ../../LibrariesExtra/SerializationBinaryTypeErased \
                          ../../Libraries/SerializationText \
                          ../../Libraries/Socket \

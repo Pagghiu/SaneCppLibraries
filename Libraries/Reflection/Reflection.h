@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include "../Foundation/Limits.h"   // MaxValue
-#include "../Foundation/TypeList.h" // EnableIf
+#include "../Foundation/Limits.h"     // MaxValue
+#include "../Foundation/TypeTraits.h" // EnableIf
 #include "ReflectionFoundation.h"
 
 namespace SC

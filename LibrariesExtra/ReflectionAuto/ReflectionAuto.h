@@ -9,7 +9,7 @@
 //------------------------------------------------------------------------
 #pragma once
 #include "../../Libraries/Foundation/Compiler.h"
-#include "../../Libraries/Foundation/TypeList.h"
+#include "../FoundationExtra/TypeList.h"
 
 namespace SC
 {

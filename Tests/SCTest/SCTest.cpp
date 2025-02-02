@@ -19,7 +19,10 @@ void runVectorTest(TestReport& report);
 void runFunctionTest(TestReport& report);
 void runUniqueHandleTest(TestReport& report);
 void runOptionalTest(TestReport& report);
+
+// Foundation Extra
 void runTaggedUnionTest(TestReport& report);
+void runTaggedMapTest(TestReport& report);
 
 // File
 void runFileTest(TestReport& report);
@@ -139,10 +142,13 @@ int main(int argc, const char* argv[])
     runUniqueHandleTest(report);
     runOptionalTest(report);
     runSmallVectorTest(report);
-    runTaggedUnionTest(report);
     runVectorTest(report);
     runVectorMapTest(report);
     runVectorSetTest(report);
+
+    // Foundation extra tests
+    runTaggedUnionTest(report);
+    runTaggedMapTest(report);
 
     // File tests
     runFileTest(report);
