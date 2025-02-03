@@ -141,10 +141,6 @@ struct SC::SegmentItems : public SegmentHeader
                 size_t otherSize);
 
     template <typename Lambda>
-    [[nodiscard]] static bool findIf(const T* items, size_t indexStart, const size_t numElements, Lambda&& criteria,
-                                     size_t* foundIndex = nullptr);
-
-    template <typename Lambda>
     [[nodiscard]] static bool removeAll(T* items, size_t indexStart, const size_t numElements, Lambda&& criteria);
 };
 
@@ -344,20 +340,6 @@ SC::SegmentItems<T>::insertItems(T*& oldItems, size_t position, const size_t num
     const size_t numElementsToMove = numElements - position;
     memmove(oldItems + position + otherSize, oldItems + position, numElementsToMove * sizeof(T));
     memcpy(oldItems + position, other, otherSize * sizeof(T));
-}
-
-template <typename T>
-template <typename Lambda>
-bool SC::SegmentItems<T>::findIf(const T* items, size_t indexStart, const size_t numElements, Lambda&& criteria,
-                                 size_t* foundIndex)
-{
-    auto end = items + numElements;
-    auto it  = Algorithms::findIf(items + indexStart, end, forward<Lambda>(criteria));
-    if (foundIndex)
-    {
-        *foundIndex = static_cast<size_t>(it - items);
-    }
-    return it != end;
 }
 
 //-----------------------------------------------------------------------------------------------------------------------

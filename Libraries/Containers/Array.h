@@ -247,19 +247,25 @@ struct SC::Array
     /// @brief Check if the current array contains a given value.
     /// @tparam U Type of the object being searched
     /// @param value Value being searched
-    /// @param foundIndex if passed in != `nullptr`, receives index where item was found.
+    /// @param index if passed in != `nullptr`, receives index where item was found.
     /// Only written if function returns `true`
     /// @return `true` if the array contains the given value.
     template <typename U>
-    [[nodiscard]] bool contains(const U& value, size_t* foundIndex = nullptr) const;
+    [[nodiscard]] bool contains(const U& value, size_t* index = nullptr) const
+    {
+        return toSpanConst().contains(value, index);
+    }
 
     /// @brief Finds the first item in array matching criteria given by the lambda
     /// @tparam Lambda Type of the Lambda passed that declares a `bool operator()(const T&)` operator
     /// @param lambda The functor or lambda called that evaluates to `true` when item is found
-    /// @param foundIndex if passed in != `nullptr`, receives index where item was found.
+    /// @param index if passed in != `nullptr`, receives index where item was found.
     /// @return `true` if the wanted value with given criteria is found.
     template <typename Lambda>
-    [[nodiscard]] bool find(Lambda&& lambda, size_t* foundIndex = nullptr) const;
+    [[nodiscard]] bool find(Lambda&& lambda, size_t* index = nullptr) const
+    {
+        return toSpanConst().find(move(lambda), index);
+    }
 
     /// @brief Removes an item at a given index
     /// @param index Index where the item must be removed
@@ -545,21 +551,6 @@ bool SC::Array<T, N>::appendMove(U&& src)
         return true;
     }
     return false;
-}
-
-template <typename T, int N>
-template <typename U>
-bool SC::Array<T, N>::contains(const U& value, size_t* foundIndex) const
-{
-    return SegmentItems<T>::findIf(
-        items, 0, size(), [&](const T& element) { return element == value; }, foundIndex);
-}
-
-template <typename T, int N>
-template <typename Lambda>
-bool SC::Array<T, N>::find(Lambda&& lambda, size_t* foundIndex) const
-{
-    return SegmentItems<T>::findIf(items, 0, size(), forward<Lambda>(lambda), foundIndex);
 }
 
 template <typename T, int N>
