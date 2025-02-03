@@ -10,19 +10,20 @@ void runBuildTest(TestReport& report);
 // Foundation
 void runBaseTest(TestReport& report);
 void runArenaMapTest(TestReport& report);
+void runFunctionTest(TestReport& report);
+void runUniqueHandleTest(TestReport& report);
+
+// Foundation Extra
+void runTaggedUnionTest(TestReport& report);
+void runTaggedMapTest(TestReport& report);
+
+// Containers
 void runArrayTest(TestReport& report);
 void runIntrusiveDoubleLinkedListTest(TestReport& report);
 void runSmallVectorTest(TestReport& report);
 void runVectorMapTest(TestReport& report);
 void runVectorSetTest(TestReport& report);
 void runVectorTest(TestReport& report);
-void runFunctionTest(TestReport& report);
-void runUniqueHandleTest(TestReport& report);
-void runOptionalTest(TestReport& report);
-
-// Foundation Extra
-void runTaggedUnionTest(TestReport& report);
-void runTaggedMapTest(TestReport& report);
 
 // File
 void runFileTest(TestReport& report);
@@ -82,6 +83,7 @@ void runTimeTest(TestReport& report);
 void runAtomicTest(TestReport& report);
 void runThreadingTest(TestReport& report);
 void runThreadPoolTest(TestReport& report);
+void runOptionalTest(TestReport& report);
 
 // Async
 void runAsyncTest(SC::TestReport& report);
@@ -134,13 +136,14 @@ int main(int argc, const char* argv[])
     globalConsole = &console;
 
     // Foundation tests
-    runArenaMapTest(report);
-    runArrayTest(report);
     runBaseTest(report);
     runFunctionTest(report);
-    runIntrusiveDoubleLinkedListTest(report);
     runUniqueHandleTest(report);
-    runOptionalTest(report);
+
+    // Containers tests
+    runArenaMapTest(report);
+    runArrayTest(report);
+    runIntrusiveDoubleLinkedListTest(report);
     runSmallVectorTest(report);
     runVectorTest(report);
     runVectorMapTest(report);
@@ -208,6 +211,7 @@ int main(int argc, const char* argv[])
     runAtomicTest(report);
     runThreadingTest(report);
     runThreadPoolTest(report);
+    runOptionalTest(report);
 
     // Async tests
     runAsyncTest(report);
