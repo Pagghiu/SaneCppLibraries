@@ -1,9 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../Strings/StringFormat.h"
-#include "../Strings/Console.h" // TODO: Console here is a module circular dependency. Consider type-erasing with a Function
-#include "../Strings/String.h"
-#include "../Strings/StringConverter.h"
+
+#include "../../Strings/Console.h" // TODO: Console here is a module circular dependency. Consider type-erasing with a Function
+#include "../../Strings/String.h"
+#include "../../Strings/StringConverter.h"
+#include "../../Strings/StringFormat.h"
 
 #include <inttypes.h> // PRIu64 / PRIi64
 #include <stdio.h>    // snprintf

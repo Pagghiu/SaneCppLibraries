@@ -1,10 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
-#include "Console.h"
-#include "../Foundation/Limits.h"
-#include "../Foundation/Platform.h"
-#include "../Strings/StringConverter.h"
+#include "../../Foundation/Limits.h"
+#include "../../Foundation/Platform.h"
+#include "../../Strings/StringConverter.h"
+#include "../Console.h"
 
 #include <stdio.h>  // stdout
 #include <string.h> // strlen

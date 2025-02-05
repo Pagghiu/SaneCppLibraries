@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../Strings/StringIterator.h"
+
+#include "../../Strings/StringIterator.h"
 
 namespace SC
 {

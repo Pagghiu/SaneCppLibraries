@@ -1,10 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
-#include "../Strings/StringConverter.h"
-#include "../Foundation/Deferred.h"
-#include "../Foundation/Result.h"
-#include "../Strings/String.h"
+#include "../../Foundation/Deferred.h"
+#include "../../Foundation/Result.h"
+#include "../../Strings/String.h"
+#include "../../Strings/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN

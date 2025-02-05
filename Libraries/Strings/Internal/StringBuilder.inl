@@ -1,9 +1,11 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../Strings/StringBuilder.h"
-#include "../Foundation/Result.h"
-#include "../Strings/String.h"
-#include "../Strings/StringConverter.h"
+
+#include "../../Foundation/Result.h"
+#include "../../Strings/String.h"
+#include "../../Strings/StringBuilder.h"
+#include "../../Strings/StringConverter.h"
+
 namespace SC
 {
 StringBuilder::StringBuilder(Vector<char>& stringData, StringEncoding encoding, Flags f)

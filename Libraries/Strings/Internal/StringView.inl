@@ -1,11 +1,13 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../Strings/StringView.h"
+
+#include "../../Strings/StringView.h"
 
 #include <errno.h>  // errno
 #include <stdint.h> // INT32_MIN/MAX
-#include <stdlib.h> //atoi
-#include <string.h> //strlen
+#include <stdlib.h> // atoi
+#include <string.h> // strlen
+
 SC::StringView SC::StringView::fromNullTerminated(const char* text, StringEncoding encoding)
 {
     if (text == nullptr)
