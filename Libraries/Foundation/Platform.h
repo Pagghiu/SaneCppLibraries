@@ -35,9 +35,6 @@ struct OperatingSystem
         Windows,
         Linux,
     };
-
-    /// @brief Returns the currently active host operating system
-    [[nodiscard]] static Type getHostOS();
 };
 
 #if defined(__APPLE__)
