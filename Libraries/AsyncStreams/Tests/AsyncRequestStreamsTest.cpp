@@ -8,7 +8,7 @@
 #include "../../File/File.h"
 #include "../../FileSystem/FileSystem.h"
 #include "../../FileSystem/Path.h"
-#include "../../Foundation/HeapBuffer.h"
+#include "../../Foundation/Buffer.h"
 #include "../../Socket/Socket.h"
 #include "../../Testing/Testing.h"
 
@@ -114,11 +114,11 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     constexpr size_t numberOfBuffers = 2;
     constexpr size_t bufferBytesSize = 16;
     AsyncBufferView  buffers[numberOfBuffers];
-    HeapBuffer       buffer;
-    SC_TEST_EXPECT(buffer.allocate(bufferBytesSize * numberOfBuffers));
+    Buffer           buffer;
+    SC_TEST_EXPECT(buffer.resize(bufferBytesSize * numberOfBuffers));
     for (size_t idx = 0; idx < numberOfBuffers; ++idx)
     {
-        SC_TEST_EXPECT(buffer.data.sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
+        SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
     }
     AsyncBuffersPool pool;
     pool.buffers = {buffers, numberOfBuffers};
@@ -216,11 +216,11 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     constexpr size_t buffers1Size     = 512;
     AsyncBufferView  buffers1[numberOfBuffers1];
     buffersPool1.buffers = {buffers1, numberOfBuffers1};
-    HeapBuffer buffer1;
-    SC_TEST_EXPECT(buffer1.allocate(buffers1Size * numberOfBuffers1));
+    Buffer buffer1;
+    SC_TEST_EXPECT(buffer1.resize(buffers1Size * numberOfBuffers1));
     for (size_t idx = 0; idx < numberOfBuffers1; ++idx)
     {
-        SC_TEST_EXPECT(buffer1.data.sliceStartLength(idx * buffers1Size, buffers1Size, buffers1[idx].data));
+        SC_TEST_EXPECT(buffer1.toSpan().sliceStartLength(idx * buffers1Size, buffers1Size, buffers1[idx].data));
     }
 
     File::OpenOptions openOptions;
@@ -257,11 +257,11 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     constexpr size_t buffers2Size     = 512;
     AsyncBufferView  buffers2[numberOfBuffers2 + 1];
     buffersPool2.buffers = {buffers2, numberOfBuffers2};
-    HeapBuffer buffer2;
-    SC_TEST_EXPECT(buffer2.allocate(buffers2Size * numberOfBuffers2));
+    Buffer buffer2;
+    SC_TEST_EXPECT(buffer2.resize(buffers2Size * numberOfBuffers2));
     for (size_t idx = 0; idx < numberOfBuffers2; ++idx)
     {
-        SC_TEST_EXPECT(buffer2.data.sliceStartLength(idx * buffers2Size, buffers2Size, buffers2[idx].data));
+        SC_TEST_EXPECT(buffer2.toSpan().sliceStartLength(idx * buffers2Size, buffers2Size, buffers2[idx].data));
     }
 
     // Create sockets pairs

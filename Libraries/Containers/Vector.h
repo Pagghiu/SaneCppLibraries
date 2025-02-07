@@ -20,6 +20,7 @@ struct SC_COMPILER_EXPORT VectorAllocator;
 //! @{
 struct SC::VectorAllocator
 {
+    using SegmentHeader = Internal::SegmentHeader;
     static SegmentHeader* reallocate(SegmentHeader* oldHeader, size_t newSize);
 
     static SegmentHeader* allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* selfPointer);
@@ -49,6 +50,8 @@ struct SC::VectorAllocator
 template <typename T>
 struct SC::Vector
 {
+    using SegmentHeader = Internal::SegmentHeader;
+
   protected:
     SegmentItems<T>* getSegmentItems() const { return SegmentItems<T>::getSegment(items); }
     template <int N>
@@ -294,7 +297,7 @@ struct SC::Vector
 // VectorAllocator
 //-----------------------------------------------------------------------------------------------------------------------
 
-inline SC::SegmentHeader* SC::VectorAllocator::reallocate(SegmentHeader* oldHeader, size_t newSize)
+inline SC::Internal::SegmentHeader* SC::VectorAllocator::reallocate(SegmentHeader* oldHeader, size_t newSize)
 {
     if (newSize > SegmentHeader::MaxValue)
     {
@@ -320,7 +323,8 @@ inline SC::SegmentHeader* SC::VectorAllocator::reallocate(SegmentHeader* oldHead
     return newHeader;
 }
 
-inline SC::SegmentHeader* SC::VectorAllocator::allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* selfPointer)
+inline SC::Internal::SegmentHeader* SC::VectorAllocator::allocate(SegmentHeader* oldHeader, size_t numNewBytes,
+                                                                  void* selfPointer)
 {
     if (numNewBytes > SegmentHeader::MaxValue)
     {

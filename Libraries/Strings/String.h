@@ -150,6 +150,7 @@ struct SC::String
     template <typename T>
     friend struct Reflection::Reflect;
     StringEncoding encoding;
+    using SegmentHeader = Internal::SegmentHeader;
 #if SC_COMPILER_MSVC
 #pragma warning(push)
 #pragma warning(disable : 4324) // useless warning on 32 bit... (structure was padded due to __declspec(align()))

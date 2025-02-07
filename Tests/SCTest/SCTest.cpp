@@ -9,6 +9,7 @@ void runBuildTest(TestReport& report);
 
 // Foundation
 void runBaseTest(TestReport& report);
+void runBufferTest(TestReport& report);
 void runArenaMapTest(TestReport& report);
 void runFunctionTest(TestReport& report);
 void runUniqueHandleTest(TestReport& report);
@@ -137,6 +138,7 @@ int main(int argc, const char* argv[])
 
     // Foundation tests
     runBaseTest(report);
+    runBufferTest(report);
     runFunctionTest(report);
     runUniqueHandleTest(report);
 

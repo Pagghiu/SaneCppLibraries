@@ -1,6 +1,6 @@
 @page library_foundation Foundation
 
-@brief 🟩 Primitive types, asserts, limits, Function, Span, Result
+@brief 🟩 Primitive types, asserts, limits, Function, Span, Result, Buffer
 
 [TOC]
 
@@ -13,6 +13,7 @@ Detailed documentation is in the @ref group_foundation topic.
 ## Classes
 | Class                     | Description
 |:--------------------------|:--------------------------------|
+| SC::Buffer                | @copybrief SC::Buffer
 | SC::Span                  | @copybrief SC::Span
 | SC::SpanString            | @copybrief SC::SpanString
 | SC::SpanStringView        | @copybrief SC::SpanStringView
@@ -43,6 +44,9 @@ The library is very simple it it has what is needed so far by the other librarie
 # Description
 There is an hard rule in the library [Principles](@ref page_principles) not to include system and compiler headers in public headers.  
 Foundation provides all primitive types to be used in headers and classes like SC::UniqueHandle, SC::OpaqueObject, SC::AlignedStorage to encourage static PIMPL in order to hide platform specific implementation details everywhere.
+
+## Buffer
+@copydoc SC::Buffer
 
 ## Function
 @copydoc SC::Function

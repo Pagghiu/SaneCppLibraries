@@ -1,5 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include "../../Foundation/Buffer.h"
 #include "AsyncTest.h"
 
 void SC::AsyncTest::createTCPSocketPair(AsyncEventLoop& eventLoop, SocketDescriptor& client,
@@ -236,7 +237,7 @@ void SC::AsyncTest::socketSendReceive()
 
     // Test sending large data
     constexpr size_t largeBufferSize = 1024 * 1024; // 1Mb
-    Vector<char>     sendBufferLarge, receiveBufferLarge;
+    Buffer           sendBufferLarge, receiveBufferLarge;
     SC_TEST_EXPECT(sendBufferLarge.resize(largeBufferSize));
     SC_TEST_EXPECT(receiveBufferLarge.resizeWithoutInitializing(sendBufferLarge.size()));
     sendAsync.callback = {};

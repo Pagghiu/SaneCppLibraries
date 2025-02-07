@@ -120,6 +120,11 @@ struct SerializerBinaryReadWriteExact<BinaryStream, SC::Vector<T>> : public Seri
 /// @brief Specialization for `SC::Array<T, N>` types
 template <typename BinaryStream, typename T, int N>
 struct SerializerBinaryReadWriteExact<BinaryStream, SC::Array<T, N>> : public SerializerBinaryExactVector<BinaryStream, SC::Array<T, N>, T> { };
+
+/// @brief Specialization for `SC::Vector<T>` types
+template <typename BinaryStream>
+struct SerializerBinaryReadWriteExact<BinaryStream, SC::Buffer> : public SerializerBinaryExactVector<BinaryStream, SC::Buffer, char> { };
+
 // clang-format on
 } // namespace Serialization
 

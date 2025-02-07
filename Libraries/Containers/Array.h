@@ -14,6 +14,7 @@ struct Array;
 //! @{
 struct SC::ArrayAllocator
 {
+    using SegmentHeader = Internal::SegmentHeader;
     [[nodiscard]] static SegmentHeader* reallocate(SegmentHeader* oldHeader, size_t newSize);
     [[nodiscard]] static SegmentHeader* allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* selfPointer);
     static void                         release(SegmentHeader* oldHeader);
@@ -301,7 +302,7 @@ struct SC::Array
 // ArrayAllocator
 //-----------------------------------------------------------------------------------------------------------------------
 
-inline SC::SegmentHeader* SC::ArrayAllocator::reallocate(SegmentHeader* oldHeader, size_t newSize)
+inline SC::Internal::SegmentHeader* SC::ArrayAllocator::reallocate(SegmentHeader* oldHeader, size_t newSize)
 {
     if (newSize <= oldHeader->sizeBytes)
     {
@@ -309,7 +310,8 @@ inline SC::SegmentHeader* SC::ArrayAllocator::reallocate(SegmentHeader* oldHeade
     }
     return nullptr;
 }
-inline SC::SegmentHeader* SC::ArrayAllocator::allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* selfPointer)
+inline SC::Internal::SegmentHeader* SC::ArrayAllocator::allocate(SegmentHeader* oldHeader, size_t numNewBytes,
+                                                                 void* selfPointer)
 {
     SC_COMPILER_UNUSED(numNewBytes);
     SC_COMPILER_UNUSED(selfPointer);

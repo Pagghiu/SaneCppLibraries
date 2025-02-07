@@ -25,6 +25,7 @@ struct SmallVector;
 template <typename T, int N>
 struct SC::SmallVector : public Vector<T>
 {
+    using SegmentHeader = Internal::SegmentHeader;
     Array<T, N> buffer;
     SmallVector()
     {

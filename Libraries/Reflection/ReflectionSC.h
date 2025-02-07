@@ -4,6 +4,7 @@
 #include "../Containers/Array.h"
 #include "../Containers/Vector.h"
 #include "../Containers/VectorMap.h"
+#include "../Foundation/Buffer.h"
 #include "../Strings/String.h"
 #include "Reflection.h"
 
@@ -94,6 +95,41 @@ struct ExtendedTypeInfo<SC::Vector<T>>
         return object.resizeWithoutInitializing(newSize);
     }
     [[nodiscard]] static bool resize(SC::Vector<T>& object, size_t newSize) { return object.resize(newSize); }
+};
+
+template <>
+struct Reflect<SC::Buffer>
+{
+    static constexpr TypeCategory getCategory() { return TypeCategory::TypeVector; }
+
+    template <typename MemberVisitor>
+    [[nodiscard]] static constexpr bool build(MemberVisitor& builder)
+    {
+        // TODO: Figure out a way to get rid of calling VectorArrayVTable here
+        if (not VectorArrayVTable<MemberVisitor, SC::Buffer, char, -1>::build(builder))
+            return false;
+
+        // Add Vector type
+        constexpr TypeInfo::ArrayInfo arrayInfo = {false, 0}; // false == not packed
+        if (not builder.addType(MemberVisitor::Type::template createArray<SC::Buffer>("SC::Buffer", 1, arrayInfo)))
+            return false;
+
+        // Add dependent item type
+        return builder.addType(MemberVisitor::Type::template createGeneric<char>());
+    }
+};
+template <>
+struct ExtendedTypeInfo<SC::Buffer>
+{
+    static constexpr bool IsPacked = false;
+
+    [[nodiscard]] static auto size(const Buffer& object) { return object.size(); }
+    [[nodiscard]] static auto data(Buffer& object) { return object.data(); }
+    [[nodiscard]] static bool resizeWithoutInitializing(Buffer& object, size_t newSize)
+    {
+        return object.resizeWithoutInitializing(newSize);
+    }
+    [[nodiscard]] static bool resize(Buffer& object, size_t newSize) { return object.resize(newSize, 0); }
 };
 
 template <typename Key, typename Value, typename Container>

@@ -12,6 +12,7 @@ struct SC::SmallVectorTest : public SC::TestCase
 {
     SmallVectorTest(SC::TestReport& report) : TestCase(report, "SmallVectorTest")
     {
+        using SegmentHeader = Internal::SegmentHeader;
         using namespace SC;
         if (test_section("shrink_to_fit"))
         {

@@ -5,7 +5,7 @@
 #include "../../Async/Async.h"
 #include "../../FileSystem/FileSystem.h"
 #include "../../FileSystem/Path.h"
-#include "../../Foundation/HeapBuffer.h"
+#include "../../Foundation/Buffer.h"
 #include "../../Strings/StringBuilder.h"
 #include "../../Testing/Testing.h"
 
@@ -128,11 +128,11 @@ void SC::AsyncStreamsTest::readableSyncStream()
     constexpr size_t numberOfBuffers = 2;
     constexpr size_t bufferBytesSize = sizeof(size_t);
     AsyncBufferView  buffers[numberOfBuffers];
-    HeapBuffer       buffer;
-    SC_TEST_EXPECT(buffer.allocate(bufferBytesSize * numberOfBuffers));
+    Buffer           buffer;
+    SC_TEST_EXPECT(buffer.resize(bufferBytesSize * numberOfBuffers));
     for (size_t idx = 0; idx < numberOfBuffers; ++idx)
     {
-        SC_TEST_EXPECT(buffer.data.sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
+        SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
     }
     AsyncBuffersPool pool;
     pool.buffers = {buffers, numberOfBuffers};
@@ -197,15 +197,15 @@ void SC::AsyncStreamsTest::readableSyncStream()
 
 void SC::AsyncStreamsTest::readableAsyncStream()
 {
-    // Create a pool of byte buffers slicing a single HeapBuffer in multiple AsyncBufferView(s)
+    // Create a pool of byte buffers slicing a single Buffer in multiple AsyncBufferView(s)
     constexpr size_t numberOfBuffers = 2;
     constexpr size_t bufferBytesSize = sizeof(size_t);
     AsyncBufferView  buffers[numberOfBuffers];
-    HeapBuffer       buffer;
-    SC_TEST_EXPECT(buffer.allocate(bufferBytesSize * numberOfBuffers));
+    Buffer           buffer;
+    SC_TEST_EXPECT(buffer.resize(bufferBytesSize * numberOfBuffers));
     for (size_t idx = 0; idx < numberOfBuffers; ++idx)
     {
-        SC_TEST_EXPECT(buffer.data.sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
+        SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
     }
     AsyncBuffersPool pool;
     pool.buffers = {buffers, numberOfBuffers};
@@ -288,15 +288,15 @@ void SC::AsyncStreamsTest::readableAsyncStream()
 
 void SC::AsyncStreamsTest::writableStream()
 {
-    // Create a pool of byte buffers slicing a single HeapBuffer in multiple AsyncBufferView(s)
+    // Create a pool of byte buffers slicing a single Buffer in multiple AsyncBufferView(s)
     constexpr size_t numberOfBuffers = 2;
     constexpr size_t bufferBytesSize = sizeof(size_t);
     AsyncBufferView  buffers[numberOfBuffers];
-    HeapBuffer       buffer;
-    SC_TEST_EXPECT(buffer.allocate(bufferBytesSize * numberOfBuffers));
+    Buffer           buffer;
+    SC_TEST_EXPECT(buffer.resize(bufferBytesSize * numberOfBuffers));
     for (size_t idx = 0; idx < numberOfBuffers; ++idx)
     {
-        SC_TEST_EXPECT(buffer.data.sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
+        SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
     }
     AsyncBuffersPool pool;
     pool.buffers = {buffers, numberOfBuffers};

@@ -167,6 +167,11 @@ struct SerializationBinaryVersionedVector
     }
 };
 
+template <typename BinaryStream>
+struct SerializerBinaryReadVersioned<BinaryStream, SC::Buffer>
+    : public SerializationBinaryVersionedVector<BinaryStream, SC::Buffer, char, 0xffffffff>
+{
+};
 template <typename BinaryStream, typename T>
 struct SerializerBinaryReadVersioned<BinaryStream, SC::Vector<T>>
     : public SerializationBinaryVersionedVector<BinaryStream, SC::Vector<T>, T, 0xffffffff>

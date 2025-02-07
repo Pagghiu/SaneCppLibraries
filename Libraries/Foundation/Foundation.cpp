@@ -1,8 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Internal/Assert.inl"
-
-#include "../Foundation/HeapBuffer.h"
+#include "../Foundation/Assert.inl"
 #include "../Foundation/Limits.h"
 #include "../Foundation/Memory.h"
 
@@ -16,69 +14,89 @@ using ssize_t = SSIZE_T;
 #endif
 
 //--------------------------------------------------------------------
+// Buffer
+//--------------------------------------------------------------------
+#include "../Foundation/Buffer.h"
+#include "../Foundation/Segment.inl"
+
+void SC::SegmentTrivial::destruct(SegmentHeader&, size_t, size_t) {}
+
+void SC::SegmentTrivial::copyConstructSingle(SegmentHeader& header, size_t offsetBytes, const void* value,
+                                             size_t numBytes, size_t valueSize)
+{
+    if (valueSize == 1)
+    {
+        int intValue = 0;
+        ::memcpy(&intValue, value, 1);
+        ::memset(header.getData<char>() + offsetBytes, intValue, numBytes);
+    }
+    else
+    {
+        char* data = header.getData<char>();
+        for (size_t idx = offsetBytes; idx < offsetBytes + numBytes; idx += valueSize)
+        {
+            ::memcpy(data + idx, value, valueSize);
+        }
+    }
+}
+
+void SC::SegmentTrivial::copyConstruct(SegmentHeader& header, size_t offsetBytes, const void* src, size_t numBytes)
+{
+    ::memmove(header.getData<char>() + offsetBytes, src, numBytes);
+}
+
+void SC::SegmentTrivial::copyAssign(SegmentHeader& dest, size_t bytesOffset, const void* src, size_t numBytes)
+{
+    ::memcpy(dest.getData<char>() + bytesOffset, src, numBytes);
+}
+
+void SC::SegmentTrivial::copyInsert(SegmentHeader& dest, size_t bytesOffset, const void* src, size_t numBytes)
+{
+    char* data = dest.getData<char>();
+    ::memmove(data + bytesOffset + numBytes, data + bytesOffset, dest.sizeBytes - bytesOffset);
+    ::memmove(data + bytesOffset, src, numBytes);
+}
+
+void SC::SegmentTrivial::moveConstruct(SegmentHeader& dest, size_t bytesOffset, void* src, size_t numBytes)
+{
+    ::memcpy(dest.getData<char>() + bytesOffset, src, numBytes);
+}
+
+void SC::SegmentTrivial::moveAssign(SegmentHeader& dest, size_t bytesOffset, void* src, size_t numBytes)
+{
+    ::memcpy(dest.getData<char>() + bytesOffset, src, numBytes);
+}
+
+void SC::SegmentTrivial::remove(SegmentHeader& dest, size_t fromBytesOffset, size_t toBytesOffset)
+{
+    char* data = dest.getData<char>();
+    ::memmove(data + fromBytesOffset, data + toBytesOffset, dest.sizeBytes - toBytesOffset);
+}
+
+SC::SegmentHeader* SC::SegmentAllocator::allocateNewHeader(size_t newCapacityInBytes)
+{
+    return reinterpret_cast<SegmentHeader*>(Memory::allocate(sizeof(SegmentHeader) + newCapacityInBytes));
+}
+
+SC::SegmentHeader* SC::SegmentAllocator::reallocateExistingHeader(SegmentHeader& src, size_t newCapacityInBytes)
+{
+    return reinterpret_cast<SegmentHeader*>(Memory::reallocate(&src, sizeof(SegmentHeader) + newCapacityInBytes));
+}
+
+void SC::SegmentAllocator::destroyHeader(SegmentHeader& header) { Memory::release(&header); }
+
+namespace SC
+{
+template struct Segment<SegmentBuffer>;
+} // namespace SC
+
+//--------------------------------------------------------------------
 // Memory
 //--------------------------------------------------------------------
 void* SC::Memory::reallocate(void* memory, size_t numBytes) { return ::realloc(memory, numBytes); }
 void* SC::Memory::allocate(size_t numBytes) { return ::malloc(numBytes); }
 void  SC::Memory::release(void* allocatedMemory) { return ::free(allocatedMemory); }
 
-//--------------------------------------------------------------------
-// HeapBuffer
-//--------------------------------------------------------------------
-
-SC::HeapBuffer::~HeapBuffer() { Memory::release(data.data()); }
-
-SC::HeapBuffer::HeapBuffer() = default;
-
-SC::HeapBuffer::HeapBuffer(HeapBuffer&& other)
-{
-    data       = other.data;
-    other.data = {};
-}
-
-SC::HeapBuffer& SC::HeapBuffer::operator=(HeapBuffer&& other)
-{
-    data       = other.data;
-    other.data = {};
-    return *this;
-}
-
-bool SC::HeapBuffer::allocate(size_t numBytes)
-{
-    Memory::release(data.data());
-    char* memory = reinterpret_cast<char*>(Memory::allocate(numBytes));
-    if (memory != nullptr)
-    {
-        data = {memory, numBytes};
-        return true;
-    }
-    else
-    {
-        data = {};
-        return false;
-    }
-}
-
-bool SC::HeapBuffer::reallocate(size_t numBytes)
-{
-    char* memory = reinterpret_cast<char*>(Memory::reallocate(data.data(), numBytes));
-    if (memory != nullptr)
-    {
-        data = {memory, numBytes};
-        return true;
-    }
-    else
-    {
-        data = {};
-        return false;
-    }
-}
-
-void SC::HeapBuffer::release()
-{
-    Memory::release(data.data());
-    data = {};
-}
 //--------------------------------------------------------------------
 // Standard C++ Library support
 //--------------------------------------------------------------------

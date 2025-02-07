@@ -57,12 +57,17 @@ struct alignas(SC::uint64_t) SC::SegmentHeaderBase
 
 namespace SC
 {
+namespace Internal
+{
 using SegmentHeader = SegmentHeaderBase<uint32_t>;
 }
+} // namespace SC
 
 template <typename T>
-struct SC::SegmentItems : public SegmentHeader
+struct SC::SegmentItems : public Internal::SegmentHeader
 {
+    using SegmentHeader = Internal::SegmentHeader;
+
     // Members
 
     SegmentItems() { initDefaults(); }
@@ -147,6 +152,7 @@ struct SC::SegmentItems : public SegmentHeader
 template <typename Allocator, typename T>
 struct SC::SegmentOperations
 {
+    using SegmentHeader = Internal::SegmentHeader;
     [[nodiscard]] static bool push_back(T*& oldItems, const T& element);
 
     [[nodiscard]] static bool push_back(T*& oldItems, T&& element);
