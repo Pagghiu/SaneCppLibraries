@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../../Foundation/Assert.h"
+#include "../../Foundation/Limits.h"
 #include "../../Foundation/Memory.h"
 #include "../../Testing/Testing.h"
 

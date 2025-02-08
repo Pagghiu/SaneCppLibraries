@@ -17,7 +17,7 @@ struct SC::ConsoleTest : public SC::TestCase
     {
         using namespace SC;
 
-        SmallVector<char, 512 * sizeof(native_char_t)> consoleConversionBuffer;
+        SmallBuffer<512 * sizeof(native_char_t)> consoleConversionBuffer;
 
         Console console(consoleConversionBuffer);
 

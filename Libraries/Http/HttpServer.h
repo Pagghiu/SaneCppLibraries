@@ -4,8 +4,10 @@
 #include "HttpParser.h"
 
 #include "../Containers/ArenaMapKey.h"
+#include "../Containers/Vector.h"
+#include "../Foundation/Buffer.h"
 #include "../Foundation/Function.h"
-#include "../Strings/SmallString.h" // Contains Vector<char> export
+#include "../Strings/StringView.h"
 
 namespace SC
 {
@@ -63,9 +65,9 @@ struct SC::HttpRequest
     bool headersEndReceived = false; ///< All headers have been received
     bool parsedSuccessfully = true;  ///< Request headers have been parsed successfully
 
-    HttpParser   parser;       ///< The parser used to parse headers
-    StringView   url;          ///< The url extracted from parsed headers
-    Vector<char> headerBuffer; ///< Buffer containing all headers
+    HttpParser parser;       ///< The parser used to parse headers
+    StringView url;          ///< The url extracted from parsed headers
+    Buffer     headerBuffer; ///< Buffer containing all headers
 
     Vector<HttpHeaderOffset> headerOffsets; ///< Headers, defined as offsets in headerBuffer
 };
@@ -98,7 +100,7 @@ struct SC::HttpResponse
 
     ArenaMapKey<HttpServerClient> key;
 
-    Vector<char> outputBuffer;
+    Buffer outputBuffer;
 
     bool   responseEnded = false;
     size_t highwaterMark = 1024;

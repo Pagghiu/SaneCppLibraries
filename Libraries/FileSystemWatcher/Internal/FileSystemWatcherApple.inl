@@ -3,7 +3,7 @@
 
 #include "../../Async/Async.h"
 #include "../../Foundation/Deferred.h"
-#include "../../Strings/SmallString.h"
+#include "../../Strings/String.h"
 #include "../../Strings/StringConverter.h"
 #include "../../Threading/Threading.h"
 #include <CoreServices/CoreServices.h> // FSEvents

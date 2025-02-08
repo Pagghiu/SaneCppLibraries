@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
+#include "../../Foundation/Buffer.h"
 #include "../../Foundation/Deferred.h"
 #include "../../Foundation/Result.h"
 #include "../../Strings/String.h"
@@ -21,9 +22,9 @@ SC::StringConverter::StringConverter(String& text, Flags flags) : encoding(text.
     }
 }
 
-SC::StringConverter::StringConverter(Vector<char>& data, StringEncoding encoding) : encoding(encoding), data(data) {}
+SC::StringConverter::StringConverter(Buffer& data, StringEncoding encoding) : encoding(encoding), data(data) {}
 
-bool SC::StringConverter::convertSameEncoding(StringView text, Vector<char>& buffer, StringView* encodedText,
+bool SC::StringConverter::convertSameEncoding(StringView text, Buffer& buffer, StringView* encodedText,
                                               NullTermination terminate)
 {
     const bool nullTerminate = terminate == AddZeroTerminator;
@@ -69,15 +70,17 @@ bool SC::StringConverter::convertSameEncoding(StringView text, Vector<char>& buf
     return true;
 }
 
-void SC::StringConverter::eventuallyNullTerminate(Vector<char>& buffer, StringEncoding destinationEncoding,
+void SC::StringConverter::eventuallyNullTerminate(Buffer& buffer, StringEncoding destinationEncoding,
                                                   StringView* encodedText, StringConverter::NullTermination terminate)
 {
     const auto destinationCharSize = StringEncodingGetSize(destinationEncoding);
     if (terminate == StringConverter::AddZeroTerminator)
     {
+        char*  bufferData = buffer.data();
+        size_t size       = buffer.size();
         for (uint32_t idx = 0; idx < destinationCharSize; ++idx)
         {
-            buffer[buffer.size() - idx - 1] = 0; // null terminator
+            bufferData[size - idx - 1] = 0; // null terminator
         }
         if (encodedText)
         {
@@ -90,7 +93,7 @@ void SC::StringConverter::eventuallyNullTerminate(Vector<char>& buffer, StringEn
     }
 }
 
-bool SC::StringConverter::convertEncodingToUTF8(StringView text, Vector<char>& buffer, StringView* encodedText,
+bool SC::StringConverter::convertEncodingToUTF8(StringView text, Buffer& buffer, StringView* encodedText,
                                                 NullTermination terminate)
 {
     if (text.isEmpty())
@@ -142,7 +145,7 @@ bool SC::StringConverter::convertEncodingToUTF8(StringView text, Vector<char>& b
     return false;
 }
 
-bool SC::StringConverter::convertEncodingToUTF16(StringView text, Vector<char>& buffer, StringView* encodedText,
+bool SC::StringConverter::convertEncodingToUTF16(StringView text, Buffer& buffer, StringView* encodedText,
                                                  NullTermination terminate)
 {
     if (text.isEmpty())
@@ -199,7 +202,7 @@ bool SC::StringConverter::convertEncodingToUTF16(StringView text, Vector<char>& 
     return false;
 }
 
-bool SC::StringConverter::convertEncodingTo(StringEncoding encoding, StringView text, Vector<char>& buffer,
+bool SC::StringConverter::convertEncodingTo(StringEncoding encoding, StringView text, Buffer& buffer,
                                             StringView* encodedText, NullTermination terminate)
 {
     switch (encoding)
@@ -211,11 +214,11 @@ bool SC::StringConverter::convertEncodingTo(StringEncoding encoding, StringView 
     return false;
 }
 
-void SC::StringConverter::internalClear() { data.clearWithoutInitializing(); }
+void SC::StringConverter::internalClear() { data.clear(); }
 
 bool SC::StringConverter::convertNullTerminateFastPath(StringView input, StringView& encodedText)
 {
-    data.clearWithoutInitializing();
+    data.clear();
     SC_TRY(internalAppend(input, &encodedText));
     return true;
 }
@@ -245,20 +248,20 @@ bool SC::StringConverter::internalAppend(StringView input, StringView* encodedTe
     return StringConverter::convertEncodingTo(encoding, input, data, encodedText);
 }
 
-bool SC::StringConverter::ensureZeroTermination(Vector<char>& data, StringEncoding encoding)
+void SC::StringConverter::ensureZeroTermination(Buffer& buffer, StringEncoding encoding)
 {
     const size_t numZeros = StringEncodingGetSize(encoding);
-    if (data.size() >= numZeros)
+    if (buffer.size() >= numZeros)
     {
+        auto* data = buffer.data();
         for (size_t idx = 0; idx < numZeros; ++idx)
         {
-            (&data.back())[-static_cast<int>(idx)] = 0;
+            data[buffer.size() - 1 - idx] = 0;
         }
     }
-    return true;
 }
 
-bool SC::StringConverter::popNullTermIfNotEmpty(Vector<char>& stringData, StringEncoding encoding)
+bool SC::StringConverter::popNullTermIfNotEmpty(Buffer& stringData, StringEncoding encoding)
 {
     const auto sizeOfZero = StringEncodingGetSize(encoding);
     const auto dataSize   = stringData.size();
@@ -273,7 +276,7 @@ bool SC::StringConverter::popNullTermIfNotEmpty(Vector<char>& stringData, String
     }
 }
 
-bool SC::StringConverter::pushNullTerm(Vector<char>& stringData, StringEncoding encoding)
+bool SC::StringConverter::pushNullTerm(Buffer& stringData, StringEncoding encoding)
 {
     return stringData.resize(stringData.size() + StringEncodingGetSize(encoding), 0);
 }
@@ -282,7 +285,7 @@ bool SC::StringConverter::pushNullTerm(Vector<char>& stringData, StringEncoding 
 
 // Fallbacks for platforms without a supported fast conversion function (Linux for now)
 
-bool SC::StringConverter::convertUTF8_to_UTF16LE(const SC::StringView sourceUtf8, SC::Vector<char>& destination,
+bool SC::StringConverter::convertUTF8_to_UTF16LE(const SC::StringView sourceUtf8, SC::Buffer& destination,
                                                  int& writtenCodeUnits)
 {
     const char*  utf8    = sourceUtf8.bytesWithoutTerminator();
@@ -354,7 +357,7 @@ bool SC::StringConverter::convertUTF8_to_UTF16LE(const SC::StringView sourceUtf8
     return true;
 }
 
-bool SC::StringConverter::convertUTF16LE_to_UTF8(const SC::StringView sourceUtf16, SC::Vector<char>& destination,
+bool SC::StringConverter::convertUTF16LE_to_UTF8(const SC::StringView sourceUtf16, SC::Buffer& destination,
                                                  int& writtenCodeUnits)
 {
     const uint16_t* utf16    = reinterpret_cast<const uint16_t*>(sourceUtf16.bytesWithoutTerminator());

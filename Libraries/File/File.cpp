@@ -68,7 +68,21 @@ SC::Result SC::File::readUntilEOFTemplate(Vector<T>& destination)
     SC_TRY(fd.get(fileDescriptor, Result::Error("FileDescriptor::readAppend - Invalid Handle")));
     while (not readResult.isEOF)
     {
-        SC_TRY(Internal::readAppend(fileDescriptor, destination, {buffer, sizeof(buffer)}, readResult));
+        SC_TRY(Internal::readAppend<T>(fileDescriptor, destination, {buffer, sizeof(buffer)}, readResult));
+    }
+    return Result(true);
+}
+
+SC::Result SC::File::readUntilEOFTemplate(Buffer& destination)
+{
+    char buffer[1024];
+    SC_TRY(fd.isValid());
+    ReadResult             readResult;
+    FileDescriptor::Handle fileDescriptor;
+    SC_TRY(fd.get(fileDescriptor, Result::Error("FileDescriptor::readAppend - Invalid Handle")));
+    while (not readResult.isEOF)
+    {
+        SC_TRY(Internal::readAppend<char>(fileDescriptor, destination, {buffer, sizeof(buffer)}, readResult));
     }
     return Result(true);
 }
@@ -76,6 +90,8 @@ SC::Result SC::File::readUntilEOFTemplate(Vector<T>& destination)
 SC::Result SC::File::readUntilEOF(Vector<char>& destination) { return readUntilEOFTemplate(destination); }
 
 SC::Result SC::File::readUntilEOF(Vector<uint8_t>& destination) { return readUntilEOFTemplate(destination); }
+
+SC::Result SC::File::readUntilEOF(Buffer& destination) { return readUntilEOFTemplate(destination); }
 
 SC::Result SC::File::readUntilEOF(String& destination)
 {

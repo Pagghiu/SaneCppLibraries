@@ -71,7 +71,6 @@ void runSocketTest(TestReport& report);
 // Strings
 void runConsoleTest(TestReport& report);
 void runStringTest(TestReport& report);
-void runSmallStringTest(TestReport& report);
 void runStringConverterTest(TestReport& report);
 void runStringBuilderTest(TestReport& report);
 void runStringFormatTest(TestReport& report);
@@ -112,7 +111,7 @@ SC::Console* globalConsole;
 int main(int argc, const char* argv[])
 {
     using namespace SC;
-    SmallVector<char, 1024 * sizeof(SC::native_char_t)> globalConsoleConversionBuffer;
+    SmallBuffer<1024 * sizeof(SC::native_char_t)> globalConsoleConversionBuffer;
     Console::tryAttachingToParentConsole();
     FileSystemDirectories directories;
     if (not directories.init())
@@ -203,7 +202,6 @@ int main(int argc, const char* argv[])
     runStringBuilderTest(report);
     runStringFormatTest(report);
     runStringTest(report);
-    runSmallStringTest(report);
     runStringViewTest(report);
 
     // Time tests

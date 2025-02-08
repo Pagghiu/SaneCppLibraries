@@ -1158,7 +1158,15 @@ struct SC::AsyncEventLoopMonitor
     Result stopMonitoringAndDispatchCompletions();
 
   private:
+#if SC_COMPILER_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4324) // useless warning on 32 bit... (structure was padded due to __declspec(align()))
+#endif
     alignas(uint64_t) uint8_t eventsMemory[8 * 1024]; // 8 Kb of kernel events
+#if SC_COMPILER_MSVC
+#pragma warning(pop)
+#endif
+
     AsyncKernelEvents asyncKernelEvents;
     AsyncEventLoop*   eventLoop = nullptr;
     AsyncLoopWakeUp   eventLoopWakeUp;

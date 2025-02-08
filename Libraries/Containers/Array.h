@@ -53,8 +53,6 @@ struct SC::Array
 
     using Parent     = SegmentItems<T>;
     using Operations = SegmentOperations<ArrayAllocator, T>;
-    template <int>
-    friend struct SmallString;
     template <typename, int>
     friend struct SmallVector;
 

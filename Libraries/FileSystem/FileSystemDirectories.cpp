@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "FileSystemDirectories.h"
-#include "../Containers/SmallVector.h"
+#include "../Foundation/Buffer.h"
 #include "../Foundation/Result.h"
 
 #if SC_PLATFORM_WINDOWS
@@ -15,25 +15,27 @@ bool SC::FileSystemDirectories::init()
     // TODO: OsPaths::init() for Windows is messy. Tune the API to improve writing software like this.
     // Reason is because it's handy counting in wchars but we can't do it with StringNative.
     // Additionally we must convert to utf8 at the end otherwise path::dirname will not work
-    SmallVector<wchar_t, MAX_PATH> buffer;
+    SmallBuffer<sizeof(wchar_t) * MAX_PATH> buffer;
 
     size_t numChars;
     int    tries = 0;
     do
     {
-        SC_TRY(buffer.resizeWithoutInitializing(buffer.size() + MAX_PATH));
+        SC_TRY(buffer.resizeWithoutInitializing(buffer.size() + sizeof(wchar_t) * MAX_PATH));
         // Is returned null terminated
-        numChars = GetModuleFileNameW(0L, buffer.data(), static_cast<DWORD>(buffer.size()));
+        numChars = GetModuleFileNameW(0L, reinterpret_cast<wchar_t*>(buffer.data()), static_cast<DWORD>(buffer.size()));
         if (tries++ >= 10)
         {
             return false;
         }
     } while (numChars == buffer.size() && GetLastError() == ERROR_INSUFFICIENT_BUFFER);
 
-    SC_TRY(buffer.resizeWithoutInitializing(numChars + 1));
-    SC_TRY(buffer[numChars] == 0);
+    SC_TRY(buffer.resizeWithoutInitializing(sizeof(wchar_t) * (numChars + 1)));
+    SC_TRY(buffer.data()[numChars * sizeof(wchar_t) + 0] == 0);
+    SC_TRY(buffer.data()[numChars * sizeof(wchar_t) + 1] == 0);
 
-    StringView utf16executable = StringView(Span<const wchar_t>(buffer.data(), (buffer.size() - 1)), true);
+    StringView utf16executable = StringView(
+        Span<const wchar_t>(reinterpret_cast<wchar_t*>(buffer.data()), (buffer.size() - 1) / sizeof(wchar_t)), true);
 
     // TODO: FileSystemDirectories::init - We must also convert to utf8 because dirname will not work on non utf8 or
     // ascii text assigning directly the SmallString inside StringNative will copy as is instad of converting utf16 to
@@ -75,8 +77,9 @@ bool SC::FileSystemDirectories::init()
     SC_TRY(applicationRootDirectory.assign(Path::dirname(executableFile.view(), Path::Type::AsPosix, 3)));
     return true;
 #else
-    SmallVector<char, StaticPathSize> data;
-    uint32_t                          executable_length = 0;
+    SmallBuffer<StaticPathSize> data;
+
+    uint32_t executable_length = 0;
     _NSGetExecutablePath(NULL, &executable_length);
     executableFile = String(StringEncoding::Utf8);
     if (executable_length > 1)
@@ -84,7 +87,7 @@ bool SC::FileSystemDirectories::init()
         SC_TRY(data.resizeWithoutInitializing(executable_length));
         // Writes also the null terminator, but assert just in case
         _NSGetExecutablePath(data.data(), &executable_length);
-        SC_TRY(data[executable_length - 1] == 0);
+        SC_TRY(data.data()[executable_length - 1] == 0);
         executableFile = SmallString<StaticPathSize>(move(data), StringEncoding::Utf8);
     }
 

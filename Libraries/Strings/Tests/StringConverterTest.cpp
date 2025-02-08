@@ -28,7 +28,7 @@ void SC::StringConverterTest::convertUtf8Utf16()
     const char utf8String1[]  = "\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E"; // "日本語" in UTF-8
     const char utf16String1[] = "\xE5\x65\x2C\x67\x9E\x8a";             // "日本語" in UTF-16LE
 
-    SmallVector<char, 255> buffer;
+    SmallBuffer<255> buffer;
 
     StringView input, output, expected;
 

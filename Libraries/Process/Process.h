@@ -3,8 +3,9 @@
 #pragma once
 
 #include "../Containers/IntrusiveDoubleLinkedList.h"
+#include "../Containers/Vector.h"
 #include "../File/FileDescriptor.h"
-#include "../Strings/SmallString.h"
+#include "../Strings/String.h"
 #include "ProcessDescriptor.h"
 
 namespace SC

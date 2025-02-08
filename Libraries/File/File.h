@@ -6,6 +6,7 @@
 
 namespace SC
 {
+struct Buffer;
 struct String;
 template <typename T>
 struct Vector;
@@ -63,6 +64,12 @@ struct SC::File
     /// @return Valid result if read succeeded until EOF
     [[nodiscard]] Result readUntilEOF(Vector<uint8_t>& destination);
 
+    /// @brief Reads into a given dynamic buffer until End of File (EOF) is signaled.
+    ///        It works also for non-seekable file descriptors (stdout / in / err).
+    /// @param destination A destination buffer to write to (it will be resized as needed)
+    /// @return Valid result if read succeeded until EOF
+    [[nodiscard]] Result readUntilEOF(Buffer& destination);
+
     /// @brief Reads into a given string until End of File (EOF) is signaled
     ///        It works also for non-seekable file descriptors (stdout / in / err).
     /// @param destination A destination string to write to (it will be sized as needed)
@@ -74,6 +81,7 @@ struct SC::File
     struct ReadResult;
     template <typename T>
     Result readUntilEOFTemplate(Vector<T>& destination);
+    Result readUntilEOFTemplate(Buffer& destination);
 };
 
 //! @}

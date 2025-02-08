@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "Libraries/Containers/Vector.h"
 #include "Libraries/Foundation/Result.h"
 #include "Libraries/Strings/String.h"
 #include "imgui.h"

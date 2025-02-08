@@ -98,7 +98,7 @@ void SC::AsyncRequestStreamsTest::fileToFile()
 
     // Generate test data
     Vector<uint64_t> referenceData;
-    (void)referenceData.resize(1024 / sizeof(uint64_t));
+    (void)referenceData.resizeWithoutInitializing(1024 / sizeof(uint64_t));
 
     for (uint64_t idx = 0; idx < 1024 / sizeof(uint64_t); ++idx)
     {
@@ -115,7 +115,7 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     constexpr size_t bufferBytesSize = 16;
     AsyncBufferView  buffers[numberOfBuffers];
     Buffer           buffer;
-    SC_TEST_EXPECT(buffer.resize(bufferBytesSize * numberOfBuffers));
+    SC_TEST_EXPECT(buffer.resizeWithoutInitializing(bufferBytesSize * numberOfBuffers));
     for (size_t idx = 0; idx < numberOfBuffers; ++idx)
     {
         SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
@@ -217,7 +217,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     AsyncBufferView  buffers1[numberOfBuffers1];
     buffersPool1.buffers = {buffers1, numberOfBuffers1};
     Buffer buffer1;
-    SC_TEST_EXPECT(buffer1.resize(buffers1Size * numberOfBuffers1));
+    SC_TEST_EXPECT(buffer1.resizeWithoutInitializing(buffers1Size * numberOfBuffers1));
     for (size_t idx = 0; idx < numberOfBuffers1; ++idx)
     {
         SC_TEST_EXPECT(buffer1.toSpan().sliceStartLength(idx * buffers1Size, buffers1Size, buffers1[idx].data));
@@ -258,7 +258,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     AsyncBufferView  buffers2[numberOfBuffers2 + 1];
     buffersPool2.buffers = {buffers2, numberOfBuffers2};
     Buffer buffer2;
-    SC_TEST_EXPECT(buffer2.resize(buffers2Size * numberOfBuffers2));
+    SC_TEST_EXPECT(buffer2.resizeWithoutInitializing(buffers2Size * numberOfBuffers2));
     for (size_t idx = 0; idx < numberOfBuffers2; ++idx)
     {
         SC_TEST_EXPECT(buffer2.toSpan().sliceStartLength(idx * buffers2Size, buffers2Size, buffers2[idx].data));

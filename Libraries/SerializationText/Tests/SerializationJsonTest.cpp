@@ -68,10 +68,10 @@ struct SC::SerializationJsonTest : public SC::TestCase
 void SC::SerializationJsonTest::jsonWrite()
 {
     //! [serializationJsonWriteSnippet]
-    constexpr StringView   testJSON = R"({"x":2,"y":1.50,"xy":[1,3],"myTest":"asdf","myVector":["Str1","Str2"]})"_a8;
-    Test                   test;
-    SmallVector<char, 256> buffer;
-    StringFormatOutput     output(StringEncoding::Ascii, buffer);
+    constexpr StringView testJSON = R"({"x":2,"y":1.50,"xy":[1,3],"myTest":"asdf","myVector":["Str1","Str2"]})"_a8;
+    Test                 test;
+    SmallBuffer<256>     buffer;
+    StringFormatOutput   output(StringEncoding::Ascii, buffer);
 
     SC_TEST_EXPECT(SerializationJson::write(test, output));
     const StringView serializedJSON({buffer.data(), buffer.size() - 1}, false, StringEncoding::Ascii);

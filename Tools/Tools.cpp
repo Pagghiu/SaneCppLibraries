@@ -5,7 +5,7 @@
 #include "../Libraries/FileSystem/Path.h"
 #include "../Libraries/Foundation/Deferred.h"
 #include "../Libraries/Strings/Console.h"
-#include "../Libraries/Strings/SmallString.h"
+#include "../Libraries/Strings/String.h"
 #include "../Libraries/Time/Time.h"
 
 #include "../Bindings/cpp/SC.cpp"
@@ -17,9 +17,10 @@
 #include <Windows.h>
 #endif
 
-static SC::SmallVector<char, 512> gConsoleBuffer;
-static SC::SmallString<512>       gFormatString;
-SC::Console*                      globalConsole;
+static SC::SmallBuffer<512> gConsoleBuffer;
+static SC::SmallString<512> gFormatString;
+
+SC::Console* globalConsole;
 
 int main(int argc, const char* argv[])
 {

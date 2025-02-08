@@ -1,8 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Containers/Vector.h"
 #include "../Foundation/Result.h"
-#include "../Strings/SmallString.h"
+#include "../Strings/String.h"
 #include "../Time/Time.h"
 
 namespace SC

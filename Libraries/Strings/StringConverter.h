@@ -5,8 +5,7 @@
 
 namespace SC
 {
-template <typename T>
-struct Vector;
+struct Buffer;
 struct SC_COMPILER_EXPORT StringConverter;
 struct String;
 } // namespace SC
@@ -36,8 +35,7 @@ struct SC::StringConverter
     /// @param encodedText If specified, a StringView containing the encoded text will be returned
     /// @param nullTerminate Specifies if the StringView will need to be null terminated or not
     /// @return `true` if the conversion succeeds
-    [[nodiscard]] static bool convertEncodingToUTF8(StringView text, Vector<char>& buffer,
-                                                    StringView*     encodedText   = nullptr,
+    [[nodiscard]] static bool convertEncodingToUTF8(StringView text, Buffer& buffer, StringView* encodedText = nullptr,
                                                     NullTermination nullTerminate = AddZeroTerminator);
 
     /// @brief Converts text to (eventually null terminated) UTF16 encoding. Uses the passed in buffer if necessary.
@@ -46,8 +44,7 @@ struct SC::StringConverter
     /// @param encodedText If specified, a StringView containing the encoded text will be returned
     /// @param nullTerminate Specifies if the StringView will need to be null terminated or not
     /// @return `true` if the conversion succeeds
-    [[nodiscard]] static bool convertEncodingToUTF16(StringView text, Vector<char>& buffer,
-                                                     StringView*     encodedText   = nullptr,
+    [[nodiscard]] static bool convertEncodingToUTF16(StringView text, Buffer& buffer, StringView* encodedText = nullptr,
                                                      NullTermination nullTerminate = AddZeroTerminator);
 
     /// @brief Converts text to (eventually null terminated) requested encoding. Uses the passed in buffer if necessary.
@@ -57,7 +54,7 @@ struct SC::StringConverter
     /// @param encodedText If specified, a StringView containing the encoded text will be returned
     /// @param nullTerminate Specifies if the StringView will need to be null terminated or not
     /// @return `true` if the conversion succeeds
-    [[nodiscard]] static bool convertEncodingTo(StringEncoding encoding, StringView text, Vector<char>& buffer,
+    [[nodiscard]] static bool convertEncodingTo(StringEncoding encoding, StringView text, Buffer& buffer,
                                                 StringView*     encodedText   = nullptr,
                                                 NullTermination nullTerminate = AddZeroTerminator);
 
@@ -76,7 +73,7 @@ struct SC::StringConverter
     /// @brief Create a StringBuilder that will push to given Vector, with specific encoding.
     /// @param text Destination buffer where code points will be pushed
     /// @param encoding The encoding to be used
-    StringConverter(Vector<char>& text, StringEncoding encoding);
+    StringConverter(Buffer& text, StringEncoding encoding);
 
     /// @brief Converts a given input StringView to null-terminated version.
     /// Uses supplied buffer in constructor if an actual conversion is needed.
@@ -97,43 +94,43 @@ struct SC::StringConverter
     /// @param stringData The buffer to be modified
     /// @param encoding The requested encoding, that determines how many null-termination bytes exist
     /// @return `false` if the stringData is empty or its size is insufficient considering the given encoding
-    [[nodiscard]] static bool popNullTermIfNotEmpty(Vector<char>& stringData, StringEncoding encoding);
+    [[nodiscard]] static bool popNullTermIfNotEmpty(Buffer& stringData, StringEncoding encoding);
 
     /// @brief Will unconditionally add a null-terminator to given buffer.
     /// @param stringData The destination buffer
     /// @param encoding The given encoding
     /// @return `true` if null-terminator was successfully pushed
-    [[nodiscard]] static bool pushNullTerm(Vector<char>& stringData, StringEncoding encoding);
+    [[nodiscard]] static bool pushNullTerm(Buffer& stringData, StringEncoding encoding);
 
     /// @brief Eventually add null-terminators if needed to end of given buffer
     /// @param data The destination buffer
     /// @param encoding The given encoding
-    /// @return `true` if null-terminator was successfully pushed
-    [[nodiscard]] static bool ensureZeroTermination(Vector<char>& data, StringEncoding encoding);
+    static void ensureZeroTermination(Buffer& data, StringEncoding encoding);
 
     void internalClear();
-    // TODO: FileSystemIterator should just use a Vector<char>
+    // TODO: FileSystemIterator should just use a Buffer
     friend struct FileSystemIterator;
+    friend struct String;
     template <int N>
     friend struct SmallString;
     friend struct StringBuilder;
     friend struct File;
 
     [[nodiscard]] bool        setTextLengthInBytesIncludingTerminator(size_t newDataSize);
-    [[nodiscard]] static bool convertSameEncoding(StringView text, Vector<char>& buffer, StringView* encodedText,
+    [[nodiscard]] static bool convertSameEncoding(StringView text, Buffer& buffer, StringView* encodedText,
                                                   NullTermination terminate);
-    static void               eventuallyNullTerminate(Vector<char>& buffer, StringEncoding destinationEncoding,
-                                                      StringView* encodedText, NullTermination terminate);
+    static void eventuallyNullTerminate(Buffer& buffer, StringEncoding destinationEncoding, StringView* encodedText,
+                                        NullTermination terminate);
 
     StringEncoding encoding;
-    Vector<char>&  data;
+    Buffer&        data;
     // Appends the input string null terminated
     [[nodiscard]] bool internalAppend(StringView input, StringView* encodedText);
 
     // Fallbacks for platforms without an API to do the conversion out of the box (Linux)
-    [[nodiscard]] static bool convertUTF16LE_to_UTF8(const StringView sourceUtf16, Vector<char>& destination,
+    [[nodiscard]] static bool convertUTF16LE_to_UTF8(const StringView sourceUtf16, Buffer& destination,
                                                      int& writtenCodeUnits);
-    [[nodiscard]] static bool convertUTF8_to_UTF16LE(const StringView sourceUtf8, Vector<char>& destination,
+    [[nodiscard]] static bool convertUTF8_to_UTF16LE(const StringView sourceUtf8, Buffer& destination,
                                                      int& writtenCodeUnits);
 };
 //! @}

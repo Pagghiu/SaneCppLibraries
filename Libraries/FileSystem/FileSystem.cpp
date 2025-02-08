@@ -144,7 +144,7 @@ SC::Result SC::FileSystem::read(StringView path, Vector<uint8_t>& data)
 
 [[nodiscard]] SC::Result SC::FileSystem::read(StringView path, String& text, StringEncoding encoding)
 {
-    text.data.clearWithoutInitializing();
+    text.data.clear();
     text.encoding = encoding;
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));

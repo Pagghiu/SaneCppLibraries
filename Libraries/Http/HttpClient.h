@@ -41,7 +41,7 @@ struct SC::HttpClient
     void onAfterSend(AsyncSocketSend::Result& result);
     void onAfterRead(AsyncSocketReceive::Result& result);
 
-    SmallVector<char, 1024> content;
+    SmallBuffer<1024> content;
 
     String customDebugName;
 

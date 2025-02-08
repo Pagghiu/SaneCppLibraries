@@ -9,7 +9,7 @@ SC::StringView externallyDefinedFunc();
 
 struct TestPluginChild : public ITestInterface1, public ITestInterface2
 {
-    SC::SmallVector<char, 1024 * sizeof(SC::native_char_t)> consoleBuffer;
+    SC::SmallBuffer<1024 * sizeof(SC::native_char_t)> consoleBuffer;
 
     SC::Console console;
 

@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../HttpServer.h"
-#include "../../Strings/SmallString.h"
+#include "../../Strings/String.h"
 #include "../../Strings/StringBuilder.h"
 #include "../../Testing/Testing.h"
 #include "../HttpClient.h"

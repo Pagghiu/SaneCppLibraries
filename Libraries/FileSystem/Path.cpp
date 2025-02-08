@@ -3,7 +3,7 @@
 #include "Path.h"
 #include "../Containers/Vector.h"
 #include "../Foundation/Result.h"
-#include "../Strings/SmallString.h"
+#include "../Strings/String.h"
 #include "../Strings/StringBuilder.h"
 
 struct SC::Path::Internal
@@ -468,7 +468,7 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
     {
         if (normalizationHappened)
         {
-            auto res = join(*output, components.toSpanConst(),
+            bool res = join(*output, components.toSpanConst(),
                             type == AsPosix ? Posix::SeparatorStringView() : Windows::SeparatorStringView());
             SC_TRY(res);
             if (view.startsWith("\\\\"))

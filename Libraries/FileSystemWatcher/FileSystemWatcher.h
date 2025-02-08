@@ -3,11 +3,13 @@
 #pragma once
 
 #include "../Async/Async.h" // AsyncLoopWakeUp
+#include "../Containers/Array.h"
 #include "../Containers/IntrusiveDoubleLinkedList.h"
+#include "../Containers/Vector.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Result.h"
-#include "../Strings/SmallString.h"
+#include "../Strings/String.h"
 #include "../Threading/Threading.h" // EventObject
 
 namespace SC

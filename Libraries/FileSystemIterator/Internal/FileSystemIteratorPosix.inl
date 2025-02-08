@@ -3,7 +3,7 @@
 // clang-format off
 #include "../FileSystemIterator.h"
 #include "../../Strings/StringConverter.h"
-#include "../../Strings/SmallString.h"
+#include "../../Strings/String.h"
 #include "../../Containers/SmallVector.h"
 
 // clang-format on

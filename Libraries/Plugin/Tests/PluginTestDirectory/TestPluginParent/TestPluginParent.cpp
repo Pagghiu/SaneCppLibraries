@@ -7,7 +7,7 @@
 
 struct TestPluginParent
 {
-    SC::SmallVector<char, 1024 * sizeof(SC::native_char_t)> consoleBuffer;
+    SC::SmallBuffer<1024 * sizeof(SC::native_char_t)> consoleBuffer;
 
     SC::Console console;
 

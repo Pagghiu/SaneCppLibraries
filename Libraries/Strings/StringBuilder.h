@@ -11,7 +11,7 @@ struct String;
 
 /// @brief Builds String out of a sequence of StringView or formatting through StringFormat
 ///
-/// The output can be a SC::Vector (or a SC::SmallVector, see [Containers](@ref library_containers))
+/// The output can be a SC::Buffer or a SC::SmallBuffer (see [Foundation](@ref library_foundation))
 struct SC_COMPILER_EXPORT StringBuilder
 {
     /// @brief Clearing flags used when initializing destination buffer
@@ -24,7 +24,7 @@ struct SC_COMPILER_EXPORT StringBuilder
     /// @param stringData Destination buffer where code points will be pushed
     /// @param encoding The encoding to be used
     /// @param flags Specifies if destination buffer must be emptied or not before pushing
-    StringBuilder(Vector<char>& stringData, StringEncoding encoding, Flags flags = DoNotClear);
+    StringBuilder(Buffer& stringData, StringEncoding encoding, Flags flags = DoNotClear);
 
     /// @brief Create a StringBuilder that will push to given String, with specific encoding.
     /// @param str Destination buffer where code points will be pushed
@@ -121,7 +121,7 @@ struct SC_COMPILER_EXPORT StringBuilder
   private:
     void clear();
 
-    Vector<char>&  stringData;
+    Buffer&        stringData;
     StringEncoding encoding;
 };
 //! @}

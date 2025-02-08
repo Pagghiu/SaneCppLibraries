@@ -1,20 +1,19 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Containers/Vector.h"
+#include "../Foundation/Buffer.h"
 #include "../Strings/StringView.h"
 
 namespace SC
 {
 struct SC_COMPILER_EXPORT String;
+template <int N>
+struct SmallString;
 namespace Reflection
 {
 template <typename T>
 struct Reflect;
 }
-// Allows using this type across Plugin boundaries
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Vector<char>;
-
 } // namespace SC
 
 //! @addtogroup group_strings
@@ -36,6 +35,10 @@ struct SC::String
     /// @param sv StringView to be assigned to this String
     /// @warning This function will assert if StringView::assign fails
     String(StringView sv) { SC_ASSERT_RELEASE(assign(sv)); }
+
+    /// @brief Builds a String from a buffer ensuring zero termination
+    /// @warning This function will assert if StringView::assign fails
+    String(Buffer&& otherData, StringEncoding encoding);
 
     /// @brief Builds String with a null terminated char string literal
     /// @tparam N Length of the string literal (including null terminator)
@@ -134,31 +137,78 @@ struct SC::String
         return *this;
     }
 
+    /// @brief Assigns (copy) contents of given StringView in current String
+    /// @warning Assignment operator will assert if String::assign fails
+    String& operator=(StringView view);
+
   protected:
     // TODO: nativeWritableBytesIncludingTerminator should be removed
     [[nodiscard]] native_char_t* nativeWritableBytesIncludingTerminator();
 
-    // All these friendships are made to leverage writing directly to the Vector<char>
+    // All these friendships are made to leverage writing directly to the Buffer
     // but while still keeping it an implementation detail
-    friend struct SmallStringTest;
+    friend struct StringTest;
     friend struct StringBuilder;
     friend struct StringConverter;
     friend struct File;
     friend struct FileSystem;
-    template <int>
-    friend struct SmallString;
     template <typename T>
     friend struct Reflection::Reflect;
     StringEncoding encoding;
-    using SegmentHeader = Internal::SegmentHeader;
-#if SC_COMPILER_MSVC
-#pragma warning(push)
-#pragma warning(disable : 4324) // useless warning on 32 bit... (structure was padded due to __declspec(align()))
-#endif
-    // alignas(alignof(SegmentHeader)) is needed on 32 bit to fix distance with SmallString::buffer
-    alignas(alignof(SegmentHeader)) Vector<char> data;
-#if SC_COMPILER_MSVC
-#pragma warning(pop)
-#endif
+    Buffer         data;
+
+    String(StringEncoding encoding, SegmentHeader& header, uint32_t inlineCapacity);
+    String(Buffer&& otherData, StringEncoding encoding, SegmentHeader& header, uint32_t inlineCapacity);
+};
+
+/// @brief String with compile time configurable inline storage (small string optimization)
+/// @tparam N number of chars to reserve in inline storage
+template <int N>
+struct SC::SmallString : public String
+{
+    // Unfortunately we have to repeat all these overloads.
+    // 'using String::operator=' or 'using String::String' would invoke default memberwise copy
+    // constructors also for SmallString::header and buffer, that would cause a disaster.
+
+    SmallString(StringEncoding encoding = StringEncoding::Utf8) : String(encoding, header, N) {}
+    SmallString(const SmallString& other) : SmallString(other.getEncoding()) { String::operator=(other); }
+    SmallString(SmallString&& other) : SmallString(other.getEncoding()) { String::operator=(move(other)); }
+    String& operator=(const SmallString& other) { return String::operator=(other); }
+    String& operator=(SmallString&& other) { return String::operator=(move(other)); }
+    String& operator=(const String& other) { return String::operator=(other); }
+    String& operator=(String&& other) { return String::operator=(move(other)); }
+    SmallString(const String& other) : SmallString(other.getEncoding()) { String::operator=(other); }
+    SmallString(String&& other) : SmallString(other.getEncoding()) { String::operator=(move(other)); }
+    SmallString(StringView other) : SmallString(other.getEncoding()) { String::operator=(move(other)); }
+    String& operator=(StringView view) { return String::operator=(view); }
+
+    SmallString(Buffer&& otherData, StringEncoding encoding) : String(move(otherData), encoding, header, N) {}
+
+    template <size_t Q>
+    SmallString(const char (&text)[Q]) : SmallString(StringView({text, Q - 1}, true, StringEncoding::Ascii))
+    {}
+
+    template <size_t Q>
+    String& operator=(const char (&text)[Q])
+    {
+        return String::operator=(text);
+    }
+
+  private:
+    SegmentHeader header;
+    char          buffer[N];
 };
 //! @}
+
+namespace SC
+{
+template <int N>
+using StringNative = SmallString<N * sizeof(native_char_t)>;
+
+// Allows using this type across Plugin boundaries
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<64>;
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<128 * sizeof(native_char_t)>;
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<255 * sizeof(native_char_t)>;
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<512 * sizeof(native_char_t)>;
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<1024 * sizeof(native_char_t)>;
+} // namespace SC

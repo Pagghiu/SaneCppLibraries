@@ -8,7 +8,7 @@
 
 namespace SC
 {
-StringBuilder::StringBuilder(Vector<char>& stringData, StringEncoding encoding, Flags f)
+StringBuilder::StringBuilder(Buffer& stringData, StringEncoding encoding, Flags f)
     : stringData(stringData), encoding(encoding)
 {
     if (f == Clear)
@@ -96,6 +96,7 @@ bool StringBuilder::appendHex(Span<const uint8_t> data, AppendHexCase casing)
     SC_TRY(stringData.resizeWithoutInitializing(stringData.size() + data.sizeInBytes() * 2));
     const size_t   sizeInBytes = data.sizeInBytes();
     const uint8_t* sourceBytes = data.data();
+    char*          destination = stringData.data();
     for (size_t idx = 0; idx < sizeInBytes; idx++)
     {
         constexpr char bytesUpper[] = "0123456789ABCDEF";
@@ -103,18 +104,18 @@ bool StringBuilder::appendHex(Span<const uint8_t> data, AppendHexCase casing)
         switch (casing)
         {
         case AppendHexCase::UpperCase:
-            stringData[previousSize + idx * 2 + 0] = bytesUpper[sourceBytes[idx] >> 4];
-            stringData[previousSize + idx * 2 + 1] = bytesUpper[sourceBytes[idx] & 0x0F];
+            destination[previousSize + idx * 2 + 0] = bytesUpper[sourceBytes[idx] >> 4];
+            destination[previousSize + idx * 2 + 1] = bytesUpper[sourceBytes[idx] & 0x0F];
             break;
         case AppendHexCase::LowerCase:
-            stringData[previousSize + idx * 2 + 0] = bytesLower[sourceBytes[idx] >> 4];
-            stringData[previousSize + idx * 2 + 1] = bytesLower[sourceBytes[idx] & 0x0F];
+            destination[previousSize + idx * 2 + 0] = bytesLower[sourceBytes[idx] >> 4];
+            destination[previousSize + idx * 2 + 1] = bytesLower[sourceBytes[idx] & 0x0F];
             break;
         }
     }
     return StringConverter::pushNullTerm(stringData, encoding);
 }
 
-void StringBuilder::clear() { stringData.clearWithoutInitializing(); }
+void StringBuilder::clear() { stringData.clear(); }
 
 } // namespace SC

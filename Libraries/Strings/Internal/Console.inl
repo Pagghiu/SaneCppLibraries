@@ -14,7 +14,7 @@
 #include <Windows.h>
 #endif
 
-SC::Console::Console(Vector<char>& encodingConversionBuffer) : encodingConversionBuffer(encodingConversionBuffer)
+SC::Console::Console(Buffer& encodingConversionBuffer) : encodingConversionBuffer(encodingConversionBuffer)
 {
 #if SC_PLATFORM_WINDOWS
     handle     = ::GetStdHandle(STD_OUTPUT_HANDLE);
@@ -57,7 +57,7 @@ void SC::Console::print(const StringView str)
     {
         if (str.getEncoding() == StringEncoding::Utf16)
         {
-            encodingConversionBuffer.clearWithoutInitializing();
+            encodingConversionBuffer.clear();
             if (StringConverter::convertEncodingToUTF8(str, encodingConversionBuffer, &encodedPath))
             {
                 ::WriteFile(handle, encodedPath.bytesWithoutTerminator(), static_cast<DWORD>(encodedPath.sizeInBytes()),
@@ -87,7 +87,7 @@ void SC::Console::print(const StringView str)
                 }
                 else
                 {
-                    encodingConversionBuffer.clearWithoutInitializing();
+                    encodingConversionBuffer.clear();
                     if (StringConverter::convertEncodingToUTF16(str, encodingConversionBuffer, &encodedPath))
                     {
                         ::OutputDebugStringW(encodedPath.getNullTerminatedNative());
@@ -107,7 +107,7 @@ void SC::Console::print(const StringView str)
         }
         else
         {
-            encodingConversionBuffer.clearWithoutInitializing();
+            encodingConversionBuffer.clear();
             if (StringConverter::convertEncodingToUTF16(str, encodingConversionBuffer, &encodedPath))
             {
                 if (isConsole)

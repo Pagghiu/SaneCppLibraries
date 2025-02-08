@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Strings/SmallString.h"
+#include "../Strings/String.h"
 
 namespace SC
 {

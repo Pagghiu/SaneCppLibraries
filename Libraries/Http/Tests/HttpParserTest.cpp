@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../HttpParser.h"
+#include "../../Containers/Vector.h"
 #include "../../Strings/StringBuilder.h"
 #include "../../Testing/Testing.h"
 namespace SC

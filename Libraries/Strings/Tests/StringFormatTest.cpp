@@ -1,5 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include "../../Foundation/Limits.h"
 #include "../../Testing/Testing.h"
 #include "../String.h"
 #include "../StringBuilder.h"

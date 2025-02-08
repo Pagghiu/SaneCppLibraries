@@ -3,7 +3,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include "../../Strings/SmallString.h"
+#include "../../Strings/String.h"
 #include "../../Strings/StringBuilder.h"
 #include "../../Strings/StringConverter.h"
 #include "../../Threading/Threading.h"

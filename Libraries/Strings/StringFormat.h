@@ -5,8 +5,6 @@
 
 namespace SC
 {
-template <typename T>
-struct Vector;
 struct Console;
 struct String;
 template <int N>
@@ -23,7 +21,7 @@ struct SC_COMPILER_EXPORT StringFormatOutput
     /// @brief Constructs a StringFormatOutput object pushing to a destination buffer
     /// @param encoding The given encoding
     /// @param destination The destination buffer
-    StringFormatOutput(StringEncoding encoding, Vector<char>& destination);
+    StringFormatOutput(StringEncoding encoding, Buffer& destination);
 
     /// @brief Constructs a StringFormatOutput object pushing to a console
     /// @param encoding The given encoding
@@ -46,7 +44,7 @@ struct SC_COMPILER_EXPORT StringFormatOutput
     [[nodiscard]] bool onFormatSucceeded();
 
   private:
-    Vector<char>*  data    = nullptr;
+    Buffer*        data    = nullptr;
     Console*       console = nullptr;
     StringEncoding encoding;
     size_t         backupSize = 0;

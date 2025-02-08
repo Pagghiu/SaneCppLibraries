@@ -4,7 +4,7 @@
 #include "../Async/Async.h"
 #include "../Containers/ArenaMap.h"
 #include "../Socket/Socket.h"
-#include "../Strings/SmallString.h"
+#include "../Strings/String.h"
 #include "../Strings/StringBuilder.h"
 
 // HttpRequest
@@ -49,7 +49,8 @@ SC::Result SC::HttpResponse::end(Span<const char> span)
 {
     StringBuilder sb(outputBuffer, StringEncoding::Ascii);
     SC_TRY(sb.append("Content-Length: {}\r\n\r\n", span.sizeInBytes()));
-    SC_TRY(outputBuffer.pop_back()); // pop null terminator
+    SC_TRY(not outputBuffer.isEmpty());
+    SC_TRY(outputBuffer.resizeWithoutInitializing(outputBuffer.size() - 1)); // pop null terminator
     SC_TRY(outputBuffer.append(span));
     responseEnded = true;
     return Result(true);
@@ -241,7 +242,7 @@ void SC::HttpServer::Internal::onNewClient(AsyncSocketAccept::Result& result)
     client.asyncReceive.setDebugName(client.debugName.bytesIncludingTerminator());
     client.asyncReceive.callback.bind<Internal, &Internal::onReceive>(*this);
 
-    Vector<char>& buffer = client.request.headerBuffer;
+    auto& buffer = client.request.headerBuffer;
 
     // TODO: This can potentially fail
     SC_TRUST_RESULT(buffer.resizeWithoutInitializing(1024));

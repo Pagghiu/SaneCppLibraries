@@ -54,10 +54,6 @@ struct SC::Vector
 
   protected:
     SegmentItems<T>* getSegmentItems() const { return SegmentItems<T>::getSegment(items); }
-    template <int N>
-    friend struct SmallString;
-    friend struct String;
-    friend struct SmallStringTest;
     friend struct VectorTest;
     friend struct SmallVectorTest;
     T* items;

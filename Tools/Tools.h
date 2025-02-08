@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Libraries/Foundation/Result.h"
-#include "../Libraries/Strings/SmallString.h"
+#include "../Libraries/Strings/String.h"
 #include "../Libraries/Strings/StringBuilder.h"
 
 namespace SC

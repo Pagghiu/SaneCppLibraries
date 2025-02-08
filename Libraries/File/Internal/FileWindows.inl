@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../../Containers/Vector.h"
-#include "../../Strings/SmallString.h"
+#include "../../Strings/String.h"
 #include "../../Strings/StringConverter.h"
 #include "../File.h"
 
@@ -178,9 +178,9 @@ SC::Result SC::File::open(StringView path, OpenMode mode, OpenOptions options)
 
 struct SC::File::Internal
 {
-    template <typename T>
-    [[nodiscard]] static Result readAppend(FileDescriptor::Handle fileDescriptor, Vector<T>& output,
-                                           Span<T> fallbackBuffer, ReadResult& result)
+    template <typename T, typename U>
+    [[nodiscard]] static Result readAppend(FileDescriptor::Handle fileDescriptor, U& output, Span<T> fallbackBuffer,
+                                           ReadResult& result)
     {
         const bool useVector = output.capacity() > output.size();
 

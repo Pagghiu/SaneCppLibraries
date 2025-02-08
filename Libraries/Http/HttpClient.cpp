@@ -4,7 +4,7 @@
 #include "../Socket/Socket.h" // SocketDNS
 #include "HttpURLParser.h"
 
-#include "../Strings/SmallString.h"
+#include "../Strings/String.h"
 #include "../Strings/StringBuilder.h"
 
 SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringView url)

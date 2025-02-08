@@ -129,7 +129,7 @@ void SC::AsyncStreamsTest::readableSyncStream()
     constexpr size_t bufferBytesSize = sizeof(size_t);
     AsyncBufferView  buffers[numberOfBuffers];
     Buffer           buffer;
-    SC_TEST_EXPECT(buffer.resize(bufferBytesSize * numberOfBuffers));
+    SC_TEST_EXPECT(buffer.resizeWithoutInitializing(bufferBytesSize * numberOfBuffers));
     for (size_t idx = 0; idx < numberOfBuffers; ++idx)
     {
         SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
@@ -202,7 +202,7 @@ void SC::AsyncStreamsTest::readableAsyncStream()
     constexpr size_t bufferBytesSize = sizeof(size_t);
     AsyncBufferView  buffers[numberOfBuffers];
     Buffer           buffer;
-    SC_TEST_EXPECT(buffer.resize(bufferBytesSize * numberOfBuffers));
+    SC_TEST_EXPECT(buffer.resizeWithoutInitializing(bufferBytesSize * numberOfBuffers));
     for (size_t idx = 0; idx < numberOfBuffers; ++idx)
     {
         SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
@@ -293,7 +293,7 @@ void SC::AsyncStreamsTest::writableStream()
     constexpr size_t bufferBytesSize = sizeof(size_t);
     AsyncBufferView  buffers[numberOfBuffers];
     Buffer           buffer;
-    SC_TEST_EXPECT(buffer.resize(bufferBytesSize * numberOfBuffers));
+    SC_TEST_EXPECT(buffer.resizeWithoutInitializing(bufferBytesSize * numberOfBuffers));
     for (size_t idx = 0; idx < numberOfBuffers; ++idx)
     {
         SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));

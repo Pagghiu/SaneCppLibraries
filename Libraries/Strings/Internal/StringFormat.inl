@@ -210,7 +210,7 @@ bool StringFormatOutput::append(StringView text)
     }
 }
 
-StringFormatOutput::StringFormatOutput(StringEncoding encoding, Vector<char>& destination) : encoding(encoding)
+StringFormatOutput::StringFormatOutput(StringEncoding encoding, Buffer& destination) : encoding(encoding)
 {
     data    = &destination;
     console = nullptr;
@@ -237,7 +237,7 @@ bool StringFormatOutput::onFormatSucceeded()
         if (backupSize < data->size())
         {
             // Add null terminator
-            return data->resize(data->size() + StringEncodingGetSize(encoding));
+            return data->resize(data->size() + StringEncodingGetSize(encoding), 0);
         }
     }
     return true;
@@ -247,7 +247,7 @@ void StringFormatOutput::onFormatFailed()
 {
     if (data != nullptr)
     {
-        SC_ASSERT_RELEASE(data->resize(backupSize));
+        SC_ASSERT_RELEASE(data->resize(backupSize, 0));
     }
 }
 

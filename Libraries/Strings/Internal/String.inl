@@ -2,6 +2,30 @@
 // SPDX-License-Identifier: MIT
 
 #include "../../Strings/String.h"
+#include "../../Strings/StringConverter.h" // ensureZeroTermination
+
+SC::String::String(Buffer&& otherData, StringEncoding encoding) : encoding(encoding)
+{
+    SC_ASSERT_RELEASE(data.assignMove(move(otherData)));
+    StringConverter::ensureZeroTermination(data, encoding);
+}
+
+SC::String::String(StringEncoding encoding, SegmentHeader& header, uint32_t inlineCapacity) : String(encoding)
+{
+    data.unsafeSetHeader(&header);
+    header.sizeBytes     = 0;
+    header.capacityBytes = inlineCapacity;
+
+    header.isInlineBuffer           = true;
+    header.isFollowedByInlineBuffer = false;
+}
+
+SC::String::String(Buffer&& otherData, StringEncoding encoding, SegmentHeader& header, uint32_t inlineCapacity)
+    : String(encoding, header, inlineCapacity)
+{
+    SC_ASSERT_RELEASE(data.assignMove(move(otherData)));
+    StringConverter::ensureZeroTermination(data, encoding);
+}
 
 bool SC::String::owns(StringView view) const
 {
@@ -18,26 +42,33 @@ bool SC::String::assign(StringView sv)
         return false;
     if (sv.isNullTerminated())
     {
-        memcpy(data.items, sv.bytesWithoutTerminator(), length + numZero);
+        memcpy(data.data(), sv.bytesWithoutTerminator(), length + numZero);
     }
     else
     {
         if (length > 0)
         {
-            memcpy(data.items, sv.bytesWithoutTerminator(), length);
+            memcpy(data.data(), sv.bytesWithoutTerminator(), length);
         }
+        auto* memory = data.data();
         for (size_t idx = 0; idx < numZero; ++idx)
         {
-            data.items[length + idx] = 0;
+            memory[length + idx] = 0;
         }
     }
     return true;
 }
 
+SC::String& SC::String::operator=(StringView view)
+{
+    SC_ASSERT_RELEASE(assign(view));
+    return *this;
+}
+
 SC::StringView SC::String::view() const SC_LANGUAGE_LIFETIME_BOUND
 {
     const bool  isEmpty = data.isEmpty();
-    const char* items   = isEmpty ? nullptr : data.items;
+    const char* items   = isEmpty ? nullptr : data.data();
     return StringView({items, isEmpty ? 0 : data.size() - StringEncodingGetSize(encoding)}, not isEmpty, encoding);
 }
 

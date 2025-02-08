@@ -10,7 +10,7 @@
 
 #include "../../File/File.h"
 #include "../../FileSystemIterator/FileSystemIterator.h"
-#include "../../Strings/SmallString.h"
+#include "../../Strings/String.h"
 #include "../../Strings/StringConverter.h"
 #include "../../Threading/Threading.h"
 
@@ -26,7 +26,7 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
 
     Array<Pair, FolderWatcherSizes::MaxNumberOfSubdirs> notifyHandles;
 
-    Vector<char> relativePaths;
+    Buffer relativePaths;
 
     FolderWatcher* parentEntry = nullptr; // We could in theory use SC_COMPILER_FIELD_OFFSET somehow to obtain it...
 };
