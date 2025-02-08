@@ -1,12 +1,11 @@
 # Copyright (c) Stefano Cristiano
 # SPDX-License-Identifier: MIT
 import lldb
-import codecs
 
 class vector_SynthProvider:
     def __init__(self, valobj, dict, name="vector_SynthProvider"):
         self.__name = name
-        logger = lldb.formatters.Logger.Logger()
+        # logger = lldb.formatters.Logger.Logger()
         # logger >> f"{self.__name}.__init__ "
         self.valobj = valobj
         self.items = None
@@ -15,25 +14,27 @@ class vector_SynthProvider:
         self.segment_header_size = self.find_segment_header_size()
 
     def num_children(self):
-        logger = lldb.formatters.Logger.Logger()
+        # logger = lldb.formatters.Logger.Logger()
         # logger >> f"{self.__name}.num_children"
         try:
             if not self.items:
                 self.update()
             return self.data_size
-        except:
+        except Exception as e:
+            # logger >> f"{self.__name} EXCEPTION\n{e}"
             return 0
 
     def get_child_index(self, name):
-        logger = lldb.formatters.Logger.Logger()
+        # logger = lldb.formatters.Logger.Logger()
         # logger >> f"{self.__name}.get_child_index"
         try:
             return int(name.lstrip("[").rstrip("]"))
-        except:
+        except Exception as e:
+            # logger >> f"{self.__name} EXCEPTION\n{e}"
             return -1
 
     def get_child_at_index(self, index):
-        logger = lldb.formatters.Logger.Logger()
+        # logger = lldb.formatters.Logger.Logger()
         # logger >> f"{self.__name}.Retrieving child " + str(index)
         if index < 0:
             return None
@@ -44,11 +45,12 @@ class vector_SynthProvider:
             return self.items.CreateChildAtOffset(
                 "[" + str(index) + "]", offset, self.data_type
             )
-        except:
+        except Exception as e:
+            # logger >> f"{self.__name} EXCEPTION\n{e}"
             return None
 
     def update(self):
-        logger = lldb.formatters.Logger.Logger()
+        # logger = lldb.formatters.Logger.Logger()
         # logger >> f"{self.__name}.update"
         try:
             self.items = self.valobj.GetChildMemberWithName("items")
@@ -76,25 +78,111 @@ class vector_SynthProvider:
             pass
 
     def has_children(self):
-        logger = lldb.formatters.Logger.Logger()
+        # logger = lldb.formatters.Logger.Logger()
         # logger >> f"{self.__name}.has_children"
         return True
     
     def find_segment_header_size(self):
-        logger = lldb.formatters.Logger.Logger()
+        # logger = lldb.formatters.Logger.Logger()
         target = lldb.debugger.GetSelectedTarget()
         # Find the type by name
         type = target.FindFirstType("SC::SegmentHeader")
         return type.GetByteSize()
 
 def vector_SummaryProvider(valobj, dict):
-    logger = lldb.formatters.Logger.Logger()
+    # logger = lldb.formatters.Logger.Logger()
     raw = valobj.GetNonSyntheticValue()
     prov = vector_SynthProvider(raw, None, "vector_SummaryProvider")
     return f"size={prov.num_children()} capacity={prov.data_capacity}"
 
+class buffer_SynthProvider:
+    def __init__(self, valobj, dict, name="buffer_SynthProvider"):
+        self.__name = name
+        # logger = lldb.formatters.Logger.Logger()
+        # logger >> f"{self.__name}.__init__ "
+        self.valobj = valobj
+        self.items = None
+        self.data_size = 0
+        self.data_capacity = 0
+        self.header_size = self.find_buffer_header_size()
+
+    def num_children(self):
+        # logger = lldb.formatters.Logger.Logger()
+        # logger >> f"{self.__name}.num_children"
+        try:
+            if not self.items:
+                self.update()
+            # logger >> f"returning data_size={self.data_size}"
+            return self.data_size
+        except:
+            # logger >> f"{self.__name} EXCEPTION\n{e}"
+            return 0
+
+    def get_child_index(self, name):
+        # logger = lldb.formatters.Logger.Logger()
+        # logger >> f"{self.__name}.get_child_index"
+        try:
+            return int(name.lstrip("[").rstrip("]"))
+        except Exception as e:
+            # logger >> f"{self.__name} EXCEPTION\n{e}"
+            return -1
+
+    def get_child_at_index(self, index):
+        # logger = lldb.formatters.Logger.Logger()
+        # logger >> f"{self.__name}.Retrieving child " + str(index)
+        if index < 0:
+            return None
+        if index >= self.num_children():
+            return None
+        try:
+            offset = index
+            return self.items.CreateChildAtOffset("[" + str(index) + "]", offset, self.data_type)
+        except Exception as e:
+            # logger >> f"{self.__name} EXCEPTION\n{e}"
+            return None
+
+    def update(self):
+        # logger = lldb.formatters.Logger.Logger()
+        # logger >> f"{self.__name}.update"
+        try:
+            self.header = self.valobj.GetChildMemberWithName("header")
+            self.data_size_bytes = self.header.GetChildMemberWithName("sizeBytes").GetValueAsUnsigned()
+            self.data_capacity_bytes = self.header.GetChildMemberWithName("capacityBytes").GetValueAsUnsigned()
+
+            target = lldb.debugger.GetSelectedTarget()
+            header_ptr = self.header.GetValueAsUnsigned()
+            self.data_type = target.FindFirstType("char")
+            self.items = self.valobj.CreateValueFromAddress("items",  header_ptr + self.header_size, self.data_type)
+            self.data_size = self.data_size_bytes
+            self.data_capacity = self.data_capacity_bytes
+            # logger >> f"{self.__name}.size_bytes = {self.data_size_bytes} capacity_bytes = {self.data_capacity_bytes}"
+            # logger >> f"{self.__name}.size = {self.data_size} capacity = {self.data_capacity}"
+            # logger >> f"{self.__name}.data_type = {self.data_type}"
+        except Exception as e:
+            # logger >> f"{self.__name} EXCEPTION\n{e}"
+            pass
+
+    def has_children(self):
+        # logger = lldb.formatters.Logger.Logger()
+        # logger >> f"{self.__name}.has_children"
+        return True
+    
+    def find_buffer_header_size(self):
+        target = lldb.debugger.GetSelectedTarget()
+        # Find the type by name
+        type = target.FindFirstType("SC::SegmentHeader")
+        return type.GetByteSize()
+
+
+def buffer_SummaryProvider(valobj, dict):
+    # logger = lldb.formatters.Logger.Logger()
+    raw = valobj.GetNonSyntheticValue()
+    prov = buffer_SynthProvider(raw, None, "buffer_SummaryProvider")
+    return f"size={prov.num_children()} capacity={prov.data_capacity}"
+
+
 def string_SummaryProvider(valobj, dict):
-    logger = lldb.formatters.Logger.Logger()
+    # logger = lldb.formatters.Logger.Logger()
     try:
         encoding = valobj.GetChildMemberWithName("encoding")
         encoding_value = encoding.GetValueAsUnsigned()
@@ -150,17 +238,38 @@ def string_SummaryProvider(valobj, dict):
         else:
             return "<error: corrupted encoding tag>"
     except Exception as e:
-        pass
         # logger >> f"string_SummaryProvider EXCEPTION {str(e)}"
+        pass
     return '""'
 
 
 # Add your CustomVector class type here
 def __lldb_init_module(debugger, internal_dict):
     lldb.formatters.Logger._lldb_formatters_debug_level = 2
-    debugger.HandleCommand('type summary add -F SCLLDB.vector_SummaryProvider -e -x "^(SC::)Vector<.+>$"')
+
+    ###########################################################################################################
+    # Buffers
+    ###########################################################################################################
+    # SmallBuffer must be registered BEFORE Buffer in order for the synthetic provider to be matched first
+    debugger.HandleCommand('type synthetic add -l SCLLDB.buffer_SynthProvider -x "^(SC::)SmallBuffer<.+>$"')
+    debugger.HandleCommand('type summary add -F SCLLDB.buffer_SummaryProvider -e -x "^(SC::)SmallBuffer<.+>$"')
+
+    debugger.HandleCommand('type synthetic add -l SCLLDB.buffer_SynthProvider -x "^(SC::)Buffer$"')
+    debugger.HandleCommand('type summary add -F SCLLDB.buffer_SummaryProvider -e -x "^(SC::)Buffer$"')
+
+    ###########################################################################################################
+    # Vectors
+    ###########################################################################################################
+    # SmallVector must be registered BEFORE Vector in order for the synthetic provider to be matched first
+    debugger.HandleCommand('type synthetic add -l SCLLDB.vector_SynthProvider -x "^(SC::)SmallVector<.+,.+>$"')
     debugger.HandleCommand('type summary add -F SCLLDB.vector_SummaryProvider -e -x "^(SC::)SmallVector<.+,.+>$"')
-    debugger.HandleCommand('type summary add -F SCLLDB.string_SummaryProvider -e -x "^(SC::)String$"')
-    debugger.HandleCommand('type summary add -F SCLLDB.string_SummaryProvider -e -x "^(SC::)SmallString<.+>$"')
-    debugger.HandleCommand('type summary add -F SCLLDB.string_SummaryProvider -e -x "^(SC::)StringView$"')
+
     debugger.HandleCommand('type synthetic add -l SCLLDB.vector_SynthProvider -x "^(SC::)Vector<.+>$"')
+    debugger.HandleCommand('type summary add -F SCLLDB.vector_SummaryProvider -e -x "^(SC::)Vector<.+>$"')
+
+    ###########################################################################################################
+    # Strings
+    ###########################################################################################################
+    debugger.HandleCommand('type summary add -F SCLLDB.string_SummaryProvider -e -x "^(SC::)SmallString<.+>$"')
+    debugger.HandleCommand('type summary add -F SCLLDB.string_SummaryProvider -e -x "^(SC::)String$"')
+    debugger.HandleCommand('type summary add -F SCLLDB.string_SummaryProvider -e -x "^(SC::)StringView$"')

@@ -1,5 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="SC::Buffer">
+    <DisplayString>{ header }</DisplayString>
+    <Expand>
+      <ExpandedItem>*header</ExpandedItem>
+      <ArrayItems>
+        <Size>header->sizeBytes</Size>
+        <ValuePointer>((char*)header)+sizeof(SC::SegmentHeader)</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="SC::SmallBuffer&lt;*&gt;">
+    <DisplayString>{*(SC::Buffer*)this}</DisplayString>
+    <Expand>
+      <ExpandedItem>*(SC::Buffer*)this</ExpandedItem>
+    </Expand>
+  </Type>
   <Type Name="SC::SegmentItems&lt;*&gt;">
     <Intrinsic Name="size" Expression="sizeBytes / sizeof($T1)" />
     <Intrinsic Name="capacity" Expression="capacityBytes / sizeof($T1)" />
