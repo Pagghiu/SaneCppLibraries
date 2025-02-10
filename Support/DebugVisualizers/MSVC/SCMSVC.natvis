@@ -53,16 +53,16 @@
     </Expand>
   </Type>
   <Type Name="SC::String">
-    <DisplayString Condition="encoding==StringEncoding::Utf16">{data.items,su}</DisplayString>
-    <DisplayString>{data.items,s8}</DisplayString>
-    <StringView Condition="encoding==StringEncoding::Utf16">data.items,su</StringView>
-    <StringView>data.items,s8</StringView>
+    <DisplayString Condition="encoding==StringEncoding::Utf16">{((char*)data.header)+sizeof(SC::SegmentHeader),su}</DisplayString>
+    <DisplayString>{((char*)data.header)+sizeof(SC::SegmentHeader),s8}</DisplayString>
+    <StringView Condition="encoding==StringEncoding::Utf16">((char*)data.header)+sizeof(SC::SegmentHeader),su</StringView>
+    <StringView>((char*)data.header)+sizeof(SC::SegmentHeader),s8</StringView>
   </Type>
   <Type Name="SC::SmallString&lt;*&gt;">
-    <DisplayString Condition="encoding==StringEncoding::Utf16">{data.items,su}</DisplayString>
-    <DisplayString>{data.items,s8}</DisplayString>
-    <StringView Condition="encoding==StringEncoding::Utf16">data.items,su</StringView>
-    <StringView>data.items,s8</StringView>
+    <DisplayString Condition="encoding==StringEncoding::Utf16">{((char*)data.header)+sizeof(SC::SegmentHeader),su}</DisplayString>
+    <DisplayString>{((char*)data.header)+sizeof(SC::SegmentHeader),s8}</DisplayString>
+    <StringView Condition="encoding==StringEncoding::Utf16">((char*)data.header)+sizeof(SC::SegmentHeader),su</StringView>
+    <StringView>((char*)data.header)+sizeof(SC::SegmentHeader),s8</StringView>
   </Type>
   <Type Name="SC::StringView">
     <DisplayString Condition="encoding==StringEncoding::Utf16">{text,[textSizeInBytes/2]su}</DisplayString>

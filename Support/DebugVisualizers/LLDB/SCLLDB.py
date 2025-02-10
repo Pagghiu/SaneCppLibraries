@@ -193,9 +193,9 @@ def string_SummaryProvider(valobj, dict):
             data = valobj.GetChildMemberWithName("text").GetPointeeData(0, data_size)
         else:            
             data = valobj.GetChildMemberWithName("data").GetNonSyntheticValue()
-            prov = vector_SynthProvider(data, None, "string_SummaryProvider")
+            prov = buffer_SynthProvider(data, None, "string_SummaryProvider")
             prov.update()
-            items = data.GetChildMemberWithName("items")
+            items = prov.items
             if prov.data_size == 0:
                 return '""'
             # Remove null terminator
@@ -204,7 +204,7 @@ def string_SummaryProvider(valobj, dict):
                 data_size = data_size - 1
             else:
                 data_size = data_size - 2
-            data = items.GetPointeeData(0, data_size)
+            data = items.AddressOf().GetPointeeData(0, data_size)
         error = lldb.SBError()
 
         if encoding_value == 0 or encoding_value == 1: # ascii or utf8
