@@ -51,7 +51,7 @@ SC::Result SC::HttpWebServer::Internal::readFile(StringView directory, HttpReque
         SC_TRY(fileSystem.getFileStat(url, fileStat));
         StringView name, extension;
         SC_TRY(Path::parseNameExtension(url, name, extension));
-        Vector<char> data;
+        Buffer data;
         SC_TRY(fileSystem.read(url, data));
         SC_TRY(response.startResponse(200));
         SC_TRY(response.addHeader("Connection", "Closed"));

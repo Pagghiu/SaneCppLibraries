@@ -47,7 +47,7 @@ struct SC::detail::FileDescriptorDefinition
 //! @addtogroup group_file
 //! @{
 
-/// @brief File Descriptor (use SC::File to open and use it with strings and containers).
+/// @brief File Descriptor (use SC::File to open and use it with strings and buffers).
 struct SC::FileDescriptor : public SC::UniqueHandle<SC::detail::FileDescriptorDefinition>
 {
     using UniqueHandle::UniqueHandle;

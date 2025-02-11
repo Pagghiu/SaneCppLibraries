@@ -8,13 +8,11 @@ namespace SC
 {
 struct Buffer;
 struct String;
-template <typename T>
-struct Vector;
 } // namespace SC
 //! @addtogroup group_file
 //! @{
 
-/// @brief Wraps a SC::FileDescriptor to open it and use strings / containers.
+/// @brief Wraps a SC::FileDescriptor to open it and use strings / buffers.
 /// Example usage:
 /// \snippet Libraries/File/Tests/FileTest.cpp FileSnippet
 struct SC::File
@@ -56,18 +54,6 @@ struct SC::File
     ///        It works also for non-seekable file descriptors (stdout / in / err).
     /// @param destination A destination buffer to write to (it will be resized as needed)
     /// @return Valid result if read succeeded until EOF
-    [[nodiscard]] Result readUntilEOF(Vector<char>& destination);
-
-    /// @brief Reads into a given dynamic buffer until End of File (EOF) is signaled.
-    ///        It works also for non-seekable file descriptors (stdout / in / err).
-    /// @param destination A destination buffer to write to (it will be resized as needed)
-    /// @return Valid result if read succeeded until EOF
-    [[nodiscard]] Result readUntilEOF(Vector<uint8_t>& destination);
-
-    /// @brief Reads into a given dynamic buffer until End of File (EOF) is signaled.
-    ///        It works also for non-seekable file descriptors (stdout / in / err).
-    /// @param destination A destination buffer to write to (it will be resized as needed)
-    /// @return Valid result if read succeeded until EOF
     [[nodiscard]] Result readUntilEOF(Buffer& destination);
 
     /// @brief Reads into a given string until End of File (EOF) is signaled
@@ -79,8 +65,6 @@ struct SC::File
   private:
     struct Internal;
     struct ReadResult;
-    template <typename T>
-    Result readUntilEOFTemplate(Vector<T>& destination);
     Result readUntilEOFTemplate(Buffer& destination);
 };
 

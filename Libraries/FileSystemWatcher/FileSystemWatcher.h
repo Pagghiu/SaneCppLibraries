@@ -3,9 +3,7 @@
 #pragma once
 
 #include "../Async/Async.h" // AsyncLoopWakeUp
-#include "../Containers/Array.h"
 #include "../Containers/IntrusiveDoubleLinkedList.h"
-#include "../Containers/Vector.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Result.h"
@@ -69,8 +67,8 @@ struct SC::FileSystemWatcher
         static constexpr int MaxChangesBufferSize = 1024;
         static constexpr int Windows =
             MaxChangesBufferSize + sizeof(void*) + sizeof(FileDescriptor) + sizeof(AsyncFilePoll);
-        static constexpr int Apple = sizeof(void*);
-        static constexpr int Linux = sizeof(Array<int64_t, MaxNumberOfSubdirs>) + sizeof(Vector<char>) + sizeof(void*);
+        static constexpr int Apple   = sizeof(void*);
+        static constexpr int Linux   = 1048;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);

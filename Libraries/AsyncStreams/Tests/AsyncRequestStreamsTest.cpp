@@ -5,6 +5,7 @@
 #include "../../Async/Async.h"
 #include "../../AsyncStreams/AsyncStreams.h"
 #include "../../AsyncStreams/ZLibTransformStreams.h"
+#include "../../Containers/Vector.h"
 #include "../../File/File.h"
 #include "../../FileSystem/FileSystem.h"
 #include "../../FileSystem/Path.h"
@@ -159,7 +160,7 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     SC_TEST_EXPECT(readDescriptor.close());
 
     // Final Check
-    Vector<char> writableData;
+    Buffer writableData;
     SC_TEST_EXPECT(fs.read(writeablePath.view(), writableData));
 
     Span<const uint64_t> writtenData = writableData.toSpanConst().reinterpret_as_array_of<const uint64_t>();
@@ -336,7 +337,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     SC_TEST_EXPECT(not client[1].isValid());
 
     // Check written file content against source file
-    Vector<char> destination;
+    Buffer destination;
     SC_TEST_EXPECT(destination.reserve(source.size() * sizeof(uint64_t)));
     SC_TEST_EXPECT(fs.read("destination.txt", destination));
     SC_TEST_EXPECT(destination.size() == source.size() * sizeof(uint64_t));

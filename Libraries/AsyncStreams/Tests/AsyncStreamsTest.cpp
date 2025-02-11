@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 #include "../../AsyncStreams/AsyncStreams.h"
 #include "../../Async/Async.h"
+#include "../../Containers/Vector.h"
 #include "../../FileSystem/FileSystem.h"
 #include "../../FileSystem/Path.h"
 #include "../../Foundation/Buffer.h"

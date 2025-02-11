@@ -3,7 +3,6 @@
 #pragma once
 
 #include "../Containers/IntrusiveDoubleLinkedList.h"
-#include "../Containers/Vector.h"
 #include "../File/FileDescriptor.h"
 #include "../Strings/String.h"
 #include "ProcessDescriptor.h"
@@ -76,7 +75,7 @@ struct SC::Process
         StdStream(String& externalString) { operation = Operation::String; string = &externalString;}
 
         /// @brief Read the process standard output/error into the given Vector
-        StdStream(Vector<char>& externalVector) { operation = Operation::Vector; vector = &externalVector; }
+        StdStream(Buffer& externalBuffer) { operation = Operation::Vector; buffer = &externalBuffer; }
         // clang-format on
 
         /// @brief Redirects child process standard output/error to a given file descriptor
@@ -119,8 +118,8 @@ struct SC::Process
         Span<const char> readableSpan;
         Span<char>       writableSpan;
 
-        String*       string;
-        Vector<char>* vector;
+        String* string;
+        Buffer* buffer;
 
         FileDescriptor::Handle fileDescriptor;
 

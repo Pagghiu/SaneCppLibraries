@@ -58,21 +58,6 @@ SC::Result SC::FileDescriptor::write(Span<const uint8_t> data)
 //-------------------------------------------------------------------------------------------------------
 SC::Result SC::File::open(StringView path, OpenMode mode) { return open(path, mode, OpenOptions()); }
 
-template <typename T>
-SC::Result SC::File::readUntilEOFTemplate(Vector<T>& destination)
-{
-    T buffer[1024];
-    SC_TRY(fd.isValid());
-    ReadResult             readResult;
-    FileDescriptor::Handle fileDescriptor;
-    SC_TRY(fd.get(fileDescriptor, Result::Error("FileDescriptor::readAppend - Invalid Handle")));
-    while (not readResult.isEOF)
-    {
-        SC_TRY(Internal::readAppend<T>(fileDescriptor, destination, {buffer, sizeof(buffer)}, readResult));
-    }
-    return Result(true);
-}
-
 SC::Result SC::File::readUntilEOFTemplate(Buffer& destination)
 {
     char buffer[1024];
@@ -86,10 +71,6 @@ SC::Result SC::File::readUntilEOFTemplate(Buffer& destination)
     }
     return Result(true);
 }
-
-SC::Result SC::File::readUntilEOF(Vector<char>& destination) { return readUntilEOFTemplate(destination); }
-
-SC::Result SC::File::readUntilEOF(Vector<uint8_t>& destination) { return readUntilEOFTemplate(destination); }
 
 SC::Result SC::File::readUntilEOF(Buffer& destination) { return readUntilEOFTemplate(destination); }
 

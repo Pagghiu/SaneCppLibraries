@@ -167,9 +167,9 @@ struct SC::SerializationExampleModel
 
     Result loadFromBinaryFile(const StringView fileName)
     {
-        Vector<uint8_t> buffer;
+        Buffer buffer;
         SC_TRY(FileSystem().read(fileName, buffer));
-        return loadFromBinary(buffer.toSpanConst());
+        return loadFromBinary(buffer.toSpanConst().reinterpret_as_array_of<const uint8_t>());
     }
 
     Result saveToJSONFile(StringView jsonPath)

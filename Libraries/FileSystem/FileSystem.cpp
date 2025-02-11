@@ -108,17 +108,7 @@ SC::Result SC::FileSystem::write(StringView path, Span<const uint8_t> data)
     return write(path, {reinterpret_cast<const char*>(data.data()), data.sizeInBytes()});
 }
 
-SC::Result SC::FileSystem::read(StringView path, Vector<char>& data)
-{
-    StringView encodedPath;
-    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
-    FileDescriptor fd;
-    File           file(fd);
-    SC_TRY(file.open(encodedPath, File::ReadOnly));
-    return file.readUntilEOF(data);
-}
-
-SC::Result SC::FileSystem::read(StringView path, Vector<uint8_t>& data)
+SC::Result SC::FileSystem::read(StringView path, Buffer& data)
 {
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));

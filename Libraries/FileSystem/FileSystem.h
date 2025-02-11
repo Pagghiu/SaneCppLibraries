@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Containers/Vector.h"
+#include "../Foundation/Buffer.h"
 #include "../Foundation/Result.h"
 #include "../Strings/String.h"
 #include "../Time/Time.h"
@@ -269,13 +269,12 @@ struct SC::FileSystem
     [[nodiscard]] Result write(StringView file, Span<const char> data);
     [[nodiscard]] Result write(StringView file, Span<const uint8_t> data);
 
-    /// @brief Reads contents of a file into a SC::Vector buffer
+    /// @brief Reads contents of a file into a SC::Buffer
     /// @param file Path to the file to read
     /// @param[out] data Destination buffer that will receive data
     /// @return Valid Result if file was fully read successfully
     /// @see write (for an usage example)
-    [[nodiscard]] Result read(StringView file, Vector<char>& data);
-    [[nodiscard]] Result read(StringView file, Vector<uint8_t>& data);
+    [[nodiscard]] Result read(StringView file, Buffer& data);
 
     /// @brief Replace the entire content of a file with the provided StringView
     /// @param file Path to the file that is meant to be written

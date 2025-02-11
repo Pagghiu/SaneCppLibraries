@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Process.h"
-#include "../Containers/Vector.h"
 #include "../File/File.h"
 #include "../Strings/StringConverter.h"
 
@@ -168,7 +167,7 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
     case StdStream::Operation::ExternalPipe: break;
     case StdStream::Operation::FileDescriptor: break;
     case StdStream::Operation::Vector: {
-        SC_TRY(stdinPipe.writePipe.write(stdInput.vector->toSpan()));
+        SC_TRY(stdinPipe.writePipe.write(stdInput.buffer->toSpan()));
         SC_TRY(stdinPipe.writePipe.close());
     }
     break;
@@ -197,7 +196,7 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         case StdStream::Operation::ExternalPipe: break;
         case StdStream::Operation::FileDescriptor: break;
         case StdStream::Operation::Vector: {
-            SC_TRY(File(pipe.readPipe).readUntilEOF(*outputObject.vector));
+            SC_TRY(File(pipe.readPipe).readUntilEOF(*outputObject.buffer));
             return pipe.close();
         }
         break;

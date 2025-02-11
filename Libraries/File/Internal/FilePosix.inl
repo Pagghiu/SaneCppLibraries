@@ -1,6 +1,5 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../Containers/Vector.h"
 #include "../../Strings/String.h"
 #include "../../Strings/StringConverter.h"
 #include "../File.h"
