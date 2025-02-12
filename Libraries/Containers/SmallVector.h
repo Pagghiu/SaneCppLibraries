@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Containers/Array.h"
 #include "../Containers/Vector.h"
 
 namespace SC
@@ -25,63 +24,21 @@ struct SmallVector;
 template <typename T, int N>
 struct SC::SmallVector : public Vector<T>
 {
-    using SegmentHeader = Internal::SegmentHeader;
-    Array<T, N> buffer;
-    SmallVector()
-    {
-        SC_COMPILER_WARNING_PUSH_OFFSETOF;
-        static_assert(SC_COMPILER_OFFSETOF(SmallVector, buffer) == alignof(SegmentHeader), "Wrong Alignment");
-        SC_COMPILER_WARNING_POP;
-        init();
-    }
-    SmallVector(SmallVector&& other)
-    {
-        init();
-        Vector<T>::operator=(forward<Vector<T>>(other));
-    }
-    SmallVector(const SmallVector& other)
-    {
-        init();
-        Vector<T>::operator=(other);
-    }
-    SmallVector& operator=(SmallVector&& other)
-    {
-        Vector<T>::operator=(forward<Vector<T>>(other));
-        return *this;
-    }
-    SmallVector& operator=(const SmallVector& other)
-    {
-        Vector<T>::operator=(other);
-        return *this;
-    }
+    // clang-format off
+    SmallVector() : Vector<T>(inlineHeader, N * sizeof(T)) {}
+    SmallVector(const Vector<T>& other) : SmallVector() { Vector<T>::operator=(other); }
+    SmallVector(Vector<T>&& other) : SmallVector() { Vector<T>::operator=(move(other)); }
+    Vector<T>& operator=(const Vector<T>& other) { return Vector<T>::operator=(other); }
+    Vector<T>& operator=(Vector<T>&& other) { return Vector<T>::operator=(move(other)); }
 
-    SmallVector(Vector<T>&& other)
-    {
-        init();
-        Vector<T>::operator=(forward<Vector<T>>(other));
-    }
-    SmallVector(const Vector<T>& other)
-    {
-        init();
-        Vector<T>::operator=(other);
-    }
-    SmallVector& operator=(Vector<T>&& other)
-    {
-        Vector<T>::operator=(forward<Vector<T>>(other));
-        return *this;
-    }
-    SmallVector& operator=(const Vector<T>& other)
-    {
-        Vector<T>::operator=(other);
-        return *this;
-    }
+    SmallVector(const SmallVector& other) : SmallVector() { Vector<T>::operator=(other); }
+    SmallVector(SmallVector&& other) : SmallVector() { Vector<T>::operator=(move(other)); }
+    SmallVector& operator=(const SmallVector& other) { Vector<T>::operator=(other); return *this; }
+    SmallVector& operator=(SmallVector&& other) { Vector<T>::operator=(move(other)); return *this; }
+    // clang-format on
 
   private:
-    void init()
-    {
-        SegmentHeader* header = SegmentHeader::getSegmentHeader(buffer.items);
-        header->isSmallVector = true;
-        Vector<T>::items      = buffer.items;
-    }
+    SegmentHeader inlineHeader;
+    char          inlineBuffer[N * sizeof(T)];
 };
 //! @}

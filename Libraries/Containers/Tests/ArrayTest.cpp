@@ -3,6 +3,7 @@
 #include "../../Containers/Array.h"
 #include "../../Algorithms/AlgorithmBubbleSort.h"
 #include "../../Containers/Vector.h"
+#include "../../Strings/String.h"
 #include "../../Testing/Testing.h"
 
 namespace SC
@@ -17,7 +18,55 @@ struct SC::ArrayTest : public SC::TestCase
         using namespace SC;
 
         const StringView testString("Ciao");
+        if (test_section("basic"))
+        {
+            Array<String, 2> strings;
+            SC_TEST_EXPECT(strings.resize(2, "ASDF"));
+            SC_TEST_EXPECT(strings[0] == "ASDF");
+            SC_TEST_EXPECT(strings[1] == "ASDF");
+            strings.front() = "ASDF1";
+            strings.back()  = "ASDF2";
+            Array<String, 1> strings1;
+            SC_TEST_EXPECT(not strings1.assign(move(strings)));
 
+            Array<String, 4> strings2 = strings;
+            // TODO: We must disable heap allocation for Array<T, N>
+            strings.clear();
+            SC_TEST_EXPECT(strings.isEmpty());
+            SC_TEST_EXPECT(strings2[0] == "ASDF1");
+            SC_TEST_EXPECT(strings2[1] == "ASDF2");
+            Array<String, 4> strings3;
+            SC_TEST_EXPECT(strings3.append({"1234", "5678"}));
+            SC_TEST_EXPECT(strings3.size() == 2);
+            SC_TEST_EXPECT(strings3.capacity() == 4);
+            SC_TEST_EXPECT(strings3[0] == "1234");
+            SC_TEST_EXPECT(strings3[1] == "5678");
+            SC_TEST_EXPECT(strings3.append({"yeah", "ohyeah"}));
+            SC_TEST_EXPECT(strings3.size() == 4);
+            SC_TEST_EXPECT(strings3.capacity() == 4);
+            SC_TEST_EXPECT(strings3[0] == "1234");
+            SC_TEST_EXPECT(strings3[1] == "5678");
+            SC_TEST_EXPECT(strings3[2] == "yeah");
+            SC_TEST_EXPECT(strings3[3] == "ohyeah");
+            SC_TEST_EXPECT(strings3.resize(2));
+            SC_TEST_EXPECT(strings3.size() == 2);
+            SC_TEST_EXPECT(strings3.capacity() == 4);
+            SC_TEST_EXPECT(strings3[0] == "1234");
+            SC_TEST_EXPECT(strings3[1] == "5678");
+            // SC_TEST_EXPECT(strings3.shrink_to_fit());
+            SC_TEST_EXPECT(strings3.size() == 2);
+            SC_TEST_EXPECT(strings3.capacity() == 4);
+            SC_TEST_EXPECT(strings3[0] == "1234");
+            SC_TEST_EXPECT(strings3[1] == "5678");
+
+            strings3 = move(strings2);
+            SC_TEST_EXPECT(strings2.isEmpty());
+            SC_TEST_EXPECT(strings3[0] == "ASDF1");
+            SC_TEST_EXPECT(strings3[1] == "ASDF2");
+
+            SC_TEST_EXPECT(strings3.push_back("ASDF3"));
+            SC_TEST_EXPECT(strings3[2] == "ASDF3");
+        }
         if (test_section("resize"))
         {
             Array<int, 10> arr;
@@ -77,7 +126,7 @@ struct SC::ArrayTest : public SC::TestCase
             SC_TEST_EXPECT(sv == testString);
 
             Array<Vector<char>, 2> arr3;
-            SC_TEST_EXPECT(arr3.appendMove(arr));
+            SC_TEST_EXPECT(arr3.appendMove(move(arr)));
             sv = StringView({arr3.back().data(), arr3.back().size() - 1}, true, StringEncoding::Ascii);
             SC_TEST_EXPECT(sv == testString);
         }
@@ -92,7 +141,8 @@ struct SC::ArrayTest : public SC::TestCase
             size_t failedComparisons = 0;
             for (size_t idx = 0; idx < 10; ++idx)
             {
-                if (myArr2[idx] != 12)
+                auto val = myArr2[idx];
+                if (val != 12)
                 {
                     failedComparisons++;
                 }

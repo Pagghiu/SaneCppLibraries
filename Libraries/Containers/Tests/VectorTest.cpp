@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "../../Containers/Vector.h"
 #include "../../Algorithms/AlgorithmBubbleSort.h"
+#include "../../Foundation/Limits.h"
+#include "../../Strings/String.h"
 #include "../../Testing/Testing.h"
 
 namespace SC
@@ -13,6 +15,7 @@ struct SC::VectorTest : public SC::TestCase
 {
     static constexpr SC::size_t INSANE_NUMBER = SC::MaxValue();
     VectorTest(SC::TestReport& report);
+    void basicTests();
     void testClassType();
     void testBasicType();
 };
@@ -157,10 +160,171 @@ struct SC::VectorTestClass
 
 SC::VectorTest::VectorTest(SC::TestReport& report) : TestCase(report, "VectorTest")
 {
+    basicTests();
     testBasicType();
     testClassType();
 }
 
+void SC::VectorTest::basicTests()
+{
+    if (test_section("remove"))
+    {
+        Vector<String> strings;
+        SC_TEST_EXPECT(strings.append({"0", "1", "2", "3", "4", "5"}));
+        SC_TEST_EXPECT(strings[1] == "1");
+        SC_TEST_EXPECT(strings.removeAt(1));
+        SC_TEST_EXPECT(strings[1] == "2");
+        SC_TEST_EXPECT(strings.removeAt(3));
+    }
+    if (test_section("insert"))
+    {
+        Vector<String> strings;
+        // insert empty
+        SC_TEST_EXPECT(strings.insert(0, {"3"}));
+        SC_TEST_EXPECT(strings[0] == "3");
+        // insert front
+        SC_TEST_EXPECT(strings.insert(0, {"0"}));
+        SC_TEST_EXPECT(strings[0] == "0");
+        SC_TEST_EXPECT(strings[1] == "3");
+        SC_TEST_EXPECT(strings.reserve(3));
+        SC_TEST_EXPECT(strings[0] == "0");
+        SC_TEST_EXPECT(strings[1] == "3");
+        // insert end
+        SC_TEST_EXPECT(strings.insert(2, {"5"}));
+        SC_TEST_EXPECT(strings[0] == "0");
+        SC_TEST_EXPECT(strings[1] == "3");
+        SC_TEST_EXPECT(strings[2] == "5");
+        // insert one before end (no moved in elements)
+        SC_TEST_EXPECT(strings.insert(2, {"4"}));
+        SC_TEST_EXPECT(strings[0] == "0");
+        SC_TEST_EXPECT(strings[1] == "3");
+        SC_TEST_EXPECT(strings[2] == "4");
+        SC_TEST_EXPECT(strings[3] == "5");
+        // insert 3 before end (1 move assigned + 2 move constructed elements)
+        SC_TEST_EXPECT(strings.insert(1, {"1", "2"}));
+        SC_TEST_EXPECT(strings[0] == "0");
+        SC_TEST_EXPECT(strings[1] == "1");
+        SC_TEST_EXPECT(strings[2] == "2");
+        SC_TEST_EXPECT(strings[3] == "3");
+        SC_TEST_EXPECT(strings[4] == "4");
+        SC_TEST_EXPECT(strings[5] == "5");
+        SC_TEST_EXPECT(strings.size() == 6);
+        // sanity check to allow inserting zero size with no effect
+        SC_TEST_EXPECT(strings.insert(0, {}));
+        SC_TEST_EXPECT(strings.size() == 6);
+        SC_TEST_EXPECT(strings[0] == "0");
+        SC_TEST_EXPECT(strings[1] == "1");
+        SC_TEST_EXPECT(strings[2] == "2");
+        SC_TEST_EXPECT(strings[3] == "3");
+        SC_TEST_EXPECT(strings[4] == "4");
+        SC_TEST_EXPECT(strings[5] == "5");
+        // insert error outside range (after last element)
+        SC_TEST_EXPECT(not strings.insert(7, {"6"}));
+    }
+
+    if (test_section("Vector"))
+    {
+        Vector<String> strings;
+        SC_TEST_EXPECT(strings.resize(2, "ASDF"));
+        SC_TEST_EXPECT(strings[0] == "ASDF");
+        SC_TEST_EXPECT(strings[1] == "ASDF");
+        strings.front() = "ASDF1";
+        strings.back()  = "ASDF2";
+
+        Vector<String> strings2 = strings;
+        strings.clear();
+        SC_TEST_EXPECT(strings.isEmpty());
+        SC_TEST_EXPECT(strings2[0] == "ASDF1");
+        SC_TEST_EXPECT(strings2[1] == "ASDF2");
+        Vector<String> strings3;
+        SC_TEST_EXPECT(strings3.append({"1234", "5678"}));
+        SC_TEST_EXPECT(strings3.size() == 2);
+        SC_TEST_EXPECT(strings3.capacity() == 2);
+        SC_TEST_EXPECT(strings3[0] == "1234");
+        SC_TEST_EXPECT(strings3[1] == "5678");
+        SC_TEST_EXPECT(strings3.append({"yeah", "ohyeah"}));
+        SC_TEST_EXPECT(strings3.size() == 4);
+        SC_TEST_EXPECT(strings3.capacity() == 4);
+        SC_TEST_EXPECT(strings3[0] == "1234");
+        SC_TEST_EXPECT(strings3[1] == "5678");
+        SC_TEST_EXPECT(strings3[2] == "yeah");
+        SC_TEST_EXPECT(strings3[3] == "ohyeah");
+        SC_TEST_EXPECT(strings3.resize(2));
+        SC_TEST_EXPECT(strings3.size() == 2);
+        SC_TEST_EXPECT(strings3.capacity() == 4);
+        SC_TEST_EXPECT(strings3[0] == "1234");
+        SC_TEST_EXPECT(strings3[1] == "5678");
+        SC_TEST_EXPECT(strings3.shrink_to_fit());
+        SC_TEST_EXPECT(strings3.size() == 2);
+        SC_TEST_EXPECT(strings3.capacity() == 2);
+        SC_TEST_EXPECT(strings3[0] == "1234");
+        SC_TEST_EXPECT(strings3[1] == "5678");
+
+        strings3 = move(strings2);
+        SC_TEST_EXPECT(strings2.isEmpty());
+        SC_TEST_EXPECT(strings3[0] == "ASDF1");
+        SC_TEST_EXPECT(strings3[1] == "ASDF2");
+        SC_TEST_EXPECT(strings3.push_back("ASDF3"));
+        SC_TEST_EXPECT(strings3[2] == "ASDF3");
+        SC_TEST_EXPECT(strings3.push_back("ASDF4"));
+
+        String popped;
+        SC_TEST_EXPECT(strings3.pop_back(&popped));
+        SC_TEST_EXPECT(popped == "ASDF4");
+        SC_TEST_EXPECT(strings3.removeAt(1));
+        SC_TEST_EXPECT(strings3[1] == "ASDF3");
+        SC_TEST_EXPECT(strings3.pop_front(&popped));
+        SC_TEST_EXPECT(popped == "ASDF1");
+        strings3.clear();
+        SC_TEST_EXPECT(not strings3.pop_back());
+    }
+
+    if (test_section("Vector trivial"))
+    {
+        Vector<int> strings;
+        // insert empty
+        SC_TEST_EXPECT(strings.insert(0, {3}));
+        SC_TEST_EXPECT(strings[0] == 3);
+        // insert front
+        SC_TEST_EXPECT(strings.insert(0, {0}));
+        SC_TEST_EXPECT(strings[0] == 0);
+        SC_TEST_EXPECT(strings[1] == 3);
+        SC_TEST_EXPECT(strings.reserve(3));
+        SC_TEST_EXPECT(strings[0] == 0);
+        SC_TEST_EXPECT(strings[1] == 3);
+        // insert end
+        SC_TEST_EXPECT(strings.insert(2, {5}));
+        SC_TEST_EXPECT(strings[0] == 0);
+        SC_TEST_EXPECT(strings[1] == 3);
+        SC_TEST_EXPECT(strings[2] == 5);
+        // insert one before end (no moved in elements)
+        SC_TEST_EXPECT(strings.insert(2, {4}));
+        SC_TEST_EXPECT(strings[0] == 0);
+        SC_TEST_EXPECT(strings[1] == 3);
+        SC_TEST_EXPECT(strings[2] == 4);
+        SC_TEST_EXPECT(strings[3] == 5);
+        // insert 3 before end (1 move assigned + 2 move constructed elements)
+        SC_TEST_EXPECT(strings.insert(1, {1, 2}));
+        SC_TEST_EXPECT(strings[0] == 0);
+        SC_TEST_EXPECT(strings[1] == 1);
+        SC_TEST_EXPECT(strings[2] == 2);
+        SC_TEST_EXPECT(strings[3] == 3);
+        SC_TEST_EXPECT(strings[4] == 4);
+        SC_TEST_EXPECT(strings[5] == 5);
+        SC_TEST_EXPECT(strings.size() == 6);
+        // sanity check to allow inserting zero size with no effect
+        SC_TEST_EXPECT(strings.insert(0, {}));
+        SC_TEST_EXPECT(strings.size() == 6);
+        SC_TEST_EXPECT(strings[0] == 0);
+        SC_TEST_EXPECT(strings[1] == 1);
+        SC_TEST_EXPECT(strings[2] == 2);
+        SC_TEST_EXPECT(strings[3] == 3);
+        SC_TEST_EXPECT(strings[4] == 4);
+        SC_TEST_EXPECT(strings[5] == 5);
+        // insert error outside range (after last element)
+        SC_TEST_EXPECT(not strings.insert(7, {6}));
+    }
+}
 void SC::VectorTest::testClassType()
 {
     using namespace SC;
@@ -186,10 +350,12 @@ void SC::VectorTest::testClassType()
 
         vecReport.reset();
         SC_TEST_EXPECT(myVector.resize(3, VectorTestClass("Custom")));
-        SC_TEST_EXPECT(vecReport.numSequences == 5);
+        SC_TEST_EXPECT(vecReport.numSequences == 7);
         SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::CONSTRUCTOR);      // DEFAULT PARAM
         SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::MOVE_CONSTRUCTOR); // ITEM[1] CONSTRUCTOR
         SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::MOVE_CONSTRUCTOR); // ITEM[2] CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR);       // ITEM[1] MOVED_DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR);       // ITEM[2] MOVED_DESTRUCTOR
         SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::COPY_CONSTRUCTOR); // ITEM[3] COPY_CONSTRUCTOR
         // (DEFAULT PARAM)
         SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR); // DEFAULT PARAM DESTRUCTOR
@@ -221,9 +387,11 @@ void SC::VectorTest::testClassType()
         SC_TEST_EXPECT(myVector.resize(2));
         vecReport.reset();
         SC_TEST_EXPECT(myVector.shrink_to_fit());
-        SC_TEST_EXPECT(vecReport.numSequences == 2);
+        SC_TEST_EXPECT(vecReport.numSequences == 4);
         SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::MOVE_CONSTRUCTOR); // ITEM[1] CONSTRUCTOR
         SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::MOVE_CONSTRUCTOR); // ITEM[2] CONSTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR);       // ITEM[1] MOVE_DESTRUCTOR
+        SC_TEST_EXPECT(vecReport.nextOperation() == VectorTestReport::DESTRUCTOR);       // ITEM[2] MOVE_DESTRUCTOR
     }
 
     if (test_section("class_clear"))
@@ -459,7 +627,7 @@ void SC::VectorTest::testClassType()
         SC_TEST_EXPECT(vector1.push_back(VectorTestClass("1")));
 
         vector2 = move(vector1);
-        SC_TEST_EXPECT(vector1.items == nullptr);
+        SC_TEST_EXPECT(vector1.data() == nullptr);
 #ifndef __clang_analyzer__
         SC_TEST_EXPECT(vector1.size() == 0);
 #endif // not __clang_analyzer__

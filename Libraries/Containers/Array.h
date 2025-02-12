@@ -1,35 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "Internal/Segment.h"
+#include "../Containers/Vector.h" // SegmentObject
 
 namespace SC
 {
-struct ArrayAllocator;
-template <typename T, int N>
-struct Array;
-} // namespace SC
-
 //! @addtogroup group_containers
 //! @{
-struct SC::ArrayAllocator
-{
-    using SegmentHeader = Internal::SegmentHeader;
-    [[nodiscard]] static SegmentHeader* reallocate(SegmentHeader* oldHeader, size_t newSize);
-    [[nodiscard]] static SegmentHeader* allocate(SegmentHeader* oldHeader, size_t numNewBytes, void* selfPointer);
-    static void                         release(SegmentHeader* oldHeader);
-
-    template <typename T>
-    static T* getItems(SegmentHeader* header)
-    {
-        return reinterpret_cast<T*>(reinterpret_cast<char*>(header) + sizeof(SegmentHeader));
-    }
-    template <typename T>
-    static const T* getItems(const SegmentHeader* header)
-    {
-        return reinterpret_cast<const T*>(reinterpret_cast<const char*>(header) + sizeof(SegmentHeader));
-    }
-};
 
 /// @brief A contiguous sequence of elements kept inside its inline storage
 /// @tparam T Type of single element of the Array
@@ -40,215 +17,192 @@ struct SC::ArrayAllocator
 /// Trying to push or insert more than N elements will fail. @n
 /// Only up to SC::Array::size elements are valid (and `N` - `size()` are initialized).
 template <typename T, int N>
-struct SC::Array
+struct Array
 {
-  protected:
-    static_assert(N > 0, "Array must have N > 0");
-
-    SegmentItems<T> segmentHeader;
-    union
-    {
-        T items[N];
-    };
-
-    using Parent     = SegmentItems<T>;
-    using Operations = SegmentOperations<ArrayAllocator, T>;
-    template <typename, int>
-    friend struct SmallVector;
-
-  public:
     /// @brief Constructs an empty Array
-    Array();
+    Array()
+    {
+        header.sizeBytes     = 0;
+        header.capacityBytes = N * sizeof(T);
 
-    /// @brief Constructs a Array from an initializer list
-    /// @param list The initializer list that will be appended to this Array
-    Array(std::initializer_list<T> list);
+        header.isInlineBuffer           = true;
+        header.isFollowedByInlineBuffer = false;
+    }
 
-    /// @brief Destroys the Array, releasing allocated memory
-    ~Array() { Operations::destroy(&segmentHeader); }
-
-    /// @brief Copies array into this array
-    /// @param other The array to be copied
-    Array(const Array& other);
-
-    /// @brief Moves array contents into this array
-    /// @param other The array being moved
-    Array(Array&& other);
-
-    /// @brief Move assigns another array to this one. Contents of this array will be freed.
-    /// @param other The array being move assigned
-    /// @return Reference to this array
-    Array& operator=(const Array& other);
-
-    /// @brief Copy assigns another array to this one. Contents of this array will be freed.
-    /// @param other The array being copy assigned
-    /// @return Reference to this array
-    Array& operator=(Array&& other);
-
+    // clang-format off
+    Array(std::initializer_list<T> list) : Array() { SC_ASSERT_RELEASE(assign({list.begin(), list.size()})); }
+    ~Array() { ArraySegment().unsafeSetHeader(&header); }
+    Array(const Array& other) : Array() { SC_ASSERT_RELEASE(append(other.toSpanConst())); }
+    Array(Array&& other) : Array() { SC_ASSERT_RELEASE(appendMove(move(other))); }
+    Array& operator=(const Array& other) { SC_ASSERT_RELEASE(assign(other.toSpanConst())); return *this; }
+    Array& operator=(Array&& other) { SC_ASSERT_RELEASE(assign(move(other))); return *this; }
     template <int M>
-    Array(const Array<T, M>& other);
-
+    Array(const Array<T, M>& other) : Array() { SC_ASSERT_RELEASE(assign(other.toSpanConst()));}
     template <int M>
-    Array(Array<T, M>&& other);
-
+    Array(Array<T, M>&& other) : Array() { SC_ASSERT_RELEASE(assign(move(other))); }
     template <int M>
-    Array& operator=(const Array<T, M>& other);
-
+    Array& operator=(const Array<T, M>& other) { SC_ASSERT_RELEASE(assign(other.toSpanConst())); return *this; }
     template <int M>
-    Array& operator=(Array<T, M>&& other);
+    Array& operator=(Array<T, M>&& other) { SC_ASSERT_RELEASE(assign(move(other))); return *this; }
+    Array(Span<const T> span) : Array() { SC_ASSERT_RELEASE(assign(span)); }
+    template <typename U>
+    Array(Span<const U> span) : Array() { SC_ASSERT_RELEASE(assign(span)); }
+    // clang-format on
 
-    /// @brief Returns a Span wrapping the entire of current array
-    /// @return a Span wrapping the entire of current array
-    [[nodiscard]] Span<const T> toSpanConst() const SC_LANGUAGE_LIFETIME_BOUND { return Span<const T>(items, size()); }
+    /// @brief Returns content of the array in a span
+    [[nodiscard]] Span<const T> toSpanConst() const { return {data(), size()}; }
 
-    /// @brief Returns a Span wrapping the entire of current array
-    /// @return a Span wrapping the entire of current array
-    [[nodiscard]] Span<T> toSpan() SC_LANGUAGE_LIFETIME_BOUND { return Span<T>(items, size()); }
-
-    /// @brief Access item at index. Bounds checked in debug.
-    /// @param index index of the item to be accessed
-    /// @return Value at index in the array
-    [[nodiscard]] T& operator[](size_t index);
-
-    /// @brief Access item at index. Bounds checked in debug.
-    /// @param index index of the item to be accessed
-    /// @return Value at index in the array
-    [[nodiscard]] const T& operator[](size_t index) const;
+    /// @brief Returns content of the array in a span
+    [[nodiscard]] Span<T> toSpan() { return {data(), size()}; }
 
     /// @brief Copies an element in front of the Array, at position 0
-    /// @param element The element to be copied in front of the Array
-    /// @return `true` if operation succeeded
-    [[nodiscard]] bool push_front(const T& element) { return insert(0, {&element, 1}); }
-
-    /// @brief Moves an element in front of the Array, at position 0
-    /// @param element The element to be moved in front of the Array
-    /// @return `true` if operation succeeded
-    [[nodiscard]] bool push_front(T&& element) { return insertMove(0, &element, 1); }
+    [[nodiscard]] bool push_front(const T& value)
+    {
+        return invoke([&value](ArraySegment& segment) { return segment.push_front(value); });
+    }
 
     /// @brief Appends an element copying it at the end of the Array
-    /// @param element The element to be copied at the end of the Array
-    /// @return `true` if operation succeeded
-    [[nodiscard]] bool push_back(const T& element);
+    [[nodiscard]] bool push_back(const T& value)
+    {
+        return invoke([&value](ArraySegment& segment) { return segment.push_back(value); });
+    }
 
     /// @brief Appends an element moving it at the end of the Array
-    /// @param element The element to be moved at the end of the Array
-    /// @return `true` if operation succeeded
-    [[nodiscard]] bool push_back(T&& element);
+    [[nodiscard]] bool push_back(T&& value)
+    {
+        return invoke([&value](ArraySegment& segment) { return segment.push_back(move(value)); });
+    }
 
     /// @brief Removes the last element of the array
-    /// @return `true` if the operation succeeds
-    [[nodiscard]] bool pop_back();
+    /// @param removedValue The removed value will be returned if != nullptr
+    [[nodiscard]] bool pop_back(T* removedValue = nullptr)
+    {
+        return invoke([&](ArraySegment& segment) { return segment.pop_back(removedValue); });
+    }
 
     /// @brief Removes the first element of the array
-    /// @return `true` if the operation succeeds
-    [[nodiscard]] bool pop_front();
+    /// @param removedValue The removed value will be returned if != nullptr
+    [[nodiscard]] bool pop_front(T* removedValue = nullptr)
+    {
+        return invoke([&](ArraySegment& segment) { return segment.pop_front(removedValue); });
+    }
 
-    /// @brief Access the first element of the Array
-    /// @return A reference to the first element of the Array
-    [[nodiscard]] T& front();
-
-    /// @brief Access the first element of the Array
-    /// @return A reference to the first element of the Array
-    [[nodiscard]] const T& front() const;
-
-    /// @brief Access the last element of the Array
-    /// @return A reference to the last element of the Array
-    [[nodiscard]] T& back();
-
-    /// @brief Access the last element of the Array
-    /// @return A reference to the last element of the Array
-    [[nodiscard]] const T& back() const;
-
-    /// @brief Reserves memory for newCapacity elements, allocating memory if necessary.
-    /// @param newCapacity The wanted new capacity for this Array
-    /// @return `true` if memory reservation succeeded
-    [[nodiscard]] bool reserve(size_t newCapacity) { return newCapacity <= capacity(); }
+    /// @brief Reserves memory for newCapacity elements
+    [[nodiscard]] bool reserve(size_t newCapacity)
+    {
+        return invoke([newCapacity](ArraySegment& segment) { return segment.reserve(newCapacity); });
+    }
 
     /// @brief Resizes this array to newSize, preserving existing elements.
     /// @param newSize The wanted new size of the array
     /// @param value a default value that will be used for new elements inserted.
     /// @return `true` if resize succeeded
-    [[nodiscard]] bool resize(size_t newSize, const T& value = T());
+    [[nodiscard]] bool resize(size_t newSize, const T& value = T())
+    {
+        return invoke([&](ArraySegment& segment) { return segment.resize(newSize, value); });
+    }
 
-    /// @brief Resizes this array to newSize, preserving existing elements. Does not initialize the items between
-    /// size() and capacity().
-    ///         Be careful, it's up to the caller to initialize such items to avoid UB.
-    /// @param newSize The wanted new size of the array
-    /// @return `true` if resize succeeded
-    [[nodiscard]] bool resizeWithoutInitializing(size_t newSize);
+    /// @brief Resizes to newSize, preserving existing elements without inizializing newly added ones.
+    [[nodiscard]] bool resizeWithoutInitializing(size_t newSize)
+    {
+        return invoke([&](ArraySegment& segment) { return segment.resizeWithoutInitializing(newSize); });
+    }
 
-    /// @brief  Removes all elements from container, calling destructor for each of them.
-    ///         Doesn't deallocate memory (use shrink_to_fit for that)
-    void clear() { Operations::clear(SegmentItems<T>::getSegment(items)); }
-
-    /// @brief Sets size() to zero, without calling destructor on elements.
-    void clearWithoutInitializing() { (void)resizeWithoutInitializing(0); }
+    /// @brief Destroys all elements in the container, making the array empty
+    void clear()
+    {
+        call([](ArraySegment& segment) { return segment.clear(); });
+    }
 
     /// @brief This operation is a no-op on Array.
-    /// @return `true`
     [[nodiscard]] bool shrink_to_fit() { return true; }
-
-    /// @brief Check if the array is empty
-    /// @return `true` if array is empty.
-    [[nodiscard]] bool isEmpty() const { return size() == 0; }
-
-    /// @brief Gets size of the array
-    /// @return size of the array
-    [[nodiscard]] size_t size() const { return segmentHeader.size(); }
-
-    /// @brief Gets capacity of the array. Capacity is always >= size.
-    /// @return capacity of the array
-    [[nodiscard]] size_t capacity() const { return segmentHeader.capacity(); }
-
-    /// @brief Gets pointer to first element of the array
-    /// @return pointer to first element of the array
-    [[nodiscard]] T* begin() SC_LANGUAGE_LIFETIME_BOUND { return items; }
-    /// @brief Gets pointer to first element of the array
-    /// @return pointer to first element of the array
-    [[nodiscard]] const T* begin() const SC_LANGUAGE_LIFETIME_BOUND { return items; }
-    /// @brief Gets pointer to one after last element of the array
-    /// @return pointer to one after last element of the array
-    [[nodiscard]] T* end() SC_LANGUAGE_LIFETIME_BOUND { return items + size(); }
-    /// @brief Gets pointer to one after last element of the array
-    /// @return pointer to one after last element of the array
-    [[nodiscard]] const T* end() const SC_LANGUAGE_LIFETIME_BOUND { return items + size(); }
-    /// @brief Gets pointer to first element of the array
-    /// @return pointer to first element of the array
-    [[nodiscard]] T* data() SC_LANGUAGE_LIFETIME_BOUND { return items; }
-    /// @brief Gets pointer to first element of the array
-    /// @return pointer to first element of the array
-    [[nodiscard]] const T* data() const SC_LANGUAGE_LIFETIME_BOUND { return items; }
 
     /// @brief Inserts a range of items copying them at given index
     /// @param idx Index where to start inserting the range of items
-    /// @param data the range of items to copy
-    /// @return `true` if operation succeeded
-    [[nodiscard]] bool insert(size_t idx, Span<const T> data);
+    /// @param data Data that will be inserted  at index `idx` (by copy)
+    [[nodiscard]] bool insert(size_t idx, Span<const T> data)
+    {
+        return invoke([&](ArraySegment& segment) { return segment.insert(idx, data); });
+    }
 
     /// @brief Appends a range of items copying them at the end of array
-    /// @param data the range of items to copy
-    /// @return `true` if operation succeeded
-    [[nodiscard]] bool append(Span<const T> data);
-
-    /// @brief Appends a range of items copying them at the end of array
-    /// @param data the range of items to copy
-    /// @return `true` if operation succeeded
-    template <typename U>
-    [[nodiscard]] bool append(Span<const U> data);
+    [[nodiscard]] bool append(Span<const T> data)
+    {
+        return invoke([data](ArraySegment& segment) { return segment.append(data); });
+    }
 
     /// @brief Appends another array moving its contents at the end of array
-    /// @tparam U Type of the array to be move appended
-    /// @param src The array to be moved at end of array
-    /// @return `true` if operation succeeded
-    template <typename U>
-    [[nodiscard]] bool appendMove(U&& src);
+    [[nodiscard]] bool appendMove(Array&& other)
+    {
+        return invoke(
+            [&other](ArraySegment& segment)
+            {
+                ArraySegment otherSegment;
+                otherSegment.unsafeSetHeader(&other.header);
+                if (not segment.appendMove(move(otherSegment)))
+                {
+                    otherSegment.unsafeSetHeader(nullptr);
+                    return false;
+                }
+                return true;
+            });
+    }
 
-    /// @brief Check if the current array contains a given value.
-    /// @tparam U Type of the object being searched
-    /// @param value Value being searched
-    /// @param index if passed in != `nullptr`, receives index where item was found.
-    /// Only written if function returns `true`
-    /// @return `true` if the array contains the given value.
+    /// @brief Replaces contents of the array copying elements from the span
+    [[nodiscard]] bool assign(Span<const T> data)
+    {
+        return invoke([&data](ArraySegment& segment) { return segment.assign(data); });
+    }
+
+    /// @brief Replaces contents of the array moving all elements from the other array
+    template <int M>
+    [[nodiscard]] bool assign(Array<T, M>&& other)
+    {
+        return invoke(
+            [&other](ArraySegment& segment)
+            {
+                ArraySegment otherSegment;
+                otherSegment.unsafeSetHeader(&other.unsafeGetHeader());
+                if (not segment.assignMove(move(otherSegment)))
+                {
+                    otherSegment.unsafeSetHeader(nullptr);
+                    return false;
+                }
+                return true;
+            });
+    }
+
+    /// @brief Returns `true` if the array is empty
+    [[nodiscard]] bool isEmpty() const { return header.sizeBytes == 0; }
+
+    /// @brief Returns the size of the array
+    [[nodiscard]] size_t size() const { return header.sizeBytes / sizeof(T); }
+
+    /// @brief Returns the capacity of the array
+    [[nodiscard]] size_t capacity() const { return header.capacityBytes / sizeof(T); }
+
+    /// @brief Gets pointer to first element of the array (or `nullptr` if empty)
+    [[nodiscard]] const T* data() const { return header.sizeBytes > 0 ? items : nullptr; }
+
+    /// @brief Gets pointer to first element of the array (or `nullptr` if empty)
+    [[nodiscard]] T* data() { return header.sizeBytes > 0 ? items : nullptr; }
+
+    // clang-format off
+    [[nodiscard]] T*       begin() SC_LANGUAGE_LIFETIME_BOUND { return data(); }
+    [[nodiscard]] const T* begin() const SC_LANGUAGE_LIFETIME_BOUND { return data(); }
+    [[nodiscard]] T*       end() SC_LANGUAGE_LIFETIME_BOUND { return data() + size(); }
+    [[nodiscard]] const T* end() const SC_LANGUAGE_LIFETIME_BOUND { return data() + size(); }
+
+    [[nodiscard]] T& back() SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_DEBUG(not isEmpty()); return *(data() + size() - 1);}
+    [[nodiscard]] T& front() SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_DEBUG(not isEmpty()); return *data();}
+    [[nodiscard]] T& operator[](size_t idx) SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_DEBUG(idx < size()); return *(data() + idx);}
+    [[nodiscard]] const T& back() const SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_DEBUG(not isEmpty()); return *(data() + size() - 1);}
+    [[nodiscard]] const T& front() const SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_DEBUG(not isEmpty()); return *data();}
+    [[nodiscard]] const T& operator[](size_t idx) const SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_DEBUG(idx < size()); return *(data() + idx);}
+    // clang-format on
+
+    /// @brief Return `true` if array contains value, returning index of found item (if != `nullptr`)
+    /// @return `true` if the array contains the given value, if `false` index will not be written
     template <typename U>
     [[nodiscard]] bool contains(const U& value, size_t* index = nullptr) const
     {
@@ -267,328 +221,78 @@ struct SC::Array
     }
 
     /// @brief Removes an item at a given index
-    /// @param index Index where the item must be removed
-    /// @return `true` if operation succeeded (index is within bounds)
-    [[nodiscard]] bool removeAt(size_t index);
+    [[nodiscard]] bool removeAt(size_t index)
+    {
+        return invoke([=](ArraySegment& segment) { return segment.removeAt(index); });
+    }
 
-    /// @brief Removes all items matching criteria given by Lambda
-    /// @tparam Lambda Type of the functor/lambda with a `bool operator()(const T&)` operator
-    /// @param criteria The lambda/functor passed in
-    /// @return `true` if at least one item has been removed
+    /// @brief Removes all items matching criteria by Lambda / Functor with a `bool operator()(const T&)`
     template <typename Lambda>
-    [[nodiscard]] bool removeAll(Lambda&& criteria);
+    [[nodiscard]] bool removeAll(Lambda&& criteria)
+    {
+        T* itBeg = begin();
+        T* itEnd = end();
+        T* it    = Algorithms::removeIf(itBeg, itEnd, forward<Lambda>(criteria));
+
+        const size_t numBytes = static_cast<size_t>(itEnd - it) * sizeof(T);
+        const size_t offBytes = static_cast<size_t>(it - itBeg) * sizeof(T);
+        ArrayVTable::destruct(header, offBytes, numBytes);
+        header.sizeBytes -= static_cast<decltype(header.sizeBytes)>(numBytes);
+        return it != itEnd;
+    }
 
     /// @brief Removes all values equal to `value`
-    /// @tparam U Type of the Value
-    /// @param value Value to be removed
-    /// @return `true` if at least one item has been removed
     template <typename U>
-    [[nodiscard]] bool remove(const U& value);
+    [[nodiscard]] bool remove(const U& value)
+    {
+        return removeAll([&](auto& v) { return value == v; });
+    }
+
+    [[nodiscard]] SegmentHeader& unsafeGetHeader() { return header; }
 
   private:
-    [[nodiscard]] bool insertMove(size_t idx, T* src, size_t srcSize);
+    static_assert(N > 0, "Array must have N > 0");
 
-    [[nodiscard]] bool appendMove(Span<T> data);
+    template <typename Lambda>
+    auto invoke(Lambda&& lambda)
+    {
+        ArraySegment segment;
+        segment.unsafeSetHeader(&header);
+        auto res = lambda(segment);
+        segment.unsafeSetHeader(nullptr);
+        return res;
+    }
+
+    template <typename Lambda>
+    auto call(Lambda&& lambda)
+    {
+        ArraySegment segment;
+        segment.unsafeSetHeader(&header);
+        lambda(segment);
+        segment.unsafeSetHeader(nullptr);
+    }
+
+    struct ArrayVTable : public Internal::ObjectVTable<T>
+    {
+        static SegmentHeader* allocateNewHeader(size_t) { return nullptr; }
+        static SegmentHeader* reallocateExistingHeader(SegmentHeader& src, size_t newCapacityInBytes)
+        {
+            return newCapacityInBytes < sizeof(items) ? &src : nullptr;
+        }
+        static void destroyHeader(SegmentHeader&) {}
+    };
+
+    using ArraySegment = Segment<ArrayVTable>;
+
+    SegmentHeader header;
+    union
+    {
+        T items[N];
+    };
 };
+
 //! @}
 
-//-----------------------------------------------------------------------------------------------------------------------
-// Implementation details
-//-----------------------------------------------------------------------------------------------------------------------
-
-//-----------------------------------------------------------------------------------------------------------------------
-// ArrayAllocator
-//-----------------------------------------------------------------------------------------------------------------------
-
-inline SC::Internal::SegmentHeader* SC::ArrayAllocator::reallocate(SegmentHeader* oldHeader, size_t newSize)
-{
-    if (newSize <= oldHeader->sizeBytes)
-    {
-        return oldHeader;
-    }
-    return nullptr;
-}
-inline SC::Internal::SegmentHeader* SC::ArrayAllocator::allocate(SegmentHeader* oldHeader, size_t numNewBytes,
-                                                                 void* selfPointer)
-{
-    SC_COMPILER_UNUSED(numNewBytes);
-    SC_COMPILER_UNUSED(selfPointer);
-    oldHeader->initDefaults();
-    return oldHeader;
-}
-
-inline void SC::ArrayAllocator::release(SegmentHeader* oldHeader) { SC_COMPILER_UNUSED(oldHeader); }
-
-//-----------------------------------------------------------------------------------------------------------------------
-// Array<T, N>
-//-----------------------------------------------------------------------------------------------------------------------
-
-template <typename T, int N>
-SC::Array<T, N>::Array()
-{
-    static_assert(alignof(Array) == alignof(uint64_t), "Array Alignment");
-    segmentHeader.sizeBytes     = 0;
-    segmentHeader.capacityBytes = sizeof(T) * N;
-}
-
-template <typename T, int N>
-SC::Array<T, N>::Array(std::initializer_list<T> list)
-{
-    segmentHeader.capacityBytes = sizeof(T) * N;
-    const auto sz               = min(static_cast<int>(list.size()), N);
-    Parent::copyConstructMultiple(items, 0, static_cast<size_t>(sz), list.begin());
-    segmentHeader.setSize(static_cast<size_t>(sz));
-}
-
-template <typename T, int N>
-T& SC::Array<T, N>::front()
-{
-    const size_t numElements = size();
-    SC_ASSERT_RELEASE(numElements > 0);
-    return items[0];
-}
-
-template <typename T, int N>
-const T& SC::Array<T, N>::front() const
-{
-    const size_t numElements = size();
-    SC_ASSERT_RELEASE(numElements > 0);
-    return items[0];
-}
-
-template <typename T, int N>
-T& SC::Array<T, N>::back()
-{
-    const size_t numElements = size();
-    SC_ASSERT_RELEASE(numElements > 0);
-    return items[numElements - 1];
-}
-
-template <typename T, int N>
-const T& SC::Array<T, N>::back() const
-{
-    const size_t numElements = size();
-    SC_ASSERT_RELEASE(numElements > 0);
-    return items[numElements - 1];
-}
-template <typename T, int N>
-SC::Array<T, N>::Array(const Array& other)
-{
-    segmentHeader.sizeBytes     = 0;
-    segmentHeader.capacityBytes = sizeof(T) * N;
-    (void)append(other.toSpanConst());
-}
-
-template <typename T, int N>
-SC::Array<T, N>::Array(Array&& other)
-{
-    segmentHeader.sizeBytes     = 0;
-    segmentHeader.capacityBytes = sizeof(T) * N;
-    (void)appendMove(other.toSpan());
-}
-
-template <typename T, int N>
-template <int M>
-SC::Array<T, N>::Array(const Array<T, M>& other)
-{
-    static_assert(M <= N, "Unsafe operation, cannot report failure inside constructor, use append instead");
-    segmentHeader.sizeBytes     = 0;
-    segmentHeader.capacityBytes = sizeof(T) * N;
-    (void)append(other.toSpanConst());
-}
-
-template <typename T, int N>
-template <int M>
-SC::Array<T, N>::Array(Array<T, M>&& other)
-{
-    static_assert(M <= N, "Unsafe operation, cannot report failure inside constructor, use appendMove instead");
-    segmentHeader.sizeBytes     = 0;
-    segmentHeader.capacityBytes = sizeof(T) * N;
-    (void)appendMove(other.items, other.size());
-}
-
-template <typename T, int N>
-T& SC::Array<T, N>::operator[](size_t index)
-{
-    SC_ASSERT_DEBUG(index < size());
-    return items[index];
-}
-
-template <typename T, int N>
-const T& SC::Array<T, N>::operator[](size_t index) const
-{
-    SC_ASSERT_DEBUG(index < size());
-    return items[index];
-}
-
-template <typename T, int N>
-SC::Array<T, N>& SC::Array<T, N>::operator=(const Array& other)
-{
-    if (&other != this)
-    {
-        T*   oldItems = Array::items;
-        bool res      = Operations::assign(oldItems, other.items, other.size());
-        (void)res;
-        SC_ASSERT_DEBUG(res);
-    }
-    return *this;
-}
-
-template <typename T, int N>
-SC::Array<T, N>& SC::Array<T, N>::operator=(Array&& other)
-{
-    if (&other != this)
-    {
-        Operations::clear(SegmentItems<T>::getSegment(items));
-        if (appendMove(other.toSpan()))
-        {
-            Operations::clear(SegmentItems<T>::getSegment(other.items));
-        }
-    }
-    return *this;
-}
-
-template <typename T, int N>
-template <int M>
-SC::Array<T, N>& SC::Array<T, N>::operator=(const Array<T, M>& other)
-{
-    if (&other != this)
-    {
-        T*   oldItems = items;
-        bool res      = copy(oldItems, other.data(), other.size());
-        (void)res;
-        SC_ASSERT_DEBUG(res);
-    }
-    return *this;
-}
-
-template <typename T, int N>
-template <int M>
-SC::Array<T, N>& SC::Array<T, N>::operator=(Array<T, M>&& other)
-{
-    if (&other != this)
-    {
-        Array::clear();
-        if (appendMove(other.items, other.size()))
-        {
-            other.clear();
-        }
-    }
-    return *this;
-}
-
-template <typename T, int N>
-bool SC::Array<T, N>::push_back(const T& element)
-{
-    T* oldItems = items;
-    return Operations::push_back(oldItems, element);
-}
-
-template <typename T, int N>
-bool SC::Array<T, N>::push_back(T&& element)
-{
-    T* oldItems = items;
-    return Operations::push_back(oldItems, move(element));
-}
-
-template <typename T, int N>
-bool SC::Array<T, N>::pop_back()
-{
-    return Operations::pop_back(items);
-}
-
-template <typename T, int N>
-bool SC::Array<T, N>::pop_front()
-{
-    return Operations::pop_front(items);
-}
-
-template <typename T, int N>
-bool SC::Array<T, N>::resize(size_t newSize, const T& value)
-{
-    T*                    oldItems  = items;
-    static constexpr bool IsTrivial = TypeTraits::IsTriviallyCopyable<T>::value;
-    return Operations::template resizeInternal<IsTrivial, true>(oldItems, newSize, &value);
-}
-
-template <typename T, int N>
-bool SC::Array<T, N>::resizeWithoutInitializing(size_t newSize)
-{
-    T*                    oldItems  = items;
-    static constexpr bool IsTrivial = TypeTraits::IsTriviallyCopyable<T>::value;
-    return Operations::template resizeInternal<IsTrivial, false>(oldItems, newSize, nullptr);
-}
-
-template <typename T, int N>
-bool SC::Array<T, N>::insert(size_t idx, Span<const T> data)
-{
-    T* oldItems = items;
-    return Operations::template insert<true>(oldItems, idx, data.data(), data.sizeInElements());
-}
-
-template <typename T, int N>
-bool SC::Array<T, N>::append(Span<const T> data)
-{
-    T* oldItems = items;
-    return Operations::template insert<true>(oldItems, size(), data.data(), data.sizeInElements());
-}
-
-template <typename T, int N>
-template <typename U>
-bool SC::Array<T, N>::append(Span<const U> data)
-{
-    T* oldItems = items;
-    return Operations::template insert<true>(oldItems, size(), data.data(), data.sizeInElements());
-}
-
-template <typename T, int N>
-template <typename U>
-bool SC::Array<T, N>::appendMove(U&& src)
-{
-    if (appendMove({src.data(), src.size()}))
-    {
-        src.clear();
-        return true;
-    }
-    return false;
-}
-
-template <typename T, int N>
-bool SC::Array<T, N>::removeAt(size_t index)
-{
-    return Operations::removeAt(items, index);
-}
-
-template <typename T, int N>
-template <typename Lambda>
-bool SC::Array<T, N>::removeAll(Lambda&& criteria)
-{
-    return SegmentItems<T>::removeAll(items, 0, size(), forward<Lambda>(criteria));
-}
-
-template <typename T, int N>
-template <typename U>
-bool SC::Array<T, N>::remove(const U& value)
-{
-    return SegmentItems<T>::removeAll(items, 0, size(), [&](const auto& it) { return it == value; });
-}
-
-template <typename T, int N>
-bool SC::Array<T, N>::appendMove(Span<T> data)
-{
-    T* oldItems = items;
-    return Operations::template insert<false>(oldItems, size(), data.data(), data.sizeInElements());
-}
-
-template <typename T, int N>
-bool SC::Array<T, N>::insertMove(size_t idx, T* src, size_t srcSize)
-{
-    T* oldItems = items;
-    return Operations::template insert<false>(oldItems, idx, src, srcSize);
-}
-
-namespace SC
-{
 // Allows using this type across Plugin boundaries
 SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Array<char, 64>;
 SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Array<char, 128 * sizeof(native_char_t)>;
