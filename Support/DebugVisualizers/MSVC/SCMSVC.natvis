@@ -16,23 +16,17 @@
       <ExpandedItem>*(SC::Buffer*)this</ExpandedItem>
     </Expand>
   </Type>
-  <Type Name="SC::SegmentItems&lt;*&gt;">
-    <Intrinsic Name="size" Expression="sizeBytes / sizeof($T1)" />
-    <Intrinsic Name="capacity" Expression="capacityBytes / sizeof($T1)" />
-    <DisplayString>{{ size={sizeBytes / sizeof($T1)}, capacity={capacityBytes / sizeof($T1)} }}</DisplayString>
+  <Type Name="SC::Vector&lt;*&gt;">
+    <Intrinsic Name="size" Expression="header->sizeBytes / sizeof($T1)" />
+    <Intrinsic Name="capacity" Expression="header->capacityBytes / sizeof($T1)" />
+    <DisplayString>{{ size={header->sizeBytes / sizeof($T1)}, capacity={header->capacityBytes / sizeof($T1)} }}</DisplayString>
     <Expand>
       <Item Name="[size]">size()</Item>
       <Item Name="[capacity]">capacity()</Item>
-    </Expand>
-  </Type>
-  <Type Name="SC::Vector&lt;*&gt;">
-    <Intrinsic Name="getSegmentItems" Expression="(SegmentItems&lt;$T1&gt;*)((uint8_t*)items - sizeof(SegmentHeader))" />
-    <DisplayString>{ getSegmentItems() }</DisplayString>
-    <Expand>
-      <ExpandedItem>*getSegmentItems()</ExpandedItem>
+      <!-- <ExpandedItem>*header</ExpandedItem> -->
       <ArrayItems>
-        <Size>getSegmentItems()->size()</Size>
-        <ValuePointer>items</ValuePointer>
+        <Size>size()</Size>
+        <ValuePointer>($T1*)(((char*)header)+sizeof(SC::SegmentHeader))</ValuePointer>
       </ArrayItems>
     </Expand>
   </Type>
@@ -43,11 +37,11 @@
     </Expand>
   </Type>
   <Type Name="SC::Array&lt;*&gt;">
-    <DisplayString>{segmentHeader}</DisplayString>
+    <DisplayString>{header}</DisplayString>
     <Expand>
-      <ExpandedItem>segmentHeader</ExpandedItem>
+      <ExpandedItem>header</ExpandedItem>
       <ArrayItems>
-        <Size>segmentHeader.size()</Size>
+        <Size>size()</Size>
         <ValuePointer>items</ValuePointer>
       </ArrayItems>
     </Expand>

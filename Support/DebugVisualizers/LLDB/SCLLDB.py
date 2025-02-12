@@ -11,7 +11,7 @@ class vector_SynthProvider:
         self.items = None
         self.data_size = 0
         self.data_capacity = 0
-        self.segment_header_size = self.find_segment_header_size()
+        self.header_size = self.find_segment_header_size()
 
     def num_children(self):
         # logger = lldb.formatters.Logger.Logger()
@@ -53,20 +53,13 @@ class vector_SynthProvider:
         # logger = lldb.formatters.Logger.Logger()
         # logger >> f"{self.__name}.update"
         try:
-            self.items = self.valobj.GetChildMemberWithName("items")
-            items_ptr = self.items.GetValueAsUnsigned()
-            # logger >> f"items={self.items} items_ptr={items_ptr}"
-            target = lldb.debugger.GetSelectedTarget()
-            segment_header_ptr = items_ptr - self.segment_header_size
-            segment_header_type = target.FindFirstType("SC::SegmentHeader")
-            # Create a value object for the 'SegmentHeader' at the calculated address
-            segment_header_valobj = self.valobj.CreateValueFromAddress("segment_header", 
-                                                                       segment_header_ptr, 
-                                                                       segment_header_type)
-            
-            self.data_size_bytes = segment_header_valobj.GetChildMemberWithName("sizeBytes").GetValueAsUnsigned()
-            self.data_capacity_bytes = segment_header_valobj.GetChildMemberWithName("capacityBytes").GetValueAsUnsigned()
-            self.data_type = self.items.GetType().GetPointeeType()
+            self.header = self.valobj.GetChildMemberWithName("header")
+            self.data_size_bytes = self.header.GetChildMemberWithName("sizeBytes").GetValueAsUnsigned()
+            self.data_capacity_bytes = self.header.GetChildMemberWithName("capacityBytes").GetValueAsUnsigned()
+
+            header_ptr = self.header.GetValueAsUnsigned()
+            self.data_type = self.valobj.GetType().GetTemplateArgumentType(0)
+            self.items = self.valobj.CreateValueFromAddress("items",  header_ptr + self.header_size, self.data_type)
             self.item_size = self.data_type.GetByteSize()
             self.data_size = self.data_size_bytes // self.item_size
             self.data_capacity = self.data_capacity_bytes // self.item_size
