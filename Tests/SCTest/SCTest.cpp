@@ -111,6 +111,7 @@ SC::Console* globalConsole;
 int main(int argc, const char* argv[])
 {
     using namespace SC;
+    Memory::registerGlobals();
     SmallBuffer<1024 * sizeof(SC::native_char_t)> globalConsoleConversionBuffer;
     Console::tryAttachingToParentConsole();
     FileSystemDirectories directories;

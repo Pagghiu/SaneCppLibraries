@@ -50,9 +50,9 @@ $(TOOL_OUTPUT_DIR)\_Intermediates\Makefile.$(TARGET_OS).$(CONFIG).touched: $(SCT
 !endif
 
 !if "$(CONFIG)"=="Debug"
-SCTool_CONFIG_FLAGS = /D_DEBUG /Zi
+SCTool_CONFIG_FLAGS = /D_DEBUG /Zi /MTd
 !else
-SCTool_CONFIG_FLAGS = /DNDEBUG /O2
+SCTool_CONFIG_FLAGS = /DNDEBUG /O2 /MT
 !endif
 
 SCTool_COMMON_FLAGS = /I"../../.." /I"."
@@ -76,7 +76,7 @@ SCTool_DEPENDENCY_FILES=$(SCTool_OBJECT_FILES:.obj=.d)
 # Rules for compiling source files
 
 $(SCTool_INTERMEDIATE_DIR)\Tools.obj: $(SCTool_INTERMEDIATE_DIR) $(MAKEDIR)\..\..\..\Tools\Tools.cpp
-    @cl.exe $(SCTool_CXXFLAGS) /c /sourceDependencies $(SCTool_INTERMEDIATE_DIR)\Tools.json /Fd"$(SCTool_INTERMEDIATE_DIR)\$(TOOL).pdb" /Fo$@ /MD $(MAKEDIR)\..\..\..\Tools\Tools.cpp
+    @cl.exe $(SCTool_CXXFLAGS) /c /sourceDependencies $(SCTool_INTERMEDIATE_DIR)\Tools.json /Fd"$(SCTool_INTERMEDIATE_DIR)\$(TOOL).pdb" /Fo$@ $(MAKEDIR)\..\..\..\Tools\Tools.cpp
 
 $(SCTool_INTERMEDIATE_DIR)\Tools.d: $(SCTool_INTERMEDIATE_DIR)\Tools.obj
     @echo Generating dependencies for Tools.cpp
@@ -87,7 +87,7 @@ $(SCTool_INTERMEDIATE_DIR)\Tools.d: $(SCTool_INTERMEDIATE_DIR)\Tools.obj
 !endif
 
 $(SCTool_INTERMEDIATE_DIR)\$(TOOL).obj: $(SCTool_INTERMEDIATE_DIR) $(TOOL_SOURCE_DIR)\$(TOOL).cpp
-    @cl.exe $(SCTool_CXXFLAGS) /c /sourceDependencies $(SCTool_INTERMEDIATE_DIR)\$(TOOL).json /Fd"$(SCTool_INTERMEDIATE_DIR)\$(TOOL).pdb" /Fo$@ /MD $(TOOL_SOURCE_DIR)\$(TOOL).cpp
+    @cl.exe $(SCTool_CXXFLAGS) /c /sourceDependencies $(SCTool_INTERMEDIATE_DIR)\$(TOOL).json /Fd"$(SCTool_INTERMEDIATE_DIR)\$(TOOL).pdb" /Fo$@ $(TOOL_SOURCE_DIR)\$(TOOL).cpp
 
 $(SCTool_INTERMEDIATE_DIR)\$(TOOL).d: $(SCTool_INTERMEDIATE_DIR)\$(TOOL).obj
     @echo Generating dependencies for $(TOOL).cpp

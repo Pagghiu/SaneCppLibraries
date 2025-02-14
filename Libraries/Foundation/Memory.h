@@ -26,5 +26,8 @@ struct SC::Memory
     /// @brief Free memory allocated by Memory::allocate and / or reallocated by Memory::reallocate
     /// @param allocatedMemory Memory to release / deallocate
     SC_COMPILER_EXPORT static void release(void* allocatedMemory);
+
+    /// @brief Registers globals for the memory systems
+    SC_COMPILER_EXPORT static void registerGlobals();
 };
 //! @}
