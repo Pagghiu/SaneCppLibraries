@@ -696,6 +696,21 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
     return Result(true);
 }
 
+SC::Result SC::PluginRegistry::close()
+{
+    Result result(true);
+    for (size_t idx = 0; idx < getNumberOfEntries(); ++idx)
+    {
+        Result res = unloadPlugin(getIdentifierAt(idx).view());
+        if (not res)
+        {
+            // We still want to continue unload all plugins
+            result = res;
+        }
+    }
+    return result;
+}
+
 SC::Result SC::PluginRegistry::replaceDefinitions(Vector<PluginDefinition>&& definitions)
 {
     SmallVector<String, 16> librariesToUnload;

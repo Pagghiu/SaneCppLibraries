@@ -39,6 +39,9 @@
                 "default",
                 "arm64"
             ],
+            "linux": {
+                "options": {"env": {"CXX":"g++", "CC":"gcc"}}
+            },
             "problemMatcher": [
                 "$gcc"
             ],
@@ -87,6 +90,9 @@
                 "default",
                 "arm64"
             ],
+            "linux":{
+                "options": {"env": {"CXX":"g++", "CC":"gcc"}}
+            },
             "problemMatcher": [
                 "$gcc"
             ],

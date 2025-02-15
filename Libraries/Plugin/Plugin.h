@@ -220,6 +220,9 @@ struct SC::PluginDynamicLibrary
 /// @brief Holds a registry of plugins, loading and compiling them on the fly
 struct SC::PluginRegistry
 {
+    /// @brief Unregisters all plugins
+    Result close();
+
     /// @brief Appends the definitions to registry
     /// @param definitions found plugin definitions
     /// @return Valid Result if definitions have been replaced successfully
