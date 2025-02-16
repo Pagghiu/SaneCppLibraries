@@ -47,7 +47,7 @@ struct SerializationBinary
      * @endcode
     */
     template <typename T>
-    [[nodiscard]] static bool write(T& value, Vector<uint8_t>& buffer, size_t* numberOfWrites = nullptr)
+    [[nodiscard]] static bool write(T& value, Buffer& buffer, size_t* numberOfWrites = nullptr)
     {
         SerializationBinaryBufferWriter writer(buffer);
         using Writer = Serialization::SerializerBinaryReadWriteExact<SerializationBinaryBufferWriter, T>;
@@ -93,7 +93,7 @@ struct SerializationBinary
      * @endcode
     */
     template <typename T>
-    [[nodiscard]] static bool loadExact(T& value, Span<const uint8_t> buffer, size_t* numberOfReads = nullptr)
+    [[nodiscard]] static bool loadExact(T& value, Span<const char> buffer, size_t* numberOfReads = nullptr)
     {
         SerializationBinaryBufferReader bufferReader(buffer);
         using Reader = Serialization::SerializerBinaryReadWriteExact<SerializationBinaryBufferReader, T>;
@@ -140,8 +140,7 @@ struct SerializationBinary
      * @endcode
     */
     template <typename T>
-    [[nodiscard]] static bool loadVersioned(T& value, Span<const uint8_t> buffer,
-                                            Span<const Reflection::TypeInfo> schema,
+    [[nodiscard]] static bool loadVersioned(T& value, Span<const char> buffer, Span<const Reflection::TypeInfo> schema,
                                             SerializationBinaryOptions options = {}, size_t* numberOfReads = nullptr)
     {
         SerializationBinaryBufferReader readerBuffer(buffer);
@@ -161,15 +160,15 @@ struct SerializationBinary
     /// @see SerializationBinary::write
     /// @see SerializationBinary::loadVersionedWithSchema
     template <typename T>
-    [[nodiscard]] static bool writeWithSchema(T& value, Vector<uint8_t>& buffer, size_t* numberOfWrites = nullptr)
+    [[nodiscard]] static bool writeWithSchema(T& value, Buffer& buffer, size_t* numberOfWrites = nullptr)
     {
         constexpr auto     typeInfos = Reflection::Schema::template compile<T>().typeInfos;
         constexpr uint32_t numInfos  = typeInfos.size;
         static_assert(alignof(Reflection::TypeInfo) == sizeof(uint32_t), "Alignof TypeInfo");
         // Implying same endianness when reading here
-        SC_TRY(buffer.append(Span<const uint8_t>::reinterpret_bytes(&numInfos, sizeof(numInfos))));
+        SC_TRY(buffer.append(Span<const char>::reinterpret_bytes(&numInfos, sizeof(numInfos))));
         SC_TRY(buffer.append(
-            Span<const uint8_t>::reinterpret_bytes(typeInfos.values, typeInfos.size * sizeof(Reflection::TypeInfo))));
+            Span<const char>::reinterpret_bytes(typeInfos.values, typeInfos.size * sizeof(Reflection::TypeInfo))));
         return write(value, buffer, numberOfWrites);
     }
 
@@ -179,20 +178,20 @@ struct SerializationBinary
     /// @see SerializationBinary::loadVersioned
     /// @see SerializationBinary::writeWithSchema
     template <typename T>
-    [[nodiscard]] static bool loadVersionedWithSchema(T& value, Span<const uint8_t> buffer,
+    [[nodiscard]] static bool loadVersionedWithSchema(T& value, Span<const char> buffer,
                                                       SerializationBinaryOptions options       = {},
                                                       size_t*                    numberOfReads = nullptr)
     {
         uint32_t numInfos = 0;
         // Read number of type info
-        Span<const uint8_t> numInfosSlice;
+        Span<const char> numInfosSlice;
         SC_TRY(buffer.sliceStartLength(0, sizeof(numInfos), numInfosSlice));
         memcpy(&numInfos, numInfosSlice.data(), sizeof(numInfos));
 
         // Cast first part of the buffer to a Span of TypeInfo.
         // It's possible as we've been serializing it with correct alignment (currently 32 bits).
         static_assert(alignof(Reflection::TypeInfo) == sizeof(uint32_t), "Alignof TypeInfo");
-        Span<const uint8_t> typeInfos;
+        Span<const char> typeInfos;
         SC_TRY(buffer.sliceStartLength(sizeof(numInfos), numInfos * sizeof(Reflection::TypeInfo), typeInfos));
         Span<const Reflection::TypeInfo> serializedSchema =
             typeInfos.reinterpret_as_array_of<const Reflection::TypeInfo>();
@@ -200,7 +199,7 @@ struct SerializationBinary
         constexpr auto sourceSchema = Reflection::Schema::template compile<T>().typeInfos;
 
         // Get the slice of bytes where actual serialization data has been written by writeWithSchema
-        Span<const uint8_t> serializedDataSlice;
+        Span<const char> serializedDataSlice;
         SC_TRY(buffer.sliceStart(sizeof(numInfos) + numInfos * sizeof(Reflection::TypeInfo), serializedDataSlice));
         if (sourceSchema.equals(serializedSchema))
         {

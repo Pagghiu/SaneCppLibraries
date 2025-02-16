@@ -66,7 +66,7 @@ struct HotReloadSystem
     {
         SC_TRY(fileSystemWatcher.close());
         eventLoop = nullptr;
-        return Result(true);
+        return registry.close();
     }
 
     Result syncRegistry()
@@ -81,7 +81,7 @@ struct HotReloadSystem
     {
         const PluginDynamicLibrary* exampleLibrary = registry.findPlugin(identifier);
 
-        Vector<uint8_t> serializedModelState, serializedViewState;
+        Buffer serializedModelState, serializedViewState;
         if (exampleLibrary)
         {
             ISCExample* example = nullptr;

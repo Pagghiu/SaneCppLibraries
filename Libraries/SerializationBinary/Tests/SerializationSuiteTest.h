@@ -289,7 +289,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
 {
     // Used only for the test
     template <typename T>
-    [[nodiscard]] constexpr const T readPrimitive(const Vector<uint8_t>& buffer, uint32_t& index)
+    [[nodiscard]] constexpr const T readPrimitive(const Buffer& buffer, uint32_t& index)
     {
         T alignedRead;
         memcpy(&alignedRead, &buffer[index], sizeof(T));
@@ -309,7 +309,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
             PrimitiveStruct objectToSerialize;
 
             // Serialization
-            SmallVector<uint8_t, 256> buffer;
+            SmallBuffer<256> buffer;
             SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
 
             // Verification
@@ -329,7 +329,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
             memset(&deserializedObject, 0, sizeof(deserializedObject));
 
             // Serialization
-            SmallVector<uint8_t, 256> buffer;
+            SmallBuffer<256> buffer;
             SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
             SC_TEST_EXPECT(numWriteOperations == 1);
 
@@ -347,7 +347,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
             memset(&deserializedObject, 0, sizeof(deserializedObject));
 
             // Serialization
-            SmallVector<uint8_t, 256> buffer;
+            SmallBuffer<256> buffer;
             SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
             SC_TEST_EXPECT(numWriteOperations == 3);
 
@@ -368,7 +368,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
             VectorStructSimple deserializedObject;
 
             // Serialization
-            SmallVector<uint8_t, 256> buffer;
+            SmallBuffer<256> buffer;
             SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
             SC_TEST_EXPECT(numWriteOperations == 4);
 
@@ -393,7 +393,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
             VectorStructComplex deserializedObject;
 
             // Serialization
-            SmallVector<uint8_t, 256> buffer;
+            SmallBuffer<256> buffer;
             SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
             SC_TEST_EXPECT(numWriteOperations == 10);
 
@@ -421,7 +421,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
             VersionedStruct2 deserializedObject;
 
             // Serialization
-            SmallVector<uint8_t, 256> buffer;
+            SmallBuffer<256> buffer;
             SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
 
             // Deserialization
@@ -441,7 +441,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
             SC_TRUST_RESULT(objectToSerialize.points.push_back({5.0f, 6.0f}));
 
             // Serialization
-            SmallVector<uint8_t, 256> buffer;
+            SmallBuffer<256> buffer;
             SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
             SC_TEST_EXPECT(numWriteOperations == 4);
 
@@ -462,7 +462,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
             ConversionStruct2 deserializedObject;
 
             // Serialization
-            SmallVector<uint8_t, 256> buffer;
+            SmallBuffer<256> buffer;
             SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
 
             // Deserialization
@@ -485,7 +485,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
             objectToSerialize.field2 = 2;
 
             // Serialization
-            SmallVector<uint8_t, 256> buffer;
+            SmallBuffer<256> buffer;
             SC_TEST_EXPECT(SerializerWriter::write(objectToSerialize, buffer, &numWriteOperations));
             SC_TEST_EXPECT(numWriteOperations == 1);
 

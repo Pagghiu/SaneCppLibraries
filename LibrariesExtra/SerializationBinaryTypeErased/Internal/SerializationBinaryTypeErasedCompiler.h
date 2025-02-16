@@ -15,14 +15,13 @@ struct SerializationBinaryTypeErasedVectorVTable
         Yes
     };
 
-    using FunctionGetSegmentSpan      = bool (*)(Reflection::TypeInfo property, Span<uint8_t> object,
-                                            Span<uint8_t>& itemBegin);
-    using FunctionGetSegmentSpanConst = bool (*)(Reflection::TypeInfo property, Span<const uint8_t> object,
-                                                 Span<const uint8_t>& itemBegin);
+    using FunctionGetSegmentSpan = bool (*)(Reflection::TypeInfo property, Span<char> object, Span<char>& itemBegin);
+    using FunctionGetSegmentSpanConst = bool (*)(Reflection::TypeInfo property, Span<const char> object,
+                                                 Span<const char>& itemBegin);
 
-    using FunctionResize = bool (*)(Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
+    using FunctionResize = bool (*)(Span<char> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
                                     DropExcessItems dropExcessItems);
-    using FunctionResizeWithoutInitialize = bool (*)(Span<uint8_t> object, Reflection::TypeInfo property,
+    using FunctionResizeWithoutInitialize = bool (*)(Span<char> object, Reflection::TypeInfo property,
                                                      uint64_t sizeInBytes, DropExcessItems dropExcessItems);
     FunctionGetSegmentSpan          getSegmentSpan;
     FunctionGetSegmentSpanConst     getSegmentSpanConst;
@@ -47,10 +46,10 @@ struct SerializationBinaryTypeErasedArrayAccess
     using VectorVTable = SerializationBinaryTypeErasedVectorVTable;
     Span<const VectorVTable> vectorVtable;
 
-    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::TypeInfo property, Span<uint8_t> object,
-                                      Span<uint8_t>& itemBegin);
-    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::TypeInfo property, Span<const uint8_t> object,
-                                      Span<const uint8_t>& itemBegin);
+    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::TypeInfo property, Span<char> object,
+                                      Span<char>& itemBegin);
+    [[nodiscard]] bool getSegmentSpan(uint32_t linkID, Reflection::TypeInfo property, Span<const char> object,
+                                      Span<const char>& itemBegin);
 
     using DropExcessItems = VectorVTable::DropExcessItems;
     enum class Initialize
@@ -59,7 +58,7 @@ struct SerializationBinaryTypeErasedArrayAccess
         Yes
     };
 
-    bool resize(uint32_t linkID, Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
+    bool resize(uint32_t linkID, Span<char> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
                 Initialize initialize, DropExcessItems dropExcessItems);
 };
 } // namespace detail
@@ -86,13 +85,13 @@ struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
         VectorVTable vector;
         vector.resize = &resize;
         assignResizeWithoutInitialize(vector);
-        vector.getSegmentSpan      = &getSegmentSpan<uint8_t>;
-        vector.getSegmentSpanConst = &getSegmentSpan<const uint8_t>;
+        vector.getSegmentSpan      = &getSegmentSpan<char>;
+        vector.getSegmentSpanConst = &getSegmentSpan<const char>;
         vector.linkID              = builder.currentLinkID;
         return builder.vtables.vector.push_back(vector);
     }
 
-    static bool resize(Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
+    static bool resize(Span<char> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
                        VectorVTable::DropExcessItems dropExcessItems)
     {
         SC_COMPILER_UNUSED(property);
@@ -110,7 +109,7 @@ struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
         }
     }
 
-    static bool resizeWithoutInitialize(Span<uint8_t> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
+    static bool resizeWithoutInitialize(Span<char> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
                                         VectorVTable::DropExcessItems dropExcessItems)
     {
         SC_COMPILER_UNUSED(property);

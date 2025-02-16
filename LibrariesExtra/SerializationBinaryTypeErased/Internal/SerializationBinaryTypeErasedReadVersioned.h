@@ -44,7 +44,7 @@ struct SerializationBinaryTypeErasedReadVersioned
     SerializationBinaryOptions options;
 
     Span<const Reflection::TypeInfo> sinkTypes;
-    Span<uint8_t>                    sinkObject;
+    Span<char>                       sinkObject;
     Reflection::TypeInfo             sinkType;
     uint32_t                         sinkTypeIndex = 0;
 

@@ -296,6 +296,4 @@ struct Vector : public Segment<SegmentVector<T>>
 };
 //! @}
 
-// Allows using this type across Plugin boundaries
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Vector<char>;
 } // namespace SC

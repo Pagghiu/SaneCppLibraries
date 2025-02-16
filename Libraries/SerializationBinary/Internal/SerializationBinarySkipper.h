@@ -74,7 +74,7 @@ struct SerializationBinarySkipper
         uint64_t sourceNumBytes = arraySourceType.sizeInBytes;
         if (arraySourceType.type == Reflection::TypeCategory::TypeVector)
         {
-            if (not sourceObject.serializeBytes(Span<uint8_t>::reinterpret_object(sourceNumBytes)))
+            if (not sourceObject.serializeBytes(Span<char>::reinterpret_object(sourceNumBytes)))
                 return false;
         }
 

@@ -8,7 +8,7 @@
 
 namespace SC
 {
-inline Result InputText(const char* name, Vector<char>& buffer, String& str, bool& modified)
+inline Result InputText(const char* name, Buffer& buffer, String& str, bool& modified)
 {
     struct Funcs
     {
@@ -16,7 +16,7 @@ inline Result InputText(const char* name, Vector<char>& buffer, String& str, boo
         {
             if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
             {
-                Vector<char>& str = *reinterpret_cast<Vector<char>*>(data->UserData);
+                Buffer& str = *reinterpret_cast<Buffer*>(data->UserData);
                 if (not str.resize(static_cast<size_t>(data->BufSize)))
                 {
                     return 0;

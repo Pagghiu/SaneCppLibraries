@@ -23,7 +23,7 @@ struct SerializationBinaryTypeErased
     /// @param numberOfWrites If provided, will return the number of serialization operations
     /// @return `true` if the operation succeeded
     template <typename T>
-    [[nodiscard]] static bool write(const T& object, Vector<uint8_t>& buffer, size_t* numberOfWrites = nullptr)
+    [[nodiscard]] static bool write(const T& object, Buffer& buffer, size_t* numberOfWrites = nullptr)
     {
         SerializationBinaryBufferWriter         binaryBuffer(buffer);
         SerializationBinaryTypeErasedWriteExact writer;
@@ -41,7 +41,7 @@ struct SerializationBinaryTypeErased
     /// @param numberOfReads If provided, will return the number deserialization operations
     /// @return `true` if the operation succeeded
     template <typename T>
-    [[nodiscard]] static bool loadExact(T& object, Span<const uint8_t> buffer, size_t* numberOfReads = nullptr)
+    [[nodiscard]] static bool loadExact(T& object, Span<const char> buffer, size_t* numberOfReads = nullptr)
     {
         SerializationBinaryBufferReader        bufferReader(buffer);
         SerializationBinaryTypeErasedReadExact reader;
@@ -60,8 +60,7 @@ struct SerializationBinaryTypeErased
     /// @param numberOfReads If provided, will return the number deserialization operations
     /// @return `true` if deserialization succeeded
     template <typename T>
-    [[nodiscard]] static bool loadVersioned(T& object, Span<const uint8_t> buffer,
-                                            Span<const Reflection::TypeInfo> schema,
+    [[nodiscard]] static bool loadVersioned(T& object, Span<const char> buffer, Span<const Reflection::TypeInfo> schema,
                                             SerializationBinaryOptions options = {}, size_t* numberOfReads = nullptr)
     {
         SerializationBinaryTypeErasedReadVersioned loader;

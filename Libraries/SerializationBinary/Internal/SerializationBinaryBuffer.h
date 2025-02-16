@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Containers/Vector.h"
+#include "../../Foundation/Buffer.h"
 #include "../../Foundation/Span.h"
 
 namespace SC
@@ -12,10 +12,10 @@ namespace SC
 /// @brief A binary serialization bytes writer based on SerializationBinaryBuffer
 struct SerializationBinaryBufferWriter
 {
-    Vector<uint8_t>& buffer; ///< The underlying buffer holding serialization data
+    Buffer& buffer; ///< The underlying buffer holding serialization data
 
     size_t numberOfOperations = 0; ///< How many read or write operations have been issued so far
-    SerializationBinaryBufferWriter(Vector<uint8_t>& buffer) : buffer(buffer) {}
+    SerializationBinaryBufferWriter(Buffer& buffer) : buffer(buffer) {}
 
     /// @brief Write given object to buffer
     /// @param object The source object
@@ -23,12 +23,12 @@ struct SerializationBinaryBufferWriter
     /// @return `true` if write succeeded
     [[nodiscard]] bool serializeBytes(const void* object, size_t numBytes)
     {
-        return serializeBytes(Span<const uint8_t>::reinterpret_bytes(object, numBytes));
+        return serializeBytes(Span<const char>::reinterpret_bytes(object, numBytes));
     }
     /// @brief Write span of bytes to buffer
     /// @param object Span of bytes
     /// @return `true` if write succeeded
-    [[nodiscard]] bool serializeBytes(Span<const uint8_t> object)
+    [[nodiscard]] bool serializeBytes(Span<const char> object)
     {
         numberOfOperations++;
         return buffer.append(object);
@@ -38,12 +38,12 @@ struct SerializationBinaryBufferWriter
 /// @brief A binary serialization bytes reader based on SerializationBinaryBuffer
 struct SerializationBinaryBufferReader
 {
-    Span<const uint8_t> memory;
+    Span<const char> memory;
 
     size_t numberOfOperations = 0; ///< How many read or write operations have been issued so far
     size_t readPosition       = 0; ///< Current read  position in the buffer
 
-    SerializationBinaryBufferReader(Span<const uint8_t> memory) : memory(memory) {}
+    SerializationBinaryBufferReader(Span<const char> memory) : memory(memory) {}
 
     [[nodiscard]] bool positionIsAtEnd() const { return readPosition == memory.sizeInBytes(); }
 
@@ -53,13 +53,13 @@ struct SerializationBinaryBufferReader
     /// @return `true` if read succeeded
     [[nodiscard]] bool serializeBytes(void* object, size_t numBytes)
     {
-        return serializeBytes(Span<uint8_t>::reinterpret_bytes(object, numBytes));
+        return serializeBytes(Span<char>::reinterpret_bytes(object, numBytes));
     }
 
     /// @brief Read bytes into given span of memory. Updates readPosition
     /// @param object The destination span
     /// @return `true` if read succeeded
-    [[nodiscard]] bool serializeBytes(Span<uint8_t> object)
+    [[nodiscard]] bool serializeBytes(Span<char> object)
     {
         if (readPosition + object.sizeInBytes() > memory.sizeInBytes())
             return false;

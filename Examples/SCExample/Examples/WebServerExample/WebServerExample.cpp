@@ -47,7 +47,7 @@ SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::WebServerExampleViewState
 {
-    Vector<char> inputTextBuffer;
+    Buffer inputTextBuffer;
 
     bool needsRestart = false;
 };
@@ -86,12 +86,12 @@ struct SC::WebServerExampleModel
                not modelState.directory.isEmpty();
     }
 
-    Result saveToBinary(Vector<uint8_t>& modelStateBuffer)
+    Result saveToBinary(Buffer& modelStateBuffer)
     {
         return Result(SC::SerializationBinary::writeWithSchema(modelState, modelStateBuffer));
     }
 
-    Result loadFromBinary(Span<const uint8_t> modelStateSpan)
+    Result loadFromBinary(Span<const char> modelStateSpan)
     {
         return Result(SC::SerializationBinary::loadVersionedWithSchema(modelState, modelStateSpan));
     }
@@ -103,12 +103,12 @@ struct SC::WebServerExampleView
 
     Result init() { return Result(true); }
 
-    Result saveToBinary(Vector<uint8_t>& viewStateBuffer)
+    Result saveToBinary(Buffer& viewStateBuffer)
     {
         return Result(SC::SerializationBinary::writeWithSchema(viewState, viewStateBuffer));
     }
 
-    Result loadFromBinary(Span<const uint8_t> viewStateSpan)
+    Result loadFromBinary(Span<const char> viewStateSpan)
     {
         return Result(SC::SerializationBinary::loadVersionedWithSchema(viewState, viewStateSpan));
     }
@@ -186,14 +186,14 @@ struct WebServerExample : public SC::ISCExample
 
     void draw() { (void)view.draw(model); }
 
-    SC::Result serialize(SC::Vector<SC::uint8_t>& modelStateBuffer, SC::Vector<SC::uint8_t>& viewStateBuffer)
+    SC::Result serialize(SC::Buffer& modelStateBuffer, SC::Buffer& viewStateBuffer)
     {
         SC_TRY(model.saveToBinary(modelStateBuffer));
         SC_TRY(view.saveToBinary(viewStateBuffer));
         return SC::Result(true);
     }
 
-    SC::Result deserialize(SC::Span<const SC::uint8_t> modelStateBuffer, SC::Span<const SC::uint8_t> viewStateBuffer)
+    SC::Result deserialize(SC::Span<const char> modelStateBuffer, SC::Span<const char> viewStateBuffer)
     {
         SC_TRY(model.loadFromBinary(modelStateBuffer));
         SC_TRY(view.loadFromBinary(viewStateBuffer));

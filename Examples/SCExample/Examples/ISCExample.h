@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "Libraries/Foundation/Buffer.h"
 #include "Libraries/Foundation/Function.h"
 #include "Libraries/Foundation/Result.h"
 #include "Libraries/Plugin/PluginHash.h"
@@ -17,8 +18,8 @@ struct ISCExample
     Function<Result(AsyncEventLoop&)> initAsync;
     Function<Result(AsyncEventLoop&)> closeAsync;
 
-    Function<Result(Vector<uint8_t>&, Vector<uint8_t>&)>       serialize;
-    Function<Result(Span<const uint8_t>, Span<const uint8_t>)> deserialize;
+    Function<Result(Buffer&, Buffer&)>                   serialize;
+    Function<Result(Span<const char>, Span<const char>)> deserialize;
 };
 
 } // namespace SC

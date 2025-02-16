@@ -11,7 +11,7 @@ namespace detail
 [[nodiscard]] static bool tryPrimitiveConversion(const SerializationBinaryOptions& options,
                                                  const Reflection::TypeInfo&       sourceType,
                                                  SerializationBinaryBufferReader*  sourceObject,
-                                                 const Reflection::TypeInfo& sinkType, Span<uint8_t>& sinkObject);
+                                                 const Reflection::TypeInfo& sinkType, Span<char>& sinkObject);
 }
 } // namespace SC
 
@@ -28,7 +28,7 @@ bool SC::SerializationBinaryTypeErasedReadVersioned::read()
         {
             if (sinkObject.sizeInBytes() >= sourceType.sizeInBytes)
             {
-                return sourceObject->serializeBytes(Span<uint8_t>{sinkObject.data(), sourceType.sizeInBytes});
+                return sourceObject->serializeBytes(Span<char>{sinkObject.data(), sourceType.sizeInBytes});
             }
         }
         else
@@ -55,7 +55,7 @@ bool SC::SerializationBinaryTypeErasedReadVersioned::readStruct()
         return false;
     }
 
-    Span<uint8_t> structSinkObject = sinkObject;
+    Span<char> structSinkObject = sinkObject;
 
     const auto structSourceType      = sourceType;
     const auto structSourceTypeIndex = sourceTypeIndex;
@@ -108,7 +108,7 @@ bool SC::SerializationBinaryTypeErasedReadVersioned::readArrayVector()
     {
         return false;
     }
-    Span<uint8_t> arraySinkObject = sinkObject;
+    Span<char> arraySinkObject = sinkObject;
 
     const auto arraySourceType      = sourceType;
     const auto arraySourceTypeIndex = sourceTypeIndex;
@@ -119,7 +119,7 @@ bool SC::SerializationBinaryTypeErasedReadVersioned::readArrayVector()
     uint64_t sourceNumBytes = arraySourceType.sizeInBytes;
     if (arraySourceType.type == Reflection::TypeCategory::TypeVector)
     {
-        if (not sourceObject->serializeBytes(Span<uint8_t>::reinterpret_object(sourceNumBytes)))
+        if (not sourceObject->serializeBytes(Span<char>::reinterpret_object(sourceNumBytes)))
             return false;
     }
 
@@ -132,7 +132,7 @@ bool SC::SerializationBinaryTypeErasedReadVersioned::readArrayVector()
     const auto sourceItemSize = sourceTypes.data()[sourceTypeIndex].sizeInBytes;
     const auto sinkItemSize   = sinkTypes.data()[sinkTypeIndex].sizeInBytes;
 
-    Span<uint8_t> arraySinkStart;
+    Span<char> arraySinkStart;
     if (arraySinkType.type == Reflection::TypeCategory::TypeArray)
     {
         if (not arraySinkObject.sliceStartLength(0, arraySinkType.sizeInBytes, arraySinkStart))
@@ -153,7 +153,7 @@ bool SC::SerializationBinaryTypeErasedReadVersioned::readArrayVector()
     if (isPacked)
     {
         const auto minBytes = min(static_cast<uint64_t>(arraySinkStart.sizeInBytes()), sourceNumBytes);
-        if (not sourceObject->serializeBytes(Span<uint8_t>{arraySinkStart.data(), static_cast<size_t>(minBytes)}))
+        if (not sourceObject->serializeBytes(Span<char>{arraySinkStart.data(), static_cast<size_t>(minBytes)}))
             return false;
         if (sourceNumBytes > static_cast<uint64_t>(arraySinkStart.sizeInBytes()))
         {
@@ -215,7 +215,7 @@ bool SC::SerializationBinaryTypeErasedWriteExact::write()
     sourceType = sourceTypes.data()[sourceTypeIndex];
     if (sourceType.isPrimitiveType())
     {
-        Span<const uint8_t> primitiveSpan;
+        Span<const char> primitiveSpan;
         if (not sourceObject.sliceStartLength(0, sourceType.sizeInBytes, primitiveSpan))
             return false;
         if (not destination->serializeBytes(primitiveSpan))
@@ -236,14 +236,14 @@ bool SC::SerializationBinaryTypeErasedWriteExact::write()
 
 bool SC::SerializationBinaryTypeErasedWriteExact::writeStruct()
 {
-    Span<const uint8_t> structSourceRoot = sourceObject;
+    Span<const char> structSourceRoot = sourceObject;
 
     const auto structSourceType      = sourceType;
     const auto structSourceTypeIndex = sourceTypeIndex;
     if (structSourceType.structInfo.isPacked)
     {
         // Bulk Write the entire struct
-        Span<const uint8_t> structSpan;
+        Span<const char> structSpan;
         if (not sourceObject.sliceStartLength(0, structSourceType.sizeInBytes, structSpan))
             return false;
         if (not destination->serializeBytes(structSpan))
@@ -269,7 +269,7 @@ bool SC::SerializationBinaryTypeErasedWriteExact::writeStruct()
 
 bool SC::SerializationBinaryTypeErasedWriteExact::writeArrayVector()
 {
-    Span<const uint8_t> arraySpan;
+    Span<const char> arraySpan;
 
     const auto arrayProperty  = sourceType;
     const auto arrayTypeIndex = sourceTypeIndex;
@@ -285,7 +285,7 @@ bool SC::SerializationBinaryTypeErasedWriteExact::writeArrayVector()
         if (not arrayAccess.getSegmentSpan(arrayTypeIndex, arrayProperty, sourceObject, arraySpan))
             return false;
         numBytes = arraySpan.sizeInBytes();
-        if (not destination->serializeBytes(Span<const uint8_t>::reinterpret_object(numBytes)))
+        if (not destination->serializeBytes(Span<const char>::reinterpret_object(numBytes)))
             return false;
     }
     sourceTypeIndex     = arrayTypeIndex + 1;
@@ -324,7 +324,7 @@ bool SC::SerializationBinaryTypeErasedReadExact::read()
     sinkType = sinkTypes.data()[sinkTypeIndex];
     if (sinkType.isPrimitiveType())
     {
-        Span<uint8_t> primitiveSpan;
+        Span<char> primitiveSpan;
         if (not sinkObject.sliceStartLength(0, sinkType.sizeInBytes, primitiveSpan))
             return false;
         return source->serializeBytes(primitiveSpan);
@@ -343,14 +343,14 @@ bool SC::SerializationBinaryTypeErasedReadExact::read()
 
 bool SC::SerializationBinaryTypeErasedReadExact::readStruct()
 {
-    const auto    structSinkType      = sinkType;
-    const auto    structSinkTypeIndex = sinkTypeIndex;
-    Span<uint8_t> structSinkObject    = sinkObject;
+    const auto structSinkType      = sinkType;
+    const auto structSinkTypeIndex = sinkTypeIndex;
+    Span<char> structSinkObject    = sinkObject;
 
     if (structSinkType.structInfo.isPacked)
     {
         // Bulk read the entire struct
-        Span<uint8_t> structSpan;
+        Span<char> structSpan;
         if (not sinkObject.sliceStartLength(0, structSinkType.sizeInBytes, structSpan))
             return false;
         if (not source->serializeBytes(structSpan))
@@ -379,12 +379,12 @@ bool SC::SerializationBinaryTypeErasedReadExact::readArrayVector()
     const auto arraySinkType      = sinkType;
     const auto arraySinkTypeIndex = sinkTypeIndex;
     sinkTypeIndex                 = arraySinkTypeIndex + 1;
-    Span<uint8_t> arraySinkObject = sinkObject;
-    const auto    sinkItemSize    = sinkTypes.data()[sinkTypeIndex].sizeInBytes;
+    Span<char> arraySinkObject    = sinkObject;
+    const auto sinkItemSize       = sinkTypes.data()[sinkTypeIndex].sizeInBytes;
     if (sinkTypes.data()[sinkTypeIndex].hasValidLinkIndex())
         sinkTypeIndex = static_cast<uint32_t>(sinkTypes.data()[sinkTypeIndex].getLinkIndex());
-    const bool    isBulkReadable = sinkTypes.data()[sinkTypeIndex].isPrimitiveOrPackedStruct();
-    Span<uint8_t> arraySinkStart;
+    const bool isBulkReadable = sinkTypes.data()[sinkTypeIndex].isPrimitiveOrPackedStruct();
+    Span<char> arraySinkStart;
     if (arraySinkType.type == Reflection::TypeCategory::TypeArray)
     {
         if (not arraySinkObject.sliceStartLength(0, arraySinkType.sizeInBytes, arraySinkStart))
@@ -393,7 +393,7 @@ bool SC::SerializationBinaryTypeErasedReadExact::readArrayVector()
     else
     {
         uint64_t sinkNumBytes = 0;
-        if (not source->serializeBytes(Span<uint8_t>::reinterpret_object(sinkNumBytes)))
+        if (not source->serializeBytes(Span<char>::reinterpret_object(sinkNumBytes)))
             return false;
         using ArrayAccess = detail::SerializationBinaryTypeErasedArrayAccess;
         if (not arrayAccess.resize(arraySinkTypeIndex, arraySinkObject, arraySinkType, sinkNumBytes,
@@ -430,8 +430,7 @@ bool SC::SerializationBinaryTypeErasedReadExact::readArrayVector()
 
 bool SC::detail::SerializationBinaryTypeErasedArrayAccess::getSegmentSpan(uint32_t             linkID,
                                                                           Reflection::TypeInfo property,
-                                                                          Span<uint8_t>        object,
-                                                                          Span<uint8_t>&       itemBegin)
+                                                                          Span<char> object, Span<char>& itemBegin)
 {
     for (uint32_t index = 0; index < vectorVtable.sizeInBytes(); ++index)
     {
@@ -445,8 +444,8 @@ bool SC::detail::SerializationBinaryTypeErasedArrayAccess::getSegmentSpan(uint32
 
 bool SC::detail::SerializationBinaryTypeErasedArrayAccess::getSegmentSpan(uint32_t             linkID,
                                                                           Reflection::TypeInfo property,
-                                                                          Span<const uint8_t>  object,
-                                                                          Span<const uint8_t>& itemBegin)
+                                                                          Span<const char>     object,
+                                                                          Span<const char>&    itemBegin)
 {
     for (uint32_t index = 0; index < vectorVtable.sizeInBytes(); ++index)
     {
@@ -458,7 +457,7 @@ bool SC::detail::SerializationBinaryTypeErasedArrayAccess::getSegmentSpan(uint32
     return false;
 }
 
-bool SC::detail::SerializationBinaryTypeErasedArrayAccess::resize(uint32_t linkID, Span<uint8_t> object,
+bool SC::detail::SerializationBinaryTypeErasedArrayAccess::resize(uint32_t linkID, Span<char> object,
                                                                   Reflection::TypeInfo property, uint64_t sizeInBytes,
                                                                   Initialize      initialize,
                                                                   DropExcessItems dropExcessItems)
@@ -488,7 +487,7 @@ namespace SC
 {
 namespace detail
 {
-[[nodiscard]] static bool copySourceSink(Span<const uint8_t> source, Span<uint8_t> other)
+[[nodiscard]] static bool copySourceSink(Span<const char> source, Span<char> other)
 {
     if (other.sizeInBytes() >= source.sizeInBytes())
     {
@@ -499,18 +498,18 @@ namespace detail
 }
 
 template <typename SourceType, typename SinkType>
-[[nodiscard]] static bool tryWritingPrimitiveValueToSink(SourceType sourceValue, Span<uint8_t>& sinkObject)
+[[nodiscard]] static bool tryWritingPrimitiveValueToSink(SourceType sourceValue, Span<char>& sinkObject)
 {
     SinkType sourceConverted = static_cast<SinkType>(sourceValue);
-    return copySourceSink(Span<const uint8_t>::reinterpret_object(sourceConverted), sinkObject);
+    return copySourceSink(Span<const char>::reinterpret_object(sourceConverted), sinkObject);
 }
 
 template <typename T>
 [[nodiscard]] static bool tryReadPrimitiveValue(SerializationBinaryBufferReader* sourceObject,
-                                                const Reflection::TypeInfo& sinkType, Span<uint8_t>& sinkObject)
+                                                const Reflection::TypeInfo& sinkType, Span<char>& sinkObject)
 {
     T sourceValue;
-    if (not sourceObject->serializeBytes(Span<uint8_t>::reinterpret_object(sourceValue)))
+    if (not sourceObject->serializeBytes(Span<char>::reinterpret_object(sourceValue)))
         return false;
     switch (sinkType.type)
     {
@@ -540,7 +539,7 @@ template <typename T>
 [[nodiscard]] static bool tryPrimitiveConversion(const SerializationBinaryOptions& options,
                                                  const Reflection::TypeInfo&       sourceType,
                                                  SerializationBinaryBufferReader*  sourceObject,
-                                                 const Reflection::TypeInfo& sinkType, Span<uint8_t>& sinkObject)
+                                                 const Reflection::TypeInfo& sinkType, Span<char>& sinkObject)
 {
     switch (sourceType.type)
     {

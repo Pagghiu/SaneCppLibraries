@@ -148,19 +148,19 @@ struct SC::SerializationExampleModel
 {
     SerializationExampleModelState modelState;
 
-    Result saveToBinary(Vector<uint8_t>& modelStateBuffer)
+    Result saveToBinary(Buffer& modelStateBuffer)
     {
         return Result(SC::SerializationBinary::writeWithSchema(modelState, modelStateBuffer));
     }
 
-    Result loadFromBinary(Span<const uint8_t> modelStateSpan)
+    Result loadFromBinary(Span<const char> modelStateSpan)
     {
         return Result(SC::SerializationBinary::loadVersionedWithSchema(modelState, modelStateSpan));
     }
 
     Result saveToBinaryFile(const StringView fileName)
     {
-        Vector<uint8_t> buffer;
+        Buffer buffer;
         SC_TRY(saveToBinary(buffer));
         return FileSystem().write(fileName, buffer.toSpanConst());
     }
@@ -169,7 +169,7 @@ struct SC::SerializationExampleModel
     {
         Buffer buffer;
         SC_TRY(FileSystem().read(fileName, buffer));
-        return loadFromBinary(buffer.toSpanConst().reinterpret_as_array_of<const uint8_t>());
+        return loadFromBinary(buffer.toSpanConst());
     }
 
     Result saveToJSONFile(StringView jsonPath)
@@ -204,12 +204,12 @@ struct SC::SerializationExampleView
         return Result(true);
     }
 
-    Result saveToBinary(Vector<uint8_t>& viewStateBuffer)
+    Result saveToBinary(Buffer& viewStateBuffer)
     {
         return Result(SC::SerializationBinary::writeWithSchema(viewState, viewStateBuffer));
     }
 
-    Result loadFromBinary(Span<const uint8_t> viewStateSpan)
+    Result loadFromBinary(Span<const char> viewStateSpan)
     {
         return Result(SC::SerializationBinary::loadVersionedWithSchema(viewState, viewStateSpan));
     }
@@ -395,14 +395,14 @@ struct SerializationExample : public SC::ISCExample
 
     void draw() { view.draw(model); }
 
-    SC::Result serialize(SC::Vector<SC::uint8_t>& modelStateBuffer, SC::Vector<SC::uint8_t>& viewStateBuffer)
+    SC::Result serialize(SC::Buffer& modelStateBuffer, SC::Buffer& viewStateBuffer)
     {
         SC_TRY(model.saveToBinary(modelStateBuffer));
         SC_TRY(view.saveToBinary(viewStateBuffer));
         return SC::Result(true);
     }
 
-    SC::Result deserialize(SC::Span<const SC::uint8_t> modelStateBuffer, SC::Span<const SC::uint8_t> viewStateBuffer)
+    SC::Result deserialize(SC::Span<const char> modelStateBuffer, SC::Span<const char> viewStateBuffer)
     {
         SC_TRY(model.loadFromBinary(modelStateBuffer));
         SC_TRY(view.loadFromBinary(viewStateBuffer));

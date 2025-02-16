@@ -50,7 +50,7 @@ struct SerializationBinaryTypeErasedWriteExact
     Span<const Reflection::TypeInfo>       sourceTypes;
     Span<const Reflection::TypeStringView> sourceNames;
 
-    Span<const uint8_t>  sourceObject;
+    Span<const char>     sourceObject;
     uint32_t             sourceTypeIndex;
     Reflection::TypeInfo sourceType;
 
@@ -95,7 +95,7 @@ struct SerializationBinaryTypeErasedReadExact
 
     Reflection::TypeInfo sinkType;
     uint32_t             sinkTypeIndex = 0;
-    Span<uint8_t>        sinkObject;
+    Span<char>           sinkObject;
 
     detail::SerializationBinaryTypeErasedArrayAccess arrayAccess;
 };
