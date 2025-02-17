@@ -179,9 +179,10 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
 struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 {
   private:
-    io_uring_cqe* events;
-
     KernelEvents& parentKernelEvents;
+
+    io_uring_cqe*  events;
+    io_uring_cqe** eventPointers;
 
     int&      newEvents;
     const int totalNumEvents;
@@ -189,9 +190,13 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
   public:
     KernelEventsIoURing(KernelEvents& kq, AsyncKernelEvents& kernelEvents)
         : parentKernelEvents(kq), newEvents(kernelEvents.numberOfEvents),
-          totalNumEvents(static_cast<int>(kernelEvents.eventsMemory.sizeInBytes() / sizeof(events[0])))
+          totalNumEvents(static_cast<int>(kernelEvents.eventsMemory.sizeInBytes() /
+                                          (sizeof(io_uring_cqe) + sizeof(io_uring_cqe*))))
     {
-        events = reinterpret_cast<decltype(events)>(kernelEvents.eventsMemory.data());
+        // First part of events memory is dedicated to eventPointers, second part to actual events
+        eventPointers = reinterpret_cast<decltype(eventPointers)>(kernelEvents.eventsMemory.data());
+        events        = reinterpret_cast<decltype(events)>(kernelEvents.eventsMemory.data() +
+                                                    totalNumEvents * sizeof(io_uring_cqe*));
     }
 
     [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t idx)
@@ -232,7 +237,6 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         KernelQueueIoURing& kq = getKernelQueue(eventLoop);
         // Read up to totalNumEvents completions, copy them into a local array and
         // advance the ring buffer pointers to free ring slots.
-        io_uring_cqe* eventPointers[totalNumEvents];
         newEvents = globalLibURing.io_uring_peek_batch_cqe(&kq.ring, &eventPointers[0], totalNumEvents);
 
         int writeIdx = 0;
