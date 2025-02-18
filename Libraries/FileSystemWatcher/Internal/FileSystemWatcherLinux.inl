@@ -140,7 +140,7 @@ struct SC::FileSystemWatcher::Internal
         pair.nameOffset = 0;
         SC_TRY(opaque.notifyHandles.push_back(pair));
 
-        // Watch all subfolders of current directoy.
+        // Watch all subfolders of current directory.
         // TODO: We should also dynamically add / remove watched directories added after now...
         StringConverter    converter(opaque.relativePaths, StringEncoding::Utf8);
         FileSystemIterator iterator;

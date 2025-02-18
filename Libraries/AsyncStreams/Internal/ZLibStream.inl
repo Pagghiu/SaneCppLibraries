@@ -237,7 +237,7 @@ SC::Result SC::ZLibStream::finalize(Span<char>& output, bool& streamEnded)
     case Algorithm::DecompressZLib:
     case Algorithm::DecompressGZip:
     case Algorithm::DecompressDeflate:
-        // Decompression fialization
+        // Decompression finalization
         return Internal::decompressFinalize(stream, output, streamEnded);
     }
     Assert::unreachable();

@@ -25,7 +25,7 @@ struct SC::HttpWebServer
     /// @brief Release all resources allocated by this web server
     Result stopAsync();
 
-    /// @brief Serve the efile requested by this Http Client on its channel
+    /// @brief Serve the file requested by this Http Client on its channel
     /// Call this method in response to HttpServer::onRequest to serve a file
     void serveFile(HttpRequest& request, HttpResponse& response);
 

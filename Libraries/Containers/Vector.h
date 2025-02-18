@@ -117,7 +117,7 @@ struct SegmentNonTrivial
 
 // Executes operations using trivial or non trivial variations of the move/copy/construct functions.
 // Trivial check cannot be a template param of this class because it would cause Vector to need
-// the entire definition of T to declare Vector<T>, making it impossible to create "recursivee structures
+// the entire definition of T to declare Vector<T>, making it impossible to create "recursive" structures
 // like SC::Build::WriteInternal::RenderGroup (that has a "Vector<RenderGroup> children" as member )
 template <typename T>
 struct ObjectVTable

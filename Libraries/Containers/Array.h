@@ -102,7 +102,7 @@ struct Array
         return invoke([&](ArraySegment& segment) { return segment.resize(newSize, value); });
     }
 
-    /// @brief Resizes to newSize, preserving existing elements without inizializing newly added ones.
+    /// @brief Resizes to newSize, preserving existing elements without initializing newly added ones.
     [[nodiscard]] bool resizeWithoutInitializing(size_t newSize)
     {
         return invoke([&](ArraySegment& segment) { return segment.resizeWithoutInitializing(newSize); });

@@ -338,7 +338,7 @@ struct SC::ProcessEnvironment
     /// @brief Returns the total number of environment variables for current process
     [[nodiscard]] size_t size() const { return numberOfEnvironment; }
 
-    /// @brief Get the environmnent variable at given index, returning its name and value
+    /// @brief Get the environment variable at given index, returning its name and value
     /// @param index The index of the variable to retrieve (must be less than ProcessEnvironment::size())
     /// @param name The parsed name of the environment variable at requested index
     /// @param value The parsed value of the environment variable at requested index
