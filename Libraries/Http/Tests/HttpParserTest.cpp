@@ -20,8 +20,8 @@ struct SC::HttpParserTest : public SC::TestCase
 
         int numMatches[9] = {0};
 
-        size_t       length = 1;
-        Vector<char> currentField;
+        size_t length = 1;
+        Buffer currentField;
         while (true)
         {
             length              = min(length, originalString.sizeInBytes());
@@ -143,8 +143,8 @@ struct SC::HttpParserTest : public SC::TestCase
 
             int numMatches[9] = {0};
 
-            size_t       length = 1;
-            Vector<char> currentField;
+            size_t length = 1;
+            Buffer currentField;
             while (true)
             {
                 length              = min(length, originalString.sizeInBytes());
