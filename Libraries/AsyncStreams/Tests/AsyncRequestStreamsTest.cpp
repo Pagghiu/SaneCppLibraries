@@ -38,6 +38,15 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
 
         for (int i = 0; i < numTestsToRun; ++i)
         {
+            // Avoid "expression is constant" warning
+            auto host           = HostPlatform;
+            auto instructionSet = HostInstructionSet;
+            if (host == Platform::Windows and instructionSet == InstructionSet::ARM64)
+            {
+                // Can't load the system installed x86_64 zlib dll from ARM64 executable
+                continue;
+            }
+
             if (test_section("file to socket to file"))
             {
                 fileToSocketToFile();

@@ -15,6 +15,15 @@ struct SC::ZLibStreamTest : public SC::TestCase
 {
     ZLibStreamTest(SC::TestReport& report) : TestCase(report, "ZLibStreamTest")
     {
+        // Avoid "expression is constant" warning
+        auto host           = HostPlatform;
+        auto instructionSet = HostInstructionSet;
+        if (host == Platform::Windows and instructionSet == InstructionSet::ARM64)
+        {
+            // Can't load the system installed x86_64 zlib dll from ARM64 executable
+            return;
+        }
+
         if (test_section("gzip"))
         {
             // "test" compressed with gzip
