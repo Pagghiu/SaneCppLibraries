@@ -43,13 +43,15 @@ SC::Build::Configuration::Configuration()
     (void)StringBuilder(intermediatesPath).format("$(PROJECT_NAME)/{}", getStandardBuildDirectory());
 }
 
-bool SC::Build::Configuration::applyPreset(Preset newPreset, const Parameters& parameters)
+bool SC::Build::Configuration::applyPreset(const Project& project, Preset newPreset, const Parameters& parameters)
 {
-    preset = newPreset;
-    switch (preset)
+    switch (newPreset)
     {
     case Configuration::Preset::DebugCoverage:
-        compile.enableCoverage    = true;
+        if (not project.compile.enableASAN.hasBeenSet())
+        {
+            compile.enableCoverage = true;
+        }
         compile.optimizationLevel = Optimization::Debug;
         SC_TRY(compile.defines.append({"DEBUG=1"}));
         if (parameters.generator == Build::Generator::VisualStudio2022)
@@ -58,7 +60,16 @@ bool SC::Build::Configuration::applyPreset(Preset newPreset, const Parameters& p
         }
         break;
     case Configuration::Preset::Debug:
-        compile.enableASAN        = true;
+        if (not project.compile.enableASAN.hasBeenSet())
+        {
+            // VS ASAN is unsupported on ARM64 and needs manual flags / libs with ClangCL toolset
+            // It also needs paths where clang_rt.asan_*.dll exist to be manually set before debugging
+            if (parameters.generator != Generator::VisualStudio2022 and
+                parameters.generator != Generator::VisualStudio2019)
+            {
+                compile.enableASAN = true;
+            }
+        }
         compile.optimizationLevel = Optimization::Debug;
         SC_TRY(compile.defines.append({"DEBUG=1"}));
         break;
@@ -66,7 +77,7 @@ bool SC::Build::Configuration::applyPreset(Preset newPreset, const Parameters& p
         compile.optimizationLevel = Optimization::Release;
         SC_TRY(compile.defines.append({"NDEBUG=1"}));
         break;
-    case Configuration::Preset::None: break;
+    default: return false;
     }
     return true;
 }
@@ -89,7 +100,7 @@ bool SC::Build::Project::addPresetConfiguration(Configuration::Preset preset, co
     {
         SC_TRY(configuration.name.assign(configurationName));
     }
-    SC_TRY(configuration.applyPreset(preset, parameters));
+    SC_TRY(configuration.applyPreset(*this, preset, parameters));
     return configurations.push_back(configuration);
 }
 
@@ -272,6 +283,10 @@ SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<Strin
                 {
                     if (not file.mask.isEmpty())
                     {
+                        if (Path::isAbsolute(file.mask.view(), Path::AsPosix))
+                        {
+                            return Result::Error("Absolute path detected");
+                        }
                         SC_TRY(Path::append(buffer, file.mask.view(), Path::AsPosix));
                         auto* value = paths.getOrCreate(buffer);
                         SC_TRY(value != nullptr and value->insert(file));

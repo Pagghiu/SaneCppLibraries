@@ -16,6 +16,30 @@ namespace Build
 //! @addtogroup group_build
 //! @{
 struct Parameters;
+struct Project;
+
+template <typename T>
+struct Parameter
+{
+    Parameter() = default;
+    Parameter(const T& other) : value(other) {}
+    operator const T&() const { return value; }
+
+    bool hasBeenSet() const { return valueSet; }
+    void unset() { valueSet = false; }
+
+    Parameter& operator=(const T& other)
+    {
+        value    = other;
+        valueSet = true;
+        return *this;
+    }
+
+  private:
+    T    value;
+    bool valueSet = false;
+};
+
 /// @brief Build Platform (Operating System)
 struct Platform
 {
@@ -124,11 +148,11 @@ struct CompileFlags
 
     Optimization::Type optimizationLevel = Optimization::Release; ///< Optimization level
 
-    bool enableASAN       = false; ///< Enable Address Sanitizer
-    bool enableRTTI       = false; ///< Enable C++ Runtime Type Identification
-    bool enableExceptions = false; ///< Enable C++ Exceptions
-    bool enableStdCpp     = false; ///< Enable and include C++ Standard Library
-    bool enableCoverage   = false; ///< Enables code coverage instrumentation
+    Parameter<bool> enableASAN       = false; ///< Enable Address Sanitizer
+    Parameter<bool> enableRTTI       = false; ///< Enable C++ Runtime Type Identification
+    Parameter<bool> enableExceptions = false; ///< Enable C++ Exceptions
+    Parameter<bool> enableStdCpp     = false; ///< Enable and include C++ Standard Library
+    Parameter<bool> enableCoverage   = false; ///< Enables code coverage instrumentation
 };
 
 /// @brief Link flags (library paths, libraries to link, etc.)
@@ -140,9 +164,8 @@ struct LinkFlags
     Vector<String> frameworksIOS;   ///< Frameworks to link on iOS only
     Vector<String> frameworksMacOS; ///< Frameworks to link on macOS only
 
-    bool enableLTO    = false; ///< Enable Link Time Optimization
-    bool enableASAN   = false; ///< Enable linking Address Sanitizer
-    bool enableStdCpp = false; ///< Enable and link C++ Standard Library
+    Parameter<bool> enableASAN   = false; ///< Enable linking Address Sanitizer
+    Parameter<bool> enableStdCpp = false; ///< Enable and link C++ Standard Library
 };
 
 /// @brief Groups SC::Build::CompileFlags and SC::Build::LinkFlags for a given SC::Build::Architecture
@@ -151,10 +174,9 @@ struct Configuration
     /// @brief A pre-made preset with pre-configured set of options
     enum class Preset
     {
-        None,          ///< Custom configuration
-        Debug,         ///< Debug configuration
-        DebugCoverage, ///< Debug coverage configuration
-        Release,       ///< Release configuration
+        Debug,         ///< Compile for debug, enabling ASAN (if not set on project and never on VStudio)
+        DebugCoverage, ///< Compile for debug, enabling coverage (sets ClangCL for VStudio)
+        Release,       ///< Compile for release
     };
 
     /// @brief Visual Studio platform toolset
@@ -173,13 +195,12 @@ struct Configuration
         case Configuration::Preset::Debug: return "Debug";
         case Configuration::Preset::DebugCoverage: return "DebugCoverage";
         case Configuration::Preset::Release: return "Release";
-        case Configuration::Preset::None: return "None";
         }
         Assert::unreachable();
     }
 
     /// @brief Set compile flags depending on the given Preset
-    [[nodiscard]] bool applyPreset(Preset newPreset, const Parameters& parameters);
+    [[nodiscard]] bool applyPreset(const Project& project, Preset newPreset, const Parameters& parameters);
 
     [[nodiscard]] static constexpr StringView getStandardBuildDirectory()
     {
@@ -193,7 +214,6 @@ struct Configuration
     CompileFlags compile; ///< Configuration compile flags
     LinkFlags    link;    ///< Configuration link flags
 
-    Preset             preset       = Preset::None;      ///< Build preset applied to this configuration
     Architecture::Type architecture = Architecture::Any; ///< Restrict this configuration to a specific architecture
 
     Configuration();
@@ -287,8 +307,6 @@ struct Workspace
 
     String          name;     ///< Workspace name
     Vector<Project> projects; ///< List of projects in this workspace
-    CompileFlags    compile;  ///< Global workspace compile flags for all projects
-    LinkFlags       link;     ///< Global workspace link flags for all projects
 
     /// @brief Validates all projects in this workspace
     [[nodiscard]] Result validate() const;

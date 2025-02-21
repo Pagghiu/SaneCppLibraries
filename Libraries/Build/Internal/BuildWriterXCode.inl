@@ -760,7 +760,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                          "\"$(SYMROOT)/CompilationDatabase\"",
                        );)delimiter");
 
-        if (not configuration->compile.enableStdCpp)
+        if (not resolve(project.compile, configuration->compile, &CompileFlags::enableStdCpp))
         {
             builder.append(R"delimiter(
                        OTHER_CPLUSPLUSFLAGS = (
@@ -768,10 +768,8 @@ struct SC::Build::ProjectWriter::WriterXCode
                          "-nostdinc++",
                        );)delimiter");
         }
-
-        if (not configuration->link.enableStdCpp)
+        if (not resolve(project.link, configuration->link, &LinkFlags::enableStdCpp))
         {
-
             builder.append("\n                       OTHER_LDFLAGS = \"-nostdlib++\";");
         }
         switch (configuration->compile.optimizationLevel)

@@ -231,7 +231,7 @@ endif
 
         for (const Configuration& configuration : project.configurations)
         {
-            SC_TRY(writeConfiguration(builder, configuration, relativeDirectories, makeTarget.view(), renderer))
+            SC_TRY(writeConfiguration(builder, project, configuration, relativeDirectories, makeTarget.view()))
         }
 
         builder.append(R"delimiter(
@@ -262,23 +262,8 @@ endif
                        makeTarget.view());
 
         builder.append("\n# Flags for .cpp files");
-        builder.append("\n{0}_CXXFLAGS := $({0}_CPPFLAGS) $({0}_WARNING_FLAGS_CXX) -std=c++14 -fstrict-aliasing "
-                       "-fvisibility=hidden "
-                       "-fvisibility-inlines-hidden",
+        builder.append("\n{0}_CXXFLAGS := $({0}_CPPFLAGS) $({0}_WARNING_FLAGS_CXX) $({0}_CONFIG_CXXFLAGS)",
                        makeTarget.view());
-        // TODO: Merge these with configuration overrides
-        if (not project.compile.enableRTTI)
-        {
-            builder.append(" -fno-rtti");
-        }
-        if (not project.compile.enableStdCpp)
-        {
-            builder.append(" -nostdinc++");
-        }
-        if (not project.compile.enableExceptions)
-        {
-            builder.append(" -fno-exceptions");
-        }
 
         builder.append(" $(CXXFLAGS)");
 
@@ -318,27 +303,6 @@ endif
             }
         }
 
-        builder.append("\n\nifeq ($(CLANG_DETECTED),yes)\n");
-        // Clang specific flags
-        builder.append("{0}_COMPILER_LDFLAGS :=", makeTarget.view());
-        if (not project.link.enableStdCpp)
-        {
-            builder.append(" -nostdlib++");
-        }
-        if (project.compile.enableASAN)
-        {
-            builder.append(" -fsanitize=address,undefined"); // TODO: Split the UBSAN flag
-        }
-
-        builder.append("\nelse\n");
-        // Non Clang specific flags
-        builder.append("{0}_COMPILER_LDFLAGS :=", makeTarget.view());
-        if (project.compile.enableASAN)
-        {
-            builder.append(" -fsanitize=address,undefined"); // TODO: Split the UBSAN flag
-        }
-        builder.append("\nendif\n");
-
         builder.append("\nifeq ($(TARGET_OS),macOS)\n");
         builder.append("     {0}_OS_LDFLAGS := $({0}_FRAMEWORKS)\n", makeTarget.view());
         builder.append("else ifeq ($(TARGET_OS),iOS)\n");
@@ -353,7 +317,7 @@ endif
         // TODO: De-hardcode LDFLAGS
         builder.append("\n{0}_LDFLAGS :=", makeTarget.view());
 
-        builder.append(" $({0}_TARGET_FLAGS) $({0}_COMPILER_LDFLAGS) $({0}_CONFIG_LDFLAGS) "
+        builder.append(" $({0}_TARGET_FLAGS) $({0}_CONFIG_LDFLAGS) "
                        "$({0}_CONFIG_COMPILER_LDFLAGS) $({0}_LIBRARIES) "
                        "$({0}_OS_LDFLAGS) $(LDFLAGS)",
                        makeTarget.view());
@@ -459,14 +423,11 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
         return output.assign(input);
     }
 
-    [[nodiscard]] Result writeConfiguration(StringBuilder& builder, const Configuration& configuration,
-                                            const RelativeDirectories& relativeDirectories, StringView makeTarget,
-                                            Renderer& renderer)
+    [[nodiscard]] Result writeConfiguration(StringBuilder& builder, const Project& project,
+                                            const Configuration&       configuration,
+                                            const RelativeDirectories& relativeDirectories, StringView makeTarget)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-        SC_COMPILER_UNUSED(builder);
-        SC_COMPILER_UNUSED(configuration);
-        SC_COMPILER_UNUSED(renderer);
         SmallString<255> configName;
         SC_TRY(sanitizeName(configuration.name.view(), configName)); // TODO: Sanitize the name
         builder.append("\n\nifeq ($(CONFIG),{0})\n", configName.view());
@@ -488,7 +449,7 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
             // As the Makefile rule gets redefined for these targets, make prints a warning about it.
             // Here we are tracking if value for a previous _TARGET_DIR or _INTERMEDIATE_DIR was already
             // written (with the same value) to avoid re-defining it.
-            // It will not work 100% of the times if the path string doesnt match 1:1 due for example to
+            // It will not work 100% of the times if the path string doesn't match 1:1 due for example to
             // the use of makefile variables but should handle most well written build files and common cases.
 
             String key;
@@ -565,23 +526,61 @@ $({0}_TARGET_DIR):
             builder.append("\n{0}_NO_SANITIZE_FLAGS :=", makeTarget);
         }
 
+        // TODO: De-hardcode all these flags
+        builder.append("\n{0}_VISIBILITY_FLAGS :="
+                       " -fstrict-aliasing"
+                       " -fvisibility=hidden",
+                       makeTarget);
+        builder.append("\n{0}_VISIBILITY_CXXFLAGS :="
+                       " -fvisibility-inlines-hidden",
+                       makeTarget);
+
         // TODO: De-hardcode debug and release optimization levels
         switch (configuration.compile.optimizationLevel)
         {
         case Optimization::Debug:
-            builder.append("\n{0}_CONFIG_FLAGS := -D_DEBUG=1 -g -ggdb -O0 $({0}_SANITIZE_FLAGS)", makeTarget);
+            builder.append("\n{0}_OPTIMIZATION_FLAGS := -D_DEBUG=1 -g -ggdb -O0", makeTarget);
+            builder.append("\n{0}_OPTIMIZATION_LDFLAGS :=", makeTarget);
             break;
-        case Optimization::Release: builder.append("\n{0}_CONFIG_FLAGS := -DNDEBUG=1 -O3", makeTarget); break;
+        case Optimization::Release:
+            builder.append("\n{0}_OPTIMIZATION_FLAGS := -DNDEBUG=1 -O3", makeTarget);
+            builder.append("\n{0}_OPTIMIZATION_LDFLAGS :=", makeTarget);
+            break;
         }
 
-        builder.append("\n{0}_CONFIG_LDFLAGS := $({0}_SANITIZE_FLAGS)", makeTarget);
+        builder.append("\n{0}_CONFIG_FLAGS := $({0}_OPTIMIZATION_FLAGS) $({0}_SANITIZE_FLAGS) $({0}_VISIBILITY_FLAGS)",
+                       makeTarget);
+        builder.append("\n{0}_CONFIG_LDFLAGS := $({0}_OPTIMIZATION_LDFLAGS) $({0}_SANITIZE_FLAGS)", makeTarget);
+
+        // TODO: De-hardcode -std=c++14
+        builder.append("\n{0}_CONFIG_CXXFLAGS := $({0}_VISIBILITY_CXXFLAGS) -std=c++14", makeTarget);
+        if (not resolve(project.compile, configuration.compile, &CompileFlags::enableStdCpp))
+        {
+            builder.append(" -nostdlib++");
+        }
+
+        if (not resolve(project.compile, configuration.compile, &CompileFlags::enableRTTI))
+        {
+            builder.append(" -fno-rtti");
+        }
+
+        if (not resolve(project.compile, configuration.compile, &CompileFlags::enableExceptions))
+        {
+            builder.append(" -fno-exceptions");
+        }
 
         builder.append("\n\nifeq ($(CLANG_DETECTED),yes)\n");
         // Clang specific flags
         builder.append("{0}_CONFIG_COMPILER_FLAGS :=", makeTarget);
-        if (configuration.compile.enableCoverage)
+
+        if (resolve(project.compile, configuration.compile, &CompileFlags::enableCoverage))
         {
             builder.append(" -fprofile-instr-generate -fcoverage-mapping");
+        }
+
+        if (not resolve(project.compile, configuration.compile, &CompileFlags::enableStdCpp))
+        {
+            builder.append(" -nostdinc++");
         }
 
         {
@@ -597,7 +596,7 @@ $({0}_TARGET_DIR):
             builder.append(" $({0}_NO_SANITIZE_FLAGS)", makeTarget);
         }
         builder.append("\n{0}_CONFIG_COMPILER_LDFLAGS :=", makeTarget);
-        if (configuration.compile.enableCoverage)
+        if (resolve(project.compile, configuration.compile, &CompileFlags::enableCoverage))
         {
             builder.append(" -fprofile-instr-generate -fcoverage-mapping");
         }

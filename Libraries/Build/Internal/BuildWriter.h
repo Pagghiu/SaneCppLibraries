@@ -10,6 +10,15 @@ namespace SC
 {
 namespace Build
 {
+template <typename U, typename T>
+static const T& resolve(const U& projectCompile, const U& configurationCompile, Parameter<T> U::*Field)
+{
+    if ((configurationCompile.*Field).hasBeenSet())
+    {
+        return configurationCompile.*Field;
+    }
+    return projectCompile.*Field;
+}
 /// @brief Caches file paths by pre-resolving directory filter search masks
 struct DefinitionCompiler
 {

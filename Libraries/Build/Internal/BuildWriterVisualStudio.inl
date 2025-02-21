@@ -116,8 +116,8 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         return Result(true);
     }
 
-    [[nodiscard]] bool writeConfigurationProperty(StringBuilder& builder, const Configuration& configuration,
-                                                  StringView architecture)
+    [[nodiscard]] bool writeConfigurationProperty(StringBuilder& builder, const Project& project,
+                                                  const Configuration& configuration, StringView architecture)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
 
@@ -156,17 +156,10 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             break;
         }
 
-#if 0
-        // TODO: Temporarily disabled as ASAN crashes at startup in VS2022 17.7.1
-        if(configuration.compile.hasValue<Compile::enableASAN>(true))
+        if (resolve(project.compile, configuration.compile, &CompileFlags::enableASAN))
         {
-            // VS ASAN is unsupported on ARM64 and needs manual flags / libs with ClangCL toolset
-            if(architecture != "ARM64" and platformToolset != "ClangCL")
-            {
-                builder.append("    <EnableASAN>true</EnableASAN>\n");
-            }
+            builder.append("    <EnableASAN>true</EnableASAN>\n");
         }
-#endif
         builder.append("  </PropertyGroup>\n");
         SC_COMPILER_WARNING_POP;
         return Result(true);
@@ -175,10 +168,10 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     [[nodiscard]] bool writeConfigurationsProperties(StringBuilder& builder, const Project& project)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-        return forArchitecture(
-            builder, project,
-            [this](StringBuilder& builder, const Project&, const Configuration& configuration, StringView platform)
-            { return writeConfigurationProperty(builder, configuration, platform); });
+        return forArchitecture(builder, project,
+                               [this](StringBuilder& builder, const Project& project,
+                                      const Configuration& configuration, StringView platform)
+                               { return writeConfigurationProperty(builder, project, configuration, platform); });
         SC_COMPILER_WARNING_POP;
     }
 
@@ -305,7 +298,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("      <ExceptionHandling>false</ExceptionHandling>\n");
         builder.append("      <UseFullPaths>false</UseFullPaths>\n");
         builder.append("      <TreatWarningAsError>true</TreatWarningAsError>\n");
-        if (configuration.compile.enableExceptions)
+        if (resolve(project.compile, configuration.compile, &CompileFlags::enableExceptions))
         {
             builder.append("      <ExceptionHandling>true</ExceptionHandling>\n");
         }
@@ -313,7 +306,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             builder.append("      <ExceptionHandling>false</ExceptionHandling>\n");
         }
-        if (configuration.compile.enableRTTI)
+        if (resolve(project.compile, configuration.compile, &CompileFlags::enableRTTI))
         {
             builder.append("      <RuntimeTypeInfo>true</RuntimeTypeInfo>\n");
         }
