@@ -65,6 +65,10 @@ struct Segment
     /// @brief Appends a Span to the end of the segment
     [[nodiscard]] bool append(Span<const T> span);
 
+    /// @brief Appends a Span of items convertible to T to the end of the segment
+    template <typename U>
+    [[nodiscard]] bool append(Span<const U> span);
+
     /// @brief Moves contents of another segment to the end of this segment
     [[nodiscard]] bool appendMove(Segment&& other);
 

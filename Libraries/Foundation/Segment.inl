@@ -225,6 +225,18 @@ bool SC::Segment<VTable>::append(Span<const T> span)
 }
 
 template <typename VTable>
+template <typename U>
+[[nodiscard]] bool SC::Segment<VTable>::append(Span<const U> span)
+{
+    for (const U& it : span)
+    {
+        if (not push_back(it))
+            return false;
+    }
+    return true;
+}
+
+template <typename VTable>
 bool SC::Segment<VTable>::appendMove(Segment&& other)
 {
     const auto oldSize = header ? header->sizeBytes / sizeof(T) : 0;
