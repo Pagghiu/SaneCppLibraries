@@ -220,6 +220,12 @@ void SC::VectorTest::basicTests()
         SC_TEST_EXPECT(strings[5] == "5");
         // insert error outside range (after last element)
         SC_TEST_EXPECT(not strings.insert(7, {"6"}));
+        {
+            // Special insert case that will test some edge cases
+            strings = {};
+            SC_TEST_EXPECT(strings.insert(0, {"STRING1"_a8}));
+            SC_TEST_EXPECT(strings.insert(0, {"STRING2"_a8, "STRING3"_a8}));
+        }
     }
 
     if (test_section("Vector"))

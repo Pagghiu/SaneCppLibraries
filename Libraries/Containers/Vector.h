@@ -62,19 +62,36 @@ struct SegmentNonTrivial
             // Move construct some elements in the not initialized area
             for (size_t idx = numElements; idx < numElements + numToInsert; ++idx)
             {
-                placementNew(data[idx], move(data[idx - numToInsert]));
+                // Guard against using slots that are before segment start.
+                // In the last loop at end of this scope such slots must be
+                // initialized with placement new instead of assignemnt operator
+                if (idx >= numToInsert)
+                {
+                    placementNew(data[idx], move(data[idx - numToInsert]));
+                }
             }
 
             // Move assign some elements to slots in "post-move" state left from previous loop
             for (size_t idx = numElements - 1; idx >= insertStartIdx + numToInsert; --idx)
             {
-                data[idx] = move(data[idx - numToInsert]);
+                if (idx >= numToInsert)
+                {
+                    data[idx] = move(data[idx - numToInsert]);
+                }
             }
 
             // Copy assign source data to slots in "post-move" state left from previous loop
             for (size_t idx = insertStartIdx; idx < insertEndIdx; ++idx)
             {
-                data[idx] = src[idx - insertStartIdx];
+                // See note in the first loop in this scope to understand use of assignment vs. placement new
+                if (idx < numElements)
+                {
+                    data[idx] = src[idx - insertStartIdx];
+                }
+                else
+                {
+                    placementNew(data[idx], src[idx - insertStartIdx]);
+                }
             }
         }
     }

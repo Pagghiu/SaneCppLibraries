@@ -425,7 +425,7 @@ bool SC::Segment<VTable>::insert(size_t index, Span<const T> data)
 {
     const size_t numElements = size();
     const size_t dataSize    = data.sizeInElements();
-    if ((index > numElements) or (dataSize >= SegmentHeader::MaxCapacity - numElements) or
+    if ((index > numElements) or (dataSize >= SegmentHeader::MaxCapacity / sizeof(T) - numElements) or
         not reserve(numElements + dataSize))
     {
         return false;
