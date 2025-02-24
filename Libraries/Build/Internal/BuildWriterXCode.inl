@@ -556,10 +556,10 @@ struct SC::Build::ProjectWriter::WriterXCode
     }
     [[nodiscard]] bool writeincludes(StringBuilder& builder, const Project& project)
     {
-        if (not project.compile.includePaths.isEmpty())
+        if (not project.files.compile.includePaths.isEmpty())
         {
             SC_TRY(builder.append("\n                       HEADER_SEARCH_PATHS = ("));
-            for (const String& it : project.compile.includePaths)
+            for (const String& it : project.files.compile.includePaths)
             {
                 // TODO: Escape double quotes for include paths
                 if (Path::isAbsolute(it.view(), Path::AsNative))
@@ -584,12 +584,12 @@ struct SC::Build::ProjectWriter::WriterXCode
     [[nodiscard]] bool writeDefines(StringBuilder& builder, const Project& project, const Configuration& configuration)
     {
         bool opened = false;
-        if (not project.compile.defines.isEmpty() or not configuration.compile.defines.isEmpty())
+        if (not project.files.compile.defines.isEmpty() or not configuration.compile.defines.isEmpty())
         {
             opened = true;
             SC_TRY(builder.append("\n                       GCC_PREPROCESSOR_DEFINITIONS = ("));
         }
-        for (const String& it : project.compile.defines)
+        for (const String& it : project.files.compile.defines)
         {
             SC_TRY(builder.append("\n                       \""));
             SC_TRY(appendVariable(builder, it.view())); // TODO: Escape double quotes
@@ -760,7 +760,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                          "\"$(SYMROOT)/CompilationDatabase\"",
                        );)delimiter");
 
-        if (not resolve(project.compile, configuration->compile, &CompileFlags::enableStdCpp))
+        if (not resolve(project.files.compile, configuration->compile, &CompileFlags::enableStdCpp))
         {
             builder.append(R"delimiter(
                        OTHER_CPLUSPLUSFLAGS = (

@@ -207,13 +207,13 @@ endif
                        makeTarget.view());
 
         builder.append("\n{0}_COMMON_FLAGS := $({0}_WARNING_FLAGS)", makeTarget.view());
-        for (const String& it : project.compile.defines)
+        for (const String& it : project.files.compile.defines)
         {
             SC_TRY(builder.append(" \"-D"));
             SC_TRY(appendVariable(builder, it.view(), makeTarget.view(), relativeDirectories));
             SC_TRY(builder.append("\""));
         }
-        for (auto& it : project.compile.includePaths)
+        for (auto& it : project.files.compile.includePaths)
         {
             SC_TRY(builder.append(" \"-I"));
             if (Path::isAbsolute(it.view(), Path::AsNative))
@@ -554,17 +554,17 @@ $({0}_TARGET_DIR):
 
         // TODO: De-hardcode -std=c++14
         builder.append("\n{0}_CONFIG_CXXFLAGS := $({0}_VISIBILITY_CXXFLAGS) -std=c++14", makeTarget);
-        if (not resolve(project.compile, configuration.compile, &CompileFlags::enableStdCpp))
+        if (not resolve(project.files.compile, configuration.compile, &CompileFlags::enableStdCpp))
         {
             builder.append(" -nostdlib++");
         }
 
-        if (not resolve(project.compile, configuration.compile, &CompileFlags::enableRTTI))
+        if (not resolve(project.files.compile, configuration.compile, &CompileFlags::enableRTTI))
         {
             builder.append(" -fno-rtti");
         }
 
-        if (not resolve(project.compile, configuration.compile, &CompileFlags::enableExceptions))
+        if (not resolve(project.files.compile, configuration.compile, &CompileFlags::enableExceptions))
         {
             builder.append(" -fno-exceptions");
         }
@@ -573,12 +573,12 @@ $({0}_TARGET_DIR):
         // Clang specific flags
         builder.append("{0}_CONFIG_COMPILER_FLAGS :=", makeTarget);
 
-        if (resolve(project.compile, configuration.compile, &CompileFlags::enableCoverage))
+        if (resolve(project.files.compile, configuration.compile, &CompileFlags::enableCoverage))
         {
             builder.append(" -fprofile-instr-generate -fcoverage-mapping");
         }
 
-        if (not resolve(project.compile, configuration.compile, &CompileFlags::enableStdCpp))
+        if (not resolve(project.files.compile, configuration.compile, &CompileFlags::enableStdCpp))
         {
             builder.append(" -nostdinc++");
         }
@@ -596,7 +596,7 @@ $({0}_TARGET_DIR):
             builder.append(" $({0}_NO_SANITIZE_FLAGS)", makeTarget);
         }
         builder.append("\n{0}_CONFIG_COMPILER_LDFLAGS :=", makeTarget);
-        if (resolve(project.compile, configuration.compile, &CompileFlags::enableCoverage))
+        if (resolve(project.files.compile, configuration.compile, &CompileFlags::enableCoverage))
         {
             builder.append(" -fprofile-instr-generate -fcoverage-mapping");
         }

@@ -54,35 +54,35 @@ SC_COMPILER_WARNING_PUSH_UNUSED_RESULT; // Doing some optimistic coding here, ig
 void addSaneCppLibraries(Project& project, const Parameters& parameters)
 {
     // Files
-    project.addDirectory("Bindings/c", "**.cpp");              // add all cpp support files for c bindings
-    project.addDirectory("Bindings/c", "**.c");                // add all c bindings
-    project.addDirectory("Bindings/c", "**.h");                // add all c bindings
-    project.addDirectory("Libraries", "**.cpp");               // recursively add all cpp files
-    project.addDirectory("Libraries", "**.h");                 // recursively add all header files
-    project.addDirectory("Libraries", "**.inl");               // recursively add all inline files
-    project.addDirectory("LibrariesExtra", "**.h");            // recursively add all header files
-    project.addDirectory("LibrariesExtra", "**.cpp");          // recursively add all cpp files
-    project.addDirectory("Support/DebugVisualizers", "*.cpp"); // add debug visualizers
+    project.addFiles("Bindings/c", "**.cpp");              // add all cpp support files for c bindings
+    project.addFiles("Bindings/c", "**.c");                // add all c bindings
+    project.addFiles("Bindings/c", "**.h");                // add all c bindings
+    project.addFiles("Libraries", "**.cpp");               // recursively add all cpp files
+    project.addFiles("Libraries", "**.h");                 // recursively add all header files
+    project.addFiles("Libraries", "**.inl");               // recursively add all inline files
+    project.addFiles("LibrariesExtra", "**.h");            // recursively add all header files
+    project.addFiles("LibrariesExtra", "**.cpp");          // recursively add all cpp files
+    project.addFiles("Support/DebugVisualizers", "*.cpp"); // add debug visualizers
 
     // Libraries to link
     if (parameters.platform == Platform::Apple)
     {
-        project.link.frameworks.append({"CoreFoundation", "CoreServices"});
+        project.addLinkFrameworks({"CoreFoundation", "CoreServices"});
     }
 
     if (parameters.platform != Platform::Windows)
     {
-        project.link.libraries.append({"dl", "pthread"});
+        project.addLinkLibraries({"dl", "pthread"});
     }
 
     // Debug visualization helpers
     if (parameters.generator == Generator::VisualStudio2022)
     {
-        project.addDirectory("Support/DebugVisualizers/MSVC", "*.natvis");
+        project.addFiles("Support/DebugVisualizers/MSVC", "*.natvis");
     }
     else
     {
-        project.addDirectory("Support/DebugVisualizers/LLDB", "*");
+        project.addFiles("Support/DebugVisualizers/LLDB", "*");
     }
 }
 
@@ -102,20 +102,29 @@ Result buildTestProject(const Parameters& parameters, Project& project)
 
     // Defines
     // $(PROJECT_ROOT) expands to Project::setRootDirectory expressed relative to $(PROJECT_DIR)
-    project.compile.defines.append({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", "SC_COMPILER_ENABLE_CONFIG=1"});
+    project.addDefines({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", "SC_COMPILER_ENABLE_CONFIG=1"});
 
     // Includes
-    project.compile.includePaths.append({
+    project.addIncludePaths({
         ".",            // Libraries path (for PluginTest)
         "Tests/SCTest", // SCConfig.h path (enabled by SC_COMPILER_ENABLE_CONFIG == 1)
     });
 
     addSaneCppLibraries(project, parameters);
-    project.addDirectory("Tests/SCTest", "*.cpp"); // add all .cpp from SCTest directory
-    project.addDirectory("Tests/SCTest", "*.h");   // add all .h from SCTest directory
-    project.addDirectory("Tools", "SC-*.cpp");     // add all tools
-    project.addDirectory("Tools", "*.h");          // add tools headers
-    project.addDirectory("Tools", "*Test.cpp");    // add tools tests
+    project.addFiles("Tests/SCTest", "*.cpp"); // add all .cpp from SCTest directory
+    project.addFiles("Tests/SCTest", "*.h");   // add all .h from SCTest directory
+    project.addFiles("Tools", "SC-*.cpp");     // add all tools
+    project.addFiles("Tools", "*.h");          // add tools headers
+    project.addFiles("Tools", "*Test.cpp");    // add tools tests
+
+    // This is a totally useless per-file define to test "per-file" flags SC::Build feature.
+    SourceFiles specificFiles;
+    // For testing purposes let's create a needlessly complex selection filter for "SC Spaces.cpp"
+    specificFiles.addSelection("Tests/SCTest", "*.cpp");
+    specificFiles.removeSelection("Tests/SCTest", "SCTest.cpp");
+    // Add an useless define to be checked inside "SC Spaces.cpp" and "SCTest.cpp"
+    specificFiles.compile.addDefines({"SC_SPACES_SPECIFIC_DEFINE=1"});
+    specificFiles.compile.addIncludePaths({"../Directory With Spaces"});
     return Result(true);
 }
 
@@ -138,7 +147,7 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
     SC_TRY(Tools::installDearImGui(parameters.directories, imgui));
 
     // Add includes
-    project.compile.includePaths.append({".", sokol.packageLocalDirectory.view(), imgui.packageLocalDirectory.view()});
+    project.addIncludePaths({".", sokol.packageLocalDirectory.view(), imgui.packageLocalDirectory.view()});
 
     // Project Configurations
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
@@ -151,39 +160,39 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
     project.removeFiles("LibrariesExtra", "**Test.cpp"); // remove all tests
     project.removeFiles("Support", "**Test.cpp");        // remove all tests
 
-    project.addDirectory(imgui.packageLocalDirectory.view(), "*.cpp");
-    project.addDirectory(sokol.packageLocalDirectory.view(), "*.h");
+    project.addFiles(imgui.packageLocalDirectory.view(), "*.cpp");
+    project.addFiles(sokol.packageLocalDirectory.view(), "*.h");
     String imguiRelative, imguiDefine;
     SC_TRY(Path::relativeFromTo(project.rootDirectory.view(), imgui.packageLocalDirectory.view(), imguiRelative,
                                 Path::AsNative));
     SC_TRY(StringBuilder(imguiDefine).format("SC_IMGUI_PATH=$(PROJECT_ROOT)/{}", imguiRelative));
-    project.compile.defines.append({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", imguiDefine.view()});
+    project.addDefines({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", imguiDefine.view()});
 
     if (parameters.platform == Platform::Apple)
     {
-        project.addDirectory("Examples/SCExample", "*.m"); // add all .m from SCExample directory
-        project.link.frameworks.append({"Metal", "MetalKit", "QuartzCore"});
-        project.link.frameworksMacOS.append({"Cocoa"});
-        project.link.frameworksIOS.append({"UIKit", "Foundation"});
+        project.addFiles("Examples/SCExample", "*.m"); // add all .m from SCExample directory
+        project.addLinkFrameworks({"Metal", "MetalKit", "QuartzCore"});
+        project.addLinkFrameworksMacOS({"Cocoa"});
+        project.addLinkFrameworksIOS({"UIKit", "Foundation"});
     }
     else
     {
-        project.addDirectory("Examples/SCExample", "*.c"); // add all .c from SCExample directory
+        project.addFiles("Examples/SCExample", "*.c"); // add all .c from SCExample directory
         if (parameters.platform == Platform::Linux)
         {
-            project.link.libraries.append({"GL", "EGL", "X11", "Xi", "Xcursor"});
+            project.addLinkLibraries({"GL", "EGL", "X11", "Xi", "Xcursor"});
         }
     }
     if (parameters.platform == Platform::Windows)
     {
-        project.compile.defines.append({"IMGUI_API=__declspec( dllexport )"});
+        project.addDefines({"IMGUI_API=__declspec( dllexport )"});
     }
     else
     {
-        project.compile.defines.append({"IMGUI_API=__attribute__((visibility(\"default\")))"});
+        project.addDefines({"IMGUI_API=__attribute__((visibility(\"default\")))"});
     }
-    project.addDirectory("Examples/SCExample", "**.h");   // add all .h from SCExample directory recursively
-    project.addDirectory("Examples/SCExample", "**.cpp"); // add all .cpp from SCExample directory recursively
+    project.addFiles("Examples/SCExample", "**.h");   // add all .h from SCExample directory recursively
+    project.addFiles("Examples/SCExample", "**.cpp"); // add all .cpp from SCExample directory recursively
     return Result(true);
 }
 

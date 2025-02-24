@@ -31,9 +31,9 @@ struct DefinitionCompiler
     [[nodiscard]] Result build();
 
   private:
-    static SC::Result    fillPathsList(StringView path, const VectorSet<Project::File>& filters,
+    static SC::Result    fillPathsList(StringView path, const VectorSet<FilesSelection>& filters,
                                        VectorMap<String, Vector<String>>& filtersToFiles);
-    [[nodiscard]] Result collectUniqueRootPaths(VectorMap<String, VectorSet<Project::File>>& paths);
+    [[nodiscard]] Result collectUniqueRootPaths(VectorMap<String, VectorSet<FilesSelection>>& paths);
 };
 
 struct RelativeDirectories
@@ -159,7 +159,7 @@ struct SC::Build::WriterInternal
     {
         String             renderedFile;
         Vector<StringView> components;
-        for (const auto& file : project.files)
+        for (const FilesSelection& file : project.files.selection)
         {
             if (Path::isAbsolute(file.base.view(), Path::AsNative))
             {
@@ -172,66 +172,63 @@ struct SC::Build::WriterInternal
                 paths[0] = project.rootDirectory.view();
                 paths[1] = file.base.view();
                 paths[2] = file.mask.view();
-                SC_TRY(
-                    Path::join(renderedFile, {paths}, Path::Posix::SeparatorStringView(), true)); // skipEmpty == true
+                // skipEmpty == true
+                SC_TRY(Path::join(renderedFile, {paths}, Path::Posix::SeparatorStringView(), true));
             }
-            const auto* res = definitionCompiler.resolvedPaths.get(renderedFile.view());
-            if (res)
-            {
-                for (const auto& it : *res)
-                {
-                    RenderItem renderItem;
-                    renderItem.name = StringEncoding::Utf8; // To unify hashes
-                    SC_TRY(StringBuilder(renderItem.name).append(Path::basename(it.view(), Path::AsPosix)));
-                    auto nameView = renderItem.name.view();
-                    if (nameView.endsWith(".h"))
-                    {
-                        renderItem.type = RenderItem::HeaderFile;
-                    }
-                    else if (nameView.endsWith(".cpp"))
-                    {
-                        renderItem.type = RenderItem::CppFile;
-                    }
-                    else if (nameView.endsWith(".c"))
-                    {
-                        renderItem.type = RenderItem::CFile;
-                    }
-                    else if (nameView.endsWith(".m"))
-                    {
-                        renderItem.type = RenderItem::ObjCFile;
-                    }
-                    else if (nameView.endsWith(".mm"))
-                    {
-                        renderItem.type = RenderItem::ObjCppFile;
-                    }
-                    else if (nameView.endsWith(".inl"))
-                    {
-                        renderItem.type = RenderItem::InlineFile;
-                    }
-                    else if (nameView.endsWith(".natvis") or nameView.endsWith(".lldbinit"))
-                    {
-                        renderItem.type = RenderItem::DebugVisualizerFile;
-                    }
-                    SC_TRY(Path::relativeFromTo(referenceDirectory, it.view(), renderItem.path,
-                                                Path::Type::AsNative,  // input type
-                                                Path::Type::AsPosix)); // output type
-                    SC_TRY(Path::relativeFromTo(project.rootDirectory.view(), it.view(), renderItem.referencePath,
-                                                Path::Type::AsNative,  // input type
-                                                Path::Type::AsPosix)); // output type
-                    if (file.operation == Project::File::Add)
-                    {
-                        SC_TRY(outputFiles.push_back(move(renderItem)));
-                    }
-                    else
-                    {
-                        (void)(outputFiles.removeAll([&](const auto& it)
-                                                     { return it.referencePath == renderItem.referencePath; }));
-                    }
-                }
-            }
-            else
+            const Vector<String>* res = definitionCompiler.resolvedPaths.get(renderedFile.view());
+            if (res == nullptr)
             {
                 return Result::Error("BuildWriter::getPathsRelativeTo - Cannot find path");
+            }
+            for (const String& it : *res)
+            {
+                RenderItem renderItem;
+                renderItem.name = StringEncoding::Utf8; // To unify hashes
+                SC_TRY(StringBuilder(renderItem.name).append(Path::basename(it.view(), Path::AsPosix)));
+                auto nameView = renderItem.name.view();
+                if (nameView.endsWith(".h"))
+                {
+                    renderItem.type = RenderItem::HeaderFile;
+                }
+                else if (nameView.endsWith(".cpp"))
+                {
+                    renderItem.type = RenderItem::CppFile;
+                }
+                else if (nameView.endsWith(".c"))
+                {
+                    renderItem.type = RenderItem::CFile;
+                }
+                else if (nameView.endsWith(".m"))
+                {
+                    renderItem.type = RenderItem::ObjCFile;
+                }
+                else if (nameView.endsWith(".mm"))
+                {
+                    renderItem.type = RenderItem::ObjCppFile;
+                }
+                else if (nameView.endsWith(".inl"))
+                {
+                    renderItem.type = RenderItem::InlineFile;
+                }
+                else if (nameView.endsWith(".natvis") or nameView.endsWith(".lldbinit"))
+                {
+                    renderItem.type = RenderItem::DebugVisualizerFile;
+                }
+                SC_TRY(Path::relativeFromTo(referenceDirectory, it.view(), renderItem.path,
+                                            Path::Type::AsNative,  // input type
+                                            Path::Type::AsPosix)); // output type
+                SC_TRY(Path::relativeFromTo(project.rootDirectory.view(), it.view(), renderItem.referencePath,
+                                            Path::Type::AsNative,  // input type
+                                            Path::Type::AsPosix)); // output type
+                if (file.action == FilesSelection::Add)
+                {
+                    SC_TRY(outputFiles.push_back(move(renderItem)));
+                }
+                else
+                {
+                    (void)(outputFiles.removeAll([&](const auto& it)
+                                                 { return it.referencePath == renderItem.referencePath; }));
+                }
             }
         }
         Algorithms::bubbleSort(outputFiles.begin(), outputFiles.end(),

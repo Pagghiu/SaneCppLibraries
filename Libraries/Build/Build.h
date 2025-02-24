@@ -168,6 +168,39 @@ struct LinkFlags
     Parameter<bool> enableStdCpp = false; ///< Enable and link C++ Standard Library
 };
 
+/// @brief Describes an additive / subtractive selection of files
+struct FilesSelection
+{
+    /// @brief Add or removes from selection
+    enum Action
+    {
+        Add,   ///< Add files
+        Remove ///< Remove files
+    };
+    Action action = Add; ///< Operation type (add or remove files)
+    String base;         ///< Base path (not containing `*`)
+    String mask;         ///< Mask suffix (can contain `*`)
+
+    bool operator==(const FilesSelection& other) const
+    {
+        // collectUniqueRootPaths doesn't care about de-duplicating also operation
+        return base == other.base and mask == other.mask;
+    }
+};
+
+/// @brief A selection of files with their associated compile flags
+struct SourceFiles
+{
+    Vector<FilesSelection> selection;
+    CompileFlags           compile;
+
+    /// @brief Add some files from a directory to the selection
+    [[nodiscard]] bool addSelection(StringView directory, StringView filter);
+
+    /// @brief Remove some files from a directory to the selection
+    [[nodiscard]] bool removeSelection(StringView directory, StringView filter);
+};
+
 /// @brief Groups SC::Build::CompileFlags and SC::Build::LinkFlags for a given SC::Build::Architecture
 struct Configuration
 {
@@ -233,26 +266,6 @@ struct TargetType
 /// @brief Groups multiple Configuration and source files with their compile and link flags
 struct Project
 {
-    /// @brief Project list of files
-    struct File
-    {
-        /// @brief Indicates if this is an additive or subtractive files operation
-        enum Operation
-        {
-            Add,   ///< Add files
-            Remove ///< Remove files
-        };
-        Operation operation = Add; ///< Operation type (add or remove files)
-        String    base;            ///< Base path (not containing `*`)
-        String    mask;            ///< Mask suffix (can contain `*`)
-
-        bool operator==(const File& other) const
-        {
-            // collectUniqueRootPaths doesn't care about de-duplicating also operation
-            return base == other.base and mask == other.mask;
-        }
-    };
-
     Project() = default;
     Project(TargetType::Type targetType, StringView name) : targetType(targetType), name(name), targetName(name) {}
 
@@ -263,9 +276,8 @@ struct Project
     String targetName;    ///< Project target name
     String iconPath;      ///< Icon location
 
-    Vector<File> files;   ///< Files that belong to the project
-    CompileFlags compile; ///< Shared CompileFlags for all files in the project
-    LinkFlags    link;    ///< Shared LinkFlags for all files in the project
+    SourceFiles files; ///< Project source files with their associated compile flags
+    LinkFlags   link;  ///< Linker flags applied to all files in the project
 
     Vector<Configuration> configurations; ///< Build configurations created inside the project
 
@@ -278,19 +290,42 @@ struct Project
 
     /// @brief Get Configuration with the matching `configurationName`
     [[nodiscard]] Configuration* getConfiguration(StringView configurationName);
+
     /// @brief Get Configuration with the matching `configurationName`
     [[nodiscard]] const Configuration* getConfiguration(StringView configurationName) const;
 
-    /// @brief Add all files from specific subdirectory (relative to project root) matching given filter
+    /// @brief Add all source or header/inline files from a subdirectory (relative to project root) matching the given
+    /// filter
     /// @param subdirectory The subdirectory to search files from, absolute or relative to project root. No `*` allowed.
     /// @param filter The suffix filter that is appended to `subdirectory` (can contain `*`)
-    [[nodiscard]] bool addDirectory(StringView subdirectory, StringView filter);
+    /// @note Files with header or inline extension (`.h`, `.hpp`, `.inl`) will be considered non-source files.
+    [[nodiscard]] bool addFiles(StringView subdirectory, StringView filter);
 
-    /// @brief Add a single file to the project
+    /// @brief Add a single source or header/inline file to the project, relative to project root
     [[nodiscard]] bool addFile(StringView singleFile);
 
-    /// @brief Remove files matching the given filter. Useful to remove only a specific file type after
-    /// Project::addDirectory
+    /// @brief Adds paths to include paths list
+    [[nodiscard]] bool addIncludePaths(Span<const StringView> includePaths);
+
+    /// @brief Adds paths to libraries paths list
+    [[nodiscard]] bool addLinkLibraryPaths(Span<const StringView> libraryPaths);
+
+    /// @brief Adds libraries to be linked
+    [[nodiscard]] bool addLinkLibraries(Span<const StringView> linkLibraries);
+
+    /// @brief Add frameworks shared with all apple os
+    [[nodiscard]] bool addLinkFrameworks(Span<const StringView> frameworks);
+
+    /// @brief Add frameworks only for macOS
+    [[nodiscard]] bool addLinkFrameworksMacOS(Span<const StringView> frameworks);
+
+    /// @brief Add frameworks only for iOS
+    [[nodiscard]] bool addLinkFrameworksIOS(Span<const StringView> frameworks);
+
+    /// @brief Adds some pre-processor defines
+    [[nodiscard]] bool addDefines(Span<const StringView> defines);
+
+    /// @brief Remove files matching a filter, to remove only a specific file type after Project::addDirectory
     /// @param subdirectory The subdirectory to search files into, absolute or relative to project root. No `*` allowed.
     /// @param filter The suffix filter that is appended to `subdirectory` (can contain `*`)
     [[nodiscard]] bool removeFiles(StringView subdirectory, StringView filter);
@@ -312,6 +347,7 @@ struct Workspace
     [[nodiscard]] Result validate() const;
 };
 
+/// @brief Collects all directories used during build generation
 struct Directories
 {
     String projectsDirectory;

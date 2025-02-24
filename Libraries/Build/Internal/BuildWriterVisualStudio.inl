@@ -156,7 +156,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             break;
         }
 
-        if (resolve(project.compile, configuration.compile, &CompileFlags::enableASAN))
+        if (resolve(project.files.compile, configuration.compile, &CompileFlags::enableASAN))
         {
             builder.append("    <EnableASAN>true</EnableASAN>\n");
         }
@@ -236,7 +236,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             builder.append("</IntDir>\n");
         }
 
-        if (not configuration.compile.includePaths.isEmpty() or not project.compile.includePaths.isEmpty())
+        if (not configuration.compile.includePaths.isEmpty() or not project.files.compile.includePaths.isEmpty())
         {
             builder.append("    <IncludePath>");
             for (const String& it : configuration.compile.includePaths)
@@ -244,7 +244,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                 SC_TRY(appendProjectRelative(builder, it.view()));
                 builder.append(";");
             }
-            for (const String& it : project.compile.includePaths)
+            for (const String& it : project.files.compile.includePaths)
             {
                 SC_TRY(appendProjectRelative(builder, it.view()));
                 builder.append(";");
@@ -278,7 +278,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("      <SDLCheck>true</SDLCheck>\n");
 
         //  TODO: This can be refactored
-        if (not configuration.compile.defines.isEmpty() or not project.compile.defines.isEmpty())
+        if (not configuration.compile.defines.isEmpty() or not project.files.compile.defines.isEmpty())
         {
             builder.append("    <PreprocessorDefinitions>");
             for (const String& it : configuration.compile.defines)
@@ -286,7 +286,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                 SC_TRY(appendVariable(builder, it.view()));
                 builder.append(";");
             }
-            for (const String& it : project.compile.defines)
+            for (const String& it : project.files.compile.defines)
             {
                 SC_TRY(appendVariable(builder, it.view()));
                 builder.append(";");
@@ -298,7 +298,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("      <ExceptionHandling>false</ExceptionHandling>\n");
         builder.append("      <UseFullPaths>false</UseFullPaths>\n");
         builder.append("      <TreatWarningAsError>true</TreatWarningAsError>\n");
-        if (resolve(project.compile, configuration.compile, &CompileFlags::enableExceptions))
+        if (resolve(project.files.compile, configuration.compile, &CompileFlags::enableExceptions))
         {
             builder.append("      <ExceptionHandling>true</ExceptionHandling>\n");
         }
@@ -306,7 +306,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             builder.append("      <ExceptionHandling>false</ExceptionHandling>\n");
         }
-        if (resolve(project.compile, configuration.compile, &CompileFlags::enableRTTI))
+        if (resolve(project.files.compile, configuration.compile, &CompileFlags::enableRTTI))
         {
             builder.append("      <RuntimeTypeInfo>true</RuntimeTypeInfo>\n");
         }

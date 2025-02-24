@@ -48,7 +48,7 @@ bool SC::Build::Configuration::applyPreset(const Project& project, Preset newPre
     switch (newPreset)
     {
     case Configuration::Preset::DebugCoverage:
-        if (not project.compile.enableASAN.hasBeenSet())
+        if (not project.files.compile.enableASAN.hasBeenSet())
         {
             compile.enableCoverage = true;
         }
@@ -60,7 +60,7 @@ bool SC::Build::Configuration::applyPreset(const Project& project, Preset newPre
         }
         break;
     case Configuration::Preset::Debug:
-        if (not project.compile.enableASAN.hasBeenSet())
+        if (not project.files.compile.enableASAN.hasBeenSet())
         {
             // VS ASAN is unsupported on ARM64 and needs manual flags / libs with ClangCL toolset
             // It also needs paths where clang_rt.asan_*.dll exist to be manually set before debugging
@@ -123,25 +123,67 @@ const SC::Build::Configuration* SC::Build::Project::getConfiguration(StringView 
     return nullptr;
 }
 
-bool SC::Build::Project::addDirectory(StringView subdirectory, StringView filter)
+bool SC::Build::SourceFiles::addSelection(StringView directory, StringView filter)
+{
+    return selection.push_back({FilesSelection::Add, directory, filter});
+}
+
+bool SC::Build::SourceFiles::removeSelection(StringView directory, StringView filter)
+{
+    return selection.push_back({FilesSelection::Remove, directory, filter});
+}
+
+bool SC::Build::Project::addFiles(StringView subdirectory, StringView filter)
 {
     if (subdirectory.containsCodePoint('*') or subdirectory.containsCodePoint('?'))
         return false;
-    return files.push_back({Project::File::Add, subdirectory, filter});
+    return files.selection.push_back({FilesSelection::Add, subdirectory, filter});
 }
+
+bool SC::Build::Project::addIncludePaths(Span<const StringView> includePaths)
+{
+    return files.compile.includePaths.append(includePaths);
+}
+
+bool SC::Build::Project::addLinkLibraryPaths(Span<const StringView> libraryPaths)
+{
+    return link.libraryPaths.append(libraryPaths);
+}
+
+bool SC::Build::Project::addLinkLibraries(Span<const StringView> linkLibraries)
+{
+    return link.libraries.append(linkLibraries);
+}
+
+bool SC::Build::Project::addLinkFrameworks(Span<const StringView> frameworks)
+{
+    return link.frameworks.append(frameworks);
+}
+
+bool SC::Build::Project::addLinkFrameworksMacOS(Span<const StringView> frameworks)
+{
+    return link.frameworksMacOS.append(frameworks);
+}
+
+bool SC::Build::Project::addLinkFrameworksIOS(Span<const StringView> frameworks)
+{
+    return link.frameworksIOS.append(frameworks);
+}
+
+bool SC::Build::Project::addDefines(Span<const StringView> defines) { return files.compile.defines.append(defines); }
 
 bool SC::Build::Project::addFile(StringView singleFile)
 {
     if (singleFile.containsCodePoint('*') or singleFile.containsCodePoint('?'))
         return false;
-    return files.push_back({Project::File::Add, {}, singleFile});
+    return files.selection.push_back({FilesSelection::Add, {}, singleFile});
 }
 
 bool SC::Build::Project::removeFiles(StringView subdirectory, StringView filter)
 {
     if (subdirectory.containsCodePoint('*') or subdirectory.containsCodePoint('?'))
         return false;
-    return files.push_back({Project::File::Remove, subdirectory, filter});
+    return files.selection.push_back({FilesSelection::Remove, subdirectory, filter});
 }
 
 SC::Result SC::Build::Project::validate() const
@@ -187,7 +229,7 @@ SC::Result SC::Build::DefinitionCompiler::validate()
     return Result(true);
 }
 
-SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const VectorSet<Project::File>& filters,
+SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const VectorSet<FilesSelection>& filters,
                                                         VectorMap<String, Vector<String>>& filtersToFiles)
 {
     bool doRecurse = false;
@@ -211,11 +253,11 @@ SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const V
         return Result(true);
     }
 
-    Vector<Project::File> renderedFilters;
+    Vector<FilesSelection> renderedFilters;
     for (const auto& filter : filters)
     {
-        Project::File file;
-        file.operation = filter.operation;
+        FilesSelection file;
+        file.action = filter.action;
         SC_TRY(file.mask.assign(path));
         SC_TRY(Path::append(file.mask, {filter.mask.view()}, Path::AsPosix));
         SC_TRY(renderedFilters.push_back(move(file)));
@@ -249,7 +291,7 @@ SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const V
 
 SC::Result SC::Build::DefinitionCompiler::build()
 {
-    VectorMap<String, VectorSet<Project::File>> uniquePaths;
+    VectorMap<String, VectorSet<FilesSelection>> uniquePaths;
     SC_TRY(collectUniqueRootPaths(uniquePaths));
     for (auto& it : uniquePaths)
     {
@@ -259,7 +301,7 @@ SC::Result SC::Build::DefinitionCompiler::build()
 }
 
 // Collects root paths to build a stat map
-SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<String, VectorSet<Project::File>>& paths)
+SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<String, VectorSet<FilesSelection>>& paths)
 {
     String                      buffer;
     SmallVector<StringView, 16> components;
@@ -267,13 +309,13 @@ SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<Strin
     {
         for (const Project& project : workspace.projects)
         {
-            for (const Project::File& file : project.files)
+            for (const FilesSelection& file : project.files.selection)
             {
                 SC_TRY(buffer.assign(project.rootDirectory.view()));
                 if (Path::isAbsolute(file.base.view(), Path::Type::AsNative))
                 {
-                    Project::File absFile;
-                    absFile.operation = file.operation;
+                    FilesSelection absFile;
+                    absFile.action = file.action;
                     SC_TRY(Path::normalize(file.base.view(), components, &absFile.base, Path::Type::AsPosix));
                     SC_TRY(absFile.mask.assign(file.mask.view()));
                     SC_TRY(paths.getOrCreate(absFile.base.view())->insert(absFile));
@@ -314,16 +356,16 @@ SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<Strin
                     }
                     else
                     {
-                        const auto overlapNew      = buffer.view().sliceStart(commonOverlap);
-                        const auto overlapExisting = it.key.view().sliceStart(commonOverlap);
+                        const StringView overlapNew      = buffer.view().sliceStart(commonOverlap);
+                        const StringView overlapExisting = it.key.view().sliceStart(commonOverlap);
                         if (overlapExisting.isEmpty())
                         {
                             // Case .5 and .3 after .2
                             if (overlapNew.startsWithAnyOf({'/'}))
                             {
                                 // Case .3 after 2 (can be merged)
-                                Project::File mergedFile;
-                                mergedFile.operation = file.operation;
+                                FilesSelection mergedFile;
+                                mergedFile.action = file.action;
                                 SC_TRY(mergedFile.base.assign(it.value.begin()->base.view()));
                                 SC_TRY(mergedFile.mask.assign(Path::removeStartingSeparator(overlapNew)));
                                 SC_TRY(Path::append(mergedFile.mask, {file.mask.view()}, Path::AsPosix));
