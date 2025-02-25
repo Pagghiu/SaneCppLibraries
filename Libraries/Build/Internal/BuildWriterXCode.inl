@@ -66,7 +66,7 @@ struct SC::Build::ProjectWriter::WriterXCode
     {
         SC_TRY(group.referenceHash.assign("7B0074092A73143F00660B94"));
         SC_TRY(group.name.assign("/"));
-        for (const auto& file : xcodeFiles)
+        for (const RenderItem& file : xcodeFiles)
         {
             StringViewTokenizer tokenizer(file.referencePath.view());
             RenderGroup*        current = &group;
@@ -93,11 +93,11 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     [[nodiscard]] bool fillProductGroup(const Project& project, RenderGroup& group)
     {
-        auto products = group.children.getOrCreate("Products"_a8);
+        RenderGroup* products = group.children.getOrCreate("Products"_a8);
         SC_TRY(products != nullptr);
         SC_TRY(products->name.assign("Products"));
         SC_TRY(products->referenceHash.assign("7B0074132A73143F00660B94"));
-        auto test = products->children.getOrCreate(project.targetName.view());
+        RenderGroup* test = products->children.getOrCreate(project.targetName.view());
         SC_TRY(test != nullptr);
         SC_TRY(test->name.assign(project.targetName.view()));
         SC_TRY(test->referenceHash.assign("7B0074122A73143F00660B94"));
@@ -106,16 +106,16 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     [[nodiscard]] bool fillFrameworkGroup(const Project&, RenderGroup& group, Vector<RenderItem>& xcodeFiles)
     {
-        auto frameworksGroup = group.children.getOrCreate("Frameworks"_a8);
+        RenderGroup* frameworksGroup = group.children.getOrCreate("Frameworks"_a8);
         SC_TRY(frameworksGroup != nullptr);
         SC_TRY(frameworksGroup->name.assign("Frameworks"));
         SC_TRY(frameworksGroup->referenceHash.assign("7B3D0EF12A74DEEF00AE03EE"));
 
-        for (auto it : xcodeFiles)
+        for (const RenderItem& it : xcodeFiles)
         {
             if (it.type == RenderItem::Framework or it.type == RenderItem::SystemLibrary)
             {
-                auto framework = frameworksGroup->children.getOrCreate(it.name);
+                RenderGroup* framework = frameworksGroup->children.getOrCreate(it.name);
                 SC_TRY(framework != nullptr);
                 SC_TRY(framework->name.assign(it.name.view()));
                 SC_TRY(framework->referenceHash.assign(it.referenceHash.view()));
@@ -131,22 +131,22 @@ struct SC::Build::ProjectWriter::WriterXCode
             return true;
         }
 
-        auto resourcesGroup = group.children.getOrCreate("Resources"_a8);
+        RenderGroup* resourcesGroup = group.children.getOrCreate("Resources"_a8);
         SC_TRY(resourcesGroup != nullptr);
         SC_TRY(resourcesGroup->name.assign("Resources"));
         SC_TRY(resourcesGroup->referenceHash.assign("7A3A0EF12979DAEB00AE0312"));
 
-        auto entitlement = resourcesGroup->children.getOrCreate("7B5A4A5A2C20D35E00EB8229");
+        RenderGroup* entitlement = resourcesGroup->children.getOrCreate("7B5A4A5A2C20D35E00EB8229");
         SC_TRY(entitlement != nullptr);
         SC_TRY(StringBuilder(entitlement->name).format("{0}.entitlements", project.name.view()));
         SC_TRY(entitlement->referenceHash.assign("7B5A4A5A2C20D35E00EB8229"));
 
-        auto storyboard = resourcesGroup->children.getOrCreate("7B375FE92C2F16B1007D27E7");
+        RenderGroup* storyboard = resourcesGroup->children.getOrCreate("7B375FE92C2F16B1007D27E7");
         SC_TRY(storyboard != nullptr);
         SC_TRY(StringBuilder(storyboard->name).format("{0}.storyboard", project.name.view()));
         SC_TRY(storyboard->referenceHash.assign("7B375FE92C2F16B1007D27E7"));
 
-        auto xcasset = resourcesGroup->children.getOrCreate("7A4F78E229662D25000D7EE4");
+        RenderGroup* xcasset = resourcesGroup->children.getOrCreate("7A4F78E229662D25000D7EE4");
         SC_TRY(xcasset != nullptr);
         SC_TRY(StringBuilder(xcasset->name).format("{0}.xcassets", project.name.view()));
         SC_TRY(xcasset->referenceHash.assign("7A4F78E229662D25000D7EE4"));
@@ -201,38 +201,34 @@ struct SC::Build::ProjectWriter::WriterXCode
         builder.append(R"delimiter(
 /* Begin PBXBuildFile section */
 )delimiter");
-        for (auto& file : xcodeFiles)
+        for (const RenderItem& file : xcodeFiles)
         {
-            if (file.type == RenderItem::CppFile or file.type == RenderItem::CFile or
-                file.type == RenderItem::ObjCFile or file.type == RenderItem::ObjCppFile)
+            String platformFilters;
+            if (not file.platformFilters.isEmpty())
             {
-                builder.append("        {} /* {} in Sources */ = {{isa = PBXBuildFile; fileRef = {} /* {} */; }};\n",
-                               file.buildHash, file.name, file.referenceHash, file.name);
-            }
-            else if (file.type == RenderItem::Framework or file.type == RenderItem::SystemLibrary)
-            {
-
-                String platformFilters;
-                if (not file.platformFilters.isEmpty())
+                platformFilters = "platformFilters = (";
+                StringBuilder sb(platformFilters, StringBuilder::DoNotClear);
+                for (size_t idx = 0; idx < file.platformFilters.size(); ++idx)
                 {
-                    platformFilters = "platformFilters = (";
-                    StringBuilder sb(platformFilters, StringBuilder::DoNotClear);
-                    for (size_t idx = 0; idx < file.platformFilters.size(); ++idx)
-                    {
-                        sb.append(file.platformFilters[idx].view());
-                        sb.append(", ");
-                    }
-                    sb.append(");");
+                    sb.append(file.platformFilters[idx].view());
+                    sb.append(", ");
                 }
-                builder.append(
-                    "        {0} /* {1} in Frameworks */ = {{isa = PBXBuildFile; fileRef = {2} /* {1} */;{3} }};\n",
-                    file.buildHash, file.name, file.referenceHash, platformFilters);
+                sb.append(");");
             }
-            else if (file.type == RenderItem::XCAsset)
+            StringView type;
+            switch (file.type)
             {
-                builder.append("        {} /* {} in Resources */ = {{isa = PBXBuildFile; fileRef = {} /* {} */; }};\n",
-                               file.buildHash, file.name, file.referenceHash, file.name);
+            case RenderItem::Framework:
+            case RenderItem::SystemLibrary: type = "Frameworks"; break;
+            case RenderItem::XCAsset: type = "Resources"; break;
+            case RenderItem::CppFile:
+            case RenderItem::CFile:
+            case RenderItem::ObjCFile:
+            case RenderItem::ObjCppFile: type = "Sources"; break;
+            default: continue;
             }
+            builder.append("        {0} /* {1} in {4} */ = {{isa = PBXBuildFile; fileRef = {2} /* {1} */;{3} }};\n",
+                           file.buildHash, file.name, file.referenceHash, platformFilters, type);
         }
 
         builder.append(R"delimiter(/* End PBXBuildFile section */
@@ -294,71 +290,58 @@ struct SC::Build::ProjectWriter::WriterXCode
                            project.name.view());
         }
 
-        for (auto& file : xcodeFiles)
+        for (const RenderItem& file : xcodeFiles)
         {
-            if (file.type == RenderItem::HeaderFile)
+            StringView lastKnownFileType;
+            StringView fileEncoding = " fileEncoding = 4;";
+            StringView sourceTree   = "\"<group>\"";
+            switch (file.type)
             {
-                builder.append(
-                    "\n        {} /* {} */ = {{isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = "
-                    "sourcecode.c.h; name = \"{}\"; path = \"{}\"; sourceTree = \"<group>\"; }};",
-                    file.referenceHash, file.name, file.name, file.path);
-            }
-            else if (file.type == RenderItem::CppFile)
-            {
-                builder.append(
-                    "\n        {} /* {} */ = {{isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = "
-                    "sourcecode.cpp.cpp; name = \"{}\"; path = \"{}\"; sourceTree = \"<group>\"; }};",
-                    file.referenceHash, file.name, file.name, file.path);
-            }
-            else if (file.type == RenderItem::CFile)
-            {
-                builder.append(
-                    "\n        {} /* {} */ = {{isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = "
-                    "sourcecode.c.c; name = \"{}\"; path = \"{}\"; sourceTree = \"<group>\"; }};",
-                    file.referenceHash, file.name, file.name, file.path);
-            }
-            else if (file.type == RenderItem::ObjCFile)
-            {
-                builder.append(
-                    "\n        {} /* {} */ = {{isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = "
-                    "sourcecode.m.m; name = \"{}\"; path = \"{}\"; sourceTree = \"<group>\"; }};",
-                    file.referenceHash, file.name, file.name, file.path);
-            }
-
-            else if (file.type == RenderItem::ObjCppFile)
-            {
-                builder.append(
-                    "\n        {} /* {} */ = {{isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = "
-                    "sourcecode.mm.mm; name = \"{}\"; path = \"{}\"; sourceTree = \"<group>\"; }};",
-                    file.referenceHash, file.name, file.name, file.path);
-            }
-            else if (file.type == RenderItem::InlineFile)
-            {
-                builder.append(
-                    "\n        {} /* {} */ = {{isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = "
-                    "text; name = \"{}\"; path = \"{}\"; sourceTree = \"<group>\"; }};",
-                    file.referenceHash, file.name, file.name, file.path);
-            }
-            else if (file.type == RenderItem::Framework)
-            {
-                builder.append("\n        {} /* {} */ = {{isa = PBXFileReference; lastKnownFileType = "
-                               "wrapper.framework; name = \"{}\"; path = \"{}\"; sourceTree = SDKROOT; }};",
-                               file.referenceHash, file.name, file.name, file.path);
+            case RenderItem::HeaderFile:
+                // HeaderFile
+                lastKnownFileType = "sourcecode.c.h";
+                break;
+            case RenderItem::CppFile:
+                // CppFile
+                lastKnownFileType = "sourcecode.cpp.cpp";
+                break;
+            case RenderItem::CFile:
+                // CFile
+                lastKnownFileType = "sourcecode.c.c";
+                break;
+            case RenderItem::ObjCFile:
+                // ObjCFile
+                lastKnownFileType = "sourcecode.m.m";
+                break;
+            case RenderItem::ObjCppFile:
+                // ObjCppFile
+                lastKnownFileType = "sourcecode.mm.mm";
+                break;
+            case RenderItem::InlineFile:
+                // InlineFile
+                lastKnownFileType = "text";
+                break;
+            case RenderItem::Framework:
+                lastKnownFileType = "wrapper.framework";
+                sourceTree        = "SDKROOT";
+                fileEncoding      = {};
+                break;
+            case RenderItem::SystemLibrary:
+                lastKnownFileType = "sourcecode.text-based-dylib-definition";
+                sourceTree        = "SDKROOT";
+                fileEncoding      = {};
+                break;
+            case RenderItem::XCAsset:
+                // XCAsset
+                lastKnownFileType = "folder.assetcatalog";
+                break;
+            default: continue;
             }
 
-            else if (file.type == RenderItem::SystemLibrary)
-            {
-                builder.append(
-                    "\n        {} /* {} */ = {{isa = PBXFileReference; lastKnownFileType = "
-                    "sourcecode.text-based-dylib-definition; name = \"{}\"; path = \"{}\"; sourceTree = SDKROOT; }};",
-                    file.referenceHash, file.name, file.name, file.path);
-            }
-            else if (file.type == RenderItem::XCAsset)
-            {
-                builder.append("\n        {} /* {} */ = {{isa = PBXFileReference; lastKnownFileType = "
-                               "folder.assetcatalog; name = \"{}\"; path = \"{}\"; sourceTree = \"<group>\"; }};",
-                               file.referenceHash, file.name, file.name, file.path);
-            }
+            builder.append("\n        {0} /* {1} */ = {{isa = PBXFileReference;{5} lastKnownFileType = "
+                           "{4}; name = \"{2}\"; path = \"{3}\"; sourceTree = {6}; }};",
+                           file.referenceHash, file.name, file.name, file.path, lastKnownFileType, fileEncoding,
+                           sourceTree);
         }
 
         builder.append("\n/* End PBXFileReference section */");
@@ -376,7 +359,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             isa = PBXFrameworksBuildPhase;
             buildActionMask = 2147483647;
             files = ()delimiter");
-        for (const auto& it : xcodeObjects)
+        for (const RenderItem& it : xcodeObjects)
         {
             if (it.type == RenderItem::Framework or it.type == RenderItem::SystemLibrary)
             {
@@ -393,6 +376,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         SC_COMPILER_WARNING_POP;
         return true;
     }
+
     [[nodiscard]] bool writePBXNativeTarget(StringBuilder& builder, const Project& project)
     {
         StringView productType;
@@ -537,7 +521,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             isa = PBXSourcesBuildPhase;
             buildActionMask = 2147483647;
             files = ()delimiter");
-        for (auto& file : xcodeFiles)
+        for (const RenderItem& file : xcodeFiles)
         {
             if (file.type == RenderItem::CppFile or file.type == RenderItem::CFile or
                 file.type == RenderItem::ObjCppFile or file.type == RenderItem::ObjCFile)
@@ -554,6 +538,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         SC_COMPILER_WARNING_POP;
         return true;
     }
+
     [[nodiscard]] bool writeincludes(StringBuilder& builder, const Project& project)
     {
         if (not project.files.compile.includePaths.isEmpty())
@@ -808,7 +793,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("\n/* Begin XCBuildConfiguration section */");
 
-        for (auto& configuration : xcodeObjects)
+        for (const RenderItem& configuration : xcodeObjects)
         {
             if (configuration.type == RenderItem::Configuration)
             {
@@ -816,7 +801,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             }
         }
 
-        for (auto& configuration : xcodeObjects)
+        for (const RenderItem& configuration : xcodeObjects)
         {
             if (configuration.type == RenderItem::Configuration)
             {
@@ -857,7 +842,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             buildConfigurations = ()delimiter",
             project.targetName.view());
 
-        for (auto& configuration : xcodeObjects)
+        for (const RenderItem& configuration : xcodeObjects)
         {
             if (configuration.type == RenderItem::Configuration)
             {
@@ -875,7 +860,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             isa = XCConfigurationList;
             buildConfigurations = ()delimiter",
             project.targetName.view());
-        for (auto& configuration : xcodeObjects)
+        for (const RenderItem& configuration : xcodeObjects)
         {
             if (configuration.type == RenderItem::Configuration)
             {
@@ -898,7 +883,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                                       Vector<RenderItem>& outputFiles)
     {
         SC_TRY(WriterInternal::getPathsRelativeTo(projectDirectory, definitionCompiler, project, outputFiles));
-        for (auto& it : outputFiles)
+        for (RenderItem& it : outputFiles)
         {
             SC_TRY(computeReferenceHash(it.name.view(), it.referenceHash));
             SC_TRY(computeBuildHash(it.name.view(), it.buildHash));
@@ -1012,7 +997,7 @@ struct SC::Build::ProjectWriter::WriterXCode
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         String output;
-        for (auto& item : renderer.renderItems)
+        for (const RenderItem& item : renderer.renderItems)
         {
             if (item.type == WriterInternal::RenderItem::DebugVisualizerFile)
             {
