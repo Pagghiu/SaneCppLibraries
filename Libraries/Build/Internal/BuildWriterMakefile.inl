@@ -173,13 +173,46 @@ endif
         return Result(true);
     }
 
-    [[nodiscard]] Result writeProject(StringBuilder& builder, const Project& project, Renderer& renderer,
+    [[nodiscard]] Result writeProject(StringBuilder& builder, const Project& project, const Renderer& renderer,
                                       const RelativeDirectories& relativeDirectories)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         SmallString<255> makeTarget;
         SC_TRY(sanitizeName(project.targetName.view(), makeTarget));
 
+        writeTargetRule(builder, makeTarget.view());
+
+        for (const Configuration& configuration : project.configurations)
+        {
+            SC_TRY(writeConfiguration(builder, project, configuration, relativeDirectories, makeTarget.view()))
+        }
+
+        writeMergedCompileFlags(builder, makeTarget.view());
+        writeTargetFlags(builder, makeTarget.view());
+        writeLinkerFlags(builder, makeTarget.view(), project.link);
+
+        // Rules
+        writeCleanRule(builder, makeTarget.view());
+        writeObjectFilesList(builder, makeTarget.view(), renderer);
+        writeRebuildOnHeaderChangeRule(builder, makeTarget.view());
+        writeCompileCommandsJsonRule(builder, makeTarget.view());
+
+        writeLinkExecutableRule(builder, makeTarget.view());
+        writeRunExecutableRule(builder, makeTarget.view());
+        writeSourceFilesList(builder, makeTarget.view(), renderer);
+        SC_COMPILER_WARNING_POP;
+        return Result(true);
+    }
+
+    [[nodiscard]] bool sanitizeName(StringView input, String& output)
+    {
+        // TODO: Actually implement name sanitization
+        return output.assign(input);
+    }
+
+    void writeTargetRule(StringBuilder& builder, StringView makeTarget)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(R"delimiter(
 # {0} Target
 
@@ -189,164 +222,13 @@ endif
 	@echo $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 
 )delimiter",
-                       makeTarget.view());
+                       makeTarget);
+        SC_COMPILER_WARNING_POP;
+    }
 
-        // TODO: On GCC we need to enable also the following fixing the warnings
-        // -Werror=conversion
-        // -Wshadow
-        // -Wsign-compare
-        // -Werror=sign-conversion
-        // -Wmissing-field-initializers
-
-        builder.append("\n{0}_WARNING_FLAGS_CXX :=-Wnon-virtual-dtor -Woverloaded-virtual", makeTarget.view());
-
-        builder.append("\n{0}_WARNING_FLAGS :=-Werror -Werror=return-type -Wunreachable-code  "
-                       " -Wmissing-braces -Wparentheses -Wswitch -Wunused-function -Wunused-label "
-                       "-Wunused-parameter -Wunused-variable -Wunused-value -Wempty-body -Wuninitialized "
-                       "-Wunknown-pragmas -Wenum-conversion -Werror=float-conversion -Werror=implicit-fallthrough",
-                       makeTarget.view());
-
-        builder.append("\n{0}_COMMON_FLAGS := $({0}_WARNING_FLAGS)", makeTarget.view());
-        for (const String& it : project.files.compile.defines)
-        {
-            SC_TRY(builder.append(" \"-D"));
-            SC_TRY(appendVariable(builder, it.view(), makeTarget.view(), relativeDirectories));
-            SC_TRY(builder.append("\""));
-        }
-        for (auto& it : project.files.compile.includePaths)
-        {
-            SC_TRY(builder.append(" \"-I"));
-            if (Path::isAbsolute(it.view(), Path::AsNative))
-            {
-                String relative;
-                SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), it.view(), relative, Path::AsNative));
-                builder.append("$(CURDIR)/{}", relative);
-            }
-            else
-            {
-                builder.append("$(CURDIR)/{}/{}", relativeDirectories.relativeProjectsToProjectRoot, it.view());
-            }
-            SC_TRY(builder.append("\""));
-        }
-
-        for (const Configuration& configuration : project.configurations)
-        {
-            SC_TRY(writeConfiguration(builder, project, configuration, relativeDirectories, makeTarget.view()))
-        }
-
-        builder.append(R"delimiter(
-
-# Cross-compile support
-ifeq ($(CLANG_DETECTED),yes)
-ifeq ($(TARGET_OS),macOS)
-ifeq ($(TARGET_ARCHITECTURE),arm64)
-{0}_TARGET_FLAGS := -target arm64-apple-macos11
-else
-{0}_TARGET_FLAGS := -target x86_64-apple-macos11
-endif # TARGET_ARCHITECTURE
-endif # TARGET_OS
-endif # CLANG_DETECTED
-
-ifeq ($({0}_TARGET_FLAGS),)
-ifneq ($(HOST_ARCHITECTURE),$(TARGET_ARCHITECTURE))
-$(error "Cross-compiling TARGET_ARCHITECTURE = $(TARGET_ARCHITECTURE) is unsupported")
-endif
-endif
-
-# Flags for both .c and .cpp files
-{0}_CPPFLAGS := $({0}_TARGET_FLAGS) $({0}_COMMON_FLAGS) $({0}_CONFIG_FLAGS) $({0}_CONFIG_COMPILER_FLAGS) $(CPPFLAGS)
-
-# Flags for .c files
-{0}_CFLAGS := $({0}_CPPFLAGS) $({0}_CONFIG_COMPILER_FLAGS) $(CFLAGS)
-)delimiter",
-                       makeTarget.view());
-
-        builder.append("\n# Flags for .cpp files");
-        builder.append("\n{0}_CXXFLAGS := $({0}_CPPFLAGS) $({0}_WARNING_FLAGS_CXX) $({0}_CONFIG_CXXFLAGS)",
-                       makeTarget.view());
-
-        builder.append(" $(CXXFLAGS)");
-
-        builder.append("\n{0}_FRAMEWORKS_ANY :=", makeTarget.view());
-        {
-            for (const String& it : project.link.frameworks)
-            {
-                builder.append(" -framework {0}", it.view());
-            }
-        }
-        builder.append("\n{0}_FRAMEWORKS_MACOS :=", makeTarget.view());
-        {
-            for (const String& it : project.link.frameworksMacOS)
-            {
-                builder.append(" -framework {0}", it.view());
-            }
-        }
-        builder.append("\n{0}_FRAMEWORKS_IOS :=", makeTarget.view());
-        {
-            for (const String& it : project.link.frameworksIOS)
-            {
-                builder.append(" -framework {0}", it.view());
-            }
-        }
-
-        builder.append("\nifeq ($(TARGET_OS),macOS)\n");
-        builder.append("     {0}_FRAMEWORKS := $({0}_FRAMEWORKS_ANY) $({0}_FRAMEWORKS_MACOS)\n", makeTarget.view());
-        builder.append("else\n");
-        builder.append("     {0}_FRAMEWORKS := $({0}_FRAMEWORKS_ANY) $({0}_FRAMEWORKS_IOS)\n", makeTarget.view());
-        builder.append("endif\n");
-
-        builder.append("\n{0}_LIBRARIES :=", makeTarget.view());
-        {
-            for (const String& it : project.link.libraries)
-            {
-                builder.append(" -l{}", it.view());
-            }
-        }
-
-        builder.append("\nifeq ($(TARGET_OS),macOS)\n");
-        builder.append("     {0}_OS_LDFLAGS := $({0}_FRAMEWORKS)\n", makeTarget.view());
-        builder.append("else ifeq ($(TARGET_OS),iOS)\n");
-        builder.append("     {0}_OS_LDFLAGS := $({0}_FRAMEWORKS)\n", makeTarget.view());
-        builder.append("else ifeq ($(TARGET_OS),linux)\n");
-        // -rdynamic is needed to resolve Plugin symbols in the executable
-        builder.append("     {0}_OS_LDFLAGS := -rdynamic\n", makeTarget.view());
-        builder.append("else\n");
-        builder.append("     {0}_OS_LDFLAGS :=\n", makeTarget.view());
-        builder.append("endif\n");
-
-        // TODO: De-hardcode LDFLAGS
-        builder.append("\n{0}_LDFLAGS :=", makeTarget.view());
-
-        builder.append(" $({0}_TARGET_FLAGS) $({0}_CONFIG_LDFLAGS) "
-                       "$({0}_CONFIG_COMPILER_LDFLAGS) $({0}_LIBRARIES) "
-                       "$({0}_OS_LDFLAGS) $(LDFLAGS)",
-                       makeTarget.view());
-
-        builder.append(R"delimiter(
-{0}_CLEAN:
-	@echo Cleaning {0}
-	$(VRBS)rm -rf $({0}_TARGET_DIR)/$(TARGET) $({0}_INTERMEDIATE_DIR)
-
-)delimiter",
-                       makeTarget.view());
-
-        builder.append("{0}_OBJECT_FILES := \\", makeTarget.view());
-
-        for (const RenderItem& item : renderer.renderItems)
-        {
-            const StringView extension = RenderItem::getExtension(item.type);
-            if (extension.isEmpty())
-                continue;
-            builder.append("\n$({0}_INTERMEDIATE_DIR)/", makeTarget.view());
-            builder.appendReplaceAll(Path::basename(item.name.view(), extension), " ", "\\ ");
-            builder.append(".o \\");
-        }
-        builder.append(R"delimiter(
-
-# Rebuild object files when an header dependency changes
--include $({0}_OBJECT_FILES:.o=.d)
-)delimiter",
-                       makeTarget.view());
+    void writeCompileCommandsJsonRule(StringBuilder& builder, StringView makeTarget)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
 
         builder.append(R"delimiter(
 
@@ -365,21 +247,38 @@ $({0}_INTERMEDIATE_DIR)/compile_commands.json: $({0}_TARGET_DIR)/$({0}_TARGET_NA
 # Under GNU sed
 # gsed -e '1s/^/[\n/' -e '$$s/,$$/\n]/' *.o.json > compile_commands.json
 )delimiter",
-                       makeTarget.view());
+                       makeTarget);
+        SC_COMPILER_WARNING_POP;
+    }
+
+    void writeLinkExecutableRule(StringBuilder& builder, StringView makeTarget)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
 
         builder.append(R"delimiter(
 $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
 	@echo Linking "{0}"
 	$(VRBS)$(CXX) -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
 )delimiter",
-                       makeTarget.view());
+                       makeTarget);
+        SC_COMPILER_WARNING_POP;
+    }
+
+    void writeRunExecutableRule(StringBuilder& builder, StringView makeTarget)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
 
         builder.append(R"delimiter(
 {0}_RUN: {0}_COMPILE
 	$({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 )delimiter",
-                       makeTarget.view());
+                       makeTarget);
+        SC_COMPILER_WARNING_POP;
+    }
 
+    void writeSourceFilesList(StringBuilder& builder, StringView makeTarget, const Renderer& renderer)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         SmallString<32> escapedPath;
         SmallString<32> escapedName;
         for (const RenderItem& item : renderer.renderItems)
@@ -396,191 +295,256 @@ $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
                 builder.append(R"delimiter(
 $({0}_INTERMEDIATE_DIR)/{1}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
 	@echo "Compiling {4}{3}"
-	$(VRBS)$(CXX) $({0}_CXXFLAGS) -o "$@" -MMD -pthread $(call MJ_if_Clang) -c "$<"
+	$(VRBS)$(CXX) $({0}_TARGET_CPPFLAGS) $({0}_CXXFLAGS) -o "$@" -MMD -pthread $(call MJ_if_Clang) -c "$<"
 
     )delimiter",
-                               makeTarget.view(), escapedName, escapedPath, extension, itemName);
+                               makeTarget, escapedName, escapedPath, extension, itemName);
             }
             else
             {
                 builder.append(R"delimiter(
 $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
 	@echo "Compiling {1}{3}"
-	$(VRBS)$(CC) $({0}_CFLAGS) -o "$@" -MMD -pthread $(call MJ_if_Clang) -c "$<"
+	$(VRBS)$(CC) $({0}_TARGET_CPPFLAGS) $({0}_CFLAGS) -o "$@" -MMD -pthread $(call MJ_if_Clang) -c "$<"
 
     )delimiter",
-                               makeTarget.view(), escapedName, escapedPath, extension, itemName);
+                               makeTarget, escapedName, escapedPath, extension, itemName);
+            }
+        }
+        SC_COMPILER_WARNING_POP;
+    }
+
+    void writeLinkerFlags(StringBuilder& builder, StringView makeTarget, const LinkFlags& link)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        builder.append("\n{0}_FRAMEWORKS_ANY :=", makeTarget);
+        {
+            for (const String& it : link.frameworks)
+            {
+                builder.append(" -framework {0}", it.view());
+            }
+        }
+        builder.append("\n{0}_FRAMEWORKS_MACOS :=", makeTarget);
+        {
+            for (const String& it : link.frameworksMacOS)
+            {
+                builder.append(" -framework {0}", it.view());
+            }
+        }
+        builder.append("\n{0}_FRAMEWORKS_IOS :=", makeTarget);
+        {
+            for (const String& it : link.frameworksIOS)
+            {
+                builder.append(" -framework {0}", it.view());
             }
         }
 
+        builder.append("\nifeq ($(TARGET_OS),macOS)\n");
+        builder.append("     {0}_FRAMEWORKS := $({0}_FRAMEWORKS_ANY) $({0}_FRAMEWORKS_MACOS)\n", makeTarget);
+        builder.append("else\n");
+        builder.append("     {0}_FRAMEWORKS := $({0}_FRAMEWORKS_ANY) $({0}_FRAMEWORKS_IOS)\n", makeTarget);
+        builder.append("endif\n");
+
+        builder.append("\n{0}_LIBRARIES :=", makeTarget);
+        {
+            for (const String& it : link.libraries)
+            {
+                builder.append(" -l{}", it.view());
+            }
+        }
+
+        builder.append("\nifeq ($(TARGET_OS),macOS)\n");
+        builder.append("     {0}_OS_LDFLAGS := $({0}_FRAMEWORKS)\n", makeTarget);
+        builder.append("else ifeq ($(TARGET_OS),iOS)\n");
+        builder.append("     {0}_OS_LDFLAGS := $({0}_FRAMEWORKS)\n", makeTarget);
+        builder.append("else ifeq ($(TARGET_OS),linux)\n");
+        // -rdynamic is needed to resolve Plugin symbols in the executable
+        builder.append("     {0}_OS_LDFLAGS := -rdynamic\n", makeTarget);
+        builder.append("else\n");
+        builder.append("     {0}_OS_LDFLAGS :=\n", makeTarget);
+        builder.append("endif\n");
+
+        builder.append("\n{0}_CONFIG_LDFLAGS := $({0}_SANITIZE_CPPFLAGS) $({0}_COMPILER_LDFLAGS)", makeTarget);
+        builder.append("\n{0}_LDFLAGS := $({0}_TARGET_CPPFLAGS) $({0}_CONFIG_LDFLAGS) $({0}_LIBRARIES) "
+                       "$({0}_OS_LDFLAGS) $(LDFLAGS)",
+                       makeTarget);
         SC_COMPILER_WARNING_POP;
+    }
+
+    void writeCleanRule(StringBuilder& builder, StringView makeTarget)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        builder.append(R"delimiter(
+{0}_CLEAN:
+	@echo Cleaning {0}
+	$(VRBS)rm -rf $({0}_TARGET_DIR)/$(TARGET) $({0}_INTERMEDIATE_DIR)
+
+)delimiter",
+                       makeTarget);
+
+        SC_COMPILER_WARNING_POP;
+    }
+
+    void writeObjectFilesList(StringBuilder& builder, StringView makeTarget, const Renderer& renderer)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        builder.append("{0}_OBJECT_FILES := \\", makeTarget);
+        for (const RenderItem& item : renderer.renderItems)
+        {
+            const StringView extension = RenderItem::getExtension(item.type);
+            if (extension.isEmpty())
+                continue;
+            builder.append("\n$({0}_INTERMEDIATE_DIR)/", makeTarget);
+            builder.appendReplaceAll(Path::basename(item.name.view(), extension), " ", "\\ ");
+            builder.append(".o \\");
+        }
+        SC_COMPILER_WARNING_POP;
+    }
+
+    void writeRebuildOnHeaderChangeRule(StringBuilder& builder, StringView makeTarget)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        builder.append(R"delimiter(
+
+# Rebuild object files when an header dependency changes
+-include $({0}_OBJECT_FILES:.o=.d)
+)delimiter",
+                       makeTarget);
+
+        SC_COMPILER_WARNING_POP;
+    }
+
+    void appendWarnings(StringBuilder& builder, StringView makeTarget)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        // TODO: On GCC we need to enable also the following fixing the warnings
+        // -W error=conversion
+        // -W shadow
+        // -W sign-compare
+        // -W error=sign-conversion
+        // -W missing-field-initializers
+
+        builder.append("\n{0}_WARNING_CXXFLAGS :=-Wnon-virtual-dtor -Woverloaded-virtual", makeTarget);
+
+        builder.append("\n{0}_WARNING_CPPFLAGS :=-Werror -Werror=return-type -Wunreachable-code "
+                       "-Wmissing-braces -Wparentheses -Wswitch -Wunused-function -Wunused-label "
+                       "-Wunused-parameter -Wunused-variable -Wunused-value -Wempty-body -Wuninitialized "
+                       "-Wunknown-pragmas -Wenum-conversion -Werror=float-conversion -Werror=implicit-fallthrough",
+                       makeTarget);
+        SC_COMPILER_WARNING_POP;
+    }
+
+    Result appendDefines(StringBuilder& builder, StringView makeTarget, const RelativeDirectories& relativeDirectories,
+                         const CompileFlags& compile)
+    {
+        SC_TRY(builder.append("\n{0}_DEFINES :=", makeTarget));
+        for (const String& it : compile.defines)
+        {
+            SC_TRY(builder.append(" \"-D"));
+            SC_TRY(appendVariable(builder, it.view(), makeTarget, relativeDirectories));
+            SC_TRY(builder.append("\""));
+        }
         return Result(true);
     }
 
-    [[nodiscard]] bool sanitizeName(StringView input, String& output)
+    Result appendIncludes(StringBuilder& builder, StringView makeTarget, const RelativeDirectories& relativeDirectories,
+                          const CompileFlags& compile)
     {
-        // TODO: Actually implement name sanitization
-        return output.assign(input);
+        SC_TRY(builder.append("\n{0}_INCLUDE_PATHS :=", makeTarget));
+        for (const String& it : compile.includePaths)
+        {
+            SC_TRY(builder.append(" \"-I"));
+            if (Path::isAbsolute(it.view(), Path::AsNative))
+            {
+                String relative;
+                SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), it.view(), relative, Path::AsNative));
+                SC_TRY(builder.append("$(CURDIR)/{}", relative));
+            }
+            else
+            {
+                SC_TRY(builder.append("$(CURDIR)/{}/{}", relativeDirectories.relativeProjectsToProjectRoot, it.view()));
+            }
+            SC_TRY(builder.append("\""));
+        }
+        return Result(true);
     }
-
-    [[nodiscard]] Result writeConfiguration(StringBuilder& builder, const Project& project,
-                                            const Configuration&       configuration,
-                                            const RelativeDirectories& relativeDirectories, StringView makeTarget)
+    Result appendSanitizeFlags(StringBuilder& builder, StringView makeTarget, const CompileFlags& projectCompile,
+                               const CompileFlags& compile)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-        SmallString<255> configName;
-        SC_TRY(sanitizeName(configuration.name.view(), configName)); // TODO: Sanitize the name
-        builder.append("\n\nifeq ($(CONFIG),{0})\n", configName.view());
-
+        builder.append("\nifeq ($(TARGET_OS),iOS)");
+        builder.append("\n{0}_SANITIZE_CPPFLAGS :=", makeTarget);
+        builder.append("\n{0}_NO_SANITIZE_CPPFLAGS :=", makeTarget);
+        builder.append("\nelse");
+        if (not resolve(projectCompile, compile, &CompileFlags::enableASAN))
         {
-            String        intermediate;
-            StringBuilder intermediateBuilder(intermediate);
-
-            WriterInternal::appendPrefixIfRelativePosix("$(CURDIR_ESCAPED)", intermediateBuilder,
-                                                        configuration.intermediatesPath.view(),
-                                                        relativeDirectories.relativeProjectsToIntermediates.view());
-
-            SC_TRY(appendVariable(intermediateBuilder, configuration.intermediatesPath.view(), makeTarget,
-                                  relativeDirectories));
-
-            // Avoid Makefile warnings on intermediates and outputs directory creation.
-            //
-            // This happens when multiple projects define the same output or intermediates directory.
-            // As the Makefile rule gets redefined for these targets, make prints a warning about it.
-            // Here we are tracking if value for a previous _TARGET_DIR or _INTERMEDIATE_DIR was already
-            // written (with the same value) to avoid re-defining it.
-            // It will not work 100% of the times if the path string doesn't match 1:1 due for example to
-            // the use of makefile variables but should handle most well written build files and common cases.
-
-            String key;
-            StringBuilder(key).format("{}_{}", intermediate, configName);
-            if (intermediateDirectories.insertIfNotExists({key.view(), makeTarget}))
-            {
-                builder.append("{0}_INTERMEDIATE_DIR := ", makeTarget);
-                builder.append(intermediate.view());
-                builder.append("\n");
-
-                builder.append(R"delimiter(
-$({0}_INTERMEDIATE_DIR):
-	@echo Creating "$({0}_INTERMEDIATE_DIR)"
-	$(VRBS)mkdir -p "$@"
-
-)delimiter",
-                               makeTarget);
-            }
-            else if (makeTarget != intermediateDirectories.get(key.view())->view())
-            {
-                builder.append("{0}_INTERMEDIATE_DIR := $(", makeTarget);
-                builder.append(intermediateDirectories.get(key.view())->view());
-                builder.append("_INTERMEDIATE_DIR)\n");
-            }
-        }
-
-        {
-            String        output;
-            StringBuilder outputBuilder(output);
-            WriterInternal::appendPrefixIfRelativePosix("$(CURDIR_ESCAPED)", outputBuilder,
-                                                        configuration.outputPath.view(),
-                                                        relativeDirectories.relativeProjectsToOutputs.view());
-            SC_TRY(appendVariable(outputBuilder, configuration.outputPath.view(), makeTarget, relativeDirectories));
-            String key;
-            StringBuilder(key).format("{}_{}", output, configName);
-            if (outputDirectories.insertIfNotExists({key.view(), makeTarget}))
-            {
-                builder.append("{0}_TARGET_DIR := ", makeTarget);
-                builder.append(output.view());
-                builder.append("\n");
-
-                builder.append(R"delimiter(
-$({0}_TARGET_DIR):
-	@echo Creating "$({0}_TARGET_DIR)"
-	$(VRBS)mkdir -p "$@"
-
-)delimiter",
-                               makeTarget);
-            }
-            else if (makeTarget != outputDirectories.get(key.view())->view())
-            {
-                builder.append("{0}_TARGET_DIR := $(", makeTarget);
-                builder.append(outputDirectories.get(key.view())->view());
-                builder.append("_TARGET_DIR)\n");
-            }
-        }
-
-        if (configuration.compile.enableASAN)
-        {
-            builder.append("\nifeq ($(TARGET_OS),iOS)");
-            builder.append("\n{0}_SANITIZE_FLAGS :=", makeTarget);
-            builder.append("\n{0}_NO_SANITIZE_FLAGS :=", makeTarget);
-            builder.append("\nelse");
-            builder.append("\n{0}_SANITIZE_FLAGS := -fsanitize=address,undefined",
-                           makeTarget); // TODO: Split the UBSAN flag
-            builder.append("\n{0}_NO_SANITIZE_FLAGS := -fno-sanitize=enum,return,float-divide-by-zero,function,vptr # "
-                           "Needed on macOS x64",
-                           makeTarget); // TODO: Split the UBSAN flag
-            builder.append("\nendif");
+            // TODO: Split the UBSAN flag
+            builder.append("\n{0}_SANITIZE_CPPFLAGS := -fsanitize=address,undefined", makeTarget);
+            builder.append("\n{0}_NO_SANITIZE_CPPFLAGS := -fno-sanitize=enum,return,float-divide-by-zero,function,vptr "
+                           "# Needed on macOS x64",
+                           makeTarget);
         }
         else
         {
-            builder.append("\n{0}_SANITIZE_FLAGS :=", makeTarget);
-            builder.append("\n{0}_NO_SANITIZE_FLAGS :=", makeTarget);
+            builder.append("\n{0}_SANITIZE_CPPFLAGS :=", makeTarget);
+            builder.append("\n{0}_NO_SANITIZE_CPPFLAGS :=", makeTarget);
         }
+        builder.append("\nendif");
+        return Result(true);
+        SC_COMPILER_WARNING_POP;
+    }
 
-        // TODO: De-hardcode all these flags
-        builder.append("\n{0}_VISIBILITY_FLAGS :="
-                       " -fstrict-aliasing"
-                       " -fvisibility=hidden",
-                       makeTarget);
-        builder.append("\n{0}_VISIBILITY_CXXFLAGS :="
-                       " -fvisibility-inlines-hidden",
-                       makeTarget);
-
-        // TODO: De-hardcode debug and release optimization levels
-        switch (configuration.compile.optimizationLevel)
-        {
-        case Optimization::Debug:
-            builder.append("\n{0}_OPTIMIZATION_FLAGS := -D_DEBUG=1 -g -ggdb -O0", makeTarget);
-            builder.append("\n{0}_OPTIMIZATION_LDFLAGS :=", makeTarget);
-            break;
-        case Optimization::Release:
-            builder.append("\n{0}_OPTIMIZATION_FLAGS := -DNDEBUG=1 -O3", makeTarget);
-            builder.append("\n{0}_OPTIMIZATION_LDFLAGS :=", makeTarget);
-            break;
-        }
-
-        builder.append("\n{0}_CONFIG_FLAGS := $({0}_OPTIMIZATION_FLAGS) $({0}_SANITIZE_FLAGS) $({0}_VISIBILITY_FLAGS)",
-                       makeTarget);
-        builder.append("\n{0}_CONFIG_LDFLAGS := $({0}_OPTIMIZATION_LDFLAGS) $({0}_SANITIZE_FLAGS)", makeTarget);
+    Result appendCommonFlags(StringBuilder& builder, StringView makeTarget, const CompileFlags& projectCompile,
+                             const CompileFlags& compile)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
 
         // TODO: De-hardcode -std=c++14
-        builder.append("\n{0}_CONFIG_CXXFLAGS := $({0}_VISIBILITY_CXXFLAGS) -std=c++14", makeTarget);
-        if (not resolve(project.files.compile, configuration.compile, &CompileFlags::enableStdCpp))
+        builder.append("\n{0}_COMMON_CXXFLAGS := -std=c++14", makeTarget);
+        if (not resolve(projectCompile, compile, &CompileFlags::enableStdCpp))
         {
             builder.append(" -nostdlib++");
         }
 
-        if (not resolve(project.files.compile, configuration.compile, &CompileFlags::enableRTTI))
+        if (not resolve(projectCompile, compile, &CompileFlags::enableRTTI))
         {
             builder.append(" -fno-rtti");
         }
 
-        if (not resolve(project.files.compile, configuration.compile, &CompileFlags::enableExceptions))
+        if (not resolve(projectCompile, compile, &CompileFlags::enableExceptions))
         {
             builder.append(" -fno-exceptions");
         }
 
+        // TODO: De-hardcode visibility flags
+        builder.append("\n{0}_VISIBILITY_CPPFLAGS := -fvisibility=hidden", makeTarget);
+        builder.append("\n{0}_VISIBILITY_CXXFLAGS := -fvisibility-inlines-hidden", makeTarget);
+
+        // TODO: De-hardcode debug and release optimization levels and aliasing
+        switch (compile.optimizationLevel)
+        {
+        case Optimization::Debug:
+            builder.append("\n{0}_OPTIMIZATION_CPPFLAGS := -D_DEBUG=1 -g -ggdb -O0 -fstrict-aliasing", makeTarget);
+            break;
+        case Optimization::Release:
+            builder.append("\n{0}_OPTIMIZATION_CPPFLAGS := -DNDEBUG=1 -O3 -fstrict-aliasing", makeTarget);
+            break;
+        }
+        return Result(true);
+        SC_COMPILER_WARNING_POP;
+    }
+
+    Result appendCompilerFlags(StringBuilder& builder, StringView makeTarget, const CompileFlags& projectCompile,
+                               const CompileFlags& compile)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("\n\nifeq ($(CLANG_DETECTED),yes)\n");
         // Clang specific flags
-        builder.append("{0}_CONFIG_COMPILER_FLAGS :=", makeTarget);
+        builder.append("{0}_COMPILER_CPPFLAGS :=", makeTarget);
 
-        if (resolve(project.files.compile, configuration.compile, &CompileFlags::enableCoverage))
+        if (resolve(projectCompile, compile, &CompileFlags::enableCoverage))
         {
             builder.append(" -fprofile-instr-generate -fcoverage-mapping");
-        }
-
-        if (not resolve(project.files.compile, configuration.compile, &CompileFlags::enableStdCpp))
-        {
-            builder.append(" -nostdinc++");
         }
 
         {
@@ -590,28 +554,205 @@ $({0}_TARGET_DIR):
             //   "vtable for __cxxabiv1::__function_type_info", referenced from:
             //       typeinfo for void (SC::AlignedStorage<88, 8>&) in Async.o
             // ...
-            // This happens on macOS (Intel only) with some combination of ASAN/UBSAN if standard library is not linked.
-            // Note:
-            // It's important that these flags come AFTER -fsanitize=address,undefined otherwise they will be overridden
-            builder.append(" $({0}_NO_SANITIZE_FLAGS)", makeTarget);
+            // This happens on macOS (Intel only) with some combination of ASAN/UBSAN if standard library is not
+            // linked. Note: It's important that these flags come AFTER -fsanitize=address,undefined otherwise they
+            // will be overridden
+            builder.append(" $({0}_NO_SANITIZE_CPPFLAGS)", makeTarget);
         }
-        builder.append("\n{0}_CONFIG_COMPILER_LDFLAGS :=", makeTarget);
-        if (resolve(project.files.compile, configuration.compile, &CompileFlags::enableCoverage))
+        builder.append("\n{0}_COMPILER_CXXFLAGS :=", makeTarget);
+        if (not resolve(projectCompile, compile, &CompileFlags::enableStdCpp))
+        {
+            builder.append(" -nostdinc++");
+        }
+        builder.append(" $({0}_NO_SANITIZE_CPPFLAGS)", makeTarget);
+
+        builder.append("\nelse");
+        // Non Clang specific flags
+        builder.append("\n{0}_COMPILER_CPPFLAGS :=", makeTarget);
+        builder.append("\n{0}_COMPILER_CXXFLAGS :=", makeTarget);
+
+        builder.append("\nendif");
+
+        return Result(true);
+        SC_COMPILER_WARNING_POP;
+    }
+
+    Result appendCompilerLinkFlags(StringBuilder& builder, StringView makeTarget, const CompileFlags& projectCompile,
+                                   const CompileFlags& compile)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        builder.append("\n\nifeq ($(CLANG_DETECTED),yes)");
+        // Clang specific flags
+        builder.append("\n{0}_COMPILER_LDFLAGS :=", makeTarget);
+        if (resolve(projectCompile, compile, &CompileFlags::enableCoverage))
         {
             builder.append(" -fprofile-instr-generate -fcoverage-mapping");
         }
-        builder.append(" $({0}_NO_SANITIZE_FLAGS)", makeTarget);
+        builder.append(" $({0}_NO_SANITIZE_CPPFLAGS)", makeTarget);
 
-        builder.append("\nelse\n");
+        builder.append("\nelse");
         // Non Clang specific flags
-        builder.append("{0}_CONFIG_COMPILER_FLAGS :=", makeTarget);
-        builder.append("\n{0}_CONFIG_COMPILER_LDFLAGS :=", makeTarget);
+        builder.append("\n{0}_COMPILER_LDFLAGS :=", makeTarget);
+        builder.append("\nendif");
+        return Result(true);
+        SC_COMPILER_WARNING_POP;
+    }
 
-        builder.append("\nendif\n");
+    Result appendIntermediateDir(StringBuilder& builder, StringView makeTarget,
+                                 const RelativeDirectories& relativeDirectories, StringView configName,
+                                 StringView intermediatesPath)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        String        intermediate;
+        StringBuilder intermediateBuilder(intermediate);
+
+        WriterInternal::appendPrefixIfRelativePosix("$(CURDIR_ESCAPED)", intermediateBuilder, intermediatesPath,
+                                                    relativeDirectories.relativeProjectsToIntermediates.view());
+
+        SC_TRY(appendVariable(intermediateBuilder, intermediatesPath, makeTarget, relativeDirectories));
+
+        // Avoid Makefile warnings on intermediates and outputs directory creation.
+        //
+        // This happens when multiple projects define the same output or intermediates directory.
+        // As the Makefile rule gets redefined for these targets, make prints a warning about it.
+        // Here we are tracking if value for a previous _TARGET_DIR or _INTERMEDIATE_DIR was already
+        // written (with the same value) to avoid re-defining it.
+        // It will not work 100% of the times if the path string doesn't match 1:1 due for example to
+        // the use of makefile variables but should handle most well written build files and common cases.
+
+        String key;
+        StringBuilder(key).format("{}_{}", intermediate, configName);
+        if (intermediateDirectories.insertIfNotExists({key.view(), makeTarget}))
+        {
+            builder.append("\n{0}_INTERMEDIATE_DIR := ", makeTarget);
+            builder.append(intermediate.view());
+            builder.append("\n");
+
+            builder.append(R"delimiter(
+$({0}_INTERMEDIATE_DIR):
+	@echo Creating "$({0}_INTERMEDIATE_DIR)"
+	$(VRBS)mkdir -p "$@"
+)delimiter",
+                           makeTarget);
+        }
+        else if (makeTarget != intermediateDirectories.get(key.view())->view())
+        {
+            builder.append("\n{0}_INTERMEDIATE_DIR := $(", makeTarget);
+            builder.append(intermediateDirectories.get(key.view())->view());
+            builder.append("_INTERMEDIATE_DIR)");
+        }
+        return Result(true);
+        SC_COMPILER_WARNING_POP;
+    }
+
+    Result appendTargetDir(StringBuilder& builder, StringView makeTarget,
+                           const RelativeDirectories& relativeDirectories, StringView configName, StringView outputPath)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        String        output;
+        StringBuilder outputBuilder(output);
+        WriterInternal::appendPrefixIfRelativePosix("$(CURDIR_ESCAPED)", outputBuilder, outputPath,
+                                                    relativeDirectories.relativeProjectsToOutputs.view());
+        SC_TRY(appendVariable(outputBuilder, outputPath, makeTarget, relativeDirectories));
+        String key;
+        StringBuilder(key).format("{}_{}", output, configName);
+        if (outputDirectories.insertIfNotExists({key.view(), makeTarget}))
+        {
+            builder.append("\n{0}_TARGET_DIR := ", makeTarget);
+            builder.append(output.view());
+            builder.append("\n");
+
+            builder.append(R"delimiter(
+$({0}_TARGET_DIR):
+	@echo Creating "$({0}_TARGET_DIR)"
+	$(VRBS)mkdir -p "$@"
+)delimiter",
+                           makeTarget);
+        }
+        else if (makeTarget != outputDirectories.get(key.view())->view())
+        {
+            builder.append("\n{0}_TARGET_DIR := $(", makeTarget);
+            builder.append(outputDirectories.get(key.view())->view());
+            builder.append("_TARGET_DIR)");
+        }
+        return Result(true);
+        SC_COMPILER_WARNING_POP;
+    }
+
+    [[nodiscard]] Result writeConfiguration(StringBuilder& builder, const Project& project,
+                                            const Configuration&       configuration,
+                                            const RelativeDirectories& relativeDirectories, StringView makeTarget)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        SmallString<255> configName;
+        SC_TRY(sanitizeName(configuration.name.view(), configName));
+
+        builder.append("\n\nifeq ($(CONFIG),{0})\n", configName.view());
+        appendIntermediateDir(builder, makeTarget, relativeDirectories, configName.view(),
+                              configuration.intermediatesPath.view());
+        appendTargetDir(builder, makeTarget, relativeDirectories, configName.view(), configuration.outputPath.view());
+        writeCompileFlags(builder, makeTarget, relativeDirectories, project.files.compile, configuration.compile);
+        appendCompilerLinkFlags(builder, makeTarget, project.files.compile, configuration.compile);
         builder.append("\nendif");
 
         SC_COMPILER_WARNING_POP;
         return Result(true);
+    }
+
+    Result writeCompileFlags(StringBuilder& builder, StringView makeTarget,
+                             const RelativeDirectories& relativeDirectories, const CompileFlags& projectCompile,
+                             const CompileFlags& compile)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        appendDefines(builder, makeTarget, relativeDirectories, projectCompile);
+        appendIncludes(builder, makeTarget, relativeDirectories, projectCompile);
+        appendWarnings(builder, makeTarget);
+        appendSanitizeFlags(builder, makeTarget, projectCompile, compile);
+        appendCommonFlags(builder, makeTarget, projectCompile, compile);
+        appendCompilerFlags(builder, makeTarget, projectCompile, compile);
+        return Result(true);
+        SC_COMPILER_WARNING_POP;
+    }
+
+    static bool writeMergedCompileFlags(StringBuilder& builder, StringView makeTarget)
+    {
+        return builder.append(R"delimiter(
+{0}_CONFIG_CPPFLAGS := $({0}_COMPILER_CPPFLAGS) $({0}_VISIBILITY_CPPFLAGS) $({0}_WARNING_CPPFLAGS) $({0}_OPTIMIZATION_CPPFLAGS) $({0}_SANITIZE_CPPFLAGS) $({0}_DEFINES) $({0}_INCLUDE_PATHS)
+{0}_CONFIG_CXXFLAGS := $({0}_COMMON_CXXFLAGS) $({0}_COMPILER_CXXFLAGS) $({0}_VISIBILITY_CXXFLAGS) $({0}_WARNING_CXXFLAGS)
+
+# Flags for both .c and .cpp files
+{0}_CPPFLAGS := $({0}_CONFIG_CPPFLAGS) $(CPPFLAGS)
+
+# Flags for .c files
+{0}_CFLAGS := $({0}_CPPFLAGS) $(CFLAGS)
+
+# Flags for .cpp files
+{0}_CXXFLAGS := $({0}_CPPFLAGS) $({0}_CONFIG_CXXFLAGS) $(CXXFLAGS)
+)delimiter",
+                              makeTarget);
+    }
+
+    static bool writeTargetFlags(StringBuilder& builder, StringView makeTarget)
+    {
+        return builder.append(R"delimiter(
+# Cross-compile support
+ifeq ($(CLANG_DETECTED),yes)
+ifeq ($(TARGET_OS),macOS)
+ifeq ($(TARGET_ARCHITECTURE),arm64)
+{0}_TARGET_CPPFLAGS := -target arm64-apple-macos11
+else
+{0}_TARGET_CPPFLAGS := -target x86_64-apple-macos11
+endif # TARGET_ARCHITECTURE
+endif # TARGET_OS
+endif # CLANG_DETECTED
+
+ifeq ($({0}_TARGET_CPPFLAGS),)
+ifneq ($(HOST_ARCHITECTURE),$(TARGET_ARCHITECTURE))
+$(error "Cross-compiling TARGET_ARCHITECTURE = $(TARGET_ARCHITECTURE) is unsupported")
+endif
+endif
+)delimiter",
+                              makeTarget);
     }
 
     [[nodiscard]] static bool appendVariable(StringBuilder& builder, StringView text, StringView makeTarget,
