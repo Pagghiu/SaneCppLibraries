@@ -8,17 +8,17 @@ namespace SC
 {
 namespace Build
 {
-struct DefinitionCompiler;
-/// @brief Writes all project files for a given Definition with some Parameters using the provided DefinitionCompiler
+struct FilePathsResolver;
+/// @brief Writes all project files for a given Definition with some Parameters using the provided FilePathsResolver
 struct ProjectWriter
 {
-    const Definition&         definition;
-    const DefinitionCompiler& definitionCompiler;
-    const Parameters&         parameters;
+    const Definition&        definition;
+    const FilePathsResolver& filePathsResolver;
+    const Parameters&        parameters;
 
-    ProjectWriter(const Definition& definition, const DefinitionCompiler& definitionCompiler,
+    ProjectWriter(const Definition& definition, const FilePathsResolver& filePathsResolver,
                   const Parameters& parameters)
-        : definition(definition), definitionCompiler(definitionCompiler), parameters(parameters)
+        : definition(definition), filePathsResolver(filePathsResolver), parameters(parameters)
     {}
 
     /// @brief Write the project file at given directories
@@ -36,6 +36,58 @@ struct ProjectWriter
 #include "Internal/BuildWriterXCode.inl"
 
 #include "../Containers/SmallVector.h"
+
+struct SC::Build::CompileFlags::Internal
+{
+    template <typename FieldType, typename FlagsClass>
+    static void writeStrongest(FieldType FlagsClass::*ptr, const SC::Span<const FlagsClass*> opinions,
+                               FlagsClass& flags)
+    {
+        for (const FlagsClass* opinion : opinions)
+        {
+            if (((*opinion).*ptr).hasBeenSet())
+            {
+                flags.*ptr = ((*opinion).*ptr);
+                break;
+            }
+        }
+    }
+};
+
+SC::Result SC::Build::CompileFlags::merge(Span<const CompileFlags*> opinions, CompileFlags& flags)
+{
+    Internal::writeStrongest(&CompileFlags::optimizationLevel, opinions, flags);
+    Internal::writeStrongest(&CompileFlags::enableASAN, opinions, flags);
+    Internal::writeStrongest(&CompileFlags::enableExceptions, opinions, flags);
+    Internal::writeStrongest(&CompileFlags::enableStdCpp, opinions, flags);
+    Internal::writeStrongest(&CompileFlags::enableCoverage, opinions, flags);
+
+    // TODO: Implement ability to "remove" paths from stronger opinions
+    for (const CompileFlags* opinion : opinions)
+    {
+        SC_TRY(flags.defines.insert(0, opinion->defines.toSpanConst()));
+        SC_TRY(flags.includePaths.insert(0, opinion->includePaths.toSpanConst()));
+    }
+
+    return Result(true);
+}
+
+SC::Result SC::Build::LinkFlags::merge(Span<const LinkFlags*> opinions, LinkFlags& flags)
+{
+    CompileFlags::Internal::writeStrongest(&LinkFlags::enableASAN, opinions, flags);
+    CompileFlags::Internal::writeStrongest(&LinkFlags::enableStdCpp, opinions, flags);
+
+    // TODO: Implement ability to "remove" paths from stronger opinions
+    for (const LinkFlags* opinion : opinions)
+    {
+        SC_TRY(flags.libraryPaths.append(opinion->libraryPaths.toSpanConst()));
+        SC_TRY(flags.libraries.append(opinion->libraries.toSpanConst()));
+        SC_TRY(flags.frameworks.append(opinion->libraries.toSpanConst()));
+        SC_TRY(flags.frameworksIOS.append(opinion->libraries.toSpanConst()));
+        SC_TRY(flags.frameworksMacOS.append(opinion->libraries.toSpanConst()));
+    }
+    return Result(true);
+}
 
 SC::Build::Configuration::Configuration()
 {
@@ -179,6 +231,11 @@ bool SC::Build::Project::addFile(StringView singleFile)
     return files.selection.push_back({FilesSelection::Add, {}, singleFile});
 }
 
+bool SC::Build::Project::addSpecificFileFlags(SourceFiles selection)
+{
+    return filesWithSpecificFlags.push_back(selection);
+}
+
 bool SC::Build::Project::removeFiles(StringView subdirectory, StringView filter)
 {
     if (subdirectory.containsCodePoint('*') or subdirectory.containsCodePoint('?'))
@@ -203,9 +260,12 @@ SC::Result SC::Build::Workspace::validate() const
 
 SC::Result SC::Build::Definition::configure(StringView projectFileName, const Build::Parameters& parameters) const
 {
-    Build::DefinitionCompiler definitionCompiler(*this);
-    SC_TRY(definitionCompiler.validate());
-    SC_TRY(definitionCompiler.build());
+    for (const auto& workspace : workspaces)
+    {
+        SC_TRY(workspace.validate());
+    }
+    FilePathsResolver filePathsResolver;
+    SC_TRY(filePathsResolver.resolve(*this));
     String projectGeneratorSubFolder = StringEncoding::Utf8;
     {
         Vector<StringView> components;
@@ -216,24 +276,16 @@ SC::Result SC::Build::Definition::configure(StringView projectFileName, const Bu
     }
     Build::Parameters newParameters             = parameters;
     newParameters.directories.projectsDirectory = move(projectGeneratorSubFolder);
-    Build::ProjectWriter writer(*this, definitionCompiler, newParameters);
+    Build::ProjectWriter writer(*this, filePathsResolver, newParameters);
     return Result(writer.write(projectFileName));
 }
 
-SC::Result SC::Build::DefinitionCompiler::validate()
-{
-    for (const auto& workspace : definition.workspaces)
-    {
-        SC_TRY(workspace.validate());
-    }
-    return Result(true);
-}
-
-SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const VectorSet<FilesSelection>& filters,
-                                                        VectorMap<String, Vector<String>>& filtersToFiles)
+SC::Result SC::Build::FilePathsResolver::enumerateFileSystemFor(StringView                         path,
+                                                                const VectorSet<FilesSelection>&   filters,
+                                                                VectorMap<String, Vector<String>>& filtersToFiles)
 {
     bool doRecurse = false;
-    for (const auto& it : filters)
+    for (const FilesSelection& it : filters)
     {
         if (it.mask.view().containsCodePoint('/'))
         {
@@ -254,7 +306,7 @@ SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const V
     }
 
     Vector<FilesSelection> renderedFilters;
-    for (const auto& filter : filters)
+    for (const FilesSelection& filter : filters)
     {
         FilesSelection file;
         file.action = filter.action;
@@ -269,7 +321,7 @@ SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const V
 
     while (fsIterator.enumerateNext())
     {
-        auto& item = fsIterator.get();
+        const FileSystemIterator::Entry& item = fsIterator.get();
         if (doRecurse and item.isDirectory())
         {
             // TODO: Check if it's possible to optimize entire subdirectory out in some cases
@@ -277,7 +329,7 @@ SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const V
         }
         else
         {
-            for (const auto& filter : renderedFilters)
+            for (const FilesSelection& filter : renderedFilters)
             {
                 if (StringAlgorithms::matchWildcard(filter.mask.view(), item.path))
                 {
@@ -289,100 +341,111 @@ SC::Result SC::Build::DefinitionCompiler::fillPathsList(StringView path, const V
     return fsIterator.checkErrors();
 }
 
-SC::Result SC::Build::DefinitionCompiler::build()
+SC::Result SC::Build::FilePathsResolver::resolve(const Build::Definition& definition)
 {
     VectorMap<String, VectorSet<FilesSelection>> uniquePaths;
-    SC_TRY(collectUniqueRootPaths(uniquePaths));
-    for (auto& it : uniquePaths)
-    {
-        SC_TRY(fillPathsList(it.key.view(), it.value, resolvedPaths));
-    }
-    return Result(true);
-}
+    String                                       buffer;
 
-// Collects root paths to build a stat map
-SC::Result SC::Build::DefinitionCompiler::collectUniqueRootPaths(VectorMap<String, VectorSet<FilesSelection>>& paths)
-{
-    String                      buffer;
     SmallVector<StringView, 16> components;
+
     for (const Workspace& workspace : definition.workspaces)
     {
         for (const Project& project : workspace.projects)
         {
             for (const FilesSelection& file : project.files.selection)
             {
-                SC_TRY(buffer.assign(project.rootDirectory.view()));
-                if (Path::isAbsolute(file.base.view(), Path::Type::AsNative))
+                SC_TRY(mergePathsFor(file, project.rootDirectory.view(), buffer, components, uniquePaths));
+            }
+            for (const SourceFiles& sourceFiles : project.filesWithSpecificFlags)
+            {
+                for (const FilesSelection& file : sourceFiles.selection)
                 {
-                    FilesSelection absFile;
-                    absFile.action = file.action;
-                    SC_TRY(Path::normalize(file.base.view(), components, &absFile.base, Path::Type::AsPosix));
-                    SC_TRY(absFile.mask.assign(file.mask.view()));
-                    SC_TRY(paths.getOrCreate(absFile.base.view())->insert(absFile));
-                    continue;
-                }
-                if (file.base.view().isEmpty())
-                {
-                    if (not file.mask.isEmpty())
-                    {
-                        if (Path::isAbsolute(file.mask.view(), Path::AsPosix))
-                        {
-                            return Result::Error("Absolute path detected");
-                        }
-                        SC_TRY(Path::append(buffer, file.mask.view(), Path::AsPosix));
-                        auto* value = paths.getOrCreate(buffer);
-                        SC_TRY(value != nullptr and value->insert(file));
-                    }
-                    continue;
-                }
-                SC_TRY(Path::append(buffer, file.base.view(), Path::AsPosix));
-                // Some example cases:
-                // 1. /SC/Tests/SCTest
-                // 2. /SC/Libraries
-                // 3. /SC/Libraries/UserInterface
-                // 4. /SC/Libraries
-                // 5. /SC/LibrariesASD
-
-                bool shouldInsert = true;
-                for (auto& it : paths)
-                {
-                    size_t commonOverlap = 0;
-                    if (it.key.view().fullyOverlaps(buffer.view(), commonOverlap))
-                    {
-                        // they are the same (Case 4. after 2. has been inserted)
-                        SC_TRY(it.value.insert(file));
-                        shouldInsert = false;
-                        break;
-                    }
-                    else
-                    {
-                        const StringView overlapNew      = buffer.view().sliceStart(commonOverlap);
-                        const StringView overlapExisting = it.key.view().sliceStart(commonOverlap);
-                        if (overlapExisting.isEmpty())
-                        {
-                            // Case .5 and .3 after .2
-                            if (overlapNew.startsWithAnyOf({'/'}))
-                            {
-                                // Case .3 after 2 (can be merged)
-                                FilesSelection mergedFile;
-                                mergedFile.action = file.action;
-                                SC_TRY(mergedFile.base.assign(it.value.begin()->base.view()));
-                                SC_TRY(mergedFile.mask.assign(Path::removeStartingSeparator(overlapNew)));
-                                SC_TRY(Path::append(mergedFile.mask, {file.mask.view()}, Path::AsPosix));
-                                SC_TRY(it.value.insert(mergedFile));
-                                shouldInsert = false;
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (shouldInsert)
-                {
-                    auto* value = paths.getOrCreate(buffer);
-                    SC_TRY(value != nullptr and value->insert(file));
+                    SC_TRY(mergePathsFor(file, project.rootDirectory.view(), buffer, components, uniquePaths));
                 }
             }
         }
+    }
+
+    for (auto& it : uniquePaths)
+    {
+        SC_TRY(enumerateFileSystemFor(it.key.view(), it.value, resolvedPaths));
+    }
+    return Result(true);
+}
+
+SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& file, const StringView rootDirectory,
+                                                       String& buffer, Vector<StringView>& components,
+                                                       VectorMap<String, VectorSet<FilesSelection>>& paths)
+{
+    SC_TRY(buffer.assign(rootDirectory));
+    if (Path::isAbsolute(file.base.view(), Path::Type::AsNative))
+    {
+        FilesSelection absFile;
+        absFile.action = file.action;
+        SC_TRY(Path::normalize(file.base.view(), components, &absFile.base, Path::Type::AsPosix));
+        SC_TRY(absFile.mask.assign(file.mask.view()));
+        SC_TRY(paths.getOrCreate(absFile.base.view())->insert(absFile));
+        return Result(true);
+    }
+    if (file.base.view().isEmpty())
+    {
+        if (not file.mask.isEmpty())
+        {
+            if (Path::isAbsolute(file.mask.view(), Path::AsPosix))
+            {
+                return Result::Error("Absolute path detected");
+            }
+            SC_TRY(Path::append(buffer, file.mask.view(), Path::AsPosix));
+            auto* value = paths.getOrCreate(buffer);
+            SC_TRY(value != nullptr and value->insert(file));
+        }
+        return Result(true);
+    }
+    SC_TRY(Path::append(buffer, file.base.view(), Path::AsPosix));
+    // Some example cases:
+    // 1. /SC/Tests/SCTest
+    // 2. /SC/Libraries
+    // 3. /SC/Libraries/UserInterface
+    // 4. /SC/Libraries
+    // 5. /SC/LibrariesASD
+
+    bool shouldInsert = true;
+    for (auto& it : paths)
+    {
+        size_t commonOverlap = 0;
+        if (it.key.view().fullyOverlaps(buffer.view(), commonOverlap))
+        {
+            // they are the same (Case 4. after 2. has been inserted)
+            SC_TRY(it.value.insert(file));
+            shouldInsert = false;
+            break;
+        }
+        else
+        {
+            const StringView overlapNew      = buffer.view().sliceStart(commonOverlap);
+            const StringView overlapExisting = it.key.view().sliceStart(commonOverlap);
+            if (overlapExisting.isEmpty())
+            {
+                // Case .5 and .3 after .2
+                if (overlapNew.startsWithAnyOf({'/'}))
+                {
+                    // Case .3 after 2 (can be merged)
+                    FilesSelection mergedFile;
+                    mergedFile.action = file.action;
+                    SC_TRY(mergedFile.base.assign(it.value.begin()->base.view()));
+                    SC_TRY(mergedFile.mask.assign(Path::removeStartingSeparator(overlapNew)));
+                    SC_TRY(Path::append(mergedFile.mask, {file.mask.view()}, Path::AsPosix));
+                    SC_TRY(it.value.insert(mergedFile));
+                    shouldInsert = false;
+                    break;
+                }
+            }
+        }
+    }
+    if (shouldInsert)
+    {
+        auto* value = paths.getOrCreate(buffer);
+        SC_TRY(value != nullptr and value->insert(file));
     }
     return Result(true);
 }
@@ -412,7 +475,7 @@ bool SC::Build::ProjectWriter::write(StringView defaultProjectName)
             RelativeDirectories relativeDirectories;
             SC_TRY(relativeDirectories.computeRelativeDirectories(directories, Path::AsPosix, project,
                                                                   "$(PROJECT_DIR)/{}"));
-            WriterXCode           writer(definition, definitionCompiler, directories, relativeDirectories);
+            WriterXCode           writer(definition, filePathsResolver, directories, relativeDirectories);
             WriterXCode::Renderer renderer;
             StringView            projectName = project.name.view();
             SC_TRY(writer.prepare(project, renderer));
@@ -472,7 +535,7 @@ bool SC::Build::ProjectWriter::write(StringView defaultProjectName)
             RelativeDirectories relativeDirectories;
             SC_TRY(relativeDirectories.computeRelativeDirectories(directories, Path::AsWindows, project,
                                                                   "$(ProjectDir){}"));
-            WriterVisualStudio writer(definition, definitionCompiler, directories, relativeDirectories,
+            WriterVisualStudio writer(definition, filePathsResolver, directories, relativeDirectories,
                                       parameters.generator);
 
             WriterVisualStudio::Renderer renderer;
@@ -510,7 +573,7 @@ bool SC::Build::ProjectWriter::write(StringView defaultProjectName)
     case Generator::Make: {
         String prjName;
         SC_TRY(StringBuilder(prjName).format("Makefile.{}", Platform::toString(parameters.platform)));
-        WriterMakefile writer(definition, definitionCompiler, directories);
+        WriterMakefile writer(definition, filePathsResolver, directories);
 
         WriterMakefile::Renderer renderer;
         {

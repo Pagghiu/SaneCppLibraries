@@ -11,15 +11,15 @@
 struct SC::Build::ProjectWriter::WriterXCode
 {
     const Definition&          definition;
-    const DefinitionCompiler&  definitionCompiler;
+    const FilePathsResolver&   filePathsResolver;
     const Directories&         directories;
     const RelativeDirectories& relativeDirectories;
 
     Hashing hashing;
 
-    WriterXCode(const Definition& definition, const DefinitionCompiler& definitionCompiler,
+    WriterXCode(const Definition& definition, const FilePathsResolver& filePathsResolver,
                 const Directories& directories, const RelativeDirectories& relativeDirectories)
-        : definition(definition), definitionCompiler(definitionCompiler), directories(directories),
+        : definition(definition), filePathsResolver(filePathsResolver), directories(directories),
           relativeDirectories(relativeDirectories)
     {}
     using RenderItem  = WriterInternal::RenderItem;
@@ -203,18 +203,6 @@ struct SC::Build::ProjectWriter::WriterXCode
 )delimiter");
         for (const RenderItem& file : xcodeFiles)
         {
-            String platformFilters;
-            if (not file.platformFilters.isEmpty())
-            {
-                platformFilters = "platformFilters = (";
-                StringBuilder sb(platformFilters, StringBuilder::DoNotClear);
-                for (size_t idx = 0; idx < file.platformFilters.size(); ++idx)
-                {
-                    sb.append(file.platformFilters[idx].view());
-                    sb.append(", ");
-                }
-                sb.append(");");
-            }
             StringView type;
             switch (file.type)
             {
@@ -227,8 +215,49 @@ struct SC::Build::ProjectWriter::WriterXCode
             case RenderItem::ObjCppFile: type = "Sources"; break;
             default: continue;
             }
-            builder.append("        {0} /* {1} in {4} */ = {{isa = PBXBuildFile; fileRef = {2} /* {1} */;{3} }};\n",
-                           file.buildHash, file.name, file.referenceHash, platformFilters, type);
+
+            String platformFilters;
+            if (not file.platformFilters.isEmpty())
+            {
+                platformFilters = " platformFilters = (";
+                StringBuilder sb(platformFilters, StringBuilder::DoNotClear);
+                for (size_t idx = 0; idx < file.platformFilters.size(); ++idx)
+                {
+                    sb.append(file.platformFilters[idx].view());
+                    sb.append(", ");
+                }
+                sb.append(");");
+            }
+            String compilerFlags;
+            if (file.compileFlags != nullptr)
+            {
+                // TODO: Figure out a way to remove flags that are in contrast with configuration
+                // on XCode one can't "remove" a flag that has been set at project or config level
+                // so it's not really clear how this can be handled properly, maybe using some $(VAR)
+                // TODO: Add additional per-file compile flags other than defines / include paths
+                const CompileFlags& compileFlags = *file.compileFlags;
+
+                compilerFlags = " settings = {COMPILER_FLAGS = \"";
+                StringBuilder sb(compilerFlags, StringBuilder::DoNotClear);
+                for (const String& includePath : compileFlags.includePaths)
+                {
+                    // TODO: Escape double quotes
+                    sb.append("-I\\\"");
+                    appendVariable(sb, includePath.view());
+                    sb.append("\\\" ");
+                }
+                for (const String& define : compileFlags.defines)
+                {
+                    // TODO: Escape double quotes
+                    sb.append("-D");
+                    appendVariable(sb, define.view());
+                    sb.append(" ");
+                }
+                sb.append("\"; };");
+            }
+
+            builder.append("        {0} /* {1} in {2} */ = {{isa = PBXBuildFile; fileRef = {3} /* {1} */;{4}{5} }};\n",
+                           file.buildHash, file.name, type, file.referenceHash, platformFilters, compilerFlags);
         }
 
         builder.append(R"delimiter(/* End PBXBuildFile section */
@@ -539,12 +568,12 @@ struct SC::Build::ProjectWriter::WriterXCode
         return true;
     }
 
-    [[nodiscard]] bool writeincludes(StringBuilder& builder, const Project& project)
+    [[nodiscard]] bool writeIncludes(StringBuilder& builder, const CompileFlags& compile)
     {
-        if (not project.files.compile.includePaths.isEmpty())
+        if (not compile.includePaths.isEmpty())
         {
             SC_TRY(builder.append("\n                       HEADER_SEARCH_PATHS = ("));
-            for (const String& it : project.files.compile.includePaths)
+            for (const String& it : compile.includePaths)
             {
                 // TODO: Escape double quotes for include paths
                 if (Path::isAbsolute(it.view(), Path::AsNative))
@@ -566,33 +595,20 @@ struct SC::Build::ProjectWriter::WriterXCode
         return true;
     }
 
-    [[nodiscard]] bool writeDefines(StringBuilder& builder, const Project& project, const Configuration& configuration)
+    [[nodiscard]] bool writeDefines(StringBuilder& builder, const CompileFlags& compile)
     {
-        bool opened = false;
-        if (not project.files.compile.defines.isEmpty() or not configuration.compile.defines.isEmpty())
+        if (not compile.defines.isEmpty())
         {
-            opened = true;
             SC_TRY(builder.append("\n                       GCC_PREPROCESSOR_DEFINITIONS = ("));
-        }
-        for (const String& it : project.files.compile.defines)
-        {
-            SC_TRY(builder.append("\n                       \""));
-            SC_TRY(appendVariable(builder, it.view())); // TODO: Escape double quotes
-            SC_TRY(builder.append("\","));
-        }
-
-        for (const String& it : configuration.compile.defines)
-        {
-            SC_TRY(builder.append("\n                       \""));
-            SC_TRY(appendVariable(builder, it.view())); // TODO: Escape double quotes
-            SC_TRY(builder.append("\","));
-        }
-        if (opened)
-        {
+            for (const String& it : compile.defines)
+            {
+                SC_TRY(builder.append("\n                       \""));
+                SC_TRY(appendVariable(builder, it.view())); // TODO: Escape double quotes
+                SC_TRY(builder.append("\","));
+            }
             SC_TRY(builder.append("\n                       \"$(inherited)\","));
             SC_TRY(builder.append("\n                       );"));
         }
-
         return true;
     }
 
@@ -701,6 +717,16 @@ struct SC::Build::ProjectWriter::WriterXCode
     [[nodiscard]] bool writeConfiguration(StringBuilder& builder, const Project& project, const RenderItem& xcodeObject)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        const Configuration* configuration = project.getConfiguration(xcodeObject.name.view());
+        SC_TRY(configuration != nullptr);
+        CompileFlags        compileFlags;
+        const CompileFlags* compileSources[] = {&configuration->compile, &project.files.compile};
+        SC_TRY(CompileFlags::merge(compileSources, compileFlags));
+
+        LinkFlags        linkFlags;
+        const LinkFlags* linkSources[] = {&project.link, &configuration->link};
+        SC_TRY(LinkFlags::merge(linkSources, linkFlags));
+
         builder.append(
             R"delimiter(
         {} /* {} */ = {{
@@ -709,20 +735,9 @@ struct SC::Build::ProjectWriter::WriterXCode
             xcodeObject.referenceHash.view(), xcodeObject.name.view());
 
         writeCommonOptions(builder, project);
+        writeDirectories(builder, configuration);
 
-        const Configuration* configuration = project.getConfiguration(xcodeObject.name.view());
-        SC_TRY(configuration != nullptr);
-        builder.append("\n                       CONFIGURATION_BUILD_DIR = \"");
-        WriterInternal::appendPrefixIfRelativePosix("$(PROJECT_DIR)", builder, configuration->outputPath.view(),
-                                                    relativeDirectories.relativeProjectsToOutputs.view());
-        appendVariable(builder, configuration->outputPath.view());
-        builder.append("\";");
-        builder.append("\n                       SYMROOT = \"");
-        WriterInternal::appendPrefixIfRelativePosix("$(PROJECT_DIR)", builder, configuration->intermediatesPath.view(),
-                                                    relativeDirectories.relativeProjectsToIntermediates.view());
-        appendVariable(builder, configuration->intermediatesPath.view());
-        builder.append("\";");
-        if (configuration->compile.enableRTTI)
+        if (compileFlags.enableRTTI)
         {
             builder.append("\n                       GCC_ENABLE_CPP_RTTI = YES;");
         }
@@ -730,7 +745,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
             builder.append("\n                       GCC_ENABLE_CPP_RTTI = NO;");
         }
-        if (configuration->compile.enableExceptions)
+        if (compileFlags.enableExceptions)
         {
             builder.append("\n                       GCC_ENABLE_CPP_EXCEPTIONS = YES;");
         }
@@ -745,7 +760,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                          "\"$(SYMROOT)/CompilationDatabase\"",
                        );)delimiter");
 
-        if (not resolve(project.files.compile, configuration->compile, &CompileFlags::enableStdCpp))
+        if (not compileFlags.enableStdCpp)
         {
             builder.append(R"delimiter(
                        OTHER_CPLUSPLUSFLAGS = (
@@ -753,11 +768,11 @@ struct SC::Build::ProjectWriter::WriterXCode
                          "-nostdinc++",
                        );)delimiter");
         }
-        if (not resolve(project.link, configuration->link, &LinkFlags::enableStdCpp))
+        if (not linkFlags.enableStdCpp)
         {
             builder.append("\n                       OTHER_LDFLAGS = \"-nostdlib++\";");
         }
-        switch (configuration->compile.optimizationLevel)
+        switch (compileFlags.optimizationLevel)
         {
         case Optimization::Debug:
             builder.append(R"delimiter(
@@ -776,8 +791,8 @@ struct SC::Build::ProjectWriter::WriterXCode
             break;
         }
 
-        writeDefines(builder, project, *configuration);
-        writeincludes(builder, project);
+        writeDefines(builder, compileFlags);
+        writeIncludes(builder, compileFlags);
         builder.append(R"delimiter(
             }};
             name = {};
@@ -785,6 +800,22 @@ struct SC::Build::ProjectWriter::WriterXCode
                        xcodeObject.name.view());
         SC_COMPILER_WARNING_POP;
         return true;
+    }
+
+    void writeDirectories(StringBuilder& builder, const Configuration* configuration)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        builder.append("\n                       CONFIGURATION_BUILD_DIR = \"");
+        WriterInternal::appendPrefixIfRelativePosix("$(PROJECT_DIR)", builder, configuration->outputPath.view(),
+                                                    relativeDirectories.relativeProjectsToOutputs.view());
+        appendVariable(builder, configuration->outputPath.view());
+        builder.append("\";");
+        builder.append("\n                       SYMROOT = \"");
+        WriterInternal::appendPrefixIfRelativePosix("$(PROJECT_DIR)", builder, configuration->intermediatesPath.view(),
+                                                    relativeDirectories.relativeProjectsToIntermediates.view());
+        appendVariable(builder, configuration->intermediatesPath.view());
+        builder.append("\";");
+        SC_COMPILER_WARNING_POP;
     }
 
     [[nodiscard]] bool writeXCBuildConfiguration(StringBuilder& builder, const Project& project,
@@ -882,7 +913,7 @@ struct SC::Build::ProjectWriter::WriterXCode
     [[nodiscard]] bool fillXCodeFiles(StringView projectDirectory, const Project& project,
                                       Vector<RenderItem>& outputFiles)
     {
-        SC_TRY(WriterInternal::getPathsRelativeTo(projectDirectory, definitionCompiler, project, outputFiles));
+        SC_TRY(WriterInternal::renderProject(projectDirectory, project, filePathsResolver, outputFiles));
         for (RenderItem& it : outputFiles)
         {
             SC_TRY(computeReferenceHash(it.name.view(), it.referenceHash));

@@ -99,6 +99,11 @@ void runSupportToolsTest(TestReport& report);
 void runCBindingsTest(TestReport& report);
 } // namespace SC
 
+#ifdef SC_SPACES_SPECIFIC_DEFINE
+// This tests that a file-specific define for "SC Spaces.cpp" is not defined globally by mistake
+#error "SC_SPACES_SPECIFIC_DEFINE should NOT be defined on this file"
+#endif
+
 #include "../../Libraries/Containers/SmallVector.h"
 #include "../../Libraries/FileSystem/FileSystemDirectories.h"
 #include "../../Libraries/FileSystem/Path.h"

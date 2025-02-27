@@ -146,13 +146,22 @@ struct CompileFlags
     Vector<String> includePaths; ///< Include search paths list
     Vector<String> defines;      ///< Preprocessor defines
 
-    Optimization::Type optimizationLevel = Optimization::Release; ///< Optimization level
+    Parameter<Optimization::Type> optimizationLevel = Optimization::Release; ///< Optimization level
 
     Parameter<bool> enableASAN       = false; ///< Enable Address Sanitizer
     Parameter<bool> enableRTTI       = false; ///< Enable C++ Runtime Type Identification
     Parameter<bool> enableExceptions = false; ///< Enable C++ Exceptions
     Parameter<bool> enableStdCpp     = false; ///< Enable and include C++ Standard Library
     Parameter<bool> enableCoverage   = false; ///< Enables code coverage instrumentation
+
+    /// @brief Merges opinions about flags into target flags
+    /// @param opinions Opinions about flags from strongest to weakest
+    /// @param flags Output flags
+    static Result merge(Span<const CompileFlags*> opinions, CompileFlags& flags);
+
+  private:
+    friend struct LinkFlags;
+    struct Internal;
 };
 
 /// @brief Link flags (library paths, libraries to link, etc.)
@@ -166,6 +175,11 @@ struct LinkFlags
 
     Parameter<bool> enableASAN   = false; ///< Enable linking Address Sanitizer
     Parameter<bool> enableStdCpp = false; ///< Enable and link C++ Standard Library
+
+    /// @brief Merges opinions about flags into target flags
+    /// @param opinions Opinions about flags from strongest to weakest
+    /// @param flags Output flags
+    static Result merge(Span<const LinkFlags*> opinions, LinkFlags& flags);
 };
 
 /// @brief Describes an additive / subtractive selection of files
@@ -279,6 +293,8 @@ struct Project
     SourceFiles files; ///< Project source files with their associated compile flags
     LinkFlags   link;  ///< Linker flags applied to all files in the project
 
+    Vector<SourceFiles> filesWithSpecificFlags; ///< List of files with specific flags different from project/config
+
     Vector<Configuration> configurations; ///< Build configurations created inside the project
 
     /// @brief Set root directory for this project (all relative paths will be relative to this one)
@@ -303,6 +319,9 @@ struct Project
 
     /// @brief Add a single source or header/inline file to the project, relative to project root
     [[nodiscard]] bool addFile(StringView singleFile);
+
+    /// @brief Add a set of flags that apply to some files only
+    [[nodiscard]] bool addSpecificFileFlags(SourceFiles selection);
 
     /// @brief Adds paths to include paths list
     [[nodiscard]] bool addIncludePaths(Span<const StringView> includePaths);

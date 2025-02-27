@@ -10,30 +10,17 @@ namespace SC
 {
 namespace Build
 {
-template <typename U, typename T>
-static const T& resolve(const U& projectCompile, const U& configurationCompile, Parameter<T> U::*Field)
-{
-    if ((configurationCompile.*Field).hasBeenSet())
-    {
-        return configurationCompile.*Field;
-    }
-    return projectCompile.*Field;
-}
 /// @brief Caches file paths by pre-resolving directory filter search masks
-struct DefinitionCompiler
+struct FilePathsResolver
 {
     VectorMap<String, Vector<String>> resolvedPaths;
 
-    const Build::Definition& definition;
-    DefinitionCompiler(const Build::Definition& definition) : definition(definition) {}
+    Result resolve(const Build::Definition& definition);
 
-    [[nodiscard]] Result validate();
-    [[nodiscard]] Result build();
-
-  private:
-    static SC::Result    fillPathsList(StringView path, const VectorSet<FilesSelection>& filters,
-                                       VectorMap<String, Vector<String>>& filtersToFiles);
-    [[nodiscard]] Result collectUniqueRootPaths(VectorMap<String, VectorSet<FilesSelection>>& paths);
+    static Result enumerateFileSystemFor(StringView path, const VectorSet<FilesSelection>& filters,
+                                         VectorMap<String, Vector<String>>& filtersToFiles);
+    static Result mergePathsFor(const FilesSelection& selection, const StringView rootDirectory, String& buffer,
+                                Vector<StringView>& components, VectorMap<String, VectorSet<FilesSelection>>& paths);
 };
 
 struct RelativeDirectories
@@ -91,7 +78,8 @@ struct SC::Build::WriterInternal
         String buildHash;
         String referenceHash;
 
-        Vector<String> platformFilters;
+        Vector<String>      platformFilters;
+        const CompileFlags* compileFlags = nullptr;
 
         [[nodiscard]] static StringView getExtension(RenderItem::Type type)
         {
@@ -153,13 +141,14 @@ struct SC::Build::WriterInternal
         return true;
     }
 
-    [[nodiscard]] static Result getPathsRelativeTo(StringView                referenceDirectory,
-                                                   const DefinitionCompiler& definitionCompiler, const Project& project,
+    [[nodiscard]] static Result getPathsRelativeTo(StringView referenceDirectory, StringView rootDirectory,
+                                                   const SourceFiles& files, const FilePathsResolver& filePathsResolver,
+
                                                    Vector<RenderItem>& outputFiles)
     {
         String             renderedFile;
         Vector<StringView> components;
-        for (const FilesSelection& file : project.files.selection)
+        for (const FilesSelection& file : files.selection)
         {
             if (Path::isAbsolute(file.base.view(), Path::AsNative))
             {
@@ -169,13 +158,13 @@ struct SC::Build::WriterInternal
             else
             {
                 StringView paths[3];
-                paths[0] = project.rootDirectory.view();
+                paths[0] = rootDirectory;
                 paths[1] = file.base.view();
                 paths[2] = file.mask.view();
                 // skipEmpty == true
                 SC_TRY(Path::join(renderedFile, {paths}, Path::Posix::SeparatorStringView(), true));
             }
-            const Vector<String>* res = definitionCompiler.resolvedPaths.get(renderedFile.view());
+            const Vector<String>* res = filePathsResolver.resolvedPaths.get(renderedFile.view());
             if (res == nullptr)
             {
                 return Result::Error("BuildWriter::getPathsRelativeTo - Cannot find path");
@@ -214,10 +203,11 @@ struct SC::Build::WriterInternal
                 {
                     renderItem.type = RenderItem::DebugVisualizerFile;
                 }
+                renderItem.compileFlags = &files.compile;
                 SC_TRY(Path::relativeFromTo(referenceDirectory, it.view(), renderItem.path,
                                             Path::Type::AsNative,  // input type
                                             Path::Type::AsPosix)); // output type
-                SC_TRY(Path::relativeFromTo(project.rootDirectory.view(), it.view(), renderItem.referencePath,
+                SC_TRY(Path::relativeFromTo(rootDirectory, it.view(), renderItem.referencePath,
                                             Path::Type::AsNative,  // input type
                                             Path::Type::AsPosix)); // output type
                 if (file.action == FilesSelection::Add)
@@ -234,6 +224,44 @@ struct SC::Build::WriterInternal
         Algorithms::bubbleSort(outputFiles.begin(), outputFiles.end(),
                                [](const RenderItem& a1, const RenderItem& a2)
                                { return a1.path.view().compare(a2.path.view()) == StringView::Comparison::Smaller; });
+        return Result(true);
+    }
+
+    [[nodiscard]] static Result renderProject(StringView projectDirectory, const Project& project,
+                                              const FilePathsResolver& filePathsResolver,
+                                              Vector<RenderItem>&      outputFiles)
+    {
+        SC_TRY(WriterInternal::getPathsRelativeTo(projectDirectory, project.rootDirectory.view(), project.files,
+                                                  filePathsResolver, outputFiles));
+        // TODO: Improve per file flags handling, this is not 100% correct and not even efficient
+        Vector<RenderItem> filesWithSpecificFlags;
+        for (const SourceFiles& files : project.filesWithSpecificFlags)
+        {
+            SC_TRY(WriterInternal::getPathsRelativeTo(projectDirectory, project.rootDirectory.view(), files,
+                                                      filePathsResolver, filesWithSpecificFlags));
+        }
+        for (RenderItem& it : outputFiles)
+        {
+            size_t     index;
+            const bool hasPerFileFlags = filesWithSpecificFlags.find(
+                [&](const RenderItem& item)
+                {
+                    if (it.path == item.path)
+                    {
+                        return true;
+                    }
+                    return false;
+                },
+                &index);
+            if (hasPerFileFlags)
+            {
+                it.compileFlags = filesWithSpecificFlags[index].compileFlags;
+            }
+            else
+            {
+                it.compileFlags = nullptr; // This is the shared compile flags
+            }
+        }
         return Result(true);
     }
 };

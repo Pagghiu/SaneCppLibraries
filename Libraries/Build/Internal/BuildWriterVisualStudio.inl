@@ -9,7 +9,7 @@
 struct SC::Build::ProjectWriter::WriterVisualStudio
 {
     const Definition&          definition;
-    const DefinitionCompiler&  definitionCompiler;
+    const FilePathsResolver&   filePathsResolver;
     const Directories&         directories;
     const RelativeDirectories& relativeDirectories;
 
@@ -18,10 +18,10 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     Hashing hashing;
     String  projectGuid;
 
-    WriterVisualStudio(const Definition& definition, const DefinitionCompiler& definitionCompiler,
+    WriterVisualStudio(const Definition& definition, const FilePathsResolver& filePathsResolver,
                        const Directories& directories, const RelativeDirectories& relativeDirectories,
                        Generator::Type generator)
-        : definition(definition), definitionCompiler(definitionCompiler), directories(directories),
+        : definition(definition), filePathsResolver(filePathsResolver), directories(directories),
           relativeDirectories(relativeDirectories), generator(generator)
     {}
 
@@ -62,7 +62,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     template <typename Lambda>
     [[nodiscard]] static Result forArchitecture(StringBuilder& builder, const Project& project, Lambda lambda)
     {
-        for (const auto& config : project.configurations)
+        for (const Configuration& config : project.configurations)
         {
             switch (config.architecture)
             {
@@ -120,6 +120,9 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                                                   const Configuration& configuration, StringView architecture)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        CompileFlags        compileFlags;
+        const CompileFlags* compileSources[] = {&configuration.compile, &project.files.compile};
+        SC_TRY(CompileFlags::merge(compileSources, compileFlags));
 
         StringView platformToolset = configuration.visualStudio.platformToolset;
         if (platformToolset.isEmpty())
@@ -137,7 +140,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             "  <PropertyGroup Condition=\"'$(Configuration)|$(Platform)'=='{}|{}'\" Label=\"Configuration\">\n",
             configuration.name, architecture);
 
-        switch (configuration.compile.optimizationLevel)
+        switch (compileFlags.optimizationLevel)
         {
         case Optimization::Debug:
             builder.append("    <ConfigurationType>Application</ConfigurationType>\n"
@@ -156,7 +159,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             break;
         }
 
-        if (resolve(project.files.compile, configuration.compile, &CompileFlags::enableASAN))
+        if (compileFlags.enableASAN)
         {
             builder.append("    <EnableASAN>true</EnableASAN>\n");
         }
@@ -271,22 +274,20 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                                                 const Configuration& configuration, StringView architecture)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        CompileFlags        compileFlags;
+        const CompileFlags* compileSources[] = {&configuration.compile, &project.files.compile};
+        SC_TRY(CompileFlags::merge(compileSources, compileFlags));
+
         builder.append("  <ItemDefinitionGroup Condition=\"'$(Configuration)|$(Platform)'=='{}|{}'\">\n",
                        configuration.name.view(), architecture);
         builder.append("    <ClCompile>\n");
         builder.append("      <WarningLevel>Level4</WarningLevel>\n");
         builder.append("      <SDLCheck>true</SDLCheck>\n");
 
-        //  TODO: This can be refactored
-        if (not configuration.compile.defines.isEmpty() or not project.files.compile.defines.isEmpty())
+        if (not compileFlags.defines.isEmpty())
         {
             builder.append("    <PreprocessorDefinitions>");
-            for (const String& it : configuration.compile.defines)
-            {
-                SC_TRY(appendVariable(builder, it.view()));
-                builder.append(";");
-            }
-            for (const String& it : project.files.compile.defines)
+            for (const String& it : compileFlags.defines)
             {
                 SC_TRY(appendVariable(builder, it.view()));
                 builder.append(";");
@@ -298,7 +299,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("      <ExceptionHandling>false</ExceptionHandling>\n");
         builder.append("      <UseFullPaths>false</UseFullPaths>\n");
         builder.append("      <TreatWarningAsError>true</TreatWarningAsError>\n");
-        if (resolve(project.files.compile, configuration.compile, &CompileFlags::enableExceptions))
+        if (compileFlags.enableExceptions)
         {
             builder.append("      <ExceptionHandling>true</ExceptionHandling>\n");
         }
@@ -306,7 +307,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             builder.append("      <ExceptionHandling>false</ExceptionHandling>\n");
         }
-        if (resolve(project.files.compile, configuration.compile, &CompileFlags::enableRTTI))
+        if (compileFlags.enableRTTI)
         {
             builder.append("      <RuntimeTypeInfo>true</RuntimeTypeInfo>\n");
         }
@@ -314,7 +315,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             builder.append("      <RuntimeTypeInfo>false</RuntimeTypeInfo>\n");
         }
-        switch (configuration.compile.optimizationLevel)
+        switch (compileFlags.optimizationLevel)
         {
         case Optimization::Debug: builder.append("      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>\n"); break;
         case Optimization::Release: builder.append("      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>\n"); break;
@@ -329,7 +330,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         case TargetType::GUIApplication: builder.append("      <SubSystem>Windows</SubSystem>\n"); break;
         }
 
-        switch (configuration.compile.optimizationLevel)
+        switch (compileFlags.optimizationLevel)
         {
         case Optimization::Debug:
             builder.append("      <GenerateDebugInformation>true</GenerateDebugInformation>\n");
@@ -361,11 +362,18 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         SC_COMPILER_UNUSED(project);
         builder.append("  <ItemGroup>\n");
-        for (auto& it : files)
+        for (const RenderItem& it : files)
         {
             if (it.type == WriterInternal::RenderItem::CppFile or it.type == WriterInternal::RenderItem::CFile)
             {
-                builder.append("    <ClCompile Include=\"{}\" />\n", it.path);
+                if (it.compileFlags == nullptr)
+                {
+                    builder.append("    <ClCompile Include=\"{}\" />\n", it.path);
+                }
+                else
+                {
+                    SC_TRY(renderSourceFileWithCompileFlags(builder, project, it));
+                }
             }
         }
         builder.append("  </ItemGroup>\n");
@@ -373,11 +381,48 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         return true;
     }
 
+    [[nodiscard]] bool renderSourceFileWithCompileFlags(StringBuilder& builder, const Project& project,
+                                                        const RenderItem& file)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        // TODO: Add additional per-file compile flags other than defines / include paths
+        builder.append("    <ClCompile Include=\"{}\">\n", file.path);
+        for (const String& includePath : file.compileFlags->includePaths)
+        {
+            writeForAllArchitectures("AdditionalIncludeDirectories", builder, project, includePath.view());
+        }
+        for (const String& define : file.compileFlags->defines)
+        {
+            writeForAllArchitectures("PreprocessorDefinitions", builder, project, define.view());
+        }
+        builder.append("    </ClCompile>\n");
+        SC_COMPILER_WARNING_POP;
+        return true;
+    }
+
+    [[nodiscard]] Result writeForAllArchitectures(StringView tag, StringBuilder& builder, const Project& project,
+                                                  StringView value)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        return forArchitecture(
+            builder, project,
+            [&](StringBuilder& builder, const Project&, const Configuration& configuration, StringView platform)
+
+            {
+                builder.append("      <{0} "
+                               "Condition=\"'$(Configuration)|$(Platform)'=='{1}|{2}'\">{3}",
+                               tag, configuration.name, platform, value);
+                builder.append("</{0}>\n", tag);
+                return true;
+            });
+        SC_COMPILER_WARNING_POP;
+    }
+
     [[nodiscard]] bool writeHeaderFiles(StringBuilder& builder, Vector<RenderItem>& files)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("  <ItemGroup>\n");
-        for (auto& it : files)
+        for (const RenderItem& it : files)
         {
             if (it.type == WriterInternal::RenderItem::HeaderFile)
             {
@@ -393,7 +438,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("  <ItemGroup>\n");
-        for (auto& it : files)
+        for (const RenderItem& it : files)
         {
             if (it.type == WriterInternal::RenderItem::InlineFile)
             {
@@ -409,7 +454,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("  <ItemGroup>\n");
-        for (auto& it : files)
+        for (const RenderItem& it : files)
         {
             if (it.type == WriterInternal::RenderItem::DebugVisualizerFile)
             {
@@ -431,7 +476,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     [[nodiscard]] Result fillVisualStudioFiles(StringView projectDirectory, const Project& project,
                                                Vector<RenderItem>& outputFiles)
     {
-        SC_TRY(WriterInternal::getPathsRelativeTo(projectDirectory, definitionCompiler, project, outputFiles));
+        SC_TRY(WriterInternal::renderProject(projectDirectory, project, filePathsResolver, outputFiles));
         return Result(true);
     }
 
@@ -549,13 +594,13 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     }
 
     // Filters
-    [[nodiscard]] bool fillFileGroups(RenderGroup& group, const Vector<RenderItem>& xcodeFiles)
+    [[nodiscard]] bool fillFileGroups(RenderGroup& group, const Vector<RenderItem>& renderItems)
     {
         SC_TRY(group.referenceHash.assign("None"));
         SC_TRY(group.name.assign("/"));
-        for (const auto& file : xcodeFiles)
+        for (const RenderItem& item : renderItems)
         {
-            StringViewTokenizer tokenizer(file.referencePath.view());
+            StringViewTokenizer tokenizer(item.referencePath.view());
             RenderGroup*        current = &group;
             while (tokenizer.tokenizeNext('/', StringViewTokenizer::SkipEmpty))
             {
@@ -576,7 +621,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("  <ItemGroup>\n");
-        for (auto& it : renderer.renderItems)
+        for (const RenderItem& it : renderer.renderItems)
         {
             const StringView dir = Path::removeStartingSeparator(Path::dirname(it.referencePath.view(), Path::AsPosix));
             if (it.type == WriterInternal::RenderItem::HeaderFile)
@@ -590,7 +635,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         }
         builder.append("  </ItemGroup>\n");
         builder.append("  <ItemGroup>\n");
-        for (auto& it : renderer.renderItems)
+        for (const RenderItem& it : renderer.renderItems)
         {
             const StringView dir = Path::removeStartingSeparator(Path::dirname(it.referencePath.view(), Path::AsPosix));
             if (it.type == WriterInternal::RenderItem::CppFile or it.type == WriterInternal::RenderItem::CFile)
@@ -604,7 +649,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         }
         builder.append("  </ItemGroup>\n");
         builder.append("  <ItemGroup>\n");
-        for (auto& it : renderer.renderItems)
+        for (const RenderItem& it : renderer.renderItems)
         {
             const StringView dir = Path::removeStartingSeparator(Path::dirname(it.referencePath.view(), Path::AsPosix));
             if (it.type == WriterInternal::RenderItem::InlineFile)
@@ -618,7 +663,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         }
         builder.append("  </ItemGroup>\n");
         builder.append("  <ItemGroup>\n");
-        for (auto& it : renderer.renderItems)
+        for (const RenderItem& it : renderer.renderItems)
         {
             const StringView dir = Path::removeStartingSeparator(Path::dirname(it.referencePath.view(), Path::AsPosix));
             if (it.type == WriterInternal::RenderItem::DebugVisualizerFile)
@@ -638,7 +683,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     [[nodiscard]] bool writeFiltersFolder(StringBuilder& builder, const RenderGroup& folder)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-        for (auto& it : folder.children)
+        for (const auto& it : folder.children)
         {
             builder.append("    <Filter Include=\"");
             builder.appendReplaceAll(it.value.name.view(), "/", "\\");
@@ -646,7 +691,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             builder.append("      <UniqueIdentifier>{}</UniqueIdentifier>\n", it.value.referenceHash);
             builder.append("    </Filter>\n");
         }
-        for (auto& it : folder.children)
+        for (const auto& it : folder.children)
         {
             SC_TRY(writeFiltersFolder(builder, it.value));
         }
