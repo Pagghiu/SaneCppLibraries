@@ -15,6 +15,8 @@ struct VectorSet;
 /// @brief A set built on an unsorted Vector, ensuring no item duplication
 /// @tparam Value The contained value
 /// @tparam Container The underlying container used
+///
+/// \snippet Libraries/Containers/Tests/VectorSetTest.cpp VectorSetSnippet
 template <typename Value, typename Container = SC::Vector<Value>>
 struct SC::VectorSet
 {

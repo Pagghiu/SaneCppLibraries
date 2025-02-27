@@ -59,7 +59,7 @@ This library is in MVP state but it doesn't have a clear roadmap.
 
 Some relevant blog posts are:
 
-- [January 2022 Update](https://pagghiu.github.io/site/blog/2025-01-31-SaneCppLibrariesUpdate.html)
+- [January 2025 Update](https://pagghiu.github.io/site/blog/2025-01-31-SaneCppLibrariesUpdate.html)
 
 # Roadmap
 

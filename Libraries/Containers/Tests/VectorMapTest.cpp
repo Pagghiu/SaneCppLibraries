@@ -66,7 +66,22 @@ struct SC::VectorMapTest : public SC::TestCase
             SC_TEST_EXPECT(not map.get(key3));
         }
     }
+    bool vectorMapSnippet();
 };
+
+bool SC::VectorMapTest::vectorMapSnippet()
+{
+    //! [VectorMapSnippet]
+    VectorMap<String, int> map;
+    SC_TRY(map.insertIfNotExists({"A", 2})); // Allocates a String
+    SC_TRY(map.insertIfNotExists({"B", 3})); // Allocates a String
+    const int* value;
+    SC_TRY(map.contains("A", value) && *value == 2); // <-- "A" is a StringView, avoiding allocation
+    SC_TRY(map.contains("B", value) && *value == 3); // <-- "B" is a StringView, avoiding allocation
+    SC_TRY(not map.contains("C"));                   // <-- "C" is a StringView, avoiding allocation
+    //! [VectorMapSnippet]
+    return true;
+}
 
 namespace SC
 {

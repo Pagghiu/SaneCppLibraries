@@ -86,6 +86,7 @@ struct SC::ProcessTest : public SC::TestCase
 
     Result spawnChildAndPrintEnvironmentVars(Process& process, String& output);
 
+    Result quickSheet();
     Result processSnippet1();
     Result processSnippet2();
     Result processSnippet3();
@@ -341,6 +342,63 @@ void SC::ProcessTest::processEnvironmentDisableInheritance()
     //! [ProcessEnvironmentDisableInheritance]
 }
 
+SC::Result SC::ProcessTest::quickSheet()
+{
+    // clang-format off
+    SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+    //! [ProcessQuickSheetSnippet]
+// 1. Execute child process (launch and wait for it to fully execute)
+Process().exec({"cmd-exe", "-h"});
+//--------------------------------------------------------------------------
+// 2. Execute child process, redirecting stdout to a string
+SmallString<256> output; // could be also just String
+Process().exec({"where-exe", "winver"}, output);
+//--------------------------------------------------------------------------
+// 3. Launch a child process and explicitly wait for it to finish execution
+Process process;
+// This is equivalent to process.exec({"1s", "-l"))
+process.launch({"ls", "-l"});
+//
+// ...
+// Here you can do I/0 to and from the spawned process
+// ...
+process.waitForExitSync();
+//--------------------------------------------------------------------------
+// 4. Execute child process, filling its stdin with a StringView
+// This is equivalent of shell command: `echo "child proc" | grep process`
+Process().exec({"grep", "process"}, Process::StdOut::Inherit(), "child proc");
+//--------------------------------------------------------------------------
+// 5. Read process output using a pipe, using launch + waitForExitSync
+Process process5;
+PipeDescriptor outputPipe;
+process5.launch({"executable.exe", "—argument1", "-argument2"}, outputPipe);
+String output5 = StringEncoding::Ascii; // Could also use SmallString<N>
+File(outputPipe.readPipe).readUntilEOF(output5);
+process5.waitForExitSync(); // call process-getExitStatus() for status code
+//--------------------------------------------------------------------------
+// 6. Executes two processes piping p1 output to p2 input
+Process p1, p2;
+ProcessChain chain;
+chain.pipe(p1, {"echo", "Salve\nDoctori"});
+chain.pipe(p2, {"grep", "Doc"});
+// Read the output of the last process in the chain
+String output6;
+chain.exec(output6);
+SC_ASSERT_RELEASE(output == "Doctori\n");
+//--------------------------------------------------------------------------
+// 7. Set an environment var and current directory for child process 
+Process process7;
+// This child process7 will inherit parent environment variables plus NewEnvVar
+SC_TEST_EXPECT(process7.setEnvironment("NewEnvVar", "SomeValue"));
+// This child process7 will inherit parent environment variables but we re-define PATH
+SC_TEST_EXPECT(process7.setEnvironment("PATH", "/usr/sane_cpp_binaries"));
+// Set the current working directory
+SC_TEST_EXPECT(process7.setWorkingDirectory("/usr/home"));
+    //! [ProcessQuickSheetSnippet]
+    SC_COMPILER_WARNING_POP;
+    // clang-format on
+    return Result(true);
+}
 SC::Result SC::ProcessTest::processSnippet1()
 {
     //! [ProcessSnippet1]

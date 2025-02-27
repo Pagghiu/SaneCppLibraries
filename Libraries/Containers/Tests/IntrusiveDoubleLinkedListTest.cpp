@@ -98,7 +98,40 @@ struct SC::IntrusiveDoubleLinkedListTest : public SC::TestCase
             }
         }
     }
+
+    bool intrusiveDoubleLinkedListSnippet();
 };
+
+bool SC::IntrusiveDoubleLinkedListTest::intrusiveDoubleLinkedListSnippet()
+{
+    //! [IntrusiveDoubleLinkedListSnippet]
+    struct Node
+    {
+        Node* next = nullptr; // <-- Required by IntrusiveDoubleLinkedList
+        Node* prev = nullptr; // <-- Required by IntrusiveDoubleLinkedList
+        int   data = 0;
+    };
+    IntrusiveDoubleLinkedList<Node> queue;
+
+    Node items[2];
+    items[0].data = 0;
+    items[1].data = 1;
+    SC_TRY(queue.isEmpty());
+
+    queue.queueBack(items[0]);
+    queue.queueBack(items[1]);
+
+    SC_TRY(not queue.isEmpty());
+    Node* first = queue.dequeueFront();
+    SC_TRY(first->data == 0);
+    SC_TRY(not queue.isEmpty());
+
+    Node* second = queue.dequeueFront();
+    SC_TRY(second->data == 1);
+    SC_TRY(queue.isEmpty());
+    //! [IntrusiveDoubleLinkedListSnippet]
+    return true;
+}
 
 namespace SC
 {

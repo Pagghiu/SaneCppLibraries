@@ -16,26 +16,35 @@ struct SC::VectorSetTest : public SC::TestCase
         using namespace SC;
         if (test_section("simple"))
         {
-            VectorSet<String> setOfStrings;
-            SC_TEST_EXPECT(setOfStrings.insert("123"));
-            SC_TEST_EXPECT(setOfStrings.insert("123"));
-            SC_TEST_EXPECT(setOfStrings.contains("123"));
-            SC_TEST_EXPECT(setOfStrings.insert("456"));
-            SC_TEST_EXPECT(setOfStrings.contains("123"));
-            SC_TEST_EXPECT(setOfStrings.contains("456"));
-            SC_TEST_EXPECT(setOfStrings.size() == 2);
-            SC_TEST_EXPECT(setOfStrings.remove("123"));
-            SC_TEST_EXPECT(setOfStrings.size() == 1);
-            SC_TEST_EXPECT(setOfStrings.contains("456"));
-            SC_TEST_EXPECT(not setOfStrings.contains("123"));
-
-            for (auto& item : setOfStrings)
-            {
-                SC_TEST_EXPECT(item == "456");
-            }
+            simple();
         }
     }
+
+    void simple();
 };
+
+void SC::VectorSetTest::simple()
+{
+    //! [VectorSetSnippet]
+    VectorSet<String> setOfStrings;
+    SC_TEST_EXPECT(setOfStrings.insert("123"));
+    SC_TEST_EXPECT(setOfStrings.insert("123"));
+    SC_TEST_EXPECT(setOfStrings.contains("123"));
+    SC_TEST_EXPECT(setOfStrings.insert("456"));
+    SC_TEST_EXPECT(setOfStrings.contains("123"));
+    SC_TEST_EXPECT(setOfStrings.contains("456"));
+    SC_TEST_EXPECT(setOfStrings.size() == 2);
+    SC_TEST_EXPECT(setOfStrings.remove("123"));
+    SC_TEST_EXPECT(setOfStrings.size() == 1);
+    SC_TEST_EXPECT(setOfStrings.contains("456"));
+    SC_TEST_EXPECT(not setOfStrings.contains("123"));
+
+    for (auto& item : setOfStrings)
+    {
+        SC_TEST_EXPECT(item == "456");
+    }
+    //! [VectorSetSnippet]
+}
 
 namespace SC
 {

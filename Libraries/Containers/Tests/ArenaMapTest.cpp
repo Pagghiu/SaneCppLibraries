@@ -110,7 +110,31 @@ struct SC::ArenaMapTest : public SC::TestCase
             SC_TEST_EXPECT(mapMove.get(keys[2])->view() == "BDA");
         }
     }
+
+    bool arenaMapSnippet();
 };
+
+bool SC::ArenaMapTest::arenaMapSnippet()
+{
+    //! [ArenaMapSnippet]
+    ArenaMap<String> map;
+    SC_TRY(not map.insert("ASD").isValid());
+    SC_TRY(map.resize(3));
+    ArenaMap<String>::Key keys[3];
+    keys[0] = map.insert("ASD");
+    SC_TRY(map.size() == 1);
+    SC_TRY(not map.resize(4)); // cannot resize unless is empty
+    keys[1] = map.insert("DSA");
+    keys[2] = map.insert("BDA");
+    SC_TRY(map.size() == 3);
+    SC_TRY(not map.insert("123").isValid()); // Arena is full
+
+    SC_TRY(map.get(keys[0])->view() == "ASD"); // Get first element
+    SC_TRY(map.get(keys[1])->view() == "DSA"); // Get second element
+    SC_TRY(map.get(keys[2])->view() == "BDA"); // Get third element
+    //! [ArenaMapSnippet]
+    return true;
+}
 
 namespace SC
 {

@@ -8,55 +8,7 @@ Process allows launching, chaining input and output, setting working directory a
 
 # Quick Sheet
 
-```cpp
-// 1. Execute child process (launch and wait for it to fully execute)
-Process().exec({"cmd-exe", "-h"});
-//--------------------------------------------------------------------------
-// 2. Execute child process, redirecting stdout to a string
-SmallString<256> output; // could be also just String
-Process().exec({"where-exe", "winver"}, output);
-//--------------------------------------------------------------------------
-// 3. Launch a child process and explicitly wait for it to finish execution
-Process process;
-// This is equivalent to process.exec({"1s", "-l"))
-process.launch({"ls", "-l"});
-//
-// ...
-// Here you can do I/0 to and from the spawned process
-// ...
-process.waitForExitSync();
-//--------------------------------------------------------------------------
-// 4. Execute child process, filling its stdin with a StringView
-// This is equivalent of shell command: `echo "child proc" | grep process`
-Process().exec({"grep", "process"}, Process::StdOut::Inherit(), "child proc");
-//--------------------------------------------------------------------------
-// 5. Read process output using a pipe, using launch + waitForExitSync
-Process process;
-PipeDescriptor outputPipe;
-process.launch({"executable.exe", "—argument1", "-argument2"}, outputPipe);
-String output = StringEncoding::Ascii; // Could also use SmallString<N>
-outputPipe.readPipe.readUntilEOF(output);
-process.waitForExitSync(); // call process-getExitStatus() for status code
-//--------------------------------------------------------------------------
-// 6. Executes two processes piping p1 output to p2 input
-Process p1, p2;
-ProcessChain chain;
-chain.pipe(p1, {"echo", "Salve\nDoctori"});
-chain.pipe(p2, {"grep", "Doc"});
-// Read the output of the last process in the chain
-String output;
-chain.exec(output);
-SC_ASSERT_RELEASE(output == "Doctori\n");
-//--------------------------------------------------------------------------
-// 7. Set an environment var and current directory for child process 
-Process process;
-// This child process will inherit parent environment variables plus NewEnvVar
-SC_TEST_EXPECT(process.setEnvironment("NewEnvVar", "SomeValue"));
-// This child process will inherit parent environment variables but we re-define PATH
-SC_TEST_EXPECT(process.setEnvironment("PATH", "/usr/sane_cpp_binaries"));
-// Set the current working directory
-SC_TEST_EXPECT(process.setWorkingDirectory("/usr/home"));
-```
+\snippet Libraries/Process/Tests/ProcessTest.cpp ProcessQuickSheetSnippet
 
 # Features
 | Class                     | Description

@@ -262,7 +262,35 @@ struct SC::SmallVectorTest : public SC::TestCase
             SC_TEST_EXPECT(container.push_back(static_cast<int>(idx)));
         }
     }
+
+    bool smallVectorSnippet();
 };
+
+bool SC::SmallVectorTest::smallVectorSnippet()
+{
+    //! [SmallVectorSnippet]
+    auto pushThreeIntegers = [](Vector<int>& myVector) -> bool
+    {
+        SC_TRY(myVector.push_back(1));
+        SC_TRY(myVector.push_back(2));
+        SC_TRY(myVector.push_back(3));
+        return true;
+    };
+    //...
+
+    SmallVector<int, 3> mySmallVector;
+    SC_TRY(pushThreeIntegers(mySmallVector)); // <-- No heap allocation will happen
+
+    // ... later on
+
+    SC_TRY(mySmallVector.push_back(4)); // <-- Vector is now moved to heap
+
+    // ... later on
+
+    SC_TRY(mySmallVector.pop_back()); // <-- Vector is moved back to SmallVector inline storage
+    //! [SmallVectorSnippet]
+    return true;
+}
 
 namespace SC
 {

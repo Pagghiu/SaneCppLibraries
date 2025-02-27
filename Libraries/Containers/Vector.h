@@ -252,6 +252,8 @@ struct SegmentVector : public Internal::ObjectVTable<T>
 /// `memcpy` is used to optimize copies when `T` is a memcpy-able object.
 /// @note Use SC::SmallVector everywhere a SC::Vector reference is needed if the upper bound size of required elements
 /// is known to get rid of unnecessary heap allocations.
+///
+/// \snippet Libraries/Containers/Tests/VectorTest.cpp VectorSnippet
 template <typename T>
 struct Vector : public Segment<SegmentVector<T>>
 {

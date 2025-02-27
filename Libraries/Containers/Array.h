@@ -16,6 +16,8 @@ namespace SC
 /// resorting to heap allocation. @n
 /// Trying to push or insert more than N elements will fail. @n
 /// Only up to SC::Array::size elements are valid (and `N` - `size()` are initialized).
+///
+/// \snippet Libraries/Containers/Tests/ArrayTest.cpp ArraySnippet
 template <typename T, int N>
 struct Array
 {

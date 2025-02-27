@@ -21,6 +21,8 @@ struct SmallVector;
 /// @note SC::SmallVector derives from SC::Vector and it can be passed everywhere a reference to SC::Vector is needed.
 /// It can be used to get rid of unnecessary allocations where the upper bound of required elements is known or it can
 /// be predicted.
+///
+/// \snippet Libraries/Containers/Tests/SmallVectorTest.cpp SmallVectorSnippet
 template <typename T, int N>
 struct SC::SmallVector : public Vector<T>
 {

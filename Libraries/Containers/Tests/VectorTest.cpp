@@ -18,6 +18,7 @@ struct SC::VectorTest : public SC::TestCase
     void basicTests();
     void testClassType();
     void testBasicType();
+    bool vectorSnippet();
 };
 
 namespace SC
@@ -786,6 +787,23 @@ void SC::VectorTest::testBasicType()
         elements.clear();
         SC_TEST_EXPECT(not elements.removeAt(1));
     }
+}
+
+bool SC::VectorTest::vectorSnippet()
+{
+    Buffer  buffer;
+    Console console(buffer);
+    //! [VectorSnippet]
+    Vector<int> myVector;
+    SC_TRY(myVector.reserve(10));
+    SC_TRY(myVector.push_back(1));
+    console.print("[0]={}", myVector[0]);
+    SC_TRY(myVector.push_back(2));
+    SC_TRY(myVector.pop_back());
+    SC_TRY(myVector.pop_front());
+    console.print("Vector<int> is {}", myVector.isEmpty() ? "empty" : "not empty");
+    //! [VectorSnippet]
+    return true;
 }
 
 namespace SC

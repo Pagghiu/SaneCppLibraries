@@ -28,6 +28,8 @@ struct SC::VectorMapItem
 /// @tparam Key Type of the key (must support `==` comparison)
 /// @tparam Value Value type associated with Key
 /// @tparam Container Container used for the Map
+///
+/// \snippet Libraries/Containers/Tests/VectorMapTest.cpp VectorMapSnippet
 template <typename Key, typename Value, typename Container = SC::Vector<SC::VectorMapItem<Key, Value>>>
 struct SC::VectorMap
 {

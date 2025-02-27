@@ -22,6 +22,8 @@ struct StringConverter;
 /// It will scope all operations on relative paths to the `initialWorkingDirectory` passed in SC::FileSystem::init.
 /// All methods can always return failure due to access or disk I/O errors, and they will be omitted in the return
 /// clauses for each method. Only the specific returned result behaviour of the given method will be described.
+///
+/// \snippet Libraries/FileSystem/Tests/FileSystemTest.cpp FileSystemQuickSheetSnippet
 struct SC::FileSystem
 {
   private:

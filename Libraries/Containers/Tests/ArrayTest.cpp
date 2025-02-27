@@ -174,7 +174,27 @@ struct SC::ArrayTest : public SC::TestCase
             SC_TEST_EXPECT(elements[2] == 2);
         }
     }
+    bool arraySnippet();
 };
+
+bool SC::ArrayTest::arraySnippet()
+{
+    Buffer  buffer;
+    Console console(buffer);
+    //! [ArraySnippet]
+    Array<int, 3> myVector;
+    SC_TRY(myVector.push_back(1));
+    SC_TRY(myVector.push_back(2));
+    SC_TRY(myVector.push_back(3));
+    (void)myVector.push_back(4); // <-- This will fail
+    SC_TRY(myVector.pop_back());
+    SC_TRY(myVector.pop_front());
+    SC_TRY(myVector.pop_front());
+    (void)myVector.pop_front(); // <-- This will fail
+    console.print("Array<int, 3> is {}", myVector.isEmpty() ? "empty" : "not empty");
+    //! [ArraySnippet]
+    return true;
+}
 
 namespace SC
 {
