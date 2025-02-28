@@ -140,11 +140,39 @@ struct Optimization
     }
 };
 
+/// @brief Describe a compile warning to disable
+struct Warning
+{
+    /// @brief Warning disabled state
+    enum State
+    {
+        Disabled // TODO: Add enabled state
+    };
+
+    /// @brief What compiler this warning applies to
+    enum Type
+    {
+        MSVCWarning,
+        NotMSVCWarning,
+        ClangWarning,
+        GCCWarning,
+    };
+
+    State      state = Disabled;
+    Type       type  = MSVCWarning;
+    StringView name;
+    uint32_t   number = 0;
+
+    Warning(State state, StringView name, Type type = NotMSVCWarning) : state(state), name(name), type(type) {}
+    Warning(State state, uint32_t number) : state(state), number(number), type(MSVCWarning) {}
+};
+
 /// @brief Compile flags (include paths, preprocessor defines etc.)
 struct CompileFlags
 {
-    Vector<String> includePaths; ///< Include search paths list
-    Vector<String> defines;      ///< Preprocessor defines
+    Vector<String>  includePaths; ///< Include search paths list
+    Vector<String>  defines;      ///< Preprocessor defines list
+    Vector<Warning> warnings;     ///< Warnings list
 
     Parameter<Optimization::Type> optimizationLevel = Optimization::Release; ///< Optimization level
 
@@ -158,6 +186,24 @@ struct CompileFlags
     /// @param opinions Opinions about flags from strongest to weakest
     /// @param flags Output flags
     static Result merge(Span<const CompileFlags*> opinions, CompileFlags& flags);
+
+    /// @brief Disable a warning for MSVC
+    [[nodiscard]] bool disableWarnings(Span<const uint32_t> number);
+
+    /// @brief Disable a warning for non-MSVC compiler
+    [[nodiscard]] bool disableWarnings(Span<const StringView> name);
+
+    /// @brief Disable a warning for Clang
+    [[nodiscard]] bool disableClangWarnings(Span<const StringView> name);
+
+    /// @brief Disable a warning for GCC
+    [[nodiscard]] bool disableGCCWarnings(Span<const StringView> name);
+
+    /// @brief Adds paths to include paths list
+    [[nodiscard]] bool addIncludePaths(Span<const StringView> includePaths);
+
+    /// @brief Adds some pre-processor defines
+    [[nodiscard]] bool addDefines(Span<const StringView> defines);
 
   private:
     friend struct LinkFlags;

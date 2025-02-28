@@ -457,7 +457,7 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
         SC_COMPILER_WARNING_POP;
     }
 
-    void appendWarnings(StringBuilder& builder, StringView makeTarget)
+    void appendWarnings(StringBuilder& builder, StringView makeTarget, const CompileFlags& compile)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         // TODO: On GCC we need to enable also the following fixing the warnings
@@ -474,6 +474,14 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
                        "-Wunused-parameter -Wunused-variable -Wunused-value -Wempty-body -Wuninitialized "
                        "-Wunknown-pragmas -Wenum-conversion -Werror=float-conversion -Werror=implicit-fallthrough",
                        makeTarget);
+        for (const Warning& warning : compile.warnings)
+        {
+            // TODO: Differentiate between Clang and GCC warnings
+            if (warning.state == Warning::Disabled and warning.type != Warning::MSVCWarning)
+            {
+                builder.append(" -Wno-{0}", warning.name);
+            }
+        }
         SC_COMPILER_WARNING_POP;
     }
 
@@ -743,7 +751,7 @@ $({0}_TARGET_DIR):
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         appendDefines(builder, makeTarget, relativeDirectories, compileFlags);
         appendIncludes(builder, makeTarget, relativeDirectories, compileFlags);
-        appendWarnings(builder, makeTarget);
+        appendWarnings(builder, makeTarget, compileFlags);
         appendSanitizeFlags(builder, makeTarget, compileFlags);
         appendCommonFlags(builder, makeTarget, compileFlags);
         appendCompilerFlags(builder, makeTarget, compileFlags);

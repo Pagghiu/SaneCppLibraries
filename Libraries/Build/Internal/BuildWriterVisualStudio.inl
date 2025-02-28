@@ -395,6 +395,21 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             writeForAllArchitectures("PreprocessorDefinitions", builder, project, define.view());
         }
+
+        String        allWarnings;
+        StringBuilder sb(allWarnings, StringBuilder::DoNotClear);
+        for (const Warning& warning : file.compileFlags->warnings)
+        {
+            if (warning.state == Warning::Disabled and warning.type == Warning::MSVCWarning)
+            {
+                sb.append("{0};", warning.number);
+            }
+        }
+        if (not allWarnings.isEmpty())
+        {
+            sb.append("%(DisableSpecificWarnings)");
+            writeForAllArchitectures("DisableSpecificWarnings", builder, project, allWarnings.view());
+        }
         builder.append("    </ClCompile>\n");
         SC_COMPILER_WARNING_POP;
         return true;

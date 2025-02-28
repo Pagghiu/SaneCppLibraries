@@ -253,6 +253,16 @@ struct SC::Build::ProjectWriter::WriterXCode
                     appendVariable(sb, define.view());
                     sb.append(" ");
                 }
+
+                for (const Warning& warning : compileFlags.warnings)
+                {
+                    if (warning.state == Warning::Disabled and
+                        (warning.type == Warning::NotMSVCWarning or warning.type == Warning::ClangWarning))
+                    {
+                        sb.append(" -Wno-{0}", warning.name);
+                    }
+                }
+
                 sb.append("\"; };");
             }
 

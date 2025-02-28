@@ -67,9 +67,46 @@ SC::Result SC::Build::CompileFlags::merge(Span<const CompileFlags*> opinions, Co
     {
         SC_TRY(flags.defines.insert(0, opinion->defines.toSpanConst()));
         SC_TRY(flags.includePaths.insert(0, opinion->includePaths.toSpanConst()));
+        SC_TRY(flags.warnings.insert(0, opinion->warnings.toSpanConst()));
     }
 
     return Result(true);
+}
+
+bool SC::Build::CompileFlags::disableWarnings(Span<const uint32_t> number)
+{
+    for (auto& it : number)
+        SC_TRY(warnings.push_back({Warning::Disabled, it}));
+    return true;
+}
+
+bool SC::Build::CompileFlags::disableWarnings(Span<const StringView> name)
+{
+
+    for (auto& it : name)
+        SC_TRY(warnings.push_back({Warning::Disabled, it}));
+    return true;
+}
+
+bool SC::Build::CompileFlags::disableClangWarnings(Span<const StringView> name)
+{
+    for (auto& it : name)
+        SC_TRY(warnings.push_back({Warning::Disabled, it, Warning::ClangWarning}));
+    return true;
+}
+
+bool SC::Build::CompileFlags::disableGCCWarnings(Span<const StringView> name)
+{
+    for (auto& it : name)
+        SC_TRY(warnings.push_back({Warning::Disabled, it, Warning::GCCWarning}));
+    return true;
+}
+
+bool SC::Build::CompileFlags::addIncludePaths(Span<const StringView> paths) { return includePaths.append(paths); }
+
+bool SC::Build::CompileFlags::addDefines(Span<const StringView> preprocessorDefines)
+{
+    return defines.append(preprocessorDefines);
 }
 
 SC::Result SC::Build::LinkFlags::merge(Span<const LinkFlags*> opinions, LinkFlags& flags)
@@ -165,6 +202,7 @@ SC::Build::Configuration* SC::Build::Project::getConfiguration(StringView config
     }
     return nullptr;
 }
+
 const SC::Build::Configuration* SC::Build::Project::getConfiguration(StringView configurationName) const
 {
     size_t index;

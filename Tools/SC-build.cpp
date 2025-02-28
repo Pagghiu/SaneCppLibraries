@@ -125,6 +125,13 @@ Result buildTestProject(const Parameters& parameters, Project& project)
     // Add an useless define to be checked inside "SC Spaces.cpp" and "SCTest.cpp"
     specificFiles.compile.addDefines({"SC_SPACES_SPECIFIC_DEFINE=1"});
     specificFiles.compile.addIncludePaths({"../Directory With Spaces"});
+
+    // For testing purposes disable some warnings caused in "SC Spaces.cpp"
+    specificFiles.compile.disableWarnings({4100});                                 // MSVC only
+    specificFiles.compile.disableWarnings({"unused-parameter"});                   // GCC and Clang
+    specificFiles.compile.disableClangWarnings({"reserved-user-defined-literal"}); // Clang Only
+    project.addSpecificFileFlags(specificFiles);
+
     return Result(true);
 }
 
