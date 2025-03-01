@@ -204,10 +204,12 @@ struct SC::FileSystemWatcher::Internal
 
     void onEventLoopNotification(AsyncFilePoll::Result& result)
     {
+        SC_COMPILER_WARNING_PUSH_OFFSETOF;
         FolderWatcherInternal& fwi = SC_COMPILER_FIELD_OFFSET(FolderWatcherInternal, asyncPoll, result.getAsync());
         SC_ASSERT_DEBUG(fwi.fileHandle.isValid());
         notifyEntry(*fwi.parentEntry);
         result.reactivateRequest(true);
+        SC_COMPILER_WARNING_POP;
     }
 
     static void notifyEntry(FolderWatcher& entry)

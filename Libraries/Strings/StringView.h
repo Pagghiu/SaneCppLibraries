@@ -883,8 +883,7 @@ inline SC::StringView SC::StringView::fromIterators(StringIterator from, StringI
         StringIterator fromEnd = from;
         fromEnd.setToEnd();
         if (fromEnd.bytesDistanceFrom(to) >= 0) // If current iterator of to is inside from range
-            return StringView({from.getCurrentIt(), static_cast<size_t>(numBytes)}, false,
-                              StringIterator::getEncoding());
+            return StringView({from.it, static_cast<size_t>(numBytes)}, false, StringIterator::getEncoding());
     }
     return StringView(); // TODO: Make StringView::fromIterators return bool to make it fallible
 }
@@ -895,7 +894,7 @@ inline SC::StringView SC::StringView::fromIteratorUntilEnd(StringIterator it)
     StringIterator endIt = it;
     endIt.setToEnd();
     const size_t numBytes = static_cast<size_t>(endIt.bytesDistanceFrom(it));
-    return StringView({it.getCurrentIt(), numBytes}, false, StringIterator::getEncoding());
+    return StringView({it.it, numBytes}, false, StringIterator::getEncoding());
 }
 
 template <typename StringIterator>
@@ -904,7 +903,7 @@ constexpr SC::StringView SC::StringView::fromIteratorFromStart(StringIterator it
     StringIterator start = it;
     start.setToStart();
     const size_t numBytes = static_cast<size_t>(it.bytesDistanceFrom(start));
-    return StringView({start.getCurrentIt(), numBytes}, false, StringIterator::getEncoding());
+    return StringView({start.it, numBytes}, false, StringIterator::getEncoding());
 }
 
 constexpr SC::StringView SC::StringView::sliceStartBytes(size_t start) const

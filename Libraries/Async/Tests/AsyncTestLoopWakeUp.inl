@@ -15,7 +15,7 @@ void SC::AsyncTest::loopWakeUpFromExternalThread()
         int             threadWasCalled;
         int             wakeUpSucceeded;
     } context                 = {eventLoop, 0, 0};
-    auto externalThreadLambda = [this, &context](Thread& thread)
+    auto externalThreadLambda = [&context](Thread& thread)
     {
         thread.setThreadName(SC_NATIVE_STR("test"));
         context.threadWasCalled++;

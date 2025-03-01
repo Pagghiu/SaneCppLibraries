@@ -1117,7 +1117,7 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncRequest& async, AsyncTea
     teardown.type      = async.type;
     teardown.flags     = async.flags;
 #if SC_CONFIGURATION_DEBUG
-#if SC_COMPILER_MSVC
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
     ::strncpy_s(teardown.debugName, async.debugName, sizeof(teardown.debugName));
 #else
     ::strncpy(teardown.debugName, async.debugName, sizeof(teardown.debugName));

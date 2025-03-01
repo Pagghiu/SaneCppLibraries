@@ -177,7 +177,7 @@ struct PluginClient : public IPluginContract
 {
     PluginClient()
     {
-        IPluginContract::onDraw = [this]()
+        IPluginContract::onDraw = []()
         {
             // Draw stuff...
         };

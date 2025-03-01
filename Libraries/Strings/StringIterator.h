@@ -234,7 +234,6 @@ struct SC_COMPILER_EXPORT StringIterator
     static constexpr const CodeUnit* getNextOf(const CodeUnit* src) { return CharIterator::getNextOf(src); }
     static constexpr const CodeUnit* getPreviousOf(const CodeUnit* src) { return CharIterator::getPreviousOf(src); }
     constexpr StringIterator(const CodeUnit* it, const CodeUnit* end) : it(it), start(it), end(end) {}
-    constexpr auto* getCurrentIt() const { return it; }
     const CodeUnit* it;
     const CodeUnit* start;
     const CodeUnit* end;
@@ -248,6 +247,7 @@ struct SC_COMPILER_EXPORT StringIteratorASCII : public StringIterator<StringIter
   private:
     [[nodiscard]] bool advanceUntilMatchesNonConstexpr(CodePoint c);
     using StringIterator::StringIterator;
+    constexpr StringIteratorASCII(const CodeUnit* it, const CodeUnit* end) : StringIterator(it, end) {}
     using Parent = StringIterator<StringIteratorASCII>;
     friend Parent;
     friend struct StringView;
@@ -264,6 +264,7 @@ struct SC_COMPILER_EXPORT StringIteratorUTF16 : public StringIterator<StringIter
 {
   private:
     using StringIterator::StringIterator;
+    constexpr StringIteratorUTF16(const CodeUnit* it, const CodeUnit* end) : StringIterator(it, end) {}
     using Parent = StringIterator<StringIteratorUTF16>;
     friend Parent;
     friend struct StringView;
@@ -285,6 +286,7 @@ struct SC_COMPILER_EXPORT StringIteratorUTF8 : public StringIterator<StringItera
     friend Parent;
     friend struct StringView;
     using StringIterator::StringIterator;
+    constexpr StringIteratorUTF8(const CodeUnit* it, const CodeUnit* end) : StringIterator(it, end) {}
 
     [[nodiscard]] static StringEncoding getEncoding() { return StringEncoding::Utf8; }
 

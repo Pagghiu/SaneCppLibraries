@@ -302,9 +302,11 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         file_completion_info.Port = NULL;
         struct SC_IO_STATUS_BLOCK status_block;
         memset(&status_block, 0, sizeof(status_block));
-        HMODULE                 ntdll = GetModuleHandleA("ntdll.dll");
-        SC_NtSetInformationFile pNtSetInformationFile =
-            reinterpret_cast<SC_NtSetInformationFile>(GetProcAddress(ntdll, "NtSetInformationFile"));
+        HMODULE ntdll = GetModuleHandleA("ntdll.dll");
+        auto    func  = ::GetProcAddress(ntdll, "NtSetInformationFile");
+
+        SC_NtSetInformationFile pNtSetInformationFile;
+        memcpy(&pNtSetInformationFile, &func, sizeof(func));
 
         NTSTATUS status = pNtSetInformationFile(listenHandle, &status_block, &file_completion_info,
                                                 sizeof(file_completion_info), FileReplaceCompletionInformation);

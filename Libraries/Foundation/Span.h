@@ -155,7 +155,7 @@ struct SC::Span
     /// @brief Creates another Span shorter or equal than the current one such that its end equals other.data().
     /// @param other The other Span that defines length of output slice
     /// @param output The slice extracted from current span
-    [[nodiscard]] const bool sliceFromStartUntil(Span other, Span& output) const
+    [[nodiscard]] bool sliceFromStartUntil(Span other, Span& output) const
     {
         const auto diff = other.items - items;
         if (diff < 0 or static_cast<SizeType>(diff) > sizeInBytes())

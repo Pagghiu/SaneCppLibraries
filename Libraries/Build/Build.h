@@ -163,8 +163,8 @@ struct Warning
     StringView name;
     uint32_t   number = 0;
 
-    Warning(State state, StringView name, Type type = NotMSVCWarning) : state(state), name(name), type(type) {}
-    Warning(State state, uint32_t number) : state(state), number(number), type(MSVCWarning) {}
+    Warning(State state, StringView name, Type type = NotMSVCWarning) : state(state), type(type), name(name) {}
+    Warning(State state, uint32_t number) : state(state), type(MSVCWarning), number(number) {}
 };
 
 /// @brief Compile flags (include paths, preprocessor defines etc.)

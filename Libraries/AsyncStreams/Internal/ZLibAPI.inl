@@ -18,7 +18,9 @@ struct SC::ZLibAPI::Internal
 #ifdef _WIN32
         HMODULE hmodule;
         memcpy(&hmodule, &zlib.library, sizeof(HMODULE));
-        sym = reinterpret_cast<Func>(::GetProcAddress(hmodule, name));
+        auto func = ::GetProcAddress(hmodule, name);
+        memcpy(&sym, &func, sizeof(func));
+        static_assert(sizeof(Func) == sizeof(void*), "");
 #else
         sym = reinterpret_cast<Func>(::dlsym(zlib.library, name));
 #endif

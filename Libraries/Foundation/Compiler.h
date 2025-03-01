@@ -59,7 +59,7 @@
 #endif
 
 /// Define compiler-specific export macros for DLL visibility.
-#if SC_COMPILER_MSVC
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 
 #if defined(SC_PLUGIN_LIBRARY)
 #define SC_COMPILER_EXPORT __declspec(dllimport) ///< Macro for importing symbols from DLL in MSVC.

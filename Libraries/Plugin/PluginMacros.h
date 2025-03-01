@@ -9,7 +9,7 @@
 // SC_PLUGIN_EXPORT
 //
 
-#if SC_COMPILER_MSVC
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #define SC_PLUGIN_EXPORT __declspec(dllexport)
 #else
 #define SC_PLUGIN_EXPORT __attribute__((visibility("default")))
