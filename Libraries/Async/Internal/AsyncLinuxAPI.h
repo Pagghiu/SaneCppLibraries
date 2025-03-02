@@ -213,19 +213,12 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
     static inline void io_uring_prep_rw(int op, struct io_uring_sqe* sqe, int fd, const void* addr, unsigned len,
                                         __u64 offset)
     {
-        sqe->opcode      = (__u8)op;
-        sqe->flags       = 0;
-        sqe->ioprio      = 0;
-        sqe->fd          = fd;
-        sqe->off         = offset;
-        sqe->addr        = (unsigned long)addr;
-        sqe->len         = len;
-        sqe->rw_flags    = 0;
-        sqe->user_data   = 0;
-        sqe->buf_index   = 0;
-        sqe->personality = 0;
-        sqe->file_index  = 0;
-        sqe->optval      = 0;
+        memset(sqe, 0, sizeof(io_uring_sqe));
+        sqe->opcode = (__u8)op;
+        sqe->fd     = fd;
+        sqe->off    = offset;
+        sqe->addr   = (unsigned long)addr;
+        sqe->len    = len;
     }
 
     static inline void io_uring_prep_timeout(struct io_uring_sqe* sqe, struct __kernel_timespec* ts, unsigned count,
