@@ -10,8 +10,8 @@ The test suite and example projects uses the handmade / self-hosted [SC::Build](
 
 ## Command-line
 - Generate projects
-    - **Windows**: `SC.bat build generate`
-    - **Posix**: `SC.sh build generate`
+    - **Windows**: `SC.bat build configure`
+    - **Posix**: `SC.sh build configure`
 - Open generated projects (in `_Build/_Projects`). 
 
 @note Check the [Tools](@ref page_tools) page for more details on invoking `SC.sh build`.
@@ -26,12 +26,12 @@ Under VSCode select `Tasks: Run Task` and choose:
 ## Command-line
 
 Intel Machines
-- **Windows**: `SC.bat compile Debug default intel64`
-- **Posix**: `SC.sh compile Debug default intel64`
+- **Windows**: `SC.bat build compile Debug default intel64`
+- **Posix**: `SC.sh build compile Debug default intel64`
 
 Arm Machines
-- **Windows**: `SC.bat compile Debug default arm64`
-- **Posix**: `SC.sh compile Debug default arm64`
+- **Windows**: `SC.bat build compile Debug default arm64`
+- **Posix**: `SC.sh build compile Debug default arm64`
 
 ## Visual Studio 2022
 - Open `_Build/_Projects/VisualStudio2022/SCTest.sln` 

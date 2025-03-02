@@ -2,8 +2,9 @@
 # Examples
 
 @note All of the examples assume build configure to be already run, as described in [Building Contributor](@ref page_building_contributor):
-- Windows: `./SC.sh build configure`
-- Posix: `SC.bat build configure`
+- Posix: `./SC.sh build configure`
+- Windows: `SC.bat build configure`
+Projects will be generated in `_Build/_Projects` for Visual Studio, Xcode and Makefiles
 
 ## SCExample
 
