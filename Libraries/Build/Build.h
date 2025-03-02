@@ -219,8 +219,7 @@ struct LinkFlags
     Vector<String> frameworksIOS;   ///< Frameworks to link on iOS only
     Vector<String> frameworksMacOS; ///< Frameworks to link on macOS only
 
-    Parameter<bool> enableASAN   = false; ///< Enable linking Address Sanitizer
-    Parameter<bool> enableStdCpp = false; ///< Enable and link C++ Standard Library
+    Parameter<bool> enableASAN = false; ///< Enable linking Address Sanitizer
 
     /// @brief Merges opinions about flags into target flags
     /// @param opinions Opinions about flags from strongest to weakest

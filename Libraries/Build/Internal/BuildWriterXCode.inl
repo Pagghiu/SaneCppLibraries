@@ -778,7 +778,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                          "-nostdinc++",
                        );)delimiter");
         }
-        if (not linkFlags.enableStdCpp)
+        if (not compileFlags.enableStdCpp)
         {
             builder.append("\n                       OTHER_LDFLAGS = \"-nostdlib++\";");
         }

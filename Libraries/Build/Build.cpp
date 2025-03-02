@@ -112,7 +112,6 @@ bool SC::Build::CompileFlags::addDefines(Span<const StringView> preprocessorDefi
 SC::Result SC::Build::LinkFlags::merge(Span<const LinkFlags*> opinions, LinkFlags& flags)
 {
     CompileFlags::Internal::writeStrongest(&LinkFlags::enableASAN, opinions, flags);
-    CompileFlags::Internal::writeStrongest(&LinkFlags::enableStdCpp, opinions, flags);
 
     // TODO: Implement ability to "remove" paths from stronger opinions
     for (const LinkFlags* opinion : opinions)

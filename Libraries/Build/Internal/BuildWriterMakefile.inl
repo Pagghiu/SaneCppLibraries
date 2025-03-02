@@ -550,10 +550,6 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
 
         // TODO: De-hardcode -std=c++14
         builder.append("\n{0}_COMMON_CXXFLAGS := -std=c++14", makeTarget);
-        if (not compileFlags.enableStdCpp)
-        {
-            builder.append(" -nostdlib++");
-        }
 
         if (not compileFlags.enableRTTI)
         {
@@ -634,6 +630,10 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
         if (compileFlags.enableCoverage)
         {
             builder.append(" -fprofile-instr-generate -fcoverage-mapping");
+        }
+        if (not compileFlags.enableStdCpp)
+        {
+            builder.append(" -nostdlib++"); // This is only Clang and GCC 13+
         }
         builder.append(" $({0}_NO_SANITIZE_CPPFLAGS)", makeTarget);
 
