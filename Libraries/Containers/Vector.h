@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Algorithms/AlgorithmRemove.h" // removeIf
-#include "../Foundation/Segment.h"
-#include "../Foundation/Segment.inl"
+#include "../Foundation/Internal/Segment.inl"
+#include "../Foundation/Internal/SegmentTrivial.inl"
 #include "../Foundation/TypeTraits.h" // IsTriviallyCopyable
 
 namespace SC

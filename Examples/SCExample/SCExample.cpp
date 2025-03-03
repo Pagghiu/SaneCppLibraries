@@ -48,7 +48,7 @@ struct ApplicationSystem
         SC_TRY(eventLoop.create());
         timeout.callback = [this](AsyncLoopTimeout::Result& result) { onTimeout(result); };
         SC_TRY(timeout.start(eventLoop, Time::Milliseconds(state.timeoutOccursEveryMs)));
-        eventLoopMonitor.onNewEventsAvailable = [this]() { sokol_wake_up(); };
+        eventLoopMonitor.onNewEventsAvailable = []() { sokol_wake_up(); };
         SC_TRY(eventLoopMonitor.create(eventLoop));
         SC_TRY(hotReloadSystem.create(eventLoop));
         SC_TRY(hotReloadSystem.syncRegistry());

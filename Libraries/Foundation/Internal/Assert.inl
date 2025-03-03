@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../Foundation/Assert.h"
-#include "../Foundation/Limits.h"
+#include "../../Foundation/Assert.h"
+#include "../../Foundation/Limits.h"
 #if SC_PLATFORM_EMSCRIPTEN
 #include <emscripten.h>
 #elif SC_PLATFORM_WINDOWS

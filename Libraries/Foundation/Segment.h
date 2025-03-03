@@ -187,24 +187,24 @@ struct Segment
 /// @brief Allows SC::Segment handle trivial types
 struct SC_COMPILER_EXPORT SegmentTrivial
 {
-    static void destruct(SegmentHeader& header, size_t bytesOffset, size_t numBytes);
-    static void copyConstructSingle(SegmentHeader& dest, size_t bytesOffset, const void* value, size_t numBytes,
-                                    size_t valueSize);
-    static void copyConstruct(SegmentHeader& dest, size_t bytesOffset, const void* src, size_t numBytes);
-    static void copyAssign(SegmentHeader& dest, size_t bytesOffset, const void* src, size_t numBytes);
-    static void copyInsert(SegmentHeader& dest, size_t bytesOffset, const void* src, size_t numBytes);
-    static void moveConstruct(SegmentHeader& dest, size_t bytesOffset, void* src, size_t numBytes);
-    static void moveAssign(SegmentHeader& dest, size_t bytesOffset, void* src, size_t numBytes);
-    static void remove(SegmentHeader& dest, size_t fromBytesOffset, size_t toBytesOffset);
+    inline static void destruct(SegmentHeader& header, size_t bytesOffset, size_t numBytes);
+    inline static void copyConstructSingle(SegmentHeader& dest, size_t bytesOffset, const void* value, size_t numBytes,
+                                           size_t valueSize);
+    inline static void copyConstruct(SegmentHeader& dest, size_t bytesOffset, const void* src, size_t numBytes);
+    inline static void copyAssign(SegmentHeader& dest, size_t bytesOffset, const void* src, size_t numBytes);
+    inline static void copyInsert(SegmentHeader& dest, size_t bytesOffset, const void* src, size_t numBytes);
+    inline static void moveConstruct(SegmentHeader& dest, size_t bytesOffset, void* src, size_t numBytes);
+    inline static void moveAssign(SegmentHeader& dest, size_t bytesOffset, void* src, size_t numBytes);
+    inline static void remove(SegmentHeader& dest, size_t fromBytesOffset, size_t toBytesOffset);
 };
 
 /// @brief Basic allocator for SC::Segment using Memory functions
 struct SC_COMPILER_EXPORT SegmentAllocator
 {
-    static SegmentHeader* allocateNewHeader(size_t newCapacityInBytes);
-    static SegmentHeader* reallocateExistingHeader(SegmentHeader& src, size_t newCapacityInBytes);
+    inline static SegmentHeader* allocateNewHeader(size_t newCapacityInBytes);
+    inline static SegmentHeader* reallocateExistingHeader(SegmentHeader& src, size_t newCapacityInBytes);
 
-    static void destroyHeader(SegmentHeader& header);
+    inline static void destroyHeader(SegmentHeader& header);
 };
 //! @}
 } // namespace SC

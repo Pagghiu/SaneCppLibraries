@@ -1,8 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Assert.h"
-#include "../Foundation/Memory.h"
+#include "../../Foundation/Assert.h"
+#include "../../Foundation/Memory.h"
+#include "../../Foundation/Segment.h"
 
 template <typename VTable>
 struct SC::Segment<VTable>::Internal
@@ -349,13 +350,16 @@ bool SC::Segment<VTable>::assignMove(Segment&& other)
 template <typename VTable>
 bool SC::Segment<VTable>::push_back(T&& value)
 {
-    if (resizeWithoutInitializing(size() + 1))
+    const auto currentSize = size();
+    if (resizeWithoutInitializing(currentSize + 1))
     {
 #if SC_COMPILER_GCC
-        // "error: writing 1 byte into a region of size 0 [-Werror=stringop-overflow=]"
-        VTable::moveConstruct(*header, (size() - 1) * sizeof(T), &value, sizeof(T));
-#else
-        placementNew(back(), move(value));
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow="
+#endif
+        placementNew(data()[currentSize], move(value));
+#if SC_COMPILER_GCC
+#pragma GCC diagnostic pop
 #endif
         return true;
     }
