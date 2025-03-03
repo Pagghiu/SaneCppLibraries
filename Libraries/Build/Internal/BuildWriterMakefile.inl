@@ -118,7 +118,7 @@ endef
         for (const Project& project : workspace.projects)
         {
             SC_TRY(sanitizeName(project.targetName.view(), makeTarget));
-            builder.append(" {0}_COMPILE_COMMANDS {0}_COMPILE", makeTarget);
+            builder.append(" {0}_COMPILE_COMMANDS {0}", makeTarget);
         }
 
         // Clean jobs are better done sequentially
@@ -263,7 +263,7 @@ endif
 
         builder.append(R"delimiter(
 
-{0}_COMPILE: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
+{0}: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 
 ifeq ($(CLANG_DETECTED),yes)
 {0}_COMPILE_COMMANDS: $({0}_INTERMEDIATE_DIR)/compile_commands.json
@@ -300,7 +300,7 @@ $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
 
         builder.append(R"delimiter(
-{0}_RUN: {0}_COMPILE
+{0}_RUN: {0}
 	$({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 )delimiter",
                        makeTarget);

@@ -41,6 +41,12 @@ Arm Machines
 - Open `_Build/_Projects/XCode/SCTest.xcodeproj/project.xcworkspace` 
 - Build the default configuration target (or another one you prefer)
 
+## Makefile
+- Linux: `cd _Build/_Projects/Makefile/linux` 
+- macOS: `cd _Build/_Projects/Makefile/apple`
+- Build Debug: `make -j SCTest`
+- Build Release: `make -j SCTest CONFIG=Release`
+
 ## VScode on macOS
 Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 - `Build SCTest Debug intel64` [1]
@@ -70,6 +76,11 @@ Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 
 @note
 [1] Needs `Visual Studio 2022` installed
+
+# Run the tests
+Executables will be at `_Build/_Outputs/${platform}-${arch}-${build}-${compiler}-${config}/${EXAMPLE_NAME}`.  
+For example assuming host to be ARM64 Linux, compiling with Clang in Debug will cause the folder to be `_Build/_Outputs/linux-arm64-make-clang-Debug/SCTest`.
+
 
 # Debug the tests
 

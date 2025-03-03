@@ -310,6 +310,17 @@ SC::Result SC::Build::Definition::configure(StringView projectFileName, const Bu
                                Path::Type::AsPosix));
         SC_TRY(
             Path::append(projectGeneratorSubFolder, {Generator::toString(parameters.generator)}, Path::Type::AsPosix));
+        if (parameters.generator == Generator::Make)
+        {
+            if (parameters.platform == Platform::Linux)
+            {
+                SC_TRY(Path::append(projectGeneratorSubFolder, {"linux"}, Path::Type::AsPosix));
+            }
+            else
+            {
+                SC_TRY(Path::append(projectGeneratorSubFolder, {"apple"}, Path::Type::AsPosix));
+            }
+        }
     }
     Build::Parameters newParameters             = parameters;
     newParameters.directories.projectsDirectory = move(projectGeneratorSubFolder);
@@ -608,16 +619,13 @@ bool SC::Build::ProjectWriter::write(StringView defaultProjectName)
         break;
     }
     case Generator::Make: {
-        String prjName;
-        SC_TRY(StringBuilder(prjName).format("Makefile.{}", Platform::toString(parameters.platform)));
-        WriterMakefile writer(definition, filePathsResolver, directories);
-
+        WriterMakefile           writer(definition, filePathsResolver, directories);
         WriterMakefile::Renderer renderer;
         {
             StringBuilder builder(buffer, StringBuilder::Clear);
             SC_TRY(writer.writeMakefile(builder, workspace, renderer));
-            SC_TRY(fs.removeFileIfExists(prjName.view()));
-            SC_TRY(fs.writeString(prjName.view(), buffer.view()));
+            SC_TRY(fs.removeFileIfExists("Makefile"));
+            SC_TRY(fs.writeString("Makefile", buffer.view()));
         }
         break;
     }
@@ -997,8 +1005,17 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
     case Generator::Make: {
         SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),
                                              Generator::toString(action.parameters.generator)}));
-        String makeFileLocation;
-        SC_TRY(StringBuilder(makeFileLocation).append("Makefile.{}", Platform::toString(action.parameters.platform)));
+        if (action.parameters.generator == Generator::Make)
+        {
+            if (action.parameters.platform == Platform::Linux)
+            {
+                SC_TRY(Path::append(solutionLocation, {"linux"}, Path::Type::AsPosix));
+            }
+            else
+            {
+                SC_TRY(Path::append(solutionLocation, {"apple"}, Path::Type::AsPosix));
+            }
+        }
         SmallString<32> platformConfiguration;
         SC_TRY(StringBuilder(platformConfiguration).format("CONFIG={}", configuration));
 
@@ -1030,12 +1047,10 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
         arguments[numArgs++] = "-j";                         // 3
         arguments[numArgs++] = "-C";                         // 4
         arguments[numArgs++] = solutionLocation.view();      // 5
-        arguments[numArgs++] = "-f";                         // 6
-        arguments[numArgs++] = makeFileLocation.view();      // 7
-        arguments[numArgs++] = platformConfiguration.view(); // 8
+        arguments[numArgs++] = platformConfiguration.view(); // 7
         if (not architecture.isEmpty())
         {
-            arguments[numArgs++] = architecture; // 9
+            arguments[numArgs++] = architecture; // 7
         }
         SC_TRY(process.setEnvironment("GNUMAKEFLAGS", "--no-print-directory"));
         if (action.action == Action::Print)

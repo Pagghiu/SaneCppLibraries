@@ -1,10 +1,14 @@
 @page page_examples Examples
 # Examples
 
+## Building
+
 @note All of the examples assume build configure to be already run, as described in [Building Contributor](@ref page_building_contributor):
 - Posix: `./SC.sh build configure`
 - Windows: `SC.bat build configure`
-Projects will be generated in `_Build/_Projects` for Visual Studio, Xcode and Makefiles
+
+@note Projects will be generated in `_Build/_Projects`.  
+After compiling (`SC build compile`) executables will be at `_Build/_Outputs/${platform}-${arch}-${build}-${compiler}-${config}/${EXAMPLE_NAME}`.
 
 ## SCExample
 
@@ -19,8 +23,8 @@ Projects will be generated in `_Build/_Projects` for Visual Studio, Xcode and Ma
 |               | Windows: None                                                                                                                     |
 |               | macOS: None                                                                                                                       |
 | Dependencies  | `sokol` and `dear-imgui` are automatically downloaded during `./SC.sh build configure` or  `SC.bat build configure`               |
-| Run (Posix)   | `./SC.sh build run SCExample`                                                                                                     |
-| Run (Windows) | `SC.bat build run SCExample`                                                                                                      |
+| Run (Posix)   | `./SC.sh build run SCExample` (will also compile before running)                                                                  |
+| Run (Windows) | `SC.bat build run SCExample`  (will also compile before running)                                                                  |
 | Debug (VSCode)| Select correct `SCExample $ARCH ($PLATFORM)` for your system and press `Start Debugging` (F5)                                     |
 | Debug (XCode) | Open `_Build/_Projects/XCode/SCExample.xcodeproj` and choose `Product` --> `Run`                                                  |
 | Debug (VS2022)| Open `_Build/_Projects/VisualStudio2022/SCExample.sln` and start Debugging (F5)                                                   |
