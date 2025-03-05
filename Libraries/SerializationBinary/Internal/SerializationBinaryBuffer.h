@@ -64,7 +64,10 @@ struct SerializationBinaryBufferReader
         if (readPosition + object.sizeInBytes() > memory.sizeInBytes())
             return false;
         numberOfOperations++;
-        memcpy(object.data(), &memory.data()[readPosition], object.sizeInBytes());
+        if (not object.empty())
+        {
+            ::memcpy(object.data(), &memory.data()[readPosition], object.sizeInBytes());
+        }
         readPosition += object.sizeInBytes();
         return true;
     }
