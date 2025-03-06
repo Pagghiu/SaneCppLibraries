@@ -12,6 +12,14 @@ struct Span;
 
 struct SpanStringView;
 struct SpanString;
+namespace detail
+{
+// clang-format off
+template<typename U> struct SpanSizeOfType              { static constexpr auto size = sizeof(U);  };
+template<>           struct SpanSizeOfType<void>        { static constexpr auto size = 1;          };
+template<>           struct SpanSizeOfType<const void>  { static constexpr auto size = 1;          };
+// clang-format on
+} // namespace detail
 } // namespace SC
 
 //! @addtogroup group_foundation_utility
@@ -22,11 +30,20 @@ struct SpanString;
 template <typename Type>
 struct SC::Span
 {
+  private:
+    // clang-format off
     using SizeType = size_t;
     using VoidType = typename TypeTraits::SameConstnessAs<Type, void>::type;
+    template <typename U> using TypeIfNotVoid = typename TypeTraits::EnableIf<not TypeTraits::IsSame<U, VoidType>::value, Type>::type;
+    template <typename U> using SameType = TypeTraits::IsSame<typename TypeTraits::RemoveConst<U>::type, typename TypeTraits::RemoveConst<Type>::type>;
+    template <typename U> using EnableNotVoid = typename TypeTraits::EnableIf<SameType<U>::value and not TypeTraits::IsSame<U, VoidType>::value, bool>::type;
+    // clang-format on
+    Type*    items;
+    SizeType sizeElements;
 
-    template <size_t N>
-    constexpr Span(Type (&_items)[N]) : items(_items), sizeElements(N)
+  public:
+    template <size_t N, typename U = Type, EnableNotVoid<U> = true>
+    constexpr Span(U (&itemsArray)[N]) : items(itemsArray), sizeElements(N)
     {}
 
     /// @brief Builds an empty Span
@@ -39,19 +56,26 @@ struct SC::Span
 
     /// @brief Builds a Span from a single object
     /// @param type A reference to a single object of type Type
-    constexpr Span(Type& type) : items(&type), sizeElements(1) {}
+    template <typename U = Type>
+    constexpr Span(TypeIfNotVoid<U>& type) : items(&type), sizeElements(1)
+    {}
 
     /// @brief Span specialized constructor (mainly used for converting const char* to StringView)
     /// @param list an initializer list of elements
-    constexpr Span(std::initializer_list<Type> list) : items(nullptr), sizeElements(0)
+    template <typename U = Type>
+    constexpr Span(std::initializer_list<TypeIfNotVoid<U>> list) : items(nullptr), sizeElements(0)
     {
         // We need this two step initialization to avoid warnings on all compilers
         items        = list.begin();
         sizeElements = list.size();
     }
 
-    /// @brief Converts to a span with `const` qualified Type
-    operator Span<const Type>() const { return {items, sizeElements}; }
+    // clang-format off
+    template <typename U = Type> operator Span<const TypeIfNotVoid<U>>() const { return {items, sizeElements}; }
+    template <typename U = Type> operator Span<      TypeIfNotVoid<U>>()       { return {items, sizeElements}; }
+    operator Span<const void>() const { return Span<const void>(items, sizeElements * detail::SpanSizeOfType<Type>::size); }
+    operator Span<void>() { return Span<void>(items, sizeElements * detail::SpanSizeOfType<Type>::size); }
+    // clang-format on
 
     /// @brief Constructs a Span reinterpreting memory pointed by object of type `T` as a type `Type`
     /// @tparam T Type of object to be reinterpreted
@@ -60,7 +84,7 @@ struct SC::Span
     template <typename T>
     [[nodiscard]] static Span<Type> reinterpret_object(T& value)
     {
-        return {reinterpret_cast<Type*>(&value), sizeof(T) / sizeof(Type)};
+        return {reinterpret_cast<Type*>(&value), sizeof(T) / detail::SpanSizeOfType<Type>::size};
     }
 
     /// @brief Construct a span reinterpreting raw memory (`void*` or `const void*`) to `Type` or `const Type`
@@ -69,7 +93,7 @@ struct SC::Span
     /// @return The reinterpreted Span object
     [[nodiscard]] static Span<Type> reinterpret_bytes(VoidType* rawMemory, SizeType sizeInBytes)
     {
-        return Span(reinterpret_cast<Type*>(rawMemory), sizeInBytes / sizeof(Type));
+        return Span(reinterpret_cast<Type*>(rawMemory), sizeInBytes / detail::SpanSizeOfType<Type>::size);
     }
 
     /// @brief Reinterprets the current span as an array of the specified type
@@ -116,7 +140,7 @@ struct SC::Span
 
     /// @brief Size of Span in bytes
     /// @return The number of bytes covering the entire Span
-    [[nodiscard]] constexpr SizeType sizeInBytes() const { return sizeElements * sizeof(Type); }
+    [[nodiscard]] constexpr SizeType sizeInBytes() const { return sizeElements * detail::SpanSizeOfType<Type>::size; }
 
     /// @brief Creates another Span, starting at an offset in elements from current Span, until end.
     /// @param offsetInElements Offset in current Span where destination Span will be starting
@@ -164,7 +188,7 @@ struct SC::Span
         }
         else
         {
-            output = Span(items, static_cast<SizeType>(diff) / sizeof(Type));
+            output = Span(items, static_cast<SizeType>(diff) / detail::SpanSizeOfType<Type>::size);
             return true;
         }
     }
@@ -207,9 +231,10 @@ struct SC::Span
         return false;
     }
 
-    Type& operator[](SizeType idx) { return items[idx]; }
-
-    const Type& operator[](SizeType idx) const { return items[idx]; }
+    // clang-format off
+    template <typename U = Type> TypeIfNotVoid<U>& operator[](SizeType idx) { return items[idx]; }
+    template <typename U = Type> const TypeIfNotVoid<U>& operator[](SizeType idx) const { return items[idx]; }
+    // clang-format on
 
     /// @brief Gets the item at given index or nullptr if index is negative or bigger than size
     template <typename IntType>
@@ -250,10 +275,6 @@ struct SC::Span
         other = {other.data(), sizeInBytes() / sizeof(U)};
         return true;
     }
-
-  private:
-    Type*    items;
-    SizeType sizeElements;
 };
 
 #if SC_PLATFORM_WINDOWS
