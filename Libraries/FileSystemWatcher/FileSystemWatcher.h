@@ -68,7 +68,7 @@ struct SC::FileSystemWatcher
         static constexpr int Windows =
             MaxChangesBufferSize + sizeof(void*) + sizeof(FileDescriptor) + sizeof(AsyncFilePoll);
         static constexpr int Apple   = sizeof(void*);
-        static constexpr int Linux   = 1048;
+        static constexpr int Linux   = 1056;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);

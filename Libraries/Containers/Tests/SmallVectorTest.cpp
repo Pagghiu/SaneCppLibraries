@@ -20,26 +20,24 @@ struct SC::SmallVectorTest : public SC::TestCase
             SC_TEST_EXPECT(vec.shrink_to_fit());
             SC_TEST_EXPECT(vec.capacity() == 3);
             SC_TEST_EXPECT(vec.size() == 2);
-            SegmentHeader* vecHeader = vec.unsafeGetHeader();
-            SC_TEST_EXPECT(vecHeader->isInlineBuffer);
+            SC_TEST_EXPECT(vec.isInlineBuffer());
         }
         if (test_section("resize stack heap"))
         {
             SmallVector<int, 3> vec;
             SC_TEST_EXPECT(vec.resize(3));
-            SegmentHeader* header;
-            header = vec.unsafeGetHeader();
-            SC_TEST_EXPECT(header->isInlineBuffer);
-            SC_TEST_EXPECT(not header->isFollowedByInlineBuffer);
+            auto* header = vec.getHeader();
+            SC_TEST_EXPECT(vec.isInlineBuffer());
+            SC_TEST_EXPECT(not header->restoreInlineBuffer);
             SC_TEST_EXPECT(vec.resize(4));
-            header = vec.unsafeGetHeader();
-            SC_TEST_EXPECT(not header->isInlineBuffer);
-            SC_TEST_EXPECT(header->isFollowedByInlineBuffer);
+            header = vec.getHeader();
+            SC_TEST_EXPECT(not vec.isInlineBuffer());
+            SC_TEST_EXPECT(header->restoreInlineBuffer);
             SC_TEST_EXPECT(vec.resize(3));
             SC_TEST_EXPECT(vec.shrink_to_fit());
-            header = vec.unsafeGetHeader();
-            SC_TEST_EXPECT(header->isInlineBuffer);
-            SC_TEST_EXPECT(not header->isFollowedByInlineBuffer);
+            header = vec.getHeader();
+            SC_TEST_EXPECT(vec.isInlineBuffer());
+            SC_TEST_EXPECT(not header->restoreInlineBuffer);
         }
         if (test_section("construction copy stack"))
         {
@@ -67,9 +65,9 @@ struct SC::SmallVectorTest : public SC::TestCase
                 SC_TEST_EXPECT(vec.size() == 4);
                 vec2 = vec;
             }
-            SegmentHeader* vec2Header = vec2.unsafeGetHeader();
-            SC_TEST_EXPECT(not vec2Header->isInlineBuffer);
-            SC_TEST_EXPECT(vec2Header->isFollowedByInlineBuffer);
+            auto* vec2Header = vec2.getHeader();
+            SC_TEST_EXPECT(not vec2.isInlineBuffer());
+            SC_TEST_EXPECT(vec2Header->restoreInlineBuffer);
             SC_TEST_EXPECT(vec2.size() == 4);
             SC_TEST_EXPECT(not vec2.isInlineBuffer());
             checkItems(vec2, 4);
@@ -83,9 +81,9 @@ struct SC::SmallVectorTest : public SC::TestCase
                 SC_TEST_EXPECT(vec.size() == 3);
                 vec2 = move(vec);
             }
-            SegmentHeader* vec2Header = vec2.unsafeGetHeader();
-            SC_TEST_EXPECT(not vec2Header->isInlineBuffer);
-            SC_TEST_EXPECT(not vec2Header->isFollowedByInlineBuffer);
+            auto* vec2Header = vec2.getHeader();
+            SC_TEST_EXPECT(not vec2.isInlineBuffer());
+            SC_TEST_EXPECT(not vec2Header->restoreInlineBuffer);
             checkItems(vec2, 3);
         }
         if (test_section("construction move SmallVector(heap)->Vector"))
@@ -93,20 +91,20 @@ struct SC::SmallVectorTest : public SC::TestCase
             Vector<int> vec2;
             {
                 SmallVector<int, 3> vec;
-                SegmentHeader*      vec1Header = vec.unsafeGetHeader();
+                auto*               vec1Header = vec.getHeader();
                 addItems(vec, 4);
                 SC_TEST_EXPECT(vec.size() == 4);
 
                 vec2 = move(vec);
                 SC_TEST_EXPECT(vec.data() != nullptr);
-                SegmentHeader* vec1Header2 = vec.unsafeGetHeader();
+                auto* vec1Header2 = vec.getHeader();
                 SC_TEST_EXPECT(vec1Header2 == vec1Header);
-                SC_TEST_EXPECT(vec1Header2->isInlineBuffer);
+                SC_TEST_EXPECT(vec.isInlineBuffer());
                 SC_TEST_EXPECT(vec1Header2->capacityBytes == 3 * sizeof(int));
             }
-            SegmentHeader* vec2Header = vec2.unsafeGetHeader();
-            SC_TEST_EXPECT(not vec2Header->isInlineBuffer);
-            SC_TEST_EXPECT(not vec2Header->isFollowedByInlineBuffer);
+            auto* vec2Header = vec2.getHeader();
+            SC_TEST_EXPECT(not vec2.isInlineBuffer());
+            SC_TEST_EXPECT(not vec2Header->restoreInlineBuffer);
             checkItems(vec2, 4);
         }
         if (test_section("construction move Vector->SmallVector(heap)"))
@@ -119,9 +117,9 @@ struct SC::SmallVectorTest : public SC::TestCase
                 vec2 = move(vec);
                 SC_TEST_EXPECT(vec.data() == nullptr);
             }
-            SegmentHeader* vec2Header = vec2.unsafeGetHeader();
-            SC_TEST_EXPECT(not vec2Header->isInlineBuffer);
-            SC_TEST_EXPECT(vec2Header->isFollowedByInlineBuffer);
+            auto* vec2Header = vec2.getHeader();
+            SC_TEST_EXPECT(not vec2.isInlineBuffer());
+            SC_TEST_EXPECT(vec2Header->restoreInlineBuffer);
             checkItems(vec2, 4);
         }
         if (test_section("construction move Vector->SmallVector(stack)"))
@@ -134,9 +132,9 @@ struct SC::SmallVectorTest : public SC::TestCase
                 vec2 = move(vec);
                 SC_TEST_EXPECT(vec.data() == nullptr);
             }
-            SegmentHeader* vec2Header = vec2.unsafeGetHeader();
-            SC_TEST_EXPECT(not vec2Header->isInlineBuffer);
-            SC_TEST_EXPECT(vec2Header->isFollowedByInlineBuffer);
+            auto* vec2Header = vec2.getHeader();
+            SC_TEST_EXPECT(not vec2.isInlineBuffer());
+            SC_TEST_EXPECT(vec2Header->restoreInlineBuffer);
             SC_TEST_EXPECT(vec2.size() == 3);
             checkItems(vec2, 3);
         }
@@ -152,14 +150,13 @@ struct SC::SmallVectorTest : public SC::TestCase
                 SC_TEST_EXPECT(vec.size() == 0);
 #endif // not __clang_analyzer__
                 SC_TEST_EXPECT(vec2.size() == 3);
-                SegmentHeader* vec1Header = vec.unsafeGetHeader();
+                auto* vec1Header = vec.getHeader();
                 SC_TEST_EXPECT(vec1Header != nullptr);
 #ifndef __clang_analyzer__
-                SC_TEST_EXPECT(vec1Header->isInlineBuffer);
+                SC_TEST_EXPECT(vec.isInlineBuffer());
 #endif // not __clang_analyzer__
             }
-            SegmentHeader* vec2Header = vec2.unsafeGetHeader();
-            SC_TEST_EXPECT(vec2Header->isInlineBuffer);
+            SC_TEST_EXPECT(vec2.isInlineBuffer());
             checkItems(vec2, 3);
         }
         if (test_section("construction move SmallVector(heap)->SmallVector(stack)"))
@@ -174,15 +171,15 @@ struct SC::SmallVectorTest : public SC::TestCase
                 SC_TEST_EXPECT(vec.size() == 0);
 #endif // not __clang_analyzer__
                 SC_TEST_EXPECT(vec2.size() == 4);
-                SegmentHeader* vec1Header = vec.unsafeGetHeader();
+                auto* vec1Header = vec.getHeader();
                 SC_TEST_EXPECT(vec1Header != nullptr);
 #ifndef __clang_analyzer__
-                SC_TEST_EXPECT(vec1Header->isInlineBuffer);
+                SC_TEST_EXPECT(vec.isInlineBuffer());
 #endif // not __clang_analyzer__
             }
-            SegmentHeader* vec2Header = vec2.unsafeGetHeader();
-            SC_TEST_EXPECT(not vec2Header->isInlineBuffer);
-            SC_TEST_EXPECT(vec2Header->isFollowedByInlineBuffer);
+            auto* vec2Header = vec2.getHeader();
+            SC_TEST_EXPECT(not vec2.isInlineBuffer());
+            SC_TEST_EXPECT(vec2Header->restoreInlineBuffer);
             checkItems(vec2, 4);
         }
         if (test_section("construction move SmallVector(stack)->SmallVector(stack)"))
@@ -197,14 +194,13 @@ struct SC::SmallVectorTest : public SC::TestCase
                 SC_TEST_EXPECT(vec.size() == 0);
 #endif // not __clang_analyzer__
                 SC_TEST_EXPECT(vec2.size() == 3);
-                SegmentHeader* vec1Header = vec.unsafeGetHeader();
+                auto* vec1Header = vec.getHeader();
                 SC_TEST_EXPECT(vec1Header != nullptr);
 #ifndef __clang_analyzer__
-                SC_TEST_EXPECT(vec1Header->isInlineBuffer);
+                SC_TEST_EXPECT(vec.isInlineBuffer());
 #endif // not __clang_analyzer__
             }
-            SegmentHeader* vec2Header = vec2.unsafeGetHeader();
-            SC_TEST_EXPECT(vec2Header->isInlineBuffer);
+            SC_TEST_EXPECT(vec2.isInlineBuffer());
             checkItems(vec2, 3);
         }
         if (test_section("construction move SmallVector(heap)->SmallVector(stack)"))
@@ -217,15 +213,15 @@ struct SC::SmallVectorTest : public SC::TestCase
                 vec2 = move(vec);
                 SC_TEST_EXPECT(vec.size() == 0);
                 SC_TEST_EXPECT(vec2.size() == 4);
-                SegmentHeader* vec1Header = vec.unsafeGetHeader();
+                auto* vec1Header = vec.getHeader();
                 SC_TEST_EXPECT(vec1Header != nullptr);
 #ifndef __clang_analyzer__
-                SC_TEST_EXPECT(vec1Header->isInlineBuffer);
+                SC_TEST_EXPECT(vec.isInlineBuffer());
 #endif // not __clang_analyzer__
             }
-            SegmentHeader* vec2Header = vec2.unsafeGetHeader();
-            SC_TEST_EXPECT(not vec2Header->isInlineBuffer);
-            SC_TEST_EXPECT(vec2Header->isFollowedByInlineBuffer);
+            auto* vec2Header = vec2.getHeader();
+            SC_TEST_EXPECT(not vec2.isInlineBuffer());
+            SC_TEST_EXPECT(vec2Header->restoreInlineBuffer);
             checkItems(vec2, 4);
         }
         if (test_section("move operations"))

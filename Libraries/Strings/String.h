@@ -157,8 +157,8 @@ struct SC::String
     StringEncoding encoding;
     Buffer         data;
 
-    String(StringEncoding encoding, SegmentHeader& header, uint32_t inlineCapacity);
-    String(Buffer&& otherData, StringEncoding encoding, SegmentHeader& header, uint32_t inlineCapacity);
+    String(StringEncoding encoding, uint32_t inlineCapacity);
+    String(Buffer&& otherData, StringEncoding encoding, uint32_t inlineCapacity);
 };
 
 /// @brief String with compile time configurable inline storage (small string optimization)
@@ -170,7 +170,7 @@ struct SC::SmallString : public String
     // 'using String::operator=' or 'using String::String' would invoke default memberwise copy
     // constructors also for SmallString::header and buffer, that would cause a disaster.
 
-    SmallString(StringEncoding encoding = StringEncoding::Utf8) : String(encoding, header, N) {}
+    SmallString(StringEncoding encoding = StringEncoding::Utf8) : String(encoding, N) {}
     SmallString(const SmallString& other) : SmallString(other.getEncoding()) { String::operator=(other); }
     SmallString(SmallString&& other) : SmallString(other.getEncoding()) { String::operator=(move(other)); }
     String& operator=(const SmallString& other) { return String::operator=(other); }
@@ -182,7 +182,7 @@ struct SC::SmallString : public String
     SmallString(StringView other) : SmallString(other.getEncoding()) { String::operator=(move(other)); }
     String& operator=(StringView view) { return String::operator=(view); }
 
-    SmallString(Buffer&& otherData, StringEncoding encoding) : String(move(otherData), encoding, header, N) {}
+    SmallString(Buffer&& otherData, StringEncoding encoding) : String(move(otherData), encoding, N) {}
 
     template <size_t Q>
     SmallString(const char (&text)[Q]) : SmallString(StringView({text, Q - 1}, true, StringEncoding::Ascii))
@@ -195,8 +195,8 @@ struct SC::SmallString : public String
     }
 
   private:
-    SegmentHeader header;
-    char          buffer[N];
+    uint64_t inlineCapacity = N;
+    char     buffer[N];
 };
 //! @}
 

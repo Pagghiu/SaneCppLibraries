@@ -6,23 +6,77 @@
 
 namespace SC
 {
+//! @addtogroup group_foundation_utility
+//! @{
+namespace detail
+{
 struct SC_COMPILER_EXPORT SegmentHeader;
+
 struct alignas(uint64_t) SegmentHeader
 {
     static constexpr uint32_t MaxCapacity = (~static_cast<uint32_t>(0)) >> 1;
 
+    SegmentHeader(uint32_t capacity)
+    {
+        sizeBytes           = 0;
+        unused              = 0;
+        capacityBytes       = capacity;
+        restoreInlineBuffer = false;
+    }
     uint32_t sizeBytes : sizeof(uint32_t) * 8 - 1;
-    uint32_t isInlineBuffer : 1;
+    uint32_t unused : 1;
     uint32_t capacityBytes : sizeof(uint32_t) * 8 - 1;
-    uint32_t isFollowedByInlineBuffer : 1;
-    // clang-format off
-    template <typename T>       T* getData()       { return reinterpret_cast<T*>(reinterpret_cast<char*>(this) + sizeof(*this)); }
-    template <typename T> const T* getData() const { return reinterpret_cast<const T*>(reinterpret_cast<const char*>(this) + sizeof(*this)); }
-    // clang-format on
+    uint32_t restoreInlineBuffer : 1;
 };
 
-//! @addtogroup group_foundation_utility
-//! @{
+template <bool IsArrayLayout>
+struct SegmentData
+{
+    // clang-format off
+    // volatile is needed to prevent GCC from optimizing away some memcpy calls under -O2 
+    SC_COMPILER_FORCE_INLINE void* getData() volatile { return offset == 0 ? nullptr : (char*)this + offset; }
+    SC_COMPILER_FORCE_INLINE const void* getData() volatile const { return offset == 0 ? nullptr : (const char*)this + offset; }
+    SC_COMPILER_FORCE_INLINE void setData( void* newData) volatile { offset = newData == nullptr ? 0 : (volatile char*)newData - (volatile char*)this; }
+    SC_COMPILER_FORCE_INLINE void* getInlineData() volatile { return (char*)this + sizeof(*this) + sizeof(uint64_t); }
+    SC_COMPILER_FORCE_INLINE uint32_t getInlineCapacity() volatile { return static_cast<uint32_t>(*reinterpret_cast<uint64_t*>((char*)this + sizeof(*this))); }
+    SC_COMPILER_FORCE_INLINE bool isInline() const { return offset == sizeof(*this) + sizeof(uint64_t); }
+    // clang-format on
+
+  protected:
+    SegmentData(uint32_t capacity = 0);
+    SegmentHeader header;
+    ssize_t       offset = 0; // memory offset representing relative pointer to data from "this"
+};
+
+template <>
+struct SegmentData<true>
+{
+    SC_COMPILER_FORCE_INLINE void*       getData() volatile { return (char*)this + sizeof(*this); }
+    SC_COMPILER_FORCE_INLINE const void* getData() const volatile { return (const char*)this + sizeof(*this); }
+    SC_COMPILER_FORCE_INLINE void        setData(void*) {}
+    SC_COMPILER_FORCE_INLINE void*       getInlineData() volatile { return (char*)this + sizeof(*this); }
+    SC_COMPILER_FORCE_INLINE uint32_t    getInlineCapacity() { return header.capacityBytes; }
+    SC_COMPILER_FORCE_INLINE static constexpr bool isInline() { return true; }
+
+  protected:
+    SegmentData(uint32_t capacity = 0);
+    SegmentHeader header;
+};
+
+/// @brief Allows SC::Segment handle trivial types
+struct SC_COMPILER_EXPORT SegmentTrivial
+{
+    static void destruct(Span<void> data);
+    static void copyConstructAs(Span<void> data, Span<const void> value);
+    static void copyConstruct(Span<void> data, const void* src);
+    static void copyAssign(Span<void> data, const void* src);
+    static void copyInsert(Span<void> data, Span<const void> values);
+    static void moveConstruct(Span<void> data, void* src);
+    static void moveAssign(Span<void> data, void* src);
+    static void remove(Span<void> data, size_t numElements);
+};
+
+} // namespace detail
 
 /// @brief A slice of contiguous memory, prefixed by and header containing size and capacity.
 /// Can act as a simple byte buffer or more of a "vector-like" class depending on the passed in VTable traits.
@@ -31,9 +85,10 @@ struct alignas(uint64_t) SegmentHeader
 /// @note Implementation is in `.inl` to reduce include bloat for non-templated derived classes like SC::Buffer.
 /// This reduces header bloat as the `.inl` can be included where derived class is defined (typically a `.cpp` file).
 template <typename VTable>
-struct Segment
+struct Segment : protected detail::SegmentData<VTable::IsArray>
 {
     using T = typename VTable::Type;
+    Segment(uint32_t capacityInBytes);
 
     Segment();
     ~Segment();
@@ -42,15 +97,11 @@ struct Segment
     Segment& operator=(Segment&& other);
     Segment& operator=(const Segment& other);
 
-    template <typename U>
-    Segment(Span<const U> span) : Segment()
-    {
-        SC_ASSERT_RELEASE(assign(span));
-    }
-
+    // clang-format off
+    template <typename U> Segment(Span<const U> span) : Segment() { SC_ASSERT_RELEASE(assign(span)); }
     Segment(Span<const T> span) : Segment() { SC_ASSERT_RELEASE(assign(span)); }
-
     Segment(std::initializer_list<T> list) : Segment() { SC_ASSERT_RELEASE(assign({list.begin(), list.size()})); }
+    // clang-format on
 
     /// @brief Re-allocates to the requested new size, preserving its contents
     /// @note To restore link with an inline buffer, resize to its capacity (or less) and call Segment::shrink
@@ -107,18 +158,8 @@ struct Segment
     [[nodiscard]] bool pop_front(T* removedValue = nullptr);
 
     // clang-format off
-
-    /// @brief Access data owned by the segment or `nullptr` if segment is empty
-    [[nodiscard]] const T* data() const SC_LANGUAGE_LIFETIME_BOUND
-    {
-        return header == nullptr ? nullptr : reinterpret_cast<const T*>(reinterpret_cast<const char*>(header) + sizeof(SegmentHeader));
-    }
-
-    /// @brief Access data owned by the segment  or `nullptr` if segment is empty
-    [[nodiscard]] T* data() SC_LANGUAGE_LIFETIME_BOUND
-    {
-        return header == nullptr ? nullptr : reinterpret_cast<T*>(reinterpret_cast<char*>(header) + sizeof(SegmentHeader));
-    }
+    [[nodiscard]] const T* data() const     SC_LANGUAGE_LIFETIME_BOUND { return reinterpret_cast<const T*>(Parent::getData()); }
+    [[nodiscard]] T*       data()           SC_LANGUAGE_LIFETIME_BOUND { return reinterpret_cast<T*>(Parent::getData()); }
 
     [[nodiscard]] T*       begin()          SC_LANGUAGE_LIFETIME_BOUND { return data(); }
     [[nodiscard]] const T* begin() const    SC_LANGUAGE_LIFETIME_BOUND { return data(); }
@@ -127,18 +168,18 @@ struct Segment
 
     [[nodiscard]] T& back()                 SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_RELEASE(not isEmpty()); return *(data() + size() - 1);}
     [[nodiscard]] T& front()                SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_RELEASE(not isEmpty()); return *data();}
-    [[nodiscard]] T& operator[](size_t idx) SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_DEBUG(idx < size()); return *(data() + idx);}
     [[nodiscard]] const T& back() const     SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_RELEASE(not isEmpty()); return *(data() + size() - 1);}
     [[nodiscard]] const T& front() const    SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_RELEASE(not isEmpty()); return *data();}
-    [[nodiscard]] const T& operator[](size_t idx) const SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_DEBUG(idx < size()); return *(data() + idx);}
 
+    [[nodiscard]] T&       operator[](size_t idx)       SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_DEBUG(idx < size()); return *(data() + idx);}
+    [[nodiscard]] const T& operator[](size_t idx) const SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_DEBUG(idx < size()); return *(data() + idx);}
     // clang-format on
 
     /// @brief Returns `true` if an inline buffer is in use (`false` if segment is heap allocated).
-    [[nodiscard]] bool isInlineBuffer() const { return header != nullptr and header->isInlineBuffer; }
+    [[nodiscard]] bool isInlineBuffer() const { return Parent::isInline(); }
 
     /// @brief Check if is empty (`size()` == 0)
-    [[nodiscard]] bool isEmpty() const { return header == nullptr or header->sizeBytes == 0; }
+    [[nodiscard]] bool isEmpty() const { return header.sizeBytes == 0; }
 
     /// @brief Obtains a Span of internal contents
     [[nodiscard]] Span<T> toSpan() SC_LANGUAGE_LIFETIME_BOUND { return {data(), size()}; }
@@ -147,10 +188,10 @@ struct Segment
     [[nodiscard]] Span<const T> toSpanConst() const SC_LANGUAGE_LIFETIME_BOUND { return {data(), size()}; }
 
     /// @brief Returns current size
-    [[nodiscard]] size_t size() const { return header == nullptr ? 0 : header->sizeBytes / sizeof(T); }
+    [[nodiscard]] size_t size() const { return header.sizeBytes / sizeof(T); }
 
     /// @brief Returns current capacity (always >= of `size()`)
-    [[nodiscard]] size_t capacity() { return header == nullptr ? 0 : header->capacityBytes / sizeof(T); }
+    [[nodiscard]] size_t capacity() { return header.capacityBytes / sizeof(T); }
 
     /// @brief Removes the range [start, start + length] from the segment
     /// @param start Index where the item must be removed
@@ -169,42 +210,15 @@ struct Segment
     /// @return `true` if index is less than or equal to size()
     [[nodiscard]] bool insert(size_t index, Span<const T> data);
 
-    /// @brief Sets the internal header handled by this class
-    void unsafeSetHeader(SegmentHeader* newHeader) { header = newHeader; }
-
     /// @brief Get the internal header handled by this class
-    [[nodiscard]] SegmentHeader* unsafeGetHeader() const { return header; }
-
-    /// @brief Builds a Segment with an inlineHeader of given capacity in bytes
-    Segment(SegmentHeader& inlineHeader, uint32_t capacityInBytes);
+    [[nodiscard]] const detail::SegmentHeader* getHeader() const { return &header; }
 
   protected:
     struct Internal;
-    // Alignment is relevant for 32 bit platforms
-    alignas(alignof(SegmentHeader)) SegmentHeader* header;
+    using Parent = detail::SegmentData<VTable::IsArray>;
+    using Parent::header;
+    using SegmentHeader = detail::SegmentHeader;
 };
 
-/// @brief Allows SC::Segment handle trivial types
-struct SC_COMPILER_EXPORT SegmentTrivial
-{
-    inline static void destruct(SegmentHeader& header, size_t bytesOffset, size_t numBytes);
-    inline static void copyConstructSingle(SegmentHeader& dest, size_t bytesOffset, const void* value, size_t numBytes,
-                                           size_t valueSize);
-    inline static void copyConstruct(SegmentHeader& dest, size_t bytesOffset, const void* src, size_t numBytes);
-    inline static void copyAssign(SegmentHeader& dest, size_t bytesOffset, const void* src, size_t numBytes);
-    inline static void copyInsert(SegmentHeader& dest, size_t bytesOffset, const void* src, size_t numBytes);
-    inline static void moveConstruct(SegmentHeader& dest, size_t bytesOffset, void* src, size_t numBytes);
-    inline static void moveAssign(SegmentHeader& dest, size_t bytesOffset, void* src, size_t numBytes);
-    inline static void remove(SegmentHeader& dest, size_t fromBytesOffset, size_t toBytesOffset);
-};
-
-/// @brief Basic allocator for SC::Segment using Memory functions
-struct SC_COMPILER_EXPORT SegmentAllocator
-{
-    inline static SegmentHeader* allocateNewHeader(size_t newCapacityInBytes);
-    inline static SegmentHeader* reallocateExistingHeader(SegmentHeader& src, size_t newCapacityInBytes);
-
-    inline static void destroyHeader(SegmentHeader& header);
-};
 //! @}
 } // namespace SC

@@ -12,6 +12,10 @@ void static_assert_size()
     static_assert(R <= E, "Size mismatch");
 }
 #endif
+#if SC_COMPILER_GCC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow="
+#endif
 //! @addtogroup group_foundation_utility
 //! @{
 
@@ -60,5 +64,7 @@ struct AlignedStorage
 };
 
 //! @}
-
+#if SC_COMPILER_GCC
+#pragma GCC diagnostic pop
+#endif
 } // namespace SC

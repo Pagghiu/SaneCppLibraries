@@ -6,5 +6,5 @@
 
 namespace SC
 {
-template struct Segment<SegmentBuffer>;
+template struct Segment<detail::SegmentBuffer>;
 } // namespace SC

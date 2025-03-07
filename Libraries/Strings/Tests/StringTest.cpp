@@ -37,20 +37,20 @@ struct SC::StringTest : public SC::TestCase
             String vec2;
             {
                 SmallString<3> vec;
-                SegmentHeader* vec1Header = vec.data.unsafeGetHeader();
+                auto*          vec1Header = vec.data.getHeader();
                 SC_TEST_EXPECT(vec.assign("123"));
                 SC_TEST_EXPECT(vec.data.size() == 4);
 
                 vec2 = move(vec);
-                SC_TEST_EXPECT(vec.data.unsafeGetHeader() != nullptr);
-                SegmentHeader* vec1Header2 = vec.data.unsafeGetHeader();
+                SC_TEST_EXPECT(vec.data.getHeader() != nullptr);
+                auto* vec1Header2 = vec.data.getHeader();
                 SC_TEST_EXPECT(vec1Header2 == vec1Header);
                 SC_TEST_EXPECT(vec.data.isInlineBuffer());
                 SC_TEST_EXPECT(vec1Header2->capacityBytes == 3 * sizeof(char));
             }
-            SegmentHeader* vec2Header = vec2.data.unsafeGetHeader();
+            auto* vec2Header = vec2.data.getHeader();
             SC_TEST_EXPECT(not vec2.data.isInlineBuffer());
-            SC_TEST_EXPECT(not vec2Header->isFollowedByInlineBuffer);
+            SC_TEST_EXPECT(not vec2Header->restoreInlineBuffer);
         }
 
         if (test_section("SmallString"))
@@ -70,7 +70,7 @@ struct SC::StringTest : public SC::TestCase
             normal = move(ss20);
             SC_TEST_EXPECT(normal.view() == "ASD22");
             SC_TEST_EXPECT(not normal.data.isInlineBuffer());
-            SC_TEST_EXPECT(not normal.data.unsafeGetHeader()->isFollowedByInlineBuffer);
+            SC_TEST_EXPECT(not normal.data.getHeader()->restoreInlineBuffer);
         }
 
         if (test_section("SmallString Buffer"))

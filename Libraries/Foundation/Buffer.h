@@ -9,10 +9,14 @@ namespace SC
 //! @addtogroup group_foundation_utility
 //! @{
 
-struct SegmentBuffer : public SegmentTrivial, public SegmentAllocator
+namespace detail
 {
-    using Type = char;
+struct SegmentBuffer : public SegmentTrivial
+{
+    using Type                    = char;
+    static constexpr bool IsArray = false;
 };
+} // namespace detail
 
 /// @brief An heap allocated byte buffer that can optionally use an inline buffer.
 /// @see SC::SmallBuffer to use an inline buffer that can optionally become heap allocated as needed.
@@ -21,7 +25,7 @@ struct SegmentBuffer : public SegmentTrivial, public SegmentAllocator
 ///
 /// Example:
 /// \snippet Libraries/Foundation/Tests/BufferTest.cpp BufferBasicSnippet
-struct Buffer : public Segment<SegmentBuffer>
+struct Buffer : public Segment<detail::SegmentBuffer>
 {
     using Segment::Segment;
 };
@@ -32,7 +36,7 @@ struct Buffer : public Segment<SegmentBuffer>
 template <int N>
 struct SmallBuffer : public Buffer
 {
-    SmallBuffer() : Buffer(inlineHeader, N) {}
+    SmallBuffer() : Buffer(N) {}
     SmallBuffer(const Buffer& other) : SmallBuffer() { Buffer::operator=(other); }
     SmallBuffer(Buffer&& other) : SmallBuffer() { Buffer::operator=(move(other)); }
     Buffer& operator=(const Buffer& other) { return Buffer::operator=(other); }
@@ -46,8 +50,8 @@ struct SmallBuffer : public Buffer
     // clang-format on
 
   private:
-    SegmentHeader inlineHeader;
-    char          inlineBuffer[N];
+    uint64_t inlineCapacity = N;
+    char     inlineBuffer[N];
 };
 
 #if SC_COMPILER_MSVC

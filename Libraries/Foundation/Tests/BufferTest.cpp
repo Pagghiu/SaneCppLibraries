@@ -192,7 +192,7 @@ struct SC::BufferTest : public SC::TestCase
         constexpr size_t lower  = 10;
         constexpr size_t middle = 12;
         constexpr size_t higher = 16;
-        SC_TEST_EXPECT(not buffer.resizeWithoutInitializing(SegmentHeader::MaxCapacity + 1));
+        SC_TEST_EXPECT(not buffer.resizeWithoutInitializing(detail::SegmentHeader::MaxCapacity + 1));
         SC_TEST_EXPECT(buffer.resizeWithoutInitializing(middle));
         constexpr char value1 = 64;
         constexpr char value2 = 32;

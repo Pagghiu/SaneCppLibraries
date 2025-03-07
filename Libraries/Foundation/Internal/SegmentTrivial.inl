@@ -3,69 +3,56 @@
 #pragma once
 #include "Segment.inl"
 
-inline void SC::SegmentTrivial::destruct(SegmentHeader&, size_t, size_t) {}
+void SC::detail::SegmentTrivial::destruct(Span<void>) {}
 
-inline void SC::SegmentTrivial::copyConstructSingle(SegmentHeader& header, size_t offsetBytes, const void* value,
-                                                    size_t numBytes, size_t valueSize)
+void SC::detail::SegmentTrivial::copyConstructAs(Span<void> data, Span<const void> value)
 {
-    if (valueSize == 1)
+    if (value.sizeInBytes() == 1)
     {
         int intValue = 0;
-        ::memcpy(&intValue, value, 1);
-        ::memset(header.getData<char>() + offsetBytes, intValue, numBytes);
+        ::memcpy(&intValue, value.data(), 1);
+        ::memset(data.data(), intValue, data.sizeInBytes());
     }
     else
     {
-        char* data = header.getData<char>();
-        for (size_t idx = offsetBytes; idx < offsetBytes + numBytes; idx += valueSize)
+        const size_t valueSize   = value.sizeInBytes();
+        const size_t numBytes    = data.sizeInBytes();
+        char*        destData    = data.reinterpret_as_array_of<char>().data();
+        const void*  sourceValue = value.data();
+        for (size_t idx = 0; idx < numBytes; idx += valueSize)
         {
-            ::memcpy(data + idx, value, valueSize);
+            ::memcpy(destData + idx, sourceValue, valueSize);
         }
     }
 }
 
-inline void SC::SegmentTrivial::copyConstruct(SegmentHeader& header, size_t offsetBytes, const void* src,
-                                              size_t numBytes)
+void SC::detail::SegmentTrivial::copyConstruct(Span<void> data, const void* src)
 {
-    ::memmove(header.getData<char>() + offsetBytes, src, numBytes);
+    ::memmove(data.data(), src, data.sizeInBytes());
 }
 
-inline void SC::SegmentTrivial::copyAssign(SegmentHeader& dest, size_t bytesOffset, const void* src, size_t numBytes)
+void SC::detail::SegmentTrivial::copyAssign(Span<void> data, const void* src)
 {
-    ::memcpy(dest.getData<char>() + bytesOffset, src, numBytes);
+    ::memcpy(data.data(), src, data.sizeInBytes());
 }
 
-inline void SC::SegmentTrivial::copyInsert(SegmentHeader& dest, size_t bytesOffset, const void* src, size_t numBytes)
+void SC::detail::SegmentTrivial::copyInsert(Span<void> data, Span<const void> values)
 {
-    char* data = dest.getData<char>();
-    ::memmove(data + bytesOffset + numBytes, data + bytesOffset, dest.sizeBytes - bytesOffset);
-    ::memmove(data + bytesOffset, src, numBytes);
+    ::memmove(data.reinterpret_as_array_of<char>().data() + values.sizeInBytes(), data.data(), data.sizeInBytes());
+    ::memmove(data.data(), values.data(), values.sizeInBytes());
 }
 
-inline void SC::SegmentTrivial::moveConstruct(SegmentHeader& dest, size_t bytesOffset, void* src, size_t numBytes)
+void SC::detail::SegmentTrivial::moveConstruct(Span<void> data, void* src)
 {
-    ::memcpy(dest.getData<char>() + bytesOffset, src, numBytes);
+    ::memcpy(data.data(), src, data.sizeInBytes());
 }
 
-inline void SC::SegmentTrivial::moveAssign(SegmentHeader& dest, size_t bytesOffset, void* src, size_t numBytes)
+void SC::detail::SegmentTrivial::moveAssign(Span<void> data, void* src)
 {
-    ::memcpy(dest.getData<char>() + bytesOffset, src, numBytes);
+    ::memcpy(data.data(), src, data.sizeInBytes());
 }
 
-inline void SC::SegmentTrivial::remove(SegmentHeader& dest, size_t fromBytesOffset, size_t toBytesOffset)
+void SC::detail::SegmentTrivial::remove(Span<void> data, size_t numElements)
 {
-    char* data = dest.getData<char>();
-    ::memmove(data + fromBytesOffset, data + toBytesOffset, dest.sizeBytes - toBytesOffset);
+    ::memmove(data.data(), data.reinterpret_as_array_of<char>().data() + numElements, numElements);
 }
-
-inline SC::SegmentHeader* SC::SegmentAllocator::allocateNewHeader(size_t newCapacityInBytes)
-{
-    return reinterpret_cast<SegmentHeader*>(Memory::allocate(sizeof(SegmentHeader) + newCapacityInBytes));
-}
-
-inline SC::SegmentHeader* SC::SegmentAllocator::reallocateExistingHeader(SegmentHeader& src, size_t newCapacityInBytes)
-{
-    return reinterpret_cast<SegmentHeader*>(Memory::reallocate(&src, sizeof(SegmentHeader) + newCapacityInBytes));
-}
-
-inline void SC::SegmentAllocator::destroyHeader(SegmentHeader& header) { Memory::release(&header); }

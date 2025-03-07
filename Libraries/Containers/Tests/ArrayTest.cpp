@@ -27,7 +27,7 @@ struct SC::ArrayTest : public SC::TestCase
             strings.front() = "ASDF1";
             strings.back()  = "ASDF2";
             Array<String, 1> strings1;
-            SC_TEST_EXPECT(not strings1.assign(move(strings)));
+            SC_TEST_EXPECT(not strings1.assignMove(move(strings)));
 
             Array<String, 4> strings2 = strings;
             // TODO: We must disable heap allocation for Array<T, N>

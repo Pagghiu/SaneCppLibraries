@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../../Libraries/Containers/ArenaMap.h"
+#include "../../Libraries/Containers/Array.h"
 #include "../../Libraries/Containers/SmallVector.h"
 #include "../../Libraries/Containers/VectorMap.h"
 #include "../../Libraries/Containers/VectorSet.h"
@@ -35,6 +36,7 @@ struct SC::DebugVisualizersTest : public SC::TestCase
     VectorSet<StringView>  set;
     ArenaMap<String>       arenaMap; // This has no Debug visualizer
 
+    Array<String, 3> array;
     DebugVisualizersTest(SC::TestReport& report) : TestCase(report, "DebugVisualizersTest")
     {
         using namespace SC;
@@ -75,6 +77,7 @@ struct SC::DebugVisualizersTest : public SC::TestCase
         auto k2 = arenaMap.insert("two");
         (void)arenaMap.insert("three");
         (void)arenaMap.remove(k2);
+        array = {"Salve", "a", "Tutti"};
         (void)k2;
     }
 };

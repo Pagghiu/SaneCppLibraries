@@ -3,58 +3,67 @@
 #pragma once
 #include "../Algorithms/AlgorithmRemove.h" // removeIf
 #include "../Foundation/Internal/Segment.inl"
-#include "../Foundation/Internal/SegmentTrivial.inl"
 #include "../Foundation/TypeTraits.h" // IsTriviallyCopyable
 
 namespace SC
 {
-namespace Internal
+namespace detail
 {
 
-/// @brief Allows SC::Segment handle non trivial types
+template <typename T, bool isTrivial = TypeTraits::IsTriviallyCopyable<T>::value>
+struct SegmentVTable : public SegmentTrivial
+{
+};
+
 template <typename T>
-struct SegmentNonTrivial
+struct SegmentVTable<T, false>
 {
-    static void destruct(SegmentHeader& header, size_t bytesOffset, size_t numBytes)
+    static void destruct(Span<T> data)
     {
-        forEach(header, bytesOffset, numBytes, [](auto, T& item) { item.~T(); });
-    }
-    static void copyConstructSingle(SegmentHeader& header, size_t bytesOffset, const T* value, size_t numBytes, size_t)
-    {
-        forEach(header, bytesOffset, numBytes, [value](auto, T& item) { placementNew(item, *value); });
-    }
-    static void copyConstruct(SegmentHeader& dest, size_t bytesOffset, const T* src, size_t numBytes)
-    {
-        forEach(dest, bytesOffset, numBytes, [src](auto idx, T& item) { placementNew(item, src[idx]); });
-    }
-    static void copyAssign(SegmentHeader& dest, size_t bytesOffset, const T* src, size_t numBytes)
-    {
-        forEach(dest, bytesOffset, numBytes, [src](auto idx, T& item) { item = src[idx]; });
-    }
-    static void moveConstruct(SegmentHeader& dest, size_t bytesOffset, T* src, size_t numBytes)
-    {
-        forEach(dest, bytesOffset, numBytes, [src](auto idx, T& item) { placementNew(item, move(src[idx])); });
-    }
-    static void moveAssign(SegmentHeader& dest, size_t bytesOffset, T* src, size_t numBytes)
-    {
-        forEach(dest, bytesOffset, numBytes, [src](auto idx, T& item) { item = move(src[idx]); });
+        forEach(data, [](auto, T& item) { item.~T(); });
     }
 
-    static void copyInsert(SegmentHeader& dest, size_t startOffsetBytes, const T* src, size_t numBytes)
+    static void copyConstructAs(Span<T> data, Span<const T> value)
     {
-        T* data = getData(dest, 0);
+        const T& single = value[0];
+        forEach(data, [&single](auto, T& item) { placementNew(item, single); });
+    }
 
-        const size_t numElements    = dest.sizeBytes / sizeof(T);
-        const size_t numToInsert    = numBytes / sizeof(T);
-        const size_t insertStartIdx = startOffsetBytes / sizeof(T);
-        const size_t insertEndIdx   = insertStartIdx + numToInsert;
+    static void copyConstruct(Span<T> data, const T* src)
+    {
+        forEach(data, [src](auto idx, T& item) { placementNew(item, src[idx]); });
+    }
 
-        if (insertStartIdx == numElements)
+    static void copyAssign(Span<T> data, const T* src)
+    {
+        forEach(data, [src](auto idx, T& item) { item = src[idx]; });
+    }
+
+    static void moveConstruct(Span<T> data, T* src)
+    {
+        forEach(data, [src](auto idx, T& item) { placementNew(item, move(src[idx])); });
+    }
+
+    static void moveAssign(Span<T> data, T* src)
+    {
+        forEach(data, [src](auto idx, T& item) { item = move(src[idx]); });
+    }
+
+    static void copyInsert(Span<T> headerData, Span<const T> values)
+    {
+        // This function inserts values at the beginning of headerData
+        T*       data = headerData.data();
+        const T* src  = values.data();
+
+        const size_t numElements = headerData.sizeInElements();
+        const size_t numToInsert = values.sizeInElements();
+
+        if (numElements == 0)
         {
-            // If the newly inserted elements fall in the uninitialized area, copy construct them
-            for (size_t idx = numElements; idx < numElements + numToInsert; ++idx)
+            // All newly inserted elements will be copy-constructed in the uninitialized area
+            for (size_t idx = 0; idx < numToInsert; ++idx)
             {
-                placementNew(data[idx], src[idx - numElements]);
+                placementNew(data[idx], src[idx]);
             }
         }
         else
@@ -64,7 +73,7 @@ struct SegmentNonTrivial
             {
                 // Guard against using slots that are before segment start.
                 // In the last loop at end of this scope such slots must be
-                // initialized with placement new instead of assignemnt operator
+                // initialized with placement new instead of assignment operator
                 if (idx >= numToInsert)
                 {
                     placementNew(data[idx], move(data[idx - numToInsert]));
@@ -72,7 +81,7 @@ struct SegmentNonTrivial
             }
 
             // Move assign some elements to slots in "post-move" state left from previous loop
-            for (size_t idx = numElements - 1; idx >= insertStartIdx + numToInsert; --idx)
+            for (size_t idx = numElements - 1; idx >= numToInsert; --idx)
             {
                 if (idx >= numToInsert)
                 {
@@ -81,31 +90,28 @@ struct SegmentNonTrivial
             }
 
             // Copy assign source data to slots in "post-move" state left from previous loop
-            for (size_t idx = insertStartIdx; idx < insertEndIdx; ++idx)
+            for (size_t idx = 0; idx < numToInsert; ++idx)
             {
                 // See note in the first loop in this scope to understand use of assignment vs. placement new
                 if (idx < numElements)
                 {
-                    data[idx] = src[idx - insertStartIdx];
+                    data[idx] = src[idx];
                 }
                 else
                 {
-                    placementNew(data[idx], src[idx - insertStartIdx]);
+                    placementNew(data[idx], src[idx]);
                 }
             }
         }
     }
 
-    static void remove(SegmentHeader& dest, size_t fromBytesOffset, size_t toBytesOffset)
+    static void remove(Span<T> headerData, size_t numToRemove)
     {
-        T* data = getData(dest, 0);
+        T* data = headerData.data();
 
-        const size_t numElements = dest.sizeBytes / sizeof(T);
-        const size_t startIdx    = fromBytesOffset / sizeof(T);
-        const size_t endIdx      = toBytesOffset / sizeof(T);
-        const size_t numToRemove = (endIdx - startIdx);
+        const size_t numElements = headerData.sizeInElements();
 
-        for (size_t idx = startIdx; idx < numElements - numToRemove; ++idx)
+        for (size_t idx = 0; idx < numElements - numToRemove; ++idx)
         {
             data[idx] = move(data[idx + numToRemove]);
         }
@@ -116,18 +122,14 @@ struct SegmentNonTrivial
     }
 
   private:
-    static T* getData(SegmentHeader& header, size_t byteOffset) { return header.getData<T>() + byteOffset / sizeof(T); }
-
-    static size_t getSize(SegmentHeader& header) { return header.sizeBytes / sizeof(T); }
-
     template <typename Lambda>
-    static void forEach(SegmentHeader& header, size_t byteOffset, size_t numBytes, Lambda&& lambda)
+    static void forEach(Span<T> data, Lambda&& lambda)
     {
-        T*           data        = getData(header, byteOffset);
-        const size_t numElements = numBytes / sizeof(T);
+        const size_t numElements = data.sizeInElements();
+        T*           elements    = data.data();
         for (size_t idx = 0; idx < numElements; ++idx)
         {
-            lambda(idx, data[idx]);
+            lambda(idx, elements[idx]);
         }
     }
 };
@@ -140,104 +142,23 @@ template <typename T>
 struct ObjectVTable
 {
     using Type = T;
-    static void destruct(SegmentHeader& header, size_t bytesOffset, size_t numBytes)
-    {
-        if SC_LANGUAGE_IF_CONSTEXPR (TypeTraits::IsTriviallyCopyable<T>::value)
-            SegmentTrivial::destruct(header, bytesOffset, numBytes);
-        else
-            SegmentNonTrivial<T>::destruct(header, bytesOffset, numBytes);
-    }
-
-    static void copyConstructSingle(SegmentHeader& header, size_t bytesOffset, const T* value, size_t numBytes,
-                                    size_t sizeOfValue)
-    {
-        if SC_LANGUAGE_IF_CONSTEXPR (TypeTraits::IsTriviallyCopyable<T>::value)
-            SegmentTrivial::copyConstructSingle(header, bytesOffset, value, numBytes, sizeOfValue);
-        else
-            SegmentNonTrivial<T>::copyConstructSingle(header, bytesOffset, value, numBytes, sizeOfValue);
-    }
-
-    static void copyConstruct(SegmentHeader& dest, size_t bytesOffset, const T* src, size_t numBytes)
-    {
-        if SC_LANGUAGE_IF_CONSTEXPR (TypeTraits::IsTriviallyCopyable<T>::value)
-            SegmentTrivial::copyConstruct(dest, bytesOffset, src, numBytes);
-        else
-            SegmentNonTrivial<T>::copyConstruct(dest, bytesOffset, src, numBytes);
-    }
-
-    static void copyAssign(SegmentHeader& dest, size_t bytesOffset, const T* src, size_t numBytes)
-    {
-        if SC_LANGUAGE_IF_CONSTEXPR (TypeTraits::IsTriviallyCopyable<T>::value)
-            SegmentTrivial::copyAssign(dest, bytesOffset, src, numBytes);
-        else
-            SegmentNonTrivial<T>::copyAssign(dest, bytesOffset, src, numBytes);
-    }
-
-    static void moveConstruct(SegmentHeader& dest, size_t bytesOffset, T* src, size_t numBytes)
-    {
-        if SC_LANGUAGE_IF_CONSTEXPR (TypeTraits::IsTriviallyCopyable<T>::value)
-            SegmentTrivial::moveConstruct(dest, bytesOffset, src, numBytes);
-        else
-            SegmentNonTrivial<T>::moveConstruct(dest, bytesOffset, src, numBytes);
-    }
-
-    static void moveAssign(SegmentHeader& dest, size_t bytesOffset, T* src, size_t numBytes)
-    {
-        if SC_LANGUAGE_IF_CONSTEXPR (TypeTraits::IsTriviallyCopyable<T>::value)
-            SegmentTrivial::moveAssign(dest, bytesOffset, src, numBytes);
-        else
-            SegmentNonTrivial<T>::moveAssign(dest, bytesOffset, src, numBytes);
-    }
-
-    static void copyInsert(SegmentHeader& dest, size_t bytesOffset, const T* src, size_t numBytes)
-    {
-        if SC_LANGUAGE_IF_CONSTEXPR (TypeTraits::IsTriviallyCopyable<T>::value)
-            SegmentTrivial::copyInsert(dest, bytesOffset, src, numBytes);
-        else
-            SegmentNonTrivial<T>::copyInsert(dest, bytesOffset, src, numBytes);
-    }
-
-    static void remove(SegmentHeader& dest, size_t fromBytesOffset, size_t toBytesOffset)
-    {
-        if SC_LANGUAGE_IF_CONSTEXPR (TypeTraits::IsTriviallyCopyable<T>::value)
-            SegmentTrivial::remove(dest, fromBytesOffset, toBytesOffset);
-        else
-            SegmentNonTrivial<T>::remove(dest, fromBytesOffset, toBytesOffset);
-    }
+    static void destruct(Span<T> data) { SegmentVTable<T>::destruct(data); }
+    static void copyConstructAs(Span<T> data, Span<const T> value) { SegmentVTable<T>::copyConstructAs(data, value); }
+    static void copyConstruct(Span<T> data, const T* src) { SegmentVTable<T>::copyConstruct(data, src); }
+    static void copyAssign(Span<T> data, const T* src) { SegmentVTable<T>::copyAssign(data, src); }
+    static void moveConstruct(Span<T> data, T* src) { SegmentVTable<T>::moveConstruct(data, src); }
+    static void moveAssign(Span<T> data, T* src) { SegmentVTable<T>::moveAssign(data, src); }
+    static void copyInsert(Span<T> data, Span<const T> values) { SegmentVTable<T>::copyInsert(data, values); }
+    static void remove(Span<T> data, size_t numElements) { SegmentVTable<T>::remove(data, numElements); }
 };
-} // namespace Internal
 
 template <typename T>
-struct SegmentVector : public Internal::ObjectVTable<T>
+struct VectorVTable : public ObjectVTable<T>
 {
-    static SegmentHeader* allocateNewHeader(size_t newCapacityInBytes)
-    {
-        return SegmentAllocator::allocateNewHeader(newCapacityInBytes);
-    }
-
-    static SegmentHeader* reallocateExistingHeader(SegmentHeader& src, size_t newCapacityInBytes)
-    {
-        if (TypeTraits::IsTriviallyCopyable<T>::value)
-        {
-            return SegmentAllocator::reallocateExistingHeader(src, newCapacityInBytes);
-        }
-        else
-        {
-            // TODO: Room for optimization for memcpy-able objects (a >= subset than trivially copyable)
-            SegmentHeader* newHeader = allocateNewHeader(newCapacityInBytes);
-            if (newHeader != nullptr)
-            {
-                *newHeader = src; // copy capacity, size and other fields
-                T* tsrc    = src.getData<T>();
-                Internal::ObjectVTable<T>::moveConstruct(*newHeader, 0, tsrc, src.sizeBytes);
-                Internal::ObjectVTable<T>::destruct(src, 0, src.sizeBytes);
-                destroyHeader(src);
-            }
-            return newHeader;
-        }
-    }
-    static void destroyHeader(SegmentHeader& header) { SegmentAllocator::destroyHeader(header); }
+    static constexpr bool IsArray = false;
 };
+} // namespace detail
+
 //! @defgroup group_containers Containers
 //! @copybrief library_containers (see @ref library_containers for more details)
 
@@ -255,9 +176,9 @@ struct SegmentVector : public Internal::ObjectVTable<T>
 ///
 /// \snippet Libraries/Containers/Tests/VectorTest.cpp VectorSnippet
 template <typename T>
-struct Vector : public Segment<SegmentVector<T>>
+struct Vector : public Segment<detail::VectorVTable<T>>
 {
-    using Parent = Segment<SegmentVector<T>>;
+    using Parent = Segment<detail::VectorVTable<T>>;
 
     // Inherits all constructors from Segment
     using Parent::Parent;
@@ -296,10 +217,10 @@ struct Vector : public Segment<SegmentVector<T>>
         T* itEnd = Parent::end();
         T* it    = Algorithms::removeIf(itBeg, itEnd, forward<Lambda>(criteria));
 
-        const size_t numBytes = static_cast<size_t>(itEnd - it) * sizeof(T);
-        const size_t offBytes = static_cast<size_t>(it - itBeg) * sizeof(T);
-        SegmentVector<T>::destruct(*Parent::header, offBytes, numBytes);
-        Parent::header->sizeBytes -= static_cast<decltype(Parent::header->sizeBytes)>(numBytes);
+        const size_t numElements = static_cast<size_t>(itEnd - it);
+        const size_t offset      = static_cast<size_t>(it - itBeg);
+        detail::VectorVTable<T>::destruct({Parent::data() + offset, numElements});
+        Parent::header.sizeBytes -= static_cast<decltype(Parent::header.sizeBytes)>(numElements * sizeof(T));
         return it != itEnd;
     }
 
@@ -313,6 +234,7 @@ struct Vector : public Segment<SegmentVector<T>>
         return removeAll([&](auto& item) { return item == value; });
     }
 };
+
 //! @}
 
 } // namespace SC

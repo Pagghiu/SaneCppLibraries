@@ -27,11 +27,13 @@ template <typename T, int N>
 struct SC::SmallVector : public Vector<T>
 {
     // clang-format off
-    SmallVector() : Vector<T>(inlineHeader, N * sizeof(T)) {}
+    SmallVector() : Vector<T>( N * sizeof(T)) {}
     SmallVector(const Vector<T>& other) : SmallVector() { Vector<T>::operator=(other); }
     SmallVector(Vector<T>&& other) : SmallVector() { Vector<T>::operator=(move(other)); }
     Vector<T>& operator=(const Vector<T>& other) { return Vector<T>::operator=(other); }
     Vector<T>& operator=(Vector<T>&& other) { return Vector<T>::operator=(move(other)); }
+
+    SmallVector(std::initializer_list<T> list) : SmallVector() { SC_ASSERT_RELEASE(Vector<T>::assign({list.begin(), list.size()})); }
 
     SmallVector(const SmallVector& other) : SmallVector() { Vector<T>::operator=(other); }
     SmallVector(SmallVector&& other) : SmallVector() { Vector<T>::operator=(move(other)); }
@@ -40,7 +42,7 @@ struct SC::SmallVector : public Vector<T>
     // clang-format on
 
   private:
-    SegmentHeader inlineHeader;
-    char          inlineBuffer[N * sizeof(T)];
+    uint64_t inlineCapacity = N * sizeof(T);
+    char     inlineBuffer[N * sizeof(T)];
 };
 //! @}

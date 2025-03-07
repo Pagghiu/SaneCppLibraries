@@ -10,18 +10,10 @@ SC::String::String(Buffer&& otherData, StringEncoding encoding) : encoding(encod
     StringConverter::ensureZeroTermination(data, encoding);
 }
 
-SC::String::String(StringEncoding encoding, SegmentHeader& header, uint32_t inlineCapacity) : String(encoding)
-{
-    data.unsafeSetHeader(&header);
-    header.sizeBytes     = 0;
-    header.capacityBytes = inlineCapacity;
+SC::String::String(StringEncoding encoding, uint32_t inlineCapacity) : encoding(encoding), data(inlineCapacity) {}
 
-    header.isInlineBuffer           = true;
-    header.isFollowedByInlineBuffer = false;
-}
-
-SC::String::String(Buffer&& otherData, StringEncoding encoding, SegmentHeader& header, uint32_t inlineCapacity)
-    : String(encoding, header, inlineCapacity)
+SC::String::String(Buffer&& otherData, StringEncoding encoding, uint32_t inlineCapacity)
+    : String(encoding, inlineCapacity)
 {
     SC_ASSERT_RELEASE(data.assignMove(move(otherData)));
     StringConverter::ensureZeroTermination(data, encoding);
