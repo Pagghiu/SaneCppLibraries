@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
   <Type Name="SC::Buffer">
-    <DisplayString>{ header }</DisplayString>
+    <Intrinsic Name="size" Expression="header.sizeBytes " />
+    <Intrinsic Name="capacity" Expression="header.capacityBytes " />
+    <DisplayString>{{ size={header.sizeBytes }, capacity={header.capacityBytes } }}</DisplayString>
     <Expand>
-      <ExpandedItem>*header</ExpandedItem>
+      <Item Name="[size]">size()</Item>
+      <Item Name="[capacity]">capacity()</Item>
       <ArrayItems>
-        <Size>header->sizeBytes</Size>
-        <ValuePointer>((char*)header)+sizeof(SC::SegmentHeader)</ValuePointer>
+        <Size>header.sizeBytes</Size>
+        <ValuePointer>(char*)this+offset</ValuePointer>
       </ArrayItems>
     </Expand>
   </Type>
@@ -17,16 +20,15 @@
     </Expand>
   </Type>
   <Type Name="SC::Vector&lt;*&gt;">
-    <Intrinsic Name="size" Expression="header->sizeBytes / sizeof($T1)" />
-    <Intrinsic Name="capacity" Expression="header->capacityBytes / sizeof($T1)" />
-    <DisplayString>{{ size={header->sizeBytes / sizeof($T1)}, capacity={header->capacityBytes / sizeof($T1)} }}</DisplayString>
+    <Intrinsic Name="size" Expression="header.sizeBytes / sizeof($T1)" />
+    <Intrinsic Name="capacity" Expression="header.capacityBytes / sizeof($T1)" />
+    <DisplayString>{{ size={header.sizeBytes / sizeof($T1)}, capacity={header.capacityBytes / sizeof($T1)} }}</DisplayString>
     <Expand>
       <Item Name="[size]">size()</Item>
       <Item Name="[capacity]">capacity()</Item>
-      <!-- <ExpandedItem>*header</ExpandedItem> -->
       <ArrayItems>
         <Size>size()</Size>
-        <ValuePointer>($T1*)(((char*)header)+sizeof(SC::SegmentHeader))</ValuePointer>
+        <ValuePointer>($T1*)(((char*)this)+offset)</ValuePointer>
       </ArrayItems>
     </Expand>
   </Type>
@@ -37,9 +39,12 @@
     </Expand>
   </Type>
   <Type Name="SC::Array&lt;*&gt;">
-    <DisplayString>{header}</DisplayString>
+    <Intrinsic Name="size" Expression="header.sizeBytes / sizeof($T1)" />
+    <Intrinsic Name="capacity" Expression="header.capacityBytes / sizeof($T1)" />
+    <DisplayString>{{ size={header.sizeBytes / sizeof($T1)}, capacity={header.capacityBytes / sizeof($T1)} }}</DisplayString>
     <Expand>
-      <ExpandedItem>header</ExpandedItem>
+      <Item Name="[size]">size()</Item>
+      <Item Name="[capacity]">capacity()</Item>
       <ArrayItems>
         <Size>size()</Size>
         <ValuePointer>items</ValuePointer>
@@ -47,16 +52,16 @@
     </Expand>
   </Type>
   <Type Name="SC::String">
-    <DisplayString Condition="encoding==StringEncoding::Utf16">{((char*)data.header)+sizeof(SC::SegmentHeader),su}</DisplayString>
-    <DisplayString>{((char*)data.header)+sizeof(SC::SegmentHeader),s8}</DisplayString>
-    <StringView Condition="encoding==StringEncoding::Utf16">((char*)data.header)+sizeof(SC::SegmentHeader),su</StringView>
-    <StringView>((char*)data.header)+sizeof(SC::SegmentHeader),s8</StringView>
+    <DisplayString Condition="encoding==StringEncoding::Utf16">{((char*)&amp;data)+data.offset,su}</DisplayString>
+    <DisplayString>{((char*)&amp;data)+data.offset,s8}</DisplayString>
+    <StringView Condition="encoding==StringEncoding::Utf16">((char*)&amp;data)+data.offset,su</StringView>
+    <StringView>((char*)&amp;data)+data.offset,s8</StringView>
   </Type>
   <Type Name="SC::SmallString&lt;*&gt;">
-    <DisplayString Condition="encoding==StringEncoding::Utf16">{((char*)data.header)+sizeof(SC::SegmentHeader),su}</DisplayString>
-    <DisplayString>{((char*)data.header)+sizeof(SC::SegmentHeader),s8}</DisplayString>
-    <StringView Condition="encoding==StringEncoding::Utf16">((char*)data.header)+sizeof(SC::SegmentHeader),su</StringView>
-    <StringView>((char*)data.header)+sizeof(SC::SegmentHeader),s8</StringView>
+    <DisplayString Condition="encoding==StringEncoding::Utf16">{((char*)&amp;data)+data.offset,su}</DisplayString>
+    <DisplayString>{((char*)&amp;data)+data.offset,s8}</DisplayString>
+    <StringView Condition="encoding==StringEncoding::Utf16">((char*)amp;amp;data)+data.offset,su</StringView>
+    <StringView>((char*)&amp;data)+data.offset,s8</StringView>
   </Type>
   <Type Name="SC::StringView">
     <DisplayString Condition="encoding==StringEncoding::Utf16">{text,[textSizeInBytes/2]su}</DisplayString>

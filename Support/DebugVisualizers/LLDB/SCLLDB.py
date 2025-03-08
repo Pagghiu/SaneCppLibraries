@@ -41,10 +41,11 @@ class vector_SynthProvider:
         if index >= self.num_children():
             return None
         try:
-            offset = index * self.item_size
-            return self.items.CreateChildAtOffset(
-                "[" + str(index) + "]", offset, self.data_type
-            )
+            if self.isArray:
+                return self.items.GetChildAtIndex(index)
+            else:
+                offset = index * self.item_size
+                return self.items.CreateChildAtOffset("[" + str(index) + "]", offset, self.data_type)
         except Exception as e:
             # logger >> f"{self.__name} EXCEPTION\n{e}"
             return None
@@ -57,12 +58,20 @@ class vector_SynthProvider:
             self.data_size_bytes = self.header.GetChildMemberWithName("sizeBytes").GetValueAsUnsigned()
             self.data_capacity_bytes = self.header.GetChildMemberWithName("capacityBytes").GetValueAsUnsigned()
 
-            header_ptr = self.header.GetValueAsUnsigned()
             self.data_type = self.valobj.GetType().GetTemplateArgumentType(0)
-            self.items = self.valobj.CreateValueFromAddress("items",  header_ptr + self.header_size, self.data_type)
             self.item_size = self.data_type.GetByteSize()
             self.data_size = self.data_size_bytes // self.item_size
             self.data_capacity = self.data_capacity_bytes // self.item_size
+
+            offset_field = self.valobj.GetChildMemberWithName("offset")
+            self.isArray = not offset_field.IsValid()
+            if self.isArray:
+                self.items = self.valobj.GetChildAtIndex(1).GetChildAtIndex(0) # Items inside union
+            else:
+                pointer_to_this = self.valobj.AddressOf().GetValueAsSigned()
+                offset = offset_field.GetValueAsSigned()
+                self.items = self.valobj.CreateValueFromAddress("items",  pointer_to_this + offset, self.data_type)
+
             # logger >> f"{self.__name}.size_bytes = {self.data_size_bytes} capacity_bytes = {self.data_capacity_bytes}"
             # logger >> f"{self.__name}.size = {self.data_size} capacity = {self.data_capacity}"
             # logger >> f"{self.__name}.data_type = {self.data_type}"
@@ -143,9 +152,10 @@ class buffer_SynthProvider:
             self.data_capacity_bytes = self.header.GetChildMemberWithName("capacityBytes").GetValueAsUnsigned()
 
             target = lldb.debugger.GetSelectedTarget()
-            header_ptr = self.header.GetValueAsUnsigned()
             self.data_type = target.FindFirstType("char")
-            self.items = self.valobj.CreateValueFromAddress("items",  header_ptr + self.header_size, self.data_type)
+            offset = self.valobj.GetChildMemberWithName("offset").GetValueAsSigned()
+            pointer_to_this = self.valobj.AddressOf().GetValueAsSigned()
+            self.items = self.valobj.CreateValueFromAddress("items",  pointer_to_this + offset, self.data_type)
             self.data_size = self.data_size_bytes
             self.data_capacity = self.data_capacity_bytes
             # logger >> f"{self.__name}.size_bytes = {self.data_size_bytes} capacity_bytes = {self.data_capacity_bytes}"
@@ -249,6 +259,12 @@ def __lldb_init_module(debugger, internal_dict):
 
     debugger.HandleCommand('type synthetic add -l SCLLDB.buffer_SynthProvider -x "^(SC::)Buffer$"')
     debugger.HandleCommand('type summary add -F SCLLDB.buffer_SummaryProvider -e -x "^(SC::)Buffer$"')
+
+    ###########################################################################################################
+    # Arrays
+    ###########################################################################################################
+    debugger.HandleCommand('type synthetic add -l SCLLDB.vector_SynthProvider -x "^(SC::)Array<.+>$"')
+    debugger.HandleCommand('type summary add -F SCLLDB.vector_SummaryProvider -e -x "^(SC::)Array<.+>$"')
 
     ###########################################################################################################
     # Vectors
