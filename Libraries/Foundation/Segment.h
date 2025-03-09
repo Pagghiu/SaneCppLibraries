@@ -12,6 +12,14 @@ namespace detail
 {
 struct SC_COMPILER_EXPORT SegmentHeader;
 
+// clang-format off
+#if SC_COMPILER_MSVC && !SC_LANGUAGE_CPP_AT_LEAST_17
+template <typename T> [[nodiscard]] constexpr T* Launder(T* p) noexcept { return p; } // We're in UB-land
+#else
+template <typename T> [[nodiscard]] constexpr T* Launder(T* p) noexcept { return __builtin_launder(p); }
+#endif
+// clang-format on
+
 struct alignas(uint64_t) SegmentHeader
 {
     static constexpr uint32_t MaxCapacity = (~static_cast<uint32_t>(0)) >> 1;
@@ -33,12 +41,12 @@ template <bool IsArrayLayout>
 struct SegmentData
 {
     // clang-format off
-    // volatile is needed to prevent GCC from optimizing away some memcpy calls under -O2 
-    SC_COMPILER_FORCE_INLINE void* getData() volatile { return offset == 0 ? nullptr : (char*)this + offset; }
-    SC_COMPILER_FORCE_INLINE const void* getData() volatile const { return offset == 0 ? nullptr : (const char*)this + offset; }
-    SC_COMPILER_FORCE_INLINE void setData( void* newData) volatile { offset = newData == nullptr ? 0 : (volatile char*)newData - (volatile char*)this; }
-    SC_COMPILER_FORCE_INLINE void* getInlineData() volatile { return (char*)this + sizeof(*this) + sizeof(uint64_t); }
-    SC_COMPILER_FORCE_INLINE uint32_t getInlineCapacity() volatile { return static_cast<uint32_t>(*reinterpret_cast<uint64_t*>((char*)this + sizeof(*this))); }
+    SC_COMPILER_FORCE_INLINE void*       getData() { return offset == 0 ? nullptr : (char*)this + offset; }
+    SC_COMPILER_FORCE_INLINE const void* getData() const { return offset == 0 ? nullptr : (const char*)this + offset; }
+    SC_COMPILER_FORCE_INLINE void        setData(void* newData) { offset = newData == nullptr ? 0 : (char*)newData -  (char*)this; }
+    SC_COMPILER_FORCE_INLINE void*       getInlineData() { return (char*)this + sizeof(*this) + sizeof(uint64_t); }
+    SC_COMPILER_FORCE_INLINE uint32_t    getInlineCapacity() { return static_cast<uint32_t>(*reinterpret_cast<uint64_t*>((char*)this + sizeof(*this))); }
+
     SC_COMPILER_FORCE_INLINE bool isInline() const { return offset == sizeof(*this) + sizeof(uint64_t); }
     // clang-format on
 
@@ -51,11 +59,12 @@ struct SegmentData
 template <>
 struct SegmentData<true>
 {
-    SC_COMPILER_FORCE_INLINE void*       getData() volatile { return (char*)this + sizeof(*this); }
-    SC_COMPILER_FORCE_INLINE const void* getData() const volatile { return (const char*)this + sizeof(*this); }
+    SC_COMPILER_FORCE_INLINE void*       getData() { return (char*)this + sizeof(*this); }
+    SC_COMPILER_FORCE_INLINE const void* getData() const { return (const char*)this + sizeof(*this); }
     SC_COMPILER_FORCE_INLINE void        setData(void*) {}
-    SC_COMPILER_FORCE_INLINE void*       getInlineData() volatile { return (char*)this + sizeof(*this); }
+    SC_COMPILER_FORCE_INLINE void*       getInlineData() { return (char*)this + sizeof(*this); }
     SC_COMPILER_FORCE_INLINE uint32_t    getInlineCapacity() { return header.capacityBytes; }
+
     SC_COMPILER_FORCE_INLINE static constexpr bool isInline() { return true; }
 
   protected:
@@ -158,8 +167,8 @@ struct Segment : protected detail::SegmentData<VTable::IsArray>
     [[nodiscard]] bool pop_front(T* removedValue = nullptr);
 
     // clang-format off
-    [[nodiscard]] const T* data() const     SC_LANGUAGE_LIFETIME_BOUND { return reinterpret_cast<const T*>(Parent::getData()); }
-    [[nodiscard]] T*       data()           SC_LANGUAGE_LIFETIME_BOUND { return reinterpret_cast<T*>(Parent::getData()); }
+    [[nodiscard]] const T* data() const     SC_LANGUAGE_LIFETIME_BOUND { return detail::Launder(reinterpret_cast<const T*>(Parent::getData())); }
+    [[nodiscard]] T*       data()           SC_LANGUAGE_LIFETIME_BOUND { return detail::Launder(reinterpret_cast<T*>(Parent::getData())); }
 
     [[nodiscard]] T*       begin()          SC_LANGUAGE_LIFETIME_BOUND { return data(); }
     [[nodiscard]] const T* begin() const    SC_LANGUAGE_LIFETIME_BOUND { return data(); }
