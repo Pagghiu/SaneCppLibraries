@@ -55,23 +55,23 @@ struct SC::BufferTest : public SC::TestCase
         if (test_section("Buffer"))
         {
             Buffer buffer;
-            SC_TEST_EXPECT(not buffer.isInlineBuffer());
+            SC_TEST_EXPECT(not buffer.isInline());
             SC_TEST_EXPECT(buffer.size() == 0);
             SC_TEST_EXPECT(buffer.capacity() == 0);
-            SC_TEST_EXPECT(buffer.isInlineBuffer() == false);
+            SC_TEST_EXPECT(buffer.isInline() == false);
             resizeTest(buffer);
-            SC_TEST_EXPECT(buffer.isInlineBuffer() == false);
+            SC_TEST_EXPECT(buffer.isInline() == false);
         }
 
         if (test_section("SmallBuffer"))
         {
             SmallBuffer<12> buffer;
-            SC_TEST_EXPECT(buffer.isInlineBuffer());
+            SC_TEST_EXPECT(buffer.isInline());
             SC_TEST_EXPECT(buffer.size() == 0);
             SC_TEST_EXPECT(buffer.capacity() == 12);
-            SC_TEST_EXPECT(buffer.isInlineBuffer() == true);
+            SC_TEST_EXPECT(buffer.isInline() == true);
             resizeTest(buffer);
-            SC_TEST_EXPECT(buffer.isInlineBuffer() == true);
+            SC_TEST_EXPECT(buffer.isInline() == true);
         }
 
         if (test_section("Buffer / SmallBuffer"))
@@ -151,7 +151,7 @@ struct SC::BufferTest : public SC::TestCase
             auto    size = buffer0.size();
             Buffer2 buffer1;
             SC_TEST_EXPECT(buffer1.resizeWithoutInitializing(Resize2));
-            SC_TEST_EXPECT(not buffer1.isInlineBuffer());
+            SC_TEST_EXPECT(not buffer1.isInline());
             buffer1.clear();
             SC_TEST_EXPECT(buffer1.resize(Resize2, 2));
             buffer1 = copy ? buffer0 : move(buffer0);
@@ -239,7 +239,7 @@ void BufferTest::basic()
     SC_TEST_EXPECT(buffer.resizeWithoutInitializing(16));
 
     // Buffer is not inline (it's heap allocated)
-    SC_TEST_EXPECT(not buffer.isInlineBuffer());
+    SC_TEST_EXPECT(not buffer.isInline());
 
     // Fill buffer with a value
     buffer.clear();
@@ -253,7 +253,7 @@ void BufferTest::basic()
     smallBuffer = buffer;
 
     // smallBuffer is using inline buffer (no heap allocation)
-    SC_TEST_EXPECT(smallBuffer.isInlineBuffer());
+    SC_TEST_EXPECT(smallBuffer.isInline());
     SC_TEST_EXPECT(smallBuffer.size() == 16);
     SC_TEST_EXPECT(smallBuffer.capacity() == 128);
 
@@ -266,7 +266,7 @@ void BufferTest::basic()
     // by using assignCopy instead of assignment operator
     // caller can check for allocation failure
     SC_TEST_EXPECT(smallBuffer.assign(buffer.toSpanConst()));
-    SC_TEST_EXPECT(not smallBuffer.isInlineBuffer());
+    SC_TEST_EXPECT(not smallBuffer.isInline());
     SC_TEST_EXPECT(smallBuffer.size() == 1024);
     SC_TEST_EXPECT(smallBuffer.capacity() == 1024);
 
@@ -285,14 +285,14 @@ void BufferTest::basic()
     SC_TEST_EXPECT(smallBuffer.resizeWithoutInitializing(128));
 
     // The heap block is still in use
-    SC_TEST_EXPECT(not smallBuffer.isInlineBuffer());
+    SC_TEST_EXPECT(not smallBuffer.isInline());
     SC_TEST_EXPECT(smallBuffer.capacity() == 2048);
 
     // Shrinking it will restore its original inline buffer
     SC_TEST_EXPECT(smallBuffer.shrink_to_fit());
 
     // And verify that that's actually true
-    SC_TEST_EXPECT(smallBuffer.isInlineBuffer());
+    SC_TEST_EXPECT(smallBuffer.isInline());
     SC_TEST_EXPECT(smallBuffer.capacity() == 128);
 }
 //! [BufferBasicSnippet]

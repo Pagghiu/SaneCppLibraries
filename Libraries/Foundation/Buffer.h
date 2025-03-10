@@ -11,9 +11,8 @@ namespace SC
 
 namespace detail
 {
-struct SegmentBuffer : public SegmentTrivial
+struct SegmentBuffer : public SegmentTrivial<char>, public SegmentSelfRelativePointer<char>
 {
-    using Type                    = char;
     static constexpr bool IsArray = false;
 };
 } // namespace detail

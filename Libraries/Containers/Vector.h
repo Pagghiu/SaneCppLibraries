@@ -3,6 +3,7 @@
 #pragma once
 #include "../Algorithms/AlgorithmRemove.h" // removeIf
 #include "../Foundation/Internal/Segment.inl"
+#include "../Foundation/Internal/SegmentTrivial.inl"
 #include "../Foundation/TypeTraits.h" // IsTriviallyCopyable
 
 namespace SC
@@ -11,7 +12,7 @@ namespace detail
 {
 
 template <typename T, bool isTrivial = TypeTraits::IsTriviallyCopyable<T>::value>
-struct SegmentVTable : public SegmentTrivial
+struct SegmentVTable : public SegmentTrivial<T>
 {
 };
 
@@ -153,7 +154,7 @@ struct ObjectVTable
 };
 
 template <typename T>
-struct VectorVTable : public ObjectVTable<T>
+struct VectorVTable : public ObjectVTable<T>, public SegmentSelfRelativePointer<T>
 {
     static constexpr bool IsArray = false;
 };

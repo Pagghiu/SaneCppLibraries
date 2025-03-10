@@ -37,20 +37,13 @@ struct SC::StringTest : public SC::TestCase
             String vec2;
             {
                 SmallString<3> vec;
-                auto*          vec1Header = vec.data.getHeader();
                 SC_TEST_EXPECT(vec.assign("123"));
                 SC_TEST_EXPECT(vec.data.size() == 4);
 
                 vec2 = move(vec);
-                SC_TEST_EXPECT(vec.data.getHeader() != nullptr);
-                auto* vec1Header2 = vec.data.getHeader();
-                SC_TEST_EXPECT(vec1Header2 == vec1Header);
-                SC_TEST_EXPECT(vec.data.isInlineBuffer());
-                SC_TEST_EXPECT(vec1Header2->capacityBytes == 3 * sizeof(char));
+                SC_TEST_EXPECT(vec.data.isInline());
             }
-            auto* vec2Header = vec2.data.getHeader();
-            SC_TEST_EXPECT(not vec2.data.isInlineBuffer());
-            SC_TEST_EXPECT(not vec2Header->restoreInlineBuffer);
+            SC_TEST_EXPECT(not vec2.data.isInline());
         }
 
         if (test_section("SmallString"))
@@ -62,15 +55,14 @@ struct SC::StringTest : public SC::TestCase
             auto assertUpCasting = [this](String& s) { SC_TEST_EXPECT(s.sizeInBytesIncludingTerminator() == 4); };
             assertUpCasting(ss10);
             SC_TEST_EXPECT(ss10.view() == "asd");
-            SC_TEST_EXPECT(ss10.data.isInlineBuffer());
+            SC_TEST_EXPECT(ss10.data.isInline());
             SC_TEST_EXPECT(ss10.data.capacity() == 10);
             // Test SmallString assignment to regular string
             SmallString<20> ss20;
             ss20   = "ASD22";
             normal = move(ss20);
             SC_TEST_EXPECT(normal.view() == "ASD22");
-            SC_TEST_EXPECT(not normal.data.isInlineBuffer());
-            SC_TEST_EXPECT(not normal.data.getHeader()->restoreInlineBuffer);
+            SC_TEST_EXPECT(not normal.data.isInline());
         }
 
         if (test_section("SmallString Buffer"))
@@ -81,7 +73,7 @@ struct SC::StringTest : public SC::TestCase
             SmallString<5> ss = SmallString<5>(move(myStuff), test.getEncoding());
             SC_TEST_EXPECT(ss.data.size() == 5);
             SC_TEST_EXPECT(ss.data.capacity() == 5);
-            SC_TEST_EXPECT(ss.data.isInlineBuffer());
+            SC_TEST_EXPECT(ss.data.isInline());
         }
     }
 };

@@ -34,27 +34,25 @@ struct SC::Segment<VTable>::Internal
         return nullptr;
     }
 
-    static void* allocate(Segment& segment, size_t capacityBytes, bool restoreInlineBuffer)
+    static T* allocate(Segment& segment, size_t capacityBytes)
     {
         void* newData = Internal::allocateMemory(segment.header, capacityBytes);
         if (newData)
         {
-            segment.header.sizeBytes           = 0;
-            segment.header.capacityBytes       = static_cast<uint32_t>(capacityBytes);
-            segment.header.restoreInlineBuffer = restoreInlineBuffer;
+            segment.header.capacityBytes = static_cast<uint32_t>(capacityBytes);
         }
-        return newData;
+        return static_cast<T*>(newData);
     }
 
-    static void* reallocate(Segment& segment, size_t capacityBytes)
+    static T* reallocate(Segment& segment, size_t capacityBytes)
     {
-        Span<T> data    = segment.toSpan();
-        void*   newData = nullptr;
+        Span<T> selfSpan = segment.toSpan();
+        void*   newData  = nullptr;
         if SC_LANGUAGE_IF_CONSTEXPR (not VTable::IsArray)
         {
             if SC_LANGUAGE_IF_CONSTEXPR (TypeTraits::IsTriviallyCopyable<T>::value)
             {
-                newData = Internal::reallocateMemory(segment.header, data.data(), capacityBytes);
+                newData = Internal::reallocateMemory(segment.header, selfSpan.data(), capacityBytes);
             }
             else
             {
@@ -62,104 +60,95 @@ struct SC::Segment<VTable>::Internal
                 newData = Internal::allocateMemory(segment.header, capacityBytes);
                 if (newData != nullptr)
                 {
-                    VTable::moveConstruct({reinterpret_cast<T*>(newData), data.sizeInElements()}, data.data());
-                    VTable::destruct(data);
-                    Internal::releaseMemory(segment.header, data.data());
+                    VTable::moveConstruct({reinterpret_cast<T*>(newData), selfSpan.sizeInElements()}, selfSpan.data());
+                    VTable::destruct(selfSpan);
+                    Internal::releaseMemory(segment.header, selfSpan.data());
                 }
             }
         }
         segment.header.capacityBytes = static_cast<uint32_t>(capacityBytes);
-        return newData;
+        return static_cast<T*>(newData);
     }
 
     static void releaseInternal(Segment& segment)
     {
         VTable::destruct(segment.toSpan());
-        segment.header.sizeBytes       = 0;
-        const bool restoreInlineBuffer = segment.header.restoreInlineBuffer;
-        if (not segment.isInlineBuffer())
+        segment.header.sizeBytes = 0;
+        if (not segment.isInline())
         {
-            Internal::releaseMemory(segment.header, segment.getData());
-            if (restoreInlineBuffer)
-            {
-                segment.setData(segment.getInlineData());
-                segment.header.capacityBytes       = segment.getInlineCapacity();
-                segment.header.restoreInlineBuffer = false;
-            }
-            else
-            {
-                segment.setData(nullptr);
-                segment.header.capacityBytes = 0;
-            }
+            Internal::releaseMemory(segment.header, segment.data());
+            Internal::eventuallyRestoreInlineData(segment);
         }
+    }
+
+    template <typename VTable2>
+    static void eventuallyRestoreInlineData(Segment<VTable2>& segment)
+    {
+        const bool hasInlineData = segment.header.hasInlineData;
+        segment.setData(hasInlineData ? segment.getInlineData() : nullptr);
+        segment.header.capacityBytes = hasInlineData ? static_cast<uint32_t>(segment.getInlineCapacity()) : 0;
     }
 
     template <typename Construct, typename Assign, typename U>
     static bool assignInternal(Construct constructFunc, Assign assignFunc, Segment& segment, Span<U> span)
     {
-        SegmentHeader& header        = segment.header;
-        const size_t   prevSizeBytes = header.sizeBytes;
-        if (segment.getData() == nullptr or header.capacityBytes < span.sizeInBytes())
+        const size_t newSize     = span.sizeInElements();
+        T*           segmentData = segment.data();
+        if (segment.header.capacityBytes < span.sizeInBytes())
         {
-            const bool restoreInlineBuffer = (segment.isInlineBuffer() or header.restoreInlineBuffer);
-            if (not segment.isInlineBuffer())
+            if (segmentData != nullptr and not segment.isInline())
             {
                 VTable::destruct(segment.toSpan());
-                Internal::releaseMemory(segment.header, segment.getData());
+                Internal::releaseMemory(segment.header, segmentData);
             }
-            void* newData = Internal::allocate(segment, span.sizeInBytes(), restoreInlineBuffer);
+            T* newData = Internal::allocate(segment, span.sizeInBytes());
             segment.setData(newData);
             if (newData == nullptr)
             {
                 return false;
             }
-            header.sizeBytes = static_cast<uint32_t>(span.sizeInBytes());
-            constructFunc({segment.data(), span.sizeInElements()}, span.data());
+            constructFunc({newData, newSize}, span.data());
         }
         else
         {
-            segment.header.sizeBytes = static_cast<uint32_t>(span.sizeInBytes());
-            const size_t assignBytes = min(prevSizeBytes, span.sizeInBytes());
-            assignFunc({segment.data(), assignBytes / sizeof(T)}, span.data());
-            if (header.sizeBytes > assignBytes)
+            const size_t oldSize = segment.size();
+            const size_t minSize = min(oldSize, newSize);
+            assignFunc({segmentData, minSize}, span.data());
+            if (newSize > minSize)
             {
-                constructFunc({segment.data() + assignBytes / sizeof(T), (header.sizeBytes - assignBytes) / sizeof(T)},
-                              span.data() + assignBytes / sizeof(T));
+                constructFunc({segmentData + minSize, newSize - minSize}, span.data() + minSize);
             }
-            else if (prevSizeBytes > assignBytes)
+            else if (oldSize > minSize)
             {
-                VTable::destruct({segment.data() + assignBytes / sizeof(T), (prevSizeBytes - assignBytes) / sizeof(T)});
+                VTable::destruct({segmentData + minSize, oldSize - minSize});
             }
         }
+        segment.header.sizeBytes = static_cast<uint32_t>(newSize * sizeof(T));
         return true;
     }
 
     static Span<T> toSpanOffsetElements(Segment& segment, size_t offsetElements)
     {
-        return {segment.data() + offsetElements, segment.header.sizeBytes / sizeof(T) - offsetElements};
+        return {segment.data() + offsetElements, segment.size() - offsetElements};
     }
 };
 
 // clang-format off
-template <> inline SC::detail::SegmentData<false>::SegmentData(uint32_t capacity) : header(capacity) {}
-inline SC::detail::SegmentData<true>::SegmentData(uint32_t capacity) : header(capacity) {}
-
 template <typename VTable> SC::Segment<VTable>::Segment() {}
+template <typename VTable> SC::Segment<VTable>::~Segment() { Internal::releaseInternal(*this); }
 template <typename VTable> SC::Segment<VTable>::Segment(Segment&& other) { SC_ASSERT_RELEASE(assignMove(move(other))); }
 template <typename VTable> SC::Segment<VTable>::Segment(const Segment& other) { SC_ASSERT_RELEASE(assign(other.toSpanConst())); }
-
-template <typename VTable> SC::Segment<VTable>::~Segment() { Internal::releaseInternal(*this); }
-
-template <typename VTable> SC::Segment<VTable>& SC::Segment<VTable>::operator=(Segment&& other) { SC_ASSERT_RELEASE(assignMove(move(other))); return *this; }
+template <typename VTable> SC::Segment<VTable>& SC::Segment<VTable>::operator=(Segment&& other) { SC_ASSERT_RELEASE(assignMove(move(other))); return *this;}
 template <typename VTable> SC::Segment<VTable>& SC::Segment<VTable>::operator=(const Segment& other) { SC_ASSERT_RELEASE(assign(other.toSpanConst())); return *this; }
 // clang-format on
 
 template <typename VTable>
-SC::Segment<VTable>::Segment(uint32_t capacityInBytes) : Parent(capacityInBytes)
+SC::Segment<VTable>::Segment(uint32_t capacityInBytes)
 {
+    header = SegmentHeader(capacityInBytes);
     if (capacityInBytes > 0)
     {
-        Parent::setData(Parent::getInlineData());
+        VTable::setData(VTable::getInlineData());
     }
 }
 
@@ -167,24 +156,24 @@ template <typename VTable>
 bool SC::Segment<VTable>::shrink_to_fit()
 {
     // 1. Can't shrink inline or empty buffers
-    if (Parent::getData() == nullptr or isInlineBuffer())
+    if (header.capacityBytes == 0 or VTable::isInline())
     {
         return true;
     }
 
     // 2. Rollback to inline segment if it's available and if there is enough capacity
-    if (header.restoreInlineBuffer)
+    if (header.hasInlineData)
     {
-        uint32_t inlineCapacity = Parent::getInlineCapacity();
+        uint32_t inlineCapacity = static_cast<uint32_t>(VTable::getInlineCapacity());
         if (header.sizeBytes <= inlineCapacity)
         {
-            T* inlineData = reinterpret_cast<T*>(Parent::getInlineData());
-            VTable::moveConstruct(toSpan(), inlineData);
-            VTable::destruct(toSpan());
-            Internal::releaseMemory(header, Parent::getData());
-            Parent::setData(inlineData);
-            header.capacityBytes       = inlineCapacity;
-            header.restoreInlineBuffer = false;
+            T*      inlineData = VTable::getInlineData();
+            Span<T> selfSpan   = toSpan();
+            VTable::moveConstruct(selfSpan, inlineData);
+            VTable::destruct(selfSpan);
+            Internal::releaseMemory(header, selfSpan.data());
+            VTable::setData(inlineData);
+            header.capacityBytes = inlineCapacity;
             return true; // No need to go on the heap allocation branch
         }
     }
@@ -192,8 +181,8 @@ bool SC::Segment<VTable>::shrink_to_fit()
     // 3. Otherwise we are on heap, possibly followed by an insufficient inline segment
     if (header.sizeBytes < header.capacityBytes)
     {
-        void* newData = Internal::reallocate(*this, header.sizeBytes);
-        Parent::setData(newData);
+        T* newData = Internal::reallocate(*this, header.sizeBytes);
+        VTable::setData(newData);
         if (header.sizeBytes > 0 and newData == nullptr)
         {
             return false;
@@ -205,21 +194,19 @@ bool SC::Segment<VTable>::shrink_to_fit()
 template <typename VTable>
 bool SC::Segment<VTable>::resize(size_t newSize, const T& value)
 {
-    const size_t previousSizeBytes = size() * sizeof(T);
+    const size_t oldSize = size();
     if (not reserve(newSize))
     {
         return false;
     }
-    const size_t newSizeBytes = newSize * sizeof(T);
-    header.sizeBytes          = static_cast<uint32_t>(newSizeBytes);
-    if (newSizeBytes > previousSizeBytes)
+    header.sizeBytes = static_cast<uint32_t>(newSize * sizeof(T));
+    if (newSize > oldSize)
     {
-        Span<T> newElements = {data() + previousSizeBytes / sizeof(T), (newSizeBytes - previousSizeBytes) / sizeof(T)};
-        VTable::copyConstructAs(newElements, Span<const T>(value));
+        VTable::copyConstructAs({data() + oldSize, newSize - oldSize}, value);
     }
-    else if (newSizeBytes < previousSizeBytes)
+    else if (newSize < oldSize)
     {
-        VTable::destruct({data() + newSizeBytes / sizeof(T), (previousSizeBytes - newSizeBytes) / sizeof(T)});
+        VTable::destruct({data() + newSize, oldSize - newSize});
     }
     return true;
 }
@@ -238,12 +225,12 @@ bool SC::Segment<VTable>::resizeWithoutInitializing(size_t newSize)
 template <typename VTable>
 bool SC::Segment<VTable>::append(Span<const T> span)
 {
-    const auto oldSize = header.sizeBytes / sizeof(T);
+    const auto oldSize = size();
     if (resizeWithoutInitializing(oldSize + span.sizeInElements()))
     {
         if (not span.empty())
         {
-            VTable::copyConstruct({data() + oldSize, span.sizeInBytes() / sizeof(T)}, span.data());
+            VTable::copyConstruct({data() + oldSize, span.sizeInElements()}, span.data());
         }
         return true;
     }
@@ -263,9 +250,10 @@ template <typename U>
 }
 
 template <typename VTable>
-bool SC::Segment<VTable>::appendMove(Segment&& other)
+template <typename VTable2>
+bool SC::Segment<VTable>::appendMove(Segment<VTable2>&& other)
 {
-    const auto oldSize = header.sizeBytes / sizeof(T);
+    const auto oldSize = size();
     if (resizeWithoutInitializing(oldSize + other.size()))
     {
         VTable::moveConstruct({data() + oldSize, other.size()}, other.data());
@@ -275,38 +263,29 @@ bool SC::Segment<VTable>::appendMove(Segment&& other)
 }
 
 template <typename VTable>
-bool SC::Segment<VTable>::reserve(size_t newCapacity)
+bool SC::Segment<VTable>::reserve(size_t capacity)
 {
-    const size_t newCapacityBytes = newCapacity * sizeof(T);
-    if (newCapacityBytes > SegmentHeader::MaxCapacity)
+    const size_t capacityBytes = capacity * sizeof(T);
+    if (capacityBytes > SegmentHeader::MaxCapacity)
     {
         return false;
     }
-    if (newCapacityBytes <= header.capacityBytes)
+    if (capacityBytes <= header.capacityBytes)
     {
         return true;
     }
 
-    const bool     isInline     = isInlineBuffer();
-    const uint32_t oldSizeBytes = header.sizeBytes;
-    void*          newData;
-    if (isInline or Parent::getData() == nullptr)
-    {
-        newData = Internal::allocate(*this, newCapacityBytes, isInline);
-    }
-    else
-    {
-        newData = Internal::reallocate(*this, newCapacityBytes);
-    }
-    Parent::setData(newData);
+    const bool wasInline = VTable::isInline();
+    const bool mustAlloc = header.capacityBytes == 0 or wasInline;
+    T* newData = mustAlloc ? Internal::allocate(*this, capacityBytes) : Internal::reallocate(*this, capacityBytes);
+    VTable::setData(newData);
     if (newData == nullptr)
     {
         return false;
     }
-    if (isInline)
+    if (wasInline and header.sizeBytes > 0)
     {
-        VTable::moveConstruct({data(), oldSizeBytes / sizeof(T)}, reinterpret_cast<T*>(Parent::getInlineData()));
-        header.sizeBytes = oldSizeBytes;
+        VTable::moveConstruct({newData, size()}, VTable::getInlineData());
     }
     return true;
 }
@@ -319,9 +298,12 @@ void SC::Segment<VTable>::clear()
 }
 
 template <typename VTable>
-bool SC::Segment<VTable>::assignMove(Segment&& other)
+template <typename VTable2>
+bool SC::Segment<VTable>::assignMove(Segment<VTable2>&& other)
 {
-    if (&other == this)
+    Span<T> selfSpan  = toSpan();
+    Span<T> otherSpan = other.toSpan();
+    if (selfSpan.data() == otherSpan.data())
     {
         return true;
     }
@@ -332,15 +314,14 @@ bool SC::Segment<VTable>::assignMove(Segment&& other)
         return true;
     }
 
-    if (other.isInlineBuffer())
+    if (other.isInline())
     {
         // we cannot steal segment but only copy it (move-assign)
-        Span<T> span = {other.data(), other.header.sizeBytes / sizeof(T)};
-        if (not Internal::assignInternal(&VTable::moveConstruct, &VTable::moveAssign, *this, span))
+        if (not Internal::assignInternal(&VTable::moveConstruct, &VTable::moveAssign, *this, otherSpan))
         {
             return false;
         }
-        VTable::destruct(other.toSpan());
+        VTable::destruct(otherSpan);
         other.header.sizeBytes = 0;
     }
     else
@@ -348,28 +329,16 @@ bool SC::Segment<VTable>::assignMove(Segment&& other)
         // Cool we can just steal the heap allocated segment header pointer
         // If other was followed by inline segment we restore its link
         // If other was just heap allocated we set it to nullptr
-        const bool restoreInlineBuffer = isInlineBuffer() or (header.restoreInlineBuffer);
-
-        if (not isInlineBuffer())
+        if (not VTable::isInline())
         {
-            VTable::destruct(toSpan());
-            Internal::releaseMemory(header, Parent::getData());
+            VTable::destruct(selfSpan);
+            Internal::releaseMemory(header, selfSpan.data());
         }
-        Parent::setData(other.getData());
-        if (other.header.restoreInlineBuffer)
-        {
-            other.setData(other.getInlineData());
-            other.header.restoreInlineBuffer = false;
-            other.header.capacityBytes       = other.getInlineCapacity();
-        }
-        else
-        {
-            other.setData(nullptr);
-        }
-        header                 = other.header;
+        VTable::setData(otherSpan.data());
+        header.sizeBytes       = other.header.sizeBytes;
+        header.capacityBytes   = other.header.capacityBytes;
         other.header.sizeBytes = 0;
-
-        header.restoreInlineBuffer = restoreInlineBuffer;
+        Internal::eventuallyRestoreInlineData(other);
     }
     return true;
 }
@@ -377,17 +346,10 @@ bool SC::Segment<VTable>::assignMove(Segment&& other)
 template <typename VTable>
 bool SC::Segment<VTable>::push_back(T&& value)
 {
-    const auto currentSize = size();
-    if (resizeWithoutInitializing(currentSize + 1))
+    const auto numElements = size();
+    if (resizeWithoutInitializing(numElements + 1))
     {
-#if SC_COMPILER_GCC
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstringop-overflow="
-#endif
-        placementNew(data()[currentSize], move(value));
-#if SC_COMPILER_GCC
-#pragma GCC diagnostic pop
-#endif
+        placementNew(data()[numElements], move(value));
         return true;
     }
     return false;
@@ -404,7 +366,7 @@ bool SC::Segment<VTable>::pop_back(T* removedValue)
     {
         *removedValue = move(back());
     }
-    VTable::destruct({data() + (header.sizeBytes - sizeof(T)) / sizeof(T), 1});
+    VTable::destruct(Internal::toSpanOffsetElements(*this, size() - 1));
     header.sizeBytes -= sizeof(T);
     return true;
 }
@@ -454,10 +416,10 @@ bool SC::Segment<VTable>::removeRange(size_t start, size_t length)
 template <typename VTable>
 bool SC::Segment<VTable>::insert(size_t index, Span<const T> data)
 {
-    const size_t numElements = size();
-    const size_t dataSize    = data.sizeInElements();
-    if ((index > numElements) or (dataSize >= SegmentHeader::MaxCapacity / sizeof(T) - numElements) or
-        not reserve(numElements + dataSize))
+    const size_t     numElements = size();
+    const size_t     dataSize    = data.sizeInElements();
+    constexpr size_t MaxElements = SegmentHeader::MaxCapacity / sizeof(T);
+    if ((index > numElements) or (dataSize >= MaxElements - numElements) or not reserve(numElements + dataSize))
     {
         return false;
     }

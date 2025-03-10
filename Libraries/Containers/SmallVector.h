@@ -28,6 +28,7 @@ struct SC::SmallVector : public Vector<T>
 {
     // clang-format off
     SmallVector() : Vector<T>( N * sizeof(T)) {}
+    ~SmallVector() {}
     SmallVector(const Vector<T>& other) : SmallVector() { Vector<T>::operator=(other); }
     SmallVector(Vector<T>&& other) : SmallVector() { Vector<T>::operator=(move(other)); }
     Vector<T>& operator=(const Vector<T>& other) { return Vector<T>::operator=(other); }
@@ -43,6 +44,9 @@ struct SC::SmallVector : public Vector<T>
 
   private:
     uint64_t inlineCapacity = N * sizeof(T);
-    char     inlineBuffer[N * sizeof(T)];
+    union
+    {
+        T inlineData[N];
+    };
 };
 //! @}

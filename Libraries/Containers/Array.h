@@ -7,11 +7,29 @@ namespace SC
 {
 namespace detail
 {
-template <typename T>
+template <typename T, int N>
 struct ArrayVTable : public ObjectVTable<T>
 {
     static constexpr bool IsArray = true;
+
+    T*       data() { return items; }
+    const T* data() const { return items; }
+    void     setData(T*) {}
+    T*       getInlineData() { return items; }
+    uint32_t getInlineCapacity() { return header.capacityBytes; }
+
+    static constexpr bool isInline() { return true; }
+
+    ArrayVTable(uint32_t capacity = 0) : header(capacity) {}
+    ~ArrayVTable() {}
+
+    SegmentHeader header;
+    union
+    {
+        T items[N];
+    };
 };
+
 } // namespace detail
 //! @addtogroup group_containers
 //! @{
@@ -27,11 +45,10 @@ struct ArrayVTable : public ObjectVTable<T>
 ///
 /// \snippet Libraries/Containers/Tests/ArrayTest.cpp ArraySnippet
 template <typename T, int N>
-struct Array : public Segment<detail::ArrayVTable<T>>
+struct Array : public Segment<detail::ArrayVTable<T, N>>
 {
-    using Parent = Segment<detail::ArrayVTable<T>>;
+    using Parent = Segment<detail::ArrayVTable<T, N>>;
     Array() : Parent(sizeof(T) * N){};
-    ~Array() {}
     // clang-format off
     Array(std::initializer_list<T> list) : Array() { SC_ASSERT_RELEASE(Parent::assign({list.begin(), list.size()})); }
     Array(const Array& other) : Array() { SC_ASSERT_RELEASE(Parent::append(other.toSpanConst())); }
@@ -41,11 +58,11 @@ struct Array : public Segment<detail::ArrayVTable<T>>
     template <int M>
     Array(const Array<T, M>& other) : Array() { SC_ASSERT_RELEASE(Parent::assign(other.toSpanConst()));}
     template <int M>
-    Array(Array<T, M>&& other) : Array() { SC_ASSERT_RELEASE(Parent::assign(move(other))); }
+    Array(Array<T, M>&& other) : Array() { SC_ASSERT_RELEASE(Parent::assignMove(move(other))); }
     template <int M>
     Array& operator=(const Array<T, M>& other) { SC_ASSERT_RELEASE(Parent::assign(other.toSpanConst())); return *this; }
     template <int M>
-    Array& operator=(Array<T, M>&& other) { SC_ASSERT_RELEASE(Parent::assign(move(other))); return *this; }
+    Array& operator=(Array<T, M>&& other) { SC_ASSERT_RELEASE(Parent::assignMove(move(other))); return *this; }
     Array(Span<const T> span) : Array() { SC_ASSERT_RELEASE(Parent::assign(span)); }
     template <typename U>
     Array(Span<const U> span) : Array() { SC_ASSERT_RELEASE(Parent::assign(span)); }
@@ -101,12 +118,6 @@ struct Array : public Segment<detail::ArrayVTable<T>>
     {
         return removeAll([&](auto& item) { return item == value; });
     }
-
-  private:
-    union
-    {
-        T items[N];
-    };
 };
 
 //! @}

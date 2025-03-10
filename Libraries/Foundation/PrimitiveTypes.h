@@ -75,14 +75,17 @@ struct PlacementNew {};
 /// Custom placement new using SC::PlacementNew class
 #if SC_COMPILER_MSVC
 inline void* operator new(size_t, void* p, SC::PlacementNew) noexcept { return p; }
+inline void* operator new[](size_t, void* p, SC::PlacementNew) noexcept { return p; }
 inline void  operator delete(void*, void*, SC::PlacementNew) noexcept {}
 #else
 inline void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { return p; }
+inline void* operator new[](SC::size_t, void* p, SC::PlacementNew) noexcept { return p; }
 #endif
 namespace SC
 {
 /// Placement New
 template<typename T, typename... Q> void placementNew(T& storage, Q&&... other) { new (&storage, PlacementNew()) T(forward<Q>(other)...); }
+template<typename T> void placementNewArray(T* storage, size_t size) { new (storage, PlacementNew()) T[size]; }
 }
 //! @}
 // clang-format on

@@ -20,24 +20,18 @@ struct SC::SmallVectorTest : public SC::TestCase
             SC_TEST_EXPECT(vec.shrink_to_fit());
             SC_TEST_EXPECT(vec.capacity() == 3);
             SC_TEST_EXPECT(vec.size() == 2);
-            SC_TEST_EXPECT(vec.isInlineBuffer());
+            SC_TEST_EXPECT(vec.isInline());
         }
         if (test_section("resize stack heap"))
         {
             SmallVector<int, 3> vec;
             SC_TEST_EXPECT(vec.resize(3));
-            auto* header = vec.getHeader();
-            SC_TEST_EXPECT(vec.isInlineBuffer());
-            SC_TEST_EXPECT(not header->restoreInlineBuffer);
+            SC_TEST_EXPECT(vec.isInline());
             SC_TEST_EXPECT(vec.resize(4));
-            header = vec.getHeader();
-            SC_TEST_EXPECT(not vec.isInlineBuffer());
-            SC_TEST_EXPECT(header->restoreInlineBuffer);
+            SC_TEST_EXPECT(not vec.isInline());
             SC_TEST_EXPECT(vec.resize(3));
             SC_TEST_EXPECT(vec.shrink_to_fit());
-            header = vec.getHeader();
-            SC_TEST_EXPECT(vec.isInlineBuffer());
-            SC_TEST_EXPECT(not header->restoreInlineBuffer);
+            SC_TEST_EXPECT(vec.isInline());
         }
         if (test_section("construction copy stack"))
         {
@@ -45,12 +39,12 @@ struct SC::SmallVectorTest : public SC::TestCase
             {
                 SmallVector<int, 3> vec;
                 addItems(vec, 3);
-                SC_TEST_EXPECT(vec.isInlineBuffer() and vec.size() == 3);
+                SC_TEST_EXPECT(vec.isInline() and vec.size() == 3);
                 SC_TEST_EXPECT(vec.push_back(3));
-                SC_TEST_EXPECT(not vec.isInlineBuffer());
+                SC_TEST_EXPECT(not vec.isInline());
                 SC_TEST_EXPECT(vec.pop_back());
                 SC_TEST_EXPECT(vec.shrink_to_fit());
-                SC_TEST_EXPECT(vec.isInlineBuffer() and vec.size() == 3);
+                SC_TEST_EXPECT(vec.isInline() and vec.size() == 3);
                 vec2 = vec;
             }
             SC_TEST_EXPECT(vec2.size() == 3);
@@ -65,11 +59,9 @@ struct SC::SmallVectorTest : public SC::TestCase
                 SC_TEST_EXPECT(vec.size() == 4);
                 vec2 = vec;
             }
-            auto* vec2Header = vec2.getHeader();
-            SC_TEST_EXPECT(not vec2.isInlineBuffer());
-            SC_TEST_EXPECT(vec2Header->restoreInlineBuffer);
+            SC_TEST_EXPECT(not vec2.isInline());
             SC_TEST_EXPECT(vec2.size() == 4);
-            SC_TEST_EXPECT(not vec2.isInlineBuffer());
+            SC_TEST_EXPECT(not vec2.isInline());
             checkItems(vec2, 4);
         }
         if (test_section("construction move SmallVector(stack)->Vector"))
@@ -81,148 +73,125 @@ struct SC::SmallVectorTest : public SC::TestCase
                 SC_TEST_EXPECT(vec.size() == 3);
                 vec2 = move(vec);
             }
-            auto* vec2Header = vec2.getHeader();
-            SC_TEST_EXPECT(not vec2.isInlineBuffer());
-            SC_TEST_EXPECT(not vec2Header->restoreInlineBuffer);
+            SC_TEST_EXPECT(not vec2.isInline());
             checkItems(vec2, 3);
         }
         if (test_section("construction move SmallVector(heap)->Vector"))
         {
-            Vector<int> vec2;
+            Vector<int> vec4;
             {
-                SmallVector<int, 3> vec;
-                auto*               vec1Header = vec.getHeader();
-                addItems(vec, 4);
-                SC_TEST_EXPECT(vec.size() == 4);
+                SmallVector<int, 3> smallVec3;
+                addItems(smallVec3, 4);
+                SC_TEST_EXPECT(smallVec3.size() == 4);
 
-                vec2 = move(vec);
-                SC_TEST_EXPECT(vec.data() != nullptr);
-                auto* vec1Header2 = vec.getHeader();
-                SC_TEST_EXPECT(vec1Header2 == vec1Header);
-                SC_TEST_EXPECT(vec.isInlineBuffer());
-                SC_TEST_EXPECT(vec1Header2->capacityBytes == 3 * sizeof(int));
+                vec4 = move(smallVec3);
+                SC_TEST_EXPECT(smallVec3.data() != nullptr);
+                SC_TEST_EXPECT(smallVec3.isInline());
+                SC_TEST_EXPECT(smallVec3.capacity() == 3); // restored initial capacity
             }
-            auto* vec2Header = vec2.getHeader();
-            SC_TEST_EXPECT(not vec2.isInlineBuffer());
-            SC_TEST_EXPECT(not vec2Header->restoreInlineBuffer);
-            checkItems(vec2, 4);
+            SC_TEST_EXPECT(not vec4.isInline());
+            checkItems(vec4, 4);
         }
         if (test_section("construction move Vector->SmallVector(heap)"))
         {
-            SmallVector<int, 3> vec2;
+            SmallVector<int, 3> smallVec3;
             {
-                Vector<int> vec;
-                addItems(vec, 4);
-                SC_TEST_EXPECT(vec.size() == 4);
-                vec2 = move(vec);
-                SC_TEST_EXPECT(vec.data() == nullptr);
+                Vector<int> vec4;
+                addItems(vec4, 4);
+                SC_TEST_EXPECT(vec4.size() == 4);
+                smallVec3 = move(vec4);
+                SC_TEST_EXPECT(vec4.data() == nullptr);
             }
-            auto* vec2Header = vec2.getHeader();
-            SC_TEST_EXPECT(not vec2.isInlineBuffer());
-            SC_TEST_EXPECT(vec2Header->restoreInlineBuffer);
-            checkItems(vec2, 4);
+            SC_TEST_EXPECT(not smallVec3.isInline());
+            checkItems(smallVec3, 4);
         }
         if (test_section("construction move Vector->SmallVector(stack)"))
         {
-            SmallVector<int, 3> vec2;
+            SmallVector<int, 3> smallVec3;
             {
-                Vector<int> vec;
-                addItems(vec, 3);
-                SC_TEST_EXPECT(vec.size() == 3);
-                vec2 = move(vec);
-                SC_TEST_EXPECT(vec.data() == nullptr);
+                Vector<int> vec3;
+                addItems(vec3, 3);
+                SC_TEST_EXPECT(vec3.size() == 3);
+                smallVec3 = move(vec3);
+                SC_TEST_EXPECT(vec3.data() == nullptr);
             }
-            auto* vec2Header = vec2.getHeader();
-            SC_TEST_EXPECT(not vec2.isInlineBuffer());
-            SC_TEST_EXPECT(vec2Header->restoreInlineBuffer);
-            SC_TEST_EXPECT(vec2.size() == 3);
-            checkItems(vec2, 3);
+            SC_TEST_EXPECT(not smallVec3.isInline());
+            SC_TEST_EXPECT(smallVec3.size() == 3);
+            checkItems(smallVec3, 3);
         }
         if (test_section("construction move SmallVector(stack)->SmallVector(stack)"))
         {
-            SmallVector<int, 3> vec2;
+            SmallVector<int, 3> smallVec3A;
             {
-                SmallVector<int, 3> vec;
-                addItems(vec, 3);
-                SC_TEST_EXPECT(vec.size() == 3);
-                vec2 = move(vec);
+                SmallVector<int, 3> smallVec3B;
+                addItems(smallVec3B, 3);
+                SC_TEST_EXPECT(smallVec3B.size() == 3);
+                smallVec3A = move(smallVec3B);
 #ifndef __clang_analyzer__
-                SC_TEST_EXPECT(vec.size() == 0);
+                SC_TEST_EXPECT(smallVec3B.size() == 0);
 #endif // not __clang_analyzer__
-                SC_TEST_EXPECT(vec2.size() == 3);
-                auto* vec1Header = vec.getHeader();
-                SC_TEST_EXPECT(vec1Header != nullptr);
+                SC_TEST_EXPECT(smallVec3A.size() == 3);
 #ifndef __clang_analyzer__
-                SC_TEST_EXPECT(vec.isInlineBuffer());
+                SC_TEST_EXPECT(smallVec3B.isInline());
 #endif // not __clang_analyzer__
             }
-            SC_TEST_EXPECT(vec2.isInlineBuffer());
-            checkItems(vec2, 3);
+            SC_TEST_EXPECT(smallVec3A.isInline());
+            checkItems(smallVec3A, 3);
         }
         if (test_section("construction move SmallVector(heap)->SmallVector(stack)"))
         {
-            SmallVector<int, 3> vec2;
+            SmallVector<int, 3> smallVec3A;
             {
-                SmallVector<int, 3> vec;
-                addItems(vec, 4);
-                SC_TEST_EXPECT(vec.size() == 4);
-                vec2 = move(vec);
+                SmallVector<int, 3> smallVec3B;
+                addItems(smallVec3B, 4);
+                SC_TEST_EXPECT(smallVec3B.size() == 4);
+                smallVec3A = move(smallVec3B);
 #ifndef __clang_analyzer__
-                SC_TEST_EXPECT(vec.size() == 0);
+                SC_TEST_EXPECT(smallVec3B.size() == 0);
 #endif // not __clang_analyzer__
-                SC_TEST_EXPECT(vec2.size() == 4);
-                auto* vec1Header = vec.getHeader();
-                SC_TEST_EXPECT(vec1Header != nullptr);
+                SC_TEST_EXPECT(smallVec3A.size() == 4);
 #ifndef __clang_analyzer__
-                SC_TEST_EXPECT(vec.isInlineBuffer());
+                SC_TEST_EXPECT(smallVec3B.isInline());
 #endif // not __clang_analyzer__
             }
-            auto* vec2Header = vec2.getHeader();
-            SC_TEST_EXPECT(not vec2.isInlineBuffer());
-            SC_TEST_EXPECT(vec2Header->restoreInlineBuffer);
-            checkItems(vec2, 4);
+            SC_TEST_EXPECT(not smallVec3A.isInline());
+            checkItems(smallVec3A, 4);
         }
         if (test_section("construction move SmallVector(stack)->SmallVector(stack)"))
         {
-            SmallVector<int, 3> vec2;
+            SmallVector<int, 3> smallVec3A;
             {
-                SmallVector<int, 3> vec;
-                addItems(vec, 3);
-                SC_TEST_EXPECT(vec.size() == 3);
-                vec2 = move(vec);
+                SmallVector<int, 3> smallVec3B;
+                addItems(smallVec3B, 3);
+                SC_TEST_EXPECT(smallVec3B.size() == 3);
+                smallVec3A = move(smallVec3B);
 #ifndef __clang_analyzer__
-                SC_TEST_EXPECT(vec.size() == 0);
+                SC_TEST_EXPECT(smallVec3B.size() == 0);
 #endif // not __clang_analyzer__
-                SC_TEST_EXPECT(vec2.size() == 3);
-                auto* vec1Header = vec.getHeader();
-                SC_TEST_EXPECT(vec1Header != nullptr);
+                SC_TEST_EXPECT(smallVec3A.size() == 3);
 #ifndef __clang_analyzer__
-                SC_TEST_EXPECT(vec.isInlineBuffer());
+                SC_TEST_EXPECT(smallVec3B.isInline());
 #endif // not __clang_analyzer__
             }
-            SC_TEST_EXPECT(vec2.isInlineBuffer());
-            checkItems(vec2, 3);
+            SC_TEST_EXPECT(smallVec3A.isInline());
+            checkItems(smallVec3A, 3);
         }
         if (test_section("construction move SmallVector(heap)->SmallVector(stack)"))
         {
-            SmallVector<int, 4> vec2;
+            SmallVector<int, 4> smallVec4;
             {
-                SmallVector<int, 3> vec;
-                addItems(vec, 4);
-                SC_TEST_EXPECT(vec.size() == 4);
-                vec2 = move(vec);
-                SC_TEST_EXPECT(vec.size() == 0);
-                SC_TEST_EXPECT(vec2.size() == 4);
-                auto* vec1Header = vec.getHeader();
-                SC_TEST_EXPECT(vec1Header != nullptr);
+                SmallVector<int, 3> smallVec3;
+                addItems(smallVec3, 4);
+                SC_TEST_EXPECT(smallVec3.size() == 4);
+                smallVec4 = move(smallVec3);
+                SC_TEST_EXPECT(smallVec3.size() == 0);
+                SC_TEST_EXPECT(smallVec4.size() == 4);
 #ifndef __clang_analyzer__
-                SC_TEST_EXPECT(vec.isInlineBuffer());
+                SC_TEST_EXPECT(smallVec3.isInline());
 #endif // not __clang_analyzer__
             }
-            auto* vec2Header = vec2.getHeader();
-            SC_TEST_EXPECT(not vec2.isInlineBuffer());
-            SC_TEST_EXPECT(vec2Header->restoreInlineBuffer);
-            checkItems(vec2, 4);
+            SC_TEST_EXPECT(not smallVec4.isInline());
+            checkItems(smallVec4, 4);
         }
         if (test_section("move operations"))
         {

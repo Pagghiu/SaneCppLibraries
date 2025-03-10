@@ -11,78 +11,67 @@ namespace SC
 namespace detail
 {
 struct SC_COMPILER_EXPORT SegmentHeader;
-
-// clang-format off
-#if SC_COMPILER_MSVC && !SC_LANGUAGE_CPP_AT_LEAST_17
-template <typename T> [[nodiscard]] constexpr T* Launder(T* p) noexcept { return p; } // We're in UB-land
-#else
-template <typename T> [[nodiscard]] constexpr T* Launder(T* p) noexcept { return __builtin_launder(p); }
-#endif
-// clang-format on
-
 struct alignas(uint64_t) SegmentHeader
 {
     static constexpr uint32_t MaxCapacity = (~static_cast<uint32_t>(0)) >> 1;
 
-    SegmentHeader(uint32_t capacity)
+    SegmentHeader(uint32_t capacity = 0)
     {
-        sizeBytes           = 0;
-        unused              = 0;
-        capacityBytes       = capacity;
-        restoreInlineBuffer = false;
+        sizeBytes     = 0;
+        unused        = 0;
+        capacityBytes = capacity;
+        hasInlineData = capacity > 0;
     }
     uint32_t sizeBytes : sizeof(uint32_t) * 8 - 1;
     uint32_t unused : 1;
     uint32_t capacityBytes : sizeof(uint32_t) * 8 - 1;
-    uint32_t restoreInlineBuffer : 1;
+    uint32_t hasInlineData : 1;
 };
 
-template <bool IsArrayLayout>
-struct SegmentData
+struct SegmentHeaderOffset
 {
-    // clang-format off
-    SC_COMPILER_FORCE_INLINE void*       getData() { return offset == 0 ? nullptr : (char*)this + offset; }
-    SC_COMPILER_FORCE_INLINE const void* getData() const { return offset == 0 ? nullptr : (const char*)this + offset; }
-    SC_COMPILER_FORCE_INLINE void        setData(void* newData) { offset = newData == nullptr ? 0 : (char*)newData -  (char*)this; }
-    SC_COMPILER_FORCE_INLINE void*       getInlineData() { return (char*)this + sizeof(*this) + sizeof(uint64_t); }
-    SC_COMPILER_FORCE_INLINE uint32_t    getInlineCapacity() { return static_cast<uint32_t>(*reinterpret_cast<uint64_t*>((char*)this + sizeof(*this))); }
-
-    SC_COMPILER_FORCE_INLINE bool isInline() const { return offset == sizeof(*this) + sizeof(uint64_t); }
-    // clang-format on
-
-  protected:
-    SegmentData(uint32_t capacity = 0);
+    using PtrOffset = size_t;
     SegmentHeader header;
-    ssize_t       offset = 0; // memory offset representing relative pointer to data from "this"
+    PtrOffset     offset = 0; // memory offset representing relative pointer to data from "this"
 };
 
-template <>
-struct SegmentData<true>
+template <typename T>
+struct SegmentSelfRelativePointer : protected SegmentHeaderOffset
 {
-    SC_COMPILER_FORCE_INLINE void*       getData() { return (char*)this + sizeof(*this); }
-    SC_COMPILER_FORCE_INLINE const void* getData() const { return (const char*)this + sizeof(*this); }
-    SC_COMPILER_FORCE_INLINE void        setData(void*) {}
-    SC_COMPILER_FORCE_INLINE void*       getInlineData() { return (char*)this + sizeof(*this); }
-    SC_COMPILER_FORCE_INLINE uint32_t    getInlineCapacity() { return header.capacityBytes; }
-
-    SC_COMPILER_FORCE_INLINE static constexpr bool isInline() { return true; }
+    SC_COMPILER_FORCE_INLINE T*       data() { return offset == 0 ? nullptr : toPtr(toOffset(this) + offset); }
+    SC_COMPILER_FORCE_INLINE const T* data() const { return offset == 0 ? nullptr : toPtr(toOffset(this) + offset); }
+    SC_COMPILER_FORCE_INLINE bool isInline() const { return offset == sizeof(SegmentHeaderOffset) + sizeof(uint64_t); }
 
   protected:
-    SegmentData(uint32_t capacity = 0);
-    SegmentHeader header;
+    struct InlineData : public SegmentHeaderOffset // Data layout corresponds to SmallBuffer, SmallVector etc.
+    {
+        uint64_t capacity; // Could use uint32_t but we need to align data to 64 bit anyway
+        ~InlineData() {}
+        union
+        {
+            T data[1]; // Accessing the whole class through volatile cast anyway so array size can be whatever
+        };
+    };
+    SC_COMPILER_FORCE_INLINE static auto toOffset(const volatile void* src) { return reinterpret_cast<PtrOffset>(src); }
+    SC_COMPILER_FORCE_INLINE static T*   toPtr(PtrOffset src) { return reinterpret_cast<T*>(src); }
+    SC_COMPILER_FORCE_INLINE void setData(T* mem) { offset = mem == nullptr ? 0 : toOffset(mem) - toOffset(this); }
+    SC_COMPILER_FORCE_INLINE T*   getInlineData() { return (T*)reinterpret_cast<volatile InlineData*>(this)->data; }
+    SC_COMPILER_FORCE_INLINE auto getInlineCapacity() { return reinterpret_cast<volatile InlineData*>(this)->capacity; }
 };
 
 /// @brief Allows SC::Segment handle trivial types
-struct SC_COMPILER_EXPORT SegmentTrivial
+template <typename T>
+struct SegmentTrivial
 {
-    static void destruct(Span<void> data);
-    static void copyConstructAs(Span<void> data, Span<const void> value);
-    static void copyConstruct(Span<void> data, const void* src);
-    static void copyAssign(Span<void> data, const void* src);
-    static void copyInsert(Span<void> data, Span<const void> values);
-    static void moveConstruct(Span<void> data, void* src);
-    static void moveAssign(Span<void> data, void* src);
-    static void remove(Span<void> data, size_t numElements);
+    using Type = T;
+    inline static void destruct(Span<T> data);
+    inline static void copyConstructAs(Span<T> data, Span<const T> value);
+    inline static void copyConstruct(Span<T> data, const T* src);
+    inline static void copyAssign(Span<T> data, const T* src);
+    inline static void copyInsert(Span<T> data, Span<const T> values);
+    inline static void moveConstruct(Span<T> data, T* src);
+    inline static void moveAssign(Span<T> data, T* src);
+    inline static void remove(Span<T> data, size_t numElements);
 };
 
 } // namespace detail
@@ -94,8 +83,9 @@ struct SC_COMPILER_EXPORT SegmentTrivial
 /// @note Implementation is in `.inl` to reduce include bloat for non-templated derived classes like SC::Buffer.
 /// This reduces header bloat as the `.inl` can be included where derived class is defined (typically a `.cpp` file).
 template <typename VTable>
-struct Segment : protected detail::SegmentData<VTable::IsArray>
+struct Segment : public VTable
 {
+    using VTable::data;
     using T = typename VTable::Type;
     Segment(uint32_t capacityInBytes);
 
@@ -130,10 +120,11 @@ struct Segment : protected detail::SegmentData<VTable::IsArray>
     [[nodiscard]] bool append(Span<const U> span);
 
     /// @brief Moves contents of another segment to the end of this segment
-    [[nodiscard]] bool appendMove(Segment&& other);
+    template <typename VTable2>
+    [[nodiscard]] bool appendMove(Segment<VTable2>&& other);
 
     /// @brief Ensures `capacity == size` re-allocating (if `capacity>size`) or freeing ( if `size==0`) memory.
-    /// @note If `isInlineBuffer() == true` its capacity will not shrink.
+    /// @note If `isInline() == true` its capacity will not shrink.
     [[nodiscard]] bool shrink_to_fit();
 
     /// @brief Sets size to zero without freeing any memory (use `shrink_to_fit()` to free memory)
@@ -145,7 +136,8 @@ struct Segment : protected detail::SegmentData<VTable::IsArray>
 
     /// @brief Replaces content moving (possibly "stealing") content of another segment
     /// @note This method allows detecting allocation failures (unlike the assignment operator)
-    [[nodiscard]] bool assignMove(Segment&& other);
+    template <typename VTable2>
+    [[nodiscard]] bool assignMove(Segment<VTable2>&& other);
 
     /// @brief Appends a single element to the end of the segment
     [[nodiscard]] bool push_back(const T& value) { return resize(size() + 1, value); }
@@ -167,9 +159,6 @@ struct Segment : protected detail::SegmentData<VTable::IsArray>
     [[nodiscard]] bool pop_front(T* removedValue = nullptr);
 
     // clang-format off
-    [[nodiscard]] const T* data() const     SC_LANGUAGE_LIFETIME_BOUND { return detail::Launder(reinterpret_cast<const T*>(Parent::getData())); }
-    [[nodiscard]] T*       data()           SC_LANGUAGE_LIFETIME_BOUND { return detail::Launder(reinterpret_cast<T*>(Parent::getData())); }
-
     [[nodiscard]] T*       begin()          SC_LANGUAGE_LIFETIME_BOUND { return data(); }
     [[nodiscard]] const T* begin() const    SC_LANGUAGE_LIFETIME_BOUND { return data(); }
     [[nodiscard]] T*       end()            SC_LANGUAGE_LIFETIME_BOUND { return data() + size(); }
@@ -183,9 +172,6 @@ struct Segment : protected detail::SegmentData<VTable::IsArray>
     [[nodiscard]] T&       operator[](size_t idx)       SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_DEBUG(idx < size()); return *(data() + idx);}
     [[nodiscard]] const T& operator[](size_t idx) const SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_DEBUG(idx < size()); return *(data() + idx);}
     // clang-format on
-
-    /// @brief Returns `true` if an inline buffer is in use (`false` if segment is heap allocated).
-    [[nodiscard]] bool isInlineBuffer() const { return Parent::isInline(); }
 
     /// @brief Check if is empty (`size()` == 0)
     [[nodiscard]] bool isEmpty() const { return header.sizeBytes == 0; }
@@ -219,13 +205,11 @@ struct Segment : protected detail::SegmentData<VTable::IsArray>
     /// @return `true` if index is less than or equal to size()
     [[nodiscard]] bool insert(size_t index, Span<const T> data);
 
-    /// @brief Get the internal header handled by this class
-    [[nodiscard]] const detail::SegmentHeader* getHeader() const { return &header; }
-
   protected:
+    template <typename VTable2>
+    friend struct Segment;
     struct Internal;
-    using Parent = detail::SegmentData<VTable::IsArray>;
-    using Parent::header;
+    using VTable::header;
     using SegmentHeader = detail::SegmentHeader;
 };
 
