@@ -236,6 +236,40 @@ struct Vector : public Segment<detail::VectorVTable<T>>
     }
 };
 
+/// @brief A Vector that can hold up to `N` elements inline and `> N` on heap
+/// @tparam T Type of single vector element
+/// @tparam N Number of elements kept inline to avoid heap allocation
+///
+/// SC::SmallVector is like SC::Vector but it will do heap allocation once more than `N` elements are needed. @n
+/// When the `size()` becomes less than `N` the container will switch back using memory coming from inline storage.
+/// @note SC::SmallVector derives from SC::Vector and it can be passed everywhere a reference to SC::Vector is needed.
+/// It can be used to get rid of unnecessary allocations where the upper bound of required elements is known or it can
+/// be predicted.
+///
+/// \snippet Libraries/Containers/Tests/SmallVectorTest.cpp SmallVectorSnippet
+template <typename T, int N>
+struct SmallVector : public Vector<T>
+{
+    // clang-format off
+    SmallVector() : Vector<T>( N * sizeof(T)) {}
+    ~SmallVector() {}
+    SmallVector(const SmallVector& other) : SmallVector() { Vector<T>::operator=(other); }
+    SmallVector(SmallVector&& other) : SmallVector() { Vector<T>::operator=(move(other)); }
+    SmallVector& operator=(const SmallVector& other) { Vector<T>::operator=(other); return *this; }
+    SmallVector& operator=(SmallVector&& other) { Vector<T>::operator=(move(other)); return *this; }
+
+    SmallVector(const Vector<T>& other) : SmallVector() { Vector<T>::operator=(other); }
+    SmallVector(Vector<T>&& other) : SmallVector() { Vector<T>::operator=(move(other)); }
+    SmallVector(std::initializer_list<T> list) : SmallVector() { SC_ASSERT_RELEASE(Vector<T>::assign({list.begin(), list.size()})); }
+    // clang-format on
+
+  private:
+    uint64_t inlineCapacity = N * sizeof(T);
+    union
+    {
+        T inlineData[N];
+    };
+};
 //! @}
 
 } // namespace SC

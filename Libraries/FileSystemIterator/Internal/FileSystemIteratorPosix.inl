@@ -4,7 +4,7 @@
 #include "../FileSystemIterator.h"
 #include "../../Strings/StringConverter.h"
 #include "../../Strings/String.h"
-#include "../../Containers/SmallVector.h"
+#include "../../Containers/Vector.h"
 
 // clang-format on
 #include <dirent.h>

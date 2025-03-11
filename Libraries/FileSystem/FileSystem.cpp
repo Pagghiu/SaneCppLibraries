@@ -391,7 +391,7 @@ SC::Result SC::FileSystem::setLastModifiedTime(StringView file, Time::Realtime t
 }
 
 #if !SC_PLATFORM_APPLE
-#include "../Containers/SmallVector.h"
+#include "../Containers/Vector.h"
 #include "../FileSystemIterator/FileSystemIterator.h"
 SC::Result SC::FileSystem::fallbackCopyDirectory(String& sourceDirectory, String& destinationDirectory,
                                                  FileSystem::CopyFlags options)

@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../StringConverter.h"
-#include "../../Containers/SmallVector.h"
+#include "../../Containers/Vector.h"
 #include "../../Testing/Testing.h"
 
 namespace SC

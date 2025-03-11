@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Containers/Array.h"
-#include "../../Containers/SmallVector.h"
 #include "../../Containers/Vector.h"
 #include "../../Reflection/Reflection.h"
 #include "../../Strings/Console.h"

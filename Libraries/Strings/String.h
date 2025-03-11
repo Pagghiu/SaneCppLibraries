@@ -166,33 +166,20 @@ struct SC::String
 template <int N>
 struct SC::SmallString : public String
 {
-    // Unfortunately we have to repeat all these overloads.
-    // 'using String::operator=' or 'using String::String' would invoke default memberwise copy
-    // constructors also for SmallString::header and buffer, that would cause a disaster.
-
+    // Unfortunately we have to repeat all these overloads to set inline capacity and hasInlineData flag
     SmallString(StringEncoding encoding = StringEncoding::Utf8) : String(encoding, N) {}
     SmallString(const SmallString& other) : SmallString(other.getEncoding()) { String::operator=(other); }
     SmallString(SmallString&& other) : SmallString(other.getEncoding()) { String::operator=(move(other)); }
     String& operator=(const SmallString& other) { return String::operator=(other); }
     String& operator=(SmallString&& other) { return String::operator=(move(other)); }
-    String& operator=(const String& other) { return String::operator=(other); }
-    String& operator=(String&& other) { return String::operator=(move(other)); }
+
     SmallString(const String& other) : SmallString(other.getEncoding()) { String::operator=(other); }
     SmallString(String&& other) : SmallString(other.getEncoding()) { String::operator=(move(other)); }
     SmallString(StringView other) : SmallString(other.getEncoding()) { String::operator=(move(other)); }
-    String& operator=(StringView view) { return String::operator=(view); }
-
     SmallString(Buffer&& otherData, StringEncoding encoding) : String(move(otherData), encoding, N) {}
-
     template <size_t Q>
     SmallString(const char (&text)[Q]) : SmallString(StringView({text, Q - 1}, true, StringEncoding::Ascii))
     {}
-
-    template <size_t Q>
-    String& operator=(const char (&text)[Q])
-    {
-        return String::operator=(text);
-    }
 
   private:
     uint64_t inlineCapacity = N;

@@ -35,7 +35,7 @@ struct ProjectWriter
 #include "Internal/BuildWriterVisualStudio.inl"
 #include "Internal/BuildWriterXCode.inl"
 
-#include "../Containers/SmallVector.h"
+#include "../Containers/Vector.h"
 
 struct SC::Build::CompileFlags::Internal
 {

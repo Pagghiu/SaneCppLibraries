@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "../../Libraries/Containers/ArenaMap.h"
 #include "../../Libraries/Containers/Array.h"
-#include "../../Libraries/Containers/SmallVector.h"
+#include "../../Libraries/Containers/Vector.h"
 #include "../../Libraries/Containers/VectorMap.h"
 #include "../../Libraries/Containers/VectorSet.h"
 #include "../../Libraries/Foundation/Memory.h"

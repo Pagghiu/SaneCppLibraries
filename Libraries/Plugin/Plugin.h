@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Containers/SmallVector.h"
+#include "../Containers/Vector.h"
 #include "../Containers/VectorMap.h"
 #include "../Foundation/Function.h"
 #include "../Strings/String.h"

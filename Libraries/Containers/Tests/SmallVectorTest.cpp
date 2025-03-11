@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../SmallVector.h"
 #include "../../Testing/Testing.h"
+#include "../Vector.h"
 
 namespace SC
 {
