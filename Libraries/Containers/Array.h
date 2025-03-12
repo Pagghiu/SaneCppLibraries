@@ -50,7 +50,7 @@ struct Array : public Segment<detail::ArrayVTable<T, N>>
     using Parent = Segment<detail::ArrayVTable<T, N>>;
     Array() : Parent(sizeof(T) * N){};
     // clang-format off
-    Array(std::initializer_list<T> list) : Array() { SC_ASSERT_RELEASE(Parent::assign({list.begin(), list.size()})); }
+    Array(std::initializer_list<T> list) : Array() { SC_ASSERT_RELEASE(Parent::template assign<T>({list.begin(), list.size()})); }
     Array(const Array& other) : Array() { SC_ASSERT_RELEASE(Parent::append(other.toSpanConst())); }
     Array(Array&& other) : Array() { SC_ASSERT_RELEASE(Parent::appendMove(move(other))); }
     Array& operator=(const Array& other) { SC_ASSERT_RELEASE(Parent::assign(other.toSpanConst())); return *this; }

@@ -24,37 +24,43 @@ struct SegmentVTable<T, false>
         forEach(data, [](auto, T& item) { item.~T(); });
     }
 
-    static void copyConstructAs(Span<T> data, Span<const T> value)
+    template <typename U>
+    static void copyConstructAs(Span<T> data, Span<const U> value)
     {
-        const T& single = value[0];
+        const U& single = value[0];
         forEach(data, [&single](auto, T& item) { placementNew(item, single); });
     }
 
-    static void copyConstruct(Span<T> data, const T* src)
+    template <typename U>
+    static void copyConstruct(Span<T> data, const U* src)
     {
         forEach(data, [src](auto idx, T& item) { placementNew(item, src[idx]); });
     }
 
-    static void copyAssign(Span<T> data, const T* src)
+    template <typename U>
+    static void copyAssign(Span<T> data, const U* src)
     {
         forEach(data, [src](auto idx, T& item) { item = src[idx]; });
     }
 
-    static void moveConstruct(Span<T> data, T* src)
+    template <typename U>
+    static void moveConstruct(Span<T> data, U* src)
     {
         forEach(data, [src](auto idx, T& item) { placementNew(item, move(src[idx])); });
     }
 
-    static void moveAssign(Span<T> data, T* src)
+    template <typename U>
+    static void moveAssign(Span<T> data, U* src)
     {
         forEach(data, [src](auto idx, T& item) { item = move(src[idx]); });
     }
 
-    static void copyInsert(Span<T> headerData, Span<const T> values)
+    template <typename U>
+    static void copyInsert(Span<T> headerData, Span<const U> values)
     {
         // This function inserts values at the beginning of headerData
         T*       data = headerData.data();
-        const T* src  = values.data();
+        const U* src  = values.data();
 
         const size_t numElements = headerData.sizeInElements();
         const size_t numToInsert = values.sizeInElements();
@@ -144,12 +150,14 @@ struct ObjectVTable
 {
     using Type = T;
     static void destruct(Span<T> data) { SegmentVTable<T>::destruct(data); }
-    static void copyConstructAs(Span<T> data, Span<const T> value) { SegmentVTable<T>::copyConstructAs(data, value); }
-    static void copyConstruct(Span<T> data, const T* src) { SegmentVTable<T>::copyConstruct(data, src); }
-    static void copyAssign(Span<T> data, const T* src) { SegmentVTable<T>::copyAssign(data, src); }
-    static void moveConstruct(Span<T> data, T* src) { SegmentVTable<T>::moveConstruct(data, src); }
-    static void moveAssign(Span<T> data, T* src) { SegmentVTable<T>::moveAssign(data, src); }
-    static void copyInsert(Span<T> data, Span<const T> values) { SegmentVTable<T>::copyInsert(data, values); }
+    // clang-format off
+    template <typename U> static void copyConstructAs(Span<T> data, Span<const U> value) { SegmentVTable<T>::template copyConstructAs<U>(data, value);}
+    template <typename U> static void copyConstruct(Span<T> data, const U* src) { SegmentVTable<T>::template copyConstruct<U>(data, src);}
+    template <typename U> static void copyAssign(Span<T> data, const U* src) { SegmentVTable<T>::template copyAssign<U>(data, src);}
+    template <typename U> static void moveConstruct(Span<T> data, U* src) { SegmentVTable<T>::template moveConstruct<U>(data, src);}
+    template <typename U> static void moveAssign(Span<T> data, U* src) { SegmentVTable<T>::template moveAssign<U>(data, src);}
+    template <typename U> static void copyInsert(Span<T> data, Span<const U> values) { SegmentVTable<T>::template copyInsert<U>(data, values);}
+    // clang-format on
     static void remove(Span<T> data, size_t numElements) { SegmentVTable<T>::remove(data, numElements); }
 };
 

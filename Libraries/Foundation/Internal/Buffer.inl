@@ -7,4 +7,7 @@
 namespace SC
 {
 template struct Segment<detail::SegmentBuffer>;
+// Explicit instantiation of these methods because they are templated at method level
+template bool Segment<detail::SegmentBuffer>::assign<char>(Span<const char>);
+template bool Segment<detail::SegmentBuffer>::append<char>(Span<const char>);
 } // namespace SC

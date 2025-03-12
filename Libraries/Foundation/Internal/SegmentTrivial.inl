@@ -31,6 +31,7 @@ inline void SC::detail::SegmentTrivial<T>::destruct(Span<T>)
 {}
 
 template <typename T>
+template <typename U>
 inline void SC::detail::SegmentTrivial<T>::copyConstructAs(Span<T> data, Span<const T> value)
 {
     const size_t numElements = data.sizeInElements();
@@ -44,7 +45,7 @@ inline void SC::detail::SegmentTrivial<T>::copyConstructAs(Span<T> data, Span<co
     else
     {
         const size_t valueSize   = value.sizeInBytes();
-        const T*     sourceValue = value.data();
+        const auto*  sourceValue = value.data();
         for (size_t idx = 0; idx < numElements; idx++)
         {
             ::memcpy(destData + idx, sourceValue, valueSize);
@@ -53,18 +54,21 @@ inline void SC::detail::SegmentTrivial<T>::copyConstructAs(Span<T> data, Span<co
 }
 
 template <typename T>
+template <typename U>
 inline void SC::detail::SegmentTrivial<T>::copyConstruct(Span<T> data, const T* src)
 {
     ::memmove(start_lifetime_as_array<T>(data.data(), data.sizeInElements()), src, data.sizeInBytes());
 }
 
 template <typename T>
+template <typename U>
 inline void SC::detail::SegmentTrivial<T>::copyAssign(Span<T> data, const T* src)
 {
     ::memcpy(data.data(), src, data.sizeInBytes());
 }
 
 template <typename T>
+template <typename U>
 inline void SC::detail::SegmentTrivial<T>::copyInsert(Span<T> data, Span<const T> values)
 {
     ::memmove(data.template reinterpret_as_array_of<char>().data() + values.sizeInBytes(), data.data(),
@@ -73,12 +77,14 @@ inline void SC::detail::SegmentTrivial<T>::copyInsert(Span<T> data, Span<const T
 }
 
 template <typename T>
+template <typename U>
 inline void SC::detail::SegmentTrivial<T>::moveConstruct(Span<T> data, T* src)
 {
     ::memcpy(start_lifetime_as_array<T>(data.data(), data.sizeInElements()), src, data.sizeInBytes());
 }
 
 template <typename T>
+template <typename U>
 inline void SC::detail::SegmentTrivial<T>::moveAssign(Span<T> data, T* src)
 {
     ::memcpy(start_lifetime_as_array<T>(data.data(), data.sizeInElements()), src, data.sizeInBytes());

@@ -47,20 +47,21 @@ struct SC::Segment<VTable>::Internal
     static T* reallocate(Segment& segment, size_t capacityBytes)
     {
         Span<T> selfSpan = segment.toSpan();
-        void*   newData  = nullptr;
+        T*      newData  = nullptr;
         if SC_LANGUAGE_IF_CONSTEXPR (not VTable::IsArray)
         {
             if SC_LANGUAGE_IF_CONSTEXPR (TypeTraits::IsTriviallyCopyable<T>::value)
             {
-                newData = Internal::reallocateMemory(segment.header, selfSpan.data(), capacityBytes);
+                newData =
+                    reinterpret_cast<T*>(Internal::reallocateMemory(segment.header, selfSpan.data(), capacityBytes));
             }
             else
             {
                 // TODO: Room for optimization for memcpy-able objects (a >= subset than trivially copyable)
-                newData = Internal::allocateMemory(segment.header, capacityBytes);
+                newData = reinterpret_cast<T*>(Internal::allocateMemory(segment.header, capacityBytes));
                 if (newData != nullptr)
                 {
-                    VTable::moveConstruct({reinterpret_cast<T*>(newData), selfSpan.sizeInElements()}, selfSpan.data());
+                    VTable::template moveConstruct<T>({newData, selfSpan.sizeInElements()}, selfSpan.data());
                     VTable::destruct(selfSpan);
                     Internal::releaseMemory(segment.header, selfSpan.data());
                 }
@@ -169,7 +170,7 @@ bool SC::Segment<VTable>::shrink_to_fit()
         {
             T*      inlineData = VTable::getInlineData();
             Span<T> selfSpan   = toSpan();
-            VTable::moveConstruct(selfSpan, inlineData);
+            VTable::template moveConstruct<T>(selfSpan, inlineData);
             VTable::destruct(selfSpan);
             Internal::releaseMemory(header, selfSpan.data());
             VTable::setData(inlineData);
@@ -202,7 +203,7 @@ bool SC::Segment<VTable>::resize(size_t newSize, const T& value)
     header.sizeBytes = static_cast<uint32_t>(newSize * sizeof(T));
     if (newSize > oldSize)
     {
-        VTable::copyConstructAs({data() + oldSize, newSize - oldSize}, value);
+        VTable::template copyConstructAs<T>({data() + oldSize, newSize - oldSize}, value);
     }
     else if (newSize < oldSize)
     {
@@ -223,14 +224,15 @@ bool SC::Segment<VTable>::resizeWithoutInitializing(size_t newSize)
 }
 
 template <typename VTable>
-bool SC::Segment<VTable>::append(Span<const T> span)
+template <typename U>
+[[nodiscard]] bool SC::Segment<VTable>::append(Span<const U> span)
 {
     const auto oldSize = size();
     if (resizeWithoutInitializing(oldSize + span.sizeInElements()))
     {
         if (not span.empty())
         {
-            VTable::copyConstruct({data() + oldSize, span.sizeInElements()}, span.data());
+            VTable::template copyConstruct<U>({data() + oldSize, span.sizeInElements()}, span.data());
         }
         return true;
     }
@@ -238,25 +240,14 @@ bool SC::Segment<VTable>::append(Span<const T> span)
 }
 
 template <typename VTable>
-template <typename U>
-[[nodiscard]] bool SC::Segment<VTable>::append(Span<const U> span)
-{
-    for (const U& it : span)
-    {
-        if (not push_back(it))
-            return false;
-    }
-    return true;
-}
-
-template <typename VTable>
 template <typename VTable2>
 bool SC::Segment<VTable>::appendMove(Segment<VTable2>&& other)
 {
+    using U            = typename VTable2::Type;
     const auto oldSize = size();
     if (resizeWithoutInitializing(oldSize + other.size()))
     {
-        VTable::moveConstruct({data() + oldSize, other.size()}, other.data());
+        VTable::template moveConstruct<U>({data() + oldSize, other.size()}, other.data());
         return true;
     }
     return false;
@@ -285,7 +276,7 @@ bool SC::Segment<VTable>::reserve(size_t capacity)
     }
     if (wasInline and header.sizeBytes > 0)
     {
-        VTable::moveConstruct({newData, size()}, VTable::getInlineData());
+        VTable::template moveConstruct<T>({newData, size()}, VTable::getInlineData());
     }
     return true;
 }
@@ -301,8 +292,9 @@ template <typename VTable>
 template <typename VTable2>
 bool SC::Segment<VTable>::assignMove(Segment<VTable2>&& other)
 {
+    using U           = typename VTable2::Type;
     Span<T> selfSpan  = toSpan();
-    Span<T> otherSpan = other.toSpan();
+    Span<U> otherSpan = other.toSpan();
     if (selfSpan.data() == otherSpan.data())
     {
         return true;
@@ -317,7 +309,8 @@ bool SC::Segment<VTable>::assignMove(Segment<VTable2>&& other)
     if (other.isInline())
     {
         // we cannot steal segment but only copy it (move-assign)
-        if (not Internal::assignInternal(&VTable::moveConstruct, &VTable::moveAssign, *this, otherSpan))
+        if (not Internal::assignInternal(&VTable::template moveConstruct<U>, &VTable::template moveAssign<U>, *this,
+                                         otherSpan))
         {
             return false;
         }
@@ -386,7 +379,8 @@ bool SC::Segment<VTable>::pop_front(T* removedValue)
 }
 
 template <typename VTable>
-bool SC::Segment<VTable>::assign(Span<const T> span)
+template <typename U>
+bool SC::Segment<VTable>::assign(Span<const U> span)
 {
     if (span.data() == data())
     {
@@ -397,7 +391,7 @@ bool SC::Segment<VTable>::assign(Span<const T> span)
         Internal::releaseInternal(*this);
         return true;
     }
-    return Internal::assignInternal(&VTable::copyConstruct, &VTable::copyAssign, *this, span);
+    return Internal::assignInternal(&VTable::template copyConstruct<U>, &VTable::template copyAssign<U>, *this, span);
 }
 
 template <typename VTable>
@@ -425,7 +419,7 @@ bool SC::Segment<VTable>::insert(size_t index, Span<const T> data)
     }
     if (not data.empty())
     {
-        VTable::copyInsert(Internal::toSpanOffsetElements(*this, index), data);
+        VTable::template copyInsert<T>(Internal::toSpanOffsetElements(*this, index), data);
         header.sizeBytes += static_cast<uint32_t>(data.sizeInBytes());
     }
     return true;

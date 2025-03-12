@@ -65,12 +65,14 @@ struct SegmentTrivial
 {
     using Type = T;
     inline static void destruct(Span<T> data);
-    inline static void copyConstructAs(Span<T> data, Span<const T> value);
-    inline static void copyConstruct(Span<T> data, const T* src);
-    inline static void copyAssign(Span<T> data, const T* src);
-    inline static void copyInsert(Span<T> data, Span<const T> values);
-    inline static void moveConstruct(Span<T> data, T* src);
-    inline static void moveAssign(Span<T> data, T* src);
+    // clang-format off
+    template <typename U> inline static void copyConstructAs(Span<T> data, Span<const T> value);
+    template <typename U> inline static void copyConstruct(Span<T> data, const T* src);
+    template <typename U> inline static void copyAssign(Span<T> data, const T* src);
+    template <typename U> inline static void copyInsert(Span<T> data, Span<const T> values);
+    template <typename U> inline static void moveConstruct(Span<T> data, T* src);
+    template <typename U> inline static void moveAssign(Span<T> data, T* src);
+    // clang-format on
     inline static void remove(Span<T> data, size_t numElements);
 };
 
@@ -99,7 +101,7 @@ struct Segment : public VTable
     // clang-format off
     template <typename U> Segment(Span<const U> span) : Segment() { SC_ASSERT_RELEASE(assign(span)); }
     Segment(Span<const T> span) : Segment() { SC_ASSERT_RELEASE(assign(span)); }
-    Segment(std::initializer_list<T> list) : Segment() { SC_ASSERT_RELEASE(assign({list.begin(), list.size()})); }
+    Segment(std::initializer_list<T> list) noexcept : Segment() { SC_ASSERT_RELEASE(assign<T>({list.begin(), list.size()})); }
     // clang-format on
 
     /// @brief Re-allocates to the requested new size, preserving its contents
@@ -110,14 +112,11 @@ struct Segment : public VTable
     [[nodiscard]] bool resize(size_t newSize, const T& value = T());
 
     /// @brief Reserves capacity to avoid heap-allocation during a future append, assign or resize
-    [[nodiscard]] bool reserve(size_t newCapacity);
-
-    /// @brief Appends a Span to the end of the segment
-    [[nodiscard]] bool append(Span<const T> span);
+    [[nodiscard]] bool reserve(size_t capacity);
 
     /// @brief Appends a Span of items convertible to T to the end of the segment
-    template <typename U>
-    [[nodiscard]] bool append(Span<const U> span);
+    template <typename U = T>
+    [[nodiscard]] bool append(Span<const U> span) noexcept;
 
     /// @brief Moves contents of another segment to the end of this segment
     template <typename VTable2>
@@ -132,7 +131,8 @@ struct Segment : public VTable
 
     /// @brief Replaces contents with contents of the span
     /// @note This method allows detecting allocation failures (unlike the assignment operator)
-    [[nodiscard]] bool assign(Span<const T> span);
+    template <typename U = T>
+    [[nodiscard]] bool assign(Span<const U> span) noexcept;
 
     /// @brief Replaces content moving (possibly "stealing") content of another segment
     /// @note This method allows detecting allocation failures (unlike the assignment operator)

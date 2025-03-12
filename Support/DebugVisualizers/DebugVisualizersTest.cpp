@@ -40,9 +40,9 @@ struct SC::DebugVisualizersTest : public SC::TestCase
     DebugVisualizersTest(SC::TestReport& report) : TestCase(report, "DebugVisualizersTest")
     {
         using namespace SC;
-        (void)buffer.append("asdf");
+        (void)buffer.append({"asdf"});
         smallBuffer = buffer;
-        (void)buffer.append(" salver");
+        (void)buffer.append({" salver"});
 
         twoFaces   = stringUtf8.view().sliceStartLengthBytes(0, 8);
         threeKanji = stringUtf16.view().sliceStartLengthBytes(0, 6);

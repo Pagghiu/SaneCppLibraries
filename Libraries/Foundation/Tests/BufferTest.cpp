@@ -36,13 +36,13 @@ struct SC::BufferTest : public SC::TestCase
         if (test_section("append"))
         {
             Buffer buffer;
-            SC_TEST_EXPECT(buffer.append("ciao"));
+            SC_TEST_EXPECT(buffer.append({"ciao"}));
             SC_TEST_EXPECT(buffer.size() == 5);
             SC_TEST_EXPECT(memcmp(buffer.data(), "ciao\0", 5) == 0);
-            SC_TEST_EXPECT(buffer.append("yeah"));
+            SC_TEST_EXPECT(buffer.append({"yeah"}));
             SC_TEST_EXPECT(buffer.size() == 10);
             SC_TEST_EXPECT(memcmp(buffer.data(), "ciao\0yeah\0", 10) == 0);
-            SC_TEST_EXPECT(buffer.append("woow"));
+            SC_TEST_EXPECT(buffer.append({"woow"}));
             SC_TEST_EXPECT(buffer.size() == 15);
             SC_TEST_EXPECT(buffer.removeRange(5, 5));
             SC_TEST_EXPECT(buffer.size() == 10);
