@@ -174,7 +174,7 @@ struct Segment : public VTable
     // clang-format on
 
     /// @brief Check if is empty (`size()` == 0)
-    [[nodiscard]] bool isEmpty() const { return header.sizeBytes == 0; }
+    [[nodiscard]] bool isEmpty() const { return VTable::header.sizeBytes == 0; }
 
     /// @brief Obtains a Span of internal contents
     [[nodiscard]] Span<T> toSpan() SC_LANGUAGE_LIFETIME_BOUND { return {data(), size()}; }
@@ -183,10 +183,10 @@ struct Segment : public VTable
     [[nodiscard]] Span<const T> toSpanConst() const SC_LANGUAGE_LIFETIME_BOUND { return {data(), size()}; }
 
     /// @brief Returns current size
-    [[nodiscard]] size_t size() const { return header.sizeBytes / sizeof(T); }
+    [[nodiscard]] size_t size() const { return VTable::header.sizeBytes / sizeof(T); }
 
     /// @brief Returns current capacity (always >= of `size()`)
-    [[nodiscard]] size_t capacity() { return header.capacityBytes / sizeof(T); }
+    [[nodiscard]] size_t capacity() { return VTable::header.capacityBytes / sizeof(T); }
 
     /// @brief Removes the range [start, start + length] from the segment
     /// @param start Index where the item must be removed
@@ -209,7 +209,6 @@ struct Segment : public VTable
     template <typename VTable2>
     friend struct Segment;
     struct Internal;
-    using VTable::header;
     using SegmentHeader = detail::SegmentHeader;
 };
 

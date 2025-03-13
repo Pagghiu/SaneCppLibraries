@@ -146,7 +146,7 @@ template <typename VTable> SC::Segment<VTable>& SC::Segment<VTable>::operator=(c
 template <typename VTable>
 SC::Segment<VTable>::Segment(uint32_t capacityInBytes)
 {
-    header = SegmentHeader(capacityInBytes);
+    VTable::header = {capacityInBytes, allocator};
     if (capacityInBytes > 0)
     {
         VTable::setData(VTable::getInlineData());
@@ -157,34 +157,34 @@ template <typename VTable>
 bool SC::Segment<VTable>::shrink_to_fit()
 {
     // 1. Can't shrink inline or empty buffers
-    if (header.capacityBytes == 0 or VTable::isInline())
+    if (VTable::header.capacityBytes == 0 or VTable::isInline())
     {
         return true;
     }
 
     // 2. Rollback to inline segment if it's available and if there is enough capacity
-    if (header.hasInlineData)
+    if (VTable::header.hasInlineData)
     {
         uint32_t inlineCapacity = static_cast<uint32_t>(VTable::getInlineCapacity());
-        if (header.sizeBytes <= inlineCapacity)
+        if (VTable::header.sizeBytes <= inlineCapacity)
         {
             T*      inlineData = VTable::getInlineData();
             Span<T> selfSpan   = toSpan();
             VTable::template moveConstruct<T>(selfSpan, inlineData);
             VTable::destruct(selfSpan);
-            Internal::releaseMemory(header, selfSpan.data());
+            Internal::releaseMemory(VTable::header, selfSpan.data());
             VTable::setData(inlineData);
-            header.capacityBytes = inlineCapacity;
+            VTable::header.capacityBytes = inlineCapacity;
             return true; // No need to go on the heap allocation branch
         }
     }
 
     // 3. Otherwise we are on heap, possibly followed by an insufficient inline segment
-    if (header.sizeBytes < header.capacityBytes)
+    if (VTable::header.sizeBytes < VTable::header.capacityBytes)
     {
-        T* newData = Internal::reallocate(*this, header.sizeBytes);
+        T* newData = Internal::reallocate(*this, VTable::header.sizeBytes);
         VTable::setData(newData);
-        if (header.sizeBytes > 0 and newData == nullptr)
+        if (VTable::header.sizeBytes > 0 and newData == nullptr)
         {
             return false;
         }
@@ -200,7 +200,7 @@ bool SC::Segment<VTable>::resize(size_t newSize, const T& value)
     {
         return false;
     }
-    header.sizeBytes = static_cast<uint32_t>(newSize * sizeof(T));
+    VTable::header.sizeBytes = static_cast<uint32_t>(newSize * sizeof(T));
     if (newSize > oldSize)
     {
         VTable::template copyConstructAs<T>({data() + oldSize, newSize - oldSize}, value);
@@ -217,7 +217,7 @@ bool SC::Segment<VTable>::resizeWithoutInitializing(size_t newSize)
 {
     if (reserve(newSize))
     {
-        header.sizeBytes = static_cast<uint32_t>(newSize * sizeof(T));
+        VTable::header.sizeBytes = static_cast<uint32_t>(newSize * sizeof(T));
         return true;
     }
     return false;
@@ -261,20 +261,20 @@ bool SC::Segment<VTable>::reserve(size_t capacity)
     {
         return false;
     }
-    if (capacityBytes <= header.capacityBytes)
+    if (capacityBytes <= VTable::header.capacityBytes)
     {
         return true;
     }
 
     const bool wasInline = VTable::isInline();
-    const bool mustAlloc = header.capacityBytes == 0 or wasInline;
+    const bool mustAlloc = VTable::header.capacityBytes == 0 or wasInline;
     T* newData = mustAlloc ? Internal::allocate(*this, capacityBytes) : Internal::reallocate(*this, capacityBytes);
     VTable::setData(newData);
     if (newData == nullptr)
     {
         return false;
     }
-    if (wasInline and header.sizeBytes > 0)
+    if (wasInline and VTable::header.sizeBytes > 0)
     {
         VTable::template moveConstruct<T>({newData, size()}, VTable::getInlineData());
     }
@@ -285,7 +285,7 @@ template <typename VTable>
 void SC::Segment<VTable>::clear()
 {
     VTable::destruct(toSpan());
-    header.sizeBytes = 0;
+    VTable::header.sizeBytes = 0;
 }
 
 template <typename VTable>
@@ -325,12 +325,12 @@ bool SC::Segment<VTable>::assignMove(Segment<VTable2>&& other)
         if (not VTable::isInline())
         {
             VTable::destruct(selfSpan);
-            Internal::releaseMemory(header, selfSpan.data());
+            Internal::releaseMemory(VTable::header, selfSpan.data());
         }
         VTable::setData(otherSpan.data());
-        header.sizeBytes       = other.header.sizeBytes;
-        header.capacityBytes   = other.header.capacityBytes;
-        other.header.sizeBytes = 0;
+        VTable::header.sizeBytes     = other.header.sizeBytes;
+        VTable::header.capacityBytes = other.header.capacityBytes;
+        other.header.sizeBytes       = 0;
         Internal::eventuallyRestoreInlineData(other);
     }
     return true;
@@ -360,7 +360,7 @@ bool SC::Segment<VTable>::pop_back(T* removedValue)
         *removedValue = move(back());
     }
     VTable::destruct(Internal::toSpanOffsetElements(*this, size() - 1));
-    header.sizeBytes -= sizeof(T);
+    VTable::header.sizeBytes -= sizeof(T);
     return true;
 }
 
@@ -403,7 +403,7 @@ bool SC::Segment<VTable>::removeRange(size_t start, size_t length)
         return false;
     }
     VTable::remove(Internal::toSpanOffsetElements(*this, start), length);
-    header.sizeBytes -= static_cast<uint32_t>(length * sizeof(T));
+    VTable::header.sizeBytes -= static_cast<uint32_t>(length * sizeof(T));
     return true;
 }
 
@@ -420,7 +420,7 @@ bool SC::Segment<VTable>::insert(size_t index, Span<const T> data)
     if (not data.empty())
     {
         VTable::template copyInsert<T>(Internal::toSpanOffsetElements(*this, index), data);
-        header.sizeBytes += static_cast<uint32_t>(data.sizeInBytes());
+        VTable::header.sizeBytes += static_cast<uint32_t>(data.sizeInBytes());
     }
     return true;
 }
