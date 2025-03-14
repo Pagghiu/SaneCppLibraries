@@ -34,7 +34,7 @@ struct SC::Segment<VTable>::Internal
         return nullptr;
     }
 
-    static T* allocate(Segment& segment, size_t capacityBytes)
+    static T* allocate(Segment& segment, size_t capacityBytes) noexcept
     {
         void* newData = Internal::allocateMemory(segment.header, capacityBytes);
         if (newData)
@@ -44,7 +44,7 @@ struct SC::Segment<VTable>::Internal
         return static_cast<T*>(newData);
     }
 
-    static T* reallocate(Segment& segment, size_t capacityBytes)
+    static T* reallocate(Segment& segment, size_t capacityBytes) noexcept
     {
         Span<T> selfSpan = segment.toSpan();
         T*      newData  = nullptr;
@@ -71,7 +71,7 @@ struct SC::Segment<VTable>::Internal
         return static_cast<T*>(newData);
     }
 
-    static void releaseInternal(Segment& segment)
+    static void releaseInternal(Segment& segment) noexcept
     {
         VTable::destruct(segment.toSpan());
         segment.header.sizeBytes = 0;
@@ -83,7 +83,7 @@ struct SC::Segment<VTable>::Internal
     }
 
     template <typename VTable2>
-    static void eventuallyRestoreInlineData(Segment<VTable2>& segment)
+    static void eventuallyRestoreInlineData(Segment<VTable2>& segment) noexcept
     {
         const bool hasInlineData = segment.header.hasInlineData;
         segment.setData(hasInlineData ? segment.getInlineData() : nullptr);
@@ -91,7 +91,7 @@ struct SC::Segment<VTable>::Internal
     }
 
     template <typename Construct, typename Assign, typename U>
-    static bool assignInternal(Construct constructFunc, Assign assignFunc, Segment& segment, Span<U> span)
+    static bool assignInternal(Construct constructFunc, Assign assignFunc, Segment& segment, Span<U> span) noexcept
     {
         const size_t newSize     = span.sizeInElements();
         T*           segmentData = segment.data();
@@ -135,18 +135,18 @@ struct SC::Segment<VTable>::Internal
 };
 
 // clang-format off
-template <typename VTable> SC::Segment<VTable>::Segment() {}
-template <typename VTable> SC::Segment<VTable>::~Segment() { Internal::releaseInternal(*this); }
-template <typename VTable> SC::Segment<VTable>::Segment(Segment&& other) { SC_ASSERT_RELEASE(assignMove(move(other))); }
-template <typename VTable> SC::Segment<VTable>::Segment(const Segment& other) { SC_ASSERT_RELEASE(assign(other.toSpanConst())); }
-template <typename VTable> SC::Segment<VTable>& SC::Segment<VTable>::operator=(Segment&& other) { SC_ASSERT_RELEASE(assignMove(move(other))); return *this;}
-template <typename VTable> SC::Segment<VTable>& SC::Segment<VTable>::operator=(const Segment& other) { SC_ASSERT_RELEASE(assign(other.toSpanConst())); return *this; }
+template <typename VTable> SC::Segment<VTable>::Segment() noexcept {}
+template <typename VTable> SC::Segment<VTable>::~Segment() noexcept { Internal::releaseInternal(*this); }
+template <typename VTable> SC::Segment<VTable>::Segment(Segment&& other) noexcept { SC_ASSERT_RELEASE(assignMove(move(other))); }
+template <typename VTable> SC::Segment<VTable>::Segment(const Segment& other) noexcept { SC_ASSERT_RELEASE(assign(other.toSpanConst())); }
+template <typename VTable> SC::Segment<VTable>& SC::Segment<VTable>::operator=(Segment&& other) noexcept { SC_ASSERT_RELEASE(assignMove(move(other))); return *this;}
+template <typename VTable> SC::Segment<VTable>& SC::Segment<VTable>::operator=(const Segment& other) noexcept { SC_ASSERT_RELEASE(assign(other.toSpanConst())); return *this; }
 // clang-format on
 
 template <typename VTable>
 SC::Segment<VTable>::Segment(uint32_t capacityInBytes)
 {
-    VTable::header = {capacityInBytes, allocator};
+    VTable::header = {capacityInBytes};
     if (capacityInBytes > 0)
     {
         VTable::setData(VTable::getInlineData());
@@ -154,7 +154,7 @@ SC::Segment<VTable>::Segment(uint32_t capacityInBytes)
 }
 
 template <typename VTable>
-bool SC::Segment<VTable>::shrink_to_fit()
+bool SC::Segment<VTable>::shrink_to_fit() noexcept
 {
     // 1. Can't shrink inline or empty buffers
     if (VTable::header.capacityBytes == 0 or VTable::isInline())
@@ -193,7 +193,7 @@ bool SC::Segment<VTable>::shrink_to_fit()
 }
 
 template <typename VTable>
-bool SC::Segment<VTable>::resize(size_t newSize, const T& value)
+bool SC::Segment<VTable>::resize(size_t newSize, const T& value) noexcept
 {
     const size_t oldSize = size();
     if (not reserve(newSize))
@@ -213,7 +213,7 @@ bool SC::Segment<VTable>::resize(size_t newSize, const T& value)
 }
 
 template <typename VTable>
-bool SC::Segment<VTable>::resizeWithoutInitializing(size_t newSize)
+bool SC::Segment<VTable>::resizeWithoutInitializing(size_t newSize) noexcept
 {
     if (reserve(newSize))
     {
@@ -225,7 +225,7 @@ bool SC::Segment<VTable>::resizeWithoutInitializing(size_t newSize)
 
 template <typename VTable>
 template <typename U>
-[[nodiscard]] bool SC::Segment<VTable>::append(Span<const U> span)
+[[nodiscard]] bool SC::Segment<VTable>::append(Span<const U> span) noexcept
 {
     const auto oldSize = size();
     if (resizeWithoutInitializing(oldSize + span.sizeInElements()))
@@ -241,7 +241,7 @@ template <typename U>
 
 template <typename VTable>
 template <typename VTable2>
-bool SC::Segment<VTable>::appendMove(Segment<VTable2>&& other)
+bool SC::Segment<VTable>::appendMove(Segment<VTable2>&& other) noexcept
 {
     using U            = typename VTable2::Type;
     const auto oldSize = size();
@@ -254,7 +254,7 @@ bool SC::Segment<VTable>::appendMove(Segment<VTable2>&& other)
 }
 
 template <typename VTable>
-bool SC::Segment<VTable>::reserve(size_t capacity)
+bool SC::Segment<VTable>::reserve(size_t capacity) noexcept
 {
     const size_t capacityBytes = capacity * sizeof(T);
     if (capacityBytes > SegmentHeader::MaxCapacity)
@@ -282,7 +282,7 @@ bool SC::Segment<VTable>::reserve(size_t capacity)
 }
 
 template <typename VTable>
-void SC::Segment<VTable>::clear()
+void SC::Segment<VTable>::clear() noexcept
 {
     VTable::destruct(toSpan());
     VTable::header.sizeBytes = 0;
@@ -290,7 +290,7 @@ void SC::Segment<VTable>::clear()
 
 template <typename VTable>
 template <typename VTable2>
-bool SC::Segment<VTable>::assignMove(Segment<VTable2>&& other)
+bool SC::Segment<VTable>::assignMove(Segment<VTable2>&& other) noexcept
 {
     using U           = typename VTable2::Type;
     Span<T> selfSpan  = toSpan();
@@ -337,7 +337,7 @@ bool SC::Segment<VTable>::assignMove(Segment<VTable2>&& other)
 }
 
 template <typename VTable>
-bool SC::Segment<VTable>::push_back(T&& value)
+bool SC::Segment<VTable>::push_back(T&& value) noexcept
 {
     const auto numElements = size();
     if (resizeWithoutInitializing(numElements + 1))
@@ -349,7 +349,7 @@ bool SC::Segment<VTable>::push_back(T&& value)
 }
 
 template <typename VTable>
-bool SC::Segment<VTable>::pop_back(T* removedValue)
+bool SC::Segment<VTable>::pop_back(T* removedValue) noexcept
 {
     if (isEmpty())
     {
@@ -365,7 +365,7 @@ bool SC::Segment<VTable>::pop_back(T* removedValue)
 }
 
 template <typename VTable>
-bool SC::Segment<VTable>::pop_front(T* removedValue)
+bool SC::Segment<VTable>::pop_front(T* removedValue) noexcept
 {
     if (isEmpty())
     {
@@ -380,7 +380,7 @@ bool SC::Segment<VTable>::pop_front(T* removedValue)
 
 template <typename VTable>
 template <typename U>
-bool SC::Segment<VTable>::assign(Span<const U> span)
+bool SC::Segment<VTable>::assign(Span<const U> span) noexcept
 {
     if (span.data() == data())
     {
@@ -395,7 +395,7 @@ bool SC::Segment<VTable>::assign(Span<const U> span)
 }
 
 template <typename VTable>
-bool SC::Segment<VTable>::removeRange(size_t start, size_t length)
+bool SC::Segment<VTable>::removeRange(size_t start, size_t length) noexcept
 {
     const size_t numElements = size();
     if (start >= numElements or (start + length) > numElements)
@@ -408,7 +408,7 @@ bool SC::Segment<VTable>::removeRange(size_t start, size_t length)
 }
 
 template <typename VTable>
-bool SC::Segment<VTable>::insert(size_t index, Span<const T> data)
+bool SC::Segment<VTable>::insert(size_t index, Span<const T> data) noexcept
 {
     const size_t     numElements = size();
     const size_t     dataSize    = data.sizeInElements();

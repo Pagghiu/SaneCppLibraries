@@ -19,44 +19,44 @@ struct SegmentVTable : public SegmentTrivial<T>
 template <typename T>
 struct SegmentVTable<T, false>
 {
-    static void destruct(Span<T> data)
+    static void destruct(Span<T> data) noexcept
     {
         forEach(data, [](auto, T& item) { item.~T(); });
     }
 
     template <typename U>
-    static void copyConstructAs(Span<T> data, Span<const U> value)
+    static void copyConstructAs(Span<T> data, Span<const U> value) noexcept
     {
         const U& single = value[0];
         forEach(data, [&single](auto, T& item) { placementNew(item, single); });
     }
 
     template <typename U>
-    static void copyConstruct(Span<T> data, const U* src)
+    static void copyConstruct(Span<T> data, const U* src) noexcept
     {
         forEach(data, [src](auto idx, T& item) { placementNew(item, src[idx]); });
     }
 
     template <typename U>
-    static void copyAssign(Span<T> data, const U* src)
+    static void copyAssign(Span<T> data, const U* src) noexcept
     {
         forEach(data, [src](auto idx, T& item) { item = src[idx]; });
     }
 
     template <typename U>
-    static void moveConstruct(Span<T> data, U* src)
+    static void moveConstruct(Span<T> data, U* src) noexcept
     {
         forEach(data, [src](auto idx, T& item) { placementNew(item, move(src[idx])); });
     }
 
     template <typename U>
-    static void moveAssign(Span<T> data, U* src)
+    static void moveAssign(Span<T> data, U* src) noexcept
     {
         forEach(data, [src](auto idx, T& item) { item = move(src[idx]); });
     }
 
     template <typename U>
-    static void copyInsert(Span<T> headerData, Span<const U> values)
+    static void copyInsert(Span<T> headerData, Span<const U> values) noexcept
     {
         // This function inserts values at the beginning of headerData
         T*       data = headerData.data();
@@ -112,7 +112,7 @@ struct SegmentVTable<T, false>
         }
     }
 
-    static void remove(Span<T> headerData, size_t numToRemove)
+    static void remove(Span<T> headerData, size_t numToRemove) noexcept
     {
         T* data = headerData.data();
 
@@ -130,7 +130,7 @@ struct SegmentVTable<T, false>
 
   private:
     template <typename Lambda>
-    static void forEach(Span<T> data, Lambda&& lambda)
+    static void forEach(Span<T> data, Lambda&& lambda) noexcept
     {
         const size_t numElements = data.sizeInElements();
         T*           elements    = data.data();
@@ -149,16 +149,16 @@ template <typename T>
 struct ObjectVTable
 {
     using Type = T;
-    static void destruct(Span<T> data) { SegmentVTable<T>::destruct(data); }
+    static void destruct(Span<T> data) noexcept { SegmentVTable<T>::destruct(data); }
     // clang-format off
-    template <typename U> static void copyConstructAs(Span<T> data, Span<const U> value) { SegmentVTable<T>::template copyConstructAs<U>(data, value);}
-    template <typename U> static void copyConstruct(Span<T> data, const U* src) { SegmentVTable<T>::template copyConstruct<U>(data, src);}
-    template <typename U> static void copyAssign(Span<T> data, const U* src) { SegmentVTable<T>::template copyAssign<U>(data, src);}
-    template <typename U> static void moveConstruct(Span<T> data, U* src) { SegmentVTable<T>::template moveConstruct<U>(data, src);}
-    template <typename U> static void moveAssign(Span<T> data, U* src) { SegmentVTable<T>::template moveAssign<U>(data, src);}
-    template <typename U> static void copyInsert(Span<T> data, Span<const U> values) { SegmentVTable<T>::template copyInsert<U>(data, values);}
+    template <typename U> static void copyConstructAs(Span<T> data, Span<const U> value) noexcept { SegmentVTable<T>::template copyConstructAs<U>(data, value);}
+    template <typename U> static void copyConstruct(Span<T> data, const U* src) noexcept { SegmentVTable<T>::template copyConstruct<U>(data, src);}
+    template <typename U> static void copyAssign(Span<T> data, const U* src) noexcept { SegmentVTable<T>::template copyAssign<U>(data, src);}
+    template <typename U> static void moveConstruct(Span<T> data, U* src) noexcept { SegmentVTable<T>::template moveConstruct<U>(data, src);}
+    template <typename U> static void moveAssign(Span<T> data, U* src) noexcept { SegmentVTable<T>::template moveAssign<U>(data, src);}
+    template <typename U> static void copyInsert(Span<T> data, Span<const U> values) noexcept { SegmentVTable<T>::template copyInsert<U>(data, values);}
     // clang-format on
-    static void remove(Span<T> data, size_t numElements) { SegmentVTable<T>::remove(data, numElements); }
+    static void remove(Span<T> data, size_t numElements) noexcept { SegmentVTable<T>::remove(data, numElements); }
 };
 
 template <typename T>
@@ -199,7 +199,7 @@ struct Vector : public Segment<detail::VectorVTable<T>>
     /// Only written if function returns `true`
     /// @return `true` if the array contains the given value.
     template <typename U>
-    [[nodiscard]] bool contains(const U& value, size_t* index = nullptr) const
+    [[nodiscard]] bool contains(const U& value, size_t* index = nullptr) const noexcept
     {
         return Parent::toSpanConst().contains(value, index);
     }
@@ -210,7 +210,7 @@ struct Vector : public Segment<detail::VectorVTable<T>>
     /// @param index if passed in != `nullptr`, receives index where item was found.
     /// @return `true` if the wanted value with given criteria is found.
     template <typename Lambda>
-    [[nodiscard]] bool find(Lambda&& lambda, size_t* index = nullptr) const
+    [[nodiscard]] bool find(Lambda&& lambda, size_t* index = nullptr) const noexcept
     {
         return Parent::toSpanConst().find(move(lambda), index);
     }
@@ -220,7 +220,7 @@ struct Vector : public Segment<detail::VectorVTable<T>>
     /// @param criteria The lambda/functor passed in
     /// @return `true` if at least one item has been removed
     template <typename Lambda>
-    [[nodiscard]] bool removeAll(Lambda&& criteria)
+    [[nodiscard]] bool removeAll(Lambda&& criteria) noexcept
     {
         T* itBeg = Parent::begin();
         T* itEnd = Parent::end();
@@ -238,7 +238,7 @@ struct Vector : public Segment<detail::VectorVTable<T>>
     /// @param value Value to be removed
     /// @return `true` if at least one item has been removed
     template <typename U>
-    [[nodiscard]] bool remove(const U& value)
+    [[nodiscard]] bool remove(const U& value) noexcept
     {
         return removeAll([&](auto& item) { return item == value; });
     }
@@ -259,16 +259,16 @@ template <typename T, int N>
 struct SmallVector : public Vector<T>
 {
     // clang-format off
-    SmallVector() : Vector<T>( N * sizeof(T)) {}
-    ~SmallVector() {}
-    SmallVector(const SmallVector& other) : SmallVector() { Vector<T>::operator=(other); }
-    SmallVector(SmallVector&& other) : SmallVector() { Vector<T>::operator=(move(other)); }
-    SmallVector& operator=(const SmallVector& other) { Vector<T>::operator=(other); return *this; }
-    SmallVector& operator=(SmallVector&& other) { Vector<T>::operator=(move(other)); return *this; }
+    SmallVector() noexcept : Vector<T>( N * sizeof(T)) {}
+    ~SmallVector() noexcept {}
+    SmallVector(const SmallVector& other) noexcept : SmallVector() { Vector<T>::operator=(other); }
+    SmallVector(SmallVector&& other) noexcept : SmallVector() { Vector<T>::operator=(move(other)); }
+    SmallVector& operator=(const SmallVector& other) noexcept { Vector<T>::operator=(other); return *this; }
+    SmallVector& operator=(SmallVector&& other) noexcept { Vector<T>::operator=(move(other)); return *this; }
 
-    SmallVector(const Vector<T>& other) : SmallVector() { Vector<T>::operator=(other); }
-    SmallVector(Vector<T>&& other) : SmallVector() { Vector<T>::operator=(move(other)); }
-    SmallVector(std::initializer_list<T> list) : SmallVector() { SC_ASSERT_RELEASE(Vector<T>::assign({list.begin(), list.size()})); }
+    SmallVector(const Vector<T>& other) noexcept : SmallVector() { Vector<T>::operator=(other); }
+    SmallVector(Vector<T>&& other) noexcept : SmallVector() { Vector<T>::operator=(move(other)); }
+    SmallVector(std::initializer_list<T> list) noexcept : SmallVector() { SC_ASSERT_RELEASE(Vector<T>::assign({list.begin(), list.size()})); }
     // clang-format on
 
   private:

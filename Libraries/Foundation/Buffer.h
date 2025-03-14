@@ -35,17 +35,17 @@ struct Buffer : public Segment<detail::SegmentBuffer>
 template <int N>
 struct SmallBuffer : public Buffer
 {
-    SmallBuffer() : Buffer(N) {}
-    SmallBuffer(const Buffer& other) : SmallBuffer() { Buffer::operator=(other); }
-    SmallBuffer(Buffer&& other) : SmallBuffer() { Buffer::operator=(move(other)); }
-    Buffer& operator=(const Buffer& other) { return Buffer::operator=(other); }
-    Buffer& operator=(Buffer&& other) { return Buffer::operator=(move(other)); }
+    SmallBuffer() noexcept : Buffer(N) {}
+    SmallBuffer(const Buffer& other) noexcept : SmallBuffer() { Buffer::operator=(other); }
+    SmallBuffer(Buffer&& other) noexcept : SmallBuffer() { Buffer::operator=(move(other)); }
+    Buffer& operator=(const Buffer& other) noexcept { return Buffer::operator=(other); }
+    Buffer& operator=(Buffer&& other) noexcept { return Buffer::operator=(move(other)); }
 
     // clang-format off
-    SmallBuffer(const SmallBuffer& other) : SmallBuffer() { Buffer::operator=(other); }
-    SmallBuffer(SmallBuffer&& other) : SmallBuffer() { Buffer::operator=(move(other)); }
-    SmallBuffer& operator=(const SmallBuffer& other) { Buffer::operator=(other); return *this; }
-    SmallBuffer& operator=(SmallBuffer&& other) { Buffer::operator=(move(other)); return *this; }
+    SmallBuffer(const SmallBuffer& other) noexcept : SmallBuffer() { Buffer::operator=(other); }
+    SmallBuffer(SmallBuffer&& other) noexcept : SmallBuffer() { Buffer::operator=(move(other)); }
+    SmallBuffer& operator=(const SmallBuffer& other) noexcept { Buffer::operator=(other); return *this; }
+    SmallBuffer& operator=(SmallBuffer&& other) noexcept { Buffer::operator=(move(other)); return *this; }
     // clang-format on
 
   private:
