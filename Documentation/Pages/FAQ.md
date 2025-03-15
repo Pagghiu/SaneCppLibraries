@@ -4,9 +4,11 @@
 
 # Can I disable Standard C++ Library?
 Yes, if you're satisfied with the C++ standard library alternatives included in this SC and do not plan to use C++ Standard Library in your project:
-- *XCode / Clang / GCC*: 
-    - Add **--nostdlib**
+- *XCode / Clang / GCC 13+*: 
+    - Add **--nostdlib++**
     - Add **--nostdinc++**
+- *GCC < 13*:
+    - Not supported (missing **--nostdlib++**)
 
 # Can I disable Exceptions and RTTI?
 Yes, if you disable the Standard C++ Library, you can also disable Exceptions and RTTI

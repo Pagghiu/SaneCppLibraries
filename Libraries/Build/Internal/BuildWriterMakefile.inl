@@ -614,7 +614,7 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
         // Non Clang specific flags
         builder.append("\n{0}_COMPILER_CPPFLAGS :=", makeTarget);
         builder.append("\n{0}_COMPILER_CXXFLAGS :=", makeTarget);
-
+        builder.append(" -DSC_COMPILER_ENABLE_STD_CPP=1"); // Only GCC 13+ supports nostdlib++
         builder.append("\nendif");
 
         return Result(true);

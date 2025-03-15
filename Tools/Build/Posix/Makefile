@@ -58,7 +58,12 @@ SCTool_COMMON_FLAGS := "-I../../.."
 SCTool_CPPFLAGS := $(CFLAGS) $(SCTool_COMMON_FLAGS) $(SCTool_CONFIG_FLAGS) $(CPPFLAGS)
 SCTool_CXXFLAGS := $(CFLAGS) $(SCTool_COMMON_FLAGS) $(SCTool_CONFIG_FLAGS) $(CXXFLAGS)
 
-SCTool_CXXFLAGS += -std=c++14 -fstrict-aliasing -fvisibility=hidden -fvisibility-inlines-hidden -fno-rtti -nostdinc++ -fno-exceptions -MMD -pthread
+SCTool_CXXFLAGS += -std=c++14 -fstrict-aliasing -fvisibility=hidden -fvisibility-inlines-hidden -fno-rtti -fno-exceptions -MMD -pthread
+ifeq ($(CLANG_DETECTED),yes)
+SCTool_CXXFLAGS += -nostdinc++ 
+else
+SCTool_CXXFLAGS += -DSC_COMPILER_ENABLE_STD_CPP=1 # Only GCC 13+ supports nostdlib++
+endif
 
 SCTool_FRAMEWORKS := -framework CoreFoundation -framework CoreServices
 SCTool_LIBRARIES := -ldl -lpthread
