@@ -182,11 +182,18 @@ bool SC::Segment<VTable>::shrink_to_fit() noexcept
     // 3. Otherwise we are on heap, possibly followed by an insufficient inline segment
     if (VTable::header.sizeBytes < VTable::header.capacityBytes)
     {
-        T* newData = Internal::reallocate(*this, VTable::header.sizeBytes);
-        VTable::setData(newData);
-        if (VTable::header.sizeBytes > 0 and newData == nullptr)
+        if (VTable::header.sizeBytes == 0)
         {
-            return false;
+            Internal::releaseInternal(*this);
+        }
+        else
+        {
+            T* newData = Internal::reallocate(*this, VTable::header.sizeBytes);
+            VTable::setData(newData);
+            if (VTable::header.sizeBytes > 0 and newData == nullptr)
+            {
+                return false;
+            }
         }
     }
     return true;
