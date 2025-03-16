@@ -210,7 +210,7 @@ struct SC::ArenaMap
         Key key = allocateNewKeySlot();
         if (key.isValid())
         {
-            new (&items[key.index], PlacementNew()) T(object);
+            placementNew(items[key.index], object);
         }
         return key;
     }
@@ -220,7 +220,7 @@ struct SC::ArenaMap
         Key key = allocateNewKeySlot();
         if (key.isValid())
         {
-            new (&items[key.index], PlacementNew()) T();
+            placementNew(items[key.index]);
         }
         return key;
     }
@@ -231,7 +231,7 @@ struct SC::ArenaMap
         Key key = allocateNewKeySlot();
         if (key.isValid())
         {
-            new (&items[key.index], PlacementNew()) T(move(object));
+            placementNew(items[key.index], move(object));
         }
         return key;
     }
