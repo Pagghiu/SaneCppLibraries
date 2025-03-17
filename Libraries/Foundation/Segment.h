@@ -41,7 +41,7 @@ struct SegmentSelfRelativePointer : protected SegmentHeaderOffset
     // clang-format off
     SC_COMPILER_FORCE_INLINE T*       data() noexcept { return offset == 0 ? nullptr : toPtr(toOffset(this) + offset); }
     SC_COMPILER_FORCE_INLINE const T* data() const noexcept { return offset == 0 ? nullptr : toPtr(toOffset(this) + offset); }
-    SC_COMPILER_FORCE_INLINE bool isInline() const noexcept { return offset == sizeof(SegmentHeaderOffset) + sizeof(uint64_t); }
+    SC_COMPILER_FORCE_INLINE bool isInline() const noexcept { return (offset == sizeof(SegmentHeaderOffset) + sizeof(uint64_t)) and header.hasInlineData; }
 
   protected:
     struct InlineData : public SegmentHeaderOffset // Data layout corresponds to SmallBuffer, SmallVector etc.

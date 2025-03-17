@@ -16,30 +16,23 @@ struct SC::Segment<VTable>::Internal
         }
     }
 
-    static void* allocateMemory(const SegmentHeader&, size_t capacityBytes)
-    {
-        if SC_LANGUAGE_IF_CONSTEXPR (not VTable::IsArray)
-        {
-            return Memory::allocate(capacityBytes);
-        }
-        return nullptr;
-    }
+    static void* allocateMemory(const SegmentHeader&, size_t capacityBytes) { return Memory::allocate(capacityBytes); }
 
     static void* reallocateMemory(const SegmentHeader&, void* data, size_t capacityBytes)
     {
-        if SC_LANGUAGE_IF_CONSTEXPR (not VTable::IsArray)
-        {
-            return Memory::reallocate(data, capacityBytes);
-        }
-        return nullptr;
+        return Memory::reallocate(data, capacityBytes);
     }
 
     static T* allocate(Segment& segment, size_t capacityBytes) noexcept
     {
-        void* newData = Internal::allocateMemory(segment.header, capacityBytes);
-        if (newData)
+        void* newData = nullptr;
+        if SC_LANGUAGE_IF_CONSTEXPR (not VTable::IsArray)
         {
-            segment.header.capacityBytes = static_cast<uint32_t>(capacityBytes);
+            newData = Internal::allocateMemory(segment.header, capacityBytes);
+            if (newData)
+            {
+                segment.header.capacityBytes = static_cast<uint32_t>(capacityBytes);
+            }
         }
         return static_cast<T*>(newData);
     }
