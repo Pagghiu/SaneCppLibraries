@@ -251,14 +251,14 @@ void SC::VectorTest::basicTests()
         SC_TEST_EXPECT(strings3[1] == "5678");
         SC_TEST_EXPECT(strings3.append({"yeah", "ohyeah"}));
         SC_TEST_EXPECT(strings3.size() == 4);
-        SC_TEST_EXPECT(strings3.capacity() == 4);
+        SC_TEST_EXPECT(strings3.capacity() >= 4);
         SC_TEST_EXPECT(strings3[0] == "1234");
         SC_TEST_EXPECT(strings3[1] == "5678");
         SC_TEST_EXPECT(strings3[2] == "yeah");
         SC_TEST_EXPECT(strings3[3] == "ohyeah");
         SC_TEST_EXPECT(strings3.resize(2));
         SC_TEST_EXPECT(strings3.size() == 2);
-        SC_TEST_EXPECT(strings3.capacity() == 4);
+        SC_TEST_EXPECT(strings3.capacity() >= 4);
         SC_TEST_EXPECT(strings3[0] == "1234");
         SC_TEST_EXPECT(strings3[1] == "5678");
         SC_TEST_EXPECT(strings3.shrink_to_fit());

@@ -125,6 +125,11 @@ struct SC::Segment<VTable>::Internal
     {
         return {segment.data() + offsetElements, segment.size() - offsetElements};
     }
+
+    static bool ensureCapacityFor(Segment& segment, size_t newSize)
+    {
+        return newSize > segment.capacity() ? segment.reserve(segment.capacity() == 0 ? newSize : newSize * 2) : true;
+    }
 };
 
 // clang-format off
@@ -228,8 +233,9 @@ template <typename U>
 [[nodiscard]] bool SC::Segment<VTable>::append(Span<const U> span) noexcept
 {
     const auto oldSize = size();
-    if (resizeWithoutInitializing(oldSize + span.sizeInElements()))
+    if (Internal::ensureCapacityFor(*this, oldSize + span.sizeInElements()))
     {
+        VTable::header.sizeBytes = static_cast<uint32_t>((oldSize + span.sizeInElements()) * sizeof(T));
         if (not span.empty())
         {
             VTable::template copyConstruct<U>({data() + oldSize, span.sizeInElements()}, span.data());
@@ -243,11 +249,11 @@ template <typename VTable>
 template <typename VTable2>
 bool SC::Segment<VTable>::appendMove(Segment<VTable2>&& other) noexcept
 {
-    using U            = typename VTable2::Type;
     const auto oldSize = size();
-    if (resizeWithoutInitializing(oldSize + other.size()))
+    if (Internal::ensureCapacityFor(*this, oldSize + other.size()))
     {
-        VTable::template moveConstruct<U>({data() + oldSize, other.size()}, other.data());
+        VTable::header.sizeBytes = static_cast<uint32_t>((oldSize + other.size()) * sizeof(T));
+        VTable::template moveConstruct<typename VTable2::Type>({data() + oldSize, other.size()}, other.data());
         return true;
     }
     return false;
@@ -340,8 +346,9 @@ template <typename VTable>
 bool SC::Segment<VTable>::push_back(T&& value) noexcept
 {
     const auto numElements = size();
-    if (resizeWithoutInitializing(numElements + 1))
+    if (Internal::ensureCapacityFor(*this, numElements + 1))
     {
+        VTable::header.sizeBytes = static_cast<uint32_t>((numElements + 1) * sizeof(T));
         placementNew(data()[numElements], move(value));
         return true;
     }
@@ -410,10 +417,10 @@ bool SC::Segment<VTable>::removeRange(size_t start, size_t length) noexcept
 template <typename VTable>
 bool SC::Segment<VTable>::insert(size_t index, Span<const T> data) noexcept
 {
-    const size_t     numElements = size();
-    const size_t     dataSize    = data.sizeInElements();
-    constexpr size_t MaxElements = SegmentHeader::MaxCapacity / sizeof(T);
-    if ((index > numElements) or (dataSize >= MaxElements - numElements) or not reserve(numElements + dataSize))
+    const size_t numElements = size();
+    const size_t numToInsert = data.sizeInElements();
+    const bool   tooMany     = (numToInsert >= detail::SegmentHeader::MaxCapacity / sizeof(T) - numElements);
+    if ((index > numElements) or tooMany or not Internal::ensureCapacityFor(*this, numToInsert + numElements))
     {
         return false;
     }
