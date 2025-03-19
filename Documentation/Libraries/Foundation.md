@@ -22,6 +22,8 @@ Detailed documentation is in the @ref group_foundation topic.
 | SC::Deferred              | @copybrief SC::Deferred
 | SC::OpaqueObject          | @copybrief SC::OpaqueObject
 | SC::UniqueHandle          | @copybrief SC::UniqueHandle
+| SC::Memory                | @copybrief SC::Memory
+| SC::VirtualMemory         | @copybrief SC::VirtualMemory
 
 ## Macros
 - [Compiler Macros](@ref group_foundation_compiler_macros): @copybrief group_foundation_compiler_macros
@@ -35,7 +37,6 @@ Detailed documentation is in the @ref group_foundation topic.
 | SC::Assert                | @copybrief SC::Assert
 | SC::AlignedStorage        | @copybrief SC::AlignedStorage
 | SC::MaxValue              | @copybrief SC::MaxValue
-| SC::Memory                | @copybrief SC::Memory
 
 # Status
 🟩 Usable  
@@ -59,6 +60,9 @@ Foundation provides all primitive types to be used in headers and classes like S
 
 ## UniqueHandle
 @copydoc SC::UniqueHandle
+
+## VirtualMemory
+@copydoc SC::VirtualMemory
 
 # Blog
 

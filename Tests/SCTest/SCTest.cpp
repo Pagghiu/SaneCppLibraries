@@ -11,6 +11,7 @@ void runBuildTest(TestReport& report);
 void runBaseTest(TestReport& report);
 void runBufferTest(TestReport& report);
 void runArenaMapTest(TestReport& report);
+void runVirtualMemoryTest(TestReport& report);
 void runFunctionTest(TestReport& report);
 void runUniqueHandleTest(TestReport& report);
 
@@ -145,6 +146,7 @@ int main(int argc, const char* argv[])
     runBaseTest(report);
     runBufferTest(report);
     runFunctionTest(report);
+    runVirtualMemoryTest(report);
     runUniqueHandleTest(report);
 
     // Containers tests
