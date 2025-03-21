@@ -6,6 +6,7 @@ namespace SC
 {
 struct SC_COMPILER_EXPORT Memory;
 struct SC_COMPILER_EXPORT MemoryAllocator;
+struct SC_COMPILER_EXPORT FixedAllocator;
 } // namespace SC
 //! @addtogroup group_foundation_utility
 //! @{
@@ -78,6 +79,25 @@ struct SC::MemoryAllocator
     virtual void  releaseImpl(void* memory)                     = 0;
 
     virtual ~MemoryAllocator() {}
+};
+
+/// @brief A MemoryAllocator implementation using a finite slice of memory
+struct SC::FixedAllocator : public MemoryAllocator
+{
+    FixedAllocator(void* memory, size_t sizeInBytes);
+
+  protected:
+    // Not using a span here to avoid depending on Span<T> in this header
+    void*  memory      = nullptr;
+    size_t sizeInBytes = 0;
+
+    void*  lastAllocation    = nullptr;
+    size_t lastAllocatedSize = 0;
+    size_t position          = 0;
+
+    virtual void* allocateImpl(size_t numBytes) override;
+    virtual void* reallocateImpl(void* memory, size_t numBytes) override;
+    virtual void  releaseImpl(void* memory) override;
 };
 
 //! @}
