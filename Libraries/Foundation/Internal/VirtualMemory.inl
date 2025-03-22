@@ -7,6 +7,9 @@
 #include <sys/mman.h>
 #endif
 
+//------------------------------------------------------------------------------------------------------------------
+// VirtualMemory
+//------------------------------------------------------------------------------------------------------------------
 SC::size_t SC::VirtualMemory::roundUpToPageSize(size_t size)
 {
     const size_t pageSize = SC::VirtualMemory::getSystemPageSize();
@@ -107,4 +110,41 @@ bool SC::VirtualMemory::shrink(size_t newCapacityBytes)
 #endif
     committedCapacityBytes = alignedNewCapacity;
     return true;
+}
+
+//------------------------------------------------------------------------------------------------------------------
+// VirtualAllocator
+//------------------------------------------------------------------------------------------------------------------
+SC::VirtualAllocator::VirtualAllocator(VirtualMemory& virtualMemory)
+    : virtualMemory(virtualMemory), FixedAllocator(nullptr, 0)
+{}
+
+void* SC::VirtualAllocator::allocateImpl(size_t numBytes)
+{
+    syncFixedAllocator();
+    void* fixedMemory = FixedAllocator::allocateImpl(numBytes);
+    if (fixedMemory == nullptr and virtualMemory.commit(virtualMemory.committedCapacityBytes + numBytes))
+    {
+        syncFixedAllocator();
+        return FixedAllocator::allocateImpl(numBytes);
+    }
+    return fixedMemory;
+}
+
+void* SC::VirtualAllocator::reallocateImpl(void* allocatedMemory, size_t numBytes)
+{
+    syncFixedAllocator();
+    void* fixedMemory = FixedAllocator::reallocateImpl(allocatedMemory, numBytes);
+    if (fixedMemory == nullptr and virtualMemory.commit(virtualMemory.committedCapacityBytes + numBytes))
+    {
+        syncFixedAllocator();
+        return FixedAllocator::reallocateImpl(allocatedMemory, numBytes);
+    }
+    return fixedMemory;
+}
+
+void SC::VirtualAllocator::syncFixedAllocator()
+{
+    FixedAllocator::memory      = virtualMemory.memory;
+    FixedAllocator::sizeInBytes = virtualMemory.committedCapacityBytes;
 }

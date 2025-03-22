@@ -1,10 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Memory.h" // FixedAllocator
 #include "../Foundation/PrimitiveTypes.h"
 namespace SC
 {
 struct SC_COMPILER_EXPORT VirtualMemory;
+struct SC_COMPILER_EXPORT VirtualAllocator;
 } // namespace SC
 //! @addtogroup group_foundation_utility
 //! @{
@@ -46,6 +48,20 @@ struct SC::VirtualMemory
 
     /// @brief Reclaims all unused pages past newCapacityBytes (previously committed with VirtualMemory::commit)
     [[nodiscard]] bool shrink(size_t newCapacityBytes);
+};
+
+/// @brief A MemoryAllocator implementation based on a growable slice of VirtualMemory
+struct SC::VirtualAllocator : public FixedAllocator
+{
+    VirtualAllocator(VirtualMemory& virtualMemory);
+
+  protected:
+    VirtualMemory& virtualMemory;
+
+    virtual void* allocateImpl(size_t numBytes) override;
+    virtual void* reallocateImpl(void* memory, size_t numBytes) override;
+
+    void syncFixedAllocator();
 };
 
 //! @}
