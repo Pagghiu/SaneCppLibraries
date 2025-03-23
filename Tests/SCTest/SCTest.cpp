@@ -14,6 +14,7 @@ void runArenaMapTest(TestReport& report);
 void runVirtualMemoryTest(TestReport& report);
 void runFunctionTest(TestReport& report);
 void runUniqueHandleTest(TestReport& report);
+void runGlobalsTest(TestReport& report);
 
 // Foundation Extra
 void runTaggedUnionTest(TestReport& report);
@@ -117,7 +118,7 @@ SC::Console* globalConsole;
 int main(int argc, const char* argv[])
 {
     using namespace SC;
-    Memory::registerGlobals();
+    Globals::registerGlobals();
     SmallBuffer<1024 * sizeof(SC::native_char_t)> globalConsoleConversionBuffer;
     Console::tryAttachingToParentConsole();
     FileSystemDirectories directories;
@@ -148,6 +149,7 @@ int main(int argc, const char* argv[])
     runFunctionTest(report);
     runVirtualMemoryTest(report);
     runUniqueHandleTest(report);
+    runGlobalsTest(report);
 
     // Containers tests
     runArenaMapTest(report);

@@ -2,25 +2,40 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Foundation/Assert.h"
+#include "../../Foundation/Globals.h"
 #include "../../Foundation/Memory.h"
 #include "../../Foundation/Segment.h"
 
 template <typename VTable>
 struct SC::Segment<VTable>::Internal
 {
-    static void releaseMemory(const SegmentHeader&, void* memory)
+    static void releaseMemory(const detail::SegmentHeader& header, void* memory) noexcept
     {
-        if SC_LANGUAGE_IF_CONSTEXPR (not VTable::IsArray)
+        switch (SegmentAllocator(header.allocatorType))
         {
-            Memory::release(memory);
+        case SegmentAllocator::Global: Globals::getGlobal().allocator.release(memory); break;
+        case SegmentAllocator::ThreadLocal: Globals::getThreadLocal().allocator.release(memory); break;
         }
     }
 
-    static void* allocateMemory(const SegmentHeader&, size_t capacityBytes) { return Memory::allocate(capacityBytes); }
-
-    static void* reallocateMemory(const SegmentHeader&, void* data, size_t capacityBytes)
+    static void* allocateMemory(const detail::SegmentHeader& header, size_t capacityBytes) noexcept
     {
-        return Memory::reallocate(data, capacityBytes);
+        switch (SegmentAllocator(header.allocatorType))
+        {
+        case SegmentAllocator::Global: return Globals::getGlobal().allocator.allocate(capacityBytes);
+        case SegmentAllocator::ThreadLocal: return Globals::getThreadLocal().allocator.allocate(capacityBytes);
+        }
+        return nullptr;
+    }
+
+    static void* reallocateMemory(const detail::SegmentHeader& header, void* data, size_t capacityBytes) noexcept
+    {
+        switch (SegmentAllocator(header.allocatorType))
+        {
+        case SegmentAllocator::Global: return Globals::getGlobal().allocator.reallocate(data, capacityBytes);
+        case SegmentAllocator::ThreadLocal: return Globals::getThreadLocal().allocator.reallocate(data, capacityBytes);
+        }
+        return nullptr;
     }
 
     static T* allocate(Segment& segment, size_t capacityBytes) noexcept
@@ -121,7 +136,7 @@ struct SC::Segment<VTable>::Internal
         return true;
     }
 
-    static Span<T> toSpanOffsetElements(Segment& segment, size_t offsetElements)
+    static Span<T> toSpanOffsetElements(Segment& segment, size_t offsetElements) noexcept
     {
         return {segment.data() + offsetElements, segment.size() - offsetElements};
     }
@@ -142,9 +157,9 @@ template <typename VTable> SC::Segment<VTable>& SC::Segment<VTable>::operator=(c
 // clang-format on
 
 template <typename VTable>
-SC::Segment<VTable>::Segment(uint32_t capacityInBytes)
+SC::Segment<VTable>::Segment(uint32_t capacityInBytes, SegmentAllocator allocator) noexcept
 {
-    VTable::header = {capacityInBytes};
+    VTable::header = {capacityInBytes, allocator};
     if (capacityInBytes > 0)
     {
         VTable::setData(VTable::getInlineData());
@@ -263,7 +278,7 @@ template <typename VTable>
 bool SC::Segment<VTable>::reserve(size_t capacity) noexcept
 {
     const size_t capacityBytes = capacity * sizeof(T);
-    if (capacityBytes > SegmentHeader::MaxCapacity)
+    if (capacityBytes > detail::SegmentHeader::MaxCapacity)
     {
         return false;
     }
@@ -336,6 +351,7 @@ bool SC::Segment<VTable>::assignMove(Segment<VTable2>&& other) noexcept
         VTable::setData(otherSpan.data());
         VTable::header.sizeBytes     = other.header.sizeBytes;
         VTable::header.capacityBytes = other.header.capacityBytes;
+        VTable::header.allocatorType = other.header.allocatorType;
         other.header.sizeBytes       = 0;
         Internal::eventuallyRestoreInlineData(other);
     }

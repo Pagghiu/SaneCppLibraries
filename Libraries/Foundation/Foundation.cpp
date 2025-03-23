@@ -3,6 +3,7 @@
 
 #include "../Foundation/Internal/Assert.inl"
 #include "../Foundation/Internal/Buffer.inl"
+#include "../Foundation/Internal/Globals.inl"
 #include "../Foundation/Internal/Limits.inl"
 #include "../Foundation/Internal/Memory.inl"
 #include "../Foundation/Internal/VirtualMemory.inl"

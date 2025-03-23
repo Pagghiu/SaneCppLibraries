@@ -20,7 +20,9 @@ struct ArrayVTable : public ObjectVTable<T>
 
     static constexpr bool isInline() { return true; }
 
-    ArrayVTable(uint32_t capacity = 0) : header(capacity) {}
+    ArrayVTable(uint32_t capacity = 0, SegmentAllocator allocator = SegmentAllocator::Global)
+        : header(capacity, allocator)
+    {}
     ~ArrayVTable() {}
 
     SegmentHeader header;

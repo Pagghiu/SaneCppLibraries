@@ -35,7 +35,7 @@ struct Buffer : public Segment<detail::SegmentBuffer>
 template <int N>
 struct SmallBuffer : public Buffer
 {
-    SmallBuffer() noexcept : Buffer(N) {}
+    SmallBuffer(SegmentAllocator allocator = SegmentAllocator::Global) noexcept : Buffer(N, allocator) {}
     SmallBuffer(const Buffer& other) noexcept : SmallBuffer() { Buffer::operator=(other); }
     SmallBuffer(Buffer&& other) noexcept : SmallBuffer() { Buffer::operator=(move(other)); }
     Buffer& operator=(const Buffer& other) noexcept { return Buffer::operator=(other); }
@@ -48,10 +48,17 @@ struct SmallBuffer : public Buffer
     SmallBuffer& operator=(SmallBuffer&& other) noexcept { Buffer::operator=(move(other)); return *this; }
     // clang-format on
 
+  protected:
+    SmallBuffer(int num, SegmentAllocator allocator) : Buffer(N, allocator) { (void)num; }
+
   private:
     uint64_t inlineCapacity = N;
     char     inlineBuffer[N];
 };
+
+using BufferTL = detail::SegmentCustom<Buffer, Buffer, 0, SegmentAllocator::ThreadLocal>;
+template <int N>
+using SmallBufferTL = detail::SegmentCustom<SmallBuffer<N>, Buffer, N, SegmentAllocator::ThreadLocal>;
 
 #if SC_COMPILER_MSVC
 // Adding the SC_COMPILER_EXPORT on Buffer declaration causes MSVC to issue error C2491

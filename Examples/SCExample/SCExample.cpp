@@ -235,7 +235,7 @@ static sg_pass_action gGlobalPassAction;
 sapp_desc sokol_main(int, char*[])
 {
     using namespace SC;
-    Memory::registerGlobals();
+    Globals::registerGlobals();
     sapp_desc desc = {};
 
     desc.window_title     = "SCExample";

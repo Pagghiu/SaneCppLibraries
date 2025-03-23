@@ -8,6 +8,12 @@ namespace SC
 {
 //! @addtogroup group_foundation_utility
 //! @{
+enum class SegmentAllocator
+{
+    Global      = 0,
+    ThreadLocal = 1,
+};
+
 namespace detail
 {
 struct SC_COMPILER_EXPORT SegmentHeader;
@@ -15,15 +21,15 @@ struct alignas(uint64_t) SegmentHeader
 {
     static constexpr uint32_t MaxCapacity = (~static_cast<uint32_t>(0)) >> 1;
 
-    SegmentHeader(uint32_t capacity = 0)
+    SegmentHeader(uint32_t capacity = 0, SegmentAllocator allocator = SegmentAllocator::Global)
     {
         sizeBytes     = 0;
-        unused        = 0;
+        allocatorType = static_cast<uint32_t>(allocator);
         capacityBytes = capacity;
         hasInlineData = capacity > 0;
     }
     uint32_t sizeBytes : sizeof(uint32_t) * 8 - 1;
-    uint32_t unused : 1;
+    uint32_t allocatorType : 1;
     uint32_t capacityBytes : sizeof(uint32_t) * 8 - 1;
     uint32_t hasInlineData : 1;
 };
@@ -78,6 +84,22 @@ struct SegmentTrivial
     inline static void remove(Span<T> data, size_t numElements) noexcept;
 };
 
+/// @brief Helps creating custom Segments
+template <typename ParentSegment, typename CommonParent, int N = 0,
+          SegmentAllocator Allocator = SegmentAllocator::ThreadLocal>
+struct SegmentCustom : public ParentSegment
+{
+    SegmentCustom() : ParentSegment(N, Allocator) {}
+    SegmentCustom(const CommonParent& other) : SegmentCustom() { CommonParent::operator=(other); }
+    SegmentCustom(CommonParent&& other) : SegmentCustom() { CommonParent::operator=(move(other)); }
+
+    SegmentCustom(const SegmentCustom& other) : SegmentCustom() { ParentSegment::operator=(other); }
+    SegmentCustom(SegmentCustom&& other) : SegmentCustom() { ParentSegment::operator=(move(other)); }
+    // clang-format off
+    SegmentCustom& operator=(const SegmentCustom& other) { ParentSegment::operator=(other); return *this; }
+    SegmentCustom& operator=(SegmentCustom&& other) { ParentSegment::operator=(move(other)); return *this; }
+    // clang-format on
+};
 } // namespace detail
 
 /// @brief A slice of contiguous memory, prefixed by and header containing size and capacity.
@@ -91,7 +113,7 @@ struct Segment : public VTable
 {
     using VTable::data;
     using T = typename VTable::Type;
-    Segment(uint32_t capacityInBytes);
+    Segment(uint32_t capacityInBytes, SegmentAllocator allocator = SegmentAllocator::Global) noexcept;
 
     Segment() noexcept;
     ~Segment() noexcept;
@@ -210,7 +232,6 @@ struct Segment : public VTable
     template <typename VTable2>
     friend struct Segment;
     struct Internal;
-    using SegmentHeader = detail::SegmentHeader;
 };
 
 //! @}
