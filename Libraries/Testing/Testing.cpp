@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Testing.h"
 #include "../Foundation/Assert.h"
+#include "../Foundation/Globals.h"
 #include "../Strings/Console.h"
 #include <stdlib.h> // exit
 #include <string.h> // strlen
@@ -65,6 +66,30 @@ SC::TestReport::~TestReport()
         console.print(" TOTAL Succeeded = {}"_a8, numTestsSucceeded);
     }
     console.print("\n---------------------------------------------------\n"_a8);
+}
+
+void SC::TestReport::runGlobalMemoryReport(bool reportFailure)
+{
+    MemoryAllocator::Statistics stats = Globals::getGlobal().allocator.statistics;
+    console.print("[[ Memory Report ]]\n");
+    console.print("\t - Allocations   = {}\n", stats.numAllocate);
+    console.print("\t - Deallocations = {}\n", stats.numRelease);
+    console.print("\t - Reallocations = {}\n", stats.numReallocate);
+    if (reportFailure)
+    {
+        if (stats.numAllocate == stats.numRelease)
+        {
+            console.print(greenEMOJI);
+            console.print(" [[ Memory Report ]] SUCCEDED = 1\n");
+        }
+        else
+        {
+            console.print(redEMOJI);
+            console.print(" [[ Memory Report ]] FAILED = 1\n");
+            numTestsFailed++;
+        }
+    }
+    console.print("---------------------------------------------------\n"_a8);
 }
 
 //-------------------------------------------------------------------------------------------

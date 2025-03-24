@@ -44,6 +44,9 @@ struct SC::TestReport
     /// @return `-1` if tests are failed, `0` if tests are successful
     [[nodiscard]] int getTestReturnCode() const;
 
+    /// @brief Runs a report for the Global Memory Allocator and prints its results
+    void runGlobalMemoryReport(bool reportFailure = true);
+
   private:
     [[nodiscard]] bool isTestEnabled(StringView testName) const;
     [[nodiscard]] bool isSectionEnabled(StringView sectionName) const;

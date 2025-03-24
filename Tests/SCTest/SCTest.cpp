@@ -239,5 +239,6 @@ int main(int argc, const char* argv[])
     // C bindings tests
     runCBindingsTest(report);
 
+    report.runGlobalMemoryReport();
     return report.getTestReturnCode();
 }
