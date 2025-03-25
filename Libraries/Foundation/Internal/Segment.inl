@@ -9,33 +9,22 @@
 template <typename VTable>
 struct SC::Segment<VTable>::Internal
 {
+    static_assert((int)SegmentAllocator::Global == (int)Globals::Global, "SegmentAllocator::Global");
+    static_assert((int)SegmentAllocator::ThreadLocal == (int)Globals::ThreadLocal, "SegmentAllocator::ThreadLocal");
+
     static void releaseMemory(const detail::SegmentHeader& header, void* memory) noexcept
     {
-        switch (SegmentAllocator(header.allocatorType))
-        {
-        case SegmentAllocator::Global: Globals::getGlobal().allocator.release(memory); break;
-        case SegmentAllocator::ThreadLocal: Globals::getThreadLocal().allocator.release(memory); break;
-        }
+        return Globals::get(Globals::Type(header.allocatorType)).allocator.release(memory);
     }
 
     static void* allocateMemory(const detail::SegmentHeader& header, size_t capacityBytes) noexcept
     {
-        switch (SegmentAllocator(header.allocatorType))
-        {
-        case SegmentAllocator::Global: return Globals::getGlobal().allocator.allocate(capacityBytes);
-        case SegmentAllocator::ThreadLocal: return Globals::getThreadLocal().allocator.allocate(capacityBytes);
-        }
-        return nullptr;
+        return Globals::get(Globals::Type(header.allocatorType)).allocator.allocate(capacityBytes);
     }
 
     static void* reallocateMemory(const detail::SegmentHeader& header, void* data, size_t capacityBytes) noexcept
     {
-        switch (SegmentAllocator(header.allocatorType))
-        {
-        case SegmentAllocator::Global: return Globals::getGlobal().allocator.reallocate(data, capacityBytes);
-        case SegmentAllocator::ThreadLocal: return Globals::getThreadLocal().allocator.reallocate(data, capacityBytes);
-        }
-        return nullptr;
+        return Globals::get(Globals::Type(header.allocatorType)).allocator.reallocate(data, capacityBytes);
     }
 
     static T* allocate(Segment& segment, size_t capacityBytes) noexcept

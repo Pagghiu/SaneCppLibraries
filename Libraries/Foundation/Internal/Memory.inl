@@ -7,9 +7,9 @@
 // Memory
 //------------------------------------------------------------------------------------------------------------------
 // clang-format off
-void* SC::Memory::reallocate(void* memory, size_t numBytes) { return Globals::getGlobal().allocator.reallocate(memory, numBytes); }
-void* SC::Memory::allocate(size_t numBytes) { return Globals::getGlobal().allocator.allocate(numBytes); }
-void  SC::Memory::release(void* allocatedMemory) { return Globals::getGlobal().allocator.release(allocatedMemory); }
+void* SC::Memory::reallocate(void* memory, size_t numBytes) { return Globals::get(Globals::Global).allocator.reallocate(memory, numBytes); }
+void* SC::Memory::allocate(size_t numBytes) { return Globals::get(Globals::Global).allocator.allocate(numBytes); }
+void  SC::Memory::release(void* allocatedMemory) { return Globals::get(Globals::Global).allocator.release(allocatedMemory); }
 // clang-format on
 
 //------------------------------------------------------------------------------------------------------------------

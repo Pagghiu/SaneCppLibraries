@@ -3,6 +3,7 @@
 #include "Testing.h"
 #include "../Foundation/Assert.h"
 #include "../Foundation/Globals.h"
+#include "../Foundation/Memory.h"
 #include "../Strings/Console.h"
 #include <stdlib.h> // exit
 #include <string.h> // strlen
@@ -70,7 +71,7 @@ SC::TestReport::~TestReport()
 
 void SC::TestReport::runGlobalMemoryReport(bool reportFailure)
 {
-    MemoryAllocator::Statistics stats = Globals::getGlobal().allocator.statistics;
+    MemoryAllocator::Statistics stats = Globals::get(Globals::Global).allocator.statistics;
     console.print("[[ Memory Report ]]\n");
     console.print("\t - Allocations   = {}\n", stats.numAllocate);
     console.print("\t - Deallocations = {}\n", stats.numRelease);

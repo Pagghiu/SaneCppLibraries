@@ -42,6 +42,18 @@ struct SC::MemoryAllocator
     };
     Statistics statistics; ///< Holds statistics about how many allocations/release have been issued
 
+    /// @brief Allocate and construct an object of type `T` using this allocator
+    template <typename T, typename... U>
+    T* allocate(U&&... u)
+    {
+        T* t = reinterpret_cast<T*>(allocate(sizeof(T)));
+        if (t)
+        {
+            placementNew(*t, forward<U>(u)...);
+        }
+        return t;
+    }
+
     /// @brief Allocates numBytes bytes of memory
     /// @param numBytes Number of bytes to allocate
     /// @return Raw pointer to allocated memory, to be freed with MemoryAllocator::release

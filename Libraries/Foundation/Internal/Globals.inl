@@ -15,81 +15,62 @@ struct SC::Globals::Internal
         virtual void* reallocateImpl(void* memory, size_t numBytes) override { return ::realloc(memory, numBytes); }
         virtual void  releaseImpl(void* memory) override { return ::free(memory); }
     };
+
     struct StaticGlobals
     {
-        DefaultAllocator allocator;
-        Globals          globals = {allocator};
-        Globals*         current = &globals;
+        DefaultAllocator defaultAllocator;
+
+        Globals  globals = {defaultAllocator};
+        Globals* current = &globals;
     };
 
-    static Globals* getOrSet(bool threadLocal, Globals* globals = nullptr)
+    static StaticGlobals& getStatic(Globals::Type type)
     {
-        static StaticGlobals staticGlobals;
-        if (threadLocal)
+        // clang-format off
+        if (type == Globals::Global) SC_LANGUAGE_LIKELY
         {
-            static thread_local StaticGlobals staticThreadLocals = staticGlobals;
-            if (globals != nullptr)
-            {
-                staticThreadLocals.current = globals;
-            }
-            return staticThreadLocals.current;
+            static StaticGlobals staticGlobals;
+            return staticGlobals;
         }
         else
         {
-            if (globals != nullptr)
-            {
-                staticGlobals.current = globals;
-            }
-            return staticGlobals.current;
+            static thread_local StaticGlobals staticThreadLocals;
+            return staticThreadLocals;
         }
+        // clang-format on
     }
-
-    static void setThreadLocal(Globals& globals) { Internal::getOrSet(true, &globals); }
-
-    static void setGlobal(Globals& globals) { Internal::getOrSet(false, &globals); }
 };
 
-void SC::Globals::registerGlobals()
+void SC::Globals::init(Type type)
 {
+    (void)type;
 #if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
-    ::_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-    // ::_CrtSetBreakAlloc();
+    if (type == Type::Global)
+    {
+        ::_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+        // ::_CrtSetBreakAlloc();
+    }
 #endif
 }
 
-void SC::Globals::pushGlobal(Globals& globals)
+SC::Globals* SC::Globals::push(Type type, Globals& newGlobals)
 {
-    Globals& current = getGlobal();
-    globals.prev     = &current;
-    Internal::setGlobal(globals);
+    auto& globals   = Internal::getStatic(type);
+    newGlobals.prev = globals.current;
+    globals.current = &newGlobals;
+    return newGlobals.prev;
 }
 
-void SC::Globals::popGlobal()
+SC::Globals* SC::Globals::pop(Type type)
 {
-    Globals& current = getGlobal();
-    if (current.prev != nullptr)
+    auto&    globals = Internal::getStatic(type);
+    Globals* prev    = globals.current->prev;
+    if (prev != nullptr)
     {
-        Internal::setGlobal(*current.prev);
-        current.prev = nullptr;
+        globals.current->prev = nullptr;
+        globals.current       = prev;
     }
+    return prev;
 }
 
-void SC::Globals::pushThreadLocal(Globals& globals)
-{
-    Globals& current = getThreadLocal();
-    globals.prev     = &current;
-    Internal::setThreadLocal(globals);
-}
-
-void SC::Globals::popThreadLocal()
-{
-    Globals& current = getThreadLocal();
-    if (current.prev != nullptr)
-    {
-        Internal::setThreadLocal(*current.prev);
-        current.prev = nullptr;
-    }
-}
-
-SC::Globals& SC::Globals::getThreadLocal() { return *Internal::getOrSet(true); }
-SC::Globals& SC::Globals::getGlobal() { return *Internal::getOrSet(false); }
+SC::Globals& SC::Globals::get(Type type) { return *Internal::getStatic(type).current; }
