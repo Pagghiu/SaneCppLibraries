@@ -154,7 +154,7 @@ struct SC::VectorTestClass
     void copyString(const char* initData)
     {
         const size_t numBytes = dataLength(initData) + 1;
-        data                  = static_cast<char*>(Memory::allocate(numBytes));
+        data                  = static_cast<char*>(Memory::allocate(numBytes, 1));
         memcpy(data, initData, numBytes);
     }
 };

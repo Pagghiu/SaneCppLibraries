@@ -19,11 +19,11 @@
 #define SC_PLUGIN_LINKER_OPERATORS                                                                                     \
     void* operator new(SC::size_t len)                                                                                 \
     {                                                                                                                  \
-        return SC::Memory::allocate(len);                                                                              \
+        return SC::Memory::allocate(len, 8);                                                                           \
     }                                                                                                                  \
     void* operator new[](SC::size_t len)                                                                               \
     {                                                                                                                  \
-        return SC::Memory::allocate(len);                                                                              \
+        return SC::Memory::allocate(len, 8);                                                                           \
     }                                                                                                                  \
     void operator delete(void* p, SC::size_t) noexcept                                                                 \
     {                                                                                                                  \

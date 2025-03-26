@@ -19,7 +19,7 @@ struct SC::Segment<VTable>::Internal
 
     static void* allocateMemory(const detail::SegmentHeader& header, size_t capacityBytes) noexcept
     {
-        return Globals::get(Globals::Type(header.allocatorType)).allocator.allocate(capacityBytes);
+        return Globals::get(Globals::Type(header.allocatorType)).allocator.allocate(capacityBytes, alignof(T));
     }
 
     static void* reallocateMemory(const detail::SegmentHeader& header, void* data, size_t capacityBytes) noexcept

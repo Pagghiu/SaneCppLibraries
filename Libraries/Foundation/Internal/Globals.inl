@@ -11,7 +11,12 @@ struct SC::Globals::Internal
 {
     struct DefaultAllocator : public MemoryAllocator
     {
-        virtual void* allocateImpl(size_t numBytes) override { return ::malloc(numBytes); }
+        virtual void* allocateImpl(size_t numBytes, size_t alignment) override
+        {
+            (void)alignment; // TODO: Enforce alignment
+            return ::malloc(numBytes);
+        }
+
         virtual void* reallocateImpl(void* memory, size_t numBytes) override { return ::realloc(memory, numBytes); }
         virtual void  releaseImpl(void* memory) override { return ::free(memory); }
     };

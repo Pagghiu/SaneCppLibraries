@@ -28,6 +28,7 @@ template <typename T>
 struct SC::ArenaMap
 {
     using Key = ArenaMapKey<T>;
+    using Gen = typename Key::Generation;
 
     ArenaMap() {}
 
@@ -40,13 +41,11 @@ struct SC::ArenaMap
     ArenaMap& operator=(const ArenaMap& other)
     {
         clear();
-        T* newItems = reinterpret_cast<T*>(Memory::allocate(other.itemsSize * sizeof(T)));
-
-        typename Key::Generation* newGenerations = reinterpret_cast<typename Key::Generation*>(
-            Memory::allocate(other.itemsSize * sizeof(typename Key::Generation)));
+        T*   newItems       = reinterpret_cast<T*>(Memory::allocate(other.itemsSize * sizeof(T), alignof(T)));
+        Gen* newGenerations = reinterpret_cast<Gen*>(Memory::allocate(other.itemsSize * sizeof(Gen), alignof(Gen)));
         SC_ASSERT_RELEASE(newItems);
         SC_ASSERT_RELEASE(newGenerations);
-        ::memset(newGenerations, 0, other.itemsSize * sizeof(typename Key::Generation));
+        ::memset(newGenerations, 0, other.itemsSize * sizeof(Gen));
         items       = newItems;
         generations = newGenerations;
         itemsSize   = other.itemsSize;
@@ -189,15 +188,14 @@ struct SC::ArenaMap
         if (generations)
             Memory::release(generations);
         generations = nullptr;
-        T* newItems = reinterpret_cast<T*>(Memory::allocate(newSize * sizeof(T)));
+        T* newItems = reinterpret_cast<T*>(Memory::allocate(newSize * sizeof(T), alignof(T)));
         if (not newItems)
             return false;
-        items = newItems;
-        typename Key::Generation* newGenerations =
-            reinterpret_cast<typename Key::Generation*>(Memory::allocate(newSize * sizeof(typename Key::Generation)));
+        items               = newItems;
+        Gen* newGenerations = reinterpret_cast<Gen*>(Memory::allocate(newSize * sizeof(Gen), alignof(Gen)));
         if (not newGenerations)
             return false;
-        ::memset(newGenerations, 0, newSize * sizeof(typename Key::Generation));
+        ::memset(newGenerations, 0, newSize * sizeof(Gen));
         generations = newGenerations;
         itemsSize   = newSize;
         numUsed     = 0;

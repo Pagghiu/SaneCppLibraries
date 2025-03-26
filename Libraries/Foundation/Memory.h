@@ -16,8 +16,9 @@ struct SC::Memory
 {
     /// @brief Allocates numBytes bytes of memory
     /// @param numBytes Number of bytes to allocate
+    /// @param alignment Alignment of the returned memory
     /// @return Raw pointer to allocated memory, to be freed with Memory::release
-    static void* allocate(size_t numBytes);
+    static void* allocate(size_t numBytes, size_t alignment);
 
     /// @brief Change size of already allocated memory block. Existing contents of input buffer will be copied over.
     /// @param memory pointer to memory previously allocated by Memory::allocate or Memory::Reallocate
@@ -46,7 +47,7 @@ struct SC::MemoryAllocator
     template <typename T, typename... U>
     T* allocate(U&&... u)
     {
-        T* t = reinterpret_cast<T*>(allocate(sizeof(T)));
+        T* t = reinterpret_cast<T*>(allocate(sizeof(T), alignof(T)));
         if (t)
         {
             placementNew(*t, forward<U>(u)...);
@@ -57,10 +58,10 @@ struct SC::MemoryAllocator
     /// @brief Allocates numBytes bytes of memory
     /// @param numBytes Number of bytes to allocate
     /// @return Raw pointer to allocated memory, to be freed with MemoryAllocator::release
-    void* allocate(size_t numBytes)
+    void* allocate(size_t numBytes, size_t alignment)
     {
         statistics.numAllocate += 1;
-        return allocateImpl(numBytes);
+        return allocateImpl(numBytes, alignment);
     }
 
     /// @brief Change size of already allocated memory block. Existing contents of input buffer will be copied over.
@@ -86,9 +87,9 @@ struct SC::MemoryAllocator
 
     void* userData = nullptr;
 
-    virtual void* allocateImpl(size_t numBytes)                 = 0;
-    virtual void* reallocateImpl(void* memory, size_t numBytes) = 0;
-    virtual void  releaseImpl(void* memory)                     = 0;
+    virtual void* allocateImpl(size_t numBytes, size_t alignment) = 0;
+    virtual void* reallocateImpl(void* memory, size_t numBytes)   = 0;
+    virtual void  releaseImpl(void* memory)                       = 0;
 
     virtual ~MemoryAllocator() {}
 };
@@ -107,7 +108,7 @@ struct SC::FixedAllocator : public MemoryAllocator
     size_t lastAllocatedSize = 0;
     size_t position          = 0;
 
-    virtual void* allocateImpl(size_t numBytes) override;
+    virtual void* allocateImpl(size_t numBytes, size_t alignment) override;
     virtual void* reallocateImpl(void* memory, size_t numBytes) override;
     virtual void  releaseImpl(void* memory) override;
 };

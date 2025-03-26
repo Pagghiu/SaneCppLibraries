@@ -34,7 +34,7 @@ void SC::VirtualMemoryTest::virtualMemory()
     const size_t lessThanOnePageSize = VirtualMemory::getSystemPageSize() - 1024;
     SC_TEST_EXPECT(lessThanOnePageSize > 0); // sanity check just in case
 
-    void* reference = Memory::allocate(moreThanOnePageSize);
+    void* reference = Memory::allocate(moreThanOnePageSize, 1);
     memset(reference, 1, moreThanOnePageSize);
     auto releaseLater = MakeDeferred([&] { Memory::release(reference); });
 
