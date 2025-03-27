@@ -8,7 +8,7 @@
 //------------------------------------------------------------------------------------------------------------------
 // clang-format off
 void* SC::Memory::reallocate(void* memory, size_t numBytes) { return Globals::get(Globals::Global).allocator.reallocate(memory, numBytes); }
-void* SC::Memory::allocate(size_t numBytes, size_t alignment) { return Globals::get(Globals::Global).allocator.allocate(numBytes,alignment); }
+void* SC::Memory::allocate(size_t numBytes, size_t alignment) { return Globals::get(Globals::Global).allocator.allocate(nullptr, numBytes,alignment); }
 void  SC::Memory::release(void* allocatedMemory) { return Globals::get(Globals::Global).allocator.release(allocatedMemory); }
 // clang-format on
 
@@ -17,8 +17,10 @@ void  SC::Memory::release(void* allocatedMemory) { return Globals::get(Globals::
 //------------------------------------------------------------------------------------------------------------------
 SC::FixedAllocator::FixedAllocator(void* memory, size_t sizeInBytes) : memory(memory), sizeInBytes(sizeInBytes) {}
 
-void* SC::FixedAllocator::allocateImpl(size_t numBytes, size_t alignment)
+void* SC::FixedAllocator::allocateImpl(const void* owner, size_t numBytes, size_t alignment)
 {
+    if (owner != nullptr and (owner < memory or owner >= static_cast<char*>(memory) + sizeInBytes))
+        return nullptr;
     if (position + numBytes <= sizeInBytes)
     {
         auto alignPointer = [](void* ptr, size_t alignment)
@@ -63,7 +65,7 @@ void* SC::FixedAllocator::reallocateImpl(void* allocatedMemory, size_t numBytes)
         alignment = 4;
     else if ((size_t(allocatedMemory) & (2 - 1)) == 0)
         alignment = 2;
-    return allocate(numBytes, alignment);
+    return allocate(allocatedMemory, numBytes, alignment);
 }
 
 void SC::FixedAllocator::releaseImpl(void*) {}

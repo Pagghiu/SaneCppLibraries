@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../../Foundation/Globals.h"
+#include "SortedAllocations.inl"
 #if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
 #define _CRTDBG_MAP_ALLOC
 #include <crtdbg.h>
@@ -11,14 +12,65 @@ struct SC::Globals::Internal
 {
     struct DefaultAllocator : public MemoryAllocator
     {
-        virtual void* allocateImpl(size_t numBytes, size_t alignment) override
+        // If needed all allocations (address, length) are being tracked by this sorted array.
+        // This enables erroring out when Segments placed in the space managed by other allocators try
+        // to request an allocation from this one
+        SortedAllocations* allocations = nullptr;
+
+        ~DefaultAllocator()
         {
-            (void)alignment; // TODO: Enforce alignment
-            return ::malloc(numBytes);
+            if (allocations)
+            {
+                ::free(allocations);
+            }
         }
 
-        virtual void* reallocateImpl(void* memory, size_t numBytes) override { return ::realloc(memory, numBytes); }
-        virtual void  releaseImpl(void* memory) override { return ::free(memory); }
+        void reserveForSortedAllocations(size_t memorySize)
+        {
+            allocations = reinterpret_cast<SortedAllocations*>(::malloc(memorySize));
+            SortedAllocations::init(allocations, memorySize);
+        }
+
+        virtual void* allocateImpl(const void*, size_t numBytes, size_t alignment) override
+        {
+            (void)alignment; // TODO: Enforce alignment
+            void* result = ::malloc(numBytes);
+            if (result != nullptr and allocations != nullptr)
+            {
+                if (not allocations->insertSorted({result, numBytes}))
+                {
+                    ::free(result);
+                    return nullptr;
+                }
+            }
+            return result;
+        }
+
+        virtual void* reallocateImpl(void* memory, size_t numBytes) override
+        {
+            if (allocations != nullptr)
+            {
+                if (not allocations->removeSorted(memory))
+                {
+                    return nullptr;
+                }
+            }
+            void* result = ::realloc(memory, numBytes);
+            if (allocations != nullptr)
+            {
+                (void)allocations->insertSorted({result, numBytes});
+            }
+            return result;
+        }
+
+        virtual void releaseImpl(void* memory) override
+        {
+            if (memory != nullptr and allocations != nullptr)
+            {
+                SC_ASSERT_RELEASE(allocations->removeSorted(memory));
+            }
+            return ::free(memory);
+        }
     };
 
     struct StaticGlobals
@@ -46,9 +98,13 @@ struct SC::Globals::Internal
     }
 };
 
-void SC::Globals::init(Type type)
+void SC::Globals::init(Type type, GlobalSettings settings)
 {
-    (void)type;
+    if (settings.ownershipTrackingBytes > sizeof(SortedAllocations))
+    {
+        Internal::DefaultAllocator& defaultAllocator = Internal::getStatic(type).defaultAllocator;
+        defaultAllocator.reserveForSortedAllocations(settings.ownershipTrackingBytes);
+    }
 #if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
     if (type == Type::Global)
     {

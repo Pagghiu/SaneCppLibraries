@@ -118,7 +118,7 @@ SC::Console* globalConsole;
 int main(int argc, const char* argv[])
 {
     using namespace SC;
-    Globals::init(Globals::Global);
+    Globals::init(Globals::Global, {1024 * 1024}); // 1MB for ownership tracking
     SmallBuffer<1024 * sizeof(SC::native_char_t)> globalConsoleConversionBuffer;
     Console::tryAttachingToParentConsole();
     FileSystemDirectories directories;

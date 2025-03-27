@@ -58,7 +58,7 @@ struct SC::VirtualAllocator : public FixedAllocator
   protected:
     VirtualMemory& virtualMemory;
 
-    virtual void* allocateImpl(size_t numBytes, size_t alignment) override;
+    virtual void* allocateImpl(const void* owner, size_t numBytes, size_t alignment) override;
     virtual void* reallocateImpl(void* memory, size_t numBytes) override;
 
     void syncFixedAllocator();

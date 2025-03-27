@@ -22,7 +22,7 @@ struct SC::Memory
 
     /// @brief Change size of already allocated memory block. Existing contents of input buffer will be copied over.
     /// @param memory pointer to memory previously allocated by Memory::allocate or Memory::Reallocate
-    /// @param numBytes new size of the reallocated blck
+    /// @param numBytes new size of the reallocated block
     /// @return A new pointer of memory with size numBytes, to be freed with Memory::release
     static void* reallocate(void* memory, size_t numBytes);
 
@@ -47,7 +47,7 @@ struct SC::MemoryAllocator
     template <typename T, typename... U>
     T* allocate(U&&... u)
     {
-        T* t = reinterpret_cast<T*>(allocate(sizeof(T), alignof(T)));
+        T* t = reinterpret_cast<T*>(allocate(nullptr, sizeof(T), alignof(T)));
         if (t)
         {
             placementNew(*t, forward<U>(u)...);
@@ -58,10 +58,10 @@ struct SC::MemoryAllocator
     /// @brief Allocates numBytes bytes of memory
     /// @param numBytes Number of bytes to allocate
     /// @return Raw pointer to allocated memory, to be freed with MemoryAllocator::release
-    void* allocate(size_t numBytes, size_t alignment)
+    void* allocate(const void* owner, size_t numBytes, size_t alignment)
     {
         statistics.numAllocate += 1;
-        return allocateImpl(numBytes, alignment);
+        return allocateImpl(owner, numBytes, alignment);
     }
 
     /// @brief Change size of already allocated memory block. Existing contents of input buffer will be copied over.
@@ -85,11 +85,18 @@ struct SC::MemoryAllocator
         return releaseImpl(memory);
     }
 
-    void* userData = nullptr;
+    /// @brief Allocate virtual function to be reimplemented
+    /// @param owner Can be `nullptr` or an address belonging to a previous allocation of this allocator
+    /// @param numBytes How many bytes to allocate
+    /// @param alignment Alignment of the allocation
+    /// @return `false` if the passed not-null owner doesn't belong to this allocator or the allocation itself fails
+    virtual void* allocateImpl(const void* owner, size_t numBytes, size_t alignment) = 0;
 
-    virtual void* allocateImpl(size_t numBytes, size_t alignment) = 0;
-    virtual void* reallocateImpl(void* memory, size_t numBytes)   = 0;
-    virtual void  releaseImpl(void* memory)                       = 0;
+    /// @brief Re-allocate virtual function to be reimplemented
+    virtual void* reallocateImpl(void* memory, size_t numBytes) = 0;
+
+    /// @brief Release virtual function to be reimplemented
+    virtual void releaseImpl(void* memory) = 0;
 
     virtual ~MemoryAllocator() {}
 };
@@ -108,7 +115,7 @@ struct SC::FixedAllocator : public MemoryAllocator
     size_t lastAllocatedSize = 0;
     size_t position          = 0;
 
-    virtual void* allocateImpl(size_t numBytes, size_t alignment) override;
+    virtual void* allocateImpl(const void* owner, size_t numBytes, size_t alignment) override;
     virtual void* reallocateImpl(void* memory, size_t numBytes) override;
     virtual void  releaseImpl(void* memory) override;
 };

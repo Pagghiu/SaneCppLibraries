@@ -119,14 +119,14 @@ SC::VirtualAllocator::VirtualAllocator(VirtualMemory& virtualMemory)
     : virtualMemory(virtualMemory), FixedAllocator(nullptr, 0)
 {}
 
-void* SC::VirtualAllocator::allocateImpl(size_t numBytes, size_t alignment)
+void* SC::VirtualAllocator::allocateImpl(const void* owner, size_t numBytes, size_t alignment)
 {
     syncFixedAllocator();
-    void* fixedMemory = FixedAllocator::allocateImpl(numBytes, alignment);
+    void* fixedMemory = FixedAllocator::allocateImpl(owner, numBytes, alignment);
     if (fixedMemory == nullptr and virtualMemory.commit(virtualMemory.committedCapacityBytes + numBytes))
     {
         syncFixedAllocator();
-        return FixedAllocator::allocateImpl(numBytes, alignment);
+        return FixedAllocator::allocateImpl(owner, numBytes, alignment);
     }
     return fixedMemory;
 }

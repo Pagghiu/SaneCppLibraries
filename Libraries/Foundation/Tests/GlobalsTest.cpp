@@ -34,7 +34,7 @@ struct SC::GlobalsTest : public SC::TestCase
             {
                 alignas(uint64_t) char stackMemory[48 + sizeof(BufferTL) + sizeof(SmallBufferTL<10>)] = {0};
                 // Every new thread can initialize its set of globals too if different from defaults
-                Globals::init(Globals::ThreadLocal);
+                Globals::init(Globals::ThreadLocal, {1024}); // Available memory for ownership tracker
                 FixedAllocator fixedAllocator = {stackMemory, sizeof(stackMemory)};
                 Globals        fixedGlobals   = {fixedAllocator};
                 Globals::push(Globals::ThreadLocal, fixedGlobals);
@@ -75,6 +75,24 @@ struct SC::GlobalsTest : public SC::TestCase
         SC_TRY(appendBuffer(buffer1, "Buffer")); // Inserted on the heap
         SC_TRY(appendBuffer(buffer1, "1234"));   // Inserted on the heap
         SC_TRY(appendBuffer(buffer2, "2345"));   // Causes full copy to "heap"
+
+        // Let's create a fixed allocator that has enough space to append more to buffer
+        // but that will fail because the original buffer memory location doesn't belong
+        // to this allocator. The owner parameter of allocate is used to filter it out.
+        char           fixedBuffer[128];
+        FixedAllocator fixedAllocator = {fixedBuffer, sizeof(fixedBuffer)};
+        Globals        fixedGlobals   = {fixedAllocator};
+        Globals::push(globalsType, fixedGlobals);
+        SC_TRY(not appendBuffer(buffer2, "FAILURE")); // MUST fail
+        Globals::pop(globalsType);
+
+        // Let's now try to restore the "default allocator" (using malloc)
+        // This allocator also keeps track of all of its allocations and it will refuse
+        // to extend this buffer because of the "owner" parameter memory address not
+        // belonging to any of the allocations it knows have been produced by itself.
+        Globals* defaultGlobal = Globals::pop(globalsType);
+        SC_TRY(not appendBuffer(buffer2, "FAILURE")); // MUST fail
+        Globals::push(globalsType, *defaultGlobal);
         return true;
     }
 
