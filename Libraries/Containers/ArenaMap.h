@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/Assert.h"
+#include "../Foundation/Globals.h"
 #include "../Foundation/Memory.h"
 #include "ArenaMapKey.h"
 
@@ -30,30 +31,31 @@ struct SC::ArenaMap
     using Key = ArenaMapKey<T>;
     using Gen = typename Key::Generation;
 
-    ArenaMap() {}
+    ArenaMap(Globals::Type globalsType = Globals::Global) : globalsType(globalsType) {}
 
     ~ArenaMap() { clear(); }
 
-    ArenaMap(const ArenaMap& other) { *this = other; }
+    ArenaMap(const ArenaMap& other) : globalsType(other.globalsType) { *this = other; }
 
-    ArenaMap(ArenaMap&& other) { *this = move(other); }
+    ArenaMap(ArenaMap&& other) : globalsType(other.globalsType) { *this = move(other); }
 
     ArenaMap& operator=(const ArenaMap& other)
     {
         clear();
-        T*   newItems       = reinterpret_cast<T*>(Memory::allocate(other.itemsSize * sizeof(T), alignof(T)));
-        Gen* newGenerations = reinterpret_cast<Gen*>(Memory::allocate(other.itemsSize * sizeof(Gen), alignof(Gen)));
+        auto& allocator = Globals::get(globalsType).allocator;
+        T*    newItems  = reinterpret_cast<T*>(allocator.allocate(this, other.itemsSize * sizeof(T), alignof(T)));
+        Gen*  newGens   = reinterpret_cast<Gen*>(allocator.allocate(this, other.itemsSize * sizeof(Gen), alignof(Gen)));
         SC_ASSERT_RELEASE(newItems);
-        SC_ASSERT_RELEASE(newGenerations);
-        ::memset(newGenerations, 0, other.itemsSize * sizeof(Gen));
+        SC_ASSERT_RELEASE(newGens);
+        ::memset(newGens, 0, other.itemsSize * sizeof(Gen));
         items       = newItems;
-        generations = newGenerations;
+        generations = newGens;
         itemsSize   = other.itemsSize;
         for (size_t idx = 0; idx < other.itemsSize; ++idx)
         {
             if (other.generations[idx].used)
             {
-                new (&items[idx], PlacementNew()) T(other.items[idx]);
+                placementNew(items[idx], other.items[idx]);
             }
             generations[idx] = other.generations[idx];
         }
@@ -153,12 +155,10 @@ struct SC::ArenaMap
             }
             generations[idx].used = 0;
         }
-        if (items)
-            Memory::release(items);
+        Globals::get(globalsType).allocator.release(items);
         items     = nullptr;
         itemsSize = 0;
-        if (generations)
-            Memory::release(generations);
+        Globals::get(globalsType).allocator.release(generations);
         generations = nullptr;
         numUsed     = 0;
     }
@@ -182,21 +182,21 @@ struct SC::ArenaMap
             return false;
         if (newSize > Key::MaxIndex)
             return false;
-        if (items)
-            Memory::release(items);
+
+        Globals::get(globalsType).allocator.release(items);
         items = nullptr;
-        if (generations)
-            Memory::release(generations);
-        generations = nullptr;
-        T* newItems = reinterpret_cast<T*>(Memory::allocate(newSize * sizeof(T), alignof(T)));
-        if (not newItems)
+        Globals::get(globalsType).allocator.release(generations);
+        generations     = nullptr;
+        auto& allocator = Globals::get(globalsType).allocator;
+        T*    newItems  = reinterpret_cast<T*>(allocator.allocate(this, newSize * sizeof(T), alignof(T)));
+        if (newItems == nullptr)
             return false;
-        items               = newItems;
-        Gen* newGenerations = reinterpret_cast<Gen*>(Memory::allocate(newSize * sizeof(Gen), alignof(Gen)));
-        if (not newGenerations)
+        items        = newItems;
+        Gen* newGens = reinterpret_cast<Gen*>(allocator.allocate(this, newSize * sizeof(Gen), alignof(Gen)));
+        if (newGens == nullptr)
             return false;
-        ::memset(newGenerations, 0, newSize * sizeof(Gen));
-        generations = newGenerations;
+        ::memset(newGens, 0, newSize * sizeof(Gen));
+        generations = newGens;
         itemsSize   = newSize;
         numUsed     = 0;
         return true;
@@ -295,9 +295,11 @@ struct SC::ArenaMap
     T*     items     = nullptr;
     size_t itemsSize = 0;
 
-    typename Key::Generation* generations = nullptr;
+    Gen* generations = nullptr;
 
     uint32_t numUsed = 0;
+
+    Globals::Type globalsType;
 
     [[nodiscard]] Key allocateNewKeySlot()
     {
