@@ -259,7 +259,7 @@ template <typename T, int N>
 struct SmallVector : public Vector<T>
 {
     // clang-format off
-    SmallVector() noexcept : Vector<T>( N * sizeof(T)) {}
+    SmallVector(SegmentAllocator allocator = SegmentAllocator::Global) noexcept : Vector<T>( N * sizeof(T), allocator) {}
     ~SmallVector() noexcept {}
     SmallVector(const SmallVector& other) noexcept : SmallVector() { Vector<T>::operator=(other); }
     SmallVector(SmallVector&& other) noexcept : SmallVector() { Vector<T>::operator=(move(other)); }
@@ -270,6 +270,8 @@ struct SmallVector : public Vector<T>
     SmallVector(Vector<T>&& other) noexcept : SmallVector() { Vector<T>::operator=(move(other)); }
     SmallVector(std::initializer_list<T> list) noexcept : SmallVector() { SC_ASSERT_RELEASE(Vector<T>::assign({list.begin(), list.size()})); }
     // clang-format on
+  protected:
+    SmallVector(int num, SegmentAllocator allocator) : Vector<T>(N, allocator) { (void)num; }
 
   private:
     uint64_t inlineCapacity = N * sizeof(T);
@@ -278,6 +280,12 @@ struct SmallVector : public Vector<T>
         T inlineData[N];
     };
 };
+
+template <typename T>
+using VectorTL = detail::SegmentCustom<Vector<T>, Vector<T>, 0, SegmentAllocator::ThreadLocal>;
+template <typename T, int N>
+using SmallVectorTL = detail::SegmentCustom<SmallVector<T, N>, Vector<T>, N, SegmentAllocator::ThreadLocal>;
+
 //! @}
 
 } // namespace SC

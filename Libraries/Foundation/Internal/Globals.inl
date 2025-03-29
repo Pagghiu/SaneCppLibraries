@@ -128,10 +128,12 @@ SC::Globals* SC::Globals::pop(Type type)
     Globals* prev    = globals.current->prev;
     if (prev != nullptr)
     {
-        globals.current->prev = nullptr;
-        globals.current       = prev;
+        Globals* current = globals.current;
+        current->prev    = nullptr;
+        globals.current  = prev;
+        return current;
     }
-    return prev;
+    return nullptr;
 }
 
 SC::Globals& SC::Globals::get(Type type) { return *Internal::getStatic(type).current; }

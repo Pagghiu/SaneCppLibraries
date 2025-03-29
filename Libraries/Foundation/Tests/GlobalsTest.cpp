@@ -16,53 +16,17 @@ struct SC::GlobalsTest : public SC::TestCase
     {
         if (test_section("global"))
         {
-            alignas(uint64_t) char stackMemory[48 + sizeof(Buffer) + sizeof(SmallBuffer<10>)] = {0};
-
-            FixedAllocator fixedAllocator = {stackMemory, sizeof(stackMemory)};
-            Globals        globals        = {fixedAllocator};
-            Globals::push(Globals::Global, globals);
-            SC_TEST_EXPECT((testBuffer<Buffer, SmallBuffer<10>>(Globals::Global)));
-            Globals::pop(Globals::Global);
+            fixedGlobal();
         }
 
         if (test_section("thread-local"))
         {
-            Thread t1, t2;
-            bool   res[2] = {false, false};
-
-            auto threadLocalTest = [&](Thread& thread)
-            {
-                alignas(uint64_t) char stackMemory[48 + sizeof(BufferTL) + sizeof(SmallBufferTL<10>)] = {0};
-                // Every new thread can initialize its set of globals too if different from defaults
-                Globals::init(Globals::ThreadLocal, {1024}); // Available memory for ownership tracker
-                FixedAllocator fixedAllocator = {stackMemory, sizeof(stackMemory)};
-                Globals        fixedGlobals   = {fixedAllocator};
-                Globals::push(Globals::ThreadLocal, fixedGlobals);
-                bool tRes = testBuffer<BufferTL, SmallBufferTL<10>>(Globals::ThreadLocal);
-                if (&thread == &t1)
-                    res[0] = tRes;
-                else
-                    res[1] = tRes;
-                Globals::pop(Globals::ThreadLocal);
-            };
-            SC_TEST_EXPECT(t1.start(threadLocalTest));
-            SC_TEST_EXPECT(t2.start(threadLocalTest));
-            SC_TEST_EXPECT(t1.join());
-            SC_TEST_EXPECT(t2.join());
-            SC_TEST_EXPECT(res[0]);
-            SC_TEST_EXPECT(res[1]);
+            fixedThreadLocal();
         }
 
         if (test_section("global virtual"))
         {
-            VirtualMemory virtualMemory;
-            SC_TEST_EXPECT(virtualMemory.reserve(1024 * 1024)); // 1 MB
-            VirtualAllocator virtualAllocator = {virtualMemory};
-            Globals          virtualGlobals   = {virtualAllocator};
-            Globals::push(Globals::Global, virtualGlobals);
-            SC_TEST_EXPECT((testBuffer<Buffer, SmallBuffer<10>>(Globals::Global)));
-            SC_TEST_EXPECT(virtualMemory.release());
-            Globals::pop(Globals::Global);
+            virtualGlobal();
         }
     }
 
@@ -98,7 +62,66 @@ struct SC::GlobalsTest : public SC::TestCase
 
     // Both BufferTL and SmallBufferTL can be passed as Buffer references
     static bool appendBuffer(Buffer& buffer, Span<const char> data) { return buffer.append(data); }
+
+    void fixedGlobal();
+    void fixedThreadLocal();
+    void virtualGlobal();
 };
+
+void SC::GlobalsTest::fixedGlobal()
+{
+    alignas(uint64_t) char stackMemory[48 + sizeof(Buffer) + sizeof(SmallBuffer<10>)] = {0};
+
+    FixedAllocator fixedAllocator = {stackMemory, sizeof(stackMemory)};
+    Globals        globals        = {fixedAllocator};
+    Globals::push(Globals::Global, globals);
+    SC_TEST_EXPECT((testBuffer<Buffer, SmallBuffer<10>>(Globals::Global)));
+    Globals::pop(Globals::Global);
+}
+
+void SC::GlobalsTest::fixedThreadLocal()
+{
+    Thread t1, t2;
+    bool   res[2] = {false, false};
+
+    auto threadLocalTest = [&](Thread& thread)
+    {
+        alignas(uint64_t) char stackMemory[48 + sizeof(BufferTL) + sizeof(SmallBufferTL<10>)] = {0};
+        // Every new thread can initialize its set of globals too if different from defaults
+        Globals::init(Globals::ThreadLocal, {1024}); // Available memory for ownership tracker
+        FixedAllocator fixedAllocator = {stackMemory, sizeof(stackMemory)};
+        Globals        fixedGlobals   = {fixedAllocator};
+        Globals::push(Globals::ThreadLocal, fixedGlobals);
+        bool tRes = testBuffer<BufferTL, SmallBufferTL<10>>(Globals::ThreadLocal);
+        if (&thread == &t1)
+            res[0] = tRes;
+        else
+            res[1] = tRes;
+        Globals::pop(Globals::ThreadLocal);
+    };
+    SC_TEST_EXPECT(t1.start(threadLocalTest));
+    SC_TEST_EXPECT(t2.start(threadLocalTest));
+    SC_TEST_EXPECT(t1.join());
+    SC_TEST_EXPECT(t2.join());
+    SC_TEST_EXPECT(res[0]);
+    SC_TEST_EXPECT(res[1]);
+}
+
+void SC::GlobalsTest::virtualGlobal()
+{
+    VirtualMemory virtualMemory;
+    SC_TEST_EXPECT(virtualMemory.reserve(1024 * 1024)); // 1 MB
+    VirtualAllocator virtualAllocator = {virtualMemory};
+    Globals          virtualGlobals   = {virtualAllocator};
+    Globals::push(Globals::ThreadLocal, virtualGlobals);
+    VectorTL<char>*         v1 = Globals::get(Globals::ThreadLocal).allocator.allocate<VectorTL<char>>();
+    SmallVectorTL<char, 5>* v2 = Globals::get(Globals::ThreadLocal).allocator.allocate<SmallVectorTL<char, 5>>();
+    SC_TEST_EXPECT(v1->append({"SALVE"}));
+    SC_TEST_EXPECT(v2->append({"SALVE"}));
+    SC_TEST_EXPECT(v2->append({"SALVE2"}));
+    SC_TEST_EXPECT(virtualMemory.release());
+    Globals::pop(Globals::ThreadLocal);
+}
 
 namespace SC
 {

@@ -56,7 +56,9 @@ struct SC::MemoryAllocator
     }
 
     /// @brief Allocates numBytes bytes of memory
+    /// @param owner Memory address of the object that "owns" this allocation.
     /// @param numBytes Number of bytes to allocate
+    /// @param alignment Alignment of the allocated block of memory
     /// @return Raw pointer to allocated memory, to be freed with MemoryAllocator::release
     void* allocate(const void* owner, size_t numBytes, size_t alignment)
     {
