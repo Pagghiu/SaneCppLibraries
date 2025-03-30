@@ -24,6 +24,7 @@ Detailed documentation is in the @ref group_foundation topic.
 | SC::UniqueHandle          | @copybrief SC::UniqueHandle
 | SC::Memory                | @copybrief SC::Memory
 | SC::VirtualMemory         | @copybrief SC::VirtualMemory
+| SC::Globals               | @copybrief SC::Globals
 
 ## Macros
 - [Compiler Macros](@ref group_foundation_compiler_macros): @copybrief group_foundation_compiler_macros
@@ -63,6 +64,9 @@ Foundation provides all primitive types to be used in headers and classes like S
 
 ## VirtualMemory
 @copydoc SC::VirtualMemory
+
+## Globals
+@copydoc SC::Globals
 
 # Blog
 

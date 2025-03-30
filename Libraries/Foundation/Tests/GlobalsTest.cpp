@@ -66,6 +66,9 @@ struct SC::GlobalsTest : public SC::TestCase
     void fixedGlobal();
     void fixedThreadLocal();
     void virtualGlobal();
+
+    void globalsSnippetFixed();
+    void globalsSnippetVirtual();
 };
 
 void SC::GlobalsTest::fixedGlobal()
@@ -121,6 +124,40 @@ void SC::GlobalsTest::virtualGlobal()
     SC_TEST_EXPECT(v2->append({"SALVE2"}));
     SC_TEST_EXPECT(virtualMemory.release());
     Globals::pop(Globals::ThreadLocal);
+}
+
+void SC::GlobalsTest::globalsSnippetFixed()
+{
+    //! [GlobalsSnippetFixed]
+    alignas(uint64_t) char stackMemory[256] = {0};
+
+    FixedAllocator fixedAllocator = {stackMemory, sizeof(stackMemory)};
+    Globals        globals        = {fixedAllocator};
+    Globals::push(Globals::Global, globals);
+    // ...
+    Buffer& buffer = *Globals::get(Globals::Global).allocator.allocate<Buffer>();
+    (void)buffer.append({"ASDF"}); // Allocates from stackMemory
+    // ...
+    Globals::pop(Globals::Global);
+    //! [GlobalsSnippetFixed]
+}
+
+void SC::GlobalsTest::globalsSnippetVirtual()
+{
+    //! [GlobalsSnippetVirtual]
+    // Create a Virtual memory block that can expand up to 1 MB
+    VirtualMemory virtualMemory;
+    SC_TEST_EXPECT(virtualMemory.reserve(1024 * 1024));
+
+    VirtualAllocator virtualAllocator = {virtualMemory};
+    Globals          virtualGlobals   = {virtualAllocator};
+    Globals::push(Globals::Global, virtualGlobals);
+    // ...
+    Buffer& buffer = *Globals::get(Globals::Global).allocator.allocate<Buffer>();
+    (void)buffer.append({"ASDF"}); // Allocates from virtualMemory
+    // ...
+    Globals::pop(Globals::Global);
+    //! [GlobalsSnippetVirtual]
 }
 
 namespace SC
