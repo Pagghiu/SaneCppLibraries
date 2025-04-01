@@ -27,6 +27,7 @@ void runSmallVectorTest(TestReport& report);
 void runVectorMapTest(TestReport& report);
 void runVectorSetTest(TestReport& report);
 void runVectorTest(TestReport& report);
+void runGlobalsContainerTest(TestReport& report);
 
 // File
 void runFileTest(TestReport& report);
@@ -159,6 +160,7 @@ int main(int argc, const char* argv[])
     runVectorTest(report);
     runVectorMapTest(report);
     runVectorSetTest(report);
+    runGlobalsContainerTest(report);
 
     // Foundation extra tests
     runTaggedUnionTest(report);

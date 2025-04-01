@@ -1,11 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/PrimitiveTypes.h"
 namespace SC
 {
 struct SC_COMPILER_EXPORT GlobalSettings;
 struct SC_COMPILER_EXPORT Globals;
-struct SC_COMPILER_EXPORT MemoryAllocator;
+struct MemoryAllocator;
 } // namespace SC
 //! @addtogroup group_foundation_utility
 //! @{

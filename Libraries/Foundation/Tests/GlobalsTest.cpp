@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../Containers/Array.h"
-#include "../../Containers/Vector.h"
+// #include "../../Containers/Vector.h"
+#include "../../Foundation/Globals.h"
 #include "../../Foundation/VirtualMemory.h"
 #include "../../Testing/Testing.h"
 #include "../../Threading/Threading.h"
@@ -22,11 +22,6 @@ struct SC::GlobalsTest : public SC::TestCase
         if (test_section("thread-local"))
         {
             fixedThreadLocal();
-        }
-
-        if (test_section("global virtual"))
-        {
-            virtualGlobal();
         }
     }
 
@@ -108,22 +103,6 @@ void SC::GlobalsTest::fixedThreadLocal()
     SC_TEST_EXPECT(t2.join());
     SC_TEST_EXPECT(res[0]);
     SC_TEST_EXPECT(res[1]);
-}
-
-void SC::GlobalsTest::virtualGlobal()
-{
-    VirtualMemory virtualMemory;
-    SC_TEST_EXPECT(virtualMemory.reserve(1024 * 1024)); // 1 MB
-    VirtualAllocator virtualAllocator = {virtualMemory};
-    Globals          virtualGlobals   = {virtualAllocator};
-    Globals::push(Globals::ThreadLocal, virtualGlobals);
-    VectorTL<char>*         v1 = Globals::get(Globals::ThreadLocal).allocator.allocate<VectorTL<char>>();
-    SmallVectorTL<char, 5>* v2 = Globals::get(Globals::ThreadLocal).allocator.allocate<SmallVectorTL<char, 5>>();
-    SC_TEST_EXPECT(v1->append({"SALVE"}));
-    SC_TEST_EXPECT(v2->append({"SALVE"}));
-    SC_TEST_EXPECT(v2->append({"SALVE2"}));
-    SC_TEST_EXPECT(virtualMemory.release());
-    Globals::pop(Globals::ThreadLocal);
 }
 
 void SC::GlobalsTest::globalsSnippetFixed()
