@@ -108,6 +108,9 @@ struct SC::FixedAllocator : public MemoryAllocator
 {
     FixedAllocator(void* memory, size_t sizeInBytes);
 
+    const void*  getMemory() const { return memory; }
+    const size_t getMemoryUsedBytes() const { return position; }
+
   protected:
     // Not using a span here to avoid depending on Span<T> in this header
     void*  memory      = nullptr;

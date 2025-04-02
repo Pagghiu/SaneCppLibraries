@@ -74,12 +74,12 @@ struct SegmentTrivial
     using Type = T;
     inline static void destruct(Span<T> data) noexcept;
     // clang-format off
-    template <typename U> inline static void copyConstructAs(Span<T> data, Span<const T> value) noexcept;
-    template <typename U> inline static void copyConstruct(Span<T> data, const T* src) noexcept;
-    template <typename U> inline static void copyAssign(Span<T> data, const T* src) noexcept;
-    template <typename U> inline static void copyInsert(Span<T> data, Span<const T> values) noexcept;
-    template <typename U> inline static void moveConstruct(Span<T> data, T* src) noexcept;
-    template <typename U> inline static void moveAssign(Span<T> data, T* src) noexcept;
+    template <typename U> inline static void copyConstructAs(Span<T> data, Span<const U> value) noexcept;
+    template <typename U> inline static void copyConstruct(Span<T> data, const U* src) noexcept;
+    template <typename U> inline static void copyAssign(Span<T> data, const U* src) noexcept;
+    template <typename U> inline static void copyInsert(Span<T> data, Span<const U> values) noexcept;
+    template <typename U> inline static void moveConstruct(Span<T> data, U* src) noexcept;
+    template <typename U> inline static void moveAssign(Span<T> data, U* src) noexcept;
     // clang-format on
     inline static void remove(Span<T> data, size_t numElements) noexcept;
 };
