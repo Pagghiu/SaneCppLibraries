@@ -22,8 +22,8 @@ struct SC_COMPILER_EXPORT VirtualAllocator;
 /// \snippet Libraries/Foundation/Tests/VirtualMemoryTest.cpp VirtualMemorySnippet
 struct SC::VirtualMemory
 {
-    size_t reservedCapacityBytes  = 0; ///< Maximum amount of reserved memory that can be committed
-    size_t committedCapacityBytes = 0; ///< Current amount of committed memory
+    size_t reservedBytes  = 0; ///< Maximum amount of reserved memory that can be committed
+    size_t committedBytes = 0; ///< Current amount of committed memory
 
     void* memory = nullptr; ///< Pointer to start of reserved memory
 
@@ -31,11 +31,11 @@ struct SC::VirtualMemory
     [[nodiscard]] static size_t roundUpToPageSize(size_t size);
 
     /// @brief Obtains system memory page size
-    [[nodiscard]] static size_t getSystemPageSize();
+    [[nodiscard]] static size_t getPageSize();
 
     /// @brief Reserves a large block of virtual memory of size maxCapacityInBytes
     /// @param maxCapacityInBytes Size of the reserved amount of virtual address space
-    /// @note The actual memory reserved will be the rounded upper multiple of VirtualMemory::getSystemPageSize
+    /// @note The actual memory reserved will be the rounded upper multiple of VirtualMemory::getPageSize
     [[nodiscard]] bool reserve(size_t maxCapacityInBytes);
 
     /// @brief Reclaims the entire virtual memory block (reserved with VirtualMemory::reserve)
@@ -43,7 +43,7 @@ struct SC::VirtualMemory
 
     /// @brief Ensures at least newCapacityBytes to be committed / accessible from the large maxCapacityInBytes block
     /// @param newCapacityBytes Indicates how much of the reserved virtual address space that must be accessible
-    /// @note newCapacityBytes must smaller than reservedCapacityBytes (previously reserved by VirtualMemory::reserve)
+    /// @note newCapacityBytes must smaller than reservedBytes (previously reserved by VirtualMemory::reserve)
     [[nodiscard]] bool commit(size_t newCapacityBytes);
 
     /// @brief Reclaims all unused pages past newCapacityBytes (previously committed with VirtualMemory::commit)

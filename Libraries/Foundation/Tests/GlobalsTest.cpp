@@ -29,8 +29,8 @@ struct SC::GlobalsTest : public SC::TestCase
     [[nodiscard]] static bool testBuffer(Globals::Type globalsType)
     {
         Globals&      globals = Globals::get(globalsType);
-        BufferT&      buffer1 = *globals.allocator.allocate<BufferT>();
-        SmallBufferT& buffer2 = *globals.allocator.allocate<SmallBufferT>(buffer1);
+        BufferT&      buffer1 = *globals.allocator.create<BufferT>();
+        SmallBufferT& buffer2 = *globals.allocator.create<SmallBufferT>(buffer1);
         SC_TRY(appendBuffer(buffer1, "Buffer")); // Inserted on the heap
         SC_TRY(appendBuffer(buffer1, "1234"));   // Inserted on the heap
         SC_TRY(appendBuffer(buffer2, "2345"));   // Causes full copy to "heap"
@@ -114,7 +114,7 @@ void SC::GlobalsTest::globalsSnippetFixed()
     Globals        globals        = {fixedAllocator};
     Globals::push(Globals::Global, globals);
     // ...
-    Buffer& buffer = *Globals::get(Globals::Global).allocator.allocate<Buffer>();
+    Buffer& buffer = *Globals::get(Globals::Global).allocator.create<Buffer>();
     (void)buffer.append({"ASDF"}); // Allocates from stackMemory
     // ...
     Globals::pop(Globals::Global);
@@ -132,7 +132,7 @@ void SC::GlobalsTest::globalsSnippetVirtual()
     Globals          virtualGlobals   = {virtualAllocator};
     Globals::push(Globals::Global, virtualGlobals);
     // ...
-    Buffer& buffer = *Globals::get(Globals::Global).allocator.allocate<Buffer>();
+    Buffer& buffer = *Globals::get(Globals::Global).allocator.create<Buffer>();
     (void)buffer.append({"ASDF"}); // Allocates from virtualMemory
     // ...
     Globals::pop(Globals::Global);

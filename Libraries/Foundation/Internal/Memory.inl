@@ -15,13 +15,13 @@ void  SC::Memory::release(void* allocatedMemory) { return Globals::get(Globals::
 //------------------------------------------------------------------------------------------------------------------
 // FixedAllocator
 //------------------------------------------------------------------------------------------------------------------
-SC::FixedAllocator::FixedAllocator(void* memory, size_t sizeInBytes) : memory(memory), sizeInBytes(sizeInBytes) {}
+SC::FixedAllocator::FixedAllocator(void* memory, size_t capacityBytes) : memory(memory), capacityBytes(capacityBytes) {}
 
 void* SC::FixedAllocator::allocateImpl(const void* owner, size_t numBytes, size_t alignment)
 {
-    if (owner != nullptr and (owner < memory or owner >= static_cast<char*>(memory) + sizeInBytes))
+    if (owner != nullptr and (owner < memory or owner >= static_cast<char*>(memory) + capacityBytes))
         return nullptr;
-    if (position + numBytes <= sizeInBytes)
+    if (position + numBytes <= capacityBytes)
     {
         auto alignPointer = [](void* ptr, size_t alignment)
         {
@@ -51,7 +51,7 @@ void* SC::FixedAllocator::reallocateImpl(void* allocatedMemory, size_t numBytes)
             lastAllocatedSize = numBytes;
             return allocatedMemory;
         }
-        else if (position + numBytes - lastAllocatedSize <= sizeInBytes)
+        else if (position + numBytes - lastAllocatedSize <= capacityBytes)
         {
             position += numBytes - lastAllocatedSize;
             lastAllocatedSize = numBytes;

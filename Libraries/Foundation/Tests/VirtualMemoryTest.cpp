@@ -30,8 +30,8 @@ void SC::VirtualMemoryTest::virtualMemory()
     // This test uses two pages initially and just one page later
     // On Windows and Linux default Page size is typically 4Kb
     // On macOS default page size is typically 16 Kb
-    const size_t moreThanOnePageSize = VirtualMemory::getSystemPageSize() + 1024;
-    const size_t lessThanOnePageSize = VirtualMemory::getSystemPageSize() - 1024;
+    const size_t moreThanOnePageSize = VirtualMemory::getPageSize() + 1024;
+    const size_t lessThanOnePageSize = VirtualMemory::getPageSize() - 1024;
     SC_TEST_EXPECT(lessThanOnePageSize > 0); // sanity check just in case
 
     void* reference = Memory::allocate(moreThanOnePageSize, 1);
@@ -41,7 +41,7 @@ void SC::VirtualMemoryTest::virtualMemory()
     VirtualMemory virtualMemory;
 
     // Reserve 2 pages of virtual memory
-    SC_TEST_EXPECT(virtualMemory.reserve(2 * VirtualMemory::getSystemPageSize()));
+    SC_TEST_EXPECT(virtualMemory.reserve(2 * VirtualMemory::getPageSize()));
 
     // Request to use less than one page of virtual memory
     SC_TEST_EXPECT(virtualMemory.commit(lessThanOnePageSize));

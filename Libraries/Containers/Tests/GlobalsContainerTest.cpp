@@ -31,8 +31,8 @@ void SC::GlobalsContainerTest::virtualGlobal()
     VirtualAllocator virtualAllocator = {virtualMemory};
     Globals          virtualGlobals   = {virtualAllocator};
     Globals::push(Globals::ThreadLocal, virtualGlobals);
-    VectorTL<char>*         v1 = Globals::get(Globals::ThreadLocal).allocator.allocate<VectorTL<char>>();
-    SmallVectorTL<char, 5>* v2 = Globals::get(Globals::ThreadLocal).allocator.allocate<SmallVectorTL<char, 5>>();
+    VectorTL<char>*         v1 = Globals::get(Globals::ThreadLocal).allocator.create<VectorTL<char>>();
+    SmallVectorTL<char, 5>* v2 = Globals::get(Globals::ThreadLocal).allocator.create<SmallVectorTL<char, 5>>();
     SC_TEST_EXPECT(v1->append({"SALVE"}));
     SC_TEST_EXPECT(v2->append({"SALVE"}));
     SC_TEST_EXPECT(v2->append({"SALVE2"}));

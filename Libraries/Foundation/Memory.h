@@ -45,7 +45,7 @@ struct SC::MemoryAllocator
 
     /// @brief Allocate and construct an object of type `T` using this allocator
     template <typename T, typename... U>
-    T* allocate(U&&... u)
+    T* create(U&&... u)
     {
         T* t = reinterpret_cast<T*>(allocate(nullptr, sizeof(T), alignof(T)));
         if (t)
@@ -106,15 +106,16 @@ struct SC::MemoryAllocator
 /// @brief A MemoryAllocator implementation using a finite slice of memory
 struct SC::FixedAllocator : public MemoryAllocator
 {
-    FixedAllocator(void* memory, size_t sizeInBytes);
+    FixedAllocator(void* memory, size_t capacityBytes);
 
-    const void*  getMemory() const { return memory; }
-    const size_t getMemoryUsedBytes() const { return position; }
+    const void*  data() const { return memory; }
+    const size_t size() const { return position; }
+    const size_t capacity() const { return capacityBytes; }
 
   protected:
     // Not using a span here to avoid depending on Span<T> in this header
-    void*  memory      = nullptr;
-    size_t sizeInBytes = 0;
+    void*  memory        = nullptr;
+    size_t capacityBytes = 0;
 
     void*  lastAllocation    = nullptr;
     size_t lastAllocatedSize = 0;
