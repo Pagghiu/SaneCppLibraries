@@ -17,9 +17,9 @@ struct SC::Segment<VTable>::Internal
         return Globals::get(Globals::Type(header.allocatorType)).allocator.release(memory);
     }
 
-    static void* allocateMemory(const detail::SegmentHeader& header, size_t capacityBytes) noexcept
+    static void* allocateMemory(const detail::SegmentHeader& header, size_t capacityBytes, void* owner) noexcept
     {
-        return Globals::get(Globals::Type(header.allocatorType)).allocator.allocate(&header, capacityBytes, alignof(T));
+        return Globals::get(Globals::Type(header.allocatorType)).allocator.allocate(owner, capacityBytes, alignof(T));
     }
 
     static void* reallocateMemory(const detail::SegmentHeader& header, void* data, size_t capacityBytes) noexcept
@@ -27,12 +27,12 @@ struct SC::Segment<VTable>::Internal
         return Globals::get(Globals::Type(header.allocatorType)).allocator.reallocate(data, capacityBytes);
     }
 
-    static T* allocate(Segment& segment, size_t capacityBytes) noexcept
+    static T* allocate(Segment& segment, size_t capacityBytes, void* owner) noexcept
     {
         void* newData = nullptr;
         if SC_LANGUAGE_IF_CONSTEXPR (not VTable::IsArray)
         {
-            newData = Internal::allocateMemory(segment.header, capacityBytes);
+            newData = Internal::allocateMemory(segment.header, capacityBytes, owner);
             if (newData)
             {
                 segment.header.capacityBytes = static_cast<uint32_t>(capacityBytes);
@@ -55,7 +55,7 @@ struct SC::Segment<VTable>::Internal
             else
             {
                 // TODO: Room for optimization for memcpy-able objects (a >= subset than trivially copyable)
-                newData = reinterpret_cast<T*>(Internal::allocateMemory(segment.header, capacityBytes));
+                newData = reinterpret_cast<T*>(Internal::allocateMemory(segment.header, capacityBytes, &segment));
                 if (newData != nullptr)
                 {
                     VTable::template moveConstruct<T>({newData, selfSpan.sizeInElements()}, selfSpan.data());
@@ -88,7 +88,8 @@ struct SC::Segment<VTable>::Internal
     }
 
     template <typename Construct, typename Assign, typename U>
-    static bool assignInternal(Construct constructFunc, Assign assignFunc, Segment& segment, Span<U> span) noexcept
+    static bool assignInternal(Construct constructFunc, Assign assignFunc, Segment& segment, Span<U> span,
+                               void* owner) noexcept
     {
         const size_t newSize     = span.sizeInElements();
         T*           segmentData = segment.data();
@@ -99,7 +100,7 @@ struct SC::Segment<VTable>::Internal
                 VTable::destruct(segment.toSpan());
                 Internal::releaseMemory(segment.header, segmentData);
             }
-            T* newData = Internal::allocate(segment, span.sizeInBytes());
+            T* newData = Internal::allocate(segment, span.sizeInBytes(), owner);
             segment.setData(newData);
             if (newData == nullptr)
             {
@@ -152,6 +153,17 @@ SC::Segment<VTable>::Segment(uint32_t capacityInBytes, SegmentAllocator allocato
     if (capacityInBytes > 0)
     {
         VTable::setData(VTable::getInlineData());
+    }
+}
+
+template <typename VTable>
+SC::Segment<VTable>::Segment(std::initializer_list<T> list) noexcept : Segment()
+{
+    // This is not ideal but we miss an appendMove or assignMove with Span overload
+    SC_ASSERT_RELEASE(reserve(list.size()));
+    for (size_t idx = 0; idx < list.size(); ++idx)
+    {
+        SC_ASSERT_RELEASE(push_back(move(list.begin()[idx])));
     }
 }
 
@@ -278,7 +290,8 @@ bool SC::Segment<VTable>::reserve(size_t capacity) noexcept
 
     const bool wasInline = VTable::isInline();
     const bool mustAlloc = VTable::header.capacityBytes == 0 or wasInline;
-    T* newData = mustAlloc ? Internal::allocate(*this, capacityBytes) : Internal::reallocate(*this, capacityBytes);
+    T*         newData   = mustAlloc ? Internal::allocate(*this, capacityBytes, wasInline ? this : nullptr)
+                                     : Internal::reallocate(*this, capacityBytes);
     VTable::setData(newData);
     if (newData == nullptr)
     {
@@ -320,7 +333,7 @@ bool SC::Segment<VTable>::assignMove(Segment<VTable2>&& other) noexcept
     {
         // we cannot steal segment but only copy it (move-assign)
         if (not Internal::assignInternal(&VTable::template moveConstruct<U>, &VTable::template moveAssign<U>, *this,
-                                         otherSpan))
+                                         otherSpan, this))
         {
             return false;
         }
@@ -403,7 +416,8 @@ bool SC::Segment<VTable>::assign(Span<const U> span) noexcept
         Internal::releaseInternal(*this);
         return true;
     }
-    return Internal::assignInternal(&VTable::template copyConstruct<U>, &VTable::template copyAssign<U>, *this, span);
+    return Internal::assignInternal(&VTable::template copyConstruct<U>, &VTable::template copyAssign<U>, *this, span,
+                                    this);
 }
 
 template <typename VTable>

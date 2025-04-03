@@ -124,8 +124,8 @@ struct Segment : public VTable
 
     // clang-format off
     template <typename U = T> Segment(Span<const U> span) noexcept : Segment() { SC_ASSERT_RELEASE(assign(span)); }
-    Segment(std::initializer_list<T> list) noexcept : Segment() { SC_ASSERT_RELEASE(assign<T>({list.begin(), list.size()})); }
     // clang-format on
+    Segment(std::initializer_list<T> list) noexcept;
 
     /// @brief Re-allocates to the requested new size, preserving its contents
     /// @note To restore link with an inline buffer, resize to its capacity (or less) and call Segment::shrink

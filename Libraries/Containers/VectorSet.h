@@ -32,7 +32,7 @@ struct SC::VectorSet
 
     /// @brief Check if the given Value exists in the VectorSet
     template <typename ComparableToValue>
-    [[nodiscard]] bool contains(const ComparableToValue& value)
+    [[nodiscard]] bool contains(const ComparableToValue& value) const
     {
         return items.contains(value);
     }
