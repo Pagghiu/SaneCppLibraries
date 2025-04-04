@@ -277,6 +277,11 @@ template <typename T> constexpr T&& forward(typename TypeTraits::RemoveReference
     static_assert(!TypeTraits::IsLValueReference<T>::value, "Forward an rvalue as an lvalue is not allowed");
     return static_cast<T&&>(value);
 }
+#if SC_COMPILER_MSVC && !SC_LANGUAGE_CPP_AT_LEAST_17
+template <typename T> [[nodiscard]] constexpr T* launder(T* p) noexcept { return p; } // We're in UB-land
+#else
+template <typename T> [[nodiscard]] constexpr T* launder(T* p) noexcept { return __builtin_launder(p); }
+#endif
 
 /// Swaps the values of two objects.
 template <typename T> constexpr inline void swap(T& t1, T& t2)
@@ -303,5 +308,5 @@ template <typename T> constexpr const T& max(const T& t1, const T& t2) { return 
 
 //! @}
 
-}
+} // namespace SC
 // clang-format on
