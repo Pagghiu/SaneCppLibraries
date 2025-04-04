@@ -30,6 +30,9 @@ struct SC::GlobalSettings
 ///
 /// Example (Virtual Allocator):
 /// \snippet Libraries/Foundation/Tests/GlobalsTest.cpp GlobalsSnippetVirtual
+///
+/// Example (Memory dump):
+/// \snippet Libraries/Containers/Tests/GlobalsContainerTest.cpp GlobalContainerVirtualMemoryDumpSnippet
 struct SC::Globals
 {
     enum Type
