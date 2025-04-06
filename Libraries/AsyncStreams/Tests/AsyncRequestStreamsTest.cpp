@@ -114,7 +114,7 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     {
         referenceData[size_t(idx)] = idx;
     }
-    const auto spanOfChars = referenceData.toSpanConst().reinterpret_as_array_of<const char>();
+    const auto spanOfChars = referenceData.toSpanConst().reinterpret_as_span_of<const char>();
     SC_TEST_EXPECT(fs.write(readablePath.view(), spanOfChars));
 
     // Setup Async Event Loop
@@ -172,7 +172,7 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     Buffer writableData;
     SC_TEST_EXPECT(fs.read(writeablePath.view(), writableData));
 
-    Span<const uint64_t> writtenData = writableData.toSpanConst().reinterpret_as_array_of<const uint64_t>();
+    Span<const uint64_t> writtenData = writableData.toSpanConst().reinterpret_as_span_of<const uint64_t>();
 
     SC_TEST_EXPECT(writtenData.sizeInBytes() == referenceData.toSpanConst().sizeInBytes());
 
@@ -214,7 +214,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
     SC_TEST_EXPECT(fs.removeFileIfExists("source.txt"));
     SC_TEST_EXPECT(fs.removeFileIfExists("destination.txt"));
-    SC_TEST_EXPECT(fs.write("source.txt", source.toSpanConst().reinterpret_as_array_of<const char>()));
+    SC_TEST_EXPECT(fs.write("source.txt", source.toSpanConst().reinterpret_as_span_of<const char>()));
 
     // Create Event Loop
     AsyncEventLoop eventLoop;

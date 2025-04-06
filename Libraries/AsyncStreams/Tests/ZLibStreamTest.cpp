@@ -108,7 +108,7 @@ void SC::ZLibStreamTest::syncCompression(ZLibStream::Algorithm compressionAlgori
 void SC::ZLibStreamTest::syncDecompression(ZLibStream::Algorithm algorithm, const StringView referenceString,
                                            const Span<const uint8_t> compressedReference)
 {
-    const Span<const char> reference = compressedReference.reinterpret_as_array_of<const char>();
+    const Span<const char> reference = compressedReference.reinterpret_as_span_of<const char>();
 
     ZLibStream compressor;
     SC_TEST_EXPECT(compressor.init(algorithm));

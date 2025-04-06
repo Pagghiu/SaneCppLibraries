@@ -69,6 +69,7 @@ void SC::GlobalsContainerTest::virtualMemoryDump()
         String         singleString;
         NestedStruct   nestedStruct;
     };
+
     Buffer memoryDump;
 
     // Setup a Virtual Memory allocator with the max upper memory bound
@@ -101,7 +102,9 @@ void SC::GlobalsContainerTest::virtualMemoryDump()
     // -----------------------------------------------------------------------------
     // Obtain a read-only view over ComplexStruct by re-interpreting the memory dump
     // NOTE: There's no need to call ComplexStruct destructor at end of scope
-    // WARN: Using a different struct type or layout than the dumped one is UB
+    // WARN: start_lifetime_as obtains a ComplexStruct with proper lifetime.
+    // It works on all tested compilers (debug and release) but it's not technically
+    // UB-free as ComplexStruct is not implicit-lifetime.
     // -----------------------------------------------------------------------------
     const Span<const void> span     = memoryDump.toSpanConst();
     const ComplexStruct&   readonly = *span.start_lifetime_as<const ComplexStruct>();

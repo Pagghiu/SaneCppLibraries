@@ -47,7 +47,7 @@ template <typename T>
 template <typename U>
 inline void SC::detail::SegmentTrivial<T>::copyInsert(Span<T> data, Span<const U> values) noexcept
 {
-    ::memmove(data.template reinterpret_as_array_of<char>().data() + values.sizeInBytes(), data.data(),
+    ::memmove(data.template reinterpret_as_span_of<char>().data() + values.sizeInBytes(), data.data(),
               data.sizeInBytes());
     ::memmove(data.data(), values.data(), values.sizeInBytes());
 }
@@ -69,5 +69,5 @@ inline void SC::detail::SegmentTrivial<T>::moveAssign(Span<T> data, U* src) noex
 template <typename T>
 inline void SC::detail::SegmentTrivial<T>::remove(Span<T> data, size_t numElements) noexcept
 {
-    ::memmove(data.data(), data.template reinterpret_as_array_of<char>().data() + numElements, numElements);
+    ::memmove(data.data(), data.template reinterpret_as_span_of<char>().data() + numElements, numElements);
 }

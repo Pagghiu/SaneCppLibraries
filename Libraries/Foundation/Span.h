@@ -89,10 +89,10 @@ struct SC::Span
     [[nodiscard]] static Span<Type> reinterpret_bytes(VoidType* rawMemory, SizeType sizeInBytes) { return Span(reinterpret_cast<Type*>(rawMemory), sizeInBytes / detail::SpanSizeOfType<Type>::size); }
 
     /// @brief Reinterprets the current span as an array of the specified type
-    template <typename T> [[nodiscard]] Span<const T> reinterpret_as_array_of() const { return Span<const T>(reinterpret_cast<const T*>(items), sizeInBytes() / sizeof(T)); }
+    template <typename T> [[nodiscard]] Span<const T> reinterpret_as_span_of() const { return Span<const T>(reinterpret_cast<const T*>(items), sizeInBytes() / sizeof(T)); }
 
     /// @brief Reinterprets the current span as an array of the specified type
-    template <typename T> [[nodiscard]] Span<T> reinterpret_as_array_of() { return Span<T>(reinterpret_cast<T*>(items), sizeInBytes() / sizeof(T)); }
+    template <typename T> [[nodiscard]] Span<T> reinterpret_as_span_of() { return Span<T>(reinterpret_cast<T*>(items), sizeInBytes() / sizeof(T)); }
 
     template <typename T> [[nodiscard]] T* start_lifetime_as_array() const noexcept
     {

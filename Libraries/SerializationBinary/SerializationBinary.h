@@ -194,7 +194,7 @@ struct SerializationBinary
         Span<const char> typeInfos;
         SC_TRY(buffer.sliceStartLength(sizeof(numInfos), numInfos * sizeof(Reflection::TypeInfo), typeInfos));
         Span<const Reflection::TypeInfo> serializedSchema =
-            typeInfos.reinterpret_as_array_of<const Reflection::TypeInfo>();
+            typeInfos.reinterpret_as_span_of<const Reflection::TypeInfo>();
 
         constexpr auto sourceSchema = Reflection::Schema::template compile<T>().typeInfos;
 
