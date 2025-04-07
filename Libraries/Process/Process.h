@@ -11,6 +11,7 @@ namespace SC
 {
 struct SC_COMPILER_EXPORT Process;
 struct SC_COMPILER_EXPORT ProcessChain;
+struct SC_COMPILER_EXPORT ProcessFork;
 struct ProcessID;
 struct ProcessEnvironment;
 } // namespace SC
@@ -267,7 +268,7 @@ struct SC::Process
     Process* next = nullptr;
     Process* prev = nullptr;
     struct Internal;
-
+    friend struct ProcessFork;
     Result launchImplementation();
 };
 
@@ -358,7 +359,85 @@ struct SC::ProcessEnvironment
     StringView envStrings[MAX_ENVIRONMENTS];
     wchar_t*   environment = nullptr;
 #else
-    char** environment = nullptr;
+    char**    environment = nullptr;
 #endif
+};
+
+/// @brief Forks current process exiting child at end of process
+/// A _fork_ duplicates a _parent_ process execution state, os handles and private memory.
+///
+/// Its semantics are quite differents from platform to platform but on its most common denominator
+/// it can be used to carry on "background" operations on snapshots of current program memory.
+/// One relevant use case is serializing to disk or network a live, complex and large data structure.
+/// Without the fork the program should either:
+///
+/// 1. Duplicate all the data, to snapshot it in a given instant, and keep it around for Async IO
+/// 2. Block program execution and write the live datastructure until all IO is finished
+///
+/// Fork avoids memory duplication because it will be shared through Copy On Write (COW) mechanisms.
+/// COW ensures that un-modified duplicated memory pages will not occupy additional Physical RAM.
+///
+/// A pair of pipes makes it easy to do some coordination between parent and forked process.
+///
+/// @warning There are really MANY caveats when forking that one should be aware of:
+/// 1. Many API will just not work as expected on the forked process, especially on Windows
+/// 2. Limit API calls in forked process to console IO, network and file I/O (avoid GUI / Graphics)
+/// 3. All threads other than the current one will be suspended in child process (beware of deadlocks)
+/// 4. Create Sockets and FileDescriptors with Inheritable flags if you need them in fork process
+///
+/// Example: Fork current process modifying memory in forked process leaving parent's one unmodified.
+/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessFork
+struct SC::ProcessFork
+{
+    ProcessFork();
+    ~ProcessFork();
+    ProcessFork(const ProcessFork&)            = delete;
+    ProcessFork* operator=(const ProcessFork&) = delete;
+
+    enum Side
+    {
+        ForkParent, ///< Parent side of the fork
+        ForkChild,  ///< Child side of the fork
+    };
+
+    /// @brief Obtain process parent / fork side
+    [[nodiscard]] Side getSide() const { return side; }
+
+    enum State
+    {
+        Suspended, ///< Start the forked process suspended (resume it with ProcessFork::resumeChildFork)
+        Immediate, ///< Start the forked process immediately
+    };
+
+    /// @brief Forks current process (use ForkProcess::getType to know the side)
+    Result fork(State state);
+
+    /// @brief Sends 1 byte on parentToFork to resume State::Paused child fork
+    Result resumeChildFork();
+
+    /// @brief Waits for child fork to finish execution
+    Result waitForChild();
+
+    /// @brief Gets the return code from the exited child fork
+    int32_t getExitStatus() const { return exitStatus.status; }
+
+    /// @brief Gets the descriptor to "write" something to the other side
+    FileDescriptor& getWritePipe();
+
+    /// @brief Gets the descriptor to "read" something from the other side
+    FileDescriptor& getReadPipe();
+
+  private:
+    Side side = ForkParent;
+#if SC_PLATFORM_WINDOWS
+    detail::ProcessDescriptorDefinition::Handle processHandle = detail::ProcessDescriptorDefinition::Invalid;
+    detail::ProcessDescriptorDefinition::Handle threadHandle  = detail::ProcessDescriptorDefinition::Invalid;
+#else
+    ProcessID processID;
+#endif
+    ProcessDescriptor::ExitStatus exitStatus; ///< Exit status code returned after child fork exits
+
+    PipeDescriptor parentToFork; ///< Pipe to write from parent and read in fork
+    PipeDescriptor forkToParent; ///< Pipe to write from fork and read in parent
 };
 //! @}

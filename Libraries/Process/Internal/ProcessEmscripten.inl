@@ -16,3 +16,8 @@ bool       SC::Process::isWindowsConsoleSubsystem() { return false; }
 SC::ProcessEnvironment::ProcessEnvironment() {}
 SC::ProcessEnvironment::~ProcessEnvironment() {}
 bool SC::ProcessEnvironment::get(size_t, StringView&, StringView&) const { return true; }
+SC::ProcessFork::ProcessFork() {}
+SC::ProcessFork::~ProcessFork() {}
+SC::Result SC::ProcessFork::waitForChild() { return Result(true); }
+SC::Result SC::ProcessFork::resumeChildFork() { return Result(true); }
+SC::Result SC::ProcessFork::fork(State) { return Result(true); }

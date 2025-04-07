@@ -20,14 +20,14 @@
 extern char** environ;
 #endif
 
-namespace SC
-{
-} // namespace SC
 SC::Result SC::detail::ProcessDescriptorDefinition::releaseHandle(pid_t& handle)
 {
     handle = Invalid;
     return Result(true);
 }
+//-----------------------------------------------------------------------------------------------------------------------
+// ProcessEnvironment
+//-----------------------------------------------------------------------------------------------------------------------
 
 SC::size_t SC::Process::getNumberOfProcessors()
 {
@@ -100,26 +100,28 @@ struct SC::Process::Internal
 
         return Result(true);
     }
+
+    static Result waitForPid(int pid, int& status)
+    {
+        status = -1;
+        pid_t waitPid;
+        do
+        {
+            waitPid = ::waitpid(pid, &status, 0);
+        } while (waitPid == -1 and errno == EINTR);
+        if (waitPid == -1)
+        {
+            return Result::Error("Process::waitForExitSync - waitPid failed");
+        }
+        if (WIFEXITED(status) != 0)
+        {
+            status = WEXITSTATUS(status);
+        }
+        return Result(true);
+    }
 };
 
-SC::Result SC::Process::waitForExitSync()
-{
-    int   status = -1;
-    pid_t waitPid;
-    do
-    {
-        waitPid = ::waitpid(processID.pid, &status, 0);
-    } while (waitPid == -1 and errno == EINTR);
-    if (waitPid == -1)
-    {
-        return Result::Error("Process::waitForExitSync - waitPid failed");
-    }
-    if (WIFEXITED(status) != 0)
-    {
-        exitStatus.status = WEXITSTATUS(status);
-    }
-    return Result(true);
-}
+SC::Result SC::Process::waitForExitSync() { return Internal::waitForPid(processID.pid, exitStatus.status); }
 
 SC::Result SC::Process::launchImplementation()
 {
@@ -307,6 +309,9 @@ SC::Result SC::Process::formatArguments(Span<const StringView> params)
     return Result(true);
 }
 
+//-----------------------------------------------------------------------------------------------------------------------
+// ProcessEnvironment
+//-----------------------------------------------------------------------------------------------------------------------
 SC::ProcessEnvironment::ProcessEnvironment()
 {
     environment = environ;
@@ -335,4 +340,90 @@ bool SC::ProcessEnvironment::get(size_t index, StringView& name, StringView& val
         value = tokenizer.remaining;
     }
     return true;
+}
+
+//-----------------------------------------------------------------------------------------------------------------------
+// ProcessFork
+//-----------------------------------------------------------------------------------------------------------------------
+SC::ProcessFork::ProcessFork() {}
+
+SC::ProcessFork::~ProcessFork()
+{
+    (void)parentToFork.close();
+    (void)forkToParent.close();
+    if (side == ForkChild)
+    {
+        ::_exit(processID.pid < 0 ? EXIT_FAILURE : EXIT_SUCCESS);
+    }
+}
+
+SC::FileDescriptor& SC::ProcessFork::getWritePipe()
+{
+    return side == ForkChild ? forkToParent.writePipe : parentToFork.writePipe;
+}
+
+SC::FileDescriptor& SC::ProcessFork::getReadPipe()
+{
+    return side == ForkChild ? parentToFork.readPipe : forkToParent.readPipe;
+}
+
+SC::Result SC::ProcessFork::waitForChild()
+{
+    if (side == ForkChild)
+    {
+        ::_exit(EXIT_FAILURE);
+    }
+    if (processID.pid < 0)
+    {
+        return Result::Error("waitForChild");
+    }
+    return Process::Internal::waitForPid(processID.pid, exitStatus.status);
+}
+
+SC::Result SC::ProcessFork::resumeChildFork()
+{
+    if (side == ForkChild)
+    {
+        ::_exit(EXIT_FAILURE);
+    }
+    char cmd = 0;
+    SC_TRY(parentToFork.writePipe.write({&cmd, 1}));
+    return Result(true);
+}
+
+SC::Result SC::ProcessFork::fork(State state)
+{
+    // Create a CLOSE_ON_EXEC pipe (non-inheritable) to communicate with forked child
+    SC_TRY(parentToFork.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteNonInheritable));
+    SC_TRY(forkToParent.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteNonInheritable));
+    int pid = ::fork();
+    if (pid < 0)
+    {
+        processID.pid = pid;
+        return Result::Error("fork failed");
+    }
+
+    // Check parent / child branch
+    if (pid == 0)
+    {
+        // Child branch
+        side = ForkChild;
+        switch (state)
+        {
+        case Suspended: {
+            char       cmd = 0;
+            Span<char> actuallyRead;
+            SC_TRY(parentToFork.readPipe.read({&cmd, 1}, actuallyRead));
+        }
+        break;
+        case Immediate: break;
+        }
+    }
+    else
+    {
+        // parent branch
+        side = ForkParent;
+    }
+    processID.pid = pid;
+    return Result(true);
 }

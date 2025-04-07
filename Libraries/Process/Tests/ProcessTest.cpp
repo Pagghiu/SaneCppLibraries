@@ -3,6 +3,7 @@
 #include "../Process.h"
 #include "../../Async/Async.h"
 #include "../../File/File.h"
+#include "../../FileSystem/FileSystem.h"
 #include "../../Testing/Testing.h"
 
 namespace SC
@@ -53,6 +54,10 @@ struct SC::ProcessTest : public SC::TestCase
         {
             processEnvironmentPrint();
         }
+        if (test_section("Process fork"))
+        {
+            processFork();
+        }
 #if SC_XCTEST
 #else
         // These tests cannot be run when tests are compiled to a dylib under XCTest
@@ -83,6 +88,7 @@ struct SC::ProcessTest : public SC::TestCase
     void processEnvironmentNewVar();
     void processEnvironmentRedefineParentVar();
     void processEnvironmentDisableInheritance();
+    void processFork();
 
     Result spawnChildAndPrintEnvironmentVars(Process& process, String& output);
 
@@ -340,6 +346,73 @@ void SC::ProcessTest::processEnvironmentDisableInheritance()
     // PATH env var doesn't exist because of Process::inheritParentEnvironmentVariables(false)
     SC_TEST_EXPECT(not output.view().containsString("PATH="));
     //! [ProcessEnvironmentDisableInheritance]
+}
+
+void SC::ProcessTest::processFork()
+{
+    //! [ProcessFork]
+    // Cross-platform lightweight clone of current process, sharing memory
+    // but keeping any modification after clone "private" (Copy-On-Write).
+    // Achieved using "fork" on Posix and "RtlCloneUserProcess" on Windows.
+    StringView sharedTag = "INITIAL";
+    StringView parentTag = "PARENT";
+    StringView saveFile  = "ForkSaveFile.txt";
+
+    // The string will be duplicated using Copy-On-Write (COW)
+    String shared = sharedTag;
+
+    // CLONE current process, starting child fork in Suspended state
+    // Forked process will be terminated by ProcessFork destructor
+    ProcessFork fork;
+    SC_TEST_EXPECT(fork.fork(ProcessFork::Suspended));
+
+    // After fork program must check if it's on fork or parent side
+    switch (fork.getSide())
+    {
+    case ProcessFork::ForkChild: {
+        report.console.printLine("FORKED process");
+        report.console.print("FORKED Shared={0}\n", shared);
+
+        // Write the "shared" memory snapshot to the file system
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+        SC_TEST_EXPECT(fs.writeString(saveFile, shared.view()));
+
+        // Send (as a signal) modified string contents back to Parent
+        SC_TEST_EXPECT(fork.getWritePipe().write({shared.view().toCharSpan()}));
+    }
+    break;
+    case ProcessFork::ForkParent: {
+        report.console.printLine("PARENT process");
+        // Check initial state to be "INITIAL" and modify shared = "PARENT"
+        report.console.print("PARENT Shared={0}\n", shared);
+        SC_TEST_EXPECT(shared == sharedTag and "PARENT");
+        shared = parentTag;
+
+        // Resume suspended fork verifying that on its side shared == "INITIAL"
+        SC_TEST_EXPECT(fork.resumeChildFork());
+        char       string[255] = {0};
+        Span<char> received;
+        SC_TEST_EXPECT(fork.getReadPipe().read(string, received));
+        StringView stringFromFork(received, true, StringEncoding::Ascii);
+        report.console.print("PARENT received={0}\n", stringFromFork);
+        SC_TEST_EXPECT(stringFromFork == sharedTag);
+
+        // Check creation of "save file" by fork and verify its content too
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+        String savedData;
+        SC_TEST_EXPECT(fs.read(saveFile, savedData, StringEncoding::Ascii));
+        SC_TEST_EXPECT(savedData == sharedTag);
+        SC_TEST_EXPECT(fs.removeFile(saveFile));
+
+        // Optionally wait for child process to exit and check its status
+        SC_TEST_EXPECT(fork.waitForChild());
+        SC_TEST_EXPECT(fork.getExitStatus() == 0);
+    }
+    break;
+    }
+    //! [ProcessFork]
 }
 
 SC::Result SC::ProcessTest::quickSheet()

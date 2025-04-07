@@ -16,6 +16,9 @@ SC::Result SC::detail::ProcessDescriptorDefinition::releaseHandle(HANDLE& handle
         return Result::Error("ProcessNativeHandleClose - CloseHandle failed");
     return Result(true);
 }
+//-----------------------------------------------------------------------------------------------------------------------
+// Process
+//-----------------------------------------------------------------------------------------------------------------------
 
 bool SC::Process::isWindowsConsoleSubsystem() { return ::GetStdHandle(STD_OUTPUT_HANDLE) == NULL; }
 
@@ -170,6 +173,9 @@ SC::Result SC::Process::formatArguments(Span<const StringView> params)
     return Result(true);
 }
 
+//-----------------------------------------------------------------------------------------------------------------------
+// ProcessEnvironment
+//-----------------------------------------------------------------------------------------------------------------------
 SC::ProcessEnvironment::ProcessEnvironment()
 {
     environment  = ::GetEnvironmentStringsW();
@@ -200,4 +206,222 @@ bool SC::ProcessEnvironment::get(size_t index, StringView& name, StringView& val
         value = tokenizer.remaining;
     }
     return true;
+}
+
+//-----------------------------------------------------------------------------------------------------------------------
+// ProcessFork
+//-----------------------------------------------------------------------------------------------------------------------
+#if SC_PLATFORM_WINDOWS
+#include <winternl.h>
+#if SC_COMPILER_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4201)
+#endif
+extern "C"
+{
+    typedef struct _SECTION_IMAGE_INFORMATION
+    {
+        PVOID  TransferAddress;
+        ULONG  ZeroBits;
+        SIZE_T MaximumStackSize;
+        SIZE_T CommittedStackSize;
+        ULONG  SubSystemType;
+        union
+        {
+            struct
+            {
+                USHORT SubSystemMinorVersion;
+                USHORT SubSystemMajorVersion;
+            };
+            ULONG SubSystemVersion;
+        };
+        union
+        {
+            struct
+            {
+                USHORT MajorOperatingSystemVersion;
+                USHORT MinorOperatingSystemVersion;
+            };
+            ULONG OperatingSystemVersion;
+        };
+        USHORT  ImageCharacteristics;
+        USHORT  DllCharacteristics;
+        USHORT  Machine;
+        BOOLEAN ImageContainsCode;
+        union
+        {
+            UCHAR ImageFlags;
+            struct
+            {
+                UCHAR ComPlusNativeReady        : 1;
+                UCHAR ComPlusILOnly             : 1;
+                UCHAR ImageDynamicallyRelocated : 1;
+                UCHAR ImageMappedFlat           : 1;
+                UCHAR BaseBelow4gb              : 1;
+                UCHAR ComPlusPrefer32bit        : 1;
+                UCHAR Reserved                  : 2;
+            };
+        };
+        ULONG LoaderFlags;
+        ULONG ImageFileSize;
+        ULONG CheckSum;
+    } SECTION_IMAGE_INFORMATION, *PSECTION_IMAGE_INFORMATION;
+
+    typedef struct _RTL_USER_PROCESS_INFORMATION
+    {
+        ULONG                     Length;
+        HANDLE                    ProcessHandle;
+        HANDLE                    ThreadHandle;
+        CLIENT_ID                 ClientId;
+        SECTION_IMAGE_INFORMATION ImageInformation;
+    } RTL_USER_PROCESS_INFORMATION, *PRTL_USER_PROCESS_INFORMATION;
+
+    constexpr DWORD RTL_CLONE_PROCESS_FLAGS_CREATE_SUSPENDED = 0x00000001;
+    constexpr DWORD RTL_CLONE_PROCESS_FLAGS_INHERIT_HANDLES  = 0x00000002;
+    constexpr DWORD RTL_CLONE_PROCESS_FLAGS_NO_SYNCHRONIZE   = 0x00000004;
+
+    constexpr LONG RTL_CLONE_PARENT = 0;
+    constexpr LONG RTL_CLONE_CHILD  = 297;
+
+    typedef _Return_type_success_(return >= 0) LONG NTSTATUS;
+#define NtCurrentProcess() ((HANDLE)(LONG_PTR)-1)
+    NTSYSAPI NTSTATUS NTAPI RtlCloneUserProcess(_In_ ULONG                          ProcessFlags,
+                                                _In_opt_ PSECURITY_DESCRIPTOR       ProcessSecurityDescriptor,
+                                                _In_opt_ PSECURITY_DESCRIPTOR       ThreadSecurityDescriptor,
+                                                _In_opt_ HANDLE                     DebugPort,
+                                                _Out_ PRTL_USER_PROCESS_INFORMATION ProcessInformation);
+    /**
+     * Terminates the specified process.
+     *
+     * @param ProcessHandle Optional. A handle to the process to be terminated. If this parameter is NULL, the calling
+     * process is terminated.
+     * @param ExitStatus The exit status to be used by the process and the process's termination status.
+     * @return NTSTATUS Successful or errant status.
+     */
+    NTSYSCALLAPI NTSTATUS NTAPI NtTerminateProcess(_In_opt_ HANDLE ProcessHandle, _In_ NTSTATUS ExitStatus);
+}
+
+#define NT_SUCCESS(Status) (((NTSTATUS)(Status)) >= 0)
+#if SC_COMPILER_MSVC
+#pragma warning(pop)
+#endif
+#endif
+SC::ProcessFork::ProcessFork() {}
+
+SC::ProcessFork::~ProcessFork()
+{
+    (void)parentToFork.close();
+    (void)forkToParent.close();
+    if (side == ForkChild)
+    {
+        // Terminate without clean-up
+        NTSTATUS res = processHandle == 0 ? 0 : -1;
+        ::NtTerminateProcess(NtCurrentProcess(), res);
+    }
+}
+
+SC::FileDescriptor& SC::ProcessFork::getWritePipe()
+{
+    return side == ForkChild ? forkToParent.writePipe : parentToFork.writePipe;
+}
+
+SC::FileDescriptor& SC::ProcessFork::getReadPipe()
+{
+    return side == ForkChild ? parentToFork.readPipe : forkToParent.readPipe;
+}
+
+SC::Result SC::ProcessFork::waitForChild()
+{
+    if (side == ForkChild)
+    {
+        // Terminate without clean-up
+        ::NtTerminateProcess(NtCurrentProcess(), -1);
+    }
+    NTSTATUS status;
+    status = ::NtWaitForSingleObject(processHandle, FALSE, NULL);
+    if (!NT_SUCCESS(status))
+    {
+        return Result::Error("Cannot wait for process");
+    }
+
+    DWORD processStatus = 0;
+    if (::GetExitCodeProcess(processHandle, &processStatus))
+    {
+        exitStatus.status = static_cast<int32_t>(processStatus);
+    }
+    ::NtClose(processHandle);
+    ::NtClose(threadHandle);
+    threadHandle = detail::ProcessDescriptorDefinition::Invalid;
+    return Result(true);
+}
+
+SC::Result SC::ProcessFork::resumeChildFork()
+{
+    if (side == ForkChild)
+    {
+        // Terminate without clean-up
+        ::NtTerminateProcess(NtCurrentProcess(), -1);
+    }
+    char cmd = 0;
+    SC_TRY(parentToFork.writePipe.write({&cmd, 1}));
+    return Result(true);
+}
+
+SC::Result SC::ProcessFork::fork(State state)
+{
+    // We want this to be inheritable
+    SC_TRY(parentToFork.createPipe(PipeDescriptor::ReadInheritable, PipeDescriptor::WriteInheritable));
+    SC_TRY(forkToParent.createPipe(PipeDescriptor::ReadInheritable, PipeDescriptor::WriteInheritable));
+
+    RTL_USER_PROCESS_INFORMATION processInfo;
+    // RTL_CLONE_PROCESS_FLAGS_CREATE_SUSPENDED could be used instead of parentToFork.readPipe.read
+    DWORD cloneFlags = RTL_CLONE_PROCESS_FLAGS_INHERIT_HANDLES;
+
+    NTSTATUS status = ::RtlCloneUserProcess(cloneFlags, NULL, NULL, NULL, &processInfo);
+
+    // Check parent / child branch
+    if (status == RTL_CLONE_CHILD)
+    {
+        side = ForkChild;
+        // Enables using the Console
+        ::FreeConsole();
+        ::AttachConsole(ATTACH_PARENT_PROCESS);
+
+        switch (state)
+        {
+        case Suspended: {
+            char       cmd = 0;
+            Span<char> actuallyRead;
+            SC_TRY(parentToFork.readPipe.read({&cmd, 1}, actuallyRead));
+        }
+        break;
+        case Immediate: break;
+        }
+        processHandle = 0;
+    }
+    else
+    {
+        if (!NT_SUCCESS(status))
+        {
+            return Result::Error("fork failed");
+        }
+
+        processHandle = processInfo.ProcessHandle;
+        threadHandle  = processInfo.ThreadHandle;
+        if (cloneFlags == RTL_CLONE_PROCESS_FLAGS_CREATE_SUSPENDED)
+        {
+            DWORD clientProcess = static_cast<DWORD>((ptrdiff_t)processInfo.ClientId.UniqueProcess);
+            DWORD clientThread  = static_cast<DWORD>((ptrdiff_t)processInfo.ClientId.UniqueThread);
+
+            HANDLE hProcess = ::OpenProcess(PROCESS_ALL_ACCESS, FALSE, clientProcess);
+            HANDLE hThread  = ::OpenThread(THREAD_ALL_ACCESS, FALSE, clientThread);
+
+            ::ResumeThread(hThread);
+            ::CloseHandle(hThread);
+            ::CloseHandle(hProcess);
+        }
+
+        side = ForkParent;
+    }
+    return Result(true);
 }

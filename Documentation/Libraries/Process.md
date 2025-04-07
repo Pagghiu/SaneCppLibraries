@@ -16,6 +16,7 @@ Process allows launching, chaining input and output, setting working directory a
 | SC::Process               | @copybrief SC::Process            |
 | SC::ProcessChain          | @copybrief SC::ProcessChain       |
 | SC::ProcessEnvironment    | @copybrief SC::ProcessEnvironment |
+| SC::ProcessFork           | @copybrief SC::ProcessFork        |
 
 # Status
 🟩 Usable  
@@ -46,6 +47,9 @@ Some relevant blog posts are:
 
 ## ProcessEnvironment
 @copydoc SC::ProcessEnvironment
+
+## ProcessFork
+@copydoc SC::ProcessFork
 
 # Roadmap
 
