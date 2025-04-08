@@ -63,7 +63,7 @@ bool SC::StringView::parseInt32(int32_t& value) const
         {
             if (textSizeInBytes >= sizeof(buffer))
                 return false;
-            memcpy(buffer, textWide, textSizeInBytes);
+            memcpy(buffer, text, textSizeInBytes);
             buffer[textSizeInBytes] = 0;
             parseText               = buffer;
         }
