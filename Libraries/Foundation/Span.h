@@ -104,7 +104,7 @@ struct SC::Span
 
     template <typename T> [[nodiscard]] T* start_lifetime_as_array() noexcept
     {
-        void* p = const_cast<void*>(static_cast<const void*>(data()));
+        void* p = data();
         return sizeElements == 0 ? static_cast<T*>(p) : launder(static_cast<T*>(::memmove(p, p, sizeof(T) * sizeElements)));
     }
 
@@ -116,7 +116,7 @@ struct SC::Span
 
     template <typename T> [[nodiscard]] T* start_lifetime_as() noexcept
     {
-        void* p = const_cast<void*>(static_cast<const void*>(data()));
+        void* p = data();
         return launder(static_cast<T*>(::memmove(p, p, sizeof(T))));
     }
     // clang-format on
