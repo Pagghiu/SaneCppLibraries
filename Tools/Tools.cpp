@@ -8,7 +8,7 @@
 #include "../Libraries/Strings/String.h"
 #include "../Libraries/Time/Time.h"
 
-#include "../Bindings/cpp/SC.cpp"
+#include "../SC.cpp"
 
 #include "Tools.h"
 

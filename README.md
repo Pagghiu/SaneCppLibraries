@@ -5,7 +5,7 @@
 # Sane C++ Libraries
 
 [![YouTube](https://img.shields.io/youtube/channel/subscribers/UCnmN_whfM12LU6VNQWG0NFg)](https://youtube.com/@Pagghiu)
-[![X (formerly Twitter) Follow](https://img.shields.io/twitter/follow/pagghiu_)](https://twitter.com/pagghiu_)
+[![X](https://img.shields.io/twitter/follow/pagghiu_)](https://x.com/pagghiu_)
 [![Discord](https://img.shields.io/discord/1195076118307426384)](https://discord.gg/tyBfFp33Z6)
 ![GitHub Repo stars](https://img.shields.io/github/stars/Pagghiu/SaneCppLibraries)
 
@@ -72,7 +72,7 @@ Libraries can be used as is, adding a single file to your project and without ne
 See [Building (user)](https://pagghiu.github.io/SaneCppLibraries/page_building_user.html) to just use the library
 
 Shortly:
-- Add [Bindings/cpp/SC.cpp](Bindings/cpp/SC.cpp) to your build system of choice
+- Add [SC.cpp](SC.cpp) to your build system of choice
 - Define `SC_COMPILER_ENABLE_STD_CPP=1` if you plan to use the Standard C++ library
 - Include any public header (`Libraries/[Library]/*.h`)
 
@@ -107,7 +107,7 @@ Check [Building (contributor)](https://pagghiu.github.io/SaneCppLibraries/page_b
 - [Sane Coding Discord](https://discord.gg/tyBfFp33Z6)  
 ![Discord](https://img.shields.io/discord/1195076118307426384)
 - [Bluesky](https://pagghiu.bsky.social) `@pagghiu.bsky.social`
-- [Twitter](https://twitter.com/pagghiu_) `@pagghiu_`
+- [X](https://x.com/pagghiu_) `@pagghiu_`
 - [Mastodon](https://mastodon.gamedev.place/@pagghiu) `@pagghiu`
 - [Github Discussion](https://github.com/Pagghiu/SaneCppLibraries/discussions)
 

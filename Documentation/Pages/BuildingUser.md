@@ -13,32 +13,32 @@ If you want to contribute or run the test suite, check the [Building (Contributo
 
 # Use in your project
 
-- Add a single file named `SC.cpp`
+- Add the `SC.cpp` unity build file to your build system of choice (if any!).
 - Headers in `Libraries/**SomeLibrary**/*.h` are public.  
 - Headers in `Libraries/**SomeLibrary**/[Internal | Tests]` are **NOT** public.
 
 @note
-Libraries assume you're not using the Standard C++ Library to ensure peak C++ sanity in your project.  
+Libraries assume you're not using the C++ Standard Library to ensure peak C++ sanity in your project.  
 If you really need you can:
-    - `#define` `SC_COMPILER_ENABLE_STD_CPP=1` if you really need Standard C++ Library
-    - But remember you can always [Disable the standard C++ library](@ref page_faq) with a few flags
+    - `#define` `SC_COMPILER_ENABLE_STD_CPP=1` to use the C++ Standard Library
+    - But remember you can always [Disable the C++ standard library](@ref page_faq) with a few flags
 
 ## macOS
-- Add `SC.cpp` (located at `Bindings/cpp`) to your build
+- Add `SC.cpp` (located in project root) to your build
 - Include any public header located at `Libraries/**SomeLibrary**/SomeHeader.h`
 - Link:
     - `CoreFoundation.framework`
     - `CoreServices.framework`
 
 ## Linux
-- Add `SC.cpp` (located at `Bindings/cpp`) to your build
+- Add `SC.cpp` (located in project root) to your build
 - Include any public header located at `Libraries/**SomeLibrary**/SomeHeader.h`
 - Link:
     - `libdl` (`-ldl`) 
     - `libpthread` (`-lpthread`)
 
 ## Windows
-- Add `SC.cpp` (located at `Bindings/cpp`) to your build
+- Add `SC.cpp` (located in project root) to your build
 - Include any public header located at `Libraries/**SomeLibrary**/SomeHeader.h`
 
 @note on Windows the following libraries are already implicitly linked through `#pragma comment(lib, ...)`
