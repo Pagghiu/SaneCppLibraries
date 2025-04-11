@@ -98,8 +98,6 @@ void runZLibStreamTest(TestReport& report);
 void runDebugVisualizersTest(TestReport& report);
 void runSupportToolsTest(TestReport& report);
 
-// Bindings
-void runCBindingsTest(TestReport& report);
 } // namespace SC
 
 #ifdef SC_SPACES_SPECIFIC_DEFINE
@@ -237,9 +235,6 @@ int main(int argc, const char* argv[])
 
     // Build tests
     runBuildTest(report);
-
-    // C bindings tests
-    runCBindingsTest(report);
 
     report.runGlobalMemoryReport();
     return report.getTestReturnCode();

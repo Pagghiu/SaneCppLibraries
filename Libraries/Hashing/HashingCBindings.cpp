@@ -1,5 +1,7 @@
-#include "sc_hashing.h"
-#include "../../../Libraries/Hashing/Hashing.h"
+// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
+#include "HashingCBindings.h"
+#include "Hashing.h"
 
 SC::Hashing& sc_hashing_self(sc_hashing_t* hashing)
 {

@@ -54,10 +54,8 @@ SC_COMPILER_WARNING_PUSH_UNUSED_RESULT; // Doing some optimistic coding here, ig
 void addSaneCppLibraries(Project& project, const Parameters& parameters)
 {
     // Files
-    project.addFiles("Bindings/c", "**.cpp");              // add all cpp support files for c bindings
-    project.addFiles("Bindings/c", "**.c");                // add all c bindings
-    project.addFiles("Bindings/c", "**.h");                // add all c bindings
     project.addFiles("Libraries", "**.cpp");               // recursively add all cpp files
+    project.addFiles("Libraries", "**.c");                 // recursively add all c files
     project.addFiles("Libraries", "**.h");                 // recursively add all header files
     project.addFiles("Libraries", "**.inl");               // recursively add all inline files
     project.addFiles("LibrariesExtra", "**.h");            // recursively add all header files
@@ -162,8 +160,7 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
     project.addPresetConfiguration(Configuration::Preset::DebugCoverage, parameters);
 
     addSaneCppLibraries(project, parameters);            // add all SC Libraries
-    project.removeFiles("Bindings/c", "*");              // remove all bindings
-    project.removeFiles("Libraries", "**Test.cpp");      // remove all tests
+    project.removeFiles("Libraries", "**Test.c*");       // remove all tests
     project.removeFiles("LibrariesExtra", "**Test.cpp"); // remove all tests
     project.removeFiles("Support", "**Test.cpp");        // remove all tests
 

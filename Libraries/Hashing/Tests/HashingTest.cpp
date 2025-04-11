@@ -10,7 +10,7 @@ namespace SC
 {
 struct HashingTest;
 }
-
+extern "C" const char* sc_hashing_test();
 struct SC::HashingTest : public SC::TestCase
 {
     HashingTest(SC::TestReport& report) : TestCase(report, "HashingTest")
@@ -108,6 +108,12 @@ struct SC::HashingTest : public SC::TestCase
             String test;
             SC_TEST_EXPECT(StringBuilder(test).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
             SC_TEST_EXPECT(test == "37268335DD6931045BDCDF92623FF819A64244B53D0E746D438797349D4DA578"_a8);
+        }
+        if (test_section("C Bindings"))
+        {
+            const char* res = sc_hashing_test();
+            recordExpectation(res ? StringView::fromNullTerminated(res, StringEncoding::Utf8) : "Hashing",
+                              res == nullptr);
         }
     }
 };

@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "sc_hashing.h"
+#include "../../Hashing/HashingCBindings.h"
 #include <assert.h>
 #include <string.h>
 

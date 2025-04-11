@@ -43,8 +43,7 @@ INPUT                  = ../../Documentation/Pages \
                          ../../Libraries/Strings \
                          ../../Libraries/Testing \
                          ../../Libraries/Threading \
-                         ../../Libraries/Time \
-                         ../../Bindings/c/sc_hashing
+                         ../../Libraries/Time
 EXAMPLE_PATH           = ../../
 FILE_PATTERNS          = *.h *.md
 RECURSIVE              = NO
