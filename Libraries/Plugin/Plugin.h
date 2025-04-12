@@ -25,7 +25,7 @@ using PluginIdentifier = SmallString<30>;
 //! @defgroup group_plugin Plugin
 //! @copybrief library_plugin (see @ref library_plugin for more details)
 //!
-//! \snippet Libraries/Plugin/Tests/PluginTest.cpp PluginSnippet
+//! \snippet Tests/Libraries/Plugin/PluginTest.cpp PluginSnippet
 
 //! @addtogroup group_plugin
 //! @{

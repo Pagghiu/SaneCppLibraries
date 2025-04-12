@@ -38,28 +38,28 @@ struct SC::ProcessID
 /// - Wait for the child process exit code
 ///
 /// Example: execute child process (launch and wait for it to fully execute)
-/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessSnippet1
+/// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessSnippet1
 ///
 /// Example: execute child process, redirecting stdout to a string
-/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessSnippet2
+/// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessSnippet2
 ///
 /// Example: launch a child process and wait for it to finish execution
-/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessSnippet3
+/// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessSnippet3
 ///
 /// Example: execute child process, filling its stdin with a StringView
-/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessSnippet4
+/// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessSnippet4
 ///
 /// Example: read process output using a pipe, using launch + waitForExitSync
-/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessSnippet5
+/// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessSnippet5
 ///
 /// Example: Add an environment variable
-/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessEnvironmentNewVar
+/// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessEnvironmentNewVar
 ///
 /// Example: Redefine an environment variable
-/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessEnvironmentRedefine
+/// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessEnvironmentRedefine
 ///
 /// Example: Disable environment variable inheritance
-/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessEnvironmentDisableInheritance
+/// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessEnvironmentDisableInheritance
 
 struct SC::Process
 {
@@ -281,13 +281,13 @@ struct SC::Process
 /// processes together.
 ///
 /// Example: Inherit stdout file descriptor
-/// \snippet Libraries/Process/Tests/ProcessTest.cpp processChainInheritDualSnippet
+/// \snippet Tests/Libraries/Process/ProcessTest.cpp processChainInheritDualSnippet
 ///
 /// Example: Read stderr and stdout into a string
-/// \snippet Libraries/Process/Tests/ProcessTest.cpp processChainPipeSingleSnippet
+/// \snippet Tests/Libraries/Process/ProcessTest.cpp processChainPipeSingleSnippet
 ///
 /// Example: Read standard output into a string using a Pipe
-/// \snippet Libraries/Process/Tests/ProcessTest.cpp processChainPipeDualSnippet
+/// \snippet Tests/Libraries/Process/ProcessTest.cpp processChainPipeDualSnippet
 struct SC::ProcessChain
 {
     Process::Options options;
@@ -325,7 +325,7 @@ struct SC::ProcessChain
 /// @brief Reads current process environment variables
 ///
 /// Example: Print all environment variables to stdout
-/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessEnvironmentPrint
+/// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessEnvironmentPrint
 struct SC::ProcessEnvironment
 {
     ProcessEnvironment();
@@ -366,13 +366,13 @@ struct SC::ProcessEnvironment
 /// @brief Forks current process exiting child at end of process
 /// A _fork_ duplicates a _parent_ process execution state, os handles and private memory.
 ///
-/// Its semantics are quite differents from platform to platform but on its most common denominator
+/// Its semantics are quite different from platform to platform but on its most common denominator
 /// it can be used to carry on "background" operations on snapshots of current program memory.
 /// One relevant use case is serializing to disk or network a live, complex and large data structure.
 /// Without the fork the program should either:
 ///
 /// 1. Duplicate all the data, to snapshot it in a given instant, and keep it around for Async IO
-/// 2. Block program execution and write the live datastructure until all IO is finished
+/// 2. Block program execution and write the live data-structure until all IO is finished
 ///
 /// Fork avoids memory duplication because it will be shared through Copy On Write (COW) mechanisms.
 /// COW ensures that un-modified duplicated memory pages will not occupy additional Physical RAM.
@@ -386,7 +386,7 @@ struct SC::ProcessEnvironment
 /// 4. Create Sockets and FileDescriptors with Inheritable flags if you need them in fork process
 ///
 /// Example: Fork current process modifying memory in forked process leaving parent's one unmodified.
-/// \snippet Libraries/Process/Tests/ProcessTest.cpp ProcessFork
+/// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessFork
 struct SC::ProcessFork
 {
     ProcessFork();

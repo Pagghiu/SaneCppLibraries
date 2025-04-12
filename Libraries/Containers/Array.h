@@ -45,7 +45,7 @@ struct ArrayVTable : public ObjectVTable<T>
 /// Trying to push or insert more than N elements will fail. @n
 /// Only up to SC::Array::size elements are valid (and `N` - `size()` are initialized).
 ///
-/// \snippet Libraries/Containers/Tests/ArrayTest.cpp ArraySnippet
+/// \snippet Tests/Libraries/Containers/ArrayTest.cpp ArraySnippet
 template <typename T, int N>
 struct Array : public Segment<detail::ArrayVTable<T, N>>
 {

@@ -119,7 +119,7 @@ SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Function<void(HttpRequest&
 ///
 /// @see SC::HttpWebServer
 ///
-/// \snippet Libraries/Http/Tests/HttpServerTest.cpp HttpServerSnippet
+/// \snippet Tests/Libraries/Http/HttpServerTest.cpp HttpServerSnippet
 struct SC::HttpServer
 {
     HttpServer();
@@ -137,7 +137,7 @@ struct SC::HttpServer
     /// @return Valid Result if http listening has been started successfully
     [[nodiscard]] Result start(AsyncEventLoop& loop, uint32_t maxConcurrentRequests, StringView address, uint16_t port);
 
-    /// @brief Stops http server asyncronously pushing cancel and close requests for next SC::AsyncEventLoop::runOnce
+    /// @brief Stops http server asynchronously pushing cancel and close requests for next SC::AsyncEventLoop::runOnce
     [[nodiscard]] Result stopAsync();
 
     /// @brief Stops http server synchronously waiting for SC::AsyncEventLoop::runNoWait to cancel or close all requests

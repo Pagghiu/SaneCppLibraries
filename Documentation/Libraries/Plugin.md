@@ -8,7 +8,7 @@ Plugin library allows extending application compiling C++ source to executable c
 
 # Quick Sheet
 
-\snippet Libraries/Plugin/Tests/PluginTest.cpp PluginSnippet
+\snippet Tests/Libraries/Plugin/PluginTest.cpp PluginSnippet
 
 @note The above code is simplified. For a more complete implementation of an hot-reload system see [SCExample](@ref page_examples) code (`HotReloadSystem.h`).
 

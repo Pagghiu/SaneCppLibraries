@@ -26,13 +26,13 @@ struct SC::GlobalSettings
 /// issues.
 ///
 /// Example (Fixed Allocator):
-/// \snippet Libraries/Foundation/Tests/GlobalsTest.cpp GlobalsSnippetFixed
+/// \snippet Tests/Libraries/Foundation/GlobalsTest.cpp GlobalsSnippetFixed
 ///
 /// Example (Virtual Allocator):
-/// \snippet Libraries/Foundation/Tests/GlobalsTest.cpp GlobalsSnippetVirtual
+/// \snippet Tests/Libraries/Foundation/GlobalsTest.cpp GlobalsSnippetVirtual
 ///
 /// Example (Memory dump):
-/// \snippet Libraries/Containers/Tests/GlobalsContainerTest.cpp GlobalContainerVirtualMemoryDumpSnippet
+/// \snippet Tests/Libraries/Containers/GlobalsContainerTest.cpp GlobalContainerVirtualMemoryDumpSnippet
 struct SC::Globals
 {
     enum Type

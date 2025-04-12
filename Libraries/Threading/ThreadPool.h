@@ -35,7 +35,7 @@ struct SC::ThreadPoolTask
 /// If it's not already completed the task must still be valid during ThreadPool::destroy or ThreadPool destructor.
 ///
 /// Example:
-/// @snippet Libraries/Threading/Tests/ThreadPoolTest.cpp threadPoolSnippet
+/// @snippet Tests/Libraries/Threading/ThreadPoolTest.cpp threadPoolSnippet
 ///
 struct SC::ThreadPool
 {

@@ -151,7 +151,7 @@ struct SC::Time::Absolute
     /// @return `true` if time has been parsed successfully
     /// @n
     /// Example:
-    /// @snippet Libraries/Time/Tests/TimeTest.cpp absoluteParseLocalSnippet
+    /// @snippet Tests/Libraries/Time/TimeTest.cpp absoluteParseLocalSnippet
     [[nodiscard]] bool parseLocal(ParseResult& result) const;
 
     /// @brief Parses UTC time to a Parsed structure
@@ -207,7 +207,7 @@ struct SC::Time::HighResolutionCounter
     /// @brief Sets HighResolutionCounter to current instant
     /// @n
     /// Example:
-    /// @snippet Libraries/Time/Tests/TimeTest.cpp highResolutionCounterSnapSnippet
+    /// @snippet Tests/Libraries/Time/TimeTest.cpp highResolutionCounterSnapSnippet
     HighResolutionCounter& snap();
 
     /// @brief Returns a HighResolutionCounter offset by a given number of Milliseconds
@@ -215,7 +215,7 @@ struct SC::Time::HighResolutionCounter
     /// @return A HighResolutionCounter that is offset by `ms`
     /// @n
     /// Example:
-    /// @snippet Libraries/Time/Tests/TimeTest.cpp highResolutionCounterOffsetBySnippet
+    /// @snippet Tests/Libraries/Time/TimeTest.cpp highResolutionCounterOffsetBySnippet
     [[nodiscard]] HighResolutionCounter offsetBy(Milliseconds ms) const;
 
     /// @brief Check if this HighResolutionCounter is later or equal to another HighResolutionCounter
@@ -223,7 +223,7 @@ struct SC::Time::HighResolutionCounter
     /// @return `true` if this HighResolutionCounter is later or equal to another HighResolutionCounter
     /// @n
     /// Example:
-    /// @snippet Libraries/Time/Tests/TimeTest.cpp highResolutionCounterIsLaterOnSnippet
+    /// @snippet Tests/Libraries/Time/TimeTest.cpp highResolutionCounterIsLaterOnSnippet
     [[nodiscard]] bool isLaterThanOrEqualTo(HighResolutionCounter other) const;
 
     /// @brief Subtracts another HighResolutionCounter from this one, returning an approximate Relative
@@ -231,7 +231,7 @@ struct SC::Time::HighResolutionCounter
     /// @return A Relative holding the time interval between the two HighResolutionCounter
     /// @n
     /// Example:
-    /// @snippet Libraries/Time/Tests/TimeTest.cpp highResolutionCounterOffsetBySnippet
+    /// @snippet Tests/Libraries/Time/TimeTest.cpp highResolutionCounterOffsetBySnippet
     [[nodiscard]] Relative subtractApproximate(HighResolutionCounter other) const;
 
     /// @brief Subtracts another HighResolutionCounter from this one, returning a precise HighResolutionCounter

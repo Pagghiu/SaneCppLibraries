@@ -84,7 +84,7 @@ struct SC_COMPILER_EXPORT StringBuilder
     /// @return `true` if append succeeded
     ///
     /// Example:
-    /// @snippet Libraries/Strings/Tests/StringBuilderTest.cpp stringBuilderTestAppendReplaceAllSnippet
+    /// @snippet Tests/Libraries/Strings/StringBuilderTest.cpp stringBuilderTestAppendReplaceAllSnippet
     [[nodiscard]] bool appendReplaceAll(StringView source, StringView occurrencesOf, StringView with);
 
     /// @brief Holds a search / replace pair for StringBuilder::appendReplaceMultiple
@@ -100,7 +100,7 @@ struct SC_COMPILER_EXPORT StringBuilder
     /// @return `true` if append succeeded
     ///
     /// Example:
-    /// @snippet Libraries/Strings/Tests/StringBuilderTest.cpp stringBuilderTestAppendReplaceMultipleSnippet
+    /// @snippet Tests/Libraries/Strings/StringBuilderTest.cpp stringBuilderTestAppendReplaceMultipleSnippet
     [[nodiscard]] bool appendReplaceMultiple(StringView source, Span<const ReplacePair> substitutions);
 
     /// @brief Option for StringBuilder::appendHex
@@ -115,7 +115,7 @@ struct SC_COMPILER_EXPORT StringBuilder
     /// @return `true` if append succeeded
     ///
     /// Example:
-    /// @snippet Libraries/Strings/Tests/StringBuilderTest.cpp stringBuilderTestAppendHexSnippet
+    /// @snippet Tests/Libraries/Strings/StringBuilderTest.cpp stringBuilderTestAppendHexSnippet
     [[nodiscard]] bool appendHex(Span<const uint8_t> data, AppendHexCase casing);
 
   private:

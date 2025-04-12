@@ -23,7 +23,7 @@ struct SegmentBuffer : public SegmentTrivial<char>, public SegmentSelfRelativePo
 /// SC::Buffer avoids some compile time / executable size bloat because it's not header only.
 ///
 /// Example:
-/// \snippet Libraries/Foundation/Tests/BufferTest.cpp BufferBasicSnippet
+/// \snippet Tests/Libraries/Foundation/BufferTest.cpp BufferBasicSnippet
 struct Buffer : public Segment<detail::SegmentBuffer>
 {
     using Segment::Segment;

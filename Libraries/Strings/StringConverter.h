@@ -19,7 +19,7 @@ struct String;
 /// When the SC::StringView is already null-terminated, the class just forwards the original SC::StringView.
 ///
 /// Example:
-/// \snippet Libraries/Strings/Tests/StringConverterTest.cpp stringConverterTestSnippet
+/// \snippet Tests/Libraries/Strings/StringConverterTest.cpp stringConverterTestSnippet
 struct SC::StringConverter
 {
     /// @brief Specifies if to add a null terminator

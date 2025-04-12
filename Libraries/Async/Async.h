@@ -319,7 +319,7 @@ namespace SC
 /// @brief Starts a Timeout that is invoked only once after expiration (relative) time has passed.
 /// @note For a periodic timeout, call AsyncLoopTimeout::Result::reactivateRequest(true) in the completion callback
 ///
-/// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncLoopTimeoutSnippet
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncLoopTimeoutSnippet
 struct AsyncLoopTimeout : public AsyncRequest
 {
     AsyncLoopTimeout() : AsyncRequest(Type::LoopTimeout) {}
@@ -361,12 +361,12 @@ struct AsyncLoopTimeout : public AsyncRequest
 /// @note There is no guarantee that after calling AsyncLoopWakeUp::start the callback has actually finished execution.
 /// An optional SC::EventObject passed to SC::AsyncLoopWakeUp::start can be used for synchronization
 ///
-/// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncLoopWakeUpSnippet1
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncLoopWakeUpSnippet1
 ///
 /// An EventObject can be wait-ed to synchronize further actions from the thread invoking the wake up request, ensuring
 /// that the callback has finished its execution.
 ///
-/// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncLoopWakeUpSnippet2
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncLoopWakeUpSnippet2
 struct AsyncLoopWakeUp : public AsyncRequest
 {
     AsyncLoopWakeUp() : AsyncRequest(Type::LoopWakeUp) {}
@@ -399,7 +399,7 @@ struct AsyncLoopWakeUp : public AsyncRequest
 /// AsyncLoopWork::work is invoked on one of the thread supplied by the ThreadPool passed during AsyncLoopWork::start.
 /// AsyncLoopWork::callback will be called as a completion, on the event loop thread AFTER work callback is finished.
 ///
-/// \snippet Libraries/Async/Tests/AsyncTestLoopWork.inl AsyncLoopWorkSnippet
+/// \snippet Tests/Libraries/Async/AsyncTestLoopWork.inl AsyncLoopWorkSnippet
 struct AsyncLoopWork : public AsyncRequest
 {
     AsyncLoopWork() : AsyncRequest(Type::LoopWork) {}
@@ -429,7 +429,7 @@ struct AsyncLoopWork : public AsyncRequest
 /// @brief Starts monitoring a process, notifying about its termination.
 /// @ref library_process library can be used to start a process and obtain the native process handle.
 ///
-/// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncProcessSnippet
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncProcessSnippet
 struct AsyncProcessExit : public AsyncRequest
 {
     AsyncProcessExit() : AsyncRequest(Type::ProcessExit) {}
@@ -479,7 +479,7 @@ struct AsyncProcessExit : public AsyncRequest
 /// Alternatively SC::AsyncEventLoop::createAsyncTCPSocket creates and associates the socket to the loop.
 /// @note To continue accepting new socket SC::AsyncResult::reactivateRequest must be called.
 ///
-/// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncSocketAcceptSnippet
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketAcceptSnippet
 struct AsyncSocketAccept : public AsyncRequest
 {
     AsyncSocketAccept() : AsyncRequest(Type::SocketAccept) {}
@@ -533,7 +533,7 @@ struct AsyncSocketAccept : public AsyncRequest
 /// SC::AsyncEventLoop::associateExternallyCreatedTCPSocket. @n
 /// Alternatively SC::AsyncEventLoop::createAsyncTCPSocket creates and associates the socket to the loop.
 ///
-/// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncSocketConnectSnippet
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketConnectSnippet
 struct AsyncSocketConnect : public AsyncRequest
 {
     AsyncSocketConnect() : AsyncRequest(Type::SocketConnect) {}
@@ -572,7 +572,7 @@ struct AsyncSocketConnect : public AsyncRequest
 /// SC::AsyncEventLoop::associateExternallyCreatedTCPSocket or though AsyncSocketAccept. @n
 /// Alternatively SC::AsyncEventLoop::createAsyncTCPSocket creates and associates the socket to the loop.
 ///
-/// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncSocketSendSnippet
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketSendSnippet
 struct AsyncSocketSend : public AsyncRequest
 {
     AsyncSocketSend() : AsyncRequest(Type::SocketSend) {}
@@ -627,7 +627,7 @@ struct AsyncSocketSend : public AsyncRequest
 /// Additional notes:
 /// - SC::AsyncSocketReceive::CompletionData::disconnected will be set to true when client disconnects
 ///
-/// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncSocketReceiveSnippet
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketReceiveSnippet
 struct AsyncSocketReceive : public AsyncRequest
 {
     AsyncSocketReceive() : AsyncRequest(Type::SocketReceive) {}
@@ -685,7 +685,7 @@ struct AsyncSocketReceive : public AsyncRequest
 /// @brief Starts a socket close operation.
 /// Callback will be called when the socket has been fully closed.
 ///
-/// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncSocketCloseSnippet
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketCloseSnippet
 struct AsyncSocketClose : public AsyncRequest
 {
     AsyncSocketClose() : AsyncRequest(Type::SocketClose) {}
@@ -733,7 +733,7 @@ struct AsyncSocketClose : public AsyncRequest
 /// - When reactivating the AsyncRequest, remember to increment the offset (SC::AsyncFileRead::offset)
 /// - SC::AsyncFileRead::CompletionData::endOfFile signals end of file reached
 ///
-/// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncFileReadSnippet
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncFileReadSnippet
 struct AsyncFileRead : public AsyncRequest
 {
     AsyncFileRead() : AsyncRequest(Type::FileRead) { fileDescriptor = FileDescriptor::Invalid; }
@@ -812,7 +812,7 @@ struct AsyncFileRead : public AsyncRequest
 /// - Open the file descriptor for non-blocking IO (SC::File::OpenOptions::blocking == `false`)
 /// - Call SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor on the file descriptor
 ///
-/// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncFileWriteSnippet
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncFileWriteSnippet
 struct AsyncFileWrite : public AsyncRequest
 {
     AsyncFileWrite() : AsyncRequest(Type::FileWrite) { fileDescriptor = FileDescriptor::Invalid; }
@@ -877,7 +877,7 @@ struct AsyncFileWrite : public AsyncRequest
 /// Callback will be called when the file is actually closed. @n
 /// @ref library_file library can be used to open the file and obtain a blocking or non-blocking file descriptor handle.
 ///
-/// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncFileCloseSnippet
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncFileCloseSnippet
 struct AsyncFileClose : public AsyncRequest
 {
     AsyncFileClose() : AsyncRequest(Type::FileClose) {}
@@ -960,7 +960,7 @@ struct SC::AsyncEventLoopListeners
 /// @see AsyncEventLoopMonitor can be used to integrate AsyncEventLoop with a GUI event loop
 ///
 /// Basic lifetime for an event loop is:
-/// \snippet Libraries/Async/Tests/AsyncTest.cpp AsyncEventLoopSnippet
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncEventLoopSnippet
 struct SC::AsyncEventLoop
 {
     /// @brief Options given to AsyncEventLoop::create

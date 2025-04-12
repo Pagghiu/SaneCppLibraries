@@ -24,7 +24,7 @@ struct ArenaMap;
 /// @n Objects can be inserted up to the SC::ArenaMap::size and insertion returns *handle* keys allowing to retrieve the
 /// inserted object in constant time.
 ///
-/// \snippet Libraries/Containers/Tests/ArenaMapTest.cpp ArenaMapSnippet
+/// \snippet Tests/Libraries/Containers/ArenaMapTest.cpp ArenaMapSnippet
 template <typename T>
 struct SC::ArenaMap
 {

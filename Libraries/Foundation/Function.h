@@ -14,7 +14,7 @@ namespace SC
 ///  If lambda is bigger than `LAMBDA_SIZE` the constructor will static assert.
 ///
 /// Example:
-/// \snippet Libraries/Foundation/Tests/FunctionTest.cpp FunctionMainSnippet
+/// \snippet Tests/Libraries/Foundation/FunctionTest.cpp FunctionMainSnippet
 template <typename FuncType>
 struct Function;
 
@@ -170,7 +170,7 @@ struct Function<R(Args...)>
     /// @brief Unsafely retrieve the functor bound previously bound to this function
     /// @tparam Lambda type of Lambda passed to  Function::bind or Function::operator=
     /// @return Pointer to functor or null if Lambda is not the same type bound in bind()
-    /// \snippet Libraries/Foundation/Tests/FunctionTest.cpp FunctionFunctorSnippet
+    /// \snippet Tests/Libraries/Foundation/FunctionTest.cpp FunctionFunctorSnippet
     template <typename Lambda>
     Lambda* dynamicCastTo() const
     {

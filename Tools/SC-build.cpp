@@ -54,13 +54,11 @@ SC_COMPILER_WARNING_PUSH_UNUSED_RESULT; // Doing some optimistic coding here, ig
 void addSaneCppLibraries(Project& project, const Parameters& parameters)
 {
     // Files
-    project.addFiles("Libraries", "**.cpp");               // recursively add all cpp files
-    project.addFiles("Libraries", "**.c");                 // recursively add all c files
-    project.addFiles("Libraries", "**.h");                 // recursively add all header files
-    project.addFiles("Libraries", "**.inl");               // recursively add all inline files
-    project.addFiles("LibrariesExtra", "**.h");            // recursively add all header files
-    project.addFiles("LibrariesExtra", "**.cpp");          // recursively add all cpp files
-    project.addFiles("Support/DebugVisualizers", "*.cpp"); // add debug visualizers
+    project.addFiles("Libraries", "**.cpp");      // recursively add all cpp files
+    project.addFiles("Libraries", "**.h");        // recursively add all header files
+    project.addFiles("Libraries", "**.inl");      // recursively add all inline files
+    project.addFiles("LibrariesExtra", "**.h");   // recursively add all header files
+    project.addFiles("LibrariesExtra", "**.cpp"); // recursively add all cpp files
 
     // Libraries to link
     if (parameters.platform == Platform::Apple)
@@ -109,11 +107,15 @@ Result buildTestProject(const Parameters& parameters, Project& project)
     });
 
     addSaneCppLibraries(project, parameters);
-    project.addFiles("Tests/SCTest", "*.cpp"); // add all .cpp from SCTest directory
-    project.addFiles("Tests/SCTest", "*.h");   // add all .h from SCTest directory
-    project.addFiles("Tools", "SC-*.cpp");     // add all tools
-    project.addFiles("Tools", "*.h");          // add tools headers
-    project.addFiles("Tools", "*Test.cpp");    // add tools tests
+    project.addFiles("Tests/SCTest", "*.cpp");          // add all .cpp from SCTest directory
+    project.addFiles("Tests/SCTest", "*.h");            // add all .h from SCTest directory
+    project.addFiles("Tests/Libraries", "**.c*");       // add all tests from Libraries directory
+    project.addFiles("Tests/Libraries", "**.inl");      // add all tests from Libraries directory
+    project.addFiles("Tests/LibrariesExtra", "**.cpp"); // add all tests from LibrariesExtra directory
+    project.addFiles("Tests/Support", "**.cpp");        // add all tests from Support directory
+    project.addFiles("Tests/Tools", "**.cpp");          // add all tests from Tools directory
+    project.addFiles("Tools", "SC-*.cpp");              // add all tools
+    project.addFiles("Tools", "*.h");                   // add tools headers
 
     // This is a totally useless per-file define to test "per-file" flags SC::Build feature.
     SourceFiles specificFiles;
@@ -159,10 +161,7 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
     project.addPresetConfiguration(Configuration::Preset::DebugCoverage, parameters);
 
-    addSaneCppLibraries(project, parameters);            // add all SC Libraries
-    project.removeFiles("Libraries", "**Test.c*");       // remove all tests
-    project.removeFiles("LibrariesExtra", "**Test.cpp"); // remove all tests
-    project.removeFiles("Support", "**Test.cpp");        // remove all tests
+    addSaneCppLibraries(project, parameters); // add all SC Libraries
 
     project.addFiles(imgui.packageLocalDirectory.view(), "*.cpp");
     project.addFiles(sokol.packageLocalDirectory.view(), "*.h");

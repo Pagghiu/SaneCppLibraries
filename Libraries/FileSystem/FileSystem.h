@@ -23,7 +23,7 @@ struct StringConverter;
 /// All methods can always return failure due to access or disk I/O errors, and they will be omitted in the return
 /// clauses for each method. Only the specific returned result behaviour of the given method will be described.
 ///
-/// \snippet Libraries/FileSystem/Tests/FileSystemTest.cpp FileSystemQuickSheetSnippet
+/// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp FileSystemQuickSheetSnippet
 struct SC::FileSystem
 {
   private:
@@ -98,7 +98,7 @@ struct SC::FileSystem
     /// @return Valid Result if copy succeeded
     ///
     /// Example:
-    /// \snippet Libraries/FileSystem/Tests/FileSystemTest.cpp copyExistsFileSnippet
+    /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp copyExistsFileSnippet
     [[nodiscard]] Result copyFile(StringView source, StringView destination, CopyFlags copyFlags = CopyFlags())
     {
         return copyFiles(CopyOperation{source, destination, copyFlags});
@@ -117,7 +117,7 @@ struct SC::FileSystem
     /// @return Valid Result if copy succeeded
     ///
     /// Example:
-    /// \snippet Libraries/FileSystem/Tests/FileSystemTest.cpp copyDirectoryRecursiveSnippet
+    /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp copyDirectoryRecursiveSnippet
     [[nodiscard]] Result copyDirectory(StringView source, StringView destination, CopyFlags copyFlags = CopyFlags())
     {
         return copyDirectories(CopyOperation{source, destination, copyFlags});
@@ -155,7 +155,7 @@ struct SC::FileSystem
     /// @return Valid Result if directory contents has been successfully deleted
     ///
     /// Example:
-    /// \snippet Libraries/FileSystem/Tests/FileSystemTest.cpp removeDirectoryRecursiveSnippet
+    /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp removeDirectoryRecursiveSnippet
     [[nodiscard]] Result removeDirectoryRecursive(StringView directory)
     {
         return removeDirectoriesRecursive({directory});
@@ -222,7 +222,7 @@ struct SC::FileSystem
     /// @brief Create a new directory, creating also intermediate non existing directories (like posix `mkdir -p`)
     /// @param directory Path where to create such directory
     /// @return Invalid Result in case of I/O or access error
-    /// \snippet Libraries/FileSystem/Tests/FileSystemTest.cpp makeRemoveDirectoryRecursive
+    /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp makeRemoveDirectoryRecursive
     [[nodiscard]] Result makeDirectoryRecursive(StringView directory) { return makeDirectoriesRecursive({directory}); }
 
     /// @brief Creates a symbolic link at location linkFile pointing at sourceFileOrDirectory
@@ -247,7 +247,7 @@ struct SC::FileSystem
     /// @return `true` if a file exists at the given path
     ///
     /// Example:
-    /// \snippet Libraries/FileSystem/Tests/FileSystemTest.cpp copyExistsFileSnippet
+    /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp copyExistsFileSnippet
     [[nodiscard]] bool existsAndIsFile(StringView file);
 
     /// @brief Check if a link exists at given path
@@ -267,7 +267,7 @@ struct SC::FileSystem
     /// @return Valid Result if the memory was successfully written
     ///
     /// Example:
-    /// \snippet Libraries/FileSystem/Tests/FileSystemTest.cpp writeReadRemoveFileSnippet
+    /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp writeReadRemoveFileSnippet
     [[nodiscard]] Result write(StringView file, Span<const char> data);
     [[nodiscard]] Result write(StringView file, Span<const uint8_t> data);
 

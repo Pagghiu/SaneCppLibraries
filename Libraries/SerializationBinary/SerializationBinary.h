@@ -37,7 +37,7 @@ struct SerializationBinary
     /// @return `true` if serialization succeeded
     ///
     /// Assuming the following struct:
-    /// \snippet Libraries/SerializationBinary/Tests/SerializationSuiteTest.h serializationBinaryWriteSnippet1
+    /// \snippet Tests/Libraries/SerializationBinary/SerializationSuiteTest.h serializationBinaryWriteSnippet1
     /**
      * `PrimitiveStruct` can be written to a binary buffer with the following code:
      * @code{.cpp}
@@ -72,7 +72,7 @@ struct SerializationBinary
     /// @return `true` if deserialization succeeded
     ///
     /// Assuming the following structs:
-    /// \snippet Libraries/SerializationBinary/Tests/SerializationSuiteTest.h serializationBinaryExactSnippet1
+    /// \snippet Tests/Libraries/SerializationBinary/SerializationSuiteTest.h serializationBinaryExactSnippet1
     /**
      * `TopLevelStruct` can be serialized and de-serialized with the following code:
      * @code{.cpp}
@@ -123,7 +123,7 @@ struct SerializationBinary
     ///
     /// @n
     /// Assuming the following structs:
-    /// \snippet Libraries/SerializationBinary/Tests/SerializationSuiteTest.h serializationBinaryVersionedSnippet1
+    /// \snippet Tests/Libraries/SerializationBinary/SerializationSuiteTest.h serializationBinaryVersionedSnippet1
     /**
      * `VersionedStruct2` can be deserialized from `VersionedStruct1` in the following way
      * @code{.cpp}

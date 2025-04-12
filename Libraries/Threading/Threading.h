@@ -23,7 +23,7 @@ struct EventObject;
 /// @brief A native OS mutex to synchronize access to shared resources.
 ///
 /// Example:
-/// @snippet Libraries/Threading/Tests/ThreadingTest.cpp mutexSnippet
+/// @snippet Tests/Libraries/Threading/ThreadingTest.cpp mutexSnippet
 struct SC::Mutex
 {
     Mutex();
@@ -169,7 +169,7 @@ struct SC::Thread
 /// @brief An automatically reset event object to synchronize two threads.
 /// @n
 /// Example:
-/// @snippet Libraries/Threading/Tests/ThreadingTest.cpp eventObjectSnippet
+/// @snippet Tests/Libraries/Threading/ThreadingTest.cpp eventObjectSnippet
 struct SC::EventObject
 {
     bool autoReset = true;

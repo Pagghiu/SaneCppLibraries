@@ -67,7 +67,7 @@ struct SC::TestReport
 /// To create a test case derive from SC::TestCase and run tests in the constructor
 ///
 /// Example:
-/// @snippet Libraries/Strings/Tests/ConsoleTest.cpp testingSnippet
+/// @snippet Tests/Libraries/Strings/ConsoleTest.cpp testingSnippet
 struct SC::TestCase
 {
     /// @brief Adds this TestCase to a TestReport with a name

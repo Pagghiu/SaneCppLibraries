@@ -105,7 +105,7 @@ struct SC::SocketFlags
 /// @brief Native representation of an IP Address.
 ///
 /// Example:
-/// @snippet Libraries/Socket/Tests/SocketTest.cpp socketIpAddressSnippet
+/// @snippet Tests/Libraries/Socket/SocketTest.cpp socketIpAddressSnippet
 struct SC::SocketIPAddress
 {
     /// @brief Constructs an ip address from a given family (IPV4 or IPV6)
@@ -142,7 +142,7 @@ struct SC::SocketIPAddress
 /// It also allow querying inheritability and changing it (and blocking mode)
 /// @n
 /// Example (extracted from unit test):
-/// @snippet Libraries/Socket/Tests/SocketTest.cpp socketCreateSnippet
+/// @snippet Tests/Libraries/Socket/SocketTest.cpp socketCreateSnippet
 struct SC::SocketDescriptor : public UniqueHandle<detail::SocketDescriptorDefinition>
 {
     /// @brief Creates a new SocketDescriptor Descriptor of given family, type, protocol

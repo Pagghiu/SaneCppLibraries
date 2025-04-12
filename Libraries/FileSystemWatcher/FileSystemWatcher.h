@@ -37,10 +37,10 @@ struct String;
 /// | SC::FileSystemWatcher::EventLoopRunner| @copybrief SC::FileSystemWatcher::EventLoopRunner |
 ///
 /// Example using SC::FileSystemWatcher::EventLoopRunner:
-/// \snippet Libraries/FileSystemWatcher/Tests/FileSystemWatcherTest.cpp fileSystemWatcherEventLoopRunnerSnippet
+/// \snippet Tests/Libraries/FileSystemWatcher/FileSystemWatcherTest.cpp fileSystemWatcherEventLoopRunnerSnippet
 ///
 /// Example using SC::FileSystemWatcher::ThreadRunner:
-/// \snippet Libraries/FileSystemWatcher/Tests/FileSystemWatcherTest.cpp fileSystemWatcherThreadRunnerSnippet
+/// \snippet Tests/Libraries/FileSystemWatcher/FileSystemWatcherTest.cpp fileSystemWatcherThreadRunnerSnippet
 struct SC::FileSystemWatcher
 {
   private:

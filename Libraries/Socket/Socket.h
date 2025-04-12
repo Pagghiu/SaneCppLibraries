@@ -20,7 +20,7 @@ struct SocketDNS;
 /// @brief Use a SocketDescriptor as a Server (example TCP or UDP Socket Server).
 ///
 /// Example:
-/// @snippet Libraries/Socket/Tests/SocketTest.cpp socketServerSnippet
+/// @snippet Tests/Libraries/Socket/SocketTest.cpp socketServerSnippet
 struct SC::SocketServer
 {
     /// @brief Build a SocketServer from a SocketDescriptor (already created with SocketDescriptor::create)
@@ -58,10 +58,10 @@ struct SC::SocketServer
 /// through SC::SocketClient::connect.
 ///
 /// Example (accepted client from server, doing a synchronous read):
-/// @snippet Libraries/Socket/Tests/SocketTest.cpp socketClientAcceptSnippet
+/// @snippet Tests/Libraries/Socket/SocketTest.cpp socketClientAcceptSnippet
 ///
 /// Example (connecting client to server, doing two synchronous writes):
-/// @snippet Libraries/Socket/Tests/SocketTest.cpp socketClientConnectSnippet
+/// @snippet Tests/Libraries/Socket/SocketTest.cpp socketClientConnectSnippet
 struct SC::SocketClient
 {
     /// @brief Constructs this SocketClient from a SocketDescriptor (already created with SocketDescriptor::create)
@@ -105,7 +105,7 @@ struct SC::SocketClient
 /// @brief Synchronous DNS Resolution
 ///
 /// Example:
-/// @snippet Libraries/Socket/Tests/SocketTest.cpp resolveDNSSnippet
+/// @snippet Tests/Libraries/Socket/SocketTest.cpp resolveDNSSnippet
 struct SC::SocketDNS
 {
     /// @brief Resolve an host string to an ip address (blocking until DNS response arrives)
@@ -114,7 +114,7 @@ struct SC::SocketDNS
     /// @return Valid Result if ip address for the passed host has been successfully resolved
     ///
     /// Example:
-    /// @snippet Libraries/Socket/Tests/SocketTest.cpp resolveDNSSnippet
+    /// @snippet Tests/Libraries/Socket/SocketTest.cpp resolveDNSSnippet
     [[nodiscard]] static Result resolveDNS(SpanStringView host, SpanString& ipAddress);
 };
 

@@ -18,7 +18,7 @@ struct IntrusiveDoubleLinkedList;
 /// This is an useful data structure when we want to delegate the allocation strategy to caller. @n
 /// Both @ref library_async and @ref library_process use this data structure to store requests.
 ///
-/// \snippet Libraries/Containers/Tests/IntrusiveDoubleLinkedListTest.cpp IntrusiveDoubleLinkedListSnippet
+/// \snippet Tests/Libraries/Containers/IntrusiveDoubleLinkedListTest.cpp IntrusiveDoubleLinkedListSnippet
 template <typename T>
 struct SC::IntrusiveDoubleLinkedList
 {

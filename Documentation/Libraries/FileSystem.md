@@ -9,7 +9,7 @@ Path is able to parse and manipulate windows and posix paths.
 
 # Quick Sheet
 
-\snippet Libraries/FileSystem/Tests/FileSystemTest.cpp FileSystemQuickSheetSnippet
+\snippet Tests/Libraries/FileSystem/FileSystemTest.cpp FileSystemQuickSheetSnippet
 
 # Features
 

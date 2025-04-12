@@ -19,7 +19,7 @@ struct SC_COMPILER_EXPORT VirtualAllocator;
 /// @note Memory must be committed in order to be read or written, occupying physical memory pages.
 /// @warning This class has no defined destructor so memory MUST be released calling VirtualMemory::release
 ///
-/// \snippet Libraries/Foundation/Tests/VirtualMemoryTest.cpp VirtualMemorySnippet
+/// \snippet Tests/Libraries/Foundation/VirtualMemoryTest.cpp VirtualMemorySnippet
 struct SC::VirtualMemory
 {
     size_t reservedBytes  = 0; ///< Maximum amount of reserved memory that can be committed

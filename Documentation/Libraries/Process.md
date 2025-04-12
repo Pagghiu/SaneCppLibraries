@@ -8,7 +8,7 @@ Process allows launching, chaining input and output, setting working directory a
 
 # Quick Sheet
 
-\snippet Libraries/Process/Tests/ProcessTest.cpp ProcessQuickSheetSnippet
+\snippet Tests/Libraries/Process/ProcessTest.cpp ProcessQuickSheetSnippet
 
 # Features
 | Class                     | Description

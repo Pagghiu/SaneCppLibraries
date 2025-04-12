@@ -16,7 +16,7 @@ struct SC_COMPILER_EXPORT HttpWebServer;
 ///
 /// @see SC::HttpServer
 ///
-/// \snippet Libraries/Http/Tests/HttpWebServerTest.cpp HttpWebServerSnippet
+/// \snippet Tests/Libraries/Http/HttpWebServerTest.cpp HttpWebServerSnippet
 struct SC::HttpWebServer
 {
     /// @brief Initialize the web server on the given file system directory to serve

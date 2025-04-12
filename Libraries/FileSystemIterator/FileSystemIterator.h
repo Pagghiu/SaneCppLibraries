@@ -26,10 +26,10 @@ struct FileSystemIterator;
 /// (obtained with SC::FileSystemIterator::get) matches a directory of interest.
 ///
 /// Example of recursive iteration of a directory:
-/// \snippet Libraries/FileSystemIterator/Tests/FileSystemIteratorTest.cpp walkRecursiveSnippet
+/// \snippet Tests/Libraries/FileSystemIterator/FileSystemIteratorTest.cpp walkRecursiveSnippet
 ///
 /// If only some directories should be recursed, manual recursion can help speeding up directory iteration:
-/// \snippet Libraries/FileSystemIterator/Tests/FileSystemIteratorTest.cpp walkRecursiveManualSnippet
+/// \snippet Tests/Libraries/FileSystemIterator/FileSystemIteratorTest.cpp walkRecursiveManualSnippet
 struct SC::FileSystemIterator
 {
   private:

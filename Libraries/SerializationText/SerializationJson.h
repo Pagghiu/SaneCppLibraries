@@ -24,21 +24,21 @@ struct SC_COMPILER_EXPORT SerializationJson;
 ///
 /// @n
 /// Let's consider the following structure described by [Reflection](@ref library_reflection):
-/// @snippet Libraries/SerializationText/Tests/SerializationJsonTest.cpp serializationJsonSnippet1
+/// @snippet Tests/Libraries/SerializationText/SerializationJsonTest.cpp serializationJsonSnippet1
 ///
 /// This is how you can serialize the class to JSON
-/// @snippet Libraries/SerializationText/Tests/SerializationJsonTest.cpp serializationJsonWriteSnippet
+/// @snippet Tests/Libraries/SerializationText/SerializationJsonTest.cpp serializationJsonWriteSnippet
 ///
 /// This is how you can de-serialize the class from JSON, matching fields by their label name, even if they come in
 /// different order than the original class or even if there are missing field.
-/// @snippet Libraries/SerializationText/Tests/SerializationJsonTest.cpp serializationJsonLoadVersionedSnippet
+/// @snippet Tests/Libraries/SerializationText/SerializationJsonTest.cpp serializationJsonLoadVersionedSnippet
 ///
 /// This is a special loader to deserialize the class from the exact same JSON that was output by the serializer itself.
 /// Whitespace changes are fine, but changing the order in which two fields exists or removing one will make
 /// deserialization fail. If these limitations are fine for the usage (for example the generated json files are not
 /// meant to be manually edited by users) than maybe it could be worth using it, as this code path is a lot simpler (*)
 /// than SC::SerializationJson::loadVersioned.
-/// @snippet Libraries/SerializationText/Tests/SerializationJsonTest.cpp serializationJsonLoadExactSnippet
+/// @snippet Tests/Libraries/SerializationText/SerializationJsonTest.cpp serializationJsonLoadExactSnippet
 /// @note (*) simpler code probably means faster code, even if it has not been properly benchmarked yet so the
 /// hypothetical performance gain is yet to be defined.
 struct SC::SerializationJson

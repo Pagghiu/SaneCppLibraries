@@ -93,7 +93,7 @@ struct SC::Path
     /// @returns `false` if both name and extension will be empty after trying to parse them
     ///
     /// Example:
-    /// \snippet Libraries/FileSystem/Tests/PathTest.cpp parseNameExtensionSnippet
+    /// \snippet Tests/Libraries/FileSystem/PathTest.cpp parseNameExtensionSnippet
     [[nodiscard]] static bool parseNameExtension(const StringView input, StringView& name, StringView& extension);
 
     /// @brief Splits a Posix or Windows path into a ParsedView.

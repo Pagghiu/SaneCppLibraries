@@ -81,7 +81,7 @@ The *recursively packed* property allows binary serializers and deserializer to 
 Describing a structure is done externally to the struct itself, specializing a SC::Reflection::Reflect<> struct.  
 
 For Example:
-@snippet Libraries/Reflection/Tests/ReflectionTest.cpp reflectionSnippet1
+@snippet Tests/Libraries/Reflection/ReflectionTest.cpp reflectionSnippet1
 
 ## Struct member info
 - These fields are required for binary and text serialization with **Versioning** support
@@ -136,7 +136,7 @@ constexpr auto SimpleStructureFlatSchema = Schema::compile<TestNamespace::Simple
 
 For example we could print the schema with the following code:
 
-@include Libraries/Reflection/Tests/ReflectionTestPrint.h
+@include Tests/Libraries/Reflection/ReflectionTestPrint.h
 
 Called with the following code
 ```cpp
@@ -169,7 +169,7 @@ It will print the following output for the above struct:
 ```
 Another example with a more complex structure building on top of the simple one:
 
-@snippet Libraries/Reflection/Tests/ReflectionTest.cpp reflectionSnippet2
+@snippet Tests/Libraries/Reflection/ReflectionTest.cpp reflectionSnippet2
 
 Printing the schema of `ComplexStructure` outputs the following:
 

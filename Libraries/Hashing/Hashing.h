@@ -16,10 +16,10 @@ namespace SC
 /// SC::Hashing::getHash will generate an actual SC::Hashing::Result holding the computed *hash*.
 ///
 /// Example:
-/// \snippet Libraries/Hashing/Tests/HashingTest.cpp HashingSnippet
+/// \snippet Tests/Libraries/Hashing/HashingTest.cpp HashingSnippet
 ///
 /// Example with update (for hashing longer streams of data):
-/// \snippet Libraries/Hashing/Tests/HashingTest.cpp HashingUpdateSnippet
+/// \snippet Tests/Libraries/Hashing/HashingTest.cpp HashingUpdateSnippet
 struct Hashing
 {
     struct Result

@@ -14,7 +14,7 @@ struct String;
 
 /// @brief Wraps a SC::FileDescriptor to open it and use strings / buffers.
 /// Example usage:
-/// \snippet Libraries/File/Tests/FileTest.cpp FileSnippet
+/// \snippet Tests/Libraries/File/FileTest.cpp FileSnippet
 struct SC::File
 {
     FileDescriptor& fd;

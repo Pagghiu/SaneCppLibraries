@@ -183,7 +183,7 @@ struct VectorVTable : public ObjectVTable<T>, public SegmentSelfRelativePointer<
 /// @note Use SC::SmallVector everywhere a SC::Vector reference is needed if the upper bound size of required elements
 /// is known to get rid of unnecessary heap allocations.
 ///
-/// \snippet Libraries/Containers/Tests/VectorTest.cpp VectorSnippet
+/// \snippet Tests/Libraries/Containers/VectorTest.cpp VectorSnippet
 template <typename T>
 struct Vector : public Segment<detail::VectorVTable<T>>
 {
@@ -254,7 +254,7 @@ struct Vector : public Segment<detail::VectorVTable<T>>
 /// It can be used to get rid of unnecessary allocations where the upper bound of required elements is known or it can
 /// be predicted.
 ///
-/// \snippet Libraries/Containers/Tests/SmallVectorTest.cpp SmallVectorSnippet
+/// \snippet Tests/Libraries/Containers/SmallVectorTest.cpp SmallVectorSnippet
 template <typename T, int N>
 struct SmallVector : public Vector<T>
 {

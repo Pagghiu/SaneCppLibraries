@@ -105,12 +105,12 @@ void runSupportToolsTest(TestReport& report);
 #error "SC_SPACES_SPECIFIC_DEFINE should NOT be defined on this file"
 #endif
 
-#include "../../Libraries/Containers/Vector.h"
-#include "../../Libraries/FileSystem/FileSystemDirectories.h"
-#include "../../Libraries/FileSystem/Path.h"
-#include "../../Libraries/Socket/Socket.h"
-#include "../../Libraries/Strings/Console.h"
-#include "../../Libraries/Testing/Testing.h"
+#include "Libraries/Containers/Vector.h"
+#include "Libraries/FileSystem/FileSystemDirectories.h"
+#include "Libraries/FileSystem/Path.h"
+#include "Libraries/Socket/Socket.h"
+#include "Libraries/Strings/Console.h"
+#include "Libraries/Testing/Testing.h"
 
 SC::Console* globalConsole;
 
