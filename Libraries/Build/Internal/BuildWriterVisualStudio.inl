@@ -425,8 +425,9 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
 
             {
                 builder.append("      <{0} "
-                               "Condition=\"'$(Configuration)|$(Platform)'=='{1}|{2}'\">{3}",
-                               tag, configuration.name, platform, value);
+                               "Condition=\"'$(Configuration)|$(Platform)'=='{1}|{2}'\">",
+                               tag, configuration.name, platform);
+                appendVariable(builder, value);
                 builder.append("</{0}>\n", tag);
                 return true;
             });
