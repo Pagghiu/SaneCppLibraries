@@ -186,21 +186,20 @@ SC::Result SC::AsyncSocketAccept::start(AsyncEventLoop& loop, const SocketDescri
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncSocketConnect::start(AsyncEventLoop& loop, const SocketDescriptor& socketDescriptor,
-                                         SocketIPAddress socketIpAddress)
+SC::Result SC::AsyncSocketConnect::start(AsyncEventLoop& loop, const SocketDescriptor& descriptor,
+                                         SocketIPAddress address)
 {
     SC_TRY(validateAsync());
-    SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
-    ipAddress = socketIpAddress;
+    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    ipAddress = address;
     queueSubmission(loop);
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop, const SocketDescriptor& socketDescriptor,
-                                      Span<const char> dataToSend)
+SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop, const SocketDescriptor& descriptor, Span<const char> data)
 {
-    SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
-    buffer = dataToSend;
+    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    buffer       = data;
     return start(loop);
 }
 
@@ -217,11 +216,10 @@ SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop)
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncSocketReceive::start(AsyncEventLoop& loop, const SocketDescriptor& socketDescriptor,
-                                         Span<char> receiveData)
+SC::Result SC::AsyncSocketReceive::start(AsyncEventLoop& loop, const SocketDescriptor& descriptor, Span<char> data)
 {
-    SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
-    buffer = receiveData;
+    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    buffer = data;
     return start(loop);
 }
 
@@ -232,10 +230,10 @@ SC::Result SC::AsyncSocketReceive::start(AsyncEventLoop& loop)
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncSocketClose::start(AsyncEventLoop& loop, const SocketDescriptor& socketDescriptor)
+SC::Result SC::AsyncSocketClose::start(AsyncEventLoop& loop, const SocketDescriptor& descriptor)
 {
     SC_TRY(validateAsync());
-    SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
+    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
     queueSubmission(loop);
     return SC::Result(true);
 }
