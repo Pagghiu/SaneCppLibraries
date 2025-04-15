@@ -223,10 +223,13 @@ struct SC::Process
     [[nodiscard]] Result setEnvironment(StringView environmentVariable, StringView value);
 
     /// @brief Returns number of (virtual) processors available
-    static size_t getNumberOfProcessors();
+    [[nodiscard]] static size_t getNumberOfProcessors();
 
     /// @brief Returns true only under Windows if executable is compiled with `/SUBSYSTEM:Console`
-    static bool isWindowsConsoleSubsystem();
+    [[nodiscard]] static bool isWindowsConsoleSubsystem();
+
+    /// @brief Returns true if we're emulating x64 on ARM64 or the inverse on Windows
+    [[nodiscard]] static bool isWindowsEmulatedProcess();
 
   private:
     ProcessDescriptor::ExitStatus exitStatus; ///< Exit status code returned after process is finished
@@ -384,6 +387,7 @@ struct SC::ProcessEnvironment
 /// 2. Limit API calls in forked process to console IO, network and file I/O (avoid GUI / Graphics)
 /// 3. All threads other than the current one will be suspended in child process (beware of deadlocks)
 /// 4. Create Sockets and FileDescriptors with Inheritable flags if you need them in fork process
+/// 5. Process deadlocks under Windows ARM64 / x86 emulation (use Process::IsWindowsEmulatedProcess)
 ///
 /// Example: Fork current process modifying memory in forked process leaving parent's one unmodified.
 /// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessFork

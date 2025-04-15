@@ -36,6 +36,7 @@ SC::size_t SC::Process::getNumberOfProcessors()
 }
 
 bool SC::Process::isWindowsConsoleSubsystem() { return false; }
+bool SC::Process::isWindowsEmulatedProcess() { return false; }
 
 struct SC::Process::Internal
 {

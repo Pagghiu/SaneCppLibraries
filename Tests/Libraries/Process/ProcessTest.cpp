@@ -54,9 +54,14 @@ struct SC::ProcessTest : public SC::TestCase
         {
             processEnvironmentPrint();
         }
-        if (test_section("Process fork"))
+
+        // Process fork doesn't work under windows ARM64 <-> x86_64 emulation
+        if (not Process::isWindowsEmulatedProcess())
         {
-            processFork();
+            if (test_section("Process fork"))
+            {
+                processFork();
+            }
         }
 #if SC_XCTEST
 #else

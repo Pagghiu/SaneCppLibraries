@@ -22,6 +22,28 @@ SC::Result SC::detail::ProcessDescriptorDefinition::releaseHandle(HANDLE& handle
 
 bool SC::Process::isWindowsConsoleSubsystem() { return ::GetStdHandle(STD_OUTPUT_HANDLE) == NULL; }
 
+bool SC::Process::isWindowsEmulatedProcess()
+{
+    USHORT processMachine = 0;
+    USHORT nativeMachine  = 0;
+    ::IsWow64Process2(GetCurrentProcess(), &processMachine, &nativeMachine);
+    if (processMachine == IMAGE_FILE_MACHINE_UNKNOWN)
+    {
+        // I am not sure why Windows returns IMAGE_FILE_MACHINE_UNKNOWN but we can dig deeper for it
+        PROCESS_MACHINE_INFORMATION processMachineInfo;
+        if (::GetProcessInformation(::GetCurrentProcess(), ProcessMachineTypeInfo, &processMachineInfo,
+                                    sizeof(PROCESS_MACHINE_INFORMATION)))
+        {
+            processMachine = processMachineInfo.ProcessMachine;
+        }
+        else
+        {
+            processMachine = nativeMachine;
+        }
+    }
+    return processMachine != nativeMachine;
+}
+
 SC::size_t SC::Process::getNumberOfProcessors()
 {
     SYSTEM_INFO systemInfo;
