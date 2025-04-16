@@ -200,12 +200,29 @@ SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop, const SocketDescript
 {
     SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
     buffer       = data;
+    singleBuffer = true;
     return start(loop);
 }
 
+SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop, const SocketDescriptor& descriptor,
+                                      Span<Span<const char>> data)
+{
+    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    buffers      = data;
+    singleBuffer = false;
+    return start(loop);
+}
 SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop)
 {
-    SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncSocketSend::start - Zero sized write buffer");
+    if (singleBuffer)
+    {
+        SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncSocketSend::start - Zero sized write buffer");
+    }
+    else
+    {
+        SC_TRY_MSG(buffers.sizeInBytes() > 0 and not buffers[0].empty(),
+                   "AsyncSocketSend::start - Zero sized write buffer");
+    }
     SC_TRY_MSG(handle != SocketDescriptor::Invalid, "AsyncSocketSend::start - Invalid file descriptor");
     SC_TRY(validateAsync());
 #if SC_PLATFORM_WINDOWS

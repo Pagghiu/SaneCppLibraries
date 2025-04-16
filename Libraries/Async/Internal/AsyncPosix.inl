@@ -14,6 +14,7 @@
 #include <sys/signalfd.h> // For signalfd functions
 #include <sys/socket.h>   // For socket-related functions
 #include <sys/stat.h>
+#include <sys/uio.h> // writev, pwritev
 
 #else
 
@@ -22,9 +23,9 @@
 #include <sys/event.h> // kqueue
 #include <sys/stat.h>
 #include <sys/time.h> // timespec
+#include <sys/uio.h>  // writev, pwritev
 #include <sys/wait.h> // WIFEXITED / WEXITSTATUS
 #include <unistd.h>   // read/write/pread/pwrite
-
 #endif
 
 struct SC::AsyncEventLoop::Internal::KernelQueuePosix
@@ -616,10 +617,54 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     {
         AsyncSocketSend& async = result.getAsync();
 
-        while (async.totalBytesSent < async.buffer.sizeInBytes())
+        const size_t totalBytesToSend = Internal::getSummedSizeOfBuffers(async);
+        while (async.totalBytesSent < totalBytesToSend)
         {
-            const ssize_t numBytesSent = ::send(async.handle, async.buffer.data() + async.totalBytesSent,
-                                                async.buffer.sizeInBytes() - async.totalBytesSent, 0);
+            ssize_t      numBytesSent   = 0;
+            const size_t remainingBytes = totalBytesToSend - async.totalBytesSent;
+            if (async.singleBuffer)
+            {
+                numBytesSent = ::write(async.handle, async.buffer.data() + async.totalBytesSent, remainingBytes);
+            }
+            else
+            {
+                // Span has same underling representation as iovec (void*, size_t)
+                static_assert(sizeof(iovec) == sizeof(Span<const char>), "assert");
+                iovec*    ioVectors    = reinterpret_cast<iovec*>(async.buffers.data());
+                const int numIoVectors = static_cast<int>(async.buffers.sizeInElements());
+
+                // If coming from a previous partial write, find the iovec that was not fully written or
+                // just compute the index to first iovec that was not yet written at all.
+                // Modify such iovec to the not-written-yet slice of the original and proceed to write
+                // it together with all all iovecs that come after it. Restore the modified iovec (if any).
+                size_t fullyWrittenBytes = 0; // Bytes of already fully written io vecs
+                size_t indexOfVecToWrite = 0; // Index of first iovec that has not yet been written
+                while (indexOfVecToWrite < async.buffers.sizeInElements())
+                {
+                    const size_t ioVecSize = async.buffers[indexOfVecToWrite].sizeInBytes();
+                    if (fullyWrittenBytes + ioVecSize > async.totalBytesSent)
+                    {
+                        break;
+                    }
+                    fullyWrittenBytes += ioVecSize;
+                }
+                // Number of writes already written of io vector at indexOfVecToWrite
+                const size_t partiallyWrittenBytes = async.totalBytesSent - fullyWrittenBytes;
+                const iovec  backup                = ioVectors[indexOfVecToWrite];
+                if (partiallyWrittenBytes > 0)
+                {
+                    ioVectors[indexOfVecToWrite].iov_base =
+                        static_cast<char*>(ioVectors[indexOfVecToWrite].iov_base) + partiallyWrittenBytes;
+                    ioVectors[indexOfVecToWrite].iov_len -= partiallyWrittenBytes;
+                }
+                // Write everything from indexOfVecToWrite going forward
+                numBytesSent = ::writev(async.handle, ioVectors + indexOfVecToWrite,
+                                        numIoVectors - static_cast<int>(indexOfVecToWrite));
+                if (partiallyWrittenBytes > 0)
+                {
+                    ioVectors[indexOfVecToWrite] = backup;
+                }
+            }
 
             if (numBytesSent < 0)
             {
@@ -647,7 +692,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         }
 
         result.completionData.numBytes = async.totalBytesSent;
-        SC_TRY_MSG(result.completionData.numBytes == async.buffer.sizeInBytes(), "send didn't send all data");
+        SC_TRY_MSG(result.completionData.numBytes == totalBytesToSend, "send didn't send all data");
         return Result(true);
     }
 

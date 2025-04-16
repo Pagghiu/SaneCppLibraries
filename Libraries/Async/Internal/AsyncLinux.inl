@@ -456,7 +456,19 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(async, submission));
-        globalLibURing.io_uring_prep_send(submission, async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
+        if (async.singleBuffer)
+        {
+            globalLibURing.io_uring_prep_write(submission, async.handle, async.buffer.data(),
+                                               async.buffer.sizeInBytes(), 0);
+        }
+        else
+        {
+            // iovec is binary compatible with Span
+            static_assert(sizeof(iovec) == sizeof(Span<const char>), "assert");
+            const iovec*   vecs  = reinterpret_cast<const iovec*>(async.buffers.data());
+            const unsigned nVecs = static_cast<unsigned>(async.buffers.sizeInElements());
+            globalLibURing.io_uring_prep_writev(submission, async.handle, vecs, nVecs, 0);
+        }
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
     }
@@ -464,8 +476,20 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     [[nodiscard]] Result completeAsync(AsyncSocketSend::Result& result)
     {
         result.completionData.numBytes = static_cast<size_t>(events[result.getAsync().eventIndex].res);
-        SC_TRY_MSG(result.completionData.numBytes == result.getAsync().buffer.sizeInBytes(),
-                   "send didn't send all data");
+
+        size_t totalBytes = 0;
+        if (result.getAsync().singleBuffer)
+        {
+            totalBytes = result.getAsync().buffer.sizeInBytes();
+        }
+        else
+        {
+            for (const auto& buf : result.getAsync().buffers)
+            {
+                totalBytes += buf.sizeInBytes();
+            }
+        }
+        SC_TRY_MSG(result.completionData.numBytes == totalBytes, "send didn't send all data");
         return Result(true);
     }
 

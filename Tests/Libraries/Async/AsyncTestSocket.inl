@@ -276,6 +276,41 @@ void SC::AsyncTest::socketSendReceive()
     SC_TEST_EXPECT(context.totalNumBytesRead == largeBufferSize);
 }
 
+void SC::AsyncTest::socketSendMultiple()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+    SocketDescriptor client, serverSideClient;
+    createTCPSocketPair(eventLoop, client, serverSideClient);
+
+    Span<const char> sendData[] = {{"PING", 4}, {"PONG", 4}};
+
+    int             sendCount = 0;
+    AsyncSocketSend sendAsync;
+    sendAsync.callback = [&](AsyncSocketSend::Result& res)
+    {
+        SC_TEST_EXPECT(res.isValid());
+        sendCount++;
+    };
+
+    SC_TEST_EXPECT(sendAsync.start(eventLoop, client, sendData));
+    SC_TEST_EXPECT(eventLoop.runOnce());
+
+    AsyncSocketReceive receiveAsync;
+    receiveAsync.callback = [this, &client](AsyncSocketReceive::Result& res)
+    {
+        Span<char> readData;
+        SC_TEST_EXPECT(res.get(readData));
+        SC_TEST_EXPECT(client.close()); // Causes EOF
+        SC_TEST_EXPECT(readData.sizeInBytes() == 8);
+    };
+    char       receiveBuffer[8] = {0};
+    Span<char> receiveData      = {receiveBuffer, sizeof(receiveBuffer)};
+    SC_TEST_EXPECT(receiveAsync.start(eventLoop, serverSideClient, receiveData));
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(StringView({receiveBuffer, 8}, false, StringEncoding::Ascii) == "PINGPONG");
+}
+
 void SC::AsyncTest::socketClose()
 {
     AsyncEventLoop eventLoop;
@@ -337,7 +372,8 @@ void SC::AsyncTest::socketSendReceiveError()
         numOnSend++;
         SC_TEST_EXPECT(not result.isValid());
     };
-    SC_TEST_EXPECT(asyncSend.start(eventLoop, serverSideClient, {sendBuffer, sizeof(sendBuffer)}));
+    Span<const char> toSend = {sendBuffer, sizeof(sendBuffer)};
+    SC_TEST_EXPECT(asyncSend.start(eventLoop, serverSideClient, toSend));
 
     // Setup receive side on client
     char recvBuffer[1] = {1};

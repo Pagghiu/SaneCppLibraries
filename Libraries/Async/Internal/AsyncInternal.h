@@ -176,4 +176,23 @@ struct SC::AsyncEventLoop::Internal
 
     void                 prepareTeardown(AsyncRequest& async, AsyncTeardown& teardown);
     [[nodiscard]] Result teardownAsync(AsyncTeardown& async);
+
+    template <typename T>
+    static size_t getSummedSizeOfBuffers(T& async)
+    {
+        size_t summedSizeBytes;
+        if (async.singleBuffer)
+        {
+            summedSizeBytes = async.buffer.sizeInBytes();
+        }
+        else
+        {
+            summedSizeBytes = 0;
+            for (size_t idx = 0; idx < async.buffers.sizeInElements(); ++idx)
+            {
+                summedSizeBytes += async.buffers[idx].sizeInBytes();
+            }
+        }
+        return summedSizeBytes;
+    }
 };

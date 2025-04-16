@@ -69,6 +69,10 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             socketSendReceive();
         }
+        if (test_section("socket send multiple"))
+        {
+            socketSendMultiple();
+        }
         if (test_section("error send/receive"))
         {
             socketSendReceiveError();
@@ -294,6 +298,9 @@ sendAsync.callback = [&](AsyncSocketSend::Result& res)
 };
 
 SC_TRY(sendAsync.start(eventLoop, client, sendData));
+// Vectorized writes: use proper start overload or set
+// AsyncSocketSend::buffers and AsyncSocketSend::singleBuffer = false
+
 //! [AsyncSocketSendSnippet]
 SC_TRY(eventLoop.run());
 return Result(true);

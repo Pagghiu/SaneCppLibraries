@@ -283,6 +283,12 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
         io_uring_prep_rw(IORING_OP_WRITE, sqe, fd, buf, nbytes, offset);
     }
 
+    static inline void io_uring_prep_writev(struct io_uring_sqe* sqe, int fd, const iovec* vecs, unsigned nvecs,
+                                            __u64 offset)
+    {
+        io_uring_prep_rw(IORING_OP_WRITEV, sqe, fd, vecs, nvecs, offset);
+    }
+
     static inline unsigned static__io_uring_prep_poll_mask(unsigned poll_mask)
     {
 #if __BYTE_ORDER == __BIG_ENDIAN

@@ -413,12 +413,34 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     [[nodiscard]] static Result activateAsync(AsyncSocketSend& async)
     {
         OVERLAPPED& overlapped = async.overlapped.get().overlapped;
-        WSABUF      buffer;
-        // this const_cast is caused by WSABUF being used for both send and receive
-        buffer.buf = const_cast<CHAR*>(async.buffer.data());
-        buffer.len = static_cast<ULONG>(async.buffer.sizeInBytes());
-        DWORD     transferred;
-        const int res = ::WSASend(async.handle, &buffer, 1, &transferred, 0, &overlapped, nullptr);
+        DWORD       transferred;
+        // Differently from Posix backend, Span layout is not compatible with WASABUF
+        int res;
+        if (async.singleBuffer)
+        {
+            WSABUF buffer;
+            // this const_cast is caused by WSABUF being used for both send and receive
+            buffer.buf = const_cast<CHAR*>(async.buffer.data());
+            buffer.len = static_cast<ULONG>(async.buffer.sizeInBytes());
+            res        = ::WSASend(async.handle, &buffer, 1, &transferred, 0, &overlapped, nullptr);
+        }
+        else
+        {
+            // TODO: Consider if we should allow user to supply memory for the WSABUF
+            constexpr size_t MaxBuffers = 512;
+            if (async.buffers.sizeInElements() > MaxBuffers)
+            {
+                return Result::Error("Cannot write more than 512 buffers at once");
+            }
+            DWORD  numBuffers = static_cast<DWORD>(async.buffers.sizeInElements());
+            WSABUF buffers[MaxBuffers];
+            for (DWORD idx = 0; idx < numBuffers; ++idx)
+            {
+                buffers[idx].buf = const_cast<CHAR*>(async.buffers[idx].data());
+                buffers[idx].len = static_cast<ULONG>(async.buffers[idx].sizeInBytes());
+            }
+            res = ::WSASend(async.handle, buffers, numBuffers, &transferred, 0, &overlapped, nullptr);
+        }
         SC_TRY_MSG(res != SOCKET_ERROR or WSAGetLastError() == WSA_IO_PENDING, "WSASend failed");
         // TODO: when res == 0 we could avoid the additional GetOverlappedResult syscall
         return Result(true);

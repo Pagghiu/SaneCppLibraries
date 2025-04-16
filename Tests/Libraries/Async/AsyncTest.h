@@ -36,6 +36,7 @@ struct SC::AsyncTest : public SC::TestCase
     void socketAccept();
     void socketConnect();
     void socketSendReceive();
+    void socketSendMultiple();
     void socketClose();
     void socketSendReceiveError();
     void fileReadWrite(bool useThreadPool);

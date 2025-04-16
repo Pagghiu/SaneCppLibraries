@@ -585,7 +585,7 @@ struct AsyncSocketSend : public AsyncRequest
     /// @brief Callback result for AsyncSocketSend
     using Result = AsyncResultOf<AsyncSocketSend, CompletionData>;
 
-    /// @brief Starts a socket send operation.
+    /// @brief Starts a socket send operation (single buffer).
     /// Callback will be called when the given socket is ready to send more data.
     /// @param eventLoop The event loop where queuing this async request
     /// @param descriptor The socket to send data to
@@ -593,17 +593,29 @@ struct AsyncSocketSend : public AsyncRequest
     /// @return Valid Result if the request has been successfully queued
     SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor, Span<const char> data);
 
-    /// @brief Starts a socket send operation.
+    /// @brief Starts a socket send operation (multiple buffers).
+    /// Callback will be called when the given socket is ready to send more data.
+    /// @param eventLoop The event loop where queuing this async request
+    /// @param descriptor The socket to send data to
+    /// @param data The data to be sent
+    /// @return Valid Result if the request has been successfully queued
+    SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor, Span<Span<const char>> data);
+
+    /// @brief Starts a socket send operation (single or multiple epending on AsyncSocketSend::singleBuffer)
     /// Callback will be called when the given socket is ready to send more data.
     /// @param eventLoop The event loop where queuing this async request
     /// @return Valid Result if the request has been successfully queued
-    /// @note Remember to fill AsyncSocketSend::buffer and AsyncSocketSend::handle before calling start
+    /// @note Remember to fill AsyncSocketSend::buffer or AsyncSocketSend::buffers (plus potentially
+    /// AsyncSocketSend::singleBuffer) and AsyncSocketSend::handle before calling start
     SC::Result start(AsyncEventLoop& eventLoop);
 
     Function<void(Result&)> callback; ///< Called when socket is ready to send more data.
 
-    Span<const char>         buffer;                             ///< Span of bytes to send
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid; ///< The socket to send data to
+
+    Span<const char>       buffer;              ///< Span of bytes to send (singleBuffer == true)
+    Span<Span<const char>> buffers;             ///< Spans of bytes to send (singleBuffer == false)
+    bool                   singleBuffer = true; ///< Controls if buffer or buffers will be used
 
   private:
     friend struct AsyncEventLoop;
