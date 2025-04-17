@@ -838,21 +838,41 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     [[nodiscard]] static Result executeOperation(AsyncFileWrite& async, AsyncFileWrite::CompletionData& completionData)
     {
-        auto    span = async.buffer;
         ssize_t res;
+        off_t   offset = static_cast<off_t>(async.offset);
         do
         {
-            if (async.useOffset)
+            if (async.singleBuffer)
             {
-                res = ::pwrite(async.fileDescriptor, span.data(), span.sizeInBytes(), static_cast<off_t>(async.offset));
+                if (async.useOffset)
+                {
+                    res = ::pwrite(async.fileDescriptor, async.buffer.data(), async.buffer.sizeInBytes(), offset);
+                }
+                else
+                {
+                    res = ::write(async.fileDescriptor, async.buffer.data(), async.buffer.sizeInBytes());
+                }
             }
             else
             {
-                res = ::write(async.fileDescriptor, span.data(), span.sizeInBytes());
+                // Span has same underling representation as iovec (void*, size_t)
+                static_assert(sizeof(iovec) == sizeof(Span<const char>), "assert");
+                const iovec* ioVectors  = reinterpret_cast<const iovec*>(async.buffers.data());
+                const int    numVectors = static_cast<int>(async.buffers.sizeInElements());
+                if (async.useOffset)
+                {
+                    res = ::pwritev(async.fileDescriptor, ioVectors, numVectors, offset);
+                }
+                else
+                {
+                    res = ::writev(async.fileDescriptor, ioVectors, numVectors);
+                }
             }
         } while ((res == -1) and (errno == EINTR));
-        SC_TRY_MSG(res >= 0, "::write failed");
+        SC_TRY_MSG(res >= 0, "::write or ::pwrite failed");
         completionData.numBytes = static_cast<size_t>(res);
+        SC_TRY_MSG(completionData.numBytes == Internal::getSummedSizeOfBuffers(async),
+                   "Partial write (disk full or RLIMIT_FSIZE reached)");
         return Result(true);
     }
 

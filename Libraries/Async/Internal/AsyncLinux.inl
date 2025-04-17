@@ -565,17 +565,28 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(async, submission));
-        globalLibURing.io_uring_prep_write(submission, async.fileDescriptor, async.buffer.data(),
-                                           async.buffer.sizeInBytes(), async.useOffset ? async.offset : -1);
+        const __u64 off = async.useOffset ? async.offset : -1;
+        if (async.singleBuffer)
+        {
+            globalLibURing.io_uring_prep_write(submission, async.fileDescriptor, async.buffer.data(),
+                                               async.buffer.sizeInBytes(), off);
+        }
+        else
+        {
+            // iovec is binary compatible with Span
+            static_assert(sizeof(iovec) == sizeof(Span<const char>), "assert");
+            const iovec*   vecs  = reinterpret_cast<const iovec*>(async.buffers.data());
+            const unsigned nVecs = static_cast<unsigned>(async.buffers.sizeInElements());
+            globalLibURing.io_uring_prep_writev(submission, async.fileDescriptor, vecs, nVecs, off);
+        }
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
     }
 
     [[nodiscard]] Result completeAsync(AsyncFileWrite::Result& result)
     {
-        const size_t numBytes          = static_cast<size_t>(events[result.getAsync().eventIndex].res);
-        result.completionData.numBytes = numBytes;
-        return Result(numBytes == result.getAsync().buffer.sizeInBytes());
+        result.completionData.numBytes = static_cast<size_t>(events[result.getAsync().eventIndex].res);
+        return Result(result.completionData.numBytes == Internal::getSummedSizeOfBuffers(result.getAsync()));
     }
 
     //-------------------------------------------------------------------------------------------------------

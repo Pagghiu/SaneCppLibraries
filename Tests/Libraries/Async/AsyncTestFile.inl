@@ -226,6 +226,80 @@ void SC::AsyncTest::fileEndOfFile(bool useThreadPool)
     SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
 }
 
+void SC::AsyncTest::fileWriteMultiple(bool useThreadPool)
+{
+    // 1. Create ThreadPool and tasks
+    ThreadPool threadPool;
+    if (useThreadPool)
+    {
+        SC_TEST_EXPECT(threadPool.create(4));
+    }
+
+    // 2. Create EventLoop
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    // 2. Create Some file paths
+    StringNative<255> filePath = StringEncoding::Native;
+    StringNative<255> dirPath  = StringEncoding::Native;
+    const StringView  name     = "AsyncTest";
+    const StringView  fileName = "test.txt";
+    SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory, name}));
+    SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
+
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
+
+    // 4. Open the destination file and associate it with the event loop
+    File::OpenOptions openOptions;
+    openOptions.blocking = useThreadPool;
+
+    FileDescriptor fd;
+    File           file(fd);
+    SC_TEST_EXPECT(file.open(filePath.view(), File::WriteCreateTruncate, openOptions));
+    if (not useThreadPool)
+    {
+        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
+    }
+
+    FileDescriptor::Handle handle = FileDescriptor::Invalid;
+    SC_TEST_EXPECT(fd.get(handle, Result::Error("handle")));
+
+    // 5. Write the file using two buffers
+    AsyncFileWrite       fileWrite;
+    AsyncFileWrite::Task fileWriteTask;
+    if (useThreadPool)
+    {
+        SC_TEST_EXPECT(fileWrite.setThreadPoolAndTask(threadPool, fileWriteTask));
+    }
+
+    fileWrite.callback = [&](AsyncFileWrite::Result& res)
+    {
+        size_t writtenBytes = 0;
+        SC_TEST_EXPECT(res.get(writtenBytes));
+        SC_TEST_EXPECT(writtenBytes == 8);
+    };
+    Span<const char> buffers[] = {{"PING", 4}, {"PONG", 4}};
+    fileWrite.fileDescriptor   = handle;
+    SC_TEST_EXPECT(fileWrite.start(eventLoop, buffers));
+
+    SC_TEST_EXPECT(eventLoop.run());
+
+    SC_TEST_EXPECT(fd.close());
+
+    // 6. Verify file contents
+    String contents;
+    SC_TEST_EXPECT(fs.read(filePath.view(), contents, StringEncoding::Ascii));
+    SC_TEST_EXPECT(contents.view() == "PINGPONG");
+
+    // 7. Cleanup
+    SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
+    SC_TEST_EXPECT(fs.removeFile(fileName));
+    SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
+}
+
 void SC::AsyncTest::fileClose()
 {
     AsyncEventLoop eventLoop;

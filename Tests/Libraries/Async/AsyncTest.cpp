@@ -91,6 +91,11 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
             fileEndOfFile(false); // do not use thread-pool
             fileEndOfFile(true);  // use thread-pool
         }
+        if (test_section("file write multiple"))
+        {
+            fileWriteMultiple(false); // do not use thread-pool
+            fileWriteMultiple(true);  // use thread-pool
+        }
         if (test_section("file close"))
         {
             fileClose();
@@ -467,8 +472,10 @@ asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
 };
 // Obtain file descriptor handle
 SC_TRY(fd.get(asyncWriteFile.fileDescriptor, Result::Error("Invalid Handle")));
-asyncWriteFile.buffer = StringView("test").toCharSpan();;
-
+asyncWriteFile.buffer = StringView("test").toCharSpan();
+// Vectorized writes: use proper start overload or set
+// AsyncFileWrite::buffers and AsyncFileWrite::singleBuffer = false
+    
 // Start the operation in a thread pool
 AsyncFileWrite::Task asyncFileTask;
 SC_TRY(asyncWriteFile.setThreadPoolAndTask(threadPool, asyncFileTask));

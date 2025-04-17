@@ -271,9 +271,18 @@ SC::Result SC::AsyncFileRead::start(AsyncEventLoop& loop)
 
 SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop)
 {
-    SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncFileWrite::start - Zero sized write buffer");
+    if (singleBuffer)
+    {
+        SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncFileWrite::start - Zero sized write buffer");
+    }
+    else
+    {
+        SC_TRY_MSG(not buffers.empty() and not buffers[0].empty(), "AsyncFileWrite::start - Zero sized write buffer");
+    }
     SC_TRY_MSG(fileDescriptor != FileDescriptor::Invalid, "AsyncFileWrite::start - Invalid file descriptor");
     SC_TRY(validateAsync());
+    totalBytesWritten = 0;
+
     // Only use the async tasks for operations and backends that are not io_uring
     if (not loop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
     {
@@ -281,6 +290,20 @@ SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop)
     }
     queueSubmission(loop);
     return SC::Result(true);
+}
+
+SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop, Span<Span<const char>> data)
+{
+    buffers      = data;
+    singleBuffer = false;
+    return start(loop);
+}
+
+SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop, Span<const char> data)
+{
+    buffer       = data;
+    singleBuffer = true;
+    return start(loop);
 }
 
 SC::Result SC::AsyncFileClose::start(AsyncEventLoop& loop, FileDescriptor::Handle fd)

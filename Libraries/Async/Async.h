@@ -854,13 +854,30 @@ struct AsyncFileWrite : public AsyncRequest
     /// can be used in non-blocking mode (`OpenOptions::blocking` == `false`) without a thread pool and
     /// SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor must have been called on the passed in handle.
     /// - `io_uring` backend will not use thread pool because that API allows proper async file read/writes.
+    /// - Remember to set AsyncFileWrite::buffer / AsyncFileWrite::buffers / AsyncFileWrite::singleBuffer and
+    /// AsyncFileWrite::fileDescriptor before calling start.
     SC::Result start(AsyncEventLoop& eventLoop);
 
-    Function<void(Result&)> callback; /// Callback called when descriptor is ready to be written with more data
+    /// @brief Starts a file write operation with multiple buffers
+    /// @param eventLoop The EventLoop to run this operation on
+    /// @param data The buffers to be written
+    /// @see AsyncFileWrite::start
+    SC::Result start(AsyncEventLoop& eventLoop, Span<Span<const char>> data);
 
-    Span<const char>       buffer;         /// The read-only span of memory where to read the data from
-    FileDescriptor::Handle fileDescriptor; /// The file/pipe descriptor to write data to.
-                                           /// Use SC::FileDescriptor or SC::PipeDescriptor to open it.
+    /// @brief Starts a file write operation with a single buffer
+    /// @param eventLoop The EventLoop to run this operation on
+    /// @param data The buffers to be written
+    /// @see AsyncFileWrite::start
+    SC::Result start(AsyncEventLoop& eventLoop, Span<const char> data);
+
+    Function<void(Result&)> callback; ///< Callback called when descriptor is ready to be written with more data
+
+    FileDescriptor::Handle fileDescriptor; ///< The file/pipe descriptor to write data to.
+                                           ///< Use SC::FileDescriptor or SC::PipeDescriptor to open it.
+
+    Span<const char>       buffer;              ///< The read-only span of memory where to read the data from
+    Span<Span<const char>> buffers;             ///< The read-only spans of memory where to read the data from
+    bool                   singleBuffer = true; ///< Controls if buffer or buffers will be used
 
     /// @brief Returns the last offset set with AsyncFileWrite::setOffset
     uint64_t getOffset() const { return offset; }
@@ -877,6 +894,8 @@ struct AsyncFileWrite : public AsyncRequest
     friend struct AsyncEventLoop;
     bool     useOffset = false;
     uint64_t offset    = 0xffffffffffffffff; /// Offset to start writing from. Not supported on pipes.
+
+    size_t totalBytesWritten = 0;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
 #endif

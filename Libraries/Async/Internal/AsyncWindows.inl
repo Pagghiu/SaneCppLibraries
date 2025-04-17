@@ -414,7 +414,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     {
         OVERLAPPED& overlapped = async.overlapped.get().overlapped;
         DWORD       transferred;
-        // Differently from Posix backend, Span layout is not compatible with WASABUF
+        // Differently from Posix backend, Span layout is not compatible with WSABUF
         int res;
         if (async.singleBuffer)
         {
@@ -499,19 +499,19 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     // File READ / WRITE shared functions
     //-------------------------------------------------------------------------------------------------------
     template <typename Func, typename T>
-    [[nodiscard]] static Result executeFileOperation(Func func, T& async, typename T::CompletionData& completionData,
-                                                     bool synchronous, bool* endOfFile)
+    [[nodiscard]] static Result executeFileOperation(Func func, T& async, decltype(T::buffer) buffer, bool synchronous,
+                                                     size_t& readBytes, bool* endOfFile)
     {
         OVERLAPPED& overlapped = async.overlapped.get().overlapped;
         overlapped.Offset      = static_cast<DWORD>(async.offset & 0xffffffff);
         overlapped.OffsetHigh  = static_cast<DWORD>((async.offset >> 32) & 0xffffffff);
 
-        const DWORD bufSize = static_cast<DWORD>(async.buffer.sizeInBytes());
+        const DWORD bufSize = static_cast<DWORD>(buffer.sizeInBytes());
 
         const FileDescriptor::Handle fileDescriptor = async.fileDescriptor;
 
         DWORD numBytes;
-        if (func(fileDescriptor, async.buffer.data(), bufSize, &numBytes, &overlapped) == FALSE)
+        if (func(fileDescriptor, buffer.data(), bufSize, &numBytes, &overlapped) == FALSE)
         {
             const DWORD lastError = ::GetLastError();
             if (lastError == ERROR_IO_PENDING) // ERROR_IO_PENDING just indicates async operation is in progress
@@ -543,7 +543,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 // We got an unexpected error.
                 // In the async case probably the user forgot to open the file with async flags and associate it.
                 // In the sync case (threadpool) we try a regular sync call to support files opened with async == false.
-                if (not synchronous or func(fileDescriptor, async.buffer.data(), bufSize, &numBytes, nullptr) == FALSE)
+                if (not synchronous or func(fileDescriptor, buffer.data(), bufSize, &numBytes, nullptr) == FALSE)
                 {
                     // File must have File::OpenOptions::async == true +
                     // associateExternallyCreatedFileDescriptor
@@ -553,7 +553,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             }
         }
 
-        completionData.numBytes = static_cast<size_t>(numBytes);
+        readBytes = static_cast<size_t>(numBytes);
         return Result(true);
     }
 
@@ -594,7 +594,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         {
             async.offset = async.readCursor;
         }
-        SC_TRY(executeFileOperation(&::ReadFile, async, completionData, synchronous, &completionData.endOfFile));
+        SC_TRY(executeFileOperation(&::ReadFile, async, async.buffer, synchronous, completionData.numBytes,
+                                    &completionData.endOfFile));
         async.readCursor = async.offset + async.buffer.sizeInBytes();
         return Result(true);
     }
@@ -620,12 +621,58 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         // To write to the end of file, specify both the Offset and OffsetHigh members of the OVERLAPPED structure as
         // 0xFFFFFFFF. This is functionally equivalent to previously calling the CreateFile function to open hFile using
         // FILE_APPEND_DATA access.
-        return executeFileOperation(&::WriteFile, async, completionData, synchronous, nullptr);
+        if (async.singleBuffer)
+        {
+            return executeFileOperation(&::WriteFile, async, async.buffer, synchronous, completionData.numBytes,
+                                        nullptr);
+        }
+        else
+        {
+            size_t currentBufferIndex  = 0;
+            size_t partialBytesWritten = 0;
+
+            while (partialBytesWritten < async.totalBytesWritten)
+            {
+                partialBytesWritten += async.buffers[currentBufferIndex].sizeInBytes();
+                currentBufferIndex += 1;
+            }
+            SC_ASSERT_RELEASE(partialBytesWritten == async.totalBytesWritten); // Sanity check
+            while (currentBufferIndex < async.buffers.sizeInElements())
+            {
+                size_t writtenBytes;
+                auto   buffer = async.buffers[currentBufferIndex];
+                SC_TRY(executeFileOperation(&::WriteFile, async, buffer, synchronous, writtenBytes, nullptr));
+                currentBufferIndex += 1;
+                async.totalBytesWritten += buffer.sizeInBytes(); // writtenBytes could be == 0 in async case
+            }
+            completionData.numBytes = async.totalBytesWritten; // completeAsync will not be called in the sync case
+            return Result(true);
+        }
     }
 
     [[nodiscard]] static Result completeAsync(AsyncFileWrite::Result& result)
     {
-        return completeFileOperation(result, nullptr);
+        AsyncFileWrite& async = result.getAsync();
+        if (async.singleBuffer)
+        {
+            return completeFileOperation(result, nullptr);
+        }
+        else
+        {
+            if (async.totalBytesWritten == Internal::getSummedSizeOfBuffers(async))
+            {
+                SC_TRY(completeFileOperation(result, nullptr));
+                // Write correct numBytes, as completeFileOperation will consider only last write
+                result.completionData.numBytes = async.totalBytesWritten;
+            }
+            else
+            {
+                // Partial Write
+                result.shouldCallCallback = false;
+                result.reactivateRequest(true);
+            }
+            return Result(true);
+        }
     }
 
     //-------------------------------------------------------------------------------------------------------
