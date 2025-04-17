@@ -204,7 +204,8 @@ struct CustomFunctions
         if (download.isGitClone)
         {
             Process process[2];
-            SC_TRY(process[0].exec({"git", "clone", download.url.view(), package.packageLocalDirectory.view()}));
+            SC_TRY_MSG(process[0].exec({"git", "clone", download.url.view(), package.packageLocalDirectory.view()}),
+                       "git is missing");
             SC_TRY_MSG(process[0].getExitStatus() == 0, "git clone failed");
             SC_TRY(process[1].setWorkingDirectory(package.packageLocalDirectory.view()));
             SC_TRY(process[1].exec({"git", "checkout", download.packageVersion.view()}));
@@ -249,13 +250,14 @@ inline Result verifyGitCommitHash(const Download& download, const Package& packa
     String  result;
     Process process;
     SC_TRY(process.setWorkingDirectory(package.packageLocalDirectory.view()));
-    SC_TRY(process.exec(
-        {
-            "git",
-            "rev-parse",
-            "HEAD",
-        },
-        result));
+    SC_TRY_MSG(process.exec(
+                   {
+                       "git",
+                       "rev-parse",
+                       "HEAD",
+                   },
+                   result),
+               "git not installed on current system");
     return Result(result.view().startsWith(download.packageVersion.view()));
 }
 
