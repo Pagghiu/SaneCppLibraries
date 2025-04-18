@@ -225,10 +225,7 @@ SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop)
     }
     SC_TRY_MSG(handle != SocketDescriptor::Invalid, "AsyncSocketSend::start - Invalid file descriptor");
     SC_TRY(validateAsync());
-#if SC_PLATFORM_WINDOWS
-#else
-    totalBytesSent = 0;
-#endif
+    totalBytesWritten = 0;
     queueSubmission(loop);
     return SC::Result(true);
 }
@@ -1000,6 +997,13 @@ void SC::AsyncEventLoop::Internal::runStepExecuteCompletions(KernelEvents& kerne
         async.eventIndex = static_cast<int32_t>(idx);
         if (async.state == AsyncRequest::State::Active)
         {
+            const bool isManualCompletion = (async.flags & Internal::Flag_ManualCompletion) != 0;
+            if (isManualCompletion)
+            {
+                // Posix AsyncSocketSend sets Flag_ManualCompletion while also setting an active
+                // write watcher that must be removed to avoid executing completion two times.
+                manualCompletions.remove(async);
+            }
             if (not completeAndEventuallyReactivate(kernelEvents, async, move(result)))
             {
                 SC_LOG_MESSAGE("Error completing {}", async.debugName);
@@ -1055,11 +1059,12 @@ struct SC::AsyncEventLoop::Internal::ActivateAsyncPhase
             return asyncTask->threadPool->queueTask(asyncTask->task);
         }
 
+        SC_TRY(kernelEvents.activateAsync(async));
         if (async.flags & Internal::Flag_ManualCompletion)
         {
             async.eventLoop->internal.scheduleManualCompletion(async);
         }
-        return Result(kernelEvents.activateAsync(async));
+        return Result(true);
     }
 
     template <typename T>
@@ -1313,6 +1318,11 @@ SC::Result SC::AsyncEventLoop::Internal::stop(AsyncEventLoop& loop, AsyncRequest
     case AsyncRequest::State::Active: {
         removeActiveHandle(async);
         async.state = AsyncRequest::State::Cancelling;
+        if (async.flags & Internal::Flag_ManualCompletion)
+        {
+            manualCompletions.remove(async);
+            async.flags &= ~Internal::Flag_ManualCompletion;
+        }
         submissions.queueBack(async);
         numberOfSubmissions += 1;
         break;

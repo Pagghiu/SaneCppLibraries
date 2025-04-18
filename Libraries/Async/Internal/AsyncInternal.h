@@ -89,6 +89,7 @@ struct SC::AsyncEventLoop::Internal
     static constexpr int16_t Flag_ManualCompletion       = 1 << 0;
     static constexpr int16_t Flag_ExcludeFromActiveCount = 1 << 1;
     static constexpr int16_t Flag_Internal               = 1 << 2;
+    static constexpr int16_t Flag_WatcherSet             = 1 << 3;
 
     [[nodiscard]] Result close(AsyncEventLoop& loop);
 

@@ -620,10 +620,9 @@ struct AsyncSocketSend : public AsyncRequest
   private:
     friend struct AsyncEventLoop;
 
+    size_t totalBytesWritten = 0;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
-#else
-    size_t             totalBytesSent = 0;
 #endif
 };
 

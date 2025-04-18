@@ -260,9 +260,8 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
     }
 
 #endif
-
-    [[nodiscard]] static Result stopSingleWatcherImmediate(AsyncEventLoop& eventLoop, SocketDescriptor::Handle handle,
-                                                           int32_t filter)
+    template <int VALUE>
+    static Result setSingleWatcherImmediate(AsyncEventLoop& eventLoop, SocketDescriptor::Handle handle, int32_t filter)
     {
         FileDescriptor::Handle loopFd;
         SC_TRY(eventLoop.internal.kernelQueue.get().getPosix().loopFd.get(
@@ -271,17 +270,37 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
         struct epoll_event event;
         event.events   = filter;
         event.data.ptr = nullptr;
-        const int res  = ::epoll_ctl(loopFd, EPOLL_CTL_DEL, handle, &event);
+        const int res  = ::epoll_ctl(loopFd, VALUE, handle, &event);
 #else
         struct kevent kev;
-        EV_SET(&kev, handle, filter, EV_DELETE, 0, 0, nullptr);
-        const int res = ::kevent(loopFd, &kev, 1, 0, 0, nullptr);
+        EV_SET(&kev, handle, filter, VALUE, 0, 0, nullptr);
+        const int      res   = ::kevent(loopFd, &kev, 1, 0, 0, nullptr);
 #endif
         if (res == 0 or (errno == EBADF or errno == ENOENT))
         {
             return Result(true);
         }
         return Result::Error("stopSingleWatcherImmediate failed");
+    }
+
+    static Result stopSingleWatcherImmediate(AsyncEventLoop& loop, SocketDescriptor::Handle handle, int32_t filter)
+    {
+#if SC_ASYNC_USE_EPOLL
+        constexpr auto VALUE = EPOLL_CTL_DEL;
+#else
+        constexpr auto VALUE = EV_DELETE;
+#endif
+        return setSingleWatcherImmediate<VALUE>(loop, handle, filter);
+    }
+
+    static Result startSingleWatcherImmediate(AsyncEventLoop& loop, SocketDescriptor::Handle handle, int32_t filter)
+    {
+#if SC_ASYNC_USE_EPOLL
+        constexpr auto VALUE = EPOLL_CTL_ADD;
+#else
+        constexpr auto VALUE = EV_ADD | EV_ENABLE;
+#endif
+        return setSingleWatcherImmediate<VALUE>(loop, handle, filter);
     }
 
     [[nodiscard]] static Result associateExternallyCreatedTCPSocket(SocketDescriptor&) { return Result(true); }
@@ -600,31 +619,54 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     }
 
     //-------------------------------------------------------------------------------------------------------
-    // Socket SEND
+    // Posix Write (Shared between Socket Send and File Write)
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result setupAsync(AsyncSocketSend& async)
+
+    template <typename HandleType, typename T>
+    static Result posixWriteCancel(AsyncEventLoop& loop, HandleType handle, decltype(AsyncRequest::flags)& flags,
+                                   T* current)
     {
-        return Result(setEventWatcher(async, async.handle, OUTPUT_EVENTS_MASK));
+        if (flags & Internal::Flag_WatcherSet)
+        {
+            // Loop all socket send to find if one of them is monitoring watch events.
+            // If that's the case write event watcher must be updated to avoid kevent or epoll to report
+            // current async at a later time when it could have been deallocated.
+            // If no socket is monitoring this file descriptor then the watcher can be stopped entirely.
+            // TODO: This linear search is not great
+            while (current)
+            {
+                if (handle == current->handle and (current->flags & Internal::Flag_WatcherSet))
+                {
+                    current->flags |= Internal::Flag_WatcherSet;
+                    return Result(KernelQueuePosix::startSingleWatcherImmediate(*current->eventLoop, current->handle,
+                                                                                OUTPUT_EVENTS_MASK));
+                }
+                current = static_cast<T*>(current->next);
+            }
+            flags &= ~Internal::Flag_WatcherSet;
+            return KernelQueuePosix::stopSingleWatcherImmediate(loop, handle, OUTPUT_EVENTS_MASK);
+        }
+        return Result(true);
     }
 
-    [[nodiscard]] static Result teardownAsync(AsyncSocketSend*, AsyncTeardown& teardown)
+    template <typename T>
+    [[nodiscard]] static bool posixTryWrite(T& async, size_t totalBytesToSend, const off_t offset)
     {
-        return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.socketHandle,
-                                                            OUTPUT_EVENTS_MASK);
-    }
-
-    [[nodiscard]] static Result completeAsync(AsyncSocketSend::Result& result)
-    {
-        AsyncSocketSend& async = result.getAsync();
-
-        const size_t totalBytesToSend = Internal::getSummedSizeOfBuffers(async);
-        while (async.totalBytesSent < totalBytesToSend)
+        while (async.totalBytesWritten < totalBytesToSend)
         {
             ssize_t      numBytesSent   = 0;
-            const size_t remainingBytes = totalBytesToSend - async.totalBytesSent;
+            const size_t remainingBytes = totalBytesToSend - async.totalBytesWritten;
             if (async.singleBuffer)
             {
-                numBytesSent = ::write(async.handle, async.buffer.data() + async.totalBytesSent, remainingBytes);
+                if (offset == -1)
+                {
+                    numBytesSent = ::write(async.handle, async.buffer.data() + async.totalBytesWritten, remainingBytes);
+                }
+                else
+                {
+                    numBytesSent = ::pwrite(async.handle, async.buffer.data() + async.totalBytesWritten, remainingBytes,
+                                            offset + static_cast<off_t>(async.totalBytesWritten));
+                }
             }
             else
             {
@@ -636,20 +678,20 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                 // If coming from a previous partial write, find the iovec that was not fully written or
                 // just compute the index to first iovec that was not yet written at all.
                 // Modify such iovec to the not-written-yet slice of the original and proceed to write
-                // it together with all all iovecs that come after it. Restore the modified iovec (if any).
+                // it together with all all io vecs that come after it. Restore the modified iovec (if any).
                 size_t fullyWrittenBytes = 0; // Bytes of already fully written io vecs
                 size_t indexOfVecToWrite = 0; // Index of first iovec that has not yet been written
                 while (indexOfVecToWrite < async.buffers.sizeInElements())
                 {
                     const size_t ioVecSize = async.buffers[indexOfVecToWrite].sizeInBytes();
-                    if (fullyWrittenBytes + ioVecSize > async.totalBytesSent)
+                    if (fullyWrittenBytes + ioVecSize > async.totalBytesWritten)
                     {
                         break;
                     }
                     fullyWrittenBytes += ioVecSize;
                 }
                 // Number of writes already written of io vector at indexOfVecToWrite
-                const size_t partiallyWrittenBytes = async.totalBytesSent - fullyWrittenBytes;
+                const size_t partiallyWrittenBytes = async.totalBytesWritten - fullyWrittenBytes;
                 const iovec  backup                = ioVectors[indexOfVecToWrite];
                 if (partiallyWrittenBytes > 0)
                 {
@@ -658,8 +700,16 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                     ioVectors[indexOfVecToWrite].iov_len -= partiallyWrittenBytes;
                 }
                 // Write everything from indexOfVecToWrite going forward
-                numBytesSent = ::writev(async.handle, ioVectors + indexOfVecToWrite,
-                                        numIoVectors - static_cast<int>(indexOfVecToWrite));
+                const int remainingVectors = numIoVectors - static_cast<int>(indexOfVecToWrite);
+                if (offset == -1)
+                {
+                    numBytesSent = ::writev(async.handle, ioVectors + indexOfVecToWrite, remainingVectors);
+                }
+                else
+                {
+                    numBytesSent = ::pwritev(async.handle, ioVectors + indexOfVecToWrite, remainingVectors,
+                                             offset + static_cast<off_t>(async.totalBytesWritten));
+                }
                 if (partiallyWrittenBytes > 0)
                 {
                     ioVectors[indexOfVecToWrite] = backup;
@@ -668,32 +718,99 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
             if (numBytesSent < 0)
             {
-                const auto sendError = errno;
-                if (sendError == EWOULDBLOCK || sendError == EAGAIN)
-                {
-                    // Partial write case:
-                    // Socket is not writable right now, we should wait for it to be writable again, to finish
-                    // writing the remaining part of the data.
-                    // This would typically involve waiting for next EVFILT_WRITE or EPOLLOUT event again.
-                    // To achieve that let's skip user callback and manually re-activate this request.
-                    result.shouldCallCallback = false;
-                    result.reactivateRequest(true);
-                    return Result(true);
-                }
-                else
-                {
-                    break; // Error, cannot send all data
-                }
+                return false;
             }
             else
             {
-                async.totalBytesSent += static_cast<size_t>(numBytesSent);
+                async.totalBytesWritten += static_cast<size_t>(numBytesSent);
             }
         }
+        return true;
+    }
 
-        result.completionData.numBytes = async.totalBytesSent;
+    template <typename T>
+    Result posixWriteActivate(T& async, off_t offset, bool watchable)
+    {
+        const size_t totalBytesToSend = Internal::getSummedSizeOfBuffers(async);
+        SC_ASSERT_RELEASE((async.flags & Internal::Flag_ManualCompletion) == 0);
+        if (not posixTryWrite(async, totalBytesToSend, offset))
+        {
+            // Not all bytes have been written
+            if (watchable)
+            {
+                // setup a writable state watcher for this handle
+                async.flags |= Internal::Flag_WatcherSet;
+                return Result(setEventWatcher(async, async.handle, OUTPUT_EVENTS_MASK));
+            }
+            return Result::Error("Error in posixTryWrite");
+        }
+        async.flags |= Internal::Flag_ManualCompletion;
+        return Result(true);
+    }
+
+    template <typename T>
+    static Result posixWriteCompleteAsync(typename T::Result& result, off_t offset)
+    {
+        T& async = result.getAsync();
+        async.flags &= ~Internal::Flag_ManualCompletion;
+        const size_t totalBytesToSend = Internal::getSummedSizeOfBuffers(async);
+        if (not posixTryWrite(async, totalBytesToSend, offset))
+        {
+            const auto writeError = errno;
+            if (writeError == EWOULDBLOCK || writeError == EAGAIN)
+            {
+                // Partial write case:
+                // Not all bytes have been written, we need to skip user callback and reactivate this request
+                // so that setEventWatcher(OUTPUT_EVENTS_MASK) will be called again
+                result.shouldCallCallback = false;
+                result.reactivateRequest(true);
+                return Result(true);
+            }
+        }
+        result.completionData.numBytes = async.totalBytesWritten;
         SC_TRY_MSG(result.completionData.numBytes == totalBytesToSend, "send didn't send all data");
         return Result(true);
+    }
+
+    template <typename T>
+    static Result posixWriteManualActivateWithSameHandle(T& async, T* current)
+    {
+        // Activate all asyncs on the same socket descriptor too
+        while (current)
+        {
+            if (current->handle == async.handle)
+            {
+                SC_ASSERT_RELEASE(current != &async);
+                async.flags |= Internal::Flag_ManualCompletion;
+                async.eventLoop->internal.manualCompletions.queueBack(*current);
+            }
+        }
+        return Result(true);
+    }
+
+    //-------------------------------------------------------------------------------------------------------
+    // Socket SEND
+    //-------------------------------------------------------------------------------------------------------
+
+    static Result teardownAsync(AsyncSocketSend*, AsyncTeardown& teardown)
+    {
+        return posixWriteCancel(*teardown.eventLoop, teardown.socketHandle, teardown.flags,
+                                teardown.eventLoop->internal.activeSocketSends.front);
+    }
+
+    [[nodiscard]] Result activateAsync(AsyncSocketSend& async) { return posixWriteActivate(async, -1, true); }
+
+    [[nodiscard]] Result cancelAsync(AsyncSocketSend& async)
+    {
+        return posixWriteCancel(*async.eventLoop, async.handle, async.flags,
+                                async.eventLoop->internal.activeSocketSends.front);
+    }
+
+    static Result completeAsync(AsyncSocketSend::Result& result)
+    {
+        SC_TRY(posixWriteCompleteAsync<AsyncSocketSend>(result, -1));
+        return posixWriteManualActivateWithSameHandle(result.getAsync(),
+                                                      result.getAsync().eventLoop->internal.activeSocketSends.front);
     }
 
     //-------------------------------------------------------------------------------------------------------
